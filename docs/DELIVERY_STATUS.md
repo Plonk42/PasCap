@@ -495,6 +495,16 @@ are read-only, and failure diagnostics have bounded retention. Actionlint and sh
 syntax validation pass; the first actual remote CI result remains separate from
 the already recorded local correctness runs.
 
+The initial [CI run](https://github.com/Plonk42/PasCap/actions/runs/37162081461)
+passed both Node 22/24 checks and all 50 native tests on the source-built FFmpeg
+toolchain. Browser results were 150/151: the three-recording playback completion
+check reached frame 92 of 144 before its 15-second deadline. Trace screenshots show
+continued progress (20 → 37 → 81), not evidence of a frozen third decoder. The
+correctness check now allows a bounded 45-second completion wait within 60 seconds
+and records renderer/decoder diagnostics; exact end frame, failure and two-element
+ownership assertions remain unchanged. No test retry or GPU-performance claim was
+added. The follow-up CI result must be verified separately.
+
 Eleven scoped [GitHub issues](https://github.com/Plonk42/PasCap/issues) are assigned
 to three milestones: local editor hardening, real-workload qualification and
 Docker/Podman delivery. [ROADMAP.md](ROADMAP.md) links every issue, its scope and
