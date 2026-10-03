@@ -1,0 +1,14 @@
+node_modules/
+dist/
+.pascap/
+coverage/
+test-results/
+playwright-report/
+*.tsbuildinfo
+.env
+.env.*
+!.env.example
+.ci/
+*.log
+*.pem
+*.key

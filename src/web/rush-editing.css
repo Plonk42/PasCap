@@ -1,0 +1,81 @@
+.rush-edit-bar {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px 12px;
+    padding: 0;
+    flex-shrink: 0;
+}
+
+.product-workspace .timeline-toolbar {
+    flex-wrap: wrap;
+}
+
+.rush-quick-actions,
+.rush-cut-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.rush-edit-mode {
+    font-size: 11px;
+    color: var(--muted);
+}
+
+.rush-edit-mode.ripple {
+    color: #c8e5c3;
+}
+
+.rush-cut-button:not(:disabled) {
+    color: #f1c2ad;
+    border-color: #876652;
+}
+
+.rush-cut-readout {
+    color: #e6bfae;
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+}
+
+.timeline-cut-selection {
+    position: absolute;
+    height: 66px;
+    pointer-events: none;
+    border: 1px solid #eaac92;
+    background: repeating-linear-gradient(135deg, #d89b7440, #d89b7440 5px, #6d362540 5px, #6d362540 10px);
+    z-index: 7;
+}
+
+.timeline-cut-mark {
+    position: absolute;
+    width: 1px;
+    height: 72px;
+    background: #efb497;
+    pointer-events: none;
+    z-index: 7;
+}
+
+.timeline-cut-mark>span {
+    position: absolute;
+    top: -15px;
+    padding: 1px 4px;
+    border-radius: 3px;
+    background: #e9bea5;
+    color: #2c2019;
+    font-size: 10px;
+}
+
+.timeline-clip .clip-excerpt-badge {
+    font-size: 10px;
+    color: #f0e1c7;
+    font-variant-numeric: tabular-nums;
+}
+
+.timeline-panel .trim-handle {
+    min-width: 11px;
+}
+
+.timeline-clip:is(:hover, :focus-within, .selected) .trim-handle {
+    background: #759a6c55;
+}

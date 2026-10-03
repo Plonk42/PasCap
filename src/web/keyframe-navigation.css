@@ -1,0 +1,56 @@
+.keyframe-setting-navigation {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 2px;
+    vertical-align: middle;
+}
+
+.keyframe-setting-navigation>.keyframe-toggle,
+.keyframe-setting-navigation>button.keyframe-setting-step {
+    flex: 0 0 24px;
+    width: 24px;
+    height: 28px;
+    padding: 0;
+}
+
+.keyframe-setting-navigation>button.keyframe-setting-step {
+    border: 1px solid var(--line);
+    border-radius: 4px;
+}
+
+/* Unlike optional reset actions, navigation stays visible without hover. */
+.declutter-inspector .colour-control-actions .keyframe-setting-navigation>.keyframe-setting-step {
+    opacity: 1;
+}
+
+.keyframe-setting-navigation>button.keyframe-setting-step:disabled,
+.declutter-inspector .colour-control-actions .keyframe-setting-navigation>.keyframe-setting-step:disabled {
+    opacity: .4;
+}
+
+.layer-keyed-control>span:first-child,
+.layer-setting-heading,
+.layer-options .layer-opacity-heading {
+    flex-wrap: wrap;
+    gap: 4px 6px;
+}
+
+.layer-keyed-control>span:first-child>label,
+.layer-setting-heading>span:first-child,
+.layer-options .layer-opacity-heading>label {
+    min-width: 0;
+}
+
+.layer-keyed-control .colour-control-actions,
+.layer-setting-heading .layer-setting-actions,
+.layer-options .layer-opacity-heading .layer-setting-actions {
+    flex: 0 0 auto;
+    gap: 4px;
+    margin-inline-start: auto;
+}
+
+.declutter-inspector .colour-control-actions>.icon-button {
+    width: 28px;
+    height: 28px;
+}
