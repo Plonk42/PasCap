@@ -116,6 +116,12 @@ a container image. Use [the roadmap](ROADMAP.md) for remaining qualification wor
 The observed intermittent raw-reader EOF is tracked as
 [#1](https://github.com/Plonk42/PasCap/issues/1). CI does not retry tests to hide it.
 
+The three-recording playback completion check has a bounded 45-second wait inside
+a 60-second test, with renderer/decoder diagnostics. The first runner trace showed
+steady progress but did not complete 144 frames inside its original 15-second
+deadline. End-frame/error/two-decoder assertions are unchanged: this is correctness
+on software rendering, not the intended-GPU throughput gate.
+
 ## Optional real-media tools
 
 **Do not run these in CI or without the owner's explicit approval for real jobs.**

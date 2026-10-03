@@ -511,6 +511,9 @@ test('changing a later boundary and grading one duplicate leaves other excerpts 
 });
 
 test('playback crosses different recordings and dissolves with only two decoder elements', async ({ page }) => {
+  // This is an end-frame/decoder-ownership check, not target-GPU throughput.
+  // A CPU-rendered runner can advance correctly while repeatedly reanchoring.
+  test.setTimeout(60_000);
   await page.getByRole('button', { name: 'Add recording-03.mp4 to timeline', exact: true }).click();
   const base = projectSchema.parse(await page.evaluate(() => window.pascapLab!.project()));
   let project = base;
@@ -519,10 +522,25 @@ test('playback crosses different recordings and dissolves with only two decoder 
   await page.evaluate((document) => window.pascapLab!.setDocument(document), project);
   await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
   await page.evaluate(async () => { await window.pascapLab!.engine.seek(0); await window.pascapLab!.engine.play(); });
-  await page.waitForFunction(() => {
-    const state = window.pascapLab!.engine.diagnostics();
-    return state.status === 'error' || (!state.playing && state.frame === state.duration - 1);
-  }, undefined, { timeout: 15_000 });
+  try {
+    await page.waitForFunction(() => {
+      const state = window.pascapLab!.engine.diagnostics();
+      return state.status === 'error' || (!state.playing && state.frame === state.duration - 1);
+    }, undefined, { timeout: 45_000 });
+  } finally {
+    // Synthetic diagnostics only: renderer, frame progress and element state.
+    // Preserve useful evidence even when the bounded completion check fails.
+    const diagnostics = await page.evaluate(() => ({
+      preview: window.pascapLab!.engine.diagnostics(),
+      decoders: Array.from(document.querySelectorAll<HTMLVideoElement>('video[data-pascap-decoder]'), (video) => ({
+        index: video.dataset['pascapDecoder'], currentTime: video.currentTime,
+        paused: video.paused, ended: video.ended, seeking: video.seeking,
+        readyState: video.readyState, error: video.error?.message ?? null,
+      })),
+    }));
+    console.log('Synthetic bounded playback diagnostics:', JSON.stringify(diagnostics));
+    await test.info().attach('bounded-playback-diagnostics', { body: JSON.stringify(diagnostics, null, 2), contentType: 'application/json' });
+  }
   const state = await page.evaluate(() => window.pascapLab!.engine.diagnostics());
   expect(state.status, state.message).not.toBe('error'); expect(state.frame).toBe(143);
   expect(state.decoderCount).toBe(2);
