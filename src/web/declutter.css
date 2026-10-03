@@ -1,0 +1,500 @@
+/* Scoped disclosures and editor controls; no workspace or timeline geometry changes. */
+.declutter-sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    border: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+
+.editor-popover {
+    position: relative;
+    flex-shrink: 0;
+}
+
+.editor-popover>summary.editor-popover-trigger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: 5px;
+    list-style: none;
+    cursor: pointer;
+    color: var(--muted);
+}
+
+.editor-popover>summary::-webkit-details-marker {
+    display: none;
+}
+
+.editor-popover[open]>summary,
+.editor-popover>summary:hover {
+    background: #2c3b30;
+    color: var(--accent);
+    border-color: #48604e;
+}
+
+.editor-popover>summary:focus-visible,
+.control-help>summary:focus-visible,
+.declutter-music .music-timing>summary:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+.editor-popover>.editor-popover-content {
+    position: fixed;
+    inset: auto;
+    z-index: 60;
+    display: grid;
+    gap: 10px;
+    min-width: 0;
+    width: 248px;
+    max-width: calc(100vw - 16px);
+    max-height: calc(100dvh - 16px);
+    overflow: auto;
+    margin: 0;
+    padding: 12px;
+    border: 1px solid #58725f;
+    border-radius: 7px;
+    background: #1c2820;
+    box-shadow: 0 8px 24px #0008;
+    scrollbar-width: thin;
+}
+
+.editor-popover>.editor-popover-content::backdrop {
+    background: transparent;
+    pointer-events: none;
+}
+
+.editor-popover:not([open])>.editor-popover-content {
+    display: none;
+}
+
+.editor-popover-content label {
+    display: grid;
+    gap: 5px;
+    min-width: 0;
+    color: var(--muted);
+    font-size: 12px;
+}
+
+.editor-popover-content select,
+.editor-popover-content input:not([type="range"]):not([type="checkbox"]) {
+    width: 100%;
+    min-width: 0;
+    font-size: 13px;
+}
+
+.inspector-panel.declutter-inspector>.inspector-tabs.panel-heading {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 4px;
+    min-height: 44px;
+    padding: 6px;
+}
+
+.declutter-inspector .inspector-tabs>button {
+    min-height: 32px;
+    padding: 5px 4px;
+    border: 1px solid transparent;
+    border-radius: 5px;
+    color: var(--muted);
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+.declutter-inspector .inspector-tabs>button[aria-selected="true"] {
+    color: #e5f1e3;
+    background: #304235;
+    border-color: #4f6855;
+}
+
+.declutter-inspector>[hidden] {
+    display: none;
+}
+
+.inspector-panel.declutter-inspector .inspector-section>summary {
+    padding: 8px 14px;
+    background: #1f2a23;
+}
+
+.declutter-inspector .selected-clip-name {
+    padding: 12px 14px;
+    border-bottom: 0;
+}
+
+.declutter-inspector .grade-heading {
+    padding-top: 10px;
+    padding-bottom: 4px;
+}
+
+.declutter-inspector .grade-context {
+    margin: 0;
+    color: var(--muted);
+    font-size: 12px;
+}
+
+.declutter-inspector .colour-controls {
+    gap: 9px;
+}
+
+.declutter-inspector .colour-control-actions .icon-button {
+    opacity: 0;
+}
+
+.declutter-inspector .colour-control:is(:hover, :focus-within) .colour-control-actions .icon-button {
+    opacity: 1;
+}
+
+.control-help {
+    margin-top: 8px;
+    color: var(--muted);
+    font-size: 12px;
+}
+
+.control-help>summary {
+    width: fit-content;
+    padding: 3px 0;
+    cursor: pointer;
+    color: #a7b8ac;
+    font-size: 11px;
+}
+
+.control-help p {
+    margin-top: 6px;
+    line-height: 1.5;
+}
+
+.declutter-inspector .colour-help {
+    margin: 0;
+    padding: 0 14px 10px;
+}
+
+.declutter-keyframes.keyframe-controls {
+    padding-top: 4px;
+}
+
+.declutter-keyframes .keyframe-toolbar {
+    gap: 6px;
+}
+
+.declutter-keyframes .keyframe-diamond {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    width: auto;
+    height: auto;
+    min-height: 28px;
+    padding: 3px 8px;
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+.declutter-keyframes .keyframe-count {
+    color: var(--muted);
+    font-size: 12px;
+}
+
+.declutter-keyframes .keyframe-navigation {
+    gap: 2px;
+    margin: 0;
+}
+
+.declutter-keyframes .keyframe-navigation .icon-button,
+.declutter-keyframes .keyframe-toolbar>.icon-button {
+    width: 28px;
+    height: 28px;
+}
+
+.declutter-keyframes .keyframe-row-skipped {
+    color: var(--muted);
+    font-size: 11px;
+}
+
+.declutter-keyframes .keyframe-row-header>.text-button {
+    margin-right: auto;
+}
+
+.declutter-speed .speed-overview,
+.declutter-music .music-track-overview {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 8px;
+    color: var(--muted);
+    font-size: 12px;
+}
+
+.declutter-speed .speed-presets {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    gap: 5px;
+}
+
+.declutter-speed .speed-presets>.text-button {
+    justify-content: center;
+    min-width: 35px;
+    padding: 3px 6px;
+    border-radius: 4px;
+    background: #25342a;
+}
+
+.declutter-music .music-timing {
+    margin-top: 12px;
+    padding-top: 5px;
+    border-top: 1px solid var(--line);
+}
+
+.declutter-music .music-timing>summary {
+    padding: 5px 0;
+    cursor: pointer;
+    color: #bed1c2;
+    font-size: 12px;
+}
+
+.declutter-media .library-heading-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.declutter-media .media-options .library-tools {
+    display: grid;
+    gap: 10px;
+    padding: 0;
+}
+
+.declutter-media .media-options .library-tools select {
+    width: 100%;
+    max-width: none;
+    padding: 6px 8px;
+}
+
+.declutter-media .library-view-controls {
+    display: flex;
+    gap: 6px;
+}
+
+.declutter-media .library-view-field {
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+}
+
+.declutter-media .library-view-field>legend {
+    margin-bottom: 5px;
+    color: var(--muted);
+    font-size: 12px;
+}
+
+.declutter-media .library-view-controls>button {
+    flex: 1;
+}
+
+.declutter-media .library-filter-status {
+    color: #b8cbbb;
+    font-size: 11px;
+}
+
+.declutter-media .list .media-item {
+    display: grid;
+    grid-template-columns: 14px minmax(0, 1fr) auto 28px;
+    align-items: center;
+    gap: 5px;
+}
+
+.declutter-media .grid .media-item {
+    grid-template-columns: 16px minmax(0, 1fr) 28px;
+}
+
+.declutter-media .grid .media-state {
+    min-width: 0;
+    max-width: 100%;
+}
+
+.declutter-media .grid .media-state small {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.declutter-media .media-item .icon-button {
+    width: 28px;
+    height: 28px;
+}
+
+.declutter-media .media-item .media-checkbox,
+.declutter-media .media-item .add-media {
+    opacity: 0;
+}
+
+.declutter-media .media-item:is(:hover, :focus-within, .selected) .media-checkbox,
+.declutter-media .media-item:is(:hover, :focus-within, .selected) .add-media {
+    opacity: 1;
+}
+
+.declutter-media .media-state:is(.ready, .error) {
+    width: 8px;
+}
+
+.declutter-media .media-state:is(.ready, .error) small {
+    display: none;
+}
+
+.declutter-media .media-state:is(.queued, .preparing, .registered) small {
+    display: inline;
+}
+
+.declutter-media .media-state.ready[data-used="true"] {
+    width: auto;
+}
+
+.declutter-media .media-state.ready[data-used="true"] small {
+    display: inline;
+}
+
+.declutter-media .media-action-space {
+    display: block;
+    width: 28px;
+    height: 28px;
+}
+
+.declutter-media .grid .media-action-space {
+    grid-column: 3;
+    grid-row: 2;
+}
+
+.declutter-media .library-bulk {
+    display: grid;
+    gap: 8px;
+}
+
+.declutter-media .library-bulk-header,
+.declutter-media .library-bulk-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    font-size: 12px;
+}
+
+.declutter-media .library-bulk-actions {
+    flex-wrap: wrap;
+}
+
+.declutter-media .library-bulk-actions>button {
+    flex: 1;
+}
+
+.declutter-media .library-bulk .library-target {
+    padding: 0;
+    border: 0;
+}
+
+.declutter-import-copy,
+.declutter-import-report .control-hint {
+    font-size: 12px;
+}
+
+.declutter-import-report .import-queue-warning {
+    color: #eed09a;
+}
+
+.declutter-layers .layer-control {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 4px;
+}
+
+.declutter-layers .layer-control-main {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    min-width: 0;
+}
+
+.declutter-layers .layer-select {
+    display: block;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: left;
+}
+
+.declutter-layers .layer-control-main>.icon-button,
+.declutter-layers .layer-options>.editor-popover-trigger {
+    width: 28px;
+    height: 28px;
+}
+
+.declutter-layers .layer-kind {
+    padding-left: 31px;
+    color: var(--muted);
+    font-size: 10px;
+}
+
+.layer-options .layer-options-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+}
+
+.layer-options .layer-delete {
+    grid-column: 1 / -1;
+}
+
+.layer-options .layer-opacity-label {
+    display: grid;
+    gap: 6px;
+    font-size: 12px;
+}
+
+.layer-options .layer-opacity-label>span {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.layer-options .layer-opacity-label input {
+    width: 100%;
+    height: 20px;
+}
+
+.layer-options .layer-name-field[data-dirty="true"] input:not([aria-invalid="true"]) {
+    border-color: #a99359;
+}
+
+.layer-options .layer-name-error {
+    color: var(--error);
+    font-size: 12px;
+    overflow-wrap: anywhere;
+}
+
+.layer-options .layer-name-pending {
+    color: var(--muted);
+    font-size: 12px;
+}
+
+@media (hover: none) {
+
+    .declutter-media .media-item .media-checkbox,
+    .declutter-media .media-item .add-media,
+    .declutter-inspector .colour-control-actions .icon-button {
+        opacity: 1;
+    }
+}

@@ -1,0 +1,548 @@
+import { randomUUID } from 'node:crypto';
+import { readdirSync } from 'node:fs';
+import { mkdir, mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { createConfig, type ServiceConfig } from '../../src/server/config.js';
+import { renderExport, startExport, type ExportReceipt } from '../../src/server/export.js';
+import { fingerprintFile } from '../../src/server/files.js';
+import { JobQueue } from '../../src/server/jobs.js';
+import { renderLayeredExport } from '../../src/server/layered-export.js';
+import { MediaLibrary } from '../../src/server/library.js';
+import { runProcess } from '../../src/server/process.js';
+import { renderReference, validateReference } from '../../src/server/reference.js';
+import { ProjectStore } from '../../src/server/storage.js';
+import { audioAssetSchema, type AudioAsset } from '../../src/shared/audio.js';
+import { COLOUR_CONTROLS, NEUTRAL_COLOUR } from '../../src/shared/colour.js';
+import { compositePixel } from '../../src/shared/composition.js';
+import { EXPORT_PROFILES, LAYERED_EXPORT_RESOURCES, needsLayeredExport, planExport, planLayeredExport } from '../../src/shared/export.js';
+import { EMPTY_KEY_VALUES, KEYFRAME_SETTINGS, evaluateLayerSetting, hasLayerKeys, type Interpolation, type LayerKeyframe, type LayerKeyValues } from '../../src/shared/keyframes.js';
+import type { MediaAsset } from '../../src/shared/media.js';
+import { createClip, createProject, projectSchema, type ProjectDocument, type VideoLayer } from '../../src/shared/model.js';
+import { compileRetiming } from '../../src/shared/speed.js';
+import { calculateLayout, sampleTimeline, type PreviewLayer, type TimelineLayout } from '../../src/shared/timeline.js';
+import { framesToSeconds } from '../../src/shared/timing.js';
+
+const enabled = process.env['PASCAP_MEDIA_TESTS'] === '1';
+const WIDTH = 160; const HEIGHT = 90; const PIXELS = WIDTH * HEIGHT; const FRAME_BYTES = PIXELS * 3;
+function layer(id: string, opacity = 1): VideoLayer { return { id, name: id, enabled: true, opacity, keyframes: [] }; }
+function point(frame: number, values: Partial<LayerKeyValues>, interpolation: Interpolation = 'linear'): LayerKeyframe {
+  return { frame, interpolation, values: { ...EMPTY_KEY_VALUES, ...values } };
+}
+
+async function rawRgb(config: ServiceConfig, filename: string, range = 'tv'): Promise<Buffer> {
+  return runProcess(config.ffmpeg, ['-hide_banner', '-loglevel', 'error', '-nostdin', '-threads', '2', '-i', filename,
+    '-map', '0:v:0', '-an', '-sn', '-dn', '-filter_threads', '2', '-vf',
+    `scale=${WIDTH}:${HEIGHT}:flags=area:in_color_matrix=bt709:out_color_matrix=bt709:in_range=${range}:out_range=pc,format=rgb24`,
+    '-threads', '2', '-fps_mode', 'passthrough', '-f', 'rawvideo', 'pipe:1']);
+}
+
+function pixelError(project: ProjectDocument, frame: number, actual: Uint8Array, originals: Map<string, Buffer>, layout: TimelineLayout): number {
+  const samples = sampleTimeline(project, frame, layout);
+  let error = 0;
+  for (let pixel = 0; pixel < PIXELS; pixel++) {
+    const expected = compositePixel(samples, (sample) => {
+      const bytes = originals.get(sample.mediaId)!;
+      const offset = sample.sourceFrame * FRAME_BYTES + pixel * 3;
+      return [bytes[offset]! / 255, bytes[offset + 1]! / 255, bytes[offset + 2]! / 255];
+    });
+    for (let channel = 0; channel < 3; channel++) error += Math.abs(actual[pixel * 3 + channel]! - expected[channel]! * 255);
+  }
+  return error / FRAME_BYTES;
+}
+
+function coverage(samples: PreviewLayer[]): number {
+  let result = 0;
+  for (const id of new Set(samples.map((sample) => sample.layerId))) {
+    const group = samples.filter((sample) => sample.layerId === id);
+    const alpha = group.reduce((sum, sample) => sum + sample.opacity * sample.blendWeight, 0) * group[0]!.layerOpacity;
+    result = alpha + result * (1 - alpha);
+  }
+  return result;
+}
+
+describe.skipIf(!enabled)('schema-4 layered native export · disposable synthetic sources only', () => {
+  let root: string;
+  let config: ServiceConfig;
+  let jobs: JobQueue;
+  let library: MediaLibrary;
+  let assets: MediaAsset[];
+  let originals: Map<string, Buffer>;
+  let originalBytes: Buffer[];
+  let music: AudioAsset;
+  let savedPath: string;
+  let savedBytes: Buffer;
+  let successfulDirectory = '';
+  beforeAll(async () => {
+    root = await mkdtemp(path.join(os.tmpdir(), 'pascap-layered-media-'));
+    const sources = path.join(root, 'sources'); await mkdir(sources);
+    config = createConfig({ dataDir: path.join(root, 'cache') });
+    jobs = new JobQueue(); library = new MediaLibrary(config, jobs); await library.initialise();
+    assets = [];
+    for (let index = 0; index < 3; index++) {
+      const filename = path.join(sources, `pattern-${index}.mp4`);
+      // Four broad patches and large per-frame steps reveal wrong source sampling.
+      // Native tags are attached to lavfi frames as well as to the encoder.
+      await runProcess(config.ffmpeg, ['-hide_banner', '-loglevel', 'error', '-nostdin', '-n', '-f', 'lavfi', '-i',
+        `nullsrc=size=${WIDTH}x${HEIGHT}:rate=30000/1001,geq=lum='45+7*N+12*gte(X,80)+7*gte(Y,45)':cb='${100 + index * 12}+N+8*lt(X,80)':cr='${165 - index * 12}-2*N-7*gte(Y,45)',setparams=range=limited:color_primaries=bt709:color_trc=bt709:colorspace=bt709`,
+        '-frames:v', '20', '-an', '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '8', '-pix_fmt', 'yuv420p', '-threads', '2',
+        '-filter_threads', '2', '-bf', '0', '-color_primaries', 'bt709', '-color_trc', 'bt709', '-colorspace', 'bt709', '-color_range', 'tv',
+        '-video_track_timescale', '30000', filename]);
+      assets.push(await library.register(filename));
+    }
+    originals = new Map(await Promise.all(assets.map(async (asset) => [asset.id, await rawRgb(config, asset.sourcePath)] as const)));
+    originalBytes = await Promise.all(assets.map((asset) => readFile(asset.sourcePath)));
+    const store = new ProjectStore(config.dataDir);
+    const saved = createProject('saved-edits', 'User edits remain read-only');
+    saved.clips = [createClip('saved-instance', assets[0]!.id, 2, 8)];
+    const persisted = await store.save(saved, 0);
+    savedPath = path.join(config.dataDir, 'projects', `${persisted.id}.json`); savedBytes = await readFile(savedPath);
+    const musicPath = path.join(sources, 'short-selected-music.wav');
+    await runProcess(config.ffmpeg, ['-hide_banner', '-loglevel', 'error', '-nostdin', '-n', '-f', 'lavfi', '-i',
+      `sine=frequency=880:sample_rate=48000:duration=${framesToSeconds(20)}`, '-threads', '2', '-c:a', 'pcm_s16le', musicPath]);
+    music = audioAssetSchema.parse({
+      id: 'layered-music', name: 'short-selected-music.wav', sourcePath: musicPath,
+      fingerprint: await fingerprintFile(musicPath), metadata: {
+        codec: 'pcm_s16le', sampleRate: 48000, channels: 1,
+        durationSeconds: framesToSeconds(20), frameCount: 20
+      }, status: 'registered', error: null, waveform: []
+    });
+  });
+  afterAll(async () => { vi.restoreAllMocks(); await jobs?.close(); if (root) await rm(root, { recursive: true, force: true }); });
+
+  function simple(frames = 4): ProjectDocument {
+    const project = createProject('native-layered', 'Disposable layered export');
+    project.layers.push(layer('video-2', 0.6));
+    project.clips = [createClip('base', assets[0]!.id, 0, frames),
+    { ...createClip('overlay', assets[1]!.id, 8, 10), layerId: 'video-2', start: 1, opacity: 0.5 }];
+    return projectSchema.parse(project);
+  }
+  async function complete(project: ProjectDocument, profile: 'draft720' | 'final4k' = 'draft720') {
+    const job = startExport(project, profile, library, (id) => { expect(id).toBe(music.id); return music; });
+    const result = await jobs.wait(job.id);
+    expect(result.state, result.message).toBe('completed');
+    const directory = path.join(config.dataDir, 'renders', job.id);
+    expect((await readdir(directory)).sort()).toEqual(['export.mp4', 'receipt.json']);
+    const receipt = JSON.parse(await readFile(path.join(directory, 'receipt.json'), 'utf8')) as ExportReceipt;
+    expect(receipt.snapshot).toEqual(project); expect(receipt.verification.frameCount).toBe(calculateLayout(project).duration);
+    expect(receipt.verification).toMatchObject({
+      width: EXPORT_PROFILES[profile].width, height: EXPORT_PROFILES[profile].height,
+      codec: 'h264', pixelFormat: 'yuv420p', colourRange: 'tv', fullDecode: true, faststart: true
+    });
+    return { directory, filename: path.join(directory, 'export.mp4'), receipt };
+  }
+  async function parity(project: ProjectDocument, filename: string): Promise<number> {
+    const actual = await rawRgb(config, filename); const layout = calculateLayout(project); const duration = layout.duration;
+    expect(actual).toHaveLength(duration * FRAME_BYTES);
+    let maximum = 0;
+    for (let frame = 0; frame < duration; frame++) {
+      const mae = pixelError(project, frame, actual.subarray(frame * FRAME_BYTES, (frame + 1) * FRAME_BYTES), originals, layout);
+      expect(mae, `frame ${frame}: shared compositePixel RGB MAE ${mae} / 255`).toBeLessThan(4);
+      maximum = Math.max(maximum, mae);
+    }
+    return maximum;
+  }
+  function bounds(receipt: ExportReceipt): void {
+    expect(receipt.settings.pipeline).toBe('sequential-layered');
+    expect(receipt.settings.resources).toEqual(LAYERED_EXPORT_RESOURCES);
+    const report = receipt.settings.layered!;
+    expect(report.peakOriginalVideoDecoders).toBeLessThanOrEqual(1);
+    expect(report.peakIntermediateVideoDecoders).toBeLessThanOrEqual(2);
+    expect(report.peakVideoEncoders).toBe(1);
+    expect(report.peakNativeVideoChildren).toBeLessThanOrEqual(3);
+    expect(report.peakLosslessClipFiles).toBeLessThanOrEqual(2);
+    expect(report.peakLosslessTimelineRepresentations).toBeLessThanOrEqual(2);
+    expect(report.rawFrameBuffers).toBe(3);
+    expect(report.rawBufferBytes).toBe(receipt.verification.width * receipt.verification.height * 14);
+    expect(report.peakLutEntries).toBeLessThanOrEqual(2);
+    expect(report.lutBytes).toBeLessThanOrEqual(LAYERED_EXPORT_RESOURCES.lutBytes * 2);
+    expect(report.largestReadChunkBytes).toBeLessThanOrEqual(256 * 1024);
+    const layout = calculateLayout(receipt.snapshot);
+    for (const [index, report] of receipt.retiming.entries()) {
+      const placed = layout.clips.find((item) => item.clip.id === receipt.settings.layered!.renderedClipIds[index])!;
+      const clip = placed.clip;
+      expect(report.decodedFrames).toBe(clip.sourceOut - clip.sourceIn);
+      expect(report.outputFrames).toBe(placed.retiming.duration);
+      expect(report.rawFrameBuffers).toBe(1);
+    }
+  }
+  async function unchanged(): Promise<void> {
+    expect(await readFile(savedPath)).toEqual(savedBytes);
+    for (const [index, asset] of assets.entries()) {
+      expect(await fingerprintFile(asset.sourcePath)).toEqual(asset.fingerprint);
+      expect(await readFile(asset.sourcePath)).toEqual(originalBytes[index]);
+    }
+  }
+
+  it('exports shared row speed/opacity and seven independently participating colour channels across dissolves, gaps and hidden black holds', async () => {
+    const project = createProject('native-compound', 'Compound keyed layers');
+    project.layers.push(layer('video-2', 0.85), layer('video-3', 0.55), { ...layer('video-4'), enabled: false });
+    project.layers[0]!.keyframes = [
+      point(0, { layerOpacity: 0.8, clipOpacity: 0.3, speed: 0.75, exposure: -0.5, hue: -25, saturation: 0.7, highlights: 0.1, shadows: 0.2 }, 'smooth'),
+      point(4, { brightness: 0.02, contrast: 1.1 }, 'ease-in'),
+      point(8, { layerOpacity: 0.45, clipOpacity: 0.8, speed: 1.5, exposure: 0.4, hue: 30, saturation: 1.2, highlights: -0.35 }, 'ease-out'),
+      point(12, { clipOpacity: 0.4, brightness: 0.06, contrast: 1.25, shadows: -0.1 }),
+      point(18, { layerOpacity: 0.9, speed: 0.6, shadows: 0.15, highlights: 0.2 }, 'hold'),
+    ];
+    project.layers[1]!.keyframes = [
+      point(0, { layerOpacity: 0.25, clipOpacity: 0.2, speed: 0.7, hue: 40, highlights: -0.3 }, 'ease-in'),
+      point(6, { clipOpacity: 0.85, exposure: 0.2, shadows: 0.15 }, 'smooth'),
+      point(10, { layerOpacity: 0.8, speed: 2, hue: -35, exposure: 0.4, highlights: -0.1 }, 'smooth'),
+      point(24, { layerOpacity: 0.45, speed: 0.8, clipOpacity: 0.45, hue: 15, shadows: -0.2 }, 'hold'),
+    ];
+    project.layers[2]!.keyframes = [
+      point(0, { brightness: 0.08, hue: -15 }, 'ease-out'),
+      point(12, { exposure: -0.2, shadows: 0.4, saturation: 1.3, brightness: -0.02, hue: 40 }, 'hold'),
+    ];
+    for (const { key } of COLOUR_CONTROLS) {
+      expect(hasLayerKeys(project.layers[0]!, key)).toBe(true);
+      expect(project.layers[0]!.keyframes.filter((keyframe) => keyframe.values[key] !== null).length).toBeGreaterThanOrEqual(2);
+    }
+    const left = createClip('left', assets[0]!.id, 2, 10);
+    const right = createClip('right', assets[1]!.id, 3, 11);
+    left.speed = { mode: 'constant', rate: 0.5 }; right.speed = { mode: 'constant', rate: 2 };
+    for (const [index, clip] of [left, right].entries()) {
+      clip.opacity = 0.7;
+      clip.colour = { ...NEUTRAL_COLOUR, exposure: index * 0.2, brightness: index * 0.015, shadows: 0.05 };
+    }
+    project.clips = [left, right]; project.transitions = [{ leftId: left.id, rightId: right.id, type: 'cross-dissolve', duration: 2 }];
+    project.openingFade = 1; project.closingFade = 1;
+    const baseEnd = calculateLayout(project).baseDuration;
+    const early = { ...createClip('early-overlay', assets[0]!.id, 1, 6), layerId: 'video-2', start: 2, opacity: 0.6 };
+    const late = { ...createClip('late-overlay', assets[1]!.id, 9, 13), layerId: 'video-2', start: baseEnd + 2, opacity: 0.7 };
+    late.speed = { mode: 'constant', rate: 1.25 }; late.colour = { ...NEUTRAL_COLOUR, exposure: 0.25, saturation: 0.6 };
+    const top = { ...createClip('top-overlay', assets[0]!.id, 4, 9), layerId: 'video-3', start: 4, opacity: 0.45 };
+    project.clips = [late, left, top, early, right]; // Flat indices deliberately differ from row/primary order.
+    const hiddenStart = calculateLayout(project).clips.find((placed) => placed.clip.id === late.id)!.end + 2;
+    const hidden = { ...createClip('hidden-only-source', assets[2]!.id, 17, 19), layerId: 'video-4', start: hiddenStart };
+    project.clips.push(hidden);
+    const layout = calculateLayout(project);
+    const earlyPlaced = layout.clips.find((placed) => placed.clip.id === early.id)!;
+    expect(late.start).toBeGreaterThan(earlyPlaced.end);
+    for (let frame = 0; frame < layout.duration; frame++) {
+      for (const sample of sampleTimeline(project, frame, layout)) {
+        const placed = layout.clips.find((placed) => placed.clip.id === sample.clipId)!;
+        const row = project.layers.find((row) => row.id === sample.layerId)!;
+        expect(sample.sourceFrame).toBe(placed.retiming.sourceAt(frame - placed.start));
+        for (const { key } of COLOUR_CONTROLS) expect(sample.colour[key]).toBe(evaluateLayerSetting(row, key, frame, placed.clip.colour[key]));
+        if (hasLayerKeys(row, 'speed')) expect(placed.retiming.rateAt(frame - placed.start)).toBeCloseTo(evaluateLayerSetting(row, 'speed', frame, 1));
+      }
+    }
+    const updates: number[] = []; let peakObservedClipFiles = 0; let sawLutFile = false;
+    const submit = jobs.submit.bind(jobs);
+    const spy = vi.spyOn(jobs, 'submit').mockImplementation((kind, label, task, settled = null) => submit(kind, label, async (context) => task({
+      ...context, update: (progress, message) => {
+        updates.push(progress); context.update(progress, message);
+        const work = path.join(config.dataDir, 'renders', context.id, 'work');
+        try {
+          const names = readdirSync(work); peakObservedClipFiles = Math.max(peakObservedClipFiles, names.filter((name) => /^clip-\d+\.nut$/.test(name)).length);
+          sawLutFile ||= names.some((name) => name.endsWith('.cube'));
+        } catch { /* Work has been removed before successful publication. */ }
+      },
+    }), settled));
+    let result: Awaited<ReturnType<typeof complete>>;
+    try { result = await complete(project); } finally { spy.mockRestore(); }
+    successfulDirectory = result.directory; bounds(result.receipt);
+    const maximumMae = await parity(project, result.filename);
+    expect(result.receipt.settings.layered!.renderedClipIds).toEqual(['left', 'right', 'early-overlay', 'late-overlay', 'top-overlay']);
+    expect(result.receipt.settings.layered!.skippedLayerIds).toEqual(['video-4']);
+    expect(result.receipt.sources.map((source) => source.id).sort()).toEqual(assets.map((asset) => asset.id).sort());
+    expect(result.receipt.settings.layered!.peakIntermediateVideoDecoders).toBe(2);
+    expect(result.receipt.settings.layered!.peakLosslessTimelineRepresentations).toBe(2);
+    expect(result.receipt.settings.layered!.peakLosslessClipFiles).toBe(2);
+    expect(peakObservedClipFiles).toBeLessThanOrEqual(2); expect(sawLutFile).toBe(false);
+    expect(updates.every((value, index) => index === 0 || value >= updates[index - 1]!)).toBe(true);
+    const pixels = await rawRgb(config, result.filename);
+    for (let frame = hiddenStart - 2; frame < result.receipt.verification.frameCount; frame++) {
+      expect(sampleTimeline(project, frame)).toHaveLength(0);
+      const bytes = pixels.subarray(frame * FRAME_BYTES, (frame + 1) * FRAME_BYTES);
+      expect(bytes.reduce((sum, value) => sum + value, 0) / FRAME_BYTES).toBeLessThan(1);
+    }
+    await unchanged();
+    console.log(`Layered compound RGB parity: ${result.receipt.verification.frameCount} frames, maximum MAE ${maximumMae.toFixed(4)} / 255; ${JSON.stringify(result.receipt.settings.layered)}`);
+  }, 120_000);
+
+  it('retains shared speed points/easing across different clips and a dissolve using absolute row maps without UI state', async () => {
+    const project = createProject('native-row-boundary', 'Row speed across clip boundaries');
+    const authored = [point(0, { speed: 0.5 }, 'smooth'), point(4, { speed: 1 }, 'ease-in'),
+      point(10, { speed: 2 }, 'ease-out'), point(16, { speed: 0.75 }), point(24, { speed: 1.25 }, 'hold')];
+    project.layers[0]!.keyframes = structuredClone(authored);
+    project.clips = [createClip('row-left', assets[0]!.id, 3, 15), createClip('row-right', assets[1]!.id, 6, 18),
+      createClip('row-tail', assets[0]!.id, 10, 18)];
+    project.clips[0]!.speed = { mode: 'constant', rate: 0.5 };
+    project.clips[1]!.speed = { mode: 'constant', rate: 2 };
+    project.clips[2]!.speed = { mode: 'ramp', startRate: 3, endRate: 4, curve: 'ease-out', anchorIn: 0, anchorOut: 20 };
+    project.clips[1]!.colour = { ...NEUTRAL_COLOUR, brightness: 0.04 };
+    project.transitions = [{ leftId: 'row-left', rightId: 'row-right', type: 'cross-dissolve', duration: 2 },
+      { leftId: 'row-right', rightId: 'row-tail', type: 'cut', duration: 0 }];
+    expect(needsLayeredExport(project)).toBe(true);
+    expect(needsLayeredExport({ ...project, layers: [{ ...project.layers[0]!, keyframes: [] }] })).toBe(false);
+    expect(() => planExport(project)).toThrow('layered exporter');
+    const layout = calculateLayout(project);
+    const boundary = layout.clips[1]!.start;
+    expect(boundary).toBeGreaterThan(authored[1]!.frame); expect(boundary).toBeLessThan(authored[2]!.frame);
+    for (const placed of layout.clips) {
+      expect(placed.duration).not.toBe(compileRetiming(placed.clip).duration);
+      const rates = Array.from({ length: placed.duration }, (_, offset) => placed.retiming.rateAt(offset));
+      expect(new Set(rates).size).toBeGreaterThan(1);
+    }
+    for (let frame = 0; frame < layout.duration; frame++) {
+      const samples = sampleTimeline(project, frame, layout);
+      expect(samples).toHaveLength(frame >= boundary && frame < boundary + 2 ? 2 : 1);
+      for (const sample of samples) {
+        const placed = layout.clips.find((placed) => placed.clip.id === sample.clipId)!;
+        expect(sample.sourceFrame).toBe(placed.retiming.sourceAt(frame - placed.start));
+        expect(placed.retiming.rateAt(frame - placed.start)).toBeCloseTo(evaluateLayerSetting(project.layers[0]!, 'speed', frame, 1));
+      }
+    }
+    const result = await complete(project); bounds(result.receipt); await parity(project, result.filename);
+    expect(result.receipt.snapshot.layers[0]!.keyframes).toEqual(authored);
+    expect(project.layers[0]!.keyframes).toEqual(authored);
+    expect(result.receipt.settings.grading).toContain('absolute project frames');
+    await unchanged();
+  }, 120_000);
+
+  it('rejects every shared setting even at neutral values and keeps the two-clip 1x diagnostic restricted and read-only', async () => {
+    const plain = createProject('native-reference-guard', 'Plain diagnostic validation');
+    plain.clips = [createClip('reference-left', assets[0]!.id, 2, 6), createClip('reference-right', assets[1]!.id, 3, 7)];
+    plain.transitions = [{ leftId: 'reference-left', rightId: 'reference-right', type: 'cut', duration: 0 }];
+    expect(validateReference(plain, library).clips).toHaveLength(2);
+    const neutral: LayerKeyValues = { ...NEUTRAL_COLOUR, layerOpacity: 1, clipOpacity: 1, speed: 1 };
+    const variants: ((document: ProjectDocument) => void)[] = [
+      ...KEYFRAME_SETTINGS.map(({ key }) => (document: ProjectDocument) => {
+        document.layers[0]!.keyframes = [point(20, { [key]: neutral[key]! }, 'smooth')];
+      }),
+      (document) => { document.layers[0]!.enabled = false; },
+      (document) => { document.layers[0]!.opacity = 0.6; },
+      (document) => { document.layers.push(layer('video-2')); },
+      (document) => { document.clips[0]!.opacity = 0.5; },
+    ];
+    const before = jobs.list();
+    for (const change of variants) {
+      const document = structuredClone(plain); change(document); const id = randomUUID();
+      expect(needsLayeredExport(document)).toBe(true);
+      expect(() => validateReference(document, library)).toThrow(/diagnostic reference/i);
+      await expect(renderReference(document, library, { id, signal: new AbortController().signal, update: () => { } })).rejects.toThrow(/diagnostic reference/i);
+      await expect(readdir(path.join(config.dataDir, 'renders', id))).rejects.toMatchObject({ code: 'ENOENT' });
+    }
+    expect(jobs.list()).toEqual(before); await unchanged();
+  });
+
+  it('preserves RGBA16 premultiplied colour/coverage before H.264, including group opacity and transparent gaps', async () => {
+    const project = simple(3);
+    project.clips[0]!.sourceOut = 2;
+    const right = createClip('right', assets[1]!.id, 5, 7); project.clips.push(right);
+    project.transitions = [{ leftId: 'base', rightId: 'right', type: 'cross-dissolve', duration: 1 }];
+    project.openingFade = 1; project.closingFade = 1;
+    project.layers[0]!.opacity = 0.55; project.clips[0]!.opacity = 0.7; right.opacity = 0.8;
+    project.clips[1]!.colour = { ...NEUTRAL_COLOUR, exposure: 0.2, brightness: 0.02, hue: -30, shadows: 0.2 };
+    project.layers[1]!.keyframes = [point(0, { clipOpacity: 0.2 }), point(4, { clipOpacity: 0.9 }, 'hold')];
+    const work = path.join(config.dataDir, `raw-layered-${randomUUID()}`); await mkdir(work);
+    try {
+      const result = await renderLayeredExport({
+        document: project, plan: planLayeredExport(project), assets: project.clips.map((clip) => library.get(clip.mediaId)),
+        ffmpeg: config.ffmpeg, directory: work, target: { ...EXPORT_PROFILES.draft720, width: WIDTH, height: HEIGHT },
+        context: { id: randomUUID(), signal: new AbortController().signal, update: () => { } }
+      });
+      expect(await readdir(work)).toEqual([result.filename]);
+      const bytes = await runProcess(config.ffmpeg, ['-hide_banner', '-loglevel', 'error', '-nostdin', '-threads', '2', '-i', path.join(work, result.filename),
+        '-map', '0:v:0', '-an', '-filter_threads', '2', '-threads', '2', '-pix_fmt', 'rgba64le', '-fps_mode', 'passthrough', '-f', 'rawvideo', 'pipe:1']);
+      const actual = new Uint16Array(bytes.buffer, bytes.byteOffset, bytes.length / 2); const duration = calculateLayout(project).duration;
+      expect(bytes).toHaveLength(duration * PIXELS * 8);
+      let maximumMae = 0;
+      for (let frame = 0; frame < duration; frame++) {
+        const samples = sampleTimeline(project, frame); const expectedAlpha = coverage(samples);
+        let error = 0;
+        for (let pixel = 0; pixel < PIXELS; pixel++) {
+          const expected = compositePixel(samples, (sample) => {
+            const original = originals.get(sample.mediaId)!; const offset = sample.sourceFrame * FRAME_BYTES + pixel * 3;
+            return [original[offset]! / 255, original[offset + 1]! / 255, original[offset + 2]! / 255];
+          });
+          const offset = (frame * PIXELS + pixel) * 4;
+          for (let channel = 0; channel < 3; channel++) error += Math.abs(actual[offset + channel]! / 65535 - expected[channel]!) * 255;
+          expect(Math.abs(actual[offset + 3]! - Math.round(expectedAlpha * 65535))).toBeLessThanOrEqual(2);
+        }
+        maximumMae = Math.max(maximumMae, error / FRAME_BYTES);
+      }
+      expect(maximumMae).toBeLessThan(1);
+      expect(result.report.nativeVideoProcesses).toBeLessThan(40);
+      console.log(`Lossless premultiplied RGBA16 maximum RGB MAE: ${maximumMae.toFixed(5)} / 255`);
+    } finally { await rm(work, { recursive: true, force: true }); }
+  });
+
+  it('samples fade-through-black in output frames after animated grading without changing coverage', async () => {
+    const project = simple(4);
+    project.clips.push(createClip('right', assets[1]!.id, 11, 15));
+    project.transitions = [{ leftId: 'base', rightId: 'right', type: 'fade-through-black', duration: 5 }];
+    project.openingFade = 1; project.closingFade = 1;
+    project.layers[0]!.keyframes = [point(0, { brightness: 0.05, shadows: 0.5 }), point(3, { exposure: -0.2 }),
+      point(6, { brightness: 0.1, exposure: 0.5, hue: 25, shadows: 0.3 }, 'hold')];
+    project.clips[2]!.colour = { ...NEUTRAL_COLOUR, brightness: 0.1, exposure: 0.4, highlights: -0.2 };
+    const result = await complete(project); bounds(result.receipt); await parity(project, result.filename);
+    for (const frame of [3, 4]) {
+      const base = sampleTimeline(project, frame).find((sample) => sample.layerId === 'video-1')!;
+      expect(base.brightness).toBe(0); expect(base.blendWeight).toBe(1); expect(base.opacity).toBe(1);
+    }
+  });
+
+  it('renders single-layer animated grade/opacity and sampled source holds rather than silently taking the static path', async () => {
+    const project = createProject('native-single-animated', 'Animated single layer');
+    const clip = createClip('animated', assets[0]!.id, 5, 9); project.clips = [clip];
+    clip.speed = { mode: 'constant', rate: 0.5 };
+    project.layers[0]!.keyframes = [
+      point(0, { exposure: -1, hue: -20, brightness: 0, saturation: 1, clipOpacity: 0.2, layerOpacity: 1 }, 'smooth'),
+      point(4, { exposure: 0.1, hue: 10, brightness: 0.03, saturation: 0.9 }),
+      point(7, { layerOpacity: 0.4, clipOpacity: 0.9, exposure: 0.7, hue: 40, brightness: 0.06, saturation: 0.8 }, 'hold'),
+    ];
+    expect(needsLayeredExport(project)).toBe(true);
+    const result = await complete(project); bounds(result.receipt); await parity(project, result.filename);
+    expect(result.receipt.retiming[0]).toMatchObject({ decodedFrames: 4, outputFrames: 8 });
+    // The same held original frame receives different grades at distinct project frames.
+    expect(result.receipt.settings.layered!.lutsGenerated).toBe(8);
+  });
+
+  it('supports overlay-only projects, hidden primary footage and final opaque-black empty holds', async () => {
+    for (const hiddenPrimary of [false, true]) {
+      const project = createProject(`native-no-primary-${hiddenPrimary}`, 'Overlay only / hidden primary');
+      project.layers.push(layer('video-2', 0.6));
+      project.clips = [{ ...createClip('overlay', assets[1]!.id, 5, 7), layerId: 'video-2', start: 2, opacity: 0.7 }];
+      if (hiddenPrimary) {
+        project.layers[0]!.enabled = false; project.clips.push(createClip('hidden-base', assets[0]!.id, 0, 7));
+      }
+      const result = await complete(project); bounds(result.receipt); await parity(project, result.filename);
+      expect(result.receipt.settings.layered!.renderedClipIds).toEqual(['overlay']);
+      expect(result.receipt.verification.frameCount).toBe(hiddenPrimary ? 7 : 4);
+    }
+    const project = simple(3); project.layers.forEach((layer) => { layer.enabled = false; });
+    project.clips[1]!.start = 5;
+    const result = await complete(project); bounds(result.receipt); await parity(project, result.filename);
+    expect(result.receipt.retiming).toEqual([]);
+    expect(result.receipt.settings.layered).toMatchObject({ peakOriginalVideoDecoders: 0, originalDecoderProcesses: 0, lutsGenerated: 0, lutBytes: 0 });
+  });
+
+  it('renders three genuine UHD frames with three layers and bounded reusable raw/LUT memory', async () => {
+    const uhdPath = path.join(root, 'sources', 'uhd-three-frames.mp4');
+    await runProcess(config.ffmpeg, ['-hide_banner', '-loglevel', 'error', '-nostdin', '-n', '-f', 'lavfi', '-i',
+      'nullsrc=size=3840x2160:rate=30000/1001,geq=lum=\'60+20*N+8*gte(X,1920)\':cb=\'100+N\':cr=\'165-2*N\',setparams=range=limited:color_primaries=bt709:color_trc=bt709:colorspace=bt709',
+      '-frames:v', '3', '-an', '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '10', '-pix_fmt', 'yuv420p', '-threads', '2', '-filter_threads', '2', '-bf', '0',
+      '-color_primaries', 'bt709', '-color_trc', 'bt709', '-colorspace', 'bt709', '-color_range', 'tv', '-video_track_timescale', '30000', uhdPath]);
+    const uhd = await library.register(uhdPath);
+    originals.set(uhd.id, await rawRgb(config, uhdPath));
+    const project = simple(3); project.layers.push(layer('video-3', 0.75));
+    project.clips[0]!.mediaId = uhd.id;
+    project.layers[0]!.opacity = 0.9;
+    project.clips[0]!.opacity = 0.8; project.clips[0]!.colour = { ...NEUTRAL_COLOUR, exposure: 0.15, shadows: 0.25 };
+    project.layers[1]!.keyframes = [point(1, { layerOpacity: 0.7 }), point(2, { layerOpacity: 0.3 }, 'hold')];
+    const top = { ...createClip('uhd-top', assets[1]!.id, 4, 5), layerId: 'video-3', start: 2, opacity: 0.6 };
+    project.layers[2]!.keyframes = [point(3, { ...NEUTRAL_COLOUR, brightness: 0.08, hue: -30 }),
+      point(6, { ...NEUTRAL_COLOUR, exposure: -0.3, saturation: 0.6 }, 'hold')];
+    project.clips.push(top);
+    const started = performance.now(); const result = await complete(project, 'final4k');
+    const elapsed = performance.now() - started; bounds(result.receipt);
+    expect(result.receipt.verification.frameCount).toBe(3);
+    const maximumMae = await parity(project, result.filename);
+    expect(uhd.metadata).toMatchObject({ width: 3840, height: 2160, frameCount: 3 });
+    expect(await fingerprintFile(uhdPath)).toEqual(uhd.fingerprint);
+    console.log(`Layered UHD: 3 frames, ${elapsed.toFixed(0)} ms end-to-end, maximum MAE ${maximumMae.toFixed(4)} / 255, raw ${result.receipt.settings.layered!.rawBufferBytes} bytes + LUT ${result.receipt.settings.layered!.lutBytes} bytes; ${JSON.stringify(result.receipt.settings.layered)}`);
+    const draft = await complete(project, 'draft720'); bounds(draft.receipt);
+    const draftMae = await parity(project, draft.filename);
+    console.log(`UHD original downscaled/tagged BT.709 before animated grade: maximum 720p MAE ${draftMae.toFixed(4)} / 255`);
+  }, 120_000);
+
+  it('exports all eight video layers without multiplying decoder or raw-buffer peaks', async () => {
+    const project = createProject('native-eight-layers', 'Eight synthetic video layers');
+    for (let index = 1; index < 8; index++) project.layers.push(layer(`video-${index + 1}`, 0.3 + index * 0.07));
+    project.clips = project.layers.map((row, index) => ({
+      ...createClip(`eight-${index}`, assets[index % 2]!.id, index + 1, index + 3), layerId: row.id, opacity: 0.4 + index * 0.06,
+      colour: { ...NEUTRAL_COLOUR, exposure: index * 0.025, brightness: index * 0.003, saturation: 0.8 + index * 0.02 },
+    }));
+    const result = await complete(project); bounds(result.receipt);
+    const maximumMae = await parity(project, result.filename);
+    expect(result.receipt.settings.layered!.layerPasses).toBe(8);
+    expect(result.receipt.settings.layered!.originalDecoderProcesses).toBe(8);
+    expect(result.receipt.settings.layered!.peakLosslessClipFiles).toBe(1);
+    expect(result.receipt.settings.layered!.rawBufferBytes).toBe(1280 * 720 * 14);
+    console.log(`Eight-layer maximum RGB MAE: ${maximumMae.toFixed(4)} / 255; decoder peaks remain 1 original / 2 intermediate`);
+  });
+
+  it('reuses the selected-range 48 kHz music/mux/verification path for an extended layered duration', async () => {
+    const project = simple(4); project.clips[1]!.start = 5;
+    project.music = { mediaId: music.id, sourceIn: 2, sourceOut: 6, start: 1, duration: 5, gainDb: -6, fadeIn: 1, fadeOut: 1, loop: true };
+    const result = await complete(project); bounds(result.receipt); await parity(project, result.filename);
+    expect(result.receipt.verification.audio).toMatchObject({ codec: 'aac', sampleRate: 48000, channels: 2 });
+    expect(result.receipt.verification.audio!.durationErrorSeconds).toBeLessThanOrEqual(framesToSeconds(1));
+    expect(result.receipt.musicSource).toEqual(music);
+    expect(await fingerprintFile(music.sourcePath)).toEqual(music.fingerprint);
+  });
+
+  it('owns the queued immutable snapshot without modifying originals or saved user edits', async () => {
+    const project = simple(4); project.layers[1]!.keyframes = [point(8, { clipOpacity: 0.4 }, 'hold')];
+    const captured = structuredClone(project);
+    let release = (): void => { };
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    const busy = jobs.submit('prepare', 'unit-only scheduling gate', async () => gate);
+    let id = '';
+    try {
+      const job = startExport(project, 'draft720', library); id = job.id;
+      expect(job.state).toBe('queued');
+      project.title = 'Later user edit'; project.layers[1]!.opacity = 0;
+      project.layers[1]!.keyframes[0]!.values.clipOpacity = 1;
+      release(); await jobs.wait(busy.id);
+      const result = await jobs.wait(id); expect(result.state, result.message).toBe('completed');
+      const receipt = JSON.parse(await readFile(path.join(config.dataDir, 'renders', id, 'receipt.json'), 'utf8')) as ExportReceipt;
+      expect(receipt.snapshot).toEqual(captured);
+      expect(project.title).toBe('Later user edit'); expect(project.layers[1]!.opacity).toBe(0);
+      await unchanged();
+    } finally { release(); }
+  });
+
+  it('cancels active layer composition, reaps native pipes and removes only the owned render directory', async () => {
+    if (!successfulDirectory) successfulDirectory = (await complete(simple())).directory;
+    const before = await readFile(path.join(successfulDirectory, 'export.mp4'));
+    const submit = jobs.submit.bind(jobs); let cancelled = false;
+    const spy = vi.spyOn(jobs, 'submit').mockImplementation((kind, label, task, settled = null) => submit(kind, label, async (context) => task({
+      ...context, update: (progress, message) => {
+        context.update(progress, message);
+        if (!cancelled && message.startsWith('Compositing layer')) { cancelled = true; jobs.cancel(context.id); }
+      },
+    }), settled));
+    let id = '';
+    try {
+      const job = startExport(simple(12), 'draft720', library); id = job.id;
+      const result = await jobs.wait(id);
+      expect(result.state, result.message).toBe('cancelled'); expect(cancelled).toBe(true);
+      expect(result.outputUrl).toBeNull(); expect(result.receiptUrl).toBeNull();
+    } finally { spy.mockRestore(); }
+    expect(await readdir(path.join(config.dataDir, 'renders'))).not.toContain(id);
+    expect(await readFile(path.join(successfulDirectory, 'export.mp4'))).toEqual(before);
+    await unchanged();
+  });
+
+  it('cleans failed native work, checks even hidden source identities, and refuses to overwrite an existing UUID', async () => {
+    const ffmpeg = config.ffmpeg; let failedId = '';
+    try {
+      config.ffmpeg = '/no-such-layered-ffmpeg';
+      const job = startExport(simple(), 'draft720', library); failedId = job.id;
+      expect((await jobs.wait(job.id)).state).toBe('failed');
+    } finally { config.ffmpeg = ffmpeg; }
+    expect(await readdir(path.join(config.dataDir, 'renders'))).not.toContain(failedId);
+    const project = simple(); project.layers.push({ ...layer('video-3'), enabled: false });
+    project.clips.push({ ...createClip('hidden', assets[2]!.id, 0, 1), layerId: 'video-3', start: 6 });
+    const get = library.get.bind(library);
+    const spy = vi.spyOn(library, 'get').mockImplementation((id) => {
+      const asset = get(id); return id === assets[2]!.id ? { ...asset, fingerprint: { ...asset.fingerprint, digest: 'f'.repeat(64) } } : asset;
+    });
+    let hiddenId = '';
+    try {
+      const job = startExport(project, 'draft720', library); hiddenId = job.id;
+      const result = await jobs.wait(job.id); expect(result.state).toBe('failed'); expect(result.message).toMatch(/changed|identity|fingerprint/i);
+    } finally { spy.mockRestore(); }
+    expect(await readdir(path.join(config.dataDir, 'renders'))).not.toContain(hiddenId);
+    if (!successfulDirectory) successfulDirectory = (await complete(simple())).directory;
+    const receipt = await readFile(path.join(successfulDirectory, 'receipt.json'));
+    await expect(renderExport(simple(), 'draft720', library, { id: path.basename(successfulDirectory), signal: new AbortController().signal, update: () => { } })).rejects.toThrow('EEXIST');
+    expect(await readFile(path.join(successfulDirectory, 'receipt.json'))).toEqual(receipt);
+    await unchanged();
+  });
+});

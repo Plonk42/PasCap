@@ -1,0 +1,33 @@
+name: Bug report
+description: Report a reproducible editor, preview, import or export problem.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Do not attach private footage, credentials, local project files or licensed audio. Use synthetic media when possible and redact filesystem paths.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What went wrong?
+      description: Describe the expected and actual behaviour.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproduction steps
+      description: Include the smallest reproducible sequence and relevant frame/key values.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Commit, Linux version, Node/FFmpeg versions, browser version and actual renderer if preview-related. Container packaging is not released yet.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence
+      description: Sanitized errors, a synthetic test case, screenshot or verification receipt. Note whether edits remain unsaved.

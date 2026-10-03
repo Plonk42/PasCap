@@ -1,0 +1,118 @@
+import { randomUUID } from 'node:crypto';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+import { afterEach, describe, expect, it } from 'vitest';
+import { createConfig } from '../../src/server/config.js';
+import { restoreExports } from '../../src/server/export-archive.js';
+import { JobQueue } from '../../src/server/jobs.js';
+import { ProjectStore } from '../../src/server/storage.js';
+import { EMPTY_KEY_VALUES } from '../../src/shared/keyframes.js';
+import { createClip, createProject } from '../../src/shared/model.js';
+import { legacyV4Project } from '../unit/project-fixtures.js';
+
+const enabled = process.env['PASCAP_MEDIA_TESTS'] === '1';
+const roots: string[] = [];
+async function temp(): Promise<string> {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'pascap-schema5-storage-media-')); roots.push(root); return root;
+}
+
+describe.skipIf(!enabled)('schema-5 storage/archive integration · generated files only, no migrations', () => {
+  afterEach(async () => { await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))); });
+
+  it('loads strict v5 points/bins and lists/rejects v1/v2/v3 headers and genuine v4 without rewriting them', async () => {
+    const root = await temp(); const store = new ProjectStore(root);
+    const project = createProject('strict-v5', 'Strict current document');
+    project.media = { videoIds: ['generated-original', 'unplaced-original'], audioIds: ['unplaced-music'] };
+    project.clips = [createClip('current-clip', 'generated-original', 0, 4)];
+    project.layers[0]!.keyframes = [
+      { frame: 0, interpolation: 'linear', values: { ...EMPTY_KEY_VALUES, speed: 0.5, clipOpacity: 0.8 } },
+      { frame: 5000, interpolation: 'ease-out', values: { ...EMPTY_KEY_VALUES, exposure: 0.25 } },
+    ];
+    const saved = await store.save(project, 0);
+    expect(saved.schemaVersion).toBe(5); expect(saved.media).toEqual(project.media); expect(await store.load(saved.id)).toEqual(saved);
+    const currentPath = path.join(root, 'projects', `${saved.id}.json`); const currentBytes = await readFile(currentPath);
+    const old = [];
+    for (const version of [1, 2, 3, 4]) {
+      const id = `original-v${version}`; const title = `Preserved original version ${version}`;
+      // Keep the v1/v2/v3 header cases; v4 has its real row/static shape and no media field.
+      const document = version === 4 ? legacyV4Project(id, title) : { schemaVersion: version, id, title };
+      if (version === 4) expect(document).not.toHaveProperty('media');
+      const bytes = Buffer.from(`${JSON.stringify(document)}\n`);
+      const filename = path.join(root, 'projects', `${id}.json`); await writeFile(filename, bytes);
+      old.push({ id, title, version, filename, bytes });
+      await expect(store.load(id)).rejects.toThrow(`schema version ${version}; this build requires version 5`);
+      await expect(store.rename(id, 'Must not rewrite an older file', 0)).rejects.toThrow('existing file was not changed');
+      await expect(store.save(createProject(id, 'No migration'), 0)).rejects.toThrow('existing file was not changed');
+    }
+    const summaries = await store.list();
+    expect(summaries.find((summary) => summary.id === saved.id)).toMatchObject({ compatible: true, revision: 1, clipCount: 1, duration: 8, error: null });
+    for (const entry of old) {
+      expect(summaries.find((summary) => summary.id === entry.id)).toMatchObject({ id: entry.id, title: entry.title,
+        compatible: false, revision: 0, clipCount: 0, duration: 0, error: expect.stringContaining(`requires version 5`) });
+      expect(await readFile(entry.filename)).toEqual(entry.bytes);
+    }
+    expect(await readFile(currentPath)).toEqual(currentBytes);
+  });
+
+  it('rejects malformed v5 without synthesizing missing media, row, static clip or nullable point fields', async () => {
+    const root = await temp(); const store = new ProjectStore(root); const directory = path.join(root, 'projects'); await mkdir(directory);
+    const valid = createProject('malformed-v5', 'Must remain strict'); valid.clips = [createClip('current', 'generated-original', 0, 4)];
+    const missingMedia: Record<string, unknown> = { ...valid }; delete missingMedia['media'];
+    const missingRow: Record<string, unknown> = { ...valid.layers[0]! }; delete missingRow['keyframes'];
+    const missingClip: Record<string, unknown> = { ...valid.clips[0]! }; delete missingClip['speed'];
+    const missingValues: Record<string, unknown> = { ...EMPTY_KEY_VALUES, exposure: 0.25 }; delete missingValues['hue'];
+    const variants: Record<string, unknown>[] = [
+      missingMedia, { ...valid, media: { videoIds: [] } }, { ...valid, media: { audioIds: [] } },
+      { ...valid, layers: [missingRow] }, { ...valid, clips: [missingClip] }, { ...valid, unexpected: true },
+      { ...valid, layers: [{ ...valid.layers[0]!, keyframes: [{ frame: 100, interpolation: 'linear', values: missingValues }] }] },
+    ];
+    for (const [index, variant] of variants.entries()) {
+      const id = `malformed-${index}`; const filename = path.join(directory, `${id}.json`);
+      const bytes = Buffer.from(`${JSON.stringify({ ...variant, id })}\n`); await writeFile(filename, bytes);
+      await expect(store.load(id)).rejects.toThrow('Cannot open this project');
+      await expect(store.save(createProject(id, 'No defaults or rewrite'), 0)).rejects.toThrow('existing file was not changed');
+      expect(await readFile(filename)).toEqual(bytes);
+    }
+    expect((await store.list()).every((summary) => !summary.compatible)).toBe(true);
+  });
+
+  it('restores only strict v5 snapshots in version-1 receipts and preserves earlier outputs/receipts byte-for-byte', async () => {
+    const root = await temp(); const config = createConfig({ dataDir: root }); const jobs = new JobQueue();
+    const snapshot = createProject('current-export', 'Current verified export'); snapshot.clips = [createClip('one', 'generated-original', 0, 2)];
+    snapshot.layers[0]!.keyframes = [{ frame: 50, interpolation: 'smooth', values: { ...EMPTY_KEY_VALUES, exposure: 0.1 } }];
+    async function archive(document: unknown, label: string) {
+      const id = randomUUID(); const folder = path.join(root, 'renders', id); await mkdir(folder, { recursive: true });
+      const receipt = Buffer.from(JSON.stringify({ kind: 'export', schemaVersion: 1, jobId: id, createdAt: '2026-10-03T00:00:00.000Z',
+        snapshot: document, profile: 'draft720', verification: { frameCount: 2, fullDecode: true, faststart: true } }));
+      const output = Buffer.from(`Preserved successful-output sentinel: ${label}`);
+      await writeFile(path.join(folder, 'receipt.json'), receipt); await writeFile(path.join(folder, 'export.mp4'), output);
+      return { id, folder, receipt, output };
+    }
+    try {
+      const current = await archive(snapshot, 'v5');
+      const older = [];
+      for (const version of [1, 2, 3, 4]) {
+        const document = version === 4 ? legacyV4Project('old-4', 'Original 4') : { schemaVersion: version, id: `old-${version}`, title: `Original ${version}` };
+        older.push({ ...await archive(document, `v${version}`), version });
+      }
+      const missingRow: Record<string, unknown> = { ...snapshot.layers[0]! }; delete missingRow['keyframes'];
+      const malformed = await archive({ ...snapshot, layers: [missingRow] }, 'Malformed v5');
+      const warnings = await restoreExports(config, jobs);
+      expect(warnings).toHaveLength(5);
+      expect(jobs.list().map((job) => job.id)).toEqual([current.id]);
+      expect(jobs.get(current.id)).toMatchObject({ kind: 'export', state: 'completed', progress: 1,
+        outputUrl: `/api/jobs/${current.id}/export`, receiptUrl: `/api/jobs/${current.id}/receipt` });
+      for (const entry of older) {
+        expect(warnings.find((warning) => warning.startsWith(`${entry.id}:`))).toContain(`Unsupported export snapshot schema version ${entry.version}; this build requires version 5`);
+        expect(warnings.find((warning) => warning.startsWith(`${entry.id}:`))).toContain('successful output were not changed');
+      }
+      expect(warnings.find((warning) => warning.startsWith(`${malformed.id}:`))).toContain('keyframes');
+      for (const entry of [current, ...older, malformed]) {
+        expect(await readFile(path.join(entry.folder, 'receipt.json'))).toEqual(entry.receipt);
+        expect(await readFile(path.join(entry.folder, 'export.mp4'))).toEqual(entry.output);
+      }
+      expect(await restoreExports(config, jobs)).toHaveLength(5); expect(jobs.list()).toHaveLength(1);
+    } finally { await jobs.close(); }
+  });
+});

@@ -1,0 +1,30 @@
+name: Scoped feature proposal
+description: Propose a focused improvement without changing the no-copy/local-only contract.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: User problem
+      description: What cannot be done with the current editor?
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope and non-goals
+      description: Define what is included and explicitly excluded. Inspection worksheets are not implementation commitments.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Observable behaviour and tests; preserve originals, strict timing/colour validation and bounded native work.
+    validations:
+      required: true
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Dependencies and milestone
+      description: Link existing issues and identify the appropriate milestone when known.
