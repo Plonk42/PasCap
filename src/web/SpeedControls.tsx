@@ -1,5 +1,6 @@
 import { useId } from 'react';
 import type { EditCommand } from '../shared/commands.js';
+import { editableClipSpeed } from '../shared/clip-speed.js';
 import { activeLayerSetting, evaluateLayerSetting, hasLayerKeys } from '../shared/keyframes.js';
 import type { VideoClip, VideoLayer } from '../shared/model.js';
 import { sourceRateAt, type SpeedSettings } from '../shared/speed.js';
@@ -24,6 +25,7 @@ export interface SpeedControlsProps {
 
 function speedPreset(speed: SpeedSettings): string {
   if (speed.mode === 'constant') return 'constant';
+  if (speed.mode === 'curve') return 'curve';
   return speed.endRate >= speed.startRate ? 'ramp-up' : 'ramp-down';
 }
 
@@ -33,8 +35,9 @@ function BaseSpeedControls({ clip, disabled, helpId, inputContext, onChange }: R
   return <>
     <select aria-label="Speed mode" disabled={disabled} value={speedPreset(speed)} onChange={(event) => {
       if (event.target.value === 'constant') onChange({ mode: 'constant', rate: 1 });
+      else if (event.target.value === 'curve') onChange(editableClipSpeed(clip));
       else onChange({ mode: 'ramp', startRate: event.target.value === 'ramp-up' ? 0.5 : 2, endRate: event.target.value === 'ramp-up' ? 2 : 0.5, curve: 'smooth', anchorIn: clip.sourceIn, anchorOut: clip.sourceOut });
-    }}><option value="constant">Constant speed</option><option value="ramp-up">Ramp up</option><option value="ramp-down">Ramp down</option></select>
+    }}><option value="constant">Constant speed</option><option value="ramp-up">Ramp up</option><option value="ramp-down">Ramp down</option><option value="curve">Custom curve</option></select>
     {speed.mode === 'constant' && <>
       <div className="speed-presets">{[0.25, 0.5, 1, 2, 4].map((rate) => <button type="button" key={rate} className={`text-button ${speed.rate === rate ? 'active' : ''}`} disabled={disabled} onClick={() => onChange({ mode: 'constant', rate })}>{rate}×</button>)}</div>
       <label className="speed-field">Rate ×<NumberField aria-label="Clip speed rate" aria-describedby={helpId} min={0.1} max={8} step={0.05} value={speed.rate} disabled={disabled} resetKey={inputContext} hint="Selected clip base; used only while this layer has no Speed keys." onCommit={(rate) => onChange({ mode: 'constant', rate })} /></label>

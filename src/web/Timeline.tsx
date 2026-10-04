@@ -97,6 +97,7 @@ function speedLabel(clip: VideoClip): string {
   switch (clip.speed.mode) {
     case 'constant': return clip.speed.rate === 1 ? '' : ` · ${clip.speed.rate}×`;
     case 'ramp': return ' · ramp';
+    case 'curve': return ' · curve';
   }
 }
 
