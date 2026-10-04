@@ -22,7 +22,7 @@ clip/layer opacity, source-anchored speed/colour/opacity keys, source hover revi
 pre-trims and collapsible inspector sections. Preview now uses a bounded pool up
 to nine decoders rather than a fixed pair for multi-layer projects. Native export
 adds sequential RGBA16 animated-layer passes. Those extensions have their own
-numeric/browser evidence in [DELIVERY_STATUS.md](DELIVERY_STATUS.md) and semantics
+numeric/browser evidence in Git history and semantics
 in [LAYERS_AND_KEYFRAMES.md](LAYERS_AND_KEYFRAMES.md). The original two-source
 measurements below are preserved; they do not certify layered-GPU throughput.
 
@@ -31,7 +31,9 @@ import bins, empty new projects and confirmed document-only deletion. The shared
 content-deduplicated registry/proxy cache and originals/finished exports are preserved;
 v1/v2/v3/v4 documents and receipt snapshots remain incompatible, with no migration.
 This does not change the historical measurements below or certify schema-5 checks;
-current status is recorded separately in [DELIVERY_STATUS.md](DELIVERY_STATUS.md).
+current delivery and verification are recorded on
+[GitHub work issues](https://github.com/Plonk42/PasCap/issues) and
+[actual-commit CI](https://github.com/Plonk42/PasCap/actions).
 
 ## Environment and source facts
 
@@ -160,4 +162,5 @@ seeking across five excerpts. These extensions do not close the target-GPU
 performance gate. Bounded native export tests additionally cover every curve in
 both directions, independent grades, music placement/selected-range looping/
 envelopes, cancellation cleanup, exact packet/frame counts and genuine short UHD
-output. See [DELIVERY_STATUS.md](DELIVERY_STATUS.md).
+output. These are historical results; current acceptance evidence belongs on
+[GitHub work issues](https://github.com/Plonk42/PasCap/issues).

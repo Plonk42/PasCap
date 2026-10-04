@@ -241,12 +241,12 @@ ready proxies. Confirmed project deletion affects only its saved document, not o
 the shared content-deduplicated registry/cache or finished exports/receipts.
 
 Marker movement/channel navigation adds no schema, migration, toolchain or native
-pipeline change. The completed no-copy schema-5 886-test milestone, schema-4
-browser/native checks and earlier measurements are preserved as historical evidence
-in [DELIVERY_STATUS.md](DELIVERY_STATUS.md). The 982-test marker/channel-navigation
-and 1,039-test UX-hardening baselines remain historical; current clip-speed results
-are recorded separately there. Intended-GPU, long-flight and long-run audio
-validation remain deferred and are tracked in
-[ROADMAP.md](ROADMAP.md). No additional real preparation/render was performed for
-this clip-speed update.
+pipeline change. Synthetic correctness checks do not qualify intended-GPU preview,
+long-flight throughput or long-run audio behaviour. Those acceptance requirements
+are tracked in [#6](https://github.com/Plonk42/PasCap/issues/6),
+[#7](https://github.com/Plonk42/PasCap/issues/7) and
+[#8](https://github.com/Plonk42/PasCap/issues/8); real preparation/rendering needs
+explicit owner consent. Consult
+[GitHub Actions](https://github.com/Plonk42/PasCap/actions) for actual-commit CI,
+not a cumulative historical test total.
 

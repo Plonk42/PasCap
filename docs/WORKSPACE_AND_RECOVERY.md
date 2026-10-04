@@ -37,14 +37,13 @@ during timeline trim/shared-point/music drafts to preserve captured geometry.
 
 **Workspace options → Reset layout** restores defaults. Side-panel visibility and dimensions are
 browser-local UI preferences, never document/history fields. Sizes are clamped to
-viewport bounds; below 980 px, one side drawer is visible at a time. The prior v3
-pass tested desktop widths 1440/1280/1024/900/720 without horizontal overflow; those
-remain the regression matrix, not a completed current-update browser result. The CSS floor
-is 640 px; this is not a mobile editor. Denied browser storage leaves layout/section
-controls usable for the session and exposes an explanatory preference warning.
-Keyframe checks cover the 270 px inspector and 720 px drawer. Current hardening
-also checks the 640 px toolbar and music pointer targets; see
-[the dated delivery evidence](DELIVERY_STATUS.md).
+viewport bounds; below 980 px, one side drawer is visible at a time. Desktop widths
+1440/1280/1024/900/720 form the responsive regression matrix; the workspace should
+not overflow horizontally. The CSS floor is 640 px; this is not a mobile editor.
+Denied browser storage leaves layout/section controls usable for the session and
+exposes an explanatory preference warning. Keyframe controls must remain reachable
+in the 270 px inspector and 720 px drawer; the 640 px toolbar and music lane must
+retain usable pointer targets. These are UI contracts, not performance certification.
 
 Choosing a layer selects its first excerpt (if present), highlights that row and
 reveals it vertically. Empty-layer selection clears clip selection but retains the
@@ -425,14 +424,16 @@ Finished MP4/receipt links survive later failures and restored successful histor
 is preserved. Owned cancelled/failed scratch is cleaned by the unchanged service;
 incomplete output is never offered as a finished video.
 
-UX regressions use disposable synthetic or memory-only projects. The former
-schema-5 909-test baseline, completed no-copy 886-test milestone and prior v3/v4
-correctness checks are historical. The **982-test** marker/channel-navigation and
-**1,039-test** UX-hardening results remain historical; current clip-speed evidence
-is recorded separately in [DELIVERY_STATUS.md](DELIVERY_STATUS.md).
-UX screenshots and short tests are not long-flight or intended-discrete-GPU
-performance certification; those gates remain in [ROADMAP.md](ROADMAP.md).
-This documentation update performs no additional sample preparation or real-media work.
+UX regressions use disposable synthetic or memory-only projects. Actual-commit
+results belong in [GitHub Actions](https://github.com/Plonk42/PasCap/actions) and
+the corresponding [work issues](https://github.com/Plonk42/PasCap/issues), including
+[#16](https://github.com/Plonk42/PasCap/issues/16) for contextual-help acceptance.
+UX screenshots and short tests are not intended-GPU, long-flight or long-run A/V
+certification; those requirements belong to
+[#6](https://github.com/Plonk42/PasCap/issues/6),
+[#7](https://github.com/Plonk42/PasCap/issues/7) and
+[#8](https://github.com/Plonk42/PasCap/issues/8). Real-media jobs require explicit
+owner consent.
 
 
 

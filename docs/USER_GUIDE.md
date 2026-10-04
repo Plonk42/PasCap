@@ -240,7 +240,7 @@ Successful outputs survive later failures/restarts; interrupted exports are not
 resumed or published as finished. Long 4K/layered renders can need substantial
 scratch disk and CPU time; short tests do not qualify long-flight throughput.
 See [SPEED_AND_AUDIO.md](SPEED_AND_AUDIO.md) and
-[DELIVERY_STATUS.md](DELIVERY_STATUS.md#resource-contract).
+[Inspector and resource limits](LAYERS_AND_KEYFRAMES.md#inspector-and-resource-limits).
 
 ## Workspace and keyboard
 

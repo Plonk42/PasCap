@@ -2,7 +2,9 @@
 
 This records the completed UX-hardening logical step. Its test/bundle figures are
 historical evidence, not relabelled as results of later clip-speed additions.
-See [current delivery evidence](DELIVERY_STATUS.md) for the newest verification.
+See the corresponding [work issues](https://github.com/Plonk42/PasCap/issues) and
+[GitHub Actions](https://github.com/Plonk42/PasCap/actions) for acceptance and
+actual-commit CI; the dated evidence below is not a current verification claim.
 
 ## Simpler presentation, unchanged editing contract
 

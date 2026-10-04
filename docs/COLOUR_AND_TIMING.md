@@ -1,4 +1,4 @@
-# PasCap colour and timing contract · v3
+# PasCap colour and timing contract · project v5
 
 This specification precedes the preview controls. It is shared by the CPU reference,
 WebGL2 shader and generated native FFmpeg LUTs. It is elementary SDR grading, not
@@ -45,11 +45,14 @@ highlight recovery. Originals remain untouched.
 
 ## Opacity and animation
 
-Clip opacity/colour/speed keys use integer **original-source frames**. Layer-opacity
-keys use integer **project frames**. Hold/linear/ease-in/ease-out/smooth interpolation
-belongs to the left key; endpoints hold outside the keyed interval. Colour evaluates
-all seven parameter values before applying the equations above. Trim/split retain
-keys, including those outside the excerpt but inside the registered original.
+Shared row opacity, colour and Speed points use integer **project frames** and
+override each participating channel across every clip on that row. Clip-instance
+custom speed keys instead use integer **original-source frames**; static clip
+colour/opacity bases remain independent. Hold/linear/ease-in/ease-out/smooth
+interpolation belongs to the left participating point; endpoints hold outside the
+keyed interval. Colour evaluates all seven parameter values before applying the
+equations above. Trim/split never copy or shift row points; they retain clip-speed
+anchors, including those outside the excerpt but inside the registered original.
 
 For each enabled layer, source-over uses premultiplied encoded RGB/coverage.
 Let `w` be dissolve weight, `o` clip opacity, `b` black-fade brightness and `G` graded
@@ -62,7 +65,9 @@ light blend or extra tone map. See [LAYERS_AND_KEYFRAMES.md](LAYERS_AND_KEYFRAME
 
 ## Timing
 
-- All stored timing is integer **project frames**. Rate: exactly `30000/1001`.
+- Project placements, row points and output durations use integer **project frames**;
+  source bounds and clip-speed anchors use integer **original-source frames**.
+  Rate: exactly `30000/1001`.
   Seconds exist only at media API / FFmpeg boundaries. Source OUT is exclusive.
 - Cuts consume zero frames. Primary ripple duration is the sum of retimed output
   durations minus primary dissolve overlaps, not source length at non-1× speed.
@@ -79,7 +84,8 @@ light blend or extra tone map. See [LAYERS_AND_KEYFRAMES.md](LAYERS_AND_KEYFRAME
   a black transition's centre. It is intentional, deterministic and testable.
 - Incoming/outgoing transition and opening/closing regions must not overlap
   within a clip. Invalid durations/edits are rejected, never silently clamped.
-- Primary splits copy settings/source keys, preserve exterior boundaries and add a cut.
+- Primary splits copy static settings/clip-speed anchors, preserve exterior boundaries
+  and add a cut; shared row points stay at their project frames.
   Overlay split pieces start consecutively and do not ripple other placements.
   Reordering preserves only unchanged adjacent ID pairs; new pairs become cuts.
 - Trimming selects a recoverable source IN/OUT range inside the complete registered
@@ -107,7 +113,7 @@ Production export reads originals and uses exact shared retiming. Plain static
 single-layer edits retain bounded body/dissolve chunks. Layers/nontrivial opacity/
 animated colour use sequential RGBA16 layer passes and one final H.264 encode,
 with optional 48 kHz AAC music in both paths. Resource and numeric limits are in
-[DELIVERY_STATUS.md](DELIVERY_STATUS.md).
+[Inspector and resource limits](LAYERS_AND_KEYFRAMES.md#inspector-and-resource-limits).
 
 The diagnostic reference accepts **exactly two normal-speed primary clips without
 music, layers, nontrivial opacity or animation** and refuses unsupported documents.

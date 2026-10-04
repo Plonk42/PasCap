@@ -653,7 +653,7 @@ or the deferred long-flight validation.
   additional real-footage render or intended-GPU performance certification is added.
 
 Current verification and remaining acceptance gates are in
-[docs/DELIVERY_STATUS.md](docs/DELIVERY_STATUS.md); movement semantics are in
+[GitHub work issues](https://github.com/Plonk42/PasCap/issues); movement semantics are in
 [docs/TIMELINE_EDITING.md](docs/TIMELINE_EDITING.md).
 
 ## 21. Approved row-wide shared keyframes and strict v4 · 2026-10-03
@@ -741,9 +741,10 @@ development records; they are not rewritten or treated as the current format.
   browser cache keeps **`preview-lab`**, also schema 4. Manual sample preparation
   targets only **`sample-taillefer-v4`**, reusing the already prepared first two
   Taillefer recordings. **Do not execute that script for this update.**
-- Final verification and current build-chunk measurements are recorded in
-  [docs/DELIVERY_STATUS.md](docs/DELIVERY_STATUS.md); the scoped partial handoff is
-  resolved. Prior v3 milestones remain historical, not the current total.
+- Historical verification and build-chunk measurements remain in Git history;
+  the scoped partial handoff is resolved. Current acceptance is recorded on
+  [GitHub work issues](https://github.com/Plonk42/PasCap/issues).
+  Prior v3 milestones remain historical, not the current total.
 - Tests are disposable/synthetic or memory-only. This documentation scope runs no
   tests, starts no services and adds no real footage preparation/import/render.
   Intended-GPU and long-flight validation remain deferred by the user; no additional
@@ -753,7 +754,7 @@ Current contracts: [docs/LAYERS_AND_KEYFRAMES.md](docs/LAYERS_AND_KEYFRAMES.md),
 [docs/SPEED_AND_AUDIO.md](docs/SPEED_AND_AUDIO.md),
 [docs/TIMELINE_EDITING.md](docs/TIMELINE_EDITING.md) and
 [docs/WORKSPACE_AND_RECOVERY.md](docs/WORKSPACE_AND_RECOVERY.md).
-Verification handoff: [docs/DELIVERY_STATUS.md](docs/DELIVERY_STATUS.md).
+Verification handoff: [GitHub work issues](https://github.com/Plonk42/PasCap/issues).
 
 ## 22. Approved rush cutting and ripple assembly priority · 2026-10-03
 
@@ -797,7 +798,8 @@ original/proxy protection, shared project-time row points and native resource bo
 
 Workflow contract: [docs/TIMELINE_EDITING.md](docs/TIMELINE_EDITING.md) and
 [docs/WORKSPACE_AND_RECOVERY.md](docs/WORKSPACE_AND_RECOVERY.md).
-Verified results: [docs/DELIVERY_STATUS.md](docs/DELIVERY_STATUS.md).
+Historical verified results remain in Git history; current delivery evidence is
+recorded on [GitHub work issues](https://github.com/Plonk42/PasCap/issues).
 
 ## 23. Approved precise clip speed curves · 2026-10-04
 

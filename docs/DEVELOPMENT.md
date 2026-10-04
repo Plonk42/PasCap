@@ -88,35 +88,18 @@ originals in `.pascap/browser-footage/synthetic-sources/` are outside that cache
 cache and `preview-lab` inside it; bin resets never imply a global-library fallback.
 Neither suite invokes real-source sample preparation or needs private footage/music.
 
-### Recorded local baseline
+### Verification evidence
 
-The current [UI verification](DELIVERY_STATUS.md#current-ui-verification) passes
-**900 unit/service + 241 browser = 1,141** fresh checks on Node **22.23.3**, with
-strict frontend/server types and production build. It includes native timeline/header
-scrolling, primary-first presentation, the pinned ruler and exact scrolled seeks,
-accessible layer-action restrictions and the retained heading-help suite.
-No historical native count is added to that total; intended-GPU/real-flight, fresh
-delivery-commit CI and container gates remain separate.
-
-**2026-10-04 local baseline: 876 unit/service + 185 browser + 54 native = 1,115
-tests**, strict typechecks/build passing. The native total includes the separately
-enabled private tmpfs test. [Evidence/history](DELIVERY_STATUS.md#current-clip-speed-verification)
-is recorded separately from new CI results and target-GPU, long-run memory/A/V or
-complete 5–10 minute real-flight qualification. Complete unit suites passed on
-local Node 22.23.3 and 24.21.0; the final browser/native suites used Node 22.
-The 1,039-test UX-hardening baseline remains historical rather than being relabelled.
-
-The historical [inline-help UI verification](DELIVERY_STATUS.md#current-help-popover-verification)
-records its hover/pin/dismiss checks separately. Retained
-[heading-placement verification](DELIVERY_STATUS.md#current-heading-help-verification)
-adds collapsed-title access, independent native expansion/help, mounted drafts
-and compact geometry coverage without changing the native pipeline;
-the older 54 native/private-tmpfs results are not claimed as a new run.
+Record dated results on the corresponding [GitHub work issue](https://github.com/Plonk42/PasCap/issues):
+exact commit, toolchain, commands, passed/failed checks and remaining acceptance.
+Keep local checks, [actual-commit CI](https://github.com/Plonk42/PasCap/actions)
+and consented intended-GPU/real-flight qualification separate. Never add historical
+native counts to a fresh UI run or describe an older green run as current delivery
+evidence. Follow [the delivery workflow](GITHUB_WORKFLOW.md#verified-closure-on-main).
 
 ### GitHub CI
 
-The [workflow](../.github/workflows/ci.yml) is committed with the initial repository
-publication. Its first remote run is separate evidence from the local baseline:
+The [workflow](../.github/workflows/ci.yml) runs:
 
 - Linux unit/typecheck/build checks on **Node 22 and 24**.
 - Native/media and Chrome/browser checks on **Node 22**, using **FFmpeg/ffprobe
@@ -137,17 +120,15 @@ or the whole generated cache. Action references are commit-pinned and the workfl
 uses read-only repository permissions. It does not deploy GitHub Pages or publish
 a container image. Use [the roadmap](ROADMAP.md) for remaining qualification work.
 
-The raw-reader EOF tracked as [#1](https://github.com/Plonk42/PasCap/issues/1)
-now has a local deterministic exit-before-read regression and eager bounded-read
-fix. CI does not retry tests to hide it; fresh remote-runner evidence remains
-separate. [UX_HARDENING.md](UX_HARDENING.md) records the cause, identity limitations,
-storage evidence and loading boundaries.
+The raw reader has a deterministic exit-before-read regression and eager bounded
+read ownership; [#1](https://github.com/Plonk42/PasCap/issues/1) records its delivery
+evidence. CI does not retry tests to hide failures. [UX_HARDENING.md](UX_HARDENING.md)
+records the cause, identity limitations, storage evidence and loading boundaries.
 
 The three-recording playback completion check has a bounded 45-second wait inside
-a 60-second test, with renderer/decoder diagnostics. The first runner trace showed
-steady progress but did not complete 144 frames inside its original 15-second
-deadline. End-frame/error/two-decoder assertions are unchanged: this is correctness
-on software rendering, not the intended-GPU throughput gate.
+a 60-second test, with renderer/decoder diagnostics and exact end-frame/error/
+two-decoder assertions. This is correctness on software rendering, not the
+intended-GPU throughput gate.
 
 ## Optional real-media tools
 
@@ -180,7 +161,7 @@ Preview reuses **two decoders for one layer, up to nine for eight**, plus one so
 reviewer, not one per clip. Layered export: one original decoder, two intermediate
 readers/one encoder maximum; raw buffers **116.1 MB at 4K** + LUTs **6.6 MB** + native
 memory. Two clip files/two timeline representations bound concurrency, **not disk GB**;
-scratch grows with duration ([resource contract](DELIVERY_STATUS.md#resource-contract)).
+scratch grows with duration ([resource contract](LAYERS_AND_KEYFRAMES.md#inspector-and-resource-limits)).
 Processing: [row points](LAYERS_AND_KEYFRAMES.md), [retiming/audio](SPEED_AND_AUDIO.md)
 and [grading equations](COLOUR_AND_TIMING.md#colour).
 

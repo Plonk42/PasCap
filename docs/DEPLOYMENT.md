@@ -12,7 +12,11 @@ container build/run recipe exists. The layout and configuration examples below
 record the intended design and future acceptance requirements, not a working
 container deployment. The current native Linux workflow is in
 [../README.md](../README.md#run-locally); current validation is tracked in
-[DELIVERY_STATUS.md](DELIVERY_STATUS.md).
+[DEVELOPMENT.md](DEVELOPMENT.md#validation) and
+[GitHub Actions](https://github.com/Plonk42/PasCap/actions). Container acceptance
+is tracked in [#9 — networking](https://github.com/Plonk42/PasCap/issues/9),
+[#10 — OCI package](https://github.com/Plonk42/PasCap/issues/10) and
+[#11 — both-runtime acceptance](https://github.com/Plonk42/PasCap/issues/11).
 
 ## No-copy source access today
 
