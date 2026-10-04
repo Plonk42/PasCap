@@ -7,6 +7,13 @@ tracking describe how that work is delivered. Local guides describe contracts an
 dated evidence; [ROADMAP.md](ROADMAP.md) is an outcome/dependency index, not a second
 mutable backlog. Historical plans and feature worksheets do not approve new scope.
 
+Record dated verification and acceptance evidence on the corresponding work issue:
+exact commit, toolchain, commands/results, remaining criteria and actual-commit CI
+links. Keep local checks, remote CI and consented hardware/real-workload evidence
+distinct. Versioned guides contain current behaviour, contracts, limitations and
+validation procedures, not a separate delivery-status ledger. Earlier documentation
+and verification snapshots remain in Git history; they are not current acceptance.
+
 ## Work cycle
 
 1. **Inspect before acting.** Confirm the repository/host and current issue,

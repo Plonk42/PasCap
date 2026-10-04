@@ -11,14 +11,14 @@ priorities, progress and delivery updates.
 | --- | --- |
 | [../README.md](../README.md) | Project overview, quick local start and current scope |
 | [USER_GUIDE.md](USER_GUIDE.md) | Projects, no-copy import, repeated excerpts, timeline editing, clip speed curves, row keyframes, music/export and recovery |
-| [DEVELOPMENT.md](DEVELOPMENT.md) | Linux toolchain, commands, synthetic tests, planned CI, architecture and contributor safety |
+| [DEVELOPMENT.md](DEVELOPMENT.md) | Linux toolchain, commands, synthetic tests, CI, architecture and contributor safety |
 | [DEPLOYMENT.md](DEPLOYMENT.md) | Service-side source paths/API and security; planned local Docker/Podman packaging, **not a runnable container recipe** |
 
 ## Processing and editing contracts
 
 | Document | Authority/scope |
 | --- | --- |
-| [COLOUR_AND_TIMING.md](COLOUR_AND_TIMING.md) | SDR grading and fade/dissolve/rational-frame equations; historical v3 animation-storage notes are superseded by the current row-point contract below |
+| [COLOUR_AND_TIMING.md](COLOUR_AND_TIMING.md) | SDR grading, fade/dissolve/rational-frame equations and preview/reference scope |
 | [LAYERS_AND_KEYFRAMES.md](LAYERS_AND_KEYFRAMES.md) | Current whole-row project-time points, ten opt-in channels, interpolation, navigation, movement, composition and resource bounds |
 | [SPEED_AND_AUDIO.md](SPEED_AND_AUDIO.md) | Source-anchored constant/ramp/custom clip curves versus analytic project-time row Speed, precise curve editing, shared retiming and music/export audio |
 | [TIMELINE_EDITING.md](TIMELINE_EDITING.md) | No-copy import, source ranges, ripple/overlay placement, recoverable trims, marked cuts, history and snapping |
@@ -27,18 +27,16 @@ priorities, progress and delivery updates.
 
 Use current row-point and retiming contracts: colour/opacity animation remains
 row-wide, while the separately approved clip-only speed curves use source frames.
-Older clip-local animation descriptions are historical. Detailed documents preserve
-implementation history; their older pending-status passages are not newer evidence
-than the dated final verification table linked below.
+Guides describe current contracts. Explicitly historical reports/design records
+and Git history retain earlier evidence, not current acceptance claims.
 
 ## Status and planning
 
-- [Current heading-help verification](DELIVERY_STATUS.md#current-heading-help-verification)
-  records title-level access and independent expansion separately from the
-  [preceding help interaction checks](DELIVERY_STATUS.md#current-help-popover-verification) and the
-  [recorded 1,115-test core baseline](DELIVERY_STATUS.md#current-clip-speed-verification),
-  remote CI and hardware qualification. [DELIVERY_STATUS.md](DELIVERY_STATUS.md)
-  also preserves prior milestones, native resource bounds and remaining acceptance gates.
+- Dated local verification, acceptance evidence, blockers and next actions belong
+  on the corresponding [GitHub work issue](https://github.com/Plonk42/PasCap/issues).
+  [GitHub Actions](https://github.com/Plonk42/PasCap/actions) records actual-commit
+  remote checks. Guides describe current contracts and validation procedures,
+  not a second delivery-status ledger; deleted documentation remains in Git history.
 - [FEASIBILITY_REPORT.md](FEASIBILITY_REPORT.md): **historical** two-source preview/
   colour evidence. It does not qualify current layered throughput or the intended GPU.
 - Follow planned work in [GitHub issues](https://github.com/Plonk42/PasCap/issues)

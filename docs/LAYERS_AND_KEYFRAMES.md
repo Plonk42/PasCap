@@ -262,10 +262,10 @@ Preview, CPU numeric tests and native layered export share this sampling/composi
 contract, unchanged by schemas 4 and 5. Each source's grade/clip opacity and the complete
 group's layer opacity are evaluated at the same project frame. Full opacity/neutral
 settings preserve the original single-track behavior. Native LUT interpolation and
-final H.264/YUV quantisation are approximations, not bitwise shader equivalence;
-prior evidence and current verification status are separated in
-[DELIVERY_STATUS.md](DELIVERY_STATUS.md). See [COLOUR_AND_TIMING.md](COLOUR_AND_TIMING.md)
-for the unchanged equations.
+final H.264/YUV quantisation are approximations, not bitwise shader equivalence.
+See [COLOUR_AND_TIMING.md](COLOUR_AND_TIMING.md) for the unchanged equations and
+[GitHub Actions](https://github.com/Plonk42/PasCap/actions) for actual-commit CI;
+synthetic checks do not establish intended-GPU or long-flight performance.
 
 ## Source review and derushing
 
@@ -317,19 +317,36 @@ eight layers (primary dissolve plus seven overlays), with unused slots available
 for preloading. Source review adds at most one decoder while visible. No decoder or
 texture is allocated per stored clip.
 
+Export reads one original at a time through the shared backpressured frame mapper.
+The plain static single-layer path retains at most two lossless clips, two
+intermediate decoders and one reusable RGB frame (24.9 MB UHD), plus native memory.
+
 Any shared row point, including a speed-only or neutral-valued point, requires the
 layered native path; the plain static chunk plan rejects it. That pipeline remains
-sequential, with one original decoder, at most two intermediate readers and one
-encoder. RGBA16 premultiplied accumulators preserve
-coverage between layers; final H.264 is encoded once. Three reusable raw buffers
-total 116,121,600 bytes at UHD; two 65³ float LUTs add 6,591,000 bytes, with native
-codec/pipe/filter memory additional. Two clip files and at most two complete
-timeline representations coexist. Scratch is duration-dependent, not fixed in GB.
-Animated LUT generation/CPU passes can be slow. Prior short synthetic UHD evidence
-does not qualify this update's native parity, long-flight throughput or intended-GPU
-performance. The completed 886-test no-copy milestone is historical evidence;
-full-suite reporting for marker movement/channel navigation remains pending in
-[DELIVERY_STATUS.md](DELIVERY_STATUS.md).
+sequential, with at most one original decoder, two intermediate readers and one
+encoder, and at most three native video children per pass. RGBA16 premultiplied
+accumulators preserve coverage between layers; final H.264 is encoded once.
+Three reusable raw buffers
+total **116,121,600 bytes at UHD**; two reusable **65³ Float32 LUTs** add
+**6,591,000 bytes**, with native codec/pipe/filter memory and selected audio PCM
+additional. Grades use evaluated parameters, not crossfaded endpoint LUTs; there
+are no per-frame LUT files or per-frame native-process launches. Source mapping
+uses the layout's captured `PlacedClip.retiming`; grade/opacity sampling uses
+absolute project time, including repeated source images.
+
+At most two lossless clip files and two complete timeline representations coexist;
+a span collection counts as one. Layer accumulators are joined/deleted between
+passes. Selected PCM and the final MP4 remain through verification. Scratch grows
+with those duration-dependent representations, not simultaneously decoded
+originals: these are concurrency bounds, not a fixed memory/disk-in-GB promise.
+Animated LUT generation/CPU passes can be slow, and long 4K/slow-motion edits may
+need substantial disk. Interrupted jobs are not resumed; cancellation/failure
+cleans only owned scratch and preserves originals, saved edits and prior successful
+outputs. Intended-GPU preview, real-flight throughput and long-run A/V/resource
+qualification remain separate work in
+[#6](https://github.com/Plonk42/PasCap/issues/6),
+[#7](https://github.com/Plonk42/PasCap/issues/7) and
+[#8](https://github.com/Plonk42/PasCap/issues/8).
 
 Schema **v5 is strict**, including required unique `media.videoIds` / `media.audioIds`
 arrays, at most 10,000 IDs each. Older v1/v2/v3/v4 project documents and export receipt snapshots

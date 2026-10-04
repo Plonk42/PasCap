@@ -107,12 +107,10 @@ scripts are opt-in and must not be run against someone else's media without cons
 [GitHub Actions](https://github.com/Plonk42/PasCap/actions) runs checks on Node 22
 and 24, plus native-media and browser integration on the checksum-pinned FFmpeg
 8.0.1 toolchain. CI is correctness evidence, **not target-GPU or long-render certification**.
-The current local baseline is **876 unit/service + 185 browser + 54 native tests
-= 1,115**, including a separately opt-in private-tmpfs disk-full check; see
-[delivery evidence](docs/DELIVERY_STATUS.md#current-clip-speed-verification),
-not a performance guarantee. The entry bundle is **475.73 kB / 143.83 kB gzip**,
-with preview/Inspector/Diagnostics loading deferred and no raised warning threshold.
-Earlier test counts and bundle measurements remain historical.
+Record dated local results and acceptance evidence on the corresponding
+[work issue](https://github.com/Plonk42/PasCap/issues), separately from CI for the
+actual delivery commit. Preview/Inspector/Diagnostics loading is deferred;
+resource limits are documented in the [layer contract](docs/LAYERS_AND_KEYFRAMES.md#inspector-and-resource-limits).
 
 [Development guide](docs/DEVELOPMENT.md) · [CI implementation](.github/workflows/ci.yml)
 

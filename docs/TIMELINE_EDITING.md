@@ -386,13 +386,17 @@ a section never disables its processing.
 Keyboard help, context guards, Activity and save/connection recovery are documented
 in [WORKSPACE_AND_RECOVERY.md](WORKSPACE_AND_RECOVERY.md).
 
-GPU performance remains unvalidated on the intended discrete GPU, per the user's
-request. Disposable browser regressions target correctness, not embedded-GPU speed;
-the completed no-copy schema-5 **886-test** milestone, former-copy **909-test**
-baseline and prior v3/v4 verification are historical evidence in
-[DELIVERY_STATUS.md](DELIVERY_STATUS.md). The **982-test** marker/navigation and
-**1,039-test** UX-hardening runs retain their historical evidence; current clip-speed
-results are recorded separately there. Local Docker/Podman packaging is planned, not
-implemented; hardware and real-duration gates are tracked in [ROADMAP.md](ROADMAP.md).
+Disposable browser regressions target correctness, not intended-GPU speed or
+real-duration throughput. Intended-GPU preview and consented real-flight/long-run
+qualification are tracked in [#6](https://github.com/Plonk42/PasCap/issues/6),
+[#7](https://github.com/Plonk42/PasCap/issues/7) and
+[#8](https://github.com/Plonk42/PasCap/issues/8).
+Local Docker/Podman packaging is planned, not implemented; networking, packaging
+and both-runtime acceptance belong to
+[#9](https://github.com/Plonk42/PasCap/issues/9),
+[#10](https://github.com/Plonk42/PasCap/issues/10) and
+[#11](https://github.com/Plonk42/PasCap/issues/11), with the contract in
+[DEPLOYMENT.md](DEPLOYMENT.md). Actual-commit correctness results are available in
+[GitHub Actions](https://github.com/Plonk42/PasCap/actions).
 
 

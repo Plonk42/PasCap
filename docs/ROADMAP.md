@@ -13,15 +13,14 @@ deadline; hardware/real-media work requires explicit owner consent.
 The local schema-5 editor implements no-copy footage import, projects, source
 excerpts, layered timelines, colour/speed/opacity row points, music and verified
 720p/4K export, with precise clip-only speed curves as well as overriding row Speed.
-The recorded **1,115-test** core/native baseline is retained in
-[clip-speed delivery evidence](DELIVERY_STATUS.md#current-clip-speed-verification),
-with the later [question-mark help UI checks](DELIVERY_STATUS.md#current-help-popover-verification)
-and [current UI verification](DELIVERY_STATUS.md#current-ui-verification)
-recorded separately: primary-first presentation, the pinned ruler, synchronized
-native row access, explained layer-action bounds and retained heading help pass
-**900 unit/service + 241 browser** checks.
-Repository
-publication and CI are not a container release or a target-GPU/long-flight
+The UI presents the primary row first, a pinned ruler, synchronized native row
+access, explained layer-action bounds and contextual heading help. Current usage
+and limits are documented in [the user guide](USER_GUIDE.md),
+[layer/resource contracts](LAYERS_AND_KEYFRAMES.md) and
+[development/validation guide](DEVELOPMENT.md).
+Dated acceptance evidence belongs to the corresponding work issues, with
+[CI results](https://github.com/Plonk42/PasCap/actions) for the actual delivery
+commit. Publication and CI are not a container release or a target-GPU/long-flight
 qualification claim.
 
 ## Work selection and next steps
@@ -63,16 +62,15 @@ forms. Those are delivered work, not duplicate open backlog tasks.
 
 The local [UX-hardening update](UX_HARDENING.md) implements the #1 deterministic
 raw-reader fix, #3 storage/recovery controls and genuine constrained-volume test,
-and #4 measured loading boundaries, with simpler visual UI throughout. This is
-local evidence, not issue closure or new remote CI. #2 has a documented sampled-
-versus-full identity prerequisite; no unsafe relink action was introduced. #5
-still requires a maintainer decision.
+and #4 measured loading boundaries, with simpler visual UI throughout. Delivery
+and acceptance are recorded on those issues, not duplicated here. #2 has a
+documented sampled-versus-full identity prerequisite; no unsafe relink action was
+introduced. #5 still requires a maintainer decision.
 
 The separately approved clip-speed extension adds presets and editable source-frame
-curves without replacing row animation. It is committed in logical steps under
-[repository instructions](../.github/copilot-instructions.md) and tracked in #14;
-it does not approve new optical-flow effects or private-media/hardware qualification
-work. `status:local-complete` records verified local delivery, not issue closure.
+curves without replacing row animation; [#14](https://github.com/Plonk42/PasCap/issues/14)
+records its verification and delivery. It does not approve new optical-flow effects
+or private-media/hardware qualification work.
 
 ## v0.2 — Real-workload qualification
 

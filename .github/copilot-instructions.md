@@ -88,5 +88,7 @@
 - Refer to [the development guide](../docs/DEVELOPMENT.md),
   [workspace/recovery contracts](../docs/WORKSPACE_AND_RECOVERY.md),
   [speed/audio contracts](../docs/SPEED_AND_AUDIO.md) and
-  [current delivery evidence](../docs/DELIVERY_STATUS.md). Update these when
-  behaviour changes; do not relabel historical evidence as a new result.
+  [layer/resource contracts](../docs/LAYERS_AND_KEYFRAMES.md). Update these when
+  behaviour changes. Record dated verification evidence on the corresponding
+  GitHub work issue and link actual-commit CI; do not maintain a separate delivery
+  status document or relabel historical evidence as a new result.
