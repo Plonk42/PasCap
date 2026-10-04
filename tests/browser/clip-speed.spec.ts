@@ -88,6 +88,8 @@ test('exact frame/rate/easing fields preserve focus, reject collisions and keep 
   const beforeRate = await current(page);
   await rate.fill('1.234567'); expect(await current(page)).toEqual(beforeRate);
   await rate.press('Enter'); await expect(rate).toBeFocused(); await expect(rate).toHaveValue('1.234567');
+  await point(page, 63).focus(); await point(page, 63).press('ArrowUp'); await expect(rate).toHaveValue('1.244567');
+  await point(page, 63).press('ArrowDown'); await expect(rate).toHaveValue('1.234567');
   await page.getByRole('combobox', { name: 'Clip speed keyframe easing', exact: true }).selectOption('ease-out');
   let document = await current(page); if (document.clips[0]!.speed.mode !== 'curve') throw new Error('Curve expected');
   expect(document.clips[0]!.speed.keyframes[2]).toEqual({ frame: 63, rate: 1.234567, interpolation: 'ease-out' });

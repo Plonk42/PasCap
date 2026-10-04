@@ -5,7 +5,7 @@ import type { Interpolation } from '../shared/keyframes.js';
 import type { ProjectDocument, VideoClip } from '../shared/model.js';
 import { MAX_CLIP_SPEED_KEYS, type SpeedCurve } from '../shared/speed.js';
 import { formatTimecode } from '../shared/timing.js';
-import { clipCurvePoints, previewClipSource, speedRatePosition } from './clip-speed-geometry.js';
+import { clipCurvePoints, previewClipSource, speedRatePosition, stepClipSpeedRate } from './clip-speed-geometry.js';
 import { Icon } from './icons.js';
 import { useKeyframeNavigation } from './keyframe-navigation.js';
 import { NumberField } from './NumberField.js';
@@ -83,8 +83,8 @@ export function ClipSpeedCurve({ project, clip, speed, sourceFrameCount, frame, 
     switch (event.key) {
       case 'ArrowLeft': changes = { frame: Math.max(0, point.frame - (event.shiftKey ? 10 : 1)) }; break;
       case 'ArrowRight': changes = { frame: Math.min(sourceFrameCount, point.frame + (event.shiftKey ? 10 : 1)) }; break;
-      case 'ArrowUp': changes = { rate: Math.min(8, Math.round((point.rate + (event.shiftKey ? 0.1 : 0.01)) * 1000) / 1000) }; break;
-      case 'ArrowDown': changes = { rate: Math.max(0.1, Math.round((point.rate - (event.shiftKey ? 0.1 : 0.01)) * 1000) / 1000) }; break;
+      case 'ArrowUp': changes = { rate: stepClipSpeedRate(point.rate, event.shiftKey ? 0.1 : 0.01) }; break;
+      case 'ArrowDown': changes = { rate: stepClipSpeedRate(point.rate, event.shiftKey ? -0.1 : -0.01) }; break;
       case 'Delete':
       case 'Backspace':
         event.preventDefault(); event.stopPropagation();
