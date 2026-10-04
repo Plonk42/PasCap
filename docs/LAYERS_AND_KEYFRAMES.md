@@ -180,9 +180,10 @@ inspected point clear inspection. A still-valid single-point move and Undo retai
 the cursor and list input identity. **Follow playhead** explicitly ends inspection;
 the cursor is not a saved project field or an Undo operation.
 
-Speed's base mode remains **Constant speed / Ramp up / Ramp down**, with no
-Keyframes option or automatic endpoint keys. When Speed is keyed, its row-rate
-control replaces base editing. Reset to 1× changes only the active Speed participant;
+Speed's clip modes include **Constant speed / Ramp up / Ramp down / Custom curve**.
+Custom supplies 2–256 original-source points owned only by that clip. Clip curves
+never automatically add row participants. When Speed is keyed on the row, its
+row-rate control overrides clip speed. Reset to 1× changes only the active Speed participant;
 it never clears other points/participants or overwrites the saved clip base. Colour
 resets likewise target only enabled colour values at the current point; individual
 resets can edit unanimated clip-base channels.

@@ -20,6 +20,7 @@ deployment targets.
 - Ripple-edited primary sequence and independently positioned overlays, up to eight video layers.
 - Recoverable trims, split, duplication, marked-range cutting, snapping, Undo/Redo and source review.
 - Independent clip colour/speed bases and **shared row-wide keyframes** for opacity, speed and seven colour settings.
+- Precise clip-only speed curves with editable presets, draggable source-frame points and exact rate/easing inputs.
 - Draggable timeline keyframes and setting-specific Previous/Next navigation.
 - Direct panel/help controls, compact visual animation states and grouped editing tools.
 - Cuts, fade-through-black, cross-dissolves and opening/closing fades.
@@ -106,11 +107,12 @@ scripts are opt-in and must not be run against someone else's media without cons
 [GitHub Actions](https://github.com/Plonk42/PasCap/actions) runs checks on Node 22
 and 24, plus native-media and browser integration on the checksum-pinned FFmpeg
 8.0.1 toolchain. CI is correctness evidence, **not target-GPU or long-render certification**.
-The current local baseline is **820 unit/service + 168 browser + 51 native tests**,
-including a separately opt-in private-tmpfs disk-full check; see
-[delivery evidence](docs/DELIVERY_STATUS.md#current-ux-hardening-verification),
-not a performance guarantee. The entry bundle is **370.62 kB / 113.88 kB gzip**;
-its former warning is resolved by measured splitting, not suppression.
+The current local baseline is **876 unit/service + 185 browser + 54 native tests
+= 1,115**, including a separately opt-in private-tmpfs disk-full check; see
+[delivery evidence](docs/DELIVERY_STATUS.md#current-clip-speed-verification),
+not a performance guarantee. The entry bundle is **475.73 kB / 143.83 kB gzip**,
+with preview/Inspector/Diagnostics loading deferred and no raised warning threshold.
+Earlier test counts and bundle measurements remain historical.
 
 [Development guide](docs/DEVELOPMENT.md) · [CI implementation](.github/workflows/ci.yml)
 

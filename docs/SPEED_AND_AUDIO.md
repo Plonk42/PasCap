@@ -243,9 +243,10 @@ the shared content-deduplicated registry/cache or finished exports/receipts.
 Marker movement/channel navigation adds no schema, migration, toolchain or native
 pipeline change. The completed no-copy schema-5 886-test milestone, schema-4
 browser/native checks and earlier measurements are preserved as historical evidence
-in [DELIVERY_STATUS.md](DELIVERY_STATUS.md). The current full-suite baseline is
-781 unit/service, 151 browser and 50 native/media tests (982 total). Intended-GPU,
-long-flight and long-run audio validation remain deferred and are tracked in
+in [DELIVERY_STATUS.md](DELIVERY_STATUS.md). The 982-test marker/channel-navigation
+and 1,039-test UX-hardening baselines remain historical; current clip-speed results
+are recorded separately there. Intended-GPU, long-flight and long-run audio
+validation remain deferred and are tracked in
 [ROADMAP.md](ROADMAP.md). No additional real preparation/render was performed for
-this documentation/publication update.
+this clip-speed update.
 

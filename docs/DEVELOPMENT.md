@@ -90,12 +90,13 @@ Neither suite invokes real-source sample preparation or needs private footage/mu
 
 ### Recorded local baseline
 
-**2026-10-04 local baseline: 820 unit/service + 168 browser + 51 native = 1,039
+**2026-10-04 local baseline: 876 unit/service + 185 browser + 54 native = 1,115
 tests**, strict typechecks/build passing. The native total includes the separately
-enabled private tmpfs test. [Evidence/history](DELIVERY_STATUS.md#current-ux-hardening-verification)
+enabled private tmpfs test. [Evidence/history](DELIVERY_STATUS.md#current-clip-speed-verification)
 is recorded separately from new CI results and target-GPU, long-run memory/A/V or
 complete 5–10 minute real-flight qualification. Complete unit suites passed on
 local Node 22.23.3 and 24.21.0; the final browser/native suites used Node 22.
+The 1,039-test UX-hardening baseline remains historical rather than being relabelled.
 
 ### GitHub CI
 

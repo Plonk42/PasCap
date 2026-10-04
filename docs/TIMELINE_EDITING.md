@@ -364,7 +364,8 @@ review occupies a docked viewer tab rather than covering the workspace. Numeric
 inspector fields commit on Enter/blur, retain invalid drafts for correction and
 support Escape. Source-review paired IN/OUT retains its explicit Apply workflow.
 **Clip / Sequence / Audio** separates source/appearance/speed, transitions/fades and
-music. **Workspace options** holds panel controls/help/Diagnostics; **Layer options**
+music. The header directly exposes panel toggles and help; **Workspace options**
+holds layout reset and Diagnostics. **Layer options**
 holds rename/opacity/stacking/deletion; **Clip actions** holds duplication/nudging,
 while the frequent split/trim/delete/cut actions stay directly visible.
 Diagnostic counters, shader tests and the two-clip native comparison tool remain
@@ -381,9 +382,9 @@ GPU performance remains unvalidated on the intended discrete GPU, per the user's
 request. Disposable browser regressions target correctness, not embedded-GPU speed;
 the completed no-copy schema-5 **886-test** milestone, former-copy **909-test**
 baseline and prior v3/v4 verification are historical evidence in
-[DELIVERY_STATUS.md](DELIVERY_STATUS.md). The current full-suite baseline is
-**982 tests** (781 unit/service + 151 browser + 50 native/media), including the
-marker/navigation regressions. Local Docker/Podman packaging is planned, not
+[DELIVERY_STATUS.md](DELIVERY_STATUS.md). The **982-test** marker/navigation and
+**1,039-test** UX-hardening runs retain their historical evidence; current clip-speed
+results are recorded separately there. Local Docker/Podman packaging is planned, not
 implemented; hardware and real-duration gates are tracked in [ROADMAP.md](ROADMAP.md).
 
 
