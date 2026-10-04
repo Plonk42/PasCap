@@ -1,7 +1,26 @@
 name: Scoped feature proposal
 description: Propose a focused improvement without changing the no-copy/local-only contract.
-labels: [enhancement]
+labels: [enhancement, "priority:p2", "status:backlog"]
 body:
+  - type: markdown
+    attributes:
+      value: Search existing issues first. A proposal, priority or milestone is not implementation approval. Do not attach private media, credentials, project snapshots or filesystem paths. Triage applies area, priority, status and milestone/iteration tracking.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Primary area
+      options:
+        - Editor and frontend (area:editor)
+        - Source/import/relinking (area:media)
+        - Native export/storage (area:export)
+        - Preview/hardware (area:preview)
+        - Music/A/V (area:audio)
+        - Tests/CI (area:ci)
+        - Docker/Podman (area:container)
+        - License/distribution obligations (area:licensing)
+        - Planning/contributor workflow (area:workflow)
+    validations:
+      required: true
   - type: textarea
     id: problem
     attributes:
@@ -26,5 +45,12 @@ body:
   - type: textarea
     id: dependencies
     attributes:
-      label: Dependencies and milestone
-      description: Link existing issues and identify the appropriate milestone when known.
+      label: Dependencies, milestone and iteration
+      description: Link existing issues and identify the outcome milestone/current iteration when known. Triage records real prerequisites as native blocked-by relationships; do not invent a delivery deadline.
+  - type: textarea
+    id: next
+    attributes:
+      label: Proposed next action and approval
+      description: Smallest actionable design/implementation step, priority rationale and any owner decision or consent still needed. Separate a proposal from approved work.
+    validations:
+      required: true

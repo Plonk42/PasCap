@@ -1,0 +1,49 @@
+name: Engineering task or iteration
+description: Track verification, documentation, operations or a bounded iteration using existing issues.
+labels: [task, "priority:p2", "status:backlog"]
+body:
+  - type: markdown
+    attributes:
+      value: Search for an existing task first. For an iteration, link selected issues rather than recreating them; triage adds iteration/iteration:current labels and preserves existing parents. No invented deadline, push, closure, release or real-media job is authorized by this form. Keep evidence public-safe.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Primary area
+      options:
+        - Planning/contributor workflow (area:workflow)
+        - Tests/CI (area:ci)
+        - Editor and frontend (area:editor)
+        - Source/import/relinking (area:media)
+        - Native export/storage (area:export)
+        - Preview/hardware (area:preview)
+        - Music/A/V (area:audio)
+        - Docker/Podman (area:container)
+        - License/distribution obligations (area:licensing)
+    validations:
+      required: true
+  - type: textarea
+    id: goal
+    attributes:
+      label: Goal, scope and non-goals
+      description: Define the approved outcome or pending decision. For an iteration, describe its bounded goal and link the existing selected issues.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance and verification
+      description: Observable completion criteria and applicable checks. Separate local commits/tests, actual-commit remote CI and owner hardware/real-workload acceptance.
+    validations:
+      required: true
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Dependencies, milestone and iteration
+      description: Existing blockers/parents, outcome milestone and current iteration. Preserve existing hierarchy; link already-parented issues instead of moving them.
+  - type: textarea
+    id: next
+    attributes:
+      label: Next action, priority and blockers
+      description: State the immediate step, why it matters and any access, owner decision or consent required. Do not put secrets or private paths here.
+    validations:
+      required: true
