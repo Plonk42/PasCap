@@ -27,11 +27,14 @@
   describe outcomes, not invented sprint deadlines or permission for real-media work.
 - Use a repository-linked GitHub Project for board/iteration views when access is
   available, reusing the same issues and keeping its Status aligned with issue labels.
+  Add new triaged issues to that Project, not duplicate draft cards. Status/label
+  synchronization is explicit; a board drag does not update the issue label or next action.
   If unavailable, record the access limitation and use an iteration issue/checklist;
   never claim a board exists, request secrets or stop otherwise accessible tracking.
 - At the start, after each completed logical step and at handoff, update the issue
-  and iteration with progress, blockers, exact local commits, verification and the
-  next action. Commit references use `Refs #N`; do not add automatic closing keywords.
+  and iteration, plus Project Status when available, with progress, blockers,
+  exact local commits, verification and the next action. Commit references use
+  `Refs #N`; do not add automatic closing keywords.
   Mark verified unpublished work `status:local-complete`, not accepted/closed.
 - Keep local checks, actual-commit remote CI and consented hardware/real-workload
   qualification separate. Do not push, close issues/milestones, release, or start

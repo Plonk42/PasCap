@@ -45,7 +45,9 @@ than the dated final verification table linked below.
   [the current iteration](https://github.com/Plonk42/PasCap/issues/15), native
   dependencies and categorized/prioritized labels. The
   [workflow](GITHUB_WORKFLOW.md) distinguishes local completion from actual-commit
-  CI/review; Projects access is currently unavailable. Tracking is not proof of
+  CI/review. The private repository-linked
+  [planning Project](https://github.com/users/Plonk42/projects/1) reuses those issues
+  in delivery/iteration/milestone views; sign-in is required. Tracking is not proof of
   completed CI, containers or real-flight acceptance.
 - [../EDITOR_IMPLEMENTATION_PLAN.md](../EDITOR_IMPLEMENTATION_PLAN.md) retains the
   original plan and chronology.
