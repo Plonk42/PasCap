@@ -142,7 +142,7 @@ rate/base change or an Undo/autosave operation.
 
 An animated channel is read-only where it does not participate until its hollow
 diamond is clicked. Unanimated Speed uses **Constant speed / Ramp up / Ramp down**
-base controls, with no Keyframes mode. Reset to 1× affects only the active Speed
+or **Custom curve** clip controls. Reset to 1× affects only the active row Speed
 participant when keyed, otherwise the selected clip's base. All stored point times,
 easing and participant values remain editable in **Layer keyframes → Edit points**,
 even beyond current duration.
@@ -163,6 +163,44 @@ diamond capture still use the **real playhead**, not the inspected off-duration
 time. Storing/moving a point beyond duration does not extend the sequence merely
 for that point; only actual clip retiming changes duration. Details:
 [LAYERS_AND_KEYFRAMES.md](LAYERS_AND_KEYFRAMES.md).
+
+### Precise clip-curve editor
+
+With an excerpt selected and no overriding row Speed keys, choose **Speed →
+Custom curve**. A constant rate becomes a flat editable curve; converting an old
+ramp retains its original anchors and easing. Flat, Accelerate, Decelerate, Slow
+centre and Fast centre buttons deliberately replace only this clip's speed points.
+
+The graph uses source time horizontally and a logarithmic **0.1×–8×** speed axis
+vertically. A vertical line identifies the actually displayed source frame. Click
+the background or a point to preview, then **Add point** captures speed at an
+unkeyed displayed source frame. The exclusive OUT anchor previews the last
+available frame, never an invented source frame. Point arrows and the native
+point selector also reach retained off-trim keys.
+
+**Source frame / Speed × / To next point** provide exact editing. Numeric fields
+retain full entered decimal precision and commit on Enter/blur; invalid collisions,
+out-of-original positions and timing conflicts retain the draft with inline
+errors. They do not automatically seek. Escape restores the field. Easing belongs
+to the left point; the last rate holds without a next interval.
+
+Drag a point horizontally to change its integer source frame and vertically to
+change its speed, quantised to **0.001×** for pointer movement only. Capture-relative
+geometry does not drift as duration changes. Valid drafts preview the complete
+new layout while retaining the displayed original source position, but do not
+enter committed history/autosave. Valid release is **one Undo**. Red collision/
+fade/overlap feedback rejects the entire release, not just the last invalid
+movement; no merge, transition shortening or last-valid commit occurs.
+Escape, pointer cancellation, lost capture and window blur restore the original
+preview/document. Other edit/navigation gestures are disabled during capture.
+
+Focused point Left/Right changes one source frame (Shift ten), Up/Down changes
+0.01× (Shift 0.1×), Enter previews it, and Delete removes it if at least two
+points remain. These controls isolate timeline shortcuts; the source frame field
+remains reachable if a point moves outside the visible trim. New points select
+themselves. Reset removes this clip curve in favour of constant 1× without
+changing row points or other clips. The **Row speed animation** controls remain
+separate; an explicit override notice appears when row Speed suppresses clip speed.
 
 ## Music
 

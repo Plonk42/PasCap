@@ -229,6 +229,7 @@ describe('native diamond, previous, next DOM and all control placements', () => 
     const inspector = renderToStaticMarkup(createElement(KeyframeNavigationContext.Provider, { value: navigation() }, createElement(Inspector, {
       project: document, assets: [], selectedClipId: 'clip', selectedLayerId: 'video-1', boundaryId: null,
       frame: 50, drafting: false, section: 'clip', onSection: vi.fn(), onEdit: vi.fn(),
+      onPreview: vi.fn(), onSeek: vi.fn(), onPause: vi.fn(),
     })));
     for (const { label } of KEYFRAME_SETTINGS) {
       for (const name of [`Keyframe ${label}`, `Previous ${label} keyframe`, `Next ${label} keyframe`]) {
