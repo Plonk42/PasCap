@@ -128,31 +128,20 @@
     border-top: 1px solid #34473a;
 }
 
-.inspector-section>summary {
-    display: flex;
-    align-items: center;
-    cursor: pointer;
-    list-style: none;
-    gap: 7px;
-    padding: 10px 13px;
+.inspector-section>.disclosure-heading {
+    gap: 0;
     font-size: 11px;
     font-weight: 550;
     background: #1e2c23;
     user-select: none;
 }
 
-.inspector-section>summary::-webkit-details-marker {
-    display: none;
+.inspector-section .disclosure-trigger {
+    padding: 10px 13px;
 }
 
-.inspector-section>summary::before {
-    content: '›';
-    font-size: 15px;
-    width: 8px;
-}
-
-.inspector-section[open]>summary::before {
-    transform: rotate(90deg);
+.inspector-section>.disclosure-heading>.editor-help {
+    margin-right: 14px;
 }
 
 .inspector-section-content>.source-range,

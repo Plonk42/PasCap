@@ -1,4 +1,3 @@
-import { useId } from 'react';
 import type { EditCommand } from '../shared/commands.js';
 import { editableClipSpeed } from '../shared/clip-speed.js';
 import { activeLayerSetting, evaluateLayerSetting, hasLayerKeys } from '../shared/keyframes.js';
@@ -23,6 +22,7 @@ export interface SpeedControlsProps {
   sourceFrame: number | null;
   sourceFrameCount: number | null;
   disabled: boolean;
+  helpId: string;
   onEdit: (command: EditCommand) => void;
   onPreview: (draft: DraftPreview | null, restoreFrame?: number) => void;
   onSeek: (frame: number) => void;
@@ -94,8 +94,17 @@ function speedScope(clip: VideoClip | null, keyed: boolean): string {
   return clip ? 'Selected clip base' : 'No selected clip base';
 }
 
-export function SpeedControls({ project, clip, layer, frame, projectDuration, placedDuration, disabled, onEdit, onPreview, onSeek, onPause, sourceFrame, sourceFrameCount, resetKey }: Readonly<SpeedControlsProps>) {
-  const helpId = useId();
+export function SpeedHelp({ clip, keyed, helpId }: Readonly<{ clip: VideoClip | null; keyed: boolean; helpId: string }>) {
+  return <HelpPopover label="Speed timing">
+    <p id={helpId}>1× is recorded speed. Custom curve points belong to one clip and use original source frames; drag a point or enter its exact frame/rate. Their positions stay anchored when trimming or splitting. The logarithmic graph spans 0.1×–8×. Slow motion repeats recorded frames, without generated optical-flow images.</p>
+    <p>The Row speed animation diamond keys the whole layer in project timeline time. Row keys override, rather than multiply, each clip's constant/ramp/custom speed. Between row points, capture with the diamond before changing its rate.</p>
+    {!keyed && clip?.speed.mode === 'ramp' && <p>Selected clip ramp anchors: IN {clip.speed.anchorIn}, OUT {clip.speed.anchorOut} (exclusive). Trims do not move them.</p>}
+    {!keyed && clip?.speed.mode === 'constant' && clip.speed.rate < 1 && <p>Slow motion repeats recorded frames.</p>}
+    {keyed && <p>Reset to 1× changes only an enabled Speed value at this frame; it never clears the row curve. Use the diamonds or the shared point list to remove keys explicitly.</p>}
+  </HelpPopover>;
+}
+
+export function SpeedControls({ project, clip, layer, frame, projectDuration, placedDuration, disabled, helpId, onEdit, onPreview, onSeek, onPause, sourceFrame, sourceFrameCount, resetKey }: Readonly<SpeedControlsProps>) {
   const rateId = `${helpId}-rate`;
   const layerContext = `${resetKey ?? layer.id}:${layer.id}`;
   const inputContext = `${layerContext}:${clip?.id ?? 'row'}`;
@@ -135,12 +144,5 @@ export function SpeedControls({ project, clip, layer, frame, projectDuration, pl
       <svg className="speed-graph" viewBox="0 0 220 55" role="img" aria-label={`${keyed ? 'Layer' : 'Clip base'} speed curve · ${graphRange}`}><path d="M0 48H220" stroke="var(--line)" /><polyline points={speedGraphPoints(clip, layer, projectDuration)} fill="none" stroke="var(--accent)" strokeWidth="2" /></svg>
       <div className="speed-graph-range"><span>{graphRange}</span><span>0–8×</span></div>
     </>}
-    <HelpPopover label="Speed timing" className="control-help">
-      <p id={helpId}>1× is recorded speed. Custom curve points belong to one clip and use original source frames; drag a point or enter its exact frame/rate. Their positions stay anchored when trimming or splitting. The logarithmic graph spans 0.1×–8×. Slow motion repeats recorded frames, without generated optical-flow images.</p>
-      <p>The Row speed animation diamond keys the whole layer in project timeline time. Row keys override, rather than multiply, each clip's constant/ramp/custom speed. Between row points, capture with the diamond before changing its rate.</p>
-      {!keyed && clip?.speed.mode === 'ramp' && <p>Selected clip ramp anchors: IN {clip.speed.anchorIn}, OUT {clip.speed.anchorOut} (exclusive). Trims do not move them.</p>}
-      {!keyed && clip?.speed.mode === 'constant' && clip.speed.rate < 1 && <p>Slow motion repeats recorded frames.</p>}
-      {keyed && <p>Reset to 1× changes only an enabled Speed value at this frame; it never clears the row curve. Use the diamonds or the shared point list to remove keys explicitly.</p>}
-    </HelpPopover>
   </section>;
 }

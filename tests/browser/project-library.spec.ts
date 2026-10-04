@@ -88,7 +88,7 @@ test('audio imports persist in the new project bin without assigning a music tra
   const id = await create(page);
   await page.getByRole('tab', { name: 'Audio', exact: true }).click();
   const filename = page.getByRole('textbox', { name: 'Music file path', exact: true });
-  if (!await filename.isVisible()) await page.locator('summary[aria-label="Music section"]').click();
+  if (!await filename.isVisible()) await page.getByRole('button', { name: 'Music section', exact: true }).click();
   await filename.fill('/memory-only/music.wav');
   await page.getByRole('button', { name: 'Import audio', exact: true }).click();
   await expect(page.locator('select[aria-label="Music recording"] option')).toHaveCount(2);

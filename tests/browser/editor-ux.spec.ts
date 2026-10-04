@@ -120,9 +120,9 @@ test('selected context precedes compact animation controls and adjusted sections
   const control = page.getByRole('button', { name: 'Keyframe Exposure', exact: true });
   await expect(control).toHaveAccessibleDescription(/static base/);
   await page.getByRole('slider', { name: 'Exposure', exact: true }).fill('0.4');
-  await expect(page.locator('summary[aria-label="Colour section"] .inspector-section-modified')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Colour section', exact: true }).locator('.inspector-section-modified')).toBeVisible();
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
-  await expect(page.locator('summary[aria-label="Colour section"] .inspector-section-modified')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Colour section', exact: true }).locator('.inspector-section-modified')).toHaveCount(0);
 });
 
 test('animated visual feedback retains explicit capture, native navigation order, and one Undo', async ({ page }) => {
@@ -144,7 +144,7 @@ test('animated visual feedback retains explicit capture, native navigation order
 
 test('hiding the deferred inspector applies a blur draft once and retains its section state', async ({ page }) => {
   const before = await current(page);
-  await page.locator('summary[aria-label="Source range section"]').click();
+  await page.getByRole('button', { name: 'Source range section', exact: true }).click();
   const input = page.getByRole('spinbutton', { name: 'Source IN frame', exact: true });
   await input.fill('5');
   const toggle = page.getByRole('button', { name: 'Toggle Clip panel', exact: true });

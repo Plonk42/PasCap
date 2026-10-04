@@ -554,7 +554,7 @@ body {
     color: #d5e7d5;
 }
 
-.product-workspace .inspector-section>summary {
+.product-workspace .inspector-section .disclosure-trigger {
     padding: 12px 14px;
     font-size: 13px;
     background: #212e25;
