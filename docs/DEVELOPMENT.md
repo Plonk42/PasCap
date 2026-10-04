@@ -99,8 +99,10 @@ local Node 22.23.3 and 24.21.0; the final browser/native suites used Node 22.
 The 1,039-test UX-hardening baseline remains historical rather than being relabelled.
 
 The later [inline-help UI verification](DELIVERY_STATUS.md#current-help-popover-verification)
-records its fresh checks separately. The shared hover/pinned question-mark control
-adds viewport/focus/draft/touch coverage without changing the native pipeline;
+records the completed hover/pin/dismiss checks separately. The current
+[heading-placement verification](DELIVERY_STATUS.md#current-heading-help-verification)
+adds collapsed-title access, independent native expansion/help, mounted drafts
+and compact geometry coverage without changing the native pipeline;
 the older 54 native/private-tmpfs results are not claimed as a new run.
 
 ### GitHub CI

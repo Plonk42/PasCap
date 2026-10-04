@@ -16,6 +16,7 @@ excerpts, layered timelines, colour/speed/opacity row points, music and verified
 The recorded **1,115-test** core/native baseline is retained in
 [clip-speed delivery evidence](DELIVERY_STATUS.md#current-clip-speed-verification),
 with the later [question-mark help UI checks](DELIVERY_STATUS.md#current-help-popover-verification)
+and [heading-placement verification](DELIVERY_STATUS.md#current-heading-help-verification)
 recorded separately. Repository
 publication and CI are not a container release or a target-GPU/long-flight
 qualification claim.
@@ -51,7 +52,7 @@ cleanup; no new Iteration dates or Project field/view changes are implied here.
 | [#12 — GitHub workflow](https://github.com/Plonk42/PasCap/issues/12) | Keep instructions/forms, categorized priorities, next actions and iteration/dependency tracking aligned |
 | [#13 — Shared-point movement/navigation](https://github.com/Plonk42/PasCap/issues/13) | Retrospective delivered-feature record; preserve whole-point transactions, independent channel navigation and dated evidence |
 | [#14 — Precise clip speed](https://github.com/Plonk42/PasCap/issues/14) | Track approved source-frame curves and locally verified graph/numeric/native delivery separately from remote acceptance |
-| [#16 — Compact contextual help](https://github.com/Plonk42/PasCap/issues/16) | Replace help-only disclosures with accessible hover/pinned question-mark buttons, preserving drafts/focus and actual editable/data panels |
+| [#16 — Compact contextual help](https://github.com/Plonk42/PasCap/issues/16) | Heading-level hover/pinned question-mark buttons accessible even when collapsed, with independent expansion and preserved drafts/focus/editable panels |
 
 Done means a repeatable, documented local foundation—not more CapCut-style effects.
 The initial publication includes README/user/developer guides, pinned CI and issue

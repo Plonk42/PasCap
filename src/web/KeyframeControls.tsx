@@ -5,6 +5,7 @@ import type { VideoLayer } from '../shared/model.js';
 import { formatTimecode } from '../shared/timing.js';
 import './declutter.css';
 import './layer-keyframes.css';
+import { Disclosure } from './Disclosure.js';
 import { HelpPopover } from './HelpPopover.js';
 import { Icon } from './icons.js';
 import { keyframeNavigationFrame, keySeekHint, useKeyframeNavigation } from './keyframe-navigation.js';
@@ -179,13 +180,8 @@ export function KeyframeControls({ projectId, layer, frame, duration, disabled, 
       {inspection && <button type="button" className="text-button" onClick={navigation.onFollowPlayhead}>Follow playhead</button>}
     </div>}
 
-    {keys.length > 0 && <details className="keyframe-list" open={listOpen} onToggle={(event) => {
-      const expanded = event.currentTarget.open;
-      if (expanded === listOpen) return;
-      setListOpen(expanded);
-    }}><summary id={listId} aria-label="Edit layer keys" aria-expanded={listOpen} aria-controls={entriesId}>Edit points</summary>
-      <ol className="keyframe-entries" id={entriesId} aria-labelledby={listId}>{keys.map((key, index) => <KeyframePointRow key={current.rows[index]!.id} point={key} keys={keys} row={current.rows[index]!} layerId={layer.id} context={context} listId={listId} helpId={helpId} duration={duration} current={(inspection !== null || previewAvailable) && key.frame === navigationFrame} disabled={unavailable} onEdit={onEdit} onSeek={seekPoint} />)}</ol>
-      <HelpPopover label="Keyframe timing" className="control-help"><p id={helpId}>Absolute project timeline frames, independent of clip trims. Moving a point moves every participating setting. Its easing runs to each setting's next participating point; the first and last channel values hold. An unkeyed setting uses each clip's base, or the layer base for layer opacity. Points outside the current duration stay editable; navigation previews the nearest available frame without moving them.</p></HelpPopover>
-    </details>}
+    {keys.length > 0 && <Disclosure className="keyframe-list" title="Edit points" label="Edit layer keys" triggerId={listId} contentId={entriesId} open={listOpen} onToggle={setListOpen} help={<HelpPopover label="Keyframe timing"><p id={helpId}>Absolute project timeline frames, independent of clip trims. Moving a point moves every participating setting. Its easing runs to each setting's next participating point; the first and last channel values hold. An unkeyed setting uses each clip's base, or the layer base for layer opacity. Points outside the current duration stay editable; navigation previews the nearest available frame without moving them.</p></HelpPopover>}>
+      <ol className="keyframe-entries" aria-labelledby={listId}>{keys.map((key, index) => <KeyframePointRow key={current.rows[index]!.id} point={key} keys={keys} row={current.rows[index]!} layerId={layer.id} context={context} listId={listId} helpId={helpId} duration={duration} current={(inspection !== null || previewAvailable) && key.frame === navigationFrame} disabled={unavailable} onEdit={onEdit} onSeek={seekPoint} />)}</ol>
+    </Disclosure>}
   </fieldset>;
 }

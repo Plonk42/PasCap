@@ -1,14 +1,21 @@
-import { useId, useState } from 'react';
+import { useId, useState, type ReactNode } from 'react';
 import type { AudioAsset } from '../shared/audio.js';
 import type { EditCommand } from '../shared/commands.js';
 import type { MusicTrack, ProjectDocument } from '../shared/model.js';
 import { calculateLayout } from '../shared/timeline.js';
 import './declutter.css';
 import { durationLabel, sourceSeconds } from './display.js';
+import { Disclosure } from './Disclosure.js';
 import { HelpPopover } from './HelpPopover.js';
 import { NumberField } from './NumberField.js';
 
 interface Props { project: ProjectDocument; assets: AudioAsset[]; busy: boolean; drafting: boolean; onImport: (path: string) => Promise<void>; onPrepare: (id: string) => Promise<void>; onEdit: (command: EditCommand) => void }
+
+function MusicTiming({ helpId, children }: Readonly<{ helpId: string; children: ReactNode }>) {
+  const [open, setOpen] = useState(false);
+  return <Disclosure className="music-timing" title="Placement & fades" label="Placement & fades" triggerId={`${helpId}-timing-title`} contentId={`${helpId}-timing-fields`} open={open} onToggle={setOpen} help={<HelpPopover label="Audio timing"><p id={helpId}>IN / OUT use original audio frames; OUT is exclusive. Start, duration and fades use timeline frames. Both fades must fit within Duration.</p></HelpPopover>}>{children}</Disclosure>;
+}
+
 export function MusicControls({ project, assets, busy, drafting, onImport, onPrepare, onEdit }: Readonly<Props>) {
   const helpId = useId();
   const [filename, setFilename] = useState('');
@@ -31,12 +38,11 @@ export function MusicControls({ project, assets, busy, drafting, onImport, onPre
       <div className="music-track-overview"><span>{sourceSeconds(music.duration)} on timeline</span><button className="text-button" disabled={drafting || !duration} onClick={() => update({ start: 0, duration: music.loop ? duration : Math.min(duration, music.sourceOut - music.sourceIn) })}>Fit to video duration</button></div>
       <label className="speed-field">Gain dB<NumberField aria-label="Music gain" min={-60} max={12} step={0.5} value={music.gainDb} disabled={drafting} resetKey={inputContext} onCommit={(gainDb) => update({ gainDb })} /></label>
       <label className="music-loop"><input type="checkbox" aria-label="Loop music" checked={music.loop} disabled={drafting} onChange={(event) => update({ loop: event.target.checked })} />Loop selected source range</label>
-      <details className="music-timing"><summary>Placement & fades</summary>
+      <MusicTiming helpId={helpId}>
         <div className="range-fields"><label>Source IN<NumberField aria-label="Music source IN" aria-describedby={helpId} min={0} max={music.sourceOut - 1} integer step={1} value={music.sourceIn} disabled={drafting} resetKey={inputContext} validate={(value) => sourceRangeError(value, music.sourceOut)} onCommit={(sourceIn) => update({ sourceIn })} /></label><label>Source OUT<NumberField aria-label="Music source OUT" aria-describedby={helpId} min={music.sourceIn + 1} max={Math.min(source?.metadata.frameCount ?? 2_147_483_647, 2_147_483_647)} integer step={1} value={music.sourceOut} disabled={drafting} resetKey={inputContext} validate={(value) => sourceRangeError(music.sourceIn, value)} onCommit={(sourceOut) => update({ sourceOut })} /></label></div>
         <div className="range-fields"><label>Timeline start<NumberField aria-label="Music timeline start" aria-describedby={helpId} min={0} max={2_147_483_647} integer step={1} value={music.start} disabled={drafting} resetKey={inputContext} onCommit={(start) => update({ start })} /></label><label>Duration · frames<NumberField aria-label="Music duration" aria-describedby={helpId} min={Math.max(1, music.fadeIn + music.fadeOut)} max={music.loop ? 2_147_483_647 : music.sourceOut - music.sourceIn} integer step={1} value={music.duration} disabled={drafting} resetKey={inputContext} hint={music.loop ? 'At least the combined fade lengths.' : 'Must fit the source range and combined fades; enable Loop music to repeat.'} onCommit={(duration) => update({ duration })} /></label></div>
         <div className="range-fields"><label>Fade in · frames<NumberField aria-label="Music fade in" aria-describedby={helpId} min={0} max={music.duration - music.fadeOut} integer step={1} value={music.fadeIn} disabled={drafting} resetKey={inputContext} onCommit={(fadeIn) => update({ fadeIn })} /></label><label>Fade out · frames<NumberField aria-label="Music fade out" aria-describedby={helpId} min={0} max={music.duration - music.fadeIn} integer step={1} value={music.fadeOut} disabled={drafting} resetKey={inputContext} onCommit={(fadeOut) => update({ fadeOut })} /></label></div>
-        <HelpPopover label="Audio timing" className="control-help"><p id={helpId}>IN / OUT use original audio frames; OUT is exclusive. Start, duration and fades use timeline frames. Both fades must fit within Duration.</p></HelpPopover>
-      </details>
+      </MusicTiming>
     </>}
   </section>;
 }

@@ -242,8 +242,6 @@ for (const context of HELP_CONTEXTS) {
     test(`${context.label} uses a compact hover/pinned question mark and retains its complete explanation`, async ({ page }) => {
         const before = await current(page);
         await inspectorTab(page, context.tab);
-        if (context.label === 'Keyframe timing') await page.getByLabel('Edit layer keys', { exact: true }).click();
-        if (context.label === 'Audio timing') await page.getByText('Placement & fades', { exact: true }).click();
         const trigger = page.getByRole('button', { name: `${context.label} help`, exact: true });
         const panel = await panelFor(page, trigger);
         await trigger.scrollIntoViewIfNeeded();
@@ -325,16 +323,65 @@ test('hover keeps a valid numeric draft unapplied; clicking help keeps the ordin
     await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
 });
 
-test('collapsing an editable point list by keyboard closes its help without removing the actual fields', async ({ page }) => {
+test('collapsing an editable point list keeps its heading help available and its fields mounted', async ({ page }) => {
     const list = page.getByLabel('Edit layer keys', { exact: true }); await list.click();
     const trigger = page.getByRole('button', { name: 'Keyframe timing help', exact: true });
     const panel = await panelFor(page, trigger);
     await trigger.click(); await expect(panel).toBeVisible();
     await list.focus(); await list.press('Enter');
-    await expect.poll(() => panel.evaluate((element) => element.matches(':popover-open'))).toBe(false);
+    await expect(list).toHaveAttribute('aria-expanded', 'false');
+    // Activating another native button is an outside click even from Enter.
+    await expect(panel).toBeHidden(); await expect(trigger).toBeVisible();
+    await trigger.click(); await expect(panel).toBeVisible();
+    await expect(list).toHaveAttribute('aria-expanded', 'false');
+    await trigger.press('Escape'); await expect(panel).toBeHidden();
     await list.press('Enter'); await page.getByLabel('Edit layer keyframe 10', { exact: true }).click();
     await expect(page.getByRole('spinbutton', { name: 'Layer keyframe frame 10', exact: true })).toBeVisible();
     expect(memory.saves).toBe(0);
+});
+
+for (const context of [
+    { title: 'Edit points', toggle: 'Edit layer keys', help: 'Keyframe timing', tab: 'Clip' },
+    { title: 'Placement & fades', toggle: 'Placement & fades', help: 'Audio timing', tab: 'Audio' },
+] as const) {
+    test(`${context.title} has independent title-level help before opening its editable fields`, async ({ page }) => {
+        const before = await current(page); await inspectorTab(page, context.tab);
+        const toggle = page.getByRole('button', { name: context.toggle, exact: true });
+        const help = page.getByRole('button', { name: `${context.help} help`, exact: true });
+        const panel = await panelFor(page, help);
+        await toggle.scrollIntoViewIfNeeded(); await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+        const header = toggle.locator('xpath=../..');
+        const bounds = (await header.boundingBox())!; const button = (await help.boundingBox())!;
+        expect(Math.abs(button.y + button.height / 2 - bounds.y - bounds.height / 2)).toBeLessThanOrEqual(1);
+        expect(await help.evaluate((element) => element.parentElement?.parentElement?.classList.contains('disclosure-heading'))).toBe(true);
+        await toggle.focus(); await page.keyboard.press('Tab'); await expect(help).toBeFocused();
+        await help.press('Enter'); await expect(help).toHaveAttribute('aria-pressed', 'true');
+        await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+        await help.press('Escape'); await expect(panel).toBeHidden(); await toggle.press('Space');
+        await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+        expect(await current(page)).toEqual(before); expect(memory.saves).toBe(0);
+    });
+}
+
+test('all Inspector title actions and help remain distinct and unclipped at a 270px panel width', async ({ page }) => {
+    const before = await current(page);
+    await page.addInitScript(() => localStorage.setItem('pascap-workspace-layout', JSON.stringify({ mediaWidth: 300, inspectorWidth: 270, timelineHeight: 290, mediaOpen: true, inspectorOpen: true })));
+    await page.reload(); await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
+    expect(Number(await page.getByRole('slider', { name: 'Resize Clip panel', exact: true }).getAttribute('aria-valuenow'))).toBe(270);
+    for (const context of INSPECTOR_HELP_HEADINGS) {
+        await inspectorTab(page, context.tab);
+        const section = page.getByRole('button', { name: `${context.title} section`, exact: true });
+        const help = page.getByRole('button', { name: `${context.help} help`, exact: true });
+        await section.scrollIntoViewIfNeeded();
+        const heading = (await section.boundingBox())!; const target = (await help.boundingBox())!;
+        expect(target.x).toBeGreaterThanOrEqual(heading.x + heading.width);
+        expect(target.width).toBe(24); expect(target.height).toBe(24);
+        const inspector = (await page.getByRole('complementary', { name: 'Clip inspector', exact: true }).boundingBox())!;
+        expect(target.x + target.width).toBeLessThanOrEqual(inspector.x + inspector.width);
+        await help.click(); await expect(section).toHaveAttribute('aria-expanded', 'true');
+        await help.press('Escape');
+    }
+    expect(await current(page)).toEqual(before); expect(memory.saves).toBe(0);
 });
 
 for (const width of [1440, 1024, 720, 640]) {
@@ -346,6 +393,9 @@ for (const width of [1440, 1024, 720, 640]) {
         const panel = await panelFor(page, trigger);
         await trigger.scrollIntoViewIfNeeded(); await trigger.hover(); await expect(panel).toBeVisible();
         const target = (await trigger.boundingBox())!; const bounds = (await panel.boundingBox())!;
+        const section = page.getByRole('button', { name: 'Speed section', exact: true });
+        const heading = (await section.locator('xpath=../..').boundingBox())!;
+        expect(Math.abs(target.y + target.height / 2 - heading.y - heading.height / 2)).toBeLessThanOrEqual(1);
         expect(target.width).toBeGreaterThanOrEqual(24); expect(target.height).toBeGreaterThanOrEqual(24);
         expect(bounds.x).toBeGreaterThanOrEqual(8); expect(bounds.y).toBeGreaterThanOrEqual(8);
         expect(bounds.x + bounds.width).toBeLessThanOrEqual(width - 8);
@@ -365,6 +415,10 @@ test('startup-error help retains diagnostics and dismissal never reloads or edit
     await expect(page.getByRole('button', { name: 'Reload editor', exact: true })).toBeVisible();
     const trigger = page.getByRole('button', { name: 'Startup details help', exact: true });
     const panel = await panelFor(page, trigger);
+    const heading = page.getByRole('heading', { name: 'Preview needs attention', exact: true });
+    expect(await trigger.evaluate((element) => element.parentElement?.parentElement?.classList.contains('preview-empty-heading'))).toBe(true);
+    const titleBounds = (await heading.boundingBox())!; const helpBounds = (await trigger.boundingBox())!;
+    expect(Math.abs(titleBounds.y + titleBounds.height / 2 - helpBounds.y - helpBounds.height / 2)).toBeLessThanOrEqual(1);
     await trigger.hover(); await expect(panel).toBeVisible(); await expect(panel).toContainText(/import|fetch|Preview/i);
     await trigger.click(); await trigger.press('Escape'); await expect(panel).toBeHidden();
     await expect(page.getByRole('button', { name: 'Reload editor', exact: true })).toBeVisible();

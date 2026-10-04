@@ -171,7 +171,7 @@ test('the shared list labels time/value/easing, retains reordered input focus, a
   await page.locator('[data-clip-id="other-row"] .timeline-clip-body').evaluate((button) => (button as HTMLButtonElement).click());
   const otherKeys = layerKeyframes(page, 'Video 2');
   const otherValue = otherKeys.getByRole('spinbutton', { name: 'Clip opacity keyframe value 80', exact: true });
-  await expect(otherKeys.locator('.keyframe-list')).toHaveAttribute('open', '');
+  await expect(otherKeys.getByRole('button', { name: 'Edit layer keys', exact: true })).toHaveAttribute('aria-expanded', 'true');
   await expect(otherValue).toHaveValue('0.4');
   await expect(otherValue).toBeFocused();
   expect((await currentProject(page)).layers[0]?.keyframes[0]?.values.clipOpacity).toBe(0.4);
@@ -179,7 +179,7 @@ test('the shared list labels time/value/easing, retains reordered input focus, a
   await page.evaluate(() => window.pascapLab!.flush());
   await page.reload();
   await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
-  await expect(layerKeyframes(page, 'Video 1').locator('.keyframe-list')).toHaveAttribute('open', '');
+  await expect(layerKeyframes(page, 'Video 1').getByRole('button', { name: 'Edit layer keys', exact: true })).toHaveAttribute('aria-expanded', 'true');
 });
 
 test('row-speed navigation reaches project points and previews outside-duration points at the nearest frame', async ({ page }) => {
@@ -226,7 +226,7 @@ test('row-speed navigation reaches project points and previews outside-duration 
   expect((await currentProject(page)).layers[0]?.keyframes[0]).toEqual(sharedPoint(0, { speed: 1 }));
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   expect((await currentProject(page)).layers[0]?.keyframes).toEqual(points);
-  await expect(keys.locator('.keyframe-list')).toHaveAttribute('open', '');
+  await expect(keys.getByRole('button', { name: 'Edit layer keys', exact: true })).toHaveAttribute('aria-expanded', 'true');
 });
 
 test('speed/ramp numbers commit explicitly and reset to 1× changes only speed in one undo step', async ({ page }) => {

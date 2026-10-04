@@ -33,8 +33,9 @@ than the dated final verification table linked below.
 
 ## Status and planning
 
-- [Current help UI verification](DELIVERY_STATUS.md#current-help-popover-verification)
-  records the question-mark hover/pin/dismiss update separately from the
+- [Current heading-help verification](DELIVERY_STATUS.md#current-heading-help-verification)
+  records title-level access and independent expansion separately from the
+  [preceding help interaction checks](DELIVERY_STATUS.md#current-help-popover-verification) and the
   [recorded 1,115-test core baseline](DELIVERY_STATUS.md#current-clip-speed-verification),
   remote CI and hardware qualification. [DELIVERY_STATUS.md](DELIVERY_STATUS.md)
   also preserves prior milestones, native resource bounds and remaining acceptance gates.

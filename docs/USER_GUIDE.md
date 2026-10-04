@@ -252,8 +252,14 @@ at the playhead. **Animation help** explains scope and capture once; no static
 or animated control was removed. Search/filter clear actions, mixed select-all
 and always-visible media Add simplify the library.
 
-Inline help is now a small **? button**, not an expandable text section. Hover or
-focus to preview it; click, Enter or Space to keep it open while moving away.
+Inline help is a small **? button**, not an expandable text section. Find it
+beside the relevant title—**Source range**, **Layer &
+opacity**, **Speed**, **Colour**, **Transition**, **Sequence fades**, **Edit points**
+or **Placement & fades**—even when that section is collapsed. Help and expansion
+are separate buttons; no scrolling to the end of a section is needed. Startup
+details are next to **Preview needs attention**.
+
+Hover or focus to preview it; click, Enter or Space to keep it open while moving away.
 You can move the pointer into the help to read it, or press Down arrow to focus
 and scroll its text. Escape or a click elsewhere closes it; Escape closes help
 before cancelling an input draft. Hovering help never applies a field or edits
