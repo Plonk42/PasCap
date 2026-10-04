@@ -5,10 +5,10 @@ import type { VideoLayer } from '../shared/model.js';
 import { formatTimecode } from '../shared/timing.js';
 import './declutter.css';
 import './layer-keyframes.css';
+import { HelpPopover } from './HelpPopover.js';
 import { Icon } from './icons.js';
 import { keyframeNavigationFrame, keySeekHint, useKeyframeNavigation } from './keyframe-navigation.js';
 import { NumberField } from './NumberField.js';
-import { Popover } from './Popover.js';
 import { readPreference, writePreference } from './preferences.js';
 
 export interface KeyframeControlsProps {
@@ -161,11 +161,11 @@ export function KeyframeControls({ projectId, layer, frame, duration, disabled, 
         <button type="button" className="icon-button" aria-label="Next layer keyframe" title={next ? keySeekHint(next.frame, duration) : 'No next shared point'} disabled={unavailable || !next} onClick={() => { if (next) seekPoint(next); }}><Icon name="forward" size={14} /></button>
       </div>
       {atHead && <button type="button" className="icon-button" disabled={unavailable} aria-label="Remove layer keyframe at playhead" title="Remove this whole shared point and all its participating settings" onClick={() => onEdit({ type: 'layer-key-remove', layerId: layer.id, frame: atHead.frame })}><Icon name="x" size={14} /></button>}
-      <Popover label="Animation help" className="animation-help" trigger={<Icon name="help" size={15} />}>
+      <HelpPopover label="Animation" className="animation-help">
         <p>Each setting's diamond animates this whole video row, not just the selected clip. All participating settings share one point and its easing.</p>
         <div className="animation-legend"><span><span aria-hidden="true">◇</span>Static base · click to capture</span><span><Icon name="curve" size={14} />Row curve · capture before editing</span><span><span aria-hidden="true">◆</span>Key at playhead · editable</span></div>
         <p>Use the arrows beside a diamond to visit that setting's keys. Drag a timeline point to move all its participants; Escape cancels.</p>
-      </Popover>
+      </HelpPopover>
     </div>
 
     <div className="layer-keyframe-current">

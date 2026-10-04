@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import './declutter.css';
 import { Icon } from './icons.js';
+import { popoverPosition, type PopoverPosition } from './popover-position.js';
 
 interface Props { label: string; className?: string; trigger?: ReactNode; children: ReactNode | ((close: () => void) => ReactNode) }
-interface Position { left: number; top: number }
 
 /** A nonmodal disclosure: normal Tab order, not an incomplete ARIA menu. */
 export function Popover({ label, className = '', trigger: triggerContent, children }: Readonly<Props>) {
@@ -12,7 +12,7 @@ export function Popover({ label, className = '', trigger: triggerContent, childr
     const trigger = useRef<HTMLElement>(null);
     const content = useRef<HTMLFieldSetElement>(null);
     const [open, setOpen] = useState(false);
-    const [position, setPosition] = useState<Position | null>(null);
+    const [position, setPosition] = useState<PopoverPosition | null>(null);
     const close = useCallback((restoreFocus = true): void => {
         if (content.current?.matches(':popover-open')) content.current.hidePopover();
         setOpen(false); setPosition(null);
@@ -20,14 +20,8 @@ export function Popover({ label, className = '', trigger: triggerContent, childr
     }, []);
     const place = useCallback((): void => {
         if (!trigger.current || !content.current) return;
-        const anchor = trigger.current.getBoundingClientRect();
-        const panel = content.current.getBoundingClientRect();
-        const margin = 8;
-        const gap = 6;
-        const left = Math.max(margin, Math.min(anchor.right - panel.width, window.innerWidth - panel.width - margin));
-        const below = anchor.bottom + gap;
-        const top = Math.max(margin, Math.min(below + panel.height <= window.innerHeight - margin ? below : anchor.top - panel.height - gap, window.innerHeight - panel.height - margin));
-        setPosition((previous) => previous?.left === left && previous.top === top ? previous : { left, top });
+        const next = popoverPosition(trigger.current.getBoundingClientRect(), content.current.getBoundingClientRect(), { width: innerWidth, height: innerHeight });
+        setPosition((previous) => previous?.left === next.left && previous.top === next.top ? previous : next);
     }, []);
 
     // The native top layer escapes clipping AND size-container fixed-position containing blocks.

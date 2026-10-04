@@ -127,15 +127,8 @@
     font-size: 11px;
 }
 
-.product-workspace .animation-help>summary.editor-popover-trigger {
-    width: 24px;
-    height: 28px;
-}
-
-.animation-help .editor-popover-content {
+.animation-help .editor-help-content {
     width: 290px;
-    color: #d3ded6;
-    font-size: 12px;
 }
 
 .animation-legend {

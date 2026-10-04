@@ -59,7 +59,7 @@ function timingKey(project: ProjectDocument): string {
 
 function shortcutBlocked(event: KeyboardEvent): boolean {
   const target = event.target;
-  return event.defaultPrevented || !!document.querySelector('dialog[open]') || (target instanceof HTMLElement && target.closest('input,textarea,select,[role="slider"],[role="separator"],[contenteditable="true"],.source-review,.activity-drawer,.editor-popover,.clip-speed-curve-editor') !== null);
+  return event.defaultPrevented || !!document.querySelector('dialog[open]') || (target instanceof HTMLElement && target.closest('input,textarea,select,[role="slider"],[role="separator"],[contenteditable="true"],.source-review,.activity-drawer,.editor-popover,.editor-help,.clip-speed-curve-editor') !== null);
 }
 
 function message(cause: unknown, fallback: string): string { return cause instanceof Error && cause.message ? cause.message : fallback; }
