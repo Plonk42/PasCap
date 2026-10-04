@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { clipSpeedPreset } from '../../src/shared/clip-speed.js';
 import { createClip, createProject } from '../../src/shared/model.js';
 import { calculateLayout } from '../../src/shared/timeline.js';
-import { clipCurvePoints, clipSpeedPointer, planClipSpeedDrag, previewClipSource, speedRatePosition } from '../../src/web/clip-speed-geometry.js';
+import { clipCurvePoints, clipSpeedPointer, planClipSpeedDrag, previewClipSource, speedRatePosition, stepClipSpeedRate } from '../../src/web/clip-speed-geometry.js';
 
 function fixture() {
   const project = createProject('curve-gesture', 'Curve gesture'); const clip = createClip('clip', 'source', 0, 120);
@@ -15,6 +15,13 @@ describe('clip speed graph geometry and transaction planning', () => {
     const height = 158;
     const dy = -(Math.log(2) / Math.log(80)) * height;
     expect(clipSpeedPointer({ originFrame: 60, originRate: 1, deltaX: 15, deltaY: dy, width: 180, height, sourceIn: 0, sourceOut: 120 })).toEqual({ frame: 70, rate: 2 });
+  });
+  it('retains entered decimal precision through keyboard increments without pointer quantisation or accumulating float noise', () => {
+    expect(stepClipSpeedRate(1.234567, 0.01)).toBe(1.244567);
+    expect(stepClipSpeedRate(1.234567, -0.1)).toBe(1.134567);
+    expect(stepClipSpeedRate(0.3, -0.1)).toBe(0.2);
+    expect(stepClipSpeedRate(stepClipSpeedRate(1.234567, 0.01), -0.01)).toBe(1.234567);
+    expect(stepClipSpeedRate(8, 0.1)).toBe(8); expect(stepClipSpeedRate(0.1, -0.01)).toBe(0.1);
   });
   it.each([{ dx: -1000, dy: 1000, frame: 0, rate: 0.1 }, { dx: 1000, dy: -1000, frame: 120, rate: 8 }])('bounds a pointer gesture at source $frame / rate $rate', ({ dx, dy, frame, rate }) => {
     expect(clipSpeedPointer({ originFrame: 60, originRate: 1, deltaX: dx, deltaY: dy, width: 180, height: 158, sourceIn: 0, sourceOut: 120 })).toEqual({ frame, rate });

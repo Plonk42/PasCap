@@ -198,7 +198,8 @@ Escape, pointer cancellation, lost capture and window blur restore the original
 preview/document. Other edit/navigation gestures are disabled during capture.
 
 Focused point Left/Right changes one source frame (Shift ten), Up/Down changes
-0.01× (Shift 0.1×), Enter previews it, and Delete removes it if at least two
+0.01× (Shift 0.1×) while retaining the entered decimal precision, Enter previews it,
+and Delete removes it if at least two
 points remain. These controls isolate timeline shortcuts; the source frame field
 remains reachable if a point moves outside the visible trim. New points select
 themselves. Reset removes this clip curve in favour of constant 1× without
