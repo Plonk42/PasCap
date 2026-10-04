@@ -16,11 +16,11 @@ describe('existing layer stack actions and explicit disabled reasons', () => {
 
     it('explains the primary, top and lowest-overlay limits rather than implying these are removable', () => {
         const primary = layerActionRestrictions(0, 8, false);
-        expect(primary.raise).toContain('primary sequence stays at the bottom');
-        expect(primary.lower).toContain('primary sequence stays at the bottom');
+        expect(primary.raise).toContain('fixed composition base');
+        expect(primary.lower).toContain('fixed composition base');
         expect(primary.remove).toContain('Delete its excerpts instead');
         expect(layerActionRestrictions(7, 8, false).raise).toContain('already the top layer');
-        expect(layerActionRestrictions(1, 8, false).lower).toContain('cannot move below it');
+        expect(layerActionRestrictions(1, 8, false).lower).toContain('cannot move below the primary composition base');
     });
 
     it('blocks every otherwise available overlay operation during an active draft or unavailable preview', () => {

@@ -17,8 +17,9 @@ The recorded **1,115-test** core/native baseline is retained in
 [clip-speed delivery evidence](DELIVERY_STATUS.md#current-clip-speed-verification),
 with the later [question-mark help UI checks](DELIVERY_STATUS.md#current-help-popover-verification)
 and [current UI verification](DELIVERY_STATUS.md#current-ui-verification)
-recorded separately: synchronized native row access, explained layer-action bounds
-and the retained heading-help contract pass **894 unit/service + 237 browser** checks.
+recorded separately: primary-first presentation, the pinned ruler, synchronized
+native row access, explained layer-action bounds and retained heading help pass
+**900 unit/service + 241 browser** checks.
 Repository
 publication and CI are not a container release or a target-GPU/long-flight
 qualification claim.

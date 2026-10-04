@@ -168,6 +168,14 @@ after sequencing changes. No timing migration or schema extension is introduced.
 
 ## Insertion, reordering and history
 
+The primary sequence is displayed first, with overlays below it in front-to-back
+overlay order; saved bottom-to-top composition and primary/overlay timing are
+unchanged. Tracks and layer headers have synchronized native vertical scrolling.
+The ruler, playhead handle and timecode remain pinned above scrolling rows. Ticks
+follow horizontal scroll; a ruler click/drag still maps to the exact timeline
+frame. Scrolling creates no seek/history/save, and a drop on the ruler cannot
+target a row hidden underneath it.
+
 - Media drags carry registered IDs, not arbitrary paths. Only verified ready
   recordings can be added; the server validates registered source ranges on save.
 - Primary drops choose the nearest legal ripple slot after temporarily removing

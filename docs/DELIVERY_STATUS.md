@@ -2,6 +2,12 @@
 
 ## Implemented
 
+The primary sequence is displayed first, with overlays below it; stored
+composition order, row animation, primary ripple and independent overlay timing
+are unchanged. The ruler, ticks, playhead handle and timecode remain pinned above
+vertically scrolling rows while retaining horizontal frame mapping. Drop targets
+exclude the ruler rather than editing a row obscured by it.
+
 The timeline and layer headers support synchronized native vertical scrolling,
 including wheel/trackpad, visible scrollbars and keyboard focus reveal. All eight
 rows and music remain reachable without a seek, history entry or save. Layer options
@@ -10,7 +16,7 @@ atomic Undo and draft guards remain unchanged. No saved data or rendering semant
 are changed.
 
 All **nine inline help disclosures** use small
-question-mark buttons and gives the existing Animation help the same hover/focus,
+question-mark buttons, with the existing Animation help sharing the same hover/focus,
 click-to-pin and Escape/outside-click contract. Explanations and numeric accessible
 descriptions are retained. Help is beside the relevant heading, including collapsed
 Inspector settings, Edit points, Placement & fades and Preview needs attention.
@@ -49,8 +55,8 @@ evidence. The current update's completed verification is separated below.
 | Projects | Search/filter/create/open/rename, empty new-project bins, confirmed document-only deletion preserving originals/cache/exports, explicit title drafts/autosave, URL/last-project restore, stale-revision rejection |
 | Media | Project-specific video/music membership with timeline-reference union, shared content-deduplicated registry/proxy reuse, automatic proxy queue and explicit retries; compact list/grid, pinned repeated additions, sticky Add/count header, excerpt popup/reveal, reuse badges, source IN/OUT and original protection |
 | Footage import | Default approved-root service browser, metadata-only one-folder reads, natural-sorted 2,000-entry cap/explicit truncation, selected original-path registration up to 5,000 paths, existing queue/partial errors; deliberate recursive folder form preserved, no footage copies |
-| Timeline | Visible split/right-piece selection and quick trims, one-step marked-range cuts, primary ripple, recoverable trim headspace/autoscroll, contextual ghost/snaps, absolute overlays, duplicate/nudge/history; horizontal shared-point dragging with captured geometry/snap/autoscroll and reversible drafts |
-| Layers | Up to eight with synchronized native header/track scrolling, bottom-to-top composition, explained primary/stack-edge restrictions, visibility/stack order, editable names, layer/clip opacity, independent placement and undoable overlay deletion |
+| Timeline | Primary-first row presentation and pinned ruler/playhead handle/timecode with exact scrolled seeking; visible split/right-piece selection and quick trims, one-step marked-range cuts, primary ripple, recoverable trim headspace/autoscroll, contextual ghost/snaps, absolute overlays, duplicate/nudge/history; horizontal shared-point dragging with captured geometry/snap/autoscroll and reversible drafts |
+| Layers | Up to eight with synchronized native header/track scrolling, primary displayed first with overlays below, unchanged bottom-to-top composition, explained primary/stack-edge restrictions, visibility/stack order, editable names, layer/clip opacity, independent placement and undoable overlay deletion |
 | Keyframes | Whole-row project-frame points, ten independent channels, shared easing to each channel's next participant, endpoint holds/static bases, 256 points maximum; drag/keyboard/list movement preserves all participants/easing in one Undo, collisions never merge/overwrite; footage edits never copy/shift points |
 | Inspector | Clip/Sequence/Audio, compact hover/focus/pinned question-mark help, one Layer keyframes panel including empty rows, clickable hollow/filled diamonds immediately followed by always-present native SVG channel Previous/Next, explicit real-playhead capture/read-only animated values, chips/shared list, Enter/blur/Escape drafts and stable input identity |
 | Navigation | Strict channel-participant neighbours including zero, shared editor-only stored-point cursor across setting/row/list/sidebar navigation, truthful clamped-preview labels, marker click/Enter and one-/ten-frame moves with focus/context isolation; existing timecode/help/divider/modal navigation |
@@ -130,9 +136,9 @@ Usage: [LAYERS_AND_KEYFRAMES.md](LAYERS_AND_KEYFRAMES.md),
 
 ## Current UI verification
 
-**2026-10-04 local evidence:** **894 unit/service + 237 complete Chrome browser =
-1,131 fresh distinct checks pass**, on Node **22.23.3**. Strict frontend/server
-typechecks and production build pass. Entry JS is **482.44 kB / 145.55 kB gzip**,
+**2026-10-04 local evidence:** **900 unit/service + 241 complete Chrome browser =
+1,141 fresh distinct checks pass**, on Node **22.23.3**. Strict frontend/server
+typechecks and production build pass. Entry JS is **482.71 kB / 145.68 kB gzip**,
 Inspector **49.83 / 14.36** deferred; the 500 kB warning threshold is unchanged.
 Native/media/private-tmpfs suites are not rerun for this UI change; older results
 below are historical, not part of this total or fresh hardware/remote CI evidence.
@@ -143,10 +149,22 @@ after it. Thirteen new browser workflows cover both scroll surfaces, real native
 scrollbar dragging, keyboard focus reveal, matching horizontal-scrollbar extents,
 five compact/short viewport cases, accessible primary/edge restrictions, exact
 one-Undo ordering/deletion and captured-point Escape cancellation. Eight new unit
-cases retain all existing action guards. The focused layer/workspace/point run
-passes **56** tests; these are already included in the complete browser count.
+cases retain all existing action guards.
 The headless layer-access suite exposes native scrollbars rather than assuming
 Chrome reserves a gutter while its default launch hides them.
+
+[#21](https://github.com/Plonk42/PasCap/issues/21) covers primary-first presentation
+and the pinned ruler. Six pure row-geometry cases preserve saved composition order
+and exact lane/gap hit testing. Four new browser workflows verify primary-first
+headers/tracks, a fully visible unobscured ruler at every scroll position, exact
+both-axis ruler/playhead seeks, and rejection of drops onto concealed rows beneath
+the ruler. Three initial presentation/ruler regressions fail on the preceding
+build. The focused row/ruler and retained native-gesture run passes **86** cases,
+already included in the full browser count. Compact views retain the pinned ruler,
+and actual cross-row capture/autoscroll reaches the newly first primary row.
+Existing 88 px row-spacing checks now assert the requested primary-first direction;
+source/frame/Undo assertions, timeouts and no-retry policy remain unchanged.
+The final complete run used an untouched built UI/cache throughout.
 
 The full retained suite also verifies all **39** heading-help workflows from
 [#16](https://github.com/Plonk42/PasCap/issues/16): collapsed access, independent

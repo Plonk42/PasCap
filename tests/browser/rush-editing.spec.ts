@@ -567,7 +567,7 @@ test('overlay middle cuts keep their gap and neighbours fixed; visible quick tri
     await expect(page.locator('.rush-edit-mode')).toHaveText('Positioned overlay');
     const primaryTop = await clip(page, 'a').evaluate((element) => Number.parseFloat((element as HTMLElement).style.top));
     const overlayTop = await clip(page, 'top').evaluate((element) => Number.parseFloat((element as HTMLElement).style.top));
-    expect(primaryTop - overlayTop).toBe(88);
+    expect(overlayTop - primaryTop).toBe(88);
     await markRange(page, 60, 80, true); await expectCutOverlay(page, 60, 80);
     await page.getByRole('button', { name: 'Cut marked range', exact: true }).click();
     const cut = await current(page);

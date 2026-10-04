@@ -24,7 +24,9 @@ unchanged. The intended discrete-GPU and long real-flight checks remain deferred
   insertion layer, one marker per visible row point, dimmed hidden clips and Activity.
   The responsive toolbar keeps Split, Trim start/end, Delete and IN/OUT/Cut range
   directly visible; only duplication/overlay nudging remain in Clip actions.
-  The thin ruler above video rows has TIME ticks/separators and click/drag seeking;
+  The primary sequence is the first row, with overlays below it; their stored
+  composition priority is unchanged. The thin ruler remains pinned above scrolling
+  video rows with TIME ticks/separators, playhead handle/timecode and click/drag seeking;
   distinct Cut/Fade/Dissolve buttons open boundary transitions, not keyframes.
 
 Media/Clip widths and Timeline height can be resized by pointer or focused-divider
@@ -57,9 +59,14 @@ wheel/trackpad, scrollbars and keyboard focus reveal. They share the same vertic
 position and row geometry; horizontal timeline scrolling does not move the headers.
 All eight rows and the music lane remain reachable at compact timeline heights.
 Scrolling alone does not seek, edit, create history or save.
+The ruler stays visible at every vertical scroll position while its ticks follow
+horizontal timeline scroll. Header focus and automatic reveal account for the
+pinned heading/ruler. Clip/media drops target actual visible rows, never the ruler
+or a row hidden underneath it.
 Layer options explain unavailable stack actions: the primary sequence is the fixed
-composition base and cannot be reordered/deleted; the top overlay cannot be raised
-further, and the lowest cannot be lowered below primary. Other overlay actions remain
+composition base, displayed first, and cannot be reordered/deleted; the frontmost
+overlay cannot be raised further, and the rearmost cannot be lowered below the
+primary composition base. Other overlay actions remain
 undoable, and active drafts/unavailable preview still block mutations.
 
 Keyboard help is available via the **header help button** or `?`

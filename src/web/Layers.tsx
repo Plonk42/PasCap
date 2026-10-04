@@ -6,6 +6,7 @@ import { Icon } from './icons.js';
 import { KeyframeToggle } from './KeyframeToggle.js';
 import { layerActionRestrictions } from './layer-actions.js';
 import { Popover } from './Popover.js';
+import { timelineRows } from './timeline-rows.js';
 
 function layerNameError(draft: string): string | null {
   const name = draft.trim();
@@ -91,17 +92,16 @@ export function Layers({ project, selectedId, scrollTop, surfaceHeight, viewport
   };
   return <aside ref={viewport} className="layer-sidebar declutter-layers" aria-label="Video layers" style={{ height: viewportHeight ?? undefined }} onScroll={(event) => onScroll(event.currentTarget.scrollTop)}>
     <div className="layer-sidebar-surface" style={{ height: surfaceHeight }}>
-    <div className="layer-sidebar-heading" title="Bottom primary track ripple-edits. Upper layers have independent placement; higher layers cover lower footage.">Video layers · {project.layers.length} / 8</div>
-    {[...project.layers].reverse().map((layer, row) => {
-      const index = project.layers.length - 1 - row;
+    <div className="layer-sidebar-heading" title="Primary sequence first; independently positioned overlays below. Overlay order still determines which footage covers others.">Video layers · {project.layers.length} / 8</div>
+    {timelineRows(project.layers).map(({ layer, index, top }) => {
       const restrictions = layerActionRestrictions(index, project.layers.length, disabled);
       const description = `${reasonId}-${layer.id}`;
-      return <div key={layer.id} className={`layer-control ${layer.id === selectedId ? 'selected' : ''}`} data-layer-id={layer.id} style={{ top: 58 + row * 88 }}>
+      return <div key={layer.id} className={`layer-control ${layer.id === selectedId ? 'selected' : ''}`} data-layer-id={layer.id} style={{ top }}>
         <div className="layer-control-main">
           <button className="icon-button" aria-label={`${layer.enabled ? 'Hide' : 'Show'} layer ${layer.name}`} title={layer.enabled ? 'Hide layer in preview and export' : 'Show layer in preview and export'} disabled={disabled} onClick={() => onEdit({ type: 'layer-update', layer: { ...layer, enabled: !layer.enabled } })}><Icon name={layer.enabled ? 'eye' : 'eye-off'} size={15} /></button>
           <button className="text-button layer-select" aria-label={`Select layer ${layer.name}`} aria-pressed={layer.id === selectedId} disabled={disabled} title={index === 0 ? 'Primary track: edits ripple subsequent clips' : 'Overlay: clips use independent start positions'} onClick={() => onSelect(layer.id)}>{layer.name}</button>
           <Popover label={`Layer options ${layer.name}`} className="layer-options">{(close) => <>
-            {index === 0 && <p className="layer-options-note">Primary sequence · fixed bottom row. Delete excerpts, not this layer.</p>}
+            {index === 0 && <p className="layer-options-note">Primary sequence · first row, fixed composition base. Delete excerpts, not this layer.</p>}
             <LayerName projectId={project.id} layer={layer} disabled={disabled} onEdit={onEdit} onCancel={close} />
             <LayerOpacity layer={layer} frame={frame} disabled={disabled} onEdit={onEdit} />
             <div className="layer-options-actions">

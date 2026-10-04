@@ -21,6 +21,7 @@ import { Popover } from './Popover.js';
 import { RushEditBar, TimelineCutMarks } from './RushEditBar.js';
 import { planTimelineDrop, type DropPlan, type TimelinePayload } from './timeline-placement.js';
 import { useTimelineKeyframes, type TimelineKeyframeDraft } from './timeline-keyframes.js';
+import { TIMELINE_RULER_HEIGHT, timelineLayerAt, timelineRows } from './timeline-rows.js';
 
 export interface DraftPreview { document: ProjectDocument; frame: number }
 interface Props {
@@ -211,7 +212,9 @@ export function Timeline(props: Readonly<Props>) {
   const width = Math.max(viewportWidth, leading + Math.max(layout.duration, musicEnd, (dropPlan?.start ?? 0) + (dropPlan?.duration ?? 0), keyframes.draft?.frame ?? 0) * scale + trailing, drag.current?.width ?? 0, movement.current?.width ?? 0, keyframes.draft?.width ?? 0);
   const interactionBlocked = timelineInteractionBlocked(draft, keyframes.active, keyframeNavigation.disabled);
   const geometry = drag.current?.edge === 'in' ? calculateLayout(drag.current.base) : layout;
-  const rowTop = (layerId: string): number => 58 + (project.layers.length - 1 - project.layers.findIndex((layer) => layer.id === layerId)) * 88;
+  const rows = timelineRows(project.layers);
+  const rowTop = (layerId: string): number => rows.find((row) => row.layer.id === layerId)!.top;
+  const selectedRowTop = rows.find((row) => row.layer.id === selectedLayerId)?.top;
   const musicTop = 55 + project.layers.length * 88;
   const surfaceHeight = musicTop + 55;
   const seconds = framesToSeconds(Math.max(layout.duration, baseLayout.duration), project.frameRate);
@@ -224,13 +227,13 @@ export function Timeline(props: Readonly<Props>) {
   };
   const latestFit = useRef(fitTimeline); latestFit.current = fitTimeline;
   useEffect(() => { if (fitRequest > 0) latestFit.current(); }, [fitRequest]);
-  useEffect(() => {
+  useLayoutEffect(() => {
     const element = scroll.current;
-    if (!element || drag.current || movingClip.current || keyframes.active) return;
-    const top = 58 + (project.layers.length - 1 - project.layers.findIndex((layer) => layer.id === selectedLayerId)) * 88;
+    if (!element || selectedRowTop === undefined || drag.current || movingClip.current || keyframes.active) return;
+    const top = selectedRowTop;
     if (top < element.scrollTop + 34) element.scrollTop = Math.max(0, top - 40);
     else if (top + 78 > element.scrollTop + element.clientHeight) element.scrollTop = top + 88 - element.clientHeight;
-  }, [selectedLayerId, project.layers.length]);
+  }, [selectedLayerId, selectedRowTop, viewportHeight]);
   useEffect(() => {
     const element = scroll.current;
     if (!element || drag.current || movingClip.current || movement.current || keyframes.active) return;
@@ -356,11 +359,20 @@ export function Timeline(props: Readonly<Props>) {
     if (snapping && !event.altKey) position = snapFrame(position, snapPoints(visible), 8 / scale);
     onSeek(Math.max(0, Math.min(layout.duration - 1, position)));
   };
+  const beginSeek = (event: PointerEvent): void => {
+    if (!layout.duration || event.button !== 0 || drag.current || interactionBlocked) return;
+    event.preventDefault(); event.stopPropagation();
+    event.currentTarget.setPointerCapture(event.pointerId); seekAt(event);
+  };
+  const moveSeek = (event: PointerEvent): void => {
+    if (!event.currentTarget.hasPointerCapture(event.pointerId) || !layout.duration) return;
+    event.stopPropagation(); seekAt(event);
+  };
   const layerAt = (clientY: number): string | null => {
+    const viewport = scroll.current;
+    if (!viewport || clientY < viewport.getBoundingClientRect().top + TIMELINE_RULER_HEIGHT) return null;
     const y = clientY - (surface.current?.getBoundingClientRect().top ?? 0);
-    const row = Math.floor((y - 53) / 88);
-    if (row < 0 || row >= project.layers.length || y - 53 - row * 88 > 78) return null;
-    return project.layers[project.layers.length - 1 - row]!.id;
+    return timelineLayerAt(rows, y);
   };
   const mediaPayload = (ids: readonly string[]): TimelinePayload => ({
     kind: 'media', clips: ids.map((id, index) => {
@@ -393,7 +405,7 @@ export function Timeline(props: Readonly<Props>) {
       };
       const beforeX = viewport.scrollLeft; const beforeY = viewport.scrollTop;
       viewport.scrollLeft += velocity(pointer.x, bounds.left, bounds.right);
-      viewport.scrollTop += velocity(pointer.y, bounds.top, bounds.bottom);
+      viewport.scrollTop += velocity(pointer.y, bounds.top + TIMELINE_RULER_HEIGHT, bounds.bottom);
       if (viewport.scrollLeft !== beforeX || viewport.scrollTop !== beforeY) latestDrop.current();
       dropScroll.current = requestAnimationFrame(advance);
     };
@@ -452,13 +464,9 @@ export function Timeline(props: Readonly<Props>) {
       if (!event.currentTarget.contains(event.relatedTarget as Node | null)) { setDropPlan(null); dropPointer.current = null; cancelAnimationFrame(dropScroll.current); dropScroll.current = 0; }
     }}>
       <div ref={surface} className={timelineSurfaceClassName(dragError, draft, keyframes.active)} style={{ width, height: surfaceHeight }} data-pixels-per-frame={scale} data-leading={leading}>
-        <div className="timeline-ruler" onPointerDown={(event) => {
-          if (!layout.duration || event.button !== 0 || drag.current || interactionBlocked) return;
-          event.currentTarget.setPointerCapture(event.pointerId); seekAt(event);
-        }} onPointerMove={(event) => {
-          if (event.currentTarget.hasPointerCapture(event.pointerId) && layout.duration) seekAt(event);
-        }} aria-label="Timeline ruler" title="Time ruler · click or drag to seek; separators mark time, not keyframes">
+        <div className="timeline-ruler" onPointerDown={beginSeek} onPointerMove={moveSeek} aria-label="Timeline ruler" title="Time ruler · click or drag to seek; separators mark time, not keyframes">
           {ticks.map((second) => <span className="ruler-tick" key={second} style={{ left: leading + secondsToFrames(second, project.frameRate) * scale }}>{durationLabel(second)}</span>)}
+          {layout.duration > 0 && <div className="timeline-ruler-playhead" style={{ left: leading + frame * scale }}><button aria-label="Drag playhead" onPointerDown={beginSeek} onPointerMove={moveSeek} /><span className="playhead-readout">{formatTimecode(frame)}{draft || keyframes.active ? ' · draft' : ''}</span></div>}
         </div>
         {project.layers.map((layer) => <button className={`timeline-lane ${layer.id === selectedLayerId ? 'selected' : ''} ${layer.enabled ? '' : 'hidden-layer'}`} key={layer.id} data-layer-lane={layer.id} aria-label={`Timeline lane ${layer.name}`} disabled={interactionBlocked} style={{ top: rowTop(layer.id) - 5 }} onClick={() => onSelectLayer(layer.id)} />)}
         {selected && source && selectedLayer && <div className="available-source" aria-label="Available original footage" style={{ top: rowTop(selected.clip.layerId) - 5, left: leading + (selected.start - availableHead) * scale, width: compileLayerRetiming({ ...selected.clip, sourceIn: 0, sourceOut: source.metadata.frameCount }, selectedLayer, selected.start).duration * scale }} />}
@@ -515,10 +523,7 @@ export function Timeline(props: Readonly<Props>) {
           const label = { cut: 'Cut', 'cross-dissolve': 'Dissolve', 'fade-through-black': 'Fade' }[region.transition.type];
           return <button key={`${region.transition.leftId}-${region.transition.rightId}`} className={`boundary-button ${selectedBoundaryId === region.transition.leftId ? 'selected' : ''}`} disabled={interactionBlocked} style={{ top: rowTop(project.layers[0]!.id) - 24, left: leading + position * scale }} aria-label={`Transition after ${left}, excerpt ${index + 1}`} onClick={() => onBoundary(region.transition.leftId)}>{label}</button>;
         })}
-        {layout.duration > 0 && <div className="timeline-playhead" style={{ left: leading + frame * scale }}><button aria-label="Drag playhead" onPointerDown={(event) => {
-          if (drag.current || interactionBlocked) return;
-          event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId); seekAt(event);
-        }} onPointerMove={(event) => { if (event.currentTarget.hasPointerCapture(event.pointerId)) seekAt(event); }} /><span className="playhead-readout">{formatTimecode(frame)}{draft || keyframes.active ? ' · draft' : ''}</span><i /></div>}
+        {layout.duration > 0 && <div className="timeline-playhead" style={{ left: leading + frame * scale }}><i /></div>}
         {dropPlan && <><div className={`timeline-drop-preview ${dropPlan.error ? 'invalid' : ''}`} data-drop-start={dropPlan.start} data-drop-layer={dropPlan.layerId} data-drop-valid={!dropPlan.error} style={{ top: rowTop(dropPlan.layerId), left: leading + dropPlan.start * scale, width: dropPlan.duration * scale }}><span>{dropLabel(dropPlan)} · {formatTimecode(dropPlan.start)}</span></div><div className={`timeline-drop-marker ${dropPlan.error ? 'invalid' : ''}`} style={{ top: rowTop(dropPlan.layerId) - 6, height: 80, bottom: 'auto', left: leading + dropPlan.start * scale }} />{dropPlan.guide !== null && !dropPlan.error && <div className="snap-guide" style={{ left: leading + dropPlan.guide * scale }} />}</>}
         {snapGuide !== null && draft && <div className="snap-guide" style={{ left: leading + snapGuide * scale }} />}
         {keyframes.draft?.guide !== null && keyframes.draft?.guide !== undefined && <div className="snap-guide" style={{ left: leading + keyframes.draft.guide * scale }} />}
