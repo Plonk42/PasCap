@@ -30,7 +30,16 @@ export function clipCurvePoints(speed: SpeedCurve, sourceIn: number, sourceOut: 
 export function previewClipSource(project: ProjectDocument, clipId: string, sourceFrame: number): number {
   const placed = calculateLayout(project).clips.find((item) => item.clip.id === clipId);
   if (!placed) throw new Error('The selected clip no longer exists.');
-  return placed.start + placed.retiming.outputAt(Math.max(placed.clip.sourceIn, Math.min(placed.clip.sourceOut - 1, sourceFrame)));
+  if (sourceFrame <= placed.clip.sourceIn) return placed.start;
+  if (sourceFrame >= placed.clip.sourceOut) return placed.end - 1;
+  // outputAt is the authoritative FLOOR inverse, useful for trims/cut ranges.
+  // For an explicit preview, the next output may show the exact slow-motion
+  // source image, or be closer when acceleration drops the requested image.
+  const before = placed.retiming.outputAt(sourceFrame);
+  const after = Math.min(placed.duration - 1, before + 1);
+  const beforeDistance = Math.abs(placed.retiming.sourceAt(before) - sourceFrame);
+  const afterDistance = Math.abs(placed.retiming.sourceAt(after) - sourceFrame);
+  return placed.start + (afterDistance < beforeDistance ? after : before);
 }
 
 export interface ClipSpeedPlan {

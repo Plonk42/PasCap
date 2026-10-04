@@ -175,7 +175,10 @@ The graph uses source time horizontally and a logarithmic **0.1×–8×** speed 
 vertically. A vertical line identifies the actually displayed source frame. Click
 the background or a point to preview, then **Add point** captures speed at an
 unkeyed displayed source frame. The exclusive OUT anchor previews the last
-available frame, never an invented source frame. Point arrows and the native
+output frame, never an invented source frame. Source navigation compares the
+two adjacent mapped outputs, showing the exact source image when available or
+the closest rendered image when fast playback skips it; the stored key stays
+at its requested source frame. Point arrows and the native
 point selector also reach retained off-trim keys.
 
 **Source frame / Speed × / To next point** provide exact editing. Numeric fields

@@ -178,7 +178,11 @@ test('native point arrows edit frames/rates without leaking clip shortcuts, whil
   const document = await current(page); if (document.clips[0]!.speed.mode !== 'curve') throw new Error('Curve expected');
   expect(document.clips[0]!.speed.keyframes[2]).toEqual({ frame: 61, rate: 1.1, interpolation: 'smooth' });
   await point(page, 61).press('Enter');
-  await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(calculateLayout(document).clips[0]!.retiming.outputAt(61));
+  await expect.poll(() => page.evaluate(() => {
+    const state = window.pascapLab!.engine.diagnostics();
+    const video = Array.from(globalThis.document.querySelectorAll<HTMLVideoElement>('video[data-pascap-decoder]'))[state.assignedClipIds.indexOf('one')]!;
+    return Math.floor(video.currentTime * 30000 / 1001 + 1e-7);
+  })).toBe(61);
   await point(page, 61).press('Control+d'); await point(page, 61).press('s'); expect((await current(page)).clips).toHaveLength(1);
   const background = page.getByRole('button', { name: 'Seek within clip speed curve' }); await background.focus(); await background.press('Delete');
   expect(await current(page)).toEqual(document);
@@ -227,6 +231,17 @@ test('custom mapped preview uses exact decoded source frames with only two video
     expect(captured).toEqual({ frame: placed.retiming.sourceAt(frame), count: 2, status: 'paused' });
   }
   expect(await current(page)).toEqual(document); expect(memory.saves).toBe(0);
+});
+
+test('a slow clip-key click previews that exact original image instead of the preceding frame', async ({ page }) => {
+  const before = await seedCurve(page, (document) => { document.clips[0]!.speed = { mode: 'curve', keyframes: [{ frame: 0, rate: 0.5, interpolation: 'linear' }, { frame: 60, rate: 0.75, interpolation: 'linear' }, { frame: 120, rate: 1, interpolation: 'hold' }] }; });
+  await point(page, 60).click();
+  await expect.poll(() => page.evaluate(() => {
+    const state = window.pascapLab!.engine.diagnostics();
+    const video = Array.from(globalThis.document.querySelectorAll<HTMLVideoElement>('video[data-pascap-decoder]'))[state.assignedClipIds.indexOf('one')]!;
+    return { source: Math.floor(video.currentTime * 30000 / 1001 + 1e-7), status: state.status };
+  })).toEqual({ source: 60, status: 'paused' });
+  expect(await current(page)).toEqual(before); expect(memory.saves).toBe(0);
 });
 
 test('custom controls fit a 270px Inspector and 720px drawer with accessible point hit targets', async ({ page }) => {
