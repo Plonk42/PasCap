@@ -96,7 +96,7 @@ claimed. Use the issue-based iteration now and record the limitation in
 project-scoped access, link the same issues and retain their history; never ask
 for or post a token in chat or an issue.
 
-## Applied setup · 2026-10-04
+## Applied setup · 2026-10-04 · initial workflow checkpoint
 
 - All eleven original issues retain their scope/comments/milestones, with triaged
   category/priority/area/progress and explicit next actions. Existing dependency
@@ -111,8 +111,13 @@ for or post a token in chat or an issue.
 - [#15 — Current iteration](https://github.com/Plonk42/PasCap/issues/15) groups
   #1, #3, #4 and #12–#14 as **six native sub-issues**, with checkpoints, blockers
   and next-iteration candidates. Dates are identifiers, not due dates.
-- All fifteen issues remain open; locally complete work is distinguished from
-  owner decisions and deferred GPU/flight/container qualification.
+- All fifteen issues remained open at this initial checkpoint; locally complete
+  work is distinguished from owner decisions and deferred GPU/flight/container
+  qualification.
+
+Later explicitly approved additions, including the help UI in
+[#16](https://github.com/Plonk42/PasCap/issues/16), are recorded in the existing
+iteration and issues. These historical setup counts are not a second mutable backlog.
 
 The latest inspected remote [run 37183854541](https://github.com/Plonk42/PasCap/actions/runs/37183854541)
 on publication commit `6d260c5` failed the old raw-reader case on Node 24 while

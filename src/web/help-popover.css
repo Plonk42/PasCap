@@ -2,9 +2,10 @@
     display: flex;
     align-items: center;
     flex-shrink: 0;
+    width: fit-content;
 }
 
-.editor-help>.editor-help-trigger {
+.editor-help>button.editor-help-trigger {
     display: inline-flex;
     align-items: center;
     justify-content: center;

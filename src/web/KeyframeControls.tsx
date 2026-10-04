@@ -185,7 +185,7 @@ export function KeyframeControls({ projectId, layer, frame, duration, disabled, 
       setListOpen(expanded);
     }}><summary id={listId} aria-label="Edit layer keys" aria-expanded={listOpen} aria-controls={entriesId}>Edit points</summary>
       <ol className="keyframe-entries" id={entriesId} aria-labelledby={listId}>{keys.map((key, index) => <KeyframePointRow key={current.rows[index]!.id} point={key} keys={keys} row={current.rows[index]!} layerId={layer.id} context={context} listId={listId} helpId={helpId} duration={duration} current={(inspection !== null || previewAvailable) && key.frame === navigationFrame} disabled={unavailable} onEdit={onEdit} onSeek={seekPoint} />)}</ol>
-      <details className="control-help"><summary>Keyframe timing</summary><p id={helpId}>Absolute project timeline frames, independent of clip trims. Moving a point moves every participating setting. Its easing runs to each setting's next participating point; the first and last channel values hold. An unkeyed setting uses each clip's base, or the layer base for layer opacity. Points outside the current duration stay editable; navigation previews the nearest available frame without moving them.</p></details>
+      <HelpPopover label="Keyframe timing" className="control-help"><p id={helpId}>Absolute project timeline frames, independent of clip trims. Moving a point moves every participating setting. Its easing runs to each setting's next participating point; the first and last channel values hold. An unkeyed setting uses each clip's base, or the layer base for layer opacity. Points outside the current duration stay editable; navigation previews the nearest available frame without moving them.</p></HelpPopover>
     </details>}
   </fieldset>;
 }

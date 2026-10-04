@@ -1,6 +1,7 @@
 import type { RefObject } from 'react';
 import type { PreviewDiagnostics } from '../preview/engine.js';
 import { formatTimecode } from '../shared/timing.js';
+import { HelpPopover } from './HelpPopover.js';
 import { Icon } from './icons.js';
 import { TimecodeField } from './TimecodeField.js';
 
@@ -46,7 +47,7 @@ export function PreviewPanel({ canvas, diagnostics, duration, drafting, onToggle
   return <section className="preview-panel" aria-label="Preview">
     <div className="preview-heading"><h2>Preview</h2><span className="preview-quality" title={diagnostics?.renderer}>720p · 29.97 fps</span></div>
     <div className="canvas-stage"><canvas ref={canvas} aria-label="WebGL live video preview" />
-      {(!duration || failed || loading) && <div className="preview-empty" role={failed ? 'alert' : undefined}>{loading ? <span className="spinner" /> : <Icon name="video" size={36} />}<h3>{caption.heading}</h3><p>{caption.message}</p>{!loading && <div className="empty-actions"><PreviewActions startupError={startupError} runtimeError={status === 'error'} onRetry={onRetry} onMedia={onMedia} onImport={onImport} onReload={onReload} onDownload={onDownload} canDownload={canDownload} recoveryBusy={recoveryBusy} /></div>}{startupError && <details className="control-help"><summary>Startup details</summary><p>{startupError}</p></details>}</div>}
+      {(!duration || failed || loading) && <div className="preview-empty" role={failed ? 'alert' : undefined}>{loading ? <span className="spinner" /> : <Icon name="video" size={36} />}<h3>{caption.heading}</h3><p>{caption.message}</p>{!loading && <div className="empty-actions"><PreviewActions startupError={startupError} runtimeError={status === 'error'} onRetry={onRetry} onMedia={onMedia} onImport={onImport} onReload={onReload} onDownload={onDownload} canDownload={canDownload} recoveryBusy={recoveryBusy} /></div>}{startupError && <HelpPopover label="Startup details" className="control-help"><p>{startupError}</p></HelpPopover>}</div>}
       {waiting && <div className="buffering-overlay"><span className="spinner" />{diagnostics?.message}</div>}
     </div>
     <div className="transport"><span className="transport-note"><span className={`transport-dot ${status}`} />{duration ? label : 'No clips'}</span><div className="transport-buttons">

@@ -2,7 +2,14 @@
 
 ## Implemented
 
-The current update adds **precise clip-level speed curves**: editable presets,
+The current UI update replaces **all nine inline help disclosures** with small
+question-mark buttons and gives the existing Animation help the same hover/focus,
+click-to-pin and Escape/outside-click contract. Explanations and numeric accessible
+descriptions are retained. Editable sections, music/point/import controls and actual
+storage/render/error details remain ordinary disclosures. This changes no persisted
+schema, preview/native processing, source identity or rendering resource limits.
+
+The preceding approved update added **precise clip-level speed curves**: editable presets,
 source-frame/rate/easing fields, native graph/keyboard controls, source-preserving
 live drafts and one Undo per completed gesture. Clip points remain independent
 through trimming/splitting/duplication. Existing row Speed keeps its override
@@ -35,7 +42,7 @@ evidence. The current update's completed verification is separated below.
 | Timeline | Visible split/right-piece selection and quick trims, one-step marked-range cuts, primary ripple, recoverable trim headspace/autoscroll, contextual ghost/snaps, absolute overlays, duplicate/nudge/history; horizontal shared-point dragging with captured geometry/snap/autoscroll and reversible drafts |
 | Layers | Up to eight, bottom-to-top composition, visibility/stack order, editable names, layer/clip opacity, independent placement and undoable layer deletion |
 | Keyframes | Whole-row project-frame points, ten independent channels, shared easing to each channel's next participant, endpoint holds/static bases, 256 points maximum; drag/keyboard/list movement preserves all participants/easing in one Undo, collisions never merge/overwrite; footage edits never copy/shift points |
-| Inspector | Clip/Sequence/Audio, one Layer keyframes panel including empty rows, clickable hollow/filled diamonds immediately followed by always-present native SVG channel Previous/Next, explicit real-playhead capture/read-only animated values, chips/shared list, Enter/blur/Escape drafts and stable input identity |
+| Inspector | Clip/Sequence/Audio, compact hover/focus/pinned question-mark help, one Layer keyframes panel including empty rows, clickable hollow/filled diamonds immediately followed by always-present native SVG channel Previous/Next, explicit real-playhead capture/read-only animated values, chips/shared list, Enter/blur/Escape drafts and stable input identity |
 | Navigation | Strict channel-participant neighbours including zero, shared editor-only stored-point cursor across setting/row/list/sidebar navigation, truthful clamped-preview labels, marker click/Enter and one-/ten-frame moves with focus/context isolation; existing timecode/help/divider/modal navigation |
 | Colour | Independent static clip bases and seven independent row channels at project time, including held source frames; interpolate parameters before grading with unchanged CPU/GPU/65³ native LUT equations |
 | Speed | 0.1×–8× constant/ramp/custom clip speed with 2–256 source-frame points, editable visual presets, exact fields and reversible graph gestures; overriding analytic row rates remain; layout/preview/native share `PlacedClip.retiming`, one duration rounding and repeat/drop mapping; timing conflicts reject the whole edit |
@@ -111,9 +118,45 @@ Usage: [LAYERS_AND_KEYFRAMES.md](LAYERS_AND_KEYFRAMES.md),
 [TIMELINE_EDITING.md](TIMELINE_EDITING.md) and
 [WORKSPACE_AND_RECOVERY.md](WORKSPACE_AND_RECOVERY.md).
 
+## Current help-popover verification
+
+**2026-10-04 local UI-only evidence.** Verification uses isolated disposable synthetic
+media and memory-only projects; no owner project/original is edited, imported, prepared
+or rendered. [#16](https://github.com/Plonk42/PasCap/issues/16) tracks the explicitly
+approved scope within [iteration #15](https://github.com/Plonk42/PasCap/issues/15).
+
+| Check | Result |
+| --- | --- |
+| Complete unit/service check | **886 pass** on Node **22.23.3**, including ten new viewport-placement cases |
+| Strict frontend/server types and production build | **Pass** |
+| Full retained browser suite | **213 pass**, including all **28** new help workflows |
+| Combined fresh distinct checks | **1,099 pass** (886 unit/service + 213 browser); no prior native results added to this total |
+| Native/media qualification | **Not rerun for this UI-only change**; the prior 54-test native/private-tmpfs result below remains historical |
+| Production entry JS | **479.80 kB / 144.80 kB gzip**, Inspector **50.08 / 14.34** deferred; unchanged 500 kB warning threshold |
+
+Coverage includes all ten help contexts (nine replaced disclosures plus Animation),
+hover without focus theft, pointer travel into text, click/Enter/Space pinning,
+Escape-first invalid-input isolation, outside-click focus, single-help coordination,
+hidden owners, keyboard-readable/scrollable text and touch. An outside pointer press
+dismisses help before a resize control captures the gesture, so Escape still restores
+its original size without saving the preference. Hover activation is confined to the
+compact help owner, not empty space across its section. Numeric descriptions
+remain readable while help is hidden. Compact 24 px targets and viewport bounds
+are checked at 640/720/1024/1440 px, including a short 480 px-high viewport.
+
+The completed-click focus path retains the normal single blur commit: removing
+a pending number-field hint cannot move the button between pointerdown and mouseup
+and accidentally lose the click. No help hover, pin or dismissal adds its own
+history/save operation. Options remain click-only; functional point/music/source
+and storage/render disclosures remain usable. No skips, retries or weakened
+pixel/frame/resource assertions were introduced. These local UI checks do not
+relabel the earlier 1,115-test core/native baseline or qualify hardware, long
+flights, fresh remote CI or containers.
+
 ## Current clip-speed verification
 
-**2026-10-04 local evidence for the completed clip-speed update.** All checks used
+**Historical 1,115-test evidence for the completed clip-speed update, preceding
+the help-only UI change above.** All checks used
 disposable synthetic sources or memory-only projects; no owner footage/project
 was imported, prepared, edited or rendered.
 
@@ -646,8 +689,9 @@ The GitHub workflow alignment retains the eleven original issues and adds
 [workflow #12](https://github.com/Plonk42/PasCap/issues/12), retrospective
 [shared-point delivery #13](https://github.com/Plonk42/PasCap/issues/13),
 [clip-speed delivery #14](https://github.com/Plonk42/PasCap/issues/14) and
-[iteration #15](https://github.com/Plonk42/PasCap/issues/15). All fifteen remain
-open under the three outcome milestones, with categorized priority/area/progress
+[iteration #15](https://github.com/Plonk42/PasCap/issues/15). At that initial workflow
+checkpoint, all fifteen remained open under the three outcome milestones, with
+categorized priority/area/progress
 labels, explicit next actions, ten native blocked-by relationships and six native
 iteration sub-issues. Local completion is not closure or remote acceptance.
 [GITHUB_WORKFLOW.md](GITHUB_WORKFLOW.md) defines the lifecycle and usable issue
@@ -657,6 +701,8 @@ and need approval before publication; tracking metadata is applied remotely.
 
 This workflow change does not rerun/relabel the recorded 1,115-test baseline,
 qualify hardware/containers or authorize media work, a release or issue closure.
+The later explicitly approved help UI scope is tracked separately in #16 and
+the current help verification above; mutable progress remains in GitHub.
 A project license remains a maintainer decision tracked in
 [#5](https://github.com/Plonk42/PasCap/issues/5), not an automatic license grant.
 

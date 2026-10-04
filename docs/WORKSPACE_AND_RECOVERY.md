@@ -74,6 +74,24 @@ New preferences keep Source range, Layer & opacity and Speed collapsed, Colour o
 existing expansion preferences remain respected. Help/reset details are contextual,
 not repeated across the main workspace. Collapsing never disables processing.
 
+All inline help uses a small **question-mark button**, including animation, source,
+opacity, speed, colour, keyframe/transition/fade/audio timing and startup details.
+Hovering the question-mark target or keyboard focus previews help without moving
+focus or applying a draft; empty space across a section does not activate help.
+The pointer can move into the text without closing it. Click, Enter or Space pins
+it until Escape, another explicit help activation, or an outside click. A second
+click on the same button also closes it. Down arrow focuses the readable/scrollable
+text; Escape returns to its button only when focus was in that help, otherwise the
+focused field stays put. An outside click does not steal the clicked control's focus.
+An outside pointer press dismisses before a control captures a drag, retaining that
+gesture's normal Escape cancellation. With help open, Escape dismisses help before
+cancelling a field draft or closing a dialog.
+Pinned help is not displaced by another hover. The native top layer avoids clipping,
+stays within viewport bounds and closes when its owner is hidden. No help interaction
+seeks, changes history or saves; explicitly clicking away from a numeric field still
+has the ordinary one-commit blur behavior. Editable section/point/music/import controls,
+storage/render breakdowns and real warning/error lists remain normal disclosures.
+
 The preview timecode accepts nominal 30 fps NDF **HH:MM:SS:FF** or an integer
 timeline frame; it is not rounded wall-clock seconds. Out-of-range/invalid input
 stays editable with an error and never seeks. Escape returns to the current display.
@@ -98,10 +116,8 @@ validate its two endpoints atomically.
 
 The **Layer keyframes** panel belongs to the selected **entire video row**, not the
 selected clip. It remains available on an empty row and shows participants as chips.
-Its question-mark **Animation help** button previews help on hover or keyboard focus,
-without moving focus or editing. Click, Enter or Space keeps the help open after
-leaving the button; Down arrow focuses its readable/scrollable text. Escape closes help first; an outside click closes without stealing
-that control's focus. Help uses the native top layer, and hides with its owner.
+Its question-mark **Animation help** button uses the common hover/pin/dismiss
+contract above; explanatory text does not replace the shared point editor.
 All ten settings (Layer opacity, Clip opacity, Speed and seven colour parameters)
 always expose a diamond beside their control: **◇ hollow/inactive** versus **◆
 filled/active**, with `aria-pressed`. A hollow diamond remains clickable; inactivity

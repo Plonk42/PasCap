@@ -9,6 +9,7 @@ import { sourceRateAt } from '../shared/speed.js';
 import { calculateLayout } from '../shared/timeline.js';
 import { formatTimecode } from '../shared/timing.js';
 import { shortName, sourceSeconds } from './display.js';
+import { HelpPopover } from './HelpPopover.js';
 import { Icon } from './icons.js';
 import { InspectorSection, type InspectorMode } from './InspectorSection.js';
 import { KeyframeControls } from './KeyframeControls.js';
@@ -163,7 +164,7 @@ function ColourSection({ layer, clip, frame, disabled, onEdit, id }: Readonly<La
   return <InspectorSection id="colour" title="Colour" icon="colour" modified={adjusted > 0}>
     <div className="grade-heading"><span className="grade-context">{gradeLabel}</span><button type="button" className="text-button" disabled={disabled || !canReset} aria-label="Reset colour" title={resetTitle} onClick={reset}><Icon name="reset" size={13} />{animated ? 'Reset keys' : 'Reset'}</button></div>
     <div className="colour-controls">{COLOUR_CONTROLS.map((control) => <ColourControl key={control.key} layer={layer} clip={clip} frame={frame} disabled={disabled} onEdit={onEdit} control={control} value={colour[control.key]} id={`${id}-${control.key}`} />)}</div>
-    <details className="control-help colour-help"><summary>Colour animation</summary><p>Each diamond keys only its own setting for this whole layer, in project timeline time. A keyed channel overrides that setting on every clip in the row; an unkeyed channel uses each clip's static base. Between points, click the diamond before editing. Reset keys changes only this point's enabled colour settings; the individual reset buttons also handle unkeyed clip bases.</p></details>
+    <HelpPopover label="Colour animation" className="control-help colour-help"><p>Each diamond keys only its own setting for this whole layer, in project timeline time. A keyed channel overrides that setting on every clip in the row; an unkeyed channel uses each clip's static base. Between points, click the diamond before editing. Reset keys changes only this point's enabled colour settings; the individual reset buttons also handle unkeyed clip bases.</p></HelpPopover>
   </InspectorSection>;
 }
 
@@ -207,7 +208,7 @@ export function Inspector({ project, assets, selectedClipId, selectedLayerId, bo
             <div className="range-fields"><label htmlFor={`${colourControlId}-in`}>IN <output>{formatTimecode(clip.sourceIn)}</output><NumberField id={`${colourControlId}-in`} aria-label="Source IN frame" aria-describedby={`${colourControlId}-source-help`} min={0} max={clip.sourceOut - 1} integer step={1} value={clip.sourceIn} disabled={drafting} resetKey={inputContext} validate={(sourceIn) => clipTimingError({ sourceIn })} onCommit={(sourceIn) => onEdit({ type: 'trim', clipId: clip.id, sourceIn, sourceOut: clip.sourceOut })} /></label><label htmlFor={`${colourControlId}-out`}>OUT <output>{formatTimecode(clip.sourceOut)}</output><NumberField id={`${colourControlId}-out`} aria-label="Source OUT frame" aria-describedby={`${colourControlId}-source-help`} min={clip.sourceIn + 1} max={Math.min(asset.metadata.frameCount, 2_147_483_647)} integer step={1} value={clip.sourceOut} disabled={drafting} resetKey={inputContext} validate={(sourceOut) => clipTimingError({ sourceOut })} onCommit={(sourceOut) => onEdit({ type: 'trim', clipId: clip.id, sourceIn: clip.sourceIn, sourceOut })} /></label></div>
             <div className="range-availability" aria-label="Recoverable source footage"><span>{sourceSeconds(clip.sourceIn)} before</span><span>{sourceSeconds(asset.metadata.frameCount - clip.sourceOut)} after</span></div>
             <button className="text-button restore-range" disabled={drafting || (clip.sourceIn === 0 && clip.sourceOut === asset.metadata.frameCount)} onClick={() => onEdit({ type: 'trim', clipId: clip.id, sourceIn: 0, sourceOut: asset.metadata.frameCount })}><Icon name="reset" size={13} />Restore full recording</button>
-            <details className="control-help"><summary>Source timing</summary><p id={`${colourControlId}-source-help`}>Original recording frames; OUT is exclusive. Layer keyframes stay in project timeline time when this source range changes.</p></details>
+            <HelpPopover label="Source timing" className="control-help"><p id={`${colourControlId}-source-help`}>Original recording frames; OUT is exclusive. Layer keyframes stay in project timeline time when this source range changes.</p></HelpPopover>
           </section>
         </InspectorSection>}
         <InspectorSection id="layer-opacity" title="Layer & opacity" icon="layers" defaultOpen={false}>
@@ -218,7 +219,7 @@ export function Inspector({ project, assets, selectedClipId, selectedLayerId, bo
             </>}
             <OpacityControl layer={layer} clip={clip ?? null} frame={frame} disabled={drafting} onEdit={onEdit} setting="layerOpacity" id={`${colourControlId}-layer-opacity`} />
             <OpacityControl layer={layer} clip={clip ?? null} frame={frame} disabled={drafting} onEdit={onEdit} setting="clipOpacity" id={`${colourControlId}-clip-opacity`} />
-            <details className="control-help"><summary>Opacity scope</summary><p>Layer opacity is applied after the row's clips are combined, including dissolves. Clip opacity keys are also row-wide: they replace each clip's base opacity, before the combined layer opacity is applied. Unkeyed channels keep their static bases.</p></details>
+            <HelpPopover label="Opacity scope" className="control-help"><p>Layer opacity is applied after the row's clips are combined, including dissolves. Clip opacity keys are also row-wide: they replace each clip's base opacity, before the combined layer opacity is applied. Unkeyed channels keep their static bases.</p></HelpPopover>
           </section>
         </InspectorSection>
         <InspectorSection id="speed" title="Speed" icon="speed" badge={`${speedRate.toFixed(2)}×`} modified={speedRate !== 1 || hasLayerKeys(layer, 'speed') || (clip !== undefined && clip.speed.mode !== 'constant')} defaultOpen={false}><SpeedControls project={project} resetKey={project.id} clip={clip ?? null} layer={layer} frame={frame} projectDuration={layout.duration} placedDuration={placed?.duration ?? null} disabled={drafting} sourceFrame={sourceFrame} sourceFrameCount={asset?.metadata.frameCount ?? null} onEdit={onEdit} onPreview={onPreview} onSeek={onSeek} onPause={onPause} /></InspectorSection>
@@ -233,7 +234,7 @@ export function Inspector({ project, assets, selectedClipId, selectedLayerId, bo
             <label>Type<select aria-label="Transition type" disabled={drafting} value={boundary.type} onChange={(event) => setTransition(event.target.value as Transition['type'], boundary.type === 'cut' ? 30 : boundary.duration)}><option value="cut">Cut</option><option value="fade-through-black">Fade through black</option><option value="cross-dissolve">Cross-dissolve</option></select></label>
             <label>Timeline frames<NumberField aria-label="Transition duration" aria-describedby={`${colourControlId}-transition-help`} min={boundary.type === 'fade-through-black' ? 2 : 1} max={2_147_483_647} integer step={1} disabled={drafting || boundary.type === 'cut'} value={boundary.duration} resetKey={`${project.id}:${boundary.leftId}:${boundary.rightId}:${boundary.type}`} validate={(duration) => boundary.type === 'cut' ? null : timelineNumberError({ ...project, transitions: project.transitions.map((item) => item === boundary ? { ...boundary, duration } : item) }, 'Shorten this transition or another fade on its two clips.')} onCommit={(duration) => setTransition(boundary.type, duration)} /></label>
           </div>
-          <details className="control-help"><summary>Transition timing</summary><p id={`${colourControlId}-transition-help`}>Timeline frames after retiming. Transition and fade regions must fit their clips.</p></details>
+          <HelpPopover label="Transition timing" className="control-help"><p id={`${colourControlId}-transition-help`}>Timeline frames after retiming. Transition and fade regions must fit their clips.</p></HelpPopover>
         </section>
       </InspectorSection>}
       <div className="inspector-empty" hidden={boundary !== undefined}>Select a transition in the primary track.</div>
@@ -243,7 +244,7 @@ export function Inspector({ project, assets, selectedClipId, selectedLayerId, bo
             <label>Opening <small>frames</small><NumberField aria-label="Opening fade" aria-describedby={`${colourControlId}-fades-help`} min={0} max={Math.min(primary[0]?.duration ?? 0, 2_147_483_647)} integer step={1} value={project.openingFade} disabled={drafting || !primary.length} resetKey={project.id} validate={(openingFade) => timelineNumberError({ ...project, openingFade }, 'Shorten the opening fade or the other fades/transitions on the first primary clip.')} onCommit={(opening) => onEdit({ type: 'fades', opening, closing: project.closingFade })} /></label>
             <label>Closing <small>frames</small><NumberField aria-label="Closing fade" aria-describedby={`${colourControlId}-fades-help`} min={0} max={Math.min(primary.at(-1)?.duration ?? 0, 2_147_483_647)} integer step={1} value={project.closingFade} disabled={drafting || !primary.length} resetKey={project.id} validate={(closingFade) => timelineNumberError({ ...project, closingFade }, 'Shorten the closing fade or the other fades/transitions on the last primary clip.')} onCommit={(closing) => onEdit({ type: 'fades', opening: project.openingFade, closing })} /></label>
           </div>
-          <details className="control-help"><summary>Fade timing</summary><p id={`${colourControlId}-fades-help`}>Timeline frames on the first and last primary clips. 0 disables a fade.</p></details>
+          <HelpPopover label="Fade timing" className="control-help"><p id={`${colourControlId}-fades-help`}>Timeline frames on the first and last primary clips. 0 disables a fade.</p></HelpPopover>
         </section>
       </InspectorSection>
     </div>

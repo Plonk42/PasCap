@@ -33,10 +33,11 @@ than the dated final verification table linked below.
 
 ## Status and planning
 
-- [Current local verification](DELIVERY_STATUS.md#current-clip-speed-verification):
-  the recorded 2026-10-04 **1,115-test** baseline, distinct from remote CI and hardware
-  qualification. [DELIVERY_STATUS.md](DELIVERY_STATUS.md) also preserves prior
-  milestones, native resource bounds and remaining acceptance gates.
+- [Current help UI verification](DELIVERY_STATUS.md#current-help-popover-verification)
+  records the question-mark hover/pin/dismiss update separately from the
+  [recorded 1,115-test core baseline](DELIVERY_STATUS.md#current-clip-speed-verification),
+  remote CI and hardware qualification. [DELIVERY_STATUS.md](DELIVERY_STATUS.md)
+  also preserves prior milestones, native resource bounds and remaining acceptance gates.
 - [FEASIBILITY_REPORT.md](FEASIBILITY_REPORT.md): **historical** two-source preview/
   colour evidence. It does not qualify current layered throughput or the intended GPU.
 - Follow planned work in [GitHub issues](https://github.com/Plonk42/PasCap/issues)

@@ -1,10 +1,11 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { readFile } from 'node:fs/promises';
 import type { AudioAsset } from '../../src/shared/audio.js';
 import { estimateExportSpace } from '../../src/shared/export-space.js';
 import type { ExportProfile } from '../../src/shared/export.js';
 import type { MediaAsset } from '../../src/shared/media.js';
 import { createClip, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
-import { expandedInspectorPreferences, sharedPoint } from './editor-helpers.js';
+import { expandedInspectorPreferences, inspectorTab, sharedPoint } from './editor-helpers.js';
 import { memoryProjects, type MemoryProjects } from './memory-projects.js';
 
 let memory: MemoryProjects;
@@ -140,4 +141,199 @@ test('options retain click-only disclosure behavior rather than opening on hover
     await options.click(); await expect(options).toHaveAttribute('aria-expanded', 'true');
     await page.keyboard.press('Escape'); await expect(options).toBeFocused();
     expect(memory.saves).toBe(0);
+});
+
+test('an outside pointer gesture dismisses pinned help before capture so Escape still cancels the gesture', async ({ page }) => {
+    const before = await current(page);
+    const trigger = page.getByRole('button', { name: 'Animation help', exact: true });
+    const panel = await panelFor(page, trigger);
+    await trigger.click(); await expect(panel).toBeVisible();
+    const resizer = page.getByRole('slider', { name: 'Resize Clip panel', exact: true });
+    const initial = Number(await resizer.getAttribute('aria-valuenow')); const box = (await resizer.boundingBox())!;
+    const grabbedX = box.x + box.width / 2;
+    await page.mouse.move(grabbedX, box.y + 40); await page.mouse.down();
+    await expect(panel).toBeHidden();
+    await page.mouse.move(grabbedX - 20, box.y + 40, { steps: 3 });
+    await expect(resizer).toHaveAttribute('aria-valuenow', String(initial + 20));
+    await page.keyboard.press('Escape'); await page.mouse.up();
+    await expect(resizer).toHaveAttribute('aria-valuenow', String(initial));
+    expect(await current(page)).toEqual(before); expect(memory.saves).toBe(0);
+    expect(await page.evaluate(() => localStorage.getItem('pascap-workspace-layout'))).toBeNull();
+});
+
+const HELP_CONTEXTS = [
+    { label: 'Source timing', tab: 'Clip', text: 'Original recording frames; OUT is exclusive.' },
+    { label: 'Opacity scope', tab: 'Clip', text: 'Layer opacity is applied after the row' },
+    { label: 'Colour animation', tab: 'Clip', text: 'Each diamond keys only its own setting' },
+    { label: 'Speed timing', tab: 'Clip', text: 'Row keys override, rather than multiply' },
+    { label: 'Keyframe timing', tab: 'Clip', text: 'Moving a point moves every participating setting.' },
+    { label: 'Transition timing', tab: 'Sequence', text: 'Transition and fade regions must fit their clips.' },
+    { label: 'Fade timing', tab: 'Sequence', text: '0 disables a fade.' },
+    { label: 'Audio timing', tab: 'Audio', text: 'Both fades must fit within Duration.' },
+] as const;
+
+for (const context of HELP_CONTEXTS) {
+    test(`${context.label} uses a compact hover/pinned question mark and retains its complete explanation`, async ({ page }) => {
+        const before = await current(page);
+        await inspectorTab(page, context.tab);
+        if (context.label === 'Keyframe timing') await page.getByLabel('Edit layer keys', { exact: true }).click();
+        if (context.label === 'Audio timing') await page.getByText('Placement & fades', { exact: true }).click();
+        const trigger = page.getByRole('button', { name: `${context.label} help`, exact: true });
+        const panel = await panelFor(page, trigger);
+        await trigger.scrollIntoViewIfNeeded();
+        const box = (await trigger.boundingBox())!;
+        expect(box.width).toBeGreaterThanOrEqual(24); expect(box.width).toBeLessThanOrEqual(28);
+        expect(box.height).toBeGreaterThanOrEqual(24); expect(box.height).toBeLessThanOrEqual(28);
+        expect(await trigger.textContent()).toBe(''); await expect(trigger.locator('svg')).toHaveCount(1);
+        await trigger.hover(); await expect(panel).toBeVisible(); await expect(panel).toContainText(context.text);
+        await trigger.click(); await expect(trigger).toHaveAttribute('aria-pressed', 'true');
+        await page.mouse.move(600, 20); await expect(panel).toBeVisible();
+        await panel.focus(); await page.keyboard.press('Escape');
+        await expect(panel).toBeHidden(); await expect(trigger).toBeFocused();
+        await expect(page.locator('details.control-help')).toHaveCount(0);
+        expect(await current(page)).toEqual(before); expect(memory.saves).toBe(0);
+        await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
+    });
+}
+
+test('numeric fields retain their descriptions even while the linked help popover is hidden', async ({ page }) => {
+    await expect(page.getByRole('spinbutton', { name: 'Source IN frame', exact: true })).toHaveAccessibleDescription(/Original recording frames; OUT is exclusive/);
+    await expect(page.getByRole('spinbutton', { name: 'Clip speed rate', exact: true })).toHaveAccessibleDescription(/Custom curve points belong to one clip/);
+    await inspectorTab(page, 'Sequence');
+    await expect(page.getByRole('spinbutton', { name: 'Opening fade', exact: true })).toHaveAccessibleDescription(/0 disables a fade/);
+    await inspectorTab(page, 'Audio'); await page.getByText('Placement & fades', { exact: true }).click();
+    await expect(page.getByRole('spinbutton', { name: 'Music duration', exact: true })).toHaveAccessibleDescription(/Both fades must fit within Duration/);
+    expect(memory.saves).toBe(0);
+});
+
+test('only the small question-mark target opens help, not the empty space across its section', async ({ page }) => {
+    const trigger = page.getByRole('button', { name: 'Source timing help', exact: true });
+    const panel = await panelFor(page, trigger);
+    const box = (await trigger.boundingBox())!;
+    const owner = (await trigger.locator('..').boundingBox())!;
+    expect(owner.width).toBe(box.width);
+    await page.mouse.move(box.x - 40, box.y + box.height / 2);
+    await expect(panel).toBeHidden(); await expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    await trigger.hover(); await expect(panel).toBeVisible();
+    expect(memory.saves).toBe(0);
+});
+
+test('a pinned help ignores another hover but an explicit second help click replaces it', async ({ page }) => {
+    const source = page.getByRole('button', { name: 'Source timing help', exact: true });
+    const animation = page.getByRole('button', { name: 'Animation help', exact: true });
+    const sourcePanel = await panelFor(page, source); const animationPanel = await panelFor(page, animation);
+    await source.click(); await expect(sourcePanel).toBeVisible();
+    await animation.hover(); await expect(animationPanel).toBeHidden(); await expect(sourcePanel).toBeVisible();
+    await expect(source).toHaveAttribute('aria-pressed', 'true');
+    await animation.click(); await expect(animationPanel).toBeVisible(); await expect(sourcePanel).toBeHidden();
+    await expect(page.locator('.editor-help-content:popover-open')).toHaveCount(1);
+    await animation.click(); await expect(animationPanel).toBeHidden();
+    expect(memory.saves).toBe(0);
+});
+
+test('hovering another help replaces only an unpinned preview, without moving focus', async ({ page }) => {
+    const title = page.getByRole('textbox', { name: 'Project title', exact: true }); await title.focus();
+    const source = page.getByRole('button', { name: 'Source timing help', exact: true });
+    const animation = page.getByRole('button', { name: 'Animation help', exact: true });
+    const sourcePanel = await panelFor(page, source); const animationPanel = await panelFor(page, animation);
+    await source.hover(); await expect(sourcePanel).toBeVisible();
+    await animation.hover(); await expect(animationPanel).toBeVisible(); await expect(sourcePanel).toBeHidden();
+    await expect(title).toBeFocused(); await expect(page.locator('.editor-help-content:popover-open')).toHaveCount(1);
+    expect(memory.saves).toBe(0);
+});
+
+test('hover keeps a valid numeric draft unapplied; clicking help keeps the ordinary one-commit blur contract', async ({ page }) => {
+    const before = await current(page);
+    const input = page.getByRole('spinbutton', { name: 'Source IN frame', exact: true });
+    await input.fill('5');
+    const trigger = page.getByRole('button', { name: 'Source timing help', exact: true });
+    const panel = await panelFor(page, trigger);
+    await trigger.hover(); await expect(panel).toBeVisible(); await expect(input).toBeFocused();
+    expect(await current(page)).toEqual(before); expect(memory.saves).toBe(0);
+    await trigger.click(); await expect(trigger).toHaveAttribute('aria-pressed', 'true');
+    await expect(input).toHaveValue('5'); expect((await current(page)).clips[0]!.sourceIn).toBe(5);
+    await page.evaluate(() => window.pascapLab!.flush()); expect(memory.saves).toBe(1);
+    await trigger.press('Escape'); await input.focus(); await input.press('Enter');
+    await page.evaluate(() => window.pascapLab!.flush()); expect(memory.saves).toBe(1);
+    await page.getByRole('button', { name: 'Undo', exact: true }).click(); expect(await current(page)).toEqual(before);
+    await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
+});
+
+test('collapsing an editable point list by keyboard closes its help without removing the actual fields', async ({ page }) => {
+    const list = page.getByLabel('Edit layer keys', { exact: true }); await list.click();
+    const trigger = page.getByRole('button', { name: 'Keyframe timing help', exact: true });
+    const panel = await panelFor(page, trigger);
+    await trigger.click(); await expect(panel).toBeVisible();
+    await list.focus(); await list.press('Enter');
+    await expect.poll(() => panel.evaluate((element) => element.matches(':popover-open'))).toBe(false);
+    await list.press('Enter'); await page.getByLabel('Edit layer keyframe 10', { exact: true }).click();
+    await expect(page.getByRole('spinbutton', { name: 'Layer keyframe frame 10', exact: true })).toBeVisible();
+    expect(memory.saves).toBe(0);
+});
+
+for (const width of [1440, 1024, 720, 640]) {
+    test(`help remains unclipped with a 24px target and bounded panel at ${width}px`, async ({ page }) => {
+        await page.setViewportSize({ width, height: width === 640 ? 480 : 720 });
+        const toggle = page.getByRole('button', { name: 'Toggle Clip panel', exact: true });
+        if (await toggle.getAttribute('aria-pressed') !== 'true') await toggle.click();
+        const trigger = page.getByRole('button', { name: 'Speed timing help', exact: true });
+        const panel = await panelFor(page, trigger);
+        await trigger.scrollIntoViewIfNeeded(); await trigger.hover(); await expect(panel).toBeVisible();
+        const target = (await trigger.boundingBox())!; const bounds = (await panel.boundingBox())!;
+        expect(target.width).toBeGreaterThanOrEqual(24); expect(target.height).toBeGreaterThanOrEqual(24);
+        expect(bounds.x).toBeGreaterThanOrEqual(8); expect(bounds.y).toBeGreaterThanOrEqual(8);
+        expect(bounds.x + bounds.width).toBeLessThanOrEqual(width - 8);
+        expect(bounds.y + bounds.height).toBeLessThanOrEqual((width === 640 ? 480 : 720) - 8);
+        expect(await page.evaluate(() => globalThis.document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+        await trigger.click(); await expect(trigger).toHaveAttribute('aria-pressed', 'true');
+        await page.setViewportSize({ width: width + 20, height: 740 });
+        await expect(panel).toBeVisible();
+        expect((await panel.boundingBox())!.x + (await panel.boundingBox())!.width).toBeLessThanOrEqual(width + 12);
+        expect(memory.saves).toBe(0);
+    });
+}
+
+test('startup-error help retains diagnostics and dismissal never reloads or edits the project', async ({ page }) => {
+    const before = await current(page);
+    await page.route('**/assets/bootstrap-*.js', (route) => route.abort('failed')); await page.reload();
+    await expect(page.getByRole('button', { name: 'Reload editor', exact: true })).toBeVisible();
+    const trigger = page.getByRole('button', { name: 'Startup details help', exact: true });
+    const panel = await panelFor(page, trigger);
+    await trigger.hover(); await expect(panel).toBeVisible(); await expect(panel).toContainText(/import|fetch|Preview/i);
+    await trigger.click(); await trigger.press('Escape'); await expect(panel).toBeHidden();
+    await expect(page.getByRole('button', { name: 'Reload editor', exact: true })).toBeVisible();
+    // Bootstrap failed, so its debug API cannot exist. Read the actual retained draft
+    // through the normal recovery download, without relaxing the full-document check.
+    const download = page.waitForEvent('download'); await page.getByRole('button', { name: 'Download project', exact: true }).click();
+    const filename = await (await download).path();
+    if (!filename) throw new Error('The retained draft must be downloadable while preview code is unavailable.');
+    expect(projectSchema.parse(JSON.parse(await readFile(filename, 'utf8')))).toEqual(before);
+    expect(memory.snapshot()).toEqual(before); expect(memory.saves).toBe(0);
+});
+
+test('functional music, source and export detail sections remain ordinary editable/informational disclosures', async ({ page }) => {
+    await expect(page.getByRole('spinbutton', { name: 'Source OUT frame', exact: true })).toBeVisible();
+    await inspectorTab(page, 'Audio'); await page.getByText('Placement & fades', { exact: true }).click();
+    await expect(page.getByRole('spinbutton', { name: 'Music fade in', exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Export video', exact: true }).click();
+    const dialog = page.getByRole('dialog', { name: 'Export video', exact: true });
+    await dialog.getByText('Storage details', { exact: true }).click();
+    await expect(page.locator('.export-storage-path')).toHaveText('/disposable/help-cache/renders');
+    await dialog.getByText('Rendering details', { exact: true }).click();
+    await expect(dialog.getByRole('heading', { name: 'Fixed snapshot', exact: true })).toBeVisible();
+    await expect(dialog.getByRole('button', { name: 'Start export', exact: true })).toBeEnabled();
+    await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
+    expect(memory.saves).toBe(0);
+});
+
+test.describe('touch help', () => {
+    test.use({ hasTouch: true });
+    test('a tap pins help and an outside tap dismisses it without an unavailable hover step', async ({ page }) => {
+        const before = await current(page);
+        const trigger = page.getByRole('button', { name: 'Animation help', exact: true });
+        const panel = await panelFor(page, trigger);
+        await trigger.tap(); await expect(panel).toBeVisible(); await expect(trigger).toHaveAttribute('aria-pressed', 'true');
+        await page.getByRole('button', { name: 'Toggle Media panel', exact: true }).tap(); await expect(panel).toBeHidden();
+        expect(await current(page)).toEqual(before); expect(memory.saves).toBe(0);
+    });
 });

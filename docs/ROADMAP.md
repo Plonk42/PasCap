@@ -13,8 +13,10 @@ deadline; hardware/real-media work requires explicit owner consent.
 The local schema-5 editor implements no-copy footage import, projects, source
 excerpts, layered timelines, colour/speed/opacity row points, music and verified
 720p/4K export, with precise clip-only speed curves as well as overriding row Speed.
-The current **1,115-test** local correctness baseline is recorded in
-[delivery evidence](DELIVERY_STATUS.md#current-clip-speed-verification). Repository
+The recorded **1,115-test** core/native baseline is retained in
+[clip-speed delivery evidence](DELIVERY_STATUS.md#current-clip-speed-verification),
+with the later [question-mark help UI checks](DELIVERY_STATUS.md#current-help-popover-verification)
+recorded separately. Repository
 publication and CI are not a container release or a target-GPU/long-flight
 qualification claim.
 
@@ -22,7 +24,8 @@ qualification claim.
 
 [#15 — Editor delivery and GitHub workflow](https://github.com/Plonk42/PasCap/issues/15)
 groups the existing hardening delivery (#1, #3, #4), workflow alignment (#12) and
-feature records (#13, #14). Its checkpoints distinguish local commits/checks from
+feature records (#13, #14), plus the explicitly approved contextual-help UI (#16).
+Its checkpoints distinguish local commits/checks from
 publication, actual-commit CI and maintainer acceptance; none of these issues is
 closed automatically. The date identifies the batch, not a sprint deadline.
 
@@ -46,6 +49,7 @@ iteration issue/labels are usable now, without a fictitious board.
 | [#12 — GitHub workflow](https://github.com/Plonk42/PasCap/issues/12) | Keep instructions/forms, categorized priorities, next actions and iteration/dependency tracking aligned |
 | [#13 — Shared-point movement/navigation](https://github.com/Plonk42/PasCap/issues/13) | Retrospective delivered-feature record; preserve whole-point transactions, independent channel navigation and dated evidence |
 | [#14 — Precise clip speed](https://github.com/Plonk42/PasCap/issues/14) | Track approved source-frame curves and locally verified graph/numeric/native delivery separately from remote acceptance |
+| [#16 — Compact contextual help](https://github.com/Plonk42/PasCap/issues/16) | Replace help-only disclosures with accessible hover/pinned question-mark buttons, preserving drafts/focus and actual editable/data panels |
 
 Done means a repeatable, documented local foundation—not more CapCut-style effects.
 The initial publication includes README/user/developer guides, pinned CI and issue
