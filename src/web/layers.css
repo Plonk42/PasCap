@@ -4,21 +4,25 @@
     min-height: 0;
 }
 
-.timeline-scroll {
-    overflow-y: auto;
-}
-
 .layer-sidebar {
     position: relative;
     width: 146px;
     flex-shrink: 0;
-    overflow: hidden;
+    overflow-x: hidden;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: #557560 #111c15;
     background: #18241c;
     border-right: 1px solid #3b5041;
 }
 
-.layer-sidebar-heading {
+.layer-sidebar-surface {
     position: relative;
+}
+
+.layer-sidebar-heading {
+    position: sticky;
+    top: 0;
     z-index: 5;
     padding: 8px 9px;
     height: 31px;

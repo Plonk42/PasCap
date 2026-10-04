@@ -90,6 +90,13 @@ Neither suite invokes real-source sample preparation or needs private footage/mu
 
 ### Recorded local baseline
 
+The current [UI verification](DELIVERY_STATUS.md#current-ui-verification) passes
+**894 unit/service + 237 browser = 1,131** fresh checks on Node **22.23.3**, with
+strict frontend/server types and production build. It includes native timeline/header
+scrolling, accessible layer-action restrictions and the retained heading-help suite.
+No historical native count is added to that total; intended-GPU/real-flight, fresh
+delivery-commit CI and container gates remain separate.
+
 **2026-10-04 local baseline: 876 unit/service + 185 browser + 54 native = 1,115
 tests**, strict typechecks/build passing. The native total includes the separately
 enabled private tmpfs test. [Evidence/history](DELIVERY_STATUS.md#current-clip-speed-verification)
@@ -98,8 +105,8 @@ complete 5–10 minute real-flight qualification. Complete unit suites passed on
 local Node 22.23.3 and 24.21.0; the final browser/native suites used Node 22.
 The 1,039-test UX-hardening baseline remains historical rather than being relabelled.
 
-The later [inline-help UI verification](DELIVERY_STATUS.md#current-help-popover-verification)
-records the completed hover/pin/dismiss checks separately. The current
+The historical [inline-help UI verification](DELIVERY_STATUS.md#current-help-popover-verification)
+records its hover/pin/dismiss checks separately. Retained
 [heading-placement verification](DELIVERY_STATUS.md#current-heading-help-verification)
 adds collapsed-title access, independent native expansion/help, mounted drafts
 and compact geometry coverage without changing the native pipeline;

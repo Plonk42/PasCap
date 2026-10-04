@@ -52,6 +52,16 @@ source-list **Show** requests are also revealed horizontally; showing the first
 excerpt restores the normal frame-zero gutter. Selection never changes
 source/static bases, layer order or absolute project-frame row points.
 
+The timeline and layer headers both support native vertical scrolling, including
+wheel/trackpad, scrollbars and keyboard focus reveal. They share the same vertical
+position and row geometry; horizontal timeline scrolling does not move the headers.
+All eight rows and the music lane remain reachable at compact timeline heights.
+Scrolling alone does not seek, edit, create history or save.
+Layer options explain unavailable stack actions: the primary sequence is the fixed
+composition base and cannot be reordered/deleted; the top overlay cannot be raised
+further, and the lowest cannot be lowered below primary. Other overlay actions remain
+undoable, and active drafts/unavailable preview still block mutations.
+
 Keyboard help is available via the **header help button** or `?`
 outside form/modal/source controls. Space, S, Q/W, I/O, Shift+Delete, Escape,
 Ctrl+D, Delete/Backspace, Undo/Redo,

@@ -237,7 +237,8 @@ describe('native diamond, previous, next DOM and all control placements', () => 
       }
     }
     const sidebar = renderToStaticMarkup(createElement(KeyframeNavigationContext.Provider, { value: navigation() }, createElement(Layers, {
-      project: document, selectedId: 'video-1', scrollTop: 0, frame: 50, disabled: false, onSelect: vi.fn(), onEdit: vi.fn(),
+      project: document, selectedId: 'video-1', scrollTop: 0, surfaceHeight: 198, viewportHeight: 200,
+      frame: 50, disabled: false, onScroll: vi.fn(), onSelect: vi.fn(), onEdit: vi.fn(),
     })));
     expect(sidebar).toContain('Layer options Video 1');
     expect(sidebar).toContain('aria-label="Previous Layer opacity keyframe"');

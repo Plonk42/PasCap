@@ -2,7 +2,14 @@
 
 ## Implemented
 
-The current UI update replaces **all nine inline help disclosures** with small
+The timeline and layer headers support synchronized native vertical scrolling,
+including wheel/trackpad, visible scrollbars and keyboard focus reveal. All eight
+rows and music remain reachable without a seek, history entry or save. Layer options
+explain the existing primary/stack-edge restrictions; legitimate overlay actions,
+atomic Undo and draft guards remain unchanged. No saved data or rendering semantics
+are changed.
+
+All **nine inline help disclosures** use small
 question-mark buttons and gives the existing Animation help the same hover/focus,
 click-to-pin and Escape/outside-click contract. Explanations and numeric accessible
 descriptions are retained. Help is beside the relevant heading, including collapsed
@@ -43,7 +50,7 @@ evidence. The current update's completed verification is separated below.
 | Media | Project-specific video/music membership with timeline-reference union, shared content-deduplicated registry/proxy reuse, automatic proxy queue and explicit retries; compact list/grid, pinned repeated additions, sticky Add/count header, excerpt popup/reveal, reuse badges, source IN/OUT and original protection |
 | Footage import | Default approved-root service browser, metadata-only one-folder reads, natural-sorted 2,000-entry cap/explicit truncation, selected original-path registration up to 5,000 paths, existing queue/partial errors; deliberate recursive folder form preserved, no footage copies |
 | Timeline | Visible split/right-piece selection and quick trims, one-step marked-range cuts, primary ripple, recoverable trim headspace/autoscroll, contextual ghost/snaps, absolute overlays, duplicate/nudge/history; horizontal shared-point dragging with captured geometry/snap/autoscroll and reversible drafts |
-| Layers | Up to eight, bottom-to-top composition, visibility/stack order, editable names, layer/clip opacity, independent placement and undoable layer deletion |
+| Layers | Up to eight with synchronized native header/track scrolling, bottom-to-top composition, explained primary/stack-edge restrictions, visibility/stack order, editable names, layer/clip opacity, independent placement and undoable overlay deletion |
 | Keyframes | Whole-row project-frame points, ten independent channels, shared easing to each channel's next participant, endpoint holds/static bases, 256 points maximum; drag/keyboard/list movement preserves all participants/easing in one Undo, collisions never merge/overwrite; footage edits never copy/shift points |
 | Inspector | Clip/Sequence/Audio, compact hover/focus/pinned question-mark help, one Layer keyframes panel including empty rows, clickable hollow/filled diamonds immediately followed by always-present native SVG channel Previous/Next, explicit real-playhead capture/read-only animated values, chips/shared list, Enter/blur/Escape drafts and stable input identity |
 | Navigation | Strict channel-participant neighbours including zero, shared editor-only stored-point cursor across setting/row/list/sidebar navigation, truthful clamped-preview labels, marker click/Enter and one-/ten-frame moves with focus/context isolation; existing timecode/help/divider/modal navigation |
@@ -121,39 +128,48 @@ Usage: [LAYERS_AND_KEYFRAMES.md](LAYERS_AND_KEYFRAMES.md),
 [TIMELINE_EDITING.md](TIMELINE_EDITING.md) and
 [WORKSPACE_AND_RECOVERY.md](WORKSPACE_AND_RECOVERY.md).
 
-## Current heading-help verification
+## Current UI verification
 
-The title-placement refinement is tracked in
-[#16](https://github.com/Plonk42/PasCap/issues/16), with the first local step in
-`7dd6abd`. Inspector Source range, Layer & opacity, Speed, Colour, Transition and
-Sequence fades have independent section/help buttons in the same heading row.
-Shared-point timing is beside Edit points, audio timing beside Placement & fades,
-and startup diagnostics beside Preview needs attention; Animation remains beside
-Layer keyframes. Collapsed content remains mounted, preserving drafts and numeric
-descriptions, while its help stays reachable without opening the settings.
+**2026-10-04 local evidence:** **894 unit/service + 237 complete Chrome browser =
+1,131 fresh distinct checks pass**, on Node **22.23.3**. Strict frontend/server
+typechecks and production build pass. Entry JS is **482.44 kB / 145.55 kB gzip**,
+Inspector **49.83 / 14.36** deferred; the 500 kB warning threshold is unchanged.
+Native/media/private-tmpfs suites are not rerun for this UI change; older results
+below are historical, not part of this total or fresh hardware/remote CI evidence.
 
-**2026-10-04 local evidence:** complete unit/service checks **886 pass**, strict
-frontend/server types and production build pass; focused help/input checks **48 pass**
-(39 help workflows, including 11 new placement/keyboard/draft/compact cases, plus
-nine retained numeric cases). The complete retained browser suite **224 passes**;
-the fresh distinct total is **1,110** (886 unit/service + 224 browser), with no
-historical native results included. Entry JS is **480.75 kB / 145.07 kB gzip**,
-with Inspector **49.83 / 14.36** deferred and the warning threshold unchanged.
-Native/media tests are not rerun for this UI-only refinement. The preceding full
-1,099-test help result below remains separate evidence, not a new native or CI pass.
+[#18](https://github.com/Plonk42/PasCap/issues/18) covers native row access and
+truthful action states. Two actual-wheel regressions fail before the fix and pass
+after it. Thirteen new browser workflows cover both scroll surfaces, real native
+scrollbar dragging, keyboard focus reveal, matching horizontal-scrollbar extents,
+five compact/short viewport cases, accessible primary/edge restrictions, exact
+one-Undo ordering/deletion and captured-point Escape cancellation. Eight new unit
+cases retain all existing action guards. The focused layer/workspace/point run
+passes **56** tests; these are already included in the complete browser count.
+The headless layer-access suite exposes native scrollbars rather than assuming
+Chrome reserves a gutter while its default launch hides them.
 
-An isolated 1440×900 synthetic/memory-only visual check verified a 270 px Inspector
-with all four Clip headings collapsed, adjacent 24 px help controls and pinned
-Speed help without expanding settings, changing the exact document or writing.
-The owner page was untouched. Types, current IDE diagnostics, dependency audit and
-source/documentation hygiene passed; remote CI and hardware qualification are not
-claimed by these local checks.
+The full retained suite also verifies all **39** heading-help workflows from
+[#16](https://github.com/Plonk42/PasCap/issues/16): collapsed access, independent
+expansion/help, mounted valid/invalid drafts, native focus, hover/pin/Escape/outside
+activation and compact hit targets. Media/clip editing, shared-point capture,
+retiming, playback and short disposable export regressions remain intact. All new
+row-access projects are memory-only and sources are existing isolated synthetic
+fixtures. No owner project/original is edited, imported, prepared or rendered;
+no retries, weaker assertions, push, release or issue closure are implied.
 
-The retained clip-speed compact-window test now waits for the actual one-drawer
-resize state before opening Inspector; an immediate visibility check could race
-that React transition and close the drawer again. Exact 24 px point targets,
-270 px/720 px bounds, overflow and unchanged-document assertions remain intact;
-there is no timeout increase, retry or weakened correctness check.
+### Heading-help contract
+
+Inspector Source range, Layer & opacity, Speed, Colour, Transition and Sequence
+fades have independent section/help buttons in the same heading row. Shared-point
+timing is beside Edit points, audio timing beside Placement & fades, startup
+diagnostics beside Preview needs attention, and Animation beside Layer keyframes.
+Collapsed content stays mounted, preserving drafts and numeric descriptions;
+help remains reachable without opening its settings.
+
+<a id="current-heading-help-verification"></a>
+The earlier heading-placement local result (**886 unit/service + 224 browser =
+1,110**, entry **480.75 / 145.07 kB gzip**) is historical; the current full UI
+verification above reruns its retained regressions rather than adding that total.
 
 ## Current help-popover verification
 

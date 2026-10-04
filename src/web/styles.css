@@ -1094,7 +1094,7 @@ svg {
     flex: 1;
     min-height: 0;
     overflow-x: auto;
-    overflow-y: hidden;
+    overflow-y: auto;
     scrollbar-width: thin;
     scrollbar-color: #557560 #111c15;
     overscroll-behavior-x: contain;

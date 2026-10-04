@@ -1,9 +1,10 @@
-import { useId, useRef, useState } from 'react';
+import { useId, useLayoutEffect, useRef, useState } from 'react';
 import type { EditCommand } from '../shared/commands.js';
 import { activeLayerSetting, evaluateLayerSetting, hasLayerKeys } from '../shared/keyframes.js';
 import type { ProjectDocument, VideoLayer } from '../shared/model.js';
 import { Icon } from './icons.js';
 import { KeyframeToggle } from './KeyframeToggle.js';
+import { layerActionRestrictions } from './layer-actions.js';
 import { Popover } from './Popover.js';
 
 function layerNameError(draft: string): string | null {
@@ -77,32 +78,45 @@ function LayerOpacity({ layer, frame, disabled, onEdit }: Readonly<{ layer: Vide
   </div>;
 }
 
-export function Layers({ project, selectedId, scrollTop, frame, disabled, onSelect, onEdit }: Readonly<{ project: ProjectDocument; selectedId: string; scrollTop: number; frame: number; disabled: boolean; onSelect: (id: string) => void; onEdit: (command: EditCommand) => void }>) {
+export function Layers({ project, selectedId, scrollTop, surfaceHeight, viewportHeight, frame, disabled, onScroll, onSelect, onEdit }: Readonly<{ project: ProjectDocument; selectedId: string; scrollTop: number; surfaceHeight: number; viewportHeight: number | null; frame: number; disabled: boolean; onScroll: (top: number) => void; onSelect: (id: string) => void; onEdit: (command: EditCommand) => void }>) {
+  const viewport = useRef<HTMLElement>(null);
+  const reasonId = useId();
+  useLayoutEffect(() => {
+    if (viewport.current && viewport.current.scrollTop !== scrollTop) viewport.current.scrollTop = scrollTop;
+  }, [scrollTop, surfaceHeight, viewportHeight]);
   const move = (index: number, delta: number): void => {
     const ids = project.layers.map((layer) => layer.id);
     [ids[index], ids[index + delta]] = [ids[index + delta]!, ids[index]!];
     onEdit({ type: 'layer-order', layerIds: ids });
   };
-  return <aside className="layer-sidebar declutter-layers" aria-label="Video layers">
+  return <aside ref={viewport} className="layer-sidebar declutter-layers" aria-label="Video layers" style={{ height: viewportHeight ?? undefined }} onScroll={(event) => onScroll(event.currentTarget.scrollTop)}>
+    <div className="layer-sidebar-surface" style={{ height: surfaceHeight }}>
     <div className="layer-sidebar-heading" title="Bottom primary track ripple-edits. Upper layers have independent placement; higher layers cover lower footage.">Video layers · {project.layers.length} / 8</div>
     {[...project.layers].reverse().map((layer, row) => {
       const index = project.layers.length - 1 - row;
-      return <div key={layer.id} className={`layer-control ${layer.id === selectedId ? 'selected' : ''}`} data-layer-id={layer.id} style={{ top: 58 + row * 88 - scrollTop }}>
+      const restrictions = layerActionRestrictions(index, project.layers.length, disabled);
+      const description = `${reasonId}-${layer.id}`;
+      return <div key={layer.id} className={`layer-control ${layer.id === selectedId ? 'selected' : ''}`} data-layer-id={layer.id} style={{ top: 58 + row * 88 }}>
         <div className="layer-control-main">
           <button className="icon-button" aria-label={`${layer.enabled ? 'Hide' : 'Show'} layer ${layer.name}`} title={layer.enabled ? 'Hide layer in preview and export' : 'Show layer in preview and export'} disabled={disabled} onClick={() => onEdit({ type: 'layer-update', layer: { ...layer, enabled: !layer.enabled } })}><Icon name={layer.enabled ? 'eye' : 'eye-off'} size={15} /></button>
           <button className="text-button layer-select" aria-label={`Select layer ${layer.name}`} aria-pressed={layer.id === selectedId} disabled={disabled} title={index === 0 ? 'Primary track: edits ripple subsequent clips' : 'Overlay: clips use independent start positions'} onClick={() => onSelect(layer.id)}>{layer.name}</button>
           <Popover label={`Layer options ${layer.name}`} className="layer-options">{(close) => <>
+            {index === 0 && <p className="layer-options-note">Primary sequence · fixed bottom row. Delete excerpts, not this layer.</p>}
             <LayerName projectId={project.id} layer={layer} disabled={disabled} onEdit={onEdit} onCancel={close} />
             <LayerOpacity layer={layer} frame={frame} disabled={disabled} onEdit={onEdit} />
             <div className="layer-options-actions">
-              <button className="secondary-button small" aria-label={`Raise layer ${layer.name}`} title="Raise overlay above the next layer" disabled={disabled || index === 0 || index === project.layers.length - 1} onClick={() => move(index, 1)}><Icon name="chevron-up" size={14} />Raise</button>
-              <button className="secondary-button small" aria-label={`Lower layer ${layer.name}`} title="Lower overlay below the previous layer" disabled={disabled || index <= 1} onClick={() => move(index, -1)}><Icon name="chevron-down" size={14} />Lower</button>
-              <button className="secondary-button small layer-delete" aria-label={`Delete layer ${layer.name}`} title="Remove this overlay and its clips · Undo restores them" disabled={disabled || index === 0} onClick={() => { close(); onEdit({ type: 'layer-remove', layerId: layer.id }); }}><Icon name="trash" size={14} />Delete layer</button>
+              <button className="secondary-button small" aria-label={`Raise layer ${layer.name}`} aria-describedby={restrictions.raise ? `${description}-raise` : undefined} title={restrictions.raise ?? 'Raise overlay above the next layer'} disabled={restrictions.raise !== null} onClick={() => move(index, 1)}><Icon name="chevron-up" size={14} />Raise</button>
+              <button className="secondary-button small" aria-label={`Lower layer ${layer.name}`} aria-describedby={restrictions.lower ? `${description}-lower` : undefined} title={restrictions.lower ?? 'Lower overlay below the previous layer'} disabled={restrictions.lower !== null} onClick={() => move(index, -1)}><Icon name="chevron-down" size={14} />Lower</button>
+              <button className="secondary-button small layer-delete" aria-label={`Delete layer ${layer.name}`} aria-describedby={restrictions.remove ? `${description}-remove` : undefined} title={restrictions.remove ?? 'Remove this overlay and its clips · Undo restores them'} disabled={restrictions.remove !== null} onClick={() => { close(); onEdit({ type: 'layer-remove', layerId: layer.id }); }}><Icon name="trash" size={14} />Delete layer</button>
             </div>
+            {restrictions.raise && <span className="declutter-sr-only" id={`${description}-raise`}>{restrictions.raise}</span>}
+            {restrictions.lower && <span className="declutter-sr-only" id={`${description}-lower`}>{restrictions.lower}</span>}
+            {restrictions.remove && <span className="declutter-sr-only" id={`${description}-remove`}>{restrictions.remove}</span>}
           </>}</Popover>
         </div>
         {index === 0 && <span className="layer-kind">Primary · ripple</span>}
       </div>;
     })}
+    </div>
   </aside>;
 }
