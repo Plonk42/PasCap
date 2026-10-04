@@ -1,5 +1,9 @@
 # UX and local hardening · 2026-10-04
 
+This records the completed UX-hardening logical step. Its test/bundle figures are
+historical evidence, not relabelled as results of later clip-speed additions.
+See [current delivery evidence](DELIVERY_STATUS.md) for the newest verification.
+
 ## Simpler presentation, unchanged editing contract
 
 - **Media / Inspector toggles and keyboard help** are directly in the header.

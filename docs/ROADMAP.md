@@ -9,9 +9,11 @@ invented deadline; hardware/real-media work requires explicit owner consent.
 
 The local schema-5 editor implements no-copy footage import, projects, source
 excerpts, layered timelines, colour/speed/opacity row points, music and verified
-720p/4K export. The local correctness baseline is 1,039 tests; see
-[delivery evidence](DELIVERY_STATUS.md). Repository publication and CI are not a
-container release or a target-GPU/long-flight qualification claim.
+720p/4K export, with precise clip-only speed curves as well as overriding row Speed.
+The current **1,115-test** local correctness baseline is recorded in
+[delivery evidence](DELIVERY_STATUS.md#current-clip-speed-verification). Repository
+publication and CI are not a container release or a target-GPU/long-flight
+qualification claim.
 
 ## v0.1 — Local editor hardening
 
@@ -35,6 +37,11 @@ and #4 measured loading boundaries, with simpler visual UI throughout. This is
 local evidence, not issue closure or new remote CI. #2 has a documented sampled-
 versus-full identity prerequisite; no unsafe relink action was introduced. #5
 still requires a maintainer decision.
+
+The separately approved clip-speed extension adds presets and editable source-frame
+curves without replacing row animation. It is committed in logical steps under
+[repository instructions](../.github/copilot-instructions.md); it does not approve
+new optical-flow effects or private-media/hardware qualification work.
 
 ## v0.2 — Real-workload qualification
 

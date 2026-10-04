@@ -380,8 +380,9 @@ incomplete output is never offered as a finished video.
 
 UX regressions use disposable synthetic or memory-only projects. The former
 schema-5 909-test baseline, completed no-copy 886-test milestone and prior v3/v4
-correctness checks are historical. The current marker/channel-navigation full-suite
-baseline is **982 tests**, recorded in [DELIVERY_STATUS.md](DELIVERY_STATUS.md).
+correctness checks are historical. The **982-test** marker/channel-navigation and
+**1,039-test** UX-hardening results remain historical; current clip-speed evidence
+is recorded separately in [DELIVERY_STATUS.md](DELIVERY_STATUS.md).
 UX screenshots and short tests are not long-flight or intended-discrete-GPU
 performance certification; those gates remain in [ROADMAP.md](ROADMAP.md).
 This documentation update performs no additional sample preparation or real-media work.

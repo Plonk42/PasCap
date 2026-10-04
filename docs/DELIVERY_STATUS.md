@@ -2,7 +2,15 @@
 
 ## Implemented
 
-The current update simplifies the UX without removing editing features: **direct
+The current update adds **precise clip-level speed curves**: editable presets,
+source-frame/rate/easing fields, native graph/keyboard controls, source-preserving
+live drafts and one Undo per completed gesture. Clip points remain independent
+through trimming/splitting/duplication. Existing row Speed keeps its override
+precedence, with explicit UI feedback; all row colour/opacity/key navigation remain.
+The user also requested commits after each logical step, recorded in
+[repository instructions](../.github/copilot-instructions.md).
+
+The preceding UX-hardening update simplified the editor without removing features: **direct
 panel/help controls, selection-first visual Inspector states, grouped responsive
 timeline tools, visible Media Add/clear/mixed-selection feedback and quality cards
 with export-space preflight/recovery**. It also fixes the deterministic raw-reader
@@ -30,7 +38,7 @@ evidence. The current update's completed verification is separated below.
 | Inspector | Clip/Sequence/Audio, one Layer keyframes panel including empty rows, clickable hollow/filled diamonds immediately followed by always-present native SVG channel Previous/Next, explicit real-playhead capture/read-only animated values, chips/shared list, Enter/blur/Escape drafts and stable input identity |
 | Navigation | Strict channel-participant neighbours including zero, shared editor-only stored-point cursor across setting/row/list/sidebar navigation, truthful clamped-preview labels, marker click/Enter and one-/ten-frame moves with focus/context isolation; existing timecode/help/divider/modal navigation |
 | Colour | Independent static clip bases and seven independent row channels at project time, including held source frames; interpolate parameters before grading with unchanged CPU/GPU/65³ native LUT equations |
-| Speed | 0.1×–8× static constant/source ramps or overriding analytic row rates; layout/preview/native share `PlacedClip.retiming`, one duration rounding and repeat/drop mapping; point-move timing conflicts reject the whole move without shortening transitions |
+| Speed | 0.1×–8× constant/ramp/custom clip speed with 2–256 source-frame points, editable visual presets, exact fields and reversible graph gestures; overriding analytic row rates remain; layout/preview/native share `PlacedClip.retiming`, one duration rounding and repeat/drop mapping; timing conflicts reject the whole edit |
 | Music | Standalone source registration, AAC proxy, bounded server waveform, placement/trim/gain/fades, explicit selected-range loop, Web Audio clock |
 | Export | Original-based multi-layer 720p/4K SDR H.264, sampled animation/opacity, exact retiming/transitions, optional AAC, progress/cancel, receipts/full verification; native quality cards, metadata-only storage preflight, advisory allowance and owned-only ENOSPC/quota recovery |
 | Activity | Nonmodal preparation/render queue/history, real progress/confirmed cancellation, retained accepted jobs through status errors, output/receipt links |
@@ -38,11 +46,13 @@ evidence. The current update's completed verification is separated below.
 
 Project **schema v5** requires `media: { videoIds, audioIds }`: two unique ID arrays,
 at most 10,000 IDs each, explicitly empty for new projects. It retains static clip
-colour/opacity/constant-or-ramp speed, placement, complete layer point arrays and
+colour/opacity/constant/ramp/custom speed, placement, complete layer point arrays and
 music source bounds. Each layer point is
 `{ frame, interpolation, values }`, with **all ten nullable fields required**, at
 least one participant and unique ascending project frames. There is no clip
-animation/source-speed-key mode. Earlier **v1/v2/v3/v4 projects and receipt snapshots**
+colour/opacity animation object. The existing required `speed` union now also
+accepts explicit clip curve keys; valid constant/ramp values are unchanged, without
+migration, optional legacy fields or defaulting. Earlier **v1/v2/v3/v4 projects and receipt snapshots**
 remain incompatible and preserved: no migrations, compatibility fallback/default
 local fields or history rewrite. Media registry entries and currently verified
 ready proxies are reusable; create a new project and deliberately import its media.
@@ -101,7 +111,69 @@ Usage: [LAYERS_AND_KEYFRAMES.md](LAYERS_AND_KEYFRAMES.md),
 [TIMELINE_EDITING.md](TIMELINE_EDITING.md) and
 [WORKSPACE_AND_RECOVERY.md](WORKSPACE_AND_RECOVERY.md).
 
+## Current clip-speed verification
+
+**2026-10-04 local evidence for the completed clip-speed update.** All checks used
+disposable synthetic sources or memory-only projects; no owner footage/project
+was imported, prepared, edited or rendered.
+
+| Check | Result |
+| --- | --- |
+| Unit/service | **876 pass** on both Node **22.23.3 and 24.21.0**; 56 new clip-speed/compiler/geometry cases |
+| Strict frontend/server typechecks and production build | **Pass** |
+| Full browser | **185 pass**, including 17 new clip-curve workflows |
+| Opt-in native/media + private tmpfs acceptance | **54 pass**, including three new clip-curve parity cases and the separately enabled genuine ENOSPC test |
+| Combined distinct tests | **1,115 pass**; Node-version repetitions are not counted twice |
+| Dependency audit | **Zero vulnerabilities** |
+| IDE diagnostics | **No reported issues** after fresh production/test/CSS analysis; no new suppressions/exclusions |
+| Source/docs hygiene | Feature whitespace and local documentation links checked |
+| Production entry JS | **475.73 kB / 143.83 kB gzip**, with Inspector **50.38 / 14.36** deferred; no 500 kB warning or raised threshold |
+
+The 41 shared-speed cases and 15 graph/transaction cases verify strict 2–256
+source-frame points, original/exclusive-OUT bounds, endpoint holds, exact
+held/linear integration, bounded eased integration and immutable O(points) maps.
+They retain one-frame holds in long recordings, independent trim/split/cut/duplicate
+anchors, old constant/ramp behaviour, row override/restoration and atomic timing
+rejection. Layout, preview, inverse queries and native rendering still consume
+the same authoritative retiming map; row Speed's project-time integral is unchanged.
+
+The new browser workflows verify five editable visual presets, exact numeric
+frame/rate/easing drafts and decimal-preserving keyboard nudges, explicit
+Add/Delete/navigation, stable focus through reordering/Undo and saved reload.
+Native pointer gestures preview without saving and commit once on valid release;
+collision/fade conflicts reject the whole release, never a last-valid draft.
+Escape, pointer cancellation, capture loss and window blur restore the original
+document/preview. Source-key navigation finds an exact rendered image when
+available or the closest sampled image when skipped, with the exclusive OUT
+previewing the last output frame. Stored points never move merely to match a
+preview. Existing all-ten-channel navigation and two-decoder assertions remain;
+the **270 px Inspector / 720 px drawer** checks retain accessible 24 px point targets.
+
+The three new native cases compare **every output frame** with the shared map and
+CPU composite: 65-frame static 720p curves/dissolve maximum RGB MAE **2.4444/255**,
+15-frame layered 720p/custom-base/row-override **3.6667/255**, and genuine three-frame
+4K custom speed **1.3333/255**. The **<4/255** gate, exact frame counts, original
+identity/bytes, immutable receipts and decoder/buffer/resource assertions are
+unchanged. These cases use temporary frame-coded originals without preparing proxies.
+
+An isolated 1440×900 visual review used an existing synthetic proxy and memory-only
+project routes, with **zero saves/imports/preparations/renders**. It did not exercise
+the owner's open project. The browser renderer remains SwiftShader: short preview
+and 4K correctness are not intended-GPU, long-flight or long-run A/V qualification.
+The changed entry/chunk graph is a measured build result, not a total-download or
+playback-performance claim; the older UX-hardening bundle measurements below remain
+historical. No push, new remote CI result, release or issue closure is claimed.
+
+Usage and source-time versus row-time semantics: [SPEED_AND_AUDIO.md](SPEED_AND_AUDIO.md)
+and [USER_GUIDE.md](USER_GUIDE.md). The approved scope and logical-step commit policy
+are recorded in [the implementation plan](../EDITOR_IMPLEMENTATION_PLAN.md#23-approved-precise-clip-speed-curves--2026-10-04)
+and [repository instructions](../.github/copilot-instructions.md).
+
 ## Current UX-hardening verification
+
+**Historical 1,039-test evidence, preceding the clip-speed update.** The latest
+clip-speed verification is recorded separately; these entry sizes/counts remain
+the evidence for the earlier logical step.
 
 The final run used only disposable synthetic or memory-only projects:
 
@@ -502,10 +574,11 @@ or encoder-performance claim is made.
 
 ## Acceptance still pending
 
-1. The observed intermittent raw-frame reader early EOF must be diagnosed and
-   eliminated; see [#1](https://github.com/Plonk42/PasCap/issues/1). Current complete
-   correctness verification is recorded above, not pending or inferred from older
-   886/909-test milestones.
+1. Fresh remote-runner evidence for the locally diagnosed/fixed raw-frame reader
+   EOF remains pending after publication; see [#1](https://github.com/Plonk42/PasCap/issues/1).
+   The deterministic local regression and completed current correctness suites are
+   recorded above, not inferred from older 886/909-test milestones. The issue is
+   not automatically closed by a local commit.
 2. GPU-capable external browser checks for full-rate preview, responsive scrubbing,
    keyed layered/ramp/dissolve playback and long-run memory. Intel embedded/SwiftShader
    test speed is not an acceptance verdict.

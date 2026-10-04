@@ -10,7 +10,7 @@ export interface RawRetimingOptions {
   decodeArgs: readonly string[];
   encodeArgs: readonly string[];
   clip: VideoClip;
-  /** Authoritative placed map for row keys; omission compiles only static constant/ramp speed. */
+  /** Authoritative placed map for row keys; omission compiles the clip's constant/ramp/custom base. */
   retiming?: Retiming;
   frameBytes: number;
   /** Optional caller-owned reusable frame; no extra buffer in layered passes. */
