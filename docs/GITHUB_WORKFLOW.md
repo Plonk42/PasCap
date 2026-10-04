@@ -27,18 +27,59 @@ mutable backlog. Historical plans and feature worksheets do not approve new scop
 4. **Deliver incrementally.** At the start, after each completed logical step and
   at handoff, update the work issue and Project Status: progress, blockers,
   exact local commits, checks/evidence, remaining acceptance and the next action. Validate/review and
-   commit each step with its tests/docs; use `Refs #N` in commits/PRs, not closing
-   keywords. An unpublished SHA is a local reference, not a working GitHub commit link.
+  commit each step with its tests/docs; commit messages and PR titles always use
+  `(#N)`, for example `Improve timeline scrolling (#18)`, never `(Refs #N)` or
+  automatic closing keywords. An unpublished SHA is a local reference, not a
+  working GitHub commit link.
 5. **Review honestly.** Local implementation/testing can be complete while remote
    CI, publication or owner acceptance is pending. Inspect CI for the actual delivery
-   commit; old green runs do not qualify new code. Close issues/milestones, push,
-  publish or run owner-media jobs only with explicit authorization. Keep optional
+  commit; old green runs do not qualify new code. Automatically close concrete work
+  issues after verified delivery to remote `main`, following the gate below. Closing
+  milestones, pushing, publishing or running owner-media jobs still needs explicit
+  authorization. Keep optional
   sprint goals/review notes short; they must not become a second mutable backlog.
   Moving work between Project iterations does not accept or close its issues.
 
 Public updates must be sanitized: no private source/project paths, snapshots,
 credentials, recordings, licensed music or generated reports. Real imports,
 preparations, benchmarks and long renders still require explicit owner consent.
+
+## Verified closure on main
+
+The owner gives standing authorization to close a concrete work issue without another
+approval request once its implementing commit reaches **remote `main`** and the issue
+is actually fixed/implemented. A local commit, a merge notification, a checked box or
+`status:local-complete` alone is not sufficient.
+
+Before closing, the delivery agent must:
+
+1. Read the live issue, comments, acceptance criteria and dependencies. Inspect the
+  actual delivered code/contracts and relevant regression evidence; do not infer
+  completion from a title, label, commit message or another issue's completion.
+2. Verify the repository/host and remote `main` SHA, and prove the implementing
+  commit is contained in that branch. Local branch names and unpushed commits do
+  not qualify. Do not push just to trigger closure.
+3. Confirm every applicable acceptance criterion with evidence for the delivered
+  implementation. Inspect CI for the actual delivery commit (or a verified
+  descendant containing it); pending/failed required checks keep the issue open.
+  Documentation-only work needs applicable documentation validation, not invented
+  runtime tests. Hardware/real-workload criteria still require their own consented
+  evidence; unrelated deferred gates do not expand a completed issue's scope.
+4. If complete, post a sanitized acceptance summary with the delivered SHA, evidence
+  and CI links, then close with reason **completed**. Remove obsolete `status:*`
+  and `iteration:current` labels, preserve category/priority/areas, milestone,
+  history and native relationships, and set its existing Project item to **Done**.
+  Read back both issue and Project state; report any synchronization failure.
+5. If incomplete or uncertain, keep it open, align its progress label and Project
+  Status, and record the specific missing criterion/blocker and next action.
+
+Run this reconciliation after an authorized push/merge reaches remote `main` and
+at delivery handoff. This is a verification-driven agent policy, **not an installed
+background GitHub Action or an unattended merge-only automation**. Use plain `(#N)`
+issue references in commit messages and PR titles, without GitHub closing keywords
+that could bypass verification. Generic
+Project Auto-close workflows stay disabled. This policy does not authorize release,
+milestone closure, legacy tracker #15 cleanup, scope expansion or media jobs.
 
 ## Scheduling contract for agents
 
@@ -106,8 +147,9 @@ nor selects deferred container/hardware work for delivery automatically.
 | `status:local-complete` | Implementation/local checks complete; publication, remote acceptance or review may remain |
 
 `status:local-complete` is not all-criteria acceptance, issue closure or a remote
-pass. Closing is explicit; remove obsolete open-progress/current-iteration labels
-when closure is authorized, preserving category/priority/area and history.
+pass. Verified delivery to remote `main` authorizes automatic concrete-issue closure
+under the gate above; remove obsolete open-progress/current-iteration labels,
+preserving category/priority/area and history.
 `iteration` and `iteration:current` are retained legacy labels, not required triage
 metadata or the future scheduling mechanism. New work is selected through the Project,
 not labeled/parented into a sprint issue.
@@ -119,8 +161,9 @@ these same issues: backlog/table, Status board and iteration/milestone views.
 Keep Project Status aligned with issue progress labels and use labels for priority;
 do not build a competing backlog or unsynchronized priority field. Use a native
 Iteration field for an agreed cadence only, not fabricated dates. Preserve native
-issue parents and blocked-by relationships. Do not enable automatic closure/releases
-or broaden Actions permissions just to manage tracking.
+issue parents and blocked-by relationships. Do not enable unconditional Project
+Auto-close workflows or automatic releases, or broaden Actions permissions just to
+manage tracking. Verified issue closure follows the gate above.
 
 The initial setup lacked Projects scope. After the owner granted it, **2026-10-04
 CLI read/write access was verified** and

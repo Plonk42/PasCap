@@ -7,8 +7,11 @@
 - Before committing, review the diff, validate the affected behaviour, and stage
   deliberately. Preserve unrelated user edits; never discard them to obtain a
   clean tree. Do not commit generated media, caches, logs, credentials or private paths.
-- Do not push, publish releases or close GitHub issues unless requested. Distinguish
-  verified local results from remote CI and hardware qualification.
+- Do not push or publish releases unless requested. The owner authorizes automatic
+  closure of concrete work issues once their implementing commit is on remote `main`
+  and their actual implementation and acceptance criteria are verified. Follow the
+  closure gate in [the GitHub workflow](../docs/GITHUB_WORKFLOW.md); no additional
+  closure approval is needed for qualifying work. Local `main` alone is not delivery.
 - Reply in English. Keep summaries concise and identify remaining limitations.
 - Keep active documentation focused on the **current project state**: implemented
   behaviour, usage, contracts, limitations and applicable verification. Update or
@@ -47,12 +50,14 @@
   never claim a board exists, request secrets or stop otherwise accessible tracking.
 - At the start, after each completed logical step and at handoff, update the issue
   and Project Status when available, with progress, blockers,
-  exact local commits, verification and the next action. Commit references use
-  `Refs #N`; do not add automatic closing keywords.
+  exact local commits, verification and the next action. Commit messages always use
+  `(#N)` issue references, for example `Improve timeline scrolling (#18)`; never
+  use `(Refs #N)` or automatic closing keywords. PR titles use the same convention.
   Mark verified unpublished work `status:local-complete`, not accepted/closed.
 - Keep local checks, actual-commit remote CI and consented hardware/real-workload
-  qualification separate. Do not push, close issues/milestones, release, or start
-  media jobs merely to advance tracking. Public updates must contain sanitized evidence.
+  qualification separate. Close delivered issues only after the workflow's verification
+  gate; never close milestones, push, release, or start media jobs merely to advance
+  tracking. Public updates must contain sanitized evidence.
 - Keep [the roadmap](../docs/ROADMAP.md) as an outcome/dependency index and local
   guides as contracts/evidence, not a competing mutable backlog. Preserve design history.
 
