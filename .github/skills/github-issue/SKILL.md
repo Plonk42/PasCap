@@ -12,6 +12,9 @@ Turn the text following `/github-issue` into one scoped GitHub issue, or reuse a
 existing matching issue. Invocation authorizes logging and triage, **not product
 implementation**, publication, iteration admission, issue closure or media jobs.
 Do not run this workflow merely because an example invocation appears in chat.
+The standing automatic-publication/verified-closure policy applies when delivering
+approved work, not while merely logging an issue; see the
+[GitHub workflow](../../../docs/GITHUB_WORKFLOW.md#automatic-publication-to-main).
 
 ## Inspect first
 
@@ -106,8 +109,9 @@ credentials, licensed recordings/music or generated diagnostic reports.
 2. Add the **same issue** once to the repository-linked Project, not a draft card or
    duplicate. Explicitly set its native Status to match its issue progress label:
   Backlog, Ready, In progress, Blocked or Local complete. Done is for verified
-  closed issues only. Logging does not run delivery closure; the standing verified
-  remote-main closure policy is in the GitHub workflow. Do not configure
+  closed issues only. Logging does not run publication or delivery closure; the
+  standing validated-step push and verified remote-main closure policies are in
+  the GitHub workflow. Do not configure
   unconditional Project Auto-close workflows.
 3. If Project/dependency access is unavailable, record the exact limitation and next
   action on the actual work issue and continue what is accessible. Do not create a

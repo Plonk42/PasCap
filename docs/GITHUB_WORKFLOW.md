@@ -36,20 +36,56 @@ and verification snapshots remain in Git history; they are not current acceptanc
   exact local commits, checks/evidence, remaining acceptance and the next action. Validate/review and
   commit each step with its tests/docs; commit messages and PR titles always use
   `(#N)`, for example `Improve timeline scrolling (#18)`, never `(Refs #N)` or
-  automatic closing keywords. An unpublished SHA is a local reference, not a
-  working GitHub commit link.
+  automatic closing keywords. Automatically push approved, validated logical-step
+  commits to remote `main` under the standing authorization below, without another
+  approval request. An unpublished SHA is a local reference, not a working GitHub
+  commit link; report any publication blocker.
 5. **Review honestly.** Local implementation/testing can be complete while remote
    CI, publication or owner acceptance is pending. Inspect CI for the actual delivery
   commit; old green runs do not qualify new code. Automatically close concrete work
   issues after verified delivery to remote `main`, following the gate below. Closing
-  milestones, pushing, publishing or running owner-media jobs still needs explicit
-  authorization. Keep optional
+  milestones, publishing releases or running owner-media jobs still needs explicit
+  authorization; validated code/documentation pushes do not. Keep optional
   sprint goals/review notes short; they must not become a second mutable backlog.
   Moving work between Project iterations does not accept or close its issues.
 
 Public updates must be sanitized: no private source/project paths, snapshots,
 credentials, recordings, licensed music or generated reports. Real imports,
 preparations, benchmarks and long renders still require explicit owner consent.
+
+## Automatic publication to main
+
+The owner gives standing authorization for regular **agent-driven pushes to remote
+`main`** of approved work. Publish after each completed, validated and reviewed
+logical-step commit, and at handoff if such commits remain unpublished. Do not hold
+an entire completed feature locally or ask for the same push permission again.
+This is an event-driven work-cycle checkpoint, not a timer, background job, GitHub
+Action or invented sprint cadence. Logging an issue alone does not approve its
+implementation or publication; releases and scope expansion are not authorized.
+
+Before pushing:
+
+1. Verify the GitHub host/repository, local branch and target remote `main`. Review
+  **all** outgoing commits and their affected checks/contracts; do not publish
+  unrelated, unreviewed, unapproved or private content just because it is committed.
+2. Validate the affected behaviour, review the diff and stage deliberately before
+  committing. Keep unrelated user edits unstaged and intact; a dirty tree is not
+  permission to stash, discard or include them. Documentation-only work needs
+  applicable documentation validation, not invented runtime tests.
+3. Fetch remote `main` and confirm the outgoing history is a fast-forward from its
+  actual SHA. Use a normal explicit push to `main`; never force-push/rewrite remote
+  history, bypass protections, auto-merge unrelated work or broaden permissions.
+  If divergence, branch rules, failed validation or access prevents publication,
+  stop publication and record the specific blocker/recovery action on the work issue.
+  Use the protected-branch PR/review path when required rather than bypassing it.
+4. Read back remote `main` and prove the intended commits are contained. Record the
+  delivered SHA/link on the issue, inspect its actual-commit CI and run the closure
+  reconciliation below. A successful push does not itself prove acceptance or CI.
+
+Unpublished verified work remains `status:local-complete` with aligned Project
+Status and a concrete publication next action. Published work awaiting a required
+check, decision or acceptance remains open with the corresponding progress/blocker.
+Never retry or weaken tests merely to obtain a green delivery checkpoint.
 
 ## Verified closure on main
 
@@ -65,7 +101,8 @@ Before closing, the delivery agent must:
   completion from a title, label, commit message or another issue's completion.
 2. Verify the repository/host and remote `main` SHA, and prove the implementing
   commit is contained in that branch. Local branch names and unpushed commits do
-  not qualify. Do not push just to trigger closure.
+  not qualify. Publication follows the validated-step gate above, not an attempt
+  to bypass acceptance merely to trigger closure.
 3. Confirm every applicable acceptance criterion with evidence for the delivered
   implementation. Inspect CI for the actual delivery commit (or a verified
   descendant containing it); pending/failed required checks keep the issue open.
@@ -80,7 +117,7 @@ Before closing, the delivery agent must:
 5. If incomplete or uncertain, keep it open, align its progress label and Project
   Status, and record the specific missing criterion/blocker and next action.
 
-Run this reconciliation after an authorized push/merge reaches remote `main` and
+Run this reconciliation after every validated-step push/merge reaches remote `main` and
 at delivery handoff. This is a verification-driven agent policy, **not an installed
 background GitHub Action or an unattended merge-only automation**. Use plain `(#N)`
 issue references in commit messages and PR titles, without GitHub closing keywords
@@ -247,11 +284,10 @@ Later explicitly approved additions, including the help UI in
 checkpoint and issues. These historical setup counts are not a second mutable backlog
 or authorization to continue issue-based sprint tracking.
 
-The latest inspected remote [run 37183854541](https://github.com/Plonk42/PasCap/actions/runs/37183854541)
-on publication commit `6d260c5` failed the old raw-reader case on Node 24 while
-Node 22 and native/browser jobs passed. It does not contain local fix `48b4de9`
-or the clip-speed commits. Fresh delivery-commit CI awaits an explicitly approved
-push; old successful runs and local evidence are not substituted for it.
+Current delivery-commit results and remaining acceptance are recorded on the
+corresponding work issues and [GitHub Actions](https://github.com/Plonk42/PasCap/actions),
+not copied into this guide. Old successful runs and local evidence are not
+substituted for actual-commit CI.
 
 ### Working views
 
@@ -280,5 +316,6 @@ form to create a sprint container. Triage adjusts default priority/progress, app
 area labels and an outcome milestone; Project scheduling is separately authorized.
 The [PR template](../.github/pull_request_template.md) keeps linked
 tracking, local/remote/hardware verification and remaining next actions distinct.
-These local templates/instructions require an approved push before GitHub serves
-the updated files; the issue/label/milestone data is already applied remotely.
+GitHub serves the committed templates/instructions after they reach remote `main`.
+Publish approved, validated changes through the automatic-publication checkpoint
+above; issue/label/milestone metadata is applied directly and verified separately.

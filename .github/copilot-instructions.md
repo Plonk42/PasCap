@@ -7,11 +7,18 @@
 - Before committing, review the diff, validate the affected behaviour, and stage
   deliberately. Preserve unrelated user edits; never discard them to obtain a
   clean tree. Do not commit generated media, caches, logs, credentials or private paths.
-- Do not push or publish releases unless requested. The owner authorizes automatic
-  closure of concrete work issues once their implementing commit is on remote `main`
-  and their actual implementation and acceptance criteria are verified. Follow the
-  closure gate in [the GitHub workflow](../docs/GITHUB_WORKFLOW.md); no additional
-  closure approval is needed for qualifying work. Local `main` alone is not delivery.
+- The owner gives standing authorization to push approved, validated work to remote
+  `main` after each reviewed logical-step commit and at handoff if approved commits
+  remain unpublished; no repeated push approval is needed. Verify the repository,
+  intended commits and fast-forward remote state first. Preserve unrelated edits;
+  never force-push, bypass branch protection or publish unapproved/private work.
+  If publication is blocked, record the blocker and next action rather than hiding it.
+- After each delivery to remote `main` and at handoff, automatically close concrete
+  issues actually addressed, once their implementation, acceptance criteria and
+  applicable verification are confirmed. Follow the publication/closure gates in
+  [the GitHub workflow](../docs/GITHUB_WORKFLOW.md); no additional closure approval
+  is needed. Local `main` alone is not delivery. Releases, milestone closure,
+  legacy tracker cleanup and real-media jobs still need explicit approval.
 - Reply in English. Keep summaries concise and identify remaining limitations.
 - Keep active documentation focused on the **current project state**: implemented
   behaviour, usage, contracts, limitations and applicable verification. Update or
@@ -56,8 +63,9 @@
   Mark verified unpublished work `status:local-complete`, not accepted/closed.
 - Keep local checks, actual-commit remote CI and consented hardware/real-workload
   qualification separate. Close delivered issues only after the workflow's verification
-  gate; never close milestones, push, release, or start media jobs merely to advance
-  tracking. Public updates must contain sanitized evidence.
+  gate; push validated implementation steps, not incomplete/unapproved work merely
+  to advance tracking. Never close milestones, release or start media jobs without
+  explicit approval. Public updates must contain sanitized evidence.
 - Keep [the roadmap](../docs/ROADMAP.md) as an outcome/dependency index and local
   guides as contracts/evidence, not a competing mutable backlog. Preserve design history.
 
