@@ -20,25 +20,33 @@
 ## GitHub planning and delivery
 
 - GitHub is the system of record for issues, next actions, approved features,
-  iterations and milestones. Before implementation, read the relevant issue and
-  current iteration; search before creating a scoped issue. Proposals/labels are
+  Project selection/iterations and milestones. Before implementation, read the relevant
+  issue and Project context; search before creating a scoped issue. Proposals/labels are
   not approval to expand scope. Do not leave the next steps only in chat or local plans.
 - After triage, give each issue one category (`bug`, `enhancement` or `task`),
   one `priority:p0`–`priority:p3`, relevant `area:*` labels and an outcome milestone.
   Every open issue also needs one `status:*` label and a concrete next action.
   Use the definitions in [the GitHub workflow](../docs/GITHUB_WORKFLOW.md).
-- Plan a bounded current iteration with existing issues, native sub-issues and
-  `iteration:current`; use native blocked-by relationships for real prerequisites.
-  Preserve existing parents, unrelated metadata and historical comments. Milestones
-  describe outcomes, not invented sprint deadlines or permission for real-media work.
+- **Never create or maintain an issue as a sprint/iteration container.** Issues track
+  concrete deliverables; native parent/sub-issue relationships describe decomposition,
+  never sprint membership. Use the Project's native Iteration field for explicitly
+  agreed timeboxes; do not invent cadence, start dates or deadlines. Without an agreed
+  cadence, use the backlog/Status board and a bounded selected-work view instead.
+- Existing #15 and `iteration`/`iteration:current` labels are legacy tracking, not a
+  pattern to copy or a mandate to keep a second checklist synchronized. Preserve their
+  history and existing relationships; do not close, reparent or bulk relabel them
+  without explicit approval. Use native blocked-by links for real prerequisites and
+  milestones for deliverable outcomes, not sprint dates or media-work permission.
 - Use a repository-linked GitHub Project for board/iteration views when access is
   available, reusing the same issues and keeping its Status aligned with issue labels.
   Add new triaged issues to that Project, not duplicate draft cards. Status/label
   synchronization is explicit; a board drag does not update the issue label or next action.
-  If unavailable, record the access limitation and use an iteration issue/checklist;
+  If unavailable, record the limitation and continue on the actual work issues;
+  never create a replacement sprint issue or duplicate checklist. Record the selected
+  issue links on the relevant work issue if a handoff needs context;
   never claim a board exists, request secrets or stop otherwise accessible tracking.
 - At the start, after each completed logical step and at handoff, update the issue
-  and iteration, plus Project Status when available, with progress, blockers,
+  and Project Status when available, with progress, blockers,
   exact local commits, verification and the next action. Commit references use
   `Refs #N`; do not add automatic closing keywords.
   Mark verified unpublished work `status:local-complete`, not accepted/closed.

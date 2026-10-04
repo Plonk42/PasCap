@@ -20,22 +20,22 @@ recorded separately. Repository
 publication and CI are not a container release or a target-GPU/long-flight
 qualification claim.
 
-## Current iteration and next steps
+## Work selection and next steps
 
-[#15 — Editor delivery and GitHub workflow](https://github.com/Plonk42/PasCap/issues/15)
-groups the existing hardening delivery (#1, #3, #4), workflow alignment (#12) and
-feature records (#13, #14), plus the explicitly approved contextual-help UI (#16).
-Its checkpoints distinguish local commits/checks from
-publication, actual-commit CI and maintainer acceptance; none of these issues is
-closed automatically. The date identifies the batch, not a sprint deadline.
-
-Use its linked issues and [ready next actions](https://github.com/Plonk42/PasCap/issues?q=is%3Aissue%20is%3Aopen%20label%3A%22status%3Aready%22)
+Use concrete work issues and [ready next actions](https://github.com/Plonk42/PasCap/issues?q=is%3Aissue%20is%3Aopen%20label%3A%22status%3Aready%22)
 for mutable progress. #2 is ready for identity design, not unsafe relink implementation;
 #5 needs a maintainer license decision. GPU/flight work requires owner setup/consent,
 and containers remain a future milestone. The private repository-linked
-[planning Project](https://github.com/users/Plonk42/projects/1) now presents the
-same issues with aligned Status and delivery/iteration/milestone views. The native
-iteration issue, labels, parents and dependencies remain unchanged and usable.
+[planning Project](https://github.com/users/Plonk42/projects/1) presents the same
+issues with aligned Status. Use its native Iteration field for explicitly agreed
+timeboxes; without an agreed cadence, use the backlog/Status board and a bounded
+selected-work view. Do not create sprint issues or use parent/sub-issue hierarchy
+for sprint membership. Milestones remain deliverable outcomes.
+
+[#15](https://github.com/Plonk42/PasCap/issues/15) is a legacy delivery checkpoint,
+not the scheduling authority or a template for new sprint trackers. Its existing
+history, labels and relationships remain preserved pending any explicitly approved
+cleanup; no new Iteration dates or Project field/view changes are implied here.
 
 ## v0.1 — Local editor hardening
 

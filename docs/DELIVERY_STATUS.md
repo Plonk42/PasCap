@@ -123,7 +123,10 @@ Usage: [LAYERS_AND_KEYFRAMES.md](LAYERS_AND_KEYFRAMES.md),
 **2026-10-04 local UI-only evidence.** Verification uses isolated disposable synthetic
 media and memory-only projects; no owner project/original is edited, imported, prepared
 or rendered. [#16](https://github.com/Plonk42/PasCap/issues/16) tracks the explicitly
-approved scope within [iteration #15](https://github.com/Plonk42/PasCap/issues/15).
+approved scope recorded in the [legacy delivery checkpoint #15](https://github.com/Plonk42/PasCap/issues/15).
+Current scheduling follows [the GitHub workflow](GITHUB_WORKFLOW.md): native
+Project Iteration fields for agreed timeboxes, or selected-work views without a
+cadence, never new sprint-tracker issues. Existing checkpoint history is preserved.
 
 | Check | Result |
 | --- | --- |

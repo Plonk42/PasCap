@@ -4,7 +4,7 @@ labels: [enhancement, "priority:p2", "status:backlog"]
 body:
   - type: markdown
     attributes:
-      value: Search existing issues first. A proposal, priority or milestone is not implementation approval. Do not attach private media, credentials, project snapshots or filesystem paths. Triage applies area, priority, status and milestone/iteration tracking.
+      value: Search existing issues first. A proposal, priority or milestone is not implementation or Project selection approval. Do not attach private media, credentials, project snapshots or filesystem paths. Triage applies area, priority, status and outcome milestone; sprint membership belongs in the Project, not a tracker issue.
   - type: dropdown
     id: area
     attributes:
@@ -45,8 +45,8 @@ body:
   - type: textarea
     id: dependencies
     attributes:
-      label: Dependencies, milestone and iteration
-      description: Link existing issues and identify the outcome milestone/current iteration when known. Triage records real prerequisites as native blocked-by relationships; do not invent a delivery deadline.
+      label: Dependencies, milestone and Project context
+      description: Link prerequisites and identify the outcome milestone. Record native Project Iteration or selected-work context only when explicitly selected; new proposals remain unselected. Do not invent deadlines or use parent/sub-issues for sprint membership.
   - type: textarea
     id: next
     attributes:
