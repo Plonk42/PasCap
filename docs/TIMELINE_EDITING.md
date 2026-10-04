@@ -194,7 +194,7 @@ after sequencing changes. No timing migration or schema extension is introduced.
   a primary cut or positioned overlay pieces. Each piece retimes/rounds independently,
   so total duration can change. Invalid edits never enter history.
 - **Clip actions → Duplicate** / **Ctrl+D** copies the complete source excerpt,
-  static grade, opacity and constant/ramp speed into an independent ID. Primary
+  static grade, opacity and constant/ramp/custom speed into an independent ID. Primary
   duplicates insert after the original with new cut boundaries. Overlay duplicates start immediately
   after the original's contextual end and acquire their own contextual duration;
   occupied placement is rejected atomically.

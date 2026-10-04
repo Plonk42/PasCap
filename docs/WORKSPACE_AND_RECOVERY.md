@@ -117,8 +117,9 @@ other participants/easing are preserved. A keyed channel's slider/number is read
 where that channel is absent, including points belonging to other channels. Click
 its hollow diamond to capture the displayed value first; there are no slider-created
 implicit keys. Unanimated channels edit only the selected clip's static base, or
-the layer's base opacity. Speed base modes stay Constant/Ramp up/Ramp down, with no
-Keyframes option or automatic source endpoints.
+the layer's base opacity. Clip Speed modes include Constant/Ramp up/Ramp down and
+the explicitly approved Custom curve with source-frame keys. Its presets, precise
+fields and reversible graph gestures do not create row Speed participation.
 
 **Edit points** exposes one shared list. Each row names the participating setting
 dependencies; its inner **Time, easing & values** provides **Timeline frame**,
@@ -160,7 +161,7 @@ static clip bases and music are not copied or shifted. The shared time field rem
 an exact alternative, with the same atomic move validation.
 
 Reset speed to 1× changes only an active Speed participant when animated; without
-Speed keys it resets the selected clip's constant/ramp base. It never clears the
+Speed keys it resets the selected clip's constant/ramp/custom base. It never clears the
 curve or unrelated point participants. Colour **Reset keys** changes only enabled
 colour values at the current point; individual resets also handle unanimated clip
 bases. Trim/move/split/duplicate do not copy or shift row points. The contract is in

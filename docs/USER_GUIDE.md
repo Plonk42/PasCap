@@ -114,12 +114,40 @@ and the primary row only. Details: [TIMELINE_EDITING.md](TIMELINE_EDITING.md).
 
 ## Colour, speed and shared row keyframes
 
-Each excerpt has independent static colour, clip opacity and constant/ramp speed
+Each excerpt has independent static colour, clip opacity and constant/ramp/custom speed
 bases. **Colour** provides Exposure, Brightness, Contrast, Hue, Saturation, Highlights
 and Shadows. Speed accepts **0.1×–8×**, including ramp-up/down curves. Slow motion
 repeats frames and acceleration drops them; there is no optical-flow synthesis.
 Speed changes output duration: primary clips ripple, overlays keep their starts,
 and incompatible fades/transitions/overlaps reject the edit rather than being shrunk.
+
+### Precise clip speed curves
+
+Select the excerpt, open **Clip → Speed**, and choose **Custom curve**. Start from
+**Flat / Accelerate / Decelerate / Slow centre / Fast centre**, then edit any point.
+These points belong only to the selected clip, not to every clip in its video row.
+
+- Drag horizontally for original source time and vertically for speed. The graph
+  has a logarithmic 0.1×–8× axis; the vertical line is the displayed source frame.
+- For precise edits, select a point and enter **Source frame**, **Speed ×** and
+  **To next point** easing. Source frames are integers; numeric rates retain the
+  decimal precision you enter. Enter/blur applies, Escape restores.
+- Click the graph background or a point to seek, then **Add point** at an unkeyed
+  displayed source frame. Point Previous/Next and the selector also reach off-trim
+  keys. The original OUT anchor previews the last available image.
+- Drag drafts preview live without saving. Valid release is one Undo; Escape,
+  pointer cancellation/capture loss or window blur restores the prior edit.
+  Red collisions or timing conflicts never merge, overwrite or shrink transitions.
+- Focus a point: arrows move one source frame or 0.01×; Shift moves ten frames
+  or 0.1×. Enter seeks; Delete removes it if at least two points remain.
+- Keys retain original source positions through trims, splits and marked cuts;
+  duplicated/split clips have independent curves. **Reset** returns only this clip
+  to 1×. No generated slow-motion frames or optical flow are added.
+
+Existing **Row speed animation** stays separate and overrides a clip curve when
+the row has Speed keys. The override notice explains it; removing those Speed
+participants reveals the clip curve unchanged. Row colour/opacity animation is
+unaffected. Details: [SPEED_AND_AUDIO.md](SPEED_AND_AUDIO.md#precise-clip-curve-editor).
 
 ### Opt in to animation
 

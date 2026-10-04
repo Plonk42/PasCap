@@ -798,3 +798,34 @@ original/proxy protection, shared project-time row points and native resource bo
 Workflow contract: [docs/TIMELINE_EDITING.md](docs/TIMELINE_EDITING.md) and
 [docs/WORKSPACE_AND_RECOVERY.md](docs/WORKSPACE_AND_RECOVERY.md).
 Verified results: [docs/DELIVERY_STATUS.md](docs/DELIVERY_STATUS.md).
+
+## 23. Approved precise clip speed curves · 2026-10-04
+
+The user explicitly requested precise **clip-level speed keyframes**, with presets
+and a custom editable curve inspired by the supplied visual reference. This adds
+clip speed curves without undoing the prior whole-row animation decision: colour,
+opacity and existing shared Speed points remain row-owned, and a row Speed channel
+retains its established override precedence over each clip's independent base.
+
+- Add a strict `speed` union mode with 2–256 unique ascending original-source
+  frame/rate/easing points, 0.1×–8×. No optional legacy field, migration, hidden
+  point insertion or schema-default conversion is approved.
+- Preserve original source anchors through trims, splits, cuts and duplication;
+  retained copies remain independently editable. Points outside the current trim
+  stay accessible, but may not exceed the registered original's exclusive OUT.
+- Provide original editable Flat/Accelerate/Decelerate/Slow centre/Fast centre
+  templates, a logarithmic visual graph, exact frame/rate/easing inputs, Add/Delete,
+  explicit preview and native keyboard point navigation/editing.
+- Integrate each source-rate interval, including one-frame holds, into the shared
+  authoritative retiming map. Only final duration rounds; source/frame/native
+  ownership and repeat/drop semantics remain. No optical flow or copied app assets.
+- Valid graph drafts preview without autosave/history; valid release creates one
+  Undo. Escape, pointer cancellation/capture loss and window blur restore the edit.
+  Collision/transition/fade/overlay conflicts reject atomically, without merge or
+  transition shortening. Keep clear feedback when row Speed overrides the clip.
+- Commit each completed logical step with verification and relevant documentation,
+  as recorded in [repository instructions](.github/copilot-instructions.md).
+- Verify using disposable synthetic and memory-only projects; the request does not
+  authorise user-footage preparation/export or deferred hardware/long-flight jobs.
+
+Contract: [docs/SPEED_AND_AUDIO.md](docs/SPEED_AND_AUDIO.md).
