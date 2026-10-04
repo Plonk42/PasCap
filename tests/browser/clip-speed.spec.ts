@@ -254,7 +254,15 @@ test('custom controls fit a 270px Inspector and 720px drawer with accessible poi
   for (const width of [1440, 720]) {
     await page.setViewportSize({ width, height: 720 });
     const editor = page.getByRole('region', { name: 'Clip speed curve editor' });
-    if (!await editor.isVisible()) await page.getByRole('button', { name: 'Toggle Clip panel', exact: true }).click();
+    const toggle = page.getByRole('button', { name: 'Toggle Clip panel', exact: true });
+    // Compact adaptation is a React resize update, not synchronous with setViewportSize.
+    // This fixture has both panels open, so crossing the drawer breakpoint closes Clip.
+    if (width < 980) {
+      await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+      await toggle.click();
+    }
+    await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+    await expect(editor).toBeVisible();
     await point(page, 60).scrollIntoViewIfNeeded(); await expect(point(page, 60)).toBeInViewport();
     const box = (await point(page, 60).boundingBox())!; expect(box.width).toBeGreaterThanOrEqual(24); expect(box.height).toBeGreaterThanOrEqual(24);
     expect(await editor.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);

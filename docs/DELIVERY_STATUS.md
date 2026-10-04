@@ -5,7 +5,10 @@
 The current UI update replaces **all nine inline help disclosures** with small
 question-mark buttons and gives the existing Animation help the same hover/focus,
 click-to-pin and Escape/outside-click contract. Explanations and numeric accessible
-descriptions are retained. Editable sections, music/point/import controls and actual
+descriptions are retained. Help is beside the relevant heading, including collapsed
+Inspector settings, Edit points, Placement & fades and Preview needs attention.
+Expansion and help are independent native buttons; hidden content keeps its mounted
+drafts. Editable sections, music/point/import controls and actual
 storage/render/error details remain ordinary disclosures. This changes no persisted
 schema, preview/native processing, source identity or rendering resource limits.
 
@@ -118,9 +121,44 @@ Usage: [LAYERS_AND_KEYFRAMES.md](LAYERS_AND_KEYFRAMES.md),
 [TIMELINE_EDITING.md](TIMELINE_EDITING.md) and
 [WORKSPACE_AND_RECOVERY.md](WORKSPACE_AND_RECOVERY.md).
 
+## Current heading-help verification
+
+The title-placement refinement is tracked in
+[#16](https://github.com/Plonk42/PasCap/issues/16), with the first local step in
+`7dd6abd`. Inspector Source range, Layer & opacity, Speed, Colour, Transition and
+Sequence fades have independent section/help buttons in the same heading row.
+Shared-point timing is beside Edit points, audio timing beside Placement & fades,
+and startup diagnostics beside Preview needs attention; Animation remains beside
+Layer keyframes. Collapsed content remains mounted, preserving drafts and numeric
+descriptions, while its help stays reachable without opening the settings.
+
+**2026-10-04 local evidence:** complete unit/service checks **886 pass**, strict
+frontend/server types and production build pass; focused help/input checks **48 pass**
+(39 help workflows, including 11 new placement/keyboard/draft/compact cases, plus
+nine retained numeric cases). The complete retained browser suite **224 passes**;
+the fresh distinct total is **1,110** (886 unit/service + 224 browser), with no
+historical native results included. Entry JS is **480.75 kB / 145.07 kB gzip**,
+with Inspector **49.83 / 14.36** deferred and the warning threshold unchanged.
+Native/media tests are not rerun for this UI-only refinement. The preceding full
+1,099-test help result below remains separate evidence, not a new native or CI pass.
+
+An isolated 1440×900 synthetic/memory-only visual check verified a 270 px Inspector
+with all four Clip headings collapsed, adjacent 24 px help controls and pinned
+Speed help without expanding settings, changing the exact document or writing.
+The owner page was untouched. Types, current IDE diagnostics, dependency audit and
+source/documentation hygiene passed; remote CI and hardware qualification are not
+claimed by these local checks.
+
+The retained clip-speed compact-window test now waits for the actual one-drawer
+resize state before opening Inspector; an immediate visibility check could race
+that React transition and close the drawer again. Exact 24 px point targets,
+270 px/720 px bounds, overflow and unchanged-document assertions remain intact;
+there is no timeout increase, retry or weakened correctness check.
+
 ## Current help-popover verification
 
-**2026-10-04 local UI-only evidence.** Verification uses isolated disposable synthetic
+**Historical 1,099-test evidence for the preceding help-interaction update; title
+placement is verified separately above.** Verification used isolated disposable synthetic
 media and memory-only projects; no owner project/original is edited, imported, prepared
 or rendered. [#16](https://github.com/Plonk42/PasCap/issues/16) tracks the explicitly
 approved scope recorded in the [legacy delivery checkpoint #15](https://github.com/Plonk42/PasCap/issues/15).

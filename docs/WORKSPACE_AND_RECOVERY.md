@@ -81,6 +81,11 @@ fades put help beside their titles, reachable even when collapsed. Expansion and
 help are independent native buttons in normal section → help → fields Tab order;
 help never opens or closes the settings. Hidden content remains mounted, retaining
 its valid/invalid drafts and section preferences.
+Shared-point timing help sits beside **Edit points**, audio timing beside
+**Placement & fades**, and startup details beside **Preview needs attention**.
+These title-row help targets remain available without expanding their settings;
+collapsing content does not hide its heading help. Hiding the owning tab/pane
+still dismisses help. The existing Animation button remains beside **Layer keyframes**.
 Hovering the question-mark target or keyboard focus previews help without moving
 focus or applying a draft; empty space across a section does not activate help.
 The pointer can move into the text without closing it. Click, Enter or Space pins

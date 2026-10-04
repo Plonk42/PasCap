@@ -43,10 +43,11 @@ export function layerKeyframes(page: Page, name: string): Locator {
     return page.getByRole('group', { name: `Layer keyframes ${name}`, exact: true });
 }
 
-/** Open the shared list AND its point details; timing help is a different disclosure. */
+/** Open the shared list AND its point details; heading help never expands the list. */
 export async function editLayerPoint(page: Page, name: string, frame: number): Promise<Locator> {
     const keys = layerKeyframes(page, name);
-    if (await keys.locator('.keyframe-list').getAttribute('open') === null) await keys.getByLabel('Edit layer keys', { exact: true }).click();
+    const list = keys.getByRole('button', { name: 'Edit layer keys', exact: true });
+    if (await list.getAttribute('aria-expanded') !== 'true') await list.click();
     const row = keys.locator(`[data-keyframe-frame="${frame}"]`);
     if (await row.locator('.layer-keyframe-point-details').getAttribute('open') === null) await row.getByLabel(`Edit layer keyframe ${frame}`, { exact: true }).click();
     return row;
