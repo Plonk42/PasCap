@@ -132,6 +132,7 @@ export function Timeline(props: Readonly<Props>) {
   const bypassSnap = useRef(false);
   const [pixelsPerSecond, setPixelsPerSecond] = useState(48);
   const [viewportWidth, setViewportWidth] = useState(900);
+  const [viewportHeight, setViewportHeight] = useState<number | null>(null);
   const [draft, setDraft] = useState<ProjectDocument | null>(null);
   const [dragError, setDragError] = useState('');
   const [dropPlan, setDropPlan] = useState<DropPlan | null>(null);
@@ -167,7 +168,10 @@ export function Timeline(props: Readonly<Props>) {
   useEffect(() => {
     const element = scroll.current;
     if (!element) return;
-    const observer = new ResizeObserver(() => setViewportWidth(element.clientWidth));
+    const observer = new ResizeObserver(() => {
+      setViewportWidth(element.clientWidth);
+      setViewportHeight(element.clientHeight);
+    });
     observer.observe(element);
     return () => { observer.disconnect(); cancelAnimationFrame(autoScroll.current); cancelAnimationFrame(dropScroll.current); };
   }, []);
@@ -240,6 +244,12 @@ export function Timeline(props: Readonly<Props>) {
   const clearMove = (): void => {
     movingClip.current = false; movement.current = null; dropPointer.current = null;
     cancelAnimationFrame(dropScroll.current); dropScroll.current = 0; setDropPlan(null);
+  };
+  const scrollLayers = (top: number): void => {
+    const element = scroll.current;
+    if (!element) return;
+    if (element.scrollTop !== top) element.scrollTop = top;
+    setVerticalScroll(element.scrollTop);
   };
   useEffect(() => {
     if (!draggedMediaIds && movement.current?.payload.kind === 'media') clearMove();
@@ -438,7 +448,7 @@ export function Timeline(props: Readonly<Props>) {
       }}><Icon name="plus" size={15} /><span className="timeline-action-label">Layer</span></button>
       <div className="timeline-zoom"><label htmlFor="timeline-zoom">Zoom</label><input id="timeline-zoom" type="range" aria-label="Timeline zoom" min={12} max={180} step={1} value={pixelsPerSecond} disabled={interactionBlocked} onChange={(event) => setPixelsPerSecond(Number(event.target.value))} /><button className="text-button" title="Fit timeline (F)" disabled={interactionBlocked || !layout.duration} onClick={fitTimeline}>Fit</button></div>
     </div>
-    <div className="timeline-lanes"><Layers project={project} selectedId={selectedLayerId} scrollTop={verticalScroll} frame={frame} disabled={interactionBlocked} onSelect={onSelectLayer} onEdit={onEdit} /><div className="timeline-scroll" ref={scroll} onScroll={(event) => setVerticalScroll(event.currentTarget.scrollTop)} onDragOver={dragOver} onDrop={drop} onDragLeave={(event) => {
+    <div className="timeline-lanes"><Layers project={project} selectedId={selectedLayerId} scrollTop={verticalScroll} surfaceHeight={surfaceHeight} viewportHeight={viewportHeight} frame={frame} disabled={interactionBlocked} onScroll={scrollLayers} onSelect={onSelectLayer} onEdit={onEdit} /><div className="timeline-scroll" ref={scroll} onScroll={(event) => setVerticalScroll(event.currentTarget.scrollTop)} onDragOver={dragOver} onDrop={drop} onDragLeave={(event) => {
       if (!event.currentTarget.contains(event.relatedTarget as Node | null)) { setDropPlan(null); dropPointer.current = null; cancelAnimationFrame(dropScroll.current); dropScroll.current = 0; }
     }}>
       <div ref={surface} className={timelineSurfaceClassName(dragError, draft, keyframes.active)} style={{ width, height: surfaceHeight }} data-pixels-per-frame={scale} data-leading={leading}>

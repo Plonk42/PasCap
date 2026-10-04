@@ -24,6 +24,11 @@ an empty row retains both its **Layer keyframes** context and the target for Med
 reveals its row without changing placement. Media drops target the row under the
 pointer; overlay drops use the frame under it, while primary drops ripple-insert
 at a boundary.
+Scroll over either the headers or tracks to reach all eight rows and music; native
+vertical scrollbars and keyboard focus reveal stay synchronized. Horizontal timeline
+scroll is independent and scrolling never changes the project or playhead.
+Unavailable Raise/Lower/Delete actions have contextual accessible reasons. The
+primary sequence is the fixed composition base; overlays cannot move below it.
 Drag existing excerpts between rows, or use Clip → Layer & opacity. Deleting a layer
 and its clips is one undoable command. Existing moves preserve the grabbed offset
 and show the actual final placement ghost, including duration at the destination

@@ -444,6 +444,13 @@
     grid-column: 1 / -1;
 }
 
+.layer-options-note {
+    margin: 0;
+    color: var(--muted);
+    font-size: 12px;
+    line-height: 1.5;
+}
+
 .layer-options .layer-opacity-label {
     display: grid;
     gap: 6px;
