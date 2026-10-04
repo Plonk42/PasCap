@@ -10,6 +10,12 @@
 - Do not push, publish releases or close GitHub issues unless requested. Distinguish
   verified local results from remote CI and hardware qualification.
 - Reply in English. Keep summaries concise and identify remaining limitations.
+- Keep active documentation focused on the **current project state**: implemented
+  behaviour, usage, contracts, limitations and applicable verification. Update or
+  remove superseded descriptions instead of accumulating implementation chronology,
+  previous baselines or explanations of how the project got here. Keep history in
+  GitHub issues/commits or explicitly separate archives/design records, not in current
+  guides/status pages; never present historical evidence as current verification.
 
 ## GitHub planning and delivery
 
