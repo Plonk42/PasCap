@@ -56,7 +56,7 @@ fields and all-null points are invalid, not repaired with defaults.
 | --- | --- | --- |
 | `layerOpacity` | 0–1 | Layer's static `opacity`, after group composition |
 | `clipOpacity` | 0–1 | Each clip's static `opacity`, before group composition |
-| `speed` | 0.1×–8× | Each clip's static constant/ramp speed |
+| `speed` | 0.1×–8× | Each clip's constant/ramp/custom-keyframed speed |
 | `exposure` | −3 to +3 stops | Each clip's static colour value |
 | `brightness` | −0.5 to +0.5 | Each clip's static colour value |
 | `contrast` | 0–2 | Each clip's static colour value |
@@ -65,11 +65,13 @@ fields and all-null points are invalid, not repaired with defaults.
 | `highlights` | −1 to +1 | Each clip's static colour value |
 | `shadows` | −1 to +1 | Each clip's static colour value |
 
-Clip documents contain static colour/opacity and **constant or ramp** speed only.
-There is no clip animation object, source-speed-key mode or per-property key array.
+Clip documents contain static colour/opacity and **constant, ramp or custom-keyframed**
+speed. Shared row animation has no clip-animation object or per-property row key
+arrays. The explicitly approved clip speed editor stores its own source-frame
+points inside `clip.speed`; it does not change row-channel ownership or precedence.
 Trimming, restoring, moving, splitting and duplicating footage **never copy or
 shift row points**. Split/duplicate create independent source/static bases, retaining
-original-source ramp anchors. A moved clip uses its destination row's animation;
+original-source ramp/clip-speed anchors. A moved clip uses its destination row's animation;
 the old and new rows' points stay where they were. Primary ripple also leaves
 points anchored in project time. Removing the last participant of a channel reveals
 its existing static base; it does not replace that base with the deleted value.
@@ -109,7 +111,7 @@ It does not blend separately graded endpoint pictures; hue interpolates numerica
 in degrees. Grade/opacity evaluation uses **project time**, so it can change on
 consecutive output frames even when slow motion holds the same source frame.
 
-A participating Speed channel overrides each clip's whole constant/ramp base.
+A participating Speed channel overrides each clip's whole constant/ramp/custom base.
 Its analytic $ds = r(t)\,dt$ map uses absolute project time, rounds each clip's
 duration once and never rescales point times/rates. Layout, preview and native
 export use the same `PlacedClip.retiming`. See [SPEED_AND_AUDIO.md](SPEED_AND_AUDIO.md)
