@@ -13,7 +13,8 @@ import { AudioLibrary } from './audio.js';
 import { createConfig, type ServiceConfig } from './config.js';
 import { errorMessage, isNotFound, ServiceError } from './errors.js';
 import { restoreExports } from './export-archive.js';
-import { startExport } from './export.js';
+import { preflightExport, startExport } from './export.js';
+import { requireExportReserve } from './export-space.js';
 import { assertNoSymlinks, assertSourceIdentity, parseByteRange } from './files.js';
 import { FootageBrowser } from './footage.js';
 import { JobQueue } from './jobs.js';
@@ -188,8 +189,13 @@ export async function createApp(config = createConfig()) {
     jobs.cancel(idParams.parse(request.params).id); return reply.send({ job: jobs.get(idParams.parse(request.params).id) });
   });
   app.post('/api/reference', (request, reply) => reply.send({ job: startReference(referenceSchema.parse(request.body).document, library) }));
-  app.post('/api/exports', (request, reply) => {
+  app.post('/api/exports/preflight', async (request) => {
     const body = exportRequestSchema.parse(request.body);
+    return { space: await preflightExport(body.document, body.profile, library, (id) => audio.get(id)) };
+  });
+  app.post('/api/exports', async (request, reply) => {
+    const body = exportRequestSchema.parse(request.body);
+    requireExportReserve(await preflightExport(body.document, body.profile, library, (id) => audio.get(id)));
     return reply.code(202).send({ job: startExport(body.document, body.profile, library, (id) => audio.get(id)) });
   });
   for (const type of ['reference', 'export', 'receipt'] as const) {

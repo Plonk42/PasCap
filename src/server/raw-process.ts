@@ -4,6 +4,7 @@ import { EXPORT_RESOURCES } from '../shared/export.js';
 import { ServiceError } from './errors.js';
 
 interface RawProcessOptions { ffmpeg: string; cwd: string; signal: AbortSignal }
+type InitialRead = { ok: true; result: IteratorResult<Buffer> } | { ok: false; cause: unknown };
 export interface RawPassReport {
   peakReaders: number;
   peakEncoders: number;
@@ -16,18 +17,39 @@ export interface RawPassReport {
 /** Arbitrary pipe chunks are not frames; retain only one chunk per reader. */
 export class RawFrameReader {
   readonly #iterator: AsyncIterator<Buffer>;
+  #initial: Promise<InitialRead> | null = null;
   #chunk: Buffer | null = null;
   #offset = 0;
   largestChunk = 0;
-  constructor(stream: Readable, private readonly label: string, private readonly check: () => void) {
+  private constructor(stream: Readable, private readonly label: string, private readonly check: () => void) {
     this.#iterator = stream[Symbol.asyncIterator]() as AsyncIterator<Buffer>;
+  }
+  static create(stream: Readable, label: string, check: () => void): RawFrameReader {
+    const reader = new RawFrameReader(stream, label, check);
+    // Creating the iterator alone is lazy. Node flushStdio() resumes stdout on
+    // child exit and can discard an untouched second reader while the first is
+    // awaited. Begin consumption now; retain at most its first bounded chunk.
+    // Record rejection immediately too: cancellation may precede the first frame request.
+    reader.#initial = reader.#iterator.next().then(
+      (result): InitialRead => ({ ok: true, result }),
+      (cause: unknown): InitialRead => ({ ok: false, cause }),
+    );
+    return reader;
+  }
+  private async nextChunk(): Promise<IteratorResult<Buffer>> {
+    const initial = this.#initial;
+    if (initial === null) return this.#iterator.next();
+    this.#initial = null;
+    const settled = await initial;
+    if (!settled.ok) throw settled.cause;
+    return settled.result;
   }
   async readInto(frame: Buffer): Promise<boolean> {
     let filled = 0;
     while (filled < frame.length) {
       this.check();
       if (!this.#chunk) {
-        const next = await this.#iterator.next();
+        const next = await this.nextChunk();
         this.check();
         if (next.done) {
           if (filled) throw new ServiceError(`${this.label} emitted a truncated raw frame (${filled}/${frame.length} bytes).`, 422);
@@ -115,7 +137,7 @@ export class RawVideoPass {
   reader(args: readonly string[], label: string): RawFrameReader {
     const child = this.child(args, label, 'reader');
     child.stdout!.on('error', (error: Error) => this.fail(error));
-    const reader = new RawFrameReader(child.stdout!, label, this.check);
+    const reader = RawFrameReader.create(child.stdout!, label, this.check);
     this.#readers.push(reader);
     return reader;
   }

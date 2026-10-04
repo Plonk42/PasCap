@@ -1,4 +1,4 @@
-type IconName = 'mountain' | 'folder' | 'play' | 'pause' | 'back' | 'forward' | 'download' | 'reset' | 'check' | 'arrow' | 'activity' | 'x' | 'sliders' | 'search' | 'grid' | 'list' | 'plus' | 'video' | 'undo' | 'redo' | 'split' | 'trash' | 'eye' | 'eye-off' | 'help' | 'pin' | 'layout' | 'chevron-up' | 'chevron-down' | 'start' | 'end' | 'more';
+export type IconName = 'mountain' | 'folder' | 'play' | 'pause' | 'back' | 'forward' | 'download' | 'reset' | 'check' | 'arrow' | 'activity' | 'x' | 'sliders' | 'search' | 'grid' | 'list' | 'plus' | 'video' | 'undo' | 'redo' | 'split' | 'trash' | 'eye' | 'eye-off' | 'help' | 'pin' | 'layout' | 'chevron-up' | 'chevron-down' | 'start' | 'end' | 'more' | 'speed' | 'colour' | 'layers' | 'music' | 'curve' | 'magnet' | 'cut' | 'warning' | 'disk';
 const paths: Record<IconName, string> = {
   mountain: 'M3 19 9 6l5 9 3-6 4 10H3Zm6-13 2 4-2 2-2-2',
   folder: 'M3 7V5a1 1 0 0 1 1-1h5l2 3h9a1 1 0 0 1 1 1v11H3V7Zm0 3h18',
@@ -24,6 +24,15 @@ const paths: Record<IconName, string> = {
   'chevron-up': 'm6 15 6-6 6 6', 'chevron-down': 'm6 9 6 6 6-6',
   start: 'M5 5v14m13-14L8 12l10 7', end: 'M19 5v14M6 5l10 7-10 7',
   more: 'M5 12h.1M12 12h.1M19 12h.1',
+  speed: 'M4 18a9 9 0 1 1 16 0M12 13l5-6M5 13h1m6-9v1m6 8h1M10 18h4',
+  colour: 'M12 3a9 9 0 1 0 0 18h2a2 2 0 0 0 0-4h-1a2 2 0 0 1 0-4h3a5 5 0 0 0 0-10h-4ZM7 8h.1M12 6h.1M6 13h.1',
+  layers: 'm3 8 9-5 9 5-9 5-9-5Zm0 5 9 5 9-5M3 18l9 5 9-5',
+  music: 'M9 17V5l11-2v12M9 17a3 3 0 1 1-3-3c2 0 3 1 3 3Zm11-2a3 3 0 1 1-3-3c2 0 3 1 3 3Z',
+  curve: 'M3 18c8 0 10-12 18-12M3 15v6m18-18v6',
+  magnet: 'M5 3v9a7 7 0 0 0 14 0V3h-5v9a2 2 0 0 1-4 0V3H5Zm0 5h5m4 0h5',
+  cut: 'm7 7 10 10M7 17 17 7M6 3a3 3 0 1 1 0 6 3 3 0 0 1 0-6Zm0 12a3 3 0 1 1 0 6 3 3 0 0 1 0-6Zm11-8 4-4m-4 14 4 4',
+  warning: 'm12 3 10 18H2L12 3Zm0 6v5m0 3h.1',
+  disk: 'M4 4h14l3 3v14H3V4h1Zm3 0v7h10V4M7 21v-7h10v7M14 7h.1',
 };
 export function Icon({ name, size = 18 }: Readonly<{ name: IconName; size?: number }>) {
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={paths[name]} /></svg>;

@@ -403,7 +403,7 @@ test('exports a multi-clip retimed/graded music edit and serves verified snapsho
 test('export cancellation stops native work and publishes no incomplete output link', async ({ page, request }) => {
   test.setTimeout(60_000);
   await page.getByRole('button', { name: 'Export video', exact: true }).click();
-  await page.getByRole('combobox', { name: 'Export quality' }).selectOption('final4k');
+  await page.getByRole('radio', { name: '4K final', exact: true }).check();
   const accepted = await submitExport(page);
   const cancel = page.getByRole('button', { name: `Cancel ${accepted.label}`, exact: true });
   await expect(cancel).toBeVisible(); await cancel.click();

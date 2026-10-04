@@ -11,6 +11,7 @@ import { removeMarkedRange } from '../../src/shared/rush-editing.js';
 import { compileRetiming, type SpeedSettings } from '../../src/shared/speed.js';
 import { calculateLayout, sampleTimeline } from '../../src/shared/timeline.js';
 import { exportAudioSample, EXPORT_PROFILES } from '../../src/shared/export.js';
+import { estimateExportSpace } from '../../src/shared/export-space.js';
 import { framesToSeconds } from '../../src/shared/timing.js';
 import type { MediaAsset } from '../../src/shared/media.js';
 import { createConfig, type ServiceConfig } from '../../src/server/config.js';
@@ -20,6 +21,7 @@ import { extractComparisonFrame } from '../../src/server/library.js';
 import { probeVideo } from '../../src/server/probe.js';
 import { runProcess } from '../../src/server/process.js';
 import { preparedFixture } from '../../scripts/fixtures.js';
+import { observedJobBytes } from './scratch-observation.js';
 
 const enabled = process.env['PASCAP_MEDIA_TESTS'] === '1';
 const FRAME_BYTES = 160 * 90 * 3;
@@ -140,13 +142,19 @@ describe.skipIf(!enabled)('production native export · opt-in disposable media o
     });
     project.openingFade = 3; project.closingFade = 3;
     const updates: number[] = [];
+    const diskSamples: number[] = [];
     const submit = fixture.jobs.submit.bind(fixture.jobs);
     const spy = vi.spyOn(fixture.jobs, 'submit').mockImplementation((kind, label, task, settled = null) => submit(kind, label, async (context) => task({
-      ...context, update: (progress, message) => { updates.push(progress); context.update(progress, message); },
+      ...context, update: (progress, message) => {
+        updates.push(progress); context.update(progress, message);
+        diskSamples.push(observedJobBytes(path.join(directory, 'renders', context.id)));
+      },
     }), settled));
     let result: Awaited<ReturnType<typeof completed>>;
     try { result = await completed(project); } finally { spy.mockRestore(); }
     successfulDirectory = result.renderDirectory;
+    expect(Math.max(...diskSamples)).toBeGreaterThan(0);
+    console.log(`Native scratch observation (static 720p): maximum ${Math.max(...diskSamples)} allocated file bytes at ${diskSamples.length} progress points; planning allowance ${estimateExportSpace(project, 'draft720').totalBytes} bytes. Directory metadata and between-sample peaks are not measured.`);
     expect(updates.length).toBeGreaterThan(20);
     expect(updates.every((value, index) => index === 0 || value >= updates[index - 1]!)).toBe(true);
     expect(result.receipt.retiming).toHaveLength(speeds.length);

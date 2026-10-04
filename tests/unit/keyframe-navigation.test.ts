@@ -187,7 +187,9 @@ describe('one editor-only stored-point cursor', () => {
 describe('native diamond, previous, next DOM and all control placements', () => {
   it('renders exactly three sibling native buttons, in diamond/previous/next order, with SVG navigation', () => {
     const markup = toggleMarkup(); const controls = buttons(markup);
-    expect(markup.startsWith('<span class="keyframe-setting-navigation">')).toBe(true);
+    expect(markup.startsWith('<span class="keyframe-setting-navigation" data-animated="true">')).toBe(true);
+    expect(markup).toContain('aria-describedby=');
+    expect(markup).toContain('Capture a key at the playhead');
     expect(controls).toHaveLength(3);
     expect(controls[0]).toContain('aria-label="Keyframe Exposure"');
     expect(controls[0]).toContain('aria-pressed="false"'); expect(controls[0]).toContain('◇');

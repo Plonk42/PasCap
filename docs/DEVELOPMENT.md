@@ -73,6 +73,12 @@ npm run test:browser
 - `test:media` uses disposable temporary **synthetic** sources/projects/outputs only.
 - `test:browser` builds/creates synthetic fixtures, then runs serial Chrome workflows
   on its own service at **4320**, without reusing a running service.
+- `npm run test:space` is an additional explicit Linux native check using `unshare`,
+  `mount` and `umount` with unprivileged user namespaces. It exhausts a private
+  32 MiB tmpfs, never a shared disk or host mount, and needs no sudo. The ordinary
+  native suite does not enable this platform-specific test implicitly. Run both
+  native suites together with `PASCAP_MEDIA_TESTS=1 PASCAP_SPACE_TESTS=1 npm test -- tests/media`.
+  Hosts forbidding user namespaces must not claim that acceptance from unit mocks.
 
 **Browser fixture setup resets `.pascap/browser-tests/`**; never store personal work
 there. It seeds twelve video memberships, music and proxies. Separate import-test
@@ -84,10 +90,12 @@ Neither suite invokes real-source sample preparation or needs private footage/mu
 
 ### Recorded local baseline
 
-**2026-10-04 local baseline: 781 unit/service + 151 browser + 50 native/media = 982
-tests**, strict typechecks/build passing. [Evidence/history](DELIVERY_STATUS.md#current-keyframe-update-verification)
+**2026-10-04 local baseline: 820 unit/service + 168 browser + 51 native = 1,039
+tests**, strict typechecks/build passing. The native total includes the separately
+enabled private tmpfs test. [Evidence/history](DELIVERY_STATUS.md#current-ux-hardening-verification)
 is recorded separately from new CI results and target-GPU, long-run memory/A/V or
-complete 5–10 minute real-flight qualification. No tests were rerun for these guides.
+complete 5–10 minute real-flight qualification. Complete unit suites passed on
+local Node 22.23.3 and 24.21.0; the final browser/native suites used Node 22.
 
 ### GitHub CI
 
@@ -113,8 +121,11 @@ or the whole generated cache. Action references are commit-pinned and the workfl
 uses read-only repository permissions. It does not deploy GitHub Pages or publish
 a container image. Use [the roadmap](ROADMAP.md) for remaining qualification work.
 
-The observed intermittent raw-reader EOF is tracked as
-[#1](https://github.com/Plonk42/PasCap/issues/1). CI does not retry tests to hide it.
+The raw-reader EOF tracked as [#1](https://github.com/Plonk42/PasCap/issues/1)
+now has a local deterministic exit-before-read regression and eager bounded-read
+fix. CI does not retry tests to hide it; fresh remote-runner evidence remains
+separate. [UX_HARDENING.md](UX_HARDENING.md) records the cause, identity limitations,
+storage evidence and loading boundaries.
 
 The three-recording playback completion check has a bounded 45-second wait inside
 a 60-second test, with renderer/decoder diagnostics. The first runner trace showed

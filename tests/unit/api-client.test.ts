@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import type { AudioAsset } from '../../src/shared/audio.js';
+import type { ExportPreflight } from '../../src/shared/export-space.js';
 import { EMPTY_KEY_VALUES } from '../../src/shared/keyframes.js';
 import type { MediaJob } from '../../src/shared/media.js';
 import { createProject } from '../../src/shared/model.js';
@@ -11,6 +12,11 @@ const schema = z.object({ value: z.string() }).strict();
 const health: ServiceHealth = { name: 'PasCap', milestone: 'editing-and-export', frameRate: '30000/1001', workerConcurrency: 1 };
 const project = createProject('flight', 'Flight');
 const saved = { ...project, revision: 1 };
+const space: ExportPreflight = {
+  directory: '/fixtures/cache/renders', availableBytes: 10 * 1024 ** 3,
+  estimate: { losslessBytes: 400, encodedBytes: 200, audioBytes: 0, overheadBytes: 100, totalBytes: 700 },
+  status: 'available', checkedAt: '2026-10-04T10:00:00Z',
+};
 const job: MediaJob = {
   id: 'job-1', kind: 'prepare', label: 'Preparation', state: 'queued', progress: 0, message: 'Queued',
   createdAt: '2026-10-03T12:00:00Z', finishedAt: null, outputUrl: null, receiptUrl: null,
@@ -71,6 +77,7 @@ describe('registered API methods', () => {
     { name: 'audio', call: () => api.audio(), url: '/api/audio', method: 'GET', body: undefined, response: { assets: [audio] }, expected: { assets: [audio] }, status: 200 },
     { name: 'importAudio', call: () => api.importAudio(audio.sourcePath), url: '/api/audio/register', method: 'POST', body: { path: audio.sourcePath }, response: { asset: audio, job: { ...job, kind: 'audio' } }, expected: { asset: audio, job: { ...job, kind: 'audio' } }, status: 202 },
     { name: 'prepareAudio', call: () => api.prepareAudio(audio.id), url: '/api/audio/music-1/prepare', method: 'POST', body: {}, response: { job: { ...job, kind: 'audio' } }, expected: { job: { ...job, kind: 'audio' } }, status: 202 },
+    { name: 'exportPreflight', call: () => api.exportPreflight(project, 'draft720'), url: '/api/exports/preflight', method: 'POST', body: { document: project, profile: 'draft720' }, response: { space }, expected: { space }, status: 200 },
     { name: 'export', call: () => api.export(project, 'draft720'), url: '/api/exports', method: 'POST', body: { document: project, profile: 'draft720' }, response: { job: { ...job, kind: 'export' } }, expected: { job: { ...job, kind: 'export' } }, status: 202 },
     { name: 'reference', call: () => api.reference(project), url: '/api/reference', method: 'POST', body: { document: project }, response: { job: { ...job, kind: 'reference' } }, expected: { job: { ...job, kind: 'reference' } }, status: 200 },
   ];
@@ -126,6 +133,21 @@ describe('registered API methods', () => {
 });
 
 describe('API response and transport failures', () => {
+  it('reports an interrupted read-only preflight without claiming that a render may have been submitted', async () => {
+    fetchMock.mockRejectedValueOnce(new TypeError('Disconnected'));
+    const error: unknown = await api.exportPreflight(project, 'final4k').catch((cause: unknown) => cause);
+    expect(error).toMatchObject({ status: 0, kind: 'network', retryable: true });
+    expect((error as ApiError).message).not.toContain('may still have completed');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+  it.each([
+    { ...space, availableBytes: -1 }, { ...space, status: 'guaranteed-fit' }, { ...space, estimate: { totalBytes: 700 } },
+    { ...space, checkedAt: 'unknown' }, { ...space, extra: true },
+  ])('rejects an incompatible storage report rather than assuming that the disk is usable', async (invalid) => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ space: invalid }));
+    await expect(api.exportPreflight(project, 'draft720')).rejects.toMatchObject({ kind: 'response', retryable: false });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
   it('keeps the original four-argument request signature', async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({ value: 'saved' }));
     expect(await request('/api/test', schema, 'PUT', { value: 'draft' })).toEqual({ value: 'saved' });
@@ -238,6 +260,16 @@ describe('API response and transport failures', () => {
 });
 
 describe('bounded request deadlines and cancellation', () => {
+  it('uses the 15-second read deadline for preflight POST and does not retry it', async () => {
+    const gate = deferred<Response>(); fetchMock.mockReturnValueOnce(gate.promise);
+    const outcome = api.exportPreflight(project, 'draft720').catch((cause: unknown) => cause);
+    await vi.advanceTimersByTimeAsync(15_000);
+    const error = await outcome as ApiError;
+    expect(error).toMatchObject({ status: 0, kind: 'timeout', message: expect.stringContaining('15 seconds') });
+    expect(error.message).not.toContain('may still have completed');
+    expect(sentSignal().aborted).toBe(true); expect(fetchMock).toHaveBeenCalledTimes(1);
+    gate.resolve(jsonResponse({ space }));
+  });
   it('times out GET at 15 seconds even if the transport ignores abort', async () => {
     const gate = deferred<Response>(); fetchMock.mockReturnValueOnce(gate.promise);
     const outcome = request('/api/test', schema).catch((error: unknown) => error);

@@ -12,3 +12,5 @@ playwright-report/
 *.log
 *.pem
 *.key
+CAPCUT_FEATURES.md
+CAPCUT_FEATURES_SHORTLIST.md

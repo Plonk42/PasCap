@@ -9,7 +9,7 @@ invented deadline; hardware/real-media work requires explicit owner consent.
 
 The local schema-5 editor implements no-copy footage import, projects, source
 excerpts, layered timelines, colour/speed/opacity row points, music and verified
-720p/4K export. The local correctness baseline is 982 tests; see
+720p/4K export. The local correctness baseline is 1,039 tests; see
 [delivery evidence](DELIVERY_STATUS.md). Repository publication and CI are not a
 container release or a target-GPU/long-flight qualification claim.
 
@@ -28,6 +28,13 @@ container release or a target-GPU/long-flight qualification claim.
 Done means a repeatable, documented local foundation—not more CapCut-style effects.
 The initial publication includes README/user/developer guides, pinned CI and issue
 forms. Those are delivered work, not duplicate open backlog tasks.
+
+The local [UX-hardening update](UX_HARDENING.md) implements the #1 deterministic
+raw-reader fix, #3 storage/recovery controls and genuine constrained-volume test,
+and #4 measured loading boundaries, with simpler visual UI throughout. This is
+local evidence, not issue closure or new remote CI. #2 has a documented sampled-
+versus-full identity prerequisite; no unsafe relink action was introduced. #5
+still requires a maintainer decision.
 
 ## v0.2 — Real-workload qualification
 

@@ -17,6 +17,8 @@ import type { MusicTrack, ProjectDocument } from '../shared/model.js';
 import { validateSourceRanges } from '../shared/source-range.js';
 import { framesToSeconds, PROJECT_FPS, sameRate } from '../shared/timing.js';
 import { ServiceError } from './errors.js';
+import { exportStorageFailure, readExportSpace, requireExportReserve } from './export-space.js';
+import type { ExportPreflight } from '../shared/export-space.js';
 import { assertSourceIdentity } from './files.js';
 import type { JobContext } from './jobs.js';
 import { renderLayeredExport, type LayeredRenderReport } from './layered-export.js';
@@ -94,6 +96,14 @@ function captureInputs(document: ProjectDocument, profile: ExportProfile, librar
 export function validateExport(document: ProjectDocument, library: MediaLibrary): ProjectDocument {
   return captureInputs(exportDocumentSchema.parse(document), 'draft720', library).snapshot;
 }
+
+/** Read-only planning: validate the snapshot/registry, but do not read sources or admit jobs. */
+export async function preflightExport(document: ProjectDocument, profile: ExportProfile, library: MediaLibrary, resolveAudio?: AudioResolver): Promise<ExportPreflight> {
+  const inputs = captureInputs(document, profile, library);
+  if (inputs.snapshot.music) validateExportAudio(inputs.snapshot.music, await resolveRequiredAudio(inputs.snapshot.music.mediaId, resolveAudio));
+  return readExportSpace(library.config.dataDir, inputs.snapshot, inputs.profile);
+}
+
 export function validateExportAudio(music: MusicTrack, input: AudioAsset): AudioAsset {
   const asset = audioAssetSchema.parse(input);
   if (asset.id !== music.mediaId) throw new ServiceError('Music resolved to a different registered source identity.', 409);
@@ -396,6 +406,10 @@ async function renderCapturedExport(inputs: ExportInputs, library: MediaLibrary,
   let owned = false;
   let succeeded = false;
   try {
+    // A queued job may start long after the dialog check; re-read free space before ownership/native work.
+    context.update(0, 'Checking available export storage');
+    requireExportReserve(await readExportSpace(library.config.dataDir, inputs.snapshot, inputs.profile));
+    checkCancelled(context);
     await mkdir(path.dirname(directory), { recursive: true, mode: 0o700 });
     // EEXIST deliberately fails, and never grants cleanup ownership of an older export.
     await mkdir(directory, { mode: 0o700 });
@@ -449,6 +463,8 @@ async function renderCapturedExport(inputs: ExportInputs, library: MediaLibrary,
     checkCancelled(context);
     context.update(0.99, 'Export verified and ready');
     succeeded = true;
+  } catch (cause) {
+    throw exportStorageFailure(cause, directory);
   } finally {
     if (owned && !succeeded) await rm(directory, { recursive: true, force: true });
   }

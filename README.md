@@ -21,9 +21,11 @@ deployment targets.
 - Recoverable trims, split, duplication, marked-range cutting, snapping, Undo/Redo and source review.
 - Independent clip colour/speed bases and **shared row-wide keyframes** for opacity, speed and seven colour settings.
 - Draggable timeline keyframes and setting-specific Previous/Next navigation.
+- Direct panel/help controls, compact visual animation states and grouped editing tools.
 - Cuts, fade-through-black, cross-dissolves and opening/closing fades.
 - One music track with waveform, gain, fades and explicit range looping.
 - Native original-based H.264 SDR exports at **1280×720** or **3840×2160**, with progress, cancellation and verification receipts.
+- Export-space preflight, disclosed planning assumptions and safe disk-full recovery.
 
 ## Requirements
 
@@ -59,7 +61,7 @@ directory, and do not expose the unauthenticated service to a network.
 2. Use **Import → Browse footage**, select originals and register them. Browsing alone starts no media work. Alternatively, explicitly register a whole folder by path.
 3. Wait for proxy preparation in **Activity**. Review a recording, mark source IN/OUT, and add excerpts or drag prepared media onto a video row.
 4. Trim, reorder, grade and animate the edit; add standalone music in **Audio**.
-5. Choose **Export** and a draft/final preset. Export reads the original recordings, not the proxies.
+5. Choose **Export** and a draft/final preset, review its storage check, then start. Export reads the original recordings, not the proxies.
 
 Read the [user guide](docs/USER_GUIDE.md) for the full workflow and shortcuts.
 Filesystem file drops and browser upload pickers are intentionally disabled:
@@ -104,10 +106,11 @@ scripts are opt-in and must not be run against someone else's media without cons
 [GitHub Actions](https://github.com/Plonk42/PasCap/actions) runs checks on Node 22
 and 24, plus native-media and browser integration on the checksum-pinned FFmpeg
 8.0.1 toolchain. CI is correctness evidence, **not target-GPU or long-render certification**.
-The current local baseline is **781 unit/service + 151 browser + 50 native/media
-tests**; see [delivery evidence](docs/DELIVERY_STATUS.md) rather than treating a
-test count as a performance guarantee. The existing Vite bundle-size warning is
-visible and tracked, not suppressed.
+The current local baseline is **820 unit/service + 168 browser + 51 native tests**,
+including a separately opt-in private-tmpfs disk-full check; see
+[delivery evidence](docs/DELIVERY_STATUS.md#current-ux-hardening-verification),
+not a performance guarantee. The entry bundle is **370.62 kB / 113.88 kB gzip**;
+its former warning is resolved by measured splitting, not suppression.
 
 [Development guide](docs/DEVELOPMENT.md) · [CI implementation](.github/workflows/ci.yml)
 
@@ -120,6 +123,7 @@ real-workload qualification, and local Docker/Podman packaging. See
 
 - [User guide](docs/USER_GUIDE.md)
 - [Documentation index](docs/README.md)
+- [UX and local hardening](docs/UX_HARDENING.md)
 - [Timing and colour contract](docs/COLOUR_AND_TIMING.md)
 - [Layers and keyframes](docs/LAYERS_AND_KEYFRAMES.md)
 - [Speed, audio and export](docs/SPEED_AND_AUDIO.md)

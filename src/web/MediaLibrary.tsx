@@ -38,6 +38,7 @@ interface HoverMarker { projectId: string | null; mediaId: string; ratio: number
 const STATUS_LABEL: Record<MediaAsset['status'], string> = {
   ready: 'Ready', registered: 'Not prepared', queued: 'Queued', preparing: 'Preparing', error: 'Preparation failed',
 };
+const STATUS_ICON = { ready: 'check', registered: 'activity', queued: 'activity', preparing: 'activity', error: 'warning' } as const;
 const FILTER_LABEL: Record<string, string> = { all: '', ready: 'Ready', unprepared: 'Needs proxy', used: 'In timeline' };
 const FootageBrowser = lazy(() => import('./FootageBrowser.js').then((module) => ({ default: module.FootageBrowser })));
 
@@ -76,6 +77,7 @@ export function MediaLibrary({ assets, project, ranges, busy, onInsert, onDragMe
   const [sort, setSort] = useState('name');
   const [view, setView] = useState<'list' | 'grid'>(() => readPreference('pascap-media-view') === 'grid' ? 'grid' : 'list');
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const selectAll = useRef<HTMLInputElement>(null);
   const [lastSelected, setLastSelected] = useState<string | null>(null);
   const [showImport, setShowImport] = useState(false);
   const [folder, setFolder] = useState(() => readPreference('pascap-last-import') ?? '');
@@ -168,6 +170,9 @@ export function MediaLibrary({ assets, project, ranges, busy, onInsert, onDragMe
   const selectedAssets = assets.filter((asset) => selected.has(asset.id));
   const prepareIds = selectedAssets.filter((asset) => !mediaReady(asset) && !['queued', 'preparing'].includes(asset.status)).map((asset) => asset.id);
   const allVisibleSelected = visible.length > 0 && visible.every((asset) => selected.has(asset.id));
+  useEffect(() => {
+    if (selectAll.current) selectAll.current.indeterminate = !allVisibleSelected && visible.some((asset) => selected.has(asset.id));
+  }, [allVisibleSelected, selected, visible]);
 
   const toggle = (id: string): void => {
     setConfirmPrepare(false);
@@ -220,17 +225,18 @@ export function MediaLibrary({ assets, project, ranges, busy, onInsert, onDragMe
         </div></Popover>
       </div>
     </div>
-    <div className="library-search"><Icon name="search" size={15} /><input aria-label="Search media" placeholder="Search recordings" value={search} onChange={(event) => setSearch(event.target.value)} /></div>
+    <div className="library-search"><Icon name="search" size={15} /><input aria-label="Search media" placeholder="Search recordings" value={search} onChange={(event) => setSearch(event.target.value)} />{search && <button className="icon-button library-clear-search" aria-label="Clear media search" title="Clear search" onClick={() => setSearch('')}><Icon name="x" size={14} /></button>}</div>
     <div className="library-summary">
-      <label><input type="checkbox" aria-label="Select visible recordings" checked={allVisibleSelected} onChange={() => {
+      <label><input ref={selectAll} type="checkbox" aria-label="Select visible recordings" disabled={!visible.length} checked={allVisibleSelected} onChange={() => {
         setConfirmPrepare(false);
         setSelected((previous) => {
           const next = new Set(previous);
           visible.forEach((asset) => { if (allVisibleSelected) next.delete(asset.id); else next.add(asset.id); });
           return next;
         });
-      }} />{visible.length} / {assets.length}</label>
-      <span className="library-filter-status">{FILTER_LABEL[filter]}</span>
+      }} />Select all</label>
+      {visible.length !== assets.length && <span className="library-visible-count" title="Matching recordings">{visible.length} / {assets.length}</span>}
+      {filter !== 'all' && <button className="library-filter-chip" aria-label="Clear media filter" title="Show all recordings" onClick={() => setFilter('all')}>{FILTER_LABEL[filter]}<Icon name="x" size={12} /></button>}
     </div>
     {dropError && <div className="media-file-error" role="alert"><span>{dropError}</span><button className="icon-button" aria-label="Dismiss file import error" onClick={() => setDropError('')}><Icon name="x" size={14} /></button></div>}
     <div className={`media-items ${view}`} onScroll={clearHover}>
@@ -263,7 +269,7 @@ export function MediaLibrary({ assets, project, ranges, busy, onInsert, onDragMe
             </span>{trimmed && <span className="media-range-badge" title={`Original frames ${range.sourceIn}–${range.sourceOut}, OUT exclusive`}>IN {range.sourceIn} · OUT {range.sourceOut}</span>}</span>
             {hover?.projectId === projectId && hover.mediaId === asset.id && <span className="media-hover-marker" style={{ left: `${hover.ratio * 100}%` }} aria-hidden="true" />}
           </button>
-          <span className={`media-state ${asset.status}`} data-used={usage.has(asset.id)} title={asset.error ?? statusLabel} aria-label={`${asset.name}: ${STATUS_LABEL[asset.status]}${usageDescription}`}><span /><small>{statusLabel}</small></span>
+          <span className={`media-state ${asset.status}`} data-used={usage.has(asset.id)} title={asset.error ?? statusLabel} aria-label={`${asset.name}: ${STATUS_LABEL[asset.status]}${usageDescription}`}><span className="media-state-icon" aria-hidden="true"><Icon name={STATUS_ICON[asset.status]} size={13} /></span><small>{statusLabel}</small></span>
           <MediaAction asset={asset} hasProject={project !== null} trimmed={trimmed} targetLayer={targetLayer} busy={busy} onInsert={onInsert} onPrepare={onPrepare} />
         </article>;
       })}

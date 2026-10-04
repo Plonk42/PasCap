@@ -25,6 +25,10 @@ function markedCutError(project: ProjectDocument, marks: ClipCutRange | null): s
   catch (cause) { return cause instanceof Error ? cause.message : 'Choose valid IN and OUT marks.'; }
 }
 
+function markIsSet(marks: ClipCutRange | null, edge: 'inFrame' | 'outFrame'): boolean {
+  return marks !== null && marks[edge] !== null;
+}
+
 export function TimelineCutMarks({ marks, selected, top, leading, scale }: Readonly<{ marks: ClipCutRange | null; selected: PlacedClip | undefined; top: number; leading: number; scale: number }>) {
   if (!marks) return null;
   if (marks.clipId !== selected?.clip.id) return null;
@@ -45,25 +49,27 @@ export function RushEditBar({ project, selected, frame, disabled, cutRange, onSp
   const canTrimIn = sourceFrame !== null && selected !== undefined && sourceFrame > selected.clip.sourceIn;
   const canTrimOut = sourceFrame !== null && selected !== undefined && sourceFrame + 1 < selected.clip.sourceOut;
   const marks = cutRange?.clipId === selected?.clip.id ? cutRange : null;
+  const hasIn = markIsSet(marks, 'inFrame');
+  const hasOut = markIsSet(marks, 'outFrame');
   const error = markedCutError(project, marks);
   const ripple = !selected || selected.clip.layerId === project.layers[0]!.id;
   const mode = ripple ? 'Ripple sequence' : 'Positioned overlay';
   const modeHint = ripple ? 'Trim, cut, delete or reorder: later primary excerpts close up automatically. Their order and source ranges are kept.' : 'Overlay edits keep other clips at their absolute positions. Use the primary row for automatic ripple sequencing.';
 
   return <div className="rush-edit-bar" aria-label="Rush editing actions">
-    <span className={`rush-edit-mode ${ripple ? 'ripple' : ''}`} title={modeHint}>{mode}</span>
-    <div className="rush-quick-actions">
-      <button type="button" className="secondary-button small" aria-label="Split at playhead" title="Split into independent excerpts; select the right piece · S" disabled={disabled || !canSplit} onClick={onSplit}><Icon name="split" size={14} />Split</button>
-      <button type="button" className="secondary-button small" aria-label="Trim start to playhead" title="Remove before the playhead, keeping the displayed source frame · Q" disabled={disabled || !canTrimIn} onClick={() => onQuickTrim('in')}><Icon name="start" size={13} />Trim start</button>
-      <button type="button" className="secondary-button small" aria-label="Trim end to playhead" title="Remove after the playhead, keeping the displayed source frame · W" disabled={disabled || !canTrimOut} onClick={() => onQuickTrim('out')}><Icon name="end" size={13} />Trim end</button>
+    <span className={`rush-edit-mode ${ripple ? 'ripple' : ''}`} title={modeHint}><Icon name={ripple ? 'list' : 'layers'} size={15} /><span className="declutter-sr-only">{mode}</span></span>
+    <fieldset className="rush-quick-actions"><legend className="declutter-sr-only">Edit selected excerpt</legend>
+      <button type="button" className="secondary-button small" aria-label="Split at playhead" title="Split into independent excerpts; select the right piece · S" disabled={disabled || !canSplit} onClick={onSplit}><Icon name="split" size={15} /><span className="timeline-action-label">Split</span></button>
+      <button type="button" className="secondary-button small" aria-label="Trim start to playhead" title="Remove before the playhead, keeping the displayed source frame · Q" disabled={disabled || !canTrimIn} onClick={() => onQuickTrim('in')}><Icon name="start" size={15} /><span className="timeline-action-label">Trim start</span></button>
+      <button type="button" className="secondary-button small" aria-label="Trim end to playhead" title="Remove after the playhead, keeping the displayed source frame · W" disabled={disabled || !canTrimOut} onClick={() => onQuickTrim('out')}><Icon name="end" size={15} /><span className="timeline-action-label">Trim end</span></button>
       <button type="button" className="icon-button" aria-label="Delete selected clip" title="Remove this excerpt only; originals remain recoverable · Delete" disabled={disabled || !selected} onClick={onDelete}><Icon name="trash" size={15} /></button>
-    </div>
-    <div className="rush-cut-actions">
-      <button type="button" className={`secondary-button small ${marks?.inFrame !== null && marks?.inFrame !== undefined ? 'active' : ''}`} aria-label="Mark cut IN" title="Start the unwanted part here · I" disabled={disabled || !inClip} onClick={() => onMarkCut('in')}>IN</button>
-      <button type="button" className={`secondary-button small ${marks?.outFrame !== null && marks?.outFrame !== undefined ? 'active' : ''}`} aria-label="Mark cut OUT" title="End the unwanted part after this frame (OUT exclusive) · O" disabled={disabled || !inClip} onClick={() => onMarkCut('out')}>OUT</button>
-      <button type="button" className="secondary-button small rush-cut-button" aria-label="Cut marked range" title={error || 'Remove the marked part in one undoable edit; retained excerpts stay connected on the primary row · Shift+Delete'} disabled={disabled || !!error} onClick={onCutMarked}>Cut range</button>
+    </fieldset>
+    <fieldset className="rush-cut-actions" data-marked={hasIn || hasOut}><legend className="declutter-sr-only">Remove a marked range</legend>
+      <button type="button" className={`secondary-button small ${hasIn ? 'active' : ''}`} aria-label="Mark cut IN" aria-pressed={hasIn} title="Start the unwanted part here · I" disabled={disabled || !inClip} onClick={() => onMarkCut('in')}>IN</button>
+      <button type="button" className={`secondary-button small ${hasOut ? 'active' : ''}`} aria-label="Mark cut OUT" aria-pressed={hasOut} title="End the unwanted part after this frame (OUT exclusive) · O" disabled={disabled || !inClip} onClick={() => onMarkCut('out')}>OUT</button>
+      <button type="button" className="secondary-button small rush-cut-button" aria-label="Cut marked range" title={error || 'Remove the marked part in one undoable edit; retained excerpts stay connected on the primary row · Shift+Delete'} disabled={disabled || !!error} onClick={onCutMarked}><Icon name="cut" size={15} /><span className="timeline-action-label">Cut range</span></button>
       {marks && <button type="button" className="icon-button" aria-label="Clear cut marks" title="Clear temporary marks · Escape" onClick={onClearCut}><Icon name="x" size={13} /></button>}
-    </div>
-    {marks && <output className="rush-cut-readout" aria-live="polite" title={error || 'Timeline marks; OUT exclusive'}>{marks.inFrame === null ? 'IN —' : `IN ${formatTimecode(marks.inFrame)}`} → {marks.outFrame === null ? 'OUT —' : `OUT ${formatTimecode(marks.outFrame)}`}</output>}
+    </fieldset>
+    {marks && <output className="rush-cut-readout declutter-sr-only" aria-live="polite" title={error || 'Timeline marks; OUT exclusive'}>{marks.inFrame === null ? 'IN —' : `IN ${formatTimecode(marks.inFrame)}`} → {marks.outFrame === null ? 'OUT —' : `OUT ${formatTimecode(marks.outFrame)}`}</output>}
   </div>;
 }

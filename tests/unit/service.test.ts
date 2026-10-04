@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { mkdtemp, readFile, rm, mkdir, writeFile, symlink } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, mkdir, open, rename, utimes, writeFile, symlink } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import os from 'node:os';
 import path from 'node:path';
 import { createProject } from '../../src/shared/model.js';
@@ -56,6 +57,28 @@ describe('source safety', () => {
     const file = path.join(await temp(), 'video.mp4'); await writeFile(file, 'original bytes');
     const identity = await fingerprintFile(file); await rm(file);
     await expect(assertSourceIdentity(file, identity)).rejects.toThrow('original recording is missing');
+    await expect(assertSourceIdentity(file, identity)).rejects.toThrow('registered path');
+  });
+  it('has path-independent sampled evidence for a same-inode rename, not an automatic registry relink', async () => {
+    const directory = await temp(); const old = path.join(directory, 'old.mp4'); const moved = path.join(directory, 'moved.mp4');
+    await writeFile(old, 'disposable original bytes'); const identity = await fingerprintFile(old);
+    await rename(old, moved);
+    expect(await fingerprintFile(moved)).toEqual(identity);
+    await assertSourceIdentity(moved, identity, true);
+    await expect(assertSourceIdentity(old, identity, true)).rejects.toThrow('registered path');
+  });
+  it('documents that deep=true repeats samples, not a full-byte checksum of unsampled content', async () => {
+    const file = path.join(await temp(), 'large.mp4'); const original = Buffer.alloc(8 * 1024 ** 2, 7);
+    await writeFile(file, original); const time = new Date('2026-10-04T10:00:00.000Z'); await utimes(file, time, time);
+    const identity = await fingerprintFile(file);
+    const fullBefore = createHash('sha256').update(original).digest('hex');
+    const handle = await open(file, 'r+');
+    try { await handle.write(Buffer.from([9]), 0, 1, 2 * 1024 ** 2); }
+    finally { await handle.close(); }
+    await utimes(file, time, time);
+    expect(createHash('sha256').update(await readFile(file)).digest('hex')).not.toBe(fullBefore);
+    expect(await fingerprintFile(file)).toEqual(identity);
+    await assertSourceIdentity(file, identity, true);
   });
 });
 
