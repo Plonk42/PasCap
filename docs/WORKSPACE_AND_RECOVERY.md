@@ -98,6 +98,10 @@ validate its two endpoints atomically.
 
 The **Layer keyframes** panel belongs to the selected **entire video row**, not the
 selected clip. It remains available on an empty row and shows participants as chips.
+Its question-mark **Animation help** button previews help on hover or keyboard focus,
+without moving focus or editing. Click, Enter or Space keeps the help open after
+leaving the button; Down arrow focuses its readable/scrollable text. Escape closes help first; an outside click closes without stealing
+that control's focus. Help uses the native top layer, and hides with its owner.
 All ten settings (Layer opacity, Clip opacity, Speed and seven colour parameters)
 always expose a diamond beside their control: **◇ hollow/inactive** versus **◆
 filled/active**, with `aria-pressed`. A hollow diamond remains clickable; inactivity

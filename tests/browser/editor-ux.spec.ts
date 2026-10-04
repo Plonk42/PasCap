@@ -135,7 +135,7 @@ test('animated visual feedback retains explicit capture, native navigation order
   await expect(page.getByRole('slider', { name: 'Exposure', exact: true })).toBeDisabled();
   await diamond.focus(); await page.keyboard.press('Tab'); await expect(page.getByRole('button', { name: 'Previous Exposure keyframe', exact: true })).toBeFocused();
   await page.keyboard.press('Tab'); await expect(page.getByRole('button', { name: 'Next Exposure keyframe', exact: true })).toBeFocused();
-  await openOptions(page, 'Animation help'); await expect(page.locator('.animation-legend')).toBeVisible();
+  await page.getByRole('button', { name: 'Animation help', exact: true }).click(); await expect(page.locator('.animation-legend')).toBeVisible();
   await page.keyboard.press('Escape'); expect(await current(page)).toEqual(document);
   await diamond.click(); await expect(page.getByRole('slider', { name: 'Exposure', exact: true })).toBeEnabled();
   expect((await current(page)).layers[0]!.keyframes).toEqual([document.layers[0]!.keyframes[0], sharedPoint(30, { exposure: 0.2 }), document.layers[0]!.keyframes[1]]);
