@@ -2,10 +2,10 @@
 
 ## Two distinct retiming contracts
 
-Speed is positive, **0.1×–8×**. Clips store independent static **constant or ramp**
-bases; shared row points can override Speed across every clip in their layer.
-There is no source-speed-key mode. Do not confuse the row's project-time integral
-with the static ramp's original-source integral.
+Speed is positive, **0.1×–8×**. Clips store independent **constant, ramp or custom
+keyframed curves**; shared row points can override Speed across every clip in their
+layer. Clip keys use original-source frames, while row keys use project frames.
+Do not confuse the row's project-time integral with a clip's source-time integral.
 
 ### Static clip base: source-time constant/ramp
 
@@ -26,11 +26,49 @@ Each split piece compiles/rounds independently; static-base splitting can change
 the sum by one frame. This source-anchor contract is retained, not converted into
 row points.
 
+### Clip-instance custom curve: source-frame keyframes
+
+The `speed` union also accepts a strict `{ mode: 'curve', keyframes }` value.
+Each of **2–256** keys requires `{ frame, rate, interpolation }`: a unique ascending
+integer original-source frame, rate **0.1–8**, and hold/linear/ease-in/ease-out/smooth
+easing toward the next point. First/last rates hold outside their interval. A key
+at the original's exclusive OUT is a valid boundary anchor, but none may exceed
+the registered original; points outside the current trim remain stored.
+
+Timing integrates $dt=ds/r(s)$ on intervals split at **every key**, including
+one-source-frame holds in long recordings. Hold/constant intervals and linear
+rate ramps have closed-form integrals/inverses. Eased intervals use bounded
+16-point Gauss–Legendre quadrature with dimensionless tolerance $10^{-12}$ and
+maximum subdivision depth 14; inverse queries use bounded binary search. Storage
+is proportional to points, not source or output duration. Existing constant/ramp
+compilers and their rounding remain unchanged.
+
+As for the old source-ramp base, only the final output duration is rounded, its
+clock is normalised once to that duration, and mapped source positions are floored
+within source IN/OUT. Slow motion repeats recorded frames and fast motion drops
+them; no optical-flow frames are generated. Native decode still checks every
+selected original frame, even when output sampling skips it.
+
+Clip curves belong to **one excerpt instance**. Trims, moves, splits and marked
+cuts retain original-source anchors; split/cut/duplicate copies are independent.
+Every retained piece recompiles/rounds its duration once. Curves are carried in
+the existing required `speed` field: schema 5 is a strict union extension, without
+an optional fallback, data migration or project-wide field. A mode/preset change
+is a deliberate editing command, not a conversion on load.
+
+Original preset shapes provide Flat, Accelerate, Decelerate, Slow centre and Fast
+centre templates on the selected source range. Their points remain ordinary
+editable data, not hidden saved preset IDs. The same `PlacedClip.retiming` map is
+used for preview, source trims, static/layered native export and storage planning.
+Row Speed participants retain their existing precedence: they override this
+clip curve, not multiply it, and removing them restores the clip's independent
+base without deleting any clip points.
+
 ### Shared row Speed: absolute project-time rate
 
 Schema-5 layer points retain ten required nullable channels, including `speed`.
 Once any point on the row participates in Speed, the row's rate curve **overrides
-every clip's entire constant/ramp base**, not just an interval between keys. Only
+every clip's entire constant/ramp/custom-curve base**, not just an interval between keys. Only
 Speed participants define its intervals; unrelated colour/opacity-only points are
 skipped. Each left participating point supplies its shared hold/linear/ease-in/
 ease-out/smooth easing to the next Speed participant. Before the first/after the
@@ -149,7 +187,7 @@ Native export uses the same placement/loop/gain/fade rules and produces AAC at
 ## Versioning
 
 Project schema **v5** requires explicit `media.videoIds` and `media.audioIds` arrays,
-unique and limited to 10,000 IDs each, plus complete static clip colour/opacity/constant-or-ramp
+unique and limited to 10,000 IDs each, plus complete clip colour/opacity/constant/ramp/custom-curve
 speed, layer point arrays with all ten nullable value fields, placement and music
 source OUT. New projects have empty video/music bins. Standalone audio imports belong
 to the open project's bin; selected music references also count as membership.

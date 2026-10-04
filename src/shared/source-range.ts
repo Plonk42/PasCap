@@ -22,6 +22,11 @@ export function validateSourceRanges(project: ProjectDocument, frameCounts: Read
     if (count === undefined || !Number.isSafeInteger(count) || count <= 0 || !Number.isSafeInteger(clip.sourceIn) || !Number.isSafeInteger(clip.sourceOut) || clip.sourceIn < 0 || clip.sourceOut <= clip.sourceIn || clip.sourceOut > count) {
       throw new Error('Source range exceeds the registered recording. The edit was not committed.');
     }
+    // Keys at the exclusive recording OUT are valid boundary anchors; keys
+    // outside the current trim remain recoverable, but never outside the original.
+    if (clip.speed.mode === 'curve' && clip.speed.keyframes.some((key) => key.frame > count)) {
+      throw new Error('Clip speed keys exceed the registered recording. The edit was not committed.');
+    }
   }
 }
 
