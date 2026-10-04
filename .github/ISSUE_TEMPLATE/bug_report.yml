@@ -1,10 +1,39 @@
 name: Bug report
 description: Report a reproducible editor, preview, import or export problem.
-labels: [bug]
+labels: [bug, "priority:p2", "status:backlog"]
 body:
   - type: markdown
     attributes:
-      value: Do not attach private footage, credentials, local project files or licensed audio. Use synthetic media when possible and redact filesystem paths.
+      value: Do not attach private footage, credentials, local project files or licensed audio. Use synthetic media when possible and redact filesystem paths. Triage applies area labels, assesses priority and links the milestone/iteration; default normal priority is not a severity verdict.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Affected area
+      description: Select the primary area; triage can add other relevant area labels.
+      options:
+        - Editor and frontend (area:editor)
+        - Source/import/relinking (area:media)
+        - Native export/storage (area:export)
+        - Preview/hardware (area:preview)
+        - Music/A/V (area:audio)
+        - Tests/CI (area:ci)
+        - Docker/Podman (area:container)
+        - License/distribution obligations (area:licensing)
+        - Planning/contributor workflow (area:workflow)
+    validations:
+      required: true
+  - type: dropdown
+    id: impact
+    attributes:
+      label: Impact
+      description: Describe the risk so triage can replace the default priority appropriately.
+      options:
+        - Active data-loss or security risk
+        - Core workflow or correctness gate blocked
+        - Incorrect behaviour with a workaround
+        - Minor or optional improvement
+    validations:
+      required: true
   - type: textarea
     id: problem
     attributes:
@@ -31,3 +60,8 @@ body:
     attributes:
       label: Evidence
       description: Sanitized errors, a synthetic test case, screenshot or verification receipt. Note whether edits remain unsaved.
+  - type: textarea
+    id: next
+    attributes:
+      label: Next action and related tracking
+      description: Smallest investigation/verification step, linked existing issues and known milestone/iteration. Distinguish local results from remote CI and hardware evidence; unknowns are acceptable.

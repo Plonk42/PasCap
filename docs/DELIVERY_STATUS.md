@@ -633,12 +633,32 @@ and records renderer/decoder diagnostics; exact end frame, failure and two-eleme
 ownership assertions remain unchanged. No test retry or GPU-performance claim was
 added. The follow-up CI result must be verified separately.
 
-Eleven scoped [GitHub issues](https://github.com/Plonk42/PasCap/issues) are assigned
-to three milestones: local editor hardening, real-workload qualification and
-Docker/Podman delivery. [ROADMAP.md](ROADMAP.md) links every issue, its scope and
-the cross-milestone dependencies. No hardware qualification or container release
-is claimed by adding CI. A project license remains a maintainer decision tracked
-in [#5](https://github.com/Plonk42/PasCap/issues/5), not an automatic license grant.
+**2026-10-04 read-only remote inspection:** the more recent
+[run 37183854541](https://github.com/Plonk42/PasCap/actions/runs/37183854541) on
+publication commit `6d260c5` passed Node 22 and the native/browser job, but Node 24
+failed the exact right-reader SOURCE OUT case tracked in #1. That run predates
+local fix `48b4de9` and all clip-speed commits; it is not evidence against the
+new deterministic fix or a passing current-delivery CI claim. Fresh CI containing
+those commits still requires an explicitly approved push. Older run descriptions
+above remain historical evidence, not current results.
+
+The GitHub workflow alignment retains the eleven original issues and adds
+[workflow #12](https://github.com/Plonk42/PasCap/issues/12), retrospective
+[shared-point delivery #13](https://github.com/Plonk42/PasCap/issues/13),
+[clip-speed delivery #14](https://github.com/Plonk42/PasCap/issues/14) and
+[iteration #15](https://github.com/Plonk42/PasCap/issues/15). All fifteen remain
+open under the three outcome milestones, with categorized priority/area/progress
+labels, explicit next actions, ten native blocked-by relationships and six native
+iteration sub-issues. Local completion is not closure or remote acceptance.
+[GITHUB_WORKFLOW.md](GITHUB_WORKFLOW.md) defines the lifecycle and usable issue
+views; [ROADMAP.md](ROADMAP.md) indexes scope/dependencies. Projects authorization
+is unavailable, so no board is claimed. Instructions/forms are committed locally
+and need approval before publication; tracking metadata is applied remotely.
+
+This workflow change does not rerun/relabel the recorded 1,115-test baseline,
+qualify hardware/containers or authorize media work, a release or issue closure.
+A project license remains a maintainer decision tracked in
+[#5](https://github.com/Plonk42/PasCap/issues/5), not an automatic license grant.
 
 
 

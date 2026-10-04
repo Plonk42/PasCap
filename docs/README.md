@@ -1,7 +1,9 @@
 # Documentation
 
 Next steps and dependencies: [ROADMAP.md](ROADMAP.md), backed by the actual GitHub
-issues and milestones rather than an automatically approved feature catalogue.
+issues, milestones and iterations rather than an automatically approved feature
+catalogue. [GITHUB_WORKFLOW.md](GITHUB_WORKFLOW.md) defines planning, labels,
+priorities, progress and delivery updates.
 
 ## Start here
 
@@ -38,7 +40,11 @@ than the dated final verification table linked below.
 - [FEASIBILITY_REPORT.md](FEASIBILITY_REPORT.md): **historical** two-source preview/
   colour evidence. It does not qualify current layered throughput or the intended GPU.
 - Follow planned work in [GitHub issues](https://github.com/Plonk42/PasCap/issues)
-  and [milestones](https://github.com/Plonk42/PasCap/milestones); these are tracking
-  destinations, not proof of completed CI, containers or real-flight acceptance.
+  and [milestones](https://github.com/Plonk42/PasCap/milestones), with
+  [the current iteration](https://github.com/Plonk42/PasCap/issues/15), native
+  dependencies and categorized/prioritized labels. The
+  [workflow](GITHUB_WORKFLOW.md) distinguishes local completion from actual-commit
+  CI/review; Projects access is currently unavailable. Tracking is not proof of
+  completed CI, containers or real-flight acceptance.
 - [../EDITOR_IMPLEMENTATION_PLAN.md](../EDITOR_IMPLEMENTATION_PLAN.md) retains the
   original plan and chronology.
