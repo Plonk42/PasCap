@@ -1,0 +1,299 @@
+.clip-speed-curve-editor {
+    display: grid;
+    gap: 10px;
+    min-width: 0;
+}
+
+.clip-curve-presets {
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+}
+
+.clip-curve-presets>div {
+    display: flex;
+    gap: 5px;
+    overflow-x: auto;
+    padding: 4px 2px 6px;
+    scrollbar-width: thin;
+}
+
+.clip-curve-presets button {
+    display: grid;
+    align-content: start;
+    justify-items: center;
+    gap: 5px;
+    flex: 0 0 54px;
+    padding: 7px 4px;
+    min-height: 64px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: #17221b;
+    color: #c2cebf;
+    font-size: 10px;
+    text-align: center;
+}
+
+.clip-curve-presets button[aria-pressed="true"] {
+    color: #f5d69d;
+    border-color: #ba9b64;
+    background: #3b3324;
+}
+
+.clip-curve-presets svg {
+    width: 40px;
+    height: 24px;
+    overflow: visible;
+    color: #efce8d;
+}
+
+.clip-speed-key-tools {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    color: var(--muted);
+    font-size: 11px;
+}
+
+.clip-speed-key-tools>span {
+    margin-right: auto;
+}
+
+.product-workspace .clip-speed-key-tools>.secondary-button {
+    min-height: 30px;
+    padding: 4px 7px;
+    font-size: 11px;
+}
+
+.clip-speed-chart {
+    display: grid;
+    grid-template-columns: 26px minmax(0, 1fr);
+    gap: 4px;
+    padding: 12px 13px 12px 0;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: #151e18;
+}
+
+.clip-speed-axis {
+    position: relative;
+    color: #9eada1;
+    font-size: 10px;
+    text-align: right;
+}
+
+.clip-speed-axis>span {
+    position: absolute;
+    right: 0;
+    top: 0;
+    transform: translateY(-50%);
+}
+
+.clip-speed-axis>span:last-child {
+    top: 100%;
+}
+
+.clip-speed-plot {
+    position: relative;
+    height: 158px;
+    min-width: 0;
+    border-block: 1px solid #3c4c3f;
+    touch-action: none;
+    user-select: none;
+}
+
+.clip-speed-svg,
+.clip-speed-seek {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    padding: 0;
+}
+
+.clip-speed-svg {
+    pointer-events: none;
+    overflow: visible;
+}
+
+.clip-speed-svg>polyline {
+    stroke: #edc886;
+    stroke-width: 2;
+}
+
+.clip-speed-grid {
+    stroke: #3c4c3f;
+    stroke-width: .7;
+}
+
+.clip-speed-seek {
+    z-index: 1;
+    border: 0;
+    background: transparent;
+    cursor: crosshair;
+}
+
+.clip-speed-seek:focus-visible {
+    outline-offset: 6px;
+}
+
+.clip-speed-playhead {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    z-index: 2;
+    pointer-events: none;
+    background: #dce7d8;
+}
+
+.clip-speed-point {
+    position: absolute;
+    z-index: 3;
+    display: grid;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    cursor: move;
+    touch-action: none;
+}
+
+.clip-speed-point>span {
+    width: 13px;
+    height: 13px;
+    border: 2px solid #ede6d8;
+    border-radius: 50%;
+    background: #19241c;
+    pointer-events: none;
+}
+
+.clip-speed-point.selected>span,
+.clip-speed-point:focus-visible>span {
+    border-color: #ffdc99;
+    background: #635230;
+}
+
+.clip-speed-point.selected,
+.clip-speed-point:focus-visible {
+    z-index: 4;
+}
+
+.clip-speed-point.moving {
+    cursor: grabbing;
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+}
+
+.clip-speed-point.invalid {
+    outline-color: var(--error);
+}
+
+.clip-speed-point.invalid>span {
+    border-color: var(--error);
+    background: #683a2e;
+}
+
+.clip-speed-axis-times {
+    display: flex;
+    justify-content: space-between;
+    gap: 5px;
+    margin-top: -7px;
+    padding-left: 30px;
+    color: var(--muted);
+    font-size: 10px;
+    font-variant-numeric: tabular-nums;
+}
+
+.clip-speed-selection {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+}
+
+.clip-speed-selection>select {
+    width: 100%;
+    min-width: 0;
+    font-size: 11px;
+}
+
+.product-workspace .clip-speed-selection>.icon-button {
+    width: 26px;
+    height: 30px;
+}
+
+.clip-speed-point-fields {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 8px;
+}
+
+.clip-speed-point-fields>label {
+    display: grid;
+    gap: 5px;
+    min-width: 0;
+    color: #bbcabf;
+    font-size: 11px;
+}
+
+.clip-speed-point-fields>.clip-speed-easing {
+    grid-column: 1 / -1;
+}
+
+.clip-speed-easing>select {
+    width: 100%;
+    min-width: 0;
+}
+
+.clip-speed-outside,
+.clip-speed-error {
+    font-size: 11px;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+}
+
+.clip-speed-outside {
+    color: #e6c894;
+}
+
+.clip-speed-error {
+    color: var(--error);
+    padding: 7px;
+    border: 1px solid #975f50;
+    border-radius: 4px;
+}
+
+.clip-speed-scope {
+    margin-bottom: 8px;
+    font-size: 12px;
+    color: #d5dfd6;
+}
+
+.speed-overview>span {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-variant-numeric: tabular-nums;
+}
+
+.clip-speed-row-heading {
+    padding-top: 12px;
+    margin-top: 12px;
+    border-top: 1px solid var(--line);
+}
+
+.clip-speed-override {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    padding: 8px;
+    border: 1px solid #947c4b;
+    border-radius: 5px;
+    color: #edcf92;
+    background: #312c20;
+    font-size: 11px;
+    line-height: 1.5;
+}

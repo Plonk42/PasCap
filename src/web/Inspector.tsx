@@ -15,6 +15,7 @@ import { KeyframeControls } from './KeyframeControls.js';
 import { KeyframeToggle } from './KeyframeToggle.js';
 import { NumberField } from './NumberField.js';
 import { SpeedControls } from './SpeedControls.js';
+import type { DraftPreview } from './Timeline.js';
 
 export type { InspectorMode } from './InspectorSection.js';
 
@@ -23,6 +24,9 @@ interface Props {
   boundaryId: string | null; frame: number; drafting: boolean;
   section: InspectorMode; onSection: (section: InspectorMode) => void;
   onEdit: (command: EditCommand) => void; children?: ReactNode;
+  onPreview: (draft: DraftPreview | null, restoreFrame?: number) => void;
+  onSeek: (frame: number) => void;
+  onPause: () => void;
 }
 
 const INSPECTOR_MODES: readonly { id: InspectorMode; label: string }[] = [
@@ -163,7 +167,7 @@ function ColourSection({ layer, clip, frame, disabled, onEdit, id }: Readonly<La
   </InspectorSection>;
 }
 
-export function Inspector({ project, assets, selectedClipId, selectedLayerId, boundaryId, frame, drafting, section, onSection, onEdit, children }: Readonly<Props>) {
+export function Inspector({ project, assets, selectedClipId, selectedLayerId, boundaryId, frame, drafting, section, onSection, onEdit, onPreview, onSeek, onPause, children }: Readonly<Props>) {
   const inspectorId = useId();
   const colourControlId = useId();
   const layer = project.layers.find((item) => item.id === selectedLayerId);
@@ -217,7 +221,7 @@ export function Inspector({ project, assets, selectedClipId, selectedLayerId, bo
             <details className="control-help"><summary>Opacity scope</summary><p>Layer opacity is applied after the row's clips are combined, including dissolves. Clip opacity keys are also row-wide: they replace each clip's base opacity, before the combined layer opacity is applied. Unkeyed channels keep their static bases.</p></details>
           </section>
         </InspectorSection>
-        <InspectorSection id="speed" title="Speed" icon="speed" badge={`${speedRate.toFixed(2)}×`} modified={speedRate !== 1 || hasLayerKeys(layer, 'speed') || clip?.speed.mode === 'ramp'} defaultOpen={false}><SpeedControls resetKey={project.id} clip={clip ?? null} layer={layer} frame={frame} projectDuration={layout.duration} placedDuration={placed?.duration ?? null} disabled={drafting} sourceFrame={sourceFrame} onEdit={onEdit} /></InspectorSection>
+        <InspectorSection id="speed" title="Speed" icon="speed" badge={`${speedRate.toFixed(2)}×`} modified={speedRate !== 1 || hasLayerKeys(layer, 'speed') || (clip !== undefined && clip.speed.mode !== 'constant')} defaultOpen={false}><SpeedControls project={project} resetKey={project.id} clip={clip ?? null} layer={layer} frame={frame} projectDuration={layout.duration} placedDuration={placed?.duration ?? null} disabled={drafting} sourceFrame={sourceFrame} sourceFrameCount={asset?.metadata.frameCount ?? null} onEdit={onEdit} onPreview={onPreview} onSeek={onSeek} onPause={onPause} /></InspectorSection>
         <ColourSection layer={layer} clip={clip ?? null} frame={frame} disabled={drafting} onEdit={onEdit} id={colourControlId} />
       </> : <div className="inspector-empty">Select a video layer or clip in the timeline.</div>}
     </div>

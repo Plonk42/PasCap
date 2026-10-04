@@ -2,23 +2,30 @@ import { useId } from 'react';
 import type { EditCommand } from '../shared/commands.js';
 import { editableClipSpeed } from '../shared/clip-speed.js';
 import { activeLayerSetting, evaluateLayerSetting, hasLayerKeys } from '../shared/keyframes.js';
-import type { VideoClip, VideoLayer } from '../shared/model.js';
+import type { ProjectDocument, VideoClip, VideoLayer } from '../shared/model.js';
 import { sourceRateAt, type SpeedSettings } from '../shared/speed.js';
 import './declutter.css';
 import { sourceSeconds } from './display.js';
+import { ClipSpeedCurve } from './ClipSpeedCurve.js';
 import { Icon } from './icons.js';
 import { KeyframeToggle } from './KeyframeToggle.js';
 import { NumberField } from './NumberField.js';
+import type { DraftPreview } from './Timeline.js';
 
 export interface SpeedControlsProps {
+  project: ProjectDocument;
   clip: VideoClip | null;
   layer: VideoLayer;
   frame: number;
   projectDuration: number;
   placedDuration: number | null;
   sourceFrame: number | null;
+  sourceFrameCount: number | null;
   disabled: boolean;
   onEdit: (command: EditCommand) => void;
+  onPreview: (draft: DraftPreview | null, restoreFrame?: number) => void;
+  onSeek: (frame: number) => void;
+  onPause: () => void;
   /** Project/editing context; clip and layer identities are added locally. */
   resetKey?: string | number;
 }
@@ -81,7 +88,12 @@ function rateHint(keyed: boolean, active: boolean, frame: number): string {
   return 'Layer curve · click the Speed diamond to capture the evaluated rate and edit it at this frame.';
 }
 
-export function SpeedControls({ clip, layer, frame, projectDuration, placedDuration, disabled, onEdit, sourceFrame, resetKey }: Readonly<SpeedControlsProps>) {
+function speedScope(clip: VideoClip | null, keyed: boolean): string {
+  if (keyed) return 'Layer curve · timeline time';
+  return clip ? 'Selected clip base' : 'No selected clip base';
+}
+
+export function SpeedControls({ project, clip, layer, frame, projectDuration, placedDuration, disabled, onEdit, onPreview, onSeek, onPause, sourceFrame, sourceFrameCount, resetKey }: Readonly<SpeedControlsProps>) {
   const helpId = useId();
   const rateId = `${helpId}-rate`;
   const layerContext = `${resetKey ?? layer.id}:${layer.id}`;
@@ -94,7 +106,7 @@ export function SpeedControls({ clip, layer, frame, projectDuration, placedDurat
   const resetUnavailable = keyed ? !active || rate === 1 : !clip || (clip.speed.mode === 'constant' && clip.speed.rate === 1);
   const resetTitle = keyed
     ? `Set only Speed at timeline frame ${frame} to 1×. Keep the other points, participants and clip bases.`
-    : "Reset the selected clip's constant/ramp base to 1×. Layer points stay unchanged.";
+    : "Reset only the selected clip's speed to constant 1×. Its curve is removed; row points stay unchanged.";
   const updateBase = (speed: SpeedSettings): void => {
     if (clip && !disabled && !keyed) onEdit({ type: 'speed', clipId: clip.id, speed });
   };
@@ -105,23 +117,26 @@ export function SpeedControls({ clip, layer, frame, projectDuration, placedDurat
     if (keyed) updateKey(1);
     else updateBase({ mode: 'constant', rate: 1 });
   };
-  let scope = 'No selected clip base';
-  if (clip) scope = 'Selected clip base';
-  if (keyed) scope = 'Layer curve · timeline time';
+  const scope = speedScope(clip, keyed);
   const graphRange = keyed ? `Timeline 0–${Math.max(0, projectDuration - 1)}` : `Source ${clip?.sourceIn ?? 0}–${clip?.sourceOut ?? 0} (OUT exclusive)`;
   const graphAvailable = keyed ? projectDuration > 0 : clip !== null;
+  const customCurve = !keyed && clip?.speed.mode === 'curve';
 
   return <section className="speed-settings declutter-speed" aria-label="Layer and clip speed">
-    <div className="speed-overview"><span>{placedDuration === null ? 'No selected clip' : `${sourceSeconds(placedDuration)} on timeline`}</span><button type="button" className="text-button" aria-label="Reset speed to 1×" title={resetTitle} disabled={disabled || !validFrame || resetUnavailable} onClick={reset}>Reset to 1×</button></div>
-    <div className="layer-setting-heading"><span title={scope}>Speed<small className="layer-setting-kind">{keyed && <Icon name="curve" size={12} />}<span className="declutter-sr-only">{scope}</span></small></span><span className="layer-setting-actions"><output title={keyed ? `Layer rate at timeline frame ${frame}` : 'Selected clip base rate; outside the clip, its source IN rate is shown'}>{rate.toFixed(2)}×</output><KeyframeToggle layer={layer} setting="speed" label="Speed" frame={frame} value={rate} disabled={disabled} onEdit={onEdit} /></span></div>
-    {(keyed || !clip) && <label className="speed-field" htmlFor={rateId}>Layer rate ×<NumberField id={rateId} aria-label="Layer speed rate" aria-describedby={helpId} min={0.1} max={8} step={0.05} disabled={disabled || !validFrame || !active} value={rate} resetKey={`${layerContext}:${frame}:speed`} hint={rateHint(keyed, active, frame)} onCommit={updateKey} /></label>}
+    <div className="speed-overview"><span>{clip && placedDuration !== null ? <>{sourceSeconds(clip.sourceOut - clip.sourceIn)} <Icon name="arrow" size={12} /> {sourceSeconds(placedDuration)}</> : 'No selected clip'}</span><button type="button" className="text-button" aria-label="Reset speed to 1×" title={resetTitle} disabled={disabled || !validFrame || resetUnavailable} onClick={reset}><Icon name="reset" size={12} />Reset</button></div>
+    {clip && !keyed && <div className="clip-speed-scope">Clip speed</div>}
+    {clip && keyed && <p className="clip-speed-override"><Icon name="curve" size={15} /><span>Row Speed overrides this clip. Its own speed is kept; remove the row's Speed keys to use it.</span></p>}
     {!keyed && clip && <BaseSpeedControls clip={clip} disabled={disabled} helpId={helpId} inputContext={inputContext} onChange={updateBase} />}
-    {graphAvailable && <>
+    {!keyed && clip?.speed.mode === 'curve' && sourceFrameCount !== null && <ClipSpeedCurve key={`${project.id}:${clip.id}`} project={project} clip={clip} speed={clip.speed} sourceFrameCount={sourceFrameCount} frame={frame} sourceFrame={sourceFrame} disabled={disabled} onEdit={onEdit} onPreview={onPreview} onSeek={onSeek} onPause={onPause} />}
+    <div className={`layer-setting-heading${clip && !keyed ? ' clip-speed-row-heading' : ''}`}><span title={scope}>Row speed animation<small className="layer-setting-kind">{keyed && <Icon name="curve" size={12} />}<span className="declutter-sr-only">{scope}</span></small></span><span className="layer-setting-actions"><output title={keyed ? `Layer rate at timeline frame ${frame}` : 'Capture the selected clip base rate as a row-wide key'}>{rate.toFixed(2)}×</output><KeyframeToggle layer={layer} setting="speed" label="Speed" frame={frame} value={rate} disabled={disabled} onEdit={onEdit} /></span></div>
+    {(keyed || !clip) && <label className="speed-field" htmlFor={rateId}>Layer rate ×<NumberField id={rateId} aria-label="Layer speed rate" aria-describedby={helpId} min={0.1} max={8} step={0.05} disabled={disabled || !validFrame || !active} value={rate} resetKey={`${layerContext}:${frame}:speed`} hint={rateHint(keyed, active, frame)} onCommit={updateKey} /></label>}
+    {graphAvailable && !customCurve && <>
       <svg className="speed-graph" viewBox="0 0 220 55" role="img" aria-label={`${keyed ? 'Layer' : 'Clip base'} speed curve · ${graphRange}`}><path d="M0 48H220" stroke="var(--line)" /><polyline points={speedGraphPoints(clip, layer, projectDuration)} fill="none" stroke="var(--accent)" strokeWidth="2" /></svg>
       <div className="speed-graph-range"><span>{graphRange}</span><span>0–8×</span></div>
     </>}
     <details className="control-help"><summary>Speed timing</summary>
-      <p id={helpId}>1× is recorded speed. The diamond keys this whole layer in project timeline time; it does not add source-ramp endpoints. A keyed row overrides every clip's constant/ramp base. Between points, click the diamond before changing a rate.</p>
+      <p id={helpId}>1× is recorded speed. Custom curve points belong to one clip and use original source frames; drag a point or enter its exact frame/rate. Their positions stay anchored when trimming or splitting. The logarithmic graph spans 0.1×–8×. Slow motion repeats recorded frames, without generated optical-flow images.</p>
+      <p>The Row speed animation diamond keys the whole layer in project timeline time. Row keys override, rather than multiply, each clip's constant/ramp/custom speed. Between row points, capture with the diamond before changing its rate.</p>
       {!keyed && clip?.speed.mode === 'ramp' && <p>Selected clip ramp anchors: IN {clip.speed.anchorIn}, OUT {clip.speed.anchorOut} (exclusive). Trims do not move them.</p>}
       {!keyed && clip?.speed.mode === 'constant' && clip.speed.rate < 1 && <p>Slow motion repeats recorded frames.</p>}
       {keyed && <p>Reset to 1× changes only an enabled Speed value at this frame; it never clears the row curve. Use the diamonds or the shared point list to remove keys explicitly.</p>}
