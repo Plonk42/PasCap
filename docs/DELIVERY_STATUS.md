@@ -696,8 +696,22 @@ labels, explicit next actions, ten native blocked-by relationships and six nativ
 iteration sub-issues. Local completion is not closure or remote acceptance.
 [GITHUB_WORKFLOW.md](GITHUB_WORKFLOW.md) defines the lifecycle and usable issue
 views; [ROADMAP.md](ROADMAP.md) indexes scope/dependencies. Projects authorization
-is unavailable, so no board is claimed. Instructions/forms are committed locally
+was unavailable at that initial checkpoint, so no board was claimed then.
+Instructions/forms are committed locally
 and need approval before publication; tracking metadata is applied remotely.
+
+**Later 2026-10-04 Project setup:** owner-granted CLI project access was verified.
+The private repository-linked
+[PasCap planning Project](https://github.com/users/Plonk42/projects/1) contains
+all 16 existing issues, with native Status aligned to issue labels and seven saved
+backlog/delivery/current-iteration/milestone/priority views. Actual filter contents,
+the board's Status column field and zero duplicate/draft items were verified.
+All six new default automations, including Auto-close issue, were removed before
+population. No issues/milestones were closed, no dates/duplicate priority fields
+were added, and existing native parents/dependencies and historical evidence remain.
+The Project is private; browser sign-in is separate from CLI authorization.
+No runtime, browser or native/media suite was rerun for this metadata/documentation
+step; it is not a fresh CI, hardware or rendering qualification result.
 
 This workflow change does not rerun/relabel the recorded 1,115-test baseline,
 qualify hardware/containers or authorize media work, a release or issue closure.

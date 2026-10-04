@@ -32,8 +32,10 @@ closed automatically. The date identifies the batch, not a sprint deadline.
 Use its linked issues and [ready next actions](https://github.com/Plonk42/PasCap/issues?q=is%3Aissue%20is%3Aopen%20label%3A%22status%3Aready%22)
 for mutable progress. #2 is ready for identity design, not unsafe relink implementation;
 #5 needs a maintainer license decision. GPU/flight work requires owner setup/consent,
-and containers remain a future milestone. Projects access is unavailable; the native
-iteration issue/labels are usable now, without a fictitious board.
+and containers remain a future milestone. The private repository-linked
+[planning Project](https://github.com/users/Plonk42/projects/1) now presents the
+same issues with aligned Status and delivery/iteration/milestone views. The native
+iteration issue, labels, parents and dependencies remain unchanged and usable.
 
 ## v0.1 — Local editor hardening
 
