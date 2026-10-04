@@ -76,6 +76,11 @@ not repeated across the main workspace. Collapsing never disables processing.
 
 All inline help uses a small **question-mark button**, including animation, source,
 opacity, speed, colour, keyframe/transition/fade/audio timing and startup details.
+Inspector Source range, Layer & opacity, Speed, Colour, Transition and Sequence
+fades put help beside their titles, reachable even when collapsed. Expansion and
+help are independent native buttons in normal section → help → fields Tab order;
+help never opens or closes the settings. Hidden content remains mounted, retaining
+its valid/invalid drafts and section preferences.
 Hovering the question-mark target or keyboard focus previews help without moving
 focus or applying a draft; empty space across a section does not activate help.
 The pointer can move into the text without closing it. Click, Enter or Space pins

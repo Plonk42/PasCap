@@ -172,6 +172,72 @@ const HELP_CONTEXTS = [
     { label: 'Audio timing', tab: 'Audio', text: 'Both fades must fit within Duration.' },
 ] as const;
 
+const INSPECTOR_HELP_HEADINGS = [
+    { title: 'Source range', help: 'Source timing', tab: 'Clip' },
+    { title: 'Layer & opacity', help: 'Opacity scope', tab: 'Clip' },
+    { title: 'Speed', help: 'Speed timing', tab: 'Clip' },
+    { title: 'Colour', help: 'Colour animation', tab: 'Clip' },
+    { title: 'Transition', help: 'Transition timing', tab: 'Sequence' },
+    { title: 'Sequence fades', help: 'Fade timing', tab: 'Sequence' },
+] as const;
+
+for (const context of INSPECTOR_HELP_HEADINGS) {
+    test(`${context.title} title keeps adjacent help reachable when collapsed, without an accidental section toggle`, async ({ page }) => {
+        const before = await current(page);
+        await inspectorTab(page, context.tab);
+        const section = page.getByRole('button', { name: `${context.title} section`, exact: true });
+        const help = page.getByRole('button', { name: `${context.help} help`, exact: true });
+        const panel = await panelFor(page, help);
+        await section.scrollIntoViewIfNeeded();
+        const header = section.locator('xpath=../..');
+        expect(await help.evaluate((button) => button.parentElement?.parentElement?.classList.contains('disclosure-heading'))).toBe(true);
+        const headingBox = (await header.boundingBox())!; const helpBox = (await help.boundingBox())!;
+        expect(Math.abs(helpBox.y + helpBox.height / 2 - headingBox.y - headingBox.height / 2)).toBeLessThanOrEqual(1);
+        expect(helpBox.x + helpBox.width).toBeLessThanOrEqual(headingBox.x + headingBox.width);
+        await section.press('Space'); await expect(section).toHaveAttribute('aria-expanded', 'false');
+        const contentId = await section.getAttribute('aria-controls');
+        if (!contentId) throw new Error('Section buttons must own their mounted content.');
+        await expect(page.locator(`[id="${contentId}"]`)).toBeHidden();
+        await expect(help).toBeVisible(); await expect(help).toBeInViewport();
+        await help.hover(); await expect(panel).toBeVisible();
+        await help.click(); await expect(help).toHaveAttribute('aria-pressed', 'true');
+        await expect(section).toHaveAttribute('aria-expanded', 'false');
+        await help.press('Escape'); await expect(panel).toBeHidden(); await expect(help).toBeFocused();
+        await expect(section).toHaveAttribute('aria-expanded', 'false');
+        expect(await current(page)).toEqual(before); expect(memory.saves).toBe(0);
+    });
+}
+
+test('native heading Tab order is section then help then its controls, and remembered collapse leaves help available after reload', async ({ page }) => {
+    const before = await current(page);
+    const section = page.getByRole('button', { name: 'Source range section', exact: true });
+    const help = page.getByRole('button', { name: 'Source timing help', exact: true });
+    await section.focus(); await page.keyboard.press('Tab'); await expect(help).toBeFocused();
+    await page.keyboard.press('Tab'); await expect(page.getByRole('spinbutton', { name: 'Source IN frame', exact: true })).toBeFocused();
+    await section.click(); await expect(section).toHaveAttribute('aria-expanded', 'false');
+    await page.reload(); await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
+    await expect(section).toHaveAttribute('aria-expanded', 'false'); await expect(help).toBeVisible();
+    await help.click(); await expect(section).toHaveAttribute('aria-expanded', 'false');
+    expect(await current(page)).toEqual(before); expect(memory.saves).toBe(0);
+});
+
+test('collapsing and restoring a section keeps the same invalid field draft and header help does not cancel it', async ({ page }) => {
+    const before = await current(page);
+    const input = page.getByRole('spinbutton', { name: 'Source IN frame', exact: true });
+    await input.fill('0.5'); await input.press('Enter');
+    const element = await input.elementHandle();
+    if (!element) throw new Error('The field must remain mounted across collapse.');
+    const section = page.getByRole('button', { name: 'Source range section', exact: true });
+    await section.click(); await expect(input).toBeHidden();
+    expect(await element.evaluate((node) => node.isConnected)).toBe(true);
+    const help = page.getByRole('button', { name: 'Source timing help', exact: true });
+    await help.click(); await help.press('Escape'); await section.click();
+    await expect(input).toHaveValue('0.5'); await expect(input).toHaveAttribute('aria-invalid', 'true');
+    expect(await input.evaluate((node, previous) => node === previous, element)).toBe(true);
+    await input.press('Escape'); await expect(input).toHaveValue('0');
+    expect(await current(page)).toEqual(before); expect(memory.saves).toBe(0);
+});
+
 for (const context of HELP_CONTEXTS) {
     test(`${context.label} uses a compact hover/pinned question mark and retains its complete explanation`, async ({ page }) => {
         const before = await current(page);
