@@ -1,10 +1,10 @@
-name: Engineering task or iteration
-description: Track verification, documentation, operations or a bounded iteration using existing issues.
+name: Engineering task
+description: Track a concrete verification, documentation or operations deliverable, not a sprint.
 labels: [task, "priority:p2", "status:backlog"]
 body:
   - type: markdown
     attributes:
-      value: Search for an existing task first. For an iteration, link selected issues rather than recreating them; triage adds iteration/iteration:current labels and preserves existing parents. No invented deadline, push, closure, release or real-media job is authorized by this form. Keep evidence public-safe.
+      value: Search for an existing task first. Issues track concrete deliverables, not sprint containers. Use a native Project Iteration field for agreed timeboxes or a selected-work view without a cadence; never parent issues just for sprint membership. No invented deadline, push, closure, release or real-media job is authorized by this form. Keep evidence public-safe.
   - type: dropdown
     id: area
     attributes:
@@ -25,7 +25,7 @@ body:
     id: goal
     attributes:
       label: Goal, scope and non-goals
-      description: Define the approved outcome or pending decision. For an iteration, describe its bounded goal and link the existing selected issues.
+      description: Define the concrete outcome or pending decision and its boundaries. Sprint membership belongs in the Project, not a tracker issue/checklist.
     validations:
       required: true
   - type: textarea
@@ -38,8 +38,8 @@ body:
   - type: textarea
     id: dependencies
     attributes:
-      label: Dependencies, milestone and iteration
-      description: Existing blockers/parents, outcome milestone and current iteration. Preserve existing hierarchy; link already-parented issues instead of moving them.
+      label: Dependencies, milestone and Project context
+      description: Existing prerequisites, deliverable parent and outcome milestone; native Project Iteration or selected-work context only when explicitly selected. Preserve hierarchy; never use parent/sub-issues for sprint membership.
   - type: textarea
     id: next
     attributes:

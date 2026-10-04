@@ -2,7 +2,7 @@
 
 Refs #<!-- issue number; use references, not automatic closing keywords -->
 
-Iteration: <!-- existing iteration issue or Project iteration -->
+Project context: <!-- native Project Iteration if explicitly scheduled, or selected-work view; no sprint-tracker issue required -->
 
 Milestone: <!-- outcome milestone -->
 
@@ -20,6 +20,6 @@ Milestone: <!-- outcome milestone -->
 
 <!-- Blockers, limitations, acceptance still pending and linked follow-up issues. -->
 
-- [ ] Relevant contracts/evidence and GitHub issue/iteration progress are updated.
+- [ ] Relevant contracts/evidence, work issue progress and Project Status are updated; no duplicate sprint checklist is maintained.
 - [ ] Original/media safety and unrelated user edits are preserved.
 - [ ] No private paths/media, credentials, caches or generated reports are included.

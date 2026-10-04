@@ -4,7 +4,7 @@ labels: [bug, "priority:p2", "status:backlog"]
 body:
   - type: markdown
     attributes:
-      value: Do not attach private footage, credentials, local project files or licensed audio. Use synthetic media when possible and redact filesystem paths. Triage applies area labels, assesses priority and links the milestone/iteration; default normal priority is not a severity verdict.
+      value: Do not attach private footage, credentials, local project files or licensed audio. Use synthetic media when possible and redact filesystem paths. Triage applies area labels, assesses priority and links an outcome milestone; default normal priority is not a severity verdict. Sprint selection belongs in the Project, not a tracker issue or parent relationship.
   - type: dropdown
     id: area
     attributes:
@@ -64,4 +64,4 @@ body:
     id: next
     attributes:
       label: Next action and related tracking
-      description: Smallest investigation/verification step, linked existing issues and known milestone/iteration. Distinguish local results from remote CI and hardware evidence; unknowns are acceptable.
+      description: Smallest investigation/verification step, linked prerequisites and outcome milestone; native Project Iteration or selected-work context when approved. Distinguish local results from remote CI and hardware evidence; unknowns are acceptable.

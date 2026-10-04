@@ -22,8 +22,9 @@ Do not run this workflow merely because an example invocation appears in chat.
    do not assume a GitHub integration configured for an enterprise host reaches it.
    Prefer tools on the verified host; use `gh api --hostname github.com` when the
    integration targets another host. Never display tokens or request secrets.
-3. Fetch live labels, open outcome milestones, current iteration issue(s), and
-   repository-linked Projects with their Status fields/options. Discover IDs rather
+3. Fetch live labels, open outcome milestones, and repository-linked Projects with
+  their Status fields/options and native Iteration/selected-work context. Do not
+  look for or create a sprint-tracker issue as the scheduling mechanism. Discover IDs rather
    than hard-coding them. Follow pagination; do not treat a partial list as complete.
    For organization repositories, check supported native issue types as well;
    native types do not replace required category labels.
@@ -40,6 +41,11 @@ Do not run this workflow merely because an example invocation appears in chat.
   current behaviour; do not invent reproductions, approvals, technical solutions or
   completed verification. A short but clear request is enough to log a proposal.
   Ask only if a missing decision prevents safe scoping, destination or milestone choice.
+- Issues track concrete deliverables, not sprint containers. If the request is only
+  to create/manage a sprint, do not create an issue: explain the native Project
+  Iteration mechanism and ask for missing cadence/dates or selection approval before
+  scheduling. Without agreed timeboxes, use a selected-work view. Existing #15 is
+  a legacy checkpoint, not a template for another tracker or recurring checklist.
 - Give the issue **exactly one** category: `bug` for evidenced incorrect behaviour,
   `enhancement` for a product proposal/improvement, or `task` for engineering,
   documentation, verification or operations. Preserve unrelated modifiers on reuse.
@@ -61,10 +67,13 @@ Do not run this workflow merely because an example invocation appears in chat.
   proposal, not scope approval. If none fits, ask rather than create one silently.
 - Record actual prerequisites as native blocked-by relationships when supported.
   Preserve existing parents; add a native sub-issue only when that decomposition is
-  appropriate and authorized. Mere topical similarity is not a dependency.
-- Inspect the current iteration but **do not** add `iteration:current`, change its
-  scope or parent a fresh proposal to its tracker without explicit selection approval.
-  Mention relevant iteration context without implying admission. Assign a person
+  appropriate and authorized, never for sprint membership. Mere topical similarity
+  is not a dependency.
+- Inspect Project selection but **do not** assign an Iteration or selected-work field
+  without explicit selection approval. Do not apply legacy `iteration` or
+  `iteration:current` labels to new issues or parent them to #15. Preserve existing
+  legacy metadata unless its cleanup is explicitly approved.
+  Mention relevant Project context without implying admission. Assign a person
   only when responsibility is known, not automatically to the reporter.
 
 ## Issue body
@@ -77,8 +86,9 @@ Use a concise, actionable title and these sections, adapting to the matching for
   compatibility migration or owner-media qualification is implied.
 - **Acceptance criteria:** observable checklist. Distinguish proposed acceptance from
   verified delivery; include relevant regressions without running media work to log it.
-- **Dependencies, milestone and iteration:** known issue links, proposed outcome,
-  real blockers and whether this is outside the selected iteration.
+- **Dependencies, milestone and Project context:** known issue links, proposed outcome,
+  real blockers and native Project iteration/selected-work context, when applicable.
+  New proposals remain unselected; a tracker issue is not required.
 - **State and approval:** proposal vs explicitly approved work; chosen progress state.
 - **Priority rationale:** concise reason for the selected priority.
 - **Next action:** the smallest specific next design, investigation or delivery step;
@@ -98,8 +108,8 @@ credentials, licensed recordings/music or generated diagnostic reports.
    Backlog, Ready, In progress, Blocked or Local complete. Done is for explicitly
    accepted/closed issues only. Do not configure workflows or automatic closure.
 3. If Project/dependency access is unavailable, record the exact limitation and next
-   action on the issue, retain normal issue/iteration tracking, and continue what is
-   accessible. Do not claim synchronization or a native relationship succeeded.
+  action on the actual work issue and continue what is accessible. Do not create a
+  fallback sprint issue/checklist or claim unavailable synchronization succeeded.
 4. If a write times out or its result is uncertain, read/search current state before
    retrying; never blindly create a second issue, comment or Project item.
 5. Read back the issue and Project item. Verify category/priority/status cardinality,
@@ -117,5 +127,5 @@ not a bug fix or an implementation. After duplicate/code checks, normally choose
 editor outcome. Record per-layer ripple choice as the proposed goal, with independent
 layer timing and reversible edits as design/acceptance concerns. The next action is
 to review and approve the per-layer timing semantics, including transitions and
-music/keyframe treatment. Do not invent the toggle design, change the schema, admit
-it to the current iteration, or implement it without separate approval.
+music/keyframe treatment. Do not invent the toggle design, change the schema, select
+it for delivery, or implement it without separate approval.

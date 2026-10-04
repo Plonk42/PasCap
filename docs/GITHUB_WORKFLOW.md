@@ -10,7 +10,7 @@ mutable backlog. Historical plans and feature worksheets do not approve new scop
 ## Work cycle
 
 1. **Inspect before acting.** Confirm the repository/host and current issue,
-   comments, dependencies and iteration. Search before creating a new issue; reuse
+  comments, dependencies and Project selection. Search before creating a new issue; reuse
    an existing scope rather than duplicating it. A task/feature needs a goal,
    non-goals, observable acceptance, an outcome milestone and a concrete next action.
 2. **Triage.** Apply the category, priority, area and progress labels below. Record
@@ -18,26 +18,57 @@ mutable backlog. Historical plans and feature worksheets do not approve new scop
   Add the same issue to the linked Project; do not duplicate it as a draft card.
    Assign a person only when responsibility is known; otherwise name the decision
    needed in the next action. Templates start at normal/backlog, not confirmed severity.
-3. **Select a bounded iteration.** Link existing approved issues to a tracker with
-   the `iteration` label; mark it and its selected scope `iteration:current`.
-   Use native sub-issues for a useful decomposition, without replacing existing
-   parents. An already-parented issue can be linked from the iteration checklist.
-   Milestones represent deliverable outcomes; iteration dates/deadlines are not invented.
+3. **Select bounded work in the Project.** For explicitly agreed timeboxes, assign
+  existing approved issues to a native Iteration field. Without an agreed cadence,
+  use the backlog/Status board and a selected-work view. Do not create a sprint
+  issue, copy acceptance checklists or use parent/sub-issues for sprint membership.
+  Native sub-issues describe deliverable decomposition; milestones describe outcomes.
+  Never invent iteration dates/deadlines or infer selection from issue logging.
 4. **Deliver incrementally.** At the start, after each completed logical step and
-  at handoff, update the issue, iteration and Project Status: progress, blockers,
+  at handoff, update the work issue and Project Status: progress, blockers,
   exact local commits, checks/evidence, remaining acceptance and the next action. Validate/review and
    commit each step with its tests/docs; use `Refs #N` in commits/PRs, not closing
    keywords. An unpublished SHA is a local reference, not a working GitHub commit link.
 5. **Review honestly.** Local implementation/testing can be complete while remote
    CI, publication or owner acceptance is pending. Inspect CI for the actual delivery
    commit; old green runs do not qualify new code. Close issues/milestones, push,
-   publish or run owner-media jobs only with explicit authorization. An iteration
-   summary records follow-ups and review decisions; moving `iteration:current` to
-   the next agreed batch does not silently close its predecessor.
+  publish or run owner-media jobs only with explicit authorization. Keep optional
+  sprint goals/review notes short; they must not become a second mutable backlog.
+  Moving work between Project iterations does not accept or close its issues.
 
 Public updates must be sanitized: no private source/project paths, snapshots,
 credentials, recordings, licensed music or generated reports. Real imports,
 preparations, benchmarks and long renders still require explicit owner consent.
+
+## Scheduling contract for agents
+
+**An issue is not a sprint. Never create, extend or synchronize an issue as a
+sprint/iteration container, even when an older tracker exists.**
+
+| Concept | Mechanism |
+| --- | --- |
+| Concrete feature, bug, verification or engineering deliverable | Issue |
+| Sprint membership and dates | Native Project **Iteration field**, with agreed cadence/dates |
+| Continuous delivery without timeboxes | Project backlog/Status board and bounded selected-work view |
+| Work progress | Work issue progress label and explicitly aligned Project Status |
+| Deliverable outcome | Milestone |
+| Deliverable decomposition | Native parent/sub-issues, never scheduling membership |
+| Actual prerequisite | Native blocked-by relationship |
+
+GitHub [Iteration fields](https://docs.github.com/en/issues/planning-and-tracking-with-projects/understanding-fields/about-iteration-fields)
+support dated blocks and filters such as `@current`. No cadence is currently agreed
+for PasCap, and no native Iteration field has been configured. Do not manufacture
+dates to fill that gap. Use continuous-delivery selection unless the owner explicitly
+chooses timeboxes. Any new scheduling field/view or bulk selection needs explicit
+approval; a policy change alone does not migrate existing metadata.
+
+[#15](https://github.com/Plonk42/PasCap/issues/15) and the existing
+`iteration`/`iteration:current` labels are **legacy checkpoint tracking**. Their
+history and existing native relationships are preserved, not adopted as the pattern
+for future work. Do not add new issues beneath #15, apply those labels to new issues,
+or append recurring sprint checklists. Update the actual work issues and Project
+instead. Do not close/delete/reparent/relabel legacy records without explicit cleanup
+approval. Historical counts below are evidence, not current planning instructions.
 
 ## Label contract
 
@@ -64,7 +95,7 @@ primary categories. Area labels are `area:editor`, `area:media`, `area:export`,
 | `priority:p3` | Low: optional improvement without a current milestone gate |
 
 Priority orders actionable work; it neither removes a dependency/consent requirement
-nor makes deferred container/hardware work the current iteration automatically.
+nor selects deferred container/hardware work for delivery automatically.
 
 | Progress | Meaning |
 | --- | --- |
@@ -77,8 +108,9 @@ nor makes deferred container/hardware work the current iteration automatically.
 `status:local-complete` is not all-criteria acceptance, issue closure or a remote
 pass. Closing is explicit; remove obsolete open-progress/current-iteration labels
 when closure is authorized, preserving category/priority/area and history.
-`iteration` identifies a tracker; `iteration:current` identifies the active batch,
-including its selected implementation issues, not a new feature category.
+`iteration` and `iteration:current` are retained legacy labels, not required triage
+metadata or the future scheduling mechanism. New work is selected through the Project,
+not labeled/parented into a sprint issue.
 
 ## Projects and capability limits
 
@@ -98,11 +130,13 @@ sign in as the owner or an authorized collaborator to see it. CLI authorization
 does not sign the browser in. The previous access limitation remains historical
 evidence in [#12](https://github.com/Plonk42/PasCap/issues/12), not a current blocker.
 Never ask for or post a token in chat or an issue. If access becomes unavailable,
-record that limitation and continue using the same iteration issue and labels.
+record the limitation on the actual work issue and continue accessible issue tracking.
+Do not create a fallback sprint issue or duplicate checklist; report scheduling as
+unavailable until Project access is restored.
 
 ### Project views and maintenance
 
-The verified setup checkpoint contains all **16 existing issues**, with no duplicate
+The historical setup checkpoint contained **16 issues**, with no duplicate
 draft cards, seven saved views and their native labels/milestones/assignees/parent
 fields. The actual view query results were checked, not just filter strings:
 
@@ -127,8 +161,10 @@ All six newly created default Project workflows, including **Auto-close issue**,
 were removed **before any issue was added**. No automatic closure, admission,
 relabeling or Status transition is enabled. New triaged issues must be added
 explicitly, keeping their existing IDs and native relationships. No second Priority,
-next-action field or dated Iteration field was added. The rolling iteration uses
-`iteration:current`; native dated iterations require an agreed cadence first.
+next-action field or dated Iteration field was added at that checkpoint. The existing
+Current iteration view is label-filtered legacy selection, not a native sprint.
+Do not renew its tracker/label model; native dated iterations require agreed dates,
+while continuous delivery uses selected work without a tracker issue.
 
 The API supports saved layouts/filters/visible fields but does not currently expose
 custom grouping/sorting inputs. The Delivery board's default Status columns are
@@ -137,7 +173,7 @@ pretending a grouped table was configured. Optional table grouping can be chosen
 in the signed-in browser's View options and saved. This is not a metadata-access
 blocker, a release gate or a reason to broaden Actions permissions.
 
-## Applied setup · 2026-10-04 · initial workflow checkpoint
+## Historical setup evidence · not scheduling instructions
 
 - All eleven original issues retain their scope/comments/milestones, with triaged
   category/priority/area/progress and explicit next actions. Existing dependency
@@ -158,7 +194,8 @@ blocker, a release gate or a reason to broaden Actions permissions.
 
 Later explicitly approved additions, including the help UI in
 [#16](https://github.com/Plonk42/PasCap/issues/16), are recorded in the existing
-iteration and issues. These historical setup counts are not a second mutable backlog.
+checkpoint and issues. These historical setup counts are not a second mutable backlog
+or authorization to continue issue-based sprint tracking.
 
 The latest inspected remote [run 37183854541](https://github.com/Plonk42/PasCap/actions/runs/37183854541)
 on publication commit `6d260c5` failed the old raw-reader case on Node 24 while
@@ -168,7 +205,7 @@ push; old successful runs and local evidence are not substituted for it.
 
 ### Working views
 
-- [Current iteration scope](https://github.com/Plonk42/PasCap/issues?q=is%3Aissue%20is%3Aopen%20label%3A%22iteration%3Acurrent%22)
+- [Planning Project](https://github.com/users/Plonk42/projects/1) — delivery and work selection; existing Current iteration view remains legacy until approved cleanup
 - [Ready next actions](https://github.com/Plonk42/PasCap/issues?q=is%3Aissue%20is%3Aopen%20label%3A%22status%3Aready%22)
 - [High-priority gates](https://github.com/Plonk42/PasCap/issues?q=is%3Aissue%20is%3Aopen%20label%3A%22priority%3Ap1%22)
 - [Blocked work](https://github.com/Plonk42/PasCap/issues?q=is%3Aissue%20is%3Aopen%20label%3A%22status%3Ablocked%22)
@@ -182,13 +219,16 @@ The repository-local [issue skill](../.github/skills/github-issue/SKILL.md) sear
 existing issues first, applies category/priority/area/status/milestone metadata and
 adds the same issue to the linked Project with aligned Status. It records a concrete
 next action and reports access limitations. Logging an idea does **not** approve
-implementation or add it to the current iteration; the example is not a filed issue.
+implementation or select it for delivery. The ripple proposal is now logged as
+[#17](https://github.com/Plonk42/PasCap/issues/17); its backlog state is not selection
+or implementation approval.
 
 Use the [bug form](../.github/ISSUE_TEMPLATE/bug_report.yml),
 [feature form](../.github/ISSUE_TEMPLATE/feature_request.yml) or
-[task/iteration form](../.github/ISSUE_TEMPLATE/work_item.yml). Triage adjusts
-default priority/progress, applies area labels and adds real milestone/iteration
-relationships. The [PR template](../.github/pull_request_template.md) keeps linked
+[engineering task form](../.github/ISSUE_TEMPLATE/work_item.yml), never an issue
+form to create a sprint container. Triage adjusts default priority/progress, applies
+area labels and an outcome milestone; Project scheduling is separately authorized.
+The [PR template](../.github/pull_request_template.md) keeps linked
 tracking, local/remote/hardware verification and remaining next actions distinct.
 These local templates/instructions require an approved push before GitHub serves
 the updated files; the issue/label/milestone data is already applied remotely.
