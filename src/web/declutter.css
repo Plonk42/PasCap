@@ -42,7 +42,6 @@
 }
 
 .editor-popover>summary:focus-visible,
-.control-help>summary:focus-visible,
 .declutter-music .music-timing>summary:focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: 2px;
@@ -154,26 +153,15 @@
 }
 
 .control-help {
-    margin-top: 8px;
+    justify-content: flex-end;
+    margin-top: 6px;
+    margin-left: auto;
     color: var(--muted);
     font-size: 12px;
 }
 
-.control-help>summary {
-    width: fit-content;
-    padding: 3px 0;
-    cursor: pointer;
-    color: #a7b8ac;
-    font-size: 11px;
-}
-
-.control-help p {
-    margin-top: 6px;
-    line-height: 1.5;
-}
-
 .declutter-inspector .colour-help {
-    margin: 0;
+    margin: 0 0 0 auto;
     padding: 0 14px 10px;
 }
 

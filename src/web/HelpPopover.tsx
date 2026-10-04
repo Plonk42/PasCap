@@ -96,12 +96,15 @@ export function HelpPopover({ label, className = '', children }: Readonly<Props>
             if (entries.some((entry) => !entry.isIntersecting)) close();
         });
         if (trigger.current) visibility.observe(trigger.current);
+        // Dismiss before an outside control captures a drag; its Escape remains owned.
+        document.addEventListener('pointerdown', outsideClick, true);
         document.addEventListener('click', outsideClick, true);
         document.addEventListener('keydown', keyboard, true);
         window.addEventListener('resize', place);
         window.addEventListener('scroll', place, true);
         return () => {
             resize.disconnect(); visibility.disconnect();
+            document.removeEventListener('pointerdown', outsideClick, true);
             document.removeEventListener('click', outsideClick, true);
             document.removeEventListener('keydown', keyboard, true);
             window.removeEventListener('resize', place);
@@ -118,8 +121,14 @@ export function HelpPopover({ label, className = '', children }: Readonly<Props>
     }} onBlurCapture={(event) => {
         if (!(event.relatedTarget instanceof Node) || !event.currentTarget.contains(event.relatedTarget)) scheduleLeave();
     }}>
-        <button ref={trigger} type="button" className="editor-help-trigger icon-button" aria-label={`${label} help`} aria-expanded={mode !== 'closed'} aria-pressed={mode === 'pinned'} aria-controls={id} aria-describedby={`${id}-instruction`} onClick={() => {
-            if (currentMode.current === 'pinned') close();
+        <button ref={trigger} type="button" className="editor-help-trigger icon-button" aria-label={`${label} help`} aria-expanded={mode !== 'closed'} aria-pressed={mode === 'pinned'} aria-controls={id} aria-describedby={`${id}-instruction`} onPointerDown={(event) => {
+            // A draft's blur can remove its hint and move this button before mouseup.
+            // Focus on the completed click instead, retaining one ordinary blur commit.
+            if (event.button === 0) event.preventDefault();
+        }} onClick={(event) => {
+            const wasPinned = currentMode.current === 'pinned';
+            event.currentTarget.focus({ preventScroll: true });
+            if (wasPinned) close();
             else { suppressed.current = false; show('pinned'); }
         }} onKeyDown={(event) => {
             if (event.key === 'ArrowDown' && currentMode.current !== 'closed') {

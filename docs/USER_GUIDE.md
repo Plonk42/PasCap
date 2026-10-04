@@ -252,6 +252,15 @@ at the playhead. **Animation help** explains scope and capture once; no static
 or animated control was removed. Search/filter clear actions, mixed select-all
 and always-visible media Add simplify the library.
 
+Inline help is now a small **? button**, not an expandable text section. Hover or
+focus to preview it; click, Enter or Space to keep it open while moving away.
+You can move the pointer into the help to read it, or press Down arrow to focus
+and scroll its text. Escape or a click elsewhere closes it; Escape closes help
+before cancelling an input draft. Hovering help never applies a field or edits
+the project. A deliberate click away from a number still applies a valid draft
+once, as usual. Settings, **Edit points**, music placement and storage/render
+breakdowns remain their existing expandable controls, not help buttons.
+
 | Context | Shortcut |
 | --- | --- |
 | Timeline play/seek | Space; ←/→ one frame; Shift+←/→ ten; Home/End; F to fit |

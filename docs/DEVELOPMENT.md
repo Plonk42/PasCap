@@ -98,6 +98,11 @@ complete 5–10 minute real-flight qualification. Complete unit suites passed on
 local Node 22.23.3 and 24.21.0; the final browser/native suites used Node 22.
 The 1,039-test UX-hardening baseline remains historical rather than being relabelled.
 
+The later [inline-help UI verification](DELIVERY_STATUS.md#current-help-popover-verification)
+records its fresh checks separately. The shared hover/pinned question-mark control
+adds viewport/focus/draft/touch coverage without changing the native pipeline;
+the older 54 native/private-tmpfs results are not claimed as a new run.
+
 ### GitHub CI
 
 The [workflow](../.github/workflows/ci.yml) is committed with the initial repository
