@@ -17,6 +17,7 @@
         "test": "vitest run",
         "test:watch": "vitest",
         "test:media": "PASCAP_MEDIA_TESTS=1 vitest run tests/media",
+        "test:space": "PASCAP_SPACE_TESTS=1 vitest run tests/media/export-space.test.ts",
         "test:browser": "npm run build && tsx scripts/fixtures.ts --browser && playwright test",
         "check": "npm run typecheck && npm test && npm run build",
         "prepare:samples": "tsx scripts/prepare-samples.ts",

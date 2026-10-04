@@ -21,6 +21,7 @@ issues and milestones rather than an automatically approved feature catalogue.
 | [SPEED_AND_AUDIO.md](SPEED_AND_AUDIO.md) | Static source ramps versus analytic row Speed, shared retiming, music placement/selected-range loops and export audio |
 | [TIMELINE_EDITING.md](TIMELINE_EDITING.md) | No-copy import, source ranges, ripple/overlay placement, recoverable trims, marked cuts, history and snapping |
 | [WORKSPACE_AND_RECOVERY.md](WORKSPACE_AND_RECOVERY.md) | Layout, field/keyboard contexts, project bins, serial saves/conflicts, Activity and failure recovery |
+| [UX_HARDENING.md](UX_HARDENING.md) | Simplified visual controls, deterministic raw-reader ownership, relink identity prerequisite, export-space assumptions/ENOSPC evidence and measured loading boundaries |
 
 Use the current row-point and retiming contracts for animation semantics, not older
 clip-local key descriptions. Detailed documents preserve implementation history;
@@ -29,8 +30,8 @@ verification table linked below.
 
 ## Status and planning
 
-- [Current local verification](DELIVERY_STATUS.md#current-keyframe-update-verification):
-  the recorded 2026-10-04 **982-test** baseline, distinct from remote CI and hardware
+- [Current local verification](DELIVERY_STATUS.md#current-ux-hardening-verification):
+  the recorded 2026-10-04 **1,039-test** baseline, distinct from remote CI and hardware
   qualification. [DELIVERY_STATUS.md](DELIVERY_STATUS.md) also preserves prior
   milestones, native resource bounds and remaining acceptance gates.
 - [FEASIBILITY_REPORT.md](FEASIBILITY_REPORT.md): **historical** two-source preview/

@@ -71,9 +71,9 @@ function LayerOpacity({ layer, frame, disabled, onEdit }: Readonly<{ layer: Vide
     else onEdit({ type: 'layer-update', layer: { ...layer, opacity } });
   };
   return <div className="layer-opacity-label layer-keyed-opacity">
-    <span className="layer-opacity-heading"><label htmlFor={fieldId}>Opacity<small className="layer-setting-kind">{scope}</small></label><span className="layer-setting-actions"><output>{Math.round(value * 100)}%</output><KeyframeToggle layer={layer} setting="layerOpacity" label="Layer opacity" frame={frame} value={value} disabled={disabled} onEdit={onEdit} /></span></span>
+    <span className="layer-opacity-heading"><label htmlFor={fieldId} title={hint}>Opacity<small className="layer-setting-kind">{keyed && <Icon name="curve" size={12} />}<span className="declutter-sr-only">{scope}</span></small></label><span className="layer-setting-actions"><output>{Math.round(value * 100)}%</output><KeyframeToggle layer={layer} setting="layerOpacity" label="Layer opacity" frame={frame} value={value} disabled={disabled} onEdit={onEdit} /></span></span>
     <input id={fieldId} type="range" aria-label={`Opacity of layer ${layer.name}`} aria-describedby={hintId} min={0} max={1} step={0.01} value={value} disabled={disabled || !editable} title={hint} onChange={(event) => commit(Number(event.target.value))} />
-    <span id={hintId} className={editable ? 'declutter-sr-only' : 'layer-setting-hint'}>{hint}</span>
+    <span id={hintId} className="declutter-sr-only">{hint}</span>
   </div>;
 }
 

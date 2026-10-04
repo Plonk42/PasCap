@@ -6,6 +6,8 @@ import type { ProjectDocument } from '../shared/model.js';
 import { calculateLayout } from '../shared/timeline.js';
 import { framesToSeconds } from '../shared/timing.js';
 import { durationLabel } from './display.js';
+import { ExportSpace, useExportSpace } from './ExportSpace.js';
+import { Icon } from './icons.js';
 import { orderActivityJobs } from './Jobs.js';
 import { Modal } from './Modal.js';
 
@@ -50,11 +52,13 @@ export function ExportDialog({ project, jobs, busy, error, onExport, onClose, re
   const [localError, setLocalError] = useState('');
   const submitting = busy || pending;
   const summary = summarizeExport(project);
+  const space = useExportSpace(project, profile);
+  const storageReady = space.phase === 'ready' && space.data !== null && space.data.status !== 'blocked';
   const settings = EXPORT_PROFILES[profile];
   const history = orderActivityJobs(jobs).filter((job) => job.kind === 'export' && job.state === 'completed');
 
   const startExport = async (): Promise<void> => {
-    if (busy || submission.current || !summary.duration || !summary.clips) return;
+    if (busy || submission.current || !storageReady || !summary.duration || !summary.clips) return;
     submission.current = true; setPending(true); setLocalError('');
     try {
       if (await onExport(profile)) onClose();
@@ -65,7 +69,7 @@ export function ExportDialog({ project, jobs, busy, error, onExport, onClose, re
 
   return <Modal className="export-dialog" labelledBy={`${id}-title`} describedBy={`${id}-snapshot`} busy={submitting} error={error || localError} onClose={onClose} {...(restoreFocusTo ? { restoreFocusTo } : {})} footer={<>
     <button className="secondary-button" onClick={onClose} disabled={submitting}>Cancel</button>
-    <button className="primary-button" disabled={submitting || !summary.duration || !summary.clips} onClick={() => { void startExport(); }}>Start export</button>
+    <button className="primary-button" disabled={submitting || !storageReady || !summary.duration || !summary.clips} onClick={() => { void startExport(); }}><Icon name="download" size={15} />Start export</button>
   </>}>
     <div className="activity-dialog-heading"><h2 id={`${id}-title`}>Export video</h2></div>
     <p className="activity-export-project">{project.title}</p>
@@ -75,17 +79,23 @@ export function ExportDialog({ project, jobs, busy, error, onExport, onClose, re
       <div><dt>Video layers</dt><dd>{summary.layers}<small>{summary.enabledLayers} enabled</small></dd></div>
       <div><dt>Shared layer points</dt><dd>{summary.keyframeCount}<small>{summary.keys.settings} participating settings</small></dd></div>
     </dl>
-    {summary.keyframeCount > 0 && <p className="activity-hint">{summary.keys.speed} speed values · {summary.keys.colour} colour values · {summary.keys.clipOpacity} clip opacity · {summary.keys.layerOpacity} layer opacity</p>}
     {!summary.clips && <p className="activity-empty">Add a video clip to the project before exporting.</p>}
-    <label className="activity-field activity-export-quality"><span>Quality</span><select aria-label="Export quality" value={profile} disabled={submitting} onChange={(event) => setProfile(event.target.value as ExportProfile)}><option value="draft720">720p draft · H.264</option><option value="final4k">4K final · H.264 SDR BT.709</option></select></label>
-    <p className="activity-hint">{settings.width} × {settings.height} · H.264 · SDR BT.709. {profile === 'draft720' ? 'Lower-resolution draft for review.' : 'Final-resolution render.'} Both profiles render from originals, not preview proxies.</p>
-    <section className="activity-export-snapshot" id={`${id}-snapshot`}><h3>Fixed snapshot</h3><p>The submitted edit includes clip grades and speed, transitions, enabled layers, opacity and keyframes{project.music ? ', and the selected music track' : '; no music track is selected'}. Later edits do not change a submitted render.</p><p>After submission, rendering continues in Activity and the editor remains available.</p></section>
-    {summary.layered ? <aside className="activity-export-warning" aria-labelledby={`${id}-resources`}>
-      <h3 id={`${id}-resources`}>Layered export resources</h3>
-      <p>Layers or shared row keyframes require sequential compositing passes. This can be slow, especially at 4K; no completion-time estimate is available.</p>
-      <p>Scratch storage may hold up to {LAYERED_EXPORT_RESOURCES.maxLosslessClipsOnDisk} lossless clips and {LAYERED_EXPORT_RESOURCES.maxLosslessTimelineRepresentations} full-timeline representations. Disk use depends on duration; no disk-space estimate is available.</p>
-      <details><summary>Processing bounds</summary><p>Per-pass maxima: {LAYERED_EXPORT_RESOURCES.maxOriginalVideoDecoders} original decoder, {LAYERED_EXPORT_RESOURCES.maxIntermediateVideoDecoders} intermediate readers, {LAYERED_EXPORT_RESOURCES.maxVideoEncoders} encoder, and {LAYERED_EXPORT_RESOURCES.maxNativeVideoChildrenPerPass} video child processes in total. These maxima do not all occur together.</p></details>
-    </aside> : <p className="activity-hint">Temporary lossless files may hold up to {EXPORT_RESOURCES.maxLosslessClipsOnDisk} clips. Disk use depends on duration; no disk-space estimate is available.</p>}
+    <fieldset className="export-quality-field" disabled={submitting}><legend>Quality</legend><div className="export-quality-options">
+      <label className="export-quality-option"><input type="radio" name={`${id}-quality`} aria-label="720p draft" checked={profile === 'draft720'} onChange={() => setProfile('draft720')} /><strong>720p draft</strong><span>For review</span><small>1280 × 720</small></label>
+      <label className="export-quality-option"><input type="radio" name={`${id}-quality`} aria-label="4K final" checked={profile === 'final4k'} onChange={() => setProfile('final4k')} /><strong>4K final</strong><span>Full-resolution delivery</span><small>3840 × 2160</small></label>
+    </div></fieldset>
+    <p className="export-originals-note"><Icon name="video" size={15} />Renders from originals · H.264 · SDR BT.709</p>
+    <ExportSpace state={space} />
+    <details className="export-render-details"><summary>Rendering details</summary>
+      <section className="activity-export-snapshot" id={`${id}-snapshot`}><h3>Fixed snapshot</h3><p>The submitted edit includes clip grades and speed, transitions, enabled layers, opacity and keyframes{project.music ? ', and the selected music track' : '; no music track is selected'}. Later edits do not change a submitted render.</p><p>After submission, rendering continues in Activity and the editor remains available.</p></section>
+      <p className="activity-hint">{settings.width} × {settings.height} · {summary.keys.speed} speed values · {summary.keys.colour} colour values · {summary.keys.clipOpacity} clip opacity · {summary.keys.layerOpacity} layer opacity.</p>
+      {summary.layered ? <aside className="activity-export-warning" aria-labelledby={`${id}-resources`}>
+        <h3 id={`${id}-resources`}>Layered export resources</h3>
+        <p>Sequential compositing can be slow, especially at 4K; no completion-time estimate is available.</p>
+        <p>Up to {LAYERED_EXPORT_RESOURCES.maxLosslessClipsOnDisk} lossless clips and {LAYERED_EXPORT_RESOURCES.maxLosslessTimelineRepresentations} full-timeline representations. Disk use depends on duration and compression.</p>
+        <p>Per-pass maxima: {LAYERED_EXPORT_RESOURCES.maxOriginalVideoDecoders} original decoder, {LAYERED_EXPORT_RESOURCES.maxIntermediateVideoDecoders} intermediate readers, {LAYERED_EXPORT_RESOURCES.maxVideoEncoders} encoder, and {LAYERED_EXPORT_RESOURCES.maxNativeVideoChildrenPerPass} video child processes in total. These maxima do not all occur together.</p>
+      </aside> : <p className="activity-hint">Up to {EXPORT_RESOURCES.maxLosslessClipsOnDisk} temporary lossless clips. Disk use depends on duration and compression.</p>}
+    </details>
     {submitting && <output className="activity-pending" aria-live="polite">Submitting export…</output>}
     {history.length > 0 && <section className="activity-export-history" aria-labelledby={`${id}-history`}><h3 id={`${id}-history`}>Completed exports</h3><ul>{history.map((job) => <li key={job.id}>
       <div><strong>{job.label}</strong>{job.finishedAt && <span className="activity-hint">{Number.isFinite(Date.parse(job.finishedAt)) ? <time dateTime={job.finishedAt}>{new Date(job.finishedAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}</time> : 'Completion time unavailable'}</span>}</div>

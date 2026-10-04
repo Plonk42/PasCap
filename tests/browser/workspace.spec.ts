@@ -72,6 +72,7 @@ test('pane resize cancels on Escape, persists on release/keyboard and never edit
     await expect(resizer).toHaveAttribute('aria-valuenow', String(initial + 16));
     await openOptions(page, 'Workspace options');
     await page.getByRole('button', { name: 'Toggle Clip panel' }).click(); await expect(page.getByRole('complementary', { name: 'Clip inspector' })).toBeHidden();
+    await openOptions(page, 'Workspace options');
     await page.getByRole('button', { name: 'Reset workspace layout' }).click(); await expect(resizer).toHaveAttribute('aria-valuenow', '300');
     await closeOptions(page);
     await expect(page.getByRole('complementary', { name: 'Clip inspector' })).toBeVisible();

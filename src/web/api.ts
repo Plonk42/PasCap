@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { audioAssetSchema } from '../shared/audio.js';
 import type { ExportProfile } from '../shared/export.js';
+import { exportPreflightSchema } from '../shared/export-space.js';
 import { footageDirectorySchema, footageRootSchema } from '../shared/footage.js';
 import { jobSchema, mediaAssetSchema } from '../shared/media.js';
 import { projectSchema, type ProjectDocument } from '../shared/model.js';
@@ -18,7 +19,7 @@ export class ApiError extends Error {
   }
 }
 
-export interface RequestOptions { signal?: AbortSignal; timeoutMs?: number }
+export interface RequestOptions { signal?: AbortSignal; timeoutMs?: number; readOnly?: boolean }
 
 const READ_TIMEOUT_MS = 15_000;
 const WRITE_TIMEOUT_MS = 120_000;
@@ -41,7 +42,7 @@ function responseFailure(status: number, ok: boolean): ApiError {
 
 /** One attempt only, including for writes. The deadline covers both fetch and response decoding. */
 export async function request<T>(url: string, schema: z.ZodType<T>, method = 'GET', body?: unknown, options: RequestOptions = {}): Promise<T> {
-  const readOnly = ['GET', 'HEAD'].includes(method.toUpperCase());
+  const readOnly = options.readOnly === true || ['GET', 'HEAD'].includes(method.toUpperCase());
   const timeoutMs = options.timeoutMs ?? (readOnly ? READ_TIMEOUT_MS : WRITE_TIMEOUT_MS);
   if (!Number.isFinite(timeoutMs) || timeoutMs <= 0 || timeoutMs > 2_147_483_647) {
     throw new ApiError('The request timeout must be a positive, finite number of milliseconds.', 0, 'request');
@@ -131,6 +132,7 @@ export const api = {
   audio: (options?: RequestOptions) => request('/api/audio', z.object({ assets: z.array(audioAssetSchema) }), 'GET', undefined, options),
   importAudio: (path: string) => request('/api/audio/register', z.object({ asset: audioAssetSchema, job: jobSchema }), 'POST', { path }, { timeoutMs: IMPORT_TIMEOUT_MS }),
   prepareAudio: (id: string) => request(`/api/audio/${id}/prepare`, z.object({ job: jobSchema }), 'POST', {}),
+  exportPreflight: (document: ProjectDocument, profile: ExportProfile, options?: RequestOptions) => request('/api/exports/preflight', z.object({ space: exportPreflightSchema }).strict(), 'POST', { document, profile }, { ...options, readOnly: true }),
   export: (document: ProjectDocument, profile: ExportProfile) => request('/api/exports', z.object({ job: jobSchema }), 'POST', { document, profile }),
   reference: (document: ProjectDocument) => request('/api/reference', z.object({ job: jobSchema }), 'POST', { document }),
 };

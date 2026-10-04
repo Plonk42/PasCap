@@ -46,11 +46,12 @@ export async function fingerprintFile(filename: string): Promise<SourceFingerpri
   return { algorithm: 'sampled-sha256-v1', digest: hash.digest('hex'), size: before.size, mtimeMs: before.mtimeMs, device: before.dev, inode: before.ino };
 }
 
+/** deep also rechecks the three byte samples; it is NOT a full-file checksum. */
 export async function assertSourceIdentity(filename: string, fingerprint: SourceFingerprint, deep = false): Promise<void> {
   let stat: Stats;
   try { stat = await assertNoSymlinks(filename); }
   catch (error) {
-    if (isNotFound(error)) throw new ServiceError('The original recording is missing. Restore it or re-register it explicitly.', 409);
+    if (isNotFound(error)) throw new ServiceError('The original recording is missing. Reconnect its drive or restore the original at its registered path. PasCap does not relink automatically.', 409);
     throw error;
   }
   if (!stat.isFile() || stat.size !== fingerprint.size || stat.mtimeMs !== fingerprint.mtimeMs || stat.ino !== fingerprint.inode || stat.dev !== fingerprint.device) throw new ServiceError('Source is missing or changed. Re-register it; the old clip will not be reassociated.', 409);

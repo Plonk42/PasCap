@@ -8,8 +8,9 @@ unchanged. The intended discrete-GPU and long real-flight checks remain deferred
 
 ## Layout and navigation
 
-- Header: project picker/title, Undo/Redo, save state, **Workspace options** and
-  Export. Workspace options holds panel visibility/reset, Diagnostics and help.
+- Header: project picker/title, Undo/Redo, save state, direct **Media / Inspector**
+  toggles and keyboard help, **Workspace options** and Export. Workspace options
+  keeps layout reset and Diagnostics.
 - Left: independently scrolling Media list/grid with search, import and compact
   status. **Media options** holds filter/sort/view controls; batch actions and the
   insertion target appear when recordings are selected.
@@ -39,8 +40,9 @@ pass tested desktop widths 1440/1280/1024/900/720 without horizontal overflow; t
 remain the regression matrix, not a completed current-update browser result. The CSS floor
 is 640 px; this is not a mobile editor. Denied browser storage leaves layout/section
 controls usable for the session and exposes an explanatory preference warning.
-Current focused keyframe checks cover the 270 px inspector and 720 px drawer;
-full-suite reporting for this update is still pending.
+Keyframe checks cover the 270 px inspector and 720 px drawer. Current hardening
+also checks the 640 px toolbar and music pointer targets; see
+[the dated delivery evidence](DELIVERY_STATUS.md).
 
 Choosing a layer selects its first excerpt (if present), highlights that row and
 reveals it vertically. Empty-layer selection clears clip selection but retains the
@@ -50,7 +52,7 @@ source-list **Show** requests are also revealed horizontally; showing the first
 excerpt restores the normal frame-zero gutter. Selection never changes
 source/static bases, layer order or absolute project-frame row points.
 
-Keyboard help is available via **Workspace options → Keyboard shortcuts** or `?`
+Keyboard help is available via the **header help button** or `?`
 outside form/modal/source controls. Space, S, Q/W, I/O, Shift+Delete, Escape,
 Ctrl+D, Delete/Backspace, Undo/Redo,
 arrows, Shift+arrows, Alt+arrows, Alt+Shift+arrows, Home/End and F
@@ -349,9 +351,20 @@ Export summarizes contextual duration, clips/layers, shared row **points and
 participating settings**, enabled layers, profile and a fixed snapshot. A point
 with several channels counts once, not as separate clip/channel keys. Both 720p/4K
 use originals. Any row point, including Speed-only points, requires layered export.
-Layered-resource warnings derive from the actual renderer limits; no invented
-disk/time estimate is shown. Accepted export
-submission opens Activity and later editing cannot change its snapshot.
+Layered-resource information derives from the actual renderer limits. Export
+shows free space on its output/scratch volume and an explicitly advisory planning
+allowance, not a compressed-size guarantee or time estimate. Low space/mount
+errors have recheck/recovery actions; genuine ENOSPC cleans only the failed job,
+preserving originals, saved edits and completed outputs. Storage and Rendering
+details remain disclosed. Accepted submission opens Activity and later editing
+cannot change its snapshot. See [UX_HARDENING.md](UX_HARDENING.md) for assumptions,
+native disk observations and the private constrained-volume test.
+
+Preview/Inspector loading is deferred without changing per-frame ownership.
+Module-load failures keep the editor available and offer **Reload editor**, which
+first flushes pending committed edits, plus **Download project**. A save failure
+prevents reload and retains the draft; browsers cache failed imports, so this is
+not a misleading same-module Retry. Runtime preview errors still use Retry preview.
 
 Cancellation is one request per job until confirmed. **Cancelling…** means accepted,
 not finished; actual cancelled/failed/completed state controls output links. Queued

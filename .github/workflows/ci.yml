@@ -39,7 +39,7 @@ jobs:
     env:
       CI: true
       PASCAP_DATA_DIR: .pascap/ci
-      PASCAP_MEDIA_ROOTS: '[]'
+      PASCAP_MEDIA_ROOTS: "[]"
       PASCAP_FFMPEG: ${{ github.workspace }}/.ci/ffmpeg/bin/ffmpeg
       PASCAP_FFPROBE: ${{ github.workspace }}/.ci/ffmpeg/bin/ffprobe
     steps:

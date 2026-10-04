@@ -48,7 +48,7 @@ async function current(page: Page): Promise<ProjectDocument> {
 }
 async function ready(page: Page, project: ProjectDocument): Promise<void> {
   await expect.poll(() => page.evaluate(() => {
-    const state = window.pascapLab!.engine.diagnostics(); return { status: state.status, duration: state.duration };
+    const state = window.pascapLab?.engine.diagnostics(); return { status: state?.status, duration: state?.duration };
   })).toEqual({ status: 'paused', duration: calculateLayout(project).duration });
 }
 async function fixture(page: Page, project: ProjectDocument): Promise<void> {

@@ -17,12 +17,14 @@ import { audioAssetSchema, type AudioAsset } from '../../src/shared/audio.js';
 import { COLOUR_CONTROLS, NEUTRAL_COLOUR } from '../../src/shared/colour.js';
 import { compositePixel } from '../../src/shared/composition.js';
 import { EXPORT_PROFILES, LAYERED_EXPORT_RESOURCES, needsLayeredExport, planExport, planLayeredExport } from '../../src/shared/export.js';
+import { estimateExportSpace } from '../../src/shared/export-space.js';
 import { EMPTY_KEY_VALUES, KEYFRAME_SETTINGS, evaluateLayerSetting, hasLayerKeys, type Interpolation, type LayerKeyframe, type LayerKeyValues } from '../../src/shared/keyframes.js';
 import type { MediaAsset } from '../../src/shared/media.js';
 import { createClip, createProject, projectSchema, type ProjectDocument, type VideoLayer } from '../../src/shared/model.js';
 import { compileRetiming } from '../../src/shared/speed.js';
 import { calculateLayout, sampleTimeline, type PreviewLayer, type TimelineLayout } from '../../src/shared/timeline.js';
 import { framesToSeconds } from '../../src/shared/timing.js';
+import { observedJobBytes } from './scratch-observation.js';
 
 const enabled = process.env['PASCAP_MEDIA_TESTS'] === '1';
 const WIDTH = 160; const HEIGHT = 90; const PIXELS = WIDTH * HEIGHT; const FRAME_BYTES = PIXELS * 3;
@@ -230,10 +232,12 @@ describe.skipIf(!enabled)('schema-4 layered native export · disposable syntheti
       }
     }
     const updates: number[] = []; let peakObservedClipFiles = 0; let sawLutFile = false;
+    const diskSamples: number[] = [];
     const submit = jobs.submit.bind(jobs);
     const spy = vi.spyOn(jobs, 'submit').mockImplementation((kind, label, task, settled = null) => submit(kind, label, async (context) => task({
       ...context, update: (progress, message) => {
         updates.push(progress); context.update(progress, message);
+        diskSamples.push(observedJobBytes(path.join(config.dataDir, 'renders', context.id)));
         const work = path.join(config.dataDir, 'renders', context.id, 'work');
         try {
           const names = readdirSync(work); peakObservedClipFiles = Math.max(peakObservedClipFiles, names.filter((name) => /^clip-\d+\.nut$/.test(name)).length);
@@ -244,6 +248,8 @@ describe.skipIf(!enabled)('schema-4 layered native export · disposable syntheti
     let result: Awaited<ReturnType<typeof complete>>;
     try { result = await complete(project); } finally { spy.mockRestore(); }
     successfulDirectory = result.directory; bounds(result.receipt);
+    expect(Math.max(...diskSamples)).toBeGreaterThan(0);
+    console.log(`Native scratch observation (layered 720p): maximum ${Math.max(...diskSamples)} allocated file bytes at ${diskSamples.length} progress points; planning allowance ${estimateExportSpace(project, 'draft720').totalBytes} bytes. Directory metadata and between-sample peaks are not measured.`);
     const maximumMae = await parity(project, result.filename);
     expect(result.receipt.settings.layered!.renderedClipIds).toEqual(['left', 'right', 'early-overlay', 'late-overlay', 'top-overlay']);
     expect(result.receipt.settings.layered!.skippedLayerIds).toEqual(['video-4']);

@@ -2,17 +2,25 @@
 
 ## Implemented
 
-The current update adds **draggable shared row points and per-setting Previous/Next
-navigation** to the no-copy editor. The service-side approved-root footage browser,
+The current update simplifies the UX without removing editing features: **direct
+panel/help controls, selection-first visual Inspector states, grouped responsive
+timeline tools, visible Media Add/clear/mixed-selection feedback and quality cards
+with export-space preflight/recovery**. It also fixes the deterministic raw-reader
+exit race and splits preview/Inspector/Diagnostics loading without suppressing the
+bundle warning. See [UX_HARDENING.md](UX_HARDENING.md) for identity and storage
+assumptions, measured evidence and deferred relinking.
+
+The previous update added **draggable shared row points and per-setting Previous/Next
+navigation**. The service-side approved-root footage browser,
 selective original-path registration, project-specific video/music bins and confirmed
 document-only deletion remain; **strict schema 5 is unchanged**. The completed
-886-test no-copy milestone, former 909-test copy-import baseline, schema-4
+982-test keyframe milestone, 886-test no-copy milestone, former 909-test copy-import baseline, schema-4
 shared-keyframe/rush-cutting checks and prior v3 measurements below are historical
 evidence. The current update's completed verification is separated below.
 
 | Area | Delivery |
 | --- | --- |
-| Workspace | Readable desktop panels, persisted pointer/keyboard resize, compact-window drawers, docked source/timeline tabs, source pinning and contextual options menus |
+| Workspace | Direct panel/help controls, persisted pointer/keyboard resize, compact-window drawers, docked source/timeline tabs, source pinning and contextual options; deferred loading failures retain the editor with save-guarded reload/download |
 | Projects | Search/filter/create/open/rename, empty new-project bins, confirmed document-only deletion preserving originals/cache/exports, explicit title drafts/autosave, URL/last-project restore, stale-revision rejection |
 | Media | Project-specific video/music membership with timeline-reference union, shared content-deduplicated registry/proxy reuse, automatic proxy queue and explicit retries; compact list/grid, pinned repeated additions, sticky Add/count header, excerpt popup/reveal, reuse badges, source IN/OUT and original protection |
 | Footage import | Default approved-root service browser, metadata-only one-folder reads, natural-sorted 2,000-entry cap/explicit truncation, selected original-path registration up to 5,000 paths, existing queue/partial errors; deliberate recursive folder form preserved, no footage copies |
@@ -24,7 +32,7 @@ evidence. The current update's completed verification is separated below.
 | Colour | Independent static clip bases and seven independent row channels at project time, including held source frames; interpolate parameters before grading with unchanged CPU/GPU/65³ native LUT equations |
 | Speed | 0.1×–8× static constant/source ramps or overriding analytic row rates; layout/preview/native share `PlacedClip.retiming`, one duration rounding and repeat/drop mapping; point-move timing conflicts reject the whole move without shortening transitions |
 | Music | Standalone source registration, AAC proxy, bounded server waveform, placement/trim/gain/fades, explicit selected-range loop, Web Audio clock |
-| Export | Original-based multi-layer 720p/4K SDR H.264, sampled animation/opacity, exact retiming/transitions, optional AAC, progress/cancel, receipts/full verification |
+| Export | Original-based multi-layer 720p/4K SDR H.264, sampled animation/opacity, exact retiming/transitions, optional AAC, progress/cancel, receipts/full verification; native quality cards, metadata-only storage preflight, advisory allowance and owned-only ENOSPC/quota recovery |
 | Activity | Nonmodal preparation/render queue/history, real progress/confirmed cancellation, retained accepted jobs through status errors, output/receipt links |
 | Recovery | Bounded service startup/reads, preview/save retry, conflict/download/confirmed reload; shared-point Escape/pointercancel/lost capture/window blur restores preview/document/scroll without a draft save; no automatic overwrite/rebase or write retries |
 
@@ -93,7 +101,54 @@ Usage: [LAYERS_AND_KEYFRAMES.md](LAYERS_AND_KEYFRAMES.md),
 [TIMELINE_EDITING.md](TIMELINE_EDITING.md) and
 [WORKSPACE_AND_RECOVERY.md](WORKSPACE_AND_RECOVERY.md).
 
+## Current UX-hardening verification
+
+The final run used only disposable synthetic or memory-only projects:
+
+| Check | Result |
+| --- | --- |
+| Unit/service | **820 pass**; complete suites also pass on Node **22.23.3 and 24.21.0**, with independent focused reader repetitions |
+| Strict frontend/server typechecks and production build | **Pass** |
+| Full browser | **168 pass**, including 17 new visual/control/storage/loading-recovery workflows |
+| Opt-in native/media + private tmpfs acceptance | **51 pass**, including genuine native ENOSPC preserving a completed export, saved project and original |
+| Combined distinct tests | **1,039 pass** |
+| Dependency audit | **Zero vulnerabilities** |
+| IDE diagnostics | **No reported issues**; no new suppressions/exclusions |
+| Source/docs hygiene | **54 changed/existing-user files whitespace-clean; 147 local documentation links resolve** |
+| Production entry JS | **370.62 kB / 113.88 kB gzip**, previously 535.03 / 161.17; no 500 kB warning or raised threshold |
+
+The 39 additional unit/service cases cover read-only preflight/strict client
+contracts, duration/profile/row/music allowances, actual output-volume/symlink
+guards, no-space rejection and native/filesystem/quota cleanup; they also prove
+the sampled identity limitation and eager bounded raw-reader ownership. The
+deterministic right-close-before-first-read test fails on the previous code and
+passes with exact EOF/frame/process/backpressure/cancellation checks intact.
+
+Browser coverage retains every existing editing workflow, all ten channel controls,
+pointer movement/cancellation, native Tab/reset order, preferences, history and
+two-decoder checks. New cases exercise direct panels/help, mixed selection and
+filter/search clearing, visual static/animated capture, section state, 640–1440 px
+timeline/music hit targets, radio/meter keyboard access, explicit storage error/
+blocked/tight/stale-read recovery, failed module containment, save-before-reload,
+failed-save download and genuinely deferred diagnostics.
+
+Native evidence includes actual 32 MiB private tmpfs exhaustion plus allocated-file
+scratch observations at progress callbacks. Those observations exclude directory
+metadata and between-sample peaks; the allowance is not a codec bound. Short
+native/SwiftShader correctness is not long-4K or intended-GPU qualification.
+No real user project, import, preparation, render or original mutation was used.
+The live Export dialog was inspected and cancelled without submitting a render;
+its preflight reads only filesystem/registered metadata. A development-service
+restart was recovered through read-only connection retry.
+
+Relinking (#2) remains explicitly pending strong identity/stable-cache design;
+licensing, real-workload/hardware, fresh remote CI and container gates are not
+declared complete. The detailed [hardening record](UX_HARDENING.md) separates them
+from the locally verified changes.
+
 ## Current keyframe-update verification
+
+**Historical 982-test evidence, preceding the UX-hardening verification above.**
 
 The final pass used only disposable synthetic or memory-only projects:
 

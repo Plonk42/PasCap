@@ -5,6 +5,7 @@ import type { VideoClip, VideoLayer } from '../shared/model.js';
 import { sourceRateAt, type SpeedSettings } from '../shared/speed.js';
 import './declutter.css';
 import { sourceSeconds } from './display.js';
+import { Icon } from './icons.js';
 import { KeyframeToggle } from './KeyframeToggle.js';
 import { NumberField } from './NumberField.js';
 
@@ -109,7 +110,7 @@ export function SpeedControls({ clip, layer, frame, projectDuration, placedDurat
 
   return <section className="speed-settings declutter-speed" aria-label="Layer and clip speed">
     <div className="speed-overview"><span>{placedDuration === null ? 'No selected clip' : `${sourceSeconds(placedDuration)} on timeline`}</span><button type="button" className="text-button" aria-label="Reset speed to 1×" title={resetTitle} disabled={disabled || !validFrame || resetUnavailable} onClick={reset}>Reset to 1×</button></div>
-    <div className="layer-setting-heading"><span>Speed<small className="layer-setting-kind">{scope}</small></span><span className="layer-setting-actions"><output title={keyed ? `Layer rate at timeline frame ${frame}` : 'Selected clip base rate; outside the clip, its source IN rate is shown'}>{rate.toFixed(2)}×</output><KeyframeToggle layer={layer} setting="speed" label="Speed" frame={frame} value={rate} disabled={disabled} onEdit={onEdit} /></span></div>
+    <div className="layer-setting-heading"><span title={scope}>Speed<small className="layer-setting-kind">{keyed && <Icon name="curve" size={12} />}<span className="declutter-sr-only">{scope}</span></small></span><span className="layer-setting-actions"><output title={keyed ? `Layer rate at timeline frame ${frame}` : 'Selected clip base rate; outside the clip, its source IN rate is shown'}>{rate.toFixed(2)}×</output><KeyframeToggle layer={layer} setting="speed" label="Speed" frame={frame} value={rate} disabled={disabled} onEdit={onEdit} /></span></div>
     {(keyed || !clip) && <label className="speed-field" htmlFor={rateId}>Layer rate ×<NumberField id={rateId} aria-label="Layer speed rate" aria-describedby={helpId} min={0.1} max={8} step={0.05} disabled={disabled || !validFrame || !active} value={rate} resetKey={`${layerContext}:${frame}:speed`} hint={rateHint(keyed, active, frame)} onCommit={updateKey} /></label>}
     {!keyed && clip && <BaseSpeedControls clip={clip} disabled={disabled} helpId={helpId} inputContext={inputContext} onChange={updateBase} />}
     {graphAvailable && <>

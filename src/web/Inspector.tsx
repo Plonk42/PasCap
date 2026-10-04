@@ -5,6 +5,7 @@ import { colourAt, layerOpacityAt, opacityAt } from '../shared/composition.js';
 import { activeLayerSetting, evaluateLayerSetting, hasLayerKeys, type KeyframeSetting, type LayerKeyValues } from '../shared/keyframes.js';
 import type { MediaAsset } from '../shared/media.js';
 import type { ProjectDocument, Transition, VideoClip, VideoLayer } from '../shared/model.js';
+import { sourceRateAt } from '../shared/speed.js';
 import { calculateLayout } from '../shared/timeline.js';
 import { formatTimecode } from '../shared/timing.js';
 import { shortName, sourceSeconds } from './display.js';
@@ -72,6 +73,11 @@ function settingScope(state: ReturnType<typeof settingState>, baseLabel: string)
   return state.baseAvailable ? baseLabel : 'No selected clip base';
 }
 
+function SettingScope({ state, baseLabel }: Readonly<{ state: ReturnType<typeof settingState>; baseLabel: string }>) {
+  const scope = settingScope(state, baseLabel);
+  return <small className="layer-setting-kind" title={scope}>{state.keyed && <Icon name="curve" size={12} />}<span className="declutter-sr-only">{scope}</span></small>;
+}
+
 function settingHint(state: ReturnType<typeof settingState>, label: string, frame: number): string {
   if (state.keyed && !state.active) return `Layer curve · click the ${label} diamond to capture a value and edit timeline frame ${frame}.`;
   if (!state.baseAvailable && !state.keyed) return `Select a clip for its static base, or click the ${label} diamond to key this whole row.`;
@@ -93,10 +99,10 @@ function OpacityControl({ layer, clip, frame, disabled, onEdit, setting, id }: R
     if (isLayerOpacity) onEdit({ type: 'layer-update', layer: { ...layer, opacity } });
     else if (clip) onEdit({ type: 'opacity', clipId: clip.id, opacity });
   };
-  return <div className="colour-control layer-keyed-control">
-    <span><label htmlFor={id}>{label}<small className="layer-setting-kind">{settingScope(state, isLayerOpacity ? 'Layer base' : 'Clip base')}</small></label><span className="colour-control-actions"><output>{Math.round(value * 100)}%</output><KeyframeToggle layer={layer} setting={setting} label={label} frame={frame} value={value} disabled={disabled} onEdit={onEdit} /></span></span>
+  return <div className="colour-control layer-keyed-control" data-animated={state.keyed} data-key-at-playhead={state.active}>
+    <span><label htmlFor={id} title={hint}>{label}<SettingScope state={state} baseLabel={isLayerOpacity ? 'Layer base' : 'Clip base'} /></label><span className="colour-control-actions"><output>{Math.round(value * 100)}%</output><KeyframeToggle layer={layer} setting={setting} label={label} frame={frame} value={value} disabled={disabled} onEdit={onEdit} /></span></span>
     <input id={id} type="range" aria-label={label} aria-describedby={`${id}-hint`} min={0} max={1} step={0.01} disabled={disabled || !state.editable} value={value} title={hint} onChange={(event) => commit(Number(event.target.value))} />
-    <span id={`${id}-hint`} className={state.editable ? 'declutter-sr-only' : 'layer-setting-hint'}>{hint}</span>
+    <span id={`${id}-hint`} className="declutter-sr-only">{hint}</span>
   </div>;
 }
 
@@ -111,10 +117,10 @@ function ColourControl({ layer, clip, frame, disabled, onEdit, control, value, i
     if (state.keyed) { onEdit({ type: 'layer-key-value', layerId: layer.id, frame, setting: control.key, value: nextValue }); return; }
     if (clip) onEdit({ type: 'colour', clipId: clip.id, colour: { ...clip.colour, [control.key]: nextValue } });
   };
-  return <div className="colour-control layer-keyed-control">
-    <span><label htmlFor={id}>{control.label}<small className="layer-setting-kind">{settingScope(state, 'Clip base')}</small></label><span className="colour-control-actions"><output>{value > 0 && NEUTRAL_COLOUR[control.key] === 0 ? '+' : ''}{value.toFixed(control.key === 'hue' ? 0 : 2)}<small>{control.unit}</small></output><KeyframeToggle layer={layer} setting={control.key} label={control.label} frame={frame} value={value} disabled={disabled} onEdit={onEdit} /><button type="button" className="icon-button" aria-label={`Reset ${control.label}`} title={`Reset only ${control.label} at ${resetTarget}`} disabled={disabled || !state.editable || value === NEUTRAL_COLOUR[control.key]} onClick={() => commit(NEUTRAL_COLOUR[control.key])}><Icon name="reset" size={13} /></button></span></span>
+  return <div className="colour-control layer-keyed-control" data-animated={state.keyed} data-key-at-playhead={state.active}>
+    <span><label htmlFor={id} title={hint}>{control.label}<SettingScope state={state} baseLabel="Clip base" /></label><span className="colour-control-actions"><output>{value > 0 && NEUTRAL_COLOUR[control.key] === 0 ? '+' : ''}{value.toFixed(control.key === 'hue' ? 0 : 2)}<small>{control.unit}</small></output><KeyframeToggle layer={layer} setting={control.key} label={control.label} frame={frame} value={value} disabled={disabled} onEdit={onEdit} /><button type="button" className="icon-button" aria-label={`Reset ${control.label}`} title={`Reset only ${control.label} at ${resetTarget}`} disabled={disabled || !state.editable || value === NEUTRAL_COLOUR[control.key]} onClick={() => commit(NEUTRAL_COLOUR[control.key])}><Icon name="reset" size={13} /></button></span></span>
     <input id={id} type="range" aria-label={control.label} aria-describedby={`${id}-hint`} min={control.min} max={control.max} step={control.step} value={value} disabled={disabled || !state.editable} title={hint} onChange={(event) => commit(Number(event.target.value))} />
-    <span id={`${id}-hint`} className={state.editable ? 'declutter-sr-only' : 'layer-setting-hint'}>{hint}</span>
+    <span id={`${id}-hint`} className="declutter-sr-only">{hint}</span>
   </div>;
 }
 
@@ -132,6 +138,7 @@ function ColourSection({ layer, clip, frame, disabled, onEdit, id }: Readonly<La
   const activeColours = point ? COLOUR_CONTROLS.filter((control) => point.values[control.key] !== null) : [];
   const canResetKeys = activeColours.some((control) => point!.values[control.key] !== NEUTRAL_COLOUR[control.key]);
   const canResetBase = clip !== null && COLOUR_CONTROLS.some((control) => clip.colour[control.key] !== NEUTRAL_COLOUR[control.key]);
+  const adjusted = COLOUR_CONTROLS.filter((control) => colour[control.key] !== NEUTRAL_COLOUR[control.key] || hasLayerKeys(layer, control.key)).length;
   const canReset = animated ? canResetKeys : canResetBase;
   const resetTitle = animated
     ? 'Reset only the enabled colour settings at this shared point. Other participants, points and clip bases stay unchanged.'
@@ -149,7 +156,7 @@ function ColourSection({ layer, clip, frame, disabled, onEdit, id }: Readonly<La
     for (const control of activeColours) values[control.key] = NEUTRAL_COLOUR[control.key];
     onEdit({ type: 'layer-update', layer: { ...layer, keyframes: layer.keyframes.map((key) => key.frame === point.frame ? { ...key, values } : key) } });
   };
-  return <InspectorSection id="colour" title="Colour">
+  return <InspectorSection id="colour" title="Colour" icon="colour" modified={adjusted > 0}>
     <div className="grade-heading"><span className="grade-context">{gradeLabel}</span><button type="button" className="text-button" disabled={disabled || !canReset} aria-label="Reset colour" title={resetTitle} onClick={reset}><Icon name="reset" size={13} />{animated ? 'Reset keys' : 'Reset'}</button></div>
     <div className="colour-controls">{COLOUR_CONTROLS.map((control) => <ColourControl key={control.key} layer={layer} clip={clip} frame={frame} disabled={disabled} onEdit={onEdit} control={control} value={colour[control.key]} id={`${id}-${control.key}`} />)}</div>
     <details className="control-help colour-help"><summary>Colour animation</summary><p>Each diamond keys only its own setting for this whole layer, in project timeline time. A keyed channel overrides that setting on every clip in the row; an unkeyed channel uses each clip's static base. Between points, click the diamond before editing. Reset keys changes only this point's enabled colour settings; the individual reset buttons also handle unkeyed clip bases.</p></details>
@@ -166,6 +173,8 @@ export function Inspector({ project, assets, selectedClipId, selectedLayerId, bo
   const layout = calculateLayout(project);
   const placed = layout.clips.find((item) => item.clip.id === clip?.id);
   const sourceFrame = placed && frame >= placed.start && frame < placed.end ? placed.retiming.sourceAt(frame - placed.start) : null;
+  const clipRate = clip ? sourceRateAt(clip.speed, sourceFrame ?? clip.sourceIn) : 1;
+  const speedRate = layer ? evaluateLayerSetting(layer, 'speed', frame, clipRate) : 1;
   const boundary = project.transitions.find((item) => item.leftId === boundaryId);
   const boundaryIndex = boundary ? project.transitions.indexOf(boundary) : -1;
   const left = project.clips.find((item) => item.id === boundary?.leftId);
@@ -185,10 +194,10 @@ export function Inspector({ project, assets, selectedClipId, selectedLayerId, bo
     <InspectorTabs id={inspectorId} section={section} onSection={onSection} />
     <div role="tabpanel" id={`${inspectorId}-clip-panel`} aria-labelledby={`${inspectorId}-clip-tab`} hidden={section !== 'clip'}>
       {layer ? <>
+        {clip && asset && placed ? <div className="selected-clip-name inspector-selection"><Icon name="video" size={17} /><strong title={asset.name}>{shortName(asset.name)}</strong><span>Excerpt {position + 1} · {sourceSeconds(placed.duration)} · {layer.name}</span></div>
+          : <div className="selected-clip-name inspector-selection"><Icon name="layers" size={17} /><strong title={layer.name}>{layer.name}</strong><span title="Select a clip for its source range and static bases.">Whole video row</span></div>}
         <KeyframeControls projectId={project.id} layer={layer} frame={frame} duration={layout.duration} disabled={drafting} onEdit={onEdit} />
-        {clip && asset && placed ? <div className="selected-clip-name"><strong title={asset.name}>{shortName(asset.name)}</strong><span>Excerpt {position + 1} · {sourceSeconds(placed.duration)} · {layer.name}</span></div>
-          : <div className="selected-clip-name"><strong title={layer.name}>{layer.name}</strong><span>Whole video row · select a clip for its source range and static bases.</span></div>}
-        {clip && asset && placed && <InspectorSection id="source" title="Source range" defaultOpen={false}>
+        {clip && asset && placed && <InspectorSection id="source" title="Source range" icon="start" badge={sourceSeconds(clip.sourceOut - clip.sourceIn)} modified={clip.sourceIn !== 0 || clip.sourceOut !== asset.metadata.frameCount} defaultOpen={false}>
           <section className="source-range" aria-label="Source range">
             <div className="section-label"><span>{sourceSeconds(asset.metadata.frameCount)} original</span><span>{sourceFrame === null ? 'Playhead outside clip' : `Source frame ${sourceFrame}`}</span></div>
             <div className="range-fields"><label htmlFor={`${colourControlId}-in`}>IN <output>{formatTimecode(clip.sourceIn)}</output><NumberField id={`${colourControlId}-in`} aria-label="Source IN frame" aria-describedby={`${colourControlId}-source-help`} min={0} max={clip.sourceOut - 1} integer step={1} value={clip.sourceIn} disabled={drafting} resetKey={inputContext} validate={(sourceIn) => clipTimingError({ sourceIn })} onCommit={(sourceIn) => onEdit({ type: 'trim', clipId: clip.id, sourceIn, sourceOut: clip.sourceOut })} /></label><label htmlFor={`${colourControlId}-out`}>OUT <output>{formatTimecode(clip.sourceOut)}</output><NumberField id={`${colourControlId}-out`} aria-label="Source OUT frame" aria-describedby={`${colourControlId}-source-help`} min={clip.sourceIn + 1} max={Math.min(asset.metadata.frameCount, 2_147_483_647)} integer step={1} value={clip.sourceOut} disabled={drafting} resetKey={inputContext} validate={(sourceOut) => clipTimingError({ sourceOut })} onCommit={(sourceOut) => onEdit({ type: 'trim', clipId: clip.id, sourceIn: clip.sourceIn, sourceOut })} /></label></div>
@@ -197,7 +206,7 @@ export function Inspector({ project, assets, selectedClipId, selectedLayerId, bo
             <details className="control-help"><summary>Source timing</summary><p id={`${colourControlId}-source-help`}>Original recording frames; OUT is exclusive. Layer keyframes stay in project timeline time when this source range changes.</p></details>
           </section>
         </InspectorSection>}
-        <InspectorSection id="layer-opacity" title="Layer & opacity" defaultOpen={false}>
+        <InspectorSection id="layer-opacity" title="Layer & opacity" icon="layers" defaultOpen={false}>
           <section className="layer-inspector" aria-label="Layer appearance">
             {clip && placed && <>
               <label className="speed-field">Video layer<select aria-label="Clip video layer" disabled={drafting} value={clip.layerId} onChange={(event) => onEdit({ type: 'place', clipId: clip.id, layerId: event.target.value, start: placed.start, index: position })}>{project.layers.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
@@ -208,12 +217,12 @@ export function Inspector({ project, assets, selectedClipId, selectedLayerId, bo
             <details className="control-help"><summary>Opacity scope</summary><p>Layer opacity is applied after the row's clips are combined, including dissolves. Clip opacity keys are also row-wide: they replace each clip's base opacity, before the combined layer opacity is applied. Unkeyed channels keep their static bases.</p></details>
           </section>
         </InspectorSection>
-        <InspectorSection id="speed" title="Speed" defaultOpen={false}><SpeedControls resetKey={project.id} clip={clip ?? null} layer={layer} frame={frame} projectDuration={layout.duration} placedDuration={placed?.duration ?? null} disabled={drafting} sourceFrame={sourceFrame} onEdit={onEdit} /></InspectorSection>
+        <InspectorSection id="speed" title="Speed" icon="speed" badge={`${speedRate.toFixed(2)}×`} modified={speedRate !== 1 || hasLayerKeys(layer, 'speed') || clip?.speed.mode === 'ramp'} defaultOpen={false}><SpeedControls resetKey={project.id} clip={clip ?? null} layer={layer} frame={frame} projectDuration={layout.duration} placedDuration={placed?.duration ?? null} disabled={drafting} sourceFrame={sourceFrame} onEdit={onEdit} /></InspectorSection>
         <ColourSection layer={layer} clip={clip ?? null} frame={frame} disabled={drafting} onEdit={onEdit} id={colourControlId} />
       </> : <div className="inspector-empty">Select a video layer or clip in the timeline.</div>}
     </div>
     <div role="tabpanel" id={`${inspectorId}-sequence-panel`} aria-labelledby={`${inspectorId}-sequence-tab`} hidden={section !== 'sequence'}>
-      {boundary && <InspectorSection id="transition" title="Transition">
+      {boundary && <InspectorSection id="transition" title="Transition" icon="curve" modified={boundary.type !== 'cut'}>
         <section className="boundary-inspector" aria-label="Boundary transition">
           <p title={`Transition ${boundaryIndex + 1}`}>{shortName(assets.find((item) => item.id === left?.mediaId)?.name ?? '')} <Icon name="arrow" size={12} /> {shortName(assets.find((item) => item.id === right?.mediaId)?.name ?? '')}</p>
           <div className="transition-fields">
@@ -224,7 +233,7 @@ export function Inspector({ project, assets, selectedClipId, selectedLayerId, bo
         </section>
       </InspectorSection>}
       <div className="inspector-empty" hidden={boundary !== undefined}>Select a transition in the primary track.</div>
-      <InspectorSection id="fades" title="Sequence fades">
+      <InspectorSection id="fades" title="Sequence fades" icon="start" modified={project.openingFade > 0 || project.closingFade > 0}>
         <section className="edge-fade-settings" aria-label="Sequence fades">
           <div className="range-fields">
             <label>Opening <small>frames</small><NumberField aria-label="Opening fade" aria-describedby={`${colourControlId}-fades-help`} min={0} max={Math.min(primary[0]?.duration ?? 0, 2_147_483_647)} integer step={1} value={project.openingFade} disabled={drafting || !primary.length} resetKey={project.id} validate={(openingFade) => timelineNumberError({ ...project, openingFade }, 'Shorten the opening fade or the other fades/transitions on the first primary clip.')} onCommit={(opening) => onEdit({ type: 'fades', opening, closing: project.closingFade })} /></label>
@@ -235,7 +244,7 @@ export function Inspector({ project, assets, selectedClipId, selectedLayerId, bo
       </InspectorSection>
     </div>
     <div role="tabpanel" id={`${inspectorId}-audio-panel`} aria-labelledby={`${inspectorId}-audio-tab`} hidden={section !== 'audio'}>
-      <InspectorSection id="music" title="Music">{children}</InspectorSection>
+      <InspectorSection id="music" title="Music" icon="music" modified={project.music !== null}>{children}</InspectorSection>
     </div>
   </aside>;
 }

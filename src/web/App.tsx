@@ -1,6 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent } from 'react';
-import { verifyGpuColour, verifyLayerComposition, type GpuComparison, type GpuCompositionComparison } from '../preview/compositor.js';
-import { PreviewEngine, type PreviewDiagnostics } from '../preview/engine.js';
+import type { GpuComparison, GpuCompositionComparison } from '../preview/compositor.js';
+import type { PreviewEngine, PreviewDiagnostics } from '../preview/engine.js';
 import type { AudioAsset } from '../shared/audio.js';
 import type { ColourSettings } from '../shared/colour.js';
 import { applyCommand, EditHistory, type EditCommand } from '../shared/commands.js';
@@ -18,10 +18,10 @@ import { calculateLayout } from '../shared/timeline.js';
 import { api, type RequestOptions } from './api.js';
 import { Autosave, type SaveState } from './autosave.js';
 import { waitForService } from './connection.js';
-import { Diagnostics } from './Diagnostics.js';
+import { DeferredPanel } from './DeferredPanel.js';
 import { mediaReady } from './display.js';
 import { Icon } from './icons.js';
-import { Inspector, type InspectorMode } from './Inspector.js';
+import type { InspectorMode } from './InspectorSection.js';
 import { Jobs } from './Jobs.js';
 import { inspectKeyframe, KeyframeNavigationContext, reconcileKeyframeInspection, type KeyframeInspection } from './keyframe-navigation.js';
 import { MediaLibrary, type ImportResult, type ReviewTarget } from './MediaLibrary.js';
@@ -49,6 +49,8 @@ const ExportDialog = lazy(() => import('./ExportDialog.js').then((module) => ({ 
 const SaveRecovery = lazy(() => import('./SaveRecovery.js').then((module) => ({ default: module.SaveRecovery })));
 const ShortcutHelp = lazy(() => import('./ShortcutHelp.js').then((module) => ({ default: module.ShortcutHelp })));
 const SourceReview = lazy(() => import('./SourceReview.js').then((module) => ({ default: module.SourceReview })));
+const loadInspector = () => import('./Inspector.js').then((module) => ({ default: module.Inspector }));
+const loadDiagnostics = () => import('./Diagnostics.js').then((module) => ({ default: module.Diagnostics }));
 const EMPTY_PROJECT = createProject('preview-lab', 'Untitled');
 const SAVE_LABEL: Record<SaveState['state'], string> = { saved: 'Saved locally', saving: 'Saving…', error: 'Save error', unsaved: 'Unsaved' };
 function timingKey(project: ProjectDocument): string {
@@ -63,6 +65,17 @@ function shortcutBlocked(event: KeyboardEvent): boolean {
 function message(cause: unknown, fallback: string): string { return cause instanceof Error && cause.message ? cause.message : fallback; }
 type ActionResult<T> = { ok: true; value: T } | { ok: false };
 interface ConnectionState { state: 'connecting' | 'ready' | 'error'; message: string }
+
+function previewIsLoading(connection: ConnectionState, ready: boolean, error: string): boolean {
+  return connection.state === 'connecting' || (!ready && !error);
+}
+
+function WorkspacePanels({ workspace, disabled }: Readonly<{ workspace: ReturnType<typeof useWorkspace>; disabled: boolean }>) {
+  return <fieldset className="workspace-panel-controls"><legend className="declutter-sr-only">Editor panels</legend>
+    <button className={`icon-button ${workspace.layout.mediaOpen ? 'active' : ''}`} aria-label="Toggle Media panel" aria-controls="media-pane" aria-pressed={workspace.layout.mediaOpen} title="Show or hide Media" disabled={disabled} onClick={() => workspace.update({ mediaOpen: !workspace.layout.mediaOpen, ...(workspace.viewport.width < 980 ? { inspectorOpen: false } : {}) })}><Icon name="folder" size={17} /></button>
+    <button className={`icon-button ${workspace.layout.inspectorOpen ? 'active' : ''}`} aria-label="Toggle Clip panel" aria-controls="inspector-pane" aria-pressed={workspace.layout.inspectorOpen} title="Show or hide Inspector" disabled={disabled} onClick={() => workspace.update({ inspectorOpen: !workspace.layout.inspectorOpen, ...(workspace.viewport.width < 980 ? { mediaOpen: false } : {}) })}><Icon name="sliders" size={17} /></button>
+  </fieldset>;
+}
 
 export function App() {
   const workspace = useWorkspace();
@@ -101,6 +114,9 @@ export function App() {
   const [error, setError] = useState('');
   const [showDiagnostics, setShowDiagnostics] = useState(false);
   const [diagnostics, setDiagnostics] = useState<PreviewDiagnostics | null>(null);
+  const [previewReady, setPreviewReady] = useState(false);
+  const [previewStartupError, setPreviewStartupError] = useState('');
+  const [previewAttempt, setPreviewAttempt] = useState(0);
   const [saveState, setSaveState] = useState<SaveState>({ state: 'saved', message: 'Local project', revision: 0, recovery: null });
   const [historyState, setHistoryState] = useState({ canUndo: false, canRedo: false });
   const canvas = useRef<HTMLCanvasElement>(null);
@@ -378,14 +394,25 @@ export function App() {
 
   useEffect(() => {
     if (!canvas.current) return;
-    let preview: PreviewEngine;
-    try { preview = new PreviewEngine(canvas.current); }
-    catch (cause) { setError(cause instanceof Error ? cause.message : 'Preview initialisation failed'); return; }
-    engine.current = preview; lastPreview.current = '';
-    const unsubscribe = preview.subscribe(setDiagnostics);
-    window.pascapLab = { engine: preview, project: () => current.current, verifyColour: verifyGpuColour, verifyComposition: verifyLayerComposition, setDocument: commit, flush: async () => { await autosave.current?.flush(); } };
-    return () => { unsubscribe(); preview.dispose(); engine.current = null; delete window.pascapLab; };
-  }, [commit]);
+    let disposed = false;
+    let preview: PreviewEngine | null = null;
+    let unsubscribe: (() => void) | null = null;
+    setPreviewReady(false); setPreviewStartupError(''); setDiagnostics(null);
+    void import('../preview/bootstrap.js').then((module) => {
+      if (disposed || !canvas.current) return;
+      preview = new module.PreviewEngine(canvas.current);
+      engine.current = preview; lastPreview.current = '';
+      unsubscribe = preview.subscribe(setDiagnostics);
+      window.pascapLab = { engine: preview, project: () => current.current, verifyColour: module.verifyGpuColour, verifyComposition: module.verifyLayerComposition, setDocument: commit, flush: async () => { await autosave.current?.flush(); } };
+      setPreviewReady(true);
+    }).catch((cause: unknown) => {
+      if (!disposed) setPreviewStartupError(message(cause, 'Preview could not be opened. Check the local service, then retry.'));
+    });
+    return () => {
+      disposed = true; unsubscribe?.(); preview?.dispose();
+      if (engine.current === preview) { engine.current = null; delete window.pascapLab; }
+    };
+  }, [commit, previewAttempt]);
   useEffect(() => {
     const controller = new AbortController();
     setConnection({ state: 'connecting', message: 'Connecting to the local service…' });
@@ -436,7 +463,7 @@ export function App() {
         void engine.current.seek(frame).catch((cause: unknown) => setError(message(cause, 'Cannot seek to the edited keyframe.')));
       }
     }
-  }, [project, draft]);
+  }, [project, draft, previewReady]);
   useEffect(() => {
     if (!project) return;
     if (boundaryId !== null && project.transitions.some((item) => item.leftId === boundaryId)) return;
@@ -560,7 +587,7 @@ export function App() {
     }
   }, [selectLayer]);
   const followPlayhead = useCallback((): void => setKeyframeInspection(null), []);
-  const navigationDisabled = !project || draft !== null;
+  const navigationDisabled = !project || draft !== null || !previewReady;
   const keyframeNavigation = useMemo(() => ({ inspection, duration: layout.duration, disabled: navigationDisabled, onSeekKeyframe: seekKeyframe, onFollowPlayhead: followPlayhead }), [inspection, layout.duration, navigationDisabled, seekKeyframe, followPlayhead]);
   const openProject = async (id: string): Promise<boolean> => (await act(async () => {
     await flushBeforeSwitch(); installProject((await api.load(id)).document); setError('');
@@ -636,8 +663,9 @@ export function App() {
     openMedia(); setActionError(''); setImportRequest((value) => value + 1);
   };
   const retryPreview = (): void => {
+    if (!engine.current) { setPreviewAttempt((attempt) => attempt + 1); return; }
     const document = current.current;
-    if (!document || !engine.current) return;
+    if (!document) return;
     setViewerMode('timeline');
     void engine.current.loadProject(document, (id) => `/api/media/${id}/proxy`, engine.current.diagnostics().frame).catch((cause: unknown) => setError(message(cause, 'Preview could not be retried.')));
   };
@@ -660,6 +688,10 @@ export function App() {
     const loaded = (await api.load(current.current.id)).document;
     installProject(loaded); setError('');
   })).ok;
+  const reloadEditor = (): void => {
+    void act(flushBeforeSwitch).then((result) => { if (result.ok) location.reload(); });
+  };
+  const recoveryBusy = busy || draft !== null;
   const reviewAsset = assets.find((asset) => asset.id === review?.mediaId && mediaReady(asset));
   const reviewExcerpts = visible.clips.filter((clip) => clip.mediaId === reviewAsset?.id).map((clip, index) => ({ id: clip.id, index: index + 1, sourceIn: clip.sourceIn, sourceOut: clip.sourceOut, layerName: visible.layers.find((layer) => layer.id === clip.layerId)!.name }));
   const navigateViewerTabs = (event: ReactKeyboardEvent<HTMLButtonElement>): void => {
@@ -690,7 +722,9 @@ export function App() {
       <ProjectTitle title={project?.title ?? 'No project open'} projectId={project?.id ?? null} disabled={!project || busy || draft !== null} onCommit={(title) => { if (current.current) { try { commit({ ...current.current, title }); } catch (cause) { setError(message(cause, 'Cannot rename this project.')); } } }} />
       <div className="history-buttons"><button className="icon-button" aria-label="Undo" title="Undo (Ctrl+Z)" disabled={!historyState.canUndo || draft !== null} onClick={() => undoRedo('undo')}><Icon name="undo" size={17} /></button><button className="icon-button" aria-label="Redo" title="Redo (Ctrl+Shift+Z)" disabled={!historyState.canRedo || draft !== null} onClick={() => undoRedo('redo')}><Icon name="redo" size={17} /></button></div>
       <output className={`save-status ${saveState.state}`} title={saveState.message} aria-live="polite" aria-atomic="true"><span className="status-dot" />{project ? SAVE_LABEL[saveState.state] : 'Local workspace'}</output>
-      <Popover label="Workspace options" className="workspace-options">{(close) => <><button className="secondary-button small" aria-label="Toggle Media panel" aria-pressed={workspace.layout.mediaOpen} disabled={draft !== null} onClick={() => workspace.update({ mediaOpen: !workspace.layout.mediaOpen, ...(workspace.viewport.width < 980 ? { inspectorOpen: false } : {}) })}><Icon name="folder" size={16} />Media panel</button><button className="secondary-button small" aria-label="Toggle Clip panel" aria-pressed={workspace.layout.inspectorOpen} disabled={draft !== null} onClick={() => workspace.update({ inspectorOpen: !workspace.layout.inspectorOpen, ...(workspace.viewport.width < 980 ? { mediaOpen: false } : {}) })}><Icon name="sliders" size={16} />Inspector panel</button><button className="secondary-button small" aria-label="Reset workspace layout" disabled={draft !== null} onClick={workspace.reset}><Icon name="layout" size={16} />Reset layout</button><button className="secondary-button small" aria-label="Toggle diagnostics" aria-pressed={showDiagnostics} onClick={() => setShowDiagnostics(!showDiagnostics)}><Icon name="activity" size={16} />Diagnostics</button><button className="secondary-button small" aria-label="Keyboard shortcuts" onClick={() => { close(); setShowHelp(true); }}><Icon name="help" size={16} />Keyboard shortcuts</button></>}</Popover>
+      <WorkspacePanels workspace={workspace} disabled={draft !== null} />
+      <button className="icon-button workspace-help" aria-label="Keyboard shortcuts" title="Keyboard shortcuts (?)" onClick={() => setShowHelp(true)}><Icon name="help" size={18} /></button>
+      <Popover label="Workspace options" className="workspace-options"><button className="secondary-button small" aria-label="Reset workspace layout" disabled={draft !== null} onClick={workspace.reset}><Icon name="layout" size={16} />Reset layout</button><button className="secondary-button small" aria-label="Toggle diagnostics" aria-pressed={showDiagnostics} onClick={() => setShowDiagnostics(!showDiagnostics)}><Icon name="activity" size={16} />Diagnostics</button></Popover>
       <button ref={exportTrigger} className="primary-button small" aria-label="Export video" disabled={!project?.clips.length || busy || draft !== null} onClick={() => { setActionError(''); setShowExport(true); }}><Icon name="download" size={15} />Export</button>
     </header>
     {connection.state !== 'ready' && <output className={`connection-banner ${connection.state}`} role={connection.state === 'error' ? 'alert' : undefined}><span>{connection.state === 'connecting' && <span className="spinner" />}{connection.message}</span>{connection.state === 'error' && <button className="secondary-button" onClick={() => setConnectionAttempt((value) => value + 1)}>Retry connecting</button>}</output>}
@@ -702,14 +736,14 @@ export function App() {
       {workspace.layout.mediaOpen && <WorkspaceResizer className="media-resizer" label="Resize Media panel" disabled={draft !== null} orientation="vertical" value={workspace.sizes.media} min={240} max={Math.floor(Math.max(240, Math.min(440, workspace.viewport.width * 0.29)))} defaultValue={DEFAULT_LAYOUT.mediaWidth} onChange={(mediaWidth, persist) => workspace.update({ mediaWidth }, persist)} />}
       <div className="preview-column" id="viewer-pane" tabIndex={-1}>
         <div className="viewer-tabs" role="tablist" aria-label="Preview mode"><button ref={timelineTab} id="timeline-view-tab" role="tab" tabIndex={viewerMode === 'timeline' ? 0 : -1} aria-selected={viewerMode === 'timeline'} aria-controls="timeline-view" onKeyDown={navigateViewerTabs} onClick={() => setViewerMode('timeline')}>Timeline preview</button><button id="source-view-tab" role="tab" tabIndex={viewerMode === 'source' ? 0 : -1} aria-selected={viewerMode === 'source'} aria-controls="source-view" disabled={!reviewAsset} onKeyDown={navigateViewerTabs} onClick={() => setViewerMode('source')}>Source preview{reviewPinned && <Icon name="pin" size={12} />}</button><span>{reviewAsset && viewerMode === 'source' ? 'Original source frames · muted' : '720p proxies · originals on export'}</span></div>
-        <div id="timeline-view" className="viewer-panel" role="tabpanel" aria-labelledby="timeline-view-tab" hidden={viewerMode !== 'timeline'}><PreviewPanel canvas={canvas} diagnostics={diagnostics} duration={layout.duration} drafting={draft !== null} onTogglePlayback={togglePlayback} onSeek={seek} onRetry={retryPreview} onMedia={openMedia} onImport={requestImport} loading={connection.state === 'connecting'} /></div>
+        <div id="timeline-view" className="viewer-panel" role="tabpanel" aria-labelledby="timeline-view-tab" hidden={viewerMode !== 'timeline'}><PreviewPanel canvas={canvas} diagnostics={diagnostics} duration={layout.duration} drafting={draft !== null} onTogglePlayback={togglePlayback} onSeek={seek} onRetry={retryPreview} onMedia={openMedia} onImport={requestImport} loading={previewIsLoading(connection, previewReady, previewStartupError)} startupError={previewStartupError} onReload={reloadEditor} onDownload={downloadDraft} canDownload={project !== null} recoveryBusy={recoveryBusy} /></div>
         <div id="source-view" className="viewer-panel source-dock" role="tabpanel" aria-labelledby="source-view-tab" hidden={viewerMode !== 'source'}><Suspense fallback={<output className="source-loading"><span className="spinner" />Opening source preview…</output>}>{reviewAsset && review && <SourceReview asset={reviewAsset} frame={review.frame} range={resolveMediaSelection(reviewAsset.id, reviewAsset.metadata.frameCount, ranges)} excerpts={reviewExcerpts} disabled={!project || busy || draft !== null} pinned={reviewPinned} onPin={() => { pinned.current = !pinned.current; setReviewPinned(pinned.current); }} onFrame={(frame) => setReview({ mediaId: reviewAsset.id, frame })} onRange={setSourceRange} onClose={closeReview} onInsert={() => insert([reviewAsset.id], undefined, undefined, undefined, true)} onRevealClip={revealClip} targetLayer={targetLayer} />}</Suspense></div>
-        {showDiagnostics && <Diagnostics diagnostics={diagnostics} colour={selectedClip?.colour ?? null} canRenderReference={!needsLayeredExport(visible) && visible.clips.length === 2 && visible.music === null && visible.clips.every((clip) => clip.speed.mode === 'constant' && clip.speed.rate === 1) && layout.duration <= 3600 && draft === null} referenceBusy={referenceBusy || busy} onError={setError} onReference={() => {
+        {showDiagnostics && <DeferredPanel label="Diagnostics" load={loadDiagnostics} onReload={reloadEditor} onDownload={downloadDraft} canDownload={project !== null} busy={recoveryBusy} fallback={<output className="source-loading">Opening diagnostics…</output>}>{(Diagnostics) => <Diagnostics diagnostics={diagnostics} colour={selectedClip?.colour ?? null} canRenderReference={!needsLayeredExport(visible) && visible.clips.length === 2 && visible.music === null && visible.clips.every((clip) => clip.speed.mode === 'constant' && clip.speed.rate === 1) && layout.duration <= 3600 && draft === null} referenceBusy={referenceBusy || busy} onError={setError} onReference={() => {
           void act(async () => { if (current.current) receiveJob((await api.reference({ ...current.current, revision: autosave.current?.revision ?? current.current.revision })).job); }).then((result) => { if (result.ok) { setShowActivity(true); refreshAfterAcceptance(); } });
-        }} />}
+        }} />}</DeferredPanel>}
       </div>
       {workspace.layout.inspectorOpen && <WorkspaceResizer className="inspector-resizer" label="Resize Clip panel" disabled={draft !== null} orientation="vertical" direction={-1} value={workspace.sizes.inspector} min={270} max={Math.floor(Math.max(270, Math.min(440, workspace.viewport.width * 0.3)))} defaultValue={DEFAULT_LAYOUT.inspectorWidth} onChange={(inspectorWidth, persist) => workspace.update({ inspectorWidth }, persist)} />}
-      <div className="workspace-inspector" id="inspector-pane" hidden={!workspace.layout.inspectorOpen} tabIndex={-1}><Inspector project={visible} assets={assets} selectedClipId={selectedId} selectedLayerId={selectedLayerId} boundaryId={boundaryId} frame={diagnostics?.frame ?? 0} drafting={draft !== null || !project} section={inspectorMode} onSection={setInspectorMode} onEdit={edit}><MusicControls key={project?.id ?? 'empty'} project={visible} assets={projectAudio} busy={busy || !project} drafting={draft !== null || !project} onEdit={edit} onImport={importAudio} onPrepare={async (id) => { const result = await act(() => api.prepareAudio(id)); if (result.ok) { receiveJob(result.value.job); refreshAfterAcceptance(); } }} /></Inspector></div>
+      <div className="workspace-inspector" id="inspector-pane" hidden={!workspace.layout.inspectorOpen} tabIndex={-1}><DeferredPanel label="Inspector" load={loadInspector} onReload={reloadEditor} onDownload={downloadDraft} canDownload={project !== null} busy={recoveryBusy} fallback={<output className="panel inspector-loading"><span className="spinner" />Opening Inspector…</output>}>{(Inspector) => <Inspector project={visible} assets={assets} selectedClipId={selectedId} selectedLayerId={selectedLayerId} boundaryId={boundaryId} frame={diagnostics?.frame ?? 0} drafting={draft !== null || !project} section={inspectorMode} onSection={setInspectorMode} onEdit={edit}><MusicControls key={project?.id ?? 'empty'} project={visible} assets={projectAudio} busy={busy || !project} drafting={draft !== null || !project} onEdit={edit} onImport={importAudio} onPrepare={async (id) => { const result = await act(() => api.prepareAudio(id)); if (result.ok) { receiveJob(result.value.job); refreshAfterAcceptance(); } }} /></Inspector>}</DeferredPanel></div>
       <WorkspaceResizer className="timeline-resizer" label="Resize Timeline panel" disabled={draft !== null} orientation="horizontal" direction={-1} value={workspace.sizes.timeline} min={200} max={Math.max(200, Math.min(520, workspace.viewport.height - 360))} defaultValue={DEFAULT_LAYOUT.timelineHeight} onChange={(timelineHeight, persist) => workspace.update({ timelineHeight }, persist)} />
       <Timeline key={project?.id ?? 'empty'} project={project ?? EMPTY_PROJECT} assets={assets} audioAssets={audioAssets} selectedClipId={selectedId} selectedLayerId={selectedLayerId} onSelectLayer={selectLayer} selectedBoundaryId={boundaryId} frame={diagnostics?.frame ?? 0} onSelect={select} onBoundary={(id) => { setBoundaryId(id); setInspectorMode('sequence'); workspace.update({ inspectorOpen: true, ...(workspace.viewport.width < 980 ? { mediaOpen: false } : {}) }); }} onSeek={seek} onPause={() => engine.current?.pause()} onEdit={edit} onInsert={insert} onPreview={previewDraft} onError={setError} onSplit={split} onDelete={remove} onDuplicate={duplicate} onNudge={nudge} onQuickTrim={quickTrim} cutRange={cutRange} onMarkCut={markCut} onCutMarked={cutMarked} onClearCut={() => setCutRange(null)} revealRequest={revealRequest} fitRequest={fitRequest} draggedMediaIds={draggedMediaIds} ranges={ranges} />
     </main>

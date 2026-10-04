@@ -5,8 +5,10 @@ import type { VideoLayer } from '../shared/model.js';
 import { formatTimecode } from '../shared/timing.js';
 import './declutter.css';
 import './layer-keyframes.css';
+import { Icon } from './icons.js';
 import { keyframeNavigationFrame, keySeekHint, useKeyframeNavigation } from './keyframe-navigation.js';
 import { NumberField } from './NumberField.js';
+import { Popover } from './Popover.js';
 import { readPreference, writePreference } from './preferences.js';
 
 export interface KeyframeControlsProps {
@@ -151,19 +153,23 @@ export function KeyframeControls({ projectId, layer, frame, duration, disabled, 
 
   return <fieldset className="keyframe-controls declutter-keyframes layer-keyframe-controls" aria-label={`Layer keyframes ${layer.name}`}>
     <legend className="declutter-sr-only">Layer keyframes</legend>
-    <div className="layer-keyframe-heading"><strong>Layer keyframes</strong><span title={layer.name}>{layer.name}</span></div>
-    <p className="layer-keyframe-scope">Shared across this whole video row, in timeline frames. Use each setting's diamond to join or leave a point.</p>
     <div className="keyframe-toolbar">
-      <span className="keyframe-count">{keys.length} {keys.length === 1 ? 'point' : 'points'}</span>
+      <strong className="keyframe-panel-title">Layer keyframes</strong>
+      <span className="keyframe-count" title={`${keys.length} shared ${keys.length === 1 ? 'point' : 'points'} on ${layer.name}`}>{keys.length}<span className="declutter-sr-only"> {keys.length === 1 ? 'point' : 'points'}</span></span>
       <div className="keyframe-navigation">
-        <button type="button" className="icon-button" aria-label="Previous layer keyframe" title={previous ? keySeekHint(previous.frame, duration) : 'No previous shared point'} disabled={unavailable || !previous} onClick={() => { if (previous) seekPoint(previous); }}>←</button>
-        <button type="button" className="icon-button" aria-label="Next layer keyframe" title={next ? keySeekHint(next.frame, duration) : 'No next shared point'} disabled={unavailable || !next} onClick={() => { if (next) seekPoint(next); }}>→</button>
+        <button type="button" className="icon-button" aria-label="Previous layer keyframe" title={previous ? keySeekHint(previous.frame, duration) : 'No previous shared point'} disabled={unavailable || !previous} onClick={() => { if (previous) seekPoint(previous); }}><Icon name="back" size={14} /></button>
+        <button type="button" className="icon-button" aria-label="Next layer keyframe" title={next ? keySeekHint(next.frame, duration) : 'No next shared point'} disabled={unavailable || !next} onClick={() => { if (next) seekPoint(next); }}><Icon name="forward" size={14} /></button>
       </div>
-      {atHead && <button type="button" className="icon-button" disabled={unavailable} aria-label="Remove layer keyframe at playhead" title="Remove this whole shared point and all its participating settings" onClick={() => onEdit({ type: 'layer-key-remove', layerId: layer.id, frame: atHead.frame })}>×</button>}
+      {atHead && <button type="button" className="icon-button" disabled={unavailable} aria-label="Remove layer keyframe at playhead" title="Remove this whole shared point and all its participating settings" onClick={() => onEdit({ type: 'layer-key-remove', layerId: layer.id, frame: atHead.frame })}><Icon name="x" size={14} /></button>}
+      <Popover label="Animation help" className="animation-help" trigger={<Icon name="help" size={15} />}>
+        <p>Each setting's diamond animates this whole video row, not just the selected clip. All participating settings share one point and its easing.</p>
+        <div className="animation-legend"><span><span aria-hidden="true">◇</span>Static base · click to capture</span><span><Icon name="curve" size={14} />Row curve · capture before editing</span><span><span aria-hidden="true">◆</span>Key at playhead · editable</span></div>
+        <p>Use the arrows beside a diamond to visit that setting's keys. Drag a timeline point to move all its participants; Escape cancels.</p>
+      </Popover>
     </div>
 
     <div className="layer-keyframe-current">
-      <span className="layer-keyframe-position">{playheadLabel(frame, duration, atHead !== undefined)}</span>
+      <span className="layer-keyframe-position declutter-sr-only">{playheadLabel(frame, duration, atHead !== undefined)}</span>
       {atHead && <ParticipantChips point={atHead} />}
     </div>
     {inspectedAway && <div className="layer-keyframe-inspected">

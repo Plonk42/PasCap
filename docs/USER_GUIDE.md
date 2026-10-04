@@ -189,7 +189,14 @@ Native export loops the selected PCM range continuously and pads/trims AAC to vi
 duration. The complete video's duration is not extended to fit music.
 
 Choose **Export** for a **1280×720 draft** or **3840×2160 final**, H.264 SDR BT.709
-from originals, with optional 48 kHz AAC music. Submission captures an immutable
+from originals, with optional 48 kHz AAC music. The quality cards and storage meter
+show the selected preset, free space and an advisory planning allowance. Actual
+compression/disk use can differ: this is not a guarantee or fixed-GB bound.
+Use **Storage details** for the output location and assumptions, **Refresh storage
+check** after freeing space, or **Retry storage check** after a mount/check error.
+A tight-space warning is advisory; below the minimum start reserve, export is
+disabled. Low-space failure preserves originals, edits and completed exports.
+Submission captures an immutable
 snapshot: later edits cannot change that render. Activity exposes progress,
 cancellation and verified MP4/receipt links. **Cancelling…** is pending until
 confirmed; a failed status read keeps known jobs and never resubmits the export.
@@ -202,12 +209,20 @@ See [SPEED_AND_AUDIO.md](SPEED_AND_AUDIO.md) and
 ## Workspace and keyboard
 
 Use **Clip / Sequence / Audio** for excerpt settings, transitions and music.
-**Workspace options** holds panel visibility, Reset layout, Diagnostics and help.
+The header directly exposes **Media / Inspector toggles and keyboard help**.
+**Workspace options** keeps Reset layout and Diagnostics.
 Drag panel dividers or use focused arrows; double-click/Home resets a divider and
 Escape cancels its drag. Compact desktop windows use one side drawer at a time.
 Layout/section preferences do not change rendering. Numbers/titles apply on
 Enter/blur, Escape restores, and invalid text remains editable; sliders stay live.
 Source-review paired IN/OUT deliberately requires **Apply**.
+
+The selected excerpt/row appears first in Inspector; section readouts and dots
+indicate adjusted settings without expanding everything. Animated channels use
+an amber curve/diamond: dashed between keys, filled when the setting participates
+at the playhead. **Animation help** explains scope and capture once; no static
+or animated control was removed. Search/filter clear actions, mixed select-all
+and always-visible media Add simplify the library.
 
 | Context | Shortcut |
 | --- | --- |
@@ -247,4 +262,8 @@ against forced browser/laptop shutdown. Wait for **Saved locally** or download t
 unsaved snapshot; there is no crash-proof draft database. Do not run two services
 against the same data directory. **Retry connecting**, **Retry preview** and Activity
 **Refresh** recover reads without submitting hidden writes or duplicate jobs.
+If deferred preview/Inspector code fails to load, **Reload editor** saves pending
+committed edits before reloading; a save error blocks it. **Download project**
+keeps a strict snapshot available for recovery. Unapplied control drafts remain
+separate from committed project edits.
 Full recovery contract: [WORKSPACE_AND_RECOVERY.md](WORKSPACE_AND_RECOVERY.md).
