@@ -87,6 +87,14 @@ later primary excerpts connected. Primary drops choose a legal boundary. Up to
 independent, and other overlays, music and row points do not follow primary ripple.
 Excerpts cannot overlap on the same overlay row; use different rows for simultaneity.
 
+The primary sequence is shown **at the top of the timeline**, with overlays below
+it. This does not change composition: overlays still cover primary footage, and
+Raise/Lower adjust overlay priority. Scroll over the tracks or layer headers to
+reach all rows and music. The time ruler and its playhead handle/timecode remain
+visible while scrolling; its ticks follow horizontal scroll, and clicking/dragging
+it seeks without editing a row. The primary layer itself cannot be reordered or
+deleted; remove excerpts instead.
+
 Select an excerpt and drag an edge inward to shorten it or outward to restore
 omitted footage up to the original bounds. The dashed extent shows available source.
 Left-edge autoscroll can recover a long omitted beginning. **Clip → Source range →

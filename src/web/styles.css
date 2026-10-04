@@ -1107,8 +1107,9 @@ svg {
 }
 
 .timeline-ruler {
-    position: absolute;
-    inset: 0 0 auto;
+    position: sticky;
+    top: 0;
+    z-index: 15;
     height: 31px;
     background: #141e18;
     border-bottom: 1px solid #2b3e31;
@@ -1293,7 +1294,7 @@ svg {
 
 .timeline-playhead {
     position: absolute;
-    top: 0;
+    top: 31px;
     bottom: 10px;
     width: 1px;
     z-index: 6;
@@ -1307,7 +1308,14 @@ svg {
     background: #eef8ee;
 }
 
-.timeline-playhead>button {
+.timeline-ruler-playhead {
+    position: absolute;
+    inset-block: 0;
+    width: 1px;
+    pointer-events: none;
+}
+
+.timeline-ruler-playhead>button {
     position: absolute;
     top: 0;
     left: -6px;

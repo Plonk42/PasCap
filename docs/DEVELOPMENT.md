@@ -91,9 +91,10 @@ Neither suite invokes real-source sample preparation or needs private footage/mu
 ### Recorded local baseline
 
 The current [UI verification](DELIVERY_STATUS.md#current-ui-verification) passes
-**894 unit/service + 237 browser = 1,131** fresh checks on Node **22.23.3**, with
+**900 unit/service + 241 browser = 1,141** fresh checks on Node **22.23.3**, with
 strict frontend/server types and production build. It includes native timeline/header
-scrolling, accessible layer-action restrictions and the retained heading-help suite.
+scrolling, primary-first presentation, the pinned ruler and exact scrolled seeks,
+accessible layer-action restrictions and the retained heading-help suite.
 No historical native count is added to that total; intended-GPU/real-flight, fresh
 delivery-commit CI and container gates remain separate.
 

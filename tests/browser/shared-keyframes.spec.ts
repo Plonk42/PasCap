@@ -337,12 +337,12 @@ test('a row marker opens the selected empty row independently of clips, and keyb
     expect(Number(await surface.getAttribute('data-leading'))).toBe(32);
     const scale = Number(await surface.getAttribute('data-pixels-per-frame'));
     expect(Number.parseFloat(await marker.evaluate((element) => (element as HTMLElement).style.left))).toBeCloseTo(32 + 20 * scale);
-    const lower = (await page.locator('[data-layer-lane="video-1"]').boundingBox())!;
-    const upper = (await page.locator('[data-layer-lane="upper"]').boundingBox())!;
-    expect(lower.y - upper.y).toBe(88);
+    const primary = (await page.locator('[data-layer-lane="video-1"]').boundingBox())!;
+    const overlay = (await page.locator('[data-layer-lane="upper"]').boundingBox())!;
+    expect(overlay.y - primary.y).toBe(88);
     const ruler = page.getByLabel('Timeline ruler', { exact: true });
     await expect(ruler).toHaveAttribute('title', /timeline|seek|ruler/i);
-    expect((await ruler.boundingBox())!.y).toBeLessThan(upper.y);
+    expect((await ruler.boundingBox())!.y).toBeLessThan(primary.y);
 
     await marker.click();
     await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(20);

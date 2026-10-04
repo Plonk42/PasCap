@@ -2,9 +2,13 @@
 
 ## Video layers
 
-The document stores one to eight layers **bottom-to-top**. The sidebar shows the
-visual top layer first. Video 1 is the primary layer: it cannot be removed or moved
-above an overlay. Its insert/delete/reorder/trim commands retain ripple behavior,
+The document stores one to eight layers **bottom-to-top for composition**. The
+timeline and sidebar show **the primary sequence first**, with overlay rows below
+it in front-to-back overlay order. This is display order, not a change to which
+footage covers others: overlays still composite over the primary, and Raise/Lower
+adjust their relative composition priority. Video 1 is the primary layer: it cannot
+be removed or reordered out of its base role. Its insert/delete/reorder/trim commands
+retain ripple behavior,
 and cut/fade-through-black/dissolve boundaries and sequence fades belong to it.
 
 Other layers contain independently positioned excerpts. Their starts are absolute
@@ -26,7 +30,10 @@ pointer; overlay drops use the frame under it, while primary drops ripple-insert
 at a boundary.
 Scroll over either the headers or tracks to reach all eight rows and music; native
 vertical scrollbars and keyboard focus reveal stay synchronized. Horizontal timeline
-scroll is independent and scrolling never changes the project or playhead.
+scroll is independent and scrolling never changes the project or playhead. The time
+ruler stays pinned above the rows, with horizontally aligned ticks and a visible
+playhead handle/timecode; click/drag seeking uses the same integer-frame geometry.
+Dropping on the ruler never targets a row concealed underneath it.
 Unavailable Raise/Lower/Delete actions have contextual accessible reasons. The
 primary sequence is the fixed composition base; overlays cannot move below it.
 Drag existing excerpts between rows, or use Clip → Layer & opacity. Deleting a layer

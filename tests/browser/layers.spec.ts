@@ -428,7 +428,22 @@ test('cross-layer dragging uses scrolled lane coordinates and inserts before the
   await scroll.evaluate((element) => { element.scrollTop = element.scrollHeight; element.scrollLeft = 128; });
   expect(await scroll.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
   expect(await scroll.evaluate((element) => element.scrollLeft)).toBeGreaterThan(0);
-  await page.locator('[data-clip-id="moving"]').dragTo(page.locator('[data-clip-id="b"] .timeline-clip-body'), { targetPosition: { x: 10, y: 30 } });
+  const moving = page.locator('[data-clip-id="moving"]');
+  await expect(moving).toBeInViewport();
+  const sourceBox = (await moving.boundingBox())!;
+  const viewport = (await scroll.boundingBox())!;
+  // Start on the actual scrolled overlay before revealing the primary target.
+  // dragTo scrolls both endpoints before pointerdown, which can put a different
+  // primary clip under the saved start coordinates when the rows are far apart.
+  await page.mouse.move(sourceBox.x + 24, sourceBox.y + 30); await page.mouse.down();
+  await page.mouse.move(sourceBox.x + 38, sourceBox.y + 30, { steps: 3 });
+  await page.mouse.move(viewport.x + 100, viewport.y + 34, { steps: 5 });
+  await expect.poll(() => scroll.evaluate((element) => element.scrollTop)).toBe(0);
+  const targetBox = (await page.locator('[data-clip-id="b"] .timeline-clip-body').boundingBox())!;
+  await page.mouse.move(targetBox.x + 10, targetBox.y + 30, { steps: 5 });
+  await expect(page.locator('.timeline-drop-preview')).toHaveAttribute('data-drop-layer', 'video-1');
+  await expect(page.locator('.timeline-drop-preview')).toHaveAttribute('data-drop-start', '30');
+  await page.mouse.up();
   const edited = projectSchema.parse(await page.evaluate(() => window.pascapLab!.project()));
   expect(calculateLayout(edited).clips.filter((placed) => placed.clip.layerId === 'video-1').map((placed) => placed.clip.id)).toEqual(['a', 'moving', 'b', 'c']);
   expect(edited.clips.find((clip) => clip.id === 'moving')).toMatchObject({ layerId: 'video-1', sourceIn: 0, sourceOut: 30 });
