@@ -176,6 +176,14 @@ push; old successful runs and local evidence are not substituted for it.
 
 ### Submission and review
 
+In VS Code Copilot Chat, use **`/github-issue` followed by a short request** to log
+and triage an issue, for example `/github-issue ripple should be a per-layer behavior`.
+The repository-local [issue skill](../.github/skills/github-issue/SKILL.md) searches
+existing issues first, applies category/priority/area/status/milestone metadata and
+adds the same issue to the linked Project with aligned Status. It records a concrete
+next action and reports access limitations. Logging an idea does **not** approve
+implementation or add it to the current iteration; the example is not a filed issue.
+
 Use the [bug form](../.github/ISSUE_TEMPLATE/bug_report.yml),
 [feature form](../.github/ISSUE_TEMPLATE/feature_request.yml) or
 [task/iteration form](../.github/ISSUE_TEMPLATE/work_item.yml). Triage adjusts
