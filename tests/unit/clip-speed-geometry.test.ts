@@ -28,7 +28,7 @@ describe('clip speed graph geometry and transaction planning', () => {
     expect(plan.error).toBe(''); expect(plan.command).toMatchObject({ type: 'speed', clipId: 'clip' });
     expect(project).toEqual(before); expect(plan.document.clips[0]!).toMatchObject({ sourceIn: 0, sourceOut: 120 });
     const placed = calculateLayout(plan.document).clips[0]!;
-    expect(plan.previewFrame).toBe(placed.retiming.outputAt(40));
+    expect(placed.retiming.sourceAt(plan.previewFrame)).toBe(40);
   });
   it('rejects a collision without merging or returning the last valid candidate', () => {
     const project = fixture(); const valid = planClipSpeedDrag(project, 'clip', 60, 70, 2, 20, 20);
@@ -47,6 +47,23 @@ describe('clip speed graph geometry and transaction planning', () => {
     const project = fixture(); project.clips[0]!.sourceIn = 30; project.clips[0]!.sourceOut = 90;
     expect(previewClipSource(project, 'clip', 0)).toBe(0);
     expect(previewClipSource(project, 'clip', 120)).toBe(59);
+  });
+  it('previews the exact slow-motion source image when the floor inverse lands just before it', () => {
+    const project = fixture(); project.clips[0]!.speed = { mode: 'curve', keyframes: [{ frame: 0, rate: 0.5, interpolation: 'linear' }, { frame: 60, rate: 0.75, interpolation: 'linear' }, { frame: 120, rate: 1, interpolation: 'hold' }] };
+    const map = calculateLayout(project).clips[0]!.retiming;
+    expect(map.sourceAt(map.outputAt(60))).toBe(59);
+    expect(map.sourceAt(previewClipSource(project, 'clip', 60))).toBe(60);
+  });
+  it('previews the closest available fast image without moving its skipped source key', () => {
+    const project = fixture(); project.clips[0]!.speed = { mode: 'curve', keyframes: [{ frame: 0, rate: 4, interpolation: 'hold' }, { frame: 3, rate: 4, interpolation: 'hold' }, { frame: 120, rate: 4, interpolation: 'hold' }] };
+    const before = structuredClone(project); const map = calculateLayout(project).clips[0]!.retiming;
+    expect(previewClipSource(project, 'clip', 3)).toBe(1); expect(map.sourceAt(1)).toBe(4);
+    expect(project).toEqual(before);
+  });
+  it('previews the final output frame at the exclusive OUT even when its last source image repeats', () => {
+    const project = fixture(); project.clips[0]!.speed = { mode: 'curve', keyframes: [{ frame: 0, rate: 0.25, interpolation: 'hold' }, { frame: 120, rate: 0.25, interpolation: 'hold' }] };
+    expect(previewClipSource(project, 'clip', 120)).toBe(479);
+    expect(calculateLayout(project).clips[0]!.retiming.sourceAt(479)).toBe(119);
   });
   it('draws the held rate up to its key rather than a fictional ramp and includes exact key positions', () => {
     const points = clipCurvePoints({ mode: 'curve', keyframes: [{ frame: 0, rate: 1, interpolation: 'hold' }, { frame: 30, rate: 2, interpolation: 'linear' }, { frame: 120, rate: 2, interpolation: 'hold' }] }, 0, 120);
