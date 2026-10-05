@@ -8,6 +8,13 @@
 - Before committing, review the diff, validate the affected behaviour, and stage
   deliberately. Preserve unrelated user edits; never discard them to obtain a
   clean tree. Do not commit generated media, caches, logs, credentials or private paths.
+- Formatting is part of the logical step, **before validation, staging and commit**.
+  Format changed files with their configured formatter, organize imports where
+  applicable, save them and let save actions finish before reviewing/testing the
+  final bytes. Do not defer formatting or saves until after the commit. If a save
+  changes files after validation or staging, review the delta, rerun invalidated
+  checks and restage deliberately before committing. Verify committed files have
+  no leftover formatting diff after commit; preserve/report unrelated existing edits.
 - The owner gives standing authorization to push approved, validated work to remote
   `main` after each reviewed logical-step commit and at handoff if approved commits
   remain unpublished; no repeated push approval is needed. Verify the repository,

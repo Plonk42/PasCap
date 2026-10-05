@@ -160,8 +160,15 @@ Before pushing:
 1. Verify the GitHub host/repository, local branch and target remote `main`. Review
   **all** outgoing commits and their affected checks/contracts; do not publish
   unrelated, unreviewed, unapproved or private content just because it is committed.
-2. Validate the affected behaviour, review the diff and stage deliberately before
-  committing. Keep unrelated user edits unstaged and intact; a dirty tree is not
+2. Format the changed files, organize imports where applicable, save and let the
+  configured editor save actions finish **before final validation, review and
+  staging**. Commit the formatted, saved and validated bytes, not an earlier
+  version that a later save will reformat. If formatting/save actions change files
+  after checks or staging, review the delta, rerun invalidated checks and restage
+  deliberately before committing. After commit, inspect status and the diff for
+  committed files to catch leftover formatting; resolve owned leftovers through
+  a reviewed, validated follow-up before publication, without rewriting history.
+  Keep unrelated user edits unstaged and intact; a dirty tree is not
   permission to stash, discard or include them. Documentation-only work needs
   applicable documentation validation, not invented runtime tests.
 3. Fetch remote `main` and confirm the outgoing history is a fast-forward from its

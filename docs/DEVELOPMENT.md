@@ -251,6 +251,13 @@ and [grading equations](COLOUR_AND_TIMING.md#colour).
 
 ## Contributor safety
 
+- **Format before committing, not afterward.** Use each changed file's configured
+  formatter and applicable import organization, save and let editor save actions
+  finish, then perform final checks, review and deliberate staging. Format-on-save
+  is not sufficient if the save happens after staging or commit. A later formatting
+  change invalidates affected checks/staging: review it, rerun applicable checks
+  and restage before commit. Check committed files for leftover formatting diffs
+  afterward; preserve unrelated edits rather than forcing a clean working tree.
 - Before the first release candidate, approved changes may break existing projects
   and persisted formats: favour one current strict implementation, not backward-
   compatibility boilerplate. Do not add unrequested migrations, legacy fields,
