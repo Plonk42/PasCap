@@ -96,13 +96,19 @@ The implementation prerequisite is an explicit strong identity design:
    or user-footage hash job is introduced in this update.
 4. An explicit approved-location proposal must show old/new paths, verify all
    required evidence and require confirmation; commit atomically only if source,
-   association and active-job state still match. Failure keeps the old association.
+  association and active-job state still match. Pre-commit failure keeps the old
+  association; lost post-commit acknowledgement requires honest readback/recovery,
+  not promised rollback or a blind retry.
 5. If the original is already missing without strong baseline evidence, explain
    that limitation rather than accepting a name/sample-only association.
 
 **Issue #2 remains pending.** Missing-source guidance now first recommends
 reconnecting the drive or restoring the original at its registered path. No
 misleading relink button, whole-filesystem search or hidden reassociation was added.
+The [separate proposed relink contract](design/SOURCE_RELINK.md) specifies full
+baseline evidence, immutable asset/cache identity, strict format implications and
+confirmed atomic location changes. It requires explicit approval before implementation;
+the current registry and usage behaviour are unchanged.
 
 ## Issue #3: export storage and recovery
 

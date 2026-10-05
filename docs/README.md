@@ -54,3 +54,6 @@ and Git history retain earlier evidence, not current acceptance claims.
   completed CI, containers or real-flight acceptance.
 - [../EDITOR_IMPLEMENTATION_PLAN.md](../EDITOR_IMPLEMENTATION_PLAN.md) retains the
   original plan and chronology.
+- [Source relink proposal](design/SOURCE_RELINK.md) is the separate #2 design record:
+  required full-byte evidence, stable IDs/cache and confirmed location/format decisions,
+  **not an implemented relink workflow or approved data migration**.
