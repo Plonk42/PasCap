@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { EMPTY_KEY_VALUES, type Interpolation, type LayerKeyframe, type LayerKeyValues } from '../../src/shared/keyframes.js';
 import type { MediaJob } from '../../src/shared/media.js';
-import { createClip, createProject, type ProjectDocument } from '../../src/shared/model.js';
+import { createClip, createLayer, createProject, type ProjectDocument } from '../../src/shared/model.js';
 import type { ProjectSummary } from '../../src/shared/projects.js';
 import { summarizeExport } from '../../src/web/ExportDialog.js';
 import { activityResultSummary, activitySummary, isActiveJob, latestCompletedRender, orderActivityJobs } from '../../src/web/Jobs.js';
@@ -22,7 +22,7 @@ describe('project dialog filtering', () => {
   const entries = [
     project('north-2', { title: 'North flight 2', clipCount: 2, duration: 90, updatedAt: '2026-10-02T12:00:00Z' }),
     project('north-10', { title: 'North flight 10', updatedAt: '2026-10-03T12:00:00Z' }),
-    project('legacy', { title: 'North flight old', compatible: false, error: 'Unsupported project schema version 2; this build requires version 5.' }),
+    project('legacy', { title: 'North flight old', compatible: false, error: 'Unsupported project schema version 2; this build requires version 6.' }),
     project('south', { title: 'South flight', updatedAt: '2026-10-01T12:00:00Z' }),
   ];
 
@@ -129,12 +129,12 @@ describe('activity ordering and summaries', () => {
 });
 
 describe('export snapshot summary', () => {
-  it('summarizes an empty strict version 5 project without adding defaults', () => {
+  it('summarizes an empty strict version 6 project without adding defaults', () => {
     const document = createProject('empty', 'Empty');
     const summary = summarizeExport(document);
     expect(summary).toMatchObject({ duration: 0, clips: 0, layers: 1, enabledLayers: 1, layered: false });
     expect(summary.keys).toEqual({ points: 0, settings: 0, speed: 0, colour: 0, clipOpacity: 0, layerOpacity: 0 });
-    expect(document.schemaVersion).toBe(5); expect(document.media).toEqual({ videoIds: [], audioIds: [] });
+    expect(document.schemaVersion).toBe(6); expect(document.media).toEqual({ videoIds: [], audioIds: [] });
     expect(document.layers[0]!.keyframes).toEqual([]);
   });
 
@@ -145,7 +145,7 @@ describe('export snapshot summary', () => {
     document.layers[0]!.keyframes = [point(0, { clipOpacity: 1, ...primary.colour }, 'hold')];
     const overlay = createClip('overlay', 'source', 0, 30);
     overlay.layerId = 'video-2'; overlay.start = 100;
-    document.layers.push({ id: 'video-2', name: 'Overlay', enabled: false, opacity: 1, keyframes: [point(0, { speed: 1, layerOpacity: 1 }), point(200, { brightness: 0.1 }, 'hold')] });
+    document.layers.push({ ...createLayer('video-2', 'Overlay', false), enabled: false, keyframes: [point(0, { speed: 1, layerOpacity: 1 }), point(200, { brightness: 0.1 }, 'hold')] });
     document.clips = [primary, overlay];
     const before = JSON.stringify(document);
     const summary = summarizeExport(document);
@@ -172,7 +172,7 @@ describe('export snapshot summary', () => {
     const document = createProject('participants', 'Participants');
     const left = createClip('left', 'source', 0, 30); const right = createClip('right', 'source', 100, 130);
     right.colour.hue = 90;
-    document.clips = [left, right]; document.transitions = [{ leftId: 'left', rightId: 'right', type: 'cut', duration: 0 }];
+    document.clips = [left, right]; document.layers[0]!.transitions = [{ leftId: 'left', rightId: 'right', type: 'cut', duration: 0 }];
     document.layers[0]!.keyframes = [point(0, { speed: 1, exposure: 0, brightness: 0, clipOpacity: 0, layerOpacity: 0 }), point(60, { exposure: 1, shadows: 0 })];
     const before = JSON.stringify(document); const summary = summarizeExport(document);
     expect(summary).toMatchObject({ duration: 60, clips: 2, layers: 1, enabledLayers: 1, layered: true });

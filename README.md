@@ -7,7 +7,7 @@ animate colour and speed, add music, and export a 720p draft or 4K final using
 native FFmpeg. Footage stays on your machine and is **referenced in place, not
 uploaded or copied**.
 
-PasCap is in early development. Short correctness tests pass; target-GPU playback
+PasCap is in early development. Synthetic tests target correctness; target-GPU playback
 and a complete 5–10 minute real-flight edit are still qualification gates, not
 performance claims. The eventual package is a **local Docker/Podman application**;
 container packaging is not available yet. GitHub Pages and cloud editing are not
@@ -17,13 +17,13 @@ deployment targets.
 
 - Separate projects with local autosave, conflict recovery and an initially empty media bin.
 - No-copy footage browsing, verified editing proxies, thumbnails and reusable source excerpts.
-- Ripple-edited primary sequence and independently positioned overlays, up to eight video layers.
+- Up to eight uniform video tracks, each with Ripple on by default; turn it off for independent placement.
 - Recoverable trims, split, duplication, marked-range cutting, snapping, Undo/Redo and source review.
 - Independent clip colour/speed bases and **shared row-wide keyframes** for opacity, speed and seven colour settings.
 - Precise clip-only speed curves with editable presets, draggable source-frame points and exact rate/easing inputs.
 - Draggable timeline keyframes and setting-specific Previous/Next navigation.
 - Direct panel/help controls, compact visual animation states and grouped editing tools.
-- Cuts, fade-through-black, cross-dissolves and opening/closing fades.
+- Track-local cuts, fade-through-black, cross-dissolves and opening/closing fades.
 - One music track with waveform, gain, fades and explicit range looping.
 - Native original-based H.264 SDR exports at **1280×720** or **3840×2160**, with progress, cancellation and verification receipts.
 - Export-space preflight, disclosed planning assumptions and safe disk-full recovery.
@@ -64,6 +64,13 @@ directory, and do not expose the unauthenticated service to a network.
 4. Trim, reorder, grade and animate the edit; add standalone music in **Audio**.
 5. Choose **Export** and a draft/final preset, review its storage check, then start. Export reads the original recordings, not the proxies.
 
+Rows follow composition order: row 1 is below row 2 in the image, row 3 is above
+row 2, and so on. No row has a special editing role. **Layer options → Ripple**
+packs a track from its first clip's current start in one Undo step when enabled;
+while on, later clips remain continuously sequenced, retaining dissolve overlaps.
+Turning it off keeps actual placements for independent edits. Music, other tracks
+and absolute row points do not move with it.
+
 Read the [user guide](docs/USER_GUIDE.md) for the full workflow and shortcuts.
 Filesystem file drops and browser upload pickers are intentionally disabled:
 no import flow duplicates your original footage.
@@ -87,9 +94,10 @@ Missing mounts and symlinks fail explicitly. In the eventual container package,
 originals will be read-only bind mounts and application data will be a separate
 persistent writable mount. See [deployment design](docs/DEPLOYMENT.md).
 
-**Project format:** strict schema **v5**. Earlier project/receipt snapshots remain
-on disk but are incompatible; there are no automatic migrations or default-filled
-legacy fields. Unsaved in-memory changes are not guaranteed to survive forced
+**Project format:** strict schema **v6**, with required per-track Ripple,
+transitions and fades. v1–v5 projects and receipt snapshots remain unchanged on
+disk but are incompatible; registry/proxy formats do not change. There are no
+automatic migrations or default-filled legacy fields. Unsaved in-memory changes are not guaranteed to survive forced
 shutdown. See [workspace and recovery](docs/WORKSPACE_AND_RECOVERY.md).
 
 ## Development and CI

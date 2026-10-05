@@ -8,21 +8,26 @@ import { restoreExports } from '../../src/server/export-archive.js';
 import { JobQueue } from '../../src/server/jobs.js';
 import { ProjectStore } from '../../src/server/storage.js';
 import { EMPTY_KEY_VALUES } from '../../src/shared/keyframes.js';
-import { createClip, createProject } from '../../src/shared/model.js';
+import { createClip, createLayer, createProject } from '../../src/shared/model.js';
 import { legacyV4Project } from '../unit/project-fixtures.js';
 
 const enabled = process.env['PASCAP_MEDIA_TESTS'] === '1';
 const roots: string[] = [];
+// Genuine v5 shape: project bins/shared points, global fades/transitions and no
+// track timing fields. Never manufacture old data by relabelling a v6 document.
+function legacyV5Project(id: string, title: string) {
+  return { ...legacyV4Project(id, title), schemaVersion: 5, media: { videoIds: ['legacy-media'], audioIds: [] } };
+}
 async function temp(): Promise<string> {
-  const root = await mkdtemp(path.join(os.tmpdir(), 'pascap-schema5-storage-media-')); roots.push(root); return root;
+  const root = await mkdtemp(path.join(os.tmpdir(), 'pascap-schema6-storage-media-')); roots.push(root); return root;
 }
 
-describe.skipIf(!enabled)('schema-5 storage/archive integration · generated files only, no migrations', () => {
+describe.skipIf(!enabled)('schema-6 storage/archive integration · generated files only, no migrations', () => {
   afterEach(async () => { await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))); });
 
-  it('loads strict v5 points/bins and lists/rejects v1/v2/v3 headers and genuine v4 without rewriting them', async () => {
+  it('loads strict v6 points/bins and lists/rejects v1/v2/v3 headers and genuine v4/v5 without rewriting them', async () => {
     const root = await temp(); const store = new ProjectStore(root);
-    const project = createProject('strict-v5', 'Strict current document');
+    const project = createProject('strict-v6', 'Strict current document');
     project.media = { videoIds: ['generated-original', 'unplaced-original'], audioIds: ['unplaced-music'] };
     project.clips = [createClip('current-clip', 'generated-original', 0, 4)];
     project.layers[0]!.keyframes = [
@@ -30,18 +35,18 @@ describe.skipIf(!enabled)('schema-5 storage/archive integration · generated fil
       { frame: 5000, interpolation: 'ease-out', values: { ...EMPTY_KEY_VALUES, exposure: 0.25 } },
     ];
     const saved = await store.save(project, 0);
-    expect(saved.schemaVersion).toBe(5); expect(saved.media).toEqual(project.media); expect(await store.load(saved.id)).toEqual(saved);
+    expect(saved.schemaVersion).toBe(6); expect(saved.media).toEqual(project.media); expect(await store.load(saved.id)).toEqual(saved);
     const currentPath = path.join(root, 'projects', `${saved.id}.json`); const currentBytes = await readFile(currentPath);
     const old = [];
-    for (const version of [1, 2, 3, 4]) {
+    for (const version of [1, 2, 3, 4, 5]) {
       const id = `original-v${version}`; const title = `Preserved original version ${version}`;
-      // Keep the v1/v2/v3 header cases; v4 has its real row/static shape and no media field.
-      const document = version === 4 ? legacyV4Project(id, title) : { schemaVersion: version, id, title };
+      // Keep the original header cases and both actual preceding storage shapes.
+      const document = version === 5 ? legacyV5Project(id, title) : version === 4 ? legacyV4Project(id, title) : { schemaVersion: version, id, title };
       if (version === 4) expect(document).not.toHaveProperty('media');
       const bytes = Buffer.from(`${JSON.stringify(document)}\n`);
       const filename = path.join(root, 'projects', `${id}.json`); await writeFile(filename, bytes);
       old.push({ id, title, version, filename, bytes });
-      await expect(store.load(id)).rejects.toThrow(`schema version ${version}; this build requires version 5`);
+      await expect(store.load(id)).rejects.toThrow(`schema version ${version}; this build requires version 6`);
       await expect(store.rename(id, 'Must not rewrite an older file', 0)).rejects.toThrow('existing file was not changed');
       await expect(store.save(createProject(id, 'No migration'), 0)).rejects.toThrow('existing file was not changed');
     }
@@ -49,15 +54,42 @@ describe.skipIf(!enabled)('schema-5 storage/archive integration · generated fil
     expect(summaries.find((summary) => summary.id === saved.id)).toMatchObject({ compatible: true, revision: 1, clipCount: 1, duration: 8, error: null });
     for (const entry of old) {
       expect(summaries.find((summary) => summary.id === entry.id)).toMatchObject({ id: entry.id, title: entry.title,
-        compatible: false, revision: 0, clipCount: 0, duration: 0, error: expect.stringContaining(`requires version 5`) });
+        compatible: false, revision: 0, clipCount: 0, duration: 0, error: expect.stringContaining(`requires version 6`) });
       expect(await readFile(entry.filename)).toEqual(entry.bytes);
     }
     expect(await readFile(currentPath)).toEqual(currentBytes);
   });
 
-  it('rejects malformed v5 without synthesizing missing media, row, static clip or nullable point fields', async () => {
+  it('round-trips arbitrary mixed-Ripple tracks with track-owned transitions/fades and dormant empty-track fades', async () => {
+    const root = await temp(); const store = new ProjectStore(root);
+    const project = createProject('strict-tracks', 'Role-independent saved tracks');
+    project.layers = [
+      { ...createLayer('positioned', 'Independent', false), opacity: 0.65, openingFade: 1, closingFade: 1,
+        transitions: [{ leftId: 'left', rightId: 'right', type: 'cross-dissolve', duration: 2 }] },
+      { ...createLayer('packed', 'Ripple', true), openingFade: 1, closingFade: 1,
+        transitions: [{ leftId: 'packed-left', rightId: 'packed-right', type: 'cut', duration: 0 }] },
+      { ...createLayer('empty', 'Dormant fades', false), openingFade: 7, closingFade: 9 },
+    ];
+    project.clips = [
+      { ...createClip('right', 'generated-original', 8, 12, 'positioned'), start: 4, opacity: 0.7 },
+      { ...createClip('packed-left', 'generated-original', 0, 4, 'packed'), start: 3 },
+      { ...createClip('left', 'generated-original', 0, 4, 'positioned'), start: 2 },
+      { ...createClip('packed-right', 'generated-original', 4, 8, 'packed'), start: 7 },
+    ];
+    project.media.videoIds = ['generated-original'];
+    const saved = await store.save(project, 0);
+    expect(saved).toEqual({ ...project, revision: 1 });
+    expect(await store.load(project.id)).toEqual(saved);
+    expect(saved).not.toHaveProperty('transitions');
+    expect(saved).not.toHaveProperty('openingFade'); expect(saved).not.toHaveProperty('closingFade');
+    expect((await store.list()).find((item) => item.id === project.id)).toMatchObject({ compatible: true, duration: 11, clipCount: 4, revision: 1, error: null });
+    const filename = path.join(root, 'projects', `${project.id}.json`); const bytes = await readFile(filename);
+    expect(await store.load(project.id)).toEqual(saved); expect(await readFile(filename)).toEqual(bytes);
+  });
+
+  it('rejects malformed v6 without synthesizing missing media, row timing, static clip or nullable point fields', async () => {
     const root = await temp(); const store = new ProjectStore(root); const directory = path.join(root, 'projects'); await mkdir(directory);
-    const valid = createProject('malformed-v5', 'Must remain strict'); valid.clips = [createClip('current', 'generated-original', 0, 4)];
+    const valid = createProject('malformed-v6', 'Must remain strict'); valid.clips = [createClip('current', 'generated-original', 0, 4)];
     const missingMedia: Record<string, unknown> = { ...valid }; delete missingMedia['media'];
     const missingRow: Record<string, unknown> = { ...valid.layers[0]! }; delete missingRow['keyframes'];
     const missingClip: Record<string, unknown> = { ...valid.clips[0]! }; delete missingClip['speed'];
@@ -66,6 +98,11 @@ describe.skipIf(!enabled)('schema-5 storage/archive integration · generated fil
       missingMedia, { ...valid, media: { videoIds: [] } }, { ...valid, media: { audioIds: [] } },
       { ...valid, layers: [missingRow] }, { ...valid, clips: [missingClip] }, { ...valid, unexpected: true },
       { ...valid, layers: [{ ...valid.layers[0]!, keyframes: [{ frame: 100, interpolation: 'linear', values: missingValues }] }] },
+      ...['ripple', 'transitions', 'openingFade', 'closingFade'].map((field) => {
+        const row: Record<string, unknown> = { ...valid.layers[0]! }; delete row[field];
+        return { ...valid, layers: [row] };
+      }),
+      { ...valid, transitions: [] }, { ...valid, openingFade: 0 }, { ...valid, closingFade: 0 },
     ];
     for (const [index, variant] of variants.entries()) {
       const id = `malformed-${index}`; const filename = path.join(directory, `${id}.json`);
@@ -77,7 +114,7 @@ describe.skipIf(!enabled)('schema-5 storage/archive integration · generated fil
     expect((await store.list()).every((summary) => !summary.compatible)).toBe(true);
   });
 
-  it('restores only strict v5 snapshots in version-1 receipts and preserves earlier outputs/receipts byte-for-byte', async () => {
+  it('restores only strict v6 snapshots in version-1 receipts and preserves earlier outputs/receipts byte-for-byte', async () => {
     const root = await temp(); const config = createConfig({ dataDir: root }); const jobs = new JobQueue();
     const snapshot = createProject('current-export', 'Current verified export'); snapshot.clips = [createClip('one', 'generated-original', 0, 2)];
     snapshot.layers[0]!.keyframes = [{ frame: 50, interpolation: 'smooth', values: { ...EMPTY_KEY_VALUES, exposure: 0.1 } }];
@@ -90,29 +127,35 @@ describe.skipIf(!enabled)('schema-5 storage/archive integration · generated fil
       return { id, folder, receipt, output };
     }
     try {
-      const current = await archive(snapshot, 'v5');
+      const current = await archive(snapshot, 'v6');
       const older = [];
-      for (const version of [1, 2, 3, 4]) {
-        const document = version === 4 ? legacyV4Project('old-4', 'Original 4') : { schemaVersion: version, id: `old-${version}`, title: `Original ${version}` };
+      for (const version of [1, 2, 3, 4, 5]) {
+        const document = version === 5 ? legacyV5Project('old-5', 'Original 5') : version === 4 ? legacyV4Project('old-4', 'Original 4') : { schemaVersion: version, id: `old-${version}`, title: `Original ${version}` };
         older.push({ ...await archive(document, `v${version}`), version });
       }
       const missingRow: Record<string, unknown> = { ...snapshot.layers[0]! }; delete missingRow['keyframes'];
-      const malformed = await archive({ ...snapshot, layers: [missingRow] }, 'Malformed v5');
+      const malformed = await archive({ ...snapshot, layers: [missingRow] }, 'Malformed v6');
+      const missingTiming = [];
+      for (const field of ['ripple', 'transitions', 'openingFade', 'closingFade']) {
+        const row: Record<string, unknown> = { ...snapshot.layers[0]! }; delete row[field];
+        missingTiming.push({ ...await archive({ ...snapshot, layers: [row] }, `Missing ${field}`), field });
+      }
       const warnings = await restoreExports(config, jobs);
-      expect(warnings).toHaveLength(5);
+      expect(warnings).toHaveLength(10);
       expect(jobs.list().map((job) => job.id)).toEqual([current.id]);
       expect(jobs.get(current.id)).toMatchObject({ kind: 'export', state: 'completed', progress: 1,
         outputUrl: `/api/jobs/${current.id}/export`, receiptUrl: `/api/jobs/${current.id}/receipt` });
       for (const entry of older) {
-        expect(warnings.find((warning) => warning.startsWith(`${entry.id}:`))).toContain(`Unsupported export snapshot schema version ${entry.version}; this build requires version 5`);
+        expect(warnings.find((warning) => warning.startsWith(`${entry.id}:`))).toContain(`Unsupported export snapshot schema version ${entry.version}; this build requires version 6`);
         expect(warnings.find((warning) => warning.startsWith(`${entry.id}:`))).toContain('successful output were not changed');
       }
       expect(warnings.find((warning) => warning.startsWith(`${malformed.id}:`))).toContain('keyframes');
-      for (const entry of [current, ...older, malformed]) {
+      for (const entry of missingTiming) expect(warnings.find((warning) => warning.startsWith(`${entry.id}:`))).toContain(entry.field);
+      for (const entry of [current, ...older, malformed, ...missingTiming]) {
         expect(await readFile(path.join(entry.folder, 'receipt.json'))).toEqual(entry.receipt);
         expect(await readFile(path.join(entry.folder, 'export.mp4'))).toEqual(entry.output);
       }
-      expect(await restoreExports(config, jobs)).toHaveLength(5); expect(jobs.list()).toHaveLength(1);
+      expect(await restoreExports(config, jobs)).toHaveLength(10); expect(jobs.list()).toHaveLength(1);
     } finally { await jobs.close(); }
   });
 });

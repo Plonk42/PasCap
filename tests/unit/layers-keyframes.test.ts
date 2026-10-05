@@ -4,7 +4,7 @@ import { applyCommand, EditHistory } from '../../src/shared/commands.js';
 import { colourAt, compositePixel, layerOpacityAt, opacityAt } from '../../src/shared/composition.js';
 import { EMPTY_KEY_VALUES, evaluateLayerSetting, keySettings, type Interpolation, type LayerKeyframe, type LayerKeyValues } from '../../src/shared/keyframes.js';
 import { compileLayerRetiming } from '../../src/shared/layer-retiming.js';
-import { createClip, createProject, projectSchema } from '../../src/shared/model.js';
+import { createClip, createLayer, createProject, projectSchema } from '../../src/shared/model.js';
 import { validateSourceRanges } from '../../src/shared/source-range.js';
 import { compileRetiming } from '../../src/shared/speed.js';
 import { calculateLayout, sampleTimeline } from '../../src/shared/timeline.js';
@@ -14,13 +14,13 @@ function point(frame: number, values: Partial<LayerKeyValues>, interpolation: In
 }
 function layered() {
   let project = applyCommand(createProject('flight', 'Flight'), { type: 'insert', clip: createClip('bottom', 'red', 0, 100), index: 0 });
-  project = applyCommand(project, { type: 'layer-add', layer: { id: 'upper', name: 'Video 2', enabled: true, opacity: 0.5, keyframes: [] } });
+  project = applyCommand(project, { type: 'layer-add', layer: { ...createLayer('upper', 'Video 2', false), opacity: 0.5 } });
   return applyCommand(project, { type: 'insert', clip: { ...createClip('top', 'blue', 0, 100), layerId: 'upper', start: 20 }, index: 1 });
 }
 describe('layer layout, compositing and edit commands', () => {
   it('preserves primary ripple and positions overlays independently with gaps/tails', () => {
     const project = layered(); const layout = calculateLayout(project);
-    expect(layout.baseDuration).toBe(100); expect(layout.duration).toBe(120);
+    expect(layout.clips.find((clip) => clip.clip.id === 'bottom')!.end).toBe(100); expect(layout.duration).toBe(120);
     expect(sampleTimeline(project, 10)).toHaveLength(1); expect(sampleTimeline(project, 50)).toHaveLength(2);
     expect(sampleTimeline(project, 110).map((layer) => layer.clipId)).toEqual(['top']);
   });
@@ -36,7 +36,10 @@ describe('layer layout, compositing and edit commands', () => {
     const project = layered();
     expect(() => applyCommand(project, { type: 'insert', clip: { ...createClip('conflict', 'blue', 0, 30), layerId: 'upper', start: 40 }, index: 2 })).toThrow('cannot overlap');
     expect(() => projectSchema.parse({ ...project, layers: [{ ...project.layers[0]!, id: 'wrong' }, project.layers[1]] })).toThrow();
-    expect(() => applyCommand(project, { type: 'layer-remove', layerId: 'video-1' })).toThrow();
+    const removed = applyCommand(project, { type: 'layer-remove', layerId: 'video-1' });
+    expect(removed.layers.map((layer) => layer.id)).toEqual(['upper']);
+    expect(removed.clips).toEqual([project.clips[1]]);
+    expect(() => applyCommand(removed, { type: 'layer-remove', layerId: 'upper' })).toThrow('last video track');
   });
   it('layer deletion is one undoable operation restoring its clips/grades/keys', () => {
     const project = layered();
@@ -65,7 +68,7 @@ describe('layer layout, compositing and edit commands', () => {
   it('primary duplicate inserts directly after its source and repairs transition adjacency', () => {
     const document = layered(); const copy = applyCommand(document, { type: 'duplicate', clipId: 'bottom', newClipId: 'copy' });
     expect(copy.clips.map((clip) => clip.id)).toEqual(['bottom', 'copy', 'top']);
-    expect(copy.transitions).toEqual([{ leftId: 'bottom', rightId: 'copy', type: 'cut', duration: 0 }]);
+    expect(copy.layers[0]!.transitions).toEqual([{ leftId: 'bottom', rightId: 'copy', type: 'cut', duration: 0 }]);
     expect(() => applyCommand(copy, { type: 'duplicate', clipId: 'bottom', newClipId: 'copy' })).toThrow();
   });
   it('moving a primary clip into an overlay repairs boundaries and rejects bad placements atomically', () => {

@@ -162,7 +162,7 @@ describe('one editor-only stored-point cursor', () => {
     expect(JSON.stringify(history.current)).toBe(before);
     expect(history.canUndo).toBe(false); expect(history.canRedo).toBe(false);
     expect(projectSchema.parse(history.current)).toEqual(document);
-    expect(history.current.schemaVersion).toBe(5);
+    expect(history.current.schemaVersion).toBe(6);
   });
 
   it.each([-1, NaN, Infinity, 0.5, 2_147_483_648])('cannot inspect invalid stored/observed/duration frame %s', (frame) => {

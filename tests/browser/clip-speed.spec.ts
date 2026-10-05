@@ -166,7 +166,7 @@ test('collision red feedback rejects release instead of merging or committing th
 });
 
 test('a curve that invalidates opening fades is rejected without shrinking them or changing sources', async ({ page }) => {
-  const before = await seedCurve(page, (document) => { document.openingFade = 110; });
+  const before = await seedCurve(page, (document) => { document.layers[0]!.openingFade = 110; });
   const start = await beginDrag(page); await moveDrag(page, start, 60, 8);
   await expect(page.locator('.clip-speed-point.invalid')).toBeVisible(); await page.mouse.up();
   await expect(page.locator('.clip-speed-error')).toBeVisible(); expect(await current(page)).toEqual(before);

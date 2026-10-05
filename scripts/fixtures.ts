@@ -40,7 +40,7 @@ export async function syntheticSources(config: ServiceConfig, names: readonly st
 export async function preparedFixture(config: ServiceConfig): Promise<{ jobs: JobQueue; library: MediaLibrary; document: ProjectDocument }> {
   const store = new ProjectStore(config.dataDir);
   // Only the disposable browser context keeps the unversioned test ID.
-  const projectId = path.resolve(config.dataDir) === browserDataDir ? 'preview-lab' : 'preview-lab-v5';
+  const projectId = path.resolve(config.dataDir) === browserDataDir ? 'preview-lab' : 'preview-lab-v6';
   let existing: ProjectDocument | null = null;
   try { existing = await store.load(projectId); }
   catch (error) { if (!(error instanceof ServiceError && error.statusCode === 404)) throw error; }
@@ -49,12 +49,13 @@ export async function preparedFixture(config: ServiceConfig): Promise<{ jobs: Jo
   if (existing) return { jobs, library, document: existing };
   const sources = await syntheticSources(config);
   let document = createProject(projectId, 'Synthetic preview · disposable');
+  const layerId = document.layers[0]!.id;
   await forEachSerial(sources, async (filename, index) => {
     const asset = await library.register(filename);
     const job = await library.prepare(asset.id); const result = await jobs.wait(job.id);
     if (result.state !== 'completed') throw new Error(result.message);
     document.media.videoIds.push(asset.id);
-    document = applyCommand(document, { type: 'insert', clip: createClip(index === 0 ? 'clip-a' : 'clip-b', asset.id, 15, 105), index });
+    document = applyCommand(document, { type: 'insert', clip: createClip(index === 0 ? 'clip-a' : 'clip-b', asset.id, 15, 105, layerId), index });
   });
   document = applyCommand(document, { type: 'transition', transition: { leftId: 'clip-a', rightId: 'clip-b', type: 'cross-dissolve', duration: 18 } });
   document = await store.save(document, 0);
@@ -93,5 +94,5 @@ if (process.argv.includes('--browser')) {
   fixture.document.media = { videoIds: fixture.library.list().map((asset) => asset.id), audioIds: [registeredMusic.asset.id] };
   const store = new ProjectStore(config.dataDir);
   fixture.document = await store.save(fixture.document, fixture.document.revision);
-  await fixture.jobs.close(); console.log('Disposable schema-5 browser fixture prepared (preview-lab): 12 project recordings, registered music, three verified video proxies.');
+  await fixture.jobs.close(); console.log('Disposable schema-6 browser fixture prepared (preview-lab): 12 project recordings, registered music, three verified video proxies.');
 }

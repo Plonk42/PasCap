@@ -3,7 +3,7 @@ import path from 'node:path';
 import { generateCube } from '../shared/colour.js';
 import type { MediaJob } from '../shared/media.js';
 import { projectSchema, type ProjectDocument } from '../shared/model.js';
-import { blackFadeParts, calculateLayout } from '../shared/timeline.js';
+import { blackFadeParts, calculateLayout, layerClips } from '../shared/timeline.js';
 import { framesToSeconds, PROJECT_FPS, sameRate } from '../shared/timing.js';
 import { ServiceError } from './errors.js';
 import { assertSourceIdentity } from './files.js';
@@ -32,7 +32,12 @@ export function validateReference(project: ProjectDocument, library: MediaLibrar
     throw new ServiceError('The diagnostic reference does not support video layers, opacity or shared project-frame layer points (including speed). Use Export.');
   }
   if (snapshot.clips.some((clip) => clip.speed.mode !== 'constant' || clip.speed.rate !== 1)) throw new ServiceError('The diagnostic reference only supports normal speed. Use Export for retimed clips.');
-  if (calculateLayout(snapshot).duration > 3600) throw new ServiceError('Lab references are limited to 3,600 project frames (about two minutes).');
+  const layout = calculateLayout(snapshot);
+  const [left, right] = layout.clips;
+  const transition = snapshot.layers[0]!.transitions[0]!;
+  const overlap = transition.type === 'cross-dissolve' ? transition.duration : 0;
+  if (left!.start !== 0 || right!.start !== left!.end - overlap) throw new ServiceError('The diagnostic reference requires a zero-origin contiguous two-clip track, without leading or internal gaps. Use Export.');
+  if (layout.duration > 3600) throw new ServiceError('Lab references are limited to 3,600 project frames (about two minutes).');
   for (const clip of snapshot.clips) {
     const asset = library.get(clip.mediaId);
     if (clip.sourceOut > asset.metadata.frameCount) throw new ServiceError(`Clip ${clip.id} exceeds its registered source frame count.`);
@@ -51,19 +56,21 @@ export function startReference(project: ProjectDocument, library: MediaLibrary):
 export async function renderReference(snapshot: ProjectDocument, library: MediaLibrary, context: JobContext): Promise<void> {
   snapshot = validateReference(snapshot, library);
   const layout = calculateLayout(snapshot);
+  const layer = snapshot.layers[0]!;
+  const clips = layerClips(snapshot, layer.id);
   const directory = path.join(library.config.dataDir, 'renders', context.id);
   await mkdir(directory, { recursive: true, mode: 0o700 });
   const partial = path.join(directory, 'reference.partial.mp4');
   try {
-    const assets = snapshot.clips.map((clip) => library.get(clip.mediaId));
+    const assets = clips.map((clip) => library.get(clip.mediaId));
     for (const asset of assets) await assertSourceIdentity(asset.sourcePath, asset.fingerprint, true); // NOSONAR -- read-only checks are deliberately serial.
     context.update(0.01, 'Generating 65³ LUTs from the CPU colour contract');
-    for (const [index, clip] of snapshot.clips.entries()) await atomicWrite(path.join(directory, `clip-${index}.cube`), generateCube(clip.colour)); // NOSONAR -- bound CPU LUT generation to one at a time.
-    const transition = snapshot.transitions[0]!;
+    for (const [index, clip] of clips.entries()) await atomicWrite(path.join(directory, `clip-${index}.cube`), generateCube(clip.colour)); // NOSONAR -- bound CPU LUT generation to one at a time.
+    const transition = layer.transitions[0]!;
     const black = transition.type === 'fade-through-black' ? blackFadeParts(transition.duration) : { out: 0, in: 0 };
-    const chains = snapshot.clips.map((clip, index) => {
-      const fadeIn = index === 0 ? snapshot.openingFade : black.in;
-      const fadeOut = index === 1 ? snapshot.closingFade : black.out;
+    const chains = clips.map((clip, index) => {
+      const fadeIn = index === 0 ? layer.openingFade : black.in;
+      const fadeOut = index === 1 ? layer.closingFade : black.out;
       const range = assets[index]!.metadata.colourRange;
       return `[${index}:v]trim=start_frame=${clip.sourceIn}:end_frame=${clip.sourceOut},setpts=PTS-STARTPTS,` +
         `scale=1280:720:force_original_aspect_ratio=decrease:force_divisible_by=2:flags=bicubic:in_color_matrix=bt709:out_color_matrix=bt709:in_range=${range}:out_range=pc,` +

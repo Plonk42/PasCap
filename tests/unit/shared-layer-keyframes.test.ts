@@ -4,7 +4,7 @@ import { applyCommand, EditHistory, type EditCommand } from '../../src/shared/co
 import { colourAt, compositePixel, layerOpacityAt, opacityAt } from '../../src/shared/composition.js';
 import { EMPTY_KEY_VALUES, KEYFRAME_SETTINGS, activeLayerSetting, evaluateLayerSetting, hasLayerKeys, keySettings, layerKeyframeSchema, type Interpolation, type KeyframeSetting, type LayerKeyframe, type LayerKeyValues } from '../../src/shared/keyframes.js';
 import { compileLayerRetiming } from '../../src/shared/layer-retiming.js';
-import { BASE_LAYER_ID, clipSchema, createClip, createProject, projectSchema, type ProjectDocument, type VideoLayer } from '../../src/shared/model.js';
+import { BASE_LAYER_ID, clipSchema, createClip, createLayer, createProject, projectSchema, type ProjectDocument, type VideoLayer } from '../../src/shared/model.js';
 import { trimByOutputFrames, trimOnTimeline, validateSourceRanges } from '../../src/shared/source-range.js';
 import { clipDuration, compileRetiming, speedSchema } from '../../src/shared/speed.js';
 import { calculateLayout, sampleTimeline } from '../../src/shared/timeline.js';
@@ -15,7 +15,7 @@ function point(frame: number, values: Partial<LayerKeyValues>, interpolation: In
   return { frame, interpolation, values: { ...EMPTY_KEY_VALUES, ...values } };
 }
 function row(keyframes: LayerKeyframe[] = []): VideoLayer {
-  return { id: BASE_LAYER_ID, name: 'Video 1', enabled: true, opacity: 1, keyframes };
+  return { ...createLayer(BASE_LAYER_ID, 'Video 1'), keyframes };
 }
 function sequence(keyframes: LayerKeyframe[] = [], lengths = [120, 100]): ProjectDocument {
   let project = createProject('shared', 'Shared row');
@@ -24,7 +24,7 @@ function sequence(keyframes: LayerKeyframe[] = [], lengths = [120, 100]): Projec
   return project;
 }
 function overlay(keyframes = [point(0, { speed: 1 }), point(100, { speed: 3 })], start = 50, sourceIn = 10, sourceOut = 85): ProjectDocument {
-  const project = applyCommand(createProject('overlay', 'Overlay row'), { type: 'layer-add', layer: { id: 'upper', name: 'Video 2', enabled: true, opacity: 1, keyframes } });
+  const project = applyCommand(createProject('overlay', 'Overlay row'), { type: 'layer-add', layer: { ...createLayer('upper', 'Video 2', false), keyframes } });
   return applyCommand(project, { type: 'insert', clip: { ...createClip('top', 'source', sourceIn, sourceOut), layerId: 'upper', start, speed: { mode: 'constant', rate: 4 } }, index: 0 });
 }
 const changingRate = (): LayerKeyframe[] => [point(0, { speed: 1 }, 'hold'), point(100, { speed: 2 })];
@@ -36,7 +36,7 @@ const primitive: Record<Interpolation, (u: number) => number> = {
   smooth: (u) => u * u * u - u * u * u * u / 2,
 };
 
-describe('strict schema-5 row points and independently participating settings', () => {
+describe('strict schema-6 row points and independently participating settings', () => {
   it('exports an ordered immutable ten-setting catalogue and explicit all-null template', () => {
     const settings = ['layerOpacity', 'clipOpacity', 'speed', 'exposure', 'brightness', 'contrast', 'hue', 'saturation', 'highlights', 'shadows'];
     expect(KEYFRAME_SETTINGS.map((setting) => setting.key)).toEqual(settings);
@@ -47,9 +47,9 @@ describe('strict schema-5 row points and independently participating settings', 
     expect(KEYFRAME_SETTINGS.every(Object.isFrozen)).toBe(true);
   });
 
-  it('requires version 5, explicit media membership, row points and static clip settings without legacy fields', () => {
+  it('requires version 6, explicit media membership, row points and static clip settings without legacy fields', () => {
     const project = createProject('strict', 'Strict'); const clip = createClip('one', 'source', 0, 20);
-    expect(project.schemaVersion).toBe(5);
+    expect(project.schemaVersion).toBe(6);
     expect(project.media).toEqual({ videoIds: [], audioIds: [] });
     expect(project.layers[0]).toEqual(row());
     expect(Object.keys(clip)).toEqual(['id', 'mediaId', 'layerId', 'start', 'sourceIn', 'sourceOut', 'colour', 'speed', 'opacity']);
@@ -153,7 +153,7 @@ describe('strict schema-5 row points and independently participating settings', 
   });
 
   it('rejects timing-invalid speed edits atomically and leaves no history entry', () => {
-    const document = applyCommand(sequence([], [100]), { type: 'fades', opening: 80, closing: 0 });
+    const document = applyCommand(sequence([], [100]), { type: 'fades', layerId: BASE_LAYER_ID, opening: 80, closing: 0 });
     const history = new EditHistory(document);
     expect(() => history.commit({ type: 'layer-key-toggle', layerId: BASE_LAYER_ID, frame: 0, setting: 'speed', value: 8 })).toThrow('regions overlap');
     expect(history.current).toEqual(document);
@@ -457,7 +457,7 @@ describe('contextual trims, splits, duplicates and fixed row key times', () => {
   it('rejects unrepresentable source trims rather than moving the retained overlay OUT', () => {
     const original = overlay([point(0, { speed: 8 }, 'hold'), point(40, { speed: 0.1 })], 30, 0, 90);
     expect(calculateLayout(original).clips[0]!.end).toBe(140);
-    expect(() => trimOnTimeline(original, 'top', 'in', 1, 100, 'source')).toThrow('cannot keep the overlay OUT');
+    expect(() => trimOnTimeline(original, 'top', 'in', 1, 100, 'source')).toThrow('cannot keep the positioned clip OUT');
     expect(original.clips[0]).toMatchObject({ start: 30, sourceIn: 0, sourceOut: 90 });
     const byOutput = trimOnTimeline(original, 'top', 'in', 1, 100, 'output');
     expect(byOutput).toEqual({ type: 'trim-place', clipId: 'top', sourceIn: 8, sourceOut: 90, start: 31 });
@@ -478,7 +478,7 @@ describe('contextual trims, splits, duplicates and fixed row key times', () => {
     const sequenceProject = applyCommand(sequence(changingRate()), { type: 'transition', transition: { leftId: 'clip-0', rightId: 'clip-1', type: 'cross-dissolve', duration: 10 } });
     const divided = applyCommand(sequenceProject, { type: 'split', clipId: 'clip-0', sourceFrame: 90, newClipId: 'part' });
     expect(calculateLayout(divided).clips.slice(0, 2).map((clip) => [clip.start, clip.duration])).toEqual([[0, 90], [90, 20]]);
-    expect(divided.transitions.map((transition) => [transition.leftId, transition.rightId, transition.type])).toEqual([['clip-0', 'part', 'cut'], ['part', 'clip-1', 'cross-dissolve']]);
+    expect(divided.layers[0]!.transitions.map((transition) => [transition.leftId, transition.rightId, transition.type])).toEqual([['clip-0', 'part', 'cut'], ['part', 'clip-1', 'cross-dissolve']]);
     expect(divided.layers[0]!.keyframes).toEqual(sequenceProject.layers[0]!.keyframes);
   });
 

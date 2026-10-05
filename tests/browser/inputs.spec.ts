@@ -3,7 +3,7 @@ import type { AudioAsset } from '../../src/shared/audio.js';
 import { NEUTRAL_COLOUR } from '../../src/shared/colour.js';
 import { applyCommand } from '../../src/shared/commands.js';
 import type { MediaAsset } from '../../src/shared/media.js';
-import { createClip, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
+import { createClip, createLayer, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
 import { calculateLayout } from '../../src/shared/timeline.js';
 import { editLayerPoint, expandedInspectorPreferences, inspectorTab, layerKeyframes, sharedPoint } from './editor-helpers.js';
 import { memoryProjects } from './memory-projects.js';
@@ -130,7 +130,7 @@ test('the shared list labels time/value/easing, retains reordered input focus, a
     sharedPoint(20, { clipOpacity: 0.2, exposure: -0.5 }, 'hold'),
     sharedPoint(70, { clipOpacity: 0.8, exposure: 0.5 }, 'smooth'),
   ] } });
-  document = applyCommand(document, { type: 'layer-add', layer: { id: 'upper', name: 'Video 2', enabled: true, opacity: 1, keyframes: [sharedPoint(80, { clipOpacity: 0.4 }, 'hold')] } });
+  document = applyCommand(document, { type: 'layer-add', layer: { ...createLayer('upper', 'Video 2', false), keyframes: [sharedPoint(80, { clipOpacity: 0.4 }, 'hold')] } });
   document = applyCommand(document, { type: 'insert', clip: { ...createClip('other-row', document.clips[1]!.mediaId, 0, 30), layerId: 'upper', start: 90 }, index: 2 });
   await setProject(page, document);
   const keys = layerKeyframes(page, 'Video 1');
@@ -284,21 +284,21 @@ test('music commits preserve source/timeline units and validate range, duration,
   expect((await currentProject(page)).music?.fadeIn).toBe(10);
 });
 
-test('sequence/transition timing and overlay/layer key numbers use the same explicit commits', async ({ page }) => {
+test('per-track fade/transition timing and positioned track key numbers use the same explicit commits', async ({ page }) => {
   await commitNumber(page, 'Opening fade', '12');
   await commitNumber(page, 'Closing fade', '9');
   const transition = page.getByRole('spinbutton', { name: 'Transition duration', exact: true });
   await transition.fill('24');
-  expect((await currentProject(page)).transitions[0]?.duration).toBe(18);
+  expect((await currentProject(page)).layers[0]!.transitions[0]?.duration).toBe(18);
   await transition.press('Enter');
   const opening = page.getByRole('spinbutton', { name: 'Opening fade', exact: true });
   await opening.fill('80'); await opening.press('Enter');
   await expect(opening.locator('..').getByRole('alert')).toContainText('Shorten the opening fade');
-  expect((await currentProject(page)).openingFade).toBe(12);
+  expect((await currentProject(page)).layers[0]!.openingFade).toBe(12);
   await opening.press('Escape');
 
   let document = await currentProject(page);
-  document = applyCommand(document, { type: 'layer-add', layer: { id: 'upper', name: 'Video 2', enabled: true, opacity: 1, keyframes: [
+  document = applyCommand(document, { type: 'layer-add', layer: { ...createLayer('upper', 'Video 2', false), keyframes: [
     sharedPoint(5, { clipOpacity: 0.5 }, 'hold'), sharedPoint(10, { layerOpacity: 0.8 }, 'smooth'),
   ] } });
   document = applyCommand(document, { type: 'insert', clip: { ...createClip('overlay', document.clips[1]!.mediaId, 0, 30), layerId: 'upper', start: 5 }, index: 2 });

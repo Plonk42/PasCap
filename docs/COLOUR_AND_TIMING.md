@@ -1,6 +1,6 @@
-# PasCap colour and timing contract · project v5
+# PasCap colour and timing contract · project v6
 
-This specification precedes the preview controls. It is shared by the CPU reference,
+This specification is shared by the CPU reference,
 WebGL2 shader and generated native FFmpeg LUTs. It is elementary SDR grading, not
 highlight recovery. Originals remain untouched.
 
@@ -58,8 +58,9 @@ For each enabled layer, source-over uses premultiplied encoded RGB/coverage.
 Let `w` be dissolve weight, `o` clip opacity, `b` black-fade brightness and `G` graded
 RGB. Group RGB is `C = Σ(G × o × w × b)` and coverage is `A = Σ(o × w)`.
 Layer opacity `l` is applied once: `result = l × C + lower × (1 − l × A)`.
-The primary dissolve is one group, preventing unintended double attenuation;
-overlay groups have one source at a time. Black fades affect RGB, **not alpha**.
+Every track's dissolve is one group, preventing unintended double attenuation;
+independent pairs may dissolve simultaneously on several tracks. Black fades affect
+that track's RGB, **not alpha**, preserving its coverage of lower footage.
 Enabled layer groups blend bottom-to-top over opaque black, with no implicit linear-
 light blend or extra tone map. See [LAYERS_AND_KEYFRAMES.md](LAYERS_AND_KEYFRAMES.md).
 
@@ -69,24 +70,33 @@ light blend or extra tone map. See [LAYERS_AND_KEYFRAMES.md](LAYERS_AND_KEYFRAME
   source bounds and clip-speed anchors use integer **original-source frames**.
   Rate: exactly `30000/1001`.
   Seconds exist only at media API / FFmpeg boundaries. Source OUT is exclusive.
-- Cuts consume zero frames. Primary ripple duration is the sum of retimed output
-  durations minus primary dissolve overlaps, not source length at non-1× speed.
-- Dissolve duration `D` consumes `D` tail/head frames, subtracting `D` from total
-  duration. At overlapping frame `j` in `[0, D)`, right weight is `j / D`;
+- Cuts consume zero frames. With Ripple on, a track sequences from its first
+  anchor: its OUT is that start plus contextual retimed durations minus dissolve
+  overlaps, not raw source length at non-1× speed. Enabling closes gaps in one
+  Undo while preserving the first current start; turning it off retains actual
+  placements. While off, unrelated clips never move with duration edits.
+- Dissolve duration `D` overlaps `D` retimed tail/head frames on its own track;
+  project duration remains the maximum track OUT, not a global sum. At overlapping
+  frame `j` in `[0, D)`, right weight is `j / D`;
   left weight is `1 − j / D`. The next frame is solely the right clip.
   Both source frames are required even at a zero-weight endpoint.
+  Non-cut edits require touching clips or an existing dissolve; a gapped pair is
+  Cut only. A positioned dissolve edit explicitly changes the right start to
+  left OUT minus D (or left OUT when removed), without moving other clips.
 - Black transition duration `D ≥ 2`: left fade-out is `ceil(D/2)` frames,
   right fade-in is `floor(D/2)` frames. There is no overlap or duration change.
-- Opening/closing fades are inside the first/last primary clip, with no holds.
-  Overlays remain unaffected; animate their opacity for separate fades.
+- Opening/closing fades are inside each track's first/last clip at actual
+  placements, with no holds. They retain black-RGB/coverage-preserving math,
+  never fade the entire composite, and stay stored but dormant on empty tracks.
 - An `N ≥ 2` fade uses endpoint-inclusive weights `j/(N−1)` or `1−j/(N−1)`.
   A one-frame fade is a black frame. This yields two adjoining black frames at
   a black transition's centre. It is intentional, deterministic and testable.
 - Incoming/outgoing transition and opening/closing regions must not overlap
   within a clip. Invalid durations/edits are rejected, never silently clamped.
-- Primary splits copy static settings/clip-speed anchors, preserve exterior boundaries
-  and add a cut; shared row points stay at their project frames.
-  Overlay split pieces start consecutively and do not ripple other placements.
+- Splits copy static settings/clip-speed anchors, preserve exterior boundaries
+  and add a cut; shared row points stay at their project frames. Pieces recompile
+  and round independently. Ripple-on tracks re-sequence; off tracks retain
+  unrelated placements. Reordering tracks changes composition, not clip timing.
   Reordering preserves only unchanged adjacent ID pairs; new pairs become cuts.
 - Trimming selects a recoverable source IN/OUT range inside the complete registered
   recording. Originals/proxies are never cut. Handles may restore previously omitted
@@ -95,9 +105,10 @@ light blend or extra tone map. See [LAYERS_AND_KEYFRAMES.md](LAYERS_AND_KEYFRAME
 - Constant/ramp/keyframed speed changes output duration/source mapping using the shared
   contract in [SPEED_AND_AUDIO.md](SPEED_AND_AUDIO.md). Transitions/fades stay in
   output frames. Grading remains independent per clip instance and before blending.
-- Overlay starts are absolute project frames; gaps may reveal lower footage and
-  tails may extend beyond the primary duration. No same-overlay-row overlap is
-  allowed. Total duration is the maximum clip end, including hidden-layer tails;
+- Ripple-off starts are independent absolute project frames; gaps reveal lower
+  footage/black. Exact adjacent Cross-dissolve overlap is the only allowed
+  same-track overlap; triple overlap is invalid. Total duration is the maximum
+  clip end across all tracks, including hidden-layer tails;
   empty/entirely hidden regions are black.
 - UI timecode is 30 fps non-drop-frame, labelled NDF. Duration in seconds uses the
   rational rate, so timecode is not a wall-clock duration at 29.97 fps.
@@ -105,20 +116,26 @@ light blend or extra tone map. See [LAYERS_AND_KEYFRAMES.md](LAYERS_AND_KEYFRAME
 ## Preview and reference scope
 
 The editor supports up to eight layers and arbitrary clip instances within schema
-limits. Preview reuses two decoder/texture slots for one nonempty layer and up to
-nine for eight layers, plus at most one separate source-review decoder. Resources
+limits. Display and composition follow the same saved bottom-to-top track array;
+no ID or first row has special editing privileges. Preview reuses two decoder/texture
+slots per track in a nonempty project, up to **16 for eight**, plus at most one
+separate source-review decoder. Resources
 are not allocated per stored clip; missing observed frames buffer explicitly.
 
-Production export reads originals and uses exact shared retiming. Plain static
-single-layer edits retain bounded body/dissolve chunks. Layers/nontrivial opacity/
-animated colour use sequential RGBA16 layer passes and one final H.264 encode,
+Production export reads originals and uses exact shared retiming. The static fast
+path requires one enabled opaque track, opaque clips, no row points, zero origin
+and no internal gaps; supported track fades/dissolves retain bounded chunks.
+Other valid timelines use generalized sequential RGBA16 group and source-over
+passes without regrading, then one final H.264 encode,
 with optional 48 kHz AAC music in both paths. Resource and numeric limits are in
 [Inspector and resource limits](LAYERS_AND_KEYFRAMES.md#inspector-and-resource-limits).
 
-The diagnostic reference accepts **exactly two normal-speed primary clips without
-music, layers, nontrivial opacity or animation** and refuses unsupported documents.
-It requires a strict schema-5 project snapshot, including explicit project media
+The diagnostic reference accepts **exactly two normal-speed clips on one enabled,
+opaque, zero-origin contiguous track**, without music, extra tracks, nontrivial
+opacity or row points, and is limited to 3,600 project frames. It refuses unsupported
+documents regardless of Ripple or track ID.
+It requires a strict schema-6 project snapshot, including explicit project media
 membership; its reference receipt format remains independently version 1. New
-measurement reports use `preview-v5` without overwriting historical reports.
+measurement reports use `preview-v6` without overwriting historical reports.
 Source ranges and every retained clip key position are validated against registered
 original frame counts, including hidden layer references.

@@ -112,8 +112,8 @@ describe('registered API methods', () => {
     await expect(api.save(project, 0)).rejects.toMatchObject({ status: 200, kind: 'response' });
   });
 
-  it('uses complete schema-5 project mocks and rejects an actual schema-3 response without migration', async () => {
-    expect(project.schemaVersion).toBe(5); expect(project.layers[0]!.keyframes).toEqual([]);
+  it('uses complete schema-6 project mocks and rejects an actual schema-3 response without migration', async () => {
+    expect(project.schemaVersion).toBe(6); expect(project.layers[0]!.keyframes).toEqual([]);
     const legacy = legacyV3Project(project.id, project.title); const before = JSON.stringify(legacy);
     fetchMock.mockResolvedValueOnce(jsonResponse({ document: legacy }));
     await expect(api.load(project.id)).rejects.toMatchObject({ status: 200, kind: 'response', retryable: false });

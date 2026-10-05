@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { applyCommand } from '../../src/shared/commands.js';
 import { EMPTY_KEY_VALUES } from '../../src/shared/keyframes.js';
-import { createClip, createProject } from '../../src/shared/model.js';
+import { createClip, createLayer, createProject } from '../../src/shared/model.js';
 import { calculateLayout } from '../../src/shared/timeline.js';
 import { placementSnapPoints, planTimelineDrop, snapPlacement } from '../../src/web/timeline-placement.js';
 
 function project() {
     let document = createProject('flight', 'Flight');
     for (const [index, id] of ['a', 'b', 'c'].entries()) document = applyCommand(document, { type: 'insert', clip: createClip(id, id, 0, 60), index });
-    return applyCommand(document, { type: 'layer-add', layer: { id: 'upper', name: 'Overlay', enabled: true, opacity: 1, keyframes: [] } });
+    return applyCommand(document, { type: 'layer-add', layer: createLayer('upper', 'Overlay', false) });
 }
 
 describe('one authoritative timeline drop plan', () => {
@@ -77,7 +77,9 @@ describe('one authoritative timeline drop plan', () => {
         const next = applyCommand(document, plan.command!);
         const placed = calculateLayout(next).clips.find((clip) => clip.clip.id === 'b')!;
         expect([placed.start, placed.duration, placed.end]).toEqual([40, 29, 69]);
-        expect(next.layers).toEqual(document.layers);
+        expect(next.layers).toEqual(document.layers.map((layer) => layer.id === 'video-1' ? {
+            ...layer, transitions: [{ leftId: 'a', rightId: 'c', type: 'cut', duration: 0 }],
+        } : layer));
         expect(JSON.stringify(document)).toBe(before);
     });
 

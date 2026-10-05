@@ -60,7 +60,10 @@ external desktop file/folder drag-and-drop import**. External drops prevent
 navigation and show Import guidance without a POST. Internal ready-Media-to-Timeline
 dragging remains supported. Imports reference originals; generated proxies/
 thumbnails, project/registry metadata, exports/receipts and scratch are the only
-new local data, not duplicate original footage. Strict project schema 5 is unchanged.
+new local data, not duplicate original footage. Projects use strict schema 6 with
+required per-track Ripple, transitions and opening/closing fades. v1–v5 projects
+and receipt snapshots remain unchanged/incompatible, without migration;
+registry/proxy formats and source identity checks are unchanged.
 
 ## Planned architecture and storage layout
 

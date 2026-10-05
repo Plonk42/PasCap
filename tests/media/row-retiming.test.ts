@@ -7,7 +7,7 @@ import { fingerprintFile } from '../../src/server/files.js';
 import { runProcess } from '../../src/server/process.js';
 import { retimeRawVideo, type RawRetimingOptions } from '../../src/server/retime-process.js';
 import { EMPTY_KEY_VALUES, evaluateLayerSetting, type Interpolation, type LayerKeyframe, type LayerKeyValues } from '../../src/shared/keyframes.js';
-import { createClip, createProject, projectSchema, type VideoClip } from '../../src/shared/model.js';
+import { createClip, createLayer, createProject, projectSchema, type VideoClip } from '../../src/shared/model.js';
 import { compileRetiming, type Retiming } from '../../src/shared/speed.js';
 import { calculateLayout, sampleTimeline } from '../../src/shared/timeline.js';
 
@@ -19,7 +19,7 @@ function point(frame: number, values: Partial<LayerKeyValues>, interpolation: In
   return { frame, interpolation, values: { ...EMPTY_KEY_VALUES, ...values } };
 }
 
-describe.skipIf(!enabled)('schema-4 supplied row maps · native pipes and disposable frame-coded originals', () => {
+describe.skipIf(!enabled)('schema-6 supplied row maps · native pipes and disposable frame-coded originals', () => {
   let root: string;
   let config: ServiceConfig;
   let sourcePath: string;
@@ -65,7 +65,7 @@ describe.skipIf(!enabled)('schema-4 supplied row maps · native pipes and dispos
     const work = await mkdtemp(path.join(root, 'mapped-'));
     try {
       const project = createProject(`native-row-${interpolation}`, 'No UI state is involved');
-      const row = { id: 'video-2', name: 'Contextual row', enabled: true, opacity: 1, keyframes: [
+      const row = { ...createLayer('video-2', 'Contextual row', false), keyframes: [
         point(4, { speed: 0.35 }, interpolation), point(11, { hue: 75 }, 'hold'),
         point(26, { speed: 3 }, 'ease-out'), point(35, { speed: 0.7 }, 'smooth'), point(50, { speed: 2 }, 'hold'),
       ] };

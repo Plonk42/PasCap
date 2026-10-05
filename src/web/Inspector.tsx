@@ -1,12 +1,12 @@
 import { useId, type KeyboardEvent, type ReactNode } from 'react';
 import { COLOUR_CONTROLS, NEUTRAL_COLOUR, type ColourSettings } from '../shared/colour.js';
-import type { EditCommand } from '../shared/commands.js';
+import { applyCommand, type EditCommand } from '../shared/commands.js';
 import { colourAt, layerOpacityAt, opacityAt } from '../shared/composition.js';
 import { activeLayerSetting, evaluateLayerSetting, hasLayerKeys, type KeyframeSetting, type LayerKeyValues } from '../shared/keyframes.js';
 import type { MediaAsset } from '../shared/media.js';
 import type { ProjectDocument, Transition, VideoClip, VideoLayer } from '../shared/model.js';
 import { sourceRateAt } from '../shared/speed.js';
-import { calculateLayout } from '../shared/timeline.js';
+import { calculateLayout, type TimelineLayout } from '../shared/timeline.js';
 import { formatTimecode } from '../shared/timing.js';
 import { shortName, sourceSeconds } from './display.js';
 import { HelpPopover } from './HelpPopover.js';
@@ -14,9 +14,11 @@ import { Icon } from './icons.js';
 import { InspectorSection, type InspectorMode } from './InspectorSection.js';
 import { KeyframeControls } from './KeyframeControls.js';
 import { KeyframeToggle } from './KeyframeToggle.js';
+import { clipStartRestriction } from './layer-actions.js';
 import { NumberField } from './NumberField.js';
 import { SpeedControls, SpeedHelp } from './SpeedControls.js';
 import type { DraftPreview } from './Timeline.js';
+import { planTimelineDrop } from './timeline-placement.js';
 
 export type { InspectorMode } from './InspectorSection.js';
 
@@ -34,9 +36,26 @@ const INSPECTOR_MODES: readonly { id: InspectorMode; label: string }[] = [
   { id: 'clip', label: 'Clip' }, { id: 'sequence', label: 'Sequence' }, { id: 'audio', label: 'Audio' },
 ];
 
-function timelineNumberError(project: ProjectDocument, recovery: string): string | null {
-  try { calculateLayout(project); return null; }
+function commandNumberError(project: ProjectDocument, command: EditCommand, recovery: string): string | null {
+  try { applyCommand(project, command); return null; }
   catch (cause) { return `${cause instanceof Error ? cause.message : 'This timing is not valid.'} ${recovery}`; }
+}
+
+function placementHint(layer: VideoLayer | undefined, restriction: string | null): string {
+  if (restriction) return restriction;
+  return layer?.ripple ? 'First clip anchor in project frames; later clips follow it. Row points, music and other tracks stay fixed.' : 'Independent project-frame start; row points, music and other clips stay fixed.';
+}
+
+function transitionHasGap(boundary: Transition | undefined, layout: TimelineLayout): boolean {
+  if (!boundary || boundary.type === 'cross-dissolve') return false;
+  const left = layout.clips.find((item) => item.clip.id === boundary.leftId);
+  const right = layout.clips.find((item) => item.clip.id === boundary.rightId);
+  return !!left && !!right && left.end !== right.start;
+}
+
+function clipRangeError(project: ProjectDocument, clip: VideoClip | undefined, changes: Partial<Pick<VideoClip, 'sourceIn' | 'sourceOut'>>): string | null {
+  if (!clip) return null;
+  return commandNumberError(project, { type: 'trim', clipId: clip.id, sourceIn: changes.sourceIn ?? clip.sourceIn, sourceOut: changes.sourceOut ?? clip.sourceOut }, 'Adjust this range or the conflicting fades and clips.');
 }
 
 function InspectorTabs({ id, section, onSection }: Readonly<{ id: string; section: InspectorMode; onSection: Props['onSection'] }>) {
@@ -167,6 +186,43 @@ function ColourSection({ layer, clip, frame, disabled, onEdit, id }: Readonly<La
   </InspectorSection>;
 }
 
+function SequenceControls({ project, layer, assets, boundaryId, layout, drafting, onEdit, id }: Readonly<Pick<Props, 'project' | 'assets' | 'boundaryId' | 'drafting' | 'onEdit'> & { layer: VideoLayer; layout: TimelineLayout; id: string }>) {
+  const boundary = layer.transitions.find((item) => item.leftId === boundaryId);
+  const boundaryIndex = boundary ? layer.transitions.indexOf(boundary) : -1;
+  const left = project.clips.find((item) => item.id === boundary?.leftId);
+  const right = project.clips.find((item) => item.id === boundary?.rightId);
+  const trackClips = layout.clips.filter((item) => item.clip.layerId === layer.id);
+  const transitionGap = transitionHasGap(boundary, layout);
+  const setTransition = (type: Transition['type'], duration: number): void => {
+    if (!boundary) return;
+    const pair = { leftId: boundary.leftId, rightId: boundary.rightId };
+    if (type === 'cut') onEdit({ type: 'transition', transition: { ...pair, type, duration: 0 } });
+    else onEdit({ type: 'transition', transition: { ...pair, type, duration } });
+  };
+  return <>
+    <div className="inspector-track-selection"><Icon name="layers" size={17} /><strong title={layer.name}>{layer.name}</strong><span>Track transitions & fades</span></div>
+    {boundary && <InspectorSection id="transition" title="Transition" icon="curve" modified={boundary.type !== 'cut'} help={<HelpPopover label="Transition timing"><p id={`${id}-transition-help`}>Timeline frames after retiming, on this track only. Fade-through-black darkens this row without revealing lower footage. Non-cut transitions need touching clips or an existing dissolve; close a gap explicitly first. A positioned dissolve moves only its right clip to the exact overlap. Conflicts reject the complete edit, never shorten another fade or transition.</p></HelpPopover>}>
+      <section className="boundary-inspector" aria-label="Boundary transition">
+        <p title={`Transition ${boundaryIndex + 1}`}>{shortName(assets.find((item) => item.id === left?.mediaId)?.name ?? '')} <Icon name="arrow" size={12} /> {shortName(assets.find((item) => item.id === right?.mediaId)?.name ?? '')}</p>
+        <div className="transition-fields">
+          <label>Type<select aria-label="Transition type" aria-describedby={transitionGap ? `${id}-transition-gap` : `${id}-transition-help`} disabled={drafting} value={boundary.type} onChange={(event) => setTransition(event.target.value as Transition['type'], boundary.type === 'cut' ? 30 : boundary.duration)}><option value="cut">Cut</option><option value="fade-through-black" disabled={transitionGap}>Fade through black</option><option value="cross-dissolve" disabled={transitionGap}>Cross-dissolve</option></select></label>
+          <label>Timeline frames<NumberField aria-label="Transition duration" aria-describedby={`${id}-transition-help`} min={boundary.type === 'fade-through-black' ? 2 : 1} max={2_147_483_647} integer step={1} disabled={drafting || boundary.type === 'cut'} value={boundary.duration} resetKey={`${project.id}:${layer.id}:${boundary.leftId}:${boundary.rightId}:${boundary.type}`} validate={(duration) => boundary.type === 'cut' ? null : commandNumberError(project, { type: 'transition', transition: { ...boundary, duration } }, 'Shorten this transition or adjust conflicting fades/placements on this track.')} onCommit={(duration) => setTransition(boundary.type, duration)} /></label>
+        </div>
+        {transitionGap && <p className="control-hint" id={`${id}-transition-gap`}>These clips have a gap. Close it explicitly, or enable this track’s Ripple in Layer options, before adding a fade or dissolve.</p>}
+      </section>
+    </InspectorSection>}
+    <div className="inspector-empty" hidden={boundary !== undefined}>Select a transition on {layer.name}.</div>
+    <InspectorSection id="fades" title="Sequence fades" icon="start" modified={layer.openingFade > 0 || layer.closingFade > 0} help={<HelpPopover label="Fade timing"><p id={`${id}-fades-help`}>Timeline frames on this track’s first and last clips, at their actual placements. 0 disables a fade. These fades darken this row toward black without changing its coverage or fading another track. Empty tracks retain their stored fades.</p></HelpPopover>}>
+      <section className="edge-fade-settings" aria-label="Sequence fades">
+        <div className="range-fields">
+          <label>Opening <small>frames</small><NumberField aria-label="Opening fade" aria-describedby={`${id}-fades-help`} min={0} max={Math.min(trackClips[0]?.duration ?? 0, 2_147_483_647)} integer step={1} value={layer.openingFade} disabled={drafting || !trackClips.length} resetKey={`${project.id}:${layer.id}`} validate={(opening) => commandNumberError(project, { type: 'fades', layerId: layer.id, opening, closing: layer.closingFade }, 'Shorten the opening fade or adjust the first clip’s other fades/transitions.')} onCommit={(opening) => onEdit({ type: 'fades', layerId: layer.id, opening, closing: layer.closingFade })} /></label>
+          <label>Closing <small>frames</small><NumberField aria-label="Closing fade" aria-describedby={`${id}-fades-help`} min={0} max={Math.min(trackClips.at(-1)?.duration ?? 0, 2_147_483_647)} integer step={1} value={layer.closingFade} disabled={drafting || !trackClips.length} resetKey={`${project.id}:${layer.id}`} validate={(closing) => commandNumberError(project, { type: 'fades', layerId: layer.id, opening: layer.openingFade, closing }, 'Shorten the closing fade or adjust the last clip’s other fades/transitions.')} onCommit={(closing) => onEdit({ type: 'fades', layerId: layer.id, opening: layer.openingFade, closing })} /></label>
+        </div>
+      </section>
+    </InspectorSection>
+  </>;
+}
+
 export function Inspector({ project, assets, selectedClipId, selectedLayerId, boundaryId, frame, drafting, section, onSection, onEdit, onPreview, onSeek, onPause, children }: Readonly<Props>) {
   const inspectorId = useId();
   const colourControlId = useId();
@@ -179,20 +235,10 @@ export function Inspector({ project, assets, selectedClipId, selectedLayerId, bo
   const sourceFrame = placed && frame >= placed.start && frame < placed.end ? placed.retiming.sourceAt(frame - placed.start) : null;
   const clipRate = clip ? sourceRateAt(clip.speed, sourceFrame ?? clip.sourceIn) : 1;
   const speedRate = layer ? evaluateLayerSetting(layer, 'speed', frame, clipRate) : 1;
-  const boundary = project.transitions.find((item) => item.leftId === boundaryId);
-  const boundaryIndex = boundary ? project.transitions.indexOf(boundary) : -1;
-  const left = project.clips.find((item) => item.id === boundary?.leftId);
-  const right = project.clips.find((item) => item.id === boundary?.rightId);
   const inputContext = `${project.id}:${layer?.id}:${clip?.id ?? 'row'}`;
-  const primary = layout.clips.filter((item) => item.clip.layerId === project.layers[0]!.id);
-  const clipTimingError = (changes: Partial<Pick<VideoClip, 'sourceIn' | 'sourceOut' | 'start'>>): string | null => clip
-    ? timelineNumberError({ ...project, clips: project.clips.map((item) => item.id === clip.id ? { ...item, ...changes } : item) }, 'Adjust this range/placement or the conflicting fades and clips.') : null;
-  const setTransition = (type: Transition['type'], duration: number): void => {
-    if (!boundary) return;
-    const pair = { leftId: boundary.leftId, rightId: boundary.rightId };
-    if (type === 'cut') onEdit({ type: 'transition', transition: { ...pair, type, duration: 0 } });
-    else onEdit({ type: 'transition', transition: { ...pair, type, duration } });
-  };
+  const startRestriction = clip ? clipStartRestriction(project, clip) : null;
+  const startHint = placementHint(layer, startRestriction);
+  const clipTimingError = (changes: Partial<Pick<VideoClip, 'sourceIn' | 'sourceOut'>>): string | null => clipRangeError(project, clip, changes);
 
   return <aside className="inspector-panel panel declutter-inspector" aria-label="Clip inspector">
     <InspectorTabs id={inspectorId} section={section} onSection={onSection} />
@@ -212,8 +258,11 @@ export function Inspector({ project, assets, selectedClipId, selectedLayerId, bo
         <InspectorSection id="layer-opacity" title="Layer & opacity" icon="layers" defaultOpen={false} help={<HelpPopover label="Opacity scope"><p>Layer opacity is applied after the row's clips are combined, including dissolves. Clip opacity keys are also row-wide: they replace each clip's base opacity, before the combined layer opacity is applied. Unkeyed channels keep their static bases.</p></HelpPopover>}>
           <section className="layer-inspector" aria-label="Layer appearance">
             {clip && placed && <>
-              <label className="speed-field">Video layer<select aria-label="Clip video layer" disabled={drafting} value={clip.layerId} onChange={(event) => onEdit({ type: 'place', clipId: clip.id, layerId: event.target.value, start: placed.start, index: position })}>{project.layers.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
-              {clip.layerId !== project.layers[0]!.id && <label className="speed-field">Timeline start frame<NumberField aria-label="Clip timeline start" min={0} max={2_147_483_647 - placed.duration} integer step={1} disabled={drafting} value={clip.start} resetKey={inputContext} hint="Absolute timeline frames; this layer's points do not move with the clip." validate={(start) => clipTimingError({ start })} onCommit={(start) => onEdit({ type: 'place', clipId: clip.id, layerId: clip.layerId, start, index: position })} /></label>}
+              <label className="speed-field">Video layer<select aria-label="Clip video layer" disabled={drafting} value={clip.layerId} onChange={(event) => {
+                const plan = planTimelineDrop(project, { kind: 'clip', clipId: clip.id, grabFrame: 0 }, event.target.value, placed.start, false, 0, frame);
+                if (plan.command) onEdit(plan.command);
+              }}>{project.layers.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+              <label className="speed-field" title={startHint}>Timeline start frame<NumberField aria-label="Clip timeline start" min={0} max={2_147_483_647} integer step={1} disabled={drafting || startRestriction !== null} value={placed.start} resetKey={inputContext} hint={startHint} validate={(start) => commandNumberError(project, { type: 'place', clipId: clip.id, layerId: clip.layerId, start, index: position }, 'Adjust this placement or the conflicting clips/transitions.')} onCommit={(start) => onEdit({ type: 'place', clipId: clip.id, layerId: clip.layerId, start, index: position })} /></label>
             </>}
             <OpacityControl layer={layer} clip={clip ?? null} frame={frame} disabled={drafting} onEdit={onEdit} setting="layerOpacity" id={`${colourControlId}-layer-opacity`} />
             <OpacityControl layer={layer} clip={clip ?? null} frame={frame} disabled={drafting} onEdit={onEdit} setting="clipOpacity" id={`${colourControlId}-clip-opacity`} />
@@ -224,24 +273,7 @@ export function Inspector({ project, assets, selectedClipId, selectedLayerId, bo
       </> : <div className="inspector-empty">Select a video layer or clip in the timeline.</div>}
     </div>
     <div role="tabpanel" id={`${inspectorId}-sequence-panel`} aria-labelledby={`${inspectorId}-sequence-tab`} hidden={section !== 'sequence'}>
-      {boundary && <InspectorSection id="transition" title="Transition" icon="curve" modified={boundary.type !== 'cut'} help={<HelpPopover label="Transition timing"><p id={`${colourControlId}-transition-help`}>Timeline frames after retiming. Transition and fade regions must fit their clips.</p></HelpPopover>}>
-        <section className="boundary-inspector" aria-label="Boundary transition">
-          <p title={`Transition ${boundaryIndex + 1}`}>{shortName(assets.find((item) => item.id === left?.mediaId)?.name ?? '')} <Icon name="arrow" size={12} /> {shortName(assets.find((item) => item.id === right?.mediaId)?.name ?? '')}</p>
-          <div className="transition-fields">
-            <label>Type<select aria-label="Transition type" disabled={drafting} value={boundary.type} onChange={(event) => setTransition(event.target.value as Transition['type'], boundary.type === 'cut' ? 30 : boundary.duration)}><option value="cut">Cut</option><option value="fade-through-black">Fade through black</option><option value="cross-dissolve">Cross-dissolve</option></select></label>
-            <label>Timeline frames<NumberField aria-label="Transition duration" aria-describedby={`${colourControlId}-transition-help`} min={boundary.type === 'fade-through-black' ? 2 : 1} max={2_147_483_647} integer step={1} disabled={drafting || boundary.type === 'cut'} value={boundary.duration} resetKey={`${project.id}:${boundary.leftId}:${boundary.rightId}:${boundary.type}`} validate={(duration) => boundary.type === 'cut' ? null : timelineNumberError({ ...project, transitions: project.transitions.map((item) => item === boundary ? { ...boundary, duration } : item) }, 'Shorten this transition or another fade on its two clips.')} onCommit={(duration) => setTransition(boundary.type, duration)} /></label>
-          </div>
-        </section>
-      </InspectorSection>}
-      <div className="inspector-empty" hidden={boundary !== undefined}>Select a transition in the primary track.</div>
-      <InspectorSection id="fades" title="Sequence fades" icon="start" modified={project.openingFade > 0 || project.closingFade > 0} help={<HelpPopover label="Fade timing"><p id={`${colourControlId}-fades-help`}>Timeline frames on the first and last primary clips. 0 disables a fade.</p></HelpPopover>}>
-        <section className="edge-fade-settings" aria-label="Sequence fades">
-          <div className="range-fields">
-            <label>Opening <small>frames</small><NumberField aria-label="Opening fade" aria-describedby={`${colourControlId}-fades-help`} min={0} max={Math.min(primary[0]?.duration ?? 0, 2_147_483_647)} integer step={1} value={project.openingFade} disabled={drafting || !primary.length} resetKey={project.id} validate={(openingFade) => timelineNumberError({ ...project, openingFade }, 'Shorten the opening fade or the other fades/transitions on the first primary clip.')} onCommit={(opening) => onEdit({ type: 'fades', opening, closing: project.closingFade })} /></label>
-            <label>Closing <small>frames</small><NumberField aria-label="Closing fade" aria-describedby={`${colourControlId}-fades-help`} min={0} max={Math.min(primary.at(-1)?.duration ?? 0, 2_147_483_647)} integer step={1} value={project.closingFade} disabled={drafting || !primary.length} resetKey={project.id} validate={(closingFade) => timelineNumberError({ ...project, closingFade }, 'Shorten the closing fade or the other fades/transitions on the last primary clip.')} onCommit={(closing) => onEdit({ type: 'fades', opening: project.openingFade, closing })} /></label>
-          </div>
-        </section>
-      </InspectorSection>
+      {layer ? <SequenceControls project={project} layer={layer} assets={assets} boundaryId={boundaryId} layout={layout} drafting={drafting} onEdit={onEdit} id={colourControlId} /> : <div className="inspector-empty">Select a video track for its transitions and fades.</div>}
     </div>
     <div role="tabpanel" id={`${inspectorId}-audio-panel`} aria-labelledby={`${inspectorId}-audio-tab`} hidden={section !== 'audio'}>
       <InspectorSection id="music" title="Music" icon="music" modified={project.music !== null}>{children}</InspectorSection>

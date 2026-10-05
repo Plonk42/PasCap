@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createClip, createProject, projectSchema, type VideoLayer } from '../../src/shared/model.js';
+import { createClip, createLayer, createProject, projectSchema, type VideoLayer } from '../../src/shared/model.js';
 import { applyCommand } from '../../src/shared/commands.js';
 import { EMPTY_KEY_VALUES, type Interpolation, type LayerKeyframe, type LayerKeyValues } from '../../src/shared/keyframes.js';
 import { compileLayerRetiming } from '../../src/shared/layer-retiming.js';
@@ -14,14 +14,14 @@ function point(frame: number, values: Partial<LayerKeyValues>, interpolation: In
   return { frame, interpolation, values: { ...EMPTY_KEY_VALUES, ...values } };
 }
 function row(keyframes: LayerKeyframe[]): VideoLayer {
-  return { id: 'video-1', name: 'Video 1', enabled: true, opacity: 1, keyframes };
+  return { ...createLayer('video-1', 'Video 1'), keyframes };
 }
 
 describe('shared retiming and recoverable speed edits', () => {
-  it('requires explicit v5 static speed settings; earlier documents are not guessed', () => {
+  it('requires explicit v6 static speed settings; earlier documents are not guessed', () => {
     const project = createProject('flight', 'Flight');
-    expect(project.schemaVersion).toBe(5);
-    for (const schemaVersion of [1, 2, 3]) expect(() => projectSchema.parse({ ...project, schemaVersion })).toThrow();
+    expect(project.schemaVersion).toBe(6);
+    for (const schemaVersion of [1, 2, 3, 4, 5]) expect(() => projectSchema.parse({ ...project, schemaVersion })).toThrow();
     expect(() => projectSchema.parse(legacyV4Project('old-flight', 'Old schema-4 flight'))).toThrow();
     const clip = createClip('a', 'source', 0, 600);
     const { speed: _speed, ...incomplete } = clip;
@@ -101,7 +101,7 @@ describe('absolute-project row speed integration', () => {
 
   it('moving a clip recompiles from its new absolute start without moving or source-anchoring the row points', () => {
     let project = applyCommand(createProject('moving', 'Moving'), { type: 'insert', clip: createClip('base', 'source', 0, 200), index: 0 });
-    project = applyCommand(project, { type: 'layer-add', layer: { ...row([point(0, { speed: 1, clipOpacity: 0 }), point(100, { speed: 3, clipOpacity: 1 }, 'hold')]), id: 'upper', name: 'Upper' } });
+    project = applyCommand(project, { type: 'layer-add', layer: { ...row([point(0, { speed: 1, clipOpacity: 0 }), point(100, { speed: 3, clipOpacity: 1 }, 'hold')]), id: 'upper', name: 'Upper', ripple: false } });
     project = applyCommand(project, { type: 'insert', clip: { ...createClip('overlay', 'source', 10, 85), layerId: 'upper' }, index: 1 });
     const keys = structuredClone(project.layers[1]!.keyframes); const original = calculateLayout(project).clips[1]!;
     expect(original.duration).toBe(50); expect(original.retiming.sourceAt(25)).toBe(41);

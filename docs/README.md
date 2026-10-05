@@ -20,11 +20,11 @@ priorities, progress and delivery updates.
 | Document | Authority/scope |
 | --- | --- |
 | [COLOUR_AND_TIMING.md](COLOUR_AND_TIMING.md) | SDR grading, fade/dissolve/rational-frame equations and preview/reference scope |
-| [LAYERS_AND_KEYFRAMES.md](LAYERS_AND_KEYFRAMES.md) | Current whole-row project-time points, ten opt-in channels, interpolation, navigation, movement, composition and resource bounds |
+| [LAYERS_AND_KEYFRAMES.md](LAYERS_AND_KEYFRAMES.md) | Uniform schema-6 tracks, per-track Ripple/transitions/fades, whole-row points, composition and resource bounds |
 | [SPEED_AND_AUDIO.md](SPEED_AND_AUDIO.md) | Source-anchored constant/ramp/custom clip curves versus analytic project-time row Speed, precise curve editing, shared retiming and music/export audio |
-| [TIMELINE_EDITING.md](TIMELINE_EDITING.md) | No-copy import, source ranges, ripple/overlay placement, recoverable trims, marked cuts, history and snapping |
+| [TIMELINE_EDITING.md](TIMELINE_EDITING.md) | No-copy import, source ranges, per-track Ripple/independent placement, recoverable trims, marked cuts, history and snapping |
 | [WORKSPACE_AND_RECOVERY.md](WORKSPACE_AND_RECOVERY.md) | Layout, field/keyboard contexts, project bins, serial saves/conflicts, Activity and failure recovery |
-| [UX_HARDENING.md](UX_HARDENING.md) | Simplified visual controls, deterministic raw-reader ownership, relink identity prerequisite, export-space assumptions/ENOSPC evidence and measured loading boundaries |
+| [UX_HARDENING.md](UX_HARDENING.md) | Visual controls, deterministic raw-reader ownership, relink identity prerequisite, export-space assumptions/disk-full recovery and deferred loading |
 
 Use current row-point and retiming contracts: colour/opacity animation remains
 row-wide, while the separately approved clip-only speed curves use source frames.
@@ -57,3 +57,7 @@ and Git history retain earlier evidence, not current acceptance claims.
 - [Source relink proposal](design/SOURCE_RELINK.md) is the separate #2 design record:
   required full-byte evidence, stable IDs/cache and confirmed location/format decisions,
   **not an implemented relink workflow or approved data migration**.
+- [Track-parity design record](design/TRACK_PARITY.md) records the approved #25
+  choices: uniform tracks, default-on continuous Ripple with pack-on-enable,
+  track-local transitions/fades, strict schema 6 and concurrent-dissolve resources.
+  Current usage contracts are in the guides above; acceptance evidence stays on the issue.

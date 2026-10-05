@@ -3,12 +3,12 @@ import { MAX_VIDEO_LAYERS } from '../shared/model.js';
 export type DecoderIndex = 0 | 1;
 export type DecoderAssignments = [string | null, string | null];
 export type DecoderPoolAssignments = (string | null)[];
-export const MAX_DECODER_SLOTS = 16;
+export const MAX_DECODER_SLOTS = 2 * MAX_VIDEO_LAYERS;
 
-/** Two primary dissolve sources plus one per overlay; never one decoder per clip. */
+/** Two simultaneous dissolve sources per track; never one decoder per stored clip. */
 export function decoderPoolSize(layerCount: number): number {
   if (!Number.isInteger(layerCount) || layerCount < 0 || layerCount > MAX_VIDEO_LAYERS) throw new Error('Unsupported video layer count.');
-  return layerCount === 0 ? 0 : Math.min(MAX_DECODER_SLOTS, layerCount + 1);
+  return 2 * layerCount;
 }
 
 /** Preserve every required instance, preferring empty slots over speculative sources. */

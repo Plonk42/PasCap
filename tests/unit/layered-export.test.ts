@@ -18,11 +18,11 @@ import { exportRequestSchema, LAYERED_EXPORT_RESOURCES, needsLayeredExport, plan
 import { EMPTY_KEY_VALUES, evaluateLayerSetting, type Interpolation, type LayerKeyframe, type LayerKeyValues } from '../../src/shared/keyframes.js';
 import { compileLayerRetiming } from '../../src/shared/layer-retiming.js';
 import { mediaAssetSchema, type MediaAsset } from '../../src/shared/media.js';
-import { createClip, createProject, projectSchema, type ProjectDocument, type VideoLayer } from '../../src/shared/model.js';
+import { createClip, createLayer, createProject, projectSchema, type ProjectDocument, type VideoLayer } from '../../src/shared/model.js';
 import { compileRetiming } from '../../src/shared/speed.js';
 import { calculateLayout, type PreviewLayer } from '../../src/shared/timeline.js';
 import { framesToSeconds, PROJECT_FPS } from '../../src/shared/timing.js';
-import { legacyV3Project, legacyV4Project } from './project-fixtures.js';
+import { legacyV3Project, legacyV4Project, legacyV5Project } from './project-fixtures.js';
 
 const temporary: string[] = [];
 const queues: JobQueue[] = [];
@@ -45,7 +45,7 @@ function document(): ProjectDocument {
 function point(frame: number, values: Partial<LayerKeyValues>, interpolation: Interpolation = 'linear'): LayerKeyframe {
   return { frame, interpolation, values: { ...EMPTY_KEY_VALUES, ...values } };
 }
-function layer(id = 'video-2'): VideoLayer { return { id, name: id, enabled: true, opacity: 1, keyframes: [] }; }
+function layer(id = 'video-2'): VideoLayer { return createLayer(id, id, false); }
 function fakeLibrary(): MediaLibrary {
   const jobs = new JobQueue(); queues.push(jobs);
   const library = new MediaLibrary(createConfig({ dataDir: '/unused-layered-unit', ffmpeg: '/never-run-unit-ffmpeg' }), jobs);
@@ -61,7 +61,7 @@ function fakeLibrary(): MediaLibrary {
   return library;
 }
 
-describe('schema-5 production dispatch and read-only validation', () => {
+describe('schema-6 production dispatch and read-only validation', () => {
   it('keeps static constant/ramp speed on the cheap path and dispatches shared speed points with their placed map', () => {
     const project = document();
     expect(needsLayeredExport(project)).toBe(false);
@@ -81,10 +81,11 @@ describe('schema-5 production dispatch and read-only validation', () => {
     const placed = calculateLayout(project).clips[0]!;
     expect(planLayeredExport(project).duration).toBe(compileLayerRetiming(project.clips[0]!, project.layers[0]!, placed.start).duration);
     expect(placed.retiming.duration).toBe(planLayeredExport(project).duration);
-    expect(exportRequestSchema.parse({ document: project, profile: 'draft720' }).document.schemaVersion).toBe(5);
+    expect(exportRequestSchema.parse({ document: project, profile: 'draft720' }).document.schemaVersion).toBe(6);
     expect(exportRequestSchema.safeParse({ document: { ...project, schemaVersion: 2 }, profile: 'draft720' }).success).toBe(false);
     expect(exportRequestSchema.safeParse({ document: legacyV3Project('old', 'Old'), profile: 'draft720' }).success).toBe(false);
     expect(exportRequestSchema.safeParse({ document: legacyV4Project('old-v4', 'Old schema-4'), profile: 'draft720' }).success).toBe(false);
+    expect(exportRequestSchema.safeParse({ document: legacyV5Project('old-v5', 'Old schema-5'), profile: 'draft720' }).success).toBe(false);
   });
   it('dispatches and explicitly rejects static planning for every non-neutral layered/animated case', () => {
     const variants: ((project: ProjectDocument) => void)[] = [
@@ -104,7 +105,7 @@ describe('schema-5 production dispatch and read-only validation', () => {
       expect(planLayeredExport(project).kind).toBe('layered');
     }
   });
-  it('requires explicit v5 media/row/static clip fields, permits eight rows and refuses a ninth or same-row overlap', () => {
+  it('requires explicit v6 media/row/static clip fields, permits eight rows and refuses a ninth or same-row overlap', () => {
     const project = document();
     for (let index = 2; index <= 8; index++) project.layers.push(layer(`video-${index}`));
     expect(projectSchema.safeParse(project).success).toBe(true);
@@ -119,9 +120,10 @@ describe('schema-5 production dispatch and read-only validation', () => {
     expect(projectSchema.safeParse({ ...project, clips: [{ ...project.clips[0], animation: legacyV3Project('old', 'Old').clips[0]!.animation }] }).success).toBe(false);
     project.clips.push({ ...createClip('first-overlay', 'video', 0, 3), layerId: 'video-2', start: 1 },
       { ...createClip('overlap', 'video', 3, 6), layerId: 'video-2', start: 2 });
-    expect(() => planLayeredExport(project)).toThrow('same overlay layer cannot overlap');
+    project.layers[1]!.transitions = [{ leftId: 'first-overlay', rightId: 'overlap', type: 'cut', duration: 0 }];
+    expect(() => planLayeredExport(project)).toThrow('same track cannot overlap');
   });
-  it('plans primary transitions by primary order, not the flat array, and retains hidden end holds', () => {
+  it('plans each track by its own order, not the flat array, and retains hidden end holds', () => {
     const project = document();
     project.layers.push(layer(), { ...layer('video-3'), enabled: false });
     project.clips = [
@@ -131,11 +133,12 @@ describe('schema-5 production dispatch and read-only validation', () => {
       createClip('right', 'video', 7, 13),
       { ...createClip('hidden', 'hidden-source', 0, 2), layerId: 'video-3', start: 18 },
     ];
-    project.transitions = [{ type: 'cross-dissolve', leftId: 'left', rightId: 'right', duration: 2 }];
+    project.layers[0]!.transitions = [{ type: 'cross-dissolve', leftId: 'left', rightId: 'right', duration: 2 }];
+    project.layers[1]!.transitions = [{ type: 'cut', leftId: 'overlay-early', rightId: 'overlay-late', duration: 0 }];
     project.layers[0]!.keyframes = [point(3, { clipOpacity: 0.65, exposure: 0.4 }, 'hold')];
     const plan = planLayeredExport(project);
-    expect(plan.duration).toBe(20); expect(plan.baseDuration).toBe(10); expect(plan.chunks).toEqual([]);
-    expect(plan.primary.chunks).toEqual([
+    expect(plan.duration).toBe(20); expect(plan.layers[0]!.plan.duration).toBe(10); expect(plan.chunks).toEqual([]);
+    expect(plan.layers[0]!.plan.chunks).toEqual([
       { kind: 'body', clipIndex: 1, sourceIn: 0, sourceOut: 4, duration: 4, start: 0 },
       { kind: 'dissolve', leftIndex: 1, rightIndex: 3, leftIn: 4, duration: 2, start: 4 },
       { kind: 'body', clipIndex: 3, sourceIn: 2, sourceOut: 6, duration: 4, start: 6 },
@@ -156,7 +159,7 @@ describe('schema-5 production dispatch and read-only validation', () => {
     expect(Object.isFrozen(snapshot.layers[0]!.keyframes[0]!.values)).toBe(true);
     expect(Object.isFrozen(snapshot.clips[0]!.colour)).toBe(true);
   });
-  it('strictly loads v5 but lists/rejects v2 and actual v3/v4 inputs unchanged, including overwrite attempts', async () => {
+  it('strictly loads v6 but lists/rejects v2 and actual v3/v4/v5 inputs unchanged, including overwrite attempts', async () => {
     const directory = await temp();
     const store = new ProjectStore(directory);
     const saved = await store.save(document(), 0);
@@ -164,14 +167,14 @@ describe('schema-5 production dispatch and read-only validation', () => {
     const old = `${JSON.stringify({ schemaVersion: 2, id: 'old', title: 'Original v2 document', clips: [] })}\n`;
     const filename = path.join(directory, 'projects', 'old.json'); await writeFile(filename, old);
     expect((await store.list()).find((summary) => summary.id === 'old')).toMatchObject({ compatible: false, title: 'Original v2 document' });
-    await expect(store.load('old')).rejects.toThrow('requires version 5');
+    await expect(store.load('old')).rejects.toThrow('requires version 6');
     await expect(store.save(createProject('old', 'No migration'), 0)).rejects.toThrow('existing file was not changed');
     expect(await readFile(filename, 'utf8')).toBe(old);
     const legacy = legacyV3Project('old-v3', 'Original v3 document'); const oldV3 = `${JSON.stringify(legacy, null, 2)}\n`;
     const filenameV3 = path.join(directory, 'projects', 'old-v3.json'); await writeFile(filenameV3, oldV3);
     expect(projectSchema.safeParse(legacy).success).toBe(false);
     expect((await store.list()).find((summary) => summary.id === 'old-v3')).toMatchObject({ compatible: false, title: 'Original v3 document', error: expect.stringContaining('schema version 3') });
-    await expect(store.load('old-v3')).rejects.toThrow('requires version 5');
+    await expect(store.load('old-v3')).rejects.toThrow('requires version 6');
     await expect(store.rename('old-v3', 'No migration', 0)).rejects.toThrow('existing file was not changed');
     await expect(store.save(createProject('old-v3', 'No migration'), 0)).rejects.toThrow('existing file was not changed');
     expect(await readFile(filenameV3, 'utf8')).toBe(oldV3);
@@ -179,15 +182,41 @@ describe('schema-5 production dispatch and read-only validation', () => {
     const filenameV4 = path.join(directory, 'projects', 'old-v4.json'); await writeFile(filenameV4, oldV4);
     expect(legacyV4).not.toHaveProperty('media'); expect(projectSchema.safeParse(legacyV4).success).toBe(false);
     expect((await store.list()).find((summary) => summary.id === 'old-v4')).toMatchObject({ compatible: false, title: 'Original v4 document', error: expect.stringContaining('schema version 4') });
-    await expect(store.load('old-v4')).rejects.toThrow('requires version 5');
+    await expect(store.load('old-v4')).rejects.toThrow('requires version 6');
     await expect(store.rename('old-v4', 'No migration', 0)).rejects.toThrow('existing file was not changed');
     await expect(store.save(createProject('old-v4', 'No migration'), 0)).rejects.toThrow('existing file was not changed');
     expect(await readFile(filenameV4, 'utf8')).toBe(oldV4);
+    const oldV5 = `${JSON.stringify(legacyV5Project('old-v5', 'Original v5 document'), null, 2)}\n`;
+    const filenameV5 = path.join(directory, 'projects', 'old-v5.json'); await writeFile(filenameV5, oldV5);
+    expect((await store.list()).find((summary) => summary.id === 'old-v5')).toMatchObject({ compatible: false, title: 'Original v5 document', error: expect.stringContaining('schema version 5') });
+    await expect(store.load('old-v5')).rejects.toThrow('requires version 6');
+    await expect(store.rename('old-v5', 'No migration', 0)).rejects.toThrow('existing file was not changed');
+    await expect(store.save(createProject('old-v5', 'No migration'), 0)).rejects.toThrow('existing file was not changed');
+    expect(await readFile(filenameV5, 'utf8')).toBe(oldV5);
   });
+  it.each(['cut', 'cross-dissolve'] as const)('accepts an arbitrary-ID positioned %s reference but rejects leading/internal gaps before native work', async (type) => {
+    const plain = document(); const trackId = 'arbitrary-track';
+    plain.layers = [createLayer(trackId, 'Arbitrary', false)];
+    plain.clips = [createClip('left', 'video', 7, 19, trackId), { ...createClip('right', 'video', 20, 32, trackId), start: type === 'cut' ? 12 : 10 }];
+    plain.layers[0]!.transitions = [type === 'cut'
+      ? { leftId: 'left', rightId: 'right', type, duration: 0 }
+      : { leftId: 'left', rightId: 'right', type, duration: 2 }];
+    const library = fakeLibrary();
+    expect(validateReference(plain, library)).toEqual(plain);
+    const leading = structuredClone(plain); leading.clips.forEach((clip) => { clip.start += 5; });
+    const gap = structuredClone(plain); gap.layers[0]!.transitions = [{ leftId: 'left', rightId: 'right', type: 'cut', duration: 0 }]; gap.clips[1]!.start = 20;
+    for (const invalid of [leading, gap]) {
+      const before = structuredClone(invalid); vi.mocked(library.get).mockClear();
+      expect(() => validateReference(invalid, library)).toThrow('zero-origin contiguous');
+      await expect(renderReference(invalid, library, { id: 'unused', signal: new AbortController().signal, update: () => {} })).rejects.toThrow('zero-origin contiguous');
+      expect(library.get).not.toHaveBeenCalled(); expect(library.jobs.list()).toEqual([]); expect(invalid).toEqual(before);
+    }
+  });
+
   it('rejects layered/animated/speed-key diagnostic references, even on direct render calls', async () => {
     const plain = document();
     plain.clips.push(createClip('right', 'video', 20, 32));
-    plain.transitions = [{ leftId: 'left', rightId: 'right', type: 'cut', duration: 0 }];
+    plain.layers[0]!.transitions = [{ leftId: 'left', rightId: 'right', type: 'cut', duration: 0 }];
     const library = fakeLibrary();
     expect(validateReference(plain, library).clips).toHaveLength(2);
     for (const change of [

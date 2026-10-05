@@ -8,18 +8,14 @@ const LANE_HEIGHT = 78;
 
 export interface TimelineRow {
     layer: VideoLayer;
-    /** Saved composition index, never the displayed row number. */
+    /** Saved bottom-to-top composition index, also the displayed row index. */
     index: number;
     top: number;
 }
 
-/** Primary first; overlays below it retain their front-to-back display order.
- * This editor-only ordering never mutates the saved bottom-to-top composition. */
+/** Row 1 composites below row 2, then row 3 above row 2, without special roles. */
 export function timelineRows(layers: readonly VideoLayer[]): TimelineRow[] {
-    const [primary, ...overlays] = layers.map((layer, index) => ({ layer, index }));
-    if (!primary) return [];
-    overlays.reverse();
-    return [primary, ...overlays].map((entry, row) => ({ ...entry, top: ROW_TOP + row * ROW_HEIGHT }));
+    return layers.map((layer, index) => ({ layer, index, top: ROW_TOP + index * ROW_HEIGHT }));
 }
 
 /** Content-space hit testing shares the exact row geometry used for drawing. */

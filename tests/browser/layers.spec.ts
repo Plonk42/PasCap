@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { applyCommand } from '../../src/shared/commands.js';
-import { createClip, createProject, projectSchema } from '../../src/shared/model.js';
+import { createClip, createLayer, createProject, projectSchema } from '../../src/shared/model.js';
 import { calculateLayout, sampleTimeline } from '../../src/shared/timeline.js';
 import { closeOptions, editLayerPoint, expandedInspectorPreferences, freshExportLinks, layerKeyframes, openOptions, sharedPoint, submitExport } from './editor-helpers.js';
 import { memoryProjects } from './memory-projects.js';
@@ -22,6 +22,11 @@ async function seek(page: Page, frame: number): Promise<void> {
 }
 async function addOverlay(page: Page): Promise<string> {
   await page.getByRole('button', { name: 'Add video layer', exact: true }).click();
+  // Placement/trim regressions deliberately use a positioned track, not the new default.
+  await openOptions(page, 'Layer options Video 2');
+  const ripple = page.getByRole('checkbox', { name: 'Ripple on layer Video 2', exact: true });
+  await expect(ripple).toBeChecked(); await ripple.uncheck();
+  await closeOptions(page);
   await page.getByRole('button', { name: 'Add pattern-b.mp4 to timeline', exact: true }).click();
   await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
   return page.evaluate(() => window.pascapLab!.project()!.clips.at(-1)!.id);
@@ -78,6 +83,9 @@ test('adds layered clips, adjusts layer opacity, hides/shows and releases unused
 test('reorders independently positioned video layers without altering source ranges', async ({ page }) => {
   await addOverlay(page);
   await page.getByRole('button', { name: 'Add video layer', exact: true }).click();
+  await openOptions(page, 'Layer options Video 3');
+  await page.getByRole('checkbox', { name: 'Ripple on layer Video 3', exact: true }).uncheck();
+  await closeOptions(page);
   await page.getByRole('button', { name: 'Add recording-03.mp4 to timeline', exact: true }).click();
   const before = projectSchema.parse(await page.evaluate(() => window.pascapLab!.project()));
   await openOptions(page, 'Layer options Video 3');
@@ -249,7 +257,7 @@ test('layered native UI export includes keyed opacity and colour in an immutable
   const { receiptUrl } = await freshExportLinks(page, request, accepted, 90_000);
   const receipt = await (await request.get(receiptUrl)).json() as { snapshot: unknown; verification: { frameCount: number }; settings: { pipeline: string } };
   const snapshot = projectSchema.parse(receipt.snapshot);
-  expect(snapshot.schemaVersion).toBe(5);
+  expect(snapshot.schemaVersion).toBe(6);
   expect(snapshot.layers).toHaveLength(2); expect(snapshot.layers[1]?.keyframes).toEqual(document.layers[1]?.keyframes);
   expect(snapshot.clips[1]).not.toHaveProperty('animation');
   expect(receipt.settings.pipeline).toBe('sequential-layered'); expect(receipt.verification.frameCount).toBe(calculateLayout(document).duration);
@@ -259,7 +267,7 @@ test('layered native UI export includes keyed opacity and colour in an immutable
   expect(projectSchema.parse(again.snapshot)).toEqual(snapshot);
 });
 
-test('plays three simultaneous sources through row-wide rate/grade curves, a primary dissolve and repeated music wraps', async ({ page, request }) => {
+test('plays three simultaneous sources through row-wide rate/grade curves, a track dissolve and repeated music wraps', async ({ page, request }) => {
   test.setTimeout(40_000);
   const library = await (await request.get('/api/media')).json() as { assets: { id: string; name: string }[] };
   const music = await (await request.get('/api/audio')).json() as { assets: { id: string }[] };
@@ -274,7 +282,7 @@ test('plays three simultaneous sources through row-wide rate/grade curves, a pri
   project = applyCommand(project, { type: 'layer-update', layer: { ...project.layers[0]!, keyframes: [
     sharedPoint(0, { speed: 0.5, exposure: -0.4, clipOpacity: 0.6 }), sharedPoint(24, { speed: 2, exposure: 0.4, clipOpacity: 1 }, 'smooth'),
   ] } });
-  project = applyCommand(project, { type: 'layer-add', layer: { id: 'upper', name: 'Video 2', enabled: true, opacity: 0.8, keyframes: [] } });
+  project = applyCommand(project, { type: 'layer-add', layer: { ...createLayer('upper', 'Video 2', false), opacity: 0.8 } });
   const clip = { ...createClip('upper-clip', blue, 0, 80), layerId: 'upper', start: 5 };
   project = applyCommand(project, { type: 'insert', clip, index: 2 });
   project = applyCommand(project, { type: 'layer-update', layer: { ...project.layers[1]!, keyframes: [
@@ -313,7 +321,8 @@ test('plays three simultaneous sources through row-wide rate/grade curves, a pri
     await page.waitForFunction(() => window.pascapLab!.engine.diagnostics().activeDecoders >= 3, undefined, { timeout: 12_000 });
     await page.waitForFunction(() => { const state = window.pascapLab!.engine.diagnostics(); return state.status === 'error' || (!state.playing && state.status === 'paused' && state.frame === state.duration - 1); }, undefined, { timeout: 15_000 });
     const state = await page.evaluate(() => window.pascapLab!.engine.diagnostics());
-    expect(state.status, state.message).toBe('paused'); expect(state.frame).toBe(duration - 1); expect(state.decoderCount).toBe(3); expect(state.audioClock).toBe(true);
+    expect(state.status, state.message).toBe('paused'); expect(state.frame).toBe(duration - 1); expect(state.decoderCount).toBe(4); expect(state.audioClock).toBe(true);
+    await expect(page.locator('video[data-pascap-decoder]')).toHaveCount(4);
   }
 });
 
@@ -409,16 +418,16 @@ test('overlay trims hold the opposite edge, preserve keys, cancel drafts and com
   expect(edited.clips[0]).toEqual(project.clips[0]);
 });
 
-test('cross-layer dragging uses scrolled lane coordinates and inserts before the requested primary boundary', async ({ page, request }) => {
+test('cross-layer dragging uses scrolled lane coordinates and inserts before the requested Ripple track boundary', async ({ page, request }) => {
   const library = await (await request.get('/api/media')).json() as { assets: { id: string; name: string }[] };
   const red = library.assets.find((asset) => asset.name === 'pattern-a.mp4')!.id;
   const blue = library.assets.find((asset) => asset.name === 'pattern-b.mp4')!.id;
   let project = createProject('preview-lab', 'Scrolled layer drop · disposable');
   project.media.videoIds = library.assets.map((asset) => asset.id);
   project.revision = await page.evaluate(() => window.pascapLab!.project()!.revision);
-  for (let index = 2; index <= 5; index++) project = applyCommand(project, { type: 'layer-add', layer: { id: `layer-${index}`, name: `Video ${index}`, enabled: true, opacity: 1, keyframes: [] } });
+  for (let index = 2; index <= 5; index++) project = applyCommand(project, { type: 'layer-add', layer: createLayer(`layer-${index}`, `Video ${index}`, false) });
   project = applyCommand(project, { type: 'insert', clip: createClip('a', red, 0, 30), index: 0 });
-  project = applyCommand(project, { type: 'insert', clip: { ...createClip('moving', blue, 0, 30), layerId: 'layer-2', start: 35 }, index: 1 });
+  project = applyCommand(project, { type: 'insert', clip: { ...createClip('moving', blue, 0, 30), layerId: 'layer-5', start: 35 }, index: 1 });
   project = applyCommand(project, { type: 'insert', clip: createClip('b', red, 30, 60), index: 2 });
   project = applyCommand(project, { type: 'insert', clip: { ...createClip('c', blue, 0, 120), speed: { mode: 'constant', rate: 0.5 } }, index: 3 });
   await page.evaluate((document) => window.pascapLab!.setDocument(document), project);
@@ -432,9 +441,9 @@ test('cross-layer dragging uses scrolled lane coordinates and inserts before the
   await expect(moving).toBeInViewport();
   const sourceBox = (await moving.boundingBox())!;
   const viewport = (await scroll.boundingBox())!;
-  // Start on the actual scrolled overlay before revealing the primary target.
+  // Start on the actual scrolled last row before revealing the first-row target.
   // dragTo scrolls both endpoints before pointerdown, which can put a different
-  // primary clip under the saved start coordinates when the rows are far apart.
+  // first-row clip under the saved start coordinates when the rows are far apart.
   await page.mouse.move(sourceBox.x + 24, sourceBox.y + 30); await page.mouse.down();
   await page.mouse.move(sourceBox.x + 38, sourceBox.y + 30, { steps: 3 });
   await page.mouse.move(viewport.x + 100, viewport.y + 34, { steps: 5 });
@@ -449,5 +458,5 @@ test('cross-layer dragging uses scrolled lane coordinates and inserts before the
   expect(edited.clips.find((clip) => clip.id === 'moving')).toMatchObject({ layerId: 'video-1', sourceIn: 0, sourceOut: 30 });
   await expect(page.locator('.layer-control.selected .layer-select')).toHaveAttribute('aria-label', 'Select layer Video 1');
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
-  expect(await page.evaluate(() => window.pascapLab!.project()!.clips.find((clip) => clip.id === 'moving'))).toMatchObject({ layerId: 'layer-2', start: 35 });
+  expect(await page.evaluate(() => window.pascapLab!.project()!.clips.find((clip) => clip.id === 'moving'))).toMatchObject({ layerId: 'layer-5', start: 35 });
 });

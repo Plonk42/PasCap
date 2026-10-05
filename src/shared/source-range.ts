@@ -127,7 +127,7 @@ function startForRightEdge(clip: VideoClip, layer: VideoLayer, right: number, pr
   return Math.max(first, Math.min(low, preferred));
 }
 
-function minimumOverlayIn(clip: VideoClip, layer: VideoLayer, right: number): number {
+function minimumPositionedIn(clip: VideoClip, layer: VideoLayer, right: number): number {
   // Clamp restoration at project frame zero, taking the absolute row-rate
   // curve into account rather than subtracting a duration compiled at old IN.
   let low = 0; let high = clip.sourceOut - 1;
@@ -139,10 +139,10 @@ function minimumOverlayIn(clip: VideoClip, layer: VideoLayer, right: number): nu
   return low;
 }
 
-function sourceOverlayTrim(clip: VideoClip, layer: VideoLayer, right: number, sourceIn: number, preferred: number): Extract<EditCommand, { type: 'trim-place' }> {
-  sourceIn = Math.max(minimumOverlayIn(clip, layer, right), sourceIn);
+function sourcePositionedTrim(clip: VideoClip, layer: VideoLayer, right: number, sourceIn: number, preferred: number): Extract<EditCommand, { type: 'trim-place' }> {
+  sourceIn = Math.max(minimumPositionedIn(clip, layer, right), sourceIn);
   const start = startForRightEdge({ ...clip, sourceIn }, layer, right, preferred);
-  if (start === null) throw new Error('This source-frame trim cannot keep the overlay OUT at an integer project frame.');
+  if (start === null) throw new Error('This source-frame trim cannot keep the positioned clip OUT at an integer project frame.');
   return { type: 'trim-place', clipId: clip.id, sourceIn, sourceOut: clip.sourceOut, start };
 }
 
@@ -153,8 +153,8 @@ function betterLeftTrim(candidate: LeftTrim, best: LeftTrim | null, preferred: n
   return error < bestError || (error === bestError && Math.abs(candidate.sourceIn - currentIn) < Math.abs(best.sourceIn - currentIn));
 }
 
-function outputOverlayTrim(clip: VideoClip, layer: VideoLayer, right: number, delta: number): Extract<EditCommand, { type: 'trim-place' }> {
-  const minimumIn = minimumOverlayIn(clip, layer, right);
+function outputPositionedTrim(clip: VideoClip, layer: VideoLayer, right: number, delta: number): Extract<EditCommand, { type: 'trim-place' }> {
+  const minimumIn = minimumPositionedIn(clip, layer, right);
   const preferred = Math.max(0, Math.min(right - 1, clip.start + delta));
   const target = right - preferred;
   const endpoint = nearestEndpoint(minimumIn, clip.sourceOut - 1, clip.sourceIn, target, false, (sourceIn) => contextualDuration({ ...clip, sourceIn }, layer, preferred));
@@ -164,28 +164,28 @@ function outputOverlayTrim(clip: VideoClip, layer: VideoLayer, right: number, de
     const start = startForRightEdge({ ...clip, sourceIn }, layer, right, preferred);
     if (start !== null && betterLeftTrim({ sourceIn, start }, best, preferred, clip.sourceIn)) best = { sourceIn, start };
   }
-  if (!best) throw new Error('This output-frame trim cannot keep the overlay OUT at an integer project frame.');
+  if (!best) throw new Error('This output-frame trim cannot keep the positioned clip OUT at an integer project frame.');
   return { type: 'trim-place', clipId: clip.id, sourceIn: best.sourceIn, sourceOut: clip.sourceOut, start: best.start };
 }
 
-/** Timeline handle/keyboard trim. Overlay IN retains the old right edge;
- * primary IN retains its ripple start. Numeric IN/OUT edits continue to use
+/** Timeline handle/keyboard trim. Ripple-off IN retains the old right edge;
+ * Ripple-on IN retains its sequence start. Numeric IN/OUT edits continue to use
  * the ordinary trim command, which never changes stored placement.
  * Region/overlap validation and history are left to applyCommand by the caller.
  */
 export function trimOnTimeline(project: ProjectDocument, clipId: string, edge: TrimEdge, delta: number, sourceFrameCount: number, unit: 'output' | 'source'): EditCommand {
   const placed = calculateLayout(project).clips.find((item) => item.clip.id === clipId);
   if (!placed) throw new Error('Clip no longer exists.');
-  const clip = placed.clip;
+  const clip = { ...placed.clip, start: placed.start };
   const layer = project.layers.find((item) => item.id === clip.layerId)!;
   const sourceCommand = trimByFrames(clip, edge, delta, sourceFrameCount);
   if (unit !== 'output' && unit !== 'source') throw new Error('Trim unit must be output or source frames.');
-  if (edge !== 'in' || clip.layerId === project.layers[0]!.id) {
+  if (edge !== 'in' || layer.ripple) {
     if (unit === 'source') return sourceCommand;
     const target = Math.max(1, placed.duration + (edge === 'in' ? -delta : delta));
     return trimToDuration(clip, edge, sourceFrameCount, target, (candidate) => contextualDuration(candidate, layer, placed.start));
   }
   if (delta === 0) return { ...sourceCommand, type: 'trim-place', start: placed.start };
-  if (unit === 'source') return sourceOverlayTrim(clip, layer, placed.end, sourceCommand.sourceIn, placed.start);
-  return outputOverlayTrim(clip, layer, placed.end, delta);
+  if (unit === 'source') return sourcePositionedTrim(clip, layer, placed.end, sourceCommand.sourceIn, placed.start);
+  return outputPositionedTrim(clip, layer, placed.end, delta);
 }

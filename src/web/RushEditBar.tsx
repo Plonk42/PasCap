@@ -29,6 +29,14 @@ function markIsSet(marks: ClipCutRange | null, edge: 'inFrame' | 'outFrame'): bo
   return marks !== null && marks[edge] !== null;
 }
 
+function rushTrackMode(project: ProjectDocument, selected: PlacedClip | undefined) {
+  const layer = project.layers.find((item) => item.id === selected?.clip.layerId);
+  if (!layer) return { ripple: false, mode: 'Select an excerpt', modeHint: 'Select an excerpt to see its track’s Ripple setting. Every track has independent Layer options.' };
+  return layer.ripple
+    ? { ripple: true, mode: 'Ripple track', modeHint: 'Trim, cut, delete or reorder: later excerpts on this track close up from its first anchor. Other tracks, music and row points stay put.' }
+    : { ripple: false, mode: 'Positioned track', modeHint: 'Ripple is off: edits keep other clips at their independent project-frame starts. Enable Ripple in this track’s Layer options to pack it from its current first start.' };
+}
+
 export function TimelineCutMarks({ marks, selected, top, leading, scale }: Readonly<{ marks: ClipCutRange | null; selected: PlacedClip | undefined; top: number; leading: number; scale: number }>) {
   if (!marks) return null;
   if (marks.clipId !== selected?.clip.id) return null;
@@ -52,9 +60,7 @@ export function RushEditBar({ project, selected, frame, disabled, cutRange, onSp
   const hasIn = markIsSet(marks, 'inFrame');
   const hasOut = markIsSet(marks, 'outFrame');
   const error = markedCutError(project, marks);
-  const ripple = !selected || selected.clip.layerId === project.layers[0]!.id;
-  const mode = ripple ? 'Ripple sequence' : 'Positioned overlay';
-  const modeHint = ripple ? 'Trim, cut, delete or reorder: later primary excerpts close up automatically. Their order and source ranges are kept.' : 'Overlay edits keep other clips at their absolute positions. Use the primary row for automatic ripple sequencing.';
+  const { ripple, mode, modeHint } = rushTrackMode(project, selected);
 
   return <div className="rush-edit-bar" aria-label="Rush editing actions">
     <span className={`rush-edit-mode ${ripple ? 'ripple' : ''}`} title={modeHint}><Icon name={ripple ? 'list' : 'layers'} size={15} /><span className="declutter-sr-only">{mode}</span></span>
@@ -67,7 +73,7 @@ export function RushEditBar({ project, selected, frame, disabled, cutRange, onSp
     <fieldset className="rush-cut-actions" data-marked={hasIn || hasOut}><legend className="declutter-sr-only">Remove a marked range</legend>
       <button type="button" className={`secondary-button small ${hasIn ? 'active' : ''}`} aria-label="Mark cut IN" aria-pressed={hasIn} title="Start the unwanted part here · I" disabled={disabled || !inClip} onClick={() => onMarkCut('in')}>IN</button>
       <button type="button" className={`secondary-button small ${hasOut ? 'active' : ''}`} aria-label="Mark cut OUT" aria-pressed={hasOut} title="End the unwanted part after this frame (OUT exclusive) · O" disabled={disabled || !inClip} onClick={() => onMarkCut('out')}>OUT</button>
-      <button type="button" className="secondary-button small rush-cut-button" aria-label="Cut marked range" title={error || 'Remove the marked part in one undoable edit; retained excerpts stay connected on the primary row · Shift+Delete'} disabled={disabled || !!error} onClick={onCutMarked}><Icon name="cut" size={15} /><span className="timeline-action-label">Cut range</span></button>
+      <button type="button" className="secondary-button small rush-cut-button" aria-label="Cut marked range" title={error || 'Remove the marked part in one Undo step; this track’s Ripple setting controls gap closure · Shift+Delete'} disabled={disabled || !!error} onClick={onCutMarked}><Icon name="cut" size={15} /><span className="timeline-action-label">Cut range</span></button>
       {marks && <button type="button" className="icon-button" aria-label="Clear cut marks" title="Clear temporary marks · Escape" onClick={onClearCut}><Icon name="x" size={13} /></button>}
     </fieldset>
     {marks && <output className="rush-cut-readout declutter-sr-only" aria-live="polite" title={error || 'Timeline marks; OUT exclusive'}>{marks.inFrame === null ? 'IN —' : `IN ${formatTimecode(marks.inFrame)}`} → {marks.outFrame === null ? 'OUT —' : `OUT ${formatTimecode(marks.outFrame)}`}</output>}

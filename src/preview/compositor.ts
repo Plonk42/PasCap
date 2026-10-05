@@ -126,7 +126,7 @@ export class Compositor {
   draw(layers: readonly [CompositeLayer, CompositeLayer]): void {
     this.drawFrame([{ opacity: 1, clips: layers.map((layer, slot) => ({ slot, settings: layer.settings, aspect: layer.aspect, opacity: 1, blendWeight: layer.weight, brightness: 1 })) }]);
   }
-  /** Groups are bottom-to-top; each primary dissolve is drawn exactly once. */
+  /** Groups are bottom-to-top; each track's dissolve is drawn exactly once. */
   drawFrame(groups: readonly CompositeGroup[]): void {
     if (this.#disposed || this.gl.isContextLost()) return;
     this.clear();

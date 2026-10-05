@@ -148,7 +148,8 @@ async function retimeClip(inputs: ExportInputs, index: number, environment: Rend
   onProgress: (frames: number) => void): Promise<{ filename: string; report: RawRetimingReport }> {
   const { target, library, directory, context } = environment;
   const clip = inputs.snapshot.clips[index]!;
-  const plan = inputs.plan.clips[index]!;
+  const plan = inputs.plan.clips.find((item) => item.index === index);
+  if (plan?.clipId !== clip.id) throw new ServiceError('Static clip plan differs from its captured clip identity.', 500);
   const asset = inputs.assets[index]!;
   const lut = `clip-${index}.cube`;
   const filename = `clip-${index}.nut`;
@@ -339,16 +340,17 @@ async function renderClips(inputs: ExportInputs, environment: RenderEnvironment)
   let retained: { index: number; filename: string } | null = null;
   const chunkFiles: string[] = [];
   const retiming: RawRetimingReport[] = [];
-  for (const [index, clip] of inputs.plan.clips.entries()) {
+  for (const [ordinal, clip] of inputs.plan.clips.entries()) {
+    const index = clip.index;
     checkCancelled(context);
-    progress(0, `Generating clip ${index + 1} / ${inputs.plan.clips.length} LUT`);
+    progress(0, `Generating clip ${ordinal + 1} / ${inputs.plan.clips.length} LUT`);
     const result = await retimeClip(inputs, index, environment, // NOSONAR -- decode only one original at a time.
-      (frames) => progress(frames, `Retiming original clip ${index + 1} / ${inputs.plan.clips.length}: ${frames} / ${clip.duration} output frames`));
+      (frames) => progress(frames, `Retiming original clip ${ordinal + 1} / ${inputs.plan.clips.length}: ${frames} / ${clip.duration} output frames`));
     retiming.push(result.report);
     finishedWork += clip.duration;
     for (const chunk of inputs.plan.chunks.filter((item) => item.kind === 'body' ? item.clipIndex === index : item.rightIndex === index)) {
       const chunkFile = `chunk-${String(chunkFiles.length).padStart(5, '0')}.mp4`;
-      const filenames = chunk.kind === 'body' ? [result.filename] : [requireRetained(retained, index - 1), result.filename];
+      const filenames = chunk.kind === 'body' ? [result.filename] : [requireRetained(retained, chunk.leftIndex), result.filename];
       await encodeChunk(chunk, filenames, chunkFile, environment, // NOSONAR -- a dissolve opens at most two intermediate decoders.
         (frames) => progress(frames, `Encoding ${chunk.kind} chunk ${chunkFiles.length + 1}: ${frames} / ${chunk.duration} frames`));
       chunkFiles.push(chunkFile);
@@ -358,7 +360,7 @@ async function renderClips(inputs: ExportInputs, environment: RenderEnvironment)
         retained = null;
       }
     }
-    const outgoing = inputs.snapshot.transitions[index];
+    const outgoing = inputs.snapshot.layers[0]!.transitions[ordinal];
     if (outgoing?.type === 'cross-dissolve') retained = { index, filename: result.filename };
     else await rm(path.join(directory, result.filename)); // NOSONAR -- bound lossless scratch files to two clips.
   }
@@ -451,7 +453,7 @@ async function renderCapturedExport(inputs: ExportInputs, library: MediaLibrary,
           ? 'shared sampleTimeline evaluates independently participating layer point channels at absolute project frames across every clip in the row; source frames use placed.retiming.sourceAt(projectFrame - placed.start); at most two reusable in-memory CPU-reference 65³ Float32 LUTs, tetrahedral approximation (not bitwise); clip brightness after grading, coverage independent of black fades, layer opacity after the dissolve group; source-over encoded BT.709; black padding after grade'
           : 'One static CPU-reference 65³ LUT per instance, native tetrahedral interpolation before output-frame black fades',
         scratchPolicy: layered
-          ? 'At most two full lossless timeline representations (a span collection counts as one) and two RGB clip files. Delete the lower timeline before joining the next lane, and clip files immediately after their last span. One final H.264 encode. No LUT files. Disk scales with two timelines + two clips + the H.264 chunk and final MP4 + selected PCM; not a fixed GB limit. All owned scratch/partials removed on failure/cancel; successful exports never overwritten.'
+          ? 'At most three full lossless timeline representations (a span collection counts as one) and two RGB clip files. Each track is graded once into a premultiplied RGBA16 group, then source-overed onto the lower accumulator without regrading. Delete lower/group after their bounded composition pass and clip files immediately after their last span. One final H.264 encode. No LUT files. Disk scales with three timelines + two clips + the H.264 chunk and final MP4 + selected PCM; not a fixed GB limit. All owned scratch/partials removed on failure/cancel; successful exports never overwritten.'
           : 'At most two complete lossless clips; delete the previous clip immediately after its tail. Keep compressed chunks and selected PCM until mux/verification. Peak disk scales with two clips + chunks + selected PCM + final MP4, not all lossless clips. All scratch removed before publication; failed/cancelled job directory removed.',
         audio: music, audioPlacement: '48 kHz stereo AAC (mono duplicated without attenuation), linear afade, explicit gain, selected-range loop; streamed silence prefix and pad/trim to video duration; no normalization or source-video audio'
       },

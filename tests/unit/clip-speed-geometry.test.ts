@@ -45,10 +45,10 @@ describe('clip speed graph geometry and transaction planning', () => {
     expect(invalid.document).toBe(project); expect(invalid.previewFrame).toBe(20);
   });
   it('rejects a speed/fade conflict atomically without shrinking existing fades', () => {
-    const project = fixture(); project.openingFade = 110;
+    const project = fixture(); project.layers[0]!.openingFade = 110;
     const plan = planClipSpeedDrag(project, 'clip', 60, 60, 8, 20, 20);
     expect(plan.error).not.toBe(''); expect(plan.command).toBeNull(); expect(plan.document).toBe(project);
-    expect(project.openingFade).toBe(110);
+    expect(project.layers[0]!.openingFade).toBe(110);
   });
   it('seeks boundary/off-trim stored points to the nearest actual source frame', () => {
     const project = fixture(); project.clips[0]!.sourceIn = 30; project.clips[0]!.sourceOut = 90;

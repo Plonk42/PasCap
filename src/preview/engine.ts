@@ -1,6 +1,6 @@
 import { colourSchema, type ColourSettings } from '../shared/colour.js';
 import { projectSchema, type ProjectDocument } from '../shared/model.js';
-import { calculateLayout, sampleTimeline, type PlacedClip, type PreviewLayer, type TimelineLayout } from '../shared/timeline.js';
+import { calculateLayout, layerClips, sampleTimeline, type PlacedClip, type PreviewLayer, type TimelineLayout } from '../shared/timeline.js';
 import { framesToSeconds, PROJECT_FPS, sameRate, secondsToFrames } from '../shared/timing.js';
 import { allocateDecoders, decoderPoolSize, type DecoderPoolAssignments } from './assignment.js';
 import { Compositor, type CompositeGroup } from './compositor.js';
@@ -30,10 +30,13 @@ function median(values: number[]): number | null {
 function timingKey(project: ProjectDocument): string {
   return JSON.stringify({
     id: project.id, frameRate: project.frameRate, colourProfile: project.colourProfile,
-    primary: project.clips.filter((clip) => clip.layerId === project.layers[0]!.id).map((clip) => clip.id),
     clips: project.clips.map(({ id, mediaId, layerId, start, sourceIn, sourceOut, speed }) => ({ id, mediaId, layerId, start, sourceIn, sourceOut, speed })).sort((left, right) => left.id.localeCompare(right.id)),
-    layerRates: project.layers.filter((layer) => layer.keyframes.some((key) => key.values.speed !== null)).map((layer) => ({ id: layer.id, keys: layer.keyframes.filter((key) => key.values.speed !== null).map((key) => ({ frame: key.frame, interpolation: key.interpolation, value: key.values.speed })) })).sort((left, right) => left.id.localeCompare(right.id)),
-    transitions: project.transitions, opening: project.openingFade, closing: project.closingFade, music: project.music,
+    tracks: project.layers.filter((layer) => project.clips.some((clip) => clip.layerId === layer.id)).map((layer) => ({
+      id: layer.id, ripple: layer.ripple, order: layerClips(project, layer.id).map((clip) => clip.id),
+      transitions: layer.transitions, opening: layer.openingFade, closing: layer.closingFade,
+      rates: layer.keyframes.filter((key) => key.values.speed !== null).map((key) => ({ frame: key.frame, interpolation: key.interpolation, value: key.values.speed })),
+    })).sort((left, right) => left.id.localeCompare(right.id)),
+    music: project.music,
   });
 }
 
@@ -46,7 +49,7 @@ export class PreviewEngine {
   #nextSlotIndex = 0;
   #proxyUrl: (mediaId: string) => string = () => { throw new Error('No media resolver loaded.'); };
   #document: ProjectDocument | null = null;
-  #layout: TimelineLayout = { clips: [], transitions: [], duration: 0, baseDuration: 0 };
+  #layout: TimelineLayout = { clips: [], transitions: [], duration: 0 };
   #controller = new AbortController();
   readonly #preloads = new Map<VideoDecoderSlot, { clipId: string; controller: AbortController }>();
   #operationFrame = 0;
@@ -447,11 +450,12 @@ export class PreviewEngine {
       this.#slotFor(layer.clipId).setRate(position.retiming.rateAt(expected - position.start));
     });
     if (this.#acceptFrame(expected)) return;
-    // Enabled-layer gaps (including overlay-only tails) are valid black frames.
-    const primary = layers[0];
-    if (!primary) return;
-    const placed = this.#layout.clips.find((item) => item.clip.id === primary.clipId)!;
-    const actual = placed.start + placed.retiming.outputAt(this.#slotFor(primary.clipId).decodedFrame);
+    // Empty project-frame gaps and disabled-track tails are valid black frames.
+    // Any active source can diagnose a clock mismatch; stack order grants no role.
+    const observed = layers[0];
+    if (!observed) return;
+    const placed = this.#layout.clips.find((item) => item.clip.id === observed.clipId)!;
+    const actual = placed.start + placed.retiming.outputAt(this.#slotFor(observed.clipId).decodedFrame);
     const error = Math.abs(actual - expected);
     if (actual >= 0) this.#maxClockError = Math.max(this.#maxClockError, error);
     if (error <= 1 && actual >= 0 && actual < this.#layout.duration && this.#acceptFrame(actual)) return;

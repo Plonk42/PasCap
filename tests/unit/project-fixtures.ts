@@ -39,3 +39,11 @@ export function legacyV4Project(id: string, title: string) {
     transitions: [], openingFade: 0, closingFade: 0, music: null, revision: 0,
   };
 }
+
+/** Genuine schema 5: project bins and row points, but global transitions/fades. */
+export function legacyV5Project(id: string, title: string) {
+  return {
+    ...legacyV4Project(id, title), schemaVersion: 5,
+    media: { videoIds: ['legacy-media'], audioIds: [] },
+  };
+}

@@ -13,16 +13,16 @@ import { needsLayeredExport } from '../src/shared/export.js';
 import { jobSchema } from '../src/shared/media.js';
 import { projectSchema } from '../src/shared/model.js';
 import { forEachSerial } from '../src/shared/serial.js';
-import { calculateLayout } from '../src/shared/timeline.js';
+import { calculateLayout, layerClips } from '../src/shared/timeline.js';
 import { framesToSeconds } from '../src/shared/timing.js';
 
-const reportId = 'preview-v5';
+const reportId = 'preview-v6';
 const measurementProfile = {
-  id: 'original-two-excerpts-v4',
+  id: 'original-two-excerpts-v5',
   // Diagnostic profile format is independent of the project document schema.
-  schemaVersion: 4,
-  projectSchemaVersion: 5,
-  description: 'Strict schema-5 original two-excerpt colour/seek/transition/native-reference diagnostic: one enabled primary layer, unit opacity, static clip grades, constant 1× speed, no shared project-frame layer points or music.',
+  schemaVersion: 5,
+  projectSchemaVersion: 6,
+  description: 'Strict schema-6 original two-excerpt colour/seek/transition/native-reference diagnostic: one enabled zero-origin contiguous track, unit opacity, static clip grades, constant 1× speed, no shared project-frame layer points or music.',
 } as const;
 const url = process.env['PASCAP_MEASURE_URL'] ?? 'http://127.0.0.1:5173';
 const browser = await chromium.launch({ channel: 'chrome', headless: !process.argv.includes('--headed'), args: ['--autoplay-policy=no-user-gesture-required', '--enable-precise-memory-info'] });
@@ -30,7 +30,7 @@ const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
 // tsx/esbuild preserves nested function names using this helper. Evaluated functions
 // are serialised into the page and cannot otherwise access the Node-side helper.
 await page.addInitScript('globalThis.__name = (fn) => fn;');
-// Keep the historical reports separate from new schema-5 measurements.
+// Keep historical reports separate from new schema-6 measurements.
 const directory = path.resolve('.pascap/measurements', reportId);
 await mkdir(directory, { recursive: true });
 try {
@@ -39,8 +39,9 @@ try {
   const original = projectSchema.parse(await page.evaluate(() => window.pascapLab!.project()));
   // This is the original two-clip colour/seek comparison, not the production
   // layered renderer. Reject shared layer points/opacity rather than measure a false baseline.
-  if (original.clips.length !== 2 || original.music !== null || needsLayeredExport(original) || original.clips.some((clip) => clip.speed.mode !== 'constant' || clip.speed.rate !== 1)) throw new Error('This schema-5 diagnostic expects two normal-speed primary excerpts without music, extra layers, non-unit opacity or shared project-frame layer points. Choose a compatible project with PASCAP_MEASURE_URL (for example ?project=sample-taillefer-v5); no saved document will be changed.');
+  if (original.schemaVersion !== 6 || original.clips.length !== 2 || original.music !== null || needsLayeredExport(original) || original.clips.some((clip) => clip.speed.mode !== 'constant' || clip.speed.rate !== 1)) throw new Error('This schema-6 diagnostic expects two normal-speed excerpts on one enabled, opaque, zero-origin contiguous track, without music, extra layers or shared project-frame layer points. Choose a compatible project with PASCAP_MEASURE_URL (for example ?project=sample-taillefer-v6); no saved document will be changed.');
   const layout = calculateLayout(original);
+  const clips = layerClips(original, original.layers[0]!.id);
   const grades: ColourSettings[] = [
     { ...NEUTRAL_COLOUR }, { ...NEUTRAL_COLOUR, exposure: 1 }, { ...NEUTRAL_COLOUR, brightness: 0.1 },
     { ...NEUTRAL_COLOUR, contrast: 1.3 }, { ...NEUTRAL_COLOUR, hue: 45 }, { ...NEUTRAL_COLOUR, saturation: 0.4 },
@@ -57,17 +58,17 @@ try {
   const colour: { grade: ColourSettings; latencyMs: PreviewDiagnostics['colourLatencyMs'] }[] = [];
   await page.evaluate(() => window.pascapLab!.engine.seek(45));
   await forEachSerial(grades, async (grade) => {
-    colour.push(await page.evaluate(async (settings) => {
-      const engine = window.pascapLab!.engine; const clip = window.pascapLab!.project()!.clips[0]!;
-      engine.updateColour(clip.id, settings);
+    colour.push(await page.evaluate(async ({ settings, clipId }) => {
+      const engine = window.pascapLab!.engine;
+      engine.updateColour(clipId, settings);
       await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
       return { grade: settings, latencyMs: engine.diagnostics().colourLatencyMs };
-    }, grade));
+    }, { settings: grade, clipId: clips[0]!.id }));
   });
   const playbackModes = process.argv.includes('--skip-playback') ? [] : ['cut', 'fade-through-black', 'cross-dissolve'] as const;
   const playback: { type: typeof playbackModes[number]; repetition: number; result: unknown }[] = [];
   await forEachSerial(playbackModes, async (type) => {
-    const snapshot = applyCommand(original, { type: 'transition', transition: type === 'cut' ? { leftId: original.clips[0]!.id, rightId: original.clips[1]!.id, type, duration: 0 } : { leftId: original.clips[0]!.id, rightId: original.clips[1]!.id, type, duration: 30 } });
+    const snapshot = applyCommand(original, { type: 'transition', transition: type === 'cut' ? { leftId: clips[0]!.id, rightId: clips[1]!.id, type, duration: 0 } : { leftId: clips[0]!.id, rightId: clips[1]!.id, type, duration: 30 } });
     const duration = calculateLayout(snapshot).duration;
     await forEachSerial([0, 1], async (repetition) => {
       console.log(`Measuring ${type}, pass ${repetition + 1} (engine only; saved edit unchanged)`);
@@ -118,8 +119,8 @@ try {
   const comparisons: { frame: number; meanAbsoluteError8Bit: number }[] = [];
   let reference: unknown = null;
   if (process.argv.includes('--reference')) {
-    let snapshot = applyCommand(original, { type: 'colour', clipId: original.clips[0]!.id, colour: grades.at(-1)! });
-    snapshot = applyCommand(snapshot, { type: 'colour', clipId: original.clips[1]!.id, colour: { ...NEUTRAL_COLOUR, exposure: -0.25, hue: -6, saturation: 0.9 } });
+    let snapshot = applyCommand(original, { type: 'colour', clipId: clips[0]!.id, colour: grades.at(-1)! });
+    snapshot = applyCommand(snapshot, { type: 'colour', clipId: clips[1]!.id, colour: { ...NEUTRAL_COLOUR, exposure: -0.25, hue: -6, saturation: 0.9 } });
     console.log('Rendering an immutable graded reference for browser/native comparison.');
     const response = await page.evaluate(async (document) => {
       const result = await fetch('/api/reference', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-PasCap-Client': 'preview-lab' }, body: JSON.stringify({ document }) });
@@ -184,7 +185,7 @@ try {
     hardware: { platform: os.platform(), release: os.release(), cpu: os.cpus()[0]?.model, logicalCpus: os.cpus().length, ramGiB: os.totalmem() / 1024 ** 3 },
     renderer: await page.evaluate(() => window.pascapLab!.engine.diagnostics().renderer),
     projectSnapshot: original, durationSeconds: framesToSeconds(layout.duration),
-    notes: ['No saved edit is changed; only the independent engine is exercised.', 'Only strict schema-5 projects are measured; schema 1–4 data is incompatible and never migrated or defaulted.', 'Diagnostic profile and reference receipt schema versions are independent of the project schema.', 'This retains the original two-excerpt acceptance measurements, not shared-layer-point or layered-throughput certification.', 'Colour latency is engine update to next paint, not full input-event/React latency.', 'FPS includes buffering; memory readings are Chromium JS heap, not total decoder/GPU process memory.', 'Native/proxy comparison is downsampled RGB MAE, including scaling, H.264 4:2:0 and browser conversion.', 'Integrated-browser performance is diagnostic only; target-GPU acceptance is pending external-browser validation.', ...(process.argv.includes('--skip-playback') ? ['Repeated playback measurement explicitly skipped.'] : [])],
+    notes: ['No saved edit is changed; only the independent engine is exercised.', 'Only strict schema-6 projects are measured; schema 1–5 data is incompatible and never migrated or defaulted.', 'Diagnostic profile and reference receipt schema versions are independent of the project schema.', 'This retains the original two-excerpt acceptance measurements, not shared-layer-point or layered-throughput certification.', 'Colour latency is engine update to next paint, not full input-event/React latency.', 'FPS includes buffering; memory readings are Chromium JS heap, not total decoder/GPU process memory.', 'Native/proxy comparison is downsampled RGB MAE, including scaling, H.264 4:2:0 and browser conversion.', 'Integrated-browser performance is diagnostic only; target-GPU acceptance is pending external-browser validation.', ...(process.argv.includes('--skip-playback') ? ['Repeated playback measurement explicitly skipped.'] : [])],
     gpu, seeks, colour, playback, reference, comparisons,
   };
   await atomicWrite(path.join(directory, 'preview.json'), `${JSON.stringify(report, null, 2)}\n`);

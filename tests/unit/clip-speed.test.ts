@@ -16,7 +16,7 @@ const clip = (speed: SpeedCurve, sourceIn = 0, sourceOut = 120) => ({ ...createC
 describe('strict clip-instance speed curves', () => {
   it('adds a discriminated mode without missing defaults, optional legacy fields or project migration', () => {
     const document = createProject('curve', 'Curve'); document.clips = [clip(curve(key(0, 1), key(120, 2)))];
-    expect(projectSchema.parse(document)).toEqual(document); expect(document.schemaVersion).toBe(5);
+    expect(projectSchema.parse(document)).toEqual(document); expect(document.schemaVersion).toBe(6);
     expect(speedSchema.parse({ mode: 'constant', rate: 1 })).toEqual({ mode: 'constant', rate: 1 });
     expect(() => speedSchema.parse({ mode: 'curve' })).toThrow();
   });
@@ -171,7 +171,7 @@ describe('presets, exact key edits and existing timeline operations', () => {
     const document = createProject('native-curve', 'Native curve'); document.clips = [clip(curve(key(0, 0.5), key(120, 2)))];
     expect(needsLayeredExport(document)).toBe(false); expect(planExport(document).duration).toBe(calculateLayout(document).duration);
     for (let frame = 0; frame < calculateLayout(document).duration; frame++) expect(sampleTimeline(document, frame)[0]!.sourceFrame).toBe(compileRetiming(document.clips[0]!).sourceAt(frame));
-    document.clips.push(createClip('b', 'source', 0, 120)); document.transitions = [{ leftId: 'a', rightId: 'b', type: 'cross-dissolve', duration: 30 }];
+    document.clips.push(createClip('b', 'source', 0, 120)); document.layers[0]!.transitions = [{ leftId: 'a', rightId: 'b', type: 'cross-dissolve', duration: 30 }];
     const before = structuredClone(document);
     expect(() => applyCommand(document, { type: 'speed', clipId: 'a', speed: curve(key(0, 8), key(120, 8)) })).toThrow();
     expect(document).toEqual(before);

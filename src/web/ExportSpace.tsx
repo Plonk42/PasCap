@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { formatStorageBytes, MIN_EXPORT_FREE_BYTES, type ExportPreflight } from '../shared/export-space.js';
-import type { ExportProfile } from '../shared/export.js';
+import { EXPORT_RESOURCES, LAYERED_EXPORT_RESOURCES, type ExportProfile } from '../shared/export.js';
 import type { ProjectDocument } from '../shared/model.js';
 import { api } from './api.js';
 import { Icon } from './icons.js';
@@ -55,6 +55,6 @@ export function ExportSpace({ state }: Readonly<{ state: ExportSpaceState }>) {
       <div><dt>Encoded chunks + final MP4</dt><dd>{formatStorageBytes(space.estimate.encodedBytes)}</dd></div>
       <div><dt>Selected music PCM</dt><dd>{formatStorageBytes(space.estimate.audioBytes)}</dd></div>
       <div><dt>Margin + start reserve</dt><dd>{formatStorageBytes(space.estimate.overheadBytes)}</dd></div>
-    </dl><p>Uses uncompressed 4-byte clip and 8-byte timeline frames, one byte per pixel per frame for each encoded copy, selected stereo PCM, and a 25% margin plus a 16 MiB start reserve. These are planning assumptions, not codec guarantees.</p><p>A storage failure cleans up only the failed job. Originals, saved edits and completed exports stay intact. Space is checked again before admission and when the worker starts.</p></details>
+    </dl><p>Budgets up to {EXPORT_RESOURCES.maxLosslessClipsOnDisk} lossless clips at 4 uncompressed bytes per pixel per frame and, for layered rendering, {LAYERED_EXPORT_RESOURCES.maxLosslessTimelineRepresentations} full-timeline representations at 8 bytes per pixel per frame. It also allows one byte per pixel per frame for each encoded copy, selected stereo PCM, and a 25% margin plus a 16 MiB start reserve. These are planning assumptions, not codec guarantees.</p><p>A storage failure cleans up only the failed job. Originals, saved edits and completed exports stay intact. Space is checked again before admission and when the worker starts.</p></details>
   </section>;
 }

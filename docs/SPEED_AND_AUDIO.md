@@ -1,4 +1,4 @@
-# Speed and audio contract · project v5
+# Speed and audio contract · project v6
 
 ## Two distinct retiming contracts
 
@@ -52,8 +52,8 @@ selected original frame, even when output sampling skips it.
 Clip curves belong to **one excerpt instance**. Trims, moves, splits and marked
 cuts retain original-source anchors; split/cut/duplicate copies are independent.
 Every retained piece recompiles/rounds its duration once. Curves are carried in
-the existing required `speed` field: schema 5 is a strict union extension, without
-an optional fallback, data migration or project-wide field. A mode/preset change
+the required `speed` field of strict schema 6, without an optional fallback,
+data migration or project-wide speed field. A mode/preset change
 is a deliberate editing command, not a conversion on load.
 
 Original preset shapes provide Flat, Accelerate, Decelerate, Slow centre and Fast
@@ -66,7 +66,7 @@ base without deleting any clip points.
 
 ### Shared row Speed: absolute project-time rate
 
-Schema-5 layer points retain ten required nullable channels, including `speed`.
+Schema-6 layer points require ten nullable channels, including `speed`.
 Once any point on the row participates in Speed, the row's rate curve **overrides
 every clip's entire constant/ramp/custom-curve base**, not just an interval between keys. Only
 Speed participants define its intervals; unrelated colour/opacity-only points are
@@ -109,24 +109,32 @@ map is rejected rather than falling back to a clip's static speed.
 All row colour/opacity parameters are sampled at **absolute project time**, not at
 the retimed source frame. A held source image can therefore receive a different
 grade on the next project frame. Native LUT generation and preview redraw both
-follow that rule. Dissolve grouping, layer-opacity equations and render-resource
-bounds are unchanged. Any shared row point, even speed-only, requires the layered
+follow that rule. Dissolve grouping and layer-opacity equations apply independently
+on every track. Any shared row point, even speed-only, requires the layered
 export path; the static chunk plan cannot silently omit it.
 
 With row Speed keys, moving the same excerpt changes its contextual duration.
-Primary layout ripples and recompiles downstream clips at their newly derived
-starts; overlay starts stay absolute and neighbours are not moved. Transition/fade
-durations remain **output** frames. Invalid fade/transition regions or same-row
-overlay overlap reject the entire edit, including a rate/point-time/easing change.
+Each track's **Ripple** setting governs placement. While on (the new-track default),
+clips continuously sequence from the first anchor, subtracting dissolve overlaps
+and recompiling downstream durations at their new starts; commands persist these
+actual starts. Enabling Ripple closes gaps in one Undo step while retaining the
+first current start; turning it off captures actual placements. While off, starts
+stay independent and duration edits never move unrelated clips. Other tracks,
+music and absolute row points stay put. Transition/fade durations remain **output**
+frames on their own track. Invalid fade/transition regions, arbitrary same-track
+overlap or triple overlap reject the entire edit, including a rate/point-time/easing change.
 This includes direct marker dragging and marker keyboard moves: a timing conflict
 rejects the **whole shared point**, never just its Speed participant, and never
 shortens transitions to make the destination fit.
 
 Moving ghosts and commits use the same contextual duration calculation. A
 trailing-edge magnet solves the new start/end against the row curve rather than
-using the old width. Left overlay trims similarly retain their timeline OUT; an
+using the old width. Left handle/keyboard trims with Ripple off retain timeline OUT; an
 unrepresentable integer-frame result is explicitly rejected. Numeric source fields
-retain the start. Trim/move/split/duplicate never copy or shift row points; each
+retain the start in either mode; Ripple-on left trims also keep their sequence
+start and recompile the suffix. Only the first anchor supports numeric start/nudge
+while on; later clips expose the reason to turn Ripple off or drag to reorder.
+Trim/move/split/duplicate never copy or shift row points; each
 split piece has its own contextual duration rounding, so exact total duration is
 not guaranteed. Originals and full proxies remain unchanged.
 
@@ -154,7 +162,7 @@ contextual layout without saving; occupied frames and invalid timing never merge
 overwrite, shrink transitions or commit an earlier valid preview. Escape, pointer
 cancellation, lost capture or window blur restores preview/document/scroll.
 Source ranges, static clip bases, other row points and music are not copied/shifted;
-Speed can naturally recompile clip durations and primary derived starts.
+Speed can naturally recompile clip durations and Ripple-derived track starts.
 
 Setting/row/list navigation shares a stored-point inspection cursor, so several
 off-duration Speed points remain reachable even when preview clamps to the same
@@ -228,20 +236,24 @@ Native export uses the same placement/loop/gain/fade rules and produces AAC at
 
 ## Versioning
 
-Project schema **v5** requires explicit `media.videoIds` and `media.audioIds` arrays,
+Project schema **v6** requires explicit `media.videoIds` and `media.audioIds` arrays,
 unique and limited to 10,000 IDs each, plus complete clip colour/opacity/constant/ramp/custom-curve
 speed, layer point arrays with all ten nullable value fields, placement and music
-source OUT. New projects have empty video/music bins. Standalone audio imports belong
+source OUT. Every layer also requires `ripple`, `transitions`, `openingFade` and
+`closingFade`; transitions/fades are track-local, with no special first-track
+identity. Layers display and composite in their saved bottom-to-top array order.
+New projects have empty video/music bins. Standalone audio imports belong
 to the open project's bin; selected music references also count as membership.
 Global registered music/proxies are reusable on deliberate import, never automatically
-inherited by a new project. Earlier v1/v2/v3/v4 projects and export receipt snapshots remain unchanged
+inherited by a new project. Earlier v1–v5 projects and export receipt snapshots remain unchanged
 and incompatible. There is no migration, compatibility fallback or default-field
 injection; create a new project and import its media to reuse registered assets/verified
 ready proxies. Confirmed project deletion affects only its saved document, not originals,
 the shared content-deduplicated registry/cache or finished exports/receipts.
+Registry/proxy formats and music processing are unchanged.
 
-Marker movement/channel navigation adds no schema, migration, toolchain or native
-pipeline change. Synthetic correctness checks do not qualify intended-GPU preview,
+Stored-point inspection remains editor-only, never a persisted field or migration.
+Synthetic correctness checks do not qualify intended-GPU preview,
 long-flight throughput or long-run audio behaviour. Those acceptance requirements
 are tracked in [#6](https://github.com/Plonk42/PasCap/issues/6),
 [#7](https://github.com/Plonk42/PasCap/issues/7) and

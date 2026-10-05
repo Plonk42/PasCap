@@ -15,7 +15,7 @@ import { retimeRawVideo } from '../../src/server/retime-process.js';
 import { estimateExportSpace, exportPreflightSchema, formatStorageBytes, MIN_EXPORT_FREE_BYTES } from '../../src/shared/export-space.js';
 import { EMPTY_KEY_VALUES } from '../../src/shared/keyframes.js';
 import type { MediaAsset } from '../../src/shared/media.js';
-import { createClip, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
+import { createClip, createLayer, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
 import { framesToSeconds, PROJECT_FPS } from '../../src/shared/timing.js';
 
 vi.mock('node:fs/promises', async (importOriginal) => {
@@ -42,7 +42,7 @@ async function temp(): Promise<string> {
 function documentWithClips(count = 1): ProjectDocument {
   const document = createProject('space-unit', 'Space unit');
   document.clips = Array.from({ length: count }, (_, index) => createClip(`clip-${index}`, 'video', 0, 30));
-  document.transitions = document.clips.slice(1).map((clip, index) => ({ leftId: document.clips[index]!.id, rightId: clip.id, type: 'cut' as const, duration: 0 }));
+  document.layers[0]!.transitions = document.clips.slice(1).map((clip, index) => ({ leftId: document.clips[index]!.id, rightId: clip.id, type: 'cut' as const, duration: 0 }));
   document.media.videoIds = ['video'];
   return projectSchema.parse(document);
 }
@@ -90,16 +90,16 @@ describe('duration-dependent planning allowance, not a codec guarantee', () => {
     expect(estimateExportSpace(document, 'draft720').losslessBytes).toBe(1280 * 720 * 60 * 4);
     expect(estimateExportSpace(document, 'final4k').losslessBytes).toBe(3840 * 2160 * 60 * 4);
   });
-  it('budgets two RGBA16 timeline representations for row animation, even a neutral key', () => {
+  it('budgets three RGBA16 timeline representations for row animation, even a neutral key', () => {
     const document = documentWithClips();
     document.layers[0]!.keyframes = [{ frame: 0, interpolation: 'linear', values: { ...EMPTY_KEY_VALUES, exposure: 0 } }];
-    expect(estimateExportSpace(document, 'draft720').losslessBytes).toBe(1280 * 720 * (30 * 4 + 2 * 30 * 8));
+    expect(estimateExportSpace(document, 'draft720').losslessBytes).toBe(1280 * 720 * (30 * 4 + 3 * 30 * 8));
   });
   it('keeps disabled tails in full timeline allowance but excludes their unrendered clip files', () => {
     const document = documentWithClips();
-    document.layers.push({ id: 'hidden', name: 'Hidden', enabled: false, opacity: 1, keyframes: [] });
+    document.layers.push({ ...createLayer('hidden', 'Hidden', false), enabled: false });
     document.clips.push({ ...createClip('hidden', 'video', 0, 60), layerId: 'hidden', start: 100 });
-    expect(estimateExportSpace(document, 'draft720').losslessBytes).toBe(1280 * 720 * (30 * 4 + 2 * 160 * 8));
+    expect(estimateExportSpace(document, 'draft720').losslessBytes).toBe(1280 * 720 * (30 * 4 + 3 * 160 * 8));
   });
   it('budgets only the selected PCM once regardless of looping and none for inactive music', () => {
     const document = documentWithClips();

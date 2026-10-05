@@ -135,12 +135,12 @@ describe.skipIf(!enabled)('production native export · opt-in disposable media o
       ...createClip(`instance-${index}`, assets[index % 2]!.id, 1 + index % 4, 19 + index % 4), speed,
       colour: { ...NEUTRAL_COLOUR, brightness: index * 0.008, exposure: index * 0.025, saturation: 0.85 + index * 0.015 },
     }));
-    project.transitions = project.clips.slice(1).map((clip, index) => {
+    project.layers[0]!.transitions = project.clips.slice(1).map((clip, index) => {
       const pair = { leftId: project.clips[index]!.id, rightId: clip.id };
       if (index % 3 === 0) return { ...pair, type: 'cut' as const, duration: 0 as const };
       return { ...pair, type: index % 3 === 1 ? 'cross-dissolve' as const : 'fade-through-black' as const, duration: index % 3 === 1 ? 4 : 5 };
     });
-    project.openingFade = 3; project.closingFade = 3;
+    project.layers[0]!.openingFade = 3; project.layers[0]!.closingFade = 3;
     const updates: number[] = [];
     const diskSamples: number[] = [];
     const submit = fixture.jobs.submit.bind(fixture.jobs);
@@ -184,12 +184,13 @@ describe.skipIf(!enabled)('production native export · opt-in disposable media o
     before.clips[0]!.speed = { mode: 'constant', rate: 2 };
     before.clips[0]!.colour = { ...NEUTRAL_COLOUR, exposure: 0.3, brightness: 0.04, saturation: 0.8 };
     before.clips.push(createClip('two', assets[1]!.id, 2, 10));
-    before.transitions = [{ leftId: 'one', rightId: 'two', type: 'cut', duration: 0 }];
+    before.clips[1]!.start = 12;
+    before.layers[0]!.transitions = [{ leftId: 'one', rightId: 'two', type: 'cut', duration: 0 }];
     const project = applyCommand(before, removeMarkedRange(before, { clipId: 'one', inFrame: 3, outFrame: 6 }, 'one-right'));
     expect(project.clips).toEqual([
       { ...before.clips[0]!, sourceOut: 6 },
-      { ...before.clips[0]!, id: 'one-right', sourceIn: 12 },
-      before.clips[1],
+      { ...before.clips[0]!, id: 'one-right', sourceIn: 12, start: 3 },
+      { ...before.clips[1]!, start: 9 },
     ]);
     expect(calculateLayout(project).clips.map((placed) => [placed.clip.id, placed.start, placed.end])).toEqual([
       ['one', 0, 3], ['one-right', 3, 9], ['two', 9, 17],
@@ -207,7 +208,10 @@ describe.skipIf(!enabled)('production native export · opt-in disposable media o
       assertPixels(project, frame, output.subarray(frame * FRAME_BYTES, (frame + 1) * FRAME_BYTES), originals);
     }
     const restored = applyCommand(project, { type: 'trim', clipId: 'one', sourceIn: 0, sourceOut: 12 });
-    expect(restored.clips[1]).toEqual(project.clips[1]);
+    expect(restored.clips[1]).toEqual({ ...project.clips[1]!, start: 6 });
+    expect(calculateLayout(restored).clips.map((placed) => [placed.clip.id, placed.start, placed.end])).toEqual([
+      ['one', 0, 6], ['one-right', 6, 12], ['two', 12, 20],
+    ]);
     expect(before.clips[0]!.sourceOut).toBe(24);
     for (const asset of assets) {
       expect(asset.prepared).toBeNull();
@@ -218,7 +222,7 @@ describe.skipIf(!enabled)('production native export · opt-in disposable media o
 
   it('supports a one-frame dissolve and clips whose entire output consists of transition tails', async () => {
     const project = document(1); project.clips.push(createClip('two', assets[1]!.id, 8, 9));
-    project.transitions = [{ leftId: 'one', rightId: 'two', type: 'cross-dissolve', duration: 1 }];
+    project.layers[0]!.transitions = [{ leftId: 'one', rightId: 'two', type: 'cross-dissolve', duration: 1 }];
     const result = await completed(project);
     expect(result.receipt.timeline.chunks).toHaveLength(1);
     const pixels = await extractComparisonFrame(config, result.filename, 0, 'tv');
@@ -228,7 +232,7 @@ describe.skipIf(!enabled)('production native export · opt-in disposable media o
   it('renders a few genuine UHD frames, grading before output-frame one-frame black fades', async () => {
     const project = document(6); project.clips[0]!.speed = { mode: 'constant', rate: 2 };
     project.clips[0]!.colour = { ...NEUTRAL_COLOUR, brightness: 0.1, shadows: 0.25 };
-    project.openingFade = 1; project.closingFade = 1;
+    project.layers[0]!.openingFade = 1; project.layers[0]!.closingFade = 1;
     const result = await completed(project, 'final4k');
     expect(result.receipt.verification.frameCount).toBe(3);
     for (const frame of [0, 1, 2]) {

@@ -21,10 +21,10 @@ migration, source copying, native jobs or a release.
   also change the prepared-cache lookup.
 - [Registry v1 and MediaAsset](../../src/shared/media.ts) are strict. The video
   registry and [audio registry](../../src/server/audio.ts) are distinct files.
-  [Project v5](../../src/shared/model.ts) clips/bins reference asset IDs, not paths;
+  [Project v6](../../src/shared/model.ts) clips/bins reference asset IDs, not paths;
   row points, source-frame curves and music timing are independent of location.
 - [Export admission](../../src/server/export.ts) captures/freeze-copies source
-  assets before queuing native work. Existing version-1 receipts contain the v5
+  assets before queuing native work. Version-1 receipts contain their captured
   project snapshot **and original source paths/fingerprints/metadata**. They are
   historical export evidence, not a relink baseline; neither receipts nor finished
   videos may be rewritten by a location change.
@@ -81,8 +81,8 @@ If the owner needs those old associations preserved in an upgraded workspace,
 that is a separate explicit migration/evidence-capture decision, not hidden code.
 There is no way to manufacture their missing complete baseline after the fact.
 
-No project-schema change is needed solely for a location change: v5 already stores
-IDs rather than paths. Do not rewrite old v5 documents to substitute new IDs.
+No project-schema change is needed solely for a location change: v6 already stores
+IDs rather than paths. Do not rewrite existing project documents to substitute new IDs.
 Receipt version 1 and its recorded paths remain unchanged; this design does not
 add fields or reinterpret receipts as full-content proof. Audio relinking and
 audio registry changes are **out of scope**; audio keeps its current contract.

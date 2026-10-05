@@ -1,10 +1,12 @@
-# Desktop workspace and recovery · 2026-10-04
+# Desktop workspace and recovery
 
-The current workspace uses **strict schema 5 with project-specific video/music bins
-and draggable shared project-time video-row points**, with per-setting channel
-navigation. Layout preferences, stored-point inspection and recovery feedback remain editor-only; source
-protection, music, dissolve/layer-opacity equations and native render bounds are
-unchanged. The intended discrete-GPU and long real-flight checks remain deferred.
+The workspace uses **strict schema 6 with uniform video tracks, required per-track
+Ripple/transitions/fades, project-specific video/music bins and draggable shared
+project-time row points**, with per-setting channel navigation. Layout preferences,
+stored-point inspection and recovery feedback remain editor-only. Source protection,
+music and dissolve/layer-opacity equations are unchanged; current native bounds
+are in [the resource contract](LAYERS_AND_KEYFRAMES.md#inspector-and-resource-limits).
+The intended discrete-GPU and long real-flight checks remain deferred.
 
 ## Layout and navigation
 
@@ -19,14 +21,15 @@ unchanged. The intended discrete-GPU and long real-flight checks remain deferred
 - Right: scrollable **Clip / Sequence / Audio** inspector tabs with readable inputs,
   independent collapsible sections. Clip contains source/static bases, opacity,
   speed, colour and one **Layer keyframes** panel for the selected row; Sequence
-  owns transitions/fades; Audio owns music. Empty-row selection retains keyframe context.
+  owns the selected track's transitions/fades; Audio owns music. Empty-row selection
+  retains keyframe context and dormant track fades.
 - Bottom: frame-scaled multi-layer timeline, playhead timecode, highlighted active
   insertion layer, one marker per visible row point, dimmed hidden clips and Activity.
   The responsive toolbar keeps Split, Trim start/end, Delete and IN/OUT/Cut range
-  directly visible; only duplication/overlay nudging remain in Clip actions.
-  The primary sequence is the first row, with overlays below it; their stored
-  composition priority is unchanged. The thin ruler remains pinned above scrolling
-  video rows with TIME ticks/separators, playhead handle/timecode and click/drag seeking;
+  directly visible; duplication/start nudging remain in Clip actions.
+  Rows display the saved bottom-to-top composition array: row 1 renders below row 2,
+  row 3 above row 2, and so on, with no primary/overlay role. The thin ruler remains
+  pinned above scrolling video rows with TIME ticks/separators, playhead handle/timecode and click/drag seeking;
   distinct Cut/Fade/Dissolve buttons open boundary transitions, not keyframes.
 
 Media/Clip widths and Timeline height can be resized by pointer or focused-divider
@@ -62,11 +65,27 @@ The ruler stays visible at every vertical scroll position while its ticks follow
 horizontal timeline scroll. Header focus and automatic reveal account for the
 pinned heading/ruler. Clip/media drops target actual visible rows, never the ruler
 or a row hidden underneath it.
-Layer options explain unavailable stack actions: the primary sequence is the fixed
-composition base, displayed first, and cannot be reordered/deleted; the frontmost
-overlay cannot be raised further, and the rearmost cannot be lowered below the
-primary composition base. Other overlay actions remain
-undoable, and active drafts/unavailable preview still block mutations.
+Layer options explain unavailable stack actions: the top composition track cannot
+be raised further, the bottom cannot be lowered further, and the last remaining
+track cannot be deleted. Every other track can be reordered/deleted; the initial
+ID is not a protected base. Actions remain undoable, and active drafts/unavailable
+preview still block mutations.
+
+**Layer options → Ripple** is a native checkbox with contextual help and visible
+row state; new tracks default on. Enabling packs current clips from the first
+current start, closing gaps in one Undo and retaining valid dissolves. While on,
+later clips continuously follow the first anchor; commands persist actual starts.
+Turning off captures actual placements for independent edits. **Timeline start
+frame** and nudges work on positioned clips or the first Ripple anchor; later
+Ripple starts are disabled with an accessible explanation to drag to reorder or
+turn Ripple off. Music, other tracks and absolute row points never follow Ripple.
+
+In **Sequence**, boundary controls and **Sequence fades** use the selected track.
+Gapped pairs are Cut only, with a reason to close the gap or enable Ripple before
+adding a non-cut effect. A positioned dissolve edit explicitly adjusts its paired
+right clip; other clips stay fixed and conflicts reject the whole edit. Black
+opening/closing/transition fades darken only that row's RGB, preserving coverage.
+Empty tracks retain dormant fades; adding footage validates them again.
 
 Keyboard help is available via the **header help button** or `?`
 outside form/modal/source controls. Space, S, Q/W, I/O, Shift+Delete, Escape,
@@ -236,7 +255,7 @@ sources and queue errors; ready/in-flight preparation is reused.
 The separate absolute-folder-path form remains an explicit **recursive whole-folder
 import**, including outside browser roots. It can queue substantial work and never
 silently extends root configuration. Standalone music uses Audio. No original is
-copied: strict schema 5 and original source paths remain unchanged, with only
+copied: strict schema 6 references original source paths, with only
 generated proxies/thumbnails, metadata, exports/receipts and scratch written locally.
 
 There is no upload endpoint, browser file picker, optional copy flow or true
@@ -273,8 +292,11 @@ displayed frame. **Cut range** removes it in one Undo step, retaining independen
 left/right excerpts where needed. **Split** selects the new right piece; **Q/W**
 keep the displayed frame while shrinking the head/tail. Marks are temporary,
 cleared by selection/timing/history/project changes, never project/autosave fields.
-Primary edits automatically close gaps/shift later excerpts without reordering their
-sources. Overlays/music/shared row points keep their absolute project times. Invalid
+Ripple-on edits close gaps/re-sequence later excerpts on that track from its first
+anchor; off keeps other clips at independent starts. Left handle/keyboard trims
+keep the sequence start while on, retain timeline OUT while off, and reject an
+unrepresentable integer-frame OUT. Numeric source edits keep the start in either
+mode. Music, other tracks and shared row points keep their absolute project times. Invalid
 fade/overlap/quantisation edits remain atomic. Full details are in
 [TIMELINE_EDITING.md](TIMELINE_EDITING.md).
 
@@ -324,12 +346,16 @@ saved document. It never deletes original recordings, shared registry entries,
 proxies/cache files, successful MP4s or receipts. This is not cache garbage
 collection; another project's membership and immutable export snapshots are unaffected.
 
-Only strict v5 projects and v5 project snapshots in version-1 export receipts are interpreted.
+Only strict v6 projects and v6 project snapshots in version-1 export receipts are interpreted.
 Both `media` arrays are required, unique and limited to 10,000 IDs each; missing
 membership is an invalid document, not an invitation to expose the global library.
-Earlier v1/v2/v3/v4 projects/receipts and finished videos are preserved, incompatible
+Every layer requires `ripple`, `transitions`, `openingFade` and `closingFade`;
+project-level transitions/fades and a mandatory first-track identity are absent.
+Earlier v1–v5 projects/receipt snapshots are preserved, incompatible
 and never migrated or rewritten with fallback/default local fields. **Create a new
-project** and import its media deliberately; registered recordings and currently verified ready proxies are reusable.
+project** and import its media deliberately; finished videos remain untouched,
+and registry/proxy formats are unchanged. Registered recordings and currently
+verified ready proxies are reusable.
 The live v3 sample appearing incompatible is expected. No sample preparation or
 additional real-media import/render is needed to exercise this with disposable tests.
 
@@ -376,7 +402,7 @@ invalid release leaves the saved document and history unchanged.
 For an HTTP 409 or incompatible save response, **Review latest save** explains:
 
 1. **Keep editing this draft** — no saved document changes; the save error persists.
-2. **Download unsaved project** — download a strict v5 JSON snapshot with the current
+2. **Download unsaved project** — download a strict v6 JSON snapshot with the current
    local changes/expected revision before replacing them.
 3. **Discard local changes and reload** — explicitly replace local history/document
    with a newly read saved version. It performs no overwrite POST/PUT.
@@ -397,18 +423,26 @@ failures and cancellations. Progress is numeric/bar-based; settled outcomes are
 announced without reading every progress poll aloud. Escape closes a focused drawer
 and returns focus to Activity, without pausing the editor or native job.
 
-Export summarizes contextual duration, clips/layers, shared row **points and
-participating settings**, enabled layers, profile and a fixed snapshot. A point
+Export summarizes contextual duration, clips/layers, track-local Ripple/transitions/
+fades, shared row **points and participating settings**, enabled layers, profile
+and a fixed snapshot. A point
 with several channels counts once, not as separate clip/channel keys. Both 720p/4K
-use originals. Any row point, including Speed-only points, requires layered export.
-Layered-resource information derives from the actual renderer limits. Export
+use originals. The static fast path requires one enabled opaque, unanimated,
+zero-origin contiguous track and opaque clips; any row point, leading start,
+gap or unsupported coverage uses generalized layered export. That path renders
+premultiplied RGBA16 groups, then source-overs without regrading. Preview reuses
+two slots per track (16 maximum) plus one source reviewer. Native limits are four
+raw buffers/22 bytes per pixel, two LUTs, three timeline representations and two
+retained clip files, with serial one-original/two-intermediate/one-encoder passes
+and at most three native video children. Exact byte bounds are in
+[the resource contract](LAYERS_AND_KEYFRAMES.md#inspector-and-resource-limits). Export
 shows free space on its output/scratch volume and an explicitly advisory planning
 allowance, not a compressed-size guarantee or time estimate. Low space/mount
 errors have recheck/recovery actions; genuine ENOSPC cleans only the failed job,
 preserving originals, saved edits and completed outputs. Storage and Rendering
 details remain disclosed. Accepted submission opens Activity and later editing
-cannot change its snapshot. See [UX_HARDENING.md](UX_HARDENING.md) for assumptions,
-native disk observations and the private constrained-volume test.
+cannot change its snapshot. See [UX_HARDENING.md](UX_HARDENING.md) for storage
+assumptions, measurement procedures and the private constrained-volume test.
 
 Preview/Inspector loading is deferred without changing per-frame ownership.
 Module-load failures keep the editor available and offer **Reload editor**, which

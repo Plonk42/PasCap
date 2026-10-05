@@ -5,6 +5,7 @@ import { NORMAL_SPEED, speedSchema } from './speed.js';
 import { calculateLayout } from './timeline.js';
 import { PROJECT_FPS } from './timing.js';
 
+/** Conventional initial identity only; it has no editing or stacking privileges. */
 export const BASE_LAYER_ID = 'video-1';
 export const MAX_VIDEO_LAYERS = 8;
 
@@ -28,6 +29,17 @@ export const transitionSchema = z.discriminatedUnion('type', [
   z.object({ leftId: idSchema, rightId: idSchema, type: z.literal('fade-through-black'), duration: frameSchema.min(2) }).strict(),
   z.object({ leftId: idSchema, rightId: idSchema, type: z.literal('cross-dissolve'), duration: frameSchema.min(1) }).strict(),
 ]);
+export const layerSchema = z.object({
+  id: idSchema,
+  name: z.string().trim().min(1).max(100),
+  enabled: z.boolean(),
+  opacity: z.number().min(0).max(1),
+  keyframes: z.array(layerKeyframeSchema).max(256).refine(orderedKeys, { message: 'Layer points must have unique ascending project frames.' }),
+  ripple: z.boolean(),
+  transitions: z.array(transitionSchema).max(999),
+  openingFade: frameSchema,
+  closingFade: frameSchema,
+}).strict();
 export const musicSchema = z.object({
   mediaId: idSchema,
   sourceIn: frameSchema,
@@ -41,7 +53,7 @@ export const musicSchema = z.object({
 }).strict().refine((music) => music.fadeIn + music.fadeOut <= music.duration && music.sourceOut > music.sourceIn && (music.loop || music.duration <= music.sourceOut - music.sourceIn), { message: 'Music source range, fades or non-looping duration are invalid.' });
 
 const baseProjectSchema = z.object({
-  schemaVersion: z.literal(5),
+  schemaVersion: z.literal(6),
   id: idSchema,
   title: z.string().trim().min(1).max(200),
   media: z.object({
@@ -50,14 +62,8 @@ const baseProjectSchema = z.object({
   }).strict(),
   frameRate: rateSchema,
   colourProfile: z.literal('bt709-sdr'),
-  layers: z.array(z.object({
-    id: idSchema, name: z.string().trim().min(1).max(100), enabled: z.boolean(), opacity: z.number().min(0).max(1),
-    keyframes: z.array(layerKeyframeSchema).max(256).refine(orderedKeys, { message: 'Layer points must have unique ascending project frames.' }),
-  }).strict()).min(1).max(MAX_VIDEO_LAYERS),
+  layers: z.array(layerSchema).min(1).max(MAX_VIDEO_LAYERS),
   clips: z.array(clipSchema).max(1_000),
-  transitions: z.array(transitionSchema).max(999),
-  openingFade: frameSchema,
-  closingFade: frameSchema,
   music: musicSchema.nullable(),
   revision: frameSchema,
 }).strict();
@@ -73,10 +79,14 @@ export const projectSchema = baseProjectSchema.superRefine((project, context) =>
   catch (error) { context.addIssue({ code: 'custom', message: error instanceof Error ? error.message : 'Invalid timeline.' }); }
 });
 
-export function createProject(id: string, title: string): ProjectDocument {
-  return projectSchema.parse({ schemaVersion: 5, id, title, media: { videoIds: [], audioIds: [] }, frameRate: { ...PROJECT_FPS }, colourProfile: 'bt709-sdr', layers: [{ id: BASE_LAYER_ID, name: 'Video 1', enabled: true, opacity: 1, keyframes: [] }], clips: [], transitions: [], openingFade: 0, closingFade: 0, music: null, revision: 0 });
+export function createLayer(id: string, name: string, ripple = true): VideoLayer {
+  return layerSchema.parse({ id, name, enabled: true, opacity: 1, keyframes: [], ripple, transitions: [], openingFade: 0, closingFade: 0 });
 }
 
-export function createClip(id: string, mediaId: string, sourceIn: number, sourceOut: number): VideoClip {
-  return clipSchema.parse({ id, mediaId, layerId: BASE_LAYER_ID, start: 0, sourceIn, sourceOut, colour: { ...NEUTRAL_COLOUR }, speed: { ...NORMAL_SPEED }, opacity: 1 });
+export function createProject(id: string, title: string): ProjectDocument {
+  return projectSchema.parse({ schemaVersion: 6, id, title, media: { videoIds: [], audioIds: [] }, frameRate: { ...PROJECT_FPS }, colourProfile: 'bt709-sdr', layers: [createLayer(BASE_LAYER_ID, 'Video 1')], clips: [], music: null, revision: 0 });
+}
+
+export function createClip(id: string, mediaId: string, sourceIn: number, sourceOut: number, layerId = BASE_LAYER_ID): VideoClip {
+  return clipSchema.parse({ id, mediaId, layerId, start: 0, sourceIn, sourceOut, colour: { ...NEUTRAL_COLOUR }, speed: { ...NORMAL_SPEED }, opacity: 1 });
 }

@@ -2,11 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { applyCommand, EditHistory, type EditCommand } from '../../src/shared/commands.js';
 import { EMPTY_KEY_VALUES, type Interpolation, type LayerKeyframe, type LayerKeyValues } from '../../src/shared/keyframes.js';
 import { compileLayerRetiming } from '../../src/shared/layer-retiming.js';
-import { BASE_LAYER_ID, createClip, createProject, projectSchema, type ProjectDocument, type VideoClip, type VideoLayer } from '../../src/shared/model.js';
+import { BASE_LAYER_ID, createClip, createLayer, createProject, projectSchema, type ProjectDocument, type VideoClip, type VideoLayer } from '../../src/shared/model.js';
 import { removeMarkedRange, sourceRangeForCut, trimAtPlayhead, type ClipCutRange } from '../../src/shared/rush-editing.js';
 import { trimOnTimeline, validateSourceRanges } from '../../src/shared/source-range.js';
 import { compileRetiming, type SpeedSettings } from '../../src/shared/speed.js';
-import { calculateLayout, primaryClips, sampleTimeline } from '../../src/shared/timeline.js';
+import { calculateLayout, layerClips, sampleTimeline } from '../../src/shared/timeline.js';
 
 // Complete durations of these in-memory recordings, independent of any excerpt.
 const SOURCE_COUNTS = new Map([['recording', 600], ['other', 180]]);
@@ -21,7 +21,7 @@ function point(frame: number, values: Partial<LayerKeyValues>, interpolation: In
   return { frame, interpolation, values: { ...EMPTY_KEY_VALUES, ...values } };
 }
 function row(id: string, keyframes: LayerKeyframe[]): VideoLayer {
-  return { id, name: id, enabled: true, opacity: 0.8, keyframes };
+  return { ...createLayer(id, id, false), opacity: 0.8, keyframes };
 }
 function rushClip(id: string, layerId: string, start: number, speed: SpeedSettings): VideoClip {
   return {
@@ -41,12 +41,13 @@ function primaryProject(speed: SpeedSettings = { mode: 'constant', rate: 1 }, ke
     createClip('after', 'other', 60, 120),
     createClip('last', 'recording', 300, 340),
   ];
-  document.transitions = [
+  document.layers[0]!.transitions = [
     { leftId: 'before', rightId: 'rush', type: 'cut', duration: 0 },
     { leftId: 'rush', rightId: 'after', type: 'cut', duration: 0 },
     { leftId: 'after', rightId: 'last', type: 'cut', duration: 0 },
   ];
   document.music = MUSIC;
+  for (const item of calculateLayout(document).clips) item.clip.start = item.start;
   return projectSchema.parse(document);
 }
 function overlayProject(speed: SpeedSettings = { mode: 'constant', rate: 1 }, keys: LayerKeyframe[] = []): ProjectDocument {
@@ -62,6 +63,10 @@ function overlayProject(speed: SpeedSettings = { mode: 'constant', rate: 1 }, ke
     selected,
     { ...createClip('upper-after', 'other', 40, 60), layerId: upper.id, start: end + 10 },
     { ...createClip('other-overlay', 'other', 80, 120), layerId: 'other-row', start: 25 },
+  ];
+  upper.transitions = [
+    { leftId: 'upper-before', rightId: 'top', type: 'cut', duration: 0 },
+    { leftId: 'top', rightId: 'upper-after', type: 'cut', duration: 0 },
   ];
   document.music = MUSIC;
   return projectSchema.parse(document);
@@ -102,8 +107,27 @@ function rejected(document: ProjectDocument, command: EditCommand, message: stri
   expect(history.canRedo).toBe(false);
 }
 function expectUnchangedOthers(before: ProjectDocument, next: ProjectDocument, selectedId: string): void {
-  expect(next.clips.filter((clip) => clip.id !== selectedId && clip.id !== 'right')).toEqual(before.clips.filter((clip) => clip.id !== selectedId));
-  expect(next.layers).toEqual(before.layers);
+  const selectedLayerId = before.clips.find((clip) => clip.id === selectedId)!.layerId;
+  const ripple = before.layers.find((layer) => layer.id === selectedLayerId)!.ripple;
+  const layout = calculateLayout(next);
+  expect(next.clips.filter((clip) => clip.id !== selectedId && clip.id !== 'right')).toEqual(before.clips.filter((clip) => clip.id !== selectedId).map((clip) =>
+    ripple && clip.layerId === selectedLayerId ? { ...clip, start: layout.clips.find((item) => item.clip.id === clip.id)!.start } : clip));
+  for (const [index, layer] of before.layers.entries()) {
+    const updated = next.layers[index]!;
+    if (layer.id !== selectedLayerId) {
+      expect(updated).toEqual(layer);
+      continue;
+    }
+    expect({ ...updated, transitions: layer.transitions }).toEqual(layer);
+    const ordered = layerClips(next, layer.id);
+    expect(updated.transitions).toEqual(ordered.slice(0, -1).map((clip, position) => {
+      const rightId = ordered[position + 1]!.id;
+      const surviving = layer.transitions.find((item) => item.leftId === clip.id && item.rightId === rightId);
+      if (surviving) return surviving;
+      const transferred = clip.id === 'right' ? layer.transitions.find((item) => item.leftId === selectedId && item.rightId === rightId) : undefined;
+      return transferred ? { ...transferred, leftId: 'right' } : { leftId: clip.id, rightId, type: 'cut', duration: 0 };
+    }));
+  }
   expect(next.music).toEqual(before.music);
 }
 function withDissolves(): ProjectDocument {
@@ -188,7 +212,7 @@ describe('project marks on one selected rush excerpt', () => {
     expectUnchangedOthers(document, next, 'rush');
     expect(next.layers[0]!.keyframes).toEqual(keys);
     expect(next.clips.find((clip) => clip.id === 'right')!.speed).toEqual({ mode: 'constant', rate: 8 });
-    expect(next.transitions.slice(0, 2)).toEqual([
+    expect(next.layers[0]!.transitions.slice(0, 2)).toEqual([
       { leftId: 'before', rightId: 'rush', type: 'cross-dissolve', duration: 5 },
       { leftId: 'rush', rightId: 'right', type: 'cut', duration: 0 },
     ]);
@@ -201,14 +225,14 @@ describe('atomic source removal on the primary ripple row', () => {
     const document = primaryProject(); const original = placed(document, 'rush').clip;
     const next = singleCommit(document, removeMarkedRange(document, { clipId: 'rush', inFrame: 100, outFrame: 130 }, 'right'));
     expect(next.clips.map((clip) => clip.id)).toEqual(['before', 'upper-other', 'rush', 'right', 'after', 'last']);
-    expect(primaryClips(next).map((clip) => [clip.id, clip.sourceIn, clip.sourceOut, clip.start])).toEqual([
-      ['before', 0, 60, 0], ['rush', 100, 140, 0], ['right', 170, 220, 0], ['after', 60, 120, 0], ['last', 300, 340, 0],
+    expect(layerClips(next, BASE_LAYER_ID).map((clip) => [clip.id, clip.sourceIn, clip.sourceOut, clip.start])).toEqual([
+      ['before', 0, 60, 0], ['rush', 100, 140, 60], ['right', 170, 220, 100], ['after', 60, 120, 150], ['last', 300, 340, 210],
     ]);
     const layout = calculateLayout(next);
     expect(layout.clips.filter((item) => item.clip.layerId === BASE_LAYER_ID).map((item) => [item.clip.id, item.start, item.duration, item.end])).toEqual([
       ['before', 0, 60, 60], ['rush', 60, 40, 100], ['right', 100, 50, 150], ['after', 150, 60, 210], ['last', 210, 40, 250],
     ]);
-    expect(layout.baseDuration).toBe(250);
+    expect(layout.clips.filter((item) => item.clip.layerId === BASE_LAYER_ID).at(-1)!.end).toBe(250);
     expect(placed(next, 'upper-other')).toMatchObject({ start: 275, duration: 40, end: 315 });
     expectUnchangedOthers(document, next, 'rush');
     expect(new Set(next.clips.map((clip) => clip.mediaId))).toEqual(new Set(document.clips.map((clip) => clip.mediaId)));
@@ -232,12 +256,12 @@ describe('atomic source removal on the primary ripple row', () => {
     { name: 'suffix', sourceIn: 190, sourceOut: 220, remaining: [['rush', 100, 190]], afterStart: 150 },
     { name: 'whole excerpt', sourceIn: 100, sourceOut: 220, remaining: [], afterStart: 60 },
   ])('removes a $name with one history step and no unnecessary new instance', ({ sourceIn, sourceOut, remaining, afterStart }) => {
-    const document = applyCommand(primaryProject(), { type: 'fades', opening: 8, closing: 10 });
+    const document = applyCommand(primaryProject(), { type: 'fades', layerId: BASE_LAYER_ID, opening: 8, closing: 10 });
     const next = singleCommit(document, removal('rush', sourceIn, sourceOut));
     expect(next.clips.filter((clip) => clip.id === 'rush' || clip.id === 'right').map((clip) => [clip.id, clip.sourceIn, clip.sourceOut])).toEqual(remaining);
     expect(placed(next, 'after').start).toBe(afterStart);
     expect(placed(next, 'last').start).toBe(afterStart + 60);
-    expect(next.openingFade).toBe(8); expect(next.closingFade).toBe(10);
+    expect(next.layers[0]!.openingFade).toBe(8); expect(next.layers[0]!.closingFade).toBe(10);
     expectUnchangedOthers(document, next, 'rush');
   });
 
@@ -256,7 +280,7 @@ describe('atomic source removal on the primary ripple row', () => {
   it('deletes a one-original-frame excerpt instead of leaving an invalid empty clip', () => {
     const document = projectSchema.parse({ ...createProject('tiny', 'Tiny'), clips: [createClip('tiny', 'recording', 219, 220)], layers: [row(BASE_LAYER_ID, [point(500, { exposure: 0.5 })])] });
     const next = singleCommit(document, removal('tiny', 219, 220));
-    expect(next.clips).toEqual([]); expect(next.transitions).toEqual([]);
+    expect(next.clips).toEqual([]); expect(next.layers[0]!.transitions).toEqual([]);
     expect(next.layers).toEqual(document.layers);
   });
 
@@ -287,7 +311,7 @@ describe('atomic source removal on the primary ripple row', () => {
 
   it('preserves incoming and outgoing dissolves while making the new internal boundary a cut', () => {
     const document = withDissolves(); const next = singleCommit(document, removal('rush', 140, 170));
-    expect(next.transitions).toEqual([
+    expect(next.layers[0]!.transitions).toEqual([
       { leftId: 'before', rightId: 'rush', type: 'cross-dissolve', duration: 10 },
       { leftId: 'rush', rightId: 'right', type: 'cut', duration: 0 },
       { leftId: 'right', rightId: 'after', type: 'cross-dissolve', duration: 12 },
@@ -299,12 +323,12 @@ describe('atomic source removal on the primary ripple row', () => {
   });
   it.each([{ sourceIn: 100, sourceOut: 140 }, { sourceIn: 180, sourceOut: 220 }])('retains both original-ID transition pairs for an edge removal $sourceIn..$sourceOut', ({ sourceIn, sourceOut }) => {
     const document = withDissolves(); const next = singleCommit(document, removal('rush', sourceIn, sourceOut));
-    expect(next.transitions).toEqual(document.transitions);
+    expect(next.layers[0]!.transitions).toEqual(document.layers[0]!.transitions);
     expect(next.clips.some((clip) => clip.id === 'right')).toBe(false);
   });
   it('repairs the new neighbour boundary when the whole dissolved excerpt is deleted', () => {
     const next = singleCommit(withDissolves(), removal('rush', 100, 220));
-    expect(next.transitions).toEqual([
+    expect(next.layers[0]!.transitions).toEqual([
       { leftId: 'before', rightId: 'after', type: 'cut', duration: 0 },
       { leftId: 'after', rightId: 'last', type: 'cut', duration: 0 },
     ]);
@@ -316,30 +340,30 @@ describe('atomic source removal on the primary ripple row', () => {
   ])('rejects transition-invalid removal $sourceIn..$sourceOut without hidden clamping', ({ sourceIn, sourceOut }) => {
     const document = withDissolves();
     rejected(document, removal('rush', sourceIn, sourceOut), 'regions overlap or exceed');
-    expect(document.transitions.map((transition) => transition.duration)).toEqual([10, 12, 0]);
+    expect(document.layers[0]!.transitions.map((transition) => transition.duration)).toEqual([10, 12, 0]);
   });
 
   it.each([
     { clipId: 'before', sourceIn: 0, sourceOut: 59 },
     { clipId: 'last', sourceIn: 301, sourceOut: 340 },
   ])('rejects a too-short opening/closing region on $clipId without reducing the fade', ({ clipId, sourceIn, sourceOut }) => {
-    const document = applyCommand(primaryProject(), { type: 'fades', opening: 20, closing: 25 });
+    const document = applyCommand(primaryProject(), { type: 'fades', layerId: BASE_LAYER_ID, opening: 20, closing: 25 });
     rejected(document, removal(clipId, sourceIn, sourceOut), 'regions overlap or exceed');
-    expect([document.openingFade, document.closingFade]).toEqual([20, 25]);
+    expect([document.layers[0]!.openingFade, document.layers[0]!.closingFade]).toEqual([20, 25]);
   });
   it('validates the retained opening fade on the next clip after a whole deletion', () => {
     const document = projectSchema.parse({
       ...createProject('opening', 'Opening'), clips: [createClip('first', 'recording', 0, 100), createClip('short', 'other', 0, 5)],
-      transitions: [{ leftId: 'first', rightId: 'short', type: 'cut', duration: 0 }], openingFade: 20,
+      layers: [{ ...createLayer(BASE_LAYER_ID, 'Opening'), transitions: [{ leftId: 'first', rightId: 'short', type: 'cut', duration: 0 }], openingFade: 20 }],
     });
     rejected(document, removal('first', 0, 100), 'regions overlap or exceed');
   });
-  it('clears opening/closing only when the last primary excerpt disappears, leaving overlays/music/keys', () => {
-    const document = applyCommand(overlayProject(), { type: 'fades', opening: 10, closing: 15 });
+  it('retains dormant track opening/closing when its last excerpt disappears, leaving other tracks/music/keys', () => {
+    const document = applyCommand(overlayProject(), { type: 'fades', layerId: BASE_LAYER_ID, opening: 10, closing: 15 });
     const next = singleCommit(document, removal('base', 300, 400));
-    expect(primaryClips(next)).toEqual([]);
-    expect([next.openingFade, next.closingFade]).toEqual([0, 0]);
-    expect(next.transitions).toEqual([]);
+    expect(layerClips(next, BASE_LAYER_ID)).toEqual([]);
+    expect([next.layers[0]!.openingFade, next.layers[0]!.closingFade]).toEqual([10, 15]);
+    expect(next.layers[0]!.transitions).toEqual([]);
     expectUnchangedOthers(document, next, 'base');
   });
   it('leaves an existing redo branch intact after a failed removal', () => {
@@ -389,7 +413,9 @@ describe('positioned overlay removal without neighbour ripple', () => {
     expectUnchangedOthers(document, next, 'top');
     expect(placed(next, 'upper-before')).toMatchObject({ start: 10, end: 30 });
     expect(placed(next, 'upper-after')).toMatchObject({ start: 180, end: 200 });
-    expect(next.transitions).toEqual(document.transitions);
+    const upperOrder = layerClips(next, 'upper');
+    expect(next.layers[1]!.transitions).toEqual(upperOrder.slice(0, -1).map((clip, index) => ({ leftId: clip.id, rightId: upperOrder[index + 1]!.id, type: 'cut', duration: 0 })));
+    expect(next.layers[0]!.transitions).toEqual(document.layers[0]!.transitions);
     if (sourceIn === 140) {
       expect(sampleTimeline(next, 100).some((sample) => sample.layerId === 'upper')).toBe(false);
       expect(sampleTimeline(next, 120).find((sample) => sample.clipId === 'right')?.sourceFrame).toBe(170);
@@ -442,9 +468,9 @@ describe('positioned overlay removal without neighbour ripple', () => {
   });
 
   it('does not clear primary opening/closing fades when an overlay is wholly removed', () => {
-    const document = applyCommand(overlayProject(), { type: 'fades', opening: 10, closing: 15 });
+    const document = applyCommand(overlayProject(), { type: 'fades', layerId: BASE_LAYER_ID, opening: 10, closing: 15 });
     const next = singleCommit(document, removal('top', 100, 220));
-    expect([next.openingFade, next.closingFade]).toEqual([10, 15]);
+    expect([next.layers[0]!.openingFade, next.layers[0]!.closingFade]).toEqual([10, 15]);
     expectUnchangedOthers(document, next, 'top');
   });
 });
@@ -508,7 +534,7 @@ describe('quick trims retain the displayed original frame', () => {
     expect(selected.end).toBe(140);
     expect(selected.retiming.sourceAt(1)).toBe(107);
     const before = structuredClone(parsed); const history = new EditHistory(parsed);
-    expect(() => history.commit(trimAtPlayhead(history.current, 'top', 31, 'in'))).toThrow('cannot keep the overlay OUT');
+    expect(() => history.commit(trimAtPlayhead(history.current, 'top', 31, 'in'))).toThrow('cannot keep the positioned clip OUT');
     expect(history.current).toEqual(before); expect(history.canUndo).toBe(false);
     const cut = singleCommit(parsed, removal('top', 100, 107));
     expect(placed(cut, 'top')).toMatchObject({ start: 30, duration: 40, end: 70 });
