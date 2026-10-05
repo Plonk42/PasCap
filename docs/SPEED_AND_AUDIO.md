@@ -243,15 +243,19 @@ the opening fade and `(duration-offset)/fadeOut` within the closing fade. Outsid
 the track's timeline range the signal is silence. No hidden loudness correction.
 Source-video audio stays disabled.
 
-The preview uses a media-element Web Audio integration, not a whole-file decoded
-buffer. Music and video pause/re-anchor together for buffering and timing edits.
-Starting music anchors the Web Audio clock to its observed source progress after
-the play promise settles, retaining any elapsed startup playback rather than
-discarding it as drift. Pause, cancellation and disposal invalidate pending starts;
-an obsolete completion cannot resume the paused clock.
-Drift compares the continuous media time with the fractional Web Audio master
-position, keeping the one-project-frame limit without counting integer-video
-frame quantisation as audio drift. Rendered video still uses integer frames.
+The preview streams **PCM16 48 kHz stereo** in exact bounded HTTP byte ranges into
+one **AudioWorklet**, not a media-element clock or a whole-file decoded buffer.
+The rendering thread owns consecutive source samples and their context-frame
+receipts. Its first real rendered sample supplies the clock origin; video starts
+only once the output device reaches that origin. Project time follows the audio
+output timestamp, not graph processing ahead of the speakers or an approximate
+HTMLMediaElement currentTime. Elapsed rendering before acknowledgement is retained.
+Consumption receipts independently check the unchanged one-project-frame drift
+bound. Actual processor failures, range errors and empty-queue underruns remain
+explicit; a source underrun freezes consumption instead of inventing successful
+silence. Pause, seek, cancellation and disposal invalidate their complete epoch,
+pending reads and late receipts; an obsolete completion cannot resume playback.
+Video still uses integer project frames and exact observed source identities.
 Normal decoded-callback latency within one project frame does not clear a valid
 accepted image or restart music. Preview checks exact source maps for the clock
 frame and its one-frame neighbours across every active participant; a held source
@@ -259,10 +263,28 @@ frame's earliest inverse is not treated as its unique project time. Retaining an
 uploaded image requires the same active clips and unchanged appearance. Larger or
 incompatible mismatches, new sources and failed music synchronization still expose
 buffering and require exact source readiness before recovery.
-Source wraps use a seek to the selected IN and may briefly buffer; gapless browser
-loop joins are not promised. Audio clock drift above one project frame triggers
-re-alignment rather than accumulating silently. Target-browser long-run A/V/audio
-behaviour still requires validation.
+Placement, source IN/OUT, duration and loop boundaries use independently rounded
+integer 48 kHz sample positions, matching native audio placement. Selected-range
+wraps are filled into consecutive blocks without a music restart; valid placement
+silence is distinct from an underrun. Gain/fades are applied to the actual streamed
+samples. Four 16,384-sample stereo Float32 transfer blocks retain at most 512 KiB,
+plus bounded 64 KiB range/short-selection scratch and one 128 KiB conversion workspace. Receipts have one
+unacknowledged message and reads are serial/credit-controlled. No memory grows with
+song/project duration. Target-browser long-run A/V/audio behaviour still needs
+qualification; synthetic music regressions are not full Firefox qualification.
+Short loop selections are reused only within one block; each refill still performs
+a fresh guarded range read, rather than reading originals again for every wrap.
+Startup/prefill has a ten-second operation deadline; a blocked module, missing
+output acknowledgement or failed range cannot remain busy indefinitely.
+
+Preparation uses the existing one-heavy-job worker and writes only the versioned
+`pcm16-48k-stereo-mono-unity-v3` cache (about 11.52 MB per minute). Earlier AAC
+preview caches remain unchanged but are not current playback input. Missing current
+PCM caches appear as an explicit **Retry** preparation action in Audio → Music;
+startup/library reads never prepare, rewrite or delete them. Prepare deliberately
+to create the current cache, retaining originals and older generated files. Project
+schema, registry and video-proxy formats are unchanged; native export still reads
+original audio and is not changed by the preview transport.
 Native export uses the same placement/loop/gain/fade rules and produces AAC at
 48 kHz. The output audio is padded/trimmed to the complete video duration.
 
@@ -282,7 +304,8 @@ and incompatible. There is no migration, compatibility fallback or default-field
 injection; create a new project and import its media to reuse registered assets/verified
 ready proxies. Confirmed project deletion affects only its saved document, not originals,
 the shared content-deduplicated registry/cache or finished exports/receipts.
-Registry/proxy formats and music processing are unchanged.
+Registry/video-proxy formats and native export are unchanged; preview uses the
+current explicitly prepared PCM cache described above.
 
 Stored-point inspection remains editor-only, never a persisted field or migration.
 Synthetic correctness checks do not qualify intended-GPU preview,

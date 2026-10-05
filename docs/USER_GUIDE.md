@@ -236,8 +236,13 @@ One music track supports waveform placement/edge trims, numeric source IN/OUT,
 start/duration, **gain dB**, linear fades and **Loop selected source range**.
 Without looping, duration must fit that source range; looping repeats only it.
 There is no hidden loudness normalisation or video-speed retiming of music.
-Preview uses media-element Web Audio, not a full-file buffer. Buffering and loop
-seeks may pause/re-anchor music/video; **gapless browser loops are not promised**.
+Preview uses bounded PCM streaming through Web Audio, not a full-file buffer or
+an approximate media-element clock. Selected-range loops continue without a music
+restart; genuine video buffering or audio read/processor failures stay explicit.
+If an older prepared recording lacks the current PCM cache, **Audio → Music →
+Retry recording name** explicitly prepares it. No startup/library read starts that
+job, and older caches/originals remain untouched. This cache needs about 11.52 MB
+per minute; project and video-proxy formats are unchanged.
 Native export loops the selected PCM range continuously and pads/trims AAC to video
 duration. The complete video's duration is not extended to fit music.
 

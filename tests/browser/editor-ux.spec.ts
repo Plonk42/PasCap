@@ -5,8 +5,8 @@ import { estimateExportSpace, formatStorageBytes, MIN_EXPORT_FREE_BYTES, type Ex
 import type { ExportProfile } from '../../src/shared/export.js';
 import type { MediaAsset, MediaJob } from '../../src/shared/media.js';
 import { createClip, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
-import { memoryProjects, type MemoryProjects } from './memory-projects.js';
 import { openOptions, sharedPoint } from './editor-helpers.js';
+import { memoryProjects, type MemoryProjects } from './memory-projects.js';
 
 let assets: MediaAsset[];
 let audio: AudioAsset[];
@@ -56,6 +56,7 @@ test.beforeEach(async ({ page, request }) => {
     const video = /^\/api\/media\/([^/]+)\/(?:proxy|thumbnail\/\d+)$/.exec(pathname);
     const music = /^\/api\/audio\/([^/]+)\/(?:playback|waveform)$/.exec(pathname);
     if (method === 'GET' && ((video && assets.some((asset) => asset.id === video[1])) || (music && audio.some((asset) => asset.id === music[1])))) { await route.continue(); return; }
+    if (method === 'HEAD' && music && pathname.endsWith('/playback') && audio.some((asset) => asset.id === music[1])) { await route.continue(); return; }
     unexpected.push(`${method} ${pathname}`); await route.abort('blockedbyclient');
   });
   const document = createProject('editor-ux-memory', 'Editor UX · memory-only');
@@ -67,7 +68,7 @@ test.beforeEach(async ({ page, request }) => {
   await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
 });
 
-test.afterEach(() => expect(unexpected, 'Only explicit mock export requests and existing synthetic proxy GETs are allowed').toEqual([]));
+test.afterEach(() => expect(unexpected, 'Only explicit mock exports and existing synthetic media reads/music metadata HEADs are allowed').toEqual([]));
 
 async function current(page: Page): Promise<ProjectDocument> { return projectSchema.parse(await page.evaluate(() => window.pascapLab!.project())); }
 async function seek(page: Page, frame: number): Promise<void> {

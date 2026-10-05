@@ -3,7 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { createApp } from '../../src/server/app.js';
-import { AudioLibrary, probeAudio } from '../../src/server/audio.js';
+import { AudioLibrary } from '../../src/server/audio.js';
 import { createConfig, type ServiceConfig } from '../../src/server/config.js';
 import { JobQueue } from '../../src/server/jobs.js';
 import * as processes from '../../src/server/process.js';
@@ -68,7 +68,7 @@ describe.skipIf(!enabled)('registered music · disposable lavfi audio only', () 
     return tone;
   }
 
-  it('registers and explicitly prepares AAC 48 kHz stereo plus bounded sample peaks without changing the source', async () => {
+  it('registers and explicitly prepares PCM16 48 kHz stereo plus bounded sample peaks without changing the source', async () => {
     const asset = await readyTone();
     expect(asset.status).toBe('ready');
     expect(asset.metadata.codec).toBe('pcm_s16le');
@@ -78,11 +78,10 @@ describe.skipIf(!enabled)('registered music · disposable lavfi audio only', () 
     expect(asset.metadata.frameCount).toBe(Math.floor(2.2 * 30_000 / 1001));
     const playback = service.audio.playbackPath(asset);
     expect(path.relative(config.dataDir, playback).startsWith('audio-assets/')).toBe(true);
-    const metadata = await probeAudio(config, playback);
-    expect(metadata.codec).toBe('aac');
-    expect(metadata.sampleRate).toBe(48_000);
-    expect(metadata.channels).toBe(2);
-    expect(Math.abs(metadata.durationSeconds - asset.metadata.durationSeconds)).toBeLessThan(0.1);
+    const pcm = await readFile(playback);
+    expect(pcm.length % 4).toBe(0);
+    expect(Math.abs(pcm.length / (48_000 * 4) - asset.metadata.durationSeconds)).toBeLessThan(0.1);
+    for (let offset = 0; offset < pcm.length; offset += 4) expect(pcm.readInt16LE(offset + 2)).toBe(pcm.readInt16LE(offset));
     expect(asset.waveform.length).toBeGreaterThan(0);
     expect(asset.waveform.length).toBeLessThanOrEqual(2048);
     expect(asset.waveform.every((peak) => Number.isFinite(peak) && peak >= 0 && peak <= 1)).toBe(true);
@@ -100,7 +99,7 @@ describe.skipIf(!enabled)('registered music · disposable lavfi audio only', () 
     const head = await service.app.inject({ method: 'HEAD', url, headers });
     expect(head.statusCode).toBe(200);
     expect(head.body).toBe('');
-    expect(head.headers['content-type']).toContain('audio/mp4');
+    expect(head.headers['content-type']).toContain('application/octet-stream');
     expect(head.headers['content-length']).toBe(String(bytes.length));
     expect(head.headers['accept-ranges']).toBe('bytes');
     expect(head.headers['x-content-type-options']).toBe('nosniff');
@@ -179,7 +178,7 @@ describe.skipIf(!enabled)('registered music · disposable lavfi audio only', () 
     let cancelled = false;
     const spy = vi.spyOn(processes, 'runProcess').mockImplementation((binary, args, options) => {
       const result = actualRunProcess(binary, args, options);
-      if (binary === config.ffmpeg && args.includes('aac')) {
+      if (binary === config.ffmpeg && args.includes('pcm_s16le')) {
         const running = service.jobs.list().find((job) => job.kind === 'audio' && job.state === 'running');
         if (running) { cancelled = true; service.jobs.cancel(running.id); }
       }
@@ -235,7 +234,7 @@ describe.skipIf(!enabled)('registered music · disposable lavfi audio only', () 
     expect(asset.status).toBe('ready');
     expect(asset.waveform.length).toBeGreaterThan(0);
     const playback = JSON.parse((await processes.runProcess(config.ffprobe, [
-      '-v', 'error', '-show_entries', 'stream=codec_type', '-of', 'json', service.audio.playbackPath(asset),
+      '-v', 'error', '-f', 's16le', '-ar', '48000', '-ch_layout', 'stereo', '-show_entries', 'stream=codec_type', '-of', 'json', service.audio.playbackPath(asset),
     ])).toString('utf8'));
     expect(playback.streams).toEqual([{ codec_type: 'audio' }]);
     expect(await readFile(filename)).toEqual(bytes);
@@ -313,6 +312,32 @@ describe.skipIf(!enabled)('registered music · disposable lavfi audio only', () 
     expect(tone.status).toBe('ready');
     expect(tone.metadata).toEqual(asset.metadata);
     expect(await readFile(tonePath)).toEqual(original);
+  });
+
+  it('exposes a missing current cache without rewriting the registry, deleting older files or starting work', async () => {
+    const asset = await readyTone();
+    const playback = service.audio.playbackPath(asset);
+    const previous = path.join(path.dirname(service.audio.assetDir(asset)), 'aac-48k-stereo-mono-unity-v2');
+    await mkdir(previous, { recursive: true });
+    const archived = path.join(previous, 'playback.m4a');
+    const bytes = Buffer.from('preserved older generated music cache');
+    await writeFile(archived, bytes);
+    await rm(playback);
+    const registry = await readFile(path.join(config.dataDir, 'audio.json'));
+    const jobs = service.jobs.list();
+    const response = await service.app.inject({ url: '/api/audio', headers });
+    expect(response.statusCode).toBe(200);
+    expect(response.json().assets.find((item: AudioAsset) => item.id === asset.id)).toMatchObject({ status: 'error', error: expect.stringContaining('current PCM16 music cache is missing') });
+    expect((await service.app.inject({ method: 'HEAD', url: `/api/audio/${asset.id}/playback`, headers })).statusCode).toBe(409);
+    expect(service.audio.get(asset.id)).toEqual(asset);
+    expect(service.jobs.list()).toEqual(jobs);
+    expect(await readFile(path.join(config.dataDir, 'audio.json'))).toEqual(registry);
+    expect(await readFile(archived)).toEqual(bytes);
+    const prepared = await service.audio.prepare(asset.id);
+    expect((await service.jobs.wait(prepared.id)).state).toBe('completed');
+    expect((await service.app.inject({ method: 'HEAD', url: `/api/audio/${asset.id}/playback`, headers })).statusCode).toBe(200);
+    expect(await readFile(archived)).toEqual(bytes); expect(await readFile(tonePath)).toEqual(original);
+    tone = service.audio.get(asset.id);
   });
 
   it('rejects changed source identities for playback, waveform and retry without mutating registered metadata', async () => {

@@ -3,6 +3,7 @@ import type { AudioAsset } from '../../src/shared/audio.js';
 import type { MediaAsset } from '../../src/shared/media.js';
 import { createClip, createProject, type ProjectDocument } from '../../src/shared/model.js';
 import { memoryProjects, type MemoryProjects } from './memory-projects.js';
+import { installMusicEvidence } from './music-evidence.js';
 
 interface RecoveryFixture {
     memory: MemoryProjects;
@@ -70,6 +71,7 @@ async function openRecoveryProject(page: Page, request: APIRequestContext, withM
         project.music = { mediaId: audio!.id, sourceIn: 0, sourceOut: 120, start: 0, duration: 90, gainDb: -12, fadeIn: 0, fadeOut: 0, loop: false };
     }
     const memory = await memoryProjects(page, project);
+    await installMusicEvidence(page);
     await page.addInitScript(() => {
         // Install before nested transpiled callbacks; init-script ordering is unspecified.
         Reflect.set(globalThis, '__name', (fn: unknown) => fn);
@@ -85,20 +87,11 @@ async function openRecoveryProject(page: Page, request: APIRequestContext, withM
             errors: 0, firstError: null,
         };
         window.playbackRecoveryEvidence = evidence;
-        for (const method of ['play', 'pause'] as const) {
-            const original: (this: HTMLMediaElement) => Promise<void> | void = HTMLMediaElement.prototype[method];
-            Object.defineProperty(HTMLMediaElement.prototype, method, {
-                value: function (this: HTMLMediaElement) {
-                    if (this.dataset['pascapMusic']) {
-                        if (method === 'play') {
-                            evidence.musicStarts++;
-                            if (evidence.pausedGuard) evidence.unexpectedMusicStarts++;
-                        } else evidence.musicPauses++;
-                    }
-                    return original.call(this);
-                },
-            });
-        }
+        window.addEventListener('pascap-test-music-start', () => {
+            evidence.musicStarts++;
+            if (evidence.pausedGuard) evidence.unexpectedMusicStarts++;
+        });
+        window.addEventListener('pascap-test-music-stop', () => { evidence.musicPauses++; });
 
         // Pass through real Chrome metadata unchanged. Only an explicitly armed,
         // matching source-frame callback is held; no fake media clock or decoded frame.
@@ -107,10 +100,23 @@ async function openRecoveryProject(page: Page, request: APIRequestContext, withM
             release: null, pendingSeek: null,
         };
         window.playbackRecoveryGate = gate;
+        const decoderEvents: unknown[] = [];
+        Reflect.set(window, 'recoveryDecoderEvents', decoderEvents);
+        const currentTime = Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, 'currentTime')!;
+        Object.defineProperty(HTMLMediaElement.prototype, 'currentTime', {
+            ...currentTime,
+            set(this: HTMLMediaElement, value: number) {
+                if (this.dataset['pascapDecoder'] !== undefined && decoderEvents.length < 300) {
+                    decoderEvents.push({ kind: 'seek', slot: this.dataset['pascapDecoder'], value, previous: currentTime.get!.call(this), ready: this.readyState, paused: this.paused });
+                }
+                currentTime.set!.call(this, value);
+            },
+        });
         const requestFrame = HTMLVideoElement.prototype.requestVideoFrameCallback;
         HTMLVideoElement.prototype.requestVideoFrameCallback = function (callback) {
             return requestFrame.call(this, (now, metadata) => {
                 const frame = Math.round(metadata.mediaTime * 30_000 / 1_001);
+                if (decoderEvents.length < 300) decoderEvents.push({ kind: 'callback', slot: this.dataset['pascapDecoder'], frame, time: metadata.mediaTime, current: this.currentTime, ready: this.readyState, paused: this.paused, seeking: this.seeking });
                 const target = gate.targetFrame;
                 const matches = target !== null && (gate.atOrAfter ? frame >= target : frame === target);
                 if (this.dataset['pascapDecoder'] !== undefined && matches && gate.heldCallbacks === 0) {
@@ -169,11 +175,12 @@ async function openRecoveryProject(page: Page, request: APIRequestContext, withM
                 const drift = Math.abs(state.musicDriftFrames);
                 if (!Number.isFinite(drift) || drift > 1) evidence.driftViolations++;
                 evidence.maximumMusicDriftFrames = Math.max(evidence.maximumMusicDriftFrames, drift);
-                // This fixture maps audio source time directly to project time. Compare
-                // its current integer frame with the actually accepted video frame too,
-                // rather than treating audio-vs-clock diagnostics as A/V evidence.
-                const music = document.querySelector<HTMLAudioElement>('audio[data-pascap-music]');
-                const audioFrame = Math.floor((music?.currentTime ?? NaN) * 30_000 / 1_001 + 1e-7);
+                // Independently observed, actually consumed audio samples with their
+                // rendering-thread timestamp, not engine.musicDriftFrames or frame.
+                const music = window.musicStreamEvidence;
+                const receipt = music.receipt;
+                const sourceSamples = receipt && music.context ? receipt.samples + music.context.getOutputTimestamp().contextTime! * 48_000 - receipt.contextFrame : NaN;
+                const audioFrame = Math.floor((receipt?.startFrame ?? NaN) + sourceSamples / (48_000 * 1_001 / 30_000) + 1e-7);
                 const avDrift = Math.abs(audioFrame - state.frame);
                 if (!Number.isFinite(avDrift) || avDrift > 1) evidence.avDriftViolations++;
                 evidence.maximumAVDriftFrames = Math.max(evidence.maximumAVDriftFrames, avDrift);
@@ -203,7 +210,7 @@ async function assertPaused(page: Page, frame: number, musicStarts: number): Pro
     }));
     const paused = await page.evaluate(() => ({
         state: window.pascapLab!.engine.diagnostics(),
-        musicPaused: document.querySelector<HTMLAudioElement>('audio[data-pascap-music]')!.paused,
+        musicPaused: !window.musicStreamEvidence.active,
         evidence: window.playbackRecoveryEvidence,
     }));
     expect(paused.state.status, paused.state.message).toBe('paused');
@@ -252,6 +259,9 @@ async function attachEvidence(page: Page, browser: Browser, withMusic: boolean, 
             frame: state.frame, duration: state.duration, decoderCount: state.decoderCount,
             stalls: state.stalls, boundaryStalls: state.boundaryStalls, stallMilliseconds: state.stallMilliseconds,
             ...window.playbackRecoveryEvidence,
+            requestedFrame: state.requestedFrame, decodedSourceFrames: state.decodedSourceFrames, decoderReady: state.decoderReady,
+            decoders: Array.from(document.querySelectorAll<HTMLVideoElement>('video[data-pascap-decoder]')).map(video => ({ slot: video.dataset['pascapDecoder'], time: video.currentTime, seeking: video.seeking, paused: video.paused, ready: video.readyState })),
+            decoderEvents: Reflect.get(window, 'recoveryDecoderEvents'),
             callbackGate: { heldFrame: gate.heldFrame, heldCallbacks: gate.heldCallbacks, releasedCallbacks: gate.releasedCallbacks },
         };
     });
@@ -350,7 +360,7 @@ for (const withMusic of [false, true]) {
             }));
             expect(stopped.frame).toBeGreaterThanOrEqual(10);
             expect(stopped.frame).toBeLessThan(89);
-            expect(stopped.deliberatePauseMusicCalls).toBe(1);
+            expect(stopped.deliberatePauseMusicCalls).toBe(withMusic ? 1 : 0);
             await assertPaused(page, stopped.frame, withMusic ? 1 : 0);
 
             if (withMusic) {

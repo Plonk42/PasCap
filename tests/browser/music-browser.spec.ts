@@ -183,7 +183,7 @@ test('real explicit confirmation persists only importing-project audio membershi
     await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeEnabled();
     await expect(page.locator(`select[aria-label="Music recording"] option[value="${importedId}"]`)).toHaveJSProperty('disabled', false, { timeout: 20_000 });
     const registered = ((await (await request.get('/api/audio')).json()) as { assets: AudioAsset[] }).assets.find((asset) => asset.id === importedId)!;
-    const playback = path.resolve('.pascap/browser-tests/audio-assets', registered.fingerprint.digest, 'aac-48k-stereo-mono-unity-v2', 'playback.m4a');
+    const playback = path.resolve('.pascap/browser-tests/audio-assets', registered.fingerprint.digest, 'pcm16-48k-stereo-mono-unity-v3', 'playback.pcm');
     const cachedBytes = await readFile(playback); const cachedStat = await stat(playback);
     const reused = await request.post('/api/audio/register-selected', { headers: { 'x-pascap-client': 'preview-lab' }, data: { path: firstPath } });
     expect(reused.status()).toBe(202);
