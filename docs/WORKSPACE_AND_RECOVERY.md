@@ -386,6 +386,14 @@ project. Missing/incompatible URL targets do not open a different project withou
 explanation. A service failure exposes **Retry connecting**; a preview failure
 exposes **Retry preview**, preserving the document and timeline position.
 
+Playback retains an already accepted image for normal one-frame decoder-callback
+latency rather than flashing black or restarting music. Exact source maps across
+all active clips and project-time appearance still govern drawing; a changed clip
+set or stale appearance cannot reuse that image. Genuine larger mismatches, missing
+sources and failed music synchronization remain explicit buffering/errors. Source
+wraps and renderer throughput can still interrupt playback; this is not gapless
+audio or intended-GPU/long-run qualification.
+
 Read and response decoding have deadlines; incompatible/HTML responses are errors,
 not defaults. If a write transport times out, its result may be uncertain: check
 current project/job state before repeating it. Accepted job/create/export responses

@@ -245,6 +245,20 @@ Source-video audio stays disabled.
 
 The preview uses a media-element Web Audio integration, not a whole-file decoded
 buffer. Music and video pause/re-anchor together for buffering and timing edits.
+Starting music anchors the Web Audio clock to its observed source progress after
+the play promise settles, retaining any elapsed startup playback rather than
+discarding it as drift. Pause, cancellation and disposal invalidate pending starts;
+an obsolete completion cannot resume the paused clock.
+Drift compares the continuous media time with the fractional Web Audio master
+position, keeping the one-project-frame limit without counting integer-video
+frame quantisation as audio drift. Rendered video still uses integer frames.
+Normal decoded-callback latency within one project frame does not clear a valid
+accepted image or restart music. Preview checks exact source maps for the clock
+frame and its one-frame neighbours across every active participant; a held source
+frame's earliest inverse is not treated as its unique project time. Retaining an
+uploaded image requires the same active clips and unchanged appearance. Larger or
+incompatible mismatches, new sources and failed music synchronization still expose
+buffering and require exact source readiness before recovery.
 Source wraps use a seek to the selected IN and may briefly buffer; gapless browser
 loop joins are not promised. Audio clock drift above one project frame triggers
 re-alignment rather than accumulating silently. Target-browser long-run A/V/audio
