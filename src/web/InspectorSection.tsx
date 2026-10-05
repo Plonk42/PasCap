@@ -1,8 +1,8 @@
 import { createContext, useContext, useId, useState, type ReactNode } from 'react';
 import './declutter.css';
-import './input-controls.css';
 import { Disclosure } from './Disclosure.js';
 import { Icon, type IconName } from './icons.js';
+import './input-controls.css';
 import { readPreference, writePreference } from './preferences.js';
 
 export type InspectorMode = 'clip' | 'sequence' | 'audio';

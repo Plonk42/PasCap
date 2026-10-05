@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { audioAssetSchema } from '../shared/audio.js';
-import type { ExportProfile } from '../shared/export.js';
 import { exportPreflightSchema } from '../shared/export-space.js';
+import type { ExportProfile } from '../shared/export.js';
 import { audioDirectorySchema, footageDirectorySchema, footageRootSchema } from '../shared/footage.js';
 import { jobSchema, mediaAssetSchema } from '../shared/media.js';
 import { projectSchema, type ProjectDocument } from '../shared/model.js';
