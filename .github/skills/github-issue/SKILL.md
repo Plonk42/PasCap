@@ -16,6 +16,13 @@ The standing automatic-publication/verified-closure policy applies when deliveri
 approved work, not while merely logging an issue; see the
 [GitHub workflow](../../../docs/GITHUB_WORKFLOW.md#automatic-publication-to-main).
 
+Explicit `/github-issue` invocation requests tracking. Do not invoke this skill
+implicitly for trivial non-functional formatting/import sorting/typos or a request
+to commit/push already-reviewed housekeeping: those need no issue or Project card.
+Substantive bugs/features/engineering work still use scoped issues. Session-owned
+CI watching and LLM-driven acceptance/closure happen at verified delivery, never
+while merely logging an issue or through installed background closure automation.
+
 ## Inspect first
 
 1. Read the repository instructions and [GitHub workflow](../../../docs/GITHUB_WORKFLOW.md).

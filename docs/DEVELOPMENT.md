@@ -158,6 +158,14 @@ or the whole generated cache. Action references are commit-pinned and the workfl
 uses read-only repository permissions. It does not deploy GitHub Pages or publish
 a container image. Use [the roadmap](ROADMAP.md) for remaining qualification work.
 
+Delivery closure is handled by the LLM, not an installed Action, hook, bot or
+scheduled job. When only required CI remains, a temporary session-owned
+`gh run watch` waits in a dedicated background terminal; its completion notification
+resumes acceptance checks, issue closure and Project Done reconciliation. Interrupted
+sessions recover pending deliveries at next-session start; no unattended guarantee
+is made. See the [CI follow-up contract](GITHUB_WORKFLOW.md#session-owned-ci-follow-up).
+Trivial formatting-only housekeeping needs no GitHub issue or Project entry.
+
 The raw reader has a deterministic exit-before-read regression and eager bounded
 read ownership; [#1](https://github.com/Plonk42/PasCap/issues/1) records its delivery
 evidence. CI does not retry tests to hide failures. [UX_HARDENING.md](UX_HARDENING.md)

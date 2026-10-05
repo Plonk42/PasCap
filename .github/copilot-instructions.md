@@ -14,12 +14,14 @@
   intended commits and fast-forward remote state first. Preserve unrelated edits;
   never force-push, bypass branch protection or publish unapproved/private work.
   If publication is blocked, record the blocker and next action rather than hiding it.
-- After each delivery to remote `main` and at handoff, automatically close concrete
-  issues actually addressed, once their implementation, acceptance criteria and
-  applicable verification are confirmed. Follow the publication/closure gates in
-  [the GitHub workflow](../docs/GITHUB_WORKFLOW.md); no additional closure approval
-  is needed. Local `main` alone is not delivery. Releases, milestone closure,
-  legacy tracker cleanup and real-media jobs still need explicit approval.
+- At session start, after delivery and at handoff, reconcile published issues
+  awaiting CI using [the GitHub workflow](../docs/GITHUB_WORKFLOW.md). Close actually
+  addressed issues without another approval when all applicable gates pass, and
+  align Project Status. If only CI remains, start one temporary session-owned CI
+  watch; its completion notification resumes LLM acceptance/closure, not a script
+  that closes issues. Do not install a closure Action, hook, bot or scheduled job.
+  Green CI alone is not acceptance. Releases,
+  milestone closure, legacy tracker cleanup and real-media jobs still need approval.
 - Reply in English. Keep summaries concise and identify remaining limitations.
 - Keep active documentation focused on the **current project state**: implemented
   behaviour, usage, contracts, limitations and applicable verification. Update or
@@ -40,9 +42,13 @@
 - Never build/check or reset fixtures while browser tests serve the same output/cache.
   Keep browser/media work serial. During terminal validation, subagent reviews must
   use file/search tools only: no terminal commands that could interrupt the run.
-- Do not wait or poll for CI by default. Inspect available actual-commit results at
-  delivery/handoff, record pending checks and the next action, and leave required
-  acceptance open. Never equate a push or focused pass with full acceptance.
+- Do not block delivery or repeatedly poll CI with model/tool calls. When required
+  CI is pending for verified published work, use a temporary `gh run watch` in a
+  dedicated background terminal and yield for its completion notification. On
+  notification, inspect the actual SHA/jobs and perform verified closure/Project
+  reconciliation. Record run/SHA and pending acceptance before yielding. A watch
+  cannot guarantee resumption after the session/editor closes; next-session recovery
+  is mandatory. Never equate a push or focused pass with full acceptance.
 - Keep investigation, issue/Project updates and documentation scoped to the selected
   deliverable; update affected contracts, not the whole backlog or unchanged guides.
   Prefer one concrete deliverable per chat. Use deeper reasoning for architecture,
@@ -55,10 +61,13 @@
 
 ## GitHub planning and delivery
 
-- GitHub is the system of record for issues, next actions, approved features,
-  Project selection/iterations and milestones. Before implementation, read the relevant
-  issue and Project context; search before creating a scoped issue. Proposals/labels are
-  not approval to expand scope. Do not leave the next steps only in chat or local plans.
+- GitHub is the system of record for substantive bugs, features, engineering work,
+  next actions, Project selection and milestones. Read relevant issue/Project context
+  when work is tracked; search before creating an issue. Trivial non-functional
+  housekeeping (formatting/import sorting/typos or committing already-reviewed edits)
+  needs no issue, Project card or tracking checkpoint unless explicitly requested.
+  Do not invent an issue merely to satisfy a commit-reference rule. Proposals/labels
+  are not implementation approval; substantive follow-up belongs in GitHub.
 - After triage, give each issue one category (`bug`, `enhancement` or `task`),
   one `priority:p0`–`priority:p3`, relevant `area:*` labels and an outcome milestone.
   Every open issue also needs one `status:*` label and a concrete next action.
@@ -83,8 +92,9 @@
   never claim a board exists, request secrets or stop otherwise accessible tracking.
 - At the start, after each completed logical step and at handoff, update the issue
   and Project Status when available, with progress, blockers,
-  exact local commits, verification and the next action. Commit messages always use
-  `(#N)` issue references, for example `Improve timeline scrolling (#18)`; never
+  exact local commits, verification and the next action for tracked work. Its commit
+  messages use `(#N)`, for example `Improve timeline scrolling (#18)`; issue-free
+  housekeeping uses a descriptive message without a fabricated reference. Never
   use `(Refs #N)` or automatic closing keywords. PR titles use the same convention.
   Mark verified unpublished work `status:local-complete`, not accepted/closed.
 - Keep local checks, actual-commit remote CI and consented hardware/real-workload
