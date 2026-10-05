@@ -59,8 +59,11 @@ export function HelpPopover({ label, className = '', children }: Readonly<Props>
         if (!trigger.current || !content.current) return;
         const anchor = trigger.current.getBoundingClientRect();
         if (!anchor.width || !anchor.height) { close(); return; }
-        const next = popoverPosition(anchor, content.current.getBoundingClientRect(), { width: innerWidth, height: innerHeight });
-        setPosition((previous) => previous?.left === next.left && previous.top === next.top ? previous : next);
+        const panel = content.current.getBoundingClientRect();
+        // Measure the full text even when the previous placement made it scrollable.
+        const height = panel.height + Math.max(0, content.current.scrollHeight - content.current.clientHeight);
+        const next = popoverPosition(anchor, { width: panel.width, height }, { width: innerWidth, height: innerHeight });
+        setPosition((previous) => previous?.left === next.left && previous.top === next.top && previous.maxHeight === next.maxHeight ? previous : next);
     }, [close]);
 
     useEffect(() => {
@@ -136,7 +139,7 @@ export function HelpPopover({ label, className = '', children }: Readonly<Props>
             }
         }}><Icon name="help" size={15} /></button>
         <span className="declutter-sr-only" id={`${id}-instruction`}>Hover or focus to read help. Click to keep it open, or use Down arrow to focus the text. Escape or an outside click closes it.</span>
-        <section ref={content} id={id} popover="manual" aria-labelledby={`${id}-title`} tabIndex={-1} className="editor-help-content" style={{ left: position?.left ?? 0, top: position?.top ?? 0, visibility: position ? 'visible' : 'hidden' }}>
+        <section ref={content} id={id} popover="manual" aria-labelledby={`${id}-title`} tabIndex={-1} className="editor-help-content" style={{ left: position?.left ?? 0, top: position?.top ?? 0, maxHeight: position?.maxHeight, visibility: position ? 'visible' : 'hidden' }}>
             <h4 id={`${id}-title`}>{label}</h4>{children}
         </section>
     </div>;

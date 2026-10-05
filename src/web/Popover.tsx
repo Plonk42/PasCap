@@ -20,8 +20,10 @@ export function Popover({ label, className = '', trigger: triggerContent, childr
     }, []);
     const place = useCallback((): void => {
         if (!trigger.current || !content.current) return;
-        const next = popoverPosition(trigger.current.getBoundingClientRect(), content.current.getBoundingClientRect(), { width: innerWidth, height: innerHeight });
-        setPosition((previous) => previous?.left === next.left && previous.top === next.top ? previous : next);
+        const panel = content.current.getBoundingClientRect();
+        const height = panel.height + Math.max(0, content.current.scrollHeight - content.current.clientHeight);
+        const next = popoverPosition(trigger.current.getBoundingClientRect(), { width: panel.width, height }, { width: innerWidth, height: innerHeight });
+        setPosition((previous) => previous?.left === next.left && previous.top === next.top && previous.maxHeight === next.maxHeight ? previous : next);
     }, []);
 
     // The native top layer escapes clipping AND size-container fixed-position containing blocks.
@@ -67,6 +69,6 @@ export function Popover({ label, className = '', trigger: triggerContent, childr
             event.preventDefault();
             if (open) close(); else setOpen(true);
         }}>{triggerContent ?? <Icon name="more" size={18} />}</summary>
-        <fieldset ref={content} id={contentId} popover="manual" className="editor-popover-content" style={{ left: position?.left ?? 0, top: position?.top ?? 0, visibility: position ? 'visible' : 'hidden' }}><legend className="declutter-sr-only">{label}</legend>{typeof children === 'function' ? children(close) : children}</fieldset>
+        <fieldset ref={content} id={contentId} popover="manual" className="editor-popover-content" style={{ left: position?.left ?? 0, top: position?.top ?? 0, maxHeight: position?.maxHeight, visibility: position ? 'visible' : 'hidden' }}><legend className="declutter-sr-only">{label}</legend>{typeof children === 'function' ? children(close) : children}</fieldset>
     </details>;
 }
