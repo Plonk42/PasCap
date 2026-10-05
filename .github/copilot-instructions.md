@@ -3,7 +3,8 @@
 ## Workflow
 
 - Commit after each completed logical step, including its tests and relevant
-  documentation. Do not leave an entire feature uncommitted until the end.
+  documentation. A logical step is a coherent tested behaviour, not each small
+  correction; do not leave an entire feature uncommitted until the end.
 - Before committing, review the diff, validate the affected behaviour, and stage
   deliberately. Preserve unrelated user edits; never discard them to obtain a
   clean tree. Do not commit generated media, caches, logs, credentials or private paths.
@@ -26,6 +27,31 @@
   previous baselines or explanations of how the project got here. Keep history in
   GitHub issues/commits or explicitly separate archives/design records, not in current
   guides/status pages; never present historical evidence as current verification.
+
+## Efficient iteration
+
+- Separate focused development feedback from applicable comprehensive delivery
+  checks. Run affected tests while editing, not the full browser/native suites after
+  every correction. Before committing, satisfy the affected acceptance gates;
+  documentation-only changes need documentation checks, not unrelated runtime suites.
+- Reuse checks/builds only while their relevant inputs are unchanged. Avoid redundant
+  typecheck/build phases; use the [incremental validation guide](../docs/DEVELOPMENT.md)
+  without changing scripts or weakening tests merely to shorten a task.
+- Never build/check or reset fixtures while browser tests serve the same output/cache.
+  Keep browser/media work serial. During terminal validation, subagent reviews must
+  use file/search tools only: no terminal commands that could interrupt the run.
+- Do not wait or poll for CI by default. Inspect available actual-commit results at
+  delivery/handoff, record pending checks and the next action, and leave required
+  acceptance open. Never equate a push or focused pass with full acceptance.
+- Keep investigation, issue/Project updates and documentation scoped to the selected
+  deliverable; update affected contracts, not the whole backlog or unchanged guides.
+  Prefer one concrete deliverable per chat. Use deeper reasoning for architecture,
+  timing/ownership and hard failures; a faster model can handle bounded routine work
+  when selected by the owner. Do not claim to switch models automatically.
+- When evaluating latency, record measured investigation/editing, local-validation,
+  delivery-administration and remote-CI durations in existing issue checkpoints;
+  do not infer thinking time from session spans or test timeouts. See the
+  [efficient work cycle](../docs/GITHUB_WORKFLOW.md).
 
 ## GitHub planning and delivery
 

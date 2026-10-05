@@ -83,6 +83,41 @@ npm run test:browser
   native suites together with `PASCAP_MEDIA_TESTS=1 PASCAP_SPACE_TESTS=1 npm test -- tests/media`.
   Hosts forbidding user namespaces must not claim that acceptance from unit mocks.
 
+### Incremental feedback
+
+The validation commands above are complete entry points, not a mandatory chain
+after every edit. Follow the [work-cycle gates](GITHUB_WORKFLOW.md#efficient-development-and-delivery):
+focused feedback during implementation, applicable comprehensive checks before
+delivery, then asynchronous actual-commit CI. Keep explicit issue acceptance intact.
+
+- While editing, use `npm test -- tests/unit/<affected-file>.test.ts` or
+  `npm run test:watch -- tests/unit/<affected-file>.test.ts`; use relevant spec paths
+  or Playwright `--grep` for focused browser feedback. Native tests remain an
+  explicit synthetic opt-in when affected; ordinary `npm test` does not enable them.
+- For a code-delivery cycle, `npm test` followed by `npm run build` covers the same
+  unit/service, frontend/server types, production build and license checks as
+  `npm run check`, without its duplicate leading frontend typecheck. `check` remains
+  supported; do not run both equivalent chains on unchanged inputs or append another
+  standalone build/typecheck without a reason. Scripts are unchanged.
+- If that cycle already built the current inputs, prepare isolated browser fixtures
+  with `npx tsx scripts/fixtures.ts --browser`, then run `npx playwright test` (or
+  affected specs), instead of rebuilding through `npm run test:browser`. The latter
+  remains the self-contained build/setup/full-suite entry point. Install Chrome when
+  missing, not on every focused run.
+- Reuse a build only while relevant source/configuration/dependency/toolchain inputs
+  are unchanged. Reuse fixtures only if prior tests leave the required baseline
+  intact; reseed after state-changing runs as needed. A full acceptance run starts
+  from the documented clean fixture baseline, not an assumed clean focused run.
+- Never run build/check or fixture setup while a browser suite serves that output or
+  cache. Complete unit/type/build phases first, then run browser validation against
+  immutable output. Keep shared browser/media runs serial; additional workers need
+  verified isolation first. Parallel subagent reviews must use file/search tools only,
+  never terminal commands that could interrupt an active validation command.
+- Record exactly which checks passed on which inputs. Focused checks do not replace
+  an applicable full suite; invalidate affected results after further relevant edits.
+  Documentation-only work uses content/link/whitespace checks and review, not this
+  runtime chain. Do not shorten timeouts, retry failures or weaken tests for speed.
+
 **Browser fixture setup resets `.pascap/browser-tests/`**; never store personal work
 there. It seeds twelve video memberships, music and proxies. Separate import-test
 originals in `.pascap/browser-footage/synthetic-sources/` are outside that cache;

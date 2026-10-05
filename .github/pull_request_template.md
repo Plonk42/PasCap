@@ -18,9 +18,10 @@ Milestone: <!-- outcome milestone -->
 
 ## Verification
 
-- Local commits/checks: <!-- exact commands, results and synthetic fixture scope -->
-- Remote CI: <!-- actual commit/run; pending is not a pass -->
+- Local commits/checks: <!-- exact commands, results and synthetic fixture scope; distinguish focused feedback from applicable comprehensive delivery gates; docs-only changes need docs checks -->
+- Remote CI: <!-- actual commit/run and available status; do not wait/poll by default; pending required checks keep acceptance open -->
 - Hardware/real workload: <!-- separate consent/evidence or explicitly deferred -->
+- Phase durations, when investigating iteration latency: <!-- measured investigation/editing, local checks, administration and separate CI elapsed time; omit unavailable values, note overlaps; no timeout/session-span estimates -->
 
 ## Remaining work and next action
 
