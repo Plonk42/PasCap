@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { constants } from 'node:fs';
 import { chmod, open, readFile, rename, rm } from 'node:fs/promises';
 import path from 'node:path';
@@ -154,7 +155,10 @@ export class AudioLibrary {
     const assets = this.list();
     await forEachSerial(assets, async (asset) => {
       if (asset.status !== 'ready') return;
-      try { await verifyPlayback(this.playbackPath(asset), asset.metadata); }
+      try {
+        await assertSourceIdentity(asset.sourcePath, asset.fingerprint);
+        await verifyPlayback(this.playbackPath(asset), asset.metadata);
+      }
       catch (error) {
         asset.status = 'error';
         asset.error = isNotFound(error) ? 'The current PCM16 music cache is missing. Prepare this recording explicitly; older caches remain unchanged.' : errorMessage(error);
@@ -193,8 +197,13 @@ export class AudioLibrary {
     return this.#operations.run(async () => {
       assertCacheOutsideSource(path.dirname(sourcePath), this.config.dataDir);
       const fingerprint = await fingerprintFile(sourcePath);
-      const id = `audio-${fingerprint.digest.slice(0, 32)}`;
-      if (!this.#assets.has(id)) {
+      // An explicit new location is a new source, never an implicit relink.
+      let id: string | undefined;
+      for (const asset of this.#assets.values()) {
+        if (asset.sourcePath === sourcePath && asset.fingerprint.digest === fingerprint.digest) { id = asset.id; break; }
+      }
+      if (!id) {
+        id = `audio-${randomUUID()}`;
         const metadata = await probeAudio(this.config, sourcePath);
         await assertSourceIdentity(sourcePath, fingerprint, true);
         this.#assets.set(id, audioAssetSchema.parse({ id, name: path.basename(sourcePath), sourcePath, fingerprint, metadata, status: 'registered', error: null, waveform: [] }));
@@ -236,7 +245,6 @@ export class AudioLibrary {
     return job;
   }
   async #cachedWaveform(asset: AudioAsset, context: JobContext): Promise<number[] | null> {
-    if (asset.status !== 'ready' || asset.waveform.length === 0) return null;
     try {
       context.update(0.1, 'Verifying cached music');
       await verifyPlayback(this.playbackPath(asset), asset.metadata);

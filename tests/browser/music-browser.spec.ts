@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { copyFile, mkdir, mkdtemp, readFile, readdir, rm, stat } from 'node:fs/promises';
+import { copyFile, mkdir, mkdtemp, readFile, readdir, rename, rm, stat } from 'node:fs/promises';
 import path from 'node:path';
 import type { AudioAsset } from '../../src/shared/audio.js';
 import type { AudioDirectory, FootageRoot } from '../../src/shared/footage.js';
@@ -201,6 +201,44 @@ test('real explicit confirmation persists only importing-project audio membershi
     expect([after.size, after.mtimeMs, after.ino]).toEqual([before.size, before.mtimeMs, before.ino]);
     expect(await readFile(firstPath)).toEqual(selectedBytes); expect(await readFile(music.sourcePath)).toEqual(canonicalBytes);
     expect(await readdir(testDirectory)).toEqual(names);
+});
+
+test('importing moved music creates a new bin entry without relinking the old source or placing music', async ({ page, request }) => {
+    const oldPath = path.join(testDirectory, 'Before move.wav');
+    const movedPath = path.join(testDirectory, 'After move.wav');
+    await copyFile(music.sourcePath, oldPath);
+    const sourceBytes = await readFile(oldPath);
+    const registered = await request.post('/api/audio/register-selected', { headers: { 'x-pascap-client': 'preview-lab' }, data: { path: oldPath } });
+    expect(registered.status()).toBe(202);
+    const previous = await registered.json() as { asset: AudioAsset; job: MediaJob };
+    await expect.poll(async () => (await (await request.get(`/api/jobs/${previous.job.id}`)).json() as { job: MediaJob }).job.state).toBe('completed');
+    const before = { ...memory.snapshot(), media: { videoIds: [], audioIds: [previous.asset.id] } };
+    memory.seed(before);
+    await rename(oldPath, movedPath);
+    await page.reload();
+    const writes = posts(page);
+    const modal = await openBrowser(page);
+    await modal.getByRole('radio', { name: 'Select music After move.wav', exact: true }).check();
+    const confirmed = page.waitForResponse((response) => new URL(response.url()).pathname === '/api/audio/register-selected' && response.request().method() === 'POST');
+    await modal.getByRole('button', { name: 'Import selected music', exact: true }).click();
+    const response = await confirmed; expect(response.status()).toBe(202);
+    const imported = await response.json() as { asset: AudioAsset; job: MediaJob };
+    expect(imported.asset.id).not.toBe(previous.asset.id);
+    expect(imported.asset.sourcePath).toBe(movedPath);
+    expect(imported.asset.fingerprint).toEqual(previous.asset.fingerprint);
+    await expect(modal).toHaveCount(0);
+    await page.evaluate(() => window.pascapLab!.flush());
+    expect(memory.snapshot().media.audioIds).toEqual([previous.asset.id, imported.asset.id]);
+    expect(memory.snapshot().music).toBeNull();
+    expect({ ...memory.snapshot(), revision: before.revision, media: before.media }).toEqual(before);
+    await expect(page.locator(`select[aria-label="Music recording"] option[value="${previous.asset.id}"]`)).toHaveJSProperty('disabled', true);
+    await expect(page.locator(`select[aria-label="Music recording"] option[value="${imported.asset.id}"]`)).toHaveJSProperty('disabled', false, { timeout: 20_000 });
+    const listed = ((await (await request.get('/api/audio')).json()) as { assets: AudioAsset[] }).assets;
+    const old = listed.find((asset) => asset.id === previous.asset.id)!;
+    expect(old.sourcePath).toBe(oldPath); expect(old.fingerprint).toEqual(previous.asset.fingerprint);
+    expect(old.status).toBe('error'); expect(old.error).toContain('original recording is missing');
+    expect(writes).toEqual([{ pathname: '/api/audio/register-selected', body: { path: movedPath } }]);
+    expect(await readFile(movedPath)).toEqual(sourceBytes);
 });
 
 test('a roots read failure can be refreshed without registration, project edits or an implicit read retry', async ({ page }) => {
