@@ -300,6 +300,7 @@ describe('PreviewEngine observed-frame tolerance and recovery', () => {
     // The previously uploaded frame is valid, although this slot cannot upload now.
     Object.assign(slot.video, { readyState: 1 }); slot.video.currentTime = framesToSeconds(9);
     tick(preview, 9);
+    expect(preview.engine.diagnostics()).toMatchObject({ requestedFrame: 9, decodedSourceFrames: [8, -1], decoderReady: [false, false] });
     expect(preview.compositor.visible).toEqual(accepted);
     expect(preview.compositor.drawFrame).not.toHaveBeenCalled();
     expect(preview.compositor.uploadVideo).not.toHaveBeenCalled();

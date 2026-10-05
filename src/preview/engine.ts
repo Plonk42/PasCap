@@ -10,6 +10,7 @@ import { MusicPlayback } from './music.js';
 export type PreviewStatus = 'empty' | 'loading' | 'paused' | 'playing' | 'seeking' | 'buffering' | 'error' | 'disposed';
 export interface PreviewDiagnostics {
   status: PreviewStatus; message: string; playing: boolean; frame: number; duration: number;
+  requestedFrame: number; decodedSourceFrames: number[]; decoderReady: boolean[];
   previewFps: number; renderedFrames: number; observedDecodedFrames: number;
   lastSeekMs: number | null; medianSeekMs: number | null; seekSamples: number;
   colourLatencyMs: number | null; stalls: number; boundaryStalls: number; stallMilliseconds: number;
@@ -104,6 +105,7 @@ export class PreviewEngine {
     const interval = recent.length > 1 ? Math.max(1_000, recent.at(-1)! - recent[0]!) : 2_000;
     return {
       status: this.#status, message: this.#message, playing: this.#playing, frame: this.#frame, duration: this.#layout.duration,
+      requestedFrame: this.#operationFrame, decodedSourceFrames: this.#slots.map((slot) => slot.decodedFrame), decoderReady: this.#slots.map((slot) => slot.ready),
       previewFps: this.#playing ? Math.max(0, recent.length - 1) / interval * 1000 : 0,
       renderedFrames: this.#renderedFrames, observedDecodedFrames: this.#slots.reduce((sum, slot) => sum + slot.observedFrames, 0),
       lastSeekMs: this.#seekTimes.at(-1) ?? null, medianSeekMs: median(this.#seekTimes), seekSamples: this.#seekTimes.length,
@@ -457,6 +459,7 @@ export class PreviewEngine {
     // display cycle. Playback at frame zero must not request a negative frame.
     const elapsed = Math.max(0, now - this.#clockTime);
     const expected = this.#music.hasMusic ? this.#music.projectFrame() : this.#clockFrame + secondsToFrames(elapsed / 1000, this.#document.frameRate, 'floor');
+    this.#operationFrame = expected;
     if (expected >= this.#layout.duration) { this.pause(); void this.seek(this.#layout.duration - 1); return; }
     const layers = sampleTimeline(this.#document, expected, this.#layout);
     if (!this.#music.sync(expected)) { void this.#alignPlayback(expected, false); return; }
