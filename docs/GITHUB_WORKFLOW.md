@@ -34,7 +34,8 @@ and verification snapshots remain in Git history; they are not current acceptanc
 4. **Deliver incrementally.** At the start, after each completed logical step and
   at handoff, update the work issue and Project Status: progress, blockers,
   exact local commits, checks/evidence, remaining acceptance and the next action. Validate/review and
-  commit each step with its tests/docs; commit messages and PR titles always use
+  commit each coherent step with its tests/docs, not every intermediate correction;
+  use the focused-feedback and delivery-check separation below. Commit messages and PR titles always use
   `(#N)`, for example `Improve timeline scrolling (#18)`, never `(Refs #N)` or
   automatic closing keywords. Automatically push approved, validated logical-step
   commits to remote `main` under the standing authorization below, without another
@@ -52,6 +53,57 @@ and verification snapshots remain in Git history; they are not current acceptanc
 Public updates must be sanitized: no private source/project paths, snapshots,
 credentials, recordings, licensed music or generated reports. Real imports,
 preparations, benchmarks and long renders still require explicit owner consent.
+
+## Efficient development and delivery
+
+Shorten the feedback loop, not the acceptance gate. A logical step delivers one
+coherent, reviewable behaviour with its tests and affected contracts; small fixes
+within that step do not each trigger a full validation/publication cycle. Do not
+hold an entire multi-step feature until the end.
+
+| Phase | Required work |
+| --- | --- |
+| Development feedback | Run affected unit/service tests and focused browser/native regressions as appropriate; investigate failures before broader runs. Focused results are not full acceptance. |
+| Logical-step delivery | Review the final diff and satisfy applicable comprehensive checks and issue criteria before committing/pushing. Code normally needs the unit/service, type and production-build checks; UI/render/timing changes also need their applicable integration suites. Documentation-only steps need link/content/whitespace checks and review, not unrelated runtime tests. |
+| Remote acceptance | Inspect available CI for the actual delivery commit or a verified descendant. Record pending/failed required checks and leave the issue open; close only through the verified-closure gate. |
+
+Choose the validation scope from the changed contracts, dependencies and live issue
+criteria before running it. Broad schema/timing/render changes require broad coverage;
+a focused pass cannot satisfy an explicitly required full suite. Do not retry, skip
+regressions or weaken assertions to obtain a faster green result.
+
+Use the [incremental validation guide](DEVELOPMENT.md#incremental-feedback) to
+avoid duplicate typechecks/builds and reuse an unchanged build with a valid isolated
+fixture baseline. Changes to relevant source, configuration, dependencies or
+toolchain invalidate affected evidence. Never rebuild served output or reset the
+cache during browser validation. Keep browser/media runs serial unless independently
+isolated concurrency has been implemented and verified; increasing workers alone
+is not an approved shortcut. Subagent reviews during terminal validation must use
+file/search tools, with **no terminal commands**, to avoid interrupting the run.
+
+CI is asynchronous by default: after validated publication, inspect the available
+status without waiting/polling for completion or rerunning local suites merely to
+occupy the wait. At handoff, record the delivery SHA, CI link/status, missing gate
+and concrete next action. If a required check is pending, keep the issue open with
+aligned progress/Project Status; subsequent reconciliation verifies it before closure.
+Do not install background closure automation or promise unattended follow-up.
+
+Keep the existing start/step/handoff checkpoints concise and limited to selected
+work and actual dependencies. Do not repeat whole-backlog audits, update unchanged
+guides or add a second status ledger. Preserve all publication, source-safety,
+consent and closure rules below.
+
+Prefer a fresh chat per concrete deliverable, carrying its issue, scope, relevant
+contracts and evidence rather than unrelated conversation history. Deeper reasoning
+is useful for architecture, frame timing/native ownership, hard failures and final
+review; a faster owner-selected model can handle bounded routine edits/tracking.
+Model choice does not change verification obligations or authorize automatic switching.
+For the next few steps when investigating latency, record measured elapsed time for
+investigation/editing, local checks and delivery administration in the existing issue
+checkpoint; record remote-CI duration separately once available. Omit unavailable
+measurements and note overlaps; session spans/timeouts are not model-thinking time.
+This is lightweight evidence, not new instrumentation, benchmark/media work or a
+separate reporting requirement for every future task.
 
 ## Automatic publication to main
 
