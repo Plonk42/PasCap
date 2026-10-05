@@ -1,4 +1,4 @@
-import { useId, useState, type ReactNode } from 'react';
+import { lazy, Suspense, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import type { AudioAsset } from '../shared/audio.js';
 import type { EditCommand } from '../shared/commands.js';
 import type { MusicTrack, ProjectDocument } from '../shared/model.js';
@@ -7,18 +7,52 @@ import './declutter.css';
 import { durationLabel, sourceSeconds } from './display.js';
 import { Disclosure } from './Disclosure.js';
 import { HelpPopover } from './HelpPopover.js';
+import { Modal } from './Modal.js';
 import { NumberField } from './NumberField.js';
+import './media-import.css';
 
-interface Props { project: ProjectDocument; assets: AudioAsset[]; busy: boolean; drafting: boolean; onImport: (path: string) => Promise<void>; onPrepare: (id: string) => Promise<void>; onEdit: (command: EditCommand) => void }
+interface Props {
+  project: ProjectDocument; assets: AudioAsset[]; busy: boolean; drafting: boolean; error: string;
+  onImport: (path: string) => Promise<boolean>;
+  onBrowseImport: (path: string) => Promise<boolean>;
+  onBrowseVisibility: (open: boolean) => void;
+  onPrepare: (id: string) => Promise<void>; onEdit: (command: EditCommand) => void;
+}
+
+const MusicBrowser = lazy(() => import('./MusicBrowser.js').then((module) => ({ default: module.MusicBrowser })));
 
 function MusicTiming({ helpId, children }: Readonly<{ helpId: string; children: ReactNode }>) {
   const [open, setOpen] = useState(false);
   return <Disclosure className="music-timing" title="Placement & fades" label="Placement & fades" triggerId={`${helpId}-timing-title`} contentId={`${helpId}-timing-fields`} open={open} onToggle={setOpen} help={<HelpPopover label="Audio timing"><p id={helpId}>IN / OUT use original audio frames; OUT is exclusive. Start, duration and fades use timeline frames. Both fades must fit within Duration.</p></HelpPopover>}>{children}</Disclosure>;
 }
 
-export function MusicControls({ project, assets, busy, drafting, onImport, onPrepare, onEdit }: Readonly<Props>) {
+export function MusicControls({ project, assets, busy, drafting, error, onImport, onBrowseImport, onBrowseVisibility, onPrepare, onEdit }: Readonly<Props>) {
   const helpId = useId();
   const [filename, setFilename] = useState('');
+  const [showBrowser, setShowBrowser] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [importError, setImportError] = useState('');
+  const browseTrigger = useRef<HTMLButtonElement>(null);
+  const pending = useRef(false);
+  const mounted = useRef(false);
+  const blocked = busy || drafting || importing;
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
+  useEffect(() => {
+    onBrowseVisibility(showBrowser);
+    return () => { if (showBrowser) onBrowseVisibility(false); };
+  }, [showBrowser, onBrowseVisibility]);
+  const importMusic = async (path: string, fromBrowser: boolean): Promise<void> => {
+    if (blocked || pending.current || !path.trim()) return;
+    pending.current = true; setImporting(true); setImportError('');
+    try {
+      const accepted = await (fromBrowser ? onBrowseImport(path) : onImport(path));
+      if (!mounted.current) return;
+      if (accepted) { if (fromBrowser) setShowBrowser(false); }
+      else setImportError('Music import was not confirmed. Check Activity and the current project’s music bin before importing again. Your selection is kept.');
+    } catch (cause) {
+      if (mounted.current) setImportError(`${cause instanceof Error ? cause.message : 'Music import was not confirmed.'} Check Activity and the current project’s music bin before repeating the import.`);
+    } finally { pending.current = false; if (mounted.current) setImporting(false); }
+  };
   const music = project.music;
   const duration = calculateLayout(project).duration;
   const source = assets.find((asset) => asset.id === music?.mediaId);
@@ -27,7 +61,14 @@ export function MusicControls({ project, assets, busy, drafting, onImport, onPre
     ? `Keep at least ${music.duration} source frames, shorten Duration, or enable Loop music first.` : null;
   const update = (settings: Partial<MusicTrack>): void => { if (music) onEdit({ type: 'music', music: { ...music, ...settings } }); };
   return <section className="music-controls declutter-music" aria-label="Music settings">
-    <form className="music-import" onSubmit={(event) => { event.preventDefault(); void onImport(filename); }}><input aria-label="Music file path" placeholder="Local audio file path" value={filename} onChange={(event) => setFilename(event.target.value)} /><button type="submit" className="secondary-button small" disabled={busy || !filename.trim()}>Import audio</button></form>
+    <button ref={browseTrigger} type="button" className="secondary-button small music-browse-trigger" disabled={blocked} onClick={() => { setImportError(''); setShowBrowser(true); }}>Browse music files</button>
+    <form className="music-import" onSubmit={(event) => { event.preventDefault(); void importMusic(filename, false); }}><input aria-label="Music file path" placeholder="Local audio file path" value={filename} disabled={blocked} onChange={(event) => setFilename(event.target.value)} /><button type="submit" className="secondary-button small" disabled={blocked || !filename.trim()}>Import audio</button></form>
+    {!showBrowser && importError && !error && <p className="footage-error" role="alert">{importError}</p>}
+    {showBrowser && <Modal className="music-browser-dialog" labelledBy={`${helpId}-browse-title`} describedBy={`${helpId}-browse-description`} busy={blocked} error={[error, importError].filter(Boolean).join('\n')} restoreFocusTo={browseTrigger} onClose={() => { if (!pending.current) setShowBrowser(false); }} footer={<button type="button" className="secondary-button" disabled={blocked} onClick={() => { if (!pending.current) setShowBrowser(false); }}>Cancel</button>}>
+      <div className="activity-dialog-heading"><h2 id={`${helpId}-browse-title`}>Browse music files</h2></div>
+      <p className="control-hint" id={`${helpId}-browse-description`}>Choose one original audio file accessible to the PasCap service. Browsing and selection do not import, copy or prepare it.</p>
+      <Suspense fallback={<output className="footage-loading">Opening music browser…</output>}><MusicBrowser busy={blocked} onImport={(path) => importMusic(path, true)} /></Suspense>
+    </Modal>}
     <label className="speed-field">Recording<select aria-label="Music recording" disabled={drafting} value={music?.mediaId ?? ''} onChange={(event) => {
       const asset = assets.find((item) => item.id === event.target.value);
       if (!asset) { onEdit({ type: 'music', music: null }); return; }

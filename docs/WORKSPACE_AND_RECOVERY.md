@@ -252,7 +252,7 @@ the 2,000-entry limit has explicit truncation guidance to choose a narrower fold
 The cache branch is excluded and symlink/path checks remain enforced.
 
 `PASCAP_MEDIA_ROOTS` accepts a JSON array of at most 32 unique absolute paths;
-the default is the service user's `~/Videos`, and `[]` disables the browser.
+the default is the service user's `~/Videos`, and `[]` disables both footage and music browsing.
 Missing/unreadable roots stay visible as unavailable, not a service-startup failure.
 Selected-path requests accept at most 5,000 video paths inside approved roots.
 Read-only fingerprint/probe checks and the existing queue report accepted/rejected
@@ -260,7 +260,21 @@ sources and queue errors; ready/in-flight preparation is reused.
 
 The separate absolute-folder-path form remains an explicit **recursive whole-folder
 import**, including outside browser roots. It can queue substantial work and never
-silently extends root configuration. Standalone music uses Audio. No original is
+silently extends root configuration. Standalone music uses **Audio → Music → Browse
+music files** beside the retained manual **Music file path / Import audio** form.
+The native modal selects one audio candidate with radios, supports root/folder,
+Up/Root, search and metadata-only Refresh, and exposes unavailable roots, truncation
+and access warnings. Browsing, selecting and Cancel/Escape never register, prepare,
+edit or save; dismissal restores focus to Browse music files. Root changes clear
+selection, while folder/filter changes retain the one selected file until replaced.
+Only **Import selected music** submits its root-scoped path. Cancel/Escape and duplicate
+submissions are blocked while registration and the project-bin update are processing.
+Success adds audio membership to the importing project and displays the accepted job,
+without selecting music or changing placement; the modal then closes. Failure or an
+uncertain write keeps selection and the actual error visible, with guidance to check
+Activity/project state before repeating the import; there is no automatic write retry.
+Late folder reads are aborted on navigation/dismissal. Manual music paths remain
+deliberate imports outside browser roots and never expand configured roots. No original is
 copied: strict schema 6 references original source paths, with only
 generated proxies/thumbnails, metadata, exports/receipts and scratch written locally.
 

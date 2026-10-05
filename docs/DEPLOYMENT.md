@@ -27,7 +27,8 @@ the service's filesystem, not a browser file picker or a desktop drop payload.
 
 `ServiceConfig.mediaRoots` is configured by `PASCAP_MEDIA_ROOTS`, a JSON array of
 at most **32 unique absolute paths**. The default is only the service user's
-`~/Videos`, not the browser user's home. `[]` disables browsing. Invalid configuration
+`~/Videos`, not the browser user's home. Footage and music share these roots;
+`[]` disables both browsers, not explicit manual path imports. Invalid configuration
 is rejected, but missing/unreadable roots remain visible as unavailable rather
 than failing startup. JSON paths must be absolute; a literal `~` is not expanded.
 
@@ -36,6 +37,10 @@ than failing startup. JSON paths must be absolute; a literal `~` is not expanded
 | `GET /api/footage/roots` | Root IDs, paths and availability/error information |
 | `GET /api/footage?rootId=root-0&directory=%2Fmedia%2Ffootage%2FFlight` | Metadata for one folder inside the selected root; `directory` is an encoded absolute path, or omitted for the root itself |
 | `POST /api/media/register-paths` | JSON `{"paths":["/media/footage/Flight/DJI_0001.MP4"]}` with 1–5,000 selected absolute video paths inside approved roots |
+| `GET /api/audio/roots` | The same approved-root IDs, paths and availability/error information for music |
+| `GET /api/audio/browse?rootId=root-0&directory=%2Fmedia%2Ffootage%2FMusic` | Metadata-only one-folder audio candidates and subfolders, with the same containment, symlink, cache-exclusion and truncation guards |
+| `POST /api/audio/register-selected` | JSON `{"path":"/media/footage/Music/track.wav"}` for one explicitly confirmed audio candidate inside approved roots; existing standalone-audio probe/preparation remains authoritative |
+| `POST /api/audio/register` | Retained deliberate manual audio-path import; browser roots do not restrict this action or expand automatically |
 
 Use the root IDs returned by the service. Browsing uses directory/file metadata
 only: no media-byte reads, probing, recursive discovery, registration, cache writes
@@ -51,7 +56,12 @@ folder import, including folders outside browser roots. It can register/autoqueu
 the whole folder and therefore start substantial work; submit it only explicitly.
 It does **not** silently add a root. Approved roots constrain browsing and the
 selected-path route, not every existing deliberate manual import action. Standalone
-music still uses Audio.
+music uses **Audio → Music → Browse music files**, a native single-selection modal
+beside the manual path form. Music browsing/selection/Cancel never POST; only explicit
+confirmation registers/prepares and adds the importing project's audio membership.
+Failed/uncertain writes retain the selection and error without automatic retry.
+WAV/MP3/M4A/AAC/FLAC/OGG/OPUS/AIFF/AIF/WMA extensions are discovery candidates;
+actual streams are checked on registration. Originals remain untouched/in place.
 Manual video imports may be outside the approved browser roots, but the HTTP API
 still refuses the cache and its generated-data descendants as original footage.
 

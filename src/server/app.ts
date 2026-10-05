@@ -133,6 +133,15 @@ export async function createApp(config = createConfig()) {
     await serveRegisteredFile(request, reply, library.thumbnailPath(asset, parameters.frame), 'image/jpeg');
   });
   app.get('/api/audio', (_request, reply) => reply.send({ assets: audio.list() }));
+  app.get('/api/audio/roots', async () => ({ roots: await footage.roots() }));
+  app.get('/api/audio/browse', async (request) => {
+    const query = footageQuerySchema.parse(request.query);
+    return footage.browseAudio(query.rootId, query.directory);
+  });
+  app.post('/api/audio/register-selected', async (request, reply) => {
+    const selected = footage.validateAudioPath(registerSchema.parse(request.body).path);
+    return reply.code(202).send(await audio.register(selected));
+  });
   app.post('/api/audio/register', async (request, reply) => reply.code(202).send(await audio.register(registerSchema.parse(request.body).path)));
   app.post('/api/audio/:id/prepare', async (request, reply) => {
     z.object({}).strict().parse(request.body);

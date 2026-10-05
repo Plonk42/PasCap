@@ -1,13 +1,15 @@
 import { constants, type Dirent, type Stats } from 'node:fs';
 import { access, lstat, opendir } from 'node:fs/promises';
 import path from 'node:path';
-import { MAX_FOOTAGE_ENTRIES, MAX_FOOTAGE_FILES, isVideoFilename, type FootageDirectory, type FootageRoot } from '../shared/footage.js';
+import { MAX_FOOTAGE_ENTRIES, MAX_FOOTAGE_FILES, isAudioFilename, isVideoFilename, type AudioDirectory, type FootageDirectory, type FootageRoot } from '../shared/footage.js';
 import { forEachSerial } from '../shared/serial.js';
 import type { ServiceConfig } from './config.js';
 import { errorMessage, isNotFound, ServiceError } from './errors.js';
 import { assertNoSymlinks } from './files.js';
 
-type FootageEntry = FootageDirectory['entries'][number];
+type MediaKind = 'video' | 'audio';
+type BrowserEntry = FootageDirectory['entries'][number] | AudioDirectory['entries'][number];
+type BrowserDirectory = Omit<FootageDirectory, 'entries'> & { entries: BrowserEntry[] };
 const naturalNames = new Intl.Collator('en', { numeric: true, sensitivity: 'base' });
 const MAX_WARNINGS = 20;
 const MAX_WARNING_LENGTH = 512;
@@ -27,15 +29,16 @@ function directoryError(error: unknown): unknown {
   return error;
 }
 
-function compareEntries(a: FootageEntry, b: FootageEntry): number {
+function compareEntries(a: BrowserEntry, b: BrowserEntry): number {
   if (a.kind !== b.kind) return a.kind === 'directory' ? -1 : 1;
   return naturalNames.compare(a.name, b.name) || a.name.localeCompare(b.name);
 }
 
-function entryKind(info: Pick<Stats, 'isSymbolicLink' | 'isDirectory' | 'isFile'>, name: string): FootageEntry['kind'] | null {
+function entryKind(info: Pick<Stats, 'isSymbolicLink' | 'isDirectory' | 'isFile'>, name: string, mediaKind: MediaKind): BrowserEntry['kind'] | null {
   if (info.isSymbolicLink()) return null;
   if (info.isDirectory()) return 'directory';
-  return info.isFile() && isVideoFilename(name) ? 'video' : null;
+  const supported = mediaKind === 'audio' ? isAudioFilename(name) : isVideoFilename(name);
+  return info.isFile() && supported ? mediaKind : null;
 }
 
 function addWarning(warnings: string[], message: string): void {
@@ -44,7 +47,7 @@ function addWarning(warnings: string[], message: string): void {
 }
 
 /** Keep only the first natural-sorted page, even for a very large directory. */
-function retainEntry(entries: FootageEntry[], entry: FootageEntry): boolean {
+function retainEntry(entries: BrowserEntry[], entry: BrowserEntry): boolean {
   const full = entries.length === MAX_FOOTAGE_ENTRIES;
   if (full && compareEntries(entry, entries.at(-1)!) >= 0) return true;
   let low = 0; let high = entries.length;
@@ -84,17 +87,27 @@ export class FootageBrowser {
   }
 
   async browse(rootId: string, directory?: string): Promise<FootageDirectory> {
+    return this.#scan(rootId, directory, 'video');
+  }
+
+  async browseAudio(rootId: string, directory?: string): Promise<AudioDirectory> {
+    return this.#scan(rootId, directory, 'audio');
+  }
+
+  #scan(rootId: string, directory: string | undefined, mediaKind: 'video'): Promise<FootageDirectory>;
+  #scan(rootId: string, directory: string | undefined, mediaKind: 'audio'): Promise<AudioDirectory>;
+  async #scan(rootId: string, directory: string | undefined, mediaKind: MediaKind): Promise<BrowserDirectory> {
     const root = this.#roots.find((candidate) => candidate.id === rootId);
     if (!root) throw new ServiceError('Approved footage root not found.', 404);
     const selected = this.#scopedPath(directory ?? root.path, root.path);
     await this.#assertDirectory(selected);
-    const result: FootageDirectory = { rootId, directory: selected, parent: selected === root.path ? null : path.dirname(selected), entries: [], ignored: 0, truncated: false, warnings: [] };
+    const result: BrowserDirectory = { rootId, directory: selected, parent: selected === root.path ? null : path.dirname(selected), entries: [], ignored: 0, truncated: false, warnings: [] };
     try {
       const listing = await opendir(selected);
       // One directory only. Both result storage and diagnostic storage are bounded.
       for await (const entry of listing) {
         try {
-          const item = await this.#readEntry(selected, entry);
+          const item = await this.#readEntry(selected, entry, mediaKind);
           if (!item) { result.ignored++; continue; }
           if (retainEntry(result.entries, item)) result.truncated = true;
         } catch (error) {
@@ -106,11 +119,11 @@ export class FootageBrowser {
     return result;
   }
 
-  async #readEntry(directory: string, entry: Dirent): Promise<FootageEntry | null> {
+  async #readEntry(directory: string, entry: Dirent, mediaKind: MediaKind): Promise<BrowserEntry | null> {
     const filename = path.join(directory, entry.name);
-    if (contains(this.#cache, filename) || entryKind(entry, entry.name) === null) return null;
+    if (contains(this.#cache, filename) || entryKind(entry, entry.name, mediaKind) === null) return null;
     const info = await lstat(filename);
-    const kind = entryKind(info, entry.name);
+    const kind = entryKind(info, entry.name, mediaKind);
     if (kind === null) return null;
     if (kind === 'directory') return { name: entry.name, path: filename, kind, size: null };
     return { name: entry.name, path: filename, kind, size: info.size };
@@ -127,6 +140,13 @@ export class FootageBrowser {
       if (!isVideoFilename(path.basename(selected))) throw new ServiceError('Select recording paths ending in .mp4, .mov or .m4v.', 400);
       return selected;
     });
+  }
+
+  /** Browser-selected audio is root-scoped; registration owns existence, symlink and probe checks. */
+  validateAudioPath(filename: string): string {
+    const selected = this.#scopedPath(filename);
+    if (!isAudioFilename(path.basename(selected))) throw new ServiceError('Select an audio path ending in .wav, .mp3, .m4a, .aac, .flac, .ogg, .opus, .aiff, .aif or .wma.', 400);
+    return selected;
   }
 
   /** Deliberate manual imports may be outside browser roots, but never inside generated cache data. */

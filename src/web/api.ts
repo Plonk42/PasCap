@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { audioAssetSchema } from '../shared/audio.js';
 import type { ExportProfile } from '../shared/export.js';
 import { exportPreflightSchema } from '../shared/export-space.js';
-import { footageDirectorySchema, footageRootSchema } from '../shared/footage.js';
+import { audioDirectorySchema, footageDirectorySchema, footageRootSchema } from '../shared/footage.js';
 import { jobSchema, mediaAssetSchema } from '../shared/media.js';
 import { projectSchema, type ProjectDocument } from '../shared/model.js';
 import { projectSummarySchema } from '../shared/projects.js';
@@ -130,6 +130,13 @@ export const api = {
   load: (id: string, options?: RequestOptions) => request(`/api/projects/${id}`, z.object({ document: projectSchema }), 'GET', undefined, options),
   save: (document: ProjectDocument, expectedRevision: number) => request(`/api/projects/${document.id}`, z.object({ document: projectSchema }), 'PUT', { document, expectedRevision }).then((result) => result.document),
   audio: (options?: RequestOptions) => request('/api/audio', z.object({ assets: z.array(audioAssetSchema) }), 'GET', undefined, options),
+  audioRoots: (options?: RequestOptions) => request('/api/audio/roots', z.object({ roots: z.array(footageRootSchema).max(32) }).strict(), 'GET', undefined, options),
+  browseAudio: (rootId: string, directory?: string, options?: RequestOptions) => {
+    const query = new URLSearchParams({ rootId });
+    if (directory !== undefined) query.set('directory', directory);
+    return request(`/api/audio/browse?${query}`, audioDirectorySchema, 'GET', undefined, options);
+  },
+  importSelectedAudio: (path: string, options?: RequestOptions) => request('/api/audio/register-selected', z.object({ asset: audioAssetSchema, job: jobSchema }).strict(), 'POST', { path }, { ...options, timeoutMs: options?.timeoutMs ?? IMPORT_TIMEOUT_MS }),
   importAudio: (path: string) => request('/api/audio/register', z.object({ asset: audioAssetSchema, job: jobSchema }), 'POST', { path }, { timeoutMs: IMPORT_TIMEOUT_MS }),
   prepareAudio: (id: string) => request(`/api/audio/${id}/prepare`, z.object({ job: jobSchema }), 'POST', {}),
   exportPreflight: (document: ProjectDocument, profile: ExportProfile, options?: RequestOptions) => request('/api/exports/preflight', z.object({ space: exportPreflightSchema }).strict(), 'POST', { document, profile }, { ...options, readOnly: true }),

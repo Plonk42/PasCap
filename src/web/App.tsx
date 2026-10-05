@@ -107,6 +107,7 @@ export function App() {
   const [activityError, setActivityError] = useState('');
   const [importRequest, setImportRequest] = useState(0);
   const [importOpen, setImportOpen] = useState(false);
+  const [musicImportOpen, setMusicImportOpen] = useState(false);
   const [fitRequest, setFitRequest] = useState(0);
   const [revealRequest, setRevealRequest] = useState(0);
   const [cutRange, setCutRange] = useState<ClipCutRange | null>(null);
@@ -681,16 +682,30 @@ export function App() {
   };
   const importFolder = (directory: string): Promise<ImportResult> => importOriginals(() => api.importFolder(directory));
   const registerPaths = (paths: readonly string[]): Promise<ImportResult> => importOriginals(() => api.registerPaths(paths));
-  const importAudio = async (path: string): Promise<void> => {
-    if (!current.current) { setActionError('Create or open a project before importing music.'); return; }
-    const result = await act(() => api.importAudio(path));
-    if (!result.ok || !current.current) return;
-    const asset = result.value.asset;
-    latestAudio.current = [...latestAudio.current.filter((item) => item.id !== asset.id), asset]; setAudioAssets(latestAudio.current);
-    commit({ ...current.current, media: { ...current.current.media, audioIds: [...new Set([...current.current.media.audioIds, asset.id])] } });
-    receiveJob(result.value.job); refreshAfterAcceptance();
+  const importMusic = async (operation: () => ReturnType<typeof api.importAudio>): Promise<boolean> => {
+    const importingProjectId = current.current?.id;
+    if (!importingProjectId) { setActionError('Create or open a project before importing music.'); return false; }
+    const result = await act(async () => {
+      const accepted = await operation();
+      if (!mounted.current) return false;
+      const asset = accepted.asset;
+      latestAudio.current = [...latestAudio.current.filter((item) => item.id !== asset.id), asset]; setAudioAssets(latestAudio.current);
+      receiveJob(accepted.job); refreshAfterAcceptance();
+      const importingProject = current.current;
+      if (importingProject?.id !== importingProjectId) throw new Error('Music registration was accepted, but the importing project is no longer open. No other project was changed. Check Activity and reopen the importing project before adding this music; do not repeat registration.');
+      try {
+        commit({ ...importingProject, media: { ...importingProject.media, audioIds: [...new Set([...importingProject.media.audioIds, asset.id])] } });
+      } catch (cause) {
+        throw new Error(`Music registration was accepted, but its project-bin update failed: ${message(cause, 'Cannot update the music bin.')} Check Activity and the project’s music bin before repeating the import.`);
+      }
+      return true;
+    });
+    return result.ok && result.value;
   };
+  const importAudio = (path: string): Promise<boolean> => importMusic(() => api.importAudio(path));
+  const importSelectedAudio = (path: string): Promise<boolean> => importMusic(() => api.importSelectedAudio(path));
   const importVisibility = useCallback((open: boolean): void => { setImportOpen(open); if (open) setActionError(''); }, []);
+  const musicImportVisibility = useCallback((open: boolean): void => { setMusicImportOpen(open); if (open) setActionError(''); }, []);
   const openMedia = (): void => {
     workspace.update({ mediaOpen: true, ...(workspace.viewport.width < 980 ? { inspectorOpen: false } : {}) });
     requestAnimationFrame(() => document.querySelector<HTMLInputElement>('[aria-label="Search media"]')?.focus({ preventScroll: true }));
@@ -749,7 +764,7 @@ export function App() {
     '--media-divider': workspace.layout.mediaOpen ? '8px' : '0px',
     '--inspector-divider': workspace.layout.inspectorOpen ? '8px' : '0px',
   } as CSSProperties;
-  const modalErrorVisible = showProjects || showExport || showRecovery || importOpen;
+  const modalErrorVisible = showProjects || showExport || showRecovery || importOpen || musicImportOpen;
 
   return <KeyframeNavigationContext.Provider value={keyframeNavigation}><div className="app-shell product-workspace">
     <nav className="skip-navigation" aria-label="Skip to editor panel"><a href="#media-pane" onClick={() => workspace.update({ mediaOpen: true, ...(workspace.viewport.width < 980 ? { inspectorOpen: false } : {}) })}>Media</a><a href="#viewer-pane">Preview</a><a href="#inspector-pane" onClick={() => workspace.update({ inspectorOpen: true, ...(workspace.viewport.width < 980 ? { mediaOpen: false } : {}) })}>Clip inspector</a><a href="#timeline-pane">Timeline</a></nav>
@@ -780,7 +795,7 @@ export function App() {
         }} />}</DeferredPanel>}
       </div>
       {workspace.layout.inspectorOpen && <WorkspaceResizer className="inspector-resizer" label="Resize Clip panel" disabled={draft !== null} orientation="vertical" direction={-1} value={workspace.sizes.inspector} min={270} max={Math.floor(Math.max(270, Math.min(440, workspace.viewport.width * 0.3)))} defaultValue={DEFAULT_LAYOUT.inspectorWidth} onChange={(inspectorWidth, persist) => workspace.update({ inspectorWidth }, persist)} />}
-      <div className="workspace-inspector" id="inspector-pane" hidden={!workspace.layout.inspectorOpen} tabIndex={-1}><DeferredPanel label="Inspector" load={loadInspector} onReload={reloadEditor} onDownload={downloadDraft} canDownload={project !== null} busy={recoveryBusy} fallback={<output className="panel inspector-loading"><span className="spinner" />Opening Inspector…</output>}>{(Inspector) => <Inspector project={visible} assets={assets} selectedClipId={selectedId} selectedLayerId={selectedLayerId} boundaryId={boundaryId} frame={diagnostics?.frame ?? 0} drafting={draft !== null || !project} section={inspectorMode} onSection={setInspectorMode} onEdit={edit} onPreview={previewDraft} onSeek={seek} onPause={() => engine.current?.pause()}><MusicControls key={project?.id ?? 'empty'} project={visible} assets={projectAudio} busy={busy || !project} drafting={draft !== null || !project} onEdit={edit} onImport={importAudio} onPrepare={async (id) => { const result = await act(() => api.prepareAudio(id)); if (result.ok) { receiveJob(result.value.job); refreshAfterAcceptance(); } }} /></Inspector>}</DeferredPanel></div>
+      <div className="workspace-inspector" id="inspector-pane" hidden={!workspace.layout.inspectorOpen} tabIndex={-1}><DeferredPanel label="Inspector" load={loadInspector} onReload={reloadEditor} onDownload={downloadDraft} canDownload={project !== null} busy={recoveryBusy} fallback={<output className="panel inspector-loading"><span className="spinner" />Opening Inspector…</output>}>{(Inspector) => <Inspector project={visible} assets={assets} selectedClipId={selectedId} selectedLayerId={selectedLayerId} boundaryId={boundaryId} frame={diagnostics?.frame ?? 0} drafting={draft !== null || !project} section={inspectorMode} onSection={setInspectorMode} onEdit={edit} onPreview={previewDraft} onSeek={seek} onPause={() => engine.current?.pause()}><MusicControls key={project?.id ?? 'empty'} project={visible} assets={projectAudio} busy={busy || !project || connection.state !== 'ready'} drafting={draft !== null || !project} error={actionError} onBrowseVisibility={musicImportVisibility} onEdit={edit} onImport={importAudio} onBrowseImport={importSelectedAudio} onPrepare={async (id) => { const result = await act(() => api.prepareAudio(id)); if (result.ok) { receiveJob(result.value.job); refreshAfterAcceptance(); } }} /></Inspector>}</DeferredPanel></div>
       <WorkspaceResizer className="timeline-resizer" label="Resize Timeline panel" disabled={draft !== null} orientation="horizontal" direction={-1} value={workspace.sizes.timeline} min={200} max={Math.max(200, Math.min(520, workspace.viewport.height - 360))} defaultValue={DEFAULT_LAYOUT.timelineHeight} onChange={(timelineHeight, persist) => workspace.update({ timelineHeight }, persist)} />
       <Timeline key={project?.id ?? 'empty'} project={project ?? EMPTY_PROJECT} assets={assets} audioAssets={audioAssets} selectedClipId={selectedId} selectedLayerId={selectedLayerId} onSelectLayer={selectLayer} selectedBoundaryId={boundaryId} frame={diagnostics?.frame ?? 0} onSelect={select} onBoundary={(id) => { select(id); setBoundaryId(id); setInspectorMode('sequence'); workspace.update({ inspectorOpen: true, ...(workspace.viewport.width < 980 ? { mediaOpen: false } : {}) }); }} onSeek={seek} onPause={() => engine.current?.pause()} onEdit={edit} onInsert={insert} onPreview={previewDraft} onError={setError} onSplit={split} onDelete={remove} onDuplicate={duplicate} onNudge={nudge} onQuickTrim={quickTrim} cutRange={cutRange} onMarkCut={markCut} onCutMarked={cutMarked} onClearCut={() => setCutRange(null)} revealRequest={revealRequest} fitRequest={fitRequest} draggedMediaIds={draggedMediaIds} ranges={ranges} />
     </main>
