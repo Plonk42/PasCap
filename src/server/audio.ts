@@ -24,6 +24,7 @@ const probeSchema = z.looseObject({
   streams: z.array(z.looseObject({
     codec_type: z.string(), codec_name: z.string().optional(), sample_rate: z.string().optional(),
     channels: z.number().optional(), duration: z.string().optional(), duration_ts: z.number().optional(), time_base: z.string().optional(),
+    disposition: z.looseObject({ attached_pic: z.union([z.literal(0), z.literal(1)]) }).optional(),
   })),
   format: z.looseObject({ duration: z.string().optional() }).optional(),
 });
@@ -35,12 +36,12 @@ function assertNotCancelled(signal: AbortSignal): void {
 /** Probe only headers, never packet dumps or a source-video soundtrack. */
 export async function probeAudio(config: ServiceConfig, filename: string, signal?: AbortSignal): Promise<AudioAsset['metadata']> {
   const output = await runProcess(config.ffprobe, [
-    '-v', 'error', '-show_entries', 'stream=codec_type,codec_name,sample_rate,channels,duration,duration_ts,time_base:format=duration', '-of', 'json', filename,
+    '-v', 'error', '-show_entries', 'stream=codec_type,codec_name,sample_rate,channels,duration,duration_ts,time_base:stream_disposition=attached_pic:format=duration', '-of', 'json', filename,
   ], { maxBytes: 1_048_576, ...(signal ? { signal } : {}) });
   const probe = probeSchema.parse(JSON.parse(output.toString('utf8')));
   const streams = probe.streams.filter((stream) => stream.codec_type === 'audio');
-  if (streams.length !== 1 || probe.streams.some((stream) => stream.codec_type === 'video')) {
-    throw new ServiceError('Register a standalone music file with exactly one audio stream and no video. Source-video soundtracks are not used.', 422);
+  if (streams.length !== 1 || probe.streams.some((stream) => stream.codec_type === 'video' && stream.disposition?.attached_pic !== 1)) {
+    throw new ServiceError('Register a standalone music file with exactly one audio stream and no video footage. Embedded cover artwork is allowed; source-video soundtracks are not used.', 422);
   }
   const stream = streams[0]!;
   const timeBase = stream.time_base ? parseRate(stream.time_base) : null;

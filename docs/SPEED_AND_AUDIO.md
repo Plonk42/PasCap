@@ -216,6 +216,11 @@ separate; an explicit override notice appears when row Speed suppresses clip spe
 
 ## Music
 
+Standalone music import requires exactly one audio stream and no video footage.
+Embedded cover artwork explicitly marked as an attached picture is accepted and
+ignored during audio-only playback preparation; video soundtracks remain rejected.
+Original files are referenced in place and are never stripped or rewritten.
+
 One registered audio file, with explicit source IN/OUT, timeline start/duration,
 gain dB, fade durations and loop flag. A non-looping duration cannot exceed the
 selected source range; a looping track repeats **only that selected range**.
