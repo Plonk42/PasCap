@@ -34,6 +34,7 @@ interface PlaybackEvidence {
 
 interface VideoCallbackGate {
   targetFrame: number | null;
+  atOrAfter: boolean;
   heldFrame: number | null;
   heldCallbacks: number;
   releasedCallbacks: number;
@@ -85,7 +86,7 @@ async function openRecoveryProject(page: Page, request: APIRequestContext, withM
     };
     window.playbackRecoveryEvidence = evidence;
     for (const method of ['play', 'pause'] as const) {
-      const original = HTMLMediaElement.prototype[method];
+      const original: (this: HTMLMediaElement) => Promise<void> | void = HTMLMediaElement.prototype[method];
       Object.defineProperty(HTMLMediaElement.prototype, method, {
         value: function (this: HTMLMediaElement) {
           if (this.dataset['pascapMusic']) {
@@ -100,9 +101,9 @@ async function openRecoveryProject(page: Page, request: APIRequestContext, withM
     }
 
     // Pass through real Chrome metadata unchanged. Only an explicitly armed,
-    // exact source-frame callback is held; no fake media clock or decoded frame.
+    // matching source-frame callback is held; no fake media clock or decoded frame.
     const gate: VideoCallbackGate = {
-      targetFrame: null, heldFrame: null, heldCallbacks: 0, releasedCallbacks: 0,
+      targetFrame: null, atOrAfter: false, heldFrame: null, heldCallbacks: 0, releasedCallbacks: 0,
       release: null, pendingSeek: null,
     };
     window.playbackRecoveryGate = gate;
@@ -110,7 +111,9 @@ async function openRecoveryProject(page: Page, request: APIRequestContext, withM
     HTMLVideoElement.prototype.requestVideoFrameCallback = function (callback) {
       return requestFrame.call(this, (now, metadata) => {
         const frame = Math.round(metadata.mediaTime * 30_000 / 1_001);
-        if (this.dataset['pascapDecoder'] !== undefined && gate.targetFrame === frame && gate.heldCallbacks === 0) {
+        const target = gate.targetFrame;
+        const matches = target !== null && (gate.atOrAfter ? frame >= target : frame === target);
+        if (this.dataset['pascapDecoder'] !== undefined && matches && gate.heldCallbacks === 0) {
           gate.heldFrame = frame; gate.heldCallbacks++;
           gate.release = () => {
             gate.targetFrame = null; gate.release = null; gate.releasedCallbacks++;
@@ -284,15 +287,22 @@ test('a withheld decoded callback buffers beyond one-frame eligibility, reports 
   test.setTimeout(45_000);
   const fixture = await openRecoveryProject(page, request, false);
   try {
-    await page.evaluate(() => { window.playbackRecoveryGate.targetFrame = 30; });
+    await page.evaluate(() => {
+      // Playing decoders may legitimately skip frame callbacks under load.
+      // Hold the first genuine callback after source zero, whatever its frame;
+      // unlike an exact requested seek, no particular playback callback is promised.
+      window.playbackRecoveryGate.targetFrame = 1;
+      window.playbackRecoveryGate.atOrAfter = true;
+    });
     await startPlayback(page);
     await page.waitForFunction(() => {
       const gate = window.playbackRecoveryGate;
       const state = window.pascapLab!.engine.diagnostics();
-      return gate.heldCallbacks === 1 && state.status === 'buffering' && state.requestedFrame > 30;
+      return gate.heldCallbacks === 1 && state.status === 'buffering' && state.requestedFrame > 1;
     });
     const blocked = await page.evaluate(() => ({ state: window.pascapLab!.engine.diagnostics(), evidence: window.playbackRecoveryEvidence }));
     expect(blocked.evidence.bufferingFrames.length).toBeGreaterThan(0);
+    expect(await page.evaluate(() => window.playbackRecoveryGate.heldFrame)).toBeGreaterThanOrEqual(1);
     expect(blocked.evidence.avoidableBuffering, JSON.stringify(blocked.evidence.bufferingFrames)).toBe(0);
     expect(blocked.state.requestedFrame - blocked.state.frame).toBeGreaterThan(1);
     // Keep withholding the genuine callback: no observed frame can satisfy the
