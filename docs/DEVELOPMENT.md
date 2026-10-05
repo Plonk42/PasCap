@@ -201,7 +201,9 @@ only fully addressed issues linked in the PR description. No session CI watch or
 custom closure Action/hook/bot is needed; CI stays read-only. Failed/stale/conflicting
 PRs remain open for investigation, without retries or weakened tests. Next-session
 reconciliation handles failures, obsolete issue labels and Project Done; that
-housekeeping is not guaranteed unattended. See the [PR delivery contract](GITHUB_WORKFLOW.md#protected-pr-delivery).
+housekeeping verifies the enabled native **Item closed → Status Done** workflow's
+result. Progress-label cleanup remains explicit; no board move closes an issue,
+and unattended failure repair is not guaranteed. See the [PR delivery contract](GITHUB_WORKFLOW.md#protected-pr-delivery).
 Trivial formatting-only housekeeping still uses a PR, but needs no invented issue
 or Project entry. Changing an armed PR requires disabling auto-merge/removing closing
 links and repeating affected validation/acceptance before rearming.

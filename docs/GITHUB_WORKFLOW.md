@@ -249,14 +249,16 @@ and open `status:local-complete` issues, paginating the bounded candidate query:
    Do not retroactively accept failed/pending work because the workflow changed.
    Their next correction goes through a protected PR, without enrolling new watchers.
 
-Project item writes are accessible by CLI, but the public API exposes workflow
-read/delete, not create/update; the shared browser is signed out of the private
-Project. **Closed-issue → Done is not enabled**, so explicit reconciliation remains
-required. An authorized owner can enable only that native workflow in Project
-Workflows; verify its direction and read back the result. This does not block
-native PR merge/issue closure. Report access/synchronization failures, never request
-secrets or broaden CI permissions. Do not promise automatic label/Project cleanup
-or failure repair after the session closes.
+The native **Item closed** workflow is enabled; the owner configured its action as
+**Status → Done**. No inverse Auto-close issue workflow is enabled. The public API
+confirms the workflow's name/enabled state but does not expose its action settings;
+verify the actual Project Status after the next legitimate issue closure, without
+closing unrelated work merely to test automation. Native merge/issue closure and
+the configured Status update do not depend on a live chat. Obsolete progress labels
+still need explicit reconciliation. If Status is not Done, use the accessible CLI
+item update and record the discrepancy. Workflow configuration changes require the
+authorized Project UI; report access/synchronization failures rather than requesting
+secrets or broadening CI permissions. Unattended failure repair is not promised.
 
 ## Scheduling contract for agents
 
@@ -376,12 +378,14 @@ explicitly accepted/closed issues. **There is no automatic two-way synchronizati
 when updating an issue, set its corresponding Project Status too. If a card is
 dragged, reconcile the issue label and next action before treating that move as a
 tracking update. A card move never approves implementation or issue closure.
-Closed-issue → Done may be enabled by an authorized owner as described above;
-until verified enabled, closure housekeeping explicitly sets Done.
+The enabled Item closed workflow is configured for closed-issue → Done as described
+above; closure housekeeping verifies the resulting Status and removes obsolete
+issue progress labels. Open-status synchronization remains explicit.
 
-All six newly created default Project workflows, including **Auto-close issue**,
-were removed **before any issue was added**. No automatic closure, admission,
-relabeling or Status transition is enabled. New triaged issues must be added
+At the historical setup checkpoint, all six default Project workflows, including
+**Auto-close issue**, were removed before any issue was added. The current Item
+closed workflow updates Status only; automatic issue closure from a board move,
+admission and relabeling remain disabled. New triaged issues must be added
 explicitly, keeping their existing IDs and native relationships. No second Priority,
 next-action field or dated Iteration field was added at that checkpoint. The existing
 Current iteration view is label-filtered legacy selection, not a native sprint.
