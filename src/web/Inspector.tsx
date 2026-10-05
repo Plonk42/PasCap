@@ -11,7 +11,7 @@ import { formatTimecode } from '../shared/timing.js';
 import { shortName, sourceSeconds } from './display.js';
 import { HelpPopover } from './HelpPopover.js';
 import { Icon } from './icons.js';
-import { InspectorSection, type InspectorMode } from './InspectorSection.js';
+import { InspectorExpansionContext, InspectorExpansionControls, InspectorSection, useInspectorExpansion, type InspectorMode } from './InspectorSection.js';
 import { KeyframeControls } from './KeyframeControls.js';
 import { KeyframeToggle } from './KeyframeToggle.js';
 import { clipStartRestriction } from './layer-actions.js';
@@ -226,6 +226,7 @@ function SequenceControls({ project, layer, assets, boundaryId, layout, drafting
 export function Inspector({ project, assets, selectedClipId, selectedLayerId, boundaryId, frame, drafting, section, onSection, onEdit, onPreview, onSeek, onPause, children }: Readonly<Props>) {
   const inspectorId = useId();
   const colourControlId = useId();
+  const expansion = useInspectorExpansion();
   const layer = project.layers.find((item) => item.id === selectedLayerId);
   const clip = project.clips.find((item) => item.id === selectedClipId && item.layerId === selectedLayerId);
   const asset = assets.find((item) => item.id === clip?.mediaId);
@@ -240,14 +241,15 @@ export function Inspector({ project, assets, selectedClipId, selectedLayerId, bo
   const startHint = placementHint(layer, startRestriction);
   const clipTimingError = (changes: Partial<Pick<VideoClip, 'sourceIn' | 'sourceOut'>>): string | null => clipRangeError(project, clip, changes);
 
-  return <aside className="inspector-panel panel declutter-inspector" aria-label="Clip inspector">
+  return <InspectorExpansionContext value={expansion}><aside className="inspector-panel panel declutter-inspector" aria-label="Clip inspector">
     <InspectorTabs id={inspectorId} section={section} onSection={onSection} />
+    <InspectorExpansionControls expansion={expansion} />
     <div role="tabpanel" id={`${inspectorId}-clip-panel`} aria-labelledby={`${inspectorId}-clip-tab`} hidden={section !== 'clip'}>
       {layer ? <>
         {clip && asset && placed ? <div className="selected-clip-name inspector-selection"><Icon name="video" size={17} /><strong title={asset.name}>{shortName(asset.name)}</strong><span>Excerpt {position + 1} · {sourceSeconds(placed.duration)} · {layer.name}</span></div>
           : <div className="selected-clip-name inspector-selection"><Icon name="layers" size={17} /><strong title={layer.name}>{layer.name}</strong><span title="Select a clip for its source range and static bases.">Whole video row</span></div>}
         <KeyframeControls projectId={project.id} layer={layer} frame={frame} duration={layout.duration} disabled={drafting} onEdit={onEdit} />
-        {clip && asset && placed && <InspectorSection id="source" title="Source range" icon="start" badge={sourceSeconds(clip.sourceOut - clip.sourceIn)} modified={clip.sourceIn !== 0 || clip.sourceOut !== asset.metadata.frameCount} defaultOpen={false} help={<HelpPopover label="Source timing"><p id={`${colourControlId}-source-help`}>Original recording frames; OUT is exclusive. Layer keyframes stay in project timeline time when this source range changes.</p></HelpPopover>}>
+        {clip && asset && placed && <InspectorSection id="source" title="Source range" icon="start" badge={sourceSeconds(clip.sourceOut - clip.sourceIn)} modified={clip.sourceIn !== 0 || clip.sourceOut !== asset.metadata.frameCount} help={<HelpPopover label="Source timing"><p id={`${colourControlId}-source-help`}>Original recording frames; OUT is exclusive. Layer keyframes stay in project timeline time when this source range changes.</p></HelpPopover>}>
           <section className="source-range" aria-label="Source range">
             <div className="section-label"><span>{sourceSeconds(asset.metadata.frameCount)} original</span><span>{sourceFrame === null ? 'Playhead outside clip' : `Source frame ${sourceFrame}`}</span></div>
             <div className="range-fields"><label htmlFor={`${colourControlId}-in`}>IN <output>{formatTimecode(clip.sourceIn)}</output><NumberField id={`${colourControlId}-in`} aria-label="Source IN frame" aria-describedby={`${colourControlId}-source-help`} min={0} max={clip.sourceOut - 1} integer step={1} value={clip.sourceIn} disabled={drafting} resetKey={inputContext} validate={(sourceIn) => clipTimingError({ sourceIn })} onCommit={(sourceIn) => onEdit({ type: 'trim', clipId: clip.id, sourceIn, sourceOut: clip.sourceOut })} /></label><label htmlFor={`${colourControlId}-out`}>OUT <output>{formatTimecode(clip.sourceOut)}</output><NumberField id={`${colourControlId}-out`} aria-label="Source OUT frame" aria-describedby={`${colourControlId}-source-help`} min={clip.sourceIn + 1} max={Math.min(asset.metadata.frameCount, 2_147_483_647)} integer step={1} value={clip.sourceOut} disabled={drafting} resetKey={inputContext} validate={(sourceOut) => clipTimingError({ sourceOut })} onCommit={(sourceOut) => onEdit({ type: 'trim', clipId: clip.id, sourceIn: clip.sourceIn, sourceOut })} /></label></div>
@@ -255,7 +257,7 @@ export function Inspector({ project, assets, selectedClipId, selectedLayerId, bo
             <button className="text-button restore-range" disabled={drafting || (clip.sourceIn === 0 && clip.sourceOut === asset.metadata.frameCount)} onClick={() => onEdit({ type: 'trim', clipId: clip.id, sourceIn: 0, sourceOut: asset.metadata.frameCount })}><Icon name="reset" size={13} />Restore full recording</button>
           </section>
         </InspectorSection>}
-        <InspectorSection id="layer-opacity" title="Layer & opacity" icon="layers" defaultOpen={false} help={<HelpPopover label="Opacity scope"><p>Layer opacity is applied after the row's clips are combined, including dissolves. Clip opacity keys are also row-wide: they replace each clip's base opacity, before the combined layer opacity is applied. Unkeyed channels keep their static bases.</p></HelpPopover>}>
+        <InspectorSection id="layer-opacity" title="Layer & opacity" icon="layers" help={<HelpPopover label="Opacity scope"><p>Layer opacity is applied after the row's clips are combined, including dissolves. Clip opacity keys are also row-wide: they replace each clip's base opacity, before the combined layer opacity is applied. Unkeyed channels keep their static bases.</p></HelpPopover>}>
           <section className="layer-inspector" aria-label="Layer appearance">
             {clip && placed && <>
               <label className="speed-field">Video layer<select aria-label="Clip video layer" disabled={drafting} value={clip.layerId} onChange={(event) => {
@@ -268,7 +270,7 @@ export function Inspector({ project, assets, selectedClipId, selectedLayerId, bo
             <OpacityControl layer={layer} clip={clip ?? null} frame={frame} disabled={drafting} onEdit={onEdit} setting="clipOpacity" id={`${colourControlId}-clip-opacity`} />
           </section>
         </InspectorSection>
-        <InspectorSection id="speed" title="Speed" icon="speed" badge={`${speedRate.toFixed(2)}×`} modified={speedRate !== 1 || hasLayerKeys(layer, 'speed') || (clip !== undefined && clip.speed.mode !== 'constant')} defaultOpen={false} help={<SpeedHelp clip={clip ?? null} keyed={hasLayerKeys(layer, 'speed')} helpId={`${colourControlId}-speed-help`} />}><SpeedControls project={project} resetKey={project.id} helpId={`${colourControlId}-speed-help`} clip={clip ?? null} layer={layer} frame={frame} projectDuration={layout.duration} placedDuration={placed?.duration ?? null} disabled={drafting} sourceFrame={sourceFrame} sourceFrameCount={asset?.metadata.frameCount ?? null} onEdit={onEdit} onPreview={onPreview} onSeek={onSeek} onPause={onPause} /></InspectorSection>
+        <InspectorSection id="speed" title="Speed" icon="speed" badge={`${speedRate.toFixed(2)}×`} modified={speedRate !== 1 || hasLayerKeys(layer, 'speed') || (clip !== undefined && clip.speed.mode !== 'constant')} help={<SpeedHelp clip={clip ?? null} keyed={hasLayerKeys(layer, 'speed')} helpId={`${colourControlId}-speed-help`} />}><SpeedControls project={project} resetKey={project.id} helpId={`${colourControlId}-speed-help`} clip={clip ?? null} layer={layer} frame={frame} projectDuration={layout.duration} placedDuration={placed?.duration ?? null} disabled={drafting} sourceFrame={sourceFrame} sourceFrameCount={asset?.metadata.frameCount ?? null} onEdit={onEdit} onPreview={onPreview} onSeek={onSeek} onPause={onPause} /></InspectorSection>
         <ColourSection layer={layer} clip={clip ?? null} frame={frame} disabled={drafting} onEdit={onEdit} id={colourControlId} />
       </> : <div className="inspector-empty">Select a video layer or clip in the timeline.</div>}
     </div>
@@ -278,5 +280,5 @@ export function Inspector({ project, assets, selectedClipId, selectedLayerId, bo
     <div role="tabpanel" id={`${inspectorId}-audio-panel`} aria-labelledby={`${inspectorId}-audio-tab`} hidden={section !== 'audio'}>
       <InspectorSection id="music" title="Music" icon="music" modified={project.music !== null}>{children}</InspectorSection>
     </div>
-  </aside>;
+  </aside></InspectorExpansionContext>;
 }

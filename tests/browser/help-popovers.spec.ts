@@ -63,6 +63,71 @@ async function panelFor(page: Page, trigger: Locator): Promise<Locator> {
     return page.locator(`[id="${id}"]`);
 }
 
+test('bulk Inspector expansion covers hidden tabs, absent transitions, mixed state and preferences without document edits', async ({ page }) => {
+    const before = await current(page);
+    const headers = page.locator('.inspector-section > .disclosure-heading > h3 > .disclosure-trigger');
+    const collapse = page.getByRole('button', { name: 'Collapse all Inspector settings', exact: true });
+    await collapse.focus(); await collapse.press('Enter');
+    await expect(page.getByRole('button', { name: 'Expand all Inspector settings', exact: true })).toBeFocused();
+    expect(await headers.evaluateAll((nodes) => nodes.every((node) => node.getAttribute('aria-expanded') === 'false'))).toBe(true);
+    await inspectorTab(page, 'Sequence');
+    await expect(page.getByRole('button', { name: 'Sequence fades section', exact: true })).toHaveAttribute('aria-expanded', 'false');
+    await inspectorTab(page, 'Audio');
+    await expect(page.getByRole('button', { name: 'Music section', exact: true })).toHaveAttribute('aria-expanded', 'false');
+    await page.getByRole('button', { name: 'Music section', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Expand all Inspector settings', exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Expand all Inspector settings', exact: true }).press('Space');
+    await expect(collapse).toBeFocused();
+    expect(await headers.evaluateAll((nodes) => nodes.every((node) => node.getAttribute('aria-expanded') === 'true'))).toBe(true);
+    expect(await page.evaluate(() => ['source', 'layer-opacity', 'speed', 'colour', 'transition', 'fades', 'music'].map((id) => localStorage.getItem(`pascap-section-${id}`)))).toEqual(Array(7).fill('open'));
+    await inspectorTab(page, 'Clip');
+    await page.getByRole('button', { name: 'Source range section', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Expand all Inspector settings', exact: true })).toBeVisible();
+    await page.reload(); await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
+    await expect(page.getByRole('button', { name: 'Source range section', exact: true })).toHaveAttribute('aria-expanded', 'false');
+    await expect(page.getByRole('button', { name: 'Colour section', exact: true })).toHaveAttribute('aria-expanded', 'true');
+    expect(await current(page)).toEqual(before); expect(memory.saves).toBe(0);
+    await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
+});
+
+test('bulk collapse retains invalid drafts, nested disclosure state and reachable heading help at compact widths', async ({ page }) => {
+    const before = await current(page);
+    const input = page.getByRole('spinbutton', { name: 'Source IN frame', exact: true, includeHidden: true });
+    await input.fill('0.5'); await input.press('Enter');
+    const list = page.getByRole('button', { name: 'Edit layer keys', exact: true });
+    await list.click(); await expect(list).toHaveAttribute('aria-expanded', 'true');
+    await page.getByRole('button', { name: 'Collapse all Inspector settings', exact: true }).click();
+    await expect(input).toBeAttached(); await expect(input).toBeHidden();
+    await expect(list).toHaveAttribute('aria-expanded', 'true');
+    await page.getByRole('button', { name: 'Source timing help', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Source range section', exact: true })).toHaveAttribute('aria-expanded', 'false');
+    await page.keyboard.press('Escape');
+    await page.getByRole('button', { name: 'Expand all Inspector settings', exact: true }).click();
+    await expect(input).toHaveValue('0.5'); await expect(input).toHaveAttribute('aria-invalid', 'true');
+    for (const width of [1024, 720, 640]) {
+        await page.setViewportSize({ width, height: 720 });
+        const toggle = page.getByRole('button', { name: 'Toggle Clip panel', exact: true });
+        await expect(toggle).toHaveAttribute('aria-pressed', width === 720 ? 'false' : 'true');
+        if (width === 720) await toggle.click();
+        const bulk = page.getByRole('button', { name: 'Collapse all Inspector settings', exact: true });
+        await expect(bulk).toBeInViewport();
+        expect((await bulk.boundingBox())!.height).toBeGreaterThanOrEqual(24);
+        expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    }
+    expect(await current(page)).toEqual(before); expect(memory.saves).toBe(0);
+    await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
+});
+
+test('bulk Inspector choices still work when preference writes are denied', async ({ page }) => {
+    const before = await current(page);
+    await page.evaluate(() => { Storage.prototype.setItem = () => { throw new DOMException('Denied', 'SecurityError'); }; });
+    await page.getByRole('button', { name: 'Collapse all Inspector settings', exact: true }).click();
+    await expect(page.getByText('Section preferences cannot be saved in this browser.', { exact: false })).toBeVisible();
+    await page.getByRole('button', { name: 'Expand all Inspector settings', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Source range section', exact: true })).toHaveAttribute('aria-expanded', 'true');
+    expect(await current(page)).toEqual(before); expect(memory.saves).toBe(0);
+});
+
 test('hover help preserves focus, stays readable across the gap, and leaves without editing or saving', async ({ page }) => {
     const before = await current(page);
     const title = page.getByRole('textbox', { name: 'Project title', exact: true });
