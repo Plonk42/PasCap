@@ -26,6 +26,8 @@ and verification snapshots remain in Git history; they are not current acceptanc
    comments, dependencies and Project selection. Search before creating a new issue; reuse
    an existing scope rather than duplicating it. A task/feature needs a goal,
    non-goals, observable acceptance, an outcome milestone and a concrete next action.
+   Before any new task's edits or validation, complete the
+   [fresh-main startup gate](#start-every-new-task-from-current-main), including housekeeping.
 2. **Triage.** Apply the category, priority, area and progress labels below. Record
    decisions/consent needed and native blocked-by relationships for actual prerequisites.
    Add the same issue to the linked Project; do not duplicate it as a draft card.
@@ -152,6 +154,45 @@ repeated approval. **Never push directly to `main` or bypass protection**, inclu
 as administrator. Housekeeping also uses PRs but needs no invented issue. Logging
 an issue alone does not approve implementation, release or scope expansion.
 
+### Start every new task from current main
+
+Complete this gate **before editing or validating a new task**, not only before
+publication. It applies to housekeeping too; logging a proposal does not select
+implementation. A fresh chat is not proof of a fresh Git base.
+
+1. Inspect the current branch, staged/unstaged/untracked work, linked worktrees,
+   active jobs and relevant PRs. Preserve unfinished work and ongoing validation;
+   do not switch or update a worktree that another task or service is using.
+2. Verify the host/repository and intended `origin`, then fetch remote `main`.
+   Read back its actual remote SHA and confirm fetched `origin/main` matches it.
+   A failed fetch or cached tracking ref is not an up-to-date starting point. If
+   the remote moves during verification, refresh before creating the task branch.
+3. If the worktree is clean and idle, switch to local `main` and fast-forward only
+   from `origin/main`. Require local `main` to equal the verified remote SHA with
+   no ahead/behind commits before creating a **new** short-lived task branch.
+   Never merge a previous PR's head into local `main`, including after squash merge.
+4. If the worktree is dirty, busy or on another active task, leave it intact and
+   create a clean isolated worktree with a **new** task branch directly from the
+   freshly fetched `origin/main`. This also avoids moving `main` checked out in
+   another worktree. Local-only/ahead/diverged `main` is not a valid base: preserve
+   it and use the verified remote base in isolation, or report a blocker.
+5. Verify the new task branch's initial `HEAD` equals that remote SHA and the task
+   worktree is clean. Record the starting `main` SHA in the PR and, when tracked,
+   its existing work issue. Stop before edits/validation if freshness, access or
+   safe isolation cannot be established; never stash/reset/discard unrelated work
+   to pass the gate.
+
+Do not reuse an old task branch, stale local `main` or an unmerged PR as a new
+task's foundation. If a needed dependency is not yet on `main`, keep the new task
+blocked rather than silently stacking it on unmerged work. After a squash merge,
+the next task starts from the new remote `main`, not the old branch's commit history.
+Freshness is checked at task startup; strict up-to-date PR CI remains the merge gate.
+
+Continuing the **same approved task** may retain its existing branch. Before
+resuming paused work, fetch and inspect current `main`/PR state; when a base update
+is needed, follow the disarm/update/revalidation rules below. Do not restart a
+branch for each correction or logical step, or mix a new deliverable into it.
+
 ### Repository merge requirements
 
 `main` requires PRs and these GitHub Actions checks, with branches **up to date**:
@@ -179,9 +220,10 @@ reviewer, broaden credentials or bypass checks to get a PR merged.
 ### Publish and accept a candidate
 
 1. Confirm `github.com/Plonk42/PasCap`, fetch actual remote `main`, create a
-   short-lived branch and review **all** outgoing commits. Use an isolated worktree
-   when another deliverable is active; preserve unrelated user edits and ongoing
-   validation. Never stash/discard/include unrelated work to obtain a clean tree.
+   short-lived branch through the startup gate above and review **all** outgoing
+   commits. Record the verified starting `main` SHA; continuing an existing task
+   retains its branch, with base updates handled below. Preserve unrelated edits
+   and ongoing validation; never stash/discard/include them to obtain a clean tree.
 2. Format changed files and organize imports where applicable, save and finish save
    actions **before final validation, review and staging**. Late formatting changes
    invalidate affected checks/staging; review/recheck/restage. Commit each coherent

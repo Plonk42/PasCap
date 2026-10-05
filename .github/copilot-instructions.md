@@ -2,6 +2,15 @@
 
 ## Workflow
 
+- Before starting any new task, fetch verified remote `main` and create a new
+  short-lived branch from its exact current SHA, **before edits or validation**.
+  A clean local `main` may be fast-forwarded only and must equal `origin/main`;
+  otherwise use a clean isolated worktree directly from freshly fetched `origin/main`.
+  Inspect existing edits/branches/jobs first; never stash, reset, discard or include
+  unrelated work. Never start from stale local `main`, a previous task branch or an
+  unmerged PR. Record the starting SHA; if freshness/access/isolation cannot be
+  verified, stop and record the blocker. Continuing the same task uses its existing
+  branch with the PR update/revalidation rules, not a new branch for every correction.
 - Commit after each completed logical step, including its tests and relevant
   documentation. A logical step is a coherent tested behaviour, not each small
   correction; do not leave an entire feature uncommitted until the end.

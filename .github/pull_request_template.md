@@ -29,6 +29,7 @@ RC1; do not infer a post-RC promise or release approval. -->
 
 ## Verification
 
+- Starting main SHA: <!-- freshly fetched/remote-verified SHA before the task's first edits or validation; initial task HEAD matched it, worktree clean, new branch or isolated worktree; never a stale/previous/unmerged PR branch -->
 - Local commits/checks: <!-- exact commands, results and synthetic fixture scope; distinguish focused feedback from applicable comprehensive delivery gates; docs-only changes need docs checks -->
 - Non-CI acceptance: <!-- reviewed PR head SHA, live issue criteria/dependencies, implementation/contracts and evidence; name any remaining gate and omit closing links for partial delivery -->
 - Required PR CI: <!-- actual PR head/test-merge run and Node 22/24, native/browser, Delivery gate states; pending/failed/skipped is not passed -->
@@ -41,6 +42,7 @@ RC1; do not infer a post-RC promise or release approval. -->
 <!-- Blockers, limitations, acceptance still pending and linked follow-up issues. -->
 
 - [ ] Relevant contracts/evidence and, when tracked, issue/Project Status are updated; no duplicate sprint checklist or housekeeping issue is created.
+- [ ] The new task started from verified current remote main before edits/validation, on a new clean branch/worktree; its starting SHA is recorded and unrelated work preserved. Same-task continuation follows the disarm/update/revalidation rules.
 - [ ] Approved, reviewed and validated commits are published to this branch/PR, or a concrete blocker is recorded; no direct main push, force-push or protection bypass.
 - [ ] Non-CI acceptance is verified for the exact head before auto-merge is armed. GitHub's actual closing-issue references are read back and contain only fully completed issues, never partial work or deferred hardware/owner gates; negated closing phrases are not safe exclusions.
 - [ ] Required up-to-date PR CI is left to native auto-merge, without session watchers or custom closure automation. Next-session reconciliation removes obsolete progress labels and verifies issue/Project Done; failed CI remains actionable, not accepted.

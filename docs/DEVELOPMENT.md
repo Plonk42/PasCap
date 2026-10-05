@@ -269,6 +269,13 @@ and [grading equations](COLOUR_AND_TIMING.md#colour).
 
 ## Contributor safety
 
+- **Start each new task from current remote `main`, before edits or validation.**
+  Fetch and verify its SHA, fast-forward a clean/idle local `main` only, then create
+  a new short-lived branch. With dirty or active work, preserve it and use a clean
+  isolated worktree directly from freshly fetched `origin/main`. Never reuse a
+  previous task/unmerged PR branch or reset/stash unrelated work. Record the starting
+  SHA; stop if freshness or safe isolation cannot be verified. Same-task continuation
+  follows the [startup and PR-update rules](GITHUB_WORKFLOW.md#start-every-new-task-from-current-main).
 - **Format before committing, not afterward.** Use each changed file's configured
   formatter and applicable import organization, save and let editor save actions
   finish, then perform final checks, review and deliberate staging. Format-on-save
