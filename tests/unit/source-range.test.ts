@@ -3,7 +3,6 @@ import { applyCommand, EditHistory } from '../../src/shared/commands.js';
 import { createClip, createProject } from '../../src/shared/model.js';
 import { trimByFrames, validateSourceRanges } from '../../src/shared/source-range.js';
 import { calculateLayout } from '../../src/shared/timeline.js';
-import { assignDecoders } from '../../src/preview/assignment.js';
 
 describe('non-destructive excerpts', () => {
   it('restores both trimmed ends of a full 20-second recording', () => {
@@ -48,19 +47,5 @@ describe('non-destructive excerpts', () => {
     expect(history.undo().clips).toHaveLength(0);
     expect(history.redo().clips).toHaveLength(2);
     expect(history.canRedo).toBe(false);
-  });
-});
-
-describe('two-decoder assignment for long timelines', () => {
-  it('keeps the active decoder when entering and leaving a dissolve', () => {
-    expect(assignDecoders(['first', 'next'], ['first', 'next'])).toEqual(['first', 'next']);
-    expect(assignDecoders(['first', 'next'], ['next'])).toEqual(['first', 'next']);
-    expect(assignDecoders(['first', 'next'], ['next', 'third'])).toEqual(['third', 'next']);
-  });
-  it('seeks directly to distant excerpts without allocating more decoders', () => {
-    expect(assignDecoders(['first', 'second'], ['tenth'])).toEqual(['tenth', 'second']);
-    expect(assignDecoders(['first', 'second'], ['fifteenth', 'sixteenth'])).toEqual(['fifteenth', 'sixteenth']);
-    expect(() => assignDecoders([null, null], ['a', 'b', 'c'])).toThrow();
-    expect(() => assignDecoders([null, null], ['a', 'a'])).toThrow();
   });
 });

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { allocateDecoders, assignDecoders, decoderPoolSize, MAX_DECODER_SLOTS } from '../../src/preview/assignment.js';
+import { allocateDecoders, decoderPoolSize, MAX_DECODER_SLOTS } from '../../src/preview/assignment.js';
 import type { CompositeGroup } from '../../src/preview/compositor.js';
 import { PreviewEngine } from '../../src/preview/engine.js';
 import { gradePixel, NEUTRAL_COLOUR, type RGB } from '../../src/shared/colour.js';
@@ -201,9 +201,15 @@ afterEach(() => {
 });
 
 describe('bounded layer decoder assignment', () => {
-  it('retains the exact two-slot legacy helper and its over-capacity rejection', () => {
-    expect(assignDecoders(['a', 'b'], ['b', 'c'])).toEqual(['c', 'b']);
-    expect(() => assignDecoders([null, null], ['a', 'b', 'c'])).toThrow();
+  it('keeps active slots when entering and leaving a single-track dissolve', () => {
+    expect(allocateDecoders(['first', 'next'], ['first', 'next'])).toEqual(['first', 'next']);
+    expect(allocateDecoders(['first', 'next'], ['next'])).toEqual(['first', 'next']);
+    expect(allocateDecoders(['first', 'next'], ['next', 'third'])).toEqual(['third', 'next']);
+  });
+  it('seeks directly to distant excerpts within the same two-slot pool', () => {
+    expect(allocateDecoders(['first', 'second'], ['tenth'])).toEqual(['tenth', 'second']);
+    expect(allocateDecoders(['first', 'second'], ['fifteenth', 'sixteenth'])).toEqual(['fifteenth', 'sixteenth']);
+    expect(() => allocateDecoders([null, null], ['a', 'b', 'c'])).toThrow(/bounded/);
   });
   it('allocates exactly two reusable slots per track up to sixteen', () => {
     expect(decoderPoolSize(0)).toBe(0); expect(decoderPoolSize(1)).toBe(2);

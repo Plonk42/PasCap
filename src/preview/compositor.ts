@@ -4,7 +4,6 @@ import type { PreviewLayer } from '../shared/timeline.js';
 import { MAX_DECODER_SLOTS } from './assignment.js';
 import { fragmentShader, vertexShader } from './shaders.js';
 
-export interface CompositeLayer { settings: ColourSettings; weight: number; aspect: number }
 export interface CompositeClip {
   slot: number; settings: ColourSettings; aspect: number;
   opacity: number; blendWeight: number; brightness: number;
@@ -122,10 +121,6 @@ export class Compositor {
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
     this.#sizes[slot] = [width, height];
   }
-  /** Legacy two-source colour-test API; black is the backing surface. */
-  draw(layers: readonly [CompositeLayer, CompositeLayer]): void {
-    this.drawFrame([{ opacity: 1, clips: layers.map((layer, slot) => ({ slot, settings: layer.settings, aspect: layer.aspect, opacity: 1, blendWeight: layer.weight, brightness: 1 })) }]);
-  }
   /** Groups are bottom-to-top; each track's dissolve is drawn exactly once. */
   drawFrame(groups: readonly CompositeGroup[]): void {
     if (this.#disposed || this.gl.isContextLost()) return;
@@ -187,7 +182,7 @@ export function verifyGpuColour(settings: ColourSettings): GpuComparison {
       pixels[index * 4 + 2] = (index * 29) % 256; pixels[index * 4 + 3] = 255;
     }
     compositor.uploadPixels(0, pixels, 17, 17);
-    compositor.draw([{ settings, weight: 1, aspect: 1 }, { settings: { ...NEUTRAL_COLOUR }, weight: 0, aspect: 1 }]);
+    compositor.drawFrame([{ opacity: 1, clips: [{ slot: 0, settings, aspect: 1, opacity: 1, blendWeight: 1, brightness: 1 }] }]);
     const rendered = compositor.readPixels(); let sum = 0; let maximum = 0;
     for (let index = 0; index < 17 * 17; index++) {
       const input: RGB = [pixels[index * 4]! / 255, pixels[index * 4 + 1]! / 255, pixels[index * 4 + 2]! / 255];

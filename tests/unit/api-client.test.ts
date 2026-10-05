@@ -6,7 +6,7 @@ import { EMPTY_KEY_VALUES } from '../../src/shared/keyframes.js';
 import type { MediaJob } from '../../src/shared/media.js';
 import { createProject } from '../../src/shared/model.js';
 import { api, ApiError, request, type ServiceHealth } from '../../src/web/api.js';
-import { legacyV3Project } from './project-fixtures.js';
+import { unsupportedProject } from './project-fixtures.js';
 
 const schema = z.object({ value: z.string() }).strict();
 const health: ServiceHealth = { name: 'PasCap', milestone: 'editing-and-export', frameRate: '30000/1001', workerConcurrency: 1 };
@@ -112,12 +112,12 @@ describe('registered API methods', () => {
     await expect(api.save(project, 0)).rejects.toMatchObject({ status: 200, kind: 'response' });
   });
 
-  it('uses complete schema-6 project mocks and rejects an actual schema-3 response without migration', async () => {
+  it('uses complete schema-6 project mocks and rejects an unsupported-version response without changing it', async () => {
     expect(project.schemaVersion).toBe(6); expect(project.layers[0]!.keyframes).toEqual([]);
-    const legacy = legacyV3Project(project.id, project.title); const before = JSON.stringify(legacy);
-    fetchMock.mockResolvedValueOnce(jsonResponse({ document: legacy }));
+    const unsupported = unsupportedProject(3, project.id, project.title); const before = JSON.stringify(unsupported);
+    fetchMock.mockResolvedValueOnce(jsonResponse({ document: unsupported }));
     await expect(api.load(project.id)).rejects.toMatchObject({ status: 200, kind: 'response', retryable: false });
-    expect(JSON.stringify(legacy)).toBe(before); expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(unsupported)).toBe(before); expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it('validates all ten required nullable members in a shared row point, including zero participation', async () => {

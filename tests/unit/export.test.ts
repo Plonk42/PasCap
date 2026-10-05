@@ -14,7 +14,7 @@ import { startExport, validateExport, validateExportAudio } from '../../src/serv
 import { JobQueue } from '../../src/server/jobs.js';
 import { MediaLibrary } from '../../src/server/library.js';
 import { retimeRawVideo } from '../../src/server/retime-process.js';
-import { legacyV3Project, legacyV4Project, legacyV5Project } from './project-fixtures.js';
+import { unsupportedProject } from './project-fixtures.js';
 
 const temporary: string[] = [];
 const queues: JobQueue[] = [];
@@ -68,9 +68,7 @@ describe('strict production export request and immutable validation', () => {
       { document, profile: 'reference' }, { document, profile: 'draft720', normalize: true },
       { document: { ...document, schemaVersion: 1 }, profile: 'draft720' },
       { document: { ...document, schemaVersion: 2 }, profile: 'draft720' },
-      { document: legacyV3Project('old-export', 'Old export'), profile: 'draft720' },
-      { document: legacyV4Project('old-export-v4', 'Old schema-4 export'), profile: 'draft720' },
-      { document: legacyV5Project('old-export-v5', 'Old schema-5 export'), profile: 'draft720' },
+      ...[3, 4, 5].map((version) => ({ document: unsupportedProject(version, `old-export-v${version}`, 'Unsupported export'), profile: 'draft720' })),
       { document: { ...document, media: undefined }, profile: 'draft720' },
       { document: { ...document, clips: [{ ...document.clips[0], speed: undefined }] }, profile: 'draft720' },
       { document: { ...document, frameRate: { numerator: 30, denominator: 1 } }, profile: 'draft720' },

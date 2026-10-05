@@ -12,7 +12,7 @@ import { calculateLayout, layerClips, sampleTimeline } from '../../src/shared/ti
 import { clipStartRestriction, layerActionRestrictions } from '../../src/web/layer-actions.js';
 import { planTimelineDrop } from '../../src/web/timeline-placement.js';
 import { timelineRows } from '../../src/web/timeline-rows.js';
-import { legacyV5Project } from './project-fixtures.js';
+import { unsupportedProject } from './project-fixtures.js';
 
 const TRACK_IDS = ['ground', 'middle', 'sky'];
 const cases = TRACK_IDS.flatMap((layerId) => [false, true].map((ripple) => ({ layerId, ripple })));
@@ -79,7 +79,7 @@ describe('strict uniform schema-6 tracks', () => {
     }
     for (const extra of [{ transitions: [] }, { openingFade: 0 }, { closingFade: 0 }]) expect(projectSchema.safeParse({ ...document, ...extra }).success).toBe(false);
     for (const schemaVersion of [1, 2, 3, 4, 5]) expect(projectSchema.safeParse({ ...document, schemaVersion }).success).toBe(false);
-    expect(projectSchema.safeParse(legacyV5Project('old', 'Old global topology')).success).toBe(false);
+    expect(projectSchema.safeParse(unsupportedProject(5, 'old', 'Unsupported topology')).success).toBe(false);
     expect(document).not.toHaveProperty('transitions'); expect(document).not.toHaveProperty('openingFade'); expect(document).not.toHaveProperty('closingFade');
     for (const start of [-1, 0.5, NaN, Infinity, 2_147_483_648]) {
       for (const selected of document.clips) expect(projectSchema.safeParse({ ...document, clips: document.clips.map((clip) => clip.id === selected.id ? { ...clip, start } : clip) }).success).toBe(false);
