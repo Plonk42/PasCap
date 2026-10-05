@@ -31,6 +31,7 @@ export class MusicPlayback {
   #clockFrame = 0;
   #disposed = false;
   #lastErrorFrames = 0;
+  #generation = 0;
   constructor() { this.#audio.preload = 'auto'; this.#audio.dataset['pascapMusic'] = 'true'; document.body.append(this.#audio); }
   get clockSeconds(): number { return this.#context?.currentTime ?? performance.now() / 1000; }
   get errorFrames(): number { return this.#lastErrorFrames; }
@@ -49,35 +50,53 @@ export class MusicPlayback {
     this.#source.connect(this.#gain); this.#gain.connect(this.#context.destination);
   }
   async resumeContext(): Promise<void> { if (this.#track) { this.#setup(); await this.#context!.resume(); } }
+  #requireCurrent(signal: AbortSignal, generation: number): void {
+    if (!signal.aborted && !this.#disposed && generation === this.#generation) return;
+    // An obsolete completion must not pause a newer, already running start.
+    if (!this.#running) this.#audio.pause();
+    throw aborted();
+  }
   async start(frame: number, signal: AbortSignal): Promise<void> {
     if (this.#disposed) return;
+    const generation = ++this.#generation;
+    this.#requireCurrent(signal, generation);
+    let sourceElapsed = 0;
     if (this.#track) {
       await this.resumeContext();
+      this.#requireCurrent(signal, generation);
       const source = musicSourceFrame(this.#track, frame);
       if (source !== null) {
         this.#audio.currentTime = framesToSeconds(source);
         await waitMedia(this.#audio, () => !this.#audio.seeking && this.#audio.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA, signal);
+        this.#requireCurrent(signal, generation);
         this.#gain!.gain.setValueAtTime(musicGainAt(this.#track, frame), this.#context!.currentTime);
         await this.#audio.play();
+        this.#requireCurrent(signal, generation);
+        // play() can resolve after playback has already advanced. Preserve that
+        // source phase once when anchoring the independent Web Audio clock;
+        // throwing it away creates a false drift/reseek on the very next tick.
+        sourceElapsed = this.#audio.currentTime - framesToSeconds(source);
       }
     }
-    if (signal.aborted) { this.pause(); throw aborted(); }
-    this.#clockFrame = frame; this.#clockTime = this.clockSeconds; this.#running = true;
+    this.#requireCurrent(signal, generation);
+    this.#clockFrame = frame; this.#clockTime = this.clockSeconds - sourceElapsed; this.#running = true;
   }
-  projectFrame(): number {
-    return this.#clockFrame + Math.floor(Math.max(0, this.clockSeconds - this.#clockTime) / framesToSeconds(1) + 1e-7);
-  }
+  #projectPosition(): number { return this.#clockFrame + Math.max(0, this.clockSeconds - this.#clockTime) / framesToSeconds(1); }
+  projectFrame(): number { return Math.floor(this.#projectPosition() + 1e-7); }
   /** Returns false at a source wrap/late seek so video and music can buffer together. */
   sync(frame: number): boolean {
     if (!this.#track || !this.#running) return true;
-    const source = musicSourceFrame(this.#track, frame);
+    // Audio is continuous. Comparing its time to the floored video frame adds
+    // almost a whole frame of quantisation to genuine clock drift. Keep the
+    // same one-frame bound, but measure it against the fractional master clock.
+    const source = musicSourceFrame(this.#track, this.#projectPosition());
     this.#gain!.gain.setValueAtTime(musicGainAt(this.#track, frame), this.#context!.currentTime);
     if (source === null) { this.#audio.pause(); return true; }
     const desired = framesToSeconds(source);
     this.#lastErrorFrames = Math.abs(this.#audio.currentTime - desired) / framesToSeconds(1);
     return !this.#audio.paused && !this.#audio.seeking && !this.#audio.ended && this.#lastErrorFrames <= 1;
   }
-  pause(): void { this.#running = false; this.#audio.pause(); }
+  pause(): void { this.#generation++; this.#running = false; this.#audio.pause(); }
   dispose(): void {
     this.#disposed = true; this.pause(); this.#track = null; this.#audio.removeAttribute('src'); this.#audio.load(); this.#audio.remove();
     this.#source?.disconnect(); this.#gain?.disconnect(); void this.#context?.close();

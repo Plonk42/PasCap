@@ -431,6 +431,26 @@ export class PreviewEngine {
     if (this.#status === 'buffering') this.#setStatus('playing', 'Playing');
     return true;
   }
+
+  #acceptNeighbour(expected: number, required: readonly string[]): boolean {
+    // A floored source map is many-to-one during slow motion. Its inverse is
+    // not the nearest displayed project frame. Test the actual one-frame
+    // neighbours against every source and its project-time grade instead.
+    for (const candidate of [expected - 1, expected + 1]) {
+      if (candidate < 0 || candidate >= this.#layout.duration) continue;
+      const layers = sampleTimeline(this.#document!, candidate, this.#layout);
+      if (layers.length !== required.length || layers.some((layer) => !required.includes(layer.clipId))) continue;
+      if (this.#acceptFrame(candidate)) return true;
+    }
+    return false;
+  }
+
+  #canRetainFrame(expected: number, required: readonly string[]): boolean {
+    if (this.#status !== 'playing' || this.#dirty || Math.abs(this.#frame - expected) > 1) return false;
+    const drawn = sampleTimeline(this.#document!, this.#frame, this.#layout);
+    return drawn.length === required.length && drawn.every((layer) => required.includes(layer.clipId));
+  }
+
   #advance(now: number): void {
     if (!this.#document) return;
     // rAF's timestamp may precede a clock anchor set by a media promise in this
@@ -450,6 +470,13 @@ export class PreviewEngine {
       this.#slotFor(layer.clipId).setRate(position.retiming.rateAt(expected - position.start));
     });
     if (this.#acceptFrame(expected)) return;
+    if (this.#acceptNeighbour(expected, required)) return;
+    // The already uploaded, accepted image remains within the same one-frame
+    // tolerance even if the next decoded callback cannot upload yet. Do not
+    // replace it with black or restart audio for that normal delivery latency.
+    if (this.#canRetainFrame(expected, required)) {
+      this.#mismatchStart = 0; return;
+    }
     // Empty project-frame gaps and disabled-track tails are valid black frames.
     // Any active source can diagnose a clock mismatch; stack order grants no role.
     const observed = layers[0];
@@ -458,7 +485,6 @@ export class PreviewEngine {
     const actual = placed.start + placed.retiming.outputAt(this.#slotFor(observed.clipId).decodedFrame);
     const error = Math.abs(actual - expected);
     if (actual >= 0) this.#maxClockError = Math.max(this.#maxClockError, error);
-    if (error <= 1 && actual >= 0 && actual < this.#layout.duration && this.#acceptFrame(actual)) return;
     this.#compositor.clear(); this.#setStatus('buffering', 'Waiting for decoded frames');
     if (!this.#mismatchStart) this.#mismatchStart = now;
     if (now - this.#mismatchStart > framesToSeconds(1, this.#document.frameRate) * 1000) void this.#alignPlayback(expected, false);
