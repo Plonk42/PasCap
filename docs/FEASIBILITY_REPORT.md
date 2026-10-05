@@ -26,12 +26,11 @@ numeric/browser evidence in Git history and semantics
 in [LAYERS_AND_KEYFRAMES.md](LAYERS_AND_KEYFRAMES.md). The original two-source
 measurements below are preserved; they do not certify layered-GPU throughput.
 
-The current strict **schema-5** update adds explicit project-specific video/music
-import bins, empty new projects and confirmed document-only deletion. The shared
-content-deduplicated registry/proxy cache and originals/finished exports are preserved;
-v1/v2/v3/v4 documents and receipt snapshots remain incompatible, with no migration.
-This does not change the historical measurements below or certify schema-5 checks;
-current delivery and verification are recorded on
+The later schema-5 project-bin/deletion checkpoint is also historical, not the
+current schema contract. Current uniform-track storage, timing and resource bounds
+are in [LAYERS_AND_KEYFRAMES.md](LAYERS_AND_KEYFRAMES.md); this report's two-source
+measurements and later-extension descriptions do not certify the current build.
+Current delivery and verification are recorded on
 [GitHub work issues](https://github.com/Plonk42/PasCap/issues) and
 [actual-commit CI](https://github.com/Plonk42/PasCap/actions).
 

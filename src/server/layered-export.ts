@@ -1,8 +1,12 @@
 import { rename, rm } from 'node:fs/promises';
+import { endianness } from 'node:os';
 import path from 'node:path';
-import { LAYERED_EXPORT_RESOURCES, type ExportChunk, type ExportProfileSettings, type LayeredExportPlan } from '../shared/export.js';
+import { setImmediate as yieldToEvents } from 'node:timers/promises';
+import { isDeepStrictEqual } from 'node:util';
+import { LAYERED_EXPORT_RESOURCES, planLayeredExport, type ExportChunk, type ExportProfileSettings, type LayeredExportLayer, type LayeredExportPlan } from '../shared/export.js';
 import type { MediaAsset } from '../shared/media.js';
 import type { ProjectDocument } from '../shared/model.js';
+import { forEachSerial } from '../shared/serial.js';
 import type { Retiming } from '../shared/speed.js';
 import { calculateLayout, sampleTimeline, type PlacedClip, type PreviewLayer } from '../shared/timeline.js';
 import { framesToSeconds } from '../shared/timing.js';
@@ -35,7 +39,10 @@ export interface LayeredExportOptions {
 export interface LayeredRenderReport {
   renderedClipIds: string[];
   skippedLayerIds: string[];
+  /** One independently graded premultiplied group per enabled, populated track. */
   layerPasses: number;
+  /** Subsequent groups source-over the lower accumulator without grading again. */
+  sourceOverPasses: number;
   originalDecoderProcesses: number;
   nativeVideoProcesses: number;
   peakOriginalVideoDecoders: number;
@@ -63,10 +70,36 @@ interface RetainedClip { index: number; filename: string }
 interface Span { start: number; duration: number }
 interface LosslessChunk { filename: string; duration: number }
 
-function primaryReaders(chunk: ExportChunk, index: number, filename: string, retained: RetainedClip | null): ClipReader[] {
-  if (chunk.kind === 'body') return [{ index, filename, offset: chunk.sourceIn }];
-  if (retained?.index !== chunk.leftIndex) throw new Error('Primary dissolve lost its retained left clip.');
+function trackReaders(chunk: ExportChunk, index: number, filename: string, retained: RetainedClip | null): ClipReader[] {
+  if (chunk.kind === 'body') {
+    if (chunk.clipIndex !== index) throw new Error('Track body references a different clip.');
+    return [{ index, filename, offset: chunk.sourceIn }];
+  }
+  if (chunk.rightIndex !== index || retained?.index !== chunk.leftIndex) throw new Error('Track dissolve lost its retained left clip.');
   return [{ index: retained.index, filename: retained.filename, offset: chunk.leftIn }, { index, filename, offset: 0 }];
+}
+
+function* frameIndices(count: number): Generator<number> {
+  for (let index = 0; index < count; index++) yield index;
+}
+
+/** Already graded/premultiplied RGBA16 groups: apply coverage once, never a second LUT. */
+async function sourceOverGroup(lower: Buffer, group: Buffer, signal: AbortSignal): Promise<void> {
+  checkLayeredCancellation(signal);
+  if (lower.length !== group.length || lower.length % 8 !== 0 || lower.byteOffset % 2 !== 0 || group.byteOffset % 2 !== 0) throw new Error('Invalid RGBA16 group frames.');
+  const output = new Uint16Array(lower.buffer, lower.byteOffset, lower.length / 2);
+  const above = new Uint16Array(group.buffer, group.byteOffset, group.length / 2);
+  const batchSize = 65_536 * 4;
+  await forEachSerial(frameIndices(Math.ceil(output.length / batchSize)), async (batch) => {
+    checkLayeredCancellation(signal);
+    const end = Math.min(output.length, (batch + 1) * batchSize);
+    for (let offset = batch * batchSize; offset < end; offset += 4) {
+      const keep = 1 - above[offset + 3]! / 65535;
+      for (let channel = 0; channel < 4; channel++) output[offset + channel] = Math.round(above[offset + channel]! + output[offset + channel]! * keep);
+    }
+    await yieldToEvents();
+    checkLayeredCancellation(signal);
+  });
 }
 
 /** Decode/scale tagged original BT.709 BEFORE any CPU grade, once per clip instance. */
@@ -102,16 +135,16 @@ function losslessReader(filename: string, offset: number, duration: number, alph
 }
 
 /**
- * Primary bodies/dissolves -> premultiplied RGBA16 chunks -> one accumulator.
- * Each overlay lane reads that accumulator in disjoint gap/clip spans, then
- * replaces it. Delete the lower timeline BEFORE joining new span chunks, so
- * even during concat there are at most two complete timeline representations.
+ * Every track's bodies/dissolves -> premultiplied RGBA16 chunks -> one group.
+ * Each subsequent group source-overs the lower accumulator in a separate pass.
+ * Lower + group chunks + joined group, or lower + group + output, are explicitly
+ * three timeline representations; delete inputs as soon as their pass finishes.
  * At most two retained RGB clip files; no all-project decoder/filter graph.
  */
 class SequentialLayeredRenderer {
   readonly #layout;
   readonly #cache = new ColourLutCache();
-  readonly #rgba: Buffer;
+  readonly #rgba: readonly [Buffer, Buffer];
   readonly #rgb: readonly [Buffer, Buffer];
   readonly #retiming: RawRetimingReport[] = [];
   readonly #report: LayeredRenderReport;
@@ -127,21 +160,25 @@ class SequentialLayeredRenderer {
     if (!Number.isSafeInteger(pixels) || target.width < 2 || target.height < 2 || target.width % 2 || target.height % 2 || pixels > 3840 * 2160) {
       throw new ServiceError('Layered export dimensions must be even and bounded by UHD.', 422);
     }
+    if (endianness() !== 'LE') throw new ServiceError('The native RGBA16 compositor requires a little-endian Linux host.', 422);
     this.#layout = calculateLayout(document);
-    if (plan.duration !== this.#layout.duration || plan.baseDuration !== this.#layout.baseDuration || options.assets.length !== document.clips.length) throw new ServiceError('Layered inputs differ from their captured timeline.', 500);
-    this.#rgba = Buffer.alloc(pixels * 8);
+    if (!isDeepStrictEqual(plan, planLayeredExport(document)) || options.assets.length !== document.clips.length) throw new ServiceError('Layered inputs differ from their captured timeline.', 500);
+    if (options.assets.some((asset, index) => asset.id !== document.clips[index]!.mediaId || document.clips[index]!.sourceOut > asset.metadata.frameCount)) throw new ServiceError('Layered inputs differ from their registered original identities or source bounds.', 422);
+    this.#rgba = [Buffer.alloc(pixels * 8), Buffer.alloc(pixels * 8)];
     this.#rgb = [Buffer.allocUnsafe(pixels * 3), Buffer.allocUnsafe(pixels * 3)];
     this.#report = {
       renderedClipIds: [], skippedLayerIds: document.layers.filter((layer) => !layer.enabled).map((layer) => layer.id),
-      layerPasses: 0, originalDecoderProcesses: 0, nativeVideoProcesses: 0, peakOriginalVideoDecoders: 0,
+      layerPasses: 0, sourceOverPasses: 0, originalDecoderProcesses: 0, nativeVideoProcesses: 0, peakOriginalVideoDecoders: 0,
       peakIntermediateVideoDecoders: 0, peakVideoEncoders: 0, peakNativeVideoChildren: 0, peakLosslessClipFiles: 0,
-      peakLosslessTimelineRepresentations: 0, rawFrameBuffers: 3, rawBufferBytes: pixels * LAYERED_EXPORT_RESOURCES.rawBytesPerPixel,
+      peakLosslessTimelineRepresentations: 0, rawFrameBuffers: this.#rgb.length + this.#rgba.length,
+      rawBufferBytes: [...this.#rgb, ...this.#rgba].reduce((sum, buffer) => sum + buffer.length, 0),
       largestReadChunkBytes: 0, peakLutEntries: 0, lutBytes: 0, lutsGenerated: 0, lutGenerationMs: 0,
       compositeFrames: 0, compositePixels: 0, compositionMs: 0, elapsedMs: 0
     };
-    const active = plan.layers.filter((layer) => layer.enabled);
+    const active = plan.layers.filter((layer) => layer.enabled && layer.clips.length > 0);
     this.#totalWork = active.reduce((sum, layer) => sum + layer.clips.reduce((frames, clip) => frames + clip.duration, 0), 0) +
-      plan.duration * (1 + active.slice(document.layers[0]!.enabled ? 1 : 0).filter((layer) => layer.clips.length > 0).length);
+      plan.duration * Math.max(1, 2 * active.length - 1);
+    if (this.#report.rawFrameBuffers !== LAYERED_EXPORT_RESOURCES.rawFrameBuffers || this.#report.rawBufferBytes !== pixels * LAYERED_EXPORT_RESOURCES.rawBytesPerPixel) throw new Error('Layered raw-buffer allocation differs from the resource contract.');
   }
   private update(frames: number, message: string): void {
     checkLayeredCancellation(this.options.context.signal);
@@ -155,6 +192,7 @@ class SequentialLayeredRenderer {
     this.#report.peakLosslessTimelineRepresentations = Math.max(this.#report.peakLosslessTimelineRepresentations, this.#timelines);
   }
   private recordPass(report: RawPassReport): void {
+    if (report.peakReaders > LAYERED_EXPORT_RESOURCES.maxIntermediateVideoDecoders || report.peakEncoders > LAYERED_EXPORT_RESOURCES.maxVideoEncoders || report.peakChildren > LAYERED_EXPORT_RESOURCES.maxNativeVideoChildrenPerPass) throw new Error('Layered native pass exceeded its reader/encoder/child bound.');
     this.#report.peakIntermediateVideoDecoders = Math.max(this.#report.peakIntermediateVideoDecoders, report.peakReaders);
     this.#report.peakVideoEncoders = Math.max(this.#report.peakVideoEncoders, report.peakEncoders);
     this.#report.peakNativeVideoChildren = Math.max(this.#report.peakNativeVideoChildren, report.peakChildren);
@@ -202,7 +240,7 @@ class SequentialLayeredRenderer {
   }
   private async removeClip(filename: string): Promise<void> {
     await rm(path.join(this.options.directory, filename));
-    this.#clipFiles--;
+    if (--this.#clipFiles < 0) throw new Error('Layered clip scratch ledger underflowed.');
   }
   private async readSources(clips: readonly ClipReader[], readers: readonly RawFrameReader[], maps: readonly Retiming[],
     frame: number, samples: readonly PreviewLayer[]): Promise<LayerFrameSource[]> {
@@ -218,9 +256,9 @@ class SequentialLayeredRenderer {
     }
     return sources;
   }
-  private async span(layerId: string, span: Span, lower: string | null, clips: readonly ClipReader[]): Promise<LosslessChunk> {
+  private async span(layerId: string, span: Span, clips: readonly ClipReader[]): Promise<LosslessChunk> {
     const { ffmpeg, directory, target, document, context } = this.options;
-    if (!Number.isSafeInteger(span.duration) || !Number.isSafeInteger(span.start) || span.duration < 1 || span.start < 0 || span.start + span.duration > this.#layout.duration || clips.length + (lower ? 1 : 0) > 2) {
+    if (!Number.isSafeInteger(span.duration) || !Number.isSafeInteger(span.start) || span.duration < 1 || span.start < 0 || span.start + span.duration > this.#layout.duration || clips.length > 2) {
       throw new Error('Invalid bounded layered span.');
     }
     const filename = `span-${String(this.#spanId++).padStart(5, '0')}.nut`;
@@ -234,26 +272,23 @@ class SequentialLayeredRenderer {
       return placed.retiming;
     });
     const report = await runRawVideoPass({ ffmpeg, cwd: directory, signal: context.signal }, async (pass) => {
-      const below = lower ? pass.reader(losslessReader(lower, span.start, span.duration, true), 'lower timeline decoder') : null;
       const readers = clips.map((clip) => pass.reader(losslessReader(clip.filename, clip.offset, span.duration, false), 'retimed clip decoder'));
       const encoder = pass.encoder(losslessEncoder(target, filename, true), 'premultiplied RGBA16 encoder');
-      for (let frame = 0; frame < span.duration; frame++) {
+      await forEachSerial(frameIndices(span.duration), async (frame) => {
         pass.check();
-        if (below) await below.requireFrame(this.#rgba); // NOSONAR -- one reused lower/output frame.
-        else this.#rgba.fill(0); // Transparent gaps, not a black opaque overlay.
+        this.#rgba[0].fill(0); // A standalone transparent group, never the lower composite.
         const samples = sampleTimeline(document, span.start + frame, this.#layout).filter((sample) => sample.layerId === layerId);
-        const sources = await this.readSources(clips, readers, maps, frame, samples); // NOSONAR -- shared samples determine source and grading settings.
+        const sources = await this.readSources(clips, readers, maps, frame, samples);
         const started = performance.now();
-        await composeLayerFrame(this.#rgba, target, sources, this.#cache, context.signal); // NOSONAR -- grade sampled parameters, then source-over the complete group.
+        await composeLayerFrame(this.#rgba[0], target, sources, this.#cache, context.signal);
         this.#report.compositionMs += performance.now() - started;
-        await writeRawFrame(encoder, this.#rgba); // NOSONAR -- never mutate a buffer still owned by a pipe write.
+        await writeRawFrame(encoder, this.#rgba[0]);
         if (frame === 0 || (frame + 1) % progressStep === 0 || frame + 1 === span.duration) {
-          this.update(frame + 1, `Compositing layer ${layerId}: project frame ${span.start + frame + 1} / ${this.#layout.duration}`);
+          this.update(frame + 1, `Rendering track group ${layerId}: project frame ${span.start + frame + 1} / ${this.#layout.duration}`);
         }
-      }
+      });
       encoder.end();
-      if (below) await below.requireEnd(this.#rgba);
-      for (const [index, reader] of readers.entries()) await reader.requireEnd(this.#rgb[index]!); // NOSONAR -- exact exclusive span OUT for every decoder.
+      await forEachSerial(readers, (reader, index) => reader.requireEnd(this.#rgb[index]!));
     });
     this.recordPass(report);
     this.#finishedWork += span.duration;
@@ -261,82 +296,99 @@ class SequentialLayeredRenderer {
     this.#report.compositePixels += span.duration * target.width * target.height;
     return { filename, duration: span.duration };
   }
-  private async join(chunks: LosslessChunk[], layerIndex: number): Promise<string> {
+  private async join(chunks: LosslessChunk[], output: string): Promise<string> {
     const { directory, ffmpeg, context, plan } = this.options;
     if (chunks.reduce((sum, chunk) => sum + chunk.duration, 0) !== plan.duration) throw new Error('Layer chunks must cover every authoritative project frame exactly once.');
-    const output = `accumulator-${layerIndex}.nut`;
+    if (!chunks.length) throw new Error('A lossless timeline requires at least one chunk.');
     if (chunks.length === 1) {
       await rename(path.join(directory, chunks[0]!.filename), path.join(directory, output));
       return output;
     }
     this.timeline(1);
-    const concat = `layer-${layerIndex}.ffconcat`;
+    const concat = `${output}.ffconcat`;
     await atomicWrite(path.join(directory, concat), 'ffconcat version 1.0\n' + chunks.map((chunk) => `file ${chunk.filename}\nduration ${seconds(chunk.duration)}\n`).join(''));
     await runProcess(ffmpeg, [...BASE, '-xerror', '-threads', '2', '-f', 'concat', '-safe', '1', '-i', concat,
       '-map', '0:v:0', '-an', '-sn', '-dn', '-c:v', 'copy',
       '-bsf:v', 'setts=pts=N*1001:dts=N*1001:duration=1001:time_base=1/30000', '-f', 'nut', output], { cwd: directory, signal: context.signal });
     this.#report.nativeVideoProcesses++;
-    for (const chunk of chunks) await rm(path.join(directory, chunk.filename)); // NOSONAR -- dispose serially; a chunk collection is only one timeline representation.
+    await forEachSerial(chunks, (chunk) => rm(path.join(directory, chunk.filename)));
     await rm(path.join(directory, concat));
     this.timeline(-1);
     return output;
   }
-  private async primarySpans(index: number, filename: string, retained: RetainedClip | null, chunks: LosslessChunk[]): Promise<RetainedClip | null> {
-    const layerId = this.options.document.layers[0]!.id;
-    const relevant = this.options.plan.primary.chunks.filter((chunk) => chunk.kind === 'body' ? chunk.clipIndex === index : chunk.rightIndex === index);
-    for (const chunk of relevant) {
-      chunks.push(await this.span(layerId, chunk, null, primaryReaders(chunk, index, filename, retained))); // NOSONAR -- lossless bodies and two-reader dissolves.
-      if (chunk.kind === 'dissolve') {
-        await this.removeClip(retained!.filename); // NOSONAR -- release the old tail before retiming another original.
-        retained = null;
-      }
-    }
-    return retained;
-  }
-  private async primary(): Promise<string> {
-    const { document, plan } = this.options;
-    const layer = document.layers[0]!;
+  private async group(layer: LayeredExportLayer, layerIndex: number): Promise<string> {
+    const { plan } = this.options;
     const chunks: LosslessChunk[] = [];
     let retained: RetainedClip | null = null;
-    this.timeline(1);
-    if (layer.enabled) {
-      for (const [primaryIndex, clip] of plan.primary.clips.entries()) {
-        const filename = await this.retime(clip.index); // NOSONAR -- only one original decoder, with at most one retained dissolve tail.
-        retained = await this.primarySpans(clip.index, filename, retained, chunks); // NOSONAR -- preserve only the outgoing tail.
-        if (document.transitions[primaryIndex]?.type === 'cross-dissolve') retained = { index: clip.index, filename };
-        else await this.removeClip(filename); // NOSONAR -- never retain all instances.
-      }
-    }
-    if (retained) throw new Error('An unused primary dissolve tail remained.');
-    const filled = layer.enabled ? plan.baseDuration : 0;
-    if (filled < plan.duration) chunks.push(await this.span(layer.id, { start: filled, duration: plan.duration - filled }, null, []));
-    this.#report.layerPasses++;
-    return this.join(chunks, 0);
-  }
-  private async overlay(lower: string, layerIndex: number): Promise<string> {
-    const { plan, directory } = this.options;
-    const layer = plan.layers[layerIndex]!;
-    const chunks: LosslessChunk[] = [];
     let cursor = 0;
-    this.timeline(1); // Old accumulator + the new lane's span collection.
-    for (const clip of layer.clips) {
-      if (cursor < clip.start) chunks.push(await this.span(layer.id, { start: cursor, duration: clip.start - cursor }, lower, [])); // NOSONAR -- gaps preserve lower RGB/coverage.
-      const filename = await this.retime(clip.index); // NOSONAR -- no other original decoder remains active.
-      chunks.push(await this.span(layer.id, { start: clip.start, duration: clip.duration }, lower, [{ index: clip.index, filename, offset: 0 }])); // NOSONAR -- one lower and one retimed intermediate reader.
-      await this.removeClip(filename); // NOSONAR -- one overlay clip file at a time.
-      cursor = clip.end;
-    }
-    if (cursor < plan.duration) chunks.push(await this.span(layer.id, { start: cursor, duration: plan.duration - cursor }, lower, []));
-    await rm(path.join(directory, lower));
-    this.timeline(-1); // Delete the old timeline BEFORE making the concat output.
+    this.timeline(1);
+    await forEachSerial(layer.plan.clips, async (clip) => {
+      const filename = await this.retime(clip.index);
+      const relevant = layer.plan.chunks.filter((chunk) => chunk.kind === 'body' ? chunk.clipIndex === clip.index : chunk.rightIndex === clip.index);
+      await forEachSerial(relevant, async (chunk) => {
+        if (chunk.start < cursor) throw new Error('Track group chunks overlap.');
+        if (cursor < chunk.start) chunks.push(await this.span(layer.id, { start: cursor, duration: chunk.start - cursor }, []));
+        chunks.push(await this.span(layer.id, chunk, trackReaders(chunk, clip.index, filename, retained)));
+        cursor = chunk.start + chunk.duration;
+        if (chunk.kind === 'dissolve') {
+          await this.removeClip(retained!.filename);
+          retained = null;
+        }
+      });
+      if (layer.plan.chunks.some((chunk) => chunk.kind === 'dissolve' && chunk.leftIndex === clip.index)) retained = { index: clip.index, filename };
+      else await this.removeClip(filename);
+    });
+    if (retained) throw new Error('An unused track dissolve tail remained.');
+    if (cursor < plan.duration) chunks.push(await this.span(layer.id, { start: cursor, duration: plan.duration - cursor }, []));
     this.#report.layerPasses++;
-    return this.join(chunks, layerIndex);
+    return this.join(chunks, `group-${layerIndex}.nut`);
+  }
+  private async composite(lower: string, group: string, layerIndex: number): Promise<string> {
+    const { plan, ffmpeg, directory, target, context } = this.options;
+    const filename = `accumulator-${layerIndex}.nut`;
+    const progressStep = Math.max(1, Math.floor(plan.duration / 100));
+    this.timeline(1); // Lower + independently graded group + output accumulator.
+    const report = await runRawVideoPass({ ffmpeg, cwd: directory, signal: context.signal }, async (pass) => {
+      const below = pass.reader(losslessReader(lower, 0, plan.duration, true), 'lower RGBA16 timeline decoder');
+      const above = pass.reader(losslessReader(group, 0, plan.duration, true), 'track RGBA16 group decoder');
+      const encoder = pass.encoder(losslessEncoder(target, filename, true), 'source-over RGBA16 encoder');
+      await forEachSerial(frameIndices(plan.duration), async (frame) => {
+        pass.check();
+        await below.requireFrame(this.#rgba[0]);
+        await above.requireFrame(this.#rgba[1]);
+        const started = performance.now();
+        await sourceOverGroup(this.#rgba[0], this.#rgba[1], context.signal);
+        this.#report.compositionMs += performance.now() - started;
+        await writeRawFrame(encoder, this.#rgba[0]);
+        if (frame === 0 || (frame + 1) % progressStep === 0 || frame + 1 === plan.duration) this.update(frame + 1, `Compositing track ${plan.layers[layerIndex]!.id}: ${frame + 1} / ${plan.duration} frames`);
+      });
+      encoder.end();
+      await below.requireEnd(this.#rgba[0]);
+      await above.requireEnd(this.#rgba[1]);
+    });
+    this.recordPass(report);
+    await forEachSerial([lower, group], async (input) => {
+      await rm(path.join(directory, input));
+      this.timeline(-1);
+    });
+    this.#report.sourceOverPasses++;
+    this.#finishedWork += plan.duration;
+    this.#report.compositeFrames += plan.duration;
+    this.#report.compositePixels += plan.duration * target.width * target.height;
+    return filename;
   }
   async render(): Promise<LayeredRenderResult> {
     const started = performance.now();
-    let filename = await this.primary();
-    for (const [index, layer] of this.options.plan.layers.entries()) {
-      if (index > 0 && layer.enabled && layer.clips.length > 0) filename = await this.overlay(filename, index); // NOSONAR -- strictly bottom-to-top sequential layer passes.
+    let filename: string | null = null;
+    await forEachSerial(this.options.plan.layers, async (layer, index) => {
+      if (!layer.enabled || !layer.clips.length) return;
+      const group = await this.group(layer, index);
+      filename = filename === null ? group : await this.composite(filename, group, index);
+    });
+    if (filename === null) {
+      this.timeline(1);
+      const gap = await this.span(this.options.plan.layers[0]!.id, { start: 0, duration: this.options.plan.duration }, []);
+      filename = await this.join([gap], 'transparent-timeline.nut');
     }
     if (this.#clipFiles || this.#timelines !== 1) throw new Error('Layered renderer left unexpected scratch representations.');
     const lut = this.#cache.report;

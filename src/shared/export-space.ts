@@ -19,7 +19,8 @@ export type ExportPreflight = z.infer<typeof exportPreflightSchema>;
 
 /**
  * Planning allowance, NOT a prediction or an FFV1/H.264 upper bound.
- * Budget uncompressed bgr0 clips / RGBA16 timelines, one byte/pixel/frame for
+ * Budget two uncompressed bgr0 clips / up to three RGBA16 timelines (lower,
+ * track group and output; a span collection counts as one), one byte/pixel/frame for
  * EACH of the encoded chunks and final MP4, selected s16 stereo PCM, then 25%
  * plus the start reserve for containers/LUTs/receipts/other overhead.
  * Compression, frame content and concurrent filesystem users change actual use.

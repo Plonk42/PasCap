@@ -1,9 +1,9 @@
 import type { ColourSettings } from './colour.js';
 import { EMPTY_KEY_VALUES, KEYFRAME_SETTINGS, interpolationSchema, keySettings, layerKeyframeSchema, upsertKey, type Interpolation, type KeyframeSetting, type LayerKeyframe } from './keyframes.js';
 import { compileLayerRetiming } from './layer-retiming.js';
-import { frameSchema, idSchema, projectSchema, type MusicTrack, type ProjectDocument, type Transition, type VideoClip, type VideoLayer } from './model.js';
+import { clipSchema, frameSchema, idSchema, layerSchema, projectSchema, transitionSchema, type MusicTrack, type ProjectDocument, type Transition, type VideoClip, type VideoLayer } from './model.js';
 import type { SpeedSettings } from './speed.js';
-import { calculateLayout, primaryClips } from './timeline.js';
+import { calculateLayout, layerClips, type TimelineLayout } from './timeline.js';
 
 export type EditCommand =
   | { type: 'insert'; clip: VideoClip; index: number }
@@ -29,13 +29,41 @@ export type EditCommand =
   | { type: 'layer-order'; layerIds: string[] }
   | { type: 'place'; clipId: string; layerId: string; start: number; index: number }
   | { type: 'transition'; transition: Transition }
-  | { type: 'fades'; opening: number; closing: number };
+  | { type: 'fades'; layerId: string; opening: number; closing: number };
 
 function repairBoundaries(clips: VideoClip[], previous: Transition[]): Transition[] {
   return clips.slice(0, -1).map((clip, index) => {
     const rightId = clips[index + 1]!.id;
     return previous.find((t) => t.leftId === clip.id && t.rightId === rightId) ?? { leftId: clip.id, rightId, type: 'cut', duration: 0 };
   });
+}
+
+function requiredLayer(next: ProjectDocument, layerId: string): VideoLayer {
+  const layer = next.layers.find((item) => item.id === layerId);
+  if (!layer) throw new Error('Layer no longer exists.');
+  return layer;
+}
+
+function repairLayerBoundaries(next: ProjectDocument, layerIds: readonly string[]): void {
+  for (const layerId of new Set(layerIds)) {
+    const layer = requiredLayer(next, layerId);
+    layer.transitions = repairBoundaries(layerClips(next, layerId), layer.transitions);
+  }
+}
+
+/** Structural edits retain the pre-edit first placement, not the new first
+ * instance's former start. Only an explicit move of the retained first clip
+ * changes a nonempty Ripple track's anchor. Empty tracks keep dormant fades. */
+function preserveRippleAnchors(next: ProjectDocument, before: TimelineLayout, overrides: ReadonlyMap<string, number>): void {
+  for (const layer of next.layers) {
+    if (!layer.ripple) continue;
+    const first = layerClips(next, layer.id)[0];
+    if (!first) continue;
+    const anchor = overrides.get(layer.id);
+    const previous = before.clips.find((placed) => placed.clip.layerId === layer.id);
+    if (anchor !== undefined) first.start = anchor;
+    else if (previous) first.start = previous.start;
+  }
 }
 
 function reorderClips(next: ProjectDocument, ids: string[]): void {
@@ -45,7 +73,7 @@ function reorderClips(next: ProjectDocument, ids: string[]): void {
     if (!clip) throw new Error('Unknown clip in reorder.');
     return clip;
   });
-  next.transitions = repairBoundaries(primaryClips(next), next.transitions);
+  repairLayerBoundaries(next, next.layers.map((layer) => layer.id));
 }
 
 function splitClip(next: ProjectDocument, index: number, command: Extract<EditCommand, { type: 'split' }>): void {
@@ -54,11 +82,11 @@ function splitClip(next: ProjectDocument, index: number, command: Extract<EditCo
   const placed = calculateLayout(next).clips.find((item) => item.clip.id === original.id)!;
   const layer = next.layers.find((item) => item.id === original.layerId)!;
   const leftDuration = compileLayerRetiming({ ...original, sourceOut: command.sourceFrame }, layer, placed.start).duration;
-  const right = { ...original, id: command.newClipId, sourceIn: command.sourceFrame, colour: { ...original.colour }, start: original.layerId === next.layers[0]!.id ? 0 : placed.start + leftDuration };
-  next.clips[index] = { ...original, sourceOut: command.sourceFrame };
-  const preserved = next.transitions.map((t) => t.leftId === original.id ? { ...t, leftId: right.id } : t);
+  const right = { ...original, id: command.newClipId, sourceIn: command.sourceFrame, colour: { ...original.colour }, start: placed.start + leftDuration };
+  next.clips[index] = { ...original, sourceOut: command.sourceFrame, start: placed.start };
+  layer.transitions = layer.transitions.map((t) => t.leftId === original.id ? { ...t, leftId: right.id } : t);
   next.clips.splice(index + 1, 0, right);
-  next.transitions = repairBoundaries(primaryClips(next), preserved);
+  repairLayerBoundaries(next, [layer.id]);
 }
 
 function validateRemoval(clip: VideoClip, sourceIn: number, sourceOut: number): void {
@@ -68,22 +96,22 @@ function validateRemoval(clip: VideoClip, sourceIn: number, sourceOut: number): 
 }
 
 function retainedRightStart(project: ProjectDocument, clip: VideoClip, sourceIn: number): number {
-  if (clip.layerId === project.layers[0]!.id) return 0;
   const placed = calculateLayout(project).clips.find((item) => item.clip.id === clip.id)!;
   return placed.start + placed.retiming.outputAt(sourceIn);
 }
 
-/** Remove only original-source frames from one excerpt. Overlay cut boundaries
- * use its pre-edit contextual map; neighbours and absolute row points stay put.
+/** Remove only original-source frames from one excerpt. Positioned cut boundaries
+ * use its pre-edit contextual map; Ripple rejoins retained pieces at its anchor.
+ * Other tracks, music and absolute row points stay put.
  * Retained durations are recompiled/rounded like mapped splits, not overridden
  * to force the old OUT. Final schema validation rejects any resulting conflict.
  */
 function removeSourceRange(next: ProjectDocument, index: number, command: Extract<EditCommand, { type: 'remove-source-range' }>): void {
   const original = next.clips[index]!;
+  const layer = requiredLayer(next, original.layerId);
   validateRemoval(original, command.sourceIn, command.sourceOut);
   if (command.sourceIn === original.sourceIn && command.sourceOut === original.sourceOut) {
     next.clips.splice(index, 1);
-    if (!primaryClips(next).length) { next.openingFade = 0; next.closingFade = 0; }
   } else if (command.sourceIn === original.sourceIn) {
     next.clips[index] = { ...original, sourceIn: command.sourceOut, start: retainedRightStart(next, original, command.sourceOut) };
   } else if (command.sourceOut === original.sourceOut) {
@@ -94,17 +122,17 @@ function removeSourceRange(next: ProjectDocument, index: number, command: Extrac
     const right = { ...original, id: command.newClipId, sourceIn: command.sourceOut, start: retainedRightStart(next, original, command.sourceOut) };
     next.clips[index] = { ...original, sourceOut: command.sourceIn };
     next.clips.splice(index + 1, 0, right);
-    next.transitions = next.transitions.map((transition) => transition.leftId === original.id ? { ...transition, leftId: right.id } : transition);
+    layer.transitions = layer.transitions.map((transition) => transition.leftId === original.id ? { ...transition, leftId: right.id } : transition);
   }
-  next.transitions = repairBoundaries(primaryClips(next), next.transitions);
+  repairLayerBoundaries(next, [layer.id]);
 }
 
 function duplicateClip(next: ProjectDocument, index: number, newClipId: string): void {
   const original = next.clips[index]!;
   const placed = calculateLayout(next).clips.find((item) => item.clip.id === original.id)!;
-  const duplicate = { ...original, id: newClipId, start: original.layerId === next.layers[0]!.id ? 0 : placed.end };
+  const duplicate = { ...original, id: newClipId, start: placed.end };
   next.clips.splice(index + 1, 0, duplicate);
-  next.transitions = repairBoundaries(primaryClips(next), next.transitions);
+  repairLayerBoundaries(next, [original.layerId]);
 }
 
 type LayerKeyCommand = Extract<EditCommand, { type: 'layer-key-toggle' | 'layer-key-value' | 'layer-key-move' | 'layer-key-remove' | 'layer-key-easing' }>;
@@ -146,18 +174,31 @@ function editLayerKey(next: ProjectDocument, command: LayerKeyCommand): void {
 }
 
 type LayerCommand = Extract<EditCommand, { type: 'layer-add' | 'layer-update' | 'layer-remove' | 'layer-order' }>;
-function editLayer(next: ProjectDocument, command: LayerCommand): void {
+function updateLayer(next: ProjectDocument, updated: VideoLayer, before: TimelineLayout): void {
+  const position = next.layers.findIndex((layer) => layer.id === updated.id);
+  if (position < 0) throw new Error('Layer no longer exists.');
+  const previous = next.layers[position]!;
+  next.layers[position] = layerSchema.parse(updated);
+  if (previous.ripple === updated.ripple) return;
+  const placed = before.clips.filter((item) => item.clip.layerId === updated.id);
+  // Both toggle directions snapshot actual integer placements. Enabling packs
+  // this chronological order from its preserved first start in the final layout.
+  for (const item of placed) next.clips.find((clip) => clip.id === item.clip.id)!.start = item.start;
+  if (updated.ripple) {
+    const ordered = placed.map((item) => next.clips.find((clip) => clip.id === item.clip.id)!);
+    let cursor = 0;
+    next.clips = next.clips.map((clip) => clip.layerId === updated.id ? ordered[cursor++]! : clip);
+  }
+  repairLayerBoundaries(next, [updated.id]);
+}
+
+function editLayer(next: ProjectDocument, command: LayerCommand, before: TimelineLayout): void {
   switch (command.type) {
-    case 'layer-add': next.layers.push(command.layer); break;
-    case 'layer-update': {
-      const position = next.layers.findIndex((layer) => layer.id === command.layer.id);
-      if (position < 0) throw new Error('Layer no longer exists.');
-      next.layers[position] = command.layer;
-      break;
-    }
+    case 'layer-add': next.layers.push(layerSchema.parse(command.layer)); break;
+    case 'layer-update': updateLayer(next, command.layer, before); break;
     case 'layer-remove':
-      if (command.layerId === next.layers[0]!.id) throw new Error('The primary layer cannot be removed.');
       if (!next.layers.some((layer) => layer.id === command.layerId)) throw new Error('Layer no longer exists.');
+      if (next.layers.length === 1) throw new Error('The last video track cannot be removed.');
       next.layers = next.layers.filter((layer) => layer.id !== command.layerId);
       next.clips = next.clips.filter((clip) => clip.layerId !== command.layerId);
       break;
@@ -172,42 +213,83 @@ function editLayer(next: ProjectDocument, command: LayerCommand): void {
   }
 }
 
-function placeClip(next: ProjectDocument, index: number, command: Extract<EditCommand, { type: 'place' }>): void {
+function placeClip(next: ProjectDocument, index: number, command: Extract<EditCommand, { type: 'place' }>, before: TimelineLayout, anchors: Map<string, number>): void {
   if (!Number.isInteger(command.index) || command.index < 0 || command.index >= next.clips.length) throw new Error('Invalid placement index.');
+  frameSchema.parse(command.start);
+  const target = requiredLayer(next, command.layerId);
   const clip = next.clips.splice(index, 1)[0]!;
+  const sourceId = clip.layerId;
   clip.layerId = command.layerId; clip.start = command.start;
   // The placement index refers to the final array, after removing the instance.
   next.clips.splice(command.index, 0, clip);
-  next.transitions = repairBoundaries(primaryClips(next), next.transitions);
-  if (!primaryClips(next).length) { next.openingFade = 0; next.closingFade = 0; }
+  repairLayerBoundaries(next, [sourceId, target.id]);
+  const previousFirst = before.clips.find((item) => item.clip.layerId === target.id);
+  const first = layerClips(next, target.id)[0]!;
+  if (target.ripple && sourceId === target.id && previousFirst?.clip.id === clip.id && first.id === clip.id) anchors.set(target.id, command.start);
 }
 
-function setTransition(next: ProjectDocument, transition: Transition): void {
-  const boundary = next.transitions.findIndex((t) => t.leftId === transition.leftId && t.rightId === transition.rightId);
+function setTransition(next: ProjectDocument, value: Transition, before: TimelineLayout): void {
+  const transition = transitionSchema.parse(value);
+  const left = before.clips.find((item) => item.clip.id === transition.leftId);
+  const right = before.clips.find((item) => item.clip.id === transition.rightId);
+  if (!left || !right) throw new Error('Transition clips no longer exist.');
+  if (left.clip.layerId !== right.clip.layerId) throw new Error('Transition must join clips on the same track.');
+  const layer = requiredLayer(next, left.clip.layerId);
+  const boundary = layer.transitions.findIndex((t) => t.leftId === transition.leftId && t.rightId === transition.rightId);
   if (boundary < 0) throw new Error('Transition is not between adjacent clips.');
-  next.transitions[boundary] = transition;
+  const previous = layer.transitions[boundary]!;
+  if (transition.type !== 'cut' && previous.type !== 'cross-dissolve' && right.start !== left.end) throw new Error('Non-cut transitions require touching clips or an existing dissolve; close the gap explicitly first.');
+  layer.transitions[boundary] = transition;
+  if (!layer.ripple && (transition.type === 'cross-dissolve' || previous.type === 'cross-dissolve')) {
+    next.clips.find((clip) => clip.id === right.clip.id)!.start = left.end - (transition.type === 'cross-dissolve' ? transition.duration : 0);
+  }
+}
+
+function trimPlacedClip(next: ProjectDocument, index: number, command: Extract<EditCommand, { type: 'trim-place' }>, before: TimelineLayout, anchors: Map<string, number>): void {
+  frameSchema.parse(command.start);
+  const clip = next.clips[index]!;
+  const layer = requiredLayer(next, clip.layerId);
+  const first = before.clips.find((item) => item.clip.layerId === layer.id)!;
+  if (layer.ripple && first.clip.id === clip.id) anchors.set(layer.id, command.start);
+  next.clips[index] = { ...clip, sourceIn: command.sourceIn, sourceOut: command.sourceOut, start: command.start };
+}
+
+function normalizePlacements(next: ProjectDocument, command: EditCommand): void {
+  const layout = calculateLayout(next);
+  if (command.type === 'place' || command.type === 'trim-place') {
+    const placed = layout.clips.find((item) => item.clip.id === command.clipId)!;
+    if (requiredLayer(next, placed.clip.layerId).ripple && placed.start !== command.start) throw new Error('Ripple is on: later clips follow the packed sequence. Choose an insertion slot, move the first clip, or turn Ripple off to set an independent start.');
+  }
+  for (const placed of layout.clips) {
+    if (requiredLayer(next, placed.clip.layerId).ripple) placed.clip.start = placed.start;
+  }
 }
 
 export function applyCommand(document: ProjectDocument, command: EditCommand): ProjectDocument {
   const next = projectSchema.parse(document);
+  // Keep the snapshot attached to the untouched committed document. In-place
+  // moves of cloned clips must not change its original track/first-clip identity.
+  const before = calculateLayout(document);
+  const anchors = new Map<string, number>();
   const index = 'clipId' in command ? next.clips.findIndex((clip) => clip.id === command.clipId) : -1;
   if ('clipId' in command && index < 0) throw new Error('Clip no longer exists.');
   switch (command.type) {
     case 'insert':
       if (!Number.isInteger(command.index) || command.index < 0 || command.index > next.clips.length) throw new Error('Invalid insertion index.');
-      next.clips.splice(command.index, 0, command.clip);
-      next.transitions = repairBoundaries(primaryClips(next), next.transitions);
+      next.clips.splice(command.index, 0, clipSchema.parse(command.clip));
+      repairLayerBoundaries(next, [command.clip.layerId]);
       break;
-    case 'delete':
+    case 'delete': {
+      const layerId = next.clips[index]!.layerId;
       next.clips.splice(index, 1);
-      next.transitions = repairBoundaries(primaryClips(next), next.transitions);
-      if (primaryClips(next).length === 0) { next.openingFade = 0; next.closingFade = 0; }
+      repairLayerBoundaries(next, [layerId]);
       break;
+    }
     case 'reorder': reorderClips(next, command.clipIds); break;
     case 'trim':
       next.clips[index] = { ...next.clips[index]!, sourceIn: command.sourceIn, sourceOut: command.sourceOut };
       break;
-    case 'trim-place': next.clips[index] = { ...next.clips[index]!, sourceIn: command.sourceIn, sourceOut: command.sourceOut, start: command.start }; break;
+    case 'trim-place': trimPlacedClip(next, index, command, before, anchors); break;
     case 'split': splitClip(next, index, command); break;
     case 'remove-source-range': removeSourceRange(next, index, command); break;
     case 'duplicate': duplicateClip(next, index, command.newClipId); break;
@@ -223,13 +305,20 @@ export function applyCommand(document: ProjectDocument, command: EditCommand): P
     case 'layer-add':
     case 'layer-update':
     case 'layer-remove':
-    case 'layer-order': editLayer(next, command); break;
-    case 'place': placeClip(next, index, command); break;
-    case 'transition': setTransition(next, command.transition); break;
-    case 'fades': next.openingFade = command.opening; next.closingFade = command.closing; break;
+    case 'layer-order': editLayer(next, command, before); break;
+    case 'place': placeClip(next, index, command, before, anchors); break;
+    case 'transition': setTransition(next, command.transition, before); break;
+    case 'fades': {
+      const layer = requiredLayer(next, command.layerId);
+      layer.openingFade = command.opening; layer.closingFade = command.closing;
+      break;
+    }
     default: throw new Error('Unknown edit command.');
   }
-  // Validation runs after, but no mutation has touched the caller's committed document.
+  preserveRippleAnchors(next, before, anchors);
+  // Persist the same derived integer starts used by preview/export, never stale
+  // suffix snapshots. Validation is atomic; the caller's document is untouched.
+  normalizePlacements(next, command);
   return projectSchema.parse(next);
 }
 

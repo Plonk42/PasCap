@@ -65,7 +65,7 @@ describe('shared-point drag planning', () => {
   it('rejects speed timing that would invalidate a transition instead of shortening clips/fades silently', () => {
     const project = createProject('invalid-speed-move', 'Atomic row speed');
     project.clips = [createClip('a', 'video', 0, 30), createClip('b', 'video', 30, 60)];
-    project.transitions = [{ leftId: 'a', rightId: 'b', type: 'cross-dissolve', duration: 18 }];
+    project.layers[0]!.transitions = [{ leftId: 'a', rightId: 'b', type: 'cross-dissolve', duration: 18 }];
     project.layers[0]!.keyframes = [
       { frame: 0, interpolation: 'hold', values: { ...EMPTY_KEY_VALUES, speed: 1 } },
       { frame: 100, interpolation: 'hold', values: { ...EMPTY_KEY_VALUES, speed: 8 } },

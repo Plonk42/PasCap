@@ -12,7 +12,7 @@ import { compositePixel } from '../../src/shared/composition.js';
 import { EXPORT_PROFILES, type ExportProfile } from '../../src/shared/export.js';
 import { EMPTY_KEY_VALUES } from '../../src/shared/keyframes.js';
 import type { MediaAsset } from '../../src/shared/media.js';
-import { createClip, createProject, type ProjectDocument } from '../../src/shared/model.js';
+import { createClip, createLayer, createProject, type ProjectDocument } from '../../src/shared/model.js';
 import type { SpeedCurve } from '../../src/shared/speed.js';
 import { calculateLayout, sampleTimeline } from '../../src/shared/timeline.js';
 
@@ -82,7 +82,7 @@ describe.skipIf(!enabled)('clip speed curves · exact native maps on disposable 
       { mode: 'curve', keyframes: [{ frame: 0, rate: 2, interpolation: 'hold' }, { frame: 12, rate: 0.1, interpolation: 'hold' }, { frame: 13, rate: 2, interpolation: 'hold' }, { frame: 32, rate: 2, interpolation: 'hold' }] },
     ];
     document.clips = speeds.map((speed, index) => ({ ...createClip(`curve-${index}`, assets[index % 2]!.id, 4, 24), speed }));
-    document.transitions = [{ leftId: 'curve-0', rightId: 'curve-1', type: 'cross-dissolve', duration: 3 }, { leftId: 'curve-1', rightId: 'curve-2', type: 'cut', duration: 0 }];
+    document.layers[0]!.transitions = [{ leftId: 'curve-0', rightId: 'curve-1', type: 'cross-dissolve', duration: 3 }, { leftId: 'curve-1', rightId: 'curve-2', type: 'cut', duration: 0 }];
     const receipt = await completed(document);
     expect(receipt.settings.pipeline).toBe('static-single-layer'); expect(receipt.retiming).toHaveLength(3);
     receipt.retiming.forEach((report, index) => {
@@ -95,7 +95,7 @@ describe.skipIf(!enabled)('clip speed curves · exact native maps on disposable 
     const document = createProject('layered-clip-curves', 'Disposable layered custom speed');
     const speed: SpeedCurve = { mode: 'curve', keyframes: [{ frame: 0, rate: 0.5, interpolation: 'smooth' }, { frame: 16, rate: 2, interpolation: 'ease-in' }, { frame: 32, rate: 0.5, interpolation: 'hold' }] };
     document.clips = [{ ...createClip('base', assets[0]!.id, 2, 22), speed }, { ...createClip('upper', assets[1]!.id, 10, 20), layerId: 'upper', start: 3, opacity: 0.6, speed }];
-    document.layers.push({ id: 'upper', name: 'Upper', enabled: true, opacity: 0.8, keyframes: [
+    document.layers.push({ ...createLayer('upper', 'Upper', false), opacity: 0.8, keyframes: [
       { frame: 0, interpolation: 'linear', values: { ...EMPTY_KEY_VALUES, speed: 2 } },
       { frame: 20, interpolation: 'hold', values: { ...EMPTY_KEY_VALUES, speed: 0.5 } },
     ] });

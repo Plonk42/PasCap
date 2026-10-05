@@ -115,6 +115,26 @@
 - Shared integer-frame layout/retiming is authoritative for UI, preview and native
   export. Per-frame rendering stays outside React. Preserve serial heavy-job,
   native child/buffer ownership, exact frame counts and original identity guards.
+- Keep strict schema 6 and uniform tracks: every layer requires `ripple`,
+  `transitions`, `openingFade` and `closingFade`; no primary/overlay role or
+  mandatory first ID. Display the saved bottom-to-top array order (row 1 below
+  row 2 in composition). New tracks default to Ripple on. Enabling packs from the
+  current first start in one Undo; while on, continuously sequence and persist
+  actual starts. Turning off captures actual placements. Independent start/nudge
+  while on is only for the first anchor; later clips explain how to turn Ripple off.
+  Music, row points and other tracks keep absolute times. Preserve v1–v5 projects
+  and receipt snapshots unchanged/incompatible, with no migration; registry/proxy
+  formats are unchanged.
+- Track-local black fades preserve coverage, including dormant settings on empty
+  tracks. Non-cut transitions require touching clips or an existing dissolve;
+  positioned dissolve edits explicitly adjust only the right clip, rejecting
+  conflicts. Any track may be removed except the last; stacking has only endpoint
+  restrictions. Preview has two slots per track (16 maximum) plus one reviewer.
+  Generalized native export renders RGBA16 groups then merges without regrading:
+  four raw buffers/22 bytes per pixel, two LUTs, three timeline representations,
+  two retained clip files, one original decoder, two intermediate readers, one
+  encoder and three video children per serial pass. The static fast path requires
+  an eligible single opaque, unanimated, zero-origin contiguous track.
 - `npm run check` validates types, unit/service tests and production build.
   `npm run test:browser` and `npm run test:media` use isolated synthetic fixtures;
   `npm run test:space` is an additional Linux private-tmpfs opt-in. Never use

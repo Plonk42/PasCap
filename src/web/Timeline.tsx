@@ -1,11 +1,11 @@
-import { useEffect, useLayoutEffect, useRef, useState, type DragEvent, type KeyboardEvent, type PointerEvent } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState, type DragEvent, type KeyboardEvent, type PointerEvent } from 'react';
 import type { AudioAsset } from '../shared/audio.js';
 import { applyCommand, type EditCommand } from '../shared/commands.js';
 import { KEYFRAME_SETTINGS, keySettings } from '../shared/keyframes.js';
 import { compileLayerRetiming } from '../shared/layer-retiming.js';
 import { resolveMediaSelection, type MediaSelections } from '../shared/media-selection.js';
 import type { MediaAsset } from '../shared/media.js';
-import { createClip, MAX_VIDEO_LAYERS, type ProjectDocument, type VideoClip } from '../shared/model.js';
+import { createClip, createLayer, MAX_VIDEO_LAYERS, type ProjectDocument, type VideoClip } from '../shared/model.js';
 import type { ClipCutRange } from '../shared/rush-editing.js';
 import { snapFrame, snapPoints } from '../shared/snap.js';
 import { trimOnTimeline, type TrimEdge } from '../shared/source-range.js';
@@ -14,6 +14,7 @@ import { formatTimecode, framesToSeconds, secondsToFrames } from '../shared/timi
 import { CLIP_DRAG_TYPE, durationLabel, MEDIA_DRAG_TYPE, shortName, sourceSeconds } from './display.js';
 import { Icon } from './icons.js';
 import { useKeyframeNavigation } from './keyframe-navigation.js';
+import { clipStartRestriction } from './layer-actions.js';
 import './layers.css';
 import { Layers } from './Layers.js';
 import { MusicTimeline } from './MusicTimeline.js';
@@ -129,6 +130,7 @@ function timelineSurfaceClassName(error: string, draft: ProjectDocument | null, 
 export function Timeline(props: Readonly<Props>) {
   const { project, assets, audioAssets, selectedClipId, selectedLayerId, onSelectLayer, selectedBoundaryId, frame, onSelect, onBoundary, onSeek, onPause, onEdit, onInsert, onPreview, onError, onSplit, onDelete, fitRequest, draggedMediaIds, ranges, onDuplicate, onNudge } = props;
   const [snapping, setSnapping] = useState(true);
+  const nudgeReasonId = useId();
   const [snapGuide, setSnapGuide] = useState<number | null>(null);
   const bypassSnap = useRef(false);
   const [pixelsPerSecond, setPixelsPerSecond] = useState(48);
@@ -200,6 +202,7 @@ export function Timeline(props: Readonly<Props>) {
   const excerptCounts = countExcerpts(project.clips);
   const source = assets.find((asset) => asset.id === selected?.clip.mediaId);
   const selectedLayer = project.layers.find((layer) => layer.id === selected?.clip.layerId);
+  const nudgeRestriction = selected ? clipStartRestriction(project, selected.clip) : null;
   // Reserve access to omitted head/tail footage, including the first/last clip.
   // Outward trimming must not require dragging beyond the edge of the browser.
   const availableHead = selected && selectedLayer ? compileLayerRetiming({ ...selected.clip, sourceIn: 0 }, selectedLayer, selected.start).duration - selected.duration : 0;
@@ -381,7 +384,7 @@ export function Timeline(props: Readonly<Props>) {
       const range = resolveMediaSelection(id, asset.metadata.frameCount, ranges);
       let clipId = `drop-preview-${index}`;
       while (project.clips.some((clip) => clip.id === clipId)) clipId += '-x';
-      return createClip(clipId, id, range.sourceIn, range.sourceOut);
+      return createClip(clipId, id, range.sourceIn, range.sourceOut, selectedLayerId);
     })
   });
   latestDrop.current = (): DropPlan | null => {
@@ -451,16 +454,16 @@ export function Timeline(props: Readonly<Props>) {
   return <section className="timeline-panel panel" id="timeline-pane" tabIndex={-1} aria-label="Video timeline">
     <div className="timeline-toolbar">
       <h2>Timeline <span className="count">{project.clips.length}</span></h2>
-      <Popover label="Clip actions" className="timeline-clip-actions">{(close) => <><button className="secondary-button small" aria-label="Duplicate selected clip" disabled={!selectedClipId || interactionBlocked} onClick={() => { close(); onDuplicate(); }}><Icon name="plus" size={15} />Duplicate <kbd>Ctrl+D</kbd></button><div className="clip-nudge-controls"><button className="secondary-button small" aria-label="Move clip one frame earlier" title="Overlay placement · Alt+Left" disabled={!selected || selected.clip.layerId === project.layers[0]!.id || interactionBlocked} onClick={() => onNudge(-1)}>← 1 frame</button><button className="secondary-button small" aria-label="Move clip one frame later" title="Overlay placement · Alt+Right" disabled={!selected || selected.clip.layerId === project.layers[0]!.id || interactionBlocked} onClick={() => onNudge(1)}>1 frame →</button></div></>}</Popover>
+      <Popover label="Clip actions" className="timeline-clip-actions">{(close) => <><button className="secondary-button small" aria-label="Duplicate selected clip" disabled={!selectedClipId || interactionBlocked} onClick={() => { close(); onDuplicate(); }}><Icon name="plus" size={15} />Duplicate <kbd>Ctrl+D</kbd></button><div className="clip-nudge-controls"><button className="secondary-button small" aria-label="Move clip one frame earlier" aria-describedby={nudgeRestriction ? nudgeReasonId : undefined} title={nudgeRestriction ?? (selected?.start === 0 ? 'Already at timeline frame 0' : 'Move this start or first Ripple anchor · Alt+Left')} disabled={!selected || selected.start === 0 || nudgeRestriction !== null || interactionBlocked} onClick={() => onNudge(-1)}>← 1 frame</button><button className="secondary-button small" aria-label="Move clip one frame later" aria-describedby={nudgeRestriction ? nudgeReasonId : undefined} title={nudgeRestriction ?? 'Move this start or first Ripple anchor · Alt+Right'} disabled={!selected || nudgeRestriction !== null || interactionBlocked} onClick={() => onNudge(1)}>1 frame →</button></div>{nudgeRestriction && <p className="control-hint" id={nudgeReasonId}>{nudgeRestriction}</p>}</>}</Popover>
       <RushEditBar project={project} selected={selected} frame={frame} disabled={interactionBlocked} cutRange={props.cutRange} onSplit={onSplit} onDelete={onDelete} onQuickTrim={props.onQuickTrim} onMarkCut={props.onMarkCut} onCutMarked={props.onCutMarked} onClearCut={props.onClearCut} />
       <span className="timeline-length">{durationLabel(framesToSeconds(layout.duration))}</span>
       <button className={`secondary-button small timeline-view-action ${snapping ? 'active' : ''}`} aria-label="Toggle snapping" aria-pressed={snapping} title="Snap to nearby edges and the playhead · hold Alt to bypass" disabled={interactionBlocked} onClick={() => setSnapping(!snapping)}><Icon name="magnet" size={15} /><span className="timeline-action-label">Snap</span></button>
-      <button className="secondary-button small timeline-view-action" aria-label="Add video layer" title="Add an independently positioned overlay row" disabled={interactionBlocked || project.layers.length >= MAX_VIDEO_LAYERS} onClick={() => {
-        const id = crypto.randomUUID(); onEdit({ type: 'layer-add', layer: { id, name: nextLayerName(project), enabled: true, opacity: 1, keyframes: [] } }); onSelectLayer(id);
+      <button className="secondary-button small timeline-view-action" aria-label="Add video layer" title="Add a video track with Ripple on, independent transitions and fades" disabled={interactionBlocked || project.layers.length >= MAX_VIDEO_LAYERS} onClick={() => {
+        const id = crypto.randomUUID(); onEdit({ type: 'layer-add', layer: createLayer(id, nextLayerName(project)) }); onSelectLayer(id);
       }}><Icon name="plus" size={15} /><span className="timeline-action-label">Layer</span></button>
       <div className="timeline-zoom"><label htmlFor="timeline-zoom">Zoom</label><input id="timeline-zoom" type="range" aria-label="Timeline zoom" min={12} max={180} step={1} value={pixelsPerSecond} disabled={interactionBlocked} onChange={(event) => setPixelsPerSecond(Number(event.target.value))} /><button className="text-button" title="Fit timeline (F)" disabled={interactionBlocked || !layout.duration} onClick={fitTimeline}>Fit</button></div>
     </div>
-    <div className="timeline-lanes"><Layers project={project} selectedId={selectedLayerId} scrollTop={verticalScroll} surfaceHeight={surfaceHeight} viewportHeight={viewportHeight} frame={frame} disabled={interactionBlocked} onScroll={scrollLayers} onSelect={onSelectLayer} onEdit={onEdit} /><div className="timeline-scroll" ref={scroll} onScroll={(event) => setVerticalScroll(event.currentTarget.scrollTop)} onDragOver={dragOver} onDrop={drop} onDragLeave={(event) => {
+    <div className="timeline-lanes"><Layers project={project} selectedId={selectedLayerId} scrollTop={verticalScroll} surfaceHeight={surfaceHeight} viewportHeight={viewportHeight} frame={frame} disabled={interactionBlocked} onScroll={scrollLayers} onSelect={onSelectLayer} onEdit={onEdit} /><div className="timeline-scroll" ref={scroll} onScroll={(event) => setVerticalScroll(event.currentTarget.scrollTop)} onDragEnter={dragOver} onDragOver={dragOver} onDrop={drop} onDragLeave={(event) => {
       if (!event.currentTarget.contains(event.relatedTarget as Node | null)) { setDropPlan(null); dropPointer.current = null; cancelAnimationFrame(dropScroll.current); dropScroll.current = 0; }
     }}>
       <div ref={surface} className={timelineSurfaceClassName(dragError, draft, keyframes.active)} style={{ width, height: surfaceHeight }} data-pixels-per-frame={scale} data-leading={leading}>
@@ -521,7 +524,8 @@ export function Timeline(props: Readonly<Props>) {
           const left = assets.find((asset) => asset.id === project.clips.find((clip) => clip.id === region.transition.leftId)?.mediaId)?.name ?? `Excerpt ${index + 1}`;
           const position = region.transition.type === 'cross-dissolve' ? (region.start + region.end) / 2 : region.boundary;
           const label = { cut: 'Cut', 'cross-dissolve': 'Dissolve', 'fade-through-black': 'Fade' }[region.transition.type];
-          return <button key={`${region.transition.leftId}-${region.transition.rightId}`} className={`boundary-button ${selectedBoundaryId === region.transition.leftId ? 'selected' : ''}`} disabled={interactionBlocked} style={{ top: rowTop(project.layers[0]!.id) - 24, left: leading + position * scale }} aria-label={`Transition after ${left}, excerpt ${index + 1}`} onClick={() => onBoundary(region.transition.leftId)}>{label}</button>;
+          const layerName = project.layers.find((layer) => layer.id === region.layerId)!.name;
+          return <button key={`${region.transition.leftId}-${region.transition.rightId}`} className={`boundary-button ${selectedBoundaryId === region.transition.leftId ? 'selected' : ''}`} data-transition-layer={region.layerId} disabled={interactionBlocked} style={{ top: rowTop(region.layerId) + 4, left: leading + position * scale }} aria-label={`Transition after ${left}, excerpt ${index + 1} on ${layerName}`} title={`${label} on ${layerName} · edit this track’s boundary`} onClick={() => onBoundary(region.transition.leftId)}>{label}</button>;
         })}
         {layout.duration > 0 && <div className="timeline-playhead" style={{ left: leading + frame * scale }}><i /></div>}
         {dropPlan && <><div className={`timeline-drop-preview ${dropPlan.error ? 'invalid' : ''}`} data-drop-start={dropPlan.start} data-drop-layer={dropPlan.layerId} data-drop-valid={!dropPlan.error} style={{ top: rowTop(dropPlan.layerId), left: leading + dropPlan.start * scale, width: dropPlan.duration * scale }}><span>{dropLabel(dropPlan)} · {formatTimecode(dropPlan.start)}</span></div><div className={`timeline-drop-marker ${dropPlan.error ? 'invalid' : ''}`} style={{ top: rowTop(dropPlan.layerId) - 6, height: 80, bottom: 'auto', left: leading + dropPlan.start * scale }} />{dropPlan.guide !== null && !dropPlan.error && <div className="snap-guide" style={{ left: leading + dropPlan.guide * scale }} />}</>}
@@ -532,7 +536,7 @@ export function Timeline(props: Readonly<Props>) {
     </div></div>
     <div className="timeline-bottom">
       <span className={dragError || dropPlan?.error || keyframes.draft?.error ? 'trim-error' : ''}>{timelineInteractionMessage(keyframes.draft, dragError, dropPlan, draft, selected?.clip)}</span>
-      <span className="active-layer-readout">Insert → <strong>{project.layers.find((layer) => layer.id === selectedLayerId)?.name ?? 'Video 1'}</strong></span>
+      <span className="active-layer-readout">Insert → <strong>{project.layers.find((layer) => layer.id === selectedLayerId)?.name ?? project.layers[0]!.name}</strong></span>
     </div>
   </section>;
 }

@@ -48,22 +48,22 @@ describe('layout and sampling', () => {
     expect([97, 98, 99, 100, 101].map((frame) => sampleTimeline(project, frame)[0]?.weight)).toEqual([1, 0.5, 0, 0, 1]);
   });
   it('places opening/closing fades inside the clips', () => {
-    const project = applyCommand(sequence(), { type: 'fades', opening: 3, closing: 3 });
+    const project = applyCommand(sequence(), { type: 'fades', layerId: 'video-1', opening: 3, closing: 3 });
     expect([0, 1, 2, 177, 178, 179].map((frame) => sampleTimeline(project, frame)[0]?.weight)).toEqual([0, 0.5, 1, 1, 0.5, 0]);
     expect(calculateLayout(project).duration).toBe(180);
   });
   it('rejects overlapping transition regions without changing committed data', () => {
     const original = sequence();
     expect(() => applyCommand(original, { type: 'transition', transition: { leftId: 'a', rightId: 'b', type: 'cross-dissolve', duration: 81 } })).toThrow();
-    expect(original.transitions[0]?.type).toBe('cut');
+    expect(original.layers[0]!.transitions[0]?.type).toBe('cut');
     const transition = applyCommand(original, { type: 'transition', transition: { leftId: 'a', rightId: 'b', type: 'cross-dissolve', duration: 60 } });
-    expect(() => applyCommand(transition, { type: 'fades', opening: 41, closing: 0 })).toThrow();
+    expect(() => applyCommand(transition, { type: 'fades', layerId: 'video-1', opening: 41, closing: 0 })).toThrow();
   });
   it('rejects wrong adjacency, duplicate IDs and unknown document fields', () => {
     const project = sequence();
     expect(() => projectSchema.parse({ ...project, legacy: true })).toThrow();
     expect(() => projectSchema.parse({ ...project, clips: [project.clips[0], project.clips[0]] })).toThrow();
-    expect(() => projectSchema.parse({ ...project, transitions: [{ leftId: 'b', rightId: 'a', type: 'cut', duration: 0 }] })).toThrow();
+    expect(() => projectSchema.parse({ ...project, layers: [{ ...project.layers[0]!, transitions: [{ leftId: 'b', rightId: 'a', type: 'cut', duration: 0 }] }] })).toThrow('ordered adjacent clip pairs');
   });
 });
 
@@ -78,20 +78,22 @@ describe('editing commands and history', () => {
     project = applyCommand(project, { type: 'transition', transition: { leftId: 'a', rightId: 'b', type: 'cross-dissolve', duration: 10 } });
     project = applyCommand(project, { type: 'split', clipId: 'a', sourceFrame: 60, newClipId: 'a2' });
     expect(project.clips[1]?.colour.exposure).toBe(0.7);
-    expect(project.transitions.map((t) => [t.leftId, t.rightId, t.type])).toEqual([['a', 'a2', 'cut'], ['a2', 'b', 'cross-dissolve']]);
+    expect(project.layers[0]!.transitions.map((t) => [t.leftId, t.rightId, t.type])).toEqual([['a', 'a2', 'cut'], ['a2', 'b', 'cross-dissolve']]);
     expect(calculateLayout(project).duration).toBe(170);
   });
   it('reordering preserves only unchanged adjacent pairs', () => {
     let project = applyCommand(sequence(), { type: 'insert', clip: createClip('c', 'media-c', 0, 100), index: 2 });
     project = applyCommand(project, { type: 'transition', transition: { leftId: 'a', rightId: 'b', type: 'cross-dissolve', duration: 10 } });
-    expect(applyCommand(project, { type: 'reorder', clipIds: ['c', 'a', 'b'] }).transitions.map((t) => t.type)).toEqual(['cut', 'cross-dissolve']);
-    expect(applyCommand(project, { type: 'reorder', clipIds: ['b', 'a', 'c'] }).transitions.every((t) => t.type === 'cut')).toBe(true);
+    expect(applyCommand(project, { type: 'reorder', clipIds: ['c', 'a', 'b'] }).layers[0]!.transitions.map((t) => t.type)).toEqual(['cut', 'cross-dissolve']);
+    expect(applyCommand(project, { type: 'reorder', clipIds: ['b', 'a', 'c'] }).layers[0]!.transitions.every((t) => t.type === 'cut')).toBe(true);
   });
-  it('deleting closes the gap and resets fades on an empty track', () => {
+  it('deleting closes the gap and retains dormant fades on an empty track', () => {
     let project = applyCommand(sequence(), { type: 'delete', clipId: 'a' });
     expect(calculateLayout(project).duration).toBe(80);
-    project = applyCommand(project, { type: 'fades', opening: 10, closing: 10 });
-    expect(applyCommand(project, { type: 'delete', clipId: 'b' }).openingFade).toBe(0);
+    project = applyCommand(project, { type: 'fades', layerId: 'video-1', opening: 10, closing: 10 });
+    const empty = applyCommand(project, { type: 'delete', clipId: 'b' });
+    expect(empty.clips).toEqual([]);
+    expect(empty.layers[0]).toMatchObject({ openingFade: 10, closingFade: 10, transitions: [] });
   });
   it('undo/redo are atomic and invalid edits do not enter history', () => {
     const history = new EditHistory(sequence());

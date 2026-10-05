@@ -3,7 +3,7 @@
 ## Source footage and excerpt instances
 
 The media library describes complete recordings belonging to the open project's
-bin, not every globally registered source. Strict schema 5 requires unique
+bin, not every globally registered source. Strict schema 6 requires unique
 `media.videoIds` and `media.audioIds` arrays (10,000 IDs maximum each). Imports add
 membership even without timeline placement; clip/music references also remain
 visible. New projects start with both arrays empty. Importing an existing source
@@ -72,7 +72,8 @@ Import guidance, **without a POST**. Internal dragging of ready registered Media
 into Timeline remains unchanged. Uncertain registration results are not retried
 automatically; check Media/Activity before resubmitting.
 
-Strict schema 5 is unchanged. Only generated proxies/thumbnails, metadata,
+Strict schema 6 requires per-track Ripple, transitions and fades; registry/proxy
+formats are unchanged. Only generated proxies/thumbnails, metadata,
 exports/receipts and scratch are created, not duplicate originals. Keep originals
 accessible at their registered paths: moving files or disconnecting a drive fails
 explicitly, even with a proxy; there is no implicit guessing/reassociation and an
@@ -97,7 +98,8 @@ registered paths and bytes. This is data safety, not compatibility code.
 - Source limits stop a handle at zero/original frame count; at least one frame
   remains selected. Transition/fade incompatibility is an invalid edit, not a
   reason to shorten transitions silently.
-- Primary clips downstream ripple when a trim is committed. On overlays, a left
+- With Ripple on, a committed trim continuously re-sequences later clips on that
+  track from the existing first anchor. With Ripple off, a left
   handle/keyboard trim solves the new start and source IN together so the timeline
   OUT holds, including under a row rate curve. If integer-frame quantisation cannot
   represent that retained OUT, the trim is explicitly rejected rather than moving
@@ -108,7 +110,7 @@ registered paths and bytes. This is data safety, not compatibility code.
   On a left-handle gesture only, recoverable headspace is reserved and scroll is
   compensated before paint: pointer/frame-zero positions do not jump at gesture start.
   Keeping the pointer inside the left viewport edge autoscrolls through that headspace,
-  even when a long beginning was omitted from the first primary excerpt. Release
+  even when a long beginning was omitted from the first excerpt. Release
   removes the temporary gutter; cancellation restores its initial scroll and document.
   No negative project start is stored. Right-edge autoscroll likewise exposes tails.
   Home/End and numeric source fields remain available for exact restoration.
@@ -119,7 +121,7 @@ registered paths and bytes. This is data safety, not compatibility code.
 
 The selected excerpt's left/right trim edges are keyboard sliders. Arrow keys
 move by one original source frame; Shift moves by ten. Home at the left edge requests
-IN=0; End at the right edge requests the original OUT. An overlay left restoration
+IN=0; End at the right edge requests the original OUT. A Ripple-off left restoration
 cannot extend before project frame zero or silently change its retained timeline
 OUT; source/placement quantisation and normal overlap/fade validation still apply.
 
@@ -127,7 +129,8 @@ OUT; source/placement quantisation and normal overlap/fade validation still appl
 
 The timeline's visible rush-edit controls expose **Split**, **Trim start**, **Trim end**,
 Delete and **IN / OUT / Cut range** in the existing responsive toolbar, not another
-row covering the lanes. It identifies **Ripple sequence** versus **Positioned overlay**.
+row covering the lanes. It identifies **Ripple track** versus **Positioned track**
+from that track's own Ripple setting, not its row number or identity.
 
 - **Split / S** maps the playhead through the placed retiming map and creates two
   independent excerpts. On success the right piece is selected and its beginning
@@ -135,7 +138,8 @@ row covering the lanes. It identifies **Ripple sequence** versus **Positioned ov
   and history. The playhead must be strictly inside the excerpt's source range.
 - **Trim start / Q** discards footage before the displayed source frame; **Trim
   end / W** discards footage after it, keeping that frame via source OUT = frame + 1.
-  Primary clips ripple; the overlay left trim retains its old OUT when representable.
+  Ripple-on left trims keep their sequence start and recompile later clips;
+  Ripple-off left trims retain their old OUT when representable.
   These are shrinking operations. Handles or Restore full recording recover omitted
   footage. Repeating an unchanged endpoint trim adds no history entry.
 - With one excerpt selected, seek the first unwanted timeline frame and **IN / I**,
@@ -146,14 +150,14 @@ row covering the lanes. It identifies **Ripple sequence** versus **Positioned ov
   a fresh ID. Prefix/suffix removal keeps only the retained excerpt; a whole-range
   removal deletes it. Retained pieces share the original media but have independent
   ranges/static settings, including original-source ramp anchors. No proxy is cut.
-- The primary row closes the removed gap and recalculates later starts/durations
+- With Ripple on, the track closes the removed gap and recalculates later starts/durations
   without changing their order, original-source ranges or static settings. The new
   left/right boundary is a cut. Existing valid incoming/outgoing transitions are
   retained/reanchored; fades are never silently shortened to make an invalid edit fit.
-- An overlay cut keeps the removed gap and other clips' absolute placements. Its
+- With Ripple off, a cut keeps the removed gap and other clips' absolute placements. Its
   retained right piece starts at the original contextual output position of the
   retained source IN. Each piece retimes/rounds independently, like a mapped split;
-  invalid overlap/quantisation is rejected. Use the primary row for ripple assembly.
+  invalid overlap/quantisation is rejected. Ripple assembly is available on any track.
 - Missing/reversed/outside marks and slow-motion ranges containing no original
   source frame cannot remove footage. Mark controls require the playhead within
   the selected excerpt; errors preserve document/history and valid existing marks.
@@ -162,63 +166,76 @@ row covering the lanes. It identifies **Ripple sequence** versus **Positioned ov
   clear them. Source-review I/O controls are a separate context and never edit these
   marks or the timeline. Form/modal/slider/popover keyboard guards still apply.
 
-Music, overlays and row points do not follow primary ripple edits. Their absolute
+Music, other tracks and row points do not follow a track's Ripple edits. Their absolute
 project times remain fixed; row animation may therefore evaluate different footage
-after sequencing changes. No timing migration or schema extension is introduced.
+after sequencing changes. No migration or movement of animation anchors occurs.
 
 ## Insertion, reordering and history
 
-The primary sequence is displayed first, with overlays below it in front-to-back
-overlay order; saved bottom-to-top composition and primary/overlay timing are
-unchanged. Tracks and layer headers have synchronized native vertical scrolling.
+One to eight uniform tracks display in saved **bottom-to-top composition order**:
+row 1 renders below row 2, row 3 above row 2, and so on. There is no primary/overlay
+editing role or required first-track ID. Tracks and layer headers have synchronized native vertical scrolling.
 The ruler, playhead handle and timecode remain pinned above scrolling rows. Ticks
 follow horizontal scroll; a ruler click/drag still maps to the exact timeline
 frame. Scrolling creates no seek/history/save, and a drop on the ruler cannot
 target a row hidden underneath it.
 
+Every new track starts with **Ripple on**. **Layer options → Ripple** enables a
+continuous packed sequence, not just a policy for future edits. Enabling sorts
+current placements chronologically and closes gaps in **one Undo step**, preserving
+the first clip's current start and valid existing dissolves. Later starts follow
+the preceding contextual OUT minus incoming dissolve duration; commands persist
+actual integer placements. Structural edits retain the pre-edit first anchor even
+if a different clip becomes first. Turning Ripple off captures actual starts for
+independent placement; it does not restore former gaps. Both directions are atomic
+and undoable, and never move music, other tracks or absolute row points.
+
 - Media drags carry registered IDs, not arbitrary paths. Only verified ready
   recordings can be added; the server validates registered source ranges on save.
-- Primary drops choose the nearest legal ripple slot after temporarily removing
-  a moving instance, including retained incoming dissolves. Overlay drops target
+- Ripple-on drops choose the nearest legal sequence slot after temporarily removing
+  a moving instance, including retained incoming dissolves. Ripple-off drops target
   independent row/project placement. Plus/double-click/batch use
-  the selected layer; primary insertion appends, overlay insertion starts at the
+  the selected layer; Ripple-on insertion appends, Ripple-off insertion starts at the
   playhead, and a batch places its instances consecutively as one history operation.
   Batch cursor positions use each new clip's contextual retiming end. Every path
   copies current source-review ranges, never arbitrary source paths or row points.
-- Existing excerpt drags reorder primary IDs or change overlay placement/layer,
+- Existing excerpt drags reorder a Ripple-on track or change independent placement/track,
   without duplicating media/ranges. The pointer retains the offset where the clip
   was grabbed; selection cannot move the timeline origin underneath it. One shared
   integer-frame plan drives the row-specific placement ghost and committed command.
-  The ghost start is the actual post-removal ripple start or independent overlay
+  The ghost start is the actual post-removal sequence start or independent
   start, and its width is recomputed for the destination row's rate curve at that
   start, not copied from the old placement. A snap guide may mark its contextual
   trailing edge rather than its leading edge.
   Invalid overlap/fade placements have a red ghost/reason and never enter history.
   Edge scrolling updates the same plan; cancellation leaves placement unchanged.
   Unchanged adjacent pairs retain their transition; new pairs become cuts.
-- Primary deletion closes the gap; overlay deletion leaves other placements intact.
+- Ripple-on deletion closes the gap; Ripple-off deletion leaves other placements intact.
   Split finds the original source boundary through the placed map and preserves
   independent static colour/opacity/speed, including source-ramp anchors. It creates
-  a primary cut or positioned overlay pieces. Each piece retimes/rounds independently,
+  a cut between the pieces on that track. Each piece retimes/rounds independently,
   so total duration can change. Invalid edits never enter history.
 - **Clip actions → Duplicate** / **Ctrl+D** copies the complete source excerpt,
-  static grade, opacity and constant/ramp/custom speed into an independent ID. Primary
-  duplicates insert after the original with new cut boundaries. Overlay duplicates start immediately
+  static grade, opacity and constant/ramp/custom speed into an independent ID. Ripple-on
+  duplicates insert after the original with new cut boundaries. Ripple-off duplicates start immediately
   after the original's contextual end and acquire their own contextual duration;
   occupied placement is rejected atomically.
-- **Trim/cut/move/split/duplicate never copy or shift row points.** A primary ripple
+- **Trim/cut/move/split/duplicate never copy or shift row points.** Track Ripple
   leaves their project times fixed. Moving between rows leaves both rows' points
   intact and evaluates the destination row curve; source/static bases remain independent.
-- **Alt+Left/Right** nudges a selected overlay one frame; adding Shift nudges ten.
-  Clip actions also exposes frame-nudge buttons. Starts remain nonnegative, occupied
-  placement is rejected, and each successful action is one Undo step. Primary clips
-  do not gain free placement or frame nudging.
+- **Alt+Left/Right** nudges a positioned clip or the first Ripple anchor one frame;
+  adding Shift nudges ten. Clip actions also exposes frame-nudge buttons, and
+  Clip → Layer & opacity has **Timeline start frame** on every track. Later Ripple
+  starts are derived and disabled with an accessible reason: drag to reorder or
+  turn Ripple off for independent placement. Moving the first anchor while it
+  remains first re-sequences its track. Starts remain nonnegative, conflicts reject
+  the whole edit, and each successful action is one Undo step.
 - Session-only Undo/Redo covers clip commands and committed pointer gestures.
   Saved document revisions are managed separately by serial autosave.
 
 ## Row points, time ruler and transitions
 
-Schema-5 points belong to the **whole video row**, not individual clips. One ordered
+Schema-6 points belong to the **whole video row**, not individual clips. One ordered
 point at a project frame holds independently participating Layer opacity, Clip
 opacity, Speed and seven colour settings. Points survive clip trimming/removal and
 may remain beyond current duration. Each channel uses the point's shared easing
@@ -289,16 +306,30 @@ TIME; clicking/dragging seeks. The distinct **Cut / Fade / Dissolve** boundary
 buttons open transition settings in Sequence, not keyframe controls. Full point
 semantics are in [LAYERS_AND_KEYFRAMES.md](LAYERS_AND_KEYFRAMES.md).
 
+Every track owns its boundary list and opening/closing fades, edited in **Sequence**
+for the selected track. Exactly one record joins each adjacent pair. Cut permits a
+gap; non-cut transitions require touching clips or that pair's existing dissolve.
+Gapped pairs explain the disabled non-cut choices: explicitly close the gap or
+enable that track's Ripple first. Cross-dissolve duration explicitly sets the right
+start to left OUT minus duration; changing/removing an existing dissolve changes
+that overlap. Ripple on re-sequences the suffix; off changes only the paired right
+clip and rejects conflicts with others. Arbitrary/triple overlap is forbidden.
+Fade-through-black keeps a touching boundary without overlap. Track opening/closing
+fades apply at actual first/last placements, darken only that row's RGB and preserve
+coverage. Empty tracks retain dormant fades; adding footage validates them again.
+No edit silently shortens fades/transitions to fit.
+
 ## Layers and preview
 
-Clip names/selection are instance-based, not A/B slots. The primary layer remains
-ripple-edited and first in the bottom-to-top stack. Up to seven overlays have
-absolute starts, independent gaps/tails, visibility and opacity; two excerpts cannot
-overlap on the same overlay row. Layer order/deletion and movement between rows are
-undoable. Primary-only transitions are grouped before applying layer opacity.
+Clip names/selection are instance-based, not A/B slots. Every track has independent
+Ripple, transitions/fades, visibility and opacity. Any track can be deleted except
+the last remaining one; Raise/Lower are limited only by composition endpoints and
+active interaction state. Track order/deletion and cross-track moves are undoable.
+Each track's dissolve is grouped before applying its layer opacity; simultaneous
+dissolves on different tracks are allowed.
 
 A nonempty one-layer project uses **two reusable video elements/textures**; eight
-layers use up to **nine** (two primary dissolve sources plus seven overlay sources).
+tracks use **16**, two slots per track, never one per stored clip.
 A required instance retains its decoder; only inactive slots may be reassigned.
 Next sources per enabled row are speculatively preloaded in free slots. Source
 review uses one separate muted/paused decoder, not another timeline slot.
@@ -319,24 +350,26 @@ Dissolve grouping and layer-opacity equations are unchanged. See
 zoom. Ruler/playhead scrubbing snaps to video/music boundaries; trim handles also
 snap to the original, stationary playhead. Shared-point drags use boundaries and
 the stationary playhead captured at pointer down, with their captured zoom throughout
-autoscroll. Overlay moves match either leading or trailing edge to other clip/music/
+autoscroll. Ripple-off moves match either leading or trailing edge to other clip/music/
 transition boundaries, frame zero or the captured
 stationary playhead; their own old edges/transition regions are excluded. Holding
 Alt bypasses these magnets. A trailing-edge snap solves a representable contextual
-end under the row rate curve, rather than subtracting the old duration. Primary
-ripple insertion remains boundary-based even with Snap off or Alt held: contiguous
-primary sequencing is not free positioning. The
+end under the row rate curve, rather than subtracting the old duration. Ripple-on
+insertion remains boundary-based even with Snap off or Alt held; only an explicit
+move of its retained first clip changes the anchor. The
 toggle persists for the current timeline session, not the renderable document.
 
-Projects are named separate **version-5** documents. Switching flushes autosave first,
+Projects are named separate **version-6** documents with required per-layer Ripple,
+transitions and opening/closing fades. Switching flushes autosave first,
 blocks on failed saves, and resets session selection/history; successful export
-snapshots are independent of the open project. Earlier v1/v2/v3/v4 projects and receipt
+snapshots are independent of the open project. Earlier v1–v5 projects and receipt
 snapshots remain incompatible and preserved, without migration/fabricated defaults.
 Create a new project and deliberately import recordings/music to reuse registered
 sources/verified ready proxies. Confirmed project deletion removes only its saved
 document, never originals, the shared registry/proxy cache or successful exports/
 receipts. Removing an excerpt is not removing that recording from the import bin. The
-existing live v3 sample appearing incompatible is expected.
+existing live v3 sample appearing incompatible is expected. Registry/proxy formats
+are unchanged.
 
 The music waveform is registered/prepared by the backend. Its placement and trim
 gestures are transient and one-step undoable. Numeric controls provide source
@@ -374,13 +407,14 @@ support Escape. Source-review paired IN/OUT retains its explicit Apply workflow.
 **Clip / Sequence / Audio** separates source/appearance/speed, transitions/fades and
 music. The header directly exposes panel toggles and help; **Workspace options**
 holds layout reset and Diagnostics. **Layer options**
-holds rename/opacity/stacking/deletion; **Clip actions** holds duplication/nudging,
+holds rename/Ripple/opacity/stacking/deletion; **Clip actions** holds duplication/nudging,
 while the frequent split/trim/delete/cut actions stay directly visible.
 Diagnostic counters, shader tests and the two-clip native comparison tool remain
 hidden behind Diagnostics. **Export** uses the bounded native multi-clip
 renderer, with profiles for 720p drafts and 4K finals. The diagnostic two-excerpt
-reference remains limited to normal speed without music/extra layers/nontrivial
-opacity/shared row points, including Speed-only points.
+reference remains limited to two normal-speed clips on one enabled opaque,
+zero-origin contiguous track, without music/extra tracks/nontrivial opacity/shared
+row points, including Speed-only points, and at most 3,600 project frames.
 Clip sections collapse independently and retain expansion across reloads; collapsing
 a section never disables its processing.
 Keyboard help, context guards, Activity and save/connection recovery are documented

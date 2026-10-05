@@ -14,7 +14,7 @@ import { startExport, validateExport, validateExportAudio } from '../../src/serv
 import { JobQueue } from '../../src/server/jobs.js';
 import { MediaLibrary } from '../../src/server/library.js';
 import { retimeRawVideo } from '../../src/server/retime-process.js';
-import { legacyV3Project, legacyV4Project } from './project-fixtures.js';
+import { legacyV3Project, legacyV4Project, legacyV5Project } from './project-fixtures.js';
 
 const temporary: string[] = [];
 const queues: JobQueue[] = [];
@@ -32,7 +32,7 @@ afterEach(async () => {
 function documentWithClips(count = 1): ProjectDocument {
   const document = createProject('export-unit', 'Export unit');
   document.clips = Array.from({ length: count }, (_, index) => createClip(`clip-${index}`, 'video', 7, 37));
-  document.transitions = document.clips.slice(1).map((clip, index) => ({ type: 'cut' as const, leftId: document.clips[index]!.id, rightId: clip.id, duration: 0 as const }));
+  document.layers[0]!.transitions = document.clips.slice(1).map((clip, index) => ({ type: 'cut' as const, leftId: document.clips[index]!.id, rightId: clip.id, duration: 0 as const }));
   return projectSchema.parse(document);
 }
 const fingerprint = { algorithm: 'sampled-sha256-v1' as const, digest: 'a'.repeat(64), size: 10, mtimeMs: 0, device: 1, inode: 1 };
@@ -57,12 +57,12 @@ function audioAsset() {
 }
 
 describe('strict production export request and immutable validation', () => {
-  it('offers exactly 720p and UHD profiles, accepts no-music v5 and rejects empty/legacy/unknown requests', () => {
+  it('offers exactly 720p and UHD profiles, accepts no-music v6 and rejects empty/legacy/unknown requests', () => {
     expect(EXPORT_PROFILES.draft720).toMatchObject({ width: 1280, height: 720 });
     expect(EXPORT_PROFILES.final4k).toMatchObject({ width: 3840, height: 2160 });
     const document = documentWithClips();
     expect(exportRequestSchema.parse({ document, profile: 'draft720' }).document.music).toBeNull();
-    expect(exportRequestSchema.parse({ document, profile: 'draft720' }).document.schemaVersion).toBe(5);
+    expect(exportRequestSchema.parse({ document, profile: 'draft720' }).document.schemaVersion).toBe(6);
     for (const request of [
       { document: createProject('empty', 'Empty'), profile: 'draft720' },
       { document, profile: 'reference' }, { document, profile: 'draft720', normalize: true },
@@ -70,6 +70,7 @@ describe('strict production export request and immutable validation', () => {
       { document: { ...document, schemaVersion: 2 }, profile: 'draft720' },
       { document: legacyV3Project('old-export', 'Old export'), profile: 'draft720' },
       { document: legacyV4Project('old-export-v4', 'Old schema-4 export'), profile: 'draft720' },
+      { document: legacyV5Project('old-export-v5', 'Old schema-5 export'), profile: 'draft720' },
       { document: { ...document, media: undefined }, profile: 'draft720' },
       { document: { ...document, clips: [{ ...document.clips[0], speed: undefined }] }, profile: 'draft720' },
       { document: { ...document, frameRate: { numerator: 30, denominator: 1 } }, profile: 'draft720' },
@@ -126,10 +127,10 @@ describe('sequential output-frame chunk planning', () => {
     document.clips[1]!.speed = { mode: 'constant', rate: 2 };
     document.clips[2]!.speed = { mode: 'ramp', startRate: 0.5, endRate: 2, anchorIn: 0, anchorOut: 60, curve: 'smooth' };
     document.clips[3]!.speed = { mode: 'ramp', startRate: 2, endRate: 0.5, anchorIn: 0, anchorOut: 60, curve: 'ease-in' };
-    document.transitions[0] = { leftId: 'clip-0', rightId: 'clip-1', type: 'cross-dissolve', duration: 4 };
-    document.transitions[1] = { leftId: 'clip-1', rightId: 'clip-2', type: 'fade-through-black', duration: 5 };
-    document.transitions[3] = { leftId: 'clip-3', rightId: 'clip-4', type: 'cross-dissolve', duration: 3 };
-    document.openingFade = 3; document.closingFade = 2;
+    document.layers[0]!.transitions[0] = { leftId: 'clip-0', rightId: 'clip-1', type: 'cross-dissolve', duration: 4 };
+    document.layers[0]!.transitions[1] = { leftId: 'clip-1', rightId: 'clip-2', type: 'fade-through-black', duration: 5 };
+    document.layers[0]!.transitions[3] = { leftId: 'clip-3', rightId: 'clip-4', type: 'cross-dissolve', duration: 3 };
+    document.layers[0]!.openingFade = 3; document.layers[0]!.closingFade = 2;
     const plan = planExport(document);
     expect(plan.duration).toBe(calculateLayout(document).duration);
     expect(plan.clips[0]).toMatchObject({ duration: 60, bodyIn: 0, bodyOut: 56, fadeIn: 3 });
@@ -158,7 +159,7 @@ describe('sequential output-frame chunk planning', () => {
   it('handles zero-length bodies and the one-output-frame dissolve', () => {
     const document = documentWithClips(3);
     for (const clip of document.clips) clip.sourceOut = clip.sourceIn + 2;
-    document.transitions = [
+    document.layers[0]!.transitions = [
       { leftId: 'clip-0', rightId: 'clip-1', type: 'cross-dissolve', duration: 1 },
       { leftId: 'clip-1', rightId: 'clip-2', type: 'cross-dissolve', duration: 1 },
     ];

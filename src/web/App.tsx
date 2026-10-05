@@ -6,7 +6,6 @@ import type { ColourSettings } from '../shared/colour.js';
 import { applyCommand, EditHistory, type EditCommand } from '../shared/commands.js';
 import type { ExportProfile } from '../shared/export.js';
 import { needsLayeredExport } from '../shared/export.js';
-import { compileLayerRetiming } from '../shared/layer-retiming.js';
 import { resolveMediaSelection, validateMediaSelection, type MediaSelection, type MediaSelections } from '../shared/media-selection.js';
 import type { MediaAsset, MediaJob } from '../shared/media.js';
 import { createClip, createProject, projectSchema, type ProjectDocument } from '../shared/model.js';
@@ -14,7 +13,7 @@ import { projectAudioIds, projectVideoIds, type ProjectSummary } from '../shared
 import { removeMarkedRange, trimAtPlayhead, type ClipCutRange } from '../shared/rush-editing.js';
 import { forEachSerial } from '../shared/serial.js';
 import { validateSourceRanges } from '../shared/source-range.js';
-import { calculateLayout } from '../shared/timeline.js';
+import { calculateLayout, layerClips } from '../shared/timeline.js';
 import { api, type RequestOptions } from './api.js';
 import { Autosave, type SaveState } from './autosave.js';
 import { waitForService } from './connection.js';
@@ -24,6 +23,7 @@ import { Icon } from './icons.js';
 import type { InspectorMode } from './InspectorSection.js';
 import { Jobs } from './Jobs.js';
 import { inspectKeyframe, KeyframeNavigationContext, reconcileKeyframeInspection, type KeyframeInspection } from './keyframe-navigation.js';
+import { clipStartRestriction } from './layer-actions.js';
 import { MediaLibrary, type ImportResult, type ReviewTarget } from './MediaLibrary.js';
 import { MusicControls } from './MusicControls.js';
 import { Popover } from './Popover.js';
@@ -32,6 +32,7 @@ import { PreviewPanel } from './PreviewPanel.js';
 import { ProjectTitle } from './ProjectTitle.js';
 import { editorShortcut } from './shortcuts.js';
 import { Timeline, type DraftPreview } from './Timeline.js';
+import { planTimelineDrop } from './timeline-placement.js';
 import { DEFAULT_LAYOUT, useWorkspace, WorkspaceResizer } from './workspace.js';
 
 interface EditorDebug {
@@ -54,7 +55,16 @@ const loadDiagnostics = () => import('./Diagnostics.js').then((module) => ({ def
 const EMPTY_PROJECT = createProject('preview-lab', 'Untitled');
 const SAVE_LABEL: Record<SaveState['state'], string> = { saved: 'Saved locally', saving: 'Saving…', error: 'Save error', unsaved: 'Unsaved' };
 function timingKey(project: ProjectDocument): string {
-  return JSON.stringify({ id: project.id, layerIds: project.layers.map((layer) => layer.id).sort((left, right) => left.localeCompare(right)), layerRates: project.layers.map((layer) => ({ id: layer.id, keys: layer.keyframes.filter((key) => key.values.speed !== null).map((key) => ({ frame: key.frame, interpolation: key.interpolation, value: key.values.speed })) })).sort((left, right) => left.id.localeCompare(right.id)), clips: project.clips.map(({ id, mediaId, layerId, start, sourceIn, sourceOut, speed }) => ({ id, mediaId, layerId, start, sourceIn, sourceOut, speed })), music: project.music, transitions: project.transitions, opening: project.openingFade, closing: project.closingFade });
+  return JSON.stringify({
+    id: project.id, frameRate: project.frameRate, colourProfile: project.colourProfile,
+    layers: project.layers.filter((layer) => project.clips.some((clip) => clip.layerId === layer.id)).map((layer) => ({
+      id: layer.id, ripple: layer.ripple, transitions: layer.transitions,
+      openingFade: layer.openingFade, closingFade: layer.closingFade,
+      keys: layer.keyframes.filter((key) => key.values.speed !== null).map((key) => ({ frame: key.frame, interpolation: key.interpolation, value: key.values.speed })),
+    })).sort((left, right) => left.id.localeCompare(right.id)),
+    clips: project.clips.map(({ id, mediaId, layerId, start, sourceIn, sourceOut, speed }) => ({ id, mediaId, layerId, start, sourceIn, sourceOut, speed })),
+    music: project.music,
+  });
 }
 
 function shortcutBlocked(event: KeyboardEvent): boolean {
@@ -106,7 +116,7 @@ export function App() {
   const [review, setReview] = useState<ReviewTarget | null>(null);
   const [reviewPinned, setReviewPinned] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [selectedLayerId, setSelectedLayerId] = useState('video-1');
+  const [selectedLayerId, setSelectedLayerId] = useState(EMPTY_PROJECT.layers[0]!.id);
   const [keyframeInspection, setKeyframeInspection] = useState<KeyframeInspection | null>(null);
   const [ranges, setRanges] = useState<MediaSelections>({});
   const [boundaryId, setBoundaryId] = useState<string | null>(null);
@@ -127,7 +137,7 @@ export function App() {
   const latestAssets = useRef<MediaAsset[]>([]);
   const latestAudio = useRef<AudioAsset[]>([]);
   const selection = useRef<string | null>(null);
-  const selectedLayer = useRef('video-1');
+  const selectedLayer = useRef(EMPTY_PROJECT.layers[0]!.id);
   const sourceRanges = useRef<MediaSelections>({});
   const drafting = useRef(false);
   const requestedFrame = useRef<number | null>(null);
@@ -158,7 +168,8 @@ export function App() {
       if (selectedLayer.current !== layerId) setKeyframeInspection(null);
       selectedLayer.current = layerId; setSelectedLayerId(layerId);
     }
-    const boundary = document?.transitions.find((item) => item.leftId === id) ?? document?.transitions.find((item) => item.rightId === id);
+    const transitions = document?.layers.find((item) => item.id === layerId)?.transitions;
+    const boundary = transitions?.find((item) => item.leftId === id) ?? transitions?.find((item) => item.rightId === id);
     setBoundaryId(boundary?.leftId ?? null);
   }, []);
   const refresh = useCallback(async (options?: RequestOptions) => {
@@ -188,14 +199,19 @@ export function App() {
     if (!previous || timingKey(previous) !== timingKey(next)) { engine.current?.pause(); setCutRange(null); }
     current.current = next; setProject(next); autosave.current?.update(next);
     setHistoryState({ canUndo: history.current?.canUndo ?? false, canRedo: history.current?.canRedo ?? false });
+    if (!next.layers.some((layer) => layer.id === selectedLayer.current)) {
+      selectedLayer.current = next.layers[0]!.id; setSelectedLayerId(selectedLayer.current);
+      setKeyframeInspection(null); setBoundaryId(null);
+    }
     const selectedClip = next.clips.find((clip) => clip.id === selection.current);
     if (!selectedClip && selection.current !== null) {
-      if (next.clips[0]) select(next.clips[0].id);
+      const first = calculateLayout(next).clips.find((item) => item.clip.layerId === selectedLayer.current);
+      if (first) select(first.clip.id);
       else { selection.current = null; setSelectedId(null); setBoundaryId(null); }
     } else if (selectedClip && previous?.clips.find((clip) => clip.id === selection.current)?.layerId !== selectedClip.layerId) {
       selectedLayer.current = selectedClip.layerId; setSelectedLayerId(selectedClip.layerId);
+      setKeyframeInspection(null);
     }
-    if (!next.layers.some((layer) => layer.id === selectedLayer.current)) { selectedLayer.current = next.layers[0]!.id; setSelectedLayerId(selectedLayer.current); }
   }, [select]);
   const commit = useCallback((next: ProjectDocument) => {
     const previous = current.current;
@@ -233,24 +249,38 @@ export function App() {
       const targetLayer = layerId ?? selectedLayer.current;
       const layer = next.layers.find((layer) => layer.id === targetLayer);
       if (!layer) throw new Error('Choose a video layer before inserting.');
-      const position = index ?? next.clips.length;
-      let cursor = start ?? engine.current?.diagnostics().frame ?? 0;
       const instances = mediaIds.map((id) => {
         const asset = latestAssets.current.find((item) => item.id === id);
         if (!asset || !mediaReady(asset)) throw new Error('Prepare the recording before adding it to the timeline.');
         const range = resolveMediaSelection(id, asset.metadata.frameCount, sourceRanges.current);
-        const instance = { ...createClip(crypto.randomUUID(), id, range.sourceIn, range.sourceOut), layerId: targetLayer, start: targetLayer === next.layers[0]!.id ? 0 : cursor };
-        if (targetLayer !== next.layers[0]!.id) cursor += compileLayerRetiming(instance, layer, cursor).duration;
-        return instance;
+        return createClip(crypto.randomUUID(), id, range.sourceIn, range.sourceOut, targetLayer);
       });
-      for (const [offset, clip] of instances.entries()) next = applyCommand(next, { type: 'insert', clip, index: position + offset });
+      const lastClip = layerClips(next, targetLayer).at(-1);
+      const last = calculateLayout(next).clips.find((item) => item.clip.id === lastClip?.id);
+      let cursor = start ?? (layer.ripple && last ? last.end : engine.current?.diagnostics().frame ?? 0);
+      let position = index;
+      // Normal Add appends on Ripple tracks and uses the playhead on positioned
+      // tracks. Native drops already supply this same core planner's exact slot.
+      // Full-overlap dissolves can have tied slot starts: keep explicit append
+      // intent rather than letting nearest-slot tie-breaking reorder an Add.
+      if (layer.ripple && last && start === undefined) position ??= next.clips.length;
+      if (position === undefined) {
+        const plan = planTimelineDrop(next, { kind: 'media', clips: instances }, targetLayer, cursor, false, 0, engine.current?.diagnostics().frame ?? 0);
+        if (plan.error) throw new Error(plan.error);
+        position = plan.index; cursor = plan.start;
+      }
+      for (const [offset, clip] of instances.entries()) {
+        next = applyCommand(next, { type: 'insert', clip: { ...clip, start: cursor }, index: position + offset });
+        cursor = calculateLayout(next).clips.find((item) => item.clip.id === clip.id)!.end;
+      }
       validate(next);
-      if (instances[0]) requestedFrame.current = calculateLayout(next).clips.find((item) => item.clip.id === instances[0]!.id)!.start;
+      const first = instances[0]!; // The nonempty mediaIds guard also guarantees a nonempty batch.
+      requestedFrame.current = calculateLayout(next).clips.find((item) => item.clip.id === first.id)!.start;
       commit(next);
-      if (instances[0]) select(instances[0].id);
+      select(first.id);
       if (keepReview) { pinned.current = true; setReviewPinned(true); setViewerMode('source'); }
       setError('');
-      return instances[0]!.id;
+      return first.id;
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Cannot insert recording'); return null; }
   }, [commit, select, validate]);
   const seek = useCallback((frame: number): void => {
@@ -331,8 +361,11 @@ export function App() {
     if (!current.current || !selection.current || drafting.current) return;
     const index = current.current.clips.findIndex((clip) => clip.id === selection.current);
     const clip = current.current.clips[index];
-    if (!clip || clip.layerId === current.current.layers[0]!.id) return;
-    edit({ type: 'place', clipId: clip.id, layerId: clip.layerId, start: Math.max(0, clip.start + delta), index });
+    if (!clip) return;
+    const restriction = clipStartRestriction(current.current, clip);
+    if (restriction) { setError(restriction); return; }
+    const placed = calculateLayout(current.current).clips.find((item) => item.clip.id === clip.id)!;
+    edit({ type: 'place', clipId: clip.id, layerId: clip.layerId, start: placed.start + delta, index });
   }, [edit]);
   const previewDraft = useCallback((next: DraftPreview | null, frame?: number): void => {
     if (next) setKeyframeInspection(null);
@@ -367,7 +400,8 @@ export function App() {
     } catch (cause) { setError(cause instanceof Error ? `${cause.message} Source range choices were not loaded; originals remain intact.` : 'Cannot read source range choices.'); }
     sourceRanges.current = choices; setRanges(choices);
     pinned.current = false; setReview(null); setReviewPinned(false); setViewerMode('timeline');
-    if (loaded.clips[0]) select(loaded.clips[0].id);
+    const first = calculateLayout(loaded).clips[0];
+    if (first) select(first.clip.id);
     setSaveState({ state: 'saved', message: 'Saved on this device', revision: loaded.revision, recovery: null });
     try { localStorage.setItem('pascap-project', loaded.id); }
     catch { setError('The project is open; this browser cannot remember the last project. Its URL remains available.'); }
@@ -380,7 +414,7 @@ export function App() {
     setProject(null); setDraft(null); drafting.current = false;
     setImportRequest(0);
     setCutRange(null); setRevealRequest(0); setHistoryState({ canUndo: false, canRedo: false }); setBoundaryId(null);
-    selection.current = null; setSelectedId(null); selectedLayer.current = 'video-1'; setSelectedLayerId('video-1');
+    selection.current = null; setSelectedId(null); selectedLayer.current = EMPTY_PROJECT.layers[0]!.id; setSelectedLayerId(selectedLayer.current);
     sourceRanges.current = {}; setRanges({}); setDraggedMediaIds(null);
     pinned.current = false; setReview(null); setReviewPinned(false); setViewerMode('timeline');
     setSaveState({ state: 'saved', message: 'Local workspace', revision: 0, recovery: null });
@@ -466,10 +500,11 @@ export function App() {
   }, [project, draft, previewReady]);
   useEffect(() => {
     if (!project) return;
-    if (boundaryId !== null && project.transitions.some((item) => item.leftId === boundaryId)) return;
-    const boundary = project.transitions.find((item) => item.leftId === selectedId) ?? project.transitions.find((item) => item.rightId === selectedId);
+    const transitions = project.layers.find((layer) => layer.id === selectedLayerId)?.transitions;
+    if (boundaryId !== null && transitions?.some((item) => item.leftId === boundaryId)) return;
+    const boundary = transitions?.find((item) => item.leftId === selectedId) ?? transitions?.find((item) => item.rightId === selectedId);
     setBoundaryId(boundary?.leftId ?? null);
-  }, [project, selectedId, boundaryId]);
+  }, [project, selectedId, selectedLayerId, boundaryId]);
   const trackingJobs = jobs.some((job) => ['queued', 'running'].includes(job.state));
   useEffect(() => {
     if ((!trackingJobs && !showActivity) || connection.state !== 'ready') return;
@@ -745,7 +780,7 @@ export function App() {
       {workspace.layout.inspectorOpen && <WorkspaceResizer className="inspector-resizer" label="Resize Clip panel" disabled={draft !== null} orientation="vertical" direction={-1} value={workspace.sizes.inspector} min={270} max={Math.floor(Math.max(270, Math.min(440, workspace.viewport.width * 0.3)))} defaultValue={DEFAULT_LAYOUT.inspectorWidth} onChange={(inspectorWidth, persist) => workspace.update({ inspectorWidth }, persist)} />}
       <div className="workspace-inspector" id="inspector-pane" hidden={!workspace.layout.inspectorOpen} tabIndex={-1}><DeferredPanel label="Inspector" load={loadInspector} onReload={reloadEditor} onDownload={downloadDraft} canDownload={project !== null} busy={recoveryBusy} fallback={<output className="panel inspector-loading"><span className="spinner" />Opening Inspector…</output>}>{(Inspector) => <Inspector project={visible} assets={assets} selectedClipId={selectedId} selectedLayerId={selectedLayerId} boundaryId={boundaryId} frame={diagnostics?.frame ?? 0} drafting={draft !== null || !project} section={inspectorMode} onSection={setInspectorMode} onEdit={edit} onPreview={previewDraft} onSeek={seek} onPause={() => engine.current?.pause()}><MusicControls key={project?.id ?? 'empty'} project={visible} assets={projectAudio} busy={busy || !project} drafting={draft !== null || !project} onEdit={edit} onImport={importAudio} onPrepare={async (id) => { const result = await act(() => api.prepareAudio(id)); if (result.ok) { receiveJob(result.value.job); refreshAfterAcceptance(); } }} /></Inspector>}</DeferredPanel></div>
       <WorkspaceResizer className="timeline-resizer" label="Resize Timeline panel" disabled={draft !== null} orientation="horizontal" direction={-1} value={workspace.sizes.timeline} min={200} max={Math.max(200, Math.min(520, workspace.viewport.height - 360))} defaultValue={DEFAULT_LAYOUT.timelineHeight} onChange={(timelineHeight, persist) => workspace.update({ timelineHeight }, persist)} />
-      <Timeline key={project?.id ?? 'empty'} project={project ?? EMPTY_PROJECT} assets={assets} audioAssets={audioAssets} selectedClipId={selectedId} selectedLayerId={selectedLayerId} onSelectLayer={selectLayer} selectedBoundaryId={boundaryId} frame={diagnostics?.frame ?? 0} onSelect={select} onBoundary={(id) => { setBoundaryId(id); setInspectorMode('sequence'); workspace.update({ inspectorOpen: true, ...(workspace.viewport.width < 980 ? { mediaOpen: false } : {}) }); }} onSeek={seek} onPause={() => engine.current?.pause()} onEdit={edit} onInsert={insert} onPreview={previewDraft} onError={setError} onSplit={split} onDelete={remove} onDuplicate={duplicate} onNudge={nudge} onQuickTrim={quickTrim} cutRange={cutRange} onMarkCut={markCut} onCutMarked={cutMarked} onClearCut={() => setCutRange(null)} revealRequest={revealRequest} fitRequest={fitRequest} draggedMediaIds={draggedMediaIds} ranges={ranges} />
+      <Timeline key={project?.id ?? 'empty'} project={project ?? EMPTY_PROJECT} assets={assets} audioAssets={audioAssets} selectedClipId={selectedId} selectedLayerId={selectedLayerId} onSelectLayer={selectLayer} selectedBoundaryId={boundaryId} frame={diagnostics?.frame ?? 0} onSelect={select} onBoundary={(id) => { select(id); setBoundaryId(id); setInspectorMode('sequence'); workspace.update({ inspectorOpen: true, ...(workspace.viewport.width < 980 ? { mediaOpen: false } : {}) }); }} onSeek={seek} onPause={() => engine.current?.pause()} onEdit={edit} onInsert={insert} onPreview={previewDraft} onError={setError} onSplit={split} onDelete={remove} onDuplicate={duplicate} onNudge={nudge} onQuickTrim={quickTrim} cutRange={cutRange} onMarkCut={markCut} onCutMarked={cutMarked} onClearCut={() => setCutRange(null)} revealRequest={revealRequest} fitRequest={fitRequest} draggedMediaIds={draggedMediaIds} ranges={ranges} />
     </main>
     {workspace.storageError && <output className="workspace-preference-error">{workspace.storageError}</output>}
     <Jobs jobs={jobs} open={showActivity} onOpen={() => { setShowActivity(true); void refreshActivity(); }} onClose={() => setShowActivity(false)} busy={busy} error={activityError} onRefresh={refreshActivity} onCancel={async (id) => {

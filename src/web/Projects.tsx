@@ -88,14 +88,14 @@ export function Projects({ projects, currentId, busy, error, onOpen, onCreate, o
   };
 
   return <Modal className="project-dialog" labelledBy={`${id}-title`} busy={submitting} error={error || localError} onClose={onClose} {...(restoreFocusTo ? { restoreFocusTo } : {})} footer={<>
-    <span className="activity-hint">Version 5 · project-specific media. Older projects remain unchanged unless explicitly deleted.</span>
+    <span className="activity-hint">Version 6 · independent track settings and project-specific media. Older projects remain unchanged unless explicitly deleted; no migration.</span>
     <button className="secondary-button" onClick={onClose} disabled={submitting}>Close</button>
   </>}>
     <div className="activity-dialog-heading"><h2 id={`${id}-title`}>Projects</h2><span className="activity-hint">{compatibleCount} compatible · {projects.length - compatibleCount} unavailable</span></div>
     <div className="activity-project-tools">
       <label className="activity-field"><span>Search projects</span><input id={`${id}-search`} type="search" value={query} placeholder="Title or project ID" onChange={(event) => setQuery(event.target.value)} /></label>
       <label className="activity-field"><span>Project filter</span><select value={filter} onChange={(event) => setFilter(event.target.value as ProjectFilter)}>
-        <option value="all">All projects</option><option value="compatible">Compatible (version 5)</option><option value="unsupported">Unavailable / unsupported</option>
+        <option value="all">All projects</option><option value="compatible">Compatible (version 6)</option><option value="unsupported">Unavailable / unsupported</option>
       </select></label>
     </div>
     {submitting && <output className="activity-pending" aria-live="polite">{pendingLabel}</output>}
@@ -106,7 +106,7 @@ export function Projects({ projects, currentId, busy, error, onOpen, onCreate, o
           {project.compatible && <span>{project.clipCount} {project.clipCount === 1 ? 'clip' : 'clips'} · {durationLabel(framesToSeconds(project.duration))}</span>}
           <span>Updated {Number.isFinite(Date.parse(project.updatedAt)) ? <time dateTime={project.updatedAt}>{new Date(project.updatedAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}</time> : 'date unavailable'}</span>
         </div>
-        {!project.compatible && <p className="activity-project-reason">{project.error || 'This project is unsupported or invalid. Version 5 is required; the original is preserved.'}</p>}
+        {!project.compatible && <p className="activity-project-reason">{project.error || 'This project is unsupported or invalid. Version 6 is required; the original is preserved without migration.'}</p>}
         <div className="activity-project-actions"><button className="secondary-button" aria-label={`Open ${project.title}`} disabled={submitting || !project.compatible} onClick={() => { void openProject(project); }}>{pending?.kind === 'open' && pending.id === project.id ? 'Opening…' : 'Open'}</button><button className="secondary-button project-delete" aria-label={`Delete ${project.title}`} disabled={submitting} onClick={(event) => { deleteTrigger.current = event.currentTarget; setLocalError(''); setDeleting(project); }}>Delete</button></div>
       </li>)}
     </ul>

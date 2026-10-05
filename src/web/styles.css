@@ -1279,7 +1279,7 @@ svg {
     transform: translateX(-50%);
     min-width: 25px;
     padding: 2px 5px;
-    z-index: 3;
+    z-index: 7;
     font-size: 7px;
     color: #b4c8bc;
     background: #263b2e;

@@ -1,64 +1,86 @@
-# Layers, shared row points and source review · project v5
+# Layers, shared row points and source review · project v6
 
 ## Video layers
 
-The document stores one to eight layers **bottom-to-top for composition**. The
-timeline and sidebar show **the primary sequence first**, with overlay rows below
-it in front-to-back overlay order. This is display order, not a change to which
-footage covers others: overlays still composite over the primary, and Raise/Lower
-adjust their relative composition priority. Video 1 is the primary layer: it cannot
-be removed or reordered out of its base role. Its insert/delete/reorder/trim commands
-retain ripple behavior,
-and cut/fade-through-black/dissolve boundaries and sequence fades belong to it.
+The document stores one to eight uniform video tracks **bottom-to-top for
+composition**. Timeline/sidebar rows use that same array order: row 1 renders below
+row 2, row 3 above row 2, and so on. Raise/Lower change composition priority, not
+an editing role. The initial Video 1 identity is conventional, not mandatory or
+privileged. Every track can be reordered or deleted, except the last remaining
+track; only actual top/bottom stack endpoints restrict Raise/Lower.
 
-Other layers contain independently positioned excerpts. Their starts are absolute
-non-negative project frames, not derived from the primary sequence. Gaps reveal
-lower footage; clips on one overlay row cannot overlap. Place simultaneous footage
-on different layers. Moving or speeding one overlay does not move its neighbours;
-invalid overlap is rejected atomically. Left-edge handle/keyboard trims solve an
-overlay's new start to retain its timeline OUT. If integer source/project-frame
-quantisation cannot represent that OUT, the trim is explicitly rejected, not
-silently shifted. Numeric IN/OUT/reset retain its start.
+Every layer requires `ripple`, `transitions`, `openingFade` and `closingFade`.
+New tracks default to **Ripple on**, empty transitions and zero fades. In **Layer
+options**, enabling Ripple packs clips in chronological order from the first clip's
+current project-frame start, closing gaps in **one Undo step** and retaining valid
+existing dissolves. While on, saved clip order continuously sequences from that
+anchor: each next start is the preceding OUT minus any incoming dissolve duration.
+Contextual row Speed is recompiled at each new start, and commands persist actual
+integer starts. Structural edits preserve the track's pre-edit first start even
+when its first instance changes. Turning Ripple off captures actual placements;
+future edits keep other clips at their independent starts. Neither switch moves
+music, other tracks or absolute row points.
 
-**+ Layer** creates/selects an overlay. Sidebar controls select and hide/show;
-**Layer options** contains rename, static opacity, raise/lower and delete. Layer
+The Timeline start field and nudge controls work on any positioned clip, or the
+**first anchor only** while Ripple is on. Later Ripple starts expose an accessible
+reason: drag to reorder, or turn Ripple off for independent placement. Ripple is
+not a future-edits-only policy that preserves gaps while enabled.
+
+With Ripple off, gaps reveal lower footage/black. Edits do not move unrelated
+clips; invalid overlap is rejected atomically. Left-edge handle/keyboard trims
+solve the new start to retain timeline OUT, rejecting unrepresentable integer-frame
+results. With Ripple on, these trims keep the sequence start and recompile the
+suffix. Right trims and numeric source IN/OUT/reset keep the selected start in
+either mode. Source-frame speed anchors remain independent.
+
+Each track has one transition per adjacent pair: Cut, Fade-through-black or
+Cross-dissolve. Gapped pairs are Cut only. Non-cut edits require touching clips or
+that pair's existing dissolve. A dissolve explicitly places the right clip at
+left OUT minus its duration; changing/removing it adjusts that overlap. With Ripple
+off, only the right clip moves; conflicts reject the whole edit. Exact adjacent
+dissolve overlap is the only allowed same-track overlap; triple overlap is invalid.
+Opening/closing fades belong to the track's first/last clips at actual placements,
+fit with other transition regions and remain stored but dormant on an empty track.
+
+**+ Layer** creates/selects a track. Sidebar controls select and hide/show;
+**Layer options** contains rename, Ripple, static opacity, raise/lower and delete. Layer
 names apply on Enter/blur, Escape restores, and a rename is one Undo step. Selecting
 an empty row retains both its **Layer keyframes** context and the target for Media
 **+**/double-click/batch insertion. A populated layer selects its first excerpt and
 reveals its row without changing placement. Media drops target the row under the
-pointer; overlay drops use the frame under it, while primary drops ripple-insert
-at a boundary.
+pointer: Ripple-on drops choose a sequence insertion slot; Ripple-off drops use
+independent project-frame placement.
 Scroll over either the headers or tracks to reach all eight rows and music; native
 vertical scrollbars and keyboard focus reveal stay synchronized. Horizontal timeline
 scroll is independent and scrolling never changes the project or playhead. The time
 ruler stays pinned above the rows, with horizontally aligned ticks and a visible
 playhead handle/timecode; click/drag seeking uses the same integer-frame geometry.
 Dropping on the ruler never targets a row concealed underneath it.
-Unavailable Raise/Lower/Delete actions have contextual accessible reasons. The
-primary sequence is the fixed composition base; overlays cannot move below it.
+Unavailable Raise/Lower/Delete actions have contextual accessible reasons for the
+actual stack endpoint, last remaining track or active interaction state.
 Drag existing excerpts between rows, or use Clip → Layer & opacity. Deleting a layer
 and its clips is one undoable command. Existing moves preserve the grabbed offset
 and show the actual final placement ghost, including duration at the destination
-row/time; red invalid placements are not committed. Primary rows remain ripple-edited
-even with snapping disabled. Overlay frame nudges and duplication retain the same
-non-overlap validation and static source-ramp anchors; they never copy row points.
+row/time; red invalid placements are not committed. Ripple-on rows remain sequenced
+even with snapping disabled. Start/nudge and duplication retain contextual timing
+validation and source-ramp/curve anchors; they never copy row points.
 
 Visibility and layer opacity are renderable state, not preview-only switches.
 Disabled layers do not decode/draw, but their placements still contribute to total
 duration; an entirely hidden tail therefore exports black. Layer opacity multiplies
 the complete layer group once. Each clip has an independent static opacity base;
 a row's Clip opacity curve overrides it on **every** clip in that row. Black
-transitions/fades darken the primary's RGB without removing its alpha coverage;
-they do not dim an upper layer.
+transitions/fades darken only their track's RGB without removing its alpha coverage;
+they do not dim another track or reveal lower footage through a transparency fade.
 
 ## Strict shared-point model
 
 **A video row/layer owns the animation, not a clip.** All points use absolute integer
 **project timeline frames**, with one point per frame per row. They affect every
 clip on that row, including clips from different recordings and both participants
-in a primary dissolve. They do not restart at a clip's IN, start or boundary.
+in that track's dissolve. They do not restart at a clip's IN, start or boundary.
 
-Schema 5 retains `layers[].keyframes` as ordered `{ frame, interpolation, values }`
+Schema 6 requires `layers[].keyframes` as ordered `{ frame, interpolation, values }`
 points, with **at most 256 points per row**. Frames are unique, strictly ascending,
 non-negative and at most 2,147,483,647. Every `values` object requires **all ten
 nullable fields** below: a number participates; `null` does not. Omitted/unknown
@@ -84,7 +106,7 @@ points inside `clip.speed`; it does not change row-channel ownership or preceden
 Trimming, restoring, moving, splitting and duplicating footage **never copy or
 shift row points**. Split/duplicate create independent source/static bases, retaining
 original-source ramp/clip-speed anchors. A moved clip uses its destination row's animation;
-the old and new rows' points stay where they were. Primary ripple also leaves
+the old and new rows' points stay where they were. Track Ripple also leaves
 points anchored in project time. Removing the last participant of a channel reveals
 its existing static base; it does not replace that base with the deleted value.
 
@@ -244,7 +266,7 @@ natural timing exception. There is no cross-row point move.
 
 The thin strip above video rows is the **time ruler**: separators/ticks denote
 TIME, and click/drag seeks the playhead. The separate **Cut / Fade / Dissolve**
-buttons open primary-boundary transition controls. Neither ruler ticks nor those
+buttons open their own track's boundary transition controls. Neither ruler ticks nor those
 transition buttons are keyframe markers.
 
 ## Group composition
@@ -252,15 +274,16 @@ transition buttons are keyframe markers.
 Enabled layer groups are composited bottom-to-top over opaque black in encoded
 BT.709 RGB, after each source has its evaluated grade. For group sources `i`, let
 `wᵢ` be dissolve weight, `oᵢ` clip opacity, `bᵢ` black-fade brightness and `Gᵢ` graded
-RGB. The primary dissolve is **one** group, not two source-over layers:
+RGB. Each track's dissolve is **one** group, not two source-over layers; several
+tracks may dissolve simultaneously:
 
 - Premultiplied group RGB: `C = sum(Gᵢ × bᵢ × oᵢ × wᵢ)`.
 - Group coverage: `A = sum(oᵢ × wᵢ)`.
 - With layer opacity `l`, source-over: `result = l × C + lower × (1 − l × A)`.
 
 Preview, CPU numeric tests and native layered export share this sampling/composition
-contract, unchanged by schemas 4 and 5. Each source's grade/clip opacity and the complete
-group's layer opacity are evaluated at the same project frame. Full opacity/neutral
+contract. Each source's grade/clip opacity and the complete group's layer opacity
+are evaluated at the same project frame. Full opacity/neutral
 settings preserve the original single-track behavior. Native LUT interpolation and
 final H.264/YUV quantisation are approximations, not bitwise shader equivalence.
 See [COLOUR_AND_TIMING.md](COLOUR_AND_TIMING.md) for the unchanged equations and
@@ -304,7 +327,8 @@ offscreen/unmount/project-switch releases the review decoder.
 
 The inspector uses **Clip / Sequence / Audio** tabs. Source range, Layer & opacity,
 Speed, Colour and the shared **Layer keyframes** panel belong to Clip;
-Transition/Sequence fades belong to Sequence; Music belongs to Audio, with detailed
+the selected track's Transition/Sequence fades belong to Sequence; Music belongs
+to Audio, with detailed
 **Placement & fades**. Sections retain their expansion in local browser storage.
 New defaults collapse detailed source, layer and speed controls, while Colour stays
 open. Existing preferences are not reset. **Edit points** and inner disclosures keep
@@ -312,8 +336,8 @@ dependencies visible without opening every field. Collapse or switching tabs nev
 disables processing or changes the rendered document. Options menus and automatic
 proxy admission remain unchanged.
 
-Preview uses two reusable decoder/texture slots for one layer and up to nine for
-eight layers (primary dissolve plus seven overlays), with unused slots available
+Preview uses two reusable decoder/texture slots per track, up to **16 for eight
+tracks**, supporting independent simultaneous dissolves. Unused slots are available
 for preloading. Source review adds at most one decoder while visible. No decoder or
 texture is allocated per stored clip.
 
@@ -321,22 +345,27 @@ Export reads one original at a time through the shared backpressured frame mappe
 The plain static single-layer path retains at most two lossless clips, two
 intermediate decoders and one reusable RGB frame (24.9 MB UHD), plus native memory.
 
-Any shared row point, including a speed-only or neutral-valued point, requires the
-layered native path; the plain static chunk plan rejects it. That pipeline remains
-sequential, with at most one original decoder, two intermediate readers and one
-encoder, and at most three native video children per pass. RGBA16 premultiplied
-accumulators preserve coverage between layers; final H.264 is encoded once.
-Three reusable raw buffers
-total **116,121,600 bytes at UHD**; two reusable **65³ Float32 LUTs** add
+The static fast path is eligible only for one enabled, opaque track with opaque
+clips, no row points, a zero first start and no internal gaps. Ripple itself is not
+an eligibility requirement. Other valid timelines, including any speed-only or
+neutral row point, use the generalized layered path; static planning rejects them.
+That pipeline remains sequential, with at most one original decoder, two intermediate readers and one
+encoder, and at most three native video children per pass. Each enabled populated
+track first renders a premultiplied RGBA16 group from at most two RGB sources;
+subsequent source-over passes merge group and lower accumulator without regrading
+or applying opacity twice. Final H.264 is encoded once.
+Four reusable raw buffers (two RGB8 and two RGBA16) use **22 bytes/pixel =
+182,476,800 bytes at UHD**; two reusable **65³ Float32 LUTs** add
 **6,591,000 bytes**, with native codec/pipe/filter memory and selected audio PCM
 additional. Grades use evaluated parameters, not crossfaded endpoint LUTs; there
 are no per-frame LUT files or per-frame native-process launches. Source mapping
 uses the layout's captured `PlacedClip.retiming`; grade/opacity sampling uses
 absolute project time, including repeated source images.
 
-At most two lossless clip files and two complete timeline representations coexist;
-a span collection counts as one. Layer accumulators are joined/deleted between
-passes. Selected PCM and the final MP4 remain through verification. Scratch grows
+At most two retained lossless clip files and **three** timeline representations
+coexist: lower accumulator, track group and output (or group spans and their joined
+group). A span collection counts as one. Inputs are deleted after their serial pass.
+Selected PCM and the final MP4 remain through verification. Scratch grows
 with those duration-dependent representations, not simultaneously decoded
 originals: these are concurrency bounds, not a fixed memory/disk-in-GB promise.
 Animated LUT generation/CPU passes can be slow, and long 4K/slow-motion edits may
@@ -348,11 +377,13 @@ qualification remain separate work in
 [#7](https://github.com/Plonk42/PasCap/issues/7) and
 [#8](https://github.com/Plonk42/PasCap/issues/8).
 
-Schema **v5 is strict**, including required unique `media.videoIds` / `media.audioIds`
-arrays, at most 10,000 IDs each. Older v1/v2/v3/v4 project documents and export receipt snapshots
+Schema **v6 is strict**, including required unique `media.videoIds` / `media.audioIds`
+arrays, at most 10,000 IDs each, and all required per-track settings. Project-level
+transitions/fades are not accepted. Older v1–v5 project documents and export receipt snapshots
 remain unchanged/incompatible; no migrations, compatibility fallback/default fields
 or automatic successful-video deletion occur. Create a new project and deliberately
 import its media; registered media and currently verified ready proxies remain reusable.
+Registry/proxy formats and source identity checks are unchanged.
 Confirmed project deletion removes only its saved document, preserving originals,
 the shared registry/proxy cache and exports/receipts. The live v3 sample appearing
 incompatible is expected, not a reason to rewrite it.

@@ -13,8 +13,8 @@ test.beforeEach(async ({ page, request }) => {
     const library = await (await request.get('/api/media')).json() as { assets: MediaAsset[] };
     saved = createProject('preview-lab', 'Workspace test · memory-only');
     saved.media.videoIds = library.assets.map((asset) => asset.id);
-    saved.clips = ['pattern-a.mp4', 'pattern-b.mp4'].map((name, index) => createClip(`clip-${index}`, library.assets.find((asset) => asset.name === name)!.id, 15, 105));
-    saved.transitions = [{ leftId: 'clip-0', rightId: 'clip-1', type: 'cut', duration: 0 }];
+    saved.clips = ['pattern-a.mp4', 'pattern-b.mp4'].map((name, index) => ({ ...createClip(`clip-${index}`, library.assets.find((asset) => asset.name === name)!.id, 15, 105), start: index * 90 }));
+    saved.layers[0]!.transitions = [{ leftId: 'clip-0', rightId: 'clip-1', type: 'cut', duration: 0 }];
     saved = projectSchema.parse(saved);
     writes = 0; failure = 0; reads = 0;
     await page.route('**/api/projects', async (route) => {

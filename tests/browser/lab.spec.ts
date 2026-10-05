@@ -350,7 +350,7 @@ test('plays both ramp directions across dissolves and music source wraps on repe
     project = applyCommand(project, { type: 'trim', clipId: clip.id, sourceIn: 15, sourceOut: 75 });
     project = applyCommand(project, { type: 'speed', clipId: clip.id, speed: { mode: 'ramp', startRate: index === 1 ? 2 : 0.5, endRate: index === 1 ? 0.5 : 2, curve: index === 0 ? 'linear' : index === 1 ? 'smooth' : 'ease-out', anchorIn: 15, anchorOut: 75 } });
   }
-  for (const boundary of project.transitions) project = applyCommand(project, { type: 'transition', transition: { leftId: boundary.leftId, rightId: boundary.rightId, type: 'cross-dissolve', duration: 12 } });
+  for (const boundary of project.layers[0]!.transitions) project = applyCommand(project, { type: 'transition', transition: { leftId: boundary.leftId, rightId: boundary.rightId, type: 'cross-dissolve', duration: 12 } });
   const duration = calculateLayout(project).duration;
   project = applyCommand(project, { type: 'music', music: { mediaId: audio.assets[0]!.id, sourceIn: 30, sourceOut: 60, start: 10, duration: duration - 10, gainDb: -9, fadeIn: 6, fadeOut: 12, loop: true } });
   await page.evaluate((document) => window.pascapLab!.setDocument(document), project);
@@ -494,13 +494,13 @@ test('changing a later boundary and grading one duplicate leaves other excerpts 
   await page.getByRole('button', { name: 'Add pattern-a.mp4 to timeline', exact: true }).click();
   await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
   await page.getByRole('slider', { name: 'Exposure', exact: true }).fill('0.8');
-  await page.getByRole('button', { name: 'Transition after pattern-b.mp4, excerpt 2', exact: true }).click();
+  await page.getByRole('button', { name: 'Transition after pattern-b.mp4, excerpt 2 on Video 1', exact: true }).click();
   await page.getByRole('combobox', { name: 'Transition type' }).selectOption('cross-dissolve');
   const project = projectSchema.parse(await page.evaluate(() => window.pascapLab!.project()));
   expect(project.clips[0]?.colour.exposure).toBe(0);
   expect(project.clips[2]?.colour.exposure).toBe(0.8);
-  expect(project.transitions[0]?.duration).toBe(18);
-  expect(project.transitions[1]).toMatchObject({ type: 'cross-dissolve', duration: 30 });
+  expect(project.layers[0]!.transitions[0]?.duration).toBe(18);
+  expect(project.layers[0]!.transitions[1]).toMatchObject({ type: 'cross-dissolve', duration: 30 });
   const region = calculateLayout(project).transitions[1]!;
   const state = await page.evaluate(async (position) => {
     const engine = window.pascapLab!.engine; await engine.seek(position); engine.capturePixels(); return engine.diagnostics();

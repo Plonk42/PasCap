@@ -20,6 +20,30 @@
     position: relative;
 }
 
+.layer-options .layer-ripple-control {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.layer-options .layer-ripple-control>label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 32px;
+    cursor: pointer;
+}
+
+.layer-options .layer-ripple-control input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    flex: 0 0 auto;
+    margin: 0;
+    padding: 0;
+    accent-color: #e1ba75;
+}
+
 .layer-sidebar-heading {
     position: sticky;
     top: 0;

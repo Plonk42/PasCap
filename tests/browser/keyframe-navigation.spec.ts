@@ -2,7 +2,7 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 import { applyCommand } from '../../src/shared/commands.js';
 import { KEYFRAME_SETTINGS, type LayerKeyframe } from '../../src/shared/keyframes.js';
 import type { MediaAsset } from '../../src/shared/media.js';
-import { createClip, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
+import { createClip, createLayer, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
 import { calculateLayout } from '../../src/shared/timeline.js';
 import { closeOptions, editLayerPoint, expandedInspectorPreferences, inspectorTab, layerKeyframes, openOptions, sharedPoint } from './editor-helpers.js';
 import { memoryProjects, type MemoryProjects } from './memory-projects.js';
@@ -203,7 +203,7 @@ test('no opened project keeps all setting buttons visible and disabled without a
 
 test('duplicate sidebar opacity navigation selects its row, opens Clip context and shares the inspector cursor without stealing focus', async ({ page }) => {
     let document = sequence([sharedPoint(10, { layerOpacity: 0 }), sharedPoint(100, { layerOpacity: 0.5 })]);
-    document = applyCommand(document, { type: 'layer-add', layer: { id: 'upper', name: 'Video 2', enabled: true, opacity: 1, keyframes: [
+    document = applyCommand(document, { type: 'layer-add', layer: { ...createLayer('upper', 'Video 2', false), keyframes: [
         sharedPoint(20, { layerOpacity: 0 }), sharedPoint(130, { layerOpacity: 0.5 }), sharedPoint(140, { brightness: 0 }), sharedPoint(160, { layerOpacity: 1 }),
     ] } });
     await fixture(page, document); await inspectorTab(page, 'Sequence');
@@ -295,7 +295,7 @@ test('an empty timeline can inspect successive stored keys, without pretending t
 
 test('row and project switches discard the old stored cursor even when layer IDs are reused', async ({ page }) => {
     let document = sequence([sharedPoint(10, { exposure: 0 }), sharedPoint(100, { exposure: 1 }), sharedPoint(150, { exposure: 2 })]);
-    document = applyCommand(document, { type: 'layer-add', layer: { id: 'upper', name: 'Video 2', enabled: true, opacity: 1, keyframes: [sharedPoint(30, { layerOpacity: 0 }), sharedPoint(130, { layerOpacity: 1 })] } });
+    document = applyCommand(document, { type: 'layer-add', layer: { ...createLayer('upper', 'Video 2', false), keyframes: [sharedPoint(30, { layerOpacity: 0 }), sharedPoint(130, { layerOpacity: 1 })] } });
     await fixture(page, document); await seek(page, 100);
     await step(page, 'Exposure', 'Next').click(); await previewAt(page, 119);
     await page.getByRole('button', { name: 'Select layer Video 2', exact: true }).click();

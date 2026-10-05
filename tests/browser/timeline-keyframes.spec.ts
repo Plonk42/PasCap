@@ -2,7 +2,7 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 import { applyCommand } from '../../src/shared/commands.js';
 import { NEUTRAL_COLOUR } from '../../src/shared/colour.js';
 import type { MediaAsset } from '../../src/shared/media.js';
-import { createClip, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
+import { createClip, createLayer, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
 import { calculateLayout } from '../../src/shared/timeline.js';
 import { expandedInspectorPreferences, layerKeyframes, sharedPoint } from './editor-helpers.js';
 import { memoryProjects, type MemoryProjects } from './memory-projects.js';
@@ -35,8 +35,8 @@ test.afterEach(() => { expect(unexpectedApi, 'Only existing synthetic proxy read
 function sequence(): ProjectDocument {
   const project = createProject('timeline-points', 'Timeline point movement · memory-only');
   project.media.videoIds = assets.map((asset) => asset.id);
-  project.clips = [createClip('first', assets[0]!.id, 0, 60), createClip('second', assets[1]!.id, 30, 90)];
-  project.transitions = [{ leftId: 'first', rightId: 'second', type: 'cut', duration: 0 }];
+  project.clips = [createClip('first', assets[0]!.id, 0, 60), { ...createClip('second', assets[1]!.id, 30, 90), start: 60 }];
+  project.layers[0]!.transitions = [{ leftId: 'first', rightId: 'second', type: 'cut', duration: 0 }];
   project.layers[0]!.keyframes = [
     sharedPoint(20, { ...NEUTRAL_COLOUR, exposure: 0.6, clipOpacity: 0.7, layerOpacity: 0.8, speed: 1 }, 'ease-in'),
     sharedPoint(80, { exposure: -0.3 }, 'hold'),
@@ -52,6 +52,10 @@ async function ready(page: Page, project: ProjectDocument): Promise<void> {
   })).toEqual({ status: 'paused', duration: calculateLayout(project).duration });
 }
 async function fixture(page: Page, project: ProjectDocument): Promise<void> {
+  // Persist the fixture's actual derived Ripple placements before testing edits.
+  for (const placed of calculateLayout(project).clips) {
+    if (project.layers.find((layer) => layer.id === placed.clip.layerId)!.ripple) placed.clip.start = placed.start;
+  }
   memory.seed(project); await page.reload(); await ready(page, project);
   await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
 }
@@ -173,14 +177,18 @@ test('moving a Speed point recomputes contextual timing but never changes source
   const expected = applyCommand(project, { type: 'layer-key-move', layerId: 'video-1', frame: 70, nextFrame: 40 });
   const start = await begin(page, 70); await move(page, start, 40, true);
   expect(await current(page)).toEqual(project); await page.mouse.up(); await page.keyboard.up('Alt');
-  expect(await current(page)).toEqual(expected); expect(expected.clips).toEqual(project.clips);
+  expect(await current(page)).toEqual(expected);
+  expect(expected.clips[0]).toEqual(project.clips[0]);
+  const newSecondStart = calculateLayout(expected).clips[0]!.end;
+  expect(expected.clips[1]).toEqual({ ...project.clips[1]!, start: newSecondStart });
+  expect(expected.clips[1]!.start).not.toBe(project.clips[1]!.start);
   expect(calculateLayout(expected).duration).not.toBe(calculateLayout(project).duration); await ready(page, expected);
   await page.getByRole('button', { name: 'Undo', exact: true }).click(); expect(await current(page)).toEqual(project); await ready(page, project);
 });
 
 test('a Speed move that invalidates a dissolve is previewed as invalid and leaves all timeline settings/history intact', async ({ page }) => {
   const project = sequence(); project.clips = [createClip('first', assets[0]!.id, 0, 30), createClip('second', assets[1]!.id, 30, 60)];
-  project.transitions = [{ leftId: 'first', rightId: 'second', type: 'cross-dissolve', duration: 18 }];
+  project.layers[0]!.transitions = [{ leftId: 'first', rightId: 'second', type: 'cross-dissolve', duration: 18 }];
   project.layers[0]!.keyframes = [sharedPoint(0, { speed: 1 }, 'hold'), sharedPoint(100, { speed: 8 }, 'hold')];
   await fixture(page, project); const start = await begin(page, 0); await move(page, start, 110, true);
   await expect(page.locator('.timeline-layer-key.moving')).toHaveClass(/invalid/); await expect(page.locator('.timeline-bottom')).toContainText('overlap or exceed');
@@ -190,7 +198,7 @@ test('a Speed move that invalidates a dissolve is previewed as invalid and leave
 
 test('a keyboard Speed-point move can extend beyond the old preview duration without an invalid seek', async ({ page }) => {
   const errors: string[] = []; page.on('pageerror', (error) => errors.push(error.message));
-  const project = sequence(); project.clips = [createClip('first', assets[0]!.id, 0, 60)]; project.transitions = [];
+  const project = sequence(); project.clips = [createClip('first', assets[0]!.id, 0, 60)]; project.layers[0]!.transitions = [];
   project.layers[0]!.keyframes = [sharedPoint(0, { speed: 0.5 }, 'hold'), sharedPoint(110, { speed: 8 }, 'hold')];
   await fixture(page, project); expect(calculateLayout(project).duration).toBe(111);
   await marker(page, 110).focus(); await marker(page, 110).press('Shift+ArrowRight');
@@ -201,8 +209,8 @@ test('a keyboard Speed-point move can extend beyond the old preview duration wit
   await expect(page.locator('.error-banner')).toHaveCount(0); expect(errors).toEqual([]);
 });
 
-test('an empty overlay row has independently movable points and marker selection follows the row rather than a primary clip', async ({ page }) => {
-  const project = sequence(); project.layers.push({ id: 'empty-overlay', name: 'Video 2', enabled: true, opacity: 1, keyframes: [sharedPoint(20, { layerOpacity: 0.5, hue: 30 }, 'hold')] });
+test('an empty positioned row has independently movable points and marker selection follows its own track rather than another clip', async ({ page }) => {
+  const project = sequence(); project.layers.push({ ...createLayer('empty-overlay', 'Video 2', false), keyframes: [sharedPoint(20, { layerOpacity: 0.5, hue: 30 }, 'hold')] });
   await fixture(page, project); const start = await begin(page, 20, 'empty-overlay'); await move(page, start, 35, true);
   await expect(layerKeyframes(page, 'Video 2')).toBeVisible(); await page.mouse.up(); await page.keyboard.up('Alt');
   const next = await current(page);
@@ -214,7 +222,7 @@ test('an empty overlay row has independently movable points and marker selection
 test('horizontal autoscroll uses captured zoom/scroll coordinates and Escape restores the original viewport without saves', async ({ page }) => {
   const project = sequence();
   project.clips = Array.from({ length: 20 }, (_, index) => createClip(`long-${index}`, assets[index % 2]!.id, 0, 120));
-  project.transitions = project.clips.slice(1).map((clip, index) => ({ leftId: project.clips[index]!.id, rightId: clip.id, type: 'cut' as const, duration: 0 as const }));
+  project.layers[0]!.transitions = project.clips.slice(1).map((clip, index) => ({ leftId: project.clips[index]!.id, rightId: clip.id, type: 'cut' as const, duration: 0 as const }));
   project.layers[0]!.keyframes = [sharedPoint(20, { exposure: 0.6 })];
   await fixture(page, project); await page.getByRole('slider', { name: 'Timeline zoom' }).fill('180');
   const viewport = page.locator('.timeline-scroll'); const initial = await viewport.evaluate((element) => element.scrollLeft);

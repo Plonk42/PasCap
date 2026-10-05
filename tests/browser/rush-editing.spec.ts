@@ -2,9 +2,9 @@ import { expect, test, type APIRequestContext, type Page } from '@playwright/tes
 import { audioAssetSchema, type AudioAsset } from '../../src/shared/audio.js';
 import { applyCommand } from '../../src/shared/commands.js';
 import { mediaAssetSchema, type MediaAsset } from '../../src/shared/media.js';
-import { createClip, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
+import { createClip, createLayer, createProject, projectSchema, type ProjectDocument, type Transition } from '../../src/shared/model.js';
 import { validateSourceRanges } from '../../src/shared/source-range.js';
-import { calculateLayout, primaryClips } from '../../src/shared/timeline.js';
+import { calculateLayout, layerClips } from '../../src/shared/timeline.js';
 import { clipAction, expandedInspectorPreferences, sharedPoint } from './editor-helpers.js';
 import { memoryProjects, type MemoryProjects } from './memory-projects.js';
 
@@ -67,10 +67,10 @@ function sequence(): ProjectDocument {
     document.media.videoIds = assets.map((asset) => asset.id);
     document.clips = [
         createClip('a', assets[0]!.id, 15, 105),
-        createClip('b', assets[1]!.id, 30, 90),
-        createClip('c', assets[0]!.id, 60, 120),
+        { ...createClip('b', assets[1]!.id, 30, 90), start: 90 },
+        { ...createClip('c', assets[0]!.id, 60, 120), start: 150 },
     ];
-    document.transitions = [
+    document.layers[0]!.transitions = [
         { leftId: 'a', rightId: 'b', type: 'cut', duration: 0 },
         { leftId: 'b', rightId: 'c', type: 'cut', duration: 0 },
     ];
@@ -81,15 +81,15 @@ function dissolvedSequence(): ProjectDocument {
     let document = sequence();
     document = applyCommand(document, { type: 'transition', transition: { leftId: 'a', rightId: 'b', type: 'cross-dissolve', duration: 12 } });
     document = applyCommand(document, { type: 'transition', transition: { leftId: 'b', rightId: 'c', type: 'cross-dissolve', duration: 6 } });
-    return applyCommand(document, { type: 'fades', opening: 8, closing: 4 });
+    return applyCommand(document, { type: 'fades', layerId: document.layers[0]!.id, opening: 8, closing: 4 });
 }
 
 function omittedHeadSequence(): ProjectDocument {
     const document = sequence();
     document.clips = [
         createClip('a', assets[0]!.id, 90, 120),
-        createClip('b', assets[1]!.id, 30, 60),
-        createClip('c', assets[0]!.id, 60, 90),
+        { ...createClip('b', assets[1]!.id, 30, 60), start: 30 },
+        { ...createClip('c', assets[0]!.id, 60, 90), start: 60 },
     ];
     document.layers[0]!.keyframes = [sharedPoint(12, { exposure: 0.3 }), sharedPoint(500, { hue: 20 }, 'hold')];
     return projectSchema.parse(document);
@@ -113,6 +113,9 @@ async function flush(page: Page): Promise<void> { await page.evaluate(() => wind
 /** Reload a memory seed, not setDocument: each fixture starts with an empty Undo stack. */
 async function fixture(page: Page, document: ProjectDocument): Promise<void> {
     await flush(page);
+    for (const placed of calculateLayout(document).clips) {
+        if (document.layers.find((layer) => layer.id === placed.clip.layerId)!.ripple) placed.clip.start = placed.start;
+    }
     memory.seed(document);
     await page.reload();
     await ready(page, document);
@@ -175,18 +178,21 @@ async function expectCutOverlay(page: Page, inFrame: number, outFrame: number): 
     expect(style.width).toBeCloseTo((outFrame - inFrame) * geometry.scale, 2);
 }
 
-function primaryGeometry(document: ProjectDocument) {
+function firstTrackGeometry(document: ProjectDocument) {
     return calculateLayout(document).clips.filter((placed) => placed.clip.layerId === document.layers[0]!.id)
         .map((placed) => [placed.clip.id, placed.start, placed.duration, placed.end]);
 }
 
-function unchangedOthers(before: ProjectDocument, next: ProjectDocument, editedIds: readonly string[]): void {
-    expect(next.schemaVersion).toBe(5);
+function unchangedOthers(before: ProjectDocument, next: ProjectDocument, editedIds: readonly string[], transitions: Readonly<Record<string, readonly Transition[]>> = {}): void {
+    expect(next.schemaVersion).toBe(6);
     expect(next.media).toEqual(before.media);
-    expect(next.layers).toEqual(before.layers);
+    expect(next.layers).toEqual(before.layers.map((layer) => ({ ...layer, transitions: transitions[layer.id] ?? layer.transitions })));
     expect(next.music).toEqual(before.music);
+    const layout = calculateLayout(next);
     for (const original of before.clips.filter((item) => !editedIds.includes(item.id))) {
-        expect(next.clips.find((item) => item.id === original.id)).toEqual(original);
+        const placed = layout.clips.find((item) => item.clip.id === original.id)!;
+        const ripple = before.layers.find((layer) => layer.id === original.layerId)!.ripple;
+        expect(next.clips.find((item) => item.id === original.id)).toEqual({ ...original, start: ripple ? placed.start : original.start });
     }
 }
 
@@ -280,7 +286,7 @@ test('three ranges from one rush keep the source pinned, independent, reloadable
         ids.push(await addExcerpt(page));
         const next = await current(page);
         expect(next.clips.slice(0, -1)).toEqual(before.clips);
-        expect(next.clips.at(-1)).toEqual(createClip(ids.at(-1)!, assets[0]!.id, sourceIn, sourceOut));
+        expect(next.clips.at(-1)).toEqual({ ...createClip(ids.at(-1)!, assets[0]!.id, sourceIn, sourceOut), start: before.clips.length * 80 });
         await ready(page, next);
         await expect(page.getByRole('region', { name: 'Source review', exact: true })).toBeVisible();
         await expect(page.getByRole('button', { name: 'Pin source review', exact: true })).toHaveAttribute('aria-pressed', 'true');
@@ -295,7 +301,7 @@ test('three ranges from one rush keep the source pinned, independent, reloadable
     }
     expect(new Set(ids).size).toBe(3);
     const added = await current(page);
-    expect(primaryGeometry(added)).toEqual([[ids[0], 0, 80, 80], [ids[1], 80, 80, 160], [ids[2], 160, 80, 240]]);
+    expect(firstTrackGeometry(added)).toEqual([[ids[0], 0, 80, 80], [ids[1], 80, 80, 160], [ids[2], 160, 80, 240]]);
     expect(calculateLayout(added).duration).toBe(240);
     const badge = page.locator(`.media-item[data-media-id="${assets[0]!.id}"] .media-usage-badge`);
     await expect(badge).toBeVisible();
@@ -376,7 +382,7 @@ test('rush excerpt popup leaves review geometry and Add reachable on a short lap
     await expect(add).toBeInViewport();
     await expect(page.locator('.source-preview')).toHaveAttribute('data-source-frame', '30');
     await expect(page.locator('.source-range-editor')).toHaveCount(1);
-    expect((await current(page)).clips).toEqual([...before.clips, createClip(id, assets[0]!.id, 0, 120)]);
+    expect((await current(page)).clips).toEqual([...before.clips, { ...createClip(id, assets[0]!.id, 0, 120), start: calculateLayout(before).duration }]);
     await expect(page.locator('.source-review')).toHaveAttribute('data-source-excerpt-count', '3');
 });
 
@@ -394,9 +400,13 @@ test('visible split then S selects each right piece, preserves boundaries and de
     const first = await current(page);
     const rightId = first.clips[1]!.id;
     expect(first.clips[0]).toEqual({ ...before.clips[0]!, sourceOut: 45 });
-    expect(first.clips[1]).toEqual({ ...before.clips[0]!, id: rightId, sourceIn: 45 });
-    expect(primaryGeometry(first)).toEqual([['a', 0, 30, 30], [rightId, 30, 60, 90], ['b', 78, 60, 138], ['c', 132, 60, 192]]);
-    unchangedOthers(before, first, ['a']);
+    expect(first.clips[1]).toEqual({ ...before.clips[0]!, id: rightId, sourceIn: 45, start: 30 });
+    expect(firstTrackGeometry(first)).toEqual([['a', 0, 30, 30], [rightId, 30, 60, 90], ['b', 78, 60, 138], ['c', 132, 60, 192]]);
+    unchangedOthers(before, first, ['a'], { 'video-1': [
+        { leftId: 'a', rightId, type: 'cut', duration: 0 },
+        { leftId: rightId, rightId: 'b', type: 'cross-dissolve', duration: 12 },
+        before.layers[0]!.transitions[1]!,
+    ] });
     await expect(clip(page, rightId).locator('.timeline-clip-body')).toHaveAttribute('aria-pressed', 'true');
     await ready(page, first); await decodedSource(page, rightId, 45);
     await seek(page, 55); await shortcut(page, 's');
@@ -404,15 +414,16 @@ test('visible split then S selects each right piece, preserves boundaries and de
     const finalId = second.clips[2]!.id;
     expect(new Set(second.clips.map((item) => item.id)).size).toBe(5);
     expect(second.clips[1]).toEqual({ ...first.clips[1]!, sourceOut: 70 });
-    expect(second.clips[2]).toEqual({ ...first.clips[1]!, id: finalId, sourceIn: 70 });
-    expect(primaryGeometry(second)).toEqual([['a', 0, 30, 30], [rightId, 30, 25, 55], [finalId, 55, 35, 90], ['b', 78, 60, 138], ['c', 132, 60, 192]]);
-    expect(second.transitions).toEqual([
+    expect(second.clips[2]).toEqual({ ...first.clips[1]!, id: finalId, sourceIn: 70, start: 55 });
+    expect(firstTrackGeometry(second)).toEqual([['a', 0, 30, 30], [rightId, 30, 25, 55], [finalId, 55, 35, 90], ['b', 78, 60, 138], ['c', 132, 60, 192]]);
+    const splitTransitions: Transition[] = [
         { leftId: 'a', rightId, type: 'cut', duration: 0 },
         { leftId: rightId, rightId: finalId, type: 'cut', duration: 0 },
         { leftId: finalId, rightId: 'b', type: 'cross-dissolve', duration: 12 },
-        before.transitions[1],
-    ]);
-    unchangedOthers(before, second, ['a']);
+        before.layers[0]!.transitions[1]!,
+    ];
+    expect(second.layers[0]!.transitions).toEqual(splitTransitions);
+    unchangedOthers(before, second, ['a'], { 'video-1': splitTransitions });
     await expect(clip(page, finalId).locator('.timeline-clip-body')).toHaveAttribute('aria-pressed', 'true');
     await ready(page, second); await decodedSource(page, finalId, 70);
     await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(55);
@@ -424,9 +435,13 @@ test('visible split then S selects each right piece, preserves boundaries and de
     await expect(page.getByRole('button', { name: 'Delete selected clip', exact: true })).toBeVisible();
     await clipAction(page, 'Delete selected clip');
     const deleted = await current(page);
-    expect(primaryGeometry(deleted)).toEqual([['a', 0, 30, 30], [rightId, 30, 25, 55], ['b', 55, 60, 115], ['c', 109, 60, 169]]);
-    expect(deleted.clips).toEqual(second.clips.filter((item) => item.id !== finalId));
-    expect(deleted.layers).toEqual(before.layers);
+    expect(firstTrackGeometry(deleted)).toEqual([['a', 0, 30, 30], [rightId, 30, 25, 55], ['b', 55, 60, 115], ['c', 109, 60, 169]]);
+    expect(deleted.clips).toEqual(second.clips.filter((item) => item.id !== finalId).map((item) => ({ ...item, start: ({ a: 0, [rightId]: 30, b: 55, c: 109 })[item.id]! })));
+    unchangedOthers(before, deleted, ['a'], { 'video-1': [
+        { leftId: 'a', rightId, type: 'cut', duration: 0 },
+        { leftId: rightId, rightId: 'b', type: 'cut', duration: 0 },
+        before.layers[0]!.transitions[1]!,
+    ] });
     await page.getByRole('button', { name: 'Undo', exact: true }).click(); expect(await current(page)).toEqual(second);
     await page.getByRole('button', { name: 'Undo', exact: true }).click(); expect(await current(page)).toEqual(first);
     await page.getByRole('button', { name: 'Undo', exact: true }).click(); expect(await current(page)).toEqual(before);
@@ -435,24 +450,24 @@ test('visible split then S selects each right piece, preserves boundaries and de
 
 test('Q and W retain the mapped displayed frame, ripple dissolves and recover both original endpoints', async ({ page }) => {
     const document = dissolvedSequence();
-    document.openingFade = 5;
+    document.layers[0]!.openingFade = 5;
     document.clips[0]!.speed = { mode: 'constant', rate: 0.5 };
     document.layers[0]!.keyframes = [sharedPoint(12, { exposure: 0.25 }), sharedPoint(500, { hue: 30 }, 'smooth')];
     await fixture(page, document);
     const before = await current(page);
-    expect(primaryGeometry(before)).toEqual([['a', 0, 180, 180], ['b', 168, 60, 228], ['c', 222, 60, 282]]);
+    expect(firstTrackGeometry(before)).toEqual([['a', 0, 180, 180], ['b', 168, 60, 228], ['c', 222, 60, 282]]);
     await seek(page, 20); await decodedSource(page, 'a', 25); await shortcut(page, 'q');
     const headTrim = await current(page);
     expect(headTrim.clips[0]).toEqual({ ...before.clips[0]!, sourceIn: 25 });
-    expect(primaryGeometry(headTrim)).toEqual([['a', 0, 160, 160], ['b', 148, 60, 208], ['c', 202, 60, 262]]);
+    expect(firstTrackGeometry(headTrim)).toEqual([['a', 0, 160, 160], ['b', 148, 60, 208], ['c', 202, 60, 262]]);
     unchangedOthers(before, headTrim, ['a']);
     await ready(page, headTrim); await decodedSource(page, 'a', 25);
     await seek(page, 40); await decodedSource(page, 'a', 45); await shortcut(page, 'w');
     const bothTrimmed = await current(page);
     expect(bothTrimmed.clips[0]).toEqual({ ...headTrim.clips[0]!, sourceOut: 46 });
-    expect(primaryGeometry(bothTrimmed)).toEqual([['a', 0, 42, 42], ['b', 30, 60, 90], ['c', 84, 60, 144]]);
-    expect(bothTrimmed.transitions).toEqual(before.transitions);
-    expect([bothTrimmed.openingFade, bothTrimmed.closingFade]).toEqual([5, 4]);
+    expect(firstTrackGeometry(bothTrimmed)).toEqual([['a', 0, 42, 42], ['b', 30, 60, 90], ['c', 84, 60, 144]]);
+    expect(bothTrimmed.layers[0]!.transitions).toEqual(before.layers[0]!.transitions);
+    expect([bothTrimmed.layers[0]!.openingFade, bothTrimmed.layers[0]!.closingFade]).toEqual([5, 4]);
     unchangedOthers(before, bothTrimmed, ['a']);
     await ready(page, bothTrimmed); await decodedSource(page, 'a', 45);
     await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(41);
@@ -462,13 +477,13 @@ test('Q and W retain the mapped displayed frame, ripple dissolves and recover bo
     await inHandle.focus(); await inHandle.press('Home');
     const restoredHead = await current(page);
     expect(restoredHead.clips[0]).toEqual({ ...bothTrimmed.clips[0]!, sourceIn: 0 });
-    expect(primaryGeometry(restoredHead)).toEqual([['a', 0, 92, 92], ['b', 80, 60, 140], ['c', 134, 60, 194]]);
+    expect(firstTrackGeometry(restoredHead)).toEqual([['a', 0, 92, 92], ['b', 80, 60, 140], ['c', 134, 60, 194]]);
     const outHandle = clip(page, 'a').locator('[data-trim-handle="out"]');
     await outHandle.focus(); await outHandle.press('End');
     const restored = await current(page);
     expect(restored.clips[0]).toEqual({ ...before.clips[0]!, sourceIn: 0, sourceOut: 120 });
-    expect(primaryGeometry(restored)).toEqual([['a', 0, 240, 240], ['b', 228, 60, 288], ['c', 282, 60, 342]]);
-    expect(restored.transitions).toEqual(before.transitions);
+    expect(firstTrackGeometry(restored)).toEqual([['a', 0, 240, 240], ['b', 228, 60, 288], ['c', 282, 60, 342]]);
+    expect(restored.layers[0]!.transitions).toEqual(before.layers[0]!.transitions);
     unchangedOthers(before, restored, ['a']);
     for (const expected of [restoredHead, bothTrimmed, headTrim, before]) {
         await page.getByRole('button', { name: 'Undo', exact: true }).click(); expect(await current(page)).toEqual(expected);
@@ -492,7 +507,7 @@ test('I/O middle removal is transient then one edit, preserving absolute ten-cha
         sharedPoint(15, { layerOpacity: 0.8, clipOpacity: 0.7, speed: 1, exposure: 0.3, brightness: 0.04, contrast: 1.1, hue: 20, saturation: 0.8, highlights: 0.2, shadows: -0.1 }, 'hold'),
         sharedPoint(1_000, { speed: 1, exposure: 0.6 }, 'smooth'),
     ];
-    document.layers.push({ id: 'upper', name: 'Video 2', enabled: true, opacity: 0.75, keyframes: [sharedPoint(200, { layerOpacity: 0.6, hue: 35 }, 'ease-in')] });
+    document.layers.push({ ...createLayer('upper', 'Video 2', false), opacity: 0.75, keyframes: [sharedPoint(200, { layerOpacity: 0.6, hue: 35 }, 'ease-in')] });
     document.clips[0] = { ...document.clips[0]!, speed: { mode: 'constant', rate: 2 }, opacity: 0.65, colour: { ...document.clips[0]!.colour, exposure: -0.2, saturation: 0.6 } };
     document.clips.splice(1, 0, { ...createClip('fixed-overlay', assets[1]!.id, 0, 20), layerId: 'upper', start: 230 });
     document.music = { mediaId: music.id, sourceIn: 10, sourceOut: 100, start: 25, duration: 180, gainDb: -9, fadeIn: 5, fadeOut: 10, loop: true };
@@ -524,17 +539,18 @@ test('I/O middle removal is transient then one edit, preserving absolute ten-cha
     const right = next.clips.find((item) => !before.clips.some((original) => original.id === item.id))!;
     expect(next.clips.map((item) => item.id)).toEqual(['a', right.id, 'fixed-overlay', 'b', 'c']);
     expect(next.clips[0]).toEqual({ ...before.clips[0]!, sourceOut: 35 });
-    expect(right).toEqual({ ...before.clips[0]!, id: right.id, sourceIn: 55 });
+    expect(right).toEqual({ ...before.clips[0]!, id: right.id, sourceIn: 55, start: 20 });
     expect(Object.keys(right)).toEqual(Object.keys(before.clips[0]!));
-    expect(primaryGeometry(next)).toEqual([['a', 0, 20, 20], [right.id, 20, 50, 70], ['b', 58, 60, 118], ['c', 112, 60, 172]]);
-    expect(calculateLayout(next)).toMatchObject({ baseDuration: 172, duration: 250 });
-    expect(next.transitions).toEqual([
+    expect(firstTrackGeometry(next)).toEqual([['a', 0, 20, 20], [right.id, 20, 50, 70], ['b', 58, 60, 118], ['c', 112, 60, 172]]);
+    expect(firstTrackGeometry(next).at(-1)![3]).toBe(172); expect(calculateLayout(next).duration).toBe(250);
+    const cutTransitions: Transition[] = [
         { leftId: 'a', rightId: right.id, type: 'cut', duration: 0 },
         { leftId: right.id, rightId: 'b', type: 'cross-dissolve', duration: 12 },
-        before.transitions[1],
-    ]);
-    unchangedOthers(before, next, ['a']);
-    expect([next.openingFade, next.closingFade]).toEqual([8, 4]);
+        before.layers[0]!.transitions[1]!,
+    ];
+    expect(next.layers[0]!.transitions).toEqual(cutTransitions);
+    unchangedOthers(before, next, ['a'], { 'video-1': cutTransitions });
+    expect([next.layers[0]!.openingFade, next.layers[0]!.closingFade]).toEqual([8, 4]);
     await expect(clip(page, right.id).locator('.timeline-clip-body')).toHaveAttribute('aria-pressed', 'true');
     await expect(page.locator('.timeline-cut-mark')).toHaveCount(0);
     await expect(page.locator('.timeline-cut-selection')).toHaveCount(0);
@@ -550,13 +566,16 @@ test('I/O middle removal is transient then one edit, preserving absolute ten-cha
     const independent = await current(page);
     expect(independent.clips.find((item) => item.id === 'a')).toEqual(next.clips[0]);
     expect(independent.clips.find((item) => item.id === right.id)).toEqual({ ...right, sourceOut: 100 });
-    unchangedOthers(before, independent, ['a']);
+    unchangedOthers(before, independent, ['a'], { 'video-1': cutTransitions });
     await page.getByRole('button', { name: 'Undo', exact: true }).click(); expect(await current(page)).toEqual(next);
 });
 
 test('overlay middle cuts keep their gap and neighbours fixed; visible quick trims keep absolute placement semantics', async ({ page }) => {
     const document = sequence();
-    document.layers.push({ id: 'upper', name: 'Video 2', enabled: true, opacity: 0.8, keyframes: [sharedPoint(10, { speed: 1, exposure: 0.2 }), sharedPoint(500, { speed: 1, hue: 25 }, 'hold')] });
+    document.layers.push({ ...createLayer('upper', 'Video 2', false), opacity: 0.8, keyframes: [sharedPoint(10, { speed: 1, exposure: 0.2 }), sharedPoint(500, { speed: 1, hue: 25 }, 'hold')], transitions: [
+        { leftId: 'upper-before', rightId: 'top', type: 'cut', duration: 0 },
+        { leftId: 'top', rightId: 'upper-after', type: 'cut', duration: 0 },
+    ] });
     document.clips.push(
         { ...createClip('upper-before', assets[0]!.id, 0, 20), layerId: 'upper', start: 5 },
         { ...createClip('top', assets[1]!.id, 15, 105), layerId: 'upper', start: 40 },
@@ -564,10 +583,10 @@ test('overlay middle cuts keep their gap and neighbours fixed; visible quick tri
     );
     await fixture(page, document); await selectClip(page, 'top');
     const before = await current(page);
-    await expect(page.locator('.rush-edit-mode')).toHaveText('Positioned overlay');
-    const primaryTop = await clip(page, 'a').evaluate((element) => Number.parseFloat((element as HTMLElement).style.top));
+    await expect(page.locator('.rush-edit-mode')).toHaveText('Positioned track');
+    const firstTrackTop = await clip(page, 'a').evaluate((element) => Number.parseFloat((element as HTMLElement).style.top));
     const overlayTop = await clip(page, 'top').evaluate((element) => Number.parseFloat((element as HTMLElement).style.top));
-    expect(overlayTop - primaryTop).toBe(88);
+    expect(overlayTop - firstTrackTop).toBe(88);
     await markRange(page, 60, 80, true); await expectCutOverlay(page, 60, 80);
     await page.getByRole('button', { name: 'Cut marked range', exact: true }).click();
     const cut = await current(page);
@@ -577,9 +596,13 @@ test('overlay middle cuts keep their gap and neighbours fixed; visible quick tri
     expect(calculateLayout(cut).clips.filter((item) => item.clip.layerId === 'upper').map((item) => [item.clip.id, item.start, item.duration, item.end])).toEqual([
         ['upper-before', 5, 20, 25], ['top', 40, 20, 60], [right.id, 80, 50, 130], ['upper-after', 140, 20, 160],
     ]);
-    unchangedOthers(before, cut, ['top']);
-    expect(primaryGeometry(cut)).toEqual(primaryGeometry(before));
-    expect(cut.transitions).toEqual(before.transitions);
+    unchangedOthers(before, cut, ['top'], { upper: [
+        { leftId: 'upper-before', rightId: 'top', type: 'cut', duration: 0 },
+        { leftId: 'top', rightId: right.id, type: 'cut', duration: 0 },
+        { leftId: right.id, rightId: 'upper-after', type: 'cut', duration: 0 },
+    ] });
+    expect(firstTrackGeometry(cut)).toEqual(firstTrackGeometry(before));
+    expect(cut.layers[0]!.transitions).toEqual(before.layers[0]!.transitions);
     await expect(clip(page, right.id).locator('.timeline-clip-body')).toHaveAttribute('aria-pressed', 'true');
     await page.getByRole('button', { name: 'Undo', exact: true }).click(); expect(await current(page)).toEqual(before);
     await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
@@ -600,7 +623,7 @@ test('overlay middle cuts keep their gap and neighbours fixed; visible quick tri
     await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
 });
 
-test('prefix, suffix and whole primary cuts retain only necessary IDs, ripple and undo once, including an empty sequence', async ({ page }) => {
+test('prefix, suffix and whole Ripple track cuts retain only necessary IDs and undo once, including an empty track with dormant fades', async ({ page }) => {
     const document = dissolvedSequence();
     document.layers[0]!.keyframes = [sharedPoint(20, { clipOpacity: 0.7 }), sharedPoint(800, { exposure: 0.5 }, 'hold')];
     const cases = [
@@ -617,18 +640,18 @@ test('prefix, suffix and whole primary cuts retain only necessary IDs, ripple an
         const next = await current(page);
         expect(next.clips.every((item) => before.clips.some((original) => original.id === item.id)), scenario.name).toBe(true);
         if (scenario.sourceIn === null) {
-            expect(next.clips).toEqual(before.clips.slice(1));
-            expect(primaryGeometry(next)).toEqual([['b', 0, 60, 60], ['c', 54, 60, 114]]);
-            expect(next.transitions).toEqual([before.transitions[1]]);
+            expect(next.clips).toEqual([{ ...before.clips[1]!, start: 0 }, { ...before.clips[2]!, start: 54 }]);
+            expect(firstTrackGeometry(next)).toEqual([['b', 0, 60, 60], ['c', 54, 60, 114]]);
+            expect(next.layers[0]!.transitions).toEqual([before.layers[0]!.transitions[1]]);
             await expect(clip(page, 'b').locator('.timeline-clip-body')).toHaveAttribute('aria-pressed', 'true');
         } else {
             expect(next.clips[0]).toEqual({ ...before.clips[0]!, sourceIn: scenario.sourceIn, sourceOut: scenario.sourceOut });
-            expect(primaryGeometry(next)).toEqual([['a', 0, 70, 70], ['b', 58, 60, 118], ['c', 112, 60, 172]]);
-            expect(next.transitions).toEqual(before.transitions);
+            expect(firstTrackGeometry(next)).toEqual([['a', 0, 70, 70], ['b', 58, 60, 118], ['c', 112, 60, 172]]);
+            expect(next.layers[0]!.transitions).toEqual(before.layers[0]!.transitions);
             await expect(clip(page, 'a').locator('.timeline-clip-body')).toHaveAttribute('aria-pressed', 'true');
         }
-        unchangedOthers(before, next, ['a']);
-        expect([next.openingFade, next.closingFade]).toEqual([8, 4]);
+        unchangedOthers(before, next, ['a'], { 'video-1': scenario.sourceIn === null ? [before.layers[0]!.transitions[1]!] : before.layers[0]!.transitions });
+        expect([next.layers[0]!.openingFade, next.layers[0]!.closingFade]).toEqual([8, 4]);
         await flush(page); expect(memory.saves).toBe(saves + 1);
         await page.getByRole('button', { name: 'Undo', exact: true }).click(); expect(await current(page)).toEqual(before);
         await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
@@ -637,13 +660,13 @@ test('prefix, suffix and whole primary cuts retain only necessary IDs, ripple an
     only.media.videoIds = assets.map((asset) => asset.id);
     only.clips = [createClip('a', assets[0]!.id, 15, 105)];
     only.layers[0]!.keyframes = document.layers[0]!.keyframes;
-    only.openingFade = 8; only.closingFade = 4;
+    only.layers[0]!.openingFade = 8; only.layers[0]!.closingFade = 4;
     await fixture(page, only);
     const before = await current(page);
     await markRange(page, 0, 90); await shortcut(page, 'Shift+Delete');
     const empty = await current(page);
-    expect(empty.clips).toEqual([]); expect(empty.transitions).toEqual([]);
-    expect([empty.openingFade, empty.closingFade]).toEqual([0, 0]);
+    expect(empty.clips).toEqual([]); expect(empty.layers[0]!.transitions).toEqual([]);
+    expect([empty.layers[0]!.openingFade, empty.layers[0]!.closingFade]).toEqual([8, 4]);
     expect(empty.layers).toEqual(before.layers);
     await ready(page, empty);
     await expect(page.getByRole('button', { name: 'Delete selected clip', exact: true })).toBeDisabled();
@@ -778,7 +801,7 @@ test('native first-clip edge autoscroll restores a head longer than 32px without
     const next = await current(page);
     expect(next.clips[0]).toEqual({ ...before.clips[0]!, sourceIn: 0 });
     unchangedOthers(before, next, ['a']);
-    expect(primaryGeometry(next)).toEqual([['a', 0, 120, 120], ['b', 120, 30, 150], ['c', 150, 30, 180]]);
+    expect(firstTrackGeometry(next)).toEqual([['a', 0, 120, 120], ['b', 120, 30, 150], ['c', 150, 30, 180]]);
     expect(calculateLayout(next).duration).toBe(180);
     await expect(page.locator('.timeline-surface')).toHaveAttribute('data-leading', '32');
     await expect.poll(() => page.locator('.timeline-scroll').evaluate((element) => element.scrollLeft)).toBe(drag.scrollLeft);
@@ -824,9 +847,9 @@ test('native reorder of a cut excerpt commits its post-removal ripple ghost and 
     const before = await current(page);
     await markRange(page, 30, 60); await shortcut(page, 'Shift+Delete');
     const cut = await current(page); const rightId = cut.clips[1]!.id;
-    expect(primaryGeometry(cut)).toEqual([['a', 0, 30, 30], [rightId, 30, 60, 90], ['b', 90, 60, 150], ['c', 142, 60, 202]]);
+    expect(firstTrackGeometry(cut)).toEqual([['a', 0, 30, 30], [rightId, 30, 60, 90], ['b', 90, 60, 150], ['c', 142, 60, 202]]);
     expect(cut.clips[0]).toEqual({ ...before.clips[0]!, sourceOut: 30 });
-    expect(cut.clips[1]).toEqual({ ...before.clips[0]!, id: rightId, sourceIn: 60 });
+    expect(cut.clips[1]).toEqual({ ...before.clips[0]!, id: rightId, sourceIn: 60, start: 30 });
     await ready(page, cut);
     const moving = clip(page, rightId); await moving.scrollIntoViewIfNeeded();
     const box = (await moving.boundingBox())!;
@@ -835,7 +858,7 @@ test('native reorder of a cut excerpt commits its post-removal ripple ghost and 
     const origin = await frameOrigin(page);
     const scrollBefore = await page.locator('.timeline-scroll').evaluate((element) => ({ left: element.scrollLeft, top: element.scrollTop }));
     const grab = 12;
-    await page.keyboard.down('Alt'); // Primary insertion still ripples; Alt cannot turn it into arbitrary placement.
+    await page.keyboard.down('Alt'); // Ripple is a track setting; Alt cannot turn it into arbitrary placement.
     await page.mouse.move(box.x + grab * scale, box.y + 30); await page.mouse.down();
     await page.mouse.move(box.x + grab * scale + 12, box.y + 30, { steps: 3 });
     await page.mouse.move(origin + (150 + grab) * scale, lane.y + 38, { steps: 8 });
@@ -851,23 +874,24 @@ test('native reorder of a cut excerpt commits its post-removal ripple ghost and 
     const plannedStart = Number(await ghost.getAttribute('data-drop-start'));
     await page.mouse.up(); await page.keyboard.up('Alt');
     const reordered = await current(page);
-    expect(primaryClips(reordered).map((item) => item.id)).toEqual(['a', 'b', 'c', rightId]);
+    expect(layerClips(reordered, 'video-1').map((item) => item.id)).toEqual(['a', 'b', 'c', rightId]);
     expect(calculateLayout(reordered).clips.find((item) => item.clip.id === rightId)?.start).toBe(plannedStart);
-    expect(primaryGeometry(reordered)).toEqual([['a', 0, 30, 30], ['b', 30, 60, 90], ['c', 82, 60, 142], [rightId, 142, 60, 202]]);
-    unchangedOthers(cut, reordered, [rightId]);
-    expect(reordered.clips.find((item) => item.id === rightId)).toEqual(cut.clips[1]);
-    expect(reordered.transitions).toEqual([
+    expect(firstTrackGeometry(reordered)).toEqual([['a', 0, 30, 30], ['b', 30, 60, 90], ['c', 82, 60, 142], [rightId, 142, 60, 202]]);
+    expect(reordered.clips.find((item) => item.id === rightId)).toEqual({ ...cut.clips[1]!, start: 142 });
+    const reorderedTransitions: Transition[] = [
         { leftId: 'a', rightId: 'b', type: 'cut', duration: 0 },
-        before.transitions[1],
+        before.layers[0]!.transitions[1]!,
         { leftId: 'c', rightId, type: 'cut', duration: 0 },
-    ]);
+    ];
+    expect(reordered.layers[0]!.transitions).toEqual(reorderedTransitions);
+    unchangedOthers(cut, reordered, [rightId], { 'video-1': reorderedTransitions });
     await selectClip(page, 'a');
     const handle = clip(page, 'a').locator('[data-trim-handle="out"]');
     await handle.focus(); await handle.press('Shift+ArrowLeft');
     const trimmed = await current(page);
     expect(trimmed.clips[0]).toEqual({ ...reordered.clips[0]!, sourceOut: 20 });
     unchangedOthers(reordered, trimmed, ['a']);
-    expect(primaryGeometry(trimmed)).toEqual([['a', 0, 20, 20], ['b', 20, 60, 80], ['c', 72, 60, 132], [rightId, 132, 60, 192]]);
+    expect(firstTrackGeometry(trimmed)).toEqual([['a', 0, 20, 20], ['b', 20, 60, 80], ['c', 72, 60, 132], [rightId, 132, 60, 192]]);
     expect(calculateLayout(trimmed).duration).toBe(192);
     for (const expected of [reordered, cut, before]) {
         await page.getByRole('button', { name: 'Undo', exact: true }).click(); expect(await current(page)).toEqual(expected);
@@ -877,7 +901,7 @@ test('native reorder of a cut excerpt commits its post-removal ripple ghost and 
 
 test('an overlapping source Add clears stale success feedback but keeps the source, range, frame and previous edit', async ({ page }) => {
     const document = sequence();
-    document.layers.push({ id: 'upper', name: 'Video 2', enabled: true, opacity: 1, keyframes: [sharedPoint(10, { exposure: 0.25 }), sharedPoint(500, { hue: 20 }, 'hold')] });
+    document.layers.push({ ...createLayer('upper', 'Video 2', false), keyframes: [sharedPoint(10, { exposure: 0.25 }), sharedPoint(500, { hue: 20 }, 'hold')], transitions: [{ leftId: 'top', rightId: 'occupied', type: 'cut', duration: 0 }] });
     document.clips.push(
         { ...createClip('top', assets[0]!.id, 15, 45), layerId: 'upper', start: 20 },
         { ...createClip('occupied', assets[1]!.id, 0, 30), layerId: 'upper', start: 50 },
@@ -890,13 +914,16 @@ test('an overlapping source Add clears stale success feedback but keeps the sour
     const addedId = await addExcerpt(page);
     const added = await current(page);
     expect(added.clips.at(-1)).toEqual({ ...createClip(addedId, assets[0]!.id, 10, 30), layerId: 'upper', start: 80 });
-    unchangedOthers(before, added, []);
+    unchangedOthers(before, added, [], { upper: [
+        { leftId: 'top', rightId: 'occupied', type: 'cut', duration: 0 },
+        { leftId: 'occupied', rightId: addedId, type: 'cut', duration: 0 },
+    ] });
     await ready(page, added); await flush(page);
     const saves = memory.saves;
     const excerptCount = added.clips.filter((item) => item.mediaId === assets[0]!.id).length;
     await seek(page, 30); // Direct engine navigation does not close the independent source viewer.
     await page.getByRole('button', { name: 'Add source excerpt to timeline', exact: true }).click();
-    await expect(page.locator('.error-banner')).toContainText('Clips on the same overlay layer cannot overlap; use another layer.');
+    await expect(page.locator('.error-banner')).toContainText('Clips on the same track cannot overlap except in an exact adjacent cross-dissolve.');
     await expect(page.locator('.source-add-feedback')).toHaveText('');
     await expect(page.locator('.source-add-feedback')).not.toHaveAttribute('data-added-clip-id', /./);
     await expect(page.getByRole('region', { name: 'Source review', exact: true })).toBeVisible();

@@ -55,7 +55,7 @@ describe.skipIf(!enabled)('native FFmpeg integration · disposable synthetic sou
     it(`renders ${type} with exact frame count, colour, and true black edge fades`, async () => {
       let document = applyCommand(fixture.document, { type: 'transition', transition: type === 'cut' ? { leftId: 'clip-a', rightId: 'clip-b', type, duration: 0 } : { leftId: 'clip-a', rightId: 'clip-b', type, duration: 18 } });
       document = applyCommand(document, { type: 'colour', clipId: 'clip-a', colour: { ...NEUTRAL_COLOUR, brightness: 0.05, shadows: 0.1 } });
-      document = applyCommand(document, { type: 'fades', opening: 6, closing: 6 });
+      document = applyCommand(document, { type: 'fades', layerId: document.layers[0]!.id, opening: 6, closing: 6 });
       const job = startReference(document, fixture.library); const result = await fixture.jobs.wait(job.id);
       expect(result.state, result.message).toBe('completed');
       const filename = path.join(directory, 'renders', job.id, 'reference.mp4'); const duration = calculateLayout(document).duration;

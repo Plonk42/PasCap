@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { MAX_VIDEO_LAYERS, projectSchema, type MusicTrack, type ProjectDocument, type Transition } from './model.js';
+import { MAX_VIDEO_LAYERS, projectSchema, type MusicTrack, type ProjectDocument, type Transition, type VideoLayer } from './model.js';
 import { blackFadeParts, calculateLayout, type PlacedClip, type TimelineLayout } from './timeline.js';
 import { PROJECT_FPS, sameRate } from './timing.js';
 
@@ -48,21 +48,24 @@ export const LAYERED_EXPORT_RESOURCES = Object.freeze({
   maxVideoLayers: MAX_VIDEO_LAYERS,
   maxVideoEncoders: 1,
   maxNativeVideoChildrenPerPass: 3,
-  maxLosslessTimelineRepresentations: 2,
-  rawFrameBuffers: 3,
-  rawBytesPerPixel: 14, // One premultiplied RGBA16 accumulator and two RGB8 clip frames.
+  maxLosslessTimelineRepresentations: 3,
+  rawFrameBuffers: 4,
+  rawBytesPerPixel: 22, // Two RGB8 source frames + two premultiplied RGBA16 group/accumulator frames.
   maxInMemoryLuts: 2,
   lutBytes: 65 ** 3 * 3 * Float32Array.BYTES_PER_ELEMENT,
   intermediateBitsPerChannel: 16,
 });
 
-/** Every shared row point, including speed-only/neutral points, needs contextual sampling. */
+/** Static chunks support only an opaque, unanimated, zero-origin contiguous track. */
 export function needsLayeredExport(document: ProjectDocument): boolean {
-  return document.layers.length !== 1 || document.layers.some((layer) => !layer.enabled || layer.opacity !== 1 || layer.keyframes.length > 0) ||
-    document.clips.some((clip) => clip.opacity !== 1);
+  if (document.layers.length !== 1 || document.layers.some((layer) => !layer.enabled || layer.opacity !== 1 || layer.keyframes.length > 0) ||
+    document.clips.some((clip) => clip.opacity !== 1)) return true;
+  const { clips } = calculateLayout(document);
+  return clips.some((placed, index) => index === 0 ? placed.start !== 0 : placed.start > clips[index - 1]!.end);
 }
 
 export interface ExportClipPlan {
+  /** Index in document.clips, independent of chronological/sequence or stack order. */
   index: number;
   clipId: string;
   duration: number;
@@ -76,17 +79,22 @@ export type ExportChunk = {
 } | {
   kind: 'dissolve'; leftIndex: number; rightIndex: number; leftIn: number; duration: number; start: number;
 };
+/** Clip plans are in track order; chunk source offsets address RETIMED output frames.
+ * Duration is the absolute track OUT (zero for an empty track), not the sum of
+ * occupied frames. Layered export fills leading/internal/trailing gaps separately.
+ */
 export interface ExportPlan { duration: number; clips: ExportClipPlan[]; chunks: ExportChunk[] }
 export interface LayeredExportLayer {
   id: string;
   enabled: boolean;
   clips: { index: number; clipId: string; start: number; end: number; duration: number }[];
+  /** Chunks have absolute project-frame starts; gaps are filled transparently by the renderer. */
+  plan: ExportPlan;
 }
 export interface LayeredExportPlan extends ExportPlan {
   kind: 'layered';
-  baseDuration: number;
+  /** Bottom-to-top composition order; top-level clips flatten the per-track plans. */
   layers: LayeredExportLayer[];
-  primary: ExportPlan;
   /** No independently H.264-encoded chunks: encode the complete composite once. */
   chunks: [];
 }
@@ -94,15 +102,15 @@ export interface LayeredExportPlan extends ExportPlan {
 function blackFadeLength(transition: Transition | undefined, side: 'in' | 'out'): number {
   return transition?.type === 'fade-through-black' ? blackFadeParts(transition.duration)[side] : 0;
 }
-function planClip(snapshot: ProjectDocument, placed: PlacedClip, primaryIndex: number, primaryCount: number, index: number): ExportClipPlan {
-  const incoming = snapshot.transitions[primaryIndex - 1];
-  const outgoing = snapshot.transitions[primaryIndex];
+function planClip(layer: VideoLayer, placed: PlacedClip, trackIndex: number, trackCount: number, index: number): ExportClipPlan {
+  const incoming = layer.transitions[trackIndex - 1];
+  const outgoing = layer.transitions[trackIndex];
   return {
     index, clipId: placed.clip.id, duration: placed.duration,
     bodyIn: incoming?.type === 'cross-dissolve' ? incoming.duration : 0,
     bodyOut: placed.duration - (outgoing?.type === 'cross-dissolve' ? outgoing.duration : 0),
-    fadeIn: primaryIndex === 0 ? snapshot.openingFade : blackFadeLength(incoming, 'in'),
-    fadeOut: primaryIndex === primaryCount - 1 ? snapshot.closingFade : blackFadeLength(outgoing, 'out'),
+    fadeIn: trackIndex === 0 ? layer.openingFade : blackFadeLength(incoming, 'in'),
+    fadeOut: trackIndex === trackCount - 1 ? layer.closingFade : blackFadeLength(outgoing, 'out'),
   };
 }
 
@@ -112,62 +120,67 @@ function validateDuration(layout: TimelineLayout): void {
   }
 }
 
-function primaryPlan(snapshot: ProjectDocument, layout: TimelineLayout): ExportPlan {
-  const primary = layout.clips.filter((placed) => placed.clip.layerId === snapshot.layers[0]!.id);
+function trackPlan(snapshot: ProjectDocument, layout: TimelineLayout, layer: VideoLayer): ExportPlan {
+  const track = layout.clips.filter((placed) => placed.clip.layerId === layer.id);
   const indices = new Map(snapshot.clips.map((clip, index) => [clip.id, index]));
   const clips: ExportClipPlan[] = [];
   const chunks: ExportChunk[] = [];
   let cursor = 0;
-  for (const [primaryIndex, placed] of primary.entries()) {
+  for (const [trackIndex, placed] of track.entries()) {
     const index = indices.get(placed.clip.id)!;
-    const incoming = snapshot.transitions[primaryIndex - 1];
-    const clip = planClip(snapshot, placed, primaryIndex, primary.length, index);
+    const incoming = layer.transitions[trackIndex - 1];
+    const clip = planClip(layer, placed, trackIndex, track.length, index);
     clips.push(clip);
     if (incoming?.type === 'cross-dissolve') {
       chunks.push({
-        kind: 'dissolve', leftIndex: indices.get(primary[primaryIndex - 1]!.clip.id)!, rightIndex: index,
-        leftIn: primary[primaryIndex - 1]!.duration - incoming.duration, duration: incoming.duration, start: cursor
+        kind: 'dissolve', leftIndex: indices.get(track[trackIndex - 1]!.clip.id)!, rightIndex: index,
+        leftIn: track[trackIndex - 1]!.duration - incoming.duration, duration: incoming.duration, start: placed.start
       });
-      cursor += incoming.duration;
     }
     if (clip.bodyOut > clip.bodyIn) {
-      chunks.push({ kind: 'body', clipIndex: index, sourceIn: clip.bodyIn, sourceOut: clip.bodyOut, duration: clip.bodyOut - clip.bodyIn, start: cursor });
-      cursor += clip.bodyOut - clip.bodyIn;
+      chunks.push({ kind: 'body', clipIndex: index, sourceIn: clip.bodyIn, sourceOut: clip.bodyOut, duration: clip.bodyOut - clip.bodyIn, start: placed.start + clip.bodyIn });
     }
   }
-  if (cursor !== layout.baseDuration) throw new Error('Export chunks do not cover the authoritative primary timeline exactly.');
-  return { duration: layout.baseDuration, clips, chunks };
+  for (const chunk of chunks) {
+    if (chunk.start < cursor || chunk.duration < 1) throw new Error('Track chunks overlap or have an invalid duration.');
+    cursor = chunk.start + chunk.duration;
+  }
+  const duration = track.at(-1)?.end ?? 0;
+  if (cursor !== duration) throw new Error('Export chunks do not reach the authoritative track OUT exactly.');
+  return { duration, clips, chunks };
 }
 
-/** Cheap static single-layer plan. Never silently drop layers, opacity or shared row points. */
+/** Static single-track optimization; unsupported placement/coverage always uses layered export. */
 export function planExport(document: ProjectDocument): ExportPlan {
   const snapshot = exportDocumentSchema.parse(document);
-  if (needsLayeredExport(snapshot)) throw new Error('Layers, opacity and shared project-frame layer points require the layered exporter, not a static chunk plan.');
+  if (needsLayeredExport(snapshot)) throw new Error('Multiple/disabled tracks, opacity, shared row points, gaps or leading starts require the layered exporter, not a static chunk plan.');
   const layout = calculateLayout(snapshot);
   validateDuration(layout);
-  return primaryPlan(snapshot, layout);
+  const plan = trackPlan(snapshot, layout, snapshot.layers[0]!);
+  let cursor = 0;
+  for (const chunk of plan.chunks) {
+    if (chunk.start !== cursor) throw new Error('Static export chunks must cover every project frame without gaps.');
+    cursor += chunk.duration;
+  }
+  if (cursor !== layout.duration) throw new Error('Static export chunks do not cover the authoritative timeline exactly.');
+  return plan;
 }
 
-/** All placements, including disabled layers and black holds past the primary end. */
+/** Uniform track plans in composition order, including disabled placements and all project gaps. */
 export function planLayeredExport(document: ProjectDocument): LayeredExportPlan {
   const snapshot = exportDocumentSchema.parse(document);
   const layout = calculateLayout(snapshot);
   validateDuration(layout);
-  const primary = primaryPlan(snapshot, layout);
   const indices = new Map(snapshot.clips.map((clip, index) => [clip.id, index]));
-  const primaryClips = new Map(primary.clips.map((clip) => [clip.clipId, clip]));
-  return {
-    kind: 'layered', duration: layout.duration, baseDuration: layout.baseDuration, chunks: [], primary,
-    clips: layout.clips.map((placed) => primaryClips.get(placed.clip.id) ?? {
-      index: indices.get(placed.clip.id)!, clipId: placed.clip.id, duration: placed.duration,
-      bodyIn: 0, bodyOut: placed.duration, fadeIn: 0, fadeOut: 0,
-    }),
-    layers: snapshot.layers.map((layer) => ({
-      id: layer.id, enabled: layer.enabled,
-      clips: layout.clips.filter((placed) => placed.clip.layerId === layer.id).map((placed) => ({
-        index: indices.get(placed.clip.id)!, clipId: placed.clip.id, start: placed.start, end: placed.end, duration: placed.duration,
-      })),
+  const layers = snapshot.layers.map((layer) => ({
+    id: layer.id, enabled: layer.enabled, plan: trackPlan(snapshot, layout, layer),
+    clips: layout.clips.filter((placed) => placed.clip.layerId === layer.id).map((placed) => ({
+      index: indices.get(placed.clip.id)!, clipId: placed.clip.id, start: placed.start, end: placed.end, duration: placed.duration,
     })),
+  }));
+  return {
+    kind: 'layered', duration: layout.duration, chunks: [], layers,
+    clips: layers.flatMap((layer) => layer.plan.clips),
   };
 }
 

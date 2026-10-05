@@ -5,7 +5,7 @@ import { PreviewEngine } from '../../src/preview/engine.js';
 import { gradePixel, NEUTRAL_COLOUR, type RGB } from '../../src/shared/colour.js';
 import { compositePixel } from '../../src/shared/composition.js';
 import { EMPTY_KEY_VALUES, type Interpolation, type LayerKeyframe, type LayerKeyValues } from '../../src/shared/keyframes.js';
-import { createClip, createProject, type MusicTrack, type ProjectDocument } from '../../src/shared/model.js';
+import { createClip, createLayer, createProject, type MusicTrack, type ProjectDocument } from '../../src/shared/model.js';
 import { calculateLayout, sampleTimeline } from '../../src/shared/timeline.js';
 import { framesToSeconds } from '../../src/shared/timing.js';
 
@@ -121,11 +121,11 @@ function makeProject(layerCount = 1, dissolve = false): ProjectDocument {
   const duration = dissolve ? 102 : 60;
   if (dissolve) {
     project.clips.push(createClip('next', 'next-media', 140, 200));
-    project.transitions.push({ leftId: 'base', rightId: 'next', type: 'cross-dissolve', duration: 18 });
+    project.layers[0]!.transitions.push({ leftId: 'base', rightId: 'next', type: 'cross-dissolve', duration: 18 });
   }
   for (let index = 1; index < layerCount; index++) {
     const id = `video-${index + 1}`;
-    project.layers.push({ id, name: `Video ${index + 1}`, enabled: true, opacity: 1, keyframes: [] });
+    project.layers.push(createLayer(id, `Video ${index + 1}`, false));
     project.clips.push({ ...createClip(`overlay-${index}`, `overlay-media-${index}`, 200 + index * 100, 200 + index * 100 + duration), layerId: id });
   }
   return project;
@@ -205,9 +205,9 @@ describe('bounded layer decoder assignment', () => {
     expect(assignDecoders(['a', 'b'], ['b', 'c'])).toEqual(['c', 'b']);
     expect(() => assignDecoders([null, null], ['a', 'b', 'c'])).toThrow();
   });
-  it('allocates two baseline slots and only layer count + one for multi-layer projects', () => {
+  it('allocates exactly two reusable slots per track up to sixteen', () => {
     expect(decoderPoolSize(0)).toBe(0); expect(decoderPoolSize(1)).toBe(2);
-    expect(decoderPoolSize(2)).toBe(3); expect(decoderPoolSize(8)).toBe(9);
+    expect(decoderPoolSize(2)).toBe(4); expect(decoderPoolSize(8)).toBe(16);
     expect(() => decoderPoolSize(9)).toThrow(); expect(() => decoderPoolSize(1.5)).toThrow();
     expect(() => decoderPoolSize(-1)).toThrow(); expect(MAX_DECODER_SLOTS).toBe(16);
   });
@@ -238,7 +238,7 @@ describe('layered observed-frame preview', () => {
     const project = makeProject();
     for (let index = 1; index < 40; index++) {
       const id = `clip-${index}`;
-      project.transitions.push({ leftId: project.clips.at(-1)!.id, rightId: id, type: 'cut', duration: 0 });
+      project.layers[0]!.transitions.push({ leftId: project.clips.at(-1)!.id, rightId: id, type: 'cut', duration: 0 });
       project.clips.push(createClip(id, `media-${index}`, 10, 70));
     }
     const engine = makeEngine(); await engine.loadProject(project, resolver);
@@ -253,26 +253,54 @@ describe('layered observed-frame preview', () => {
     project.layers[1]!.keyframes = [point(0, { layerOpacity: 0, exposure: 0 }), point(102, { layerOpacity: 1, exposure: 1 }, 'hold')];
     const engine = makeEngine(); await engine.loadProject(project, resolver, 51);
     const assignments = engine.diagnostics().assignedClipIds;
-    expect(engine.diagnostics().decoderCount).toBe(9);
+    expect(engine.diagnostics().decoderCount).toBe(16);
     expect(compositor().groups).toEqual(expectedGroups(project, 51, assignments));
     expect(compositor().groups[0]!.clips).toHaveLength(2);
     for (const clip of compositor().groups[0]!.clips) expect(clip.opacity).toBeCloseTo(0.2 + 0.6 * 51 / 59);
     expect(project.clips[1]!.opacity).toBe(0.3);
     expect(compositor().groups[1]!.opacity).toBe(0.5);
     expect(compositor().groups[1]!.clips[0]!.settings.exposure).toBe(0.5);
-    expect(liveSlots().map((slot) => slot.decodedFrame)).toEqual(sampleTimeline(project, 51).map((layer) => layer.sourceFrame));
+    expect(sampleTimeline(project, 51).map((layer) => liveSlots()[assignments.indexOf(layer.clipId)]!.decodedFrame)).toEqual(sampleTimeline(project, 51).map((layer) => layer.sourceFrame));
     const rgb = (id: string): RGB => id === 'base' ? [0.8, 0.1, 0.2] : [0.1, 0.5, 0.9];
     const expected = compositePixel(sampleTimeline(project, 51), (layer) => rgb(layer.clipId));
     expect(groupPixel(compositor().groups, (slot) => rgb(assignments[slot]!))).toEqual(expected);
-    await engine.play(); expect(engine.diagnostics().activeDecoders).toBe(9); expect(state.peakSlots).toBe(9);
+    await engine.play(); expect(engine.diagnostics().activeDecoders).toBe(9); expect(state.peakSlots).toBe(16);
   });
   it('keeps black fade brightness independent of clip and layer alpha', async () => {
-    const project = makeProject(2); project.openingFade = 5;
+    const project = makeProject(2); project.layers[0]!.openingFade = 5;
     project.clips[0]!.opacity = 0.3; project.layers[0]!.opacity = 0.7;
     const engine = makeEngine(); await engine.loadProject(project, resolver, 0);
     expect(compositor().groups[0]).toMatchObject({ opacity: 0.7, clips: [{ opacity: 0.3, blendWeight: 1, brightness: 0 }] });
     await engine.seek(2);
     expect(compositor().groups[0]!.clips[0]).toMatchObject({ opacity: 0.3, blendWeight: 1, brightness: 0.5 });
+  });
+  it('observes sixteen simultaneous dissolve sources as eight independent groups without allocating per clip', async () => {
+    const project = makeProject(8, true);
+    for (let index = 1; index < 8; index++) {
+      const layer = project.layers[index]!;
+      const left = project.clips.find((clip) => clip.layerId === layer.id)!;
+      left.sourceOut = left.sourceIn + 60;
+      const right = { ...createClip(`upper-right-${index}`, `upper-right-media-${index}`, 700, 760, layer.id), start: 42 };
+      project.clips.push(right);
+      layer.transitions = [{ leftId: left.id, rightId: right.id, type: 'cross-dissolve', duration: 18 }];
+      layer.opacity = 0.2 + index / 10;
+      layer.keyframes = [point(0, { exposure: index / 10, clipOpacity: 0.6 })];
+    }
+    const engine = makeEngine(); await engine.loadProject(project, resolver, 51);
+    const assignments = engine.diagnostics().assignedClipIds;
+    const samples = sampleTimeline(project, 51);
+    expect(samples).toHaveLength(16); expect(new Set(assignments).size).toBe(16);
+    expect(engine.diagnostics()).toMatchObject({ decoderCount: 16, frame: 51, status: 'paused' });
+    expect(compositor().groups).toEqual(expectedGroups(project, 51, assignments));
+    expect(compositor().groups.map((group) => group.clips.length)).toEqual(Array(8).fill(2));
+    for (const sample of samples) expect(liveSlots()[assignments.indexOf(sample.clipId)]!.decodedFrame).toBe(sample.sourceFrame);
+    const rgb = (id: string): RGB => id.includes('right') || id === 'next' ? [0.1, 0.6, 0.8] : [0.8, 0.2, 0.1];
+    expect(groupPixel(compositor().groups, (slot) => rgb(assignments[slot]!))).toEqual(compositePixel(samples, (sample) => rgb(sample.clipId)));
+    await engine.play(); expect(engine.diagnostics().activeDecoders).toBe(16); expect(state.peakSlots).toBe(16);
+    await engine.seek(70);
+    expect(compositor().groups.map((group) => group.clips.length)).toEqual(Array(8).fill(1));
+    expect(liveSlots()).toHaveLength(16); expect(state.peakSlots).toBe(16);
+    engine.dispose(); expect(liveSlots()).toEqual([]);
   });
   it('observes enabled zero-opacity clips but never loads disabled layers', async () => {
     const project = makeProject(3); project.layers[1]!.opacity = 0; project.layers[2]!.enabled = false;
@@ -286,7 +314,8 @@ describe('layered observed-frame preview', () => {
     project.clips[0]!.sourceOut = 50;
     project.clips[1]!.start = 30; project.clips[1]!.sourceOut = project.clips[1]!.sourceIn + 20;
     const engine = makeEngine(); await engine.loadProject(project, resolver, 20);
-    expect(calculateLayout(project)).toMatchObject({ baseDuration: 10, duration: 50 });
+    expect(calculateLayout(project).clips.find((clip) => clip.clip.id === 'base')!.end).toBe(10);
+    expect(calculateLayout(project).duration).toBe(50);
     expect(compositor().groups).toEqual([]); expect(engine.capturePixels()).toEqual(new Uint8Array([0, 0, 0, 255]));
     await engine.play(); animationFrame(1000 + framesToSeconds(5) * 1000 + 0.001);
     expect(engine.diagnostics()).toMatchObject({ status: 'playing', frame: 25, activeDecoders: 0 });
@@ -299,9 +328,10 @@ describe('layered observed-frame preview', () => {
     const project = makeProject(2, true);
     const overlay = project.clips[2]!; overlay.sourceOut = overlay.sourceIn + 15;
     project.clips.push({ ...createClip('overlay-next', 'overlay-next-media', 500, 530), layerId: 'video-2', start: 20 });
+    project.layers[1]!.transitions = [{ leftId: 'overlay-1', rightId: 'overlay-next', type: 'cut', duration: 0 }];
     const engine = makeEngine(); await engine.loadProject(project, resolver, 5); await settle();
     const before = engine.diagnostics().assignedClipIds;
-    expect(before).toContain('overlay-next'); expect(before).not.toContain('next');
+    expect(before).toContain('overlay-next'); expect(before).toContain('next');
     const baseSlot = liveSlots()[before.indexOf('base')]!;
     const overlaySlot = liveSlots()[before.indexOf('overlay-1')]!;
     await engine.play(); observeFrame(engine, project, 16);
@@ -309,7 +339,7 @@ describe('layered observed-frame preview', () => {
     const after = engine.diagnostics().assignedClipIds;
     expect(liveSlots()[after.indexOf('base')]).toBe(baseSlot); expect(baseSlot.playing).toBe(true);
     expect(after).toContain('overlay-next'); expect(after).toContain('next'); expect(overlaySlot.playing).toBe(false);
-    expect(state.peakSlots).toBe(3);
+    expect(state.peakSlots).toBe(4);
   });
   it('does not report a speculative missing source as an error on the current clip', async () => {
     const project = makeProject(1, true);
@@ -381,6 +411,9 @@ describe('live appearance updates and lifecycle', () => {
       (document) => { document.clips[0]!.mediaId = 'another-media'; },
       (document) => { document.clips[0]!.speed = { mode: 'constant', rate: 2 }; },
       (document) => { document.layers[0]!.keyframes = [point(0, { speed: 2 })]; },
+      (document) => { document.layers[1]!.ripple = true; },
+      (document) => { document.layers[1]!.openingFade = 3; },
+      (document) => { document.layers[1]!.closingFade = 3; },
       (document) => { document.clips[1]!.start++; },
       (document) => { document.music = { mediaId: 'music', sourceIn: 0, sourceOut: 60, start: 0, duration: 60, gainDb: 0, fadeIn: 0, fadeOut: 0, loop: false }; },
       (document) => { document.id = 'another-project'; },
@@ -390,6 +423,19 @@ describe('live appearance updates and lifecycle', () => {
       expect(() => engine.updateProjectAppearance(next)).toThrow(/preserve project timing/);
     });
     expect(engine.diagnostics()).toMatchObject({ status: 'paused', duration: 60, frame: 0 });
+  });
+  it('rejects a non-first-track transition timing change without uploading stale frames', async () => {
+    const project = makeProject(2);
+    const layer = project.layers[1]!; const left = project.clips[1]!;
+    project.clips.push({ ...createClip('upper-next', 'upper-next-source', 500, 560, layer.id), start: 60 });
+    layer.transitions = [{ leftId: left.id, rightId: 'upper-next', type: 'cut', duration: 0 }];
+    const engine = makeEngine(); await engine.loadProject(project, resolver, 10);
+    const before = calls(); const uploads = compositor().uploads.length;
+    const changed = structuredClone(project);
+    changed.layers[1]!.transitions[0] = { leftId: left.id, rightId: 'upper-next', type: 'fade-through-black', duration: 5 };
+    expect(() => engine.updateProjectAppearance(changed)).toThrow('preserve project timing');
+    expect(calls()).toEqual(before); expect(compositor().uploads).toHaveLength(uploads);
+    expect(engine.diagnostics()).toMatchObject({ status: 'paused', frame: 10, duration: 120 });
   });
   it('rejects participating speed-point edits but permits unrelated colour points without rebuilding the captured map', async () => {
     const project = makeProject(2);
@@ -463,7 +509,7 @@ describe('live appearance updates and lifecycle', () => {
     const engine = makeEngine(); await engine.loadProject(project, resolver); await engine.play();
     const active = engine.diagnostics().assignedClipIds.map((id, index) => id ? liveSlots()[index]! : null).filter((slot) => slot !== null);
     const smaller = structuredClone(project); smaller.layers.splice(1, 1); engine.updateProjectAppearance(smaller);
-    expect(engine.diagnostics()).toMatchObject({ decoderCount: 3, activeDecoders: 2, playing: true });
+    expect(engine.diagnostics()).toMatchObject({ decoderCount: 4, activeDecoders: 2, playing: true });
     active.forEach((slot) => { expect(liveSlots()).toContain(slot); expect(slot.disposed).toBe(false); expect(slot.playing).toBe(true); });
     await engine.loadProject(makeProject(), resolver); expect(liveSlots()).toHaveLength(2);
     await engine.loadProject(createProject('empty', 'Empty'), resolver);
@@ -480,8 +526,8 @@ describe('live appearance updates and lifecycle', () => {
     expect(compositor().disposed).toBe(true);
     expect(liveSlots()).toHaveLength(0);
     engine.canvas.dispatchEvent(new Event('webglcontextrestored')); await settle();
-    expect(engine.diagnostics()).toMatchObject({ status: 'paused', decoderCount: 9, frame: 51 });
-    expect(() => engine.capturePixels()).not.toThrow(); expect(liveSlots()).toHaveLength(9); expect(state.peakSlots).toBe(9);
+    expect(engine.diagnostics()).toMatchObject({ status: 'paused', decoderCount: 16, frame: 51 });
+    expect(() => engine.capturePixels()).not.toThrow(); expect(liveSlots()).toHaveLength(16); expect(state.peakSlots).toBe(16);
     engine.dispose(); engine.dispose(); expect(liveSlots()).toHaveLength(0);
     expect(engine.diagnostics()).toMatchObject({ status: 'disposed', decoderCount: 0, assignedClipIds: [] });
     expect(state.compositors.every((renderer) => renderer.disposed)).toBe(true);

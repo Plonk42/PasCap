@@ -122,7 +122,7 @@ delivery, then asynchronous actual-commit CI. Keep explicit issue acceptance int
 there. It seeds twelve video memberships, music and proxies. Separate import-test
 originals in `.pascap/browser-footage/synthetic-sources/` are outside that cache;
 `browse-camera-*` means generated patterns, not real recordings. The
-[fixture factory](../scripts/fixtures.ts) uses `preview-lab-v5` outside the browser
+[fixture factory](../scripts/fixtures.ts) uses `preview-lab-v6` outside the browser
 cache and `preview-lab` inside it; bin resets never imply a global-library fallback.
 Neither suite invokes real-source sample preparation or needs private footage/music.
 
@@ -161,7 +161,7 @@ a container image. Use [the roadmap](ROADMAP.md) for remaining qualification wor
 The raw reader has a deterministic exit-before-read regression and eager bounded
 read ownership; [#1](https://github.com/Plonk42/PasCap/issues/1) records its delivery
 evidence. CI does not retry tests to hide failures. [UX_HARDENING.md](UX_HARDENING.md)
-records the cause, identity limitations, storage evidence and loading boundaries.
+describes ownership, identity limitations, storage assumptions/recovery and loading boundaries.
 
 The three-recording playback completion check has a bounded 45-second wait inside
 a 60-second test, with renderer/decoder diagnostics and exact end-frame/error/
@@ -173,11 +173,12 @@ intended-GPU throughput gate.
 **Do not run these in CI or without the owner's explicit approval for real jobs.**
 The [sample helper](../scripts/prepare-samples.ts) targets **DJI_0468.MP4 and DJI_0469.MP4
 only**: pass an **explicit folder after `--`**, never rely on a personal-path default.
-It reuses ready proxies but may prepare missing ones; creates only an absent v5
+It reuses ready proxies but may prepare missing ones; creates only an absent v6
 sample, never overwrites or migrates existing edits.
 
 The [measurement helper](../scripts/measure-preview.ts) accepts exactly **two
-primary 1× excerpts**, no music, extra layers, non-unit opacity or shared row points
+1× excerpts on one enabled, opaque, zero-origin contiguous track**, no music,
+extra layers, non-unit opacity or shared row points
 (even neutral/Speed-only points). `PASCAP_MEASURE_URL` selects that project.
 `npm run measure -- --skip-playback --reference` skips playback benchmarking but
 **renders a native reference**; `--headed --reference` adds repeated playback. The edit
@@ -195,11 +196,18 @@ total-process memory; reports expose private paths/snapshots, so review before s
 | Web | [App](../src/web/App.tsx), [autosave](../src/web/autosave.ts) | Panels, contextual controls, transient pointer/input drafts, session history and serial saves |
 | Service | [HTTP app](../src/server/app.ts), [library](../src/server/library.ts), [jobs](../src/server/jobs.ts), [layered export](../src/server/layered-export.ts) | Guarded registered-source access, bounded native work and verified immutable exports |
 
-Preview reuses **two decoders for one layer, up to nine for eight**, plus one source
-reviewer, not one per clip. Layered export: one original decoder, two intermediate
-readers/one encoder maximum; raw buffers **116.1 MB at 4K** + LUTs **6.6 MB** + native
-memory. Two clip files/two timeline representations bound concurrency, **not disk GB**;
+Preview reuses **two decoder/texture slots per track, up to 16 for eight**, plus one
+source reviewer, not one per clip. Each track can dissolve independently. Generalized
+layered export renders premultiplied RGBA16 track groups, then merges bottom-to-top
+without regrading. Serial limits: one original decoder, two intermediate readers,
+one encoder and three native video children per pass. Four raw buffers (two RGB8,
+two RGBA16) use **22 bytes/pixel = 182,476,800 bytes at UHD**; two 65³ Float32 LUTs
+add **6,591,000 bytes**, excluding native/audio memory. Two retained clip files and
+three timeline representations bound concurrency, **not disk GB**;
 scratch grows with duration ([resource contract](LAYERS_AND_KEYFRAMES.md#inspector-and-resource-limits)).
+The static fast path requires one enabled, opaque, unanimated, zero-origin contiguous
+track and opaque clips; unsupported placement/coverage uses generalized layered export, regardless
+of Ripple or track ID.
 Processing: [row points](LAYERS_AND_KEYFRAMES.md), [retiming/audio](SPEED_AND_AUDIO.md)
 and [grading equations](COLOUR_AND_TIMING.md#colour).
 
@@ -208,9 +216,11 @@ and [grading equations](COLOUR_AND_TIMING.md#colour).
 - Never modify/copy/delete owner's originals or commit private paths/device IDs,
   saved project IDs, real media/cache or reports. Preserve fingerprints, symlink
   rejection, cache exclusion and HTTP guards.
-- Keep **strict schema 5**: required unique video/audio membership and all ten nullable
-  channels; no compatibility fields/defaults/migration/backports for old local data.
-  Preserve incompatible files and finished videos.
+- Keep **strict schema 6**: required unique video/audio membership, all ten nullable
+  channels and per-layer `ripple`, `transitions`, `openingFade`, `closingFade`.
+  No project-level transitions/fades, compatibility fields/defaults/migration or
+  mandatory first-track ID. Preserve incompatible v1–v5 projects/receipt snapshots
+  and finished videos; registry/proxy formats remain unchanged.
 - Reuse `JobQueue`, library and backpressured raw/retime helpers: one heavy job,
   bounded threads/buffers, cancellation and owned-scratch cleanup. Keep serial awaits/
   [serial helpers](../src/shared/serial.ts), not parallel media work to satisfy lint.

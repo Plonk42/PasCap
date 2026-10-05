@@ -9,11 +9,13 @@ import { fingerprintFile } from '../../src/server/files.js';
 import { JobQueue } from '../../src/server/jobs.js';
 import { atomicWrite, ProjectStore } from '../../src/server/storage.js';
 import { audioAssetSchema, type AudioAsset } from '../../src/shared/audio.js';
+import { applyCommand } from '../../src/shared/commands.js';
 import { NEUTRAL_COLOUR } from '../../src/shared/colour.js';
 import { EMPTY_KEY_VALUES, KEYFRAME_SETTINGS, type Interpolation, type LayerKeyframe, type LayerKeyValues } from '../../src/shared/keyframes.js';
 import { mediaAssetSchema, type MediaJob } from '../../src/shared/media.js';
-import { createClip, createProject, idSchema, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
+import { createClip, createLayer, createProject, idSchema, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
 import { projectSummarySchema } from '../../src/shared/projects.js';
+import { calculateLayout } from '../../src/shared/timeline.js';
 import { framesToSeconds, PROJECT_FPS } from '../../src/shared/timing.js';
 import { legacyV3Project, legacyV4Project } from './project-fixtures.js';
 
@@ -60,7 +62,7 @@ describe('multiple-project store', () => {
     expect(first.id).not.toBe(second.id);
     expect(first.title).toBe('First flight');
     expect(first.revision).toBe(1);
-    expect(first.schemaVersion).toBe(5); expect(first.layers[0]!.keyframes).toEqual([]);
+    expect(first.schemaVersion).toBe(6); expect(first.layers[0]!.keyframes).toEqual([]);
     const clip = { ...createClip('clip-a', 'registered-video', 0, 120), speed: { mode: 'constant' as const, rate: 2 } };
     const saved = await store.save({ ...first, clips: [clip] }, 1);
     expect(saved.revision).toBe(2);
@@ -76,14 +78,14 @@ describe('multiple-project store', () => {
     expect((await readdir(path.join(directory, 'projects'))).some((name) => name.endsWith('.tmp'))).toBe(false);
   });
 
-  it('round-trips 256 strict row points and rejects malformed v5 data without changing confirmed bytes', async () => {
+  it('round-trips 256 strict row points and rejects malformed v6 data without changing confirmed bytes', async () => {
     const directory = await temp(); const store = new ProjectStore(directory);
     const document = createProject('strict-row', 'Shared row');
     document.clips = [createClip('excerpt', 'registered-video', 500, 600)];
     document.layers[0]!.keyframes = Array.from({ length: 256 }, (_, index) => point(index * 10, { exposure: index % 2 }));
     document.layers[0]!.keyframes[0] = point(0, { ...NEUTRAL_COLOUR, layerOpacity: 1, clipOpacity: 0, speed: 1.25 }, 'smooth');
     const saved = await store.save(document, 0);
-    expect(saved.schemaVersion).toBe(5); expect(saved.layers[0]!.keyframes).toHaveLength(256);
+    expect(saved.schemaVersion).toBe(6); expect(saved.layers[0]!.keyframes).toHaveLength(256);
     expect(Object.keys(saved.layers[0]!.keyframes[0]!.values)).toEqual(KEYFRAME_SETTINGS.map((setting) => setting.key));
     expect(saved.layers[0]!.keyframes.at(-1)!.frame).toBeGreaterThan(saved.clips[0]!.sourceOut);
     expect(await store.load(saved.id)).toEqual(saved);
@@ -118,6 +120,35 @@ describe('multiple-project store', () => {
       expect(await readFile(filename, 'utf8')).toBe(bytes);
     }
     expect(await store.load(saved.id)).toEqual(saved);
+  });
+
+  it('round-trips arbitrary track order, Ripple settings, dormant fades and every authoritative clip start', async () => {
+    const directory = await temp(); const store = new ProjectStore(directory);
+    const document = createProject('uniform-tracks', 'Uniform tracks');
+    document.layers = [createLayer('positioned-first', 'Positioned', false), createLayer('packed-last', 'Packed'), createLayer('empty', 'Empty')];
+    document.layers[0]!.openingFade = 3; document.layers[0]!.closingFade = 4;
+    document.layers[1]!.openingFade = 2; document.layers[1]!.closingFade = 5;
+    document.layers[2]!.openingFade = 20; document.layers[2]!.closingFade = 30;
+    document.layers[1]!.keyframes = [point(0, { exposure: 0.123456789, speed: 1 }, 'hold'), point(500, { hue: 90 }, 'smooth')];
+    document.clips = [
+      { ...createClip('positioned-left', 'one', 100, 130, 'positioned-first'), start: 10 },
+      { ...createClip('packed-left', 'two', 200, 230, 'packed-last'), start: 25 },
+      { ...createClip('positioned-right', 'three', 300, 330, 'positioned-first'), start: 35 },
+      { ...createClip('packed-right', 'four', 400, 430, 'packed-last'), start: 55 },
+    ];
+    document.layers[0]!.transitions = [{ leftId: 'positioned-left', rightId: 'positioned-right', type: 'cross-dissolve', duration: 5 }];
+    document.layers[1]!.transitions = [{ leftId: 'packed-left', rightId: 'packed-right', type: 'fade-through-black', duration: 5 }];
+    const saved = await store.save(document, 0);
+    expect(saved).toEqual({ ...document, revision: 1 });
+    const reopened = await store.load(saved.id); expect(reopened).toEqual(saved);
+    expect(JSON.parse(await readFile(path.join(directory, 'projects', `${saved.id}.json`), 'utf8'))).toEqual(saved);
+    expect(reopened).not.toHaveProperty('transitions'); expect(reopened).not.toHaveProperty('openingFade'); expect(reopened).not.toHaveProperty('closingFade');
+    for (const placed of calculateLayout(reopened).clips) expect(placed.clip.start).toBe(placed.start);
+    const reordered = applyCommand(reopened, { type: 'layer-order', layerIds: ['packed-last', 'empty', 'positioned-first'] });
+    const final = await store.save(reordered, 1);
+    expect(final).toEqual({ ...reordered, revision: 2 }); expect(await store.load(saved.id)).toEqual(final);
+    expect(final.clips.map((clip) => clip.start)).toEqual([10, 25, 35, 55]);
+    expect((await store.list())[0]).toMatchObject({ compatible: true, revision: 2, clipCount: 4, duration: 85 });
   });
 
   it('serialises rename against saves and other renames without losing a newer edit', async () => {
@@ -293,7 +324,7 @@ describe('multiple-project HTTP API', () => {
     const first = projectSchema.parse(firstResponse.json().document);
     const second = projectSchema.parse(secondResponse.json().document);
     expect(first.revision).toBe(1);
-    expect(first.schemaVersion).toBe(5); expect(second.schemaVersion).toBe(5);
+    expect(first.schemaVersion).toBe(6); expect(second.schemaVersion).toBe(6);
     expect(second.id).not.toBe(first.id);
     expect((await service.app.inject({ url: '/api/projects', headers })).json().projects).toHaveLength(2);
     expect((await service.app.inject({ url: `/api/projects/${first.id}`, headers })).json().document).toEqual(first);
@@ -328,14 +359,14 @@ describe('multiple-project HTTP API', () => {
     expect((await service.app.inject({ url: '/api/projects', headers })).json().projects[0].compatible).toBe(false);
     const load = await service.app.inject({ url: '/api/projects/old', headers });
     expect(load.statusCode).toBe(422);
-    expect(load.json().error).toContain('version 5');
+    expect(load.json().error).toContain('version 6');
     expect((await service.app.inject({ method: 'PUT', url: '/api/projects/old', headers, payload: { document: createProject('old', 'Overwrite'), expectedRevision: 0 } })).statusCode).toBe(422);
     expect(await readFile(path.join(directory, 'projects', 'old.json'), 'utf8')).toBe(old);
     const good = createProject('preview-lab', 'Valid');
     expect((await service.app.inject({ method: 'PUT', url: '/api/projects/different', headers, payload: { document: good, expectedRevision: 0 } })).statusCode).toBe(400);
   });
 
-  it('exposes an actual v3 input as incompatible and refuses load, rename or v5 overwrite without migration', async () => {
+  it('exposes an actual v3 input as incompatible and refuses load, rename or v6 overwrite without migration', async () => {
     const directory = await temp(); const legacy = legacyV3Project('legacy-v3', 'Original v3');
     const bytes = `${JSON.stringify(legacy, null, 2)}\n`; const filename = path.join(directory, 'projects', 'legacy-v3.json');
     await atomicWrite(filename, bytes);
@@ -345,7 +376,7 @@ describe('multiple-project HTTP API', () => {
     expect(listed.statusCode).toBe(200);
     expect(listed.json().projects).toEqual([expect.objectContaining({ id: 'legacy-v3', title: 'Original v3', compatible: false, clipCount: 0, revision: 0, duration: 0 })]);
     const loaded = await service.app.inject({ url: '/api/projects/legacy-v3', headers });
-    expect(loaded.statusCode).toBe(422); expect(loaded.json().error).toContain('schema version 3'); expect(loaded.json().error).toContain('requires version 5');
+    expect(loaded.statusCode).toBe(422); expect(loaded.json().error).toContain('schema version 3'); expect(loaded.json().error).toContain('requires version 6');
     expect((await service.app.inject({ method: 'POST', url: '/api/projects/legacy-v3/rename', headers, payload: { title: 'Overwrite', expectedRevision: 0 } })).statusCode).toBe(422);
     expect((await service.app.inject({ method: 'PUT', url: '/api/projects/legacy-v3', headers, payload: { document: createProject('legacy-v3', 'Overwrite'), expectedRevision: 0 } })).statusCode).toBe(422);
     expect(await readFile(filename, 'utf8')).toBe(bytes); expect(service.jobs.list()).toEqual([]);

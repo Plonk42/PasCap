@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { applyCommand } from '../../src/shared/commands.js';
 import type { MediaAsset, MediaJob } from '../../src/shared/media.js';
-import { createClip, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
+import { createClip, createLayer, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
 import { calculateLayout } from '../../src/shared/timeline.js';
 import { closeOptions, inspectorTab, openOptions, sharedPoint } from './editor-helpers.js';
 
@@ -27,7 +27,7 @@ test.beforeEach(async ({ page, request }) => {
 async function current(page: Page): Promise<ProjectDocument> { return projectSchema.parse(await page.evaluate(() => window.pascapLab!.project())); }
 async function installOverlay(page: Page, start = 20): Promise<void> {
     let document = await current(page);
-    document = applyCommand(document, { type: 'layer-add', layer: { id: 'upper', name: 'Video 2', enabled: true, opacity: 1, keyframes: [] } });
+    document = applyCommand(document, { type: 'layer-add', layer: createLayer('upper', 'Video 2', false) });
     document = applyCommand(document, { type: 'insert', clip: { ...createClip('moving', assets.find((asset) => asset.name === 'pattern-b.mp4')!.id, 15, 45), layerId: 'upper', start }, index: 1 });
     await page.evaluate((next) => window.pascapLab!.setDocument(next), document);
     await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
@@ -107,7 +107,7 @@ test('invalid overlap is visibly rejected and cancelled movement never changes t
     await expect(page.locator('.timeline-drop-preview')).toHaveCount(0); expect(await current(page)).toEqual(before);
 });
 
-test('primary ripple marker is the exact final start after removal, including movement across video rows', async ({ page }) => {
+test('a Ripple track marker is the exact final start after removal, including movement across video rows', async ({ page }) => {
     await installOverlay(page);
     const start = await beginMove(page, 100, 12, false, 'video-1'); expect(start).toBe(120);
     await expect(page.locator('.timeline-drop-preview')).toHaveAttribute('data-drop-layer', 'video-1');

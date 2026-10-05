@@ -1,3 +1,4 @@
+import { spawn, type ChildProcess } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { readdirSync } from 'node:fs';
 import { mkdir, mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
@@ -20,15 +21,22 @@ import { EXPORT_PROFILES, LAYERED_EXPORT_RESOURCES, needsLayeredExport, planExpo
 import { estimateExportSpace } from '../../src/shared/export-space.js';
 import { EMPTY_KEY_VALUES, KEYFRAME_SETTINGS, evaluateLayerSetting, hasLayerKeys, type Interpolation, type LayerKeyframe, type LayerKeyValues } from '../../src/shared/keyframes.js';
 import type { MediaAsset } from '../../src/shared/media.js';
-import { createClip, createProject, projectSchema, type ProjectDocument, type VideoLayer } from '../../src/shared/model.js';
+import { createClip, createLayer, createProject, projectSchema, type ProjectDocument, type VideoLayer } from '../../src/shared/model.js';
 import { compileRetiming } from '../../src/shared/speed.js';
 import { calculateLayout, sampleTimeline, type PreviewLayer, type TimelineLayout } from '../../src/shared/timeline.js';
 import { framesToSeconds } from '../../src/shared/timing.js';
 import { observedJobBytes } from './scratch-observation.js';
 
+// Observe actual native children; do not stub decoding, pipe backpressure or exits.
+vi.mock('node:child_process', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:child_process')>();
+  return { ...actual, spawn: vi.fn(actual.spawn) };
+});
+
 const enabled = process.env['PASCAP_MEDIA_TESTS'] === '1';
 const WIDTH = 160; const HEIGHT = 90; const PIXELS = WIDTH * HEIGHT; const FRAME_BYTES = PIXELS * 3;
-function layer(id: string, opacity = 1): VideoLayer { return { id, name: id, enabled: true, opacity, keyframes: [] }; }
+// Existing positioned fixtures must keep their independent starts and widths.
+function layer(id: string, opacity = 1): VideoLayer { return { ...createLayer(id, id, false), opacity }; }
 function point(frame: number, values: Partial<LayerKeyValues>, interpolation: Interpolation = 'linear'): LayerKeyframe {
   return { frame, interpolation, values: { ...EMPTY_KEY_VALUES, ...values } };
 }
@@ -64,7 +72,7 @@ function coverage(samples: PreviewLayer[]): number {
   return result;
 }
 
-describe.skipIf(!enabled)('schema-4 layered native export · disposable synthetic sources only', () => {
+describe.skipIf(!enabled)('schema-6 layered native export · disposable synthetic sources only', () => {
   let root: string;
   let config: ServiceConfig;
   let jobs: JobQueue;
@@ -154,13 +162,24 @@ describe.skipIf(!enabled)('schema-4 layered native export · disposable syntheti
     expect(report.peakVideoEncoders).toBe(1);
     expect(report.peakNativeVideoChildren).toBeLessThanOrEqual(3);
     expect(report.peakLosslessClipFiles).toBeLessThanOrEqual(2);
-    expect(report.peakLosslessTimelineRepresentations).toBeLessThanOrEqual(2);
-    expect(report.rawFrameBuffers).toBe(3);
-    expect(report.rawBufferBytes).toBe(receipt.verification.width * receipt.verification.height * 14);
+    expect(report.peakLosslessTimelineRepresentations).toBeLessThanOrEqual(3);
+    expect(report.rawFrameBuffers).toBe(4);
+    expect(report.rawBufferBytes).toBe(receipt.verification.width * receipt.verification.height * 22);
     expect(report.peakLutEntries).toBeLessThanOrEqual(2);
     expect(report.lutBytes).toBeLessThanOrEqual(LAYERED_EXPORT_RESOURCES.lutBytes * 2);
     expect(report.largestReadChunkBytes).toBeLessThanOrEqual(256 * 1024);
+    const groups = receipt.snapshot.layers.filter((row) => row.enabled && receipt.snapshot.clips.some((clip) => clip.layerId === row.id)).length;
+    expect(report.layerPasses).toBe(groups);
+    expect(report.sourceOverPasses).toBe(Math.max(0, groups - 1));
+    expect(LAYERED_EXPORT_RESOURCES).toMatchObject({
+      maxOriginalVideoDecoders: 1, maxIntermediateVideoDecoders: 2, maxVideoEncoders: 1,
+      maxNativeVideoChildrenPerPass: 3, maxLosslessClipsOnDisk: 2, maxLosslessTimelineRepresentations: 3,
+      rawFrameBuffers: 4, rawBytesPerPixel: 22, maxInMemoryLuts: 2, lutBytes: 3_295_500,
+    });
     const layout = calculateLayout(receipt.snapshot);
+    expect(report.renderedClipIds).toEqual(layout.clips.filter((placed) => receipt.snapshot.layers.find((row) => row.id === placed.clip.layerId)!.enabled).map((placed) => placed.clip.id));
+    expect(receipt.retiming).toHaveLength(report.renderedClipIds.length);
+    expect(report.compositeFrames).toBe(layout.duration * Math.max(1, 2 * groups - 1));
     for (const [index, report] of receipt.retiming.entries()) {
       const placed = layout.clips.find((item) => item.clip.id === receipt.settings.layered!.renderedClipIds[index])!;
       const clip = placed.clip;
@@ -176,6 +195,205 @@ describe.skipIf(!enabled)('schema-4 layered native export · disposable syntheti
       expect(await readFile(asset.sourcePath)).toEqual(originalBytes[index]);
     }
   }
+
+  function concurrentTracks(count: 2 | 3): ProjectDocument {
+    const project = createProject(`concurrent-${count}`, 'Synthetic independent track dissolves');
+    const packed = { ...createLayer('packed-track', 'Ripple track', true), opacity: 0.75, openingFade: 1, closingFade: 1 };
+    packed.keyframes = [
+      point(2, { speed: 0.5, layerOpacity: 0.75, clipOpacity: 0.35, exposure: -0.3, brightness: 0.015, hue: -20, shadows: 0.2 }),
+      point(6, { speed: 1.5, layerOpacity: 0.45, clipOpacity: 0.85, exposure: 0.25, brightness: 0.06, hue: 20, shadows: -0.1 }, 'smooth'),
+      point(14, { speed: 0.75, layerOpacity: 0.7, clipOpacity: 0.55, exposure: -0.1, brightness: 0.025, hue: -5, shadows: 0.1 }, 'hold'),
+    ];
+    const packedLeft = { ...createClip('packed-left', assets[0]!.id, 2, 8, packed.id), start: 2, opacity: 0.6 };
+    const packedRight = { ...createClip('packed-right', assets[1]!.id, 8, 14, packed.id), opacity: 0.4 };
+    packedLeft.speed = { mode: 'constant', rate: 4 }; packedRight.speed = { mode: 'constant', rate: 4 };
+    packedLeft.colour = { ...NEUTRAL_COLOUR, contrast: 0.9, saturation: 0.8, highlights: -0.2 };
+    packedRight.colour = { ...NEUTRAL_COLOUR, contrast: 1.2, saturation: 1.1, highlights: 0.15 };
+    packed.transitions = [{ leftId: packedLeft.id, rightId: packedRight.id, type: 'cross-dissolve', duration: 2 }];
+    project.layers = [packed]; project.clips = [packedLeft, packedRight];
+    const overlap = calculateLayout(project).transitions[0]!;
+    packedRight.start = overlap.start;
+
+    const positioned = { ...createLayer('positioned-track', 'Independent track', false), opacity: 0.65, openingFade: 1, closingFade: 1 };
+    positioned.keyframes = [point(2, { exposure: -0.2, hue: 25, layerOpacity: 0.3 }, 'ease-in'),
+      point(9, { exposure: 0.3, hue: -20, layerOpacity: 0.8 }, 'hold')];
+    const positionedLeft = { ...createClip('positioned-left', assets[1]!.id, 1, 5, positioned.id), start: overlap.end - 4, opacity: 0.4 };
+    const positionedRight = { ...createClip('positioned-right', assets[0]!.id, 11, 15, positioned.id), start: overlap.start, opacity: 0.75 };
+    positionedLeft.colour = { ...NEUTRAL_COLOUR, brightness: 0.025, contrast: 1.1, saturation: 0.7, shadows: 0.2 };
+    positionedRight.colour = { ...NEUTRAL_COLOUR, brightness: 0.05, contrast: 0.9, saturation: 1.2, highlights: -0.2 };
+    const afterGap = { ...createClip('after-gap', assets[1]!.id, 17, 19, positioned.id), start: positionedRight.start + 6, opacity: 0.6 };
+    afterGap.colour = { ...NEUTRAL_COLOUR, brightness: 0.035, saturation: 0.85, shadows: 0.1 };
+    positioned.transitions = [{ leftId: positionedLeft.id, rightId: positionedRight.id, type: 'cross-dissolve', duration: 2 },
+      { leftId: positionedRight.id, rightId: afterGap.id, type: 'cut', duration: 0 }];
+
+    const third = { ...createLayer('third-track', 'Another Ripple track', true), opacity: 0.7, openingFade: 1, closingFade: 1 };
+    third.keyframes = [point(3, { clipOpacity: 0.2, brightness: 0.015 }), point(9, { clipOpacity: 0.75, brightness: 0.07 }, 'hold')];
+    const thirdLeft = { ...createClip('third-left', assets[0]!.id, 4, 8, third.id), start: positionedLeft.start, opacity: 0.55 };
+    const thirdRight = { ...createClip('third-right', assets[1]!.id, 12, 16, third.id), start: overlap.start, opacity: 0.8 };
+    thirdLeft.colour = { ...NEUTRAL_COLOUR, exposure: -0.2, hue: -15, saturation: 1.1 };
+    thirdRight.colour = { ...NEUTRAL_COLOUR, exposure: 0.15, hue: 30, saturation: 0.8 };
+    third.transitions = [{ leftId: thirdLeft.id, rightId: thirdRight.id, type: 'cross-dissolve', duration: 2 }];
+    const empty = { ...createLayer('empty-track', 'Dormant timing', false), openingFade: 7, closingFade: 9 };
+    const hidden = { ...createLayer('hidden-track', 'Hidden tail', false), enabled: false };
+    // Exercise a positioned first track as well as a different arbitrary stack.
+    project.layers = count === 2 ? [positioned, packed, empty, hidden] : [packed, third, positioned, empty, hidden];
+    project.clips = [positionedRight, packedLeft, ...(count === 3 ? [thirdLeft] : []), afterGap,
+      packedRight, positionedLeft, ...(count === 3 ? [thirdRight] : [])];
+    project.clips.push({ ...createClip('hidden-tail', assets[2]!.id, 17, 19, hidden.id), start: calculateLayout(project).duration + 2 });
+    return projectSchema.parse(project);
+  }
+
+  function assertSharedSamples(project: ProjectDocument): void {
+    const layout = calculateLayout(project);
+    for (let frame = 0; frame < layout.duration; frame++) {
+      for (const sample of sampleTimeline(project, frame, layout)) {
+        const placed = layout.clips.find((item) => item.clip.id === sample.clipId)!;
+        const row = project.layers.find((item) => item.id === sample.layerId)!;
+        expect(sample.sourceFrame).toBe(placed.retiming.sourceAt(frame - placed.start));
+        expect(Number.isSafeInteger(sample.sourceFrame)).toBe(true);
+        expect(sample.sourceFrame).toBeGreaterThanOrEqual(placed.clip.sourceIn);
+        expect(sample.sourceFrame).toBeLessThan(placed.clip.sourceOut);
+        expect(sample.opacity).toBe(evaluateLayerSetting(row, 'clipOpacity', frame, placed.clip.opacity));
+        expect(sample.layerOpacity).toBe(evaluateLayerSetting(row, 'layerOpacity', frame, row.opacity));
+        for (const { key } of COLOUR_CONTROLS) expect(sample.colour[key]).toBe(evaluateLayerSetting(row, key, frame, placed.clip.colour[key]));
+        if (hasLayerKeys(row, 'speed')) expect(placed.retiming.rateAt(frame - placed.start)).toBeCloseTo(evaluateLayerSetting(row, 'speed', frame, 1));
+      }
+    }
+  }
+
+  function expectedLutGenerations(project: ProjectDocument): number {
+    const layout = calculateLayout(project); const keys: string[] = []; let generated = 0;
+    // Grades are requested only while independently rendering each group, in
+    // chronological source order. RGBA16 source-over must request no further LUT.
+    for (const row of project.layers.filter((row) => row.enabled)) {
+      for (let frame = 0; frame < layout.duration; frame++) {
+        const samples = sampleTimeline(project, frame, layout).filter((sample) => sample.layerId === row.id);
+        if (coverage(samples) === 0) continue;
+        for (const sample of samples) {
+          const key = JSON.stringify(sample.colour); const previous = keys.indexOf(key);
+          if (previous >= 0) keys.splice(previous, 1);
+          else { generated++; if (keys.length === 2) keys.shift(); }
+          keys.push(key);
+        }
+      }
+    }
+    return generated;
+  }
+
+  async function losslessParity(project: ProjectDocument, filename: string): Promise<number> {
+    const bytes = await runProcess(config.ffmpeg, ['-hide_banner', '-loglevel', 'error', '-nostdin', '-threads', '2', '-i', filename,
+      '-map', '0:v:0', '-an', '-filter_threads', '2', '-threads', '2', '-pix_fmt', 'rgba64le', '-fps_mode', 'passthrough', '-f', 'rawvideo', 'pipe:1']);
+    const actual = new Uint16Array(bytes.buffer, bytes.byteOffset, bytes.length / 2); const layout = calculateLayout(project);
+    expect(bytes).toHaveLength(layout.duration * PIXELS * 8);
+    let maximum = 0;
+    for (let frame = 0; frame < layout.duration; frame++) {
+      const samples = sampleTimeline(project, frame, layout); const expectedAlpha = coverage(samples); let error = 0;
+      for (let pixel = 0; pixel < PIXELS; pixel++) {
+        const expected = compositePixel(samples, (sample) => {
+          const original = originals.get(sample.mediaId)!; const offset = sample.sourceFrame * FRAME_BYTES + pixel * 3;
+          return [original[offset]! / 255, original[offset + 1]! / 255, original[offset + 2]! / 255];
+        });
+        const offset = (frame * PIXELS + pixel) * 4;
+        for (let channel = 0; channel < 3; channel++) error += Math.abs(actual[offset + channel]! / 65535 - expected[channel]!) * 255;
+        expect(Math.abs(actual[offset + 3]! - Math.round(expectedAlpha * 65535))).toBeLessThanOrEqual(2);
+        if (!samples.length) expect(Array.from(actual.subarray(offset, offset + 4))).toEqual([0, 0, 0, 0]);
+      }
+      const mae = error / FRAME_BYTES;
+      expect(mae, `Lossless shared track-group RGB frame ${frame}`).toBeLessThan(1);
+      maximum = Math.max(maximum, mae);
+    }
+    return maximum;
+  }
+
+  async function exactPackets(filename: string, duration: number): Promise<void> {
+    const bytes = await runProcess(config.ffprobe, ['-v', 'error', '-select_streams', 'v:0', '-show_packets',
+      '-show_entries', 'packet=pts,dts,duration', '-of', 'json', filename]);
+    const packets = (JSON.parse(bytes.toString('utf8')) as { packets: { pts: number; dts: number; duration: number }[] }).packets;
+    expect(packets).toHaveLength(duration);
+    for (const [frame, packet] of packets.entries()) expect(packet).toEqual({ pts: frame * 1001, dts: frame * 1001, duration: 1001 });
+  }
+
+  it.each([2, 3] as const)('renders %i simultaneous arbitrary-track dissolves with independent Ripple, source maps, grades and transparent holds', async (count) => {
+    const project = concurrentTracks(count); const captured = structuredClone(project); const layout = calculateLayout(project);
+    const active = project.layers.filter((row) => row.enabled && layout.clips.some((placed) => placed.clip.layerId === row.id));
+    const overlap = layout.transitions.find((item) => item.layerId === 'packed-track')!;
+    expect(project.layers.map((row) => row.ripple)).toContain(false); expect(project.layers.map((row) => row.ripple)).toContain(true);
+    expect(project.layers.some((row) => row.id === 'video-1')).toBe(false);
+    expect(active).toHaveLength(count);
+    expect(layout.clips.find((placed) => placed.clip.id === 'packed-left')!.start).toBe(2);
+    expect(layout.clips.find((placed) => placed.clip.id === 'positioned-left')!.start).toBe(project.clips.find((clip) => clip.id === 'positioned-left')!.start);
+    const gapLeft = layout.clips.find((placed) => placed.clip.id === 'positioned-right')!;
+    const gapRight = layout.clips.find((placed) => placed.clip.id === 'after-gap')!;
+    expect(gapRight.start - gapLeft.end).toBe(2);
+    expect(layout.duration).toBe(layout.clips.find((placed) => placed.clip.id === 'hidden-tail')!.end);
+    for (const row of active) {
+      const transition = layout.transitions.find((item) => item.layerId === row.id && item.transition.type === 'cross-dissolve')!;
+      expect([transition.start, transition.end]).toEqual([overlap.start, overlap.end]);
+      const clips = layout.clips.filter((placed) => placed.clip.layerId === row.id);
+      for (const frame of [clips[0]!.start, clips.at(-1)!.end - 1]) {
+        const group = sampleTimeline(project, frame, layout).filter((sample) => sample.layerId === row.id);
+        expect(group).toHaveLength(1); expect(group[0]!.brightness).toBe(0);
+        expect(group[0]!.blendWeight).toBe(1); expect(coverage(group)).toBeGreaterThan(0);
+      }
+      for (let frame = overlap.start; frame < overlap.end; frame++) {
+        const group = sampleTimeline(project, frame, layout).filter((sample) => sample.layerId === row.id);
+        expect(group).toHaveLength(2);
+        expect(group.map((sample) => sample.clipId)).toEqual([transition.transition.leftId, transition.transition.rightId]);
+        expect(group.map((sample) => sample.blendWeight)).toEqual([1 - (frame - overlap.start) / 2, (frame - overlap.start) / 2]);
+      }
+    }
+    expect(sampleTimeline(project, overlap.start + 1, layout)).toHaveLength(count * 2);
+    for (const placed of layout.clips.filter((placed) => placed.clip.layerId === 'packed-track')) expect(placed.duration).not.toBe(compileRetiming(placed.clip).duration);
+    assertSharedSamples(project);
+    const plan = planLayeredExport(project);
+    expect(plan).not.toHaveProperty('primary'); expect(plan).not.toHaveProperty('baseDuration');
+    expect(plan.layers.map((row) => row.id)).toEqual(project.layers.map((row) => row.id));
+    for (const row of plan.layers) {
+      expect(row.plan.duration).toBe(layout.clips.filter((placed) => placed.clip.layerId === row.id).at(-1)?.end ?? 0);
+      expect(row.plan.clips.map((clip) => clip.clipId)).toEqual(row.clips.map((clip) => clip.clipId));
+      for (const chunk of row.plan.chunks.filter((chunk) => chunk.kind === 'dissolve')) {
+        expect(chunk.start).toBe(overlap.start); expect(chunk.duration).toBe(2);
+        expect(project.clips[chunk.leftIndex]!.layerId).toBe(row.id); expect(project.clips[chunk.rightIndex]!.layerId).toBe(row.id);
+      }
+    }
+    const work = await mkdtemp(path.join(root, 'concurrent-lossless-'));
+    try {
+      const result = await renderLayeredExport({ document: project, plan, assets: project.clips.map((clip) => library.get(clip.mediaId)),
+        ffmpeg: config.ffmpeg, directory: work, target: { ...EXPORT_PROFILES.draft720, width: WIDTH, height: HEIGHT },
+        context: { id: randomUUID(), signal: new AbortController().signal, update: () => {} } });
+      expect(await readdir(work)).toEqual([result.filename]);
+      expect(result.report).toMatchObject({ layerPasses: count, sourceOverPasses: count - 1,
+        peakOriginalVideoDecoders: 1, peakIntermediateVideoDecoders: 2, peakVideoEncoders: 1, peakNativeVideoChildren: 3,
+        peakLosslessClipFiles: 2, peakLosslessTimelineRepresentations: 3, rawFrameBuffers: 4, rawBufferBytes: PIXELS * 22,
+        peakLutEntries: 2, lutBytes: 6_591_000, lutsGenerated: expectedLutGenerations(project),
+        compositeFrames: layout.duration * (2 * count - 1), compositePixels: layout.duration * (2 * count - 1) * PIXELS,
+      });
+      expect(result.report.renderedClipIds).toEqual(layout.clips.filter((placed) => active.some((row) => row.id === placed.clip.layerId)).map((placed) => placed.clip.id));
+      expect(result.report.skippedLayerIds).toEqual(['hidden-track']);
+      expect(result.retiming).toHaveLength(count * 2 + 1);
+      for (const [index, report] of result.retiming.entries()) {
+        const placed = layout.clips.find((placed) => placed.clip.id === result.report.renderedClipIds[index])!;
+        expect(report).toMatchObject({ decodedFrames: placed.clip.sourceOut - placed.clip.sourceIn,
+          outputFrames: placed.duration, rawFrameBuffers: 1, frameBytes: FRAME_BYTES });
+        expect(report.largestReadChunkBytes).toBeLessThanOrEqual(256 * 1024);
+      }
+      await losslessParity(project, path.join(work, result.filename));
+    } finally { await rm(work, { recursive: true, force: true }); }
+    const result = await complete(project); bounds(result.receipt); await parity(project, result.filename);
+    await exactPackets(result.filename, layout.duration);
+    expect(result.receipt.settings.layered!.lutsGenerated).toBe(expectedLutGenerations(project));
+    expect(result.receipt.settings.layered!.compositeFrames).toBe(layout.duration * (2 * count - 1));
+    expect(result.receipt.sources.map((source) => source.id).sort()).toEqual(assets.map((asset) => asset.id).sort());
+    expect(result.receipt.verification.hasAudio).toBe(false);
+    const pixels = await rawRgb(config, result.filename);
+    const tail = layout.clips.filter((placed) => active.some((row) => row.id === placed.clip.layerId)).reduce((end, placed) => Math.max(end, placed.end), 0);
+    for (const frame of [0, 1, gapLeft.end, gapLeft.end + 1, ...Array.from({ length: layout.duration - tail }, (_, index) => tail + index)]) {
+      expect(sampleTimeline(project, frame, layout)).toHaveLength(0);
+      const bytes = pixels.subarray(frame * FRAME_BYTES, (frame + 1) * FRAME_BYTES);
+      expect(bytes.reduce((sum, value) => sum + value, 0) / FRAME_BYTES).toBeLessThan(1);
+    }
+    expect(project).toEqual(captured); await unchanged();
+  }, 120_000);
 
   it('exports shared row speed/opacity and seven independently participating colour channels across dissolves, gaps and hidden black holds', async () => {
     const project = createProject('native-compound', 'Compound keyed layers');
@@ -208,14 +426,15 @@ describe.skipIf(!enabled)('schema-4 layered native export · disposable syntheti
       clip.opacity = 0.7;
       clip.colour = { ...NEUTRAL_COLOUR, exposure: index * 0.2, brightness: index * 0.015, shadows: 0.05 };
     }
-    project.clips = [left, right]; project.transitions = [{ leftId: left.id, rightId: right.id, type: 'cross-dissolve', duration: 2 }];
-    project.openingFade = 1; project.closingFade = 1;
-    const baseEnd = calculateLayout(project).baseDuration;
+    project.clips = [left, right]; project.layers[0]!.transitions = [{ leftId: left.id, rightId: right.id, type: 'cross-dissolve', duration: 2 }];
+    project.layers[0]!.openingFade = 1; project.layers[0]!.closingFade = 1;
+    const baseEnd = calculateLayout(project).duration;
     const early = { ...createClip('early-overlay', assets[0]!.id, 1, 6), layerId: 'video-2', start: 2, opacity: 0.6 };
     const late = { ...createClip('late-overlay', assets[1]!.id, 9, 13), layerId: 'video-2', start: baseEnd + 2, opacity: 0.7 };
     late.speed = { mode: 'constant', rate: 1.25 }; late.colour = { ...NEUTRAL_COLOUR, exposure: 0.25, saturation: 0.6 };
     const top = { ...createClip('top-overlay', assets[0]!.id, 4, 9), layerId: 'video-3', start: 4, opacity: 0.45 };
-    project.clips = [late, left, top, early, right]; // Flat indices deliberately differ from row/primary order.
+    project.clips = [late, left, top, early, right]; // Flat indices deliberately differ from track/chronological order.
+    project.layers[1]!.transitions = [{ leftId: early.id, rightId: late.id, type: 'cut', duration: 0 }];
     const hiddenStart = calculateLayout(project).clips.find((placed) => placed.clip.id === late.id)!.end + 2;
     const hidden = { ...createClip('hidden-only-source', assets[2]!.id, 17, 19), layerId: 'video-4', start: hiddenStart };
     project.clips.push(hidden);
@@ -255,7 +474,7 @@ describe.skipIf(!enabled)('schema-4 layered native export · disposable syntheti
     expect(result.receipt.settings.layered!.skippedLayerIds).toEqual(['video-4']);
     expect(result.receipt.sources.map((source) => source.id).sort()).toEqual(assets.map((asset) => asset.id).sort());
     expect(result.receipt.settings.layered!.peakIntermediateVideoDecoders).toBe(2);
-    expect(result.receipt.settings.layered!.peakLosslessTimelineRepresentations).toBe(2);
+    expect(result.receipt.settings.layered!.peakLosslessTimelineRepresentations).toBe(3);
     expect(result.receipt.settings.layered!.peakLosslessClipFiles).toBe(2);
     expect(peakObservedClipFiles).toBeLessThanOrEqual(2); expect(sawLutFile).toBe(false);
     expect(updates.every((value, index) => index === 0 || value >= updates[index - 1]!)).toBe(true);
@@ -280,7 +499,7 @@ describe.skipIf(!enabled)('schema-4 layered native export · disposable syntheti
     project.clips[1]!.speed = { mode: 'constant', rate: 2 };
     project.clips[2]!.speed = { mode: 'ramp', startRate: 3, endRate: 4, curve: 'ease-out', anchorIn: 0, anchorOut: 20 };
     project.clips[1]!.colour = { ...NEUTRAL_COLOUR, brightness: 0.04 };
-    project.transitions = [{ leftId: 'row-left', rightId: 'row-right', type: 'cross-dissolve', duration: 2 },
+    project.layers[0]!.transitions = [{ leftId: 'row-left', rightId: 'row-right', type: 'cross-dissolve', duration: 2 },
       { leftId: 'row-right', rightId: 'row-tail', type: 'cut', duration: 0 }];
     expect(needsLayeredExport(project)).toBe(true);
     expect(needsLayeredExport({ ...project, layers: [{ ...project.layers[0]!, keyframes: [] }] })).toBe(false);
@@ -312,7 +531,7 @@ describe.skipIf(!enabled)('schema-4 layered native export · disposable syntheti
   it('rejects every shared setting even at neutral values and keeps the two-clip 1x diagnostic restricted and read-only', async () => {
     const plain = createProject('native-reference-guard', 'Plain diagnostic validation');
     plain.clips = [createClip('reference-left', assets[0]!.id, 2, 6), createClip('reference-right', assets[1]!.id, 3, 7)];
-    plain.transitions = [{ leftId: 'reference-left', rightId: 'reference-right', type: 'cut', duration: 0 }];
+    plain.layers[0]!.transitions = [{ leftId: 'reference-left', rightId: 'reference-right', type: 'cut', duration: 0 }];
     expect(validateReference(plain, library).clips).toHaveLength(2);
     const neutral: LayerKeyValues = { ...NEUTRAL_COLOUR, layerOpacity: 1, clipOpacity: 1, speed: 1 };
     const variants: ((document: ProjectDocument) => void)[] = [
@@ -339,8 +558,8 @@ describe.skipIf(!enabled)('schema-4 layered native export · disposable syntheti
     const project = simple(3);
     project.clips[0]!.sourceOut = 2;
     const right = createClip('right', assets[1]!.id, 5, 7); project.clips.push(right);
-    project.transitions = [{ leftId: 'base', rightId: 'right', type: 'cross-dissolve', duration: 1 }];
-    project.openingFade = 1; project.closingFade = 1;
+    project.layers[0]!.transitions = [{ leftId: 'base', rightId: 'right', type: 'cross-dissolve', duration: 1 }];
+    project.layers[0]!.openingFade = 1; project.layers[0]!.closingFade = 1;
     project.layers[0]!.opacity = 0.55; project.clips[0]!.opacity = 0.7; right.opacity = 0.8;
     project.clips[1]!.colour = { ...NEUTRAL_COLOUR, exposure: 0.2, brightness: 0.02, hue: -30, shadows: 0.2 };
     project.layers[1]!.keyframes = [point(0, { clipOpacity: 0.2 }), point(4, { clipOpacity: 0.9 }, 'hold')];
@@ -380,8 +599,8 @@ describe.skipIf(!enabled)('schema-4 layered native export · disposable syntheti
   it('samples fade-through-black in output frames after animated grading without changing coverage', async () => {
     const project = simple(4);
     project.clips.push(createClip('right', assets[1]!.id, 11, 15));
-    project.transitions = [{ leftId: 'base', rightId: 'right', type: 'fade-through-black', duration: 5 }];
-    project.openingFade = 1; project.closingFade = 1;
+    project.layers[0]!.transitions = [{ leftId: 'base', rightId: 'right', type: 'fade-through-black', duration: 5 }];
+    project.layers[0]!.openingFade = 1; project.layers[0]!.closingFade = 1;
     project.layers[0]!.keyframes = [point(0, { brightness: 0.05, shadows: 0.5 }), point(3, { exposure: -0.2 }),
       point(6, { brightness: 0.1, exposure: 0.5, hue: 25, shadows: 0.3 }, 'hold')];
     project.clips[2]!.colour = { ...NEUTRAL_COLOUR, brightness: 0.1, exposure: 0.4, highlights: -0.2 };
@@ -447,6 +666,7 @@ describe.skipIf(!enabled)('schema-4 layered native export · disposable syntheti
     const started = performance.now(); const result = await complete(project, 'final4k');
     const elapsed = performance.now() - started; bounds(result.receipt);
     expect(result.receipt.verification.frameCount).toBe(3);
+    expect(result.receipt.settings.layered!.rawBufferBytes).toBe(182_476_800);
     const maximumMae = await parity(project, result.filename);
     expect(uhd.metadata).toMatchObject({ width: 3840, height: 2160, frameCount: 3 });
     expect(await fingerprintFile(uhdPath)).toEqual(uhd.fingerprint);
@@ -466,9 +686,11 @@ describe.skipIf(!enabled)('schema-4 layered native export · disposable syntheti
     const result = await complete(project); bounds(result.receipt);
     const maximumMae = await parity(project, result.filename);
     expect(result.receipt.settings.layered!.layerPasses).toBe(8);
+    expect(result.receipt.settings.layered!.sourceOverPasses).toBe(7);
     expect(result.receipt.settings.layered!.originalDecoderProcesses).toBe(8);
     expect(result.receipt.settings.layered!.peakLosslessClipFiles).toBe(1);
-    expect(result.receipt.settings.layered!.rawBufferBytes).toBe(1280 * 720 * 14);
+    expect(result.receipt.settings.layered!.peakLosslessTimelineRepresentations).toBe(3);
+    expect(result.receipt.settings.layered!.rawBufferBytes).toBe(1280 * 720 * 22);
     console.log(`Eight-layer maximum RGB MAE: ${maximumMae.toFixed(4)} / 255; decoder peaks remain 1 original / 2 intermediate`);
   });
 
@@ -503,6 +725,76 @@ describe.skipIf(!enabled)('schema-4 layered native export · disposable syntheti
     } finally { release(); }
   });
 
+  it.each(['rgb-group', 'rgba-merge'] as const)('cancels concurrent dissolves during %s, closes every real native child and preserves unrelated scratch/outputs', async (stage) => {
+    if (!successfulDirectory) successfulDirectory = (await complete(simple())).directory;
+    const successfulMp4 = await readFile(path.join(successfulDirectory, 'export.mp4'));
+    const successfulReceipt = await readFile(path.join(successfulDirectory, 'receipt.json'));
+    const project = concurrentTracks(2); const captured = structuredClone(project); const layout = calculateLayout(project);
+    const overlap = layout.transitions.find((item) => item.layerId === 'packed-track')!;
+    const renderRoot = path.join(config.dataDir, 'renders');
+    const unrelated = await mkdtemp(path.join(renderRoot, 'unrelated-scratch-'));
+    // The store writes only this disposable sentinel, never an owner project.
+    const sentinelStore = new ProjectStore(unrelated); await sentinelStore.save(createProject('sentinel', 'Unrelated scratch'), 0);
+    const sentinelPath = path.join(unrelated, 'projects', 'sentinel.json'); const sentinelBytes = await readFile(sentinelPath);
+    const before = (await readdir(renderRoot)).sort();
+    const spawnOffset = vi.mocked(spawn).mock.calls.length;
+    const observed: ChildProcess[] = []; const closed = new Set<ChildProcess>();
+    const submit = jobs.submit.bind(jobs); let cancelled = false; let liveFiles: string[] = [];
+    const targetMessage = stage === 'rgb-group'
+      ? `Rendering track group packed-track: project frame ${overlap.start + 1} / ${layout.duration}`
+      : `Compositing track packed-track: 1 / ${layout.duration} frames`;
+    const spy = vi.spyOn(jobs, 'submit').mockImplementation((kind, label, task, settled = null) => submit(kind, label, async (context) => task({
+      ...context, update: (progress, message) => {
+        context.update(progress, message);
+        if (cancelled || message !== targetMessage) return;
+        const work = path.join(renderRoot, context.id, 'work');
+        const native = vi.mocked(spawn);
+        for (let index = spawnOffset; index < native.mock.calls.length; index++) {
+          const call = native.mock.calls[index]!; const result = native.mock.results[index]!;
+          if (call[0] !== config.ffmpeg || call[2]?.cwd !== work || result.type !== 'return') continue;
+          const child = result.value as ChildProcess;
+          if (child.exitCode !== null || child.signalCode !== null) continue;
+          observed.push(child); child.once('close', () => { closed.add(child); });
+        }
+        expect(observed).toHaveLength(3);
+        const readers = observed.filter((child) => child.stdout !== null);
+        const encoders = observed.filter((child) => child.stdin !== null);
+        expect(readers).toHaveLength(2); expect(encoders).toHaveLength(1);
+        for (const child of readers) {
+          const args = native.mock.calls[native.mock.results.findIndex((result) => result.type === 'return' && result.value === child)]![1]!;
+          expect(args).toContain(stage === 'rgb-group' ? 'rgb24' : 'rgba64le');
+        }
+        liveFiles = readdirSync(work);
+        if (stage === 'rgb-group') expect(liveFiles.filter((name) => /^clip-\d+\.nut$/.test(name))).toHaveLength(2);
+        else {
+          expect(liveFiles).toContain('group-0.nut'); expect(liveFiles).toContain('group-1.nut');
+          expect(liveFiles.filter((name) => /^clip-\d+\.nut$/.test(name))).toHaveLength(0);
+        }
+        cancelled = true; jobs.cancel(context.id);
+      },
+    }), settled));
+    let id = '';
+    try {
+      const job = startExport(project, 'draft720', library); id = job.id;
+      const result = await jobs.wait(id);
+      expect(result.state, result.message).toBe('cancelled'); expect(cancelled).toBe(true);
+      expect(result.outputUrl).toBeNull(); expect(result.receiptUrl).toBeNull();
+      expect(liveFiles.length).toBeGreaterThan(0);
+      expect(closed.size).toBe(3);
+      for (const child of observed) {
+        expect(closed.has(child)).toBe(true);
+        expect(child.exitCode !== null || child.signalCode !== null).toBe(true);
+      }
+      await expect(readdir(path.join(renderRoot, id))).rejects.toMatchObject({ code: 'ENOENT' });
+      expect((await readdir(renderRoot)).sort()).toEqual(before);
+      expect(await readFile(path.join(successfulDirectory, 'export.mp4'))).toEqual(successfulMp4);
+      expect(await readFile(path.join(successfulDirectory, 'receipt.json'))).toEqual(successfulReceipt);
+      expect(await readFile(sentinelPath)).toEqual(sentinelBytes);
+      expect(project).toEqual(captured); await unchanged();
+      expect(jobs.list().some((job) => job.state === 'queued' || job.state === 'running')).toBe(false);
+    } finally { spy.mockRestore(); await rm(unrelated, { recursive: true, force: true }); }
+  }, 120_000);
+
   it('cancels active layer composition, reaps native pipes and removes only the owned render directory', async () => {
     if (!successfulDirectory) successfulDirectory = (await complete(simple())).directory;
     const before = await readFile(path.join(successfulDirectory, 'export.mp4'));
@@ -510,7 +802,7 @@ describe.skipIf(!enabled)('schema-4 layered native export · disposable syntheti
     const spy = vi.spyOn(jobs, 'submit').mockImplementation((kind, label, task, settled = null) => submit(kind, label, async (context) => task({
       ...context, update: (progress, message) => {
         context.update(progress, message);
-        if (!cancelled && message.startsWith('Compositing layer')) { cancelled = true; jobs.cancel(context.id); }
+        if (!cancelled && message.startsWith('Compositing track')) { cancelled = true; jobs.cancel(context.id); }
       },
     }), settled));
     let id = '';

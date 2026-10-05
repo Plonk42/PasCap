@@ -40,8 +40,8 @@ test.beforeEach(async ({ page, request }) => {
     });
     const document = createProject('help-popover-memory', 'Inline help · memory-only');
     document.media.videoIds = assets.map((asset) => asset.id);
-    document.clips = [createClip('help-left', assets[0]!.id, 0, 120), createClip('help-right', assets[1]!.id, 0, 120)];
-    document.transitions = [{ leftId: 'help-left', rightId: 'help-right', type: 'cut', duration: 0 }];
+    document.clips = [createClip('help-left', assets[0]!.id, 0, 120), { ...createClip('help-right', assets[1]!.id, 0, 120), start: 120 }];
+    document.layers[0]!.transitions = [{ leftId: 'help-left', rightId: 'help-right', type: 'cut', duration: 0 }];
     document.layers[0]!.keyframes = [sharedPoint(10, { exposure: 0 }), sharedPoint(90, { exposure: 0.8 })];
     const track = audio[0];
     if (!track) throw new Error('Help checks require the dedicated prepared synthetic audio fixture.');
@@ -167,7 +167,7 @@ const HELP_CONTEXTS = [
     { label: 'Colour animation', tab: 'Clip', text: 'Each diamond keys only its own setting' },
     { label: 'Speed timing', tab: 'Clip', text: 'Row keys override, rather than multiply' },
     { label: 'Keyframe timing', tab: 'Clip', text: 'Moving a point moves every participating setting.' },
-    { label: 'Transition timing', tab: 'Sequence', text: 'Transition and fade regions must fit their clips.' },
+    { label: 'Transition timing', tab: 'Sequence', text: 'Conflicts reject the complete edit, never shorten another fade or transition.' },
     { label: 'Fade timing', tab: 'Sequence', text: '0 disables a fade.' },
     { label: 'Audio timing', tab: 'Audio', text: 'Both fades must fit within Duration.' },
 ] as const;
