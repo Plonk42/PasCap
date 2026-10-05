@@ -183,6 +183,12 @@ The three-recording playback completion check has a bounded 45-second wait insid
 a 60-second test, with renderer/decoder diagnostics and exact end-frame/error/
 two-decoder assertions. This is correctness on software rendering, not the
 intended-GPU throughput gate.
+Playback recovery checks record requested project frames, observed source frames
+and decoder readiness. An unchanged single-source image within one project frame
+must not buffer unnecessarily; every additional video-only buffer needs evidence
+that no exact neighbour or retainable accepted image was available. A deliberately
+withheld real callback verifies genuine larger delays remain explicit. Neither a
+universal stall count nor a software-renderer FPS threshold qualifies hardware.
 
 ## Optional real-media tools
 

@@ -24,6 +24,8 @@ interface PlaybackEvidence {
   avDriftViolations: number;
   bufferingEntries: number;
   firstBufferingFrame: number | null;
+  avoidableBuffering: number;
+  bufferingFrames: { accepted: number; requested: number; observed: number; ready: boolean; eligible: boolean }[];
   minimumDecoderCount: number;
   maximumDecoderCount: number;
   errors: number;
@@ -77,6 +79,7 @@ async function openRecoveryProject(page: Page, request: APIRequestContext, withM
       maximumMusicDriftFrames: 0, driftViolations: 0,
       maximumAVDriftFrames: 0, avDriftViolations: 0,
       bufferingEntries: 0, firstBufferingFrame: null,
+      avoidableBuffering: 0, bufferingFrames: [],
       minimumDecoderCount: 2, maximumDecoderCount: 2,
       errors: 0, firstError: null,
     };
@@ -122,7 +125,7 @@ async function openRecoveryProject(page: Page, request: APIRequestContext, withM
   await page.goto(`/?project=${project.id}`);
   await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
   expect(await page.evaluate(() => window.pascapLab!.project())).toEqual(memory.snapshot());
-  await page.evaluate(() => {
+  await page.evaluate((rate: number) => {
     const evidence = window.playbackRecoveryEvidence;
     // Exclude resource configuration, not any part of the tested playback.
     evidence.musicStarts = 0; evidence.musicPauses = 0;
@@ -139,6 +142,21 @@ async function openRecoveryProject(page: Page, request: APIRequestContext, withM
       if (state.status === 'buffering' && previousStatus !== 'buffering') {
         evidence.bufferingEntries++;
         evidence.firstBufferingFrame ??= state.frame;
+        if (previousStatus === 'playing' && state.playing && !state.audioClock) {
+          // This fixture has exactly one unchanged clip, constant source IN=0,
+          // and no grades/topology/appearance edits. Require causal evidence for
+          // every buffer: no ready exact neighbour or retainable accepted frame.
+          const slot = state.assignedClipIds.indexOf('recovery-clip');
+          const observed = state.decodedSourceFrames[slot]!;
+          const ready = state.decoderReady[slot]!;
+          const mapped = [state.requestedFrame - 1, state.requestedFrame, state.requestedFrame + 1]
+            .filter((frame) => frame >= 0 && frame < state.duration)
+            .some((frame) => Math.floor(frame * rate + 1e-8) === observed);
+          const invalidEvidence = slot < 0 || !Number.isInteger(observed) || typeof ready !== 'boolean';
+          const eligible = invalidEvidence || (ready && mapped) || Math.abs(state.requestedFrame - state.frame) <= 1;
+          if (eligible) evidence.avoidableBuffering++;
+          evidence.bufferingFrames.push({ accepted: state.frame, requested: state.requestedFrame, observed, ready, eligible });
+        }
       }
       previousStatus = state.status;
       // Check every subscription emission in actual playing state, not merely
@@ -158,7 +176,7 @@ async function openRecoveryProject(page: Page, request: APIRequestContext, withM
         evidence.maximumAVDriftFrames = Math.max(evidence.maximumAVDriftFrames, avDrift);
       }
     });
-  });
+  }, slow ? 0.1 : 1);
   return { memory, document: memory.snapshot() };
 }
 
@@ -207,6 +225,7 @@ async function assertCompleted(page: Page, fixture: RecoveryFixture, withMusic: 
   expect(evidence.minimumDecoderCount).toBe(2);
   expect(evidence.maximumDecoderCount).toBe(2);
   expect(evidence.errors, evidence.firstError ?? 'No preview errors.').toBe(0);
+  expect(evidence.avoidableBuffering, JSON.stringify(evidence.bufferingFrames)).toBe(0);
   expect(evidence.driftViolations).toBe(0);
   expect(evidence.avDriftViolations).toBe(0);
   if (withMusic) {
@@ -251,15 +270,51 @@ for (const [withMusic, slow] of [[false, false], [true, false], [false, true], [
         const { state, evidence } = await page.evaluate(() => ({
           state: window.pascapLab!.engine.diagnostics(), evidence: window.playbackRecoveryEvidence,
         }));
-        // A clean single-source fixture needs one initial alignment, not repeated
-        // recovery. No milliseconds/FPS allowance hides additional buffering.
+        // Each non-initial buffer must be justified by the exact observed-frame
+        // contract, not an arbitrary software-renderer count/FPS allowance.
         expect(evidence.firstBufferingFrame).toBe(0);
-        expect(evidence.bufferingEntries).toBe(1);
-        expect(state.stalls).toBe(1);
+        expect(evidence.bufferingEntries).toBe(1 + evidence.bufferingFrames.length);
+        expect(state.stalls).toBe(evidence.bufferingEntries);
       }
     } finally { await attachEvidence(page, browser, withMusic, slow); }
   });
 }
+
+test('a withheld decoded callback buffers beyond one-frame eligibility, reports failure and permits explicit recovery', async ({ page, request, browser }) => {
+  test.setTimeout(45_000);
+  const fixture = await openRecoveryProject(page, request, false);
+  try {
+    await page.evaluate(() => { window.playbackRecoveryGate.targetFrame = 30; });
+    await startPlayback(page);
+    await page.waitForFunction(() => {
+      const gate = window.playbackRecoveryGate;
+      const state = window.pascapLab!.engine.diagnostics();
+      return gate.heldCallbacks === 1 && state.status === 'buffering' && state.requestedFrame > 30;
+    });
+    const blocked = await page.evaluate(() => ({ state: window.pascapLab!.engine.diagnostics(), evidence: window.playbackRecoveryEvidence }));
+    expect(blocked.evidence.bufferingFrames.length).toBeGreaterThan(0);
+    expect(blocked.evidence.avoidableBuffering, JSON.stringify(blocked.evidence.bufferingFrames)).toBe(0);
+    expect(blocked.state.requestedFrame - blocked.state.frame).toBeGreaterThan(1);
+    // Keep withholding the genuine callback: no observed frame can satisfy the
+    // required recovery seek. The existing bounded decoder deadline must report
+    // the actual failure, never silently retain stale footage indefinitely.
+    await waitForCompletion(page);
+    const failed = await page.evaluate(() => window.pascapLab!.engine.diagnostics());
+    expect(failed.status).toBe('error'); expect(failed.playing).toBe(false);
+    expect(failed.message).toContain('did not deliver the required frame within 5 seconds');
+    expect(failed.decoderCount).toBe(2);
+    await page.evaluate(() => window.playbackRecoveryGate.release!());
+    await page.evaluate(() => window.pascapLab!.engine.seek(0));
+    await assertPaused(page, 0, 0);
+    await startPlayback(page); await waitForCompletion(page); await assertPaused(page, 89, 0);
+    expect(await page.evaluate(() => window.pascapLab!.project())).toEqual(fixture.document);
+    expect(fixture.memory.saves).toBe(0);
+    expect(await page.evaluate(() => window.playbackRecoveryGate.releasedCallbacks)).toBe(1);
+  } finally {
+    await page.evaluate(() => window.playbackRecoveryGate.release?.());
+    await attachEvidence(page, browser, false, false);
+  }
+});
 
 for (const withMusic of [false, true]) {
   test(`pause, seek and deliberate restart ${withMusic ? 'with music and a callback-gated cancellation' : 'video only'}`, async ({ page, request, browser }) => {
