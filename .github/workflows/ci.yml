@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -83,3 +84,23 @@ jobs:
             test-results/
           if-no-files-found: ignore
           retention-days: 7
+
+  # Required alongside the three suite checks. Branch protection can accept skipped
+  # checks, so this unconditional job only succeeds when every prerequisite did.
+  delivery:
+    name: Delivery gate
+    needs: [checks, integration]
+    if: ${{ always() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 1
+    env:
+      CHECKS_RESULT: ${{ needs.checks.result }}
+      INTEGRATION_RESULT: ${{ needs.integration.result }}
+    steps:
+      - name: Require successful suites
+        shell: bash
+        run: |
+          if [[ "$CHECKS_RESULT" != success || "$INTEGRATION_RESULT" != success ]]; then
+            printf 'Delivery blocked: checks=%s integration=%s\n' "$CHECKS_RESULT" "$INTEGRATION_RESULT"
+            exit 1
+          fi
