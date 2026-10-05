@@ -352,6 +352,13 @@ Startup, library reads and hovering never queue existing unprepared sources.
 Rejected import items are not fabricated as successes, and uncertain write results
 must be checked before submitting the import again.
 
+Music reimport reuses an entry only for the same absolute path and unchanged source
+identity. Deliberately importing a moved file or another hard-linked location
+creates a new music entry and verifies the selected path, not a missing old one.
+The old entry, its project references and caches remain unchanged; this is a fresh
+import, not relinking. Choose the new **Recording** entry separately to place music.
+The serial worker reuses an eligible verified PCM cache without rewriting it.
+
 ## Projects, service connection and errors
 
 Projects are searchable by title/ID with compatibility filtering and recent ordering.

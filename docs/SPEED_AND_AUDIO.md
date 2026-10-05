@@ -229,6 +229,14 @@ its preparation job; choosing/placing music is still a separate action. Failed o
 uncertain registration stays open with selection/error intact and no automatic retry;
 check Activity/project state before repeating it. Originals are never uploaded or copied.
 
+Reimporting an unchanged source at the same absolute path reuses its music entry.
+Importing a different location creates a **new music entry**, even when a move or
+hard link retains the original filesystem identity. The selected file is verified
+at its own path; an older entry's missing path does not block that new import.
+Existing entries and project references are not reassociated or removed. Select
+the new entry in **Recording** to place it. Verified fingerprint-matching PCM can
+be reused through the serial worker; originals and old caches remain untouched.
+
 Standalone music import requires exactly one audio stream and no video footage.
 Embedded cover artwork explicitly marked as an attached picture is accepted and
 ignored during audio-only playback preparation; video soundtracks remain rejected.

@@ -232,6 +232,11 @@ local file in **Music file path**, choose **Import audio**, wait for preparation
 then select the ready recording from this project's music bin. No soundtrack is
 supplied; use music you own or have permission to use and keep private paths private.
 
+If music was moved, import its new location normally and choose the new **Recording**
+entry after preparation. This does not reconnect or replace the old entry; existing
+projects and caches remain untouched. Reimporting the same unchanged path reuses its
+entry, while a missing old location stays visibly unavailable.
+
 One music track supports waveform placement/edge trims, numeric source IN/OUT,
 start/duration, **gain dB**, linear fades and **Loop selected source range**.
 Without looping, duration must fit that source range; looping repeats only it.

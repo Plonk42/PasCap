@@ -1,10 +1,11 @@
-import { appendFile, copyFile, lstat, mkdir, mkdtemp, readFile, readdir, rename, rm, symlink, writeFile } from 'node:fs/promises';
+import { appendFile, copyFile, link, lstat, mkdir, mkdtemp, readFile, readdir, rename, rm, symlink, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { createApp } from '../../src/server/app.js';
 import { AudioLibrary } from '../../src/server/audio.js';
 import { createConfig, type ServiceConfig } from '../../src/server/config.js';
+import { fingerprintFile } from '../../src/server/files.js';
 import { JobQueue } from '../../src/server/jobs.js';
 import * as processes from '../../src/server/process.js';
 import { audioAssetSchema, type AudioAsset } from '../../src/shared/audio.js';
@@ -33,7 +34,7 @@ describe.skipIf(!enabled)('registered music · disposable lavfi audio only', () 
     silencePath = path.join(sources, 'silence.wav');
     cancelledPath = path.join(sources, 'cancelled.wav');
     changedPath = path.join(sources, 'changed.wav');
-    config = createConfig({ dataDir: path.join(directory, 'cache'), webDir: path.join(directory, 'absent-web') });
+    config = createConfig({ dataDir: path.join(directory, 'cache'), webDir: path.join(directory, 'absent-web'), mediaRoots: [sources] });
     await processes.runProcess(config.ffmpeg, [
       '-hide_banner', '-loglevel', 'error', '-nostdin', '-n', '-f', 'lavfi', '-i', 'sine=frequency=523.25:sample_rate=44100:duration=2.2',
       '-c:a', 'pcm_s16le', '-threads', '2', tonePath,
@@ -338,6 +339,86 @@ describe.skipIf(!enabled)('registered music · disposable lavfi audio only', () 
     expect((await service.app.inject({ method: 'HEAD', url: `/api/audio/${asset.id}/playback`, headers })).statusCode).toBe(200);
     expect(await readFile(archived)).toEqual(bytes); expect(await readFile(tonePath)).toEqual(original);
     tone = service.audio.get(asset.id);
+  });
+
+  it('imports moved music as a new source while preserving the old registration and verified cache', async () => {
+    const oldPath = path.join(sources, 'before-move.wav');
+    const selectedPath = path.join(sources, 'after-move.wav');
+    await copyFile(tonePath, oldPath);
+    const previous = await registerReady(oldPath);
+    const playback = service.audio.playbackPath(previous);
+    const cached = await readFile(playback);
+    const cacheStat = await lstat(playback);
+    await rename(oldPath, selectedPath);
+    expect(await fingerprintFile(selectedPath)).toEqual(previous.fingerprint);
+    const native = vi.spyOn(processes, 'runProcess');
+    let imported: AudioAsset;
+    try {
+      const response = await service.app.inject({ method: 'POST', url: '/api/audio/register-selected', headers, payload: { path: selectedPath } });
+      expect(response.statusCode, response.body).toBe(202);
+      imported = audioAssetSchema.parse(response.json().asset);
+      expect(imported.id).not.toBe(previous.id);
+      expect(imported.sourcePath).toBe(selectedPath);
+      expect(imported.fingerprint).toEqual(previous.fingerprint);
+      expect((await service.jobs.wait(jobSchema.parse(response.json().job).id)).state).toBe('completed');
+      imported = service.audio.get(imported.id);
+      expect(await service.audio.assertReady(imported.id)).toEqual(imported);
+      expect(service.audio.get(previous.id)).toEqual(previous);
+      await expect(service.audio.assertReady(previous.id)).rejects.toThrow('original recording is missing');
+      const listed = (await service.app.inject({ url: '/api/audio', headers })).json().assets as AudioAsset[];
+      expect(listed.find((asset) => asset.id === previous.id)).toMatchObject({ status: 'error', error: expect.stringContaining('original recording is missing') });
+      expect(listed.find((asset) => asset.id === imported.id)).toEqual(imported);
+      expect(service.audio.get(previous.id)).toEqual(previous);
+      const repeated = await service.audio.register(selectedPath);
+      expect(repeated.asset.id).toBe(imported.id);
+      expect((await service.jobs.wait(repeated.job.id)).state).toBe('completed');
+      expect(native.mock.calls.some(([binary]) => binary === config.ffmpeg)).toBe(false);
+      expect(service.audio.playbackPath(imported)).toBe(playback);
+      const finalStat = await lstat(playback);
+      expect([finalStat.ino, finalStat.mtimeMs, finalStat.size]).toEqual([cacheStat.ino, cacheStat.mtimeMs, cacheStat.size]);
+      expect(await readFile(playback)).toEqual(cached);
+      expect(await readFile(selectedPath)).toEqual(original);
+    } finally { native.mockRestore(); }
+    const queue = new JobQueue();
+    try {
+      const reloaded = new AudioLibrary(config, queue);
+      await reloaded.initialise();
+      expect(reloaded.get(previous.id)).toEqual(previous);
+      expect(reloaded.get(imported.id)).toEqual(imported);
+      expect(queue.list()).toEqual([]);
+    } finally { await queue.close(); }
+  });
+
+  it('keeps hard-linked music locations distinct while deduplicating repeat imports and active jobs at one path', async () => {
+    const previous = await readyTone();
+    const firstPath = path.join(sources, 'hard-link-one.wav');
+    const secondPath = path.join(sources, 'hard-link-two.wav');
+    await link(tonePath, firstPath); await link(tonePath, secondPath);
+    expect(await fingerprintFile(firstPath)).toEqual(previous.fingerprint);
+    expect(await fingerprintFile(secondPath)).toEqual(previous.fingerprint);
+    let release = (): void => { };
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    const blocker = service.jobs.submit('reference', 'Disposable music location gate', async () => gate);
+    let firstJob = ''; let secondJob = '';
+    try {
+      const first = await service.audio.register(firstPath);
+      const repeated = await service.audio.register(firstPath);
+      const second = await service.audio.register(secondPath);
+      firstJob = first.job.id; secondJob = second.job.id;
+      expect(first.asset.id).not.toBe(previous.id);
+      expect(second.asset.id).not.toBe(first.asset.id);
+      expect(second.asset.id).not.toBe(previous.id);
+      expect(repeated.asset.id).toBe(first.asset.id);
+      expect(repeated.job.id).toBe(first.job.id);
+      expect(second.job.id).not.toBe(first.job.id);
+      expect(first.asset.sourcePath).toBe(firstPath); expect(second.asset.sourcePath).toBe(secondPath);
+      expect(service.jobs.list().filter((job) => job.state === 'running')).toHaveLength(1);
+      expect(service.audio.get(previous.id)).toEqual(previous);
+    } finally { release(); }
+    await service.jobs.wait(blocker.id);
+    expect((await service.jobs.wait(firstJob)).state).toBe('completed');
+    expect((await service.jobs.wait(secondJob)).state).toBe('completed');
+    expect(await readFile(firstPath)).toEqual(original); expect(await readFile(secondPath)).toEqual(original);
   });
 
   it('rejects changed source identities for playback, waveform and retry without mutating registered metadata', async () => {
