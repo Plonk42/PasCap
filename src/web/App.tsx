@@ -1,6 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import type { GpuComparison, GpuCompositionComparison } from '../preview/compositor.js';
-import type { PreviewEngine, PreviewDiagnostics } from '../preview/engine.js';
+import type { PreviewDiagnostics, PreviewEngine } from '../preview/engine.js';
 import type { AudioAsset } from '../shared/audio.js';
 import type { ColourSettings } from '../shared/colour.js';
 import { applyCommand, EditHistory, type EditCommand } from '../shared/commands.js';
@@ -31,8 +31,8 @@ import { writePreference } from './preferences.js';
 import { PreviewPanel } from './PreviewPanel.js';
 import { ProjectTitle } from './ProjectTitle.js';
 import { editorShortcut } from './shortcuts.js';
-import { Timeline, type DraftPreview } from './Timeline.js';
 import { planTimelineDrop } from './timeline-placement.js';
+import { Timeline, type DraftPreview } from './Timeline.js';
 import { DEFAULT_LAYOUT, useWorkspace, WorkspaceResizer } from './workspace.js';
 
 interface EditorDebug {
@@ -216,10 +216,12 @@ export function App() {
   const commit = useCallback((next: ProjectDocument) => {
     const previous = current.current;
     // Keep imported and previously used sources in the bin even after removing their last excerpt.
-    const document = { ...next, media: {
-      videoIds: [...new Set([...projectVideoIds(next), ...(previous ? projectVideoIds(previous) : [])])],
-      audioIds: [...new Set([...projectAudioIds(next), ...(previous ? projectAudioIds(previous) : [])])],
-    } };
+    const document = {
+      ...next, media: {
+        videoIds: [...new Set([...projectVideoIds(next), ...(previous ? projectVideoIds(previous) : [])])],
+        audioIds: [...new Set([...projectAudioIds(next), ...(previous ? projectAudioIds(previous) : [])])],
+      }
+    };
     validate(document);
     if (!history.current) throw new Error('Project has not loaded yet.');
     publish(history.current.replace(document));

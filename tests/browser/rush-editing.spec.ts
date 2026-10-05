@@ -402,11 +402,13 @@ test('visible split then S selects each right piece, preserves boundaries and de
     expect(first.clips[0]).toEqual({ ...before.clips[0]!, sourceOut: 45 });
     expect(first.clips[1]).toEqual({ ...before.clips[0]!, id: rightId, sourceIn: 45, start: 30 });
     expect(firstTrackGeometry(first)).toEqual([['a', 0, 30, 30], [rightId, 30, 60, 90], ['b', 78, 60, 138], ['c', 132, 60, 192]]);
-    unchangedOthers(before, first, ['a'], { 'video-1': [
-        { leftId: 'a', rightId, type: 'cut', duration: 0 },
-        { leftId: rightId, rightId: 'b', type: 'cross-dissolve', duration: 12 },
-        before.layers[0]!.transitions[1]!,
-    ] });
+    unchangedOthers(before, first, ['a'], {
+        'video-1': [
+            { leftId: 'a', rightId, type: 'cut', duration: 0 },
+            { leftId: rightId, rightId: 'b', type: 'cross-dissolve', duration: 12 },
+            before.layers[0]!.transitions[1]!,
+        ]
+    });
     await expect(clip(page, rightId).locator('.timeline-clip-body')).toHaveAttribute('aria-pressed', 'true');
     await ready(page, first); await decodedSource(page, rightId, 45);
     await seek(page, 55); await shortcut(page, 's');
@@ -437,11 +439,13 @@ test('visible split then S selects each right piece, preserves boundaries and de
     const deleted = await current(page);
     expect(firstTrackGeometry(deleted)).toEqual([['a', 0, 30, 30], [rightId, 30, 25, 55], ['b', 55, 60, 115], ['c', 109, 60, 169]]);
     expect(deleted.clips).toEqual(second.clips.filter((item) => item.id !== finalId).map((item) => ({ ...item, start: ({ a: 0, [rightId]: 30, b: 55, c: 109 })[item.id]! })));
-    unchangedOthers(before, deleted, ['a'], { 'video-1': [
-        { leftId: 'a', rightId, type: 'cut', duration: 0 },
-        { leftId: rightId, rightId: 'b', type: 'cut', duration: 0 },
-        before.layers[0]!.transitions[1]!,
-    ] });
+    unchangedOthers(before, deleted, ['a'], {
+        'video-1': [
+            { leftId: 'a', rightId, type: 'cut', duration: 0 },
+            { leftId: rightId, rightId: 'b', type: 'cut', duration: 0 },
+            before.layers[0]!.transitions[1]!,
+        ]
+    });
     await page.getByRole('button', { name: 'Undo', exact: true }).click(); expect(await current(page)).toEqual(second);
     await page.getByRole('button', { name: 'Undo', exact: true }).click(); expect(await current(page)).toEqual(first);
     await page.getByRole('button', { name: 'Undo', exact: true }).click(); expect(await current(page)).toEqual(before);
@@ -572,10 +576,12 @@ test('I/O middle removal is transient then one edit, preserving absolute ten-cha
 
 test('overlay middle cuts keep their gap and neighbours fixed; visible quick trims keep absolute placement semantics', async ({ page }) => {
     const document = sequence();
-    document.layers.push({ ...createLayer('upper', 'Video 2', false), opacity: 0.8, keyframes: [sharedPoint(10, { speed: 1, exposure: 0.2 }), sharedPoint(500, { speed: 1, hue: 25 }, 'hold')], transitions: [
-        { leftId: 'upper-before', rightId: 'top', type: 'cut', duration: 0 },
-        { leftId: 'top', rightId: 'upper-after', type: 'cut', duration: 0 },
-    ] });
+    document.layers.push({
+        ...createLayer('upper', 'Video 2', false), opacity: 0.8, keyframes: [sharedPoint(10, { speed: 1, exposure: 0.2 }), sharedPoint(500, { speed: 1, hue: 25 }, 'hold')], transitions: [
+            { leftId: 'upper-before', rightId: 'top', type: 'cut', duration: 0 },
+            { leftId: 'top', rightId: 'upper-after', type: 'cut', duration: 0 },
+        ]
+    });
     document.clips.push(
         { ...createClip('upper-before', assets[0]!.id, 0, 20), layerId: 'upper', start: 5 },
         { ...createClip('top', assets[1]!.id, 15, 105), layerId: 'upper', start: 40 },
@@ -596,11 +602,13 @@ test('overlay middle cuts keep their gap and neighbours fixed; visible quick tri
     expect(calculateLayout(cut).clips.filter((item) => item.clip.layerId === 'upper').map((item) => [item.clip.id, item.start, item.duration, item.end])).toEqual([
         ['upper-before', 5, 20, 25], ['top', 40, 20, 60], [right.id, 80, 50, 130], ['upper-after', 140, 20, 160],
     ]);
-    unchangedOthers(before, cut, ['top'], { upper: [
-        { leftId: 'upper-before', rightId: 'top', type: 'cut', duration: 0 },
-        { leftId: 'top', rightId: right.id, type: 'cut', duration: 0 },
-        { leftId: right.id, rightId: 'upper-after', type: 'cut', duration: 0 },
-    ] });
+    unchangedOthers(before, cut, ['top'], {
+        upper: [
+            { leftId: 'upper-before', rightId: 'top', type: 'cut', duration: 0 },
+            { leftId: 'top', rightId: right.id, type: 'cut', duration: 0 },
+            { leftId: right.id, rightId: 'upper-after', type: 'cut', duration: 0 },
+        ]
+    });
     expect(firstTrackGeometry(cut)).toEqual(firstTrackGeometry(before));
     expect(cut.layers[0]!.transitions).toEqual(before.layers[0]!.transitions);
     await expect(clip(page, right.id).locator('.timeline-clip-body')).toHaveAttribute('aria-pressed', 'true');
@@ -914,10 +922,12 @@ test('an overlapping source Add clears stale success feedback but keeps the sour
     const addedId = await addExcerpt(page);
     const added = await current(page);
     expect(added.clips.at(-1)).toEqual({ ...createClip(addedId, assets[0]!.id, 10, 30), layerId: 'upper', start: 80 });
-    unchangedOthers(before, added, [], { upper: [
-        { leftId: 'top', rightId: 'occupied', type: 'cut', duration: 0 },
-        { leftId: 'occupied', rightId: addedId, type: 'cut', duration: 0 },
-    ] });
+    unchangedOthers(before, added, [], {
+        upper: [
+            { leftId: 'top', rightId: 'occupied', type: 'cut', duration: 0 },
+            { leftId: 'occupied', rightId: addedId, type: 'cut', duration: 0 },
+        ]
+    });
     await ready(page, added); await flush(page);
     const saves = memory.saves;
     const excerptCount = added.clips.filter((item) => item.mediaId === assets[0]!.id).length;

@@ -17,11 +17,15 @@ export async function memoryProjects(page: Page, initial: ProjectDocument): Prom
     await page.route(/\/api\/projects(?:\?.*)?$/, async (route) => {
         const method = route.request().method();
         if (method === 'GET') {
-            await route.fulfill({ json: { projects: [...documents.values()].map((document) => ({
-                id: document.id, title: document.title, revision: document.revision,
-                clipCount: document.clips.length, duration: calculateLayout(document).duration,
-                updatedAt: '2026-10-03T10:00:00Z', compatible: true, error: null,
-            })) } });
+            await route.fulfill({
+                json: {
+                    projects: [...documents.values()].map((document) => ({
+                        id: document.id, title: document.title, revision: document.revision,
+                        clipCount: document.clips.length, duration: calculateLayout(document).duration,
+                        updatedAt: '2026-10-03T10:00:00Z', compatible: true, error: null,
+                    }))
+                }
+            });
             return;
         }
         if (method === 'POST') {

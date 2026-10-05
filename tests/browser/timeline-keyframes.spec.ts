@@ -1,6 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { applyCommand } from '../../src/shared/commands.js';
 import { NEUTRAL_COLOUR } from '../../src/shared/colour.js';
+import { applyCommand } from '../../src/shared/commands.js';
 import type { MediaAsset } from '../../src/shared/media.js';
 import { createClip, createLayer, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
 import { calculateLayout } from '../../src/shared/timeline.js';

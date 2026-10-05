@@ -1,36 +1,36 @@
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
+import { mkdtemp, readdir, readFile, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { audioAssetSchema, musicGainAt, type AudioAsset } from '../../src/shared/audio.js';
-import { gradePixel, NEUTRAL_COLOUR } from '../../src/shared/colour.js';
-import { applyCommand } from '../../src/shared/commands.js';
-import { createClip, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
-import { removeMarkedRange } from '../../src/shared/rush-editing.js';
-import { compileRetiming, type SpeedSettings } from '../../src/shared/speed.js';
-import { calculateLayout, sampleTimeline } from '../../src/shared/timeline.js';
-import { exportAudioSample, EXPORT_PROFILES } from '../../src/shared/export.js';
-import { estimateExportSpace } from '../../src/shared/export-space.js';
-import { framesToSeconds } from '../../src/shared/timing.js';
-import type { MediaAsset } from '../../src/shared/media.js';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { preparedFixture } from '../../scripts/fixtures.js';
 import { createConfig, type ServiceConfig } from '../../src/server/config.js';
 import { renderExport, startExport, type ExportReceipt } from '../../src/server/export.js';
 import { fingerprintFile } from '../../src/server/files.js';
 import { extractComparisonFrame } from '../../src/server/library.js';
 import { probeVideo } from '../../src/server/probe.js';
 import { runProcess } from '../../src/server/process.js';
-import { preparedFixture } from '../../scripts/fixtures.js';
+import { audioAssetSchema, musicGainAt, type AudioAsset } from '../../src/shared/audio.js';
+import { gradePixel, NEUTRAL_COLOUR } from '../../src/shared/colour.js';
+import { applyCommand } from '../../src/shared/commands.js';
+import { estimateExportSpace } from '../../src/shared/export-space.js';
+import { EXPORT_PROFILES, exportAudioSample } from '../../src/shared/export.js';
+import type { MediaAsset } from '../../src/shared/media.js';
+import { createClip, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
+import { removeMarkedRange } from '../../src/shared/rush-editing.js';
+import { compileRetiming, type SpeedSettings } from '../../src/shared/speed.js';
+import { calculateLayout, sampleTimeline } from '../../src/shared/timeline.js';
+import { framesToSeconds } from '../../src/shared/timing.js';
 import { observedJobBytes } from './scratch-observation.js';
 
 const enabled = process.env['PASCAP_MEDIA_TESTS'] === '1';
 const FRAME_BYTES = 160 * 90 * 3;
 const curves = ['linear', 'ease-in', 'ease-out', 'smooth'] as const;
 const speeds: SpeedSettings[] = [{ mode: 'constant', rate: 0.5 }, { mode: 'constant', rate: 2 },
-  ...curves.flatMap((curve) => [
-    { mode: 'ramp' as const, startRate: 0.5, endRate: 2, curve, anchorIn: 0, anchorOut: 26 },
-    { mode: 'ramp' as const, startRate: 2, endRate: 0.5, curve, anchorIn: 0, anchorOut: 26 },
-  ])];
+...curves.flatMap((curve) => [
+  { mode: 'ramp' as const, startRate: 0.5, endRate: 2, curve, anchorIn: 0, anchorOut: 26 },
+  { mode: 'ramp' as const, startRate: 2, endRate: 0.5, curve, anchorIn: 0, anchorOut: 26 },
+])];
 
 async function rawVideo(config: ServiceConfig, asset: MediaAsset): Promise<Buffer> {
   return runProcess(config.ffmpeg, ['-v', 'error', '-nostdin', '-threads', '2', '-i', asset.sourcePath, '-map', '0:v:0', '-an',
@@ -102,9 +102,11 @@ describe.skipIf(!enabled)('production native export · opt-in disposable media o
       '-filter_complex_threads', '2', '-filter_complex', '[0:a][1:a][2:a]concat=n=3:v=0:a=1[out]', '-map', '[out]',
       '-c:a', 'pcm_s16le', '-threads', '2', '-ar', '48000', audioPath]);
     audioSamples = await rawAudio(config, audioPath);
-    audio = audioAssetSchema.parse({ id: 'export-music', name: 'selected-tone.wav', sourcePath: audioPath, fingerprint: await fingerprintFile(audioPath),
+    audio = audioAssetSchema.parse({
+      id: 'export-music', name: 'selected-tone.wav', sourcePath: audioPath, fingerprint: await fingerprintFile(audioPath),
       metadata: { codec: 'pcm_s16le', sampleRate: 48000, channels: 1, durationSeconds: audioSamples.length / 48000, frameCount: 23 },
-      status: 'registered', error: null, waveform: [] });
+      status: 'registered', error: null, waveform: []
+    });
   });
   afterAll(async () => { await fixture?.jobs.close(); if (directory) await rm(directory, { recursive: true, force: true }); });
 
@@ -325,15 +327,19 @@ describe.skipIf(!enabled)('production native export · opt-in disposable media o
     expect(await readdir(path.join(directory, 'renders'))).not.toContain(failedId);
     const id = path.basename(successfulDirectory);
     const before = await readFile(path.join(successfulDirectory, 'receipt.json'));
-    await expect(renderExport(document(3), 'draft720', fixture.library, { id, signal: new AbortController().signal, update: () => {} })).rejects.toThrow('EEXIST');
+    await expect(renderExport(document(3), 'draft720', fixture.library, { id, signal: new AbortController().signal, update: () => { } })).rejects.toThrow('EEXIST');
     expect(await readFile(path.join(successfulDirectory, 'receipt.json'))).toEqual(before);
-    const badAudioJob = startExport({ ...document(3), music: { mediaId: audio.id, sourceIn: 0, sourceOut: 100, start: 0, duration: 3,
-      gainDb: 0, fadeIn: 0, fadeOut: 0, loop: false } }, 'draft720', fixture.library, () => audio);
+    const badAudioJob = startExport({
+      ...document(3), music: {
+        mediaId: audio.id, sourceIn: 0, sourceOut: 100, start: 0, duration: 3,
+        gainDb: 0, fadeIn: 0, fadeOut: 0, loop: false
+      }
+    }, 'draft720', fixture.library, () => audio);
     const badAudio = await fixture.jobs.wait(badAudioJob.id); expect(badAudio.state).toBe('failed'); expect(badAudio.message).toContain('source bounds');
     expect(await readdir(path.join(directory, 'renders'))).not.toContain(badAudioJob.id);
     // Direct cancellation before directory creation cannot leave orphan scratch.
     const controller = new AbortController(); controller.abort(); const cancelledId = randomUUID();
-    await expect(renderExport(document(3), 'draft720', fixture.library, { id: cancelledId, signal: controller.signal, update: () => {} })).rejects.toThrow('cancelled');
+    await expect(renderExport(document(3), 'draft720', fixture.library, { id: cancelledId, signal: controller.signal, update: () => { } })).rejects.toThrow('cancelled');
     expect(await readdir(path.join(directory, 'renders'))).not.toContain(cancelledId);
   });
 });

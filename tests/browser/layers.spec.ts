@@ -248,9 +248,13 @@ test('layered native UI export includes keyed opacity and colour in an immutable
   let document = projectSchema.parse(await page.evaluate(() => window.pascapLab!.project()));
   for (const clip of document.clips) document = applyCommand(document, { type: 'trim', clipId: clip.id, sourceIn: 0, sourceOut: 12 });
   const upper = document.clips[1]!;
-  document = applyCommand(document, { type: 'layer-update', layer: { ...document.layers.find((layer) => layer.id === upper.layerId)!, keyframes: [
-    sharedPoint(0, { clipOpacity: 0, exposure: -0.2 }), sharedPoint(11, { clipOpacity: 0.8, exposure: 0.2 }, 'smooth'),
-  ] } });
+  document = applyCommand(document, {
+    type: 'layer-update', layer: {
+      ...document.layers.find((layer) => layer.id === upper.layerId)!, keyframes: [
+        sharedPoint(0, { clipOpacity: 0, exposure: -0.2 }), sharedPoint(11, { clipOpacity: 0.8, exposure: 0.2 }, 'smooth'),
+      ]
+    }
+  });
   await page.evaluate((project) => window.pascapLab!.setDocument(project), document);
   await page.getByRole('button', { name: 'Export video', exact: true }).click();
   const accepted = await submitExport(page);
@@ -279,16 +283,24 @@ test('plays three simultaneous sources through row-wide rate/grade curves, a tra
   project = applyCommand(project, { type: 'insert', clip: createClip('first', red, 0, 45), index: 0 });
   project = applyCommand(project, { type: 'insert', clip: createClip('second', blue, 0, 45), index: 1 });
   project = applyCommand(project, { type: 'transition', transition: { leftId: 'first', rightId: 'second', type: 'cross-dissolve', duration: 15 } });
-  project = applyCommand(project, { type: 'layer-update', layer: { ...project.layers[0]!, keyframes: [
-    sharedPoint(0, { speed: 0.5, exposure: -0.4, clipOpacity: 0.6 }), sharedPoint(24, { speed: 2, exposure: 0.4, clipOpacity: 1 }, 'smooth'),
-  ] } });
+  project = applyCommand(project, {
+    type: 'layer-update', layer: {
+      ...project.layers[0]!, keyframes: [
+        sharedPoint(0, { speed: 0.5, exposure: -0.4, clipOpacity: 0.6 }), sharedPoint(24, { speed: 2, exposure: 0.4, clipOpacity: 1 }, 'smooth'),
+      ]
+    }
+  });
   project = applyCommand(project, { type: 'layer-add', layer: { ...createLayer('upper', 'Video 2', false), opacity: 0.8 } });
   const clip = { ...createClip('upper-clip', blue, 0, 80), layerId: 'upper', start: 5 };
   project = applyCommand(project, { type: 'insert', clip, index: 2 });
-  project = applyCommand(project, { type: 'layer-update', layer: { ...project.layers[1]!, keyframes: [
-    sharedPoint(0, { speed: 0.7, clipOpacity: 0, exposure: -0.4, saturation: 1 }, 'smooth'),
-    sharedPoint(79, { speed: 1.4, clipOpacity: 1, exposure: 0.4, saturation: 0.6 }),
-  ] } });
+  project = applyCommand(project, {
+    type: 'layer-update', layer: {
+      ...project.layers[1]!, keyframes: [
+        sharedPoint(0, { speed: 0.7, clipOpacity: 0, exposure: -0.4, saturation: 1 }, 'smooth'),
+        sharedPoint(79, { speed: 1.4, clipOpacity: 1, exposure: 0.4, saturation: 0.6 }),
+      ]
+    }
+  });
   const layout = calculateLayout(project);
   const dissolve = layout.transitions[0]!;
   const during = sampleTimeline(project, dissolve.start + 7).filter((layer) => layer.layerId === 'video-1');
@@ -329,9 +341,13 @@ test('plays three simultaneous sources through row-wide rate/grade curves, a tra
 test('edits shared values outside the source excerpt and duration without moving unrelated points or bases', async ({ page }) => {
   let project = projectSchema.parse(await page.evaluate(() => window.pascapLab!.project()));
   const original = project.clips[0]!;
-  project = applyCommand(project, { type: 'layer-update', layer: { ...project.layers[0]!, keyframes: [
-    sharedPoint(5, { clipOpacity: 0.2, exposure: -0.5, speed: 0.5 }, 'smooth'), sharedPoint(110, { speed: 2 }),
-  ] } });
+  project = applyCommand(project, {
+    type: 'layer-update', layer: {
+      ...project.layers[0]!, keyframes: [
+        sharedPoint(5, { clipOpacity: 0.2, exposure: -0.5, speed: 0.5 }, 'smooth'), sharedPoint(110, { speed: 2 }),
+      ]
+    }
+  });
   project = applyCommand(project, { type: 'trim', clipId: original.id, sourceIn: 30, sourceOut: 90 });
   await page.evaluate((document) => window.pascapLab!.setDocument(document), project);
   await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');

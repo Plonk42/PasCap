@@ -1,15 +1,15 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { mkdtemp, writeFile, readFile, rm } from 'node:fs/promises';
-import path from 'node:path';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
+import path from 'node:path';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { preparedFixture } from '../../scripts/fixtures.js';
+import { createConfig, type ServiceConfig } from '../../src/server/config.js';
+import { extractComparisonFrame } from '../../src/server/library.js';
+import { runProcess } from '../../src/server/process.js';
+import { startReference } from '../../src/server/reference.js';
 import { generateCube, gradePixel, NEUTRAL_COLOUR, type ColourSettings } from '../../src/shared/colour.js';
 import { applyCommand } from '../../src/shared/commands.js';
 import { calculateLayout, sampleTimeline } from '../../src/shared/timeline.js';
-import { createConfig, type ServiceConfig } from '../../src/server/config.js';
-import { startReference } from '../../src/server/reference.js';
-import { extractComparisonFrame } from '../../src/server/library.js';
-import { runProcess } from '../../src/server/process.js';
-import { preparedFixture } from '../../scripts/fixtures.js';
 
 const enabled = process.env['PASCAP_MEDIA_TESTS'] === '1';
 describe.skipIf(!enabled)('native FFmpeg integration · disposable synthetic sources', () => {

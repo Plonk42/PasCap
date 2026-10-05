@@ -93,34 +93,34 @@ export function Layers({ project, selectedId, scrollTop, surfaceHeight, viewport
   };
   return <aside ref={viewport} className="layer-sidebar declutter-layers" aria-label="Video layers" style={{ height: viewportHeight ?? undefined }} onScroll={(event) => onScroll(event.currentTarget.scrollTop)}>
     <div className="layer-sidebar-surface" style={{ height: surfaceHeight }}>
-    <div className="layer-sidebar-heading" title="Row 1 renders below row 2, then row 3 above row 2. Every track has independent Ripple, transitions and fades.">Video layers · {project.layers.length} / 8</div>
-    {timelineRows(project.layers).map(({ layer, index, top }) => {
-      const restrictions = layerActionRestrictions(index, project.layers.length, disabled);
-      const description = `${reasonId}-${layer.id}`;
-      return <div key={layer.id} className={`layer-control ${layer.id === selectedId ? 'selected' : ''}`} data-layer-id={layer.id} style={{ top }}>
-        <div className="layer-control-main">
-          <button className="icon-button" aria-label={`${layer.enabled ? 'Hide' : 'Show'} layer ${layer.name}`} title={layer.enabled ? 'Hide layer in preview and export' : 'Show layer in preview and export'} disabled={disabled} onClick={() => onEdit({ type: 'layer-update', layer: { ...layer, enabled: !layer.enabled } })}><Icon name={layer.enabled ? 'eye' : 'eye-off'} size={15} /></button>
-          <button className="text-button layer-select" aria-label={`Select layer ${layer.name}`} aria-pressed={layer.id === selectedId} disabled={disabled} title={layer.ripple ? 'Ripple on: later clips follow the first clip’s track anchor' : 'Ripple off: clips keep independent project-frame starts'} onClick={() => onSelect(layer.id)}>{layer.name}</button>
-          <Popover label={`Layer options ${layer.name}`} className="layer-options">{(close) => <>
-            <LayerName projectId={project.id} layer={layer} disabled={disabled} onEdit={onEdit} onCancel={close} />
-            <div className="layer-ripple-control">
-              <label title="Enabling Ripple packs this track in one Undo step, preserving its first clip’s current start and existing dissolves. Turning it off preserves current placements."><input type="checkbox" aria-label={`Ripple on layer ${layer.name}`} aria-describedby={`${description}-ripple`} checked={layer.ripple} disabled={disabled} onChange={(event) => onEdit({ type: 'layer-update', layer: { ...layer, ripple: event.currentTarget.checked } })} />Ripple</label>
-              <HelpPopover label={`Ripple on ${layer.name}`}><p id={`${description}-ripple`}>On: clips pack continuously from the first clip’s current project-frame start, retaining existing dissolves. Enabling closes gaps in one Undo step; it does not move the first anchor. Off: current placements are kept and each start is independent. Other tracks, music and row points never move with this switch. New tracks start with Ripple on.</p></HelpPopover>
-            </div>
-            <LayerOpacity layer={layer} frame={frame} disabled={disabled} onEdit={onEdit} />
-            <div className="layer-options-actions">
-              <button className="secondary-button small" aria-label={`Raise layer ${layer.name}`} aria-describedby={restrictions.raise ? `${description}-raise` : undefined} title={restrictions.raise ?? 'Composite this track above the next layer'} disabled={restrictions.raise !== null} onClick={() => move(index, 1)}><Icon name="chevron-up" size={14} />Raise</button>
-              <button className="secondary-button small" aria-label={`Lower layer ${layer.name}`} aria-describedby={restrictions.lower ? `${description}-lower` : undefined} title={restrictions.lower ?? 'Composite this track below the previous layer'} disabled={restrictions.lower !== null} onClick={() => move(index, -1)}><Icon name="chevron-down" size={14} />Lower</button>
-              <button className="secondary-button small layer-delete" aria-label={`Delete layer ${layer.name}`} aria-describedby={restrictions.remove ? `${description}-remove` : undefined} title={restrictions.remove ?? 'Remove this track and its clips · Undo restores them'} disabled={restrictions.remove !== null} onClick={() => { close(); onEdit({ type: 'layer-remove', layerId: layer.id }); }}><Icon name="trash" size={14} />Delete layer</button>
-            </div>
-            {restrictions.raise && <span className="declutter-sr-only" id={`${description}-raise`}>{restrictions.raise}</span>}
-            {restrictions.lower && <span className="declutter-sr-only" id={`${description}-lower`}>{restrictions.lower}</span>}
-            {restrictions.remove && <span className="declutter-sr-only" id={`${description}-remove`}>{restrictions.remove}</span>}
-          </>}</Popover>
-        </div>
-        <span className="layer-kind">{layer.ripple ? 'Ripple on' : 'Ripple off'} · row {index + 1}</span>
-      </div>;
-    })}
+      <div className="layer-sidebar-heading" title="Row 1 renders below row 2, then row 3 above row 2. Every track has independent Ripple, transitions and fades.">Video layers · {project.layers.length} / 8</div>
+      {timelineRows(project.layers).map(({ layer, index, top }) => {
+        const restrictions = layerActionRestrictions(index, project.layers.length, disabled);
+        const description = `${reasonId}-${layer.id}`;
+        return <div key={layer.id} className={`layer-control ${layer.id === selectedId ? 'selected' : ''}`} data-layer-id={layer.id} style={{ top }}>
+          <div className="layer-control-main">
+            <button className="icon-button" aria-label={`${layer.enabled ? 'Hide' : 'Show'} layer ${layer.name}`} title={layer.enabled ? 'Hide layer in preview and export' : 'Show layer in preview and export'} disabled={disabled} onClick={() => onEdit({ type: 'layer-update', layer: { ...layer, enabled: !layer.enabled } })}><Icon name={layer.enabled ? 'eye' : 'eye-off'} size={15} /></button>
+            <button className="text-button layer-select" aria-label={`Select layer ${layer.name}`} aria-pressed={layer.id === selectedId} disabled={disabled} title={layer.ripple ? 'Ripple on: later clips follow the first clip’s track anchor' : 'Ripple off: clips keep independent project-frame starts'} onClick={() => onSelect(layer.id)}>{layer.name}</button>
+            <Popover label={`Layer options ${layer.name}`} className="layer-options">{(close) => <>
+              <LayerName projectId={project.id} layer={layer} disabled={disabled} onEdit={onEdit} onCancel={close} />
+              <div className="layer-ripple-control">
+                <label title="Enabling Ripple packs this track in one Undo step, preserving its first clip’s current start and existing dissolves. Turning it off preserves current placements."><input type="checkbox" aria-label={`Ripple on layer ${layer.name}`} aria-describedby={`${description}-ripple`} checked={layer.ripple} disabled={disabled} onChange={(event) => onEdit({ type: 'layer-update', layer: { ...layer, ripple: event.currentTarget.checked } })} />Ripple</label>
+                <HelpPopover label={`Ripple on ${layer.name}`}><p id={`${description}-ripple`}>On: clips pack continuously from the first clip’s current project-frame start, retaining existing dissolves. Enabling closes gaps in one Undo step; it does not move the first anchor. Off: current placements are kept and each start is independent. Other tracks, music and row points never move with this switch. New tracks start with Ripple on.</p></HelpPopover>
+              </div>
+              <LayerOpacity layer={layer} frame={frame} disabled={disabled} onEdit={onEdit} />
+              <div className="layer-options-actions">
+                <button className="secondary-button small" aria-label={`Raise layer ${layer.name}`} aria-describedby={restrictions.raise ? `${description}-raise` : undefined} title={restrictions.raise ?? 'Composite this track above the next layer'} disabled={restrictions.raise !== null} onClick={() => move(index, 1)}><Icon name="chevron-up" size={14} />Raise</button>
+                <button className="secondary-button small" aria-label={`Lower layer ${layer.name}`} aria-describedby={restrictions.lower ? `${description}-lower` : undefined} title={restrictions.lower ?? 'Composite this track below the previous layer'} disabled={restrictions.lower !== null} onClick={() => move(index, -1)}><Icon name="chevron-down" size={14} />Lower</button>
+                <button className="secondary-button small layer-delete" aria-label={`Delete layer ${layer.name}`} aria-describedby={restrictions.remove ? `${description}-remove` : undefined} title={restrictions.remove ?? 'Remove this track and its clips · Undo restores them'} disabled={restrictions.remove !== null} onClick={() => { close(); onEdit({ type: 'layer-remove', layerId: layer.id }); }}><Icon name="trash" size={14} />Delete layer</button>
+              </div>
+              {restrictions.raise && <span className="declutter-sr-only" id={`${description}-raise`}>{restrictions.raise}</span>}
+              {restrictions.lower && <span className="declutter-sr-only" id={`${description}-lower`}>{restrictions.lower}</span>}
+              {restrictions.remove && <span className="declutter-sr-only" id={`${description}-remove`}>{restrictions.remove}</span>}
+            </>}</Popover>
+          </div>
+          <span className="layer-kind">{layer.ripple ? 'Ripple on' : 'Ripple off'} · row {index + 1}</span>
+        </div>;
+      })}
     </div>
   </aside>;
 }

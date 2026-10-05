@@ -188,7 +188,7 @@ describe('schema-6 production dispatch and read-only validation', () => {
     for (const invalid of [leading, gap]) {
       const before = structuredClone(invalid); vi.mocked(library.get).mockClear();
       expect(() => validateReference(invalid, library)).toThrow('zero-origin contiguous');
-      await expect(renderReference(invalid, library, { id: 'unused', signal: new AbortController().signal, update: () => {} })).rejects.toThrow('zero-origin contiguous');
+      await expect(renderReference(invalid, library, { id: 'unused', signal: new AbortController().signal, update: () => { } })).rejects.toThrow('zero-origin contiguous');
       expect(library.get).not.toHaveBeenCalled(); expect(library.jobs.list()).toEqual([]); expect(invalid).toEqual(before);
     }
   });

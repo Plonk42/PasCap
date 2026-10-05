@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { NEUTRAL_COLOUR, type ColourSettings } from '../shared/colour.js';
-import { verifyGpuColour, type GpuComparison } from '../preview/compositor.js';
 import { MAX_DECODER_SLOTS } from '../preview/assignment.js';
+import { verifyGpuColour, type GpuComparison } from '../preview/compositor.js';
 import type { PreviewDiagnostics } from '../preview/engine.js';
+import { NEUTRAL_COLOUR, type ColourSettings } from '../shared/colour.js';
 import { milliseconds } from './display.js';
 
 interface Props {

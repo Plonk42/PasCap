@@ -1,19 +1,19 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { audioAssetSchema, musicGainAt } from '../../src/shared/audio.js';
-import { createClip, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
-import { compileRetiming, type SpeedSettings } from '../../src/shared/speed.js';
-import { calculateLayout, sampleTimeline } from '../../src/shared/timeline.js';
-import { framesToSeconds, PROJECT_FPS } from '../../src/shared/timing.js';
-import { EXPORT_PROFILES, exportAudioSample, exportRequestSchema, planExport, planExportMusic } from '../../src/shared/export.js';
-import { mediaAssetSchema, type MediaAsset } from '../../src/shared/media.js';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createConfig } from '../../src/server/config.js';
 import { startExport, validateExport, validateExportAudio } from '../../src/server/export.js';
 import { JobQueue } from '../../src/server/jobs.js';
 import { MediaLibrary } from '../../src/server/library.js';
 import { retimeRawVideo } from '../../src/server/retime-process.js';
+import { audioAssetSchema, musicGainAt } from '../../src/shared/audio.js';
+import { EXPORT_PROFILES, exportAudioSample, exportRequestSchema, planExport, planExportMusic } from '../../src/shared/export.js';
+import { mediaAssetSchema, type MediaAsset } from '../../src/shared/media.js';
+import { createClip, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
+import { compileRetiming, type SpeedSettings } from '../../src/shared/speed.js';
+import { calculateLayout, sampleTimeline } from '../../src/shared/timeline.js';
+import { framesToSeconds, PROJECT_FPS } from '../../src/shared/timing.js';
 import { unsupportedProject } from './project-fixtures.js';
 
 const temporary: string[] = [];
@@ -37,12 +37,14 @@ function documentWithClips(count = 1): ProjectDocument {
 }
 const fingerprint = { algorithm: 'sampled-sha256-v1' as const, digest: 'a'.repeat(64), size: 10, mtimeMs: 0, device: 1, inode: 1 };
 function videoAsset(overrides: Partial<MediaAsset['metadata']> = {}): MediaAsset {
-  return mediaAssetSchema.parse({ id: 'video', name: 'original.mp4', sourcePath: '/unread-original.mp4', fingerprint,
+  return mediaAssetSchema.parse({
+    id: 'video', name: 'original.mp4', sourcePath: '/unread-original.mp4', fingerprint,
     status: 'registered', error: null, prepared: null, metadata: {
       width: 320, height: 180, codec: 'h264', pixelFormat: 'yuv420p', frameRate: { ...PROJECT_FPS }, frameCount: 60,
       durationSeconds: framesToSeconds(60), colourPrimaries: 'bt709', colourTransfer: 'bt709', colourSpace: 'bt709', colourRange: 'tv', hasAudio: true,
       ...overrides,
-    } });
+    }
+  });
 }
 function fakeLibrary(asset = videoAsset()): MediaLibrary {
   const jobs = new JobQueue(); queues.push(jobs);
@@ -51,9 +53,11 @@ function fakeLibrary(asset = videoAsset()): MediaLibrary {
   return library;
 }
 function audioAsset() {
-  return audioAssetSchema.parse({ id: 'music', name: 'sine.wav', sourcePath: '/unread-sine.wav', fingerprint,
+  return audioAssetSchema.parse({
+    id: 'music', name: 'sine.wav', sourcePath: '/unread-sine.wav', fingerprint,
     metadata: { codec: 'pcm_s16le', sampleRate: 48000, channels: 1, durationSeconds: framesToSeconds(60), frameCount: 60 },
-    status: 'registered', error: null, waveform: [] });
+    status: 'registered', error: null, waveform: []
+  });
 }
 
 describe('strict production export request and immutable validation', () => {
@@ -104,7 +108,7 @@ describe('strict production export request and immutable validation', () => {
     const directory = await temp(); const library = fakeLibrary(); library.config.dataDir = directory;
     const old = path.join(directory, 'renders', 'older-success'); await mkdir(old, { recursive: true });
     await writeFile(path.join(old, 'export.mp4'), 'already successful');
-    let release = (): void => {};
+    let release = (): void => { };
     const gate = new Promise<void>((resolve) => { release = resolve; });
     const first = library.jobs.submit('prepare', 'busy worker', async () => gate);
     try {
@@ -192,8 +196,10 @@ describe('bounded raw-stream discrete retimer (no FFmpeg needed)', () => {
     const decode = `const b=Buffer.alloc(30*6);for(let f=0;f<30;f++)b.fill(f+7,f*6,(f+1)*6);` +
       `let p=0;function next(){if(p===b.length)return;const n=Math.min(1+(p%11),b.length-p);const c=b.subarray(p,p+n);p+=n;process.stdout.write(c,next)}next();`;
     const encode = `const fs=require('node:fs');process.stdin.pipe(fs.createWriteStream(${JSON.stringify(destination)},{flags:'wx'}));`;
-    const report = await retimeRawVideo({ ffmpeg: process.execPath, cwd: directory, decodeArgs: ['-e', decode], encodeArgs: ['-e', encode],
-      clip, frameBytes: 6, signal: new AbortController().signal });
+    const report = await retimeRawVideo({
+      ffmpeg: process.execPath, cwd: directory, decodeArgs: ['-e', decode], encodeArgs: ['-e', encode],
+      clip, frameBytes: 6, signal: new AbortController().signal
+    });
     const actual = await readFile(destination); const map = compileRetiming(clip);
     expect(actual).toHaveLength(map.duration * 6);
     for (let frame = 0; frame < map.duration; frame++) expect([...actual.subarray(frame * 6, (frame + 1) * 6)]).toEqual(Array(6).fill(map.sourceAt(frame)));
@@ -211,12 +217,14 @@ describe('bounded raw-stream discrete retimer (no FFmpeg needed)', () => {
     const decode = 'const b=Buffer.alloc(12*6);for(let f=0;f<12;f++)b.fill((20007+f)%256,f*6,(f+1)*6);process.stdout.write(b);';
     const encode = `process.stdin.pipe(require('node:fs').createWriteStream(${JSON.stringify(destination)},{flags:'wx'}));`;
     let mutated = false;
-    await retimeRawVideo({ ffmpeg: process.execPath, cwd: directory, decodeArgs: ['-e', decode], encodeArgs: ['-e', encode],
+    await retimeRawVideo({
+      ffmpeg: process.execPath, cwd: directory, decodeArgs: ['-e', decode], encodeArgs: ['-e', encode],
       clip, frameBytes: 6, signal: new AbortController().signal, onProgress: () => {
         if (mutated) return;
         mutated = true;
         clip.sourceIn += 3; clip.sourceOut += 3;
-      } });
+      }
+    });
     expect(mutated).toBe(true);
     const actual = await readFile(destination);
     expect(actual).toHaveLength(expected.length * 6);
@@ -224,26 +232,33 @@ describe('bounded raw-stream discrete retimer (no FFmpeg needed)', () => {
   });
   it('rejects truncated raw frames and terminates the companion encoder', async () => {
     const directory = await temp();
-    await expect(retimeRawVideo({ ffmpeg: process.execPath, cwd: directory, decodeArgs: ['-e', 'process.stdout.write(Buffer.alloc(11));'],
+    await expect(retimeRawVideo({
+      ffmpeg: process.execPath, cwd: directory, decodeArgs: ['-e', 'process.stdout.write(Buffer.alloc(11));'],
       encodeArgs: ['-e', 'process.stdin.resume();setInterval(()=>{},1000);'], clip: createClip('raw', 'video', 0, 2),
-      frameBytes: 6, signal: new AbortController().signal })).rejects.toThrow('truncated raw frame');
+      frameBytes: 6, signal: new AbortController().signal
+    })).rejects.toThrow('truncated raw frame');
   });
   it('reaps both children when an encoder errors while the original decoder is blocked', async () => {
     const directory = await temp();
-    await expect(retimeRawVideo({ ffmpeg: process.execPath, cwd: directory,
+    await expect(retimeRawVideo({
+      ffmpeg: process.execPath, cwd: directory,
       decodeArgs: ['-e', 'setInterval(()=>{},1000);'], encodeArgs: ['-e', 'process.stderr.write("intentional encoder failure");process.exit(23);'],
-      clip: createClip('raw', 'video', 0, 2), frameBytes: 6, signal: new AbortController().signal })).rejects.toThrow('intentional encoder failure');
+      clip: createClip('raw', 'video', 0, 2), frameBytes: 6, signal: new AbortController().signal
+    })).rejects.toThrow('intentional encoder failure');
   });
   it('rejects an already-aborted operation without starting native children', async () => {
     const controller = new AbortController(); controller.abort();
-    await expect(retimeRawVideo({ ffmpeg: '/does-not-exist', cwd: await temp(), decodeArgs: [], encodeArgs: [],
-      clip: createClip('raw', 'video', 0, 2), frameBytes: 6, signal: controller.signal })).rejects.toThrow('cancelled');
+    await expect(retimeRawVideo({
+      ffmpeg: '/does-not-exist', cwd: await temp(), decodeArgs: [], encodeArgs: [],
+      clip: createClip('raw', 'video', 0, 2), frameBytes: 6, signal: controller.signal
+    })).rejects.toThrow('cancelled');
   });
   it('cancels blocked children, including the SIGKILL fallback for ignored SIGTERM', async () => {
     const directory = await temp(); const controller = new AbortController();
     let sawProgress = false;
     const started = Date.now();
-    await expect(retimeRawVideo({ ffmpeg: process.execPath, cwd: directory,
+    await expect(retimeRawVideo({
+      ffmpeg: process.execPath, cwd: directory,
       decodeArgs: ['-e', 'process.on("SIGTERM",()=>{});process.stdout.write(Buffer.alloc(6));setInterval(()=>{},1000);'],
       encodeArgs: ['-e', 'process.on("SIGTERM",()=>{});process.stdin.resume();setInterval(()=>{},1000);'],
       clip: createClip('raw', 'video', 0, 30), frameBytes: 6, signal: controller.signal,

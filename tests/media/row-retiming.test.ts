@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
+import { mkdtemp, readdir, readFile, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -31,7 +31,7 @@ describe.skipIf(!enabled)('schema-6 supplied row maps · native pipes and dispos
     config = createConfig({ dataDir: path.join(root, 'unused-cache') });
     sourcePath = path.join(root, 'generated-frame-codes.mp4');
     await runProcess(config.ffmpeg, [...BASE, '-f', 'lavfi', '-i',
-      `nullsrc=size=${WIDTH}x${HEIGHT}:rate=30000/1001,geq=lum='40+6*N+8*gte(X,8)':cb='100+N':cr='165-2*N',setparams=range=limited:color_primaries=bt709:color_trc=bt709:colorspace=bt709`,
+    `nullsrc=size=${WIDTH}x${HEIGHT}:rate=30000/1001,geq=lum='40+6*N+8*gte(X,8)':cb='100+N':cr='165-2*N',setparams=range=limited:color_primaries=bt709:color_trc=bt709:colorspace=bt709`,
       '-frames:v', '20', '-an', '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '8', '-pix_fmt', 'yuv420p',
       '-threads', '2', '-filter_threads', '2', '-bf', '0', '-color_primaries', 'bt709', '-color_trc', 'bt709',
       '-colorspace', 'bt709', '-color_range', 'tv', '-video_track_timescale', '30000', sourcePath]);
@@ -48,7 +48,7 @@ describe.skipIf(!enabled)('schema-6 supplied row maps · native pipes and dispos
       ffmpeg: config.ffmpeg, cwd, clip, frameBytes: FRAME_BYTES, signal,
       decodeArgs: [...BASE, '-xerror', '-err_detect', 'explode', '-threads', '2', '-noautorotate', '-i', sourcePath,
         '-map', '0:v:0', '-an', '-sn', '-dn', '-filter_threads', '2', '-vf',
-        `trim=start_frame=${clip.sourceIn}:end_frame=${clip.sourceOut},setpts=PTS-STARTPTS,${RGB_FILTER}`,
+      `trim=start_frame=${clip.sourceIn}:end_frame=${clip.sourceOut},setpts=PTS-STARTPTS,${RGB_FILTER}`,
         '-frames:v', String(clip.sourceOut - clip.sourceIn), '-fps_mode', 'passthrough', '-c:v', 'rawvideo', '-pix_fmt', 'rgb24',
         '-threads', '2', '-f', 'rawvideo', 'pipe:1'],
       encodeArgs: [...BASE, '-f', 'rawvideo', '-pixel_format', 'rgb24', '-video_size', `${WIDTH}x${HEIGHT}`, '-framerate', '30000/1001',
@@ -65,13 +65,17 @@ describe.skipIf(!enabled)('schema-6 supplied row maps · native pipes and dispos
     const work = await mkdtemp(path.join(root, 'mapped-'));
     try {
       const project = createProject(`native-row-${interpolation}`, 'No UI state is involved');
-      const row = { ...createLayer('video-2', 'Contextual row', false), keyframes: [
-        point(4, { speed: 0.35 }, interpolation), point(11, { hue: 75 }, 'hold'),
-        point(26, { speed: 3 }, 'ease-out'), point(35, { speed: 0.7 }, 'smooth'), point(50, { speed: 2 }, 'hold'),
-      ] };
+      const row = {
+        ...createLayer('video-2', 'Contextual row', false), keyframes: [
+          point(4, { speed: 0.35 }, interpolation), point(11, { hue: 75 }, 'hold'),
+          point(26, { speed: 3 }, 'ease-out'), point(35, { speed: 0.7 }, 'smooth'), point(50, { speed: 2 }, 'hold'),
+        ]
+      };
       project.layers.push(row);
-      const clip = { ...createClip('placed-row-clip', 'generated-original', 7, 19), layerId: row.id, start: 9,
-        speed: { mode: 'constant' as const, rate: 4 } };
+      const clip = {
+        ...createClip('placed-row-clip', 'generated-original', 7, 19), layerId: row.id, start: 9,
+        speed: { mode: 'constant' as const, rate: 4 }
+      };
       project.clips = [clip];
       const captured = projectSchema.parse(project); const layout = calculateLayout(captured); const placed = layout.clips[0]!;
       const map = placed.retiming; const expected = Array.from({ length: map.duration }, (_, output) => map.sourceAt(output));
@@ -110,13 +114,19 @@ describe.skipIf(!enabled)('schema-6 supplied row maps · native pipes and dispos
     try {
       const clip = createClip('invalid', 'generated-original', 7, 19); const baseline = compileRetiming(clip);
       for (const duration of [0, -1, 0.5, NaN, Infinity, 2_147_483_648]) {
-        await expect(retimeRawVideo({ ...options(clip, work, 'must-not-exist.rgb', new AbortController().signal),
-          ffmpeg: '/must-not-run-invalid-row-map', retiming: { ...baseline, duration } })).rejects.toThrow('map duration');
+        await expect(retimeRawVideo({
+          ...options(clip, work, 'must-not-exist.rgb', new AbortController().signal),
+          ffmpeg: '/must-not-run-invalid-row-map', retiming: { ...baseline, duration }
+        })).rejects.toThrow('map duration');
       }
-      await expect(retimeRawVideo({ ...options(clip, work, 'must-not-exist.rgb', new AbortController().signal),
-        ffmpeg: '/must-not-run-invalid-row-map', retiming: null as unknown as Retiming })).rejects.toThrow('map duration');
-      await expect(retimeRawVideo({ ...options(clip, work, 'must-not-exist.rgb', new AbortController().signal),
-        ffmpeg: '/must-not-run-invalid-row-map', retiming: { ...baseline, sourceAt: null } as unknown as Retiming })).rejects.toThrow('sourceAt, outputAt and rateAt');
+      await expect(retimeRawVideo({
+        ...options(clip, work, 'must-not-exist.rgb', new AbortController().signal),
+        ffmpeg: '/must-not-run-invalid-row-map', retiming: null as unknown as Retiming
+      })).rejects.toThrow('map duration');
+      await expect(retimeRawVideo({
+        ...options(clip, work, 'must-not-exist.rgb', new AbortController().signal),
+        ffmpeg: '/must-not-run-invalid-row-map', retiming: { ...baseline, sourceAt: null } as unknown as Retiming
+      })).rejects.toThrow('sourceAt, outputAt and rateAt');
       expect(await readdir(work)).toEqual([]); await unchanged();
     } finally { await rm(work, { recursive: true, force: true }); }
   });
@@ -143,8 +153,10 @@ describe.skipIf(!enabled)('schema-6 supplied row maps · native pipes and dispos
       project.clips = [createClip('slow-row', 'generated-original', 7, 19)];
       const placed = calculateLayout(project).clips[0]!; let progress = false;
       expect(placed.duration).toBe(120);
-      await expect(retimeRawVideo({ ...options(placed.clip, work, 'partial.rgb', controller.signal), retiming: placed.retiming,
-        onProgress: () => { progress = true; controller.abort(); } })).rejects.toThrow('cancelled');
+      await expect(retimeRawVideo({
+        ...options(placed.clip, work, 'partial.rgb', controller.signal), retiming: placed.retiming,
+        onProgress: () => { progress = true; controller.abort(); }
+      })).rejects.toThrow('cancelled');
       expect(progress).toBe(true); await unchanged();
     } finally { await rm(work, { recursive: true, force: true }); }
   });

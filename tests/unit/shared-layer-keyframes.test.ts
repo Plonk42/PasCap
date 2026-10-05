@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { NEUTRAL_COLOUR, gradePixel } from '../../src/shared/colour.js';
+import { gradePixel, NEUTRAL_COLOUR } from '../../src/shared/colour.js';
 import { applyCommand, EditHistory, type EditCommand } from '../../src/shared/commands.js';
 import { colourAt, compositePixel, layerOpacityAt, opacityAt } from '../../src/shared/composition.js';
-import { EMPTY_KEY_VALUES, KEYFRAME_SETTINGS, activeLayerSetting, evaluateLayerSetting, hasLayerKeys, keySettings, layerKeyframeSchema, type Interpolation, type KeyframeSetting, type LayerKeyframe, type LayerKeyValues } from '../../src/shared/keyframes.js';
+import { activeLayerSetting, EMPTY_KEY_VALUES, evaluateLayerSetting, hasLayerKeys, KEYFRAME_SETTINGS, keySettings, layerKeyframeSchema, type Interpolation, type KeyframeSetting, type LayerKeyframe, type LayerKeyValues } from '../../src/shared/keyframes.js';
 import { compileLayerRetiming } from '../../src/shared/layer-retiming.js';
 import { BASE_LAYER_ID, clipSchema, createClip, createLayer, createProject, projectSchema, type ProjectDocument, type VideoLayer } from '../../src/shared/model.js';
 import { trimByOutputFrames, trimOnTimeline, validateSourceRanges } from '../../src/shared/source-range.js';

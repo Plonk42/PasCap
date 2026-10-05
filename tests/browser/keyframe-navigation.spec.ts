@@ -203,9 +203,13 @@ test('no opened project keeps all setting buttons visible and disabled without a
 
 test('duplicate sidebar opacity navigation selects its row, opens Clip context and shares the inspector cursor without stealing focus', async ({ page }) => {
     let document = sequence([sharedPoint(10, { layerOpacity: 0 }), sharedPoint(100, { layerOpacity: 0.5 })]);
-    document = applyCommand(document, { type: 'layer-add', layer: { ...createLayer('upper', 'Video 2', false), keyframes: [
-        sharedPoint(20, { layerOpacity: 0 }), sharedPoint(130, { layerOpacity: 0.5 }), sharedPoint(140, { brightness: 0 }), sharedPoint(160, { layerOpacity: 1 }),
-    ] } });
+    document = applyCommand(document, {
+        type: 'layer-add', layer: {
+            ...createLayer('upper', 'Video 2', false), keyframes: [
+                sharedPoint(20, { layerOpacity: 0 }), sharedPoint(130, { layerOpacity: 0.5 }), sharedPoint(140, { brightness: 0 }), sharedPoint(160, { layerOpacity: 1 }),
+            ]
+        }
+    });
     await fixture(page, document); await inspectorTab(page, 'Sequence');
     await openOptions(page, 'Workspace options'); await page.getByRole('button', { name: 'Toggle Clip panel', exact: true }).click(); await closeOptions(page);
     await expect(inspector(page)).toBeHidden();

@@ -67,10 +67,14 @@ describe('one authoritative timeline drop plan', () => {
 
     it('solves a trailing-edge magnet with the duration at its new row-rate placement', () => {
         let document = project();
-        document = applyCommand(document, { type: 'layer-update', layer: { ...document.layers[1]!, keyframes: [
-            { frame: 0, interpolation: 'linear', values: { ...EMPTY_KEY_VALUES, speed: 1 } },
-            { frame: 100, interpolation: 'hold', values: { ...EMPTY_KEY_VALUES, speed: 3 } },
-        ] } });
+        document = applyCommand(document, {
+            type: 'layer-update', layer: {
+                ...document.layers[1]!, keyframes: [
+                    { frame: 0, interpolation: 'linear', values: { ...EMPTY_KEY_VALUES, speed: 1 } },
+                    { frame: 100, interpolation: 'hold', values: { ...EMPTY_KEY_VALUES, speed: 3 } },
+                ]
+            }
+        });
         const before = JSON.stringify(document);
         const plan = planTimelineDrop(document, { kind: 'clip', clipId: 'b', grabFrame: 13 }, 'upper', 55, true, 3, 69);
         expect(plan).toMatchObject({ start: 40, duration: 29, guide: 69, error: '' });
@@ -85,10 +89,14 @@ describe('one authoritative timeline drop plan', () => {
 
     it('reports the exact contextual batch width and consecutive media starts across a row speed curve', () => {
         let document = project();
-        document = applyCommand(document, { type: 'layer-update', layer: { ...document.layers[1]!, keyframes: [
-            { frame: 0, interpolation: 'linear', values: { ...EMPTY_KEY_VALUES, speed: 1 } },
-            { frame: 100, interpolation: 'hold', values: { ...EMPTY_KEY_VALUES, speed: 3 } },
-        ] } });
+        document = applyCommand(document, {
+            type: 'layer-update', layer: {
+                ...document.layers[1]!, keyframes: [
+                    { frame: 0, interpolation: 'linear', values: { ...EMPTY_KEY_VALUES, speed: 1 } },
+                    { frame: 100, interpolation: 'hold', values: { ...EMPTY_KEY_VALUES, speed: 3 } },
+                ]
+            }
+        });
         const clips = [createClip('new-a', 'a', 10, 70), createClip('new-b', 'b', 20, 80)];
         const plan = planTimelineDrop(document, { kind: 'media', clips }, 'upper', 42, false, 3, 0);
         expect(plan).toMatchObject({ start: 42, duration: 51, guide: null, error: '' });

@@ -163,10 +163,14 @@ test('the first hollow diamond creates one point; same-frame channels merge inde
 
 test('between points keyed controls are read-only until their own diamond explicitly captures the project-time value', async ({ page }) => {
     let document = await current(page);
-    document = applyCommand(document, { type: 'layer-update', layer: { ...document.layers[0]!, keyframes: [
-        sharedPoint(10, { exposure: 0, speed: 0.5, clipOpacity: 0.2, layerOpacity: 0.4 }),
-        sharedPoint(90, { exposure: 0.8, speed: 2, clipOpacity: 0.8, layerOpacity: 0.8 }),
-    ] } });
+    document = applyCommand(document, {
+        type: 'layer-update', layer: {
+            ...document.layers[0]!, keyframes: [
+                sharedPoint(10, { exposure: 0, speed: 0.5, clipOpacity: 0.2, layerOpacity: 0.4 }),
+                sharedPoint(90, { exposure: 0.8, speed: 2, clipOpacity: 0.8, layerOpacity: 0.8 }),
+            ]
+        }
+    });
     await fixture(page, document); await seek(page, 30);
     for (const label of ['Exposure', 'Clip opacity', 'Layer opacity']) {
         const slider = page.getByRole('slider', { name: label, exact: true });
@@ -257,10 +261,14 @@ test('whole-row curves continue across different clips and their dissolve, while
     document = applyCommand(document, { type: 'speed', clipId: 'first', speed: { mode: 'constant', rate: 2 } });
     document = applyCommand(document, { type: 'speed', clipId: 'second', speed: { mode: 'ramp', startRate: 0.5, endRate: 2, curve: 'smooth', anchorIn: 30, anchorOut: 90 } });
     document = applyCommand(document, { type: 'transition', transition: { leftId: 'first', rightId: 'second', type: 'cross-dissolve', duration: 12 } });
-    document = applyCommand(document, { type: 'layer-update', layer: { ...document.layers[0]!, keyframes: [
-        sharedPoint(0, { exposure: -0.5, clipOpacity: 0.2, layerOpacity: 0.8, speed: 0.5 }),
-        sharedPoint(80, { exposure: 1.5, clipOpacity: 0.8, layerOpacity: 0.4, speed: 2 }),
-    ] } });
+    document = applyCommand(document, {
+        type: 'layer-update', layer: {
+            ...document.layers[0]!, keyframes: [
+                sharedPoint(0, { exposure: -0.5, clipOpacity: 0.2, layerOpacity: 0.8, speed: 0.5 }),
+                sharedPoint(80, { exposure: 1.5, clipOpacity: 0.8, layerOpacity: 0.4, speed: 2 }),
+            ]
+        }
+    });
     await fixture(page, document);
     const layout = calculateLayout(document);
     const overlap = layout.transitions[0]!.start + 6;
@@ -299,10 +307,14 @@ for (const rate of [0.25, 4]) {
     test(`project-time grade points update preview pixels at ${rate}× even when source frames are held or skipped`, async ({ page }) => {
         let document = await current(page);
         document = applyCommand(document, { type: 'transition', transition: { leftId: 'first', rightId: 'second', type: 'cross-dissolve', duration: 12 } });
-        document = applyCommand(document, { type: 'layer-update', layer: { ...document.layers[0]!, keyframes: [
-            sharedPoint(0, { speed: rate, exposure: -0.75 }), sharedPoint(1, { exposure: -0.25 }),
-            sharedPoint(2, { exposure: 0.25 }), sharedPoint(3, { exposure: 0.75 }),
-        ] } });
+        document = applyCommand(document, {
+            type: 'layer-update', layer: {
+                ...document.layers[0]!, keyframes: [
+                    sharedPoint(0, { speed: rate, exposure: -0.75 }), sharedPoint(1, { exposure: -0.25 }),
+                    sharedPoint(2, { exposure: 0.25 }), sharedPoint(3, { exposure: 0.75 }),
+                ]
+            }
+        });
         await fixture(page, document);
         const captures = [];
         for (const frame of [0, 1, 2, 3]) {
@@ -425,19 +437,23 @@ test('numeric trim, mapped split, duplicate and overlay moves keep absolute row 
     await seek(page, 10); await clipAction(page, 'Split at playhead');
     const split = await current(page);
     expect(split.clips).toHaveLength(4); expect(split.clips[0]?.sourceOut).toBe(30); expect(split.clips[1]?.sourceIn).toBe(30);
-    expect(split.layers).toEqual([{ ...document.layers[0]!, transitions: [
-        { leftId: 'first', rightId: split.clips[1]!.id, type: 'cut', duration: 0 },
-        { leftId: split.clips[1]!.id, rightId: 'second', type: 'cut', duration: 0 },
-    ] }, document.layers[1]!]);
+    expect(split.layers).toEqual([{
+        ...document.layers[0]!, transitions: [
+            { leftId: 'first', rightId: split.clips[1]!.id, type: 'cut', duration: 0 },
+            { leftId: split.clips[1]!.id, rightId: 'second', type: 'cut', duration: 0 },
+        ]
+    }, document.layers[1]!]);
     await page.getByRole('button', { name: 'Undo', exact: true }).click(); expect(await current(page)).toEqual(trimmed);
     await page.getByRole('region', { name: 'Video timeline' }).focus(); await page.keyboard.press('Control+d');
     const duplicated = await current(page); const copy = duplicated.clips[1]!;
     expect(copy.id).not.toBe('first'); expect(copy).toEqual({ ...trimmed.clips[0]!, id: copy.id, start: 25 });
     expect(calculateLayout(duplicated).clips.find((placed) => placed.clip.id === copy.id)?.start).toBe(25);
-    expect(duplicated.layers).toEqual([{ ...document.layers[0]!, transitions: [
-        { leftId: 'first', rightId: copy.id, type: 'cut', duration: 0 },
-        { leftId: copy.id, rightId: 'second', type: 'cut', duration: 0 },
-    ] }, document.layers[1]!]);
+    expect(duplicated.layers).toEqual([{
+        ...document.layers[0]!, transitions: [
+            { leftId: 'first', rightId: copy.id, type: 'cut', duration: 0 },
+            { leftId: copy.id, rightId: 'second', type: 'cut', duration: 0 },
+        ]
+    }, document.layers[1]!]);
     await page.getByRole('button', { name: 'Undo', exact: true }).click(); expect(await current(page)).toEqual(trimmed);
     await page.locator('[data-clip-id="overlay"] .timeline-clip-body').evaluate((button) => (button as HTMLButtonElement).click());
     const start = page.getByRole('spinbutton', { name: 'Clip timeline start', exact: true });

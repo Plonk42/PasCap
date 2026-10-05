@@ -17,8 +17,8 @@ import { KeyframeToggle } from './KeyframeToggle.js';
 import { clipStartRestriction } from './layer-actions.js';
 import { NumberField } from './NumberField.js';
 import { SpeedControls, SpeedHelp } from './SpeedControls.js';
-import type { DraftPreview } from './Timeline.js';
 import { planTimelineDrop } from './timeline-placement.js';
+import type { DraftPreview } from './Timeline.js';
 
 export type { InspectorMode } from './InspectorSection.js';
 
