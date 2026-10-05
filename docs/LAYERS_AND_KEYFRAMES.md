@@ -341,6 +341,13 @@ tracks**, supporting independent simultaneous dissolves. Unused slots are availa
 for preloading. Source review adds at most one decoder while visible. No decoder or
 texture is allocated per stored clip.
 
+Music adds one AudioWorklet, with up to four 128 KiB stereo Float32 transfer
+blocks, bounded 64 KiB range/short-selection scratch and one 128 KiB conversion workspace. Its serial
+credit-controlled refill and one-unacknowledged-receipt protocol are bounded
+independently of duration; no full-file audio buffer or decoder per loop is used.
+Current PCM preview preparation remains a serial native job; its generated cache
+grows about 11.52 MB per minute. Native export bounds below are unchanged.
+
 Export reads one original at a time through the shared backpressured frame mapper.
 The plain static single-layer path retains at most two lossless clips, two
 intermediate decoders and one reusable RGB frame (24.9 MB UHD), plus native memory.

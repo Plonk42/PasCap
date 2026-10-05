@@ -132,7 +132,7 @@ export async function createApp(config = createConfig()) {
     if (!asset.prepared?.thumbnailFrames.includes(parameters.frame)) throw new ServiceError('Indexed thumbnail not found.', 404);
     await serveRegisteredFile(request, reply, library.thumbnailPath(asset, parameters.frame), 'image/jpeg');
   });
-  app.get('/api/audio', (_request, reply) => reply.send({ assets: audio.list() }));
+  app.get('/api/audio', async (_request, reply) => reply.send({ assets: await audio.availableList() }));
   app.get('/api/audio/roots', async () => ({ roots: await footage.roots() }));
   app.get('/api/audio/browse', async (request) => {
     const query = footageQuerySchema.parse(request.query);
@@ -150,7 +150,7 @@ export async function createApp(config = createConfig()) {
   app.route({
     method: ['GET', 'HEAD'], url: '/api/audio/:id/playback', handler: async (request, reply) => {
       const asset = await audio.assertReady(idParams.parse(request.params).id);
-      await serveRegisteredFile(request, reply, audio.playbackPath(asset), 'audio/mp4');
+      await serveRegisteredFile(request, reply, audio.playbackPath(asset), 'application/octet-stream');
     }
   });
   app.get('/api/audio/:id/waveform', async (request) => ({ waveform: (await audio.assertReady(idParams.parse(request.params).id)).waveform }));

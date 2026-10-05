@@ -1,10 +1,12 @@
-import { spawn } from 'node:child_process';
-import { chmod, readFile, rename, rm } from 'node:fs/promises';
+import { constants } from 'node:fs';
+import { chmod, open, readFile, rename, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { z } from 'zod';
 import { audioAssetSchema, type AudioAsset } from '../shared/audio.js';
 import type { MediaJob } from '../shared/media.js';
 import { idSchema } from '../shared/model.js';
+import { MUSIC_BYTES_PER_SAMPLE, MUSIC_SAMPLE_RATE, MUSIC_SAMPLES_PER_FRAME } from '../shared/music-stream.js';
+import { forEachSerial, whileSerial } from '../shared/serial.js';
 import { parseRate, PROJECT_FPS } from '../shared/timing.js';
 import type { ServiceConfig } from './config.js';
 import { errorMessage, isNotFound, ServiceError } from './errors.js';
@@ -13,7 +15,7 @@ import { JobQueue, type JobContext } from './jobs.js';
 import { runProcess } from './process.js';
 import { atomicWrite, ensurePrivateDirectory, SerialWriter } from './storage.js';
 
-export const AUDIO_PROFILE = 'aac-48k-stereo-mono-unity-v2' as const;
+export const AUDIO_PROFILE = 'pcm16-48k-stereo-mono-unity-v3' as const;
 const SAMPLE_RATE = 48_000;
 const CHANNELS = 2;
 const MAX_PEAKS = 2048;
@@ -89,44 +91,30 @@ export class PcmPeakReducer {
   }
 }
 
-/** Stream PCM through the reducer: stdout is never accumulated, regardless of duration. */
-function sampleWaveform(config: ServiceConfig, filename: string, durationSeconds: number, signal: AbortSignal): Promise<number[]> {
-  return new Promise((resolve, reject) => {
-    if (signal.aborted) { reject(new ServiceError('Job cancelled.', 499)); return; }
-    const reducer = new PcmPeakReducer(durationSeconds);
-    const child = spawn(config.ffmpeg, [
-      '-hide_banner', '-loglevel', 'error', '-nostdin', '-xerror', '-threads', '2', '-i', filename,
-      '-map', '0:a:0', '-vn', '-sn', '-dn', '-ar', String(SAMPLE_RATE), '-ac', String(CHANNELS),
-      '-c:a', 'pcm_s16le', '-threads', '2', '-filter_threads', '2', '-f', 's16le', 'pipe:1',
-    ], { shell: false, stdio: ['ignore', 'pipe', 'pipe'] });
-    let stderr = '';
-    let killTimer: ReturnType<typeof setTimeout> | undefined;
-    const cancel = (): void => {
-      if (killTimer) return;
-      child.kill('SIGTERM');
-      killTimer = setTimeout(() => child.kill('SIGKILL'), 2_000);
-      killTimer.unref();
-    };
-    const cleanUp = (): void => {
-      if (killTimer) clearTimeout(killTimer);
-      signal.removeEventListener('abort', cancel);
-    };
-    signal.addEventListener('abort', cancel, { once: true });
-    child.stdout.on('data', (chunk: Buffer) => reducer.add(chunk));
-    child.stderr.on('data', (chunk: Buffer) => { stderr = (stderr + chunk.toString('utf8')).slice(-32_768); });
-    child.once('error', (error) => { cleanUp(); reject(new ServiceError(`Cannot start ${config.ffmpeg}: ${error.message}`, 503)); });
-    child.once('close', (code) => {
-      cleanUp();
-      if (signal.aborted) { reject(new ServiceError('Job cancelled.', 499)); return; }
-      if (code !== 0) { reject(new ServiceError(`${config.ffmpeg} waveform decoder exited ${code}: ${stderr.trim()}`, 422)); return; }
-      try { resolve(reducer.finish()); } catch (error) { reject(error); }
+/** Reduce the prepared PCM with a single bounded file reader, not a second decoder. */
+async function sampleWaveform(filename: string, durationSeconds: number, signal: AbortSignal): Promise<number[]> {
+  const reducer = new PcmPeakReducer(durationSeconds);
+  const file = await open(filename, constants.O_RDONLY | constants.O_NOFOLLOW);
+  const stream = file.createReadStream({ highWaterMark: 65_536, signal, autoClose: false });
+  const iterator = stream[Symbol.asyncIterator]();
+  let ended = false;
+  try {
+    await whileSerial(() => !ended, async () => {
+      const next = await iterator.next();
+      if (next.done) { ended = true; return; }
+      if (!Buffer.isBuffer(next.value)) throw new Error('Music waveform requires raw PCM bytes.');
+      reducer.add(next.value);
     });
-  });
+    return reducer.finish();
+  } finally { stream.destroy(); await file.close(); }
 }
 
-function verifyPlayback(metadata: AudioAsset['metadata'], original: AudioAsset['metadata']): void {
-  if (metadata.codec !== 'aac' || metadata.sampleRate !== SAMPLE_RATE || metadata.channels !== CHANNELS || Math.abs(metadata.durationSeconds - original.durationSeconds) > 0.1) {
-    throw new ServiceError('Prepared music differs from the required AAC 48 kHz stereo profile or source duration.', 422);
+async function verifyPlayback(filename: string, original: AudioAsset['metadata']): Promise<void> {
+  const info = await assertNoSymlinks(filename);
+  const samples = info.size / MUSIC_BYTES_PER_SAMPLE;
+  if (!info.isFile() || !Number.isInteger(samples) || samples < Math.round(original.frameCount * MUSIC_SAMPLES_PER_FRAME) ||
+    Math.abs(samples / MUSIC_SAMPLE_RATE - original.durationSeconds) > 0.1) {
+    throw new ServiceError('Prepared music differs from the required complete PCM16 48 kHz stereo source duration.', 422);
   }
 }
 
@@ -161,6 +149,19 @@ export class AudioLibrary {
     });
   }
   list(): AudioAsset[] { return [...this.#assets.values()].map((asset) => audioAssetSchema.parse(asset)); }
+  /** Metadata-only availability: never rewrite a registry or prepare legacy/missing caches. */
+  async availableList(): Promise<AudioAsset[]> {
+    const assets = this.list();
+    await forEachSerial(assets, async (asset) => {
+      if (asset.status !== 'ready') return;
+      try { await verifyPlayback(this.playbackPath(asset), asset.metadata); }
+      catch (error) {
+        asset.status = 'error';
+        asset.error = isNotFound(error) ? 'The current PCM16 music cache is missing. Prepare this recording explicitly; older caches remain unchanged.' : errorMessage(error);
+      }
+    });
+    return assets;
+  }
   get(id: string): AudioAsset {
     const asset = this.#assets.get(idSchema.parse(id));
     if (!asset) throw new ServiceError('Registered music not found.', 404);
@@ -170,14 +171,14 @@ export class AudioLibrary {
     const registered = this.get(asset.id);
     return path.join(this.config.dataDir, 'audio-assets', registered.fingerprint.digest, AUDIO_PROFILE);
   }
-  playbackPath(asset: AudioAsset): string { return path.join(this.assetDir(asset), 'playback.m4a'); }
+  playbackPath(asset: AudioAsset): string { return path.join(this.assetDir(asset), 'playback.pcm'); }
   async assertReady(id: string): Promise<AudioAsset> {
     const asset = this.get(id);
     const reason = asset.error ? ' ' + asset.error : '';
     if (asset.status !== 'ready' || asset.waveform.length === 0) throw new ServiceError(`Music is not prepared and ready. Retry preparation explicitly.${reason}`, 409);
     await assertSourceIdentity(asset.sourcePath, asset.fingerprint, true);
     try {
-      if (!(await assertNoSymlinks(this.playbackPath(asset))).isFile()) throw new ServiceError('Prepared music must be a regular cache file.', 422);
+      await verifyPlayback(this.playbackPath(asset), asset.metadata);
     } catch (error) {
       if (isNotFound(error)) throw new ServiceError('The prepared music cache is missing. Retry preparation explicitly.', 409);
       throw error;
@@ -238,9 +239,8 @@ export class AudioLibrary {
     if (asset.status !== 'ready' || asset.waveform.length === 0) return null;
     try {
       context.update(0.1, 'Verifying cached music');
-      const metadata = await probeAudio(this.config, this.playbackPath(asset), context.signal);
-      verifyPlayback(metadata, asset.metadata);
-      return await sampleWaveform(this.config, this.playbackPath(asset), metadata.durationSeconds, context.signal);
+      await verifyPlayback(this.playbackPath(asset), asset.metadata);
+      return await sampleWaveform(this.playbackPath(asset), asset.metadata.durationSeconds, context.signal);
     } catch (error) {
       if (context.signal.aborted) throw error;
       // This explicit retry may replace a damaged regular cache, never a symlink.
@@ -268,18 +268,18 @@ export class AudioLibrary {
         return waveform;
       }
     }
-    const temporary = path.join(directory, `playback-${idSchema.parse(context.id)}.partial.m4a`);
+    const temporary = path.join(directory, `playback-${idSchema.parse(context.id)}.partial.pcm`);
     let published = false;
     try {
-      context.update(0.02, 'Preparing AAC 48 kHz stereo music');
+      context.update(0.02, 'Preparing PCM16 48 kHz stereo music');
       // Match Web Audio mono duplication and the native export mixer; FFmpeg's
       // implicit upmix would attenuate each channel by 3 dB.
       const upmix = asset.metadata.channels === 1 ? 'pan=stereo|c0=c0|c1=c0,' : '';
       await runProcess(this.config.ffmpeg, [
         '-hide_banner', '-loglevel', 'error', '-nostdin', '-xerror', '-n', '-threads', '2', '-i', asset.sourcePath,
         '-map', '0:a:0', '-vn', '-sn', '-dn', '-map_metadata', '-1', '-map_chapters', '-1', '-af', `${upmix}asetpts=PTS-STARTPTS`,
-        '-ar', String(SAMPLE_RATE), '-ac', String(CHANNELS), '-c:a', 'aac', '-b:a', '192k', '-threads', '2', '-filter_threads', '2',
-        '-movflags', '+faststart', '-progress', 'pipe:1', temporary,
+        '-ar', String(SAMPLE_RATE), '-ac', String(CHANNELS), '-c:a', 'pcm_s16le', '-threads', '2', '-filter_threads', '2',
+        '-f', 's16le', '-progress', 'pipe:1', temporary,
       ], {
         signal: context.signal, onProgress: (fields) => {
           const microseconds = Number(fields['out_time_us']);
@@ -287,9 +287,8 @@ export class AudioLibrary {
         }
       });
       context.update(0.78, 'Verifying audio profile and sampling waveform peaks');
-      const metadata = await probeAudio(this.config, temporary, context.signal);
-      verifyPlayback(metadata, asset.metadata);
-      const waveform = await sampleWaveform(this.config, temporary, metadata.durationSeconds, context.signal);
+      await verifyPlayback(temporary, asset.metadata);
+      const waveform = await sampleWaveform(temporary, asset.metadata.durationSeconds, context.signal);
       await assertSourceIdentity(asset.sourcePath, asset.fingerprint, true);
       assertNotCancelled(context.signal);
       await chmod(temporary, 0o600);

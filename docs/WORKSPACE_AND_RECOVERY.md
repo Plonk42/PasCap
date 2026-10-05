@@ -394,6 +394,17 @@ sources and failed music synchronization remain explicit buffering/errors. Sourc
 wraps and renderer throughput can still interrupt playback; this is not gapless
 audio or intended-GPU/long-run qualification.
 
+Music uses one sample-owned Web Audio worklet with four bounded PCM blocks and
+serial byte-range refill. The actual rendered source origin/output timestamp
+governs A/V playback; block-updated media-element time does not trigger false
+restarts. Selected-range loops are filled continuously, while true empty-queue,
+processor/read failures and greater-than-one-frame drift remain explicit. Pause
+invalidates the complete epoch and outstanding reads before late work can restart.
+Missing current PCM caches appear as Audio → Music **Retry** preparation actions;
+no read automatically prepares, rewrites or removes older AAC caches. Explicit
+preparation creates the current versioned PCM cache without changing originals,
+project documents, registry/video-proxy formats or finished exports.
+
 Read and response decoding have deadlines; incompatible/HTML responses are errors,
 not defaults. If a write transport times out, its result may be uncertain: check
 current project/job state before repeating it. Accepted job/create/export responses

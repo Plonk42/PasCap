@@ -10,7 +10,8 @@ paths and **future, not implemented** containers: [DEPLOYMENT.md](DEPLOYMENT.md)
 - **FFmpeg/ffprobe 8.0.1**, the tested baseline; FFmpeg 6 is unqualified.
   Other builds need parity tests. Require `libx264`, FFV1, AAC, `lut3d`/`xfade`, raw
   RGB/lossless RGBA16 and the existing timing/colour filters and bitstream tools.
-- Browser **WebGL2**/`requestVideoFrameCallback`; tests use installed **Google Chrome**
+- Browser **WebGL2**/`requestVideoFrameCallback` and **AudioWorklet**/`getOutputTimestamp`
+  for music; tests use installed **Google Chrome**
   (`channel: 'chrome'`), not bundled Chromium: [configuration](../playwright.config.ts).
 
 ## Run locally
@@ -83,21 +84,24 @@ npm run test:browser
   native suites together with `PASCAP_MEDIA_TESTS=1 PASCAP_SPACE_TESTS=1 npm test -- tests/media`.
   Hosts forbidding user namespaces must not claim that acceptance from unit mocks.
 
-### Optional Firefox music investigation
+### Firefox music regression and optional investigation
 
-Chrome remains the required browser validation target. The optional
+Chrome remains the full browser validation target. The
 [Firefox configuration](../playwright.firefox.config.ts) runs the same isolated
 synthetic service/fixtures with Playwright's Firefox, not an existing desktop
 Firefox profile. Install it with `npx playwright install firefox`; after the
 ordinary build and clean browser fixture setup, run
-`npx playwright test --config=playwright.firefox.config.ts tests/browser/music-clock.spec.ts`.
+`npx playwright test --config=playwright.firefox.config.ts tests/browser/music-clock.spec.ts tests/browser/playback-recovery.spec.ts --grep 'streaming music clock|streamed PCM|with music normal speed|with music and a callback-gated cancellation'`.
 The [music-clock regression](../tests/browser/music-clock.spec.ts) requires one
-uninterrupted music start from zero or a nonzero seek and attaches bounded media,
-processing-clock and output-timestamp samples. It makes no project writes and
-uses only generated fixture media. This is an investigative test: Firefox music
-playback is currently unresolved in [#38](https://github.com/Plonk42/PasCap/issues/38),
-not supported-browser qualification. Do not weaken its assertions, increase drift
-tolerance or change privacy preferences to obtain a pass.
+uninterrupted music start from zero or a nonzero seek, bounded range reads and
+actual downstream PCM amplitude/placement silence. The selected recovery tests
+retain the independent one-frame audio/video bound, pause/seek/restart and genuine
+callback-gated cancellation. These five synthetic, memory-only checks run in CI;
+they do not qualify the entire Firefox editor or intended hardware. Attachments
+contain bounded consumed-sample/output-timestamp evidence, not private media.
+The complete optional Firefox recovery suite still exposes a separate 0.1× video
+seek/rVFC readiness failure, also reproducible without music. Do not hide it with
+a currentTime guess, retries, skipped assertions, privacy changes or a larger bound.
 
 ### Incremental feedback
 
@@ -164,7 +168,7 @@ evidence. Follow [the delivery workflow](GITHUB_WORKFLOW.md#verified-closure-on-
 The [workflow](../.github/workflows/ci.yml) runs:
 
 - Linux unit/typecheck/build checks on **Node 22 and 24**.
-- Native/media and Chrome/browser checks on **Node 22**, using **FFmpeg/ffprobe
+- Native/media, full Chrome/browser and scoped Firefox music checks on **Node 22**, using **FFmpeg/ffprobe
   8.0.1 built from pinned source** via a setup script/cached toolchain, not runner
   apt FFmpeg 6 or an implied untested version-support claim.
 - `push`, `pull_request` and `workflow_dispatch` triggers; read-only repository

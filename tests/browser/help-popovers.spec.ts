@@ -36,6 +36,7 @@ test.beforeEach(async ({ page, request }) => {
         const video = /^\/api\/media\/([^/]+)\/(?:proxy|thumbnail\/\d+)$/.exec(pathname);
         const music = /^\/api\/audio\/([^/]+)\/(?:playback|waveform)$/.exec(pathname);
         if (method === 'GET' && ((video && assets.some((asset) => asset.id === video[1])) || (music && audio.some((asset) => asset.id === music[1])))) { await route.continue(); return; }
+        if (method === 'HEAD' && music && pathname.endsWith('/playback') && audio.some((asset) => asset.id === music[1])) { await route.continue(); return; }
         unexpected.push(`${method} ${pathname}`); await route.abort('blockedbyclient');
     });
     const document = createProject('help-popover-memory', 'Inline help · memory-only');

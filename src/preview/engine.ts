@@ -337,7 +337,7 @@ export class PreviewEngine {
     if (this.#status === 'error') return;
     const signal = this.#beginOperation(); this.#operationFrame = this.#frame;
     try {
-      await this.#music.resumeContext();
+      await this.#music.resumeContext(signal);
       if (!this.#isCurrent(signal)) return;
       this.#busy = false; this.#playing = true; this.#renderTimes.length = 0;
       await this.#alignPlayback(this.#frame, false);
@@ -416,7 +416,9 @@ export class PreviewEngine {
       await Promise.all(this.#playingClips.map((id) => this.#slotFor(id).play()));
       if (!this.#isCurrent(signal) || !this.#playing) return;
       this.#clockFrame = frame; this.#clockTime = performance.now(); this.#mismatchStart = 0;
-      this.#busy = false; this.#setStatus('playing', 'Playing'); this.#preloadNext(frame);
+      // Promise completion is not an accepted A/V frame. Re-evaluate the current
+      // sample clock and decoded image before publishing the first Playing state.
+      this.#busy = false; this.#advance(performance.now()); this.#preloadNext(frame);
     } catch (error) { if (this.#isCurrent(signal)) this.#handleError(error); }
   }
   readonly #tick = (now: number): void => {

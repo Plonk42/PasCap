@@ -32,7 +32,7 @@ test.beforeEach(async ({ page, request }) => {
     });
 
     // Project routes are installed afterwards and take precedence over this deny-by-default guard.
-    // Only GETs for these existing synthetic proxies/thumbnails (and explicitly selected fixture music) reach the server.
+    // Only reads for these existing synthetic proxies/thumbnails (and explicitly selected fixture music) reach the server.
     const reads: Record<string, unknown> = {
         '/api/health': { name: 'PasCap', milestone: 'editing-and-export', frameRate: '30000/1001', workerConcurrency: 1 },
         '/api/media': { assets }, '/api/jobs': { jobs: [] },
@@ -45,7 +45,7 @@ test.beforeEach(async ({ page, request }) => {
         const media = /^\/api\/media\/([^/]+)\/(?:proxy|thumbnail\/\d+)$/.exec(pathname);
         if (method === 'GET' && media && assets.some((asset) => asset.id === media[1])) { await route.continue(); return; }
         const audio = /^\/api\/audio\/([^/]+)\/playback$/.exec(pathname);
-        if (method === 'GET' && audio && audioAssets.some((asset) => asset.id === audio[1])) { await route.continue(); return; }
+        if ((method === 'GET' || method === 'HEAD') && audio && audioAssets.some((asset) => asset.id === audio[1])) { await route.continue(); return; }
         unexpectedApi.push(`${method} ${pathname}`);
         await route.abort('blockedbyclient');
     });
