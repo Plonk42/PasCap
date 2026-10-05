@@ -83,6 +83,22 @@ npm run test:browser
   native suites together with `PASCAP_MEDIA_TESTS=1 PASCAP_SPACE_TESTS=1 npm test -- tests/media`.
   Hosts forbidding user namespaces must not claim that acceptance from unit mocks.
 
+### Optional Firefox music investigation
+
+Chrome remains the required browser validation target. The optional
+[Firefox configuration](../playwright.firefox.config.ts) runs the same isolated
+synthetic service/fixtures with Playwright's Firefox, not an existing desktop
+Firefox profile. Install it with `npx playwright install firefox`; after the
+ordinary build and clean browser fixture setup, run
+`npx playwright test --config=playwright.firefox.config.ts tests/browser/music-clock.spec.ts`.
+The [music-clock regression](../tests/browser/music-clock.spec.ts) requires one
+uninterrupted music start from zero or a nonzero seek and attaches bounded media,
+processing-clock and output-timestamp samples. It makes no project writes and
+uses only generated fixture media. This is an investigative test: Firefox music
+playback is currently unresolved in [#38](https://github.com/Plonk42/PasCap/issues/38),
+not supported-browser qualification. Do not weaken its assertions, increase drift
+tolerance or change privacy preferences to obtain a pass.
+
 ### Incremental feedback
 
 The validation commands above are complete entry points, not a mandatory chain
