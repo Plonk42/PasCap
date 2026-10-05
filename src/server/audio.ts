@@ -3,13 +3,13 @@ import { chmod, readFile, rename, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { z } from 'zod';
 import { audioAssetSchema, type AudioAsset } from '../shared/audio.js';
-import { idSchema } from '../shared/model.js';
 import type { MediaJob } from '../shared/media.js';
+import { idSchema } from '../shared/model.js';
 import { parseRate, PROJECT_FPS } from '../shared/timing.js';
 import type { ServiceConfig } from './config.js';
 import { errorMessage, isNotFound, ServiceError } from './errors.js';
 import { assertCacheOutsideSource, assertNoSymlinks, assertSourceIdentity, fingerprintFile } from './files.js';
-import { type JobContext, JobQueue } from './jobs.js';
+import { JobQueue, type JobContext } from './jobs.js';
 import { runProcess } from './process.js';
 import { atomicWrite, ensurePrivateDirectory, SerialWriter } from './storage.js';
 
@@ -135,7 +135,7 @@ export class AudioLibrary {
   readonly #writer = new SerialWriter();
   readonly #operations = new SerialWriter();
   readonly #preparing = new Map<string, string>();
-  constructor(readonly config: ServiceConfig, readonly jobs: JobQueue) {}
+  constructor(readonly config: ServiceConfig, readonly jobs: JobQueue) { }
 
   async initialise(): Promise<void> {
     await this.#operations.run(async () => {
@@ -280,10 +280,12 @@ export class AudioLibrary {
         '-map', '0:a:0', '-vn', '-sn', '-dn', '-map_metadata', '-1', '-map_chapters', '-1', '-af', `${upmix}asetpts=PTS-STARTPTS`,
         '-ar', String(SAMPLE_RATE), '-ac', String(CHANNELS), '-c:a', 'aac', '-b:a', '192k', '-threads', '2', '-filter_threads', '2',
         '-movflags', '+faststart', '-progress', 'pipe:1', temporary,
-      ], { signal: context.signal, onProgress: (fields) => {
-        const microseconds = Number(fields['out_time_us']);
-        if (Number.isFinite(microseconds)) context.update(0.05 + Math.min(0.7, microseconds / 1e6 / asset.metadata.durationSeconds * 0.7), 'Encoding music playback');
-      } });
+      ], {
+        signal: context.signal, onProgress: (fields) => {
+          const microseconds = Number(fields['out_time_us']);
+          if (Number.isFinite(microseconds)) context.update(0.05 + Math.min(0.7, microseconds / 1e6 / asset.metadata.durationSeconds * 0.7), 'Encoding music playback');
+        }
+      });
       context.update(0.78, 'Verifying audio profile and sampling waveform peaks');
       const metadata = await probeAudio(this.config, temporary, context.signal);
       verifyPlayback(metadata, asset.metadata);

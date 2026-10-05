@@ -1,14 +1,14 @@
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { appendFile, copyFile, lstat, mkdir, mkdtemp, readFile, readdir, rename, rm, symlink, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { audioAssetSchema, type AudioAsset } from '../../src/shared/audio.js';
-import { jobSchema } from '../../src/shared/media.js';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { createApp } from '../../src/server/app.js';
 import { AudioLibrary, probeAudio } from '../../src/server/audio.js';
 import { createConfig, type ServiceConfig } from '../../src/server/config.js';
 import { JobQueue } from '../../src/server/jobs.js';
 import * as processes from '../../src/server/process.js';
+import { audioAssetSchema, type AudioAsset } from '../../src/shared/audio.js';
+import { jobSchema } from '../../src/shared/media.js';
 
 const enabled = process.env['PASCAP_MEDIA_TESTS'] === '1';
 const headers = { host: '127.0.0.1:4318', 'x-pascap-client': 'preview-lab' };
@@ -145,7 +145,7 @@ describe.skipIf(!enabled)('registered music · disposable lavfi audio only', () 
 
   it('deduplicates concurrent preparations on the one shared queue, persists queued cancellation, and retries explicitly', async () => {
     const asset = await readyTone();
-    let release = (): void => {};
+    let release = (): void => { };
     const gate = new Promise<void>((resolve) => { release = resolve; });
     const blocker = service.jobs.submit('reference', 'Disposable queue gate', async () => gate);
     let queuedId = '';

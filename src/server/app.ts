@@ -13,8 +13,8 @@ import { AudioLibrary } from './audio.js';
 import { createConfig, type ServiceConfig } from './config.js';
 import { errorMessage, isNotFound, ServiceError } from './errors.js';
 import { restoreExports } from './export-archive.js';
-import { preflightExport, startExport } from './export.js';
 import { requireExportReserve } from './export-space.js';
+import { preflightExport, startExport } from './export.js';
 import { assertNoSymlinks, assertSourceIdentity, parseByteRange } from './files.js';
 import { FootageBrowser } from './footage.js';
 import { JobQueue } from './jobs.js';
@@ -88,7 +88,7 @@ export async function createApp(config = createConfig()) {
     if (error instanceof ServiceError) status = error.statusCode;
     if (error instanceof ZodError) status = 400;
     if (error instanceof Error && 'code' in error && typeof error.code === 'string' && error.code.startsWith('FST_ERR_CTP_') &&
-        'statusCode' in error && typeof error.statusCode === 'number' && [400, 413, 415].includes(error.statusCode)) status = error.statusCode;
+      'statusCode' in error && typeof error.statusCode === 'number' && [400, 413, 415].includes(error.statusCode)) status = error.statusCode;
     const message = error instanceof ZodError ? error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`).join('; ') : errorMessage(error);
     const body = error instanceof MediaQueueError ? { error: message, mediaId: error.asset.id, asset: error.asset, job: null } : { error: message };
     await reply.code(status).send(body);

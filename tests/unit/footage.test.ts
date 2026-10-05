@@ -11,7 +11,7 @@ import { JobQueue } from '../../src/server/jobs.js';
 import { MediaLibrary, PROXY_PROFILE, type ImportForEditingResult } from '../../src/server/library.js';
 import { probeVideo } from '../../src/server/probe.js';
 import { runProcess } from '../../src/server/process.js';
-import { MAX_FOOTAGE_ENTRIES, MAX_FOOTAGE_FILES, audioDirectorySchema, footageDirectorySchema, footageRootSchema, isAudioFilename, type AudioDirectory, type FootageDirectory, type FootageRoot } from '../../src/shared/footage.js';
+import { audioDirectorySchema, footageDirectorySchema, footageRootSchema, isAudioFilename, MAX_FOOTAGE_ENTRIES, MAX_FOOTAGE_FILES, type AudioDirectory, type FootageDirectory, type FootageRoot } from '../../src/shared/footage.js';
 import { mediaAssetSchema, registrySchema, type MediaAsset, type VideoMetadata } from '../../src/shared/media.js';
 import { forEachSerial } from '../../src/shared/serial.js';
 import { framesToSeconds, PROJECT_FPS } from '../../src/shared/timing.js';
@@ -85,7 +85,7 @@ async function setPermissions(filename: string, mode: number, restore = 0o700): 
   await fs.chmod(filename, mode);
 }
 function blockWorker(jobs: JobQueue) {
-  let release = (): void => {};
+  let release = (): void => { };
   const gate = new Promise<void>((resolve) => { release = resolve; });
   releases.push(release);
   jobs.submit('reference', 'footage-unit worker gate', async (context) => new Promise<void>((resolve, reject) => {

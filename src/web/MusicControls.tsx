@@ -3,12 +3,12 @@ import type { AudioAsset } from '../shared/audio.js';
 import type { EditCommand } from '../shared/commands.js';
 import type { MusicTrack, ProjectDocument } from '../shared/model.js';
 import { calculateLayout } from '../shared/timeline.js';
-import './declutter.css';
-import { durationLabel, sourceSeconds } from './display.js';
 import { Disclosure } from './Disclosure.js';
 import { HelpPopover } from './HelpPopover.js';
 import { Modal } from './Modal.js';
 import { NumberField } from './NumberField.js';
+import './declutter.css';
+import { durationLabel, sourceSeconds } from './display.js';
 import './media-import.css';
 
 interface Props {

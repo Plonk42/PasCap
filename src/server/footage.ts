@@ -1,7 +1,7 @@
 import { constants, type Dirent, type Stats } from 'node:fs';
 import { access, lstat, opendir } from 'node:fs/promises';
 import path from 'node:path';
-import { MAX_FOOTAGE_ENTRIES, MAX_FOOTAGE_FILES, isAudioFilename, isVideoFilename, type AudioDirectory, type FootageDirectory, type FootageRoot } from '../shared/footage.js';
+import { isAudioFilename, isVideoFilename, MAX_FOOTAGE_ENTRIES, MAX_FOOTAGE_FILES, type AudioDirectory, type FootageDirectory, type FootageRoot } from '../shared/footage.js';
 import { forEachSerial } from '../shared/serial.js';
 import type { ServiceConfig } from './config.js';
 import { errorMessage, isNotFound, ServiceError } from './errors.js';

@@ -1,5 +1,5 @@
-import type { MusicTrack } from '../shared/model.js';
 import { musicGainAt, musicSourceFrame } from '../shared/audio.js';
+import type { MusicTrack } from '../shared/model.js';
 import { framesToSeconds } from '../shared/timing.js';
 
 function aborted(): DOMException { return new DOMException('Music operation cancelled', 'AbortError'); }
