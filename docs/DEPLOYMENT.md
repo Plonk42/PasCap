@@ -165,6 +165,11 @@ layer composition, BT.709 tags, exact frame counts and music/export verification
 
 ## Future container acceptance — not completed
 
+Follow [licensing and distribution](LICENSING.md) for the approved project MIT
+terms, exact npm notices and the separate GPL-enabled FFmpeg/libx264 source,
+native dependency and artifact-review requirements. No built image/source bundle
+or codec/patent clearance is implied by the project license or CI cache.
+
 Before publishing packaging, validate **both Docker and Podman** with disposable
 synthetic media and explicit read-only source bind mounts:
 

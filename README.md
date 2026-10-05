@@ -144,6 +144,9 @@ It lists metadata and accepts selected original paths, never video upload bodies
 
 ## License
 
-No project license has been selected yet. Public availability does not grant an
-open-source license; licensing is a maintainer decision tracked before release.
-Third-party dependencies and native codecs retain their respective licenses.
+PasCap's own source and documentation use the [MIT license](LICENSE), explicitly
+chosen by the maintainer. Third-party dependencies, native codecs and user media
+retain their own terms. Builds include exact production npm notices;
+[licensing and distribution](docs/LICENSING.md) documents the inventory and the
+separate GPL-enabled FFmpeg/libx264 source/notice and release-review requirements.
+This license is not a container release or a grant of rights to recordings/music.
