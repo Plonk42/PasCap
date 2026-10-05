@@ -17,7 +17,7 @@ import { createClip, createLayer, createProject, idSchema, projectSchema, type P
 import { projectSummarySchema } from '../../src/shared/projects.js';
 import { calculateLayout } from '../../src/shared/timeline.js';
 import { framesToSeconds, PROJECT_FPS } from '../../src/shared/timing.js';
-import { legacyV3Project, legacyV4Project } from './project-fixtures.js';
+import { unsupportedProject } from './project-fixtures.js';
 
 const temporary: string[] = [];
 const services: Awaited<ReturnType<typeof createApp>>[] = [];
@@ -209,7 +209,7 @@ describe('multiple-project store', () => {
   it('explicitly deletes unsupported/corrupt regular files without migration but rejects non-files', async () => {
     const directory = await temp(); const store = new ProjectStore(directory); await store.create('Safe');
     const folder = path.join(directory, 'projects');
-    await writeFile(path.join(folder, 'old-v4.json'), JSON.stringify(legacyV4Project('old-v4', 'Old shared library')));
+    await writeFile(path.join(folder, 'old-v4.json'), JSON.stringify(unsupportedProject(4, 'old-v4', 'Old shared library')));
     await writeFile(path.join(folder, 'broken.json'), '{broken'); await mkdir(path.join(folder, 'not-file.json'));
     await expect(store.load('old-v4')).rejects.toThrow('schema version 4');
     await store.delete('old-v4', null); await store.delete('broken', null);
@@ -300,7 +300,7 @@ describe('multiple-project HTTP API', () => {
     expect((await service.app.inject({ url, headers })).statusCode).toBe(404);
     expect((await service.app.inject({ method: 'DELETE', url, headers, payload: { expectedRevision: 1 } })).statusCode).toBe(404);
     expect((await service.app.inject({ method: 'DELETE', url: '/api/projects/bad%2Fid', headers, payload: { expectedRevision: null } })).statusCode).toBe(400);
-    await atomicWrite(path.join(directory, 'projects', 'legacy.json'), JSON.stringify(legacyV4Project('legacy', 'Old')));
+    await atomicWrite(path.join(directory, 'projects', 'legacy.json'), JSON.stringify(unsupportedProject(4, 'legacy', 'Old')));
     expect((await service.app.inject({ method: 'DELETE', url: '/api/projects/legacy', headers, payload: { expectedRevision: null } })).statusCode).toBe(200);
     expect(service.jobs.list()).toEqual([]);
   });
@@ -366,11 +366,11 @@ describe('multiple-project HTTP API', () => {
     expect((await service.app.inject({ method: 'PUT', url: '/api/projects/different', headers, payload: { document: good, expectedRevision: 0 } })).statusCode).toBe(400);
   });
 
-  it('exposes an actual v3 input as incompatible and refuses load, rename or v6 overwrite without migration', async () => {
-    const directory = await temp(); const legacy = legacyV3Project('legacy-v3', 'Original v3');
-    const bytes = `${JSON.stringify(legacy, null, 2)}\n`; const filename = path.join(directory, 'projects', 'legacy-v3.json');
+  it('exposes an unsupported-version input as unavailable and refuses load, rename or v6 overwrite', async () => {
+    const directory = await temp(); const unsupported = unsupportedProject(3, 'legacy-v3', 'Original v3');
+    const bytes = `${JSON.stringify(unsupported, null, 2)}\n`; const filename = path.join(directory, 'projects', 'legacy-v3.json');
     await atomicWrite(filename, bytes);
-    expect(projectSchema.safeParse(legacy).success).toBe(false);
+    expect(projectSchema.safeParse(unsupported).success).toBe(false);
     const service = await serviceAt(directory);
     const listed = await service.app.inject({ url: '/api/projects', headers });
     expect(listed.statusCode).toBe(200);

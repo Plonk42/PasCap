@@ -8,7 +8,7 @@ import { BASE_LAYER_ID, clipSchema, createClip, createLayer, createProject, proj
 import { trimByOutputFrames, trimOnTimeline, validateSourceRanges } from '../../src/shared/source-range.js';
 import { clipDuration, compileRetiming, speedSchema } from '../../src/shared/speed.js';
 import { calculateLayout, sampleTimeline } from '../../src/shared/timeline.js';
-import { legacyV4Project } from './project-fixtures.js';
+import { unsupportedProject } from './project-fixtures.js';
 
 const curves: Interpolation[] = ['hold', 'linear', 'ease-in', 'ease-out', 'smooth'];
 function point(frame: number, values: Partial<LayerKeyValues>, interpolation: Interpolation = 'linear'): LayerKeyframe {
@@ -54,7 +54,7 @@ describe('strict schema-6 row points and independently participating settings', 
     expect(project.layers[0]).toEqual(row());
     expect(Object.keys(clip)).toEqual(['id', 'mediaId', 'layerId', 'start', 'sourceIn', 'sourceOut', 'colour', 'speed', 'opacity']);
     expect(projectSchema.safeParse({ ...project, schemaVersion: 3 }).success).toBe(false);
-    expect(projectSchema.safeParse(legacyV4Project('old', 'Old schema-4 row')).success).toBe(false);
+    expect(projectSchema.safeParse(unsupportedProject(4, 'old', 'Unsupported row')).success).toBe(false);
     expect(projectSchema.safeParse({ ...project, media: undefined }).success).toBe(false);
     expect(projectSchema.safeParse({ ...project, layers: [{ ...row(), opacityKeys: [] }] }).success).toBe(false);
     const { keyframes: _keys, ...incomplete } = row();

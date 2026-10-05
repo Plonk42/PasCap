@@ -9,15 +9,10 @@ import { JobQueue } from '../../src/server/jobs.js';
 import { ProjectStore } from '../../src/server/storage.js';
 import { EMPTY_KEY_VALUES } from '../../src/shared/keyframes.js';
 import { createClip, createLayer, createProject } from '../../src/shared/model.js';
-import { legacyV4Project } from '../unit/project-fixtures.js';
+import { unsupportedProject } from '../unit/project-fixtures.js';
 
 const enabled = process.env['PASCAP_MEDIA_TESTS'] === '1';
 const roots: string[] = [];
-// Genuine v5 shape: project bins/shared points, global fades/transitions and no
-// track timing fields. Never manufacture old data by relabelling a v6 document.
-function legacyV5Project(id: string, title: string) {
-  return { ...legacyV4Project(id, title), schemaVersion: 5, media: { videoIds: ['legacy-media'], audioIds: [] } };
-}
 async function temp(): Promise<string> {
   const root = await mkdtemp(path.join(os.tmpdir(), 'pascap-schema6-storage-media-')); roots.push(root); return root;
 }
@@ -25,7 +20,7 @@ async function temp(): Promise<string> {
 describe.skipIf(!enabled)('schema-6 storage/archive integration · generated files only, no migrations', () => {
   afterEach(async () => { await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))); });
 
-  it('loads strict v6 points/bins and lists/rejects v1/v2/v3 headers and genuine v4/v5 without rewriting them', async () => {
+  it('loads strict v6 points/bins and lists/rejects unsupported versions without rewriting them', async () => {
     const root = await temp(); const store = new ProjectStore(root);
     const project = createProject('strict-v6', 'Strict current document');
     project.media = { videoIds: ['generated-original', 'unplaced-original'], audioIds: ['unplaced-music'] };
@@ -40,9 +35,7 @@ describe.skipIf(!enabled)('schema-6 storage/archive integration · generated fil
     const old = [];
     for (const version of [1, 2, 3, 4, 5]) {
       const id = `original-v${version}`; const title = `Preserved original version ${version}`;
-      // Keep the original header cases and both actual preceding storage shapes.
-      const document = version === 5 ? legacyV5Project(id, title) : version === 4 ? legacyV4Project(id, title) : { schemaVersion: version, id, title };
-      if (version === 4) expect(document).not.toHaveProperty('media');
+      const document = unsupportedProject(version, id, title);
       const bytes = Buffer.from(`${JSON.stringify(document)}\n`);
       const filename = path.join(root, 'projects', `${id}.json`); await writeFile(filename, bytes);
       old.push({ id, title, version, filename, bytes });
@@ -130,7 +123,7 @@ describe.skipIf(!enabled)('schema-6 storage/archive integration · generated fil
       const current = await archive(snapshot, 'v6');
       const older = [];
       for (const version of [1, 2, 3, 4, 5]) {
-        const document = version === 5 ? legacyV5Project('old-5', 'Original 5') : version === 4 ? legacyV4Project('old-4', 'Original 4') : { schemaVersion: version, id: `old-${version}`, title: `Original ${version}` };
+        const document = unsupportedProject(version, `old-${version}`, `Original ${version}`);
         older.push({ ...await archive(document, `v${version}`), version });
       }
       const missingRow: Record<string, unknown> = { ...snapshot.layers[0]! }; delete missingRow['keyframes'];

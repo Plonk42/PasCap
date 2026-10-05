@@ -8,7 +8,7 @@ import { trimByOutputFrames } from '../../src/shared/source-range.js';
 import { calculateLayout, sampleTimeline } from '../../src/shared/timeline.js';
 import { musicGainAt, musicSourceFrame } from '../../src/shared/audio.js';
 import { snapFrame, snapPoints } from '../../src/shared/snap.js';
-import { legacyV4Project } from './project-fixtures.js';
+import { unsupportedProject } from './project-fixtures.js';
 
 function point(frame: number, values: Partial<LayerKeyValues>, interpolation: Interpolation = 'linear'): LayerKeyframe {
   return { frame, interpolation, values: { ...EMPTY_KEY_VALUES, ...values } };
@@ -22,7 +22,7 @@ describe('shared retiming and recoverable speed edits', () => {
     const project = createProject('flight', 'Flight');
     expect(project.schemaVersion).toBe(6);
     for (const schemaVersion of [1, 2, 3, 4, 5]) expect(() => projectSchema.parse({ ...project, schemaVersion })).toThrow();
-    expect(() => projectSchema.parse(legacyV4Project('old-flight', 'Old schema-4 flight'))).toThrow();
+    expect(() => projectSchema.parse(unsupportedProject(4, 'old-flight', 'Unsupported flight'))).toThrow();
     const clip = createClip('a', 'source', 0, 600);
     const { speed: _speed, ...incomplete } = clip;
     expect(() => projectSchema.parse({ ...project, clips: [incomplete] })).toThrow();

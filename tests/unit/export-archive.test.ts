@@ -8,7 +8,7 @@ import { createClip, createProject } from '../../src/shared/model.js';
 import { createConfig } from '../../src/server/config.js';
 import { restoreExports } from '../../src/server/export-archive.js';
 import { JobQueue } from '../../src/server/jobs.js';
-import { legacyV3Project, legacyV4Project, legacyV5Project } from './project-fixtures.js';
+import { unsupportedProject } from './project-fixtures.js';
 
 const temporary: string[] = [];
 afterEach(async () => { for (const folder of temporary.splice(0)) await rm(folder, { recursive: true, force: true }); });
@@ -26,14 +26,10 @@ describe('durable export receipts', () => {
     expect(await readFile(path.join(folder, 'receipt.json'), 'utf8')).toBe(text);
     await restoreExports(createConfig({ dataDir: root }), jobs); expect(jobs.list()).toHaveLength(1); await jobs.close();
   });
-  it.each([
-    { version: 3, fixture: legacyV3Project },
-    { version: 4, fixture: legacyV4Project },
-    { version: 5, fixture: legacyV5Project },
-  ])('leaves version-1 receipts with actual v$version snapshots and their completed outputs incompatible and unchanged', async ({ version, fixture }) => {
+  it.each([3, 4, 5])('leaves version-1 receipts with unsupported v%s snapshots and their completed outputs unchanged', async (version) => {
     const root = await mkdtemp(path.join(os.tmpdir(), 'pascap-archive-')); temporary.push(root);
     const id = randomUUID(); const folder = path.join(root, 'renders', id); await mkdir(folder, { recursive: true });
-    const snapshot = fixture('legacy-flight', `Original v${version} flight`);
+    const snapshot = unsupportedProject(version, 'unsupported-flight', `Original v${version} flight`);
     const text = JSON.stringify({ kind: 'export', schemaVersion: 1, jobId: id, createdAt: new Date().toISOString(), snapshot, profile: 'draft720', verification: { frameCount: 60, fullDecode: true, faststart: true } });
     const output = 'completed legacy output fixture';
     await writeFile(path.join(folder, 'receipt.json'), text); await writeFile(path.join(folder, 'export.mp4'), output);

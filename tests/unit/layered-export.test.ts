@@ -22,7 +22,7 @@ import { createClip, createLayer, createProject, projectSchema, type ProjectDocu
 import { compileRetiming } from '../../src/shared/speed.js';
 import { calculateLayout, type PreviewLayer } from '../../src/shared/timeline.js';
 import { framesToSeconds, PROJECT_FPS } from '../../src/shared/timing.js';
-import { legacyV3Project, legacyV4Project, legacyV5Project } from './project-fixtures.js';
+import { unsupportedProject } from './project-fixtures.js';
 
 const temporary: string[] = [];
 const queues: JobQueue[] = [];
@@ -83,9 +83,7 @@ describe('schema-6 production dispatch and read-only validation', () => {
     expect(placed.retiming.duration).toBe(planLayeredExport(project).duration);
     expect(exportRequestSchema.parse({ document: project, profile: 'draft720' }).document.schemaVersion).toBe(6);
     expect(exportRequestSchema.safeParse({ document: { ...project, schemaVersion: 2 }, profile: 'draft720' }).success).toBe(false);
-    expect(exportRequestSchema.safeParse({ document: legacyV3Project('old', 'Old'), profile: 'draft720' }).success).toBe(false);
-    expect(exportRequestSchema.safeParse({ document: legacyV4Project('old-v4', 'Old schema-4'), profile: 'draft720' }).success).toBe(false);
-    expect(exportRequestSchema.safeParse({ document: legacyV5Project('old-v5', 'Old schema-5'), profile: 'draft720' }).success).toBe(false);
+    for (const version of [3, 4, 5]) expect(exportRequestSchema.safeParse({ document: unsupportedProject(version, 'old', 'Unsupported export'), profile: 'draft720' }).success).toBe(false);
   });
   it('dispatches and explicitly rejects static planning for every non-neutral layered/animated case', () => {
     const variants: ((project: ProjectDocument) => void)[] = [
@@ -117,7 +115,7 @@ describe('schema-6 production dispatch and read-only validation', () => {
     expect(projectSchema.safeParse({ ...project, clips: [{ ...project.clips[0], colour: undefined }] }).success).toBe(false);
     expect(projectSchema.safeParse({ ...project, clips: [{ ...project.clips[0], opacity: undefined }] }).success).toBe(false);
     expect(projectSchema.safeParse({ ...project, clips: [{ ...project.clips[0], speed: undefined }] }).success).toBe(false);
-    expect(projectSchema.safeParse({ ...project, clips: [{ ...project.clips[0], animation: legacyV3Project('old', 'Old').clips[0]!.animation }] }).success).toBe(false);
+    expect(projectSchema.safeParse({ ...project, clips: [{ ...project.clips[0], animation: { opacity: [], colour: [] } }] }).success).toBe(false);
     project.clips.push({ ...createClip('first-overlay', 'video', 0, 3), layerId: 'video-2', start: 1 },
       { ...createClip('overlap', 'video', 3, 6), layerId: 'video-2', start: 2 });
     project.layers[1]!.transitions = [{ leftId: 'first-overlay', rightId: 'overlap', type: 'cut', duration: 0 }];
@@ -159,40 +157,22 @@ describe('schema-6 production dispatch and read-only validation', () => {
     expect(Object.isFrozen(snapshot.layers[0]!.keyframes[0]!.values)).toBe(true);
     expect(Object.isFrozen(snapshot.clips[0]!.colour)).toBe(true);
   });
-  it('strictly loads v6 but lists/rejects v2 and actual v3/v4/v5 inputs unchanged, including overwrite attempts', async () => {
+  it('strictly loads v6 but lists/rejects unsupported versions unchanged, including overwrite attempts', async () => {
     const directory = await temp();
     const store = new ProjectStore(directory);
     const saved = await store.save(document(), 0);
     expect(await store.load(saved.id)).toEqual(saved);
-    const old = `${JSON.stringify({ schemaVersion: 2, id: 'old', title: 'Original v2 document', clips: [] })}\n`;
-    const filename = path.join(directory, 'projects', 'old.json'); await writeFile(filename, old);
-    expect((await store.list()).find((summary) => summary.id === 'old')).toMatchObject({ compatible: false, title: 'Original v2 document' });
-    await expect(store.load('old')).rejects.toThrow('requires version 6');
-    await expect(store.save(createProject('old', 'No migration'), 0)).rejects.toThrow('existing file was not changed');
-    expect(await readFile(filename, 'utf8')).toBe(old);
-    const legacy = legacyV3Project('old-v3', 'Original v3 document'); const oldV3 = `${JSON.stringify(legacy, null, 2)}\n`;
-    const filenameV3 = path.join(directory, 'projects', 'old-v3.json'); await writeFile(filenameV3, oldV3);
-    expect(projectSchema.safeParse(legacy).success).toBe(false);
-    expect((await store.list()).find((summary) => summary.id === 'old-v3')).toMatchObject({ compatible: false, title: 'Original v3 document', error: expect.stringContaining('schema version 3') });
-    await expect(store.load('old-v3')).rejects.toThrow('requires version 6');
-    await expect(store.rename('old-v3', 'No migration', 0)).rejects.toThrow('existing file was not changed');
-    await expect(store.save(createProject('old-v3', 'No migration'), 0)).rejects.toThrow('existing file was not changed');
-    expect(await readFile(filenameV3, 'utf8')).toBe(oldV3);
-    const legacyV4 = legacyV4Project('old-v4', 'Original v4 document'); const oldV4 = `${JSON.stringify(legacyV4, null, 2)}\n`;
-    const filenameV4 = path.join(directory, 'projects', 'old-v4.json'); await writeFile(filenameV4, oldV4);
-    expect(legacyV4).not.toHaveProperty('media'); expect(projectSchema.safeParse(legacyV4).success).toBe(false);
-    expect((await store.list()).find((summary) => summary.id === 'old-v4')).toMatchObject({ compatible: false, title: 'Original v4 document', error: expect.stringContaining('schema version 4') });
-    await expect(store.load('old-v4')).rejects.toThrow('requires version 6');
-    await expect(store.rename('old-v4', 'No migration', 0)).rejects.toThrow('existing file was not changed');
-    await expect(store.save(createProject('old-v4', 'No migration'), 0)).rejects.toThrow('existing file was not changed');
-    expect(await readFile(filenameV4, 'utf8')).toBe(oldV4);
-    const oldV5 = `${JSON.stringify(legacyV5Project('old-v5', 'Original v5 document'), null, 2)}\n`;
-    const filenameV5 = path.join(directory, 'projects', 'old-v5.json'); await writeFile(filenameV5, oldV5);
-    expect((await store.list()).find((summary) => summary.id === 'old-v5')).toMatchObject({ compatible: false, title: 'Original v5 document', error: expect.stringContaining('schema version 5') });
-    await expect(store.load('old-v5')).rejects.toThrow('requires version 6');
-    await expect(store.rename('old-v5', 'No migration', 0)).rejects.toThrow('existing file was not changed');
-    await expect(store.save(createProject('old-v5', 'No migration'), 0)).rejects.toThrow('existing file was not changed');
-    expect(await readFile(filenameV5, 'utf8')).toBe(oldV5);
+    for (const version of [2, 3, 4, 5]) {
+      const id = `old-v${version}`; const title = `Original v${version} document`;
+      const unsupported = unsupportedProject(version, id, title); const bytes = `${JSON.stringify(unsupported, null, 2)}\n`;
+      const filename = path.join(directory, 'projects', `${id}.json`); await writeFile(filename, bytes);
+      expect(projectSchema.safeParse(unsupported).success).toBe(false);
+      expect((await store.list()).find((summary) => summary.id === id)).toMatchObject({ compatible: false, title, error: expect.stringContaining(`schema version ${version}`) });
+      await expect(store.load(id)).rejects.toThrow('requires version 6');
+      await expect(store.rename(id, 'No migration', 0)).rejects.toThrow('existing file was not changed');
+      await expect(store.save(createProject(id, 'No migration'), 0)).rejects.toThrow('existing file was not changed');
+      expect(await readFile(filename, 'utf8')).toBe(bytes);
+    }
   });
   it.each(['cut', 'cross-dissolve'] as const)('accepts an arbitrary-ID positioned %s reference but rejects leading/internal gaps before native work', async (type) => {
     const plain = document(); const trackId = 'arbitrary-track';
