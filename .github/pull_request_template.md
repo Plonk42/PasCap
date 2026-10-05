@@ -42,7 +42,7 @@ RC1; do not infer a post-RC promise or release approval. -->
 
 - [ ] Relevant contracts/evidence and, when tracked, issue/Project Status are updated; no duplicate sprint checklist or housekeeping issue is created.
 - [ ] Approved, reviewed and validated commits are published to this branch/PR, or a concrete blocker is recorded; no direct main push, force-push or protection bypass.
-- [ ] Non-CI acceptance is verified for the exact head before auto-merge is armed. Closing links target only fully completed issues, never partial work or deferred hardware/owner gates.
+- [ ] Non-CI acceptance is verified for the exact head before auto-merge is armed. GitHub's actual closing-issue references are read back and contain only fully completed issues, never partial work or deferred hardware/owner gates; negated closing phrases are not safe exclusions.
 - [ ] Required up-to-date PR CI is left to native auto-merge, without session watchers or custom closure automation. Next-session reconciliation removes obsolete progress labels and verifies issue/Project Done; failed CI remains actionable, not accepted.
 - [ ] Original/media safety and unrelated user edits are preserved.
 - [ ] No private paths/media, credentials, caches or generated reports are included.

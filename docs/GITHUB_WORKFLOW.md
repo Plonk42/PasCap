@@ -198,6 +198,10 @@ reviewer, broaden credentials or bypass checks to get a PR merged.
    logical steps, investigations and work awaiting hardware/owner criteria merely
    reference their issues; they may merge without closing them. Milestone/release
    acceptance and legacy tracker cleanup remain separate owner decisions.
+   **Read back GitHub's actual closing-issue references before arming** and verify
+   that they contain exactly the accepted issues. Closing keywords are parsed even
+   in negated prose; ordinary mentions of excluded work must not contain a closing
+   keyword directly followed by its issue number. Do not rely only on text matching.
 5. Enable **native squash auto-merge for the reviewed head**, using a head-SHA guard
    when supported. GitHub waits for required up-to-date PR CI, merges to `main`,
    deletes the head branch and closes eligible linked issues as completed. Record

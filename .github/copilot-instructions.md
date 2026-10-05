@@ -23,8 +23,10 @@
 - Verify non-CI acceptance against live scope/dependencies and the exact PR head
   before enabling native squash auto-merge. Add `Closes #N` only in the PR description
   when it completes the entire issue; incremental/investigation/hardware-pending PRs
-  merely reference it. Required up-to-date PR CI (Node 22/24, native/browser and
-  fail-closed Delivery gate) is the merge/closure gate; main push CI is a regression
+  merely reference it. Read back GitHub's actual closing-issue links before arming;
+  negated prose can still create unintended closing links. Required up-to-date PR CI
+  (Node 22/24, native/browser and fail-closed Delivery gate) is the merge/closure gate;
+  main push CI is a regression
   backstop, not a second closure wait. Green CI alone is not product acceptance.
   Disable auto-merge and remove closing links before further changes; revalidate
   changed inputs and rereview before rearming against the new head.
