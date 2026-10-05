@@ -69,7 +69,10 @@ npm run test:browser
 ```
 
 - `check` runs strict frontend typechecking, unit/service tests and the production
-  build/server typecheck. `npm test` runs Vitest; native tests require `test:media`.
+  build/server typecheck and locked production-license inventory. Builds retain the
+  upstream notice texts in a served notice artifact; `npm run licenses:check`
+  verifies the inventory without building/writing. See [licensing](LICENSING.md).
+  `npm test` runs Vitest; native tests require `test:media`.
 - `test:media` uses disposable temporary **synthetic** sources/projects/outputs only.
 - `test:browser` builds/creates synthetic fixtures, then runs serial Chrome workflows
   on its own service at **4320**, without reusing a running service.
@@ -179,7 +182,9 @@ and [grading equations](COLOUR_AND_TIMING.md#colour).
 - Preserve exact frame/packet/source-map, pixel-error, audio and resource assertions.
   Investigate EOF/timing failures; no weaker checks, silent clamping/fallback,
   warning suppression or analysis exclusions.
-- No project license is declared; do not assume MIT or redistribute private media.
+- The project uses the approved [MIT license](../LICENSE); third-party/native
+  components and private media keep their own terms. Follow [licensing](LICENSING.md)
+  before any binary/image distribution; source publication is not release approval.
   Preserve [../EDITOR_IMPLEMENTATION_PLAN.md](../EDITOR_IMPLEMENTATION_PLAN.md);
   planning/feature worksheets are scope inputs, not code/assets to copy.
 

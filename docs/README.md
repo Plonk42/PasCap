@@ -13,6 +13,7 @@ priorities, progress and delivery updates.
 | [USER_GUIDE.md](USER_GUIDE.md) | Projects, no-copy import, repeated excerpts, timeline editing, clip speed curves, row keyframes, music/export and recovery |
 | [DEVELOPMENT.md](DEVELOPMENT.md) | Linux toolchain, commands, synthetic tests, CI, architecture and contributor safety |
 | [DEPLOYMENT.md](DEPLOYMENT.md) | Service-side source paths/API and security; planned local Docker/Podman packaging, **not a runnable container recipe** |
+| [LICENSING.md](LICENSING.md) | Approved project MIT terms, exact production npm notices and separate native/binary distribution review gates |
 
 ## Processing and editing contracts
 

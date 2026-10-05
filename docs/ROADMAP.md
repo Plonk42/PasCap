@@ -27,7 +27,8 @@ qualification claim.
 
 Use concrete work issues and [ready next actions](https://github.com/Plonk42/PasCap/issues?q=is%3Aissue%20is%3Aopen%20label%3A%22status%3Aready%22)
 for mutable progress. #2 is ready for identity design, not unsafe relink implementation;
-#5 needs a maintainer license decision. GPU/flight work requires owner setup/consent,
+#5 covers the approved MIT license, dependency notices and native distribution review.
+GPU/flight work requires owner setup/consent,
 and containers remain a future milestone. The private repository-linked
 [planning Project](https://github.com/users/Plonk42/projects/1) presents the same
 issues with aligned Status. Use its native Iteration field for explicitly agreed
@@ -50,7 +51,7 @@ cleanup; no new Iteration dates or Project field/view changes are implied here.
 | [#2 — Explicit verified source relinking](https://github.com/Plonk42/PasCap/issues/2) | Recover moved/remounted originals with confirmation and documented identity evidence; never guess from names |
 | [#3 — Export disk preflight](https://github.com/Plonk42/PasCap/issues/3) | Explain scratch needs and handle low space without destroying original/successful data |
 | [#4 — Entry bundle loading](https://github.com/Plonk42/PasCap/issues/4) | Measure and reduce initial JS without suppressing the warning or changing per-frame ownership |
-| [#5 — License and redistribution notices](https://github.com/Plonk42/PasCap/issues/5) | Obtain a maintainer decision and inventory actual npm/native distribution obligations |
+| [#5 — License and redistribution notices](https://github.com/Plonk42/PasCap/issues/5) | Approved MIT project terms, retained npm notices and the separate GPL-enabled native distribution contract |
 | [#12 — GitHub workflow](https://github.com/Plonk42/PasCap/issues/12) | Keep instructions/forms, categorized priorities, next actions and iteration/dependency tracking aligned |
 | [#13 — Shared-point movement/navigation](https://github.com/Plonk42/PasCap/issues/13) | Retrospective delivered-feature record; preserve whole-point transactions, independent channel navigation and dated evidence |
 | [#14 — Precise clip speed](https://github.com/Plonk42/PasCap/issues/14) | Track approved source-frame curves and locally verified graph/numeric/native delivery separately from remote acceptance |
@@ -65,7 +66,8 @@ raw-reader fix, #3 storage/recovery controls and genuine constrained-volume test
 and #4 measured loading boundaries, with simpler visual UI throughout. Delivery
 and acceptance are recorded on those issues, not duplicated here. #2 has a
 documented sampled-versus-full identity prerequisite; no unsafe relink action was
-introduced. #5 still requires a maintainer decision.
+introduced. [Licensing](LICENSING.md) defines the approved project terms and
+remaining actual-artifact distribution/legal-review gates, not release approval.
 
 The separately approved clip-speed extension adds presets and editable source-frame
 curves without replacing row animation; [#14](https://github.com/Plonk42/PasCap/issues/14)

@@ -2,6 +2,7 @@
     "name": "pascap",
     "version": "0.1.0",
     "private": true,
+    "license": "MIT",
     "type": "module",
     "description": "Local Linux video editing with per-clip grading, speed curves, music and native FFmpeg export",
     "engines": {
@@ -12,7 +13,9 @@
         "dev:server": "tsx watch src/server/main.ts",
         "dev:web": "vite --host 127.0.0.1",
         "typecheck": "tsc --noEmit",
-        "build": "npm run typecheck && vite build && tsc -p tsconfig.server.json",
+        "build": "npm run typecheck && vite build && tsc -p tsconfig.server.json && npm run licenses:build",
+        "licenses:check": "tsx scripts/licenses.ts --check",
+        "licenses:build": "tsx scripts/licenses.ts --build",
         "start": "node dist/server/server/main.js",
         "test": "vitest run",
         "test:watch": "vitest",
