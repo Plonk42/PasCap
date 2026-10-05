@@ -42,11 +42,15 @@ test.beforeEach(async ({ page, request }) => {
         if (method === 'GET' && reads[pathname] !== undefined) { await route.fulfill({ json: reads[pathname] }); return; }
         if (method === 'POST' && pathname === '/api/exports/preflight') {
             const body = route.request().postDataJSON() as { document: unknown; profile: ExportProfile };
-            await route.fulfill({ json: { space: {
-                directory: '/disposable/track-parity/renders', availableBytes: 64 * 1024 ** 3,
-                estimate: estimateExportSpace(projectSchema.parse(body.document), body.profile),
-                status: 'available', checkedAt: '2026-10-05T10:00:00Z',
-            } } });
+            await route.fulfill({
+                json: {
+                    space: {
+                        directory: '/disposable/track-parity/renders', availableBytes: 64 * 1024 ** 3,
+                        estimate: estimateExportSpace(projectSchema.parse(body.document), body.profile),
+                        status: 'available', checkedAt: '2026-10-05T10:00:00Z',
+                    }
+                }
+            });
             return;
         }
         const video = /^\/api\/media\/([^/]+)\/(?:proxy|thumbnail\/\d+)$/.exec(pathname);

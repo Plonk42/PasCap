@@ -17,9 +17,9 @@ import { ProjectStore } from '../../src/server/storage.js';
 import { audioAssetSchema, type AudioAsset } from '../../src/shared/audio.js';
 import { COLOUR_CONTROLS, NEUTRAL_COLOUR } from '../../src/shared/colour.js';
 import { compositePixel } from '../../src/shared/composition.js';
-import { EXPORT_PROFILES, LAYERED_EXPORT_RESOURCES, needsLayeredExport, planExport, planLayeredExport } from '../../src/shared/export.js';
 import { estimateExportSpace } from '../../src/shared/export-space.js';
-import { EMPTY_KEY_VALUES, KEYFRAME_SETTINGS, evaluateLayerSetting, hasLayerKeys, type Interpolation, type LayerKeyframe, type LayerKeyValues } from '../../src/shared/keyframes.js';
+import { EXPORT_PROFILES, LAYERED_EXPORT_RESOURCES, needsLayeredExport, planExport, planLayeredExport } from '../../src/shared/export.js';
+import { EMPTY_KEY_VALUES, KEYFRAME_SETTINGS, evaluateLayerSetting, hasLayerKeys, type Interpolation, type LayerKeyValues, type LayerKeyframe } from '../../src/shared/keyframes.js';
 import type { MediaAsset } from '../../src/shared/media.js';
 import { createClip, createLayer, createProject, projectSchema, type ProjectDocument, type VideoLayer } from '../../src/shared/model.js';
 import { compileRetiming } from '../../src/shared/speed.js';
@@ -216,7 +216,7 @@ describe.skipIf(!enabled)('schema-6 layered native export · disposable syntheti
 
     const positioned = { ...createLayer('positioned-track', 'Independent track', false), opacity: 0.65, openingFade: 1, closingFade: 1 };
     positioned.keyframes = [point(2, { exposure: -0.2, hue: 25, layerOpacity: 0.3 }, 'ease-in'),
-      point(9, { exposure: 0.3, hue: -20, layerOpacity: 0.8 }, 'hold')];
+    point(9, { exposure: 0.3, hue: -20, layerOpacity: 0.8 }, 'hold')];
     const positionedLeft = { ...createClip('positioned-left', assets[1]!.id, 1, 5, positioned.id), start: overlap.end - 4, opacity: 0.4 };
     const positionedRight = { ...createClip('positioned-right', assets[0]!.id, 11, 15, positioned.id), start: overlap.start, opacity: 0.75 };
     positionedLeft.colour = { ...NEUTRAL_COLOUR, brightness: 0.025, contrast: 1.1, saturation: 0.7, shadows: 0.2 };
@@ -224,7 +224,7 @@ describe.skipIf(!enabled)('schema-6 layered native export · disposable syntheti
     const afterGap = { ...createClip('after-gap', assets[1]!.id, 17, 19, positioned.id), start: positionedRight.start + 6, opacity: 0.6 };
     afterGap.colour = { ...NEUTRAL_COLOUR, brightness: 0.035, saturation: 0.85, shadows: 0.1 };
     positioned.transitions = [{ leftId: positionedLeft.id, rightId: positionedRight.id, type: 'cross-dissolve', duration: 2 },
-      { leftId: positionedRight.id, rightId: afterGap.id, type: 'cut', duration: 0 }];
+    { leftId: positionedRight.id, rightId: afterGap.id, type: 'cut', duration: 0 }];
 
     const third = { ...createLayer('third-track', 'Another Ripple track', true), opacity: 0.7, openingFade: 1, closingFade: 1 };
     third.keyframes = [point(3, { clipOpacity: 0.2, brightness: 0.015 }), point(9, { clipOpacity: 0.75, brightness: 0.07 }, 'hold')];
@@ -358,11 +358,14 @@ describe.skipIf(!enabled)('schema-6 layered native export · disposable syntheti
     }
     const work = await mkdtemp(path.join(root, 'concurrent-lossless-'));
     try {
-      const result = await renderLayeredExport({ document: project, plan, assets: project.clips.map((clip) => library.get(clip.mediaId)),
+      const result = await renderLayeredExport({
+        document: project, plan, assets: project.clips.map((clip) => library.get(clip.mediaId)),
         ffmpeg: config.ffmpeg, directory: work, target: { ...EXPORT_PROFILES.draft720, width: WIDTH, height: HEIGHT },
-        context: { id: randomUUID(), signal: new AbortController().signal, update: () => {} } });
+        context: { id: randomUUID(), signal: new AbortController().signal, update: () => { } }
+      });
       expect(await readdir(work)).toEqual([result.filename]);
-      expect(result.report).toMatchObject({ layerPasses: count, sourceOverPasses: count - 1,
+      expect(result.report).toMatchObject({
+        layerPasses: count, sourceOverPasses: count - 1,
         peakOriginalVideoDecoders: 1, peakIntermediateVideoDecoders: 2, peakVideoEncoders: 1, peakNativeVideoChildren: 3,
         peakLosslessClipFiles: 2, peakLosslessTimelineRepresentations: 3, rawFrameBuffers: 4, rawBufferBytes: PIXELS * 22,
         peakLutEntries: 2, lutBytes: 6_591_000, lutsGenerated: expectedLutGenerations(project),
@@ -373,8 +376,10 @@ describe.skipIf(!enabled)('schema-6 layered native export · disposable syntheti
       expect(result.retiming).toHaveLength(count * 2 + 1);
       for (const [index, report] of result.retiming.entries()) {
         const placed = layout.clips.find((placed) => placed.clip.id === result.report.renderedClipIds[index])!;
-        expect(report).toMatchObject({ decodedFrames: placed.clip.sourceOut - placed.clip.sourceIn,
-          outputFrames: placed.duration, rawFrameBuffers: 1, frameBytes: FRAME_BYTES });
+        expect(report).toMatchObject({
+          decodedFrames: placed.clip.sourceOut - placed.clip.sourceIn,
+          outputFrames: placed.duration, rawFrameBuffers: 1, frameBytes: FRAME_BYTES
+        });
         expect(report.largestReadChunkBytes).toBeLessThanOrEqual(256 * 1024);
       }
       await losslessParity(project, path.join(work, result.filename));
@@ -491,16 +496,16 @@ describe.skipIf(!enabled)('schema-6 layered native export · disposable syntheti
   it('retains shared speed points/easing across different clips and a dissolve using absolute row maps without UI state', async () => {
     const project = createProject('native-row-boundary', 'Row speed across clip boundaries');
     const authored = [point(0, { speed: 0.5 }, 'smooth'), point(4, { speed: 1 }, 'ease-in'),
-      point(10, { speed: 2 }, 'ease-out'), point(16, { speed: 0.75 }), point(24, { speed: 1.25 }, 'hold')];
+    point(10, { speed: 2 }, 'ease-out'), point(16, { speed: 0.75 }), point(24, { speed: 1.25 }, 'hold')];
     project.layers[0]!.keyframes = structuredClone(authored);
     project.clips = [createClip('row-left', assets[0]!.id, 3, 15), createClip('row-right', assets[1]!.id, 6, 18),
-      createClip('row-tail', assets[0]!.id, 10, 18)];
+    createClip('row-tail', assets[0]!.id, 10, 18)];
     project.clips[0]!.speed = { mode: 'constant', rate: 0.5 };
     project.clips[1]!.speed = { mode: 'constant', rate: 2 };
     project.clips[2]!.speed = { mode: 'ramp', startRate: 3, endRate: 4, curve: 'ease-out', anchorIn: 0, anchorOut: 20 };
     project.clips[1]!.colour = { ...NEUTRAL_COLOUR, brightness: 0.04 };
     project.layers[0]!.transitions = [{ leftId: 'row-left', rightId: 'row-right', type: 'cross-dissolve', duration: 2 },
-      { leftId: 'row-right', rightId: 'row-tail', type: 'cut', duration: 0 }];
+    { leftId: 'row-right', rightId: 'row-tail', type: 'cut', duration: 0 }];
     expect(needsLayeredExport(project)).toBe(true);
     expect(needsLayeredExport({ ...project, layers: [{ ...project.layers[0]!, keyframes: [] }] })).toBe(false);
     expect(() => planExport(project)).toThrow('layered exporter');
@@ -602,7 +607,7 @@ describe.skipIf(!enabled)('schema-6 layered native export · disposable syntheti
     project.layers[0]!.transitions = [{ leftId: 'base', rightId: 'right', type: 'fade-through-black', duration: 5 }];
     project.layers[0]!.openingFade = 1; project.layers[0]!.closingFade = 1;
     project.layers[0]!.keyframes = [point(0, { brightness: 0.05, shadows: 0.5 }), point(3, { exposure: -0.2 }),
-      point(6, { brightness: 0.1, exposure: 0.5, hue: 25, shadows: 0.3 }, 'hold')];
+    point(6, { brightness: 0.1, exposure: 0.5, hue: 25, shadows: 0.3 }, 'hold')];
     project.clips[2]!.colour = { ...NEUTRAL_COLOUR, brightness: 0.1, exposure: 0.4, highlights: -0.2 };
     const result = await complete(project); bounds(result.receipt); await parity(project, result.filename);
     for (const frame of [3, 4]) {
@@ -661,7 +666,7 @@ describe.skipIf(!enabled)('schema-6 layered native export · disposable syntheti
     project.layers[1]!.keyframes = [point(1, { layerOpacity: 0.7 }), point(2, { layerOpacity: 0.3 }, 'hold')];
     const top = { ...createClip('uhd-top', assets[1]!.id, 4, 5), layerId: 'video-3', start: 2, opacity: 0.6 };
     project.layers[2]!.keyframes = [point(3, { ...NEUTRAL_COLOUR, brightness: 0.08, hue: -30 }),
-      point(6, { ...NEUTRAL_COLOUR, exposure: -0.3, saturation: 0.6 }, 'hold')];
+    point(6, { ...NEUTRAL_COLOUR, exposure: -0.3, saturation: 0.6 }, 'hold')];
     project.clips.push(top);
     const started = performance.now(); const result = await complete(project, 'final4k');
     const elapsed = performance.now() - started; bounds(result.receipt);

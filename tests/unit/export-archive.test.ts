@@ -1,13 +1,13 @@
-import { afterEach, describe, expect, it } from 'vitest';
-import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { EMPTY_KEY_VALUES } from '../../src/shared/keyframes.js';
-import { createClip, createProject } from '../../src/shared/model.js';
+import { afterEach, describe, expect, it } from 'vitest';
 import { createConfig } from '../../src/server/config.js';
 import { restoreExports } from '../../src/server/export-archive.js';
 import { JobQueue } from '../../src/server/jobs.js';
+import { EMPTY_KEY_VALUES } from '../../src/shared/keyframes.js';
+import { createClip, createProject } from '../../src/shared/model.js';
 import { unsupportedProject } from './project-fixtures.js';
 
 const temporary: string[] = [];

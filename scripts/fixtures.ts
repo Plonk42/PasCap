@@ -1,16 +1,16 @@
 import { copyFile, mkdir, rm } from 'node:fs/promises';
 import path from 'node:path';
-import { createClip, createProject, type ProjectDocument } from '../src/shared/model.js';
-import { applyCommand } from '../src/shared/commands.js';
-import { forEachSerial } from '../src/shared/serial.js';
+import { AudioLibrary } from '../src/server/audio.js';
 import { createConfig, type ServiceConfig } from '../src/server/config.js';
 import { isNotFound, ServiceError } from '../src/server/errors.js';
 import { assertNoSymlinks } from '../src/server/files.js';
-import { MediaLibrary } from '../src/server/library.js';
 import { JobQueue } from '../src/server/jobs.js';
+import { MediaLibrary } from '../src/server/library.js';
 import { runProcess } from '../src/server/process.js';
 import { ProjectStore } from '../src/server/storage.js';
-import { AudioLibrary } from '../src/server/audio.js';
+import { applyCommand } from '../src/shared/commands.js';
+import { createClip, createProject, type ProjectDocument } from '../src/shared/model.js';
+import { forEachSerial } from '../src/shared/serial.js';
 
 const browserDataDir = path.resolve('.pascap/browser-tests');
 

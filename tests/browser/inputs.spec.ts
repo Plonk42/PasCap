@@ -126,10 +126,14 @@ test('undo and external document updates replace stale drafts without moving inp
 
 test('the shared list labels time/value/easing, retains reordered input focus, and rejects point collisions', async ({ page }) => {
   let document = await currentProject(page);
-  document = applyCommand(document, { type: 'layer-update', layer: { ...document.layers[0]!, keyframes: [
-    sharedPoint(20, { clipOpacity: 0.2, exposure: -0.5 }, 'hold'),
-    sharedPoint(70, { clipOpacity: 0.8, exposure: 0.5 }, 'smooth'),
-  ] } });
+  document = applyCommand(document, {
+    type: 'layer-update', layer: {
+      ...document.layers[0]!, keyframes: [
+        sharedPoint(20, { clipOpacity: 0.2, exposure: -0.5 }, 'hold'),
+        sharedPoint(70, { clipOpacity: 0.8, exposure: 0.5 }, 'smooth'),
+      ]
+    }
+  });
   document = applyCommand(document, { type: 'layer-add', layer: { ...createLayer('upper', 'Video 2', false), keyframes: [sharedPoint(80, { clipOpacity: 0.4 }, 'hold')] } });
   document = applyCommand(document, { type: 'insert', clip: { ...createClip('other-row', document.clips[1]!.mediaId, 0, 30), layerId: 'upper', start: 90 }, index: 2 });
   await setProject(page, document);
@@ -184,10 +188,14 @@ test('the shared list labels time/value/easing, retains reordered input focus, a
 
 test('row-speed navigation reaches project points and previews outside-duration points at the nearest frame', async ({ page }) => {
   let document = await currentProject(page);
-  document = applyCommand(document, { type: 'layer-update', layer: { ...document.layers[0]!, keyframes: [
-    sharedPoint(5, { speed: 2 }, 'hold'), sharedPoint(35, { speed: 2 }, 'smooth'),
-    sharedPoint(40, { speed: 2 }), sharedPoint(110, { speed: 2 }, 'hold'),
-  ] } });
+  document = applyCommand(document, {
+    type: 'layer-update', layer: {
+      ...document.layers[0]!, keyframes: [
+        sharedPoint(5, { speed: 2 }, 'hold'), sharedPoint(35, { speed: 2 }, 'smooth'),
+        sharedPoint(40, { speed: 2 }), sharedPoint(110, { speed: 2 }, 'hold'),
+      ]
+    }
+  });
   document = applyCommand(document, { type: 'trim', clipId: 'clip-a', sourceIn: 30, sourceOut: 90 });
   await setProject(page, document);
   expect(document.layers[0]?.keyframes.map((point) => point.frame)).toEqual([5, 35, 40, 110]);
@@ -298,9 +306,13 @@ test('per-track fade/transition timing and positioned track key numbers use the 
   await opening.press('Escape');
 
   let document = await currentProject(page);
-  document = applyCommand(document, { type: 'layer-add', layer: { ...createLayer('upper', 'Video 2', false), keyframes: [
-    sharedPoint(5, { clipOpacity: 0.5 }, 'hold'), sharedPoint(10, { layerOpacity: 0.8 }, 'smooth'),
-  ] } });
+  document = applyCommand(document, {
+    type: 'layer-add', layer: {
+      ...createLayer('upper', 'Video 2', false), keyframes: [
+        sharedPoint(5, { clipOpacity: 0.5 }, 'hold'), sharedPoint(10, { layerOpacity: 0.8 }, 'smooth'),
+      ]
+    }
+  });
   document = applyCommand(document, { type: 'insert', clip: { ...createClip('overlay', document.clips[1]!.mediaId, 0, 30), layerId: 'upper', start: 5 }, index: 2 });
   await setProject(page, document);
   await page.locator('[data-clip-id="overlay"] .timeline-clip-body').click();
@@ -328,9 +340,13 @@ test('colour resets target the static base or only participating colours at the 
   document = await currentProject(page);
   const base = { ...document.clips[0]!.colour };
   const other = sharedPoint(110, { exposure: 1, saturation: 1.4 }, 'smooth');
-  document = applyCommand(document, { type: 'layer-update', layer: { ...document.layers[0]!, keyframes: [
-    sharedPoint(5, { exposure: -0.5, saturation: 0.6, clipOpacity: 0.4 }, 'hold'), other,
-  ] } });
+  document = applyCommand(document, {
+    type: 'layer-update', layer: {
+      ...document.layers[0]!, keyframes: [
+        sharedPoint(5, { exposure: -0.5, saturation: 0.6, clipOpacity: 0.4 }, 'hold'), other,
+      ]
+    }
+  });
   await setProject(page, document);
   const keys = layerKeyframes(page, 'Video 1');
   await editLayerPoint(page, 'Video 1', 5);

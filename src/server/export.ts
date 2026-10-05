@@ -2,6 +2,7 @@ import { mkdir, open, rename, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { audioAssetSchema, type AudioAsset } from '../shared/audio.js';
 import { generateCube } from '../shared/colour.js';
+import type { ExportPreflight } from '../shared/export-space.js';
 import {
   EXPORT_PROFILES, EXPORT_RESOURCES,
   exportDocumentSchema, exportRequestSchema,
@@ -18,7 +19,6 @@ import { validateSourceRanges } from '../shared/source-range.js';
 import { framesToSeconds, PROJECT_FPS, sameRate } from '../shared/timing.js';
 import { ServiceError } from './errors.js';
 import { exportStorageFailure, readExportSpace, requireExportReserve } from './export-space.js';
-import type { ExportPreflight } from '../shared/export-space.js';
 import { assertSourceIdentity } from './files.js';
 import type { JobContext } from './jobs.js';
 import { renderLayeredExport, type LayeredRenderReport } from './layered-export.js';

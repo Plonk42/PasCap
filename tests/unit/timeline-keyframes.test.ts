@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { EditHistory } from '../../src/shared/commands.js';
 import { NEUTRAL_COLOUR } from '../../src/shared/colour.js';
+import { EditHistory } from '../../src/shared/commands.js';
 import { EMPTY_KEY_VALUES, type LayerKeyframe } from '../../src/shared/keyframes.js';
 import { createClip, createProject } from '../../src/shared/model.js';
 import { calculateLayout } from '../../src/shared/timeline.js';

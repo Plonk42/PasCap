@@ -46,8 +46,10 @@ describe.skipIf(!enabled)('schema-6 storage/archive integration · generated fil
     const summaries = await store.list();
     expect(summaries.find((summary) => summary.id === saved.id)).toMatchObject({ compatible: true, revision: 1, clipCount: 1, duration: 8, error: null });
     for (const entry of old) {
-      expect(summaries.find((summary) => summary.id === entry.id)).toMatchObject({ id: entry.id, title: entry.title,
-        compatible: false, revision: 0, clipCount: 0, duration: 0, error: expect.stringContaining(`requires version 6`) });
+      expect(summaries.find((summary) => summary.id === entry.id)).toMatchObject({
+        id: entry.id, title: entry.title,
+        compatible: false, revision: 0, clipCount: 0, duration: 0, error: expect.stringContaining(`requires version 6`)
+      });
       expect(await readFile(entry.filename)).toEqual(entry.bytes);
     }
     expect(await readFile(currentPath)).toEqual(currentBytes);
@@ -57,10 +59,14 @@ describe.skipIf(!enabled)('schema-6 storage/archive integration · generated fil
     const root = await temp(); const store = new ProjectStore(root);
     const project = createProject('strict-tracks', 'Role-independent saved tracks');
     project.layers = [
-      { ...createLayer('positioned', 'Independent', false), opacity: 0.65, openingFade: 1, closingFade: 1,
-        transitions: [{ leftId: 'left', rightId: 'right', type: 'cross-dissolve', duration: 2 }] },
-      { ...createLayer('packed', 'Ripple', true), openingFade: 1, closingFade: 1,
-        transitions: [{ leftId: 'packed-left', rightId: 'packed-right', type: 'cut', duration: 0 }] },
+      {
+        ...createLayer('positioned', 'Independent', false), opacity: 0.65, openingFade: 1, closingFade: 1,
+        transitions: [{ leftId: 'left', rightId: 'right', type: 'cross-dissolve', duration: 2 }]
+      },
+      {
+        ...createLayer('packed', 'Ripple', true), openingFade: 1, closingFade: 1,
+        transitions: [{ leftId: 'packed-left', rightId: 'packed-right', type: 'cut', duration: 0 }]
+      },
       { ...createLayer('empty', 'Dormant fades', false), openingFade: 7, closingFade: 9 },
     ];
     project.clips = [
@@ -113,8 +119,10 @@ describe.skipIf(!enabled)('schema-6 storage/archive integration · generated fil
     snapshot.layers[0]!.keyframes = [{ frame: 50, interpolation: 'smooth', values: { ...EMPTY_KEY_VALUES, exposure: 0.1 } }];
     async function archive(document: unknown, label: string) {
       const id = randomUUID(); const folder = path.join(root, 'renders', id); await mkdir(folder, { recursive: true });
-      const receipt = Buffer.from(JSON.stringify({ kind: 'export', schemaVersion: 1, jobId: id, createdAt: '2026-10-03T00:00:00.000Z',
-        snapshot: document, profile: 'draft720', verification: { frameCount: 2, fullDecode: true, faststart: true } }));
+      const receipt = Buffer.from(JSON.stringify({
+        kind: 'export', schemaVersion: 1, jobId: id, createdAt: '2026-10-03T00:00:00.000Z',
+        snapshot: document, profile: 'draft720', verification: { frameCount: 2, fullDecode: true, faststart: true }
+      }));
       const output = Buffer.from(`Preserved successful-output sentinel: ${label}`);
       await writeFile(path.join(folder, 'receipt.json'), receipt); await writeFile(path.join(folder, 'export.mp4'), output);
       return { id, folder, receipt, output };
@@ -136,8 +144,10 @@ describe.skipIf(!enabled)('schema-6 storage/archive integration · generated fil
       const warnings = await restoreExports(config, jobs);
       expect(warnings).toHaveLength(10);
       expect(jobs.list().map((job) => job.id)).toEqual([current.id]);
-      expect(jobs.get(current.id)).toMatchObject({ kind: 'export', state: 'completed', progress: 1,
-        outputUrl: `/api/jobs/${current.id}/export`, receiptUrl: `/api/jobs/${current.id}/receipt` });
+      expect(jobs.get(current.id)).toMatchObject({
+        kind: 'export', state: 'completed', progress: 1,
+        outputUrl: `/api/jobs/${current.id}/export`, receiptUrl: `/api/jobs/${current.id}/receipt`
+      });
       for (const entry of older) {
         expect(warnings.find((warning) => warning.startsWith(`${entry.id}:`))).toContain(`Unsupported export snapshot schema version ${entry.version}; this build requires version 6`);
         expect(warnings.find((warning) => warning.startsWith(`${entry.id}:`))).toContain('successful output were not changed');

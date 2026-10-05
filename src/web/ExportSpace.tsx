@@ -3,8 +3,8 @@ import { formatStorageBytes, MIN_EXPORT_FREE_BYTES, type ExportPreflight } from 
 import { EXPORT_RESOURCES, LAYERED_EXPORT_RESOURCES, type ExportProfile } from '../shared/export.js';
 import type { ProjectDocument } from '../shared/model.js';
 import { api } from './api.js';
-import { Icon } from './icons.js';
 import './export-space.css';
+import { Icon } from './icons.js';
 
 interface SpaceState { phase: 'checking' | 'ready' | 'error'; data: ExportPreflight | null; error: string }
 interface Snapshot extends SpaceState { project: ProjectDocument; profile: ExportProfile; attempt: number }

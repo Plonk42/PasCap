@@ -20,8 +20,8 @@ import { Layers } from './Layers.js';
 import { MusicTimeline } from './MusicTimeline.js';
 import { Popover } from './Popover.js';
 import { RushEditBar, TimelineCutMarks } from './RushEditBar.js';
-import { planTimelineDrop, type DropPlan, type TimelinePayload } from './timeline-placement.js';
 import { useTimelineKeyframes, type TimelineKeyframeDraft } from './timeline-keyframes.js';
+import { planTimelineDrop, type DropPlan, type TimelinePayload } from './timeline-placement.js';
 import { TIMELINE_RULER_HEIGHT, timelineLayerAt, timelineRows } from './timeline-rows.js';
 
 export interface DraftPreview { document: ProjectDocument; frame: number }

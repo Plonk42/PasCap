@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { createClip, createLayer, createProject, projectSchema, type VideoLayer } from '../../src/shared/model.js';
+import { musicGainAt, musicSourceFrame } from '../../src/shared/audio.js';
 import { applyCommand } from '../../src/shared/commands.js';
 import { EMPTY_KEY_VALUES, type Interpolation, type LayerKeyframe, type LayerKeyValues } from '../../src/shared/keyframes.js';
 import { compileLayerRetiming } from '../../src/shared/layer-retiming.js';
-import { clipDuration, compileRetiming, curveValue, sourceFrameAt } from '../../src/shared/speed.js';
-import { trimByOutputFrames } from '../../src/shared/source-range.js';
-import { calculateLayout, sampleTimeline } from '../../src/shared/timeline.js';
-import { musicGainAt, musicSourceFrame } from '../../src/shared/audio.js';
+import { createClip, createLayer, createProject, projectSchema, type VideoLayer } from '../../src/shared/model.js';
 import { snapFrame, snapPoints } from '../../src/shared/snap.js';
+import { trimByOutputFrames } from '../../src/shared/source-range.js';
+import { clipDuration, compileRetiming, curveValue, sourceFrameAt } from '../../src/shared/speed.js';
+import { calculateLayout, sampleTimeline } from '../../src/shared/timeline.js';
 import { unsupportedProject } from './project-fixtures.js';
 
 function point(frame: number, values: Partial<LayerKeyValues>, interpolation: Interpolation = 'linear'): LayerKeyframe {

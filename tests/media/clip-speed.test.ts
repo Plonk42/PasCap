@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, readFile, readdir, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -95,10 +95,12 @@ describe.skipIf(!enabled)('clip speed curves · exact native maps on disposable 
     const document = createProject('layered-clip-curves', 'Disposable layered custom speed');
     const speed: SpeedCurve = { mode: 'curve', keyframes: [{ frame: 0, rate: 0.5, interpolation: 'smooth' }, { frame: 16, rate: 2, interpolation: 'ease-in' }, { frame: 32, rate: 0.5, interpolation: 'hold' }] };
     document.clips = [{ ...createClip('base', assets[0]!.id, 2, 22), speed }, { ...createClip('upper', assets[1]!.id, 10, 20), layerId: 'upper', start: 3, opacity: 0.6, speed }];
-    document.layers.push({ ...createLayer('upper', 'Upper', false), opacity: 0.8, keyframes: [
-      { frame: 0, interpolation: 'linear', values: { ...EMPTY_KEY_VALUES, speed: 2 } },
-      { frame: 20, interpolation: 'hold', values: { ...EMPTY_KEY_VALUES, speed: 0.5 } },
-    ] });
+    document.layers.push({
+      ...createLayer('upper', 'Upper', false), opacity: 0.8, keyframes: [
+        { frame: 0, interpolation: 'linear', values: { ...EMPTY_KEY_VALUES, speed: 2 } },
+        { frame: 20, interpolation: 'hold', values: { ...EMPTY_KEY_VALUES, speed: 0.5 } },
+      ]
+    });
     const receipt = await completed(document); const report = receipt.settings.layered!;
     expect(receipt.settings.pipeline).toBe('sequential-layered');
     expect(report.peakOriginalVideoDecoders).toBe(1); expect(report.peakIntermediateVideoDecoders).toBeLessThanOrEqual(2);
@@ -112,9 +114,13 @@ describe.skipIf(!enabled)('clip speed curves · exact native maps on disposable 
 
   it('exports three UHD frames with the exact custom linear map rather than dropping curve keys at final quality', async () => {
     const document = createProject('uhd-clip-curve', 'Disposable UHD clip curve');
-    document.clips = [{ ...createClip('uhd', assets[0]!.id, 0, 6), speed: { mode: 'curve', keyframes: [
-      { frame: 0, rate: 1, interpolation: 'linear' }, { frame: 6, rate: 4, interpolation: 'hold' },
-    ] } }];
+    document.clips = [{
+      ...createClip('uhd', assets[0]!.id, 0, 6), speed: {
+        mode: 'curve', keyframes: [
+          { frame: 0, rate: 1, interpolation: 'linear' }, { frame: 6, rate: 4, interpolation: 'hold' },
+        ]
+      }
+    }];
     const receipt = await completed(document, 'final4k');
     expect(receipt.verification.frameCount).toBe(3); expect(receipt.profile).toBe('final4k');
     expect(receipt.retiming[0]).toMatchObject({ decodedFrames: 6, outputFrames: 3, rawFrameBuffers: 1 });
