@@ -105,6 +105,12 @@ They use the browser top layer to avoid clipping inside panels. Escape closes an
 returns focus to the trigger; clicking outside closes without stealing focus from
 the clicked control. Inspector tab arrows/Home/End switch contexts without discarding
 mounted section state. Selecting a clip returns to Clip; a transition opens Sequence.
+**Expand all / Collapse all** below the Inspector tabs changes all seven top-level
+settings sections across Clip, Sequence and Audio, including hidden or temporarily
+absent sections. A mixed state offers Expand all. Individual toggles and the existing
+section preferences remain authoritative; nested details and help are excluded.
+Bulk expansion is presentation-only and leaves mounted drafts, processing, history
+and saves unchanged. If preference storage fails, choices still work for the session.
 New preferences keep Source range, Layer & opacity and Speed collapsed, Colour open;
 existing expansion preferences remain respected. Help/reset details are contextual,
 not repeated across the main workspace. Collapsing never disables processing.
