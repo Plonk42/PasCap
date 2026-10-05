@@ -1,7 +1,13 @@
 # GitHub planning and delivery
 
 GitHub [issues](https://github.com/Plonk42/PasCap/issues) are the system of record
-for bugs, approved features, tasks, next actions and blockers. Native dependencies,
+for substantive bugs, approved features, engineering tasks, next actions and blockers.
+Not every action needs an issue: trivial non-functional formatting/import sorting,
+typos and committing already-reviewed housekeeping can be delivered directly with
+a descriptive commit, local verification and a concise chat handoff. Do not create
+an issue, Project card or artificial acceptance checklist merely to commit/push.
+Use an issue when work needs substantive scope/acceptance, investigation, coordination
+or persistent follow-up, or when the owner explicitly asks to log it. Native dependencies,
 sub-issues, [milestones](https://github.com/Plonk42/PasCap/milestones) and iteration
 tracking describe how that work is delivered. Local guides describe contracts and
 dated evidence; [ROADMAP.md](ROADMAP.md) is an outcome/dependency index, not a second
@@ -16,7 +22,7 @@ and verification snapshots remain in Git history; they are not current acceptanc
 
 ## Work cycle
 
-1. **Inspect before acting.** Confirm the repository/host and current issue,
+1. **Inspect before acting.** Confirm the repository/host and, for tracked work, current issue,
   comments, dependencies and Project selection. Search before creating a new issue; reuse
    an existing scope rather than duplicating it. A task/feature needs a goal,
    non-goals, observable acceptance, an outcome milestone and a concrete next action.
@@ -35,11 +41,12 @@ and verification snapshots remain in Git history; they are not current acceptanc
   at handoff, update the work issue and Project Status: progress, blockers,
   exact local commits, checks/evidence, remaining acceptance and the next action. Validate/review and
   commit each coherent step with its tests/docs, not every intermediate correction;
-  use the focused-feedback and delivery-check separation below. Commit messages and PR titles always use
+  use the focused-feedback and delivery-check separation below. Tracked commit messages and PR titles use
   `(#N)`, for example `Improve timeline scrolling (#18)`, never `(Refs #N)` or
   automatic closing keywords. Automatically push approved, validated logical-step
   commits to remote `main` under the standing authorization below, without another
-  approval request. An unpublished SHA is a local reference, not a working GitHub
+  approval request. Issue-free housekeeping uses a descriptive message without a
+  reference and needs no issue/Project administration. An unpublished SHA is a local reference, not a working GitHub
   commit link; report any publication blocker.
 5. **Review honestly.** Local implementation/testing can be complete while remote
    CI, publication or owner acceptance is pending. Inspect CI for the actual delivery
@@ -110,14 +117,18 @@ isolated concurrency has been implemented and verified; increasing workers alone
 is not an approved shortcut. Subagent reviews during terminal validation must use
 file/search tools, with **no terminal commands**, to avoid interrupting the run.
 
-CI is asynchronous by default: after validated publication, inspect the available
-status without waiting/polling for completion or rerunning local suites merely to
-occupy the wait. At handoff, record the delivery SHA, CI link/status, missing gate
-and concrete next action. If a required check is pending, keep the issue open with
-aligned progress/Project Status; subsequent reconciliation verifies it before closure.
-Do not install background closure automation or promise unattended follow-up.
+CI is asynchronous by default: after validated publication, inspect available
+actual-commit status without repeated model/tool polling or rerunning local suites
+merely to occupy the wait. If only required CI remains, start a temporary
+session-owned background watch as described below, record the delivery SHA/run and
+verified non-CI acceptance, and yield for its completion notification. The LLM then
+verifies acceptance and closes eligible issues without another owner request.
+Keep pending/failed required acceptance open with aligned progress/Project Status.
+Do not install closure automation or promise resumption after the session/editor
+closes; the next active session reconciles interrupted pending deliveries.
 
-Keep the existing start/step/handoff checkpoints concise and limited to selected
+Issue-free housekeeping needs no fabricated checkpoints. Keep the existing
+start/step/handoff checkpoints concise and limited to selected
 work and actual dependencies. Do not repeat whole-backlog audits, update unchanged
 guides or add a second status ledger. Preserve all publication, source-safety,
 consent and closure rules below.
@@ -198,13 +209,60 @@ Before closing, the delivery agent must:
 5. If incomplete or uncertain, keep it open, align its progress label and Project
   Status, and record the specific missing criterion/blocker and next action.
 
-Run this reconciliation after every validated-step push/merge reaches remote `main` and
-at delivery handoff. This is a verification-driven agent policy, **not an installed
-background GitHub Action or an unattended merge-only automation**. Use plain `(#N)`
+Run this reconciliation at session start, after every validated-step push/merge
+reaches remote `main`, on CI-watch completion and at delivery handoff. Include
+published issues awaiting CI, not only the current task, using the bounded follow-up
+below. This is not merge-only acceptance. Use plain `(#N)`
 issue references in commit messages and PR titles, without GitHub closing keywords
 that could bypass verification. Generic
 Project Auto-close workflows stay disabled. This policy does not authorize release,
 milestone closure, legacy tracker #15 cleanup, scope expansion or media jobs.
+
+### Session-owned CI follow-up
+
+Closure belongs to the LLM workflow. Do not install a closure GitHub Action, hook,
+bot, scheduled job or Project Auto-close workflow. CI remains read-only. A temporary
+terminal watch may monitor CI for this discussion, but never contains issue-closing
+commands: its completion notification returns the decision to the agent.
+
+1. At session start, after publication and at handoff, inspect open
+  `status:local-complete` issues for published deliveries whose next action is
+  CI/acceptance reconciliation. Paginate the candidate query, without auditing
+  the whole backlog. Read live scope/comments/dependencies and verify the recorded
+  non-CI evidence; a label, checked box or commit reference is not acceptance.
+2. Prove each delivery SHA is on remote main. Inspect the applicable CI for that SHA
+  or a verified descendant containing it. For code delivery, require successful
+  Checks / Node 22, Checks / Node 24, and Native media and browser / FFmpeg 8.0.1.
+  Missing, skipped, cancelled, failed or pending required jobs are not green.
+  Documentation-only work retains its applicable documentation gates.
+3. If only required CI remains, start **one temporary `gh run watch <run-id>
+  --repo Plonk42/PasCap --exit-status`** per relevant run in a dedicated background
+  terminal. Record delivery SHA, run URL, verified non-CI acceptance, candidate
+  issue links and terminal execution ID in the session handoff. Reuse an existing
+  watch for that run; do not launch duplicate watchers or use shell wait loops.
+  Yield for the terminal completion notification rather than repeatedly asking
+  for status, sleeping or rerunning local checks. The CLI's own status polling is
+  allowed; repeated LLM/tool polling and a foreground delivery wait are not.
+4. On notification, inspect the run's actual SHA, conclusion and required jobs;
+  successful terminal exit alone is insufficient. Re-read live acceptance and
+  remote-main containment, then apply the verified-closure gate: close eligible
+  issues with reason completed, clean lifecycle labels, set Project Done and read
+  back both states. No extra owner approval is needed. Never accept proposals,
+  legacy trackers or unqualified hardware/media work merely because CI is green.
+5. Failed/cancelled/superseded runs, unavailable watch/API access or interrupted
+  sessions keep required acceptance open with a concrete recovery action. For a
+  superseded run, inspect its replacement SHA and containment before selecting a
+  new watch; do not call cancellation a pass. Clean up settled owned terminals.
+  A watch cannot guarantee chat resumption after the session/editor closes:
+  **next active session: inspect pending delivery CI and reconcile closure**.
+  Persist SHA/run/evidence and that recovery action on the work issue; do not add
+  a second tracker, automation label, token or promise of unattended closure.
+
+Use existing authorized GitHub/Project access. If Project writes are unavailable,
+report the limitation, close only issues whose acceptance is verified and reconcile
+their existing Project items at the next checkpoint. Do not request secrets or
+broaden CI permissions. Issue-free housekeeping needs no watch/tracking enrollment
+or fabricated acceptance issue.
 
 ## Scheduling contract for agents
 
