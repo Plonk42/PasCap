@@ -213,6 +213,13 @@ and [grading equations](COLOUR_AND_TIMING.md#colour).
 
 ## Contributor safety
 
+- Before the first release candidate, approved changes may break existing projects
+  and persisted formats: favour one current strict implementation, not backward-
+  compatibility boilerplate. Do not add unrequested migrations, legacy fields,
+  fallback readers/defaults or compatibility-only tests. Update affected tests/docs,
+  disclose incompatibility and recreation/reset needs, and preserve existing files
+  rather than silently rewriting/deleting them. Agree the post-RC1 policy with the
+  owner before RC1; follow the [pre-RC compatibility workflow](GITHUB_WORKFLOW.md#compatibility-before-the-first-release-candidate).
 - Never modify/copy/delete owner's originals or commit private paths/device IDs,
   saved project IDs, real media/cache or reports. Preserve fingerprints, symlink
   rejection, cache exclusion and HTTP guards.

@@ -54,6 +54,35 @@ Public updates must be sanitized: no private source/project paths, snapshots,
 credentials, recordings, licensed music or generated reports. Real imports,
 preparations, benchmarks and long renders still require explicit owner consent.
 
+## Compatibility before the first release candidate
+
+Until the first release candidate (RC1), **fast iteration takes precedence over
+backward compatibility**. Approved scoped work may break existing saved projects
+and persisted formats. Keeping old projects usable is not an acceptance gate and
+does not need separate compatibility approval; the owner accepts recreating them.
+This is not blanket approval for unrelated feature changes or data deletion.
+
+- Maintain one **current, strict** data contract. Do not add migrations, optional
+  legacy fields, compatibility defaults/adapters, parallel old-format readers or
+  tests whose only purpose is retaining superseded behaviour unless the owner
+  explicitly requests that compatibility work.
+- Prefer changing/removing superseded code over carrying both implementations.
+  Update affected fixtures, tests and documentation to the current contract; retain
+  strict invalid/incompatible-data rejection and applicable current-behaviour tests.
+- Record breaking changes and the required project recreation or explicit
+  generated-data reset in the work issue/PR and affected usage contracts. Version
+  changed formats deliberately so incompatible data is clearly identified, not
+  silently accepted through defaults, rewritten or deleted. A reset requirement
+  is guidance, not permission to perform the reset.
+- Original media and completed exports stay untouched; incompatible saved data is
+  preserved, not automatically rewritten/deleted. Source identity, atomic edits,
+  resource bounds, verification, publication and issue-closure gates remain unchanged;
+  recreating projects does not authorize real-media jobs.
+
+Before declaring RC1, agree the subsequent compatibility/versioning policy with the
+owner and record it here. Do not infer that policy, implement migrations in advance
+or treat this workflow change as approval to publish a release candidate.
+
 ## Efficient development and delivery
 
 Shorten the feedback loop, not the acceptance gate. A logical step delivers one
