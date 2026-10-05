@@ -26,7 +26,9 @@ qualification claim.
 ## Work selection and next steps
 
 Use concrete work issues and [ready next actions](https://github.com/Plonk42/PasCap/issues?q=is%3Aissue%20is%3Aopen%20label%3A%22status%3Aready%22)
-for mutable progress. #2 is ready for identity design, not unsafe relink implementation;
+for mutable progress. The [#2 identity proposal](design/SOURCE_RELINK.md) requires
+approval of its strict storage/registration and confirmed-location contract before
+implementation; no unsafe relink or automatic migration is introduced.
 #5 covers the approved MIT license, dependency notices and native distribution review.
 GPU/flight work requires owner setup/consent,
 and containers remain a future milestone. The private repository-linked
@@ -48,7 +50,7 @@ cleanup; no new Iteration dates or Project field/view changes are implied here.
 | Issue | Scope |
 | --- | --- |
 | [#1 — Deterministic raw-frame reader tests](https://github.com/Plonk42/PasCap/issues/1) | Retain the locally verified exit-before-read fix; verify fresh Node 22/24 CI without hiding failures or weakening exact frame/resource checks |
-| [#2 — Explicit verified source relinking](https://github.com/Plonk42/PasCap/issues/2) | Recover moved/remounted originals with confirmation and documented identity evidence; never guess from names |
+| [#2 — Explicit verified source relinking](https://github.com/Plonk42/PasCap/issues/2) | Approve the [strong identity/atomic relink design](design/SOURCE_RELINK.md), then implement confirmed moved/remounted-original recovery; never guess from names |
 | [#3 — Export disk preflight](https://github.com/Plonk42/PasCap/issues/3) | Explain scratch needs and handle low space without destroying original/successful data |
 | [#4 — Entry bundle loading](https://github.com/Plonk42/PasCap/issues/4) | Measure and reduce initial JS without suppressing the warning or changing per-frame ownership |
 | [#5 — License and redistribution notices](https://github.com/Plonk42/PasCap/issues/5) | Approved MIT project terms, retained npm notices and the separate GPL-enabled native distribution contract |
