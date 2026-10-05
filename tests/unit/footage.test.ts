@@ -11,12 +11,13 @@ import { JobQueue } from '../../src/server/jobs.js';
 import { MediaLibrary, PROXY_PROFILE, type ImportForEditingResult } from '../../src/server/library.js';
 import { probeVideo } from '../../src/server/probe.js';
 import { runProcess } from '../../src/server/process.js';
-import { MAX_FOOTAGE_ENTRIES, MAX_FOOTAGE_FILES, footageDirectorySchema, footageRootSchema, type FootageDirectory, type FootageRoot } from '../../src/shared/footage.js';
+import { MAX_FOOTAGE_ENTRIES, MAX_FOOTAGE_FILES, audioDirectorySchema, footageDirectorySchema, footageRootSchema, isAudioFilename, type AudioDirectory, type FootageDirectory, type FootageRoot } from '../../src/shared/footage.js';
 import { mediaAssetSchema, registrySchema, type MediaAsset, type VideoMetadata } from '../../src/shared/media.js';
 import { forEachSerial } from '../../src/shared/serial.js';
 import { framesToSeconds, PROJECT_FPS } from '../../src/shared/timing.js';
+import { api, ApiError } from '../../src/web/api.js';
 
-// All filesystem/security/HTTP/queue operations are real and disposable.
+// Service filesystem/security/HTTP/queue operations are real and disposable.
 // No unit test can launch FFmpeg/FFprobe or access a user's recordings/cache.
 vi.mock('node:fs/promises', async (importOriginal) => ({
   ...await importOriginal<typeof import('node:fs/promises')>(),
@@ -33,6 +34,7 @@ const queues: JobQueue[] = [];
 const releases: (() => void)[] = [];
 const permissions: { filename: string; mode: number }[] = [];
 const headers = { host: '127.0.0.1:4318', 'x-pascap-client': 'preview-lab' };
+const audioExtensions = ['wav', 'mp3', 'm4a', 'aac', 'flac', 'ogg', 'opus', 'aiff', 'aif', 'wma'];
 
 function metadata(): VideoMetadata {
   return {
@@ -107,8 +109,16 @@ function browseUrl(rootId: string, directory?: string): string {
   if (directory !== undefined) query.set('directory', directory);
   return `/api/footage?${query}`;
 }
+function audioBrowseUrl(rootId: string, directory?: string): string {
+  const query = new URLSearchParams({ rootId });
+  if (directory !== undefined) query.set('directory', directory);
+  return `/api/audio/browse?${query}`;
+}
 async function postPaths(app: Awaited<ReturnType<typeof createApp>>['app'], paths: readonly string[]) {
   return app.inject({ method: 'POST', url: '/api/media/register-paths', headers, payload: { paths } });
+}
+async function postAudio(app: Awaited<ReturnType<typeof createApp>>['app'], filename: string) {
+  return app.inject({ method: 'POST', url: '/api/audio/register-selected', headers, payload: { path: filename } });
 }
 
 beforeEach(() => {
@@ -122,8 +132,44 @@ afterEach(async () => {
   await Promise.all(permissions.splice(0).map(({ filename, mode }) => fs.chmod(filename, mode)));
   await Promise.all(services.splice(0).map((service) => service.app.close()));
   await Promise.all(queues.splice(0).map((queue) => queue.close()));
-  vi.restoreAllMocks(); vi.unstubAllEnvs();
+  vi.restoreAllMocks(); vi.unstubAllEnvs(); vi.unstubAllGlobals();
   await Promise.all(temporary.splice(0).map((directory) => fs.rm(directory, { recursive: true, force: true })));
+});
+
+describe('strict audio browser discovery contract', () => {
+  it.each(audioExtensions)('discovers .%s case-insensitively, without claiming that it is playable audio', (extension) => {
+    expect(isAudioFilename(`Music.${extension}`)).toBe(true);
+    expect(isAudioFilename(`Music.${extension.toUpperCase()}`)).toBe(true);
+    expect(isAudioFilename(`Music.${extension}.txt`)).toBe(false);
+  });
+
+  it.each(['Music.mp4', 'Music.mov', 'Music.m4v', 'Music.txt', 'Music', 'Music.wav/'])('does not discover %s as audio', (filename) => {
+    expect(isAudioFilename(filename)).toBe(false);
+  });
+
+  it('keeps directory and file entries strict and separates video from audio responses', () => {
+    const directory: AudioDirectory = {
+      rootId: 'root-0', directory: '/approved', parent: null, ignored: 0, truncated: false, warnings: [],
+      entries: [
+        { name: 'Album 2', path: '/approved/Album 2', kind: 'directory', size: null },
+        { name: 'Music.wav', path: '/approved/Music.wav', kind: 'audio', size: 44 },
+      ],
+    };
+    expect(audioDirectorySchema.parse(directory)).toEqual(directory);
+    expect(footageDirectorySchema.safeParse(directory).success).toBe(false);
+    const video = { ...directory, entries: [{ name: 'Camera.mp4', path: '/approved/Camera.mp4', kind: 'video', size: 44 }] };
+    expect(footageDirectorySchema.safeParse(video).success).toBe(true);
+    expect(audioDirectorySchema.safeParse(video).success).toBe(false);
+    for (const schema of [audioDirectorySchema, footageDirectorySchema]) {
+      expect(schema.safeParse({ ...directory, entries: [], extra: true }).success).toBe(false);
+      expect(schema.safeParse({ ...directory, entries: [{ ...directory.entries[0], extra: true }] }).success).toBe(false);
+      expect(schema.safeParse({ ...directory, entries: [{ ...directory.entries[0], size: 1 }] }).success).toBe(false);
+      expect(schema.safeParse({ ...directory, entries: Array(MAX_FOOTAGE_ENTRIES + 1).fill(directory.entries[0]) }).success).toBe(false);
+    }
+    expect(audioDirectorySchema.safeParse({ ...directory, entries: [{ ...directory.entries[1], size: -1 }] }).success).toBe(false);
+    expect(audioDirectorySchema.safeParse({ ...directory, entries: [{ ...directory.entries[1], size: 0.5 }] }).success).toBe(false);
+    expect(audioDirectorySchema.safeParse({ ...directory, entries: [{ ...directory.entries[1], copied: true }] }).success).toBe(false);
+  });
 });
 
 describe('approved footage-root configuration', () => {
@@ -270,30 +316,31 @@ describe('metadata-only single-directory footage browsing', () => {
     expect((await fs.stat(sources)).mode & 0o777).toBe(0o000);
   });
 
-  it('retains at most 2000 globally natural-sorted entries and explicitly signals truncation', async () => {
+  it.each([{ audio: false, extension: 'mp4' }, { audio: true, extension: 'wav' }])('retains at most 2000 globally natural-sorted .$extension entries and explicitly signals truncation', async ({ audio, extension }) => {
     const { sources, config } = await setup();
     await forEachSerial(Array.from({ length: MAX_FOOTAGE_ENTRIES }, (_, index) => MAX_FOOTAGE_ENTRIES - index), async (index) => {
-      await fs.writeFile(path.join(sources, `Clip ${index}.mp4`), '');
+      await fs.writeFile(path.join(sources, `Clip ${index}.${extension}`), '');
     });
     const browser = new FootageBrowser(config);
-    const exact = await browser.browse('root-0');
+    const browse = () => audio ? browser.browseAudio('root-0') : browser.browse('root-0');
+    const exact = await browse();
     expect(exact.entries).toHaveLength(MAX_FOOTAGE_ENTRIES); expect(exact.truncated).toBe(false);
-    await source(sources, `Clip ${MAX_FOOTAGE_ENTRIES + 1}.mp4`);
-    await source(sources, `Clip ${MAX_FOOTAGE_ENTRIES + 2}.mp4`);
+    await source(sources, `Clip ${MAX_FOOTAGE_ENTRIES + 1}.${extension}`);
+    await source(sources, `Clip ${MAX_FOOTAGE_ENTRIES + 2}.${extension}`);
     const folder = path.join(sources, 'Z directory'); await fs.mkdir(folder);
-    await source(folder, 'not scanned.mp4');
-    const capped = footageDirectorySchema.parse(await browser.browse('root-0'));
+    await source(folder, `not scanned.${extension}`);
+    const capped = (audio ? audioDirectorySchema : footageDirectorySchema).parse(await browse());
     expect(capped.entries).toHaveLength(MAX_FOOTAGE_ENTRIES);
     expect(capped).toMatchObject({ truncated: true, ignored: 0, warnings: [] });
     expect(capped.entries[0]).toMatchObject({ name: 'Z directory', kind: 'directory' });
-    expect(capped.entries[1]!.name).toBe('Clip 1.mp4');
-    expect(capped.entries.at(-1)!.name).toBe(`Clip ${MAX_FOOTAGE_ENTRIES - 1}.mp4`);
+    expect(capped.entries[1]!.name).toBe(`Clip 1.${extension}`);
+    expect(capped.entries.at(-1)!.name).toBe(`Clip ${MAX_FOOTAGE_ENTRIES - 1}.${extension}`);
     expect(probeVideo).not.toHaveBeenCalled(); expect(runProcess).not.toHaveBeenCalled();
   });
 
-  it('bounds warnings for entries that become unreadable during listing', async () => {
+  it.each([{ audio: false, extension: 'mp4' }, { audio: true, extension: 'wav' }])('bounds warnings for .$extension entries that become unreadable during listing', async ({ audio, extension }) => {
     const { sources, config } = await setup();
-    await Promise.all(Array.from({ length: 30 }, (_, index) => source(sources, `Denied ${index}.mp4`)));
+    await Promise.all(Array.from({ length: 30 }, (_, index) => source(sources, `Denied ${index}.${extension}`)));
     const inspect = fs.lstat;
     vi.spyOn(fs, 'lstat').mockImplementation((filename, options) => {
       if (String(filename).startsWith(`${sources}${path.sep}Denied `)) {
@@ -301,11 +348,255 @@ describe('metadata-only single-directory footage browsing', () => {
       }
       return inspect(filename, options);
     });
-    const result = await new FootageBrowser(config).browse('root-0');
+    const browser = new FootageBrowser(config);
+    const result = await (audio ? browser.browseAudio('root-0') : browser.browse('root-0'));
     expect(result).toMatchObject({ entries: [], ignored: 30, truncated: false });
     expect(result.warnings).toHaveLength(20);
     expect(result.warnings.every((warning) => warning.length <= 512)).toBe(true);
     expect(result.warnings.at(-1)).toContain('omitted');
+  });
+});
+
+describe('metadata-only approved-root audio browsing and explicit registration', () => {
+  it('shares roots, naturally sorts audio/directories, excludes video and symlinks, and has no source reads or writes/jobs', async () => {
+    const { sources, outside, config, app, library, audio, jobs } = await serviceFixture();
+    await Promise.all(['Album 10', 'Album 2'].map((name) => fs.mkdir(path.join(sources, name))));
+    const names = audioExtensions.map((extension, index) => `Song ${index + 1}.${extension.toUpperCase()}`);
+    const originals = await Promise.all(names.map((name) => source(sources, name)));
+    await source(path.join(sources, 'Album 2'), 'Not recursively scanned.wav');
+    await Promise.all(['Camera 1.mp4', 'Camera 2.mov', 'Camera 3.m4v', 'notes.txt'].map((name) => source(sources, name)));
+    await fs.symlink(originals[0]!, path.join(sources, 'Linked.wav'));
+    await fs.symlink(outside, path.join(sources, 'Linked album'));
+    const savedRegistry = await fs.readFile(path.join(config.dataDir, 'audio.json'));
+    const read = vi.spyOn(fs, 'readFile'); const open = vi.spyOn(fs, 'open');
+    const write = vi.spyOn(fs, 'writeFile'); const rename = vi.spyOn(fs, 'rename'); const mkdir = vi.spyOn(fs, 'mkdir');
+    const remove = vi.spyOn(fs, 'rm');
+    const fingerprint = vi.spyOn(files, 'fingerprintFile');
+    const audioRoots = await app.inject({ url: '/api/audio/roots', headers });
+    const videoRoots = await app.inject({ url: '/api/footage/roots', headers });
+    expect(audioRoots.statusCode).toBe(200); expect(audioRoots.json()).toEqual(videoRoots.json());
+    const response = await app.inject({ url: audioBrowseUrl('root-0'), headers });
+    expect(response.statusCode).toBe(200);
+    const result = audioDirectorySchema.parse(response.json());
+    expect(result).toMatchObject({ directory: sources, parent: null, ignored: 6, truncated: false, warnings: [] });
+    expect(result.entries.map((entry) => [entry.name, entry.kind])).toEqual([
+      ['Album 2', 'directory'], ['Album 10', 'directory'], ...names.map((name) => [name, 'audio']),
+    ]);
+    expect(result.entries.filter((entry) => entry.kind === 'directory').every((entry) => entry.size === null)).toBe(true);
+    expect(result.entries.filter((entry) => entry.kind === 'audio').every((entry) => entry.size === Buffer.byteLength(`disposable original bytes: ${entry.name}`))).toBe(true);
+    expect(result.entries.every((entry) => entry.path === path.join(sources, entry.name))).toBe(true);
+    const video = footageDirectorySchema.parse((await app.inject({ url: browseUrl('root-0'), headers })).json());
+    expect(video.entries.map((entry) => [entry.name, entry.kind])).toEqual([
+      ['Album 2', 'directory'], ['Album 10', 'directory'], ['Camera 1.mp4', 'video'], ['Camera 2.mov', 'video'], ['Camera 3.m4v', 'video'],
+    ]);
+    expect(read).not.toHaveBeenCalled(); expect(open).not.toHaveBeenCalled(); expect(fingerprint).not.toHaveBeenCalled();
+    expect(write).not.toHaveBeenCalled(); expect(rename).not.toHaveBeenCalled(); expect(mkdir).not.toHaveBeenCalled();
+    expect(remove).not.toHaveBeenCalled();
+    expect(probeVideo).not.toHaveBeenCalled(); expect(runProcess).not.toHaveBeenCalled();
+    expect(library.list()).toEqual([]); expect(audio.list()).toEqual([]); expect(jobs.list()).toEqual([]);
+    expect(await fs.readdir(config.dataDir)).toEqual(['audio.json']);
+    expect(await fs.readFile(path.join(config.dataDir, 'audio.json'))).toEqual(savedRegistry);
+  });
+
+  it('keeps nested-root parents and validates strict queries, path boundaries, symlink directories and missing roots', async () => {
+    const { sources, outside, config } = await setup();
+    const nested = path.join(sources, 'Album 2'); await fs.mkdir(nested);
+    const linked = path.join(sources, 'linked'); await fs.symlink(outside, linked);
+    const missing = path.join(outside, 'missing'); const file = await source(sources, 'Music.wav');
+    const service = await createApp(createConfig({ ...config, mediaRoots: [sources, nested, missing, file] })); services.push(service);
+    expect((await service.app.inject({ url: audioBrowseUrl('root-0', `${sources}/`), headers })).json()).toMatchObject({ directory: sources, parent: null });
+    expect((await service.app.inject({ url: audioBrowseUrl('root-0', nested), headers })).json()).toMatchObject({ directory: nested, parent: sources });
+    expect((await service.app.inject({ url: audioBrowseUrl('root-1'), headers })).json()).toMatchObject({ directory: nested, parent: null });
+    const cases: [string, number][] = [
+      ['/api/audio/browse', 400], ['/api/audio/browse?rootId=root-0&unexpected=yes', 400],
+      ['/api/audio/browse?rootId=root-0&rootId=root-1', 400],
+      [audioBrowseUrl('root-9'), 404], [audioBrowseUrl('root-1', sources), 403],
+      [audioBrowseUrl('root-0', outside), 403], [audioBrowseUrl('root-0', path.dirname(sources)), 403],
+      [audioBrowseUrl('root-0', 'relative'), 400], [audioBrowseUrl('root-0', `${sources}/nul\0`), 400],
+      [audioBrowseUrl('root-0', `${sources}/nested/../`), 400], [audioBrowseUrl('root-0', `/${'x'.repeat(4096)}`), 400],
+      [audioBrowseUrl('root-0', linked), 422], [audioBrowseUrl('root-0', path.join(linked, 'nested')), 422],
+      [audioBrowseUrl('root-2'), 404], [audioBrowseUrl('root-3'), 422],
+    ];
+    await forEachSerial(cases, async ([url, statusCode]) => {
+      const response = await service.app.inject({ url, headers });
+      expect(response.statusCode).toBe(statusCode); expect(response.json()).toEqual({ error: expect.any(String) });
+    });
+    const roots = (await service.app.inject({ url: '/api/audio/roots', headers })).json<{ roots: FootageRoot[] }>().roots;
+    expect(roots.map((root) => footageRootSchema.parse(root).available)).toEqual([true, true, false, false]);
+    expect(service.audio.list()).toEqual([]); expect(service.jobs.list()).toEqual([]); expect(runProcess).not.toHaveBeenCalled();
+  });
+
+  it('hides cache subtrees even beneath approved ancestors and rejects cache-selected audio before registration', async () => {
+    const { root, sources, config } = await setup();
+    const child = path.join(config.dataDir, 'nested'); await fs.mkdir(child);
+    const cached = await source(child, 'proxy.wav');
+    const service = await createApp(createConfig({ ...config, mediaRoots: [root, config.dataDir, child] })); services.push(service);
+    const register = vi.spyOn(service.audio, 'register'); const fingerprint = vi.spyOn(files, 'fingerprintFile');
+    const result = audioDirectorySchema.parse((await service.app.inject({ url: audioBrowseUrl('root-0'), headers })).json());
+    expect(result.entries.map((entry) => entry.path)).toContain(sources);
+    expect(result.entries.some((entry) => entry.path === config.dataDir)).toBe(false); expect(result.ignored).toBe(1);
+    expect((await service.app.inject({ url: audioBrowseUrl('root-0', config.dataDir), headers })).statusCode).toBe(403);
+    expect((await service.app.inject({ url: audioBrowseUrl('root-0', child), headers })).statusCode).toBe(403);
+    expect((await postAudio(service.app, cached)).statusCode).toBe(403);
+    const roots = (await service.app.inject({ url: '/api/audio/roots', headers })).json<{ roots: FootageRoot[] }>().roots;
+    expect(roots.map((entry) => entry.available)).toEqual([true, false, false]);
+    expect(register).not.toHaveBeenCalled(); expect(fingerprint).not.toHaveBeenCalled(); expect(runProcess).not.toHaveBeenCalled();
+    expect(service.audio.list()).toEqual([]); expect(service.jobs.list()).toEqual([]);
+  });
+
+  it('prevalidates lexical/root/type errors and strict selected bodies before reading or probing any source', async () => {
+    const { sources, outside, config, app, audio, jobs } = await serviceFixture();
+    const filename = await source(sources, 'Music.wav');
+    const register = vi.spyOn(audio, 'register'); const fingerprint = vi.spyOn(files, 'fingerprintFile');
+    const read = vi.spyOn(fs, 'readFile'); const open = vi.spyOn(fs, 'open');
+    const cases: [string, number][] = [
+      ['', 400], ['relative.wav', 400], [`${sources}/nul\0.wav`, 400], [`/${'x'.repeat(4096)}.wav`, 400],
+      [`${sources}/nested/../Music.wav`, 400], [path.join(outside, 'Music.wav'), 403],
+      [path.join(path.dirname(sources), 'Music.wav'), 403], [path.join(config.dataDir, 'proxy.wav'), 403],
+      [path.join(sources, 'Camera.mp4'), 400], [path.join(sources, 'Music.wav.txt'), 400],
+    ];
+    await forEachSerial(cases, async ([invalid, statusCode]) => {
+      expect((await postAudio(app, invalid)).statusCode).toBe(statusCode);
+    });
+    await forEachSerial([{}, { path: null }, { path: 1 }, { path: [filename] }, { path: filename, copy: true }, { paths: [filename] }], async (payload) => {
+      expect((await app.inject({ method: 'POST', url: '/api/audio/register-selected', headers, payload })).statusCode).toBe(400);
+    });
+    const malformed = await app.inject({ method: 'POST', url: '/api/audio/register-selected', headers: { ...headers, 'content-type': 'application/json' }, payload: '{"path":' });
+    expect(malformed.statusCode).toBe(400);
+    expect(register).not.toHaveBeenCalled(); expect(fingerprint).not.toHaveBeenCalled(); expect(read).not.toHaveBeenCalled(); expect(open).not.toHaveBeenCalled();
+    expect(probeVideo).not.toHaveBeenCalled(); expect(runProcess).not.toHaveBeenCalled(); expect(audio.list()).toEqual([]); expect(jobs.list()).toEqual([]);
+    const browser = new FootageBrowser(config);
+    expect(audioExtensions.map((extension) => browser.validateAudioPath(path.join(sources, `Music.${extension.toUpperCase()}`)))).toHaveLength(10);
+    expect(browser.validateAudioPath(path.join(sources, '..not-traversal', '..music.WAV'))).toBe(path.join(sources, '..not-traversal', '..music.WAV'));
+  });
+
+  it('retains library-owned leaf/ancestor symlink and regular-file rejection before any native probe or job', async () => {
+    const { sources, outside, app, audio, jobs } = await serviceFixture();
+    const original = await source(outside, 'Music.wav');
+    const leaf = path.join(sources, 'Linked.wav'); await fs.symlink(original, leaf);
+    const parent = path.join(sources, 'Linked parent'); await fs.symlink(outside, parent);
+    const directory = path.join(sources, 'Folder.wav'); await fs.mkdir(directory);
+    const read = vi.spyOn(fs, 'readFile'); const open = vi.spyOn(fs, 'open');
+    await forEachSerial([leaf, path.join(parent, 'Music.wav'), directory, path.join(sources, 'Missing.wav')], async (filename) => {
+      const response = await postAudio(app, filename);
+      expect(response.statusCode).toBeGreaterThanOrEqual(400); expect(response.json()).toEqual({ error: expect.any(String) });
+      if (filename === leaf || filename.startsWith(`${parent}${path.sep}`)) expect(response.json<{ error: string }>().error).toContain('Symlinks');
+    });
+    expect(read).not.toHaveBeenCalled(); expect(open).not.toHaveBeenCalled();
+    expect(probeVideo).not.toHaveBeenCalled(); expect(runProcess).not.toHaveBeenCalled(); expect(audio.list()).toEqual([]); expect(jobs.list()).toEqual([]);
+    expect(await fs.readFile(original, 'utf8')).toBe('disposable original bytes: Music.wav');
+  });
+
+  it('uses the existing standalone-audio probe to reject video content despite an allowed audio extension', async () => {
+    const { sources, app, audio, jobs } = await serviceFixture();
+    const filename = await source(sources, 'Not standalone.wav');
+    vi.mocked(runProcess).mockResolvedValueOnce(Buffer.from(JSON.stringify({
+      streams: [
+        { codec_type: 'audio', codec_name: 'aac', sample_rate: '48000', channels: 2 },
+        { codec_type: 'video', codec_name: 'h264', disposition: { attached_pic: 0 } },
+      ],
+      format: { duration: '1' },
+    })));
+    const response = await postAudio(app, filename);
+    expect(response.statusCode).toBe(422); expect(response.json()).toEqual({ error: expect.any(String) });
+    expect(runProcess).toHaveBeenCalledTimes(1); expect(probeVideo).not.toHaveBeenCalled();
+    expect(audio.list()).toEqual([]); expect(jobs.list()).toEqual([]);
+    expect(await fs.readFile(filename, 'utf8')).toBe('disposable original bytes: Not standalone.wav');
+  });
+
+  it('registers an explicitly selected synthetic WAV through the existing audio library and serial queue without copying originals', async () => {
+    const { sources, config, app, audio, jobs } = await serviceFixture();
+    blockWorker(jobs);
+    const filename = path.join(sources, 'Synthetic music.WAV');
+    const samples = 4800; const original = Buffer.alloc(44 + samples * 2);
+    original.write('RIFF', 0); original.writeUInt32LE(original.length - 8, 4); original.write('WAVEfmt ', 8);
+    original.writeUInt32LE(16, 16); original.writeUInt16LE(1, 20); original.writeUInt16LE(1, 22);
+    original.writeUInt32LE(48_000, 24); original.writeUInt32LE(96_000, 28); original.writeUInt16LE(2, 32); original.writeUInt16LE(16, 34);
+    original.write('data', 36); original.writeUInt32LE(samples * 2, 40);
+    await fs.writeFile(filename, original);
+    const identity = await files.fingerprintFile(filename);
+    vi.mocked(runProcess).mockImplementationOnce(async (binary, args) => {
+      expect(binary).toBe(config.ffprobe); expect(args).toContain(filename);
+      return Buffer.from(JSON.stringify({
+        streams: [{ index: 0, codec_type: 'audio', codec_name: 'pcm_s16le', sample_fmt: 's16', sample_rate: '48000', channels: 1, channel_layout: 'mono', duration: '0.1', duration_ts: samples, time_base: '1/48000', bits_per_sample: 16 }],
+        format: { duration: '0.1' },
+      }));
+    });
+    const response = await postAudio(app, filename);
+    expect(response.statusCode).toBe(202);
+    const result = response.json<Awaited<ReturnType<typeof api.importSelectedAudio>>>();
+    expect(result.asset).toMatchObject({ name: 'Synthetic music.WAV', sourcePath: filename, fingerprint: identity });
+    expect(result.job).toMatchObject({ state: 'queued' });
+    expect(audio.list().map((asset) => asset.id)).toEqual([result.asset.id]);
+    expect(jobs.list().filter((job) => job.id === result.job.id)).toEqual([result.job]);
+    expect(probeVideo).not.toHaveBeenCalled(); expect(runProcess).toHaveBeenCalledTimes(1);
+    expect(await fs.readFile(filename)).toEqual(original); expect(await files.fingerprintFile(filename)).toEqual(identity);
+    expect(await fs.readdir(sources)).toEqual(['Synthetic music.WAV']);
+
+    const fetch = vi.fn(async () => new Response(JSON.stringify(result), { status: 202 })); vi.stubGlobal('fetch', fetch);
+    const timeout = vi.spyOn(globalThis, 'setTimeout');
+    expect(await api.importSelectedAudio(filename)).toEqual(result);
+    expect(fetch).toHaveBeenCalledWith('/api/audio/register-selected', expect.objectContaining({ method: 'POST', body: JSON.stringify({ path: filename }), signal: expect.any(AbortSignal) }));
+    expect(timeout).toHaveBeenLastCalledWith(expect.any(Function), 600_000);
+    await api.importSelectedAudio(filename, {});
+    expect(timeout).toHaveBeenLastCalledWith(expect.any(Function), 600_000);
+    await api.importSelectedAudio(filename, { timeoutMs: 1234 });
+    expect(timeout).toHaveBeenLastCalledWith(expect.any(Function), 1234);
+    fetch.mockResolvedValue(new Response(JSON.stringify({ ...result, copy: true }), { status: 202 }));
+    await expect(api.importSelectedAudio(filename)).rejects.toMatchObject({ kind: 'response' });
+  });
+
+  it('keeps trusted Host/Origin/fetch-site/client guards on all audio browser routes', async () => {
+    const { sources, app, audio, jobs } = await serviceFixture();
+    const filename = path.join(sources, 'Music.wav'); const register = vi.spyOn(audio, 'register');
+    await forEachSerial([
+      { host: 'evil.example' }, { host: headers.host, origin: 'https://evil.example' },
+      { host: headers.host, 'sec-fetch-site': 'cross-site' },
+    ], async (hostile) => {
+      expect((await app.inject({ url: '/api/audio/roots', headers: hostile })).statusCode).toBe(403);
+      expect((await app.inject({ url: audioBrowseUrl('root-0'), headers: hostile })).statusCode).toBe(403);
+      expect((await app.inject({ method: 'POST', url: '/api/audio/register-selected', headers: { ...headers, ...hostile }, payload: { path: filename } })).statusCode).toBe(403);
+    });
+    expect((await app.inject({ method: 'POST', url: '/api/audio/register-selected', headers: { host: headers.host }, payload: { path: filename } })).statusCode).toBe(403);
+    const response = await app.inject({ url: audioBrowseUrl('root-0'), headers });
+    expect(response.statusCode).toBe(200); expect(response.headers['x-content-type-options']).toBe('nosniff');
+    expect(register).not.toHaveBeenCalled(); expect(runProcess).not.toHaveBeenCalled(); expect(jobs.list()).toEqual([]);
+  });
+});
+
+describe('audio browser request helpers', () => {
+  it('encodes directory queries, validates strict audio-only responses and honors read request options', async () => {
+    const root: FootageRoot = { id: 'root-0', name: 'Music', path: '/approved/Music & sound', available: true, error: null };
+    const directory: AudioDirectory = { rootId: root.id, directory: root.path, parent: null, entries: [{ name: 'Music.wav', path: `${root.path}/Music.wav`, kind: 'audio', size: 44 }], ignored: 0, truncated: false, warnings: [] };
+    const fetch = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ roots: [root] })))
+      .mockResolvedValueOnce(new Response(JSON.stringify(directory)));
+    vi.stubGlobal('fetch', fetch);
+    const timeout = vi.spyOn(globalThis, 'setTimeout');
+    expect(await api.audioRoots({ timeoutMs: 1234 })).toEqual({ roots: [root] });
+    expect(fetch).toHaveBeenNthCalledWith(1, '/api/audio/roots', expect.objectContaining({ method: 'GET', signal: expect.any(AbortSignal) }));
+    expect(timeout).toHaveBeenLastCalledWith(expect.any(Function), 1234);
+    expect(await api.browseAudio(root.id, root.path)).toEqual(directory);
+    expect(fetch).toHaveBeenNthCalledWith(2, audioBrowseUrl(root.id, root.path), expect.objectContaining({ method: 'GET' }));
+    expect(timeout).toHaveBeenLastCalledWith(expect.any(Function), 15_000);
+    fetch.mockResolvedValueOnce(new Response(JSON.stringify(directory)));
+    await api.browseAudio(root.id, undefined, { timeoutMs: 2345 });
+    expect(fetch).toHaveBeenLastCalledWith('/api/audio/browse?rootId=root-0', expect.objectContaining({ method: 'GET' }));
+    expect(timeout).toHaveBeenLastCalledWith(expect.any(Function), 2345);
+    fetch.mockResolvedValueOnce(new Response(JSON.stringify({ ...directory, entries: [{ ...directory.entries[0], kind: 'video' }] })));
+    await expect(api.browseAudio(root.id)).rejects.toBeInstanceOf(ApiError);
+    fetch.mockResolvedValueOnce(new Response(JSON.stringify({ roots: [root], extra: true })));
+    await expect(api.audioRoots()).rejects.toMatchObject({ kind: 'response' });
+  });
+
+  it('honors caller cancellation on reads and selected registration without fetching or retrying', async () => {
+    const fetch = vi.fn(); vi.stubGlobal('fetch', fetch);
+    const controller = new AbortController(); controller.abort();
+    const options = { signal: controller.signal };
+    await expect(api.audioRoots(options)).rejects.toMatchObject({ kind: 'aborted' });
+    await expect(api.browseAudio('root-0', undefined, options)).rejects.toMatchObject({ kind: 'aborted' });
+    await expect(api.importSelectedAudio('/approved/Music.wav', options)).rejects.toMatchObject({ kind: 'aborted' });
+    expect(fetch).not.toHaveBeenCalled();
   });
 });
 
@@ -501,12 +792,14 @@ describe('batch path prevalidation and serial no-copy registration', () => {
     blockWorker(service.jobs);
     const filename = await source(outside);
     expect((await service.app.inject({ url: '/api/footage/roots', headers })).json()).toEqual({ roots: [] });
+    expect((await service.app.inject({ url: '/api/audio/roots', headers })).json()).toEqual({ roots: [] });
     expect((await postPaths(service.app, [filename])).statusCode).toBe(403);
     const manual = await service.app.inject({ method: 'POST', url: '/api/media/import', headers, payload: { directory: outside } });
     expect(manual.statusCode).toBe(202); expect(manual.json<ImportForEditingResult>().added).toBe(1);
     expect((await service.app.inject({ method: 'POST', url: '/api/media/register', headers, payload: { path: filename } })).statusCode).toBe(202);
     const audio = vi.spyOn(service.audio, 'register').mockRejectedValue(new ServiceError('Explicit audio path reached the audio library.', 422));
     const audioPath = path.join(outside, 'music.wav');
+    expect((await postAudio(service.app, audioPath)).statusCode).toBe(403); expect(audio).not.toHaveBeenCalled();
     expect((await service.app.inject({ method: 'POST', url: '/api/audio/register', headers, payload: { path: audioPath } })).statusCode).toBe(422);
     expect(audio).toHaveBeenCalledWith(audioPath);
   });

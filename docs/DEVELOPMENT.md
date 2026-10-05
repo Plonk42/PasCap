@@ -41,7 +41,7 @@ This is not static hosting, LAN/SaaS deployment or a completed container recipe.
 | Variable | Meaning |
 | --- | --- |
 | `PASCAP_DATA_DIR` | Generated-data directory; defaults to the ignored `.pascap/` |
-| `PASCAP_MEDIA_ROOTS` | JSON array of up to 32 unique absolute browser roots; defaults to the service user's Videos folder; `[]` disables browsing only |
+| `PASCAP_MEDIA_ROOTS` | JSON array of up to 32 unique absolute roots shared by footage/music browsing; defaults to the service user's Videos folder; `[]` disables both browsers, not deliberate manual path imports |
 | `PASCAP_PORT` | Unprivileged loopback service port, default 4318 |
 | `PASCAP_FFMPEG` / `PASCAP_FFPROBE` | Native executable paths, otherwise resolved from PATH |
 | `PASCAP_MEASURE_URL` | Editor URL/project used by the optional measurement helper |
@@ -125,6 +125,14 @@ originals in `.pascap/browser-footage/synthetic-sources/` are outside that cache
 [fixture factory](../scripts/fixtures.ts) uses `preview-lab-v6` outside the browser
 cache and `preview-lab` inside it; bin resets never imply a global-library fallback.
 Neither suite invokes real-source sample preparation or needs private footage/music.
+
+The [music-browser regression](../tests/browser/music-browser.spec.ts) uses memory-only
+projects and the existing prepared synthetic WAV. It copies that generated test WAV
+into one temporary subfolder of the isolated approved browser root (the fixture's
+original path is inside the excluded cache), then removes only that owned subfolder.
+Normal navigation/confirmation exercise the guarded audio routes; unavailable locations,
+access/probe/write failures and stale reads use disposable route responses. No fixture
+generator/reset, private audio, music placement or export is needed.
 
 ### Verification evidence
 

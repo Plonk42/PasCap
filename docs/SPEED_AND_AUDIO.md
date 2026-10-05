@@ -216,6 +216,19 @@ separate; an explicit override notice appears when row Speed suppresses clip spe
 
 ## Music
 
+**Audio → Music → Browse music files** opens a keyboard-accessible native modal
+beside the manual **Music file path / Import audio** form. Choose one radio-selected
+file inside a configured `PASCAP_MEDIA_ROOTS` location, then explicitly **Import
+selected music**. Root/folder navigation, search, Refresh and Cancel are metadata-only;
+they never import or alter the project. Both media browsers share the service user's
+Videos default; `[]` disables browsing, not deliberate manual paths outside those roots.
+WAV, MP3, M4A, AAC, FLAC, OGG, OPUS, AIFF, AIF and WMA extensions are discovery
+candidates, not proof of supported contents. The existing probe is authoritative.
+An accepted import adds only the importing project's audio-bin membership and returns
+its preparation job; choosing/placing music is still a separate action. Failed or
+uncertain registration stays open with selection/error intact and no automatic retry;
+check Activity/project state before repeating it. Originals are never uploaded or copied.
+
 Standalone music import requires exactly one audio stream and no video footage.
 Embedded cover artwork explicitly marked as an attached picture is accepted and
 ignored during audio-only playback preparation; video soundtracks remain rejected.
