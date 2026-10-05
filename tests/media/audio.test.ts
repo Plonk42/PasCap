@@ -205,9 +205,51 @@ describe.skipIf(!enabled)('registered music · disposable lavfi audio only', () 
     expect(service.audio.get(asset.id).metadata).toEqual(asset.metadata);
   });
 
-  it('rejects multi-audio streams and sub-frame sources without registering or preparing them', async () => {
+  it('accepts MP3 cover artwork, prepares audio-only playback and preserves original bytes', async () => {
+    const filename = path.join(sources, 'covered.mp3');
+    const silent = path.join(sources, 'silent.mp3');
+    const cover = path.join(sources, 'cover.jpg');
+    // Twenty silent MPEG-1 Layer III frames: 128 kb/s, 44.1 kHz, mono,
+    // no padding, zero side information/main data. No optional MP3 encoder.
+    const frame = Buffer.alloc(417);
+    frame.set([0xff, 0xfb, 0x90, 0xc4]);
+    await writeFile(silent, Buffer.concat(Array.from({ length: 20 }, () => frame)));
+    await processes.runProcess(config.ffmpeg, [
+      '-hide_banner', '-loglevel', 'error', '-nostdin', '-n', '-f', 'lavfi', '-i', 'color=c=blue:s=32x32',
+      '-frames:v', '1', '-c:v', 'mjpeg', '-threads', '2', '-filter_threads', '2', cover,
+    ]);
+    await processes.runProcess(config.ffmpeg, [
+      '-hide_banner', '-loglevel', 'error', '-nostdin', '-n', '-i', silent, '-i', cover,
+      '-map', '0:a:0', '-map', '1:v:0', '-c', 'copy', '-disposition:v:0', 'attached_pic', filename,
+    ]);
+    const sourceProbe = JSON.parse((await processes.runProcess(config.ffprobe, [
+      '-v', 'error', '-show_entries', 'stream=codec_type:stream_disposition=attached_pic', '-of', 'json', filename,
+    ])).toString('utf8'));
+    expect(sourceProbe.streams).toEqual([
+      { codec_type: 'audio', disposition: { attached_pic: 0 } },
+      { codec_type: 'video', disposition: { attached_pic: 1 } },
+    ]);
+    const bytes = await readFile(filename);
+    const asset = await registerReady(filename);
+    expect(asset.metadata.codec).toBe('mp3');
+    expect(asset.status).toBe('ready');
+    expect(asset.waveform.length).toBeGreaterThan(0);
+    const playback = JSON.parse((await processes.runProcess(config.ffprobe, [
+      '-v', 'error', '-show_entries', 'stream=codec_type', '-of', 'json', service.audio.playbackPath(asset),
+    ])).toString('utf8'));
+    expect(playback.streams).toEqual([{ codec_type: 'audio' }]);
+    expect(await readFile(filename)).toEqual(bytes);
+  });
+
+  it('rejects video soundtracks, multi-audio streams and sub-frame sources without registering or preparing them', async () => {
     const multiple = path.join(sources, 'two-streams.mka');
     const short = path.join(sources, 'too-short.wav');
+    const video = path.join(sources, 'soundtrack.mp4');
+    await processes.runProcess(config.ffmpeg, [
+      '-hide_banner', '-loglevel', 'error', '-nostdin', '-n', '-f', 'lavfi', '-i', 'sine=duration=0.2',
+      '-f', 'lavfi', '-i', 'color=c=blue:s=32x32:d=0.2', '-map', '0:a:0', '-map', '1:v:0',
+      '-c:a', 'aac', '-c:v', 'libx264', '-threads', '2', '-filter_threads', '2', video,
+    ]);
     await processes.runProcess(config.ffmpeg, [
       '-hide_banner', '-loglevel', 'error', '-nostdin', '-n', '-f', 'lavfi', '-i', 'sine=frequency=440:duration=0.2',
       '-f', 'lavfi', '-i', 'sine=frequency=880:duration=0.2', '-map', '0:a:0', '-map', '1:a:0', '-c:a', 'pcm_s16le', '-threads', '2', multiple,
@@ -220,6 +262,9 @@ describe.skipIf(!enabled)('registered music · disposable lavfi audio only', () 
     const response = await service.app.inject({ method: 'POST', url: '/api/audio/register', headers, payload: { path: multiple } });
     expect(response.statusCode).toBe(422);
     expect(response.json().error).toContain('exactly one audio stream');
+    const videoResponse = await service.app.inject({ method: 'POST', url: '/api/audio/register', headers, payload: { path: video } });
+    expect(videoResponse.statusCode).toBe(422);
+    expect(videoResponse.json().error).toContain('no video footage');
     expect((await service.app.inject({ method: 'POST', url: '/api/audio/register', headers, payload: { path: short } })).statusCode).toBe(422);
     expect(service.audio.list()).toEqual(before);
     expect(service.jobs.list()).toEqual(jobs);
