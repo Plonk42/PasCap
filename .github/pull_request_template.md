@@ -16,6 +16,13 @@ Milestone: <!-- outcome milestone -->
 
 <!-- Approved change, relevant dependencies and deliberately excluded work. -->
 
+<!-- Before RC1, approved project/persisted-format breaks are acceptable without
+backward-compatibility scaffolding or separate compatibility approval. Disclose any
+incompatibility and required recreation/reset; do not silently rewrite/delete data.
+Add migration/legacy support only when explicitly requested. This does not relax
+source safety or verification. Agree the subsequent policy with the owner before
+RC1; do not infer a post-RC promise or release approval. -->
+
 ## Verification
 
 - Local commits/checks: <!-- exact commands, results and synthetic fixture scope; distinguish focused feedback from applicable comprehensive delivery gates; docs-only changes need docs checks -->

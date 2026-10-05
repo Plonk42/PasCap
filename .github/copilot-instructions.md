@@ -106,9 +106,18 @@
 - Originals are referenced in place, never uploaded/copied/modified. Verification
   uses disposable synthetic media or memory-only projects. Real imports,
   preparations, exports, benchmarks and long renders need explicit owner consent.
-- Keep persisted data strict. Do not add migrations, optional legacy fields or
-  compatibility defaults unless explicitly requested. New feature scope must
-  not be inferred from historical feature worksheets.
+- **Until the first release candidate, prioritize fast iteration over backward
+  compatibility.** Approved scoped changes may break existing saved projects and
+  persisted formats; no separate compatibility approval or old-project support
+  is required. Keep only the current strict contract: do not add migrations,
+  legacy optional fields, compatibility defaults/adapters, parallel old-format
+  readers or compatibility-only tests unless explicitly requested. Remove superseded
+  code and update affected fixtures/tests/docs to the new contract; retain strict
+  rejection and clear recreation/reset guidance for incompatible data. Never silently
+  rewrite or delete existing data. Before RC1, agree the subsequent compatibility
+  policy with the owner; see [the GitHub workflow](../docs/GITHUB_WORKFLOW.md).
+  This does not relax source safety, current-behaviour verification or feature scope;
+  historical feature worksheets still do not approve new work.
 
 ## Architecture and verification
 
