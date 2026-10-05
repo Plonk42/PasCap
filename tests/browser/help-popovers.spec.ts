@@ -384,6 +384,42 @@ test('all Inspector title actions and help remain distinct and unclipped at a 27
     expect(await current(page)).toEqual(before); expect(memory.saves).toBe(0);
 });
 
+test('compact help keeps its trigger exposed and its text pointer-scrollable when neither side fits the full panel', async ({ page }) => {
+    const before = await current(page);
+    await page.setViewportSize({ width: 640, height: 480 });
+    const toggle = page.getByRole('button', { name: 'Toggle Clip panel', exact: true });
+    await expect(toggle).toHaveAttribute('aria-pressed', 'false'); await toggle.click();
+    const trigger = page.getByRole('button', { name: 'Speed timing help', exact: true });
+    const panel = await panelFor(page, trigger);
+    await trigger.evaluate((button) => button.scrollIntoView({ block: 'center' }));
+    await trigger.hover(); await expect(panel).toBeVisible();
+    const target = (await trigger.boundingBox())!; const bounds = (await panel.boundingBox())!;
+    expect(bounds.y + bounds.height <= target.y - 6 || bounds.y >= target.y + target.height + 6,
+        'The top-layer panel must stay on one side of its native trigger, not clamp across it').toBe(true);
+    expect(await trigger.evaluate((button) => {
+        const rect = button.getBoundingClientRect();
+        return button.contains(globalThis.document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2));
+    }), 'The trigger must remain the actual pointer hit target').toBe(true);
+    expect(await panel.evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(true);
+    await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
+    await page.mouse.wheel(0, 100);
+    await expect.poll(() => panel.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
+    await expect(panel).toBeVisible();
+    await trigger.click(); await expect(trigger).toHaveAttribute('aria-pressed', 'true');
+    await page.setViewportSize({ width: 640, height: 740 });
+    await expect.poll(() => panel.evaluate((element) => element.scrollHeight <= element.clientHeight)).toBe(true);
+    await page.setViewportSize({ width: 640, height: 480 });
+    await trigger.evaluate((button) => button.scrollIntoView({ block: 'center' }));
+    await expect.poll(() => panel.evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(true);
+    const resizedTarget = (await trigger.boundingBox())!; const resizedPanel = (await panel.boundingBox())!;
+    expect(resizedPanel.y + resizedPanel.height <= resizedTarget.y - 6 || resizedPanel.y >= resizedTarget.y + resizedTarget.height + 6).toBe(true);
+    await expect(trigger).toHaveAttribute('aria-pressed', 'true');
+    await trigger.press('ArrowDown'); await expect(panel).toBeFocused();
+    await panel.press('Escape'); await expect(panel).toBeHidden(); await expect(trigger).toBeFocused();
+    expect(await current(page)).toEqual(before); expect(memory.saves).toBe(0);
+    await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
+});
+
 for (const width of [1440, 1024, 720, 640]) {
     test(`help remains unclipped with a 24px target and bounded panel at ${width}px`, async ({ page }) => {
         await page.setViewportSize({ width, height: width === 640 ? 480 : 720 });
@@ -400,11 +436,15 @@ for (const width of [1440, 1024, 720, 640]) {
         expect(bounds.x).toBeGreaterThanOrEqual(8); expect(bounds.y).toBeGreaterThanOrEqual(8);
         expect(bounds.x + bounds.width).toBeLessThanOrEqual(width - 8);
         expect(bounds.y + bounds.height).toBeLessThanOrEqual((width === 640 ? 480 : 720) - 8);
+        expect(bounds.y + bounds.height <= target.y - 6 || bounds.y >= target.y + target.height + 6).toBe(true);
         expect(await page.evaluate(() => globalThis.document.documentElement.scrollWidth <= innerWidth)).toBe(true);
         await trigger.click(); await expect(trigger).toHaveAttribute('aria-pressed', 'true');
         await page.setViewportSize({ width: width + 20, height: 740 });
         await expect(panel).toBeVisible();
-        expect((await panel.boundingBox())!.x + (await panel.boundingBox())!.width).toBeLessThanOrEqual(width + 12);
+        const resizedTarget = (await trigger.boundingBox())!; const resizedPanel = (await panel.boundingBox())!;
+        expect(resizedPanel.x + resizedPanel.width).toBeLessThanOrEqual(width + 12);
+        expect(resizedPanel.y).toBeGreaterThanOrEqual(8); expect(resizedPanel.y + resizedPanel.height).toBeLessThanOrEqual(732);
+        expect(resizedPanel.y + resizedPanel.height <= resizedTarget.y - 6 || resizedPanel.y >= resizedTarget.y + resizedTarget.height + 6).toBe(true);
         expect(memory.saves).toBe(0);
     });
 }

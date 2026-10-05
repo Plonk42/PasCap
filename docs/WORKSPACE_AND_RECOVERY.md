@@ -113,7 +113,10 @@ An outside pointer press dismisses before a control captures a drag, retaining t
 gesture's normal Escape cancellation. With help open, Escape dismisses help before
 cancelling a field draft or closing a dialog.
 Pinned help is not displaced by another hover. The native top layer avoids clipping,
-stays within viewport bounds and closes when its owner is hidden. No help interaction
+stays within viewport bounds and never covers its own question-mark target. When
+the full text fits neither above nor below, the panel scrolls on the larger side,
+retaining pointer travel, wheel scrolling and keyboard focus. It closes when its
+owner is hidden. No help interaction
 seeks, changes history or saves; explicitly clicking away from a numeric field still
 has the ordinary one-commit blur behavior. Editable section/point/music/import controls,
 storage/render breakdowns and real warning/error lists remain normal disclosures.
