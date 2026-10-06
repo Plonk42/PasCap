@@ -88,18 +88,18 @@ non-negative and at most 2,147,483,647. Every `values` object requires **all ten
 nullable fields** below: a number participates; `null` does not. Omitted/unknown
 fields and all-null points are invalid, not repaired with defaults.
 
-| Channel | Value | Base when this channel has no row keys |
-| --- | --- | --- |
-| `layerOpacity` | 0–1 | Layer's static `opacity`, after group composition |
-| `clipOpacity` | 0–1 | Each clip's static `opacity`, before group composition |
-| `speed` | 0.1×–8× | Each clip's constant/ramp/custom-keyframed speed |
-| `exposure` | −3 to +3 stops | Each clip's static colour value |
-| `brightness` | −0.5 to +0.5 | Each clip's static colour value |
-| `contrast` | 0–2 | Each clip's static colour value |
-| `hue` | −180° to +180° | Each clip's static colour value |
-| `saturation` | 0–2 | Each clip's static colour value |
-| `highlights` | −1 to +1 | Each clip's static colour value |
-| `shadows` | −1 to +1 | Each clip's static colour value |
+| Channel        | Value          | Base when this channel has no row keys                 |
+| -------------- | -------------- | ------------------------------------------------------ |
+| `layerOpacity` | 0–1            | Layer's static `opacity`, after group composition      |
+| `clipOpacity`  | 0–1            | Each clip's static `opacity`, before group composition |
+| `speed`        | 0.1×–8×        | Each clip's constant/ramp/custom-keyframed speed       |
+| `exposure`     | −3 to +3 stops | Each clip's static colour value                        |
+| `brightness`   | −0.5 to +0.5   | Each clip's static colour value                        |
+| `contrast`     | 0–2            | Each clip's static colour value                        |
+| `hue`          | −180° to +180° | Each clip's static colour value                        |
+| `saturation`   | 0–2            | Each clip's static colour value                        |
+| `highlights`   | −1 to +1       | Each clip's static colour value                        |
+| `shadows`      | −1 to +1       | Each clip's static colour value                        |
 
 Clip documents contain static colour/opacity and **constant, ramp or custom-keyframed**
 speed. Shared row animation has no clip-animation object or per-property row key
@@ -134,13 +134,13 @@ even if other channels on the row are animated.
 
 For normalized interval progress $u$, the **left participating point** supplies:
 
-| Easing | Progress |
-| --- | --- |
-| Hold | 0 until the next participating point's exact frame |
-| Linear | $u$ |
-| Ease in | $u^2$ |
-| Ease out | $2u-u^2$ |
-| Smooth | $3u^2-2u^3$ |
+| Easing   | Progress                                           |
+| -------- | -------------------------------------------------- |
+| Hold     | 0 until the next participating point's exact frame |
+| Linear   | $u$                                                |
+| Ease in  | $u^2$                                              |
+| Ease out | $2u-u^2$                                           |
+| Smooth   | $3u^2-2u^3$                                        |
 
 Colour interpolates **parameter values**, then grades the sampled source RGB.
 It does not blend separately graded endpoint pictures; hue interpolates numerically
@@ -168,13 +168,13 @@ setting always has its own diamond beside its main control, immediately
 followed by native SVG Previous/Next buttons:
 
 - **◇ Hollow**, `aria-pressed=false`: not participating at this project frame.
-	It is still clickable, **not HTML-disabled merely because it is inactive**.
+  It is still clickable, **not HTML-disabled merely because it is inactive**.
 - **◆ Filled**, `aria-pressed=true`: participating at this frame. Clicking removes
-	only that setting; other participants and the point's easing remain unchanged.
+  only that setting; other participants and the point's easing remain unchanged.
 - The first enabled setting creates the row point, capturing its displayed value.
-	Enabling another setting at that frame joins the same point. Removing the last
-	participant deletes the point. Genuine invalid/draft interaction states can
-	disable actions; hollow status itself cannot.
+  Enabling another setting at that frame joins the same point. Removing the last
+  participant deletes the point. Genuine invalid/draft interaction states can
+  disable actions; hollow status itself cannot.
 
 The setting's Previous/Next buttons visit **strictly earlier/later** points where
 `values[setting] !== null`; zero is a participant, and points belonging only to
@@ -266,26 +266,26 @@ The shared Timeline frame field remains available.
 **Drag the marker horizontally to move the whole point:**
 
 - Pointer capture snapshots the committed project, row/point, zoom, grabbed pointer
-	position, horizontal scroll and stationary playhead. Movement uses that original
-	geometry plus scroll travel, rounds the frame delta once and clamps the result
-	to **0–2,147,483,647**; live retiming never becomes a new gesture origin.
+  position, horizontal scroll and stationary playhead. Movement uses that original
+  geometry plus scroll travel, rounds the frame delta once and clamps the result
+  to **0–2,147,483,647**; live retiming never becomes a new gesture origin.
 - Each destination is validated against the captured project. A valid draft updates
-	geometry and paused preview, but does not alter the committed document, history
-	or autosave. Release moves **all participants with their values and easing intact**
-	in one Undo step; an unchanged point creates no history entry.
+  geometry and paused preview, but does not alter the committed document, history
+  or autosave. Release moves **all participants with their values and easing intact**
+  in one Undo step; an unchanged point creates no history entry.
 - Snap uses captured clip/music/transition boundaries and the captured playhead,
-	within **eight pixels at the captured zoom**. Alt bypasses it. Horizontal edge
-	autoscroll uses the same base geometry; neither row switching nor automatic row
-	reveal relocates the gesture.
+  within **eight pixels at the captured zoom**. Alt bypasses it. Horizontal edge
+  autoscroll uses the same base geometry; neither row switching nor automatic row
+  reveal relocates the gesture.
 - Occupied frames produce a **red invalid ghost**, even when the other point has
-	unrelated channels. Points are **never merged or overwritten**. Invalid release
-	reports the reason and changes nothing; it cannot commit an earlier valid draft.
-	Returning to a free valid frame permits committing that final destination.
+  unrelated channels. Points are **never merged or overwritten**. Invalid release
+  reports the reason and changes nothing; it cannot commit an earlier valid draft.
+  Returning to a free valid frame permits committing that final destination.
 - A Speed participant may recompile contextual durations. Any resulting overlap,
-	fade or transition conflict rejects the **entire point move**; transitions are
-	not shortened and no participant is moved separately.
+  fade or transition conflict rejects the **entire point move**; transitions are
+  not shortened and no participant is moved separately.
 - Escape, pointer cancellation, unexpected lost capture or window blur rolls back
-	preview, document and horizontal scroll, with no draft save or history entry.
+  preview, document and horizontal scroll, with no draft save or history entry.
 
 On a focused marker, **Left/Right** moves one project frame and **Shift+Left/Right**
 moves ten, with the same atomic validation and no snapping. Focus and the inspected
@@ -437,4 +437,3 @@ incompatible is expected, not a reason to rewrite it.
 
 Workspace layout, field commits and recovery controls are specified in
 [WORKSPACE_AND_RECOVERY.md](WORKSPACE_AND_RECOVERY.md).
-

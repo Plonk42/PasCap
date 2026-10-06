@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { COLOUR_CONTROLS, colourSchema, decode709, encode709, generateCube, gradePixel, NEUTRAL_COLOUR, type RGB } from '../../src/shared/colour.js';
+import {
+  COLOUR_CONTROLS,
+  colourSchema,
+  decode709,
+  encode709,
+  generateCube,
+  gradePixel,
+  NEUTRAL_COLOUR,
+  type RGB,
+} from '../../src/shared/colour.js';
 import { musicSchema } from '../../src/shared/model.js';
 
 describe('authoritative colour transform', () => {
@@ -29,21 +38,44 @@ describe('authoritative colour transform', () => {
   });
   it('zero saturation removes chroma, hue leaves grey alone', () => {
     const grey = gradePixel([0.7, 0.2, 0.4], { ...NEUTRAL_COLOUR, saturation: 0 });
-    expect(grey[0]).toBeCloseTo(grey[1], 10); expect(grey[1]).toBeCloseTo(grey[2], 10);
+    expect(grey[0]).toBeCloseTo(grey[1], 10);
+    expect(grey[1]).toBeCloseTo(grey[2], 10);
     expect(gradePixel([0.4, 0.4, 0.4], { ...NEUTRAL_COLOUR, hue: 130 })[0]).toBeCloseTo(0.4, 10);
   });
   it('clips gamut and rejects incomplete/out-of-range/non-finite settings', () => {
-    const result = gradePixel([1, 0.8, 0], { exposure: 3, brightness: 0.5, contrast: 2, hue: 180, saturation: 2, highlights: 1, shadows: -1 });
+    const result = gradePixel([1, 0.8, 0], {
+      exposure: 3,
+      brightness: 0.5,
+      contrast: 2,
+      hue: 180,
+      saturation: 2,
+      highlights: 1,
+      shadows: -1,
+    });
     expect(result.every((v) => v >= 0 && v <= 1)).toBe(true);
     expect(() => colourSchema.parse({ exposure: 0 })).toThrow();
     expect(() => colourSchema.parse({ ...NEUTRAL_COLOUR, exposure: 3.1 })).toThrow();
     expect(() => colourSchema.parse({ ...NEUTRAL_COLOUR, hue: Number.NaN })).toThrow();
   });
-  it.each([Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY])('Zod number schemas reject %s without a deprecated finite check', (value) => {
-    for (const control of COLOUR_CONTROLS) expect(colourSchema.safeParse({ ...NEUTRAL_COLOUR, [control.key]: value }).success).toBe(false);
-    const music = { mediaId: 'music', sourceIn: 0, sourceOut: 60, start: 0, duration: 30, gainDb: value, fadeIn: 0, fadeOut: 0, loop: false };
-    expect(musicSchema.safeParse(music).success).toBe(false);
-  });
+  it.each([Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY])(
+    'Zod number schemas reject %s without a deprecated finite check',
+    (value) => {
+      for (const control of COLOUR_CONTROLS)
+        expect(colourSchema.safeParse({ ...NEUTRAL_COLOUR, [control.key]: value }).success).toBe(false);
+      const music = {
+        mediaId: 'music',
+        sourceIn: 0,
+        sourceOut: 60,
+        start: 0,
+        duration: 30,
+        gainDb: value,
+        fadeIn: 0,
+        fadeOut: 0,
+        loop: false,
+      };
+      expect(musicSchema.safeParse(music).success).toBe(false);
+    },
+  );
   it('writes deterministic red-fastest LUTs from the actual reference function', () => {
     const lines = generateCube(NEUTRAL_COLOUR, 2).trim().split('\n');
     expect(lines).toHaveLength(12);

@@ -58,10 +58,10 @@ ambiguous timing or accept HDR/untagged colour.
 1280×720 H.264, yuv420p, BT.709, no audio, 15-frame closed GOP, no B-frames.
 Verification compares 160×90 area-downsampled full-range RGB at indexed frames.
 
-| Recording | Beginning MAE / 255 | Middle MAE / 255 | End MAE / 255 |
-| --- | ---: | ---: | ---: |
-| DJI_0468, frames 0 / 284 / 568 | 0.942 | 1.202 | 1.444 |
-| DJI_0469, frames 0 / 156 / 312 | 0.959 | 0.700 | 0.739 |
+| Recording                      | Beginning MAE / 255 | Middle MAE / 255 | End MAE / 255 |
+| ------------------------------ | ------------------: | ---------------: | ------------: |
+| DJI_0468, frames 0 / 284 / 568 |               0.942 |            1.202 |         1.444 |
+| DJI_0469, frames 0 / 156 / 312 |               0.959 |            0.700 |         0.739 |
 
 Preparation rejects sample MAE above **6/255**, or any frame-count/rate mismatch.
 This sampled pixel check is not a per-frame optical identity proof; it accompanies
@@ -106,13 +106,13 @@ grades, not from proxies, and verified as 1280×720 H.264 SDR BT.709, with no au
 The preview was captured via GPU readback, vertically corrected, and area-downsampled
 to 160×90 RGB for comparison with the decoded native render:
 
-| Timeline frame | Region | Preview/native MAE / 255 |
-| ---: | --- | ---: |
-| 0 | Opening black endpoint | 0.000 |
-| 60 | Clip A, combined grade | 2.783 |
-| 165 | Dissolve midpoint, both grades | 3.152 |
-| 210 | Clip B | 2.533 |
-| 329 | Closing black endpoint | 0.000 |
+| Timeline frame | Region                         | Preview/native MAE / 255 |
+| -------------: | ------------------------------ | -----------------------: |
+|              0 | Opening black endpoint         |                    0.000 |
+|             60 | Clip A, combined grade         |                    2.783 |
+|            165 | Dissolve midpoint, both grades |                    3.152 |
+|            210 | Clip B                         |                    2.533 |
+|            329 | Closing black endpoint         |                    0.000 |
 
 This establishes preliminary code-value agreement on these samples. It is not
 bitwise equivalence, monitor calibration, or certification of every browser's video
@@ -122,10 +122,10 @@ colour conversion. Repeat the reference comparison on the intended GPU/browser.
 
 Correctness-only automated run (SwiftShader; repeated playback explicitly skipped):
 
-| Measurement | Observed | Qualification |
-| --- | ---: | --- |
-| Warm seek, 16 samples before/inside/after dissolve | Median 37.7 ms; max 71.2 ms | Available frames only; exact observed source-frame identity |
-| Colour engine-update to next paint | 6.2–11.4 ms | Excludes full input-event/React delay; not a hardware target result |
+| Measurement                                        |                    Observed | Qualification                                                       |
+| -------------------------------------------------- | --------------------------: | ------------------------------------------------------------------- |
+| Warm seek, 16 samples before/inside/after dissolve | Median 37.7 ms; max 71.2 ms | Available frames only; exact observed source-frame identity         |
+| Colour engine-update to next paint                 |                 6.2–11.4 ms | Excludes full input-event/React delay; not a hardware target result |
 
 Embedded-browser playback observations showed roughly 28–30 fps steady regions,
 with explicit buffering at decoder/boundary mismatches, dropped/late callbacks and

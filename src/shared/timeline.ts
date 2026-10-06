@@ -4,10 +4,37 @@ import { compileLayerRetiming } from './layer-retiming.js';
 import type { ProjectDocument, Transition, VideoClip, VideoLayer } from './model.js';
 import type { Retiming } from './speed.js';
 
-export interface PlacedClip { clip: VideoClip; start: number; end: number; duration: number; retiming: Retiming }
-export interface PlacedTransition { layerId: string; transition: Transition; start: number; boundary: number; end: number }
-export interface TimelineLayout { clips: PlacedClip[]; transitions: PlacedTransition[]; duration: number }
-export interface PreviewLayer { clipId: string; mediaId: string; layerId: string; sourceFrame: number; colour: ColourSettings; weight: number; blendWeight: number; brightness: number; opacity: number; layerOpacity: number }
+export interface PlacedClip {
+  clip: VideoClip;
+  start: number;
+  end: number;
+  duration: number;
+  retiming: Retiming;
+}
+export interface PlacedTransition {
+  layerId: string;
+  transition: Transition;
+  start: number;
+  boundary: number;
+  end: number;
+}
+export interface TimelineLayout {
+  clips: PlacedClip[];
+  transitions: PlacedTransition[];
+  duration: number;
+}
+export interface PreviewLayer {
+  clipId: string;
+  mediaId: string;
+  layerId: string;
+  sourceFrame: number;
+  colour: ColourSettings;
+  weight: number;
+  blendWeight: number;
+  brightness: number;
+  opacity: number;
+  layerOpacity: number;
+}
 
 /** Ripple follows saved clip order. Positioned tracks follow chronological starts;
  * stored pair order disambiguates a legal equal-start full-overlap dissolve. */
@@ -21,7 +48,10 @@ export function layerClips(project: ProjectDocument, layerId: string): VideoClip
     pairOrder.set(transition.leftId, index);
     pairOrder.set(transition.rightId, index + 1);
   }
-  return clips.sort((left, right) => left.start - right.start || (pairOrder.get(left.id) ?? clips.length) - (pairOrder.get(right.id) ?? clips.length));
+  return clips.sort(
+    (left, right) =>
+      left.start - right.start || (pairOrder.get(left.id) ?? clips.length) - (pairOrder.get(right.id) ?? clips.length),
+  );
 }
 
 export function blackFadeParts(duration: number): { out: number; in: number } {
@@ -35,25 +65,39 @@ function regionConsumption(transition: Transition | undefined, side: 'in' | 'out
 }
 
 function validateTopology(project: ProjectDocument): void {
-  if (new Set(project.layers.map((layer) => layer.id)).size !== project.layers.length) throw new Error('Layer IDs must be unique.');
-  if (project.clips.some((clip) => !project.layers.some((layer) => layer.id === clip.layerId))) throw new Error('Clip references an unknown video layer.');
-  if (new Set(project.clips.map((clip) => clip.id)).size !== project.clips.length) throw new Error('Clip-instance IDs must be unique.');
+  if (new Set(project.layers.map((layer) => layer.id)).size !== project.layers.length)
+    throw new Error('Layer IDs must be unique.');
+  if (project.clips.some((clip) => !project.layers.some((layer) => layer.id === clip.layerId)))
+    throw new Error('Clip references an unknown video layer.');
+  if (new Set(project.clips.map((clip) => clip.id)).size !== project.clips.length)
+    throw new Error('Clip-instance IDs must be unique.');
   for (const layer of project.layers) {
     const clips = layerClips(project, layer.id);
-    if (layer.transitions.length !== Math.max(0, clips.length - 1)) throw new Error('Exactly one transition is required per adjacent track clip pair.');
+    if (layer.transitions.length !== Math.max(0, clips.length - 1))
+      throw new Error('Exactly one transition is required per adjacent track clip pair.');
     for (const [index, transition] of layer.transitions.entries()) {
-      if (transition.leftId !== clips[index]?.id || transition.rightId !== clips[index + 1]?.id) throw new Error('Transitions must follow the ordered adjacent clip pairs on their own track.');
+      if (transition.leftId !== clips[index]?.id || transition.rightId !== clips[index + 1]?.id)
+        throw new Error('Transitions must follow the ordered adjacent clip pairs on their own track.');
     }
   }
 }
 
-function validateClipRegions(clip: VideoClip, duration: number, incoming: Transition | undefined, outgoing: Transition | undefined, opening: number, closing: number): void {
+function validateClipRegions(
+  clip: VideoClip,
+  duration: number,
+  incoming: Transition | undefined,
+  outgoing: Transition | undefined,
+  opening: number,
+  closing: number,
+): void {
   if (duration <= 0) throw new Error('Clips must contain at least one frame.');
-  if (regionConsumption(incoming, 'in') + regionConsumption(outgoing, 'out') + opening + closing > duration) throw new Error(`Fade/transition regions overlap or exceed clip ${clip.id}.`);
+  if (regionConsumption(incoming, 'in') + regionConsumption(outgoing, 'out') + opening + closing > duration)
+    throw new Error(`Fade/transition regions overlap or exceed clip ${clip.id}.`);
 }
 
 function placeTransition(layerId: string, transition: Transition, start: number): PlacedTransition {
-  if (transition.type === 'cross-dissolve') return { layerId, transition, start, boundary: start + transition.duration, end: start + transition.duration };
+  if (transition.type === 'cross-dissolve')
+    return { layerId, transition, start, boundary: start + transition.duration, end: start + transition.duration };
   if (transition.type === 'fade-through-black') {
     const parts = blackFadeParts(transition.duration);
     return { layerId, transition, start: start - parts.out, boundary: start, end: start + parts.in };
@@ -61,23 +105,39 @@ function placeTransition(layerId: string, transition: Transition, start: number)
   return { layerId, transition, start, boundary: start, end: start };
 }
 
-function placementStart(clip: VideoClip, layer: VideoLayer, previous: PlacedClip | undefined, incoming: Transition | undefined): number {
+function placementStart(
+  clip: VideoClip,
+  layer: VideoLayer,
+  previous: PlacedClip | undefined,
+  incoming: Transition | undefined,
+): number {
   if (!layer.ripple || !previous) return clip.start;
   const overlap = incoming?.type === 'cross-dissolve' ? incoming.duration : 0;
   return previous.end - overlap;
 }
 
-function validatePlacement(placed: PlacedClip, previous: PlacedClip | undefined, earlier: PlacedClip | undefined, incoming: Transition | undefined): void {
+function validatePlacement(
+  placed: PlacedClip,
+  previous: PlacedClip | undefined,
+  earlier: PlacedClip | undefined,
+  incoming: Transition | undefined,
+): void {
   if (previous) {
     if (incoming?.type === 'cross-dissolve') {
-      if (placed.start !== previous.end - incoming.duration) throw new Error('A cross-dissolve must have its exact stored overlap.');
-    } else if (placed.start < previous.end) throw new Error('Clips on the same track cannot overlap except in an exact adjacent cross-dissolve.');
-    if (incoming?.type === 'fade-through-black' && placed.start !== previous.end) throw new Error('Fade-through-black requires touching clips, not a gap.');
+      if (placed.start !== previous.end - incoming.duration)
+        throw new Error('A cross-dissolve must have its exact stored overlap.');
+    } else if (placed.start < previous.end)
+      throw new Error('Clips on the same track cannot overlap except in an exact adjacent cross-dissolve.');
+    if (incoming?.type === 'fade-through-black' && placed.start !== previous.end)
+      throw new Error('Fade-through-black requires touching clips, not a gap.');
   }
   if (earlier && placed.start < earlier.end) throw new Error('A track cannot contain a triple overlap.');
 }
 
-function placeLayer(project: ProjectDocument, layer: VideoLayer): { clips: PlacedClip[]; transitions: PlacedTransition[] } {
+function placeLayer(
+  project: ProjectDocument,
+  layer: VideoLayer,
+): { clips: PlacedClip[]; transitions: PlacedTransition[] } {
   const ordered = layerClips(project, layer.id);
   const clips: PlacedClip[] = [];
   const transitions: PlacedTransition[] = [];
@@ -104,7 +164,11 @@ export function calculateLayout(project: ProjectDocument): TimelineLayout {
   validateTopology(project);
   const tracks = project.layers.map((layer) => placeLayer(project, layer));
   const clips = tracks.flatMap((track) => track.clips);
-  return { clips, transitions: tracks.flatMap((track) => track.transitions), duration: Math.max(0, ...clips.map((clip) => clip.end)) };
+  return {
+    clips,
+    transitions: tracks.flatMap((track) => track.transitions),
+    duration: Math.max(0, ...clips.map((clip) => clip.end)),
+  };
 }
 
 export function fadeInWeight(offset: number, duration: number): number {
@@ -114,8 +178,19 @@ export function fadeOutWeight(offset: number, duration: number): number {
   return duration === 1 ? 0 : 1 - fadeInWeight(offset, duration);
 }
 
-function clipWeights(placed: PlacedClip, frame: number, layer: VideoLayer, layout: TimelineLayout): { blendWeight: number; brightness: number } {
-  const region = layout.transitions.find((item) => item.layerId === layer.id && frame >= item.start && frame < item.end && (item.transition.leftId === placed.clip.id || item.transition.rightId === placed.clip.id));
+function clipWeights(
+  placed: PlacedClip,
+  frame: number,
+  layer: VideoLayer,
+  layout: TimelineLayout,
+): { blendWeight: number; brightness: number } {
+  const region = layout.transitions.find(
+    (item) =>
+      item.layerId === layer.id &&
+      frame >= item.start &&
+      frame < item.end &&
+      (item.transition.leftId === placed.clip.id || item.transition.rightId === placed.clip.id),
+  );
   let blendWeight = 1;
   let brightness = 1;
   if (region?.transition.type === 'cross-dissolve') {
@@ -124,15 +199,24 @@ function clipWeights(placed: PlacedClip, frame: number, layer: VideoLayer, layou
   }
   if (region?.transition.type === 'fade-through-black') {
     const parts = blackFadeParts(region.transition.duration);
-    brightness = placed.clip.id === region.transition.leftId ? fadeOutWeight(frame - region.start, parts.out) : fadeInWeight(frame - region.boundary, parts.in);
+    brightness =
+      placed.clip.id === region.transition.leftId
+        ? fadeOutWeight(frame - region.start, parts.out)
+        : fadeInWeight(frame - region.boundary, parts.in);
   }
   const clips = layout.clips.filter((item) => item.clip.layerId === layer.id);
-  if (placed === clips[0] && frame < placed.start + layer.openingFade) brightness *= fadeInWeight(frame - placed.start, layer.openingFade);
-  if (placed === clips.at(-1) && frame >= placed.end - layer.closingFade) brightness *= fadeOutWeight(frame - (placed.end - layer.closingFade), layer.closingFade);
+  if (placed === clips[0] && frame < placed.start + layer.openingFade)
+    brightness *= fadeInWeight(frame - placed.start, layer.openingFade);
+  if (placed === clips.at(-1) && frame >= placed.end - layer.closingFade)
+    brightness *= fadeOutWeight(frame - (placed.end - layer.closingFade), layer.closingFade);
   return { blendWeight, brightness };
 }
 
-export function sampleTimeline(project: ProjectDocument, frame: number, layout = calculateLayout(project)): PreviewLayer[] {
+export function sampleTimeline(
+  project: ProjectDocument,
+  frame: number,
+  layout = calculateLayout(project),
+): PreviewLayer[] {
   if (!Number.isInteger(frame) || frame < 0 || frame >= layout.duration) return [];
   const active = layout.clips.filter((placed) => frame >= placed.start && frame < placed.end);
   const opacities = new Map(project.layers.map((layer) => [layer.id, layerOpacityAt(layer, frame)]));
@@ -141,6 +225,19 @@ export function sampleTimeline(project: ProjectDocument, frame: number, layout =
     if (!layer.enabled) return [];
     const sourceFrame = placed.retiming.sourceAt(frame - placed.start);
     const { blendWeight, brightness } = clipWeights(placed, frame, layer, layout);
-    return [{ clipId: placed.clip.id, mediaId: placed.clip.mediaId, layerId: layer.id, sourceFrame, colour: colourAt(placed.clip, layer, frame), weight: blendWeight * brightness, blendWeight, brightness, opacity: opacityAt(placed.clip, layer, frame), layerOpacity: opacities.get(layer.id)! }];
+    return [
+      {
+        clipId: placed.clip.id,
+        mediaId: placed.clip.mediaId,
+        layerId: layer.id,
+        sourceFrame,
+        colour: colourAt(placed.clip, layer, frame),
+        weight: blendWeight * brightness,
+        blendWeight,
+        brightness,
+        opacity: opacityAt(placed.clip, layer, frame),
+        layerOpacity: opacities.get(layer.id)!,
+      },
+    ];
   });
 }

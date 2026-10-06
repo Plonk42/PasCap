@@ -1,4 +1,7 @@
-export interface FrameRate { numerator: number; denominator: number }
+export interface FrameRate {
+  numerator: number;
+  denominator: number;
+}
 
 export const PROJECT_FPS: Readonly<FrameRate> = Object.freeze({ numerator: 30_000, denominator: 1_001 });
 
@@ -7,11 +10,15 @@ export function sameRate(a: FrameRate, b: FrameRate): boolean {
 }
 
 export function framesToSeconds(frames: number, rate: FrameRate = PROJECT_FPS): number {
-  return frames * rate.denominator / rate.numerator;
+  return (frames * rate.denominator) / rate.numerator;
 }
 
-export function secondsToFrames(seconds: number, rate: FrameRate = PROJECT_FPS, rounding: 'nearest' | 'floor' = 'nearest'): number {
-  const value = seconds * rate.numerator / rate.denominator;
+export function secondsToFrames(
+  seconds: number,
+  rate: FrameRate = PROJECT_FPS,
+  rounding: 'nearest' | 'floor' = 'nearest',
+): number {
+  const value = (seconds * rate.numerator) / rate.denominator;
   return rounding === 'floor' ? Math.floor(value + 1e-7) : Math.round(value);
 }
 
@@ -30,5 +37,6 @@ export function formatTimecode(frame: number, rate: FrameRate = PROJECT_FPS): st
   const nominal = Math.ceil(rate.numerator / rate.denominator);
   const totalSeconds = Math.floor(frame / nominal);
   return [Math.floor(totalSeconds / 3600), Math.floor(totalSeconds / 60) % 60, totalSeconds % 60, frame % nominal]
-    .map((part) => String(part).padStart(2, '0')).join(':');
+    .map((part) => String(part).padStart(2, '0'))
+    .join(':');
 }

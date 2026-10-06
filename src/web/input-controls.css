@@ -24,7 +24,7 @@
   outline-offset: 2px;
 }
 
-.number-field input.number-field-input[aria-invalid="true"] {
+.number-field input.number-field-input[aria-invalid='true'] {
   border-color: var(--error);
 }
 
@@ -65,7 +65,7 @@
   font-size: 13px;
 }
 
-.keyframe-controls>legend {
+.keyframe-controls > legend {
   padding: 0;
   font-size: 12px;
 }

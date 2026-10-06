@@ -1,217 +1,217 @@
 /* Source-only disclosures; recording rows keep their existing hover geometry. */
 .source-review.rush-source {
-    container: rush-source / inline-size;
+  container: rush-source / inline-size;
 }
 
 .source-review.rush-source .source-review-heading {
-    position: sticky;
-    top: 0;
-    z-index: 4;
-    background: #172019;
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  background: #172019;
 }
 
-.source-review.rush-source .source-review-heading>.primary-button {
-    flex-shrink: 0;
+.source-review.rush-source .source-review-heading > .primary-button {
+  flex-shrink: 0;
 }
 
 .source-review.rush-source .source-add-feedback {
-    flex-shrink: 0;
-    color: var(--muted);
-    font-size: 11px;
-    line-height: 1.5;
+  flex-shrink: 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
 }
 
 .source-review.rush-source .source-add-feedback:empty {
-    display: none;
+  display: none;
 }
 
 .source-review.rush-source .source-add-feedback[data-added-clip-id] {
-    color: var(--accent);
+  color: var(--accent);
 }
 
 .source-review.rush-source .source-excerpts {
-    flex-shrink: 0;
-    min-width: 0;
-    font-size: 11px;
+  flex-shrink: 0;
+  min-width: 0;
+  font-size: 11px;
 }
 
-.source-review.rush-source .source-excerpts>summary {
-    width: auto;
-    height: auto;
-    min-height: 18px;
-    padding: 2px 4px;
-    justify-content: flex-start;
-    border: 1px solid #4a6451;
-    border-radius: 4px;
-    color: #c3d9c8;
-    background: #26392d;
-    cursor: pointer;
-    max-width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+.source-review.rush-source .source-excerpts > summary {
+  width: auto;
+  height: auto;
+  min-height: 18px;
+  padding: 2px 4px;
+  justify-content: flex-start;
+  border: 1px solid #4a6451;
+  border-radius: 4px;
+  color: #c3d9c8;
+  background: #26392d;
+  cursor: pointer;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .source-excerpts .editor-popover-content {
-    width: min(400px, calc(100vw - 32px));
-    max-width: calc(100vw - 32px);
+  width: min(400px, calc(100vw - 32px));
+  max-width: calc(100vw - 32px);
 }
 
-.source-review.rush-source .source-excerpts>summary:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 2px;
+.source-review.rush-source .source-excerpts > summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .source-review.rush-source .source-excerpts-description {
-    margin: 0 0 4px;
-    color: var(--muted);
-    font-size: 10px;
+  margin: 0 0 4px;
+  color: var(--muted);
+  font-size: 10px;
 }
 
 .source-review.rush-source .source-excerpt-list {
-    display: grid;
-    gap: 4px;
-    max-height: 220px;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    scrollbar-width: thin;
-    list-style: none;
-    margin: 0;
-    padding: 0 2px 2px;
+  display: grid;
+  gap: 4px;
+  max-height: 220px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  list-style: none;
+  margin: 0;
+  padding: 0 2px 2px;
 }
 
 .source-review.rush-source .source-excerpt-row {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: center;
-    gap: 8px;
-    padding: 5px 6px;
-    border: 1px solid transparent;
-    border-radius: 4px;
-    background: #1c2820;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 6px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: #1c2820;
 }
 
-.source-review.rush-source .source-excerpt-row[data-last-added="true"] {
-    border-color: #58765f;
-    background: #263a2c;
+.source-review.rush-source .source-excerpt-row[data-last-added='true'] {
+  border-color: #58765f;
+  background: #263a2c;
 }
 
 .source-review.rush-source .source-excerpt-info {
-    display: grid;
-    gap: 2px;
-    min-width: 0;
+  display: grid;
+  gap: 2px;
+  min-width: 0;
 }
 
 .source-review.rush-source .source-excerpt-heading {
-    display: flex;
-    align-items: baseline;
-    gap: 8px;
-    min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
 }
 
 .source-review.rush-source .source-excerpt-heading strong {
-    flex-shrink: 0;
-    font-weight: 550;
+  flex-shrink: 0;
+  font-weight: 550;
 }
 
 .source-review.rush-source .source-excerpt-layer {
-    min-width: 0;
-    max-width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    color: var(--muted);
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
 }
 
 .source-review.rush-source .source-excerpt-range {
-    color: #b0cbb8;
-    font-size: 10px;
-    font-variant-numeric: tabular-nums;
+  color: #b0cbb8;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
 }
 
 .source-review.rush-source .source-excerpt-reveal {
-    min-height: 28px;
-    padding: 4px 7px;
-    font-size: 11px;
+  min-height: 28px;
+  padding: 4px 7px;
+  font-size: 11px;
 }
 
-.media-panel .media-item-info>.media-recording-meta {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    min-width: 0;
+.media-panel .media-item-info > .media-recording-meta {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
 }
 
 .media-panel .list .media-item-info {
-    flex: 1;
+  flex: 1;
 }
 
 .media-panel .media-recording-duration {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .media-panel .media-usage-badge {
-    flex-shrink: 0;
-    padding: 0 4px;
-    border: 1px solid #4a6451;
-    border-radius: 3px;
-    background: #26392d;
-    color: #c3dfc9;
-    font-size: 9px;
-    line-height: 1.4;
-    font-variant-numeric: tabular-nums;
-    white-space: nowrap;
+  flex-shrink: 0;
+  padding: 0 4px;
+  border: 1px solid #4a6451;
+  border-radius: 3px;
+  background: #26392d;
+  color: #c3dfc9;
+  font-size: 9px;
+  line-height: 1.4;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 /* The count lives in recording info, independently of the compact ready dot. */
-.media-panel.declutter-media .media-state.ready[data-used="true"] {
-    width: 8px;
+.media-panel.declutter-media .media-state.ready[data-used='true'] {
+  width: 8px;
 }
 
-.media-panel.declutter-media .media-state.ready[data-used="true"] small {
-    display: none;
+.media-panel.declutter-media .media-state.ready[data-used='true'] small {
+  display: none;
 }
 
 @container rush-source (width < 320px) {
-    .source-review.rush-source .source-excerpt-heading {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 0;
-    }
+  .source-review.rush-source .source-excerpt-heading {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0;
+  }
 }
 
 @container rush-source (width < 500px) {
-    .source-review.rush-source .source-pin-label {
-        display: none;
-    }
+  .source-review.rush-source .source-pin-label {
+    display: none;
+  }
 }
 
 @container rush-source (width < 280px) {
-    .source-review.rush-source .source-excerpt-row {
-        grid-template-columns: minmax(0, 1fr);
-        gap: 4px;
-    }
+  .source-review.rush-source .source-excerpt-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+  }
 
-    .source-review.rush-source .source-excerpt-reveal {
-        justify-self: start;
-    }
+  .source-review.rush-source .source-excerpt-reveal {
+    justify-self: start;
+  }
 }
 
 @container media-library (width < 280px) {
-    .media-panel .media-item-info>.media-recording-meta {
-        gap: 3px;
-    }
+  .media-panel .media-item-info > .media-recording-meta {
+    gap: 3px;
+  }
 
-    .media-panel .media-usage-badge {
-        padding-inline: 3px;
-    }
+  .media-panel .media-usage-badge {
+    padding-inline: 3px;
+  }
 }
 
 @media (max-height: 760px) {
-    .source-review.rush-source .source-range-description:not(.source-range-error) {
-        display: none;
-    }
+  .source-review.rush-source .source-range-description:not(.source-range-error) {
+    display: none;
+  }
 }

@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { fullMediaSelection, markMediaSelection, moveMediaSelectionEdge, resolveMediaSelection, sourceFrameAtRatio, sourcePointerRatio, validateMediaSelection } from '../../src/shared/media-selection.js';
+import {
+  fullMediaSelection,
+  markMediaSelection,
+  moveMediaSelectionEdge,
+  resolveMediaSelection,
+  sourceFrameAtRatio,
+  sourcePointerRatio,
+  validateMediaSelection,
+} from '../../src/shared/media-selection.js';
 
 describe('editor-only source selections', () => {
   it('starts with the complete registered recording and an exclusive OUT', () => {
@@ -24,9 +32,12 @@ describe('editor-only source selections', () => {
     expect(() => validateMediaSelection({ mediaId: 'recording', ...bounds }, 100)).toThrow('OUT is exclusive');
   });
 
-  it.each(['', '../original.mp4', 'https://example.com/video', 'recording?url=elsewhere', 'x'.repeat(101)])('rejects unsafe media IDs %s', (mediaId) => {
-    expect(() => fullMediaSelection(mediaId, 100)).toThrow('registered media ID');
-  });
+  it.each(['', '../original.mp4', 'https://example.com/video', 'recording?url=elsewhere', 'x'.repeat(101)])(
+    'rejects unsafe media IDs %s',
+    (mediaId) => {
+      expect(() => fullMediaSelection(mediaId, 100)).toThrow('registered media ID');
+    },
+  );
 
   it('resolves independent parent choices without mutating or sharing stored objects', () => {
     const chosen = Object.freeze({ mediaId: 'recording', sourceIn: 15, sourceOut: 90 });
@@ -46,8 +57,12 @@ describe('editor-only source selections', () => {
   });
 
   it('rejects an entry keyed for the wrong media or outside the registered source', () => {
-    expect(() => resolveMediaSelection('recording', 100, { recording: { mediaId: 'other', sourceIn: 0, sourceOut: 100 } })).toThrow('different recording');
-    expect(() => resolveMediaSelection('recording', 100, { recording: { mediaId: 'recording', sourceIn: 0, sourceOut: 110 } })).toThrow('OUT is exclusive');
+    expect(() =>
+      resolveMediaSelection('recording', 100, { recording: { mediaId: 'other', sourceIn: 0, sourceOut: 100 } }),
+    ).toThrow('different recording');
+    expect(() =>
+      resolveMediaSelection('recording', 100, { recording: { mediaId: 'recording', sourceIn: 0, sourceOut: 110 } }),
+    ).toThrow('OUT is exclusive');
   });
 
   it('restores either end up to the original bounds without moving the opposite edge', () => {
@@ -61,8 +76,12 @@ describe('editor-only source selections', () => {
     const range = { mediaId: 'recording', sourceIn: 150, sourceOut: 510 };
     expect(moveMediaSelectionEdge(range, 'in', 999, 600).sourceIn).toBe(509);
     expect(moveMediaSelectionEdge(range, 'out', -999, 600).sourceOut).toBe(151);
-    expect(moveMediaSelectionEdge(fullMediaSelection('single', 1), 'in', 999, 1)).toEqual(fullMediaSelection('single', 1));
-    expect(moveMediaSelectionEdge(fullMediaSelection('single', 1), 'out', -999, 1)).toEqual(fullMediaSelection('single', 1));
+    expect(moveMediaSelectionEdge(fullMediaSelection('single', 1), 'in', 999, 1)).toEqual(
+      fullMediaSelection('single', 1),
+    );
+    expect(moveMediaSelectionEdge(fullMediaSelection('single', 1), 'out', -999, 1)).toEqual(
+      fullMediaSelection('single', 1),
+    );
     expect(() => moveMediaSelectionEdge(range, 'in', 0.5, 600)).toThrow('whole source frames');
   });
 
@@ -89,7 +108,9 @@ describe('editor-only source selections', () => {
 
 describe('source hover geometry', () => {
   it('maps the entire hover region to the first and last registered frames', () => {
-    expect([-100, 10, 60, 110, 900].map((x) => sourceFrameAtRatio(sourcePointerRatio(x, 10, 100), 600))).toEqual([0, 0, 300, 599, 599]);
+    expect([-100, 10, 60, 110, 900].map((x) => sourceFrameAtRatio(sourcePointerRatio(x, 10, 100), 600))).toEqual([
+      0, 0, 300, 599, 599,
+    ]);
     expect(sourceFrameAtRatio(1, 1)).toBe(0);
   });
 

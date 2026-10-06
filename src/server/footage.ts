@@ -1,7 +1,15 @@
 import { constants, type Dirent, type Stats } from 'node:fs';
 import { access, lstat, opendir } from 'node:fs/promises';
 import path from 'node:path';
-import { isAudioFilename, isVideoFilename, MAX_FOOTAGE_ENTRIES, MAX_FOOTAGE_FILES, type AudioDirectory, type FootageDirectory, type FootageRoot } from '../shared/footage.js';
+import {
+  isAudioFilename,
+  isVideoFilename,
+  MAX_FOOTAGE_ENTRIES,
+  MAX_FOOTAGE_FILES,
+  type AudioDirectory,
+  type FootageDirectory,
+  type FootageRoot,
+} from '../shared/footage.js';
 import { forEachSerial } from '../shared/serial.js';
 import type { ServiceConfig } from './config.js';
 import { errorMessage, isNotFound, ServiceError } from './errors.js';
@@ -23,7 +31,8 @@ function contains(directory: string, filename: string): boolean {
 function directoryError(error: unknown): unknown {
   if (isNotFound(error)) return new ServiceError('Footage directory is missing or disconnected.', 404);
   if (error instanceof Error && 'code' in error) {
-    if (error.code === 'EACCES' || error.code === 'EPERM') return new ServiceError('Footage directory is not readable by the PasCap service.', 403);
+    if (error.code === 'EACCES' || error.code === 'EPERM')
+      return new ServiceError('Footage directory is not readable by the PasCap service.', 403);
     if (error.code === 'ENOTDIR') return new ServiceError('Footage path must be a directory.', 422);
   }
   return error;
@@ -34,7 +43,11 @@ function compareEntries(a: BrowserEntry, b: BrowserEntry): number {
   return naturalNames.compare(a.name, b.name) || a.name.localeCompare(b.name);
 }
 
-function entryKind(info: Pick<Stats, 'isSymbolicLink' | 'isDirectory' | 'isFile'>, name: string, mediaKind: MediaKind): BrowserEntry['kind'] | null {
+function entryKind(
+  info: Pick<Stats, 'isSymbolicLink' | 'isDirectory' | 'isFile'>,
+  name: string,
+  mediaKind: MediaKind,
+): BrowserEntry['kind'] | null {
   if (info.isSymbolicLink()) return null;
   if (info.isDirectory()) return 'directory';
   const supported = mediaKind === 'audio' ? isAudioFilename(name) : isVideoFilename(name);
@@ -50,7 +63,8 @@ function addWarning(warnings: string[], message: string): void {
 function retainEntry(entries: BrowserEntry[], entry: BrowserEntry): boolean {
   const full = entries.length === MAX_FOOTAGE_ENTRIES;
   if (full && compareEntries(entry, entries.at(-1)!) >= 0) return true;
-  let low = 0; let high = entries.length;
+  let low = 0;
+  let high = entries.length;
   while (low < high) {
     const middle = Math.floor((low + high) / 2);
     if (compareEntries(entries[middle]!, entry) < 0) low = middle + 1;
@@ -81,7 +95,9 @@ export class FootageBrowser {
         this.#scopedPath(root.path, root.path);
         await this.#assertDirectory(root.path);
         roots.push({ ...root, available: true, error: null });
-      } catch (error) { roots.push({ ...root, available: false, error: errorMessage(error).slice(0, MAX_WARNING_LENGTH) }); }
+      } catch (error) {
+        roots.push({ ...root, available: false, error: errorMessage(error).slice(0, MAX_WARNING_LENGTH) });
+      }
     });
     return roots;
   }
@@ -101,21 +117,34 @@ export class FootageBrowser {
     if (!root) throw new ServiceError('Approved footage root not found.', 404);
     const selected = this.#scopedPath(directory ?? root.path, root.path);
     await this.#assertDirectory(selected);
-    const result: BrowserDirectory = { rootId, directory: selected, parent: selected === root.path ? null : path.dirname(selected), entries: [], ignored: 0, truncated: false, warnings: [] };
+    const result: BrowserDirectory = {
+      rootId,
+      directory: selected,
+      parent: selected === root.path ? null : path.dirname(selected),
+      entries: [],
+      ignored: 0,
+      truncated: false,
+      warnings: [],
+    };
     try {
       const listing = await opendir(selected);
       // One directory only. Both result storage and diagnostic storage are bounded.
       for await (const entry of listing) {
         try {
           const item = await this.#readEntry(selected, entry, mediaKind);
-          if (!item) { result.ignored++; continue; }
+          if (!item) {
+            result.ignored++;
+            continue;
+          }
           if (retainEntry(result.entries, item)) result.truncated = true;
         } catch (error) {
           result.ignored++;
           addWarning(result.warnings, `Cannot inspect ${entry.name}: ${errorMessage(error)}`);
         }
       }
-    } catch (error) { throw directoryError(error); }
+    } catch (error) {
+      throw directoryError(error);
+    }
     return result;
   }
 
@@ -134,10 +163,12 @@ export class FootageBrowser {
    * so a missing/replaced source does not discard the other valid selections.
    */
   validatePaths(paths: readonly string[]): string[] {
-    if (paths.length === 0 || paths.length > MAX_FOOTAGE_FILES) throw new ServiceError(`Select between 1 and ${MAX_FOOTAGE_FILES} recording paths.`, 400);
+    if (paths.length === 0 || paths.length > MAX_FOOTAGE_FILES)
+      throw new ServiceError(`Select between 1 and ${MAX_FOOTAGE_FILES} recording paths.`, 400);
     return paths.map((filename) => {
       const selected = this.#scopedPath(filename);
-      if (!isVideoFilename(path.basename(selected))) throw new ServiceError('Select recording paths ending in .mp4, .mov or .m4v.', 400);
+      if (!isVideoFilename(path.basename(selected)))
+        throw new ServiceError('Select recording paths ending in .mp4, .mov or .m4v.', 400);
       return selected;
     });
   }
@@ -145,7 +176,11 @@ export class FootageBrowser {
   /** Browser-selected audio is root-scoped; registration owns existence, symlink and probe checks. */
   validateAudioPath(filename: string): string {
     const selected = this.#scopedPath(filename);
-    if (!isAudioFilename(path.basename(selected))) throw new ServiceError('Select an audio path ending in .wav, .mp3, .m4a, .aac, .flac, .ogg, .opus, .aiff, .aif or .wma.', 400);
+    if (!isAudioFilename(path.basename(selected)))
+      throw new ServiceError(
+        'Select an audio path ending in .wav, .mp3, .m4a, .aac, .flac, .ogg, .opus, .aiff, .aif or .wma.',
+        400,
+      );
     return selected;
   }
 
@@ -153,25 +188,42 @@ export class FootageBrowser {
   validateManualPath(filename: string): string {
     if (filename.includes('\0')) throw new ServiceError('Import paths cannot contain NUL.', 400);
     const selected = path.resolve(filename);
-    if (contains(this.#cache, selected)) throw new ServiceError('The PasCap cache cannot be registered as original footage.', 403);
+    if (contains(this.#cache, selected))
+      throw new ServiceError('The PasCap cache cannot be registered as original footage.', 403);
     return selected;
   }
 
   #scopedPath(filename: string, root?: string): string {
-    if (!filename || filename.length > 4096 || filename.includes('\0') || !path.isAbsolute(filename) || filename.split(path.sep).includes('..')) {
-      throw new ServiceError('Footage paths must be absolute, at most 4096 characters, without NUL or parent traversal.', 400);
+    if (
+      !filename ||
+      filename.length > 4096 ||
+      filename.includes('\0') ||
+      !path.isAbsolute(filename) ||
+      filename.split(path.sep).includes('..')
+    ) {
+      throw new ServiceError(
+        'Footage paths must be absolute, at most 4096 characters, without NUL or parent traversal.',
+        400,
+      );
     }
     const selected = path.resolve(filename);
-    const approved = root === undefined ? this.#roots.some((candidate) => contains(candidate.path, selected)) : contains(root, selected);
+    const approved =
+      root === undefined
+        ? this.#roots.some((candidate) => contains(candidate.path, selected))
+        : contains(root, selected);
     if (!approved) throw new ServiceError('Footage path is outside the selected approved root.', 403);
-    if (contains(this.#cache, selected)) throw new ServiceError('The PasCap cache cannot be browsed or registered as footage.', 403);
+    if (contains(this.#cache, selected))
+      throw new ServiceError('The PasCap cache cannot be browsed or registered as footage.', 403);
     return selected;
   }
 
   async #assertDirectory(directory: string): Promise<void> {
     try {
-      if (!(await assertNoSymlinks(directory)).isDirectory()) throw new ServiceError('Footage path must be a directory.', 422);
+      if (!(await assertNoSymlinks(directory)).isDirectory())
+        throw new ServiceError('Footage path must be a directory.', 422);
       await access(directory, constants.R_OK | constants.X_OK);
-    } catch (error) { throw directoryError(error); }
+    } catch (error) {
+      throw directoryError(error);
+    }
   }
 }

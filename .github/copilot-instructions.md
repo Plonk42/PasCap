@@ -30,14 +30,13 @@ PasCap is a solo, pre-release project: optimize for fast iteration. Details are 
 
 - While editing: affected unit tests (`npm test -- tests/unit/<file>.test.ts`) and
   the dev server.
-- Before pushing: `npm run check` (unit/service tests, types, build, licenses) plus
-  the affected Playwright specs for UI changes. Docs-only changes need no test runs.
+- Before pushing: `npm run format`, then `npm run check` (formatting, unit/service
+  tests, types, build, licenses) plus the affected Playwright specs for UI changes.
+  Docs-only changes need only `npm run format`.
 - Full Chrome, Firefox and native suites run in CI. Run them locally only for
   playback, decoding, native export or test-infrastructure changes.
 - Never weaken assertions, add retries or skip regressions to get green. Don't
   build or reset fixtures while a browser run is serving them.
-- Use the editor's formatter on files you change; there is no separate formatting
-  verification step.
 
 ## Product and data safety
 

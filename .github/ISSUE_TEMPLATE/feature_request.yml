@@ -1,6 +1,6 @@
 name: Scoped feature proposal
 description: Propose a focused improvement without changing the no-copy/local-only contract.
-labels: [enhancement, "priority:p2", "status:backlog"]
+labels: [enhancement, 'priority:p2', 'status:backlog']
 body:
   - type: markdown
     attributes:

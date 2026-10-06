@@ -6,7 +6,11 @@ import { calculateLayout } from '../../src/shared/timeline.js';
 
 describe('non-destructive excerpts', () => {
   it('restores both trimmed ends of a full 20-second recording', () => {
-    let project = applyCommand(createProject('flight', 'Flight'), { type: 'insert', clip: createClip('excerpt', 'recording', 0, 600), index: 0 });
+    let project = applyCommand(createProject('flight', 'Flight'), {
+      type: 'insert',
+      clip: createClip('excerpt', 'recording', 0, 600),
+      index: 0,
+    });
     project = applyCommand(project, trimByFrames(project.clips[0]!, 'in', 150, 600));
     project = applyCommand(project, trimByFrames(project.clips[0]!, 'out', -90, 600));
     expect(project.clips[0]).toMatchObject({ mediaId: 'recording', sourceIn: 150, sourceOut: 510 });
@@ -16,7 +20,11 @@ describe('non-destructive excerpts', () => {
     expect(project.clips[0]).toMatchObject({ sourceIn: 0, sourceOut: 600 });
   });
   it('trims one instance independently and ripples subsequent excerpts', () => {
-    let project = applyCommand(createProject('flight', 'Flight'), { type: 'insert', clip: createClip('first', 'recording', 0, 600), index: 0 });
+    let project = applyCommand(createProject('flight', 'Flight'), {
+      type: 'insert',
+      clip: createClip('first', 'recording', 0, 600),
+      index: 0,
+    });
     project = applyCommand(project, { type: 'insert', clip: createClip('second', 'recording', 0, 600), index: 1 });
     project = applyCommand(project, trimByFrames(project.clips[0]!, 'out', -90, 600));
     expect(project.clips[1]).toMatchObject({ sourceIn: 0, sourceOut: 600 });
@@ -31,9 +39,16 @@ describe('non-destructive excerpts', () => {
     expect(() => trimByFrames(clip, 'in', 0.5, 600)).toThrow();
   });
   it('rejects transition-invalid trims without changing a committed document', () => {
-    let project = applyCommand(createProject('flight', 'Flight'), { type: 'insert', clip: createClip('first', 'a', 0, 100), index: 0 });
+    let project = applyCommand(createProject('flight', 'Flight'), {
+      type: 'insert',
+      clip: createClip('first', 'a', 0, 100),
+      index: 0,
+    });
     project = applyCommand(project, { type: 'insert', clip: createClip('second', 'b', 0, 100), index: 1 });
-    project = applyCommand(project, { type: 'transition', transition: { leftId: 'first', rightId: 'second', type: 'cross-dissolve', duration: 30 } });
+    project = applyCommand(project, {
+      type: 'transition',
+      transition: { leftId: 'first', rightId: 'second', type: 'cross-dissolve', duration: 30 },
+    });
     expect(() => applyCommand(project, trimByFrames(project.clips[0]!, 'out', -90, 100))).toThrow();
     expect(project.clips[0]?.sourceOut).toBe(100);
   });
