@@ -164,6 +164,13 @@ Complete this gate **before editing or validating a new task**, not only before
 publication. It applies to housekeeping too; logging a proposal does not select
 implementation. A fresh chat is not proof of a fresh Git base.
 
+**Branches in the existing clean, idle checkout are the default for sequential
+work.** A new task/chat, logical-step commit or ordinary PR CI wait does not itself
+justify a worktree. Use an additional checkout only to preserve unrelated unfinished
+work, protect an active service/test, compare an unchanged reproduction baseline,
+or support explicitly concurrent work. Record the concrete isolation reason and
+retirement condition in the existing issue/PR or handoff; no extra tracker is needed.
+
 1. Inspect the current branch, staged/unstaged/untracked work, linked worktrees,
    active jobs and relevant PRs. Preserve unfinished work and ongoing validation;
    do not switch or update a worktree that another task or service is using.
@@ -171,15 +178,17 @@ implementation. A fresh chat is not proof of a fresh Git base.
    Read back its actual remote SHA and confirm fetched `origin/main` matches it.
    A failed fetch or cached tracking ref is not an up-to-date starting point. If
    the remote moves during verification, refresh before creating the task branch.
-3. If the worktree is clean and idle, switch to local `main` and fast-forward only
-   from `origin/main`. Require local `main` to equal the verified remote SHA with
+3. If the existing checkout is clean and idle, use it: switch to local `main` and
+   fast-forward only from `origin/main`. Require local `main` to equal the verified remote SHA with
    no ahead/behind commits before creating a **new** short-lived task branch.
    Never merge a previous PR's head into local `main`, including after squash merge.
-4. If the worktree is dirty, busy or on another active task, leave it intact and
-   create a clean isolated worktree with a **new** task branch directly from the
-   freshly fetched `origin/main`. This also avoids moving `main` checked out in
-   another worktree. Local-only/ahead/diverged `main` is not a valid base: preserve
-   it and use the verified remote base in isolation, or report a blocker.
+4. If switching would disturb unrelated unfinished work or active jobs, leave it
+   intact and use a clean isolated worktree with a **new** task branch directly
+   from freshly fetched `origin/main`, documenting the exception above. This also
+   avoids moving `main` checked out in another worktree. Local-only/ahead/diverged
+   `main` is not a valid base: preserve it and use the verified remote base safely,
+   or report a blocker. Review persistent dirty-checkout blockers and their next
+   action instead of silently treating new worktrees as the permanent default.
 5. Verify the new task branch's initial `HEAD` equals that remote SHA and the task
    worktree is clean. Record the starting `main` SHA in the PR and, when tracked,
    its existing work issue. Stop before edits/validation if freshness, access or
@@ -197,9 +206,34 @@ resuming paused work, fetch and inspect current `main`/PR state; when a base upd
 is needed, follow the disarm/update/revalidation rules below. Do not restart a
 branch for each correction or logical step, or mix a new deliverable into it.
 
+### Sequential branch handoff
+
+After publishing a reviewed step, settle this session's owned local jobs and verify
+the checkout is clean and idle before switching. Normally, return to local `main`,
+fetch/fast-forward only and read back the remote SHA before the next task's branch.
+After an observed squash merge, use its actual remote `main` result, not the old
+task branch history; retire the old local branch only through the safe branch gate
+below. Never switch a directory still serving a test, service or unfinished draft.
+
+Required remote CI does not need the local directory to stay on the PR branch.
+A published, unchanged candidate awaiting CI may retain its branch while the clean,
+idle checkout returns to current `main`; do not delete the branch, mutate its
+accepted head or infer a merge. Dependent work still waits for its prerequisite on
+`main`; unrelated approved work starts from verified current `main`, never stacks
+on the pending PR. Resume the same task on its existing branch through the normal
+disarm/update/revalidation rules rather than inventing another checkout.
+
+Branch switching does not isolate ignored build output, dependencies or fixtures.
+Before using them, verify they match the selected branch/toolchain; rebuild or
+reseed only affected disposable outputs when existing evidence is invalidated,
+never while a suite serves them. Do not reset user projects, media or caches merely
+to switch branches. Preserve unrelated data and report any unsafe reuse blocker.
+
 ### Worktree lifecycle and cleanup
 
-Linked worktrees are temporary task isolation, not permanent delivery archives.
+Linked worktrees are exceptional temporary task isolation, not the default task
+workflow or permanent delivery archives. Their reason and retirement condition
+must remain explicit; do not create another tree for each correction or CI wait.
 Inspect relevant registered trees at startup, after an observed merge and at handoff.
 An armed but unmerged PR keeps its tree; native auto-merge cannot remove local files.
 If merge happens after the chat ends, the next active session owns reconciliation

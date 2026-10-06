@@ -4,13 +4,23 @@
 
 - Before starting any new task, fetch verified remote `main` and create a new
   short-lived branch from its exact current SHA, **before edits or validation**.
-  A clean local `main` may be fast-forwarded only and must equal `origin/main`;
-  otherwise use a clean isolated worktree directly from freshly fetched `origin/main`.
+  **Use branches in the existing clean, idle checkout by default**, not a new
+  worktree per task/chat/commit or while ordinary PR CI runs. Fast-forward local
+  `main` only; it must equal verified `origin/main` before branching. A worktree is
+  an exception for preserving unrelated unfinished work, an active service/test,
+  an unchanged reproduction baseline or explicitly concurrent work. Record its
+  concrete isolation reason and retirement condition; create it directly from
+  freshly fetched `origin/main`, or report a blocker if no safe checkout exists.
   Inspect existing edits/branches/jobs first; never stash, reset, discard or include
   unrelated work. Never start from stale local `main`, a previous task branch or an
   unmerged PR. Record the starting SHA; if freshness/access/isolation cannot be
   verified, stop and record the blocker. Continuing the same task uses its existing
   branch with the PR update/revalidation rules, not a new branch for every correction.
+- For sequential work, once owned local jobs are settled and the checkout is clean,
+  return to local `main`, fetch/fast-forward and verify it before the next branch.
+  A published PR awaiting CI may keep its branch without another checkout; never
+  delete or change its accepted head merely to reuse the directory. After switching,
+  verify generated output/fixtures still match the selected branch before use.
 - Commit after each completed logical step, including its tests and relevant
   documentation. A logical step is a coherent tested behaviour, not each small
   correction; do not leave an entire feature uncommitted until the end.
@@ -27,8 +37,9 @@
 - The owner authorizes publishing approved, reviewed, validated logical-step commits
   to short-lived branches and opening/updating PRs targeting `main`, without repeated
   push approval. Never push directly to `main`, force-push or bypass protection,
-  including as administrator. Preserve unrelated edits; use an isolated worktree
-  when another deliverable is active. Record publication blockers and next actions.
+  including as administrator. Preserve unrelated edits; use a worktree only when
+  switching would disturb work or a named isolation need requires it. Record
+  publication blockers and next actions.
 - Verify non-CI acceptance against live scope/dependencies and the exact PR head
   before enabling native squash auto-merge. Add `Closes #N` only in the PR description
   when it completes the entire issue; incremental/investigation/hardware-pending PRs
