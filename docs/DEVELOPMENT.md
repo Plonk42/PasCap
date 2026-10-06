@@ -120,11 +120,14 @@ frame, PCM, drift, range-read and cancellation assertions.
 
 The [music-clock regression](../tests/browser/music-clock.spec.ts) requires one
 uninterrupted music start from zero or a nonzero seek, bounded range reads and
-actual downstream PCM amplitude/placement silence. The selected recovery tests
+actual rendered stereo PCM amplitude/placement silence. Its bounded audio-thread
+observer checks every sample in the required frame windows, not UI-thread snapshots
+that can miss complete frames under load. The selected recovery tests
 retain the independent one-frame audio/video bound, pause/seek/restart and genuine
 callback-gated cancellation. These five synthetic, memory-only checks run in CI;
 they do not qualify the entire Firefox editor or intended hardware. Attachments
-contain bounded consumed-sample/output-timestamp evidence, not private media.
+contain bounded consumed-sample/output-timestamp evidence and at most 500
+decoder/clock state snapshots around music transitions, not private media.
 The complete optional Firefox recovery suite still exposes a separate 0.1× video
 seek/rVFC readiness failure, also reproducible without music. Do not hide it with
 a currentTime guess, retries, skipped assertions, privacy changes or a larger bound.
