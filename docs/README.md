@@ -2,8 +2,8 @@
 
 Next steps and dependencies: [ROADMAP.md](ROADMAP.md), backed by the actual GitHub
 issues, outcome milestones and Project work selection rather than an automatically approved feature
-catalogue. [GITHUB_WORKFLOW.md](GITHUB_WORKFLOW.md) defines planning, labels,
-priorities, progress and delivery updates.
+catalogue. [GITHUB_WORKFLOW.md](GITHUB_WORKFLOW.md) defines delivery, CI, labels
+and priorities.
 
 ## Start here
 
@@ -45,8 +45,8 @@ and Git history retain earlier evidence, not current acceptance claims.
   native dependencies and categorized/prioritized labels. Sprint membership uses
   native Project Iteration fields only for agreed timeboxes; continuous delivery
   uses a selected-work view instead, never an issue as a sprint container. The
-  [workflow](GITHUB_WORKFLOW.md) distinguishes local completion from actual-commit
-  CI/review. The private repository-linked
+  [workflow](GITHUB_WORKFLOW.md) sends routine changes straight to `main` with CI
+  as a backstop. The private repository-linked
   [planning Project](https://github.com/users/Plonk42/projects/1) reuses those issues
   in delivery/milestone views; sign-in is required. Existing
   [#15](https://github.com/Plonk42/PasCap/issues/15) is a preserved legacy checkpoint,

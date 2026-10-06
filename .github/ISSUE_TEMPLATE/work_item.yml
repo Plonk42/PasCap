@@ -4,7 +4,7 @@ labels: [task, "priority:p2", "status:backlog"]
 body:
   - type: markdown
     attributes:
-      value: Search for an existing task first. Issues track concrete deliverables, not sprint containers. Use a native Project Iteration field for agreed timeboxes or a selected-work view without a cadence; never parent issues just for sprint membership. Logging alone does not approve implementation or publication. Approved work uses protected PRs, verified non-CI acceptance and required up-to-date CI before native auto-merge; only full-delivery PRs close issues. No invented deadline, release, milestone closure or real-media job is authorized by this form. Keep evidence public-safe.
+      value: Search for an existing task first. Issues track concrete deliverables, not sprint containers. Logging alone does not approve implementation. Routine work goes directly to main and risky work through a PR, as described in docs/GITHUB_WORKFLOW.md; "Closes #N" in the delivering commit or PR closes the issue. No invented deadline, release, milestone closure or real-media job is authorized by this form. Keep evidence public-safe.
   - type: dropdown
     id: area
     attributes:
