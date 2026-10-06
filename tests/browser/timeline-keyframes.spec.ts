@@ -246,7 +246,7 @@ test('moving a point outside duration stores its time without extending footage,
   await expect(marker(page, 160)).toHaveClass(/moving/); await page.mouse.up(); await page.keyboard.up('Alt');
   const next = await current(page); expect(calculateLayout(next).duration).toBe(120); expect(next.clips).toEqual(before.clips);
   expect(next.layers[0]!.keyframes.map((point) => point.frame)).toEqual([80, 160]);
-  await expect(marker(page, 160)).toHaveCount(0);
+  await expect(marker(page, 160)).toBeFocused();
   await expect(layerKeyframes(page, 'Video 1').locator('.layer-keyframe-inspected')).toContainText('Stored point · timeline frame 160');
   await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(119);
   await inspectorTab(page, 'Clip');
@@ -257,25 +257,37 @@ test('moving a point outside duration stores its time without extending footage,
   await expect(layerKeyframes(page, 'Video 1').locator('.layer-keyframe-inspected')).toContainText('Stored point · timeline frame 160');
 });
 
-test('stored points after the end are summarised on the timeline and open their Layer keyframes entry without editing', async ({ page }) => {
+test('stored points after the last clip keep their own markers without extending playback, and navigate without editing', async ({ page }) => {
   const project = sequence();
   project.layers[0]!.keyframes.push(sharedPoint(160, { exposure: 0.1 }, 'hold'), sharedPoint(200, { contrast: 1.2 }, 'hold'));
-  await fixture(page, project);
-  const beyond = page.locator('[data-layer-keyframes-beyond="video-1"]');
-  await expect(beyond).toHaveText('◆ 2 after end'); await expect(marker(page, 160)).toHaveCount(0);
-  const surface = (await page.locator('.timeline-surface').boundingBox())!; const box = (await beyond.boundingBox())!;
-  expect(box.x + box.width).toBeLessThanOrEqual(surface.x + surface.width);
-  await inspectorTab(page, 'Clip'); await beyond.click();
-  await expect(page.getByRole('tab', { name: 'Layer keyframes', exact: true })).toHaveAttribute('aria-selected', 'true');
-  await expect(beyond).toHaveAttribute('aria-pressed', 'true');
-  await expect(layerKeyframes(page, 'Video 1').locator('.layer-keyframe-inspected')).toContainText('Stored point · timeline frame 160 · outside current duration');
+  await fixture(page, project); expect(calculateLayout(project).duration).toBe(120);
+  const scale = Number(await page.locator('.timeline-surface').getAttribute('data-pixels-per-frame'));
+  const clipEnd = (await page.locator('[data-clip-id="second"]').boundingBox())!;
+  for (const frame of [160, 200]) {
+    const box = (await marker(page, frame).boundingBox())!;
+    expect(Math.abs(box.x + box.width / 2 - (clipEnd.x + clipEnd.width + (frame - 120) * scale))).toBeLessThanOrEqual(1);
+  }
+  const surface = (await page.locator('.timeline-surface').boundingBox())!; const last = (await marker(page, 200).boundingBox())!;
+  expect(last.x + last.width).toBeLessThanOrEqual(surface.x + surface.width);
+  await inspectorTab(page, 'Clip'); await marker(page, 160).click();
+  await expect(marker(page, 160)).toHaveAttribute('aria-pressed', 'true'); await expect(marker(page, 200)).toHaveAttribute('aria-pressed', 'false');
+  await expect(page.getByRole('tab', { name: 'Clip', exact: true })).toHaveAttribute('aria-selected', 'true');
   await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(119);
+  await marker(page, 200).focus(); await marker(page, 200).press('Enter');
+  await expect(marker(page, 200)).toHaveAttribute('aria-pressed', 'true'); await expect(marker(page, 160)).toHaveAttribute('aria-pressed', 'false');
+  await inspectorTab(page, 'Layer keyframes');
+  await expect(layerKeyframes(page, 'Video 1').locator('.layer-keyframe-inspected')).toContainText('Stored point · timeline frame 200 · outside current duration');
   expect(await current(page)).toEqual(project); await page.evaluate(() => window.pascapLab!.flush()); expect(memory.saves).toBe(0);
   await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
+  await marker(page, 200).scrollIntoViewIfNeeded();
+  const ruler = (await page.locator('.timeline-ruler').boundingBox())!; const target = (await marker(page, 200).boundingBox())!;
+  await page.mouse.click(target.x + target.width / 2, ruler.y + ruler.height / 2);
+  await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics())).toMatchObject({ frame: 119, duration: 120 });
+  await expect(marker(page, 200)).toHaveAttribute('aria-pressed', 'false');
   const row = await editLayerPoint(page, 'Video 1', 160);
   await row.getByRole('button', { name: 'Delete layer keyframe 160', exact: true }).click();
   expect((await current(page)).layers[0]!.keyframes.map((point) => point.frame)).toEqual([20, 80, 200]);
-  await expect(beyond).toHaveText('◆ 1 after end');
+  await expect(marker(page, 160)).toHaveCount(0); await expect(marker(page, 200)).toBeVisible();
   await page.getByRole('button', { name: 'Undo', exact: true }).click(); expect(await current(page)).toEqual(project);
-  await expect(beyond).toHaveText('◆ 2 after end');
+  await expect(marker(page, 160)).toBeVisible();
 });

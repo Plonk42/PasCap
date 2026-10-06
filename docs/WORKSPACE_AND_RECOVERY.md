@@ -27,7 +27,7 @@ The intended discrete-GPU and long real-flight checks remain deferred.
   Audio owns music. Keyframes and Sequence omit redundant selected-track banners.
   Empty-row selection retains keyframe context and dormant fades.
 - Bottom: frame-scaled multi-layer timeline, playhead timecode, highlighted active
-  insertion layer, one marker per visible row point, dimmed hidden clips and Activity.
+  insertion layer, one marker per stored row point, dimmed hidden clips and Activity.
   The responsive toolbar keeps Split, Trim start/end, Delete and IN/OUT/Cut range
   directly visible; duplication/start nudging remain in Clip actions.
   Rows display the saved bottom-to-top composition array: row 1 renders below row 2,
@@ -243,7 +243,8 @@ Manual seek (including the same clamped frame), playback, row/project changes an
 deletion of the inspected point clear inspection. A valid single-point move/Undo
 preserves the cursor and input identity; **Follow playhead** ends inspection explicitly.
 
-One marker per visible row point lists participants in its title. **Horizontal
+One marker per stored row point lists participants in its title; points after the
+last clip keep their markers there without extending playback. **Horizontal
 marker dragging** captures the project/row/point, zoom, grabbed pointer position,
 scroll and stationary playhead. Capture-relative travel is rounded once and bounded
 to frames 0–2,147,483,647. Valid drafts preview live but never enter autosave/history;
