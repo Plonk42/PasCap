@@ -10,6 +10,7 @@ import { HelpPopover } from './HelpPopover.js';
 import { Icon } from './icons.js';
 import { KeyframeToggle } from './KeyframeToggle.js';
 import { NumberField } from './NumberField.js';
+import { settingPresentation } from './setting-scope.js';
 import { SpeedRateField } from './SettingValueControl.js';
 import type { DraftPreview } from './Timeline.js';
 
@@ -188,17 +189,6 @@ function speedGraphPoints(clip: VideoClip | null, layer: VideoLayer, projectDura
   }).join(' ');
 }
 
-function rateHint(keyed: boolean, active: boolean, frame: number): string {
-  if (!keyed) return 'Select a clip to edit its base, or click the diamond to key Speed for this whole row.';
-  if (active) return `Layer Speed key at timeline frame ${frame}; all clips on this row use this curve.`;
-  return 'Layer curve · click the Speed diamond to capture the evaluated rate and edit it at this frame.';
-}
-
-function speedScope(clip: VideoClip | null, keyed: boolean): string {
-  if (keyed) return 'Layer curve · timeline time';
-  return clip ? 'Selected clip base' : 'No selected clip base';
-}
-
 export function SpeedHelp({
   clip,
   keyed,
@@ -275,7 +265,14 @@ export function SpeedControls({
     if (keyed) updateKey(1);
     else updateBase({ mode: 'constant', rate: 1 });
   };
-  const scope = speedScope(clip, keyed);
+  const { scope, hint } = settingPresentation({
+    keyed,
+    active,
+    baseAvailable: clip !== null,
+    baseLabel: 'Clip',
+    label: 'Speed',
+    frame,
+  });
   const graphRange = keyed
     ? `Timeline 0–${Math.max(0, projectDuration - 1)}`
     : `Source ${clip?.sourceIn ?? 0}–${clip?.sourceOut ?? 0} (OUT exclusive)`;
@@ -340,9 +337,9 @@ export function SpeedControls({
         />
       )}
       <div className={`layer-setting-heading${clip && !keyed ? ' clip-speed-row-heading' : ''}`}>
-        <span title={scope}>
+        <span title={hint}>
           Row speed animation
-          <small className="layer-setting-kind">
+          <small className="layer-setting-kind" title={scope}>
             {keyed && <Icon name="curve" size={12} />}
             <span className="declutter-sr-only">{scope}</span>
           </small>
@@ -374,7 +371,7 @@ export function SpeedControls({
           disabled={disabled || !validFrame || !active}
           value={rate}
           resetKey={`${layerContext}:${frame}:speed`}
-          hint={rateHint(keyed, active, frame)}
+          hint={hint}
           onCommit={updateKey}
         />
       )}

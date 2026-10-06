@@ -192,6 +192,10 @@ the chosen Inspector tab without stealing focus from the activated navigation bu
 Once a channel is animated anywhere on the row, its main Clip value control is
 read-only at frames where that channel does not participate, including at points
 belonging only to other settings. **Click its hollow diamond to capture a value before editing**.
+Setting tooltips and screen-reader context say **Keyframe at playhead** for an
+editable participant, or **Animated · add a keyframe to edit** for a read-only
+animated value. Clip, sidebar Layer opacity and Row speed animation use the same
+terms and explain which diamond adds a keyframe at the current timeline frame.
 Sliders/numbers never implicitly create keys. Unanimated channels edit the selected
 clip's static base, or the layer base for Layer opacity. On an empty row, diamonds
 can create animation; clip-base editing requires a selected clip.

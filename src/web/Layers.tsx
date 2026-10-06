@@ -7,6 +7,7 @@ import { Icon } from './icons.js';
 import { KeyframeToggle } from './KeyframeToggle.js';
 import { layerActionRestrictions } from './layer-actions.js';
 import { Popover } from './Popover.js';
+import { settingPresentation } from './setting-scope.js';
 import { timelineRows } from './timeline-rows.js';
 
 function layerNameError(draft: string): string | null {
@@ -126,14 +127,14 @@ function LayerOpacity({
   const value = evaluateLayerSetting(layer, 'layerOpacity', frame, layer.opacity);
   const validFrame = Number.isSafeInteger(frame) && frame >= 0 && frame <= 2_147_483_647;
   const editable = validFrame && (!keyed || active);
-  let scope = 'Layer base';
-  let hint = 'Static layer opacity, applied after the row clips are combined.';
-  if (keyed) {
-    scope = active ? 'Layer key' : 'Layer curve';
-    hint = active
-      ? `Editing only Layer opacity at timeline frame ${frame}. Other point participants stay unchanged.`
-      : 'Layer curve · click the Layer opacity diamond to capture a value and edit this timeline frame.';
-  }
+  const { scope, hint } = settingPresentation({
+    keyed,
+    active,
+    baseAvailable: true,
+    baseLabel: 'Layer',
+    label: 'Layer opacity',
+    frame,
+  });
   const commit = (opacity: number): void => {
     if (disabled || !editable) return;
     if (keyed) onEdit({ type: 'layer-key-value', layerId: layer.id, frame, setting: 'layerOpacity', value: opacity });
@@ -144,7 +145,7 @@ function LayerOpacity({
       <span className="layer-opacity-heading">
         <label htmlFor={fieldId} title={hint}>
           Opacity
-          <small className="layer-setting-kind">
+          <small className="layer-setting-kind" title={scope}>
             {keyed && <Icon name="curve" size={12} />}
             <span className="declutter-sr-only">{scope}</span>
           </small>
