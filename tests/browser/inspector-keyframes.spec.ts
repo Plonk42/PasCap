@@ -80,7 +80,7 @@ test('four accessible tabs preserve selection across clips, populated/empty trac
   expect(memory.saves).toBe(0); expect(memory.snapshot(initial.id)).toEqual(initial);
 });
 
-test('all participants reuse their main control bounds, units and resets while edits isolate the stored point', async ({ page }) => {
+test('all participants reuse their main control bounds and resets with one exact value beside each slider while edits isolate the stored point', async ({ page }) => {
   const main = new Map<string, { min: string | null; max: string | null; step: string | null }>();
   for (const setting of KEYFRAME_SETTINGS.filter((item) => item.key !== 'speed')) {
     const slider = page.getByRole('slider', { name: setting.label, exact: true });
@@ -94,10 +94,16 @@ test('all participants reuse their main control bounds, units and resets while e
       const slider = row.getByRole('slider', { name, exact: true });
       expect(await slider.evaluate((input) => ({ min: input.getAttribute('min'), max: input.getAttribute('max'), step: input.getAttribute('step') }))).toEqual(main.get(setting.key));
       const colour = COLOUR_CONTROLS.find((control) => control.key === setting.key);
-      if (colour) { await expect(slider.locator('..').locator('output small')).toHaveText(colour.unit); await expect(row.getByRole('button', { name: `Reset ${name}`, exact: true })).toBeEnabled(); }
-      else await expect(slider.locator('..').locator('output')).toHaveText(`${Math.round(initial.layers[0]!.keyframes[0]!.values[setting.key]! * 100)}%`);
+      const field = row.getByRole('spinbutton', { name, exact: true });
+      await expect(field).toHaveValue(String(initial.layers[0]!.keyframes[0]!.values[setting.key]));
+      await field.scrollIntoViewIfNeeded();
+      const sliderBox = (await slider.boundingBox())!; const fieldBox = (await field.boundingBox())!;
+      expect(fieldBox.x).toBeGreaterThanOrEqual(sliderBox.x + sliderBox.width);
+      expect(Math.abs(fieldBox.y + fieldBox.height / 2 - (sliderBox.y + sliderBox.height / 2))).toBeLessThanOrEqual(2);
+      if (colour) await expect(row.getByRole('button', { name: `Reset ${name}`, exact: true })).toBeEnabled();
     }
   }
+  await expect(row.locator('output')).toHaveCount(0);
   const before = await current(page);
   const slider = row.getByRole('slider', { name: 'Exposure keyframe value 10', exact: true });
   await slider.focus(); await slider.press('ArrowRight');

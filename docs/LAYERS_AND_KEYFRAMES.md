@@ -209,9 +209,10 @@ without adding persisted point IDs; nested point details remain collapsible.
 This remains one list, not a new list per channel or marker.
 
 Stored colour and opacity participants reuse the main setting-specific sliders,
-units/readouts and individual colour-reset buttons, with precise numeric fields
-alongside them. Opacity readouts are percentages; exact values use the stored
-0–1 scale. The bounds in the channel table apply to both controls. Speed uses the
+bounds and individual colour-reset buttons. Each shows its value once, as a precise
+numeric field to the right of its slider, instead of the main controls' read-only
+readout; exact values use the stored scale (opacity 0–1). The bounds in the
+channel table apply to both controls. Speed uses the
 same **Layer rate ×** numeric field and Reset to 1× as row Speed, never a clip
 mode, preset or source-frame curve editor.
 
