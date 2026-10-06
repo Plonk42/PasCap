@@ -1,0 +1,19 @@
+name: Set up FFmpeg 8.0.1
+description: Restore or build the pinned FFmpeg/ffprobe toolchain used by native and browser tests.
+runs:
+  using: composite
+  steps:
+    - name: Install native build dependencies
+      shell: bash
+      run: sudo -n apt-get update && sudo -n apt-get install -y --no-install-recommends build-essential pkg-config nasm libx264-dev
+    - name: Cache tested FFmpeg build
+      uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+      with:
+        path: .ci/ffmpeg
+        key: ffmpeg-${{ runner.os }}-${{ runner.arch }}-ubuntu24-${{ hashFiles('scripts/ci/setup-ffmpeg.sh') }}
+    - name: Build or verify FFmpeg 8.0.1
+      shell: bash
+      run: bash scripts/ci/setup-ffmpeg.sh "$GITHUB_WORKSPACE/.ci/ffmpeg"
+    - name: Report native toolchain
+      shell: bash
+      run: '"$GITHUB_WORKSPACE/.ci/ffmpeg/bin/ffmpeg" -version && "$GITHUB_WORKSPACE/.ci/ffmpeg/bin/ffprobe" -version'

@@ -180,44 +180,28 @@ exact metadata. This stays within the five-second required-frame deadline, so a
 genuinely withheld callback still fails explicitly. There is no currentTime
 identity, retry loop, skipped assertion, privacy change or larger bound.
 
-### Incremental feedback
+### Fast local validation
 
-The validation commands above are complete entry points, not a mandatory chain
-after every edit. Follow the [work-cycle gates](GITHUB_WORKFLOW.md#efficient-development-and-delivery):
-focused feedback during implementation, applicable comprehensive checks before
-PR submission, then asynchronous required PR CI before merge. Keep explicit issue
-acceptance intact. Publish code/mixed logical-step commits on short-lived branches;
-pure workflow/instruction text follows the direct-main exception below. Format/save/review and validate the exact head's
-non-CI acceptance before arming native squash auto-merge. A full-delivery PR may
-then use `Closes #N` in its description; partial work merely references its issue.
+The commands above are complete entry points, not a chain to run after every edit.
+Full Chrome, Firefox and native suites run in CI; run them locally only when
+changing playback, decoding, native export or test infrastructure.
 
-- While editing, use `npm test -- tests/unit/<affected-file>.test.ts` or
-  `npm run test:watch -- tests/unit/<affected-file>.test.ts`; use relevant spec paths
-  or Playwright `--grep` for focused browser feedback. Native tests remain an
-  explicit synthetic opt-in when affected; ordinary `npm test` does not enable them.
-- For a code-delivery cycle, `npm test` followed by `npm run build` covers the same
-  unit/service, frontend/server types, production build and license checks as
-  `npm run check`, without its duplicate leading frontend typecheck. `check` remains
-  supported; do not run both equivalent chains on unchanged inputs or append another
-  standalone build/typecheck without a reason. Scripts are unchanged.
-- If that cycle already built the current inputs, prepare isolated browser fixtures
-  with `npx tsx scripts/fixtures.ts --browser`, then run `npx playwright test` (or
-  affected specs), instead of rebuilding through `npm run test:browser`. The latter
-  remains the self-contained build/setup/full-suite entry point. Install Chrome when
-  missing, not on every focused run.
-- Reuse a build only while relevant source/configuration/dependency/toolchain inputs
-  are unchanged. Reuse fixtures only if prior tests leave the required baseline
-  intact; reseed after state-changing runs as needed. A full acceptance run starts
-  from the documented clean fixture baseline, not an assumed clean focused run.
-- Never run build/check or fixture setup while a browser suite serves that output or
-  cache. Complete unit/type/build phases first, then run browser validation against
-  immutable output. Keep shared browser/media runs serial; additional workers need
-  verified isolation first. Parallel subagent reviews must use file/search tools only,
-  never terminal commands that could interrupt an active validation command.
-- Record exactly which checks passed on which inputs. Focused checks do not replace
-  an applicable full suite; invalidate affected results after further relevant edits.
-  Documentation-only work uses content/link/whitespace checks and review, not this
-  runtime chain. Do not shorten timeouts, retry failures or weaken tests for speed.
+- While editing: `npm test -- tests/unit/<file>.test.ts` (or `npm run test:watch`)
+  and the dev server.
+- Before pushing: `npm run check`, plus the affected browser specs for UI changes.
+  `check` has just built `dist/`, which Playwright serves:
+
+  ```sh
+  npx tsx scripts/fixtures.ts --browser
+  npx playwright test tests/browser/<spec>.spec.ts
+  ```
+
+  Install Chrome once with `npx playwright install --with-deps chrome`.
+- Reuse fixtures across focused runs while tests leave their baseline intact;
+  reseed after state-changing runs. Never build or reset fixtures while a browser
+  run serves that output.
+- Docs-only changes need no test runs. Never shorten timeouts, add retries or
+  weaken assertions for speed.
 
 **Browser fixture setup resets `.pascap/browser-tests/`**; never store personal work
 there. It seeds twelve video memberships, music and proxies. Separate import-test
@@ -235,33 +219,23 @@ Normal navigation/confirmation exercise the guarded audio routes; unavailable lo
 access/probe/write failures and stale reads use disposable route responses. No fixture
 generator/reset, private audio, music placement or export is needed.
 
-### Verification evidence
-
-Record dated results on the corresponding [GitHub work issue](https://github.com/Plonk42/PasCap/issues):
-exact commit, toolchain, commands, passed/failed checks and remaining acceptance.
-Keep local checks, [actual-commit CI](https://github.com/Plonk42/PasCap/actions)
-and consented intended-GPU/real-flight qualification separate. Never add historical
-native counts to a fresh UI run or describe an older green run as current delivery
-evidence. Follow [the delivery workflow](GITHUB_WORKFLOW.md#merge-closure-and-reconciliation).
-
 ### GitHub CI
 
-The [workflow](../.github/workflows/ci.yml) runs:
+The [workflow](../.github/workflows/ci.yml) runs on pull requests, pushes to `main`
+and manual dispatch ([job overview](GITHUB_WORKFLOW.md#ci-and-branch-protection)):
 
-- Linux unit/typecheck/build checks on **Node 22 and 24**.
-- Native/media, full Chrome/browser and scoped Firefox music checks on **Node 22**, using **FFmpeg/ffprobe
-  8.0.1 built from pinned source** via a setup script/cached toolchain, not runner
-  apt FFmpeg 6 or an implied untested version-support claim. Firefox alone runs
-  under Xvfb with Mesa llvmpipe and a fail-closed real WebGL2 prerequisite; its
-  software-rendering environment is not applied to Chrome or native jobs.
-- PRs targeting `main`, pushes to `main` and `workflow_dispatch`; read-only repository
-  permissions, dependency/toolchain caching and failure-only outputs including
-  retained Playwright traces/screenshots.
-- An unconditional **Delivery gate** succeeds only if the Node matrix and native/
-  browser job both return `success`, rejecting skipped/cancelled/failed prerequisites.
-  Protected `main` requires all three suite checks plus this gate from GitHub Actions,
-  with the PR branch up to date. Owner/admin bypass is permitted by policy only
-  for pure workflow/instruction text, never for code/mixed delivery.
+- Unit/type/build checks on **Node 22**, plus **Node 24** and `npm audit` on `main`.
+- Native media, four Chrome shards and the scoped Firefox music checks run in
+  parallel on Node 22 with **FFmpeg/ffprobe 8.0.1 built from pinned source** through
+  a shared [setup action](../.github/actions/setup-ffmpeg/action.yml) and cached
+  toolchain, not runner apt FFmpeg 6. Firefox alone runs under Xvfb with Mesa
+  llvmpipe and a fail-closed real WebGL2 prerequisite; its software-rendering
+  environment is not applied to Chrome or native jobs.
+- Each browser job builds and seeds its own isolated synthetic fixtures. Read-only
+  repository permissions, dependency/toolchain caching and failure-only retained
+  Playwright traces/screenshots.
+- The unconditional **Delivery gate** is the only required check; it fails unless
+  every job above returned `success`.
 - Synthetic fixtures only: no private media/sample helper/native reference work
   or hardware/performance acceptance claim.
 
@@ -273,26 +247,6 @@ Native/browser jobs retain failure diagnostics for seven days, never original me
 or the whole generated cache. Action references are commit-pinned and the workflow
 uses read-only repository permissions. It does not deploy GitHub Pages or publish
 a container image. Use [the roadmap](ROADMAP.md) for remaining qualification work.
-
-Required up-to-date PR CI is the merge/closure gate; main push CI is a regression
-backstop, not a second closure wait. After exact-head non-CI acceptance, native
-auto-merge waits and merges eligible PRs independently of the editor/chat, closing
-only fully addressed issues linked in the PR description. No session CI watch or
-custom closure Action/hook/bot is needed; CI stays read-only. Failed/stale/conflicting
-PRs remain open for investigation, without retries or weakened tests. Next-session
-reconciliation handles failures, obsolete issue labels and Project Done; that
-housekeeping verifies the enabled native **Item closed → Status Done** workflow's
-result. Progress-label cleanup remains explicit; no board move closes an issue,
-and unattended failure repair is not guaranteed. See the [PR delivery contract](GITHUB_WORKFLOW.md#protected-pr-delivery).
-Code/import-formatting housekeeping still uses a PR, but needs no invented issue
-or Project entry. Pure workflow/instruction text is committed/pushed directly to
-`main` with content/link/format/whitespace/privacy checks and `[skip ci]`, without
-a PR or full runtime/CI cycle. Actions workflow code, scripts/hooks, dependencies,
-tests and other configuration or mixed changes are excluded; see the
-[direct-main gate](GITHUB_WORKFLOW.md#direct-main-workflowinstruction-text).
-Administrator enforcement is disabled for this owner-approved route; GitHub cannot
-limit the bypass by paths, so the agent must never use it for code. Changing an armed PR requires disabling auto-merge/removing closing
-links and repeating affected validation/acceptance before rearming.
 
 The raw reader has a deterministic exit-before-read regression and eager bounded
 read ownership; [#1](https://github.com/Plonk42/PasCap/issues/1) records its delivery
@@ -365,46 +319,9 @@ and [grading equations](COLOUR_AND_TIMING.md#colour).
 
 ## Contributor safety
 
-- **For code/mixed work, use short-lived branches in the current workarea by default.**
-  Requesting work means expecting changes here; open tabs, running editors,
-  development servers and other processes are not isolation reasons. Worktrees
-  are exceptions only for substantive unfinished work or a conflicting active
-  session; record the actual conflict and retirement condition. Incidental untracked
-  prototypes, prose documentation updates and formatting are not automatic
-  dirty-tree blockers: inspect and preserve them unstaged, exclude them from delivery,
-  and continue here when switching can retain them safely. Never overwrite or
-  discard unrelated contents. A new chat, correction or remote CI wait alone
-  needs no extra checkout. Once owned validation settles and task edits are committed,
-  return to fresh, verified local `main` for the next task's branch. A published PR
-  can keep its branch while CI runs without keeping the directory on that branch;
-  preserve its accepted head and wait for dependencies to land. Verify ignored
-  build/fixture/dependency inputs after switching; never reset user data to reuse
-  the directory. See the [branch handoff](GITHUB_WORKFLOW.md#sequential-branch-handoff).
-- Linked task worktrees must be retired after observed merge, at handoff and
-  next-session recovery through the [worktree lifecycle](GITHUB_WORKFLOW.md#worktree-lifecycle-and-cleanup).
-  Pending PRs and active/unfinished work remain intact with a reason and next action.
-  Verify PR/squash delivery, idle ownership and staged/unstaged/untracked/ignored
-  contents before normal removal; ignored data is not automatically disposable.
-  Preserve required evidence outside the tree on persistent storage. Never force
-  removal, bulk-delete, follow original-media references or confuse remote branch
-  deletion/administrative pruning with removing an existing local worktree.
-- **Start each new task from current remote `main`, before edits or validation.**
-  Fetch and verify its SHA, fast-forward local `main` only while safely preserving
-  incidental contents and avoiding substantive work/session conflicts, then create
-  a new short-lived branch for code/mixed work; pure workflow/instruction text stays
-  on verified `main` and uses its direct-main gate. If switching would disturb
-  substantive unfinished work or another active session, preserve them and use an isolated checkout
-  directly from freshly fetched `origin/main`, recording the exception. Never reuse
-  a previous task/unmerged PR branch or reset/stash unrelated work. Record the starting
-  SHA; stop if freshness or safe isolation cannot be verified. Same-task continuation
-  follows the [startup and PR-update rules](GITHUB_WORKFLOW.md#start-every-new-task-from-current-main).
-- **Format before committing, not afterward.** Use each changed file's configured
-  formatter and applicable import organization, save and let editor save actions
-  finish, then perform final checks, review and deliberate staging. Format-on-save
-  is not sufficient if the save happens after staging or commit. A later formatting
-  change invalidates affected checks/staging: review it, rerun applicable checks
-  and restage before commit. Check committed files for leftover formatting diffs
-  afterward; preserve unrelated edits rather than forcing a clean working tree.
+- Follow [the GitHub workflow](GITHUB_WORKFLOW.md): routine changes go straight to
+  `main` after the fast local gate; risky changes use a short-lived PR. Never stash,
+  reset, discard or commit unrelated uncommitted work.
 - Before the first release candidate, approved changes may break existing projects
   and persisted formats: favour one current strict implementation, not backward-
   compatibility boilerplate. Do not add unrequested migrations, legacy fields,
