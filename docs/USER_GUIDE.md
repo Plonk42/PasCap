@@ -177,11 +177,12 @@ unaffected. Details: [SPEED_AND_AUDIO.md](SPEED_AND_AUDIO.md#precise-clip-curve-
 
 ### Opt in to animation
 
-The dedicated **Layer keyframes** Inspector tab belongs to the selected **whole
-video row**, even an empty one, not to a clip. It contains the point count,
-participant chips, whole-row Previous/Next navigation, **Animation help** and the
-shared **Edit points** list. **Clip** keeps source/static settings and the diamonds
-and value controls that use the real playhead. All row points use absolute project
+The dedicated **Keyframes** Inspector tab (accessible name **Layer keyframes**)
+belongs to the selected **whole video row**, even an empty one, not to a clip.
+It contains the point count, participant chips, whole-row Previous/Next navigation
+and a directly visible shared point list. The toolbar's **Animation help** combines
+animation and point-timing guidance. **Clip** keeps source/static settings and the
+diamonds and value controls that use the real playhead. All row points use absolute project
 frames and affect every clip on that row. Ten settings participate independently:
 Layer opacity, Clip opacity, Speed and the seven colour controls. At most 256
 shared points are allowed per row.
@@ -211,9 +212,13 @@ move **all participants, values and easing together**; valid release is one Undo
 step. With Snap on, pointer movement snaps within eight pixels at the captured zoom
 to captured clip/music/transition boundaries and playhead; **Alt** bypasses it.
 Focused marker **←/→** moves one project frame, **Shift+←/→** ten, without snapping
-or also stepping the playhead/nudging a clip. **Layer keyframes → Edit points →
-Time, easing & values** provides exact time/value editing with Enter/blur to apply
+or also stepping the playhead/nudging a clip. **Keyframes → Time, easing & values**
+on each point provides exact time/value editing with Enter/blur to apply
 and Escape to restore.
+
+The shared list has no outer disclosure or per-row list expansion preference.
+Nested point details remain collapsible; drafts and input identity survive point
+reordering and Undo.
 
 Stored colour/opacity participants use the same sliders, units and individual
 colour resets as the main controls, alongside precise numeric fields. Stored
@@ -289,17 +294,19 @@ See [SPEED_AND_AUDIO.md](SPEED_AND_AUDIO.md) and
 
 ## Workspace and keyboard
 
-Use **Clip / Layer keyframes / Sequence / Audio** for source/static and playhead
+Use **Clip / Keyframes / Sequence / Audio** for source/static and playhead
 settings, the whole-row point list, track transitions/fades and music, respectively.
+Keyframes retains the accessible tab name **Layer keyframes**. Keyframes and
+Sequence use the selected row without a redundant selected-track banner.
 Selecting an excerpt or a populated/empty row preserves the chosen tab and updates
 its row context safely. Switching tabs hides rather than unmounts content, retaining
 drafts within the same editing context; changing the edited row/clip refreshes its
 fields rather than applying a previous context's draft to the new selection.
 Explicit boundary buttons still open Sequence.
 
-**Expand all / Collapse all** controls the seven top-level settings sections across
-Clip, Sequence and Audio only; **Layer keyframes → Edit points** and its nested
-disclosures keep their independent expansion state.
+**Expand all / Collapse all** appears only in Clip and controls its four top-level
+sections: **Source range**, **Layer & opacity**, **Speed** and **Colour**. Sequence,
+Audio, nested disclosures and help remain unchanged.
 
 The header directly exposes **Media / Inspector toggles and keyboard help**.
 **Workspace options** keeps Reset layout and Diagnostics.
@@ -309,16 +316,17 @@ Layout/section preferences do not change rendering. Numbers/titles apply on
 Enter/blur, Escape restores, and invalid text remains editable; sliders stay live.
 Source-review paired IN/OUT deliberately requires **Apply**.
 
-The selected excerpt/row appears first in Inspector; section readouts and dots
+Clip shows the selected excerpt/row first; section readouts and dots
 indicate adjusted settings without expanding everything. Animated channels use
 an amber curve/diamond: dashed between keys, filled when the setting participates
-at the playhead. **Animation help** in the Layer keyframes tab explains scope and
-capture; no static or animated control is removed. Search/filter clear actions,
+at the playhead. **Animation help** in the Keyframes toolbar explains scope,
+capture and point timing; there is no separate Keyframe timing help button.
+No static or animated control is removed. Search/filter clear actions,
 mixed select-all and always-visible media Add simplify the library.
 
 Inline help is a small **? button**, not an expandable text section. Find it
 beside the relevant title—**Source range**, **Layer &
-opacity**, **Speed**, **Colour**, **Transition**, **Sequence fades**, **Edit points**
+opacity**, **Speed**, **Colour**, **Transition**, **Sequence fades**
 or **Placement & fades**—even when that section is collapsed. Help and expansion
 are separate buttons; no scrolling to the end of a section is needed. Startup
 details are next to **Preview needs attention**.
@@ -328,8 +336,8 @@ You can move the pointer into the help to read it, or press Down arrow to focus
 and scroll its text. Escape or a click elsewhere closes it; Escape closes help
 before cancelling an input draft. Hovering help never applies a field or edits
 the project. A deliberate click away from a number still applies a valid draft
-once, as usual. Settings, **Edit points**, music placement and storage/render
-breakdowns remain their existing expandable controls, not help buttons.
+once, as usual. Settings, nested **Time, easing & values**, music placement and
+storage/render breakdowns remain their existing expandable controls, not help buttons.
 
 | Context | Shortcut |
 | --- | --- |
