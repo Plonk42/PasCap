@@ -28,6 +28,7 @@ import { KeyframeControls } from './KeyframeControls.js';
 import { KeyframeToggle } from './KeyframeToggle.js';
 import { clipStartRestriction } from './layer-actions.js';
 import { NumberField } from './NumberField.js';
+import { settingPresentation } from './setting-scope.js';
 import { RangeSettingControl } from './SettingValueControl.js';
 import { SpeedControls, SpeedHelp } from './SpeedControls.js';
 import { planTimelineDrop } from './timeline-placement.js';
@@ -168,28 +169,13 @@ function settingState(layer: VideoLayer, setting: KeyframeSetting, frame: number
   return { keyed, active, baseAvailable, editable: validFrame && (keyed ? active : baseAvailable) };
 }
 
-function settingScope(state: ReturnType<typeof settingState>, baseLabel: string): string {
-  if (state.keyed) return state.active ? 'Layer key' : 'Layer curve';
-  return state.baseAvailable ? baseLabel : 'No selected clip base';
-}
-
-function SettingScope({ state, baseLabel }: Readonly<{ state: ReturnType<typeof settingState>; baseLabel: string }>) {
-  const scope = settingScope(state, baseLabel);
+function SettingScope({ keyed, scope }: Readonly<{ keyed: boolean; scope: string }>) {
   return (
     <small className="layer-setting-kind" title={scope}>
-      {state.keyed && <Icon name="curve" size={12} />}
+      {keyed && <Icon name="curve" size={12} />}
       <span className="declutter-sr-only">{scope}</span>
     </small>
   );
-}
-
-function settingHint(state: ReturnType<typeof settingState>, label: string, frame: number): string {
-  if (state.keyed && !state.active)
-    return `Layer curve · click the ${label} diamond to capture a value and edit timeline frame ${frame}.`;
-  if (!state.baseAvailable && !state.keyed)
-    return `Select a clip for its static base, or click the ${label} diamond to key this whole row.`;
-  if (state.active) return `Layer key at timeline frame ${frame}; edits change only this setting at the shared point.`;
-  return 'Editing the static base. This setting has no keys on the row.';
 }
 
 function OpacityControl({
@@ -207,7 +193,12 @@ function OpacityControl({
   let value = evaluateLayerSetting(layer, setting, frame, clip?.opacity ?? 1);
   if (isLayerOpacity) value = layerOpacityAt({ ...layer, enabled: true }, frame);
   else if (clip) value = opacityAt(clip, layer, frame);
-  const hint = settingHint(state, label, frame);
+  const { scope, hint } = settingPresentation({
+    ...state,
+    baseLabel: isLayerOpacity ? 'Layer' : 'Clip',
+    label,
+    frame,
+  });
   const commit = (opacity: number): void => {
     if (disabled || !state.editable) return;
     if (state.keyed) {
@@ -226,7 +217,7 @@ function OpacityControl({
         disabled={disabled || !state.editable}
         onCommit={commit}
         hint={hint}
-        scope={<SettingScope state={state} baseLabel={isLayerOpacity ? 'Layer base' : 'Clip base'} />}
+        scope={<SettingScope keyed={state.keyed} scope={scope} />}
         actions={
           <KeyframeToggle
             layer={layer}
@@ -256,7 +247,7 @@ function ColourControl({
   id,
 }: Readonly<LayerControlProps & { control: ColourControlDefinition; value: number; id: string }>) {
   const state = settingState(layer, control.key, frame, clip !== null);
-  const hint = settingHint(state, control.label, frame);
+  const { scope, hint } = settingPresentation({ ...state, baseLabel: 'Clip', label: control.label, frame });
   const resetTarget = state.keyed ? `timeline frame ${frame}` : 'the selected clip base';
   const commit = (nextValue: number): void => {
     if (disabled || !state.editable) return;
@@ -275,7 +266,7 @@ function ColourControl({
         disabled={disabled || !state.editable}
         onCommit={commit}
         hint={hint}
-        scope={<SettingScope state={state} baseLabel="Clip base" />}
+        scope={<SettingScope keyed={state.keyed} scope={scope} />}
         resetTitle={`Reset only ${control.label} at ${resetTarget}`}
         actions={
           <KeyframeToggle

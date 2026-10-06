@@ -109,6 +109,45 @@ function diamond(page: Page, label: string) {
     .getByRole('button', { name: `Keyframe ${label}`, exact: true });
 }
 
+test('setting tooltips and accessible descriptions explain the editable keyframe and read-only animation states', async ({
+  page,
+}) => {
+  const document = await current(page);
+  document.layers[0]!.keyframes = [sharedPoint(10, { exposure: 0, layerOpacity: 0.8, speed: 1 })];
+  await fixture(page, document);
+  for (const frame of [0, 10]) {
+    await seek(page, frame);
+    const scope = frame === 10 ? 'Keyframe at playhead' : 'Animated · add a keyframe to edit';
+    for (const [label, role, name] of [
+      ['Exposure', 'slider', 'Exposure'],
+      ['Layer opacity', 'slider', 'Layer opacity'],
+      ['Speed', 'spinbutton', 'Layer speed rate'],
+    ] as const) {
+      const hint =
+        frame === 10
+          ? `Editable keyframe at timeline frame 10. Edits change only ${label} at this shared layer point.`
+          : `Read-only animated value at timeline frame 0. Click the ${label} diamond to add a keyframe here, then edit the value.`;
+      const field = page.getByRole(role, { name, exact: true });
+      await expect(field).toHaveAccessibleDescription(new RegExp(hint.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+      if (frame === 10) await expect(field).toBeEnabled();
+      else await expect(field).toBeDisabled();
+      if (role === 'slider') await expect(field).toHaveAttribute('title', hint);
+    }
+    await expect(page.locator('[id$="-clip-panel"] .layer-setting-kind').filter({ hasText: scope })).toHaveCount(3);
+    await openOptions(page, 'Layer options Video 1');
+    const sidebar = page.getByRole('slider', { name: 'Opacity of layer Video 1', exact: true });
+    const inspector = page.getByRole('slider', { name: 'Layer opacity', exact: true });
+    await expect(sidebar).toHaveAttribute('title', (await inspector.getAttribute('title'))!);
+    await expect(sidebar).toHaveAccessibleDescription((await inspector.getAttribute('title'))!);
+    if (frame === 10) await expect(sidebar).toBeEnabled();
+    else await expect(sidebar).toBeDisabled();
+    await page.keyboard.press('Escape');
+  }
+  expect(await current(page)).toEqual(document);
+  expect(memory.saves).toBe(0);
+  await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
+});
+
 /** Paused capture checks the actual decoder positions, not just the shared sampler's expected values. */
 async function captureAt(page: Page, frame: number) {
   await seek(page, frame);
@@ -232,7 +271,10 @@ test('between points keyed controls are read-only until their own diamond explic
   for (const label of ['Exposure', 'Clip opacity', 'Layer opacity']) {
     const slider = page.getByRole('slider', { name: label, exact: true });
     await expect(slider).toBeDisabled();
-    await expect(slider).toHaveAttribute('title', new RegExp(`click the ${label} diamond`));
+    await expect(slider).toHaveAttribute(
+      'title',
+      `Read-only animated value at timeline frame 30. Click the ${label} diamond to add a keyframe here, then edit the value.`,
+    );
     await expect(diamond(page, label)).toBeEnabled();
     await expect(diamond(page, label)).toHaveAttribute('aria-pressed', 'false');
   }
