@@ -4,7 +4,7 @@ import { applyCommand } from '../../src/shared/commands.js';
 import type { MediaAsset } from '../../src/shared/media.js';
 import { createClip, createLayer, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
 import { calculateLayout } from '../../src/shared/timeline.js';
-import { expandedInspectorPreferences, inspectorTab, layerKeyframes, sharedPoint } from './editor-helpers.js';
+import { editLayerPoint, expandedInspectorPreferences, inspectorTab, layerKeyframes, sharedPoint } from './editor-helpers.js';
 import { memoryProjects, type MemoryProjects } from './memory-projects.js';
 
 let memory: MemoryProjects;
@@ -255,4 +255,27 @@ test('moving a point outside duration stores its time without extending footage,
   await page.getByRole('button', { name: 'Next Exposure keyframe', exact: true }).click();
   await inspectorTab(page, 'Layer keyframes');
   await expect(layerKeyframes(page, 'Video 1').locator('.layer-keyframe-inspected')).toContainText('Stored point · timeline frame 160');
+});
+
+test('stored points after the end are summarised on the timeline and open their Layer keyframes entry without editing', async ({ page }) => {
+  const project = sequence();
+  project.layers[0]!.keyframes.push(sharedPoint(160, { exposure: 0.1 }, 'hold'), sharedPoint(200, { contrast: 1.2 }, 'hold'));
+  await fixture(page, project);
+  const beyond = page.locator('[data-layer-keyframes-beyond="video-1"]');
+  await expect(beyond).toHaveText('◆ 2 after end'); await expect(marker(page, 160)).toHaveCount(0);
+  const surface = (await page.locator('.timeline-surface').boundingBox())!; const box = (await beyond.boundingBox())!;
+  expect(box.x + box.width).toBeLessThanOrEqual(surface.x + surface.width);
+  await inspectorTab(page, 'Clip'); await beyond.click();
+  await expect(page.getByRole('tab', { name: 'Layer keyframes', exact: true })).toHaveAttribute('aria-selected', 'true');
+  await expect(beyond).toHaveAttribute('aria-pressed', 'true');
+  await expect(layerKeyframes(page, 'Video 1').locator('.layer-keyframe-inspected')).toContainText('Stored point · timeline frame 160 · outside current duration');
+  await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(119);
+  expect(await current(page)).toEqual(project); await page.evaluate(() => window.pascapLab!.flush()); expect(memory.saves).toBe(0);
+  await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
+  const row = await editLayerPoint(page, 'Video 1', 160);
+  await row.getByRole('button', { name: 'Delete layer keyframe 160', exact: true }).click();
+  expect((await current(page)).layers[0]!.keyframes.map((point) => point.frame)).toEqual([20, 80, 200]);
+  await expect(beyond).toHaveText('◆ 1 after end');
+  await page.getByRole('button', { name: 'Undo', exact: true }).click(); expect(await current(page)).toEqual(project);
+  await expect(beyond).toHaveText('◆ 2 after end');
 });
