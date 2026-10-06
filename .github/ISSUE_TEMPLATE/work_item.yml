@@ -1,6 +1,6 @@
 name: Engineering task
 description: Track a concrete verification, documentation or operations deliverable, not a sprint.
-labels: [task, "priority:p2", "status:backlog"]
+labels: [task, 'priority:p2', 'status:backlog']
 body:
   - type: markdown
     attributes:

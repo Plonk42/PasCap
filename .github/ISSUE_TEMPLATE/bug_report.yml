@@ -1,6 +1,6 @@
 name: Bug report
 description: Report a reproducible editor, preview, import or export problem.
-labels: [bug, "priority:p2", "status:backlog"]
+labels: [bug, 'priority:p2', 'status:backlog']
 body:
   - type: markdown
     attributes:

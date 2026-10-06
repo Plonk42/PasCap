@@ -1,19 +1,27 @@
 import { z } from 'zod';
 
-export const colourSchema = z.object({
-  exposure: z.number().min(-3).max(3),
-  brightness: z.number().min(-0.5).max(0.5),
-  contrast: z.number().min(0).max(2),
-  hue: z.number().min(-180).max(180),
-  saturation: z.number().min(0).max(2),
-  highlights: z.number().min(-1).max(1),
-  shadows: z.number().min(-1).max(1),
-}).strict();
+export const colourSchema = z
+  .object({
+    exposure: z.number().min(-3).max(3),
+    brightness: z.number().min(-0.5).max(0.5),
+    contrast: z.number().min(0).max(2),
+    hue: z.number().min(-180).max(180),
+    saturation: z.number().min(0).max(2),
+    highlights: z.number().min(-1).max(1),
+    shadows: z.number().min(-1).max(1),
+  })
+  .strict();
 
 export type ColourSettings = z.infer<typeof colourSchema>;
 export type RGB = readonly [number, number, number];
 export const NEUTRAL_COLOUR: Readonly<ColourSettings> = Object.freeze({
-  exposure: 0, brightness: 0, contrast: 1, hue: 0, saturation: 1, highlights: 0, shadows: 0,
+  exposure: 0,
+  brightness: 0,
+  contrast: 1,
+  hue: 0,
+  saturation: 1,
+  highlights: 0,
+  shadows: 0,
 });
 
 export const COLOUR_CONTROLS = [
@@ -26,7 +34,9 @@ export const COLOUR_CONTROLS = [
   { key: 'shadows', label: 'Shadows', min: -1, max: 1, step: 0.01, unit: '' },
 ] as const;
 
-export function clamp01(value: number): number { return Math.max(0, Math.min(1, value)); }
+export function clamp01(value: number): number {
+  return Math.max(0, Math.min(1, value));
+}
 
 // Rounded BT.709 constants with a continuous join, including a neutral round-trip.
 export const BT709_ALPHA = 1.09929682680944;
@@ -41,7 +51,9 @@ export function encode709(value: number): number {
 /** Authoritative SDR transform. See docs/COLOUR_AND_TIMING.md; no FFmpeg eq approximation. */
 export function gradePixel(rgb: RGB, settings: ColourSettings): RGB {
   const exposure = 2 ** settings.exposure;
-  const base = rgb.map((value) => (decode709(clamp01(value)) * exposure - 0.18) * settings.contrast + 0.18 + settings.brightness);
+  const base = rgb.map(
+    (value) => (decode709(clamp01(value)) * exposure - 0.18) * settings.contrast + 0.18 + settings.brightness,
+  );
   const y = clamp01(0.2126 * base[0]! + 0.7152 * base[1]! + 0.0722 * base[2]!);
   const low = (1 - y) ** 2;
   const high = y ** 2;
@@ -49,7 +61,7 @@ export function gradePixel(rgb: RGB, settings: ColourSettings): RGB {
   const luminance = 0.2126 * tone[0]! + 0.7152 * tone[1]! + 0.0722 * tone[2]!;
   const cb = (tone[2]! - luminance) / 1.8556;
   const cr = (tone[0]! - luminance) / 1.5748;
-  const angle = settings.hue * Math.PI / 180;
+  const angle = (settings.hue * Math.PI) / 180;
   const u = settings.saturation * (cb * Math.cos(angle) - cr * Math.sin(angle));
   const v = settings.saturation * (cb * Math.sin(angle) + cr * Math.cos(angle));
   const red = luminance + 1.5748 * v;
@@ -60,13 +72,18 @@ export function gradePixel(rgb: RGB, settings: ColourSettings): RGB {
 
 export function generateCube(settings: ColourSettings, size = 65): string {
   colourSchema.parse(settings);
-  if (!Number.isInteger(size) || size < 2 || size > 129) throw new Error('LUT size must be an integer between 2 and 129.');
+  if (!Number.isInteger(size) || size < 2 || size > 129)
+    throw new Error('LUT size must be an integer between 2 and 129.');
   const lines = ['TITLE "PasCap BT709 linear SDR v1"', `LUT_3D_SIZE ${size}`, 'DOMAIN_MIN 0 0 0', 'DOMAIN_MAX 1 1 1'];
   // .cube convention: red is the fastest-moving coordinate.
   for (let blue = 0; blue < size; blue++) {
     for (let green = 0; green < size; green++) {
       for (let red = 0; red < size; red++) {
-        lines.push(gradePixel([red / (size - 1), green / (size - 1), blue / (size - 1)], settings).map((v) => v.toFixed(9)).join(' '));
+        lines.push(
+          gradePixel([red / (size - 1), green / (size - 1), blue / (size - 1)], settings)
+            .map((v) => v.toFixed(9))
+            .join(' '),
+        );
       }
     }
   }

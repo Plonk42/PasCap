@@ -433,5 +433,3 @@ and both-runtime acceptance belong to
 [#11](https://github.com/Plonk42/PasCap/issues/11), with the contract in
 [DEPLOYMENT.md](DEPLOYMENT.md). Actual-commit correctness results are available in
 [GitHub Actions](https://github.com/Plonk42/PasCap/actions).
-
-

@@ -72,11 +72,11 @@ recomputes those same samples; the `deep` argument is not full-byte verification
 
 The identity limitations are:
 
-| Operation | Consequence |
-| --- | --- |
-| Same-device/inode rename preserving modification time and bytes | Fingerprint and derived media/cache identity remain identical; old registered path is still missing |
-| Different device/inode, changed time or size | Fingerprint identity changes, even if every content byte is identical |
-| Unsampled byte changed in an 8 MiB file, preserving size/time/device/inode | Full-file SHA-256 changes but the stored sampled fingerprint does not |
+| Operation                                                                  | Consequence                                                                                         |
+| -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| Same-device/inode rename preserving modification time and bytes            | Fingerprint and derived media/cache identity remain identical; old registered path is still missing |
+| Different device/inode, changed time or size                               | Fingerprint identity changes, even if every content byte is identical                               |
+| Unsampled byte changed in an 8 MiB file, preserving size/time/device/inode | Full-file SHA-256 changes but the stored sampled fingerprint does not                               |
 
 Video IDs derive from the sampled digest; proxy directories also use that digest.
 Projects refer to media IDs, **not source paths on each clip**. Re-registering a
@@ -97,12 +97,12 @@ The implementation prerequisite is an explicit strong identity design:
    device/inode evidence; preserve references, prepared files and completed receipts.
 3. Document the required evidence storage/version and its strict incompatibility
    policy before implementation. No optional legacy default, migration, cache move
-    or implicit user-footage hash job is permitted.
+   or implicit user-footage hash job is permitted.
 4. An explicit approved-location proposal must show old/new paths, verify all
    required evidence and require confirmation; commit atomically only if source,
-    association and active-job state still match. Pre-commit failure keeps the old
-    association; lost post-commit acknowledgement requires honest readback/recovery,
-    not promised rollback or a blind retry.
+   association and active-job state still match. Pre-commit failure keeps the old
+   association; lost post-commit acknowledgement requires honest readback/recovery,
+   not promised rollback or a blind retry.
 5. If the original is already missing without strong baseline evidence, explain
    that limitation rather than accepting a name/sample-only association.
 

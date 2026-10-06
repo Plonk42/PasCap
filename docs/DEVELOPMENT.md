@@ -69,6 +69,8 @@ npx playwright install --with-deps chrome
 npm run test:browser
 ```
 
+- `npm run format` applies Prettier ([configuration](../.prettierrc.json)) to the
+  repository; `check` first verifies that formatting with `format:check`.
 - `check` runs strict frontend typechecking, unit/service tests and the production
   build/server typecheck and locked production-license inventory. Builds retain the
   upstream notice texts in a served notice artifact; `npm run licenses:check`
@@ -188,8 +190,8 @@ changing playback, decoding, native export or test infrastructure.
 
 - While editing: `npm test -- tests/unit/<file>.test.ts` (or `npm run test:watch`)
   and the dev server.
-- Before pushing: `npm run check`, plus the affected browser specs for UI changes.
-  `check` has just built `dist/`, which Playwright serves:
+- Before pushing: `npm run format`, then `npm run check`, plus the affected browser
+  specs for UI changes. `check` has just built `dist/`, which Playwright serves:
 
   ```sh
   npx tsx scripts/fixtures.ts --browser
@@ -197,11 +199,12 @@ changing playback, decoding, native export or test infrastructure.
   ```
 
   Install Chrome once with `npx playwright install --with-deps chrome`.
+
 - Reuse fixtures across focused runs while tests leave their baseline intact;
   reseed after state-changing runs. Never build or reset fixtures while a browser
   run serves that output.
-- Docs-only changes need no test runs. Never shorten timeouts, add retries or
-  weaken assertions for speed.
+- Docs-only changes need only `npm run format`. Never shorten timeouts, add retries
+  or weaken assertions for speed.
 
 **Browser fixture setup resets `.pascap/browser-tests/`**; never store personal work
 there. It seeds twelve video memberships, music and proxies. Separate import-test

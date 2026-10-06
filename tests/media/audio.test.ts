@@ -1,4 +1,17 @@
-import { appendFile, copyFile, link, lstat, mkdir, mkdtemp, readFile, readdir, rename, rm, symlink, writeFile } from 'node:fs/promises';
+import {
+  appendFile,
+  copyFile,
+  link,
+  lstat,
+  mkdir,
+  mkdtemp,
+  readFile,
+  readdir,
+  rename,
+  rm,
+  symlink,
+  writeFile,
+} from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
@@ -34,14 +47,44 @@ describe.skipIf(!enabled)('registered music · disposable lavfi audio only', () 
     silencePath = path.join(sources, 'silence.wav');
     cancelledPath = path.join(sources, 'cancelled.wav');
     changedPath = path.join(sources, 'changed.wav');
-    config = createConfig({ dataDir: path.join(directory, 'cache'), webDir: path.join(directory, 'absent-web'), mediaRoots: [sources] });
+    config = createConfig({
+      dataDir: path.join(directory, 'cache'),
+      webDir: path.join(directory, 'absent-web'),
+      mediaRoots: [sources],
+    });
     await processes.runProcess(config.ffmpeg, [
-      '-hide_banner', '-loglevel', 'error', '-nostdin', '-n', '-f', 'lavfi', '-i', 'sine=frequency=523.25:sample_rate=44100:duration=2.2',
-      '-c:a', 'pcm_s16le', '-threads', '2', tonePath,
+      '-hide_banner',
+      '-loglevel',
+      'error',
+      '-nostdin',
+      '-n',
+      '-f',
+      'lavfi',
+      '-i',
+      'sine=frequency=523.25:sample_rate=44100:duration=2.2',
+      '-c:a',
+      'pcm_s16le',
+      '-threads',
+      '2',
+      tonePath,
     ]);
     await processes.runProcess(config.ffmpeg, [
-      '-hide_banner', '-loglevel', 'error', '-nostdin', '-n', '-f', 'lavfi', '-i', 'anullsrc=r=32000:cl=mono', '-t', '0.4',
-      '-c:a', 'pcm_s16le', '-threads', '2', silencePath,
+      '-hide_banner',
+      '-loglevel',
+      'error',
+      '-nostdin',
+      '-n',
+      '-f',
+      'lavfi',
+      '-i',
+      'anullsrc=r=32000:cl=mono',
+      '-t',
+      '0.4',
+      '-c:a',
+      'pcm_s16le',
+      '-threads',
+      '2',
+      silencePath,
     ]);
     await copyFile(tonePath, cancelledPath);
     await copyFile(tonePath, changedPath);
@@ -55,7 +98,12 @@ describe.skipIf(!enabled)('registered music · disposable lavfi audio only', () 
   });
 
   async function registerReady(filename: string): Promise<AudioAsset> {
-    const response = await service.app.inject({ method: 'POST', url: '/api/audio/register', headers, payload: { path: filename } });
+    const response = await service.app.inject({
+      method: 'POST',
+      url: '/api/audio/register',
+      headers,
+      payload: { path: filename },
+    });
     expect(response.statusCode, response.body).toBe(202);
     const registered = audioAssetSchema.parse(response.json().asset);
     const job = jobSchema.parse(response.json().job);
@@ -76,13 +124,14 @@ describe.skipIf(!enabled)('registered music · disposable lavfi audio only', () 
     expect(asset.metadata.sampleRate).toBe(44_100);
     expect(asset.metadata.channels).toBe(1);
     expect(asset.metadata.durationSeconds).toBeCloseTo(2.2, 6);
-    expect(asset.metadata.frameCount).toBe(Math.floor(2.2 * 30_000 / 1001));
+    expect(asset.metadata.frameCount).toBe(Math.floor((2.2 * 30_000) / 1001));
     const playback = service.audio.playbackPath(asset);
     expect(path.relative(config.dataDir, playback).startsWith('audio-assets/')).toBe(true);
     const pcm = await readFile(playback);
     expect(pcm.length % 4).toBe(0);
     expect(Math.abs(pcm.length / (48_000 * 4) - asset.metadata.durationSeconds)).toBeLessThan(0.1);
-    for (let offset = 0; offset < pcm.length; offset += 4) expect(pcm.readInt16LE(offset + 2)).toBe(pcm.readInt16LE(offset));
+    for (let offset = 0; offset < pcm.length; offset += 4)
+      expect(pcm.readInt16LE(offset + 2)).toBe(pcm.readInt16LE(offset));
     expect(asset.waveform.length).toBeGreaterThan(0);
     expect(asset.waveform.length).toBeLessThanOrEqual(2048);
     expect(asset.waveform.every((peak) => Number.isFinite(peak) && peak >= 0 && peak <= 1)).toBe(true);
@@ -118,8 +167,12 @@ describe.skipIf(!enabled)('registered music · disposable lavfi audio only', () 
     const invalid = await service.app.inject({ url, headers: { ...headers, range: 'bytes=0-1,4-5' } });
     expect(invalid.statusCode).toBe(416);
     expect(invalid.headers['content-range']).toBe(`bytes */${bytes.length}`);
-    expect((await service.app.inject({ url: `/api/audio/${asset.id}/waveform`, headers })).json()).toEqual({ waveform: asset.waveform });
-    expect((await service.app.inject({ url, headers: { ...headers, origin: 'https://hostile.example' } })).statusCode).toBe(403);
+    expect((await service.app.inject({ url: `/api/audio/${asset.id}/waveform`, headers })).json()).toEqual({
+      waveform: asset.waveform,
+    });
+    expect(
+      (await service.app.inject({ url, headers: { ...headers, origin: 'https://hostile.example' } })).statusCode,
+    ).toBe(403);
     expect((await service.app.inject({ url: '/api/audio/bad%2Fid/playback', headers })).statusCode).toBe(400);
     expect((await service.app.inject({ url: '/api/audio/unregistered/playback', headers })).statusCode).toBe(404);
   });
@@ -140,13 +193,17 @@ describe.skipIf(!enabled)('registered music · disposable lavfi audio only', () 
       external.metadata.channels = 99;
       external.waveform[0] = 1;
       expect(reloaded.get(asset.id)).toEqual(asset);
-    } finally { await queue.close(); }
+    } finally {
+      await queue.close();
+    }
   });
 
   it('deduplicates concurrent preparations on the one shared queue, persists queued cancellation, and retries explicitly', async () => {
     const asset = await readyTone();
-    let release = (): void => { };
-    const gate = new Promise<void>((resolve) => { release = resolve; });
+    let release = (): void => {};
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
     const blocker = service.jobs.submit('reference', 'Disposable queue gate', async () => gate);
     let queuedId = '';
     try {
@@ -159,18 +216,27 @@ describe.skipIf(!enabled)('registered music · disposable lavfi audio only', () 
       const saved = JSON.parse(await readFile(path.join(config.dataDir, 'audio.json'), 'utf8'));
       expect(saved.assets.find((entry: AudioAsset) => entry.id === asset.id).status).toBe('queued');
       service.jobs.cancel(first.id);
-    } finally { release(); }
+    } finally {
+      release();
+    }
     await service.jobs.wait(blocker.id);
     expect((await service.jobs.wait(queuedId)).state).toBe('cancelled');
     expect(service.audio.get(asset.id).status).toBe('error');
     expect(service.audio.get(asset.id).waveform).toEqual([]);
-    const retry = await service.app.inject({ method: 'POST', url: `/api/audio/${asset.id}/prepare`, headers, payload: {} });
+    const retry = await service.app.inject({
+      method: 'POST',
+      url: `/api/audio/${asset.id}/prepare`,
+      headers,
+      payload: {},
+    });
     expect(retry.statusCode, retry.body).toBe(202);
     const result = await service.jobs.wait(jobSchema.parse(retry.json().job).id);
     expect(result.state, result.message).toBe('completed');
     tone = service.audio.get(asset.id);
     expect(tone.metadata).toEqual(asset.metadata);
-    expect((await readdir(service.audio.assetDir(asset))).some((name) => name.includes('.partial') || name.endsWith('.tmp'))).toBe(false);
+    expect(
+      (await readdir(service.audio.assetDir(asset))).some((name) => name.includes('.partial') || name.endsWith('.tmp')),
+    ).toBe(false);
     expect(await readFile(tonePath)).toEqual(original);
   });
 
@@ -181,7 +247,10 @@ describe.skipIf(!enabled)('registered music · disposable lavfi audio only', () 
       const result = actualRunProcess(binary, args, options);
       if (binary === config.ffmpeg && args.includes('pcm_s16le')) {
         const running = service.jobs.list().find((job) => job.kind === 'audio' && job.state === 'running');
-        if (running) { cancelled = true; service.jobs.cancel(running.id); }
+        if (running) {
+          cancelled = true;
+          service.jobs.cancel(running.id);
+        }
       }
       return result;
     });
@@ -198,7 +267,9 @@ describe.skipIf(!enabled)('registered music · disposable lavfi audio only', () 
       const saved = JSON.parse(await readFile(path.join(config.dataDir, 'audio.json'), 'utf8'));
       expect(saved.assets.find((entry: AudioAsset) => entry.id === asset.id).status).toBe('error');
       expect(await readFile(cancelledPath)).toEqual(original);
-    } finally { spy.mockRestore(); }
+    } finally {
+      spy.mockRestore();
+    }
     const retry = await service.audio.prepare(asset.id);
     const finished = await service.jobs.wait(retry.id);
     expect(finished.state, finished.message).toBe('completed');
@@ -215,16 +286,58 @@ describe.skipIf(!enabled)('registered music · disposable lavfi audio only', () 
     frame.set([0xff, 0xfb, 0x90, 0xc4]);
     await writeFile(silent, Buffer.concat(Array.from({ length: 20 }, () => frame)));
     await processes.runProcess(config.ffmpeg, [
-      '-hide_banner', '-loglevel', 'error', '-nostdin', '-n', '-f', 'lavfi', '-i', 'color=c=blue:s=32x32',
-      '-frames:v', '1', '-c:v', 'mjpeg', '-threads', '2', '-filter_threads', '2', cover,
+      '-hide_banner',
+      '-loglevel',
+      'error',
+      '-nostdin',
+      '-n',
+      '-f',
+      'lavfi',
+      '-i',
+      'color=c=blue:s=32x32',
+      '-frames:v',
+      '1',
+      '-c:v',
+      'mjpeg',
+      '-threads',
+      '2',
+      '-filter_threads',
+      '2',
+      cover,
     ]);
     await processes.runProcess(config.ffmpeg, [
-      '-hide_banner', '-loglevel', 'error', '-nostdin', '-n', '-i', silent, '-i', cover,
-      '-map', '0:a:0', '-map', '1:v:0', '-c', 'copy', '-disposition:v:0', 'attached_pic', filename,
+      '-hide_banner',
+      '-loglevel',
+      'error',
+      '-nostdin',
+      '-n',
+      '-i',
+      silent,
+      '-i',
+      cover,
+      '-map',
+      '0:a:0',
+      '-map',
+      '1:v:0',
+      '-c',
+      'copy',
+      '-disposition:v:0',
+      'attached_pic',
+      filename,
     ]);
-    const sourceProbe = JSON.parse((await processes.runProcess(config.ffprobe, [
-      '-v', 'error', '-show_entries', 'stream=codec_type:stream_disposition=attached_pic', '-of', 'json', filename,
-    ])).toString('utf8'));
+    const sourceProbe = JSON.parse(
+      (
+        await processes.runProcess(config.ffprobe, [
+          '-v',
+          'error',
+          '-show_entries',
+          'stream=codec_type:stream_disposition=attached_pic',
+          '-of',
+          'json',
+          filename,
+        ])
+      ).toString('utf8'),
+    );
     expect(sourceProbe.streams).toEqual([
       { codec_type: 'audio', disposition: { attached_pic: 0 } },
       { codec_type: 'video', disposition: { attached_pic: 1 } },
@@ -234,9 +347,25 @@ describe.skipIf(!enabled)('registered music · disposable lavfi audio only', () 
     expect(asset.metadata.codec).toBe('mp3');
     expect(asset.status).toBe('ready');
     expect(asset.waveform.length).toBeGreaterThan(0);
-    const playback = JSON.parse((await processes.runProcess(config.ffprobe, [
-      '-v', 'error', '-f', 's16le', '-ar', '48000', '-ch_layout', 'stereo', '-show_entries', 'stream=codec_type', '-of', 'json', service.audio.playbackPath(asset),
-    ])).toString('utf8'));
+    const playback = JSON.parse(
+      (
+        await processes.runProcess(config.ffprobe, [
+          '-v',
+          'error',
+          '-f',
+          's16le',
+          '-ar',
+          '48000',
+          '-ch_layout',
+          'stereo',
+          '-show_entries',
+          'stream=codec_type',
+          '-of',
+          'json',
+          service.audio.playbackPath(asset),
+        ])
+      ).toString('utf8'),
+    );
     expect(playback.streams).toEqual([{ codec_type: 'audio' }]);
     expect(await readFile(filename)).toEqual(bytes);
   });
@@ -246,26 +375,95 @@ describe.skipIf(!enabled)('registered music · disposable lavfi audio only', () 
     const short = path.join(sources, 'too-short.wav');
     const video = path.join(sources, 'soundtrack.mp4');
     await processes.runProcess(config.ffmpeg, [
-      '-hide_banner', '-loglevel', 'error', '-nostdin', '-n', '-f', 'lavfi', '-i', 'sine=duration=0.2',
-      '-f', 'lavfi', '-i', 'color=c=blue:s=32x32:d=0.2', '-map', '0:a:0', '-map', '1:v:0',
-      '-c:a', 'aac', '-c:v', 'libx264', '-threads', '2', '-filter_threads', '2', video,
+      '-hide_banner',
+      '-loglevel',
+      'error',
+      '-nostdin',
+      '-n',
+      '-f',
+      'lavfi',
+      '-i',
+      'sine=duration=0.2',
+      '-f',
+      'lavfi',
+      '-i',
+      'color=c=blue:s=32x32:d=0.2',
+      '-map',
+      '0:a:0',
+      '-map',
+      '1:v:0',
+      '-c:a',
+      'aac',
+      '-c:v',
+      'libx264',
+      '-threads',
+      '2',
+      '-filter_threads',
+      '2',
+      video,
     ]);
     await processes.runProcess(config.ffmpeg, [
-      '-hide_banner', '-loglevel', 'error', '-nostdin', '-n', '-f', 'lavfi', '-i', 'sine=frequency=440:duration=0.2',
-      '-f', 'lavfi', '-i', 'sine=frequency=880:duration=0.2', '-map', '0:a:0', '-map', '1:a:0', '-c:a', 'pcm_s16le', '-threads', '2', multiple,
+      '-hide_banner',
+      '-loglevel',
+      'error',
+      '-nostdin',
+      '-n',
+      '-f',
+      'lavfi',
+      '-i',
+      'sine=frequency=440:duration=0.2',
+      '-f',
+      'lavfi',
+      '-i',
+      'sine=frequency=880:duration=0.2',
+      '-map',
+      '0:a:0',
+      '-map',
+      '1:a:0',
+      '-c:a',
+      'pcm_s16le',
+      '-threads',
+      '2',
+      multiple,
     ]);
     await processes.runProcess(config.ffmpeg, [
-      '-hide_banner', '-loglevel', 'error', '-nostdin', '-n', '-f', 'lavfi', '-i', 'sine=duration=0.01', '-c:a', 'pcm_s16le', '-threads', '2', short,
+      '-hide_banner',
+      '-loglevel',
+      'error',
+      '-nostdin',
+      '-n',
+      '-f',
+      'lavfi',
+      '-i',
+      'sine=duration=0.01',
+      '-c:a',
+      'pcm_s16le',
+      '-threads',
+      '2',
+      short,
     ]);
     const before = service.audio.list();
     const jobs = service.jobs.list();
-    const response = await service.app.inject({ method: 'POST', url: '/api/audio/register', headers, payload: { path: multiple } });
+    const response = await service.app.inject({
+      method: 'POST',
+      url: '/api/audio/register',
+      headers,
+      payload: { path: multiple },
+    });
     expect(response.statusCode).toBe(422);
     expect(response.json().error).toContain('exactly one audio stream');
-    const videoResponse = await service.app.inject({ method: 'POST', url: '/api/audio/register', headers, payload: { path: video } });
+    const videoResponse = await service.app.inject({
+      method: 'POST',
+      url: '/api/audio/register',
+      headers,
+      payload: { path: video },
+    });
     expect(videoResponse.statusCode).toBe(422);
     expect(videoResponse.json().error).toContain('no video footage');
-    expect((await service.app.inject({ method: 'POST', url: '/api/audio/register', headers, payload: { path: short } })).statusCode).toBe(422);
+    expect(
+      (await service.app.inject({ method: 'POST', url: '/api/audio/register', headers, payload: { path: short } }))
+        .statusCode,
+    ).toBe(422);
     expect(service.audio.list()).toEqual(before);
     expect(service.jobs.list()).toEqual(jobs);
   });
@@ -285,17 +483,24 @@ describe.skipIf(!enabled)('registered music · disposable lavfi audio only', () 
       const unsafe = new AudioLibrary(createConfig({ dataDir: path.join(sources, 'must-not-exist') }), queue);
       await expect(unsafe.register(tonePath)).rejects.toThrow('cache must be outside');
       expect((await readdir(sources)).includes('must-not-exist')).toBe(false);
-    } finally { await queue.close(); }
+    } finally {
+      await queue.close();
+    }
     const playback = service.audio.playbackPath(asset);
     const backup = `${playback}.synthetic-backup`;
     await rename(playback, backup);
     await symlink(tonePath, playback);
     try {
       expect((await service.app.inject({ url: `/api/audio/${asset.id}/playback`, headers })).statusCode).toBe(422);
-      expect((await service.app.inject({ method: 'HEAD', url: `/api/audio/${asset.id}/playback`, headers })).statusCode).toBe(422);
+      expect(
+        (await service.app.inject({ method: 'HEAD', url: `/api/audio/${asset.id}/playback`, headers })).statusCode,
+      ).toBe(422);
       expect((await lstat(playback)).isSymbolicLink()).toBe(true);
       expect(await readFile(tonePath)).toEqual(original);
-    } finally { await rm(playback, { force: true }); await rename(backup, playback); }
+    } finally {
+      await rm(playback, { force: true });
+      await rename(backup, playback);
+    }
   });
 
   it('rebuilds missing or damaged regular caches only on an explicit retry', async () => {
@@ -328,16 +533,24 @@ describe.skipIf(!enabled)('registered music · disposable lavfi audio only', () 
     const jobs = service.jobs.list();
     const response = await service.app.inject({ url: '/api/audio', headers });
     expect(response.statusCode).toBe(200);
-    expect(response.json().assets.find((item: AudioAsset) => item.id === asset.id)).toMatchObject({ status: 'error', error: expect.stringContaining('current PCM16 music cache is missing') });
-    expect((await service.app.inject({ method: 'HEAD', url: `/api/audio/${asset.id}/playback`, headers })).statusCode).toBe(409);
+    expect(response.json().assets.find((item: AudioAsset) => item.id === asset.id)).toMatchObject({
+      status: 'error',
+      error: expect.stringContaining('current PCM16 music cache is missing'),
+    });
+    expect(
+      (await service.app.inject({ method: 'HEAD', url: `/api/audio/${asset.id}/playback`, headers })).statusCode,
+    ).toBe(409);
     expect(service.audio.get(asset.id)).toEqual(asset);
     expect(service.jobs.list()).toEqual(jobs);
     expect(await readFile(path.join(config.dataDir, 'audio.json'))).toEqual(registry);
     expect(await readFile(archived)).toEqual(bytes);
     const prepared = await service.audio.prepare(asset.id);
     expect((await service.jobs.wait(prepared.id)).state).toBe('completed');
-    expect((await service.app.inject({ method: 'HEAD', url: `/api/audio/${asset.id}/playback`, headers })).statusCode).toBe(200);
-    expect(await readFile(archived)).toEqual(bytes); expect(await readFile(tonePath)).toEqual(original);
+    expect(
+      (await service.app.inject({ method: 'HEAD', url: `/api/audio/${asset.id}/playback`, headers })).statusCode,
+    ).toBe(200);
+    expect(await readFile(archived)).toEqual(bytes);
+    expect(await readFile(tonePath)).toEqual(original);
     tone = service.audio.get(asset.id);
   });
 
@@ -354,7 +567,12 @@ describe.skipIf(!enabled)('registered music · disposable lavfi audio only', () 
     const native = vi.spyOn(processes, 'runProcess');
     let imported: AudioAsset;
     try {
-      const response = await service.app.inject({ method: 'POST', url: '/api/audio/register-selected', headers, payload: { path: selectedPath } });
+      const response = await service.app.inject({
+        method: 'POST',
+        url: '/api/audio/register-selected',
+        headers,
+        payload: { path: selectedPath },
+      });
       expect(response.statusCode, response.body).toBe(202);
       imported = audioAssetSchema.parse(response.json().asset);
       expect(imported.id).not.toBe(previous.id);
@@ -366,7 +584,10 @@ describe.skipIf(!enabled)('registered music · disposable lavfi audio only', () 
       expect(service.audio.get(previous.id)).toEqual(previous);
       await expect(service.audio.assertReady(previous.id)).rejects.toThrow('original recording is missing');
       const listed = (await service.app.inject({ url: '/api/audio', headers })).json().assets as AudioAsset[];
-      expect(listed.find((asset) => asset.id === previous.id)).toMatchObject({ status: 'error', error: expect.stringContaining('original recording is missing') });
+      expect(listed.find((asset) => asset.id === previous.id)).toMatchObject({
+        status: 'error',
+        error: expect.stringContaining('original recording is missing'),
+      });
       expect(listed.find((asset) => asset.id === imported.id)).toEqual(imported);
       expect(service.audio.get(previous.id)).toEqual(previous);
       const repeated = await service.audio.register(selectedPath);
@@ -375,10 +596,16 @@ describe.skipIf(!enabled)('registered music · disposable lavfi audio only', () 
       expect(native.mock.calls.some(([binary]) => binary === config.ffmpeg)).toBe(false);
       expect(service.audio.playbackPath(imported)).toBe(playback);
       const finalStat = await lstat(playback);
-      expect([finalStat.ino, finalStat.mtimeMs, finalStat.size]).toEqual([cacheStat.ino, cacheStat.mtimeMs, cacheStat.size]);
+      expect([finalStat.ino, finalStat.mtimeMs, finalStat.size]).toEqual([
+        cacheStat.ino,
+        cacheStat.mtimeMs,
+        cacheStat.size,
+      ]);
       expect(await readFile(playback)).toEqual(cached);
       expect(await readFile(selectedPath)).toEqual(original);
-    } finally { native.mockRestore(); }
+    } finally {
+      native.mockRestore();
+    }
     const queue = new JobQueue();
     try {
       const reloaded = new AudioLibrary(config, queue);
@@ -386,39 +613,50 @@ describe.skipIf(!enabled)('registered music · disposable lavfi audio only', () 
       expect(reloaded.get(previous.id)).toEqual(previous);
       expect(reloaded.get(imported.id)).toEqual(imported);
       expect(queue.list()).toEqual([]);
-    } finally { await queue.close(); }
+    } finally {
+      await queue.close();
+    }
   });
 
   it('keeps hard-linked music locations distinct while deduplicating repeat imports and active jobs at one path', async () => {
     const previous = await readyTone();
     const firstPath = path.join(sources, 'hard-link-one.wav');
     const secondPath = path.join(sources, 'hard-link-two.wav');
-    await link(tonePath, firstPath); await link(tonePath, secondPath);
+    await link(tonePath, firstPath);
+    await link(tonePath, secondPath);
     expect(await fingerprintFile(firstPath)).toEqual(previous.fingerprint);
     expect(await fingerprintFile(secondPath)).toEqual(previous.fingerprint);
-    let release = (): void => { };
-    const gate = new Promise<void>((resolve) => { release = resolve; });
+    let release = (): void => {};
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
     const blocker = service.jobs.submit('reference', 'Disposable music location gate', async () => gate);
-    let firstJob = ''; let secondJob = '';
+    let firstJob = '';
+    let secondJob = '';
     try {
       const first = await service.audio.register(firstPath);
       const repeated = await service.audio.register(firstPath);
       const second = await service.audio.register(secondPath);
-      firstJob = first.job.id; secondJob = second.job.id;
+      firstJob = first.job.id;
+      secondJob = second.job.id;
       expect(first.asset.id).not.toBe(previous.id);
       expect(second.asset.id).not.toBe(first.asset.id);
       expect(second.asset.id).not.toBe(previous.id);
       expect(repeated.asset.id).toBe(first.asset.id);
       expect(repeated.job.id).toBe(first.job.id);
       expect(second.job.id).not.toBe(first.job.id);
-      expect(first.asset.sourcePath).toBe(firstPath); expect(second.asset.sourcePath).toBe(secondPath);
+      expect(first.asset.sourcePath).toBe(firstPath);
+      expect(second.asset.sourcePath).toBe(secondPath);
       expect(service.jobs.list().filter((job) => job.state === 'running')).toHaveLength(1);
       expect(service.audio.get(previous.id)).toEqual(previous);
-    } finally { release(); }
+    } finally {
+      release();
+    }
     await service.jobs.wait(blocker.id);
     expect((await service.jobs.wait(firstJob)).state).toBe('completed');
     expect((await service.jobs.wait(secondJob)).state).toBe('completed');
-    expect(await readFile(firstPath)).toEqual(original); expect(await readFile(secondPath)).toEqual(original);
+    expect(await readFile(firstPath)).toEqual(original);
+    expect(await readFile(secondPath)).toEqual(original);
   });
 
   it('rejects changed source identities for playback, waveform and retry without mutating registered metadata', async () => {
@@ -426,9 +664,14 @@ describe.skipIf(!enabled)('registered music · disposable lavfi audio only', () 
     await appendFile(changedPath, '\0changed disposable source');
     const before = service.jobs.list();
     expect((await service.app.inject({ url: `/api/audio/${asset.id}/playback`, headers })).statusCode).toBe(409);
-    expect((await service.app.inject({ method: 'HEAD', url: `/api/audio/${asset.id}/playback`, headers })).statusCode).toBe(409);
+    expect(
+      (await service.app.inject({ method: 'HEAD', url: `/api/audio/${asset.id}/playback`, headers })).statusCode,
+    ).toBe(409);
     expect((await service.app.inject({ url: `/api/audio/${asset.id}/waveform`, headers })).statusCode).toBe(409);
-    expect((await service.app.inject({ method: 'POST', url: `/api/audio/${asset.id}/prepare`, headers, payload: {} })).statusCode).toBe(409);
+    expect(
+      (await service.app.inject({ method: 'POST', url: `/api/audio/${asset.id}/prepare`, headers, payload: {} }))
+        .statusCode,
+    ).toBe(409);
     expect(service.audio.get(asset.id)).toEqual(asset);
     expect(service.jobs.list()).toEqual(before);
   });

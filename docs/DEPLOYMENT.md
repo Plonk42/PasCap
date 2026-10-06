@@ -32,15 +32,15 @@ at most **32 unique absolute paths**. The default is only the service user's
 is rejected, but missing/unreadable roots remain visible as unavailable rather
 than failing startup. JSON paths must be absolute; a literal `~` is not expanded.
 
-| Request | Behaviour |
-| --- | --- |
-| `GET /api/footage/roots` | Root IDs, paths and availability/error information |
-| `GET /api/footage?rootId=root-0&directory=%2Fmedia%2Ffootage%2FFlight` | Metadata for one folder inside the selected root; `directory` is an encoded absolute path, or omitted for the root itself |
-| `POST /api/media/register-paths` | JSON `{"paths":["/media/footage/Flight/DJI_0001.MP4"]}` with 1–5,000 selected absolute video paths inside approved roots |
-| `GET /api/audio/roots` | The same approved-root IDs, paths and availability/error information for music |
-| `GET /api/audio/browse?rootId=root-0&directory=%2Fmedia%2Ffootage%2FMusic` | Metadata-only one-folder audio candidates and subfolders, with the same containment, symlink, cache-exclusion and truncation guards |
-| `POST /api/audio/register-selected` | JSON `{"path":"/media/footage/Music/track.wav"}` for one explicitly confirmed audio candidate inside approved roots; existing standalone-audio probe/preparation remains authoritative |
-| `POST /api/audio/register` | Retained deliberate manual audio-path import; browser roots do not restrict this action or expand automatically |
+| Request                                                                    | Behaviour                                                                                                                                                                              |
+| -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/footage/roots`                                                   | Root IDs, paths and availability/error information                                                                                                                                     |
+| `GET /api/footage?rootId=root-0&directory=%2Fmedia%2Ffootage%2FFlight`     | Metadata for one folder inside the selected root; `directory` is an encoded absolute path, or omitted for the root itself                                                              |
+| `POST /api/media/register-paths`                                           | JSON `{"paths":["/media/footage/Flight/DJI_0001.MP4"]}` with 1–5,000 selected absolute video paths inside approved roots                                                               |
+| `GET /api/audio/roots`                                                     | The same approved-root IDs, paths and availability/error information for music                                                                                                         |
+| `GET /api/audio/browse?rootId=root-0&directory=%2Fmedia%2Ffootage%2FMusic` | Metadata-only one-folder audio candidates and subfolders, with the same containment, symlink, cache-exclusion and truncation guards                                                    |
+| `POST /api/audio/register-selected`                                        | JSON `{"path":"/media/footage/Music/track.wav"}` for one explicitly confirmed audio candidate inside approved roots; existing standalone-audio probe/preparation remains authoritative |
+| `POST /api/audio/register`                                                 | Retained deliberate manual audio-path import; browser roots do not restrict this action or expand automatically                                                                        |
 
 Use the root IDs returned by the service. Browsing uses directory/file metadata
 only: no media-byte reads, probing, recursive discovery, registration, cache writes
@@ -83,11 +83,11 @@ browser remains on the host, where video decoding, WebGL2 and GPU selection occu
 No source footage belongs in the image or build context, and startup must not
 automatically register or prepare mounted footage.
 
-| Data | Stable container path | Mount/access |
-| --- | --- | --- |
-| Original footage from a user-chosen host folder | `/media/footage` | Read-only source bind mount |
-| Registries, project documents, generated proxies/thumbnails, exports/receipts and scratch | `/var/lib/pascap` | Separate read/write persistent host directory or volume |
-| Built UI, Node application and native toolchain | Image-owned application location | No bundled originals or user data |
+| Data                                                                                      | Stable container path            | Mount/access                                            |
+| ----------------------------------------------------------------------------------------- | -------------------------------- | ------------------------------------------------------- |
+| Original footage from a user-chosen host folder                                           | `/media/footage`                 | Read-only source bind mount                             |
+| Registries, project documents, generated proxies/thumbnails, exports/receipts and scratch | `/var/lib/pascap`                | Separate read/write persistent host directory or volume |
+| Built UI, Node application and native toolchain                                           | Image-owned application location | No bundled originals or user data                       |
 
 For this proposed layout, the **existing** configuration values would be
 `PASCAP_MEDIA_ROOTS=["/media/footage"]` (the environment value is that JSON array)

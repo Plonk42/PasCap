@@ -1,53 +1,56 @@
 {
-    "name": "pascap",
-    "version": "0.1.0",
-    "private": true,
-    "license": "MIT",
-    "type": "module",
-    "description": "Local Linux video editing with per-clip grading, speed curves, music and native FFmpeg export",
-    "engines": {
-        "node": ">=22.12.0 <25"
-    },
-    "scripts": {
-        "dev": "concurrently -k -n service,web -c cyan,magenta \"npm:dev:server\" \"npm:dev:web\"",
-        "dev:server": "tsx watch src/server/main.ts",
-        "dev:web": "vite --host 127.0.0.1",
-        "typecheck": "tsc --noEmit",
-        "build": "npm run typecheck && vite build && tsc -p tsconfig.server.json && npm run licenses:build",
-        "licenses:check": "tsx scripts/licenses.ts --check",
-        "licenses:build": "tsx scripts/licenses.ts --build",
-        "start": "node dist/server/server/main.js",
-        "test": "vitest run",
-        "test:watch": "vitest",
-        "test:media": "PASCAP_MEDIA_TESTS=1 vitest run tests/media",
-        "test:space": "PASCAP_SPACE_TESTS=1 vitest run tests/media/export-space.test.ts",
-        "test:browser": "npm run build && tsx scripts/fixtures.ts --browser && playwright test",
-        "check": "npm test && npm run build",
-        "prepare:samples": "tsx scripts/prepare-samples.ts",
-        "measure": "tsx scripts/measure-preview.ts"
-    },
-    "dependencies": {
-        "@fastify/static": "10.1.5",
-        "fastify": "5.12.5",
-        "react": "19.3.0",
-        "react-dom": "19.3.0",
-        "zod": "4.6.5"
-    },
-    "overrides": {
-        "concurrently": {
-            "shell-quote": "1.12.0"
-        }
-    },
-    "devDependencies": {
-        "@playwright/test": "1.63.0",
-        "@types/node": "22.18.10",
-        "@types/react": "19.3.0",
-        "@types/react-dom": "19.3.0",
-        "@vitejs/plugin-react": "6.1.1",
-        "concurrently": "10.0.5",
-        "tsx": "4.23.15",
-        "typescript": "7.0.2",
-        "vite": "8.3.2",
-        "vitest": "5.0.3"
+  "name": "pascap",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "description": "Local Linux video editing with per-clip grading, speed curves, music and native FFmpeg export",
+  "engines": {
+    "node": ">=22.12.0 <25"
+  },
+  "scripts": {
+    "dev": "concurrently -k -n service,web -c cyan,magenta \"npm:dev:server\" \"npm:dev:web\"",
+    "dev:server": "tsx watch src/server/main.ts",
+    "dev:web": "vite --host 127.0.0.1",
+    "typecheck": "tsc --noEmit",
+    "build": "npm run typecheck && vite build && tsc -p tsconfig.server.json && npm run licenses:build",
+    "licenses:check": "tsx scripts/licenses.ts --check",
+    "licenses:build": "tsx scripts/licenses.ts --build",
+    "start": "node dist/server/server/main.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:media": "PASCAP_MEDIA_TESTS=1 vitest run tests/media",
+    "test:space": "PASCAP_SPACE_TESTS=1 vitest run tests/media/export-space.test.ts",
+    "test:browser": "npm run build && tsx scripts/fixtures.ts --browser && playwright test",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "check": "npm run format:check && npm test && npm run build",
+    "prepare:samples": "tsx scripts/prepare-samples.ts",
+    "measure": "tsx scripts/measure-preview.ts"
+  },
+  "dependencies": {
+    "@fastify/static": "10.1.5",
+    "fastify": "5.12.5",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "zod": "4.6.5"
+  },
+  "overrides": {
+    "concurrently": {
+      "shell-quote": "1.12.0"
     }
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "@types/node": "22.18.10",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.1.1",
+    "concurrently": "10.0.5",
+    "prettier": "3.9.9",
+    "tsx": "4.23.15",
+    "typescript": "7.0.2",
+    "vite": "8.3.2",
+    "vitest": "5.0.3"
+  }
 }

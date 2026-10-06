@@ -1,16 +1,25 @@
 import { z } from 'zod';
-import { MAX_VIDEO_LAYERS, projectSchema, type MusicTrack, type ProjectDocument, type Transition, type VideoLayer } from './model.js';
+import {
+  MAX_VIDEO_LAYERS,
+  projectSchema,
+  type MusicTrack,
+  type ProjectDocument,
+  type Transition,
+  type VideoLayer,
+} from './model.js';
 import { blackFadeParts, calculateLayout, type PlacedClip, type TimelineLayout } from './timeline.js';
 import { PROJECT_FPS, sameRate } from './timing.js';
 
 export const exportProfileSchema = z.enum(['draft720', 'final4k']);
 export type ExportProfile = z.infer<typeof exportProfileSchema>;
 
-export const exportDocumentSchema = projectSchema.refine((document) => document.clips.length > 0, {
-  message: 'An export requires at least one video clip.',
-}).refine((document) => sameRate(document.frameRate, PROJECT_FPS), {
-  message: 'Exports require the project rate 30000/1001.',
-});
+export const exportDocumentSchema = projectSchema
+  .refine((document) => document.clips.length > 0, {
+    message: 'An export requires at least one video clip.',
+  })
+  .refine((document) => sameRate(document.frameRate, PROJECT_FPS), {
+    message: 'Exports require the project rate 30000/1001.',
+  });
 export const exportRequestSchema = z.object({ document: exportDocumentSchema, profile: exportProfileSchema }).strict();
 export type ExportRequest = z.infer<typeof exportRequestSchema>;
 
@@ -58,10 +67,14 @@ export const LAYERED_EXPORT_RESOURCES = Object.freeze({
 
 /** Static chunks support only an opaque, unanimated, zero-origin contiguous track. */
 export function needsLayeredExport(document: ProjectDocument): boolean {
-  if (document.layers.length !== 1 || document.layers.some((layer) => !layer.enabled || layer.opacity !== 1 || layer.keyframes.length > 0) ||
-    document.clips.some((clip) => clip.opacity !== 1)) return true;
+  if (
+    document.layers.length !== 1 ||
+    document.layers.some((layer) => !layer.enabled || layer.opacity !== 1 || layer.keyframes.length > 0) ||
+    document.clips.some((clip) => clip.opacity !== 1)
+  )
+    return true;
   const { clips } = calculateLayout(document);
-  return clips.some((placed, index) => index === 0 ? placed.start !== 0 : placed.start > clips[index - 1]!.end);
+  return clips.some((placed, index) => (index === 0 ? placed.start !== 0 : placed.start > clips[index - 1]!.end));
 }
 
 export interface ExportClipPlan {
@@ -74,16 +87,32 @@ export interface ExportClipPlan {
   fadeIn: number;
   fadeOut: number;
 }
-export type ExportChunk = {
-  kind: 'body'; clipIndex: number; sourceIn: number; sourceOut: number; duration: number; start: number;
-} | {
-  kind: 'dissolve'; leftIndex: number; rightIndex: number; leftIn: number; duration: number; start: number;
-};
+export type ExportChunk =
+  | {
+      kind: 'body';
+      clipIndex: number;
+      sourceIn: number;
+      sourceOut: number;
+      duration: number;
+      start: number;
+    }
+  | {
+      kind: 'dissolve';
+      leftIndex: number;
+      rightIndex: number;
+      leftIn: number;
+      duration: number;
+      start: number;
+    };
 /** Clip plans are in track order; chunk source offsets address RETIMED output frames.
  * Duration is the absolute track OUT (zero for an empty track), not the sum of
  * occupied frames. Layered export fills leading/internal/trailing gaps separately.
  */
-export interface ExportPlan { duration: number; clips: ExportClipPlan[]; chunks: ExportChunk[] }
+export interface ExportPlan {
+  duration: number;
+  clips: ExportClipPlan[];
+  chunks: ExportChunk[];
+}
 export interface LayeredExportLayer {
   id: string;
   enabled: boolean;
@@ -102,11 +131,19 @@ export interface LayeredExportPlan extends ExportPlan {
 function blackFadeLength(transition: Transition | undefined, side: 'in' | 'out'): number {
   return transition?.type === 'fade-through-black' ? blackFadeParts(transition.duration)[side] : 0;
 }
-function planClip(layer: VideoLayer, placed: PlacedClip, trackIndex: number, trackCount: number, index: number): ExportClipPlan {
+function planClip(
+  layer: VideoLayer,
+  placed: PlacedClip,
+  trackIndex: number,
+  trackCount: number,
+  index: number,
+): ExportClipPlan {
   const incoming = layer.transitions[trackIndex - 1];
   const outgoing = layer.transitions[trackIndex];
   return {
-    index, clipId: placed.clip.id, duration: placed.duration,
+    index,
+    clipId: placed.clip.id,
+    duration: placed.duration,
     bodyIn: incoming?.type === 'cross-dissolve' ? incoming.duration : 0,
     bodyOut: placed.duration - (outgoing?.type === 'cross-dissolve' ? outgoing.duration : 0),
     fadeIn: trackIndex === 0 ? layer.openingFade : blackFadeLength(incoming, 'in'),
@@ -133,16 +170,28 @@ function trackPlan(snapshot: ProjectDocument, layout: TimelineLayout, layer: Vid
     clips.push(clip);
     if (incoming?.type === 'cross-dissolve') {
       chunks.push({
-        kind: 'dissolve', leftIndex: indices.get(track[trackIndex - 1]!.clip.id)!, rightIndex: index,
-        leftIn: track[trackIndex - 1]!.duration - incoming.duration, duration: incoming.duration, start: placed.start
+        kind: 'dissolve',
+        leftIndex: indices.get(track[trackIndex - 1]!.clip.id)!,
+        rightIndex: index,
+        leftIn: track[trackIndex - 1]!.duration - incoming.duration,
+        duration: incoming.duration,
+        start: placed.start,
       });
     }
     if (clip.bodyOut > clip.bodyIn) {
-      chunks.push({ kind: 'body', clipIndex: index, sourceIn: clip.bodyIn, sourceOut: clip.bodyOut, duration: clip.bodyOut - clip.bodyIn, start: placed.start + clip.bodyIn });
+      chunks.push({
+        kind: 'body',
+        clipIndex: index,
+        sourceIn: clip.bodyIn,
+        sourceOut: clip.bodyOut,
+        duration: clip.bodyOut - clip.bodyIn,
+        start: placed.start + clip.bodyIn,
+      });
     }
   }
   for (const chunk of chunks) {
-    if (chunk.start < cursor || chunk.duration < 1) throw new Error('Track chunks overlap or have an invalid duration.');
+    if (chunk.start < cursor || chunk.duration < 1)
+      throw new Error('Track chunks overlap or have an invalid duration.');
     cursor = chunk.start + chunk.duration;
   }
   const duration = track.at(-1)?.end ?? 0;
@@ -153,7 +202,10 @@ function trackPlan(snapshot: ProjectDocument, layout: TimelineLayout, layer: Vid
 /** Static single-track optimization; unsupported placement/coverage always uses layered export. */
 export function planExport(document: ProjectDocument): ExportPlan {
   const snapshot = exportDocumentSchema.parse(document);
-  if (needsLayeredExport(snapshot)) throw new Error('Multiple/disabled tracks, opacity, shared row points, gaps or leading starts require the layered exporter, not a static chunk plan.');
+  if (needsLayeredExport(snapshot))
+    throw new Error(
+      'Multiple/disabled tracks, opacity, shared row points, gaps or leading starts require the layered exporter, not a static chunk plan.',
+    );
   const layout = calculateLayout(snapshot);
   validateDuration(layout);
   const plan = trackPlan(snapshot, layout, snapshot.layers[0]!);
@@ -162,7 +214,8 @@ export function planExport(document: ProjectDocument): ExportPlan {
     if (chunk.start !== cursor) throw new Error('Static export chunks must cover every project frame without gaps.');
     cursor += chunk.duration;
   }
-  if (cursor !== layout.duration) throw new Error('Static export chunks do not cover the authoritative timeline exactly.');
+  if (cursor !== layout.duration)
+    throw new Error('Static export chunks do not cover the authoritative timeline exactly.');
   return plan;
 }
 
@@ -173,20 +226,34 @@ export function planLayeredExport(document: ProjectDocument): LayeredExportPlan 
   validateDuration(layout);
   const indices = new Map(snapshot.clips.map((clip, index) => [clip.id, index]));
   const layers = snapshot.layers.map((layer) => ({
-    id: layer.id, enabled: layer.enabled, plan: trackPlan(snapshot, layout, layer),
-    clips: layout.clips.filter((placed) => placed.clip.layerId === layer.id).map((placed) => ({
-      index: indices.get(placed.clip.id)!, clipId: placed.clip.id, start: placed.start, end: placed.end, duration: placed.duration,
-    })),
+    id: layer.id,
+    enabled: layer.enabled,
+    plan: trackPlan(snapshot, layout, layer),
+    clips: layout.clips
+      .filter((placed) => placed.clip.layerId === layer.id)
+      .map((placed) => ({
+        index: indices.get(placed.clip.id)!,
+        clipId: placed.clip.id,
+        start: placed.start,
+        end: placed.end,
+        duration: placed.duration,
+      })),
   }));
   return {
-    kind: 'layered', duration: layout.duration, chunks: [], layers,
+    kind: 'layered',
+    duration: layout.duration,
+    chunks: [],
+    layers,
     clips: layers.flatMap((layer) => layer.plan.clips),
   };
 }
 
 export function exportAudioSample(frame: number): number {
-  const samples = Math.round(frame * PROJECT_FPS.denominator * EXPORT_RESOURCES.audioSampleRate / PROJECT_FPS.numerator);
-  if (!Number.isSafeInteger(samples) || samples < 0) throw new Error('Audio positions must fit non-negative integer sample counts.');
+  const samples = Math.round(
+    (frame * PROJECT_FPS.denominator * EXPORT_RESOURCES.audioSampleRate) / PROJECT_FPS.numerator,
+  );
+  if (!Number.isSafeInteger(samples) || samples < 0)
+    throw new Error('Audio positions must fit non-negative integer sample counts.');
   return samples;
 }
 export interface ExportMusicPlan {
@@ -205,9 +272,14 @@ export function planExportMusic(music: MusicTrack, videoFrames: number): ExportM
   const startSamples = exportAudioSample(music.start);
   const durationSamples = exportAudioSample(music.duration);
   return {
-    sourceInSamples: exportAudioSample(music.sourceIn), sourceOutSamples: exportAudioSample(music.sourceOut),
-    startSamples, durationSamples, activeSamples: Math.max(0, Math.min(durationSamples, videoSamples - startSamples)),
-    fadeInSamples: exportAudioSample(music.fadeIn), fadeOutSamples: exportAudioSample(music.fadeOut),
-    videoSamples, gain: 10 ** (music.gainDb / 20),
+    sourceInSamples: exportAudioSample(music.sourceIn),
+    sourceOutSamples: exportAudioSample(music.sourceOut),
+    startSamples,
+    durationSamples,
+    activeSamples: Math.max(0, Math.min(durationSamples, videoSamples - startSamples)),
+    fadeInSamples: exportAudioSample(music.fadeIn),
+    fadeOutSamples: exportAudioSample(music.fadeOut),
+    videoSamples,
+    gain: 10 ** (music.gainDb / 20),
   };
 }

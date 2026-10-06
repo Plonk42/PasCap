@@ -3,7 +3,11 @@ import type { Readable, Writable } from 'node:stream';
 import { EXPORT_RESOURCES } from '../shared/export.js';
 import { ServiceError } from './errors.js';
 
-interface RawProcessOptions { ffmpeg: string; cwd: string; signal: AbortSignal }
+interface RawProcessOptions {
+  ffmpeg: string;
+  cwd: string;
+  signal: AbortSignal;
+}
 type InitialRead = { ok: true; result: IteratorResult<Buffer> } | { ok: false; cause: unknown };
 export interface RawPassReport {
   peakReaders: number;
@@ -21,7 +25,11 @@ export class RawFrameReader {
   #chunk: Buffer | null = null;
   #offset = 0;
   largestChunk = 0;
-  private constructor(stream: Readable, private readonly label: string, private readonly check: () => void) {
+  private constructor(
+    stream: Readable,
+    private readonly label: string,
+    private readonly check: () => void,
+  ) {
     this.#iterator = stream[Symbol.asyncIterator]() as AsyncIterator<Buffer>;
   }
   static create(stream: Readable, label: string, check: () => void): RawFrameReader {
@@ -52,7 +60,11 @@ export class RawFrameReader {
         const next = await this.nextChunk();
         this.check();
         if (next.done) {
-          if (filled) throw new ServiceError(`${this.label} emitted a truncated raw frame (${filled}/${frame.length} bytes).`, 422);
+          if (filled)
+            throw new ServiceError(
+              `${this.label} emitted a truncated raw frame (${filled}/${frame.length} bytes).`,
+              422,
+            );
           return false;
         }
         this.#chunk = next.value;
@@ -68,22 +80,29 @@ export class RawFrameReader {
     return true;
   }
   async requireFrame(frame: Buffer): Promise<void> {
-    if (!await this.readInto(frame)) throw new ServiceError(`${this.label} ended before its exact selected frame count / SOURCE OUT.`, 422);
+    if (!(await this.readInto(frame)))
+      throw new ServiceError(`${this.label} ended before its exact selected frame count / SOURCE OUT.`, 422);
   }
   async requireEnd(frame: Buffer): Promise<void> {
-    if (await this.readInto(frame)) throw new ServiceError(`${this.label} emitted frames outside its selected range.`, 422);
+    if (await this.readInto(frame))
+      throw new ServiceError(`${this.label} emitted frames outside its selected range.`, 422);
   }
 }
 
 /** The callback honours backpressure even when write() returns true. */
 export function writeRawFrame(stream: Writable, frame: Buffer): Promise<void> {
   return new Promise((resolve, reject) => {
-    stream.write(frame, (error) => { if (error) reject(error); else resolve(); });
+    stream.write(frame, (error) => {
+      if (error) reject(error);
+      else resolve();
+    });
   });
 }
 
 function isPipeError(error: Error | null): boolean {
-  return ['EPIPE', 'ERR_STREAM_DESTROYED', 'ERR_STREAM_PREMATURE_CLOSE'].includes((error as NodeJS.ErrnoException | null)?.code ?? '');
+  return ['EPIPE', 'ERR_STREAM_DESTROYED', 'ERR_STREAM_PREMATURE_CLOSE'].includes(
+    (error as NodeJS.ErrnoException | null)?.code ?? '',
+  );
 }
 
 /** One pass owns at most two readers and one encoder; every child is reaped. */
@@ -91,7 +110,14 @@ export class RawVideoPass {
   readonly #active = new Map<ChildProcess, 'reader' | 'encoder'>();
   readonly #exits: Promise<void>[] = [];
   readonly #readers: RawFrameReader[] = [];
-  readonly #report: RawPassReport = { peakReaders: 0, peakEncoders: 0, peakChildren: 0, readerProcesses: 0, encoderProcesses: 0, largestReadChunkBytes: 0 };
+  readonly #report: RawPassReport = {
+    peakReaders: 0,
+    peakEncoders: 0,
+    peakChildren: 0,
+    readerProcesses: 0,
+    encoderProcesses: 0,
+    largestReadChunkBytes: 0,
+  };
   #failure: Error | null = null;
   #stopping = false;
   #timer: ReturnType<typeof setTimeout> | undefined;
@@ -107,10 +133,12 @@ export class RawVideoPass {
   private child(args: readonly string[], label: string, role: 'reader' | 'encoder'): ChildProcess {
     this.check();
     const count = [...this.#active.values()].filter((value) => value === role).length;
-    if (count >= (role === 'reader' ? 2 : 1)) throw new ServiceError('Raw video pass exceeded its two-reader / one-encoder bound.', 500);
+    if (count >= (role === 'reader' ? 2 : 1))
+      throw new ServiceError('Raw video pass exceeded its two-reader / one-encoder bound.', 500);
     const child = spawn(this.options.ffmpeg, [...args], {
-      cwd: this.options.cwd, shell: false,
-      stdio: role === 'reader' ? ['ignore', 'pipe', 'pipe'] : ['pipe', 'ignore', 'pipe']
+      cwd: this.options.cwd,
+      shell: false,
+      stdio: role === 'reader' ? ['ignore', 'pipe', 'pipe'] : ['pipe', 'ignore', 'pipe'],
     });
     this.#active.set(child, role);
     const readers = [...this.#active.values()].filter((value) => value === 'reader').length;
@@ -120,18 +148,24 @@ export class RawVideoPass {
     if (role === 'reader') this.#report.readerProcesses++;
     else this.#report.encoderProcesses++;
     let stderr = '';
-    child.stderr!.on('data', (chunk: Buffer) => { stderr = (stderr + chunk.toString('utf8')).slice(-EXPORT_RESOURCES.stderrBytesPerChild); });
+    child.stderr!.on('data', (chunk: Buffer) => {
+      stderr = (stderr + chunk.toString('utf8')).slice(-EXPORT_RESOURCES.stderrBytesPerChild);
+    });
     child.stderr!.on('error', (error: Error) => this.fail(error));
     child.once('error', (error) => this.fail(new ServiceError(`Cannot start ${label}: ${error.message}`, 503)));
-    this.#exits.push(new Promise((resolve) => child.once('close', (code) => {
-      this.#active.delete(child);
-      if (code !== 0) {
-        const error = new ServiceError(`${label} exited ${code}: ${stderr.trim()}`, 422);
-        if (!this.#stopping) this.fail(error);
-        else if (code !== null && stderr.trim() && isPipeError(this.#failure)) this.#failure = error;
-      }
-      resolve();
-    })));
+    this.#exits.push(
+      new Promise((resolve) =>
+        child.once('close', (code) => {
+          this.#active.delete(child);
+          if (code !== 0) {
+            const error = new ServiceError(`${label} exited ${code}: ${stderr.trim()}`, 422);
+            if (!this.#stopping) this.fail(error);
+            else if (code !== null && stderr.trim() && isPipeError(this.#failure)) this.#failure = error;
+          }
+          resolve();
+        }),
+      ),
+    );
     return child;
   }
   reader(args: readonly string[], label: string): RawFrameReader {
@@ -155,13 +189,18 @@ export class RawVideoPass {
       child.stdout?.destroy();
       child.stdin?.destroy();
     }
-    this.#timer = setTimeout(() => { for (const child of this.#active.keys()) child.kill('SIGKILL'); }, EXPORT_RESOURCES.terminateGraceMs);
+    this.#timer = setTimeout(() => {
+      for (const child of this.#active.keys()) child.kill('SIGKILL');
+    }, EXPORT_RESOURCES.terminateGraceMs);
     this.#timer.unref();
   }
   async finish(): Promise<RawPassReport> {
     await Promise.all(this.#exits);
     this.check();
-    return { ...this.#report, largestReadChunkBytes: Math.max(0, ...this.#readers.map((reader) => reader.largestChunk)) };
+    return {
+      ...this.#report,
+      largestReadChunkBytes: Math.max(0, ...this.#readers.map((reader) => reader.largestChunk)),
+    };
   }
   dispose(): void {
     this.options.signal.removeEventListener('abort', this.#cancel);
@@ -169,7 +208,10 @@ export class RawVideoPass {
   }
 }
 
-export async function runRawVideoPass(options: RawProcessOptions, pump: (pass: RawVideoPass) => Promise<void>): Promise<RawPassReport> {
+export async function runRawVideoPass(
+  options: RawProcessOptions,
+  pump: (pass: RawVideoPass) => Promise<void>,
+): Promise<RawPassReport> {
   const pass = new RawVideoPass(options);
   try {
     pass.check();
@@ -179,5 +221,7 @@ export async function runRawVideoPass(options: RawProcessOptions, pump: (pass: R
     pass.fail(error instanceof Error ? error : new Error(String(error)));
     await pass.finish(); // Always reap children; prefer cancellation / capped native diagnostics.
     throw error;
-  } finally { pass.dispose(); }
+  } finally {
+    pass.dispose();
+  }
 }

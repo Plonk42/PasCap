@@ -41,7 +41,7 @@ jobs:
     timeout-minutes: 30
     env:
       PASCAP_DATA_DIR: .pascap/ci
-      PASCAP_MEDIA_ROOTS: "[]"
+      PASCAP_MEDIA_ROOTS: '[]'
       PASCAP_FFMPEG: ${{ github.workspace }}/.ci/ffmpeg/bin/ffmpeg
       PASCAP_FFPROBE: ${{ github.workspace }}/.ci/ffmpeg/bin/ffprobe
     steps:
@@ -65,7 +65,7 @@ jobs:
         shard: [1, 2, 3, 4]
     env:
       PASCAP_DATA_DIR: .pascap/ci
-      PASCAP_MEDIA_ROOTS: "[]"
+      PASCAP_MEDIA_ROOTS: '[]'
       PASCAP_FFMPEG: ${{ github.workspace }}/.ci/ffmpeg/bin/ffmpeg
       PASCAP_FFPROBE: ${{ github.workspace }}/.ci/ffmpeg/bin/ffprobe
     steps:
@@ -100,7 +100,7 @@ jobs:
     timeout-minutes: 30
     env:
       PASCAP_DATA_DIR: .pascap/ci
-      PASCAP_MEDIA_ROOTS: "[]"
+      PASCAP_MEDIA_ROOTS: '[]'
       PASCAP_FFMPEG: ${{ github.workspace }}/.ci/ffmpeg/bin/ffmpeg
       PASCAP_FFPROBE: ${{ github.workspace }}/.ci/ffmpeg/bin/ffprobe
     steps:
@@ -120,7 +120,7 @@ jobs:
         run: npx tsx scripts/fixtures.ts --browser
       - name: Firefox music and playback regressions
         env:
-          LIBGL_ALWAYS_SOFTWARE: "1"
+          LIBGL_ALWAYS_SOFTWARE: '1'
           GALLIUM_DRIVER: llvmpipe
           __GLX_VENDOR_LIBRARY_NAME: mesa
           __EGL_VENDOR_LIBRARY_FILENAMES: /usr/share/glvnd/egl_vendor.d/50_mesa.json

@@ -11,8 +11,15 @@ interface ProcessOptions {
 /** No shell, bounded output, cancellable child process. All arguments remain separate. */
 export function runProcess(binary: string, args: string[], options: ProcessOptions = {}): Promise<Buffer> {
   return new Promise((resolve, reject) => {
-    if (options.signal?.aborted) { reject(new ServiceError('Job cancelled.', 499)); return; }
-    const child = spawn(binary, args, { shell: false, stdio: ['ignore', 'pipe', 'pipe'], ...(options.cwd ? { cwd: options.cwd } : {}) });
+    if (options.signal?.aborted) {
+      reject(new ServiceError('Job cancelled.', 499));
+      return;
+    }
+    const child = spawn(binary, args, {
+      shell: false,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      ...(options.cwd ? { cwd: options.cwd } : {}),
+    });
     const chunks: Buffer[] = [];
     let size = 0;
     let stderr = '';
@@ -27,8 +34,15 @@ export function runProcess(binary: string, args: string[], options: ProcessOptio
     options.signal?.addEventListener('abort', cancel, { once: true });
     child.stdout.on('data', (chunk: Buffer) => {
       size += chunk.length;
-      if (size > (options.maxBytes ?? 32 * 1024 * 1024)) { overflow = true; cancel(); return; }
-      if (!options.onProgress) { chunks.push(chunk); return; }
+      if (size > (options.maxBytes ?? 32 * 1024 * 1024)) {
+        overflow = true;
+        cancel();
+        return;
+      }
+      if (!options.onProgress) {
+        chunks.push(chunk);
+        return;
+      }
       pending += chunk.toString('utf8');
       let newline = pending.indexOf('\n');
       while (newline >= 0) {
@@ -39,12 +53,17 @@ export function runProcess(binary: string, args: string[], options: ProcessOptio
         newline = pending.indexOf('\n');
       }
     });
-    child.stderr.on('data', (chunk: Buffer) => { stderr = (stderr + chunk.toString('utf8')).slice(-32_768); });
+    child.stderr.on('data', (chunk: Buffer) => {
+      stderr = (stderr + chunk.toString('utf8')).slice(-32_768);
+    });
     const cleanUp = (): void => {
       if (killTimer) clearTimeout(killTimer);
       options.signal?.removeEventListener('abort', cancel);
     };
-    child.once('error', (error) => { cleanUp(); reject(new ServiceError(`Cannot start ${binary}: ${error.message}`, 503)); });
+    child.once('error', (error) => {
+      cleanUp();
+      reject(new ServiceError(`Cannot start ${binary}: ${error.message}`, 503));
+    });
     child.once('close', (code) => {
       cleanUp();
       if (options.signal?.aborted) reject(new ServiceError('Job cancelled.', 499));

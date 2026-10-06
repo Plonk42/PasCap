@@ -1,7 +1,20 @@
 import { musicGainAt } from './audio.js';
 import type { MusicTrack } from './model.js';
-import { MUSIC_BYTES_PER_SAMPLE, MUSIC_CHANNELS, MUSIC_CHUNK_SAMPLES, MUSIC_SAMPLES_PER_FRAME } from './music-format.js';
-export { MUSIC_BYTES_PER_SAMPLE, MUSIC_CHANNELS, MUSIC_CHUNK_SAMPLES, MUSIC_QUEUE_CHUNKS, MUSIC_SAMPLE_RATE, MUSIC_SAMPLES_PER_FRAME, type MusicChunk } from './music-format.js';
+import {
+  MUSIC_BYTES_PER_SAMPLE,
+  MUSIC_CHANNELS,
+  MUSIC_CHUNK_SAMPLES,
+  MUSIC_SAMPLES_PER_FRAME,
+} from './music-format.js';
+export {
+  MUSIC_BYTES_PER_SAMPLE,
+  MUSIC_CHANNELS,
+  MUSIC_CHUNK_SAMPLES,
+  MUSIC_QUEUE_CHUNKS,
+  MUSIC_SAMPLE_RATE,
+  MUSIC_SAMPLES_PER_FRAME,
+  type MusicChunk,
+} from './music-format.js';
 
 export interface MusicRead {
   source: number | null;
@@ -23,8 +36,16 @@ export function musicReadAt(track: MusicTrack, frame: number, maximum: number): 
 }
 
 /** Convert exactly one bounded PCM16 range, applying the project's amplitude envelope. */
-export function decodeMusicRange(bytes: ArrayBuffer | DataView<ArrayBuffer>, track: MusicTrack, frame: number): Float32Array<ArrayBuffer> {
-  if (bytes.byteLength === 0 || bytes.byteLength > MUSIC_CHUNK_SAMPLES * MUSIC_BYTES_PER_SAMPLE || bytes.byteLength % MUSIC_BYTES_PER_SAMPLE) {
+export function decodeMusicRange(
+  bytes: ArrayBuffer | DataView<ArrayBuffer>,
+  track: MusicTrack,
+  frame: number,
+): Float32Array<ArrayBuffer> {
+  if (
+    bytes.byteLength === 0 ||
+    bytes.byteLength > MUSIC_CHUNK_SAMPLES * MUSIC_BYTES_PER_SAMPLE ||
+    bytes.byteLength % MUSIC_BYTES_PER_SAMPLE
+  ) {
     throw new Error('Music range is not a complete bounded stereo PCM16 block.');
   }
   const input = bytes instanceof DataView ? bytes : new DataView(bytes);

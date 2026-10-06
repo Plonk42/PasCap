@@ -10,20 +10,37 @@ import { assertNoSymlinks } from './files.js';
 import type { JobQueue } from './jobs.js';
 
 const receiptSchema = z.looseObject({
-  kind: z.literal('export'), schemaVersion: z.literal(1), jobId: z.uuid(),
-  createdAt: z.iso.datetime(), snapshot: projectSchema, profile: exportProfileSchema,
-  verification: z.looseObject({ fullDecode: z.literal(true), faststart: z.literal(true), frameCount: z.number().int().positive() }),
+  kind: z.literal('export'),
+  schemaVersion: z.literal(1),
+  jobId: z.uuid(),
+  createdAt: z.iso.datetime(),
+  snapshot: projectSchema,
+  profile: exportProfileSchema,
+  verification: z.looseObject({
+    fullDecode: z.literal(true),
+    faststart: z.literal(true),
+    frameCount: z.number().int().positive(),
+  }),
 });
 
-interface ArchivedExport { receipt: z.infer<typeof receiptSchema>; finishedAt: string }
+interface ArchivedExport {
+  receipt: z.infer<typeof receiptSchema>;
+  finishedAt: string;
+}
 
 function parseReceipt(raw: unknown): z.infer<typeof receiptSchema> | null {
   if (typeof raw !== 'object' || raw === null || !('kind' in raw) || raw.kind !== 'export') return null;
   const snapshot = 'snapshot' in raw ? raw.snapshot : undefined;
-  const rawVersion = typeof snapshot === 'object' && snapshot !== null && 'schemaVersion' in snapshot ? snapshot.schemaVersion : undefined;
+  const rawVersion =
+    typeof snapshot === 'object' && snapshot !== null && 'schemaVersion' in snapshot
+      ? snapshot.schemaVersion
+      : undefined;
   if (rawVersion !== 6) {
-    const version = typeof rawVersion === 'string' || typeof rawVersion === 'number' ? String(rawVersion) : 'missing or invalid';
-    throw new Error(`Unsupported export snapshot schema version ${version}; this build requires version 6. The existing receipt and successful output were not changed.`);
+    const version =
+      typeof rawVersion === 'string' || typeof rawVersion === 'number' ? String(rawVersion) : 'missing or invalid';
+    throw new Error(
+      `Unsupported export snapshot schema version ${version}; this build requires version 6. The existing receipt and successful output were not changed.`,
+    );
   }
   return receiptSchema.parse(raw);
 }
@@ -45,8 +62,10 @@ async function readCompletedExport(folder: string, id: string): Promise<Archived
 export async function restoreExports(config: ServiceConfig, jobs: JobQueue): Promise<string[]> {
   const directory = path.join(config.dataDir, 'renders');
   let names;
-  try { await assertNoSymlinks(directory); names = await readdir(directory, { withFileTypes: true }); }
-  catch (error) {
+  try {
+    await assertNoSymlinks(directory);
+    names = await readdir(directory, { withFileTypes: true });
+  } catch (error) {
     if (isNotFound(error)) return [];
     throw error;
   }
@@ -63,10 +82,18 @@ export async function restoreExports(config: ServiceConfig, jobs: JobQueue): Pro
     }
   });
   restored.sort((a, b) => Date.parse(a.receipt.createdAt) - Date.parse(b.receipt.createdAt));
-  for (const { receipt, finishedAt } of restored) jobs.restoreCompleted({
-    id: receipt.jobId, kind: 'export', label: `${receipt.snapshot.title} · ${receipt.profile === 'draft720' ? '720p' : '4K'}`,
-    state: 'completed', progress: 1, message: 'Verified export restored from receipt', createdAt: receipt.createdAt, finishedAt,
-    outputUrl: `/api/jobs/${receipt.jobId}/export`, receiptUrl: `/api/jobs/${receipt.jobId}/receipt`,
-  });
+  for (const { receipt, finishedAt } of restored)
+    jobs.restoreCompleted({
+      id: receipt.jobId,
+      kind: 'export',
+      label: `${receipt.snapshot.title} · ${receipt.profile === 'draft720' ? '720p' : '4K'}`,
+      state: 'completed',
+      progress: 1,
+      message: 'Verified export restored from receipt',
+      createdAt: receipt.createdAt,
+      finishedAt,
+      outputUrl: `/api/jobs/${receipt.jobId}/export`,
+      receiptUrl: `/api/jobs/${receipt.jobId}/receipt`,
+    });
   return warnings;
 }
