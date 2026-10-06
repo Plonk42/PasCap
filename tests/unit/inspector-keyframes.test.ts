@@ -44,7 +44,7 @@ describe('dedicated Inspector keyframe controls', () => {
     expect(markup).toContain(`step="${setting.step}"`);
     expect(markup).toContain(`aria-label="${name}"`);
     expect(markup).toContain('type="number"');
-    if (setting.key !== 'speed') expect(markup).toContain('type="range"');
+    if (setting.key !== 'speed') { expect(markup).toMatch(/class="setting-exact-value"><input[^>]*type="range"[^>]*><span class="number-field"/); expect(markup).not.toContain('<output'); }
   });
 
   it('renders only existing participants, including off-duration points, without adding diamonds or clip-speed modes', () => {

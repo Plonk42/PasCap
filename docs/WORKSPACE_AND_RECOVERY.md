@@ -224,9 +224,9 @@ endpoint holds and static bases only for entirely unanimated channels. Row
 input identity/focus and drafts survive time reordering and Undo;
 no persisted point IDs are added.
 
-Stored colour/opacity participants reuse the main sliders, units and individual
-colour resets, with precise numeric fields alongside them. Speed reuses **Layer
-rate ×** and Reset to 1×, not clip mode/preset/source-curve controls. Each accepted
+Stored colour/opacity participants reuse the main sliders and individual colour
+resets, with one precise numeric field to the right of each slider. Speed reuses
+**Layer rate ×** and Reset to 1×, not clip mode/preset/source-curve controls. Each accepted
 value or reset targets only that existing stored participant in one Undo step;
 point time, shared easing, other participants and static bases stay unchanged.
 There is no implicit joining. Numeric drafts retain entered precision and apply
