@@ -101,7 +101,7 @@ __GLX_VENDOR_LIBRARY_NAME=mesa \
 __EGL_VENDOR_LIBRARY_FILENAMES=/usr/share/glvnd/egl_vendor.d/50_mesa.json \
 bash scripts/ci/firefox.sh npx playwright test --config=playwright.firefox.config.ts \
   tests/browser/music-clock.spec.ts tests/browser/playback-recovery.spec.ts \
-  --grep 'streaming music clock|streamed PCM|with music normal speed|with music and a callback-gated cancellation|native-event-ordered video catch-up|Playing publication rechecks'
+  --grep 'streaming music clock|streamed PCM|with music normal speed|held sources|withheld decoded callback|with music and a callback-gated cancellation|native-event-ordered video catch-up|Playing publication rechecks'
 ```
 
 Firefox remains headless, but its native graphics probe needs a working display:
@@ -131,7 +131,7 @@ The subsequent [audio prerequisite](../scripts/ci/firefox-audio.ts) has the same
 15-second browser-launch and 10-second probe deadlines as the graphics check.
 It requires a real 48 kHz context, stereo samples passed between real worklets and
 an output timestamp reaching those rendered samples. Missing resume/render/output
-readiness remains an actionable hard failure before the seven media tests. Neither
+readiness remains an actionable hard failure before the ten media tests. Neither
 prerequisite changes the editor's ten-second music-start deadline or test bounds.
 
 The [music-clock regression](../tests/browser/music-clock.spec.ts) requires one
@@ -139,7 +139,8 @@ uninterrupted music start from zero or a nonzero seek, bounded range reads and
 actual rendered stereo PCM amplitude/placement silence. Its bounded audio-thread
 observer checks every sample in the required frame windows, not UI-thread snapshots
 that can miss complete frames under load. The selected recovery tests
-retain the independent one-frame audio/video bound, pause/seek/restart, genuine
+retain the independent one-frame audio/video bound, 0.1× held-source video-only
+and music recovery, an explicit withheld-callback deadline failure, pause/seek/restart, genuine
 callback-gated cancellation and native-event-ordered video catch-up without
 restarting music. The catch-up case starts from source frame 4, holds and pauses
 on a genuine advancing playback callback (never a pending seek), then releases the callback
@@ -149,7 +150,7 @@ decoder's responsibility. Deterministic engine tests separately control between-
 display-tick delivery, delayed seek/play/cancellation/deadlines and replay observed /
 requested / delivered schedules **4/7/14, 9/12/11 and 9/12/12**, without guessing
 images or weakening bounds. The post-render clock/surface check also covers bounded
-synchronous draw work while real output audio advances. These seven synthetic,
+synchronous draw work while real output audio advances. These ten synthetic,
 memory-only browser checks run in CI;
 they do not qualify the entire Firefox editor or intended hardware. Attachments
 contain bounded consumed-sample/output-timestamp evidence and at most 500
@@ -168,9 +169,16 @@ Current exact/one-frame source readiness is rechecked after seeking and starting
 video. Catch-up has one five-second deadline, not a fresh deadline per target;
 failure, pause or cancellation stops owned work. Actual music sync failures and
 clip-set boundaries retain full alignment and its explicit audio restart.
-The complete optional Firefox recovery suite still exposes a separate 0.1× video
-seek/rVFC readiness failure, also reproducible without music. Do not hide it with
-a currentTime guess, retries, skipped assertions, privacy changes or a larger bound.
+A paused decoder seek completes only on the requested frame's real video-frame
+callback. Gecko numbers paused redraws from a container counter but played frames
+with decoder IDs, and skips a callback whose ID equals the last presented frame:
+after playback, a paused redraw can collide and never be reported. A decoder that
+has played therefore waits two rendering updates after the native `seeked` event
+(video-frame callbacks run before animation frames); if the requested frame is
+still unreported, it seeks the same target once more, presenting a fresh ID with
+exact metadata. This stays within the five-second required-frame deadline, so a
+genuinely withheld callback still fails explicitly. There is no currentTime
+identity, retry loop, skipped assertion, privacy change or larger bound.
 
 ### Incremental feedback
 

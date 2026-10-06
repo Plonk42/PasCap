@@ -11,6 +11,7 @@ export class VideoDecoderSlot {
   #disposed = false;
   readonly #listeners = new Set<() => void>();
   #presented = 0;
+  #played = false;
   decodedFrame = -1;
   observedFrames = 0;
   lateCallbacks = 0;
@@ -44,7 +45,7 @@ export class VideoDecoderSlot {
     if (signal.aborted) throw abortError();
     this.#rate = rate;
     if (this.#url === url && !this.video.error && this.ready) return;
-    this.pause(); this.#url = url; this.decodedFrame = -1; this.#presented = 0;
+    this.pause(); this.#url = url; this.decodedFrame = -1; this.#presented = 0; this.#played = false;
     this.video.cancelVideoFrameCallback(this.#callbackId);
     this.video.src = url; this.video.load();
     this.#observe();
@@ -56,31 +57,53 @@ export class VideoDecoderSlot {
     if (signal.aborted) throw abortError();
     this.pause();
     if (this.decodedFrame === frame && this.ready) return;
-    const ready = this.#wait(() => this.ready && this.decodedFrame === frame, signal);
     // Seek inside the requested frame rather than onto a floating-point boundary.
-    this.video.currentTime = framesToSeconds(frame + 0.25, this.#rate);
+    const seek = (): void => { this.video.currentTime = framesToSeconds(frame + 0.25, this.#rate); };
+    // Gecko numbers paused redraws apart from played frames. If the IDs collide,
+    // rVFC skips the new image as unchanged; one more seek presents a fresh ID.
+    const ready = this.#wait(() => this.ready && this.decodedFrame === frame, signal, this.#played ? seek : undefined);
+    seek();
     await ready;
+    this.#played = false;
   }
-  #wait(predicate: () => boolean, signal: AbortSignal): Promise<void> {
+  #wait(predicate: () => boolean, signal: AbortSignal, reseek?: () => void): Promise<void> {
     if (signal.aborted) return Promise.reject(abortError());
     if (predicate()) return Promise.resolve();
     return new Promise((resolve, reject) => {
       const events = ['loadedmetadata', 'loadeddata', 'seeked', 'canplay', 'error'];
+      let animationFrame = 0;
       const cleanup = (): void => {
-        clearTimeout(timer); this.#listeners.delete(check); signal.removeEventListener('abort', aborted);
+        clearTimeout(timer); cancelAnimationFrame(animationFrame);
+        this.#listeners.delete(check); signal.removeEventListener('abort', aborted);
         for (const event of events) this.video.removeEventListener(event, check);
+        this.video.removeEventListener('seeked', seeked);
       };
       const check = (): void => {
         if (this.video.error) { cleanup(); reject(new Error(`Decoder ${this.index + 1}: ${this.video.error.message || 'media decoding failed'}`)); }
         else if (predicate()) { cleanup(); resolve(); }
       };
+      // Each rendering update runs video frame callbacks before animation frames:
+      // two updates after 'seeked' without the callback mean it was skipped.
+      const missed = (): void => {
+        if (this.video.seeking || this.video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA || predicate()) return;
+        this.video.removeEventListener('seeked', seeked); reseek?.();
+      };
+      const seeked = (): void => {
+        cancelAnimationFrame(animationFrame);
+        animationFrame = requestAnimationFrame(() => { animationFrame = requestAnimationFrame(missed); });
+      };
       const aborted = (): void => { cleanup(); reject(abortError()); };
       const timer = setTimeout(() => { cleanup(); reject(new Error(`Decoder ${this.index + 1} did not deliver the required frame within 5 seconds.`)); }, 5_000);
       for (const event of events) this.video.addEventListener(event, check);
+      if (reseek) this.video.addEventListener('seeked', seeked);
       this.#listeners.add(check); signal.addEventListener('abort', aborted, { once: true }); check();
     });
   }
-  async play(): Promise<void> { if (!this.#disposed) await this.video.play(); }
+  async play(): Promise<void> {
+    if (this.#disposed) return;
+    this.#played = true;
+    await this.video.play();
+  }
   setRate(rate: number): void { this.video.playbackRate = Math.max(0.1, Math.min(8, rate)); }
   pause(): void { this.video.pause(); }
   dispose(): void {
