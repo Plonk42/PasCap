@@ -357,11 +357,16 @@ and [grading equations](COLOUR_AND_TIMING.md#colour).
 
 ## Contributor safety
 
-- **For code/mixed work, use short-lived branches in one clean, idle checkout by default.** Worktrees
-  are exceptions for unrelated unfinished work, an active service/test, an unchanged
-  reproduction baseline or explicitly concurrent work; record their isolation
-  reason and retirement condition. A new chat, correction or remote CI wait alone
-  needs no extra checkout. Once local jobs settle and edits are saved/committed,
+- **For code/mixed work, use short-lived branches in the current workarea by default.**
+  Requesting work means expecting changes here; open tabs, running editors,
+  development servers and other processes are not isolation reasons. Worktrees
+  are exceptions only for substantive unfinished work or a conflicting active
+  session; record the actual conflict and retirement condition. Incidental untracked
+  prototypes, prose documentation updates and formatting are not automatic
+  dirty-tree blockers: inspect and preserve them unstaged, exclude them from delivery,
+  and continue here when switching can retain them safely. Never overwrite or
+  discard unrelated contents. A new chat, correction or remote CI wait alone
+  needs no extra checkout. Once owned validation settles and task edits are committed,
   return to fresh, verified local `main` for the next task's branch. A published PR
   can keep its branch while CI runs without keeping the directory on that branch;
   preserve its accepted head and wait for dependencies to land. Verify ignored
@@ -376,10 +381,11 @@ and [grading equations](COLOUR_AND_TIMING.md#colour).
   removal, bulk-delete, follow original-media references or confuse remote branch
   deletion/administrative pruning with removing an existing local worktree.
 - **Start each new task from current remote `main`, before edits or validation.**
-  Fetch and verify its SHA, fast-forward a clean/idle local `main` only, then create
+  Fetch and verify its SHA, fast-forward local `main` only while safely preserving
+  incidental contents and avoiding substantive work/session conflicts, then create
   a new short-lived branch for code/mixed work; pure workflow/instruction text stays
   on verified `main` and uses its direct-main gate. If switching would disturb
-  unfinished edits or active jobs, preserve them and use an isolated checkout
+  substantive unfinished work or another active session, preserve them and use an isolated checkout
   directly from freshly fetched `origin/main`, recording the exception. Never reuse
   a previous task/unmerged PR branch or reset/stash unrelated work. Record the starting
   SHA; stop if freshness or safe isolation cannot be verified. Same-task continuation
