@@ -39,13 +39,13 @@ This is not static hosting, LAN/SaaS deployment or a completed container recipe.
 
 ## Configuration and storage
 
-| Variable | Meaning |
-| --- | --- |
-| `PASCAP_DATA_DIR` | Generated-data directory; defaults to the ignored `.pascap/` |
-| `PASCAP_MEDIA_ROOTS` | JSON array of up to 32 unique absolute roots shared by footage/music browsing; defaults to the service user's Videos folder; `[]` disables both browsers, not deliberate manual path imports |
-| `PASCAP_PORT` | Unprivileged loopback service port, default 4318 |
-| `PASCAP_FFMPEG` / `PASCAP_FFPROBE` | Native executable paths, otherwise resolved from PATH |
-| `PASCAP_MEASURE_URL` | Editor URL/project used by the optional measurement helper |
+| Variable                           | Meaning                                                                                                                                                                                      |
+| ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `PASCAP_DATA_DIR`                  | Generated-data directory; defaults to the ignored `.pascap/`                                                                                                                                 |
+| `PASCAP_MEDIA_ROOTS`               | JSON array of up to 32 unique absolute roots shared by footage/music browsing; defaults to the service user's Videos folder; `[]` disables both browsers, not deliberate manual path imports |
+| `PASCAP_PORT`                      | Unprivileged loopback service port, default 4318                                                                                                                                             |
+| `PASCAP_FFMPEG` / `PASCAP_FFPROBE` | Native executable paths, otherwise resolved from PATH                                                                                                                                        |
+| `PASCAP_MEASURE_URL`               | Editor URL/project used by the optional measurement helper                                                                                                                                   |
 
 For example, start with an explicit approved root (literal `~` is not expanded):
 
@@ -89,16 +89,61 @@ npm run test:browser
 Chrome remains the full browser validation target. The
 [Firefox configuration](../playwright.firefox.config.ts) runs the same isolated
 synthetic service/fixtures with Playwright's Firefox, not an existing desktop
-Firefox profile. Install it with `npx playwright install firefox`; after the
-ordinary build and clean browser fixture setup, run
-`npx playwright test --config=playwright.firefox.config.ts tests/browser/music-clock.spec.ts tests/browser/playback-recovery.spec.ts --grep 'streaming music clock|streamed PCM|with music normal speed|with music and a callback-gated cancellation'`.
+Firefox profile. Install it with `npx playwright install --with-deps firefox`.
+GPU-less Linux also needs Xvfb/xauth, Mesa EGL/GLX/DRI and a real audio output service:
+packages `xvfb`, `xauth`, `libgl1-mesa-dri`, `libegl-mesa0`, `libglx-mesa0`,
+`pulseaudio` and `pulseaudio-utils`. After the ordinary build and clean browser
+fixture setup, reproduce the isolated CI graphics/audio environment with:
+
+```sh
+LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe \
+__GLX_VENDOR_LIBRARY_NAME=mesa \
+__EGL_VENDOR_LIBRARY_FILENAMES=/usr/share/glvnd/egl_vendor.d/50_mesa.json \
+bash scripts/ci/firefox.sh npx playwright test --config=playwright.firefox.config.ts \
+  tests/browser/music-clock.spec.ts tests/browser/playback-recovery.spec.ts \
+  --grep 'streaming music clock|streamed PCM|with music normal speed|with music and a callback-gated cancellation'
+```
+
+Firefox remains headless, but its native graphics probe needs a working display:
+without one, Firefox can reject WebGL2 with `AllowWebgl2:false` before compositor
+startup. Xvfb supplies that display and Mesa llvmpipe supplies real software GL;
+no WebGL force-enable/blocklist bypass, capability override or mock is used.
+The Firefox-only [prerequisite check](../scripts/ci/firefox-webgl.ts) fails before
+media tests when real WebGL2 context creation, production compositor shader
+compilation/linking or exact one-pixel clear/readback is unavailable. Browser launch
+has a 15-second deadline; page creation/graphics probing has a separate 10-second
+deadline. Failure reports the native context reason and setup guidance rather than
+waiting through five preview-readiness timeouts. Success logs the browser version,
+actual renderer, shader status and readback; renderer sanitization is disabled only
+in the disposable test profile for this evidence, not in the product. The playback
+tests still initialize the real editor/compositor and keep their existing exact
+frame, PCM, drift, range-read and cancellation assertions.
+
+Headless Firefox also needs an available audio backend: a missing service can leave
+`AudioContext.resume()` suspended without rendering samples. The
+[Firefox runner](../scripts/ci/firefox.sh) starts a private PulseAudio server with a
+48 kHz stereo null sink, cookie and Unix socket in an owned temporary directory.
+It never changes the desktop server/default output or accesses sound devices;
+the null sink discards audio **after real Web Audio rendering**, not through a
+mock clock or silent product fallback. Startup and backend queries have bounded
+deadlines, and exit/failure/signals stop only that server and remove its scratch.
+The subsequent [audio prerequisite](../scripts/ci/firefox-audio.ts) has the same
+15-second browser-launch and 10-second probe deadlines as the graphics check.
+It requires a real 48 kHz context, stereo samples passed between real worklets and
+an output timestamp reaching those rendered samples. Missing resume/render/output
+readiness remains an actionable hard failure before the five media tests. Neither
+prerequisite changes the editor's ten-second music-start deadline or test bounds.
+
 The [music-clock regression](../tests/browser/music-clock.spec.ts) requires one
 uninterrupted music start from zero or a nonzero seek, bounded range reads and
-actual downstream PCM amplitude/placement silence. The selected recovery tests
+actual rendered stereo PCM amplitude/placement silence. Its bounded audio-thread
+observer checks every sample in the required frame windows, not UI-thread snapshots
+that can miss complete frames under load. The selected recovery tests
 retain the independent one-frame audio/video bound, pause/seek/restart and genuine
 callback-gated cancellation. These five synthetic, memory-only checks run in CI;
 they do not qualify the entire Firefox editor or intended hardware. Attachments
-contain bounded consumed-sample/output-timestamp evidence, not private media.
+contain bounded consumed-sample/output-timestamp evidence and at most 500
+decoder/clock state snapshots around music transitions, not private media.
 The complete optional Firefox recovery suite still exposes a separate 0.1× video
 seek/rVFC readiness failure, also reproducible without music. Do not hide it with
 a currentTime guess, retries, skipped assertions, privacy changes or a larger bound.
@@ -108,7 +153,11 @@ a currentTime guess, retries, skipped assertions, privacy changes or a larger bo
 The validation commands above are complete entry points, not a mandatory chain
 after every edit. Follow the [work-cycle gates](GITHUB_WORKFLOW.md#efficient-development-and-delivery):
 focused feedback during implementation, applicable comprehensive checks before
-delivery, then asynchronous actual-commit CI. Keep explicit issue acceptance intact.
+PR submission, then asynchronous required PR CI before merge. Keep explicit issue
+acceptance intact. Publish logical-step commits on short-lived branches; never push
+directly to protected `main`. Format/save/review and validate the exact head's
+non-CI acceptance before arming native squash auto-merge. A full-delivery PR may
+then use `Closes #N` in its description; partial work merely references its issue.
 
 - While editing, use `npm test -- tests/unit/<affected-file>.test.ts` or
   `npm run test:watch -- tests/unit/<affected-file>.test.ts`; use relevant spec paths
@@ -161,7 +210,7 @@ exact commit, toolchain, commands, passed/failed checks and remaining acceptance
 Keep local checks, [actual-commit CI](https://github.com/Plonk42/PasCap/actions)
 and consented intended-GPU/real-flight qualification separate. Never add historical
 native counts to a fresh UI run or describe an older green run as current delivery
-evidence. Follow [the delivery workflow](GITHUB_WORKFLOW.md#verified-closure-on-main).
+evidence. Follow [the delivery workflow](GITHUB_WORKFLOW.md#merge-closure-and-reconciliation).
 
 ### GitHub CI
 
@@ -170,10 +219,16 @@ The [workflow](../.github/workflows/ci.yml) runs:
 - Linux unit/typecheck/build checks on **Node 22 and 24**.
 - Native/media, full Chrome/browser and scoped Firefox music checks on **Node 22**, using **FFmpeg/ffprobe
   8.0.1 built from pinned source** via a setup script/cached toolchain, not runner
-  apt FFmpeg 6 or an implied untested version-support claim.
-- `push`, `pull_request` and `workflow_dispatch` triggers; read-only repository
+  apt FFmpeg 6 or an implied untested version-support claim. Firefox alone runs
+  under Xvfb with Mesa llvmpipe and a fail-closed real WebGL2 prerequisite; its
+  software-rendering environment is not applied to Chrome or native jobs.
+- PRs targeting `main`, pushes to `main` and `workflow_dispatch`; read-only repository
   permissions, dependency/toolchain caching and failure-only outputs including
   retained Playwright traces/screenshots.
+- An unconditional **Delivery gate** succeeds only if the Node matrix and native/
+  browser job both return `success`, rejecting skipped/cancelled/failed prerequisites.
+  Protected `main` requires all three suite checks plus this gate from GitHub Actions,
+  with the PR branch up to date; administrators cannot bypass protection.
 - Synthetic fixtures only: no private media/sample helper/native reference work
   or hardware/performance acceptance claim.
 
@@ -186,13 +241,19 @@ or the whole generated cache. Action references are commit-pinned and the workfl
 uses read-only repository permissions. It does not deploy GitHub Pages or publish
 a container image. Use [the roadmap](ROADMAP.md) for remaining qualification work.
 
-Delivery closure is handled by the LLM, not an installed Action, hook, bot or
-scheduled job. When only required CI remains, a temporary session-owned
-`gh run watch` waits in a dedicated background terminal; its completion notification
-resumes acceptance checks, issue closure and Project Done reconciliation. Interrupted
-sessions recover pending deliveries at next-session start; no unattended guarantee
-is made. See the [CI follow-up contract](GITHUB_WORKFLOW.md#session-owned-ci-follow-up).
-Trivial formatting-only housekeeping needs no GitHub issue or Project entry.
+Required up-to-date PR CI is the merge/closure gate; main push CI is a regression
+backstop, not a second closure wait. After exact-head non-CI acceptance, native
+auto-merge waits and merges eligible PRs independently of the editor/chat, closing
+only fully addressed issues linked in the PR description. No session CI watch or
+custom closure Action/hook/bot is needed; CI stays read-only. Failed/stale/conflicting
+PRs remain open for investigation, without retries or weakened tests. Next-session
+reconciliation handles failures, obsolete issue labels and Project Done; that
+housekeeping verifies the enabled native **Item closed → Status Done** workflow's
+result. Progress-label cleanup remains explicit; no board move closes an issue,
+and unattended failure repair is not guaranteed. See the [PR delivery contract](GITHUB_WORKFLOW.md#protected-pr-delivery).
+Trivial formatting-only housekeeping still uses a PR, but needs no invented issue
+or Project entry. Changing an armed PR requires disabling auto-merge/removing closing
+links and repeating affected validation/acceptance before rearming.
 
 The raw reader has a deterministic exit-before-read regression and eager bounded
 read ownership; [#1](https://github.com/Plonk42/PasCap/issues/1) records its delivery
@@ -231,12 +292,12 @@ total-process memory; reports expose private paths/snapshots, so review before s
 
 ## Architecture
 
-| Boundary | Entry points | Responsibility |
-| --- | --- | --- |
-| Shared | [Model](../src/shared/model.ts), [commands](../src/shared/commands.ts), [layout](../src/shared/timeline.ts), [row retiming](../src/shared/layer-retiming.ts) | Strict data, integer-frame timing, atomic edits; no React/browser/FFmpeg dependencies |
-| Preview | [Engine](../src/preview/engine.ts), [decoder](../src/preview/decoder.ts), [compositor](../src/preview/compositor.ts), [music](../src/preview/music.ts) | Observed frames, decoder reuse, WebGL2/Web Audio; independent of React |
-| Web | [App](../src/web/App.tsx), [autosave](../src/web/autosave.ts) | Panels, contextual controls, transient pointer/input drafts, session history and serial saves |
-| Service | [HTTP app](../src/server/app.ts), [library](../src/server/library.ts), [jobs](../src/server/jobs.ts), [layered export](../src/server/layered-export.ts) | Guarded registered-source access, bounded native work and verified immutable exports |
+| Boundary | Entry points                                                                                                                                                 | Responsibility                                                                                |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------- |
+| Shared   | [Model](../src/shared/model.ts), [commands](../src/shared/commands.ts), [layout](../src/shared/timeline.ts), [row retiming](../src/shared/layer-retiming.ts) | Strict data, integer-frame timing, atomic edits; no React/browser/FFmpeg dependencies         |
+| Preview  | [Engine](../src/preview/engine.ts), [decoder](../src/preview/decoder.ts), [compositor](../src/preview/compositor.ts), [music](../src/preview/music.ts)       | Observed frames, decoder reuse, WebGL2/Web Audio; independent of React                        |
+| Web      | [App](../src/web/App.tsx), [autosave](../src/web/autosave.ts)                                                                                                | Panels, contextual controls, transient pointer/input drafts, session history and serial saves |
+| Service  | [HTTP app](../src/server/app.ts), [library](../src/server/library.ts), [jobs](../src/server/jobs.ts), [layered export](../src/server/layered-export.ts)      | Guarded registered-source access, bounded native work and verified immutable exports          |
 
 Preview reuses **two decoder/texture slots per track, up to 16 for eight**, plus one
 source reviewer, not one per clip. Each track can dissolve independently. Generalized
@@ -255,6 +316,13 @@ and [grading equations](COLOUR_AND_TIMING.md#colour).
 
 ## Contributor safety
 
+- **Start each new task from current remote `main`, before edits or validation.**
+  Fetch and verify its SHA, fast-forward a clean/idle local `main` only, then create
+  a new short-lived branch. With dirty or active work, preserve it and use a clean
+  isolated worktree directly from freshly fetched `origin/main`. Never reuse a
+  previous task/unmerged PR branch or reset/stash unrelated work. Record the starting
+  SHA; stop if freshness or safe isolation cannot be verified. Same-task continuation
+  follows the [startup and PR-update rules](GITHUB_WORKFLOW.md#start-every-new-task-from-current-main).
 - **Format before committing, not afterward.** Use each changed file's configured
   formatter and applicable import organization, save and let editor save actions
   finish, then perform final checks, review and deliberate staging. Format-on-save
@@ -288,6 +356,3 @@ and [grading equations](COLOUR_AND_TIMING.md#colour).
   before any binary/image distribution; source publication is not release approval.
   Preserve [../EDITOR_IMPLEMENTATION_PLAN.md](../EDITOR_IMPLEMENTATION_PLAN.md);
   planning/feature worksheets are scope inputs, not code/assets to copy.
-
-
-

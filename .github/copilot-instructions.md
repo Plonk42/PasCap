@@ -2,6 +2,15 @@
 
 ## Workflow
 
+- Before starting any new task, fetch verified remote `main` and create a new
+  short-lived branch from its exact current SHA, **before edits or validation**.
+  A clean local `main` may be fast-forwarded only and must equal `origin/main`;
+  otherwise use a clean isolated worktree directly from freshly fetched `origin/main`.
+  Inspect existing edits/branches/jobs first; never stash, reset, discard or include
+  unrelated work. Never start from stale local `main`, a previous task branch or an
+  unmerged PR. Record the starting SHA; if freshness/access/isolation cannot be
+  verified, stop and record the blocker. Continuing the same task uses its existing
+  branch with the PR update/revalidation rules, not a new branch for every correction.
 - Commit after each completed logical step, including its tests and relevant
   documentation. A logical step is a coherent tested behaviour, not each small
   correction; do not leave an entire feature uncommitted until the end.
@@ -15,20 +24,27 @@
   changes files after validation or staging, review the delta, rerun invalidated
   checks and restage deliberately before committing. Verify committed files have
   no leftover formatting diff after commit; preserve/report unrelated existing edits.
-- The owner gives standing authorization to push approved, validated work to remote
-  `main` after each reviewed logical-step commit and at handoff if approved commits
-  remain unpublished; no repeated push approval is needed. Verify the repository,
-  intended commits and fast-forward remote state first. Preserve unrelated edits;
-  never force-push, bypass branch protection or publish unapproved/private work.
-  If publication is blocked, record the blocker and next action rather than hiding it.
-- At session start, after delivery and at handoff, reconcile published issues
-  awaiting CI using [the GitHub workflow](../docs/GITHUB_WORKFLOW.md). Close actually
-  addressed issues without another approval when all applicable gates pass, and
-  align Project Status. If only CI remains, start one temporary session-owned CI
-  watch; its completion notification resumes LLM acceptance/closure, not a script
-  that closes issues. Do not install a closure Action, hook, bot or scheduled job.
-  Green CI alone is not acceptance. Releases,
-  milestone closure, legacy tracker cleanup and real-media jobs still need approval.
+- The owner authorizes publishing approved, reviewed, validated logical-step commits
+  to short-lived branches and opening/updating PRs targeting `main`, without repeated
+  push approval. Never push directly to `main`, force-push or bypass protection,
+  including as administrator. Preserve unrelated edits; use an isolated worktree
+  when another deliverable is active. Record publication blockers and next actions.
+- Verify non-CI acceptance against live scope/dependencies and the exact PR head
+  before enabling native squash auto-merge. Add `Closes #N` only in the PR description
+  when it completes the entire issue; incremental/investigation/hardware-pending PRs
+  merely reference it. Read back GitHub's actual closing-issue links before arming;
+  negated prose can still create unintended closing links. Required up-to-date PR CI
+  (Node 22/24, native/browser and fail-closed Delivery gate) is the merge/closure gate;
+  main push CI is a regression
+  backstop, not a second closure wait. Green CI alone is not product acceptance.
+  Disable auto-merge and remove closing links before further changes; revalidate
+  changed inputs and rereview before rearming against the new head.
+- At session start and handoff, inspect relevant PRs and pending deliveries using
+  [the GitHub workflow](../docs/GITHUB_WORKFLOW.md). GitHub finishes an armed PR's
+  merge and eligible issue closure independently of the chat. Reconcile closed
+  issues' obsolete progress labels and Project Done at the next checkpoint; a board
+  move never closes an issue. No custom closure Action, hook, bot or scheduled job.
+  Releases, milestone closure, legacy cleanup and real-media jobs still need approval.
 - Reply in English. Keep summaries concise and identify remaining limitations.
 - Keep active documentation focused on the **current project state**: implemented
   behaviour, usage, contracts, limitations and applicable verification. Update or
@@ -49,13 +65,11 @@
 - Never build/check or reset fixtures while browser tests serve the same output/cache.
   Keep browser/media work serial. During terminal validation, subagent reviews must
   use file/search tools only: no terminal commands that could interrupt the run.
-- Do not block delivery or repeatedly poll CI with model/tool calls. When required
-  CI is pending for verified published work, use a temporary `gh run watch` in a
-  dedicated background terminal and yield for its completion notification. On
-  notification, inspect the actual SHA/jobs and perform verified closure/Project
-  reconciliation. Record run/SHA and pending acceptance before yielding. A watch
-  cannot guarantee resumption after the session/editor closes; next-session recovery
-  is mandatory. Never equate a push or focused pass with full acceptance.
+- Do not block delivery, repeatedly poll CI, start session CI watchers or rerun local
+  suites to occupy a wait. Record the PR/head, verified non-CI acceptance, required
+  CI state and auto-merge state, then yield. Failed CI or a stale/conflicting branch
+  stays unmerged with a concrete next action. Next-session recovery inspects actual
+  PR/check/issue state, not an assumed successful merge or an old green run.
 - Keep investigation, issue/Project updates and documentation scoped to the selected
   deliverable; update affected contracts, not the whole backlog or unchanged guides.
   Prefer one concrete deliverable per chat. Use deeper reasoning for architecture,
@@ -92,7 +106,9 @@
 - Use a repository-linked GitHub Project for board/iteration views when access is
   available, reusing the same issues and keeping its Status aligned with issue labels.
   Add new triaged issues to that Project, not duplicate draft cards. Status/label
-  synchronization is explicit; a board drag does not update the issue label or next action.
+  open-status synchronization is explicit; a board drag does not update the issue
+  label or next action. Native closed-issue → Done is permitted when available;
+  never enable Project Done → issue closure or a custom closure workflow.
   If unavailable, record the limitation and continue on the actual work issues;
   never create a replacement sprint issue or duplicate checklist. Record the selected
   issue links on the relevant work issue if a handoff needs context;
@@ -102,13 +118,16 @@
   exact local commits, verification and the next action for tracked work. Its commit
   messages use `(#N)`, for example `Improve timeline scrolling (#18)`; issue-free
   housekeeping uses a descriptive message without a fabricated reference. Never
-  use `(Refs #N)` or automatic closing keywords. PR titles use the same convention.
-  Mark verified unpublished work `status:local-complete`, not accepted/closed.
-- Keep local checks, actual-commit remote CI and consented hardware/real-workload
-  qualification separate. Close delivered issues only after the workflow's verification
-  gate; push validated implementation steps, not incomplete/unapproved work merely
-  to advance tracking. Never close milestones, release or start media jobs without
-  explicit approval. Public updates must contain sanitized evidence.
+  use `(Refs #N)` or closing keywords in commits/titles. PR descriptions may use
+  `Closes #N` only after full non-CI acceptance. Mark verified work awaiting PR
+  merge `status:local-complete`, not delivered/closed; partial work retains its
+  actual progress and next action.
+- Keep local checks, required PR CI and consented hardware/real-workload qualification
+  separate. Publish validated implementation steps, not unapproved work merely to
+  advance tracking. Full-issue closure follows pre-merge acceptance plus protected
+  merge; pending legacy direct-main deliveries still need verified remote evidence.
+  Never close milestones, release or start media jobs without explicit approval.
+  Public updates must contain sanitized evidence.
 - Keep [the roadmap](../docs/ROADMAP.md) as an outcome/dependency index and local
   guides as contracts/evidence, not a competing mutable backlog. Preserve design history.
 

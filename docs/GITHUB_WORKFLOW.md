@@ -3,8 +3,8 @@
 GitHub [issues](https://github.com/Plonk42/PasCap/issues) are the system of record
 for substantive bugs, approved features, engineering tasks, next actions and blockers.
 Not every action needs an issue: trivial non-functional formatting/import sorting,
-typos and committing already-reviewed housekeeping can be delivered directly with
-a descriptive commit, local verification and a concise chat handoff. Do not create
+typos and committing already-reviewed housekeeping use a descriptive commit and
+protected PR, local verification and a concise chat handoff. Do not create
 an issue, Project card or artificial acceptance checklist merely to commit/push.
 Use an issue when work needs substantive scope/acceptance, investigation, coordination
 or persistent follow-up, or when the owner explicitly asks to log it. Native dependencies,
@@ -23,39 +23,41 @@ and verification snapshots remain in Git history; they are not current acceptanc
 ## Work cycle
 
 1. **Inspect before acting.** Confirm the repository/host and, for tracked work, current issue,
-  comments, dependencies and Project selection. Search before creating a new issue; reuse
+   comments, dependencies and Project selection. Search before creating a new issue; reuse
    an existing scope rather than duplicating it. A task/feature needs a goal,
    non-goals, observable acceptance, an outcome milestone and a concrete next action.
+   Before any new task's edits or validation, complete the
+   [fresh-main startup gate](#start-every-new-task-from-current-main), including housekeeping.
 2. **Triage.** Apply the category, priority, area and progress labels below. Record
    decisions/consent needed and native blocked-by relationships for actual prerequisites.
-  Add the same issue to the linked Project; do not duplicate it as a draft card.
+   Add the same issue to the linked Project; do not duplicate it as a draft card.
    Assign a person only when responsibility is known; otherwise name the decision
    needed in the next action. Templates start at normal/backlog, not confirmed severity.
 3. **Select bounded work in the Project.** For explicitly agreed timeboxes, assign
-  existing approved issues to a native Iteration field. Without an agreed cadence,
-  use the backlog/Status board and a selected-work view. Do not create a sprint
-  issue, copy acceptance checklists or use parent/sub-issues for sprint membership.
-  Native sub-issues describe deliverable decomposition; milestones describe outcomes.
-  Never invent iteration dates/deadlines or infer selection from issue logging.
+   existing approved issues to a native Iteration field. Without an agreed cadence,
+   use the backlog/Status board and a selected-work view. Do not create a sprint
+   issue, copy acceptance checklists or use parent/sub-issues for sprint membership.
+   Native sub-issues describe deliverable decomposition; milestones describe outcomes.
+   Never invent iteration dates/deadlines or infer selection from issue logging.
 4. **Deliver incrementally.** At the start, after each completed logical step and
-  at handoff, update the work issue and Project Status: progress, blockers,
-  exact local commits, checks/evidence, remaining acceptance and the next action. Validate/review and
-  commit each coherent step with its tests/docs, not every intermediate correction;
-  use the focused-feedback and delivery-check separation below. Tracked commit messages and PR titles use
-  `(#N)`, for example `Improve timeline scrolling (#18)`, never `(Refs #N)` or
-  automatic closing keywords. Automatically push approved, validated logical-step
-  commits to remote `main` under the standing authorization below, without another
-  approval request. Issue-free housekeeping uses a descriptive message without a
-  reference and needs no issue/Project administration. An unpublished SHA is a local reference, not a working GitHub
-  commit link; report any publication blocker.
-5. **Review honestly.** Local implementation/testing can be complete while remote
-   CI, publication or owner acceptance is pending. Inspect CI for the actual delivery
-  commit; old green runs do not qualify new code. Automatically close concrete work
-  issues after verified delivery to remote `main`, following the gate below. Closing
-  milestones, publishing releases or running owner-media jobs still needs explicit
-  authorization; validated code/documentation pushes do not. Keep optional
-  sprint goals/review notes short; they must not become a second mutable backlog.
-  Moving work between Project iterations does not accept or close its issues.
+   at handoff, update the work issue and Project Status: progress, blockers,
+   exact local commits, checks/evidence, remaining acceptance and the next action. Validate/review and
+   commit each coherent step with its tests/docs, not every intermediate correction;
+   use the focused-feedback and delivery-check separation below. Tracked commit messages and PR titles use
+   `(#N)`, for example `Improve timeline scrolling (#18)`, never `(Refs #N)` or
+   closing keywords in titles/commits. Publish approved, validated logical-step
+   commits to short-lived branches and open/update protected PRs targeting `main`,
+   without repeated approval. Issue-free housekeeping uses a descriptive message without a
+   reference and needs no issue/Project administration. An unpublished SHA is a local reference, not a working GitHub
+   commit link; report any publication blocker.
+5. **Accept before auto-merge.** Verify non-CI acceptance against live scope and the
+   exact reviewed PR head before enabling native auto-merge. A full-delivery PR may
+   then use `Closes #N` in its description; partial work merely references its issue.
+   Required up-to-date PR CI gates merge and eligible issue closure. Main push CI is
+   a regression backstop, not a second closure wait. Closing milestones, publishing
+   releases or running owner-media jobs still needs explicit authorization. Keep optional
+   sprint goals/review notes short; they must not become a second mutable backlog.
+   Moving work between Project iterations does not accept or close its issues.
 
 Public updates must be sanitized: no private source/project paths, snapshots,
 credentials, recordings, licensed music or generated reports. Real imports,
@@ -97,11 +99,11 @@ coherent, reviewable behaviour with its tests and affected contracts; small fixe
 within that step do not each trigger a full validation/publication cycle. Do not
 hold an entire multi-step feature until the end.
 
-| Phase | Required work |
-| --- | --- |
-| Development feedback | Run affected unit/service tests and focused browser/native regressions as appropriate; investigate failures before broader runs. Focused results are not full acceptance. |
+| Phase                 | Required work                                                                                                                                                                                                                                                                                                                                                         |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Development feedback  | Run affected unit/service tests and focused browser/native regressions as appropriate; investigate failures before broader runs. Focused results are not full acceptance.                                                                                                                                                                                             |
 | Logical-step delivery | Review the final diff and satisfy applicable comprehensive checks and issue criteria before committing/pushing. Code normally needs the unit/service, type and production-build checks; UI/render/timing changes also need their applicable integration suites. Documentation-only steps need link/content/whitespace checks and review, not unrelated runtime tests. |
-| Remote acceptance | Inspect available CI for the actual delivery commit or a verified descendant. Record pending/failed required checks and leave the issue open; close only through the verified-closure gate. |
+| Pre-merge acceptance  | Review live issue scope/dependencies and the exact PR head; record all non-CI evidence before arming auto-merge. Required up-to-date PR CI gates merge and eligible closure. Pending/failed checks are not acceptance.                                                                                                                                                |
 
 Choose the validation scope from the changed contracts, dependencies and live issue
 criteria before running it. Broad schema/timing/render changes require broad coverage;
@@ -117,15 +119,14 @@ isolated concurrency has been implemented and verified; increasing workers alone
 is not an approved shortcut. Subagent reviews during terminal validation must use
 file/search tools, with **no terminal commands**, to avoid interrupting the run.
 
-CI is asynchronous by default: after validated publication, inspect available
-actual-commit status without repeated model/tool polling or rerunning local suites
-merely to occupy the wait. If only required CI remains, start a temporary
-session-owned background watch as described below, record the delivery SHA/run and
-verified non-CI acceptance, and yield for its completion notification. The LLM then
-verifies acceptance and closes eligible issues without another owner request.
-Keep pending/failed required acceptance open with aligned progress/Project Status.
-Do not install closure automation or promise resumption after the session/editor
-closes; the next active session reconciles interrupted pending deliveries.
+CI is asynchronous: after recording non-CI acceptance and arming native auto-merge,
+record the PR/head, required check state and next action, then yield. GitHub waits
+and merges eligible work independently of the chat/editor. Do not repeatedly poll,
+start session CI watchers or rerun local suites to occupy the wait. Failed CI,
+conflicts or a stale base leave the PR unmerged and the issue open. No custom closure
+Action, hook, bot or scheduled job is installed. Next-session reconciliation handles
+failures and label/Project housekeeping; it is not required for a successful armed
+PR to merge and close its fully addressed issues.
 
 Issue-free housekeeping needs no fabricated checkpoints. Keep the existing
 start/step/handoff checkpoints concise and limited to selected
@@ -145,146 +146,176 @@ measurements and note overlaps; session spans/timeouts are not model-thinking ti
 This is lightweight evidence, not new instrumentation, benchmark/media work or a
 separate reporting requirement for every future task.
 
-## Automatic publication to main
+## Protected PR delivery
 
-The owner gives standing authorization for regular **agent-driven pushes to remote
-`main`** of approved work. Publish after each completed, validated and reviewed
-logical-step commit, and at handoff if such commits remain unpublished. Do not hold
-an entire completed feature locally or ask for the same push permission again.
-This is an event-driven work-cycle checkpoint, not a timer, background job, GitHub
-Action or invented sprint cadence. Logging an issue alone does not approve its
-implementation or publication; releases and scope expansion are not authorized.
+The owner authorizes publishing approved, reviewed, validated work on short-lived
+branches and opening/updating PRs targeting the default branch, `main`, without
+repeated approval. **Never push directly to `main` or bypass protection**, including
+as administrator. Housekeeping also uses PRs but needs no invented issue. Logging
+an issue alone does not approve implementation, release or scope expansion.
 
-Before pushing:
+### Start every new task from current main
 
-1. Verify the GitHub host/repository, local branch and target remote `main`. Review
-  **all** outgoing commits and their affected checks/contracts; do not publish
-  unrelated, unreviewed, unapproved or private content just because it is committed.
-2. Format the changed files, organize imports where applicable, save and let the
-  configured editor save actions finish **before final validation, review and
-  staging**. Commit the formatted, saved and validated bytes, not an earlier
-  version that a later save will reformat. If formatting/save actions change files
-  after checks or staging, review the delta, rerun invalidated checks and restage
-  deliberately before committing. After commit, inspect status and the diff for
-  committed files to catch leftover formatting; resolve owned leftovers through
-  a reviewed, validated follow-up before publication, without rewriting history.
-  Keep unrelated user edits unstaged and intact; a dirty tree is not
-  permission to stash, discard or include them. Documentation-only work needs
-  applicable documentation validation, not invented runtime tests.
-3. Fetch remote `main` and confirm the outgoing history is a fast-forward from its
-  actual SHA. Use a normal explicit push to `main`; never force-push/rewrite remote
-  history, bypass protections, auto-merge unrelated work or broaden permissions.
-  If divergence, branch rules, failed validation or access prevents publication,
-  stop publication and record the specific blocker/recovery action on the work issue.
-  Use the protected-branch PR/review path when required rather than bypassing it.
-4. Read back remote `main` and prove the intended commits are contained. Record the
-  delivered SHA/link on the issue, inspect its actual-commit CI and run the closure
-  reconciliation below. A successful push does not itself prove acceptance or CI.
+Complete this gate **before editing or validating a new task**, not only before
+publication. It applies to housekeeping too; logging a proposal does not select
+implementation. A fresh chat is not proof of a fresh Git base.
 
-Unpublished verified work remains `status:local-complete` with aligned Project
-Status and a concrete publication next action. Published work awaiting a required
-check, decision or acceptance remains open with the corresponding progress/blocker.
-Never retry or weaken tests merely to obtain a green delivery checkpoint.
+1. Inspect the current branch, staged/unstaged/untracked work, linked worktrees,
+   active jobs and relevant PRs. Preserve unfinished work and ongoing validation;
+   do not switch or update a worktree that another task or service is using.
+2. Verify the host/repository and intended `origin`, then fetch remote `main`.
+   Read back its actual remote SHA and confirm fetched `origin/main` matches it.
+   A failed fetch or cached tracking ref is not an up-to-date starting point. If
+   the remote moves during verification, refresh before creating the task branch.
+3. If the worktree is clean and idle, switch to local `main` and fast-forward only
+   from `origin/main`. Require local `main` to equal the verified remote SHA with
+   no ahead/behind commits before creating a **new** short-lived task branch.
+   Never merge a previous PR's head into local `main`, including after squash merge.
+4. If the worktree is dirty, busy or on another active task, leave it intact and
+   create a clean isolated worktree with a **new** task branch directly from the
+   freshly fetched `origin/main`. This also avoids moving `main` checked out in
+   another worktree. Local-only/ahead/diverged `main` is not a valid base: preserve
+   it and use the verified remote base in isolation, or report a blocker.
+5. Verify the new task branch's initial `HEAD` equals that remote SHA and the task
+   worktree is clean. Record the starting `main` SHA in the PR and, when tracked,
+   its existing work issue. Stop before edits/validation if freshness, access or
+   safe isolation cannot be established; never stash/reset/discard unrelated work
+   to pass the gate.
 
-## Verified closure on main
+Do not reuse an old task branch, stale local `main` or an unmerged PR as a new
+task's foundation. If a needed dependency is not yet on `main`, keep the new task
+blocked rather than silently stacking it on unmerged work. After a squash merge,
+the next task starts from the new remote `main`, not the old branch's commit history.
+Freshness is checked at task startup; strict up-to-date PR CI remains the merge gate.
 
-The owner gives standing authorization to close a concrete work issue without another
-approval request once its implementing commit reaches **remote `main`** and the issue
-is actually fixed/implemented. A local commit, a merge notification, a checked box or
-`status:local-complete` alone is not sufficient.
+Continuing the **same approved task** may retain its existing branch. Before
+resuming paused work, fetch and inspect current `main`/PR state; when a base update
+is needed, follow the disarm/update/revalidation rules below. Do not restart a
+branch for each correction or logical step, or mix a new deliverable into it.
 
-Before closing, the delivery agent must:
+### Repository merge requirements
 
-1. Read the live issue, comments, acceptance criteria and dependencies. Inspect the
-  actual delivered code/contracts and relevant regression evidence; do not infer
-  completion from a title, label, commit message or another issue's completion.
-2. Verify the repository/host and remote `main` SHA, and prove the implementing
-  commit is contained in that branch. Local branch names and unpushed commits do
-  not qualify. Publication follows the validated-step gate above, not an attempt
-  to bypass acceptance merely to trigger closure.
-3. Confirm every applicable acceptance criterion with evidence for the delivered
-  implementation. Inspect CI for the actual delivery commit (or a verified
-  descendant containing it); pending/failed required checks keep the issue open.
-  Documentation-only work needs applicable documentation validation, not invented
-  runtime tests. Hardware/real-workload criteria still require their own consented
-  evidence; unrelated deferred gates do not expand a completed issue's scope.
-4. If complete, post a sanitized acceptance summary with the delivered SHA, evidence
-  and CI links, then close with reason **completed**. Remove obsolete `status:*`
-  and `iteration:current` labels, preserve category/priority/areas, milestone,
-  history and native relationships, and set its existing Project item to **Done**.
-  Read back both issue and Project state; report any synchronization failure.
-5. If incomplete or uncertain, keep it open, align its progress label and Project
-  Status, and record the specific missing criterion/blocker and next action.
+`main` requires PRs and these GitHub Actions checks, with branches **up to date**:
 
-Run this reconciliation at session start, after every validated-step push/merge
-reaches remote `main`, on CI-watch completion and at delivery handoff. Include
-published issues awaiting CI, not only the current task, using the bounded follow-up
-below. This is not merge-only acceptance. Use plain `(#N)`
-issue references in commit messages and PR titles, without GitHub closing keywords
-that could bypass verification. Generic
-Project Auto-close workflows stay disabled. This policy does not authorize release,
-milestone closure, legacy tracker #15 cleanup, scope expansion or media jobs.
+- **Checks / Node 22**
+- **Checks / Node 24**
+- **Native media and browser / FFmpeg 8.0.1**
+- **Delivery gate**
 
-### Session-owned CI follow-up
+The [CI workflow](../.github/workflows/ci.yml) runs on PRs targeting `main`, pushes
+to `main` and manual dispatch. The unconditional Delivery gate checks both the
+matrix result and integration result for literal `success`; failed, skipped,
+cancelled or missing prerequisites cannot pass it. All suite checks remain required
+individually, with GitHub Actions as their expected source. Keep job names unique.
+Do not add path filters, conditional skips, retries or weaker assertions to satisfy
+protection. CI has read-only repository permissions and no merge/issue-writing job.
 
-Closure belongs to the LLM workflow. Do not install a closure GitHub Action, hook,
-bot, scheduled job or Project Auto-close workflow. CI remains read-only. A temporary
-terminal watch may monitor CI for this discussion, but never contains issue-closing
-commands: its completion notification returns the decision to the agent.
+Protection applies to administrators, forbids force-push/deletion, and requires
+resolved review conversations. The solo workflow requires **zero independent
+approving reviews**; the agent's explicit pre-merge acceptance still applies.
+Auto-merge and automatic head-branch deletion are enabled; squash is the default
+delivery method. A merge queue is not configured. Do not manufacture a second
+reviewer, broaden credentials or bypass checks to get a PR merged.
 
-1. At session start, after publication and at handoff, inspect open
-  `status:local-complete` issues for published deliveries whose next action is
-  CI/acceptance reconciliation. Paginate the candidate query, without auditing
-  the whole backlog. Read live scope/comments/dependencies and verify the recorded
-  non-CI evidence; a label, checked box or commit reference is not acceptance.
-2. Prove each delivery SHA is on remote main. Inspect the applicable CI for that SHA
-  or a verified descendant containing it. For code delivery, require successful
-  Checks / Node 22, Checks / Node 24, and Native media and browser / FFmpeg 8.0.1.
-  Missing, skipped, cancelled, failed or pending required jobs are not green.
-  Documentation-only work retains its applicable documentation gates.
-3. If only required CI remains, start **one temporary `gh run watch <run-id>
-  --repo Plonk42/PasCap --exit-status`** per relevant run in a dedicated background
-  terminal. Record delivery SHA, run URL, verified non-CI acceptance, candidate
-  issue links and terminal execution ID in the session handoff. Reuse an existing
-  watch for that run; do not launch duplicate watchers or use shell wait loops.
-  Yield for the terminal completion notification rather than repeatedly asking
-  for status, sleeping or rerunning local checks. The CLI's own status polling is
-  allowed; repeated LLM/tool polling and a foreground delivery wait are not.
-4. On notification, inspect the run's actual SHA, conclusion and required jobs;
-  successful terminal exit alone is insufficient. Re-read live acceptance and
-  remote-main containment, then apply the verified-closure gate: close eligible
-  issues with reason completed, clean lifecycle labels, set Project Done and read
-  back both states. No extra owner approval is needed. Never accept proposals,
-  legacy trackers or unqualified hardware/media work merely because CI is green.
-5. Failed/cancelled/superseded runs, unavailable watch/API access or interrupted
-  sessions keep required acceptance open with a concrete recovery action. For a
-  superseded run, inspect its replacement SHA and containment before selecting a
-  new watch; do not call cancellation a pass. Clean up settled owned terminals.
-  A watch cannot guarantee chat resumption after the session/editor closes:
-  **next active session: inspect pending delivery CI and reconcile closure**.
-  Persist SHA/run/evidence and that recovery action on the work issue; do not add
-  a second tracker, automation label, token or promise of unattended closure.
+### Publish and accept a candidate
 
-Use existing authorized GitHub/Project access. If Project writes are unavailable,
-report the limitation, close only issues whose acceptance is verified and reconcile
-their existing Project items at the next checkpoint. Do not request secrets or
-broaden CI permissions. Issue-free housekeeping needs no watch/tracking enrollment
-or fabricated acceptance issue.
+1. Confirm `github.com/Plonk42/PasCap`, fetch actual remote `main`, create a
+   short-lived branch through the startup gate above and review **all** outgoing
+   commits. Record the verified starting `main` SHA; continuing an existing task
+   retains its branch, with base updates handled below. Preserve unrelated edits
+   and ongoing validation; never stash/discard/include them to obtain a clean tree.
+2. Format changed files and organize imports where applicable, save and finish save
+   actions **before final validation, review and staging**. Late formatting changes
+   invalidate affected checks/staging; review/recheck/restage. Commit each coherent
+   validated logical step and check for leftover formatting afterward. Push normally
+   to its branch and open/update a draft PR using the [template](../.github/pull_request_template.md).
+3. Before marking ready and arming auto-merge, read live issue/comments/dependencies
+   and review the exact head's implementation, contracts and regression evidence.
+   Verify **every non-CI acceptance criterion**. Record head SHA, checks, consented
+   evidence, remaining limitations and the closure decision in the PR/work issue.
+   Green CI cannot replace this judgment. Documentation-only local validation needs
+   documentation checks; repository-required remote CI still applies to every PR.
+4. For a fully completed issue, add **`Closes #N` only in the PR description**.
+   Titles/commits retain `(#N)`, never `(Refs #N)` or closing keywords. Partial
+   logical steps, investigations and work awaiting hardware/owner criteria merely
+   reference their issues; they may merge without closing them. Milestone/release
+   acceptance and legacy tracker cleanup remain separate owner decisions.
+   **Read back GitHub's actual closing-issue references before arming** and verify
+   that they contain exactly the accepted issues. Closing keywords are parsed even
+   in negated prose; ordinary mentions of excluded work must not contain a closing
+   keyword directly followed by its issue number. Do not rely only on text matching.
+5. Enable **native squash auto-merge for the reviewed head**, using a head-SHA guard
+   when supported. GitHub waits for required up-to-date PR CI, merges to `main`,
+   deletes the head branch and closes eligible linked issues as completed. Record
+   actual PR/head/check/auto-merge state and yield; no session watch or closure bot.
+
+Before making further changes to an armed PR, **disable auto-merge and remove its
+closing links**. Updates invalidate affected acceptance; new commits, base updates
+or conflict resolution require another review/validation before rearming against
+the new head. Update a stale branch by merging remote `main` normally and rerunning
+affected checks, never by force-pushing or weakening the strict requirement.
+
+`status:local-complete` / Project Local complete means non-CI implementation is
+complete but protected merge is pending, not delivered. Partial work retains its
+actual progress. Failed CI/conflicts/access blockers stay open with an explicit
+next action. A successful branch push or an old green run is not acceptance.
+
+## Merge, closure and reconciliation
+
+Required up-to-date **PR CI is the delivery/closure gate**. GitHub's test-merge
+candidate is the relevant evidence; squash may create a different final SHA, so
+record the PR head/test-merge run and actual merged commit rather than claiming
+local commit containment after squash. Main push CI remains a regression backstop:
+its completion is **not a second prerequisite for native issue closure**. A later
+failure must be inspected and tracked, with the affected issue reopened if its
+acceptance is contradicted; do not hide failures or treat a cancelled run as passed.
+
+At session start, after an observed merge and at handoff, reconcile relevant PRs
+and open `status:local-complete` issues, paginating the bounded candidate query:
+
+1. Read actual PR head/base/merge/check/auto-merge state and the recorded non-CI
+   evidence. Unmerged failed/stale/conflicting PRs remain actionable; record the
+   precise blocker. Successful native auto-merge needs no live chat or watcher.
+2. For merged full-delivery PRs, verify default-branch merge, actual merged commit
+   on remote `main`, closing-issue state/reason and pre-merge CI/acceptance evidence.
+   Remove obsolete `status:*` and `iteration:current` labels only from completed
+   work issues, preserving category/priority/areas/milestone/history/relationships.
+   Set/read back their existing Project items to **Done** if not already synchronized.
+3. Native **closed issue → Project Done** is permitted when available. Never enable
+   the inverse **Project Done → close issue**, unconditional closure or a custom
+   closure Action/hook/bot/schedule. A board move is not acceptance. Progress labels
+   are not automatically removed by GitHub's closing keywords.
+4. Direct-main deliveries published before this policy retain their recorded gate:
+   verify live acceptance, remote-main containment and successful required CI for
+   their delivery or a verified descendant before manually closing as completed.
+   Do not retroactively accept failed/pending work because the workflow changed.
+   Their next correction goes through a protected PR, without enrolling new watchers.
+
+The native **Item closed** workflow is enabled; the owner configured its action as
+**Status → Done**. No inverse Auto-close issue workflow is enabled. The public API
+confirms the workflow's name/enabled state but does not expose its action settings;
+verify the actual Project Status after the next legitimate issue closure, without
+closing unrelated work merely to test automation. Native merge/issue closure and
+the configured Status update do not depend on a live chat. Obsolete progress labels
+still need explicit reconciliation. If Status is not Done, use the accessible CLI
+item update and record the discrepancy. Workflow configuration changes require the
+authorized Project UI; report access/synchronization failures rather than requesting
+secrets or broadening CI permissions. Unattended failure repair is not promised.
 
 ## Scheduling contract for agents
 
 **An issue is not a sprint. Never create, extend or synchronize an issue as a
 sprint/iteration container, even when an older tracker exists.**
 
-| Concept | Mechanism |
-| --- | --- |
-| Concrete feature, bug, verification or engineering deliverable | Issue |
-| Sprint membership and dates | Native Project **Iteration field**, with agreed cadence/dates |
-| Continuous delivery without timeboxes | Project backlog/Status board and bounded selected-work view |
-| Work progress | Work issue progress label and explicitly aligned Project Status |
-| Deliverable outcome | Milestone |
-| Deliverable decomposition | Native parent/sub-issues, never scheduling membership |
-| Actual prerequisite | Native blocked-by relationship |
+| Concept                                                        | Mechanism                                                       |
+| -------------------------------------------------------------- | --------------------------------------------------------------- |
+| Concrete feature, bug, verification or engineering deliverable | Issue                                                           |
+| Sprint membership and dates                                    | Native Project **Iteration field**, with agreed cadence/dates   |
+| Continuous delivery without timeboxes                          | Project backlog/Status board and bounded selected-work view     |
+| Work progress                                                  | Work issue progress label and explicitly aligned Project Status |
+| Deliverable outcome                                            | Milestone                                                       |
+| Deliverable decomposition                                      | Native parent/sub-issues, never scheduling membership           |
+| Actual prerequisite                                            | Native blocked-by relationship                                  |
 
 GitHub [Iteration fields](https://docs.github.com/en/issues/planning-and-tracking-with-projects/understanding-fields/about-iteration-fields)
 support dated blocks and filters such as `@current`. No cadence is currently agreed
@@ -307,39 +338,39 @@ After triage, each issue has exactly one primary category and priority, one or
 more relevant areas, and an outcome milestone. Each **open** issue also has exactly
 one progress label and a next action. Additional existing labels are preserved.
 
-| Category | Meaning |
-| --- | --- |
-| `bug` | Reproducible incorrect behaviour |
-| `enhancement` | Product feature/improvement, proposed or approved explicitly |
-| `task` | Engineering, verification, documentation, planning or operations |
+| Category      | Meaning                                                          |
+| ------------- | ---------------------------------------------------------------- |
+| `bug`         | Reproducible incorrect behaviour                                 |
+| `enhancement` | Product feature/improvement, proposed or approved explicitly     |
+| `task`        | Engineering, verification, documentation, planning or operations |
 
 `documentation`, `accessibility` and similar labels are modifiers, not competing
 primary categories. Area labels are `area:editor`, `area:media`, `area:export`,
 `area:preview`, `area:audio`, `area:ci`, `area:container`, `area:licensing` and
 `area:workflow`; add multiple only where the scope actually crosses boundaries.
 
-| Priority | Meaning |
-| --- | --- |
+| Priority      | Meaning                                                                                      |
+| ------------- | -------------------------------------------------------------------------------------------- |
 | `priority:p0` | Critical: active data-loss/security incident or unusable core workflow; interrupt other work |
-| `priority:p1` | High: correctness, source safety or a milestone/release gate |
-| `priority:p2` | Normal: planned feature, usability or maintainability work |
-| `priority:p3` | Low: optional improvement without a current milestone gate |
+| `priority:p1` | High: correctness, source safety or a milestone/release gate                                 |
+| `priority:p2` | Normal: planned feature, usability or maintainability work                                   |
+| `priority:p3` | Low: optional improvement without a current milestone gate                                   |
 
 Priority orders actionable work; it neither removes a dependency/consent requirement
 nor selects deferred container/hardware work for delivery automatically.
 
-| Progress | Meaning |
-| --- | --- |
-| `status:backlog` | Triaged, not selected for active work |
-| `status:ready` | Its stated next step is scoped/actionable without an outstanding prerequisite |
-| `status:in-progress` | Active implementation, investigation or verification |
-| `status:blocked` | Next step waits for a dependency, decision, consent or access; name it |
+| Progress                | Meaning                                                                                   |
+| ----------------------- | ----------------------------------------------------------------------------------------- |
+| `status:backlog`        | Triaged, not selected for active work                                                     |
+| `status:ready`          | Its stated next step is scoped/actionable without an outstanding prerequisite             |
+| `status:in-progress`    | Active implementation, investigation or verification                                      |
+| `status:blocked`        | Next step waits for a dependency, decision, consent or access; name it                    |
 | `status:local-complete` | Implementation/local checks complete; publication, remote acceptance or review may remain |
 
 `status:local-complete` is not all-criteria acceptance, issue closure or a remote
-pass. Verified delivery to remote `main` authorizes automatic concrete-issue closure
-under the gate above; remove obsolete open-progress/current-iteration labels,
-preserving category/priority/area and history.
+pass. Full-delivery PRs close their issues only after pre-merge acceptance and
+required up-to-date CI permit the protected merge. Reconcile obsolete progress
+labels and Project Done afterward, preserving category/priority/area and history.
 `iteration` and `iteration:current` are retained legacy labels, not required triage
 metadata or the future scheduling mechanism. New work is selected through the Project,
 not labeled/parented into a sprint issue.
@@ -351,9 +382,9 @@ these same issues: backlog/table, Status board and iteration/milestone views.
 Keep Project Status aligned with issue progress labels and use labels for priority;
 do not build a competing backlog or unsynchronized priority field. Use a native
 Iteration field for an agreed cadence only, not fabricated dates. Preserve native
-issue parents and blocked-by relationships. Do not enable unconditional Project
-Auto-close workflows or automatic releases, or broaden Actions permissions just to
-manage tracking. Verified issue closure follows the gate above.
+issue parents and blocked-by relationships. Native closed-issue → Done is permitted;
+Project Done → issue closure and automatic releases are not. Do not broaden Actions
+permissions to manage tracking. Verified issue closure follows the gate above.
 
 The initial setup lacked Projects scope. After the owner granted it, **2026-10-04
 CLI read/write access was verified** and
@@ -373,15 +404,15 @@ The historical setup checkpoint contained **16 issues**, with no duplicate
 draft cards, seven saved views and their native labels/milestones/assignees/parent
 fields. The actual view query results were checked, not just filter strings:
 
-| View | Purpose at the setup checkpoint |
-| --- | --- |
-| [Backlog](https://github.com/users/Plonk42/projects/1/views/1) | All 16 issue records with Status, Labels, Milestone and hierarchy fields |
-| [Delivery](https://github.com/users/Plonk42/projects/1/views/2) | Board with the native **Status column field**, verified through API readback |
-| [Current iteration](https://github.com/users/Plonk42/projects/1/views/3) | Eight `iteration:current` issues, including tracker #15 and its seven existing sub-issues |
-| [v0.1 · Local hardening](https://github.com/users/Plonk42/projects/1/views/4) | Ten existing hardening/workflow/feature/iteration records |
-| [v0.2 · Workload qualification](https://github.com/users/Plonk42/projects/1/views/5) | The three existing owner/hardware qualification issues |
-| [v0.3 · Docker & Podman](https://github.com/users/Plonk42/projects/1/views/6) | The three existing future container issues |
-| [High-priority gates](https://github.com/users/Plonk42/projects/1/views/7) | Five open `priority:p1` issues; priority remains an issue label |
+| View                                                                                 | Purpose at the setup checkpoint                                                           |
+| ------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------- |
+| [Backlog](https://github.com/users/Plonk42/projects/1/views/1)                       | All 16 issue records with Status, Labels, Milestone and hierarchy fields                  |
+| [Delivery](https://github.com/users/Plonk42/projects/1/views/2)                      | Board with the native **Status column field**, verified through API readback              |
+| [Current iteration](https://github.com/users/Plonk42/projects/1/views/3)             | Eight `iteration:current` issues, including tracker #15 and its seven existing sub-issues |
+| [v0.1 · Local hardening](https://github.com/users/Plonk42/projects/1/views/4)        | Ten existing hardening/workflow/feature/iteration records                                 |
+| [v0.2 · Workload qualification](https://github.com/users/Plonk42/projects/1/views/5) | The three existing owner/hardware qualification issues                                    |
+| [v0.3 · Docker & Podman](https://github.com/users/Plonk42/projects/1/views/6)        | The three existing future container issues                                                |
+| [High-priority gates](https://github.com/users/Plonk42/projects/1/views/7)           | Five open `priority:p1` issues; priority remains an issue label                           |
 
 Status options are **Backlog, Ready, In progress, Blocked, Local complete and Done**.
 The first five map directly to their `status:*` labels; Done is reserved for
@@ -389,10 +420,14 @@ explicitly accepted/closed issues. **There is no automatic two-way synchronizati
 when updating an issue, set its corresponding Project Status too. If a card is
 dragged, reconcile the issue label and next action before treating that move as a
 tracking update. A card move never approves implementation or issue closure.
+The enabled Item closed workflow is configured for closed-issue → Done as described
+above; closure housekeeping verifies the resulting Status and removes obsolete
+issue progress labels. Open-status synchronization remains explicit.
 
-All six newly created default Project workflows, including **Auto-close issue**,
-were removed **before any issue was added**. No automatic closure, admission,
-relabeling or Status transition is enabled. New triaged issues must be added
+At the historical setup checkpoint, all six default Project workflows, including
+**Auto-close issue**, were removed before any issue was added. The current Item
+closed workflow updates Status only; automatic issue closure from a board move,
+admission and relabeling remain disabled. New triaged issues must be added
 explicitly, keeping their existing IDs and native relationships. No second Priority,
 next-action field or dated Iteration field was added at that checkpoint. The existing
 Current iteration view is label-filtered legacy selection, not a native sprint.
@@ -463,5 +498,5 @@ area labels and an outcome milestone; Project scheduling is separately authorize
 The [PR template](../.github/pull_request_template.md) keeps linked
 tracking, local/remote/hardware verification and remaining next actions distinct.
 GitHub serves the committed templates/instructions after they reach remote `main`.
-Publish approved, validated changes through the automatic-publication checkpoint
+Publish approved, validated changes through the protected-PR checkpoint
 above; issue/label/milestone metadata is applied directly and verified separately.
