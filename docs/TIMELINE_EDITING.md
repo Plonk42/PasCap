@@ -252,8 +252,9 @@ creates implicit keys. **Edit points** shows dependencies and inner **Time, easi
 in one Undo step, with collision and contextual timing validation. List input
 identity/focus and expansion survive a single-point move and Undo.
 
-Within current duration, each row draws **one marker per point**, with participants
-in its title, never per-clip duplicates. **Click or Enter** selects the marker's row
+Each row draws **one marker per stored point**, with participants in its title,
+never per-clip duplicates; points after the last clip keep their markers there
+without extending playback. **Click or Enter** selects the marker's row
 and seeks without editing. **Drag horizontally** to move the shared point:
 
 - Capture the committed project, row/point, zoom, grabbed pointer position,
@@ -275,8 +276,8 @@ and seeks without editing. **Drag horizontally** to move the shared point:
 
 On a focused marker, **Left/Right** moves the point one project frame;
 **Shift+Left/Right** moves ten, without snapping. The cursor/focus follows the
-point (or returns to Timeline if its marker is now outside duration); ordinary
-playhead stepping, clip nudging and other editor shortcuts do not also run.
+point; ordinary playhead stepping, clip nudging and other editor shortcuts do not
+also run.
 Shared time-field editing remains available. A dragged point can be stored beyond
 duration and stays list-editable, but does not extend the sequence merely for the
 point. Moving it copies/shifts no other points, clip/source/static bases or music;

@@ -13,7 +13,7 @@ import { calculateLayout } from '../shared/timeline.js';
 import { formatTimecode, framesToSeconds, secondsToFrames } from '../shared/timing.js';
 import { CLIP_DRAG_TYPE, durationLabel, MEDIA_DRAG_TYPE, shortName, sourceSeconds } from './display.js';
 import { Icon } from './icons.js';
-import { useKeyframeNavigation } from './keyframe-navigation.js';
+import { keyframeNavigationFrame, useKeyframeNavigation } from './keyframe-navigation.js';
 import { clipStartRestriction } from './layer-actions.js';
 import './layers.css';
 import { Layers } from './Layers.js';
@@ -36,7 +36,6 @@ interface Props {
   frame: number;
   onSelect: (id: string) => void;
   onBoundary: (leftId: string) => void;
-  onKeyframesBeyondEnd: (layerId: string, frame: number) => void;
   onSeek: (frame: number) => void;
   onPause: () => void;
   onEdit: (command: EditCommand) => void;
@@ -129,7 +128,7 @@ function timelineSurfaceClassName(error: string, draft: ProjectDocument | null, 
 }
 
 export function Timeline(props: Readonly<Props>) {
-  const { project, assets, audioAssets, selectedClipId, selectedLayerId, onSelectLayer, selectedBoundaryId, frame, onSelect, onBoundary, onKeyframesBeyondEnd, onSeek, onPause, onEdit, onInsert, onPreview, onError, onSplit, onDelete, fitRequest, draggedMediaIds, ranges, onDuplicate, onNudge } = props;
+  const { project, assets, audioAssets, selectedClipId, selectedLayerId, onSelectLayer, selectedBoundaryId, frame, onSelect, onBoundary, onSeek, onPause, onEdit, onInsert, onPreview, onError, onSplit, onDelete, fitRequest, draggedMediaIds, ranges, onDuplicate, onNudge } = props;
   const [snapping, setSnapping] = useState(true);
   const nudgeReasonId = useId();
   const [snapGuide, setSnapGuide] = useState<number | null>(null);
@@ -213,7 +212,9 @@ export function Timeline(props: Readonly<Props>) {
   const unusedTail = source && selected && selectedLayer ? compileLayerRetiming({ ...selected.clip, sourceOut: source.metadata.frameCount }, selectedLayer, selected.start).duration - selected.duration - (layout.duration - selected.end) : 0;
   const trailing = Math.max(96, unusedTail * scale + 24);
   const musicEnd = project.music ? project.music.start + project.music.duration : 0;
-  const width = Math.max(viewportWidth, leading + Math.max(layout.duration, musicEnd, (dropPlan?.start ?? 0) + (dropPlan?.duration ?? 0), keyframes.draft?.frame ?? 0) * scale + trailing, drag.current?.width ?? 0, movement.current?.width ?? 0, keyframes.draft?.width ?? 0);
+  // Stored points after the last clip stay reachable; they never extend the playable duration.
+  const lastKeyframe = Math.max(0, ...project.layers.flatMap((layer) => layer.keyframes.map((point) => point.frame)));
+  const width = Math.max(viewportWidth, leading + Math.max(layout.duration, musicEnd, (dropPlan?.start ?? 0) + (dropPlan?.duration ?? 0), keyframes.draft?.frame ?? 0, lastKeyframe) * scale + trailing, drag.current?.width ?? 0, movement.current?.width ?? 0, keyframes.draft?.width ?? 0);
   const interactionBlocked = timelineInteractionBlocked(draft, keyframes.active, keyframeNavigation.disabled);
   const geometry = drag.current?.edge === 'in' ? calculateLayout(drag.current.base) : layout;
   const rows = timelineRows(project.layers);
@@ -513,21 +514,15 @@ export function Timeline(props: Readonly<Props>) {
           </div>;
         })}
         <TimelineCutMarks marks={props.cutRange} selected={selected} top={rowTop(selected?.clip.layerId ?? project.layers[0]!.id)} leading={leading} scale={scale} />
-        {project.layers.flatMap((layer) => layer.keyframes.filter((point) => point.frame < layout.duration || (keyframes.draft?.layerId === layer.id && keyframes.draft.origin === point.frame)).map((point) => {
+        {project.layers.flatMap((layer) => layer.keyframes.map((point) => {
           const settings = keySettings(point).map((setting) => KEYFRAME_SETTINGS.find((definition) => definition.key === setting)!.label).join(' · ');
           const active = keyframes.draft?.layerId === layer.id && keyframes.draft.origin === point.frame;
           const displayedFrame = active ? keyframes.draft!.frame : point.frame;
-          return <button type="button" key={`${layer.id}-${point.frame}`} className={`timeline-layer-key ${layer.id === selectedLayerId && displayedFrame === frame ? 'active' : ''} ${active ? 'moving' : ''} ${active && keyframes.draft!.error ? 'invalid' : ''}`} data-layer-keyframe={displayedFrame} data-keyframe-origin={point.frame} data-keyframe-layer={layer.id} aria-label={`Layer keyframe ${displayedFrame} on ${layer.name}`} aria-pressed={layer.id === selectedLayerId && displayedFrame === frame} title={`${layer.name} · ${formatTimecode(displayedFrame)} · ${settings} · Drag to move all participants; Arrow keys: 1 frame, Shift: 10. Alt bypasses snapping.`} style={{ top: rowTop(layer.id) + 48, left: leading + displayedFrame * scale }} draggable={false} disabled={interactionBlocked && !active}
+          const current = layer.id === selectedLayerId && displayedFrame === keyframeNavigationFrame(keyframeNavigation.inspection, layer.id, frame);
+          return <button type="button" key={`${layer.id}-${point.frame}`} className={`timeline-layer-key ${current ? 'active' : ''} ${active ? 'moving' : ''} ${active && keyframes.draft!.error ? 'invalid' : ''}`} data-layer-keyframe={displayedFrame} data-keyframe-origin={point.frame} data-keyframe-layer={layer.id} aria-label={`Layer keyframe ${displayedFrame} on ${layer.name}`} aria-pressed={current} title={`${layer.name} · ${formatTimecode(displayedFrame)} · ${settings} · Drag to move all participants; Arrow keys: 1 frame, Shift: 10. Alt bypasses snapping.`} style={{ top: rowTop(layer.id) + 48, left: leading + displayedFrame * scale }} draggable={false} disabled={interactionBlocked && !active}
             onPointerDown={(event) => keyframes.begin(event, layer.id, point.frame)} onPointerMove={keyframes.move} onPointerUp={keyframes.finish} onPointerCancel={keyframes.cancel} onLostPointerCapture={keyframes.cancel}
             onKeyDown={(event) => keyframes.keyboard(event, layer.id, point.frame)} onClick={(event) => { event.stopPropagation(); if (event.detail === 0) keyframeNavigation.onSeekKeyframe(layer.id, point.frame); }}>◆</button>;
         }))}
-        {project.layers.map((layer) => {
-          const beyond = layer.keyframes.filter((point) => point.frame >= layout.duration && !(keyframes.draft?.layerId === layer.id && keyframes.draft.origin === point.frame));
-          if (beyond.length === 0) return null;
-          const inspected = keyframeNavigation.inspection?.layerId === layer.id && keyframeNavigation.inspection.frame >= layout.duration;
-          const noun = beyond.length === 1 ? 'point' : 'points';
-          return <button type="button" key={`beyond-${layer.id}`} className={`timeline-layer-keys-beyond ${inspected ? 'active' : ''}`} data-layer-keyframes-beyond={layer.id} aria-label={`${beyond.length} layer keyframe ${noun} after the end of the timeline on ${layer.name}`} aria-pressed={inspected} disabled={interactionBlocked} title={`${beyond.length} stored ${noun} on ${layer.name} start after the last frame and still affect it. Open Layer keyframes to edit or remove ${beyond.length === 1 ? 'it' : 'them'}.`} style={{ top: rowTop(layer.id) + 48, left: leading + layout.duration * scale + 8 }} onClick={() => onKeyframesBeyondEnd(layer.id, beyond[0]!.frame)}>◆ {beyond.length} after end</button>;
-        })}
         {geometry.transitions.map((region, index) => {
           const left = assets.find((asset) => asset.id === project.clips.find((clip) => clip.id === region.transition.leftId)?.mediaId)?.name ?? `Excerpt ${index + 1}`;
           const position = region.transition.type === 'cross-dissolve' ? (region.start + region.end) / 2 : region.boundary;
