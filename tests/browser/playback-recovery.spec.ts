@@ -282,6 +282,7 @@ async function attachEvidence(page: Page, browser: Browser, withMusic: boolean, 
             decoders: Array.from(document.querySelectorAll<HTMLVideoElement>('video[data-pascap-decoder]')).map(video => ({ slot: video.dataset['pascapDecoder'], time: video.currentTime, seeking: video.seeking, paused: video.paused, ready: video.readyState })),
             decoderEvents: Reflect.get(window, 'recoveryDecoderEvents'),
             videoCatchUpRecovery: Reflect.get(window, 'videoCatchUpRecovery'),
+            renderClockAdvance: Reflect.get(window, 'renderClockAdvance'),
             callbackGate: { heldFrame: gate.heldFrame, heldCallbacks: gate.heldCallbacks, releasedCallbacks: gate.releasedCallbacks },
         };
     });
@@ -404,6 +405,71 @@ test('native-event-ordered video catch-up preserves healthy music and exact sour
         await page.evaluate(() => window.playbackRecoveryGate.release?.());
         await attachEvidence(page, browser, true, false);
     }
+});
+
+test('Playing publication rechecks real audio output after bounded render-thread delay', async ({ page, request, browser, browserName }) => {
+    test.setTimeout(45_000);
+    const fixture = await openRecoveryProject(page, request, true);
+    try {
+        await page.evaluate(() => {
+            Reflect.set(window, 'renderClockAdvance', null);
+            const draw = WebGL2RenderingContext.prototype.drawArrays;
+            WebGL2RenderingContext.prototype.drawArrays = function(...args) {
+                Reflect.apply(draw, this, args);
+                const engine = window.pascapLab!.engine;
+                const state = engine.diagnostics();
+                const music = window.musicStreamEvidence;
+                const receipt = music.receipt;
+                if (this.canvas !== engine.canvas || state.status !== 'playing' || state.requestedFrame < 10 ||
+                    !receipt || !music.context || Reflect.get(window, 'renderClockAdvance') !== null) return;
+                const started = performance.now();
+                let audioFrame = state.requestedFrame;
+                // Delay one real draw until the independently rendered/output
+                // audio is beyond every eligible neighbour. No timestamp, receipt, image
+                // or engine clock is changed; this models bounded upload/draw
+                // work while the real audio thread continues consuming samples.
+                while (audioFrame < state.requestedFrame + 3 && performance.now() - started < 500) {
+                    const output = music.context.getOutputTimestamp();
+                    const samples = receipt.samples + output.contextTime! * 48_000 - receipt.contextFrame;
+                    audioFrame = Math.floor(receipt.startFrame + samples / (48_000 * 1_001 / 30_000) + 1e-7);
+                }
+                Reflect.set(window, 'renderClockAdvance', { requested: state.requestedFrame, audioFrame, elapsed: performance.now() - started });
+                queueMicrotask(() => {
+                    const after = engine.diagnostics();
+                    const output = music.context!.getOutputTimestamp();
+                    const samples = receipt.samples + output.contextTime! * 48_000 - receipt.contextFrame;
+                    const presentedFrame = Math.floor(receipt.startFrame + samples / (48_000 * 1_001 / 30_000) + 1e-7);
+                    const pixel = new Uint8Array(4);
+                    this.readPixels(0, 0, 1, 1, this.RGBA, this.UNSIGNED_BYTE, pixel);
+                    Reflect.set(window, 'renderClockAdvance', {
+                        requested: state.requestedFrame, audioFrame, elapsed: performance.now() - started,
+                        after, presentedFrame, output, pixel: Array.from(pixel),
+                    });
+                });
+            };
+        });
+        await startPlayback(page); await waitForCompletion(page);
+        const witness = await page.evaluate(() => Reflect.get(window, 'renderClockAdvance') as {
+            requested: number; audioFrame: number; elapsed: number;
+            after: { status: string; frame: number; requestedFrame: number }; presentedFrame: number; pixel: number[];
+        } | null);
+        expect(witness).not.toBeNull();
+        // Chrome exposes advancing output time during synchronous JS, giving
+        // a causal stale-image red/green. Firefox can cache its native timestamp
+        // until the task yields: validate that real clock too, without faking it
+        // or requiring Chrome's clock-update delivery on a different backend.
+        if (browserName === 'chromium') expect(witness!.audioFrame - witness!.requested).toBeGreaterThanOrEqual(3);
+        // The surface/status must be valid even between throttled notifications,
+        // not merely omit an otherwise invalid Playing subscription snapshot.
+        if (witness!.after.status === 'playing') {
+            expect(Math.abs(witness!.presentedFrame - witness!.after.frame), JSON.stringify(witness)).toBeLessThanOrEqual(1);
+        } else {
+            expect(witness!.after.status, JSON.stringify(witness)).toBe('buffering');
+            expect(witness!.after.requestedFrame).toBeGreaterThanOrEqual(witness!.audioFrame);
+            expect(witness!.pixel).toEqual([0, 0, 0, 255]);
+        }
+        await assertCompleted(page, fixture, true);
+    } finally { await attachEvidence(page, browser, true, false); }
 });
 
 for (const withMusic of [false, true]) {
