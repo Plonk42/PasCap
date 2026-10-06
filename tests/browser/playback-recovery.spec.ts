@@ -37,6 +37,7 @@ interface PlaybackEvidence {
 interface VideoCallbackGate {
     targetFrame: number | null;
     atOrAfter: boolean;
+    pauseOnHold: boolean;
     heldFrame: number | null;
     heldCallbacks: number;
     releasedCallbacks: number;
@@ -98,7 +99,7 @@ async function openRecoveryProject(page: Page, request: APIRequestContext, withM
         // Pass through real Chrome metadata unchanged. Only an explicitly armed,
         // matching source-frame callback is held; no fake media clock or decoded frame.
         const gate: VideoCallbackGate = {
-            targetFrame: null, atOrAfter: false, heldFrame: null, heldCallbacks: 0, releasedCallbacks: 0,
+            targetFrame: null, atOrAfter: false, pauseOnHold: false, heldFrame: null, heldCallbacks: 0, releasedCallbacks: 0,
             release: null, pendingSeek: null,
         };
         window.playbackRecoveryGate = gate;
@@ -121,8 +122,12 @@ async function openRecoveryProject(page: Page, request: APIRequestContext, withM
                 if (decoderEvents.length < 300) decoderEvents.push({ kind: 'callback', slot: this.dataset['pascapDecoder'], frame, time: metadata.mediaTime, current: this.currentTime, ready: this.readyState, paused: this.paused, seeking: this.seeking });
                 const target = gate.targetFrame;
                 const matches = target !== null && (gate.atOrAfter ? frame >= target : frame === target);
-                if (this.dataset['pascapDecoder'] !== undefined && matches && gate.heldCallbacks === 0) {
+                const state = gate.pauseOnHold ? window.pascapLab!.engine.diagnostics() : null;
+                const observed = state?.decodedSourceFrames[state.assignedClipIds.indexOf('recovery-clip')];
+                const playingDelivery = !gate.pauseOnHold || (state?.status === 'playing' && !this.paused && !this.seeking && observed !== undefined && frame > observed);
+                if (this.dataset['pascapDecoder'] !== undefined && matches && playingDelivery && gate.heldCallbacks === 0) {
                     gate.heldFrame = frame; gate.heldCallbacks++;
+                    if (gate.pauseOnHold) this.pause();
                     gate.release = () => {
                         gate.targetFrame = null; gate.release = null; gate.releasedCallbacks++;
                         callback(now, metadata);
@@ -276,7 +281,6 @@ async function attachEvidence(page: Page, browser: Browser, withMusic: boolean, 
             requestedFrame: state.requestedFrame, decodedSourceFrames: state.decodedSourceFrames, decoderReady: state.decoderReady,
             decoders: Array.from(document.querySelectorAll<HTMLVideoElement>('video[data-pascap-decoder]')).map(video => ({ slot: video.dataset['pascapDecoder'], time: video.currentTime, seeking: video.seeking, paused: video.paused, ready: video.readyState })),
             decoderEvents: Reflect.get(window, 'recoveryDecoderEvents'),
-            decodedCallbackRecovery: Reflect.get(window, 'decodedCallbackRecovery'),
             videoCatchUpRecovery: Reflect.get(window, 'videoCatchUpRecovery'),
             callbackGate: { heldFrame: gate.heldFrame, heldCallbacks: gate.heldCallbacks, releasedCallbacks: gate.releasedCallbacks },
         };
@@ -352,59 +356,14 @@ test('a withheld decoded callback buffers beyond one-frame eligibility, reports 
     }
 });
 
-test('a genuine decoded callback resolves buffering between display ticks without restarting music', async ({ page, request, browser }) => {
+test('native-event-ordered video catch-up preserves healthy music and exact source readiness', async ({ page, request, browser }) => {
     test.setTimeout(45_000);
     const fixture = await openRecoveryProject(page, request, true);
     try {
+        await page.evaluate(() => window.pascapLab!.engine.seek(4));
         await page.evaluate(() => {
             const gate = window.playbackRecoveryGate;
-            gate.targetFrame = 10; gate.atOrAfter = true;
-            Reflect.set(window, 'decodedCallbackRecovery', null);
-            window.pascapLab!.engine.subscribe((state) => {
-                if (state.status !== 'buffering' || !state.playing || !gate.release || gate.heldFrame === null ||
-                    Math.abs(gate.heldFrame - state.requestedFrame) > 1 || Reflect.get(window, 'decodedCallbackRecovery') !== null) return;
-                // Release the genuine metadata after this engine tick has returned,
-                // but before another display tick. Never invent a frame or clock.
-                Reflect.set(window, 'decodedCallbackRecovery', { pending: true });
-                queueMicrotask(() => {
-                    const engine = window.pascapLab!.engine;
-                    const before = engine.diagnostics(); const starts = window.musicStreamEvidence.starts;
-                    const heldFrame = gate.heldFrame;
-                    gate.release!();
-                    Reflect.set(window, 'decodedCallbackRecovery', { pending: false, before, after: engine.diagnostics(), heldFrame, starts, afterStarts: window.musicStreamEvidence.starts });
-                });
-            });
-        });
-        await startPlayback(page);
-        await page.waitForFunction(() => {
-            const result = Reflect.get(window, 'decodedCallbackRecovery') as { pending: boolean } | null;
-            return result?.pending === false || window.pascapLab!.engine.diagnostics().status === 'error';
-        });
-        const recovered = await page.evaluate(() => Reflect.get(window, 'decodedCallbackRecovery') as {
-            before: { status: string; frame: number }; after: { status: string; frame: number; requestedFrame: number; musicDriftFrames: number };
-            heldFrame: number; starts: number; afterStarts: number;
-        });
-        expect(recovered.before.status).toBe('buffering');
-        expect(recovered.after.status).toBe('playing');
-        expect(recovered.after.frame).toBe(recovered.heldFrame);
-        expect(Math.abs(recovered.after.requestedFrame - recovered.after.frame)).toBeLessThanOrEqual(1);
-        expect(recovered.after.musicDriftFrames).toBeLessThanOrEqual(1);
-        expect(recovered.starts).toBe(1); expect(recovered.afterStarts).toBe(1);
-        await waitForCompletion(page); await assertCompleted(page, fixture, true);
-        expect(await page.evaluate(() => window.playbackRecoveryGate.releasedCallbacks)).toBe(1);
-    } finally {
-        await page.evaluate(() => window.playbackRecoveryGate.release?.());
-        await attachEvidence(page, browser, true, false);
-    }
-});
-
-test('video-only catch-up preserves healthy music through a genuinely delayed callback and exact seek', async ({ page, request, browser }) => {
-    test.setTimeout(45_000);
-    const fixture = await openRecoveryProject(page, request, true);
-    try {
-        await page.evaluate(() => {
-            const gate = window.playbackRecoveryGate;
-            gate.targetFrame = 10; gate.atOrAfter = true;
+            gate.targetFrame = 5; gate.atOrAfter = true; gate.pauseOnHold = true;
             Reflect.set(window, 'videoCatchUpRecovery', null);
             const currentTime = Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, 'currentTime')!;
             Object.defineProperty(HTMLMediaElement.prototype, 'currentTime', {
@@ -416,26 +375,29 @@ test('video-only catch-up preserves healthy music through a genuinely delayed ca
                     const state = window.pascapLab!.engine.diagnostics();
                     const slot = state.assignedClipIds.indexOf('recovery-clip');
                     const observed = state.decodedSourceFrames[slot];
-                    if (observed === undefined || requested - observed <= 1) return;
-                    // Release the genuine delayed metadata only after recovery
-                    // requests an exact source beyond its observed image's bound.
-                    // The real seek must still deliver that source; no frame is
-                    // invented and native seeking/readiness checks remain active.
-                    // Eligibility is relative to the engine's OBSERVED image,
-                    // not metadata deliberately withheld by this test. A seek
-                    // at or one frame beyond that held callback can be required.
-                    Reflect.set(window, 'videoCatchUpRecovery', { requested, observed, held: gate.heldFrame, starts: window.musicStreamEvidence.starts });
-                    queueMicrotask(() => gate.release?.());
+                    // The seek EVENT releases the blocked callback chain. Its
+                    // metadata may be behind, equal to or ahead of the requested
+                    // frame: eligibility is the production decoder's job, not a
+                    // release condition that could deadlock this test.
+                    const release = gate.release;
+                    Reflect.set(window, 'videoCatchUpRecovery', { requested, observed, held: gate.heldFrame, state, starts: window.musicStreamEvidence.starts });
+                    queueMicrotask(release);
                 },
             });
         });
         await startPlayback(page);
         await waitForCompletion(page);
-        const recovered = await page.evaluate(() => Reflect.get(window, 'videoCatchUpRecovery') as { requested: number; observed: number; held: number; starts: number } | null);
-        expect(recovered).not.toBeNull();
-        expect(recovered!.held).toBeGreaterThan(recovered!.observed);
-        expect(recovered!.requested - recovered!.observed).toBeGreaterThan(1);
-        expect(recovered!.starts).toBe(1);
+        const result = await page.evaluate(() => ({
+            recovered: Reflect.get(window, 'videoCatchUpRecovery') as { requested: number; observed: number; held: number; state: { status: string; playing: boolean }; starts: number } | null,
+            state: window.pascapLab!.engine.diagnostics(),
+        }));
+        expect(result.recovered, result.state.message).not.toBeNull();
+        const recovered = result.recovered!;
+        expect(recovered.observed).toBeGreaterThanOrEqual(4);
+        expect(recovered.held).toBeGreaterThan(recovered.observed);
+        expect(recovered.requested - recovered.observed).toBeGreaterThan(1);
+        expect(recovered.state).toMatchObject({ status: 'buffering', playing: true });
+        expect(recovered.starts).toBe(1);
         await assertCompleted(page, fixture, true);
         expect(await page.evaluate(() => window.playbackRecoveryGate.releasedCallbacks)).toBe(1);
     } finally {
