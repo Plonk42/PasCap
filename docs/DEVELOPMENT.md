@@ -89,9 +89,35 @@ npm run test:browser
 Chrome remains the full browser validation target. The
 [Firefox configuration](../playwright.firefox.config.ts) runs the same isolated
 synthetic service/fixtures with Playwright's Firefox, not an existing desktop
-Firefox profile. Install it with `npx playwright install firefox`; after the
-ordinary build and clean browser fixture setup, run
-`npx playwright test --config=playwright.firefox.config.ts tests/browser/music-clock.spec.ts tests/browser/playback-recovery.spec.ts --grep 'streaming music clock|streamed PCM|with music normal speed|with music and a callback-gated cancellation'`.
+Firefox profile. Install it with `npx playwright install --with-deps firefox`.
+GPU-less Linux also needs Xvfb/xauth and Mesa EGL/GLX/DRI: packages `xvfb`, `xauth`,
+`libgl1-mesa-dri`, `libegl-mesa0` and `libglx-mesa0`. After the ordinary build and
+clean browser fixture setup, reproduce the CI graphics environment with:
+
+```sh
+LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe \
+__GLX_VENDOR_LIBRARY_NAME=mesa \
+__EGL_VENDOR_LIBRARY_FILENAMES=/usr/share/glvnd/egl_vendor.d/50_mesa.json \
+xvfb-run -a npx playwright test --config=playwright.firefox.config.ts \
+  tests/browser/music-clock.spec.ts tests/browser/playback-recovery.spec.ts \
+  --grep 'streaming music clock|streamed PCM|with music normal speed|with music and a callback-gated cancellation'
+```
+
+Firefox remains headless, but its native graphics probe needs a working display:
+without one, Firefox can reject WebGL2 with `AllowWebgl2:false` before compositor
+startup. Xvfb supplies that display and Mesa llvmpipe supplies real software GL;
+no WebGL force-enable/blocklist bypass, capability override or mock is used.
+The Firefox-only [prerequisite check](../scripts/ci/firefox-webgl.ts) fails before
+media tests when real WebGL2 context creation, production compositor shader
+compilation/linking or exact one-pixel clear/readback is unavailable. Browser launch
+has a 15-second deadline; page creation/graphics probing has a separate 10-second
+deadline. Failure reports the native context reason and setup guidance rather than
+waiting through five preview-readiness timeouts. Success logs the browser version,
+actual renderer, shader status and readback; renderer sanitization is disabled only
+in the disposable test profile for this evidence, not in the product. The playback
+tests still initialize the real editor/compositor and keep their existing exact
+frame, PCM, drift, range-read and cancellation assertions.
+
 The [music-clock regression](../tests/browser/music-clock.spec.ts) requires one
 uninterrupted music start from zero or a nonzero seek, bounded range reads and
 actual downstream PCM amplitude/placement silence. The selected recovery tests
@@ -174,7 +200,9 @@ The [workflow](../.github/workflows/ci.yml) runs:
 - Linux unit/typecheck/build checks on **Node 22 and 24**.
 - Native/media, full Chrome/browser and scoped Firefox music checks on **Node 22**, using **FFmpeg/ffprobe
   8.0.1 built from pinned source** via a setup script/cached toolchain, not runner
-  apt FFmpeg 6 or an implied untested version-support claim.
+  apt FFmpeg 6 or an implied untested version-support claim. Firefox alone runs
+  under Xvfb with Mesa llvmpipe and a fail-closed real WebGL2 prerequisite; its
+  software-rendering environment is not applied to Chrome or native jobs.
 - PRs targeting `main`, pushes to `main` and `workflow_dispatch`; read-only repository
   permissions, dependency/toolchain caching and failure-only outputs including
   retained Playwright traces/screenshots.
