@@ -413,20 +413,28 @@ test('video-only catch-up preserves healthy music through a genuinely delayed ca
                     currentTime.set!.call(this, value);
                     if (this.dataset['pascapDecoder'] === undefined || !gate.release || gate.heldFrame === null) return;
                     const requested = Math.floor(value * 30_000 / 1_001);
-                    if (requested <= gate.heldFrame + 1) return;
+                    const state = window.pascapLab!.engine.diagnostics();
+                    const slot = state.assignedClipIds.indexOf('recovery-clip');
+                    const observed = state.decodedSourceFrames[slot];
+                    if (observed === undefined || requested - observed <= 1) return;
                     // Release the genuine delayed metadata only after recovery
-                    // requests a different exact source. The actual decoder must
-                    // subsequently deliver that new image; no frame is invented.
-                    Reflect.set(window, 'videoCatchUpRecovery', { requested, held: gate.heldFrame, starts: window.musicStreamEvidence.starts });
+                    // requests an exact source beyond its observed image's bound.
+                    // The real seek must still deliver that source; no frame is
+                    // invented and native seeking/readiness checks remain active.
+                    // Eligibility is relative to the engine's OBSERVED image,
+                    // not metadata deliberately withheld by this test. A seek
+                    // at or one frame beyond that held callback can be required.
+                    Reflect.set(window, 'videoCatchUpRecovery', { requested, observed, held: gate.heldFrame, starts: window.musicStreamEvidence.starts });
                     queueMicrotask(() => gate.release?.());
                 },
             });
         });
         await startPlayback(page);
         await waitForCompletion(page);
-        const recovered = await page.evaluate(() => Reflect.get(window, 'videoCatchUpRecovery') as { requested: number; held: number; starts: number } | null);
+        const recovered = await page.evaluate(() => Reflect.get(window, 'videoCatchUpRecovery') as { requested: number; observed: number; held: number; starts: number } | null);
         expect(recovered).not.toBeNull();
-        expect(recovered!.requested - recovered!.held).toBeGreaterThan(1);
+        expect(recovered!.held).toBeGreaterThan(recovered!.observed);
+        expect(recovered!.requested - recovered!.observed).toBeGreaterThan(1);
         expect(recovered!.starts).toBe(1);
         await assertCompleted(page, fixture, true);
         expect(await page.evaluate(() => window.playbackRecoveryGate.releasedCallbacks)).toBe(1);
