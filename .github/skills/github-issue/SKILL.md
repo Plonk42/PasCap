@@ -1,7 +1,7 @@
 ---
 name: github-issue
-description: 'Log and triage a PasCap GitHub issue from a short request. Use /github-issue to search for duplicates, record scoped bugs, feature proposals or tasks, and apply category, priority, area, status, outcome milestone and linked Project tracking.'
-argument-hint: 'Describe the bug, feature proposal or task to log'
+description: "Log and triage a PasCap GitHub issue from a short request. Use /github-issue to search for duplicates, record scoped bugs, feature proposals or tasks, and apply category, priority, area, status, outcome milestone and linked Project tracking."
+argument-hint: "Describe the bug, feature proposal or task to log"
 user-invocable: true
 disable-model-invocation: true
 ---
@@ -12,16 +12,16 @@ Turn the text following `/github-issue` into one scoped GitHub issue, or reuse a
 existing matching issue. Invocation authorizes logging and triage, **not product
 implementation**, publication, iteration admission, issue closure or media jobs.
 Do not run this workflow merely because an example invocation appears in chat.
-The standing automatic-publication/verified-closure policy applies when delivering
+The standing protected-PR/pre-merge-acceptance policy applies when delivering
 approved work, not while merely logging an issue; see the
-[GitHub workflow](../../../docs/GITHUB_WORKFLOW.md#automatic-publication-to-main).
+[GitHub workflow](../../../docs/GITHUB_WORKFLOW.md#protected-pr-delivery).
 
 Explicit `/github-issue` invocation requests tracking. Do not invoke this skill
 implicitly for trivial non-functional formatting/import sorting/typos or a request
 to commit/push already-reviewed housekeeping: those need no issue or Project card.
-Substantive bugs/features/engineering work still use scoped issues. Session-owned
-CI watching and LLM-driven acceptance/closure happen at verified delivery, never
-while merely logging an issue or through installed background closure automation.
+Substantive bugs/features/engineering work still use scoped issues. Housekeeping
+also uses protected PRs. Pre-merge acceptance and native auto-merge/eligible closure
+belong to approved delivery, never issue logging; no custom closure automation.
 
 ## Inspect first
 
@@ -33,8 +33,8 @@ while merely logging an issue or through installed background closure automation
    Prefer tools on the verified host; use `gh api --hostname github.com` when the
    integration targets another host. Never display tokens or request secrets.
 3. Fetch live labels, open outcome milestones, and repository-linked Projects with
-  their Status fields/options and native Iteration/selected-work context. Do not
-  look for or create a sprint-tracker issue as the scheduling mechanism. Discover IDs rather
+   their Status fields/options and native Iteration/selected-work context. Do not
+   look for or create a sprint-tracker issue as the scheduling mechanism. Discover IDs rather
    than hard-coding them. Follow pagination; do not treat a partial list as complete.
    For organization repositories, check supported native issue types as well;
    native types do not replace required category labels.
@@ -115,14 +115,14 @@ credentials, licensed recordings/music or generated diagnostic reports.
    deliberately instead of appending another category/priority/status.
 2. Add the **same issue** once to the repository-linked Project, not a draft card or
    duplicate. Explicitly set its native Status to match its issue progress label:
-  Backlog, Ready, In progress, Blocked or Local complete. Done is for verified
-  closed issues only. Logging does not run publication or delivery closure; the
-  standing validated-step push and verified remote-main closure policies are in
-  the GitHub workflow. Do not configure
-  unconditional Project Auto-close workflows.
+   Backlog, Ready, In progress, Blocked or Local complete. Done is for verified
+   closed issues only. Logging does not run publication or delivery closure; the
+   standing protected-PR and pre-merge acceptance policies are in the GitHub
+   workflow. Native closed-issue → Done is permitted when available, but never
+   Project Done → issue closure or a custom closure workflow.
 3. If Project/dependency access is unavailable, record the exact limitation and next
-  action on the actual work issue and continue what is accessible. Do not create a
-  fallback sprint issue/checklist or claim unavailable synchronization succeeded.
+   action on the actual work issue and continue what is accessible. Do not create a
+   fallback sprint issue/checklist or claim unavailable synchronization succeeded.
 4. If a write times out or its result is uncertain, read/search current state before
    retrying; never blindly create a second issue, comment or Project item.
 5. Read back the issue and Project item. Verify category/priority/status cardinality,
