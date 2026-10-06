@@ -6,8 +6,10 @@ PR completes every non-CI acceptance criterion, with no remaining hardware/owner
 gate. Partial/investigation PRs merely reference it. Housekeeping needs no invented
 issue/card; write "Not needed — housekeeping" here instead. -->
 
-<!-- Approved logical steps are published on short-lived branches through protected
-PRs, never direct main pushes or administrator bypass. Before enabling native
+<!-- This template is for code/mixed and other PR-path work. Pure workflow/instruction
+text is committed and pushed directly to main after documentation checks with
+[skip ci], without creating a PR; executable CI/scripts/hooks are not eligible.
+Approved PR-path steps use short-lived branches, never direct main pushes or administrator bypass. Before enabling native
 squash auto-merge, review/validate the exact head and record non-CI acceptance below.
 Required up-to-date PR CI gates merge/closure; main push CI is a regression backstop.
 Releases, milestones, legacy cleanup and real-media jobs remain separate. -->

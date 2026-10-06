@@ -4,7 +4,8 @@ GitHub [issues](https://github.com/Plonk42/PasCap/issues) are the system of reco
 for substantive bugs, approved features, engineering tasks, next actions and blockers.
 Not every action needs an issue: trivial non-functional formatting/import sorting,
 typos and committing already-reviewed housekeeping use a descriptive commit and
-protected PR, local verification and a concise chat handoff. Do not create
+local verification with a concise chat handoff. Code/mixed housekeeping uses a
+protected PR; pure workflow/instruction text uses the direct-main exception below. Do not create
 an issue, Project card or artificial acceptance checklist merely to commit/push.
 Use an issue when work needs substantive scope/acceptance, investigation, coordination
 or persistent follow-up, or when the owner explicitly asks to log it. Native dependencies,
@@ -47,10 +48,14 @@ and verification snapshots remain in Git history; they are not current acceptanc
    `(#N)`, for example `Improve timeline scrolling (#18)`, never `(Refs #N)` or
    closing keywords in titles/commits. Publish approved, validated logical-step
    commits to short-lived branches and open/update protected PRs targeting `main`,
-   without repeated approval. Issue-free housekeeping uses a descriptive message without a
+   except [pure workflow/instruction text](#direct-main-workflowinstruction-text),
+   which is committed and pushed directly without a PR/full CI cycle.
+   No repeated publication approval is needed. Issue-free housekeeping uses a descriptive message without a
    reference and needs no issue/Project administration. An unpublished SHA is a local reference, not a working GitHub
    commit link; report any publication blocker.
-5. **Accept before auto-merge.** Verify non-CI acceptance against live scope and the
+5. **Accept the delivery.** Pure workflow/instruction text uses its documentation
+   checks and verified remote-main containment, without waiting for CI. For PR work,
+   verify non-CI acceptance against live scope and the
    exact reviewed PR head before enabling native auto-merge. A full-delivery PR may
    then use `Closes #N` in its description; partial work merely references its issue.
    Required up-to-date PR CI gates merge and eligible issue closure. Main push CI is
@@ -154,15 +159,61 @@ separate reporting requirement for every future task.
 
 The owner authorizes publishing approved, reviewed, validated work on short-lived
 branches and opening/updating PRs targeting the default branch, `main`, without
-repeated approval. **Never push directly to `main` or bypass protection**, including
-as administrator. Housekeeping also uses PRs but needs no invented issue. Logging
+repeated approval. **Code/mixed changes must never be pushed directly to `main` or
+use administrator bypass.** Only the pure-text exception below permits direct-main
+publication. Housekeeping needs no invented issue. Logging
 an issue alone does not approve implementation, release or scope expansion.
+
+### Direct-main workflow/instruction text
+
+Pure workflow/instruction text **must be committed and pushed directly to `main`**,
+without a PR or a full unit/build/browser/native/remote-CI validation cycle. This
+applies to reviewed agent instructions, prose contributor/delivery policies and
+textual planning/PR checklists. It is not an exemption for all documentation or
+anything named "workflow": executable Actions workflows, scripts, hooks, tests,
+dependencies, build/service configuration, runtime behaviour and mixed changes
+remain on the protected PR path with their applicable checks. Scope is judged from
+the complete diff and every outgoing commit, not a filename or an issue label.
+
+1. Fetch/read back actual remote `main` before edits or validation; inspect existing
+   work and jobs. Prefer the existing clean, idle checkout on fast-forwarded `main`
+   without creating a task branch or worktree. If dirty/busy primary work must stay
+   intact, a clean exception checkout based on that exact SHA may publish `HEAD:main`;
+   record its isolation reason and retirement condition. Never move dirty local
+   `main`, stash/reset/discard unrelated work or publish an unreviewed prior task.
+2. Format/save the changed text, validate content, local links/anchors, whitespace
+   and privacy, then review and stage only this scope. Do not create a PR, issue or
+   acceptance checklist merely for a routine instruction edit; substantive tracked
+   policy work uses its existing issue. Commit each coherent reviewed step, using
+   `(#N)` when tracked and **`[skip ci]` in the qualifying push's tip commit**.
+   GitHub's native push skip marker avoids the full CI cycle without changing the
+   CI workflow. Never put this marker on a code/mixed commit or code-delivery PR.
+3. Refetch/read back remote `main`, prove its SHA is an ancestor of the candidate
+   and review **all** outgoing commits as pure eligible text. Push normally and
+   explicitly to `main`, never force-push. If main moved incompatibly, access is
+   unavailable or the reviewed scope is no longer isolated, stop publication and
+   record the blocker; do not weaken protections or silently bundle code to push.
+4. Read back remote `main` and prove the intended commits are contained. Report the
+   delivered SHA and documentation checks; do not claim skipped CI passed. For an
+   actually completed tracked policy issue, read live scope/acceptance, post this
+   evidence, close manually with reason **completed**, remove obsolete progress
+   labels and set/read back Project **Done**. There is no additional CI wait.
+   Retire a disposable exception worktree through the normal safety gate.
+
+The owner explicitly approved **administrator bypass** for this route: required
+PR/check settings remain configured, but `enforce_admins` is disabled. GitHub cannot
+enforce this exception by changed paths and technically allows broader owner/admin
+bypass. The agent must enforce the narrow pure-text rule and must not use this
+capability for code, failed code checks or emergency mixed deliveries. Do not toggle
+protection per push, relax check requirements, add skip jobs or broaden credentials.
 
 ### Start every new task from current main
 
 Complete this gate **before editing or validating a new task**, not only before
 publication. It applies to housekeeping too; logging a proposal does not select
 implementation. A fresh chat is not proof of a fresh Git base.
+Pure workflow/instruction text follows the direct-main gate above; the new-branch
+steps below apply to the normal PR path.
 
 **Branches in the existing clean, idle checkout are the default for sequential
 work.** A new task/chat, logical-step commit or ordinary PR CI wait does not itself
@@ -249,6 +300,8 @@ and cleanup. Do not install a cleanup hook, background job or scheduled sweeper.
    contained in freshly fetched, remote-verified `main`. With squash merges, the
    old local head need not be an ancestor: check the accepted PR head/merged result
    and any later local commits instead. Preserve unpublished/local-only work.
+   For pure-text direct-main delivery, verify the reviewed commits themselves are
+   on remote `main`; no PR/merge evidence is required for that route.
    Detached baseline/reproduction trees retire when their last dependent task no
    longer needs them; a closed issue or deleted remote branch alone proves neither.
 3. **Inspect every class of contents.** Review staged/unstaged changes, all untracked
@@ -277,7 +330,8 @@ and cleanup. Do not install a cleanup hook, background job or scheduled sweeper.
    legitimate retention reasons, not silent exceptions. Recheck them at the next
    checkpoint; do not create a second cleanup ledger or issue for each directory.
    Keep private absolute paths out of public updates. Retire the workflow task's
-   own tree through the same gate once its PR has actually merged.
+   own tree through the same gate once its PR has actually merged or its eligible
+   direct-main commits are verified published.
 
 ### Repository merge requirements
 
@@ -296,9 +350,11 @@ individually, with GitHub Actions as their expected source. Keep job names uniqu
 Do not add path filters, conditional skips, retries or weaker assertions to satisfy
 protection. CI has read-only repository permissions and no merge/issue-writing job.
 
-Protection applies to administrators, forbids force-push/deletion, and requires
+The configured protection forbids force-push/deletion and requires
 resolved review conversations. The solo workflow requires **zero independent
 approving reviews**; the agent's explicit pre-merge acceptance still applies.
+Administrator enforcement is disabled for the approved pure-text direct-main
+route; code/mixed deliveries still obey every configured PR/check gate by policy.
 Auto-merge and automatic head-branch deletion are enabled; squash is the default
 delivery method. A merge queue is not configured. Do not manufacture a second
 reviewer, broaden credentials or bypass checks to get a PR merged.
@@ -355,6 +411,8 @@ local commit containment after squash. Main push CI remains a regression backsto
 its completion is **not a second prerequisite for native issue closure**. A later
 failure must be inspected and tracked, with the affected issue reopened if its
 acceptance is contradicted; do not hide failures or treat a cancelled run as passed.
+Pure workflow/instruction text is the explicit exception: its reviewed documentation
+checks and verified direct-main publication complete delivery without PR CI.
 
 At session start, after an observed merge and at handoff, reconcile relevant PRs
 and open `status:local-complete` issues, paginating the bounded candidate query:
@@ -376,6 +434,8 @@ and open `status:local-complete` issues, paginating the bounded candidate query:
    their delivery or a verified descendant before manually closing as completed.
    Do not retroactively accept failed/pending work because the workflow changed.
    Their next correction goes through a protected PR, without enrolling new watchers.
+   New pure workflow/instruction text instead uses the explicit documentation and
+   remote-containment gate above; this never retroactively accepts pending code.
 5. Apply the [worktree cleanup gate](#worktree-lifecycle-and-cleanup) to relevant
    completed task/baseline trees. Verify removal or record why each remains;
    successful remote branch deletion does not discharge this local obligation.
@@ -587,5 +647,6 @@ area labels and an outcome milestone; Project scheduling is separately authorize
 The [PR template](../.github/pull_request_template.md) keeps linked
 tracking, local/remote/hardware verification and remaining next actions distinct.
 GitHub serves the committed templates/instructions after they reach remote `main`.
-Publish approved, validated changes through the protected-PR checkpoint
-above; issue/label/milestone metadata is applied directly and verified separately.
+Publish approved, validated code/mixed changes through the protected-PR checkpoint;
+pure workflow/instruction text uses its direct-main documentation gate. Issue/label/
+milestone metadata is applied directly and verified separately.
