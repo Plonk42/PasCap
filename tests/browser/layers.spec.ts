@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { applyCommand } from '../../src/shared/commands.js';
 import { createClip, createLayer, createProject, projectSchema } from '../../src/shared/model.js';
 import { calculateLayout, sampleTimeline } from '../../src/shared/timeline.js';
-import { closeOptions, editLayerPoint, expandedInspectorPreferences, freshExportLinks, layerKeyframes, openOptions, sharedPoint, submitExport } from './editor-helpers.js';
+import { closeOptions, editLayerPoint, expandedInspectorPreferences, freshExportLinks, inspectorTab, layerKeyframes, openOptions, sharedPoint, submitExport } from './editor-helpers.js';
 import { memoryProjects } from './memory-projects.js';
 
 test.beforeEach(async ({ page, request }) => {
@@ -160,6 +160,7 @@ test('shared rate points support easing, participant removal and contextual row 
   await first.getByRole('combobox', { name: 'Layer keyframe interpolation 0', exact: true }).selectOption('smooth');
   project = projectSchema.parse(await page.evaluate(() => window.pascapLab!.project()));
   expect(calculateLayout(project).duration).toBe(41);
+  await inspectorTab(page, 'Clip');
   await seek(page, 0); await diamond.click();
   expect(projectSchema.parse(await page.evaluate(() => window.pascapLab!.project())).layers[0]?.keyframes[0]).toEqual(sharedPoint(0, { exposure: 0 }, 'smooth'));
   await diamond.click(); await rate.fill('0.5'); await rate.press('Enter');
@@ -168,6 +169,7 @@ test('shared rate points support easing, participant removal and contextual row 
   await inspector.getByRole('button', { name: 'Keyframe Clip opacity', exact: true }).click();
   const state = await page.evaluate(() => { window.pascapLab!.engine.capturePixels(); return window.pascapLab!.engine.diagnostics(); });
   expect(state.status, state.message).toBe('paused');
+  await inspectorTab(page, 'Layer keyframes');
   await layerKeyframes(page, 'Video 1').getByRole('button', { name: 'Delete layer keyframe 30', exact: true }).click();
   project = projectSchema.parse(await page.evaluate(() => window.pascapLab!.project()));
   expect(project.layers[0]?.keyframes).toEqual([sharedPoint(0, { speed: 0.5, exposure: 0 }, 'smooth'), sharedPoint(20, { clipOpacity: 1 })]);
@@ -271,7 +273,7 @@ test('layered native UI export includes keyed opacity and colour in an immutable
   expect(projectSchema.parse(again.snapshot)).toEqual(snapshot);
 });
 
-test('plays three simultaneous sources through row-wide rate/grade curves, a track dissolve and repeated music wraps', async ({ page, request }) => {
+test('plays three simultaneous sources through row-wide rate/grade curves, a track dissolve and repeated music wraps', async ({ page, request }, testInfo) => {
   test.setTimeout(40_000);
   const library = await (await request.get('/api/media')).json() as { assets: { id: string; name: string }[] };
   const music = await (await request.get('/api/audio')).json() as { assets: { id: string }[] };
@@ -333,6 +335,14 @@ test('plays three simultaneous sources through row-wide rate/grade curves, a tra
     await page.waitForFunction(() => window.pascapLab!.engine.diagnostics().activeDecoders >= 3, undefined, { timeout: 12_000 });
     await page.waitForFunction(() => { const state = window.pascapLab!.engine.diagnostics(); return state.status === 'error' || (!state.playing && state.status === 'paused' && state.frame === state.duration - 1); }, undefined, { timeout: 15_000 });
     const state = await page.evaluate(() => window.pascapLab!.engine.diagnostics());
+    if (state.status !== 'paused') {
+      const decoders = await page.locator('video[data-pascap-decoder]').evaluateAll((elements) => elements.map((element) => {
+        const video = element as HTMLVideoElement;
+        return { index: video.dataset.pascapDecoder, currentTime: video.currentTime, paused: video.paused, ended: video.ended, seeking: video.seeking, readyState: video.readyState, rate: video.playbackRate, error: video.error?.message ?? null };
+      }));
+      const required = sampleTimeline(project, state.requestedFrame, layout).map(({ clipId, sourceFrame }) => ({ clipId, sourceFrame }));
+      await testInfo.attach('layered-playback-failure', { body: JSON.stringify({ pass, state, required, decoders }), contentType: 'application/json' });
+    }
     expect(state.status, state.message).toBe('paused'); expect(state.frame).toBe(duration - 1); expect(state.decoderCount).toBe(4); expect(state.audioClock).toBe(true);
     await expect(page.locator('video[data-pascap-decoder]')).toHaveCount(4);
   }
@@ -361,6 +371,7 @@ test('edits shared values outside the source excerpt and duration without moving
   await expect(outside.locator('.keyframe-row-skipped')).toHaveText('Outside duration');
   await outside.getByRole('spinbutton', { name: 'Speed keyframe value 110', exact: true }).fill('3');
   await layerKeyframes(page, 'Video 1').getByRole('button', { name: 'Go to layer keyframe 8', exact: true }).click();
+  await inspectorTab(page, 'Clip');
   await page.getByRole('slider', { name: 'Exposure', exact: true }).fill('0.7');
   const edited = projectSchema.parse(await page.evaluate(() => window.pascapLab!.project()));
   expect(edited.layers[0]?.keyframes).toEqual([sharedPoint(8, { clipOpacity: 0.8, exposure: 0.7, speed: 0.5 }, 'smooth'), sharedPoint(110, { speed: 3 })]);

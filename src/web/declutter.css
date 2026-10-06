@@ -92,7 +92,7 @@
 
 .inspector-panel.declutter-inspector>.inspector-tabs.panel-heading {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
     gap: 4px;
     min-height: 44px;
     padding: 6px;
@@ -105,7 +105,7 @@
     border-radius: 5px;
     color: var(--muted);
     font-size: 12px;
-    white-space: nowrap;
+    white-space: normal;
 }
 
 .declutter-inspector .inspector-tabs>button[aria-selected="true"] {
