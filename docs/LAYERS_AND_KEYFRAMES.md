@@ -156,11 +156,14 @@ repeat/drop sampling without optical flow.
 
 ## Editing keys
 
-The dedicated **Layer keyframes** tab contains **one whole-row point list** for
-the selected layer, including an empty row without a selected clip. It shows point
+The dedicated **Keyframes** tab (accessible name **Layer keyframes**) contains
+**one directly visible whole-row point list** for the selected layer, including an
+empty row without a selected clip. It shows point
 count, whole-row Previous/Next navigation, **Animation help** and participant chips
-for the current or inspected stored point. **Clip** keeps source/static bases and
-the setting controls/diamonds evaluated at the real playhead. Every animatable
+for the current or inspected stored point. The toolbar's Animation help includes
+point-timing guidance, with no separate Keyframe timing help button.
+**Clip** keeps source/static bases and the setting controls/diamonds evaluated at
+the real playhead. Every animatable
 setting always has its own diamond beside its main control, immediately
 followed by native SVG Previous/Next buttons:
 
@@ -193,15 +196,16 @@ Sliders/numbers never implicitly create keys. Unanimated channels edit the selec
 clip's static base, or the layer base for Layer opacity. On an empty row, diamonds
 can create animation; clip-base editing requires a selected clip.
 
-In **Layer keyframes**, expand **Edit points**. Each shared row lists its participating
-setting dependencies and has an inner **Time, easing & values** disclosure.
+In **Keyframes**, the shared list has no outer disclosure or per-row list expansion
+preference. Each shared row lists its participating setting dependencies and has
+an inner **Time, easing & values** disclosure.
 Its Timeline frame field moves
 **every participant and the point's existing easing together in one Undo step**;
 Shared easing affects all of them, each toward its own next participating point.
 The row delete action removes the whole point. Time/value fields apply on Enter/blur,
 Escape restores, and frame collisions/invalid values/timing are rejected atomically,
-never merged or overwritten. Reordering and Undo preserve field identity/focus
-without adding persisted point IDs; list expansion is remembered per project/layer.
+never merged or overwritten. Reordering and Undo preserve drafts and field identity/focus
+without adding persisted point IDs; nested point details remain collapsible.
 This remains one list, not a new list per channel or marker.
 
 Stored colour and opacity participants reuse the main setting-specific sliders,
@@ -242,7 +246,7 @@ row-rate control overrides clip speed. In Clip, Reset to 1× changes only the ac
 Speed participant; it never clears other points/participants or overwrites the
 saved clip base. Colour
 resets likewise target only enabled colour values at the current point; individual
-resets can edit unanimated clip-base channels. In Layer keyframes, each reset instead
+resets can edit unanimated clip-base channels. In Keyframes, each reset instead
 targets its existing stored participant, even when that point is outside duration.
 
 ## Timeline markers and ruler
@@ -349,16 +353,19 @@ offscreen/unmount/project-switch releases the review decoder.
 
 ## Inspector and resource limits
 
-The inspector uses **Clip / Layer keyframes / Sequence / Audio** tabs. Source range,
+The inspector uses **Clip / Keyframes / Sequence / Audio** tabs; Keyframes retains
+the accessible name **Layer keyframes**. Source range,
 Layer & opacity, Speed, Colour and playhead diamonds belong to Clip. The shared
-point list, Animation help, participant chips and whole-row point navigation belong
-to Layer keyframes. The selected track's Transition/Sequence fades belong to
+point list is directly visible in Keyframes, with Animation help, participant chips
+and whole-row point navigation. Keyframes and Sequence have no redundant
+selected-track banner. The selected track's Transition/Sequence fades belong to
 Sequence; Music belongs to Audio, with detailed **Placement & fades**.
 Sections retain their expansion in local browser storage.
 New defaults collapse detailed source, layer and speed controls, while Colour stays
-open. Existing preferences are not reset. **Expand all / Collapse all** still affects
-the seven top-level settings sections across Clip, Sequence and Audio only; Layer
-keyframes' **Edit points** and inner disclosures retain their own expansion state.
+open. Existing section preferences are not reset. **Expand all / Collapse all**
+appears only in Clip and affects its four top-level sections: Source range,
+Layer & opacity, Speed and Colour. Sequence, Audio, nested point disclosures and
+help remain unchanged; the shared list has no expansion preference.
 Hidden tab/section content stays mounted, retaining valid/invalid drafts within
 the same editing context. Row/clip changes refresh that context safely rather than
 applying its former drafts to another selection. Collapse or switching tabs never

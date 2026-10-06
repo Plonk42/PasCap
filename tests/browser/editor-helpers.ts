@@ -43,12 +43,10 @@ export function layerKeyframes(page: Page, name: string): Locator {
   return page.getByRole('group', { name: `Layer keyframes ${name}`, exact: true });
 }
 
-/** Open the shared list AND its point details; heading help never expands the list. */
+/** Shared points are directly visible; open only the selected point's nested details. */
 export async function editLayerPoint(page: Page, name: string, frame: number): Promise<Locator> {
   await inspectorTab(page, 'Layer keyframes');
   const keys = layerKeyframes(page, name);
-  const list = keys.getByRole('button', { name: 'Edit layer keys', exact: true });
-  if (await list.getAttribute('aria-expanded') !== 'true') await list.click();
   const row = keys.locator(`[data-keyframe-frame="${frame}"]`);
   if (await row.locator('.layer-keyframe-point-details').getAttribute('open') === null) await row.getByLabel(`Edit layer keyframe ${frame}`, { exact: true }).click();
   return row;

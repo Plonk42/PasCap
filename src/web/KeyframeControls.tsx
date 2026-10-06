@@ -4,13 +4,11 @@ import { KEYFRAME_SETTINGS, keyframeNeighbors, keySettings, type Interpolation, 
 import type { ProjectDocument, VideoLayer } from '../shared/model.js';
 import { formatTimecode } from '../shared/timing.js';
 import './declutter.css';
-import { Disclosure } from './Disclosure.js';
 import { HelpPopover } from './HelpPopover.js';
 import { Icon } from './icons.js';
 import { keyframeNavigationFrame, keySeekHint, useKeyframeNavigation } from './keyframe-navigation.js';
 import './layer-keyframes.css';
 import { NumberField } from './NumberField.js';
-import { readPreference, writePreference } from './preferences.js';
 import { RangeSettingControl, SpeedRateField } from './SettingValueControl.js';
 
 export interface KeyframeControlsProps {
@@ -37,20 +35,6 @@ function participatingSettings(key: LayerKeyframe) {
 function ParticipantChips({ point }: Readonly<{ point: LayerKeyframe }>) {
   return <div className="layer-keyframe-chips" aria-label="Participating settings">{participatingSettings(point).map((setting) =>
     <span className="layer-keyframe-chip" key={setting.key}>{setting.label}</span>)}</div>;
-}
-
-function useListPreference(context: string) {
-  const key = `pascap-layer-key-list-${context}`;
-  const [state, setState] = useState(() => ({ key, open: readPreference(key) === 'open' }));
-  let open = state.open;
-  if (state.key !== key) {
-    open = readPreference(key) === 'open';
-    setState({ key, open });
-  }
-  return [open, (expanded: boolean): void => {
-    setState({ key, open: expanded });
-    writePreference(key, expanded ? 'open' : 'closed');
-  }] as const;
 }
 
 function reconcileRows(identity: PanelIdentity, context: string, keys: readonly LayerKeyframe[]) {
@@ -149,11 +133,9 @@ export function KeyframeControls({ project, layer, frame, duration, disabled, on
   const navigation = useKeyframeNavigation();
   const unavailable = disabled || navigation.disabled;
   const listId = useId();
-  const entriesId = `${listId}-entries`;
   const helpId = `${listId}-help`;
   const keys = layer.keyframes;
   const context = `${projectId}:${layer.id}`;
-  const [listOpen, setListOpen] = useListPreference(context);
   const current = usePointIdentity(context, keys);
 
   const pointAtFrame = keys.find((key) => key.frame === frame);
@@ -183,6 +165,7 @@ export function KeyframeControls({ project, layer, frame, duration, disabled, on
         <p>Each setting's diamond animates this whole video row, not just the selected clip. All participating settings share one point and its easing.</p>
         <div className="animation-legend"><span><span aria-hidden="true">◇</span>Static base · click to capture</span><span><Icon name="curve" size={14} />Row curve · capture before editing</span><span><span aria-hidden="true">◆</span>Key at playhead · editable</span></div>
         <p>Use the arrows beside a diamond to visit that setting's keys. Drag a timeline point to move all its participants; Escape cancels.</p>
+        <p id={helpId}>Absolute project timeline frames, independent of clip trims. Moving a point moves every participating setting. Its easing runs to each setting's next participating point; the first and last channel values hold. An unkeyed setting uses each clip's base, or the layer base for layer opacity. Points outside the current duration stay editable; navigation previews the nearest available frame without moving them.</p>
       </HelpPopover>
     </div>
 
@@ -197,8 +180,6 @@ export function KeyframeControls({ project, layer, frame, duration, disabled, on
       {inspection && <button type="button" className="text-button" onClick={navigation.onFollowPlayhead}>Follow playhead</button>}
     </div>}
 
-    {keys.length > 0 && <Disclosure className="keyframe-list" title="Edit points" label="Edit layer keys" triggerId={listId} contentId={entriesId} open={listOpen} onToggle={setListOpen} help={<HelpPopover label="Keyframe timing"><p id={helpId}>Absolute project timeline frames, independent of clip trims. Moving a point moves every participating setting. Its easing runs to each setting's next participating point; the first and last channel values hold. An unkeyed setting uses each clip's base, or the layer base for layer opacity. Points outside the current duration stay editable; navigation previews the nearest available frame without moving them.</p></HelpPopover>}>
-      <ol className="keyframe-entries" aria-labelledby={listId}>{keys.map((key, index) => <KeyframePointRow key={current.rows[index]!.id} project={project} point={key} keys={keys} row={current.rows[index]!} layerId={layer.id} context={context} listId={listId} helpId={helpId} duration={duration} current={(inspection !== null || previewAvailable) && key.frame === navigationFrame} disabled={unavailable} onEdit={onEdit} onSeek={seekPoint} />)}</ol>
-    </Disclosure>}
+    {keys.length > 0 && <ol className="keyframe-list keyframe-entries" aria-label="Edit layer keys">{keys.map((key, index) => <KeyframePointRow key={current.rows[index]!.id} project={project} point={key} keys={keys} row={current.rows[index]!} layerId={layer.id} context={context} listId={listId} helpId={helpId} duration={duration} current={(inspection !== null || previewAvailable) && key.frame === navigationFrame} disabled={unavailable} onEdit={onEdit} onSeek={seekPoint} />)}</ol>}
   </fieldset>;
 }

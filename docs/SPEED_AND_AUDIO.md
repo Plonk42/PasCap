@@ -154,9 +154,13 @@ its hollow diamond is clicked. Unanimated Speed uses **Constant speed / Ramp up 
 or **Custom curve** clip controls. Reset to 1× affects only the active row Speed
 participant at the playhead when keyed, otherwise the selected clip's base.
 
-The dedicated **Layer keyframes** tab contains the whole-row point list, Animation
-help and point navigation. **Edit points → Time, easing & values** edits stored
-point times, easing and existing participants, including beyond current duration
+The dedicated **Keyframes** tab (accessible name **Layer keyframes**) contains the
+directly visible whole-row point list and point navigation. Its toolbar's
+**Animation help** includes point-timing guidance, with no separate Keyframe timing
+help button. There is no outer list disclosure or per-row list expansion preference;
+nested **Time, easing & values** details remain collapsible and preserve drafts
+and input identity through reordering and Undo. **Keyframes → Time, easing & values**
+edits stored point times, easing and existing participants, including beyond current duration
 or on an empty row. A stored Speed participant reuses the **Layer rate ×** numeric
 field and Reset to 1×, not clip mode/preset/source-curve controls. Enter/blur applies
 the precise rate; Escape restores. The same **0.1×–8×** bounds and contextual timing

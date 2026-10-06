@@ -9,11 +9,12 @@ export type InspectorMode = 'clip' | 'keyframes' | 'sequence' | 'audio';
 
 const SECTION_DEFAULTS = { source: false, 'layer-opacity': false, speed: false, colour: true, transition: true, fades: true, music: true };
 type SectionId = keyof typeof SECTION_DEFAULTS;
+const CLIP_SECTIONS: readonly SectionId[] = ['source', 'layer-opacity', 'speed', 'colour'];
 type Expansion = Record<SectionId, boolean>;
 interface InspectorExpansion { sections: Expansion; setOpen: (id: SectionId, open: boolean) => void }
 export const InspectorExpansionContext = createContext<InspectorExpansion | null>(null);
 
-/** Include temporarily absent sections, so selecting a clip/boundary respects bulk choices. */
+/** Include temporarily absent Clip sections, so selecting a clip respects bulk choices. */
 export function useInspectorExpansion() {
   const [sections, setSections] = useState<Expansion>(() => Object.fromEntries(Object.entries(SECTION_DEFAULTS).map(([id, defaultOpen]) => {
     const saved = readPreference(`pascap-section-${id}`);
@@ -26,18 +27,17 @@ export function useInspectorExpansion() {
   const setOpen = (id: SectionId, open: boolean): void => {
     setSections((previous) => ({ ...previous, [id]: open })); persist(id, open);
   };
-  const allOpen = Object.values(sections).every(Boolean);
+  const allOpen = CLIP_SECTIONS.every((id) => sections[id]);
   const toggleAll = (): void => {
     const open = !allOpen;
-    const ids = Object.keys(SECTION_DEFAULTS) as SectionId[];
-    setSections(Object.fromEntries(ids.map((id) => [id, open])) as Expansion);
-    ids.forEach((id) => persist(id, open));
+    setSections((previous) => ({ ...previous, ...Object.fromEntries(CLIP_SECTIONS.map((id) => [id, open])) }));
+    CLIP_SECTIONS.forEach((id) => persist(id, open));
   };
   return { sections, setOpen, allOpen, toggleAll, storageWarning };
 }
 
 export function InspectorExpansionControls({ expansion }: Readonly<{ expansion: ReturnType<typeof useInspectorExpansion> }>) {
-  return <><div className="inspector-expansion"><button type="button" className="text-button" aria-label={expansion.allOpen ? 'Collapse all Inspector settings' : 'Expand all Inspector settings'} title="All top-level settings across Clip, Sequence and Audio; nested details and help stay unchanged." onClick={expansion.toggleAll}>{expansion.allOpen ? 'Collapse all' : 'Expand all'}</button></div>
+  return <><div className="inspector-expansion"><button type="button" className="text-button" aria-label={expansion.allOpen ? 'Collapse all Inspector settings' : 'Expand all Inspector settings'} title="All top-level Clip settings; Sequence, Audio, nested details and help stay unchanged." onClick={expansion.toggleAll}>{expansion.allOpen ? 'Collapse all' : 'Expand all'}</button></div>
     {expansion.storageWarning && <output className="control-hint">Section preferences cannot be saved in this browser. Your choices remain available for this session.</output>}</>;
 }
 

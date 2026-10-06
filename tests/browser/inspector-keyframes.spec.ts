@@ -43,7 +43,7 @@ async function selectClip(page: Page, id: string): Promise<void> {
 
 test('four accessible tabs preserve selection across clips, populated/empty tracks and projects without writes', async ({ page }) => {
   const tabs = page.getByRole('tablist', { name: 'Inspector sections', exact: true });
-  await expect(tabs.getByRole('tab')).toHaveText(['Clip', 'Layer keyframes', 'Sequence', 'Audio']);
+  await expect(tabs.getByRole('tab')).toHaveText(['Clip', 'Keyframes', 'Sequence', 'Audio']);
   await tabs.getByRole('tab', { name: 'Clip', exact: true }).focus();
   for (const label of ['Layer keyframes', 'Sequence', 'Audio']) {
     await page.keyboard.press('ArrowRight');
@@ -51,6 +51,8 @@ test('four accessible tabs preserve selection across clips, populated/empty trac
     await expect(tab).toBeFocused(); await expect(tab).toHaveAttribute('aria-selected', 'true');
     const panel = page.getByRole('tabpanel', { name: label, exact: true });
     await expect(panel).toBeVisible();
+    await expect(page.getByRole('button', { name: /^(Expand|Collapse) all Inspector settings$/ })).toHaveCount(0);
+    await expect(panel.locator('.inspector-track-selection')).toHaveCount(0);
     expect(await tab.getAttribute('aria-controls')).toBe(await panel.getAttribute('id'));
     await selectClip(page, 'upper-clip'); await expect(tab).toHaveAttribute('aria-selected', 'true');
     await selectClip(page, 'bottom'); await expect(tab).toHaveAttribute('aria-selected', 'true');
@@ -60,6 +62,8 @@ test('four accessible tabs preserve selection across clips, populated/empty trac
   await page.keyboard.press('End'); await expect(tabs.getByRole('tab', { name: 'Audio', exact: true })).toBeFocused();
   await page.keyboard.press('ArrowRight'); await expect(tabs.getByRole('tab', { name: 'Clip', exact: true })).toBeFocused();
   await inspectorTab(page, 'Layer keyframes');
+  await expect(layerKeyframes(page, 'Video 1').getByRole('list', { name: 'Edit layer keys', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Edit layer keys', exact: true })).toHaveCount(0);
   await selectClip(page, 'upper-clip'); await expect(layerKeyframes(page, 'Video 2')).toBeVisible();
   await page.getByRole('button', { name: 'Select layer Empty row', exact: true }).click();
   await expect(layerKeyframes(page, 'Empty row')).toBeVisible();
@@ -144,6 +148,8 @@ test('invalid stored drafts survive tab changes and cancel, without stale row co
 });
 
 test('four tabs and participant controls fit the minimum Inspector and compact drawer without overflow', async ({ page }) => {
+  await page.evaluate(() => localStorage.setItem('pascap-workspace-layout', JSON.stringify({ mediaWidth: 300, inspectorWidth: 270, timelineHeight: 290, mediaOpen: true, inspectorOpen: true })));
+  await page.reload(); await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
   for (const width of [1440, 720, 640]) {
     await page.setViewportSize({ width, height: 720 });
     const toggle = page.getByRole('button', { name: 'Toggle Clip panel', exact: true });
@@ -151,11 +157,17 @@ test('four tabs and participant controls fit the minimum Inspector and compact d
     if (width === 640) await expect(toggle).toHaveAttribute('aria-pressed', 'true');
     await inspectorTab(page, 'Layer keyframes');
     const row = await editLayerPoint(page, 'Video 1', 10);
-    if (width === 1440) { const divider = page.getByRole('slider', { name: 'Resize Clip panel', exact: true }); await divider.focus(); await divider.press('ArrowRight'); await divider.press('ArrowRight'); }
+    if (width === 1440) {
+      const divider = page.getByRole('slider', { name: 'Resize Clip panel', exact: true });
+      await expect(divider).toHaveAttribute('aria-valuenow', '270');
+    }
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     const panel = page.getByRole('complementary', { name: 'Clip inspector', exact: true });
     expect(await panel.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
-    for (const tab of await page.getByRole('tablist', { name: 'Inspector sections', exact: true }).getByRole('tab').all()) { await expect(tab).toBeVisible(); expect((await tab.boundingBox())!.height).toBeGreaterThanOrEqual(32); }
+    for (const tab of await page.getByRole('tablist', { name: 'Inspector sections', exact: true }).getByRole('tab').all()) {
+      await expect(tab).toBeVisible(); expect((await tab.boundingBox())!.height).toBeGreaterThanOrEqual(32);
+      expect(await tab.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+    }
     const value = row.getByRole('spinbutton', { name: 'Shadows keyframe value 10', exact: true });
     await value.scrollIntoViewIfNeeded(); await expect(value).toBeInViewport();
   }

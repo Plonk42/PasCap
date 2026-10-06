@@ -18,10 +18,15 @@ Enabling Ripple packs from the current first start; while on, clips continuously
 sequence there, and turning it off retains actual placements. Rows display stored
 bottom-to-top composition order without primary/overlay roles. The UI provides a
 pinned ruler, synchronized native row access, accessible action bounds and contextual
-heading help. Inspector tabs are **Clip / Layer keyframes / Sequence / Audio**: the
-[dedicated Layer keyframes tab](https://github.com/Plonk42/PasCap/issues/26) owns
-the whole-row point list, while Clip keeps
-source/static and playhead settings. Stored participants reuse the main value
+heading help. Inspector tabs are **Clip / Keyframes / Sequence / Audio**: the
+[dedicated Keyframes tab](https://github.com/Plonk42/PasCap/issues/26), with accessible
+name **Layer keyframes**, directly shows the whole-row point list and combines
+animation/timing help in its toolbar. Nested point details retain drafts and input
+identity; there is no outer list disclosure or per-row list expansion preference.
+Keyframes and Sequence omit redundant selected-track banners. Clip keeps
+source/static and playhead settings; its Expand all/Collapse all affects only the
+four Clip top-level sections, leaving Sequence, Audio, nested disclosures and help
+unchanged. Stored participants reuse the main value
 controls with precise numeric editing. Clip/row selection and point navigation
 preserve the chosen tab; explicit boundary buttons open Sequence. Current usage
 and limits are documented in [the user guide](USER_GUIDE.md),

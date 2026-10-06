@@ -173,11 +173,10 @@ test('the shared list labels time/value/easing, retains reordered input focus, a
   expect((await currentProject(page)).layers[0]?.keyframes).toEqual([sharedPoint(80, { clipOpacity: 0.4, exposure: -0.5 }, 'hold')]);
   const value = keys.getByRole('spinbutton', { name: 'Clip opacity keyframe value 80', exact: true });
   await value.fill('0.9');
-  await page.evaluate(() => localStorage.setItem('pascap-layer-key-list-preview-lab:upper', 'open'));
   await page.locator('[data-clip-id="other-row"] .timeline-clip-body').evaluate((button) => (button as HTMLButtonElement).click());
   const otherKeys = layerKeyframes(page, 'Video 2');
   const otherValue = otherKeys.getByRole('spinbutton', { name: 'Clip opacity keyframe value 80', exact: true });
-  await expect(otherKeys.getByRole('button', { name: 'Edit layer keys', exact: true })).toHaveAttribute('aria-expanded', 'true');
+  await expect(otherKeys.getByRole('list', { name: 'Edit layer keys', exact: true })).toBeVisible();
   await expect(otherValue).toHaveValue('0.4');
   await expect(otherValue).toBeFocused();
   expect((await currentProject(page)).layers[0]?.keyframes[0]?.values.clipOpacity).toBe(0.4);
@@ -186,7 +185,7 @@ test('the shared list labels time/value/easing, retains reordered input focus, a
   await page.reload();
   await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
   await inspectorTab(page, 'Layer keyframes');
-  await expect(layerKeyframes(page, 'Video 1').getByRole('button', { name: 'Edit layer keys', exact: true })).toHaveAttribute('aria-expanded', 'true');
+  await expect(layerKeyframes(page, 'Video 1').getByRole('list', { name: 'Edit layer keys', exact: true })).toBeVisible();
 });
 
 test('row-speed navigation reaches project points and previews outside-duration points at the nearest frame', async ({ page }) => {
@@ -240,7 +239,7 @@ test('row-speed navigation reaches project points and previews outside-duration 
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   expect((await currentProject(page)).layers[0]?.keyframes).toEqual(points);
   await inspectorTab(page, 'Layer keyframes');
-  await expect(keys.getByRole('button', { name: 'Edit layer keys', exact: true })).toHaveAttribute('aria-expanded', 'true');
+  await expect(keys.getByRole('list', { name: 'Edit layer keys', exact: true })).toBeVisible();
 });
 
 test('speed/ramp numbers commit explicitly and reset to 1× changes only speed in one undo step', async ({ page }) => {

@@ -33,8 +33,8 @@ interface Props {
   onPause: () => void;
 }
 
-const INSPECTOR_MODES: readonly { id: InspectorMode; label: string }[] = [
-  { id: 'clip', label: 'Clip' }, { id: 'keyframes', label: 'Layer keyframes' }, { id: 'sequence', label: 'Sequence' }, { id: 'audio', label: 'Audio' },
+const INSPECTOR_MODES: readonly { id: InspectorMode; label: string; accessibleLabel?: string }[] = [
+  { id: 'clip', label: 'Clip' }, { id: 'keyframes', label: 'Keyframes', accessibleLabel: 'Layer keyframes' }, { id: 'sequence', label: 'Sequence' }, { id: 'audio', label: 'Audio' },
 ];
 
 function commandNumberError(project: ProjectDocument, command: EditCommand, recovery: string): string | null {
@@ -75,7 +75,7 @@ function InspectorTabs({ id, section, onSection }: Readonly<{ id: string; sectio
     onSection(target);
     event.currentTarget.parentElement?.querySelector<HTMLButtonElement>(`[data-inspector-mode="${target}"]`)?.focus();
   };
-  return <div className="panel-heading inspector-tabs" role="tablist" aria-label="Inspector sections">{INSPECTOR_MODES.map((mode) => <button key={mode.id} type="button" role="tab" id={`${id}-${mode.id}-tab`} data-inspector-mode={mode.id} aria-selected={section === mode.id} aria-controls={`${id}-${mode.id}-panel`} tabIndex={section === mode.id ? 0 : -1} onClick={() => onSection(mode.id)} onKeyDown={(event) => navigate(event, mode.id)}>{mode.label}</button>)}</div>;
+  return <div className="panel-heading inspector-tabs" role="tablist" aria-label="Inspector sections">{INSPECTOR_MODES.map((mode) => <button key={mode.id} type="button" role="tab" id={`${id}-${mode.id}-tab`} data-inspector-mode={mode.id} aria-label={mode.accessibleLabel} aria-selected={section === mode.id} aria-controls={`${id}-${mode.id}-panel`} tabIndex={section === mode.id ? 0 : -1} onClick={() => onSection(mode.id)} onKeyDown={(event) => navigate(event, mode.id)}>{mode.label}</button>)}</div>;
 }
 
 interface LayerControlProps {
@@ -197,7 +197,6 @@ function SequenceControls({ project, layer, assets, boundaryId, layout, drafting
     else onEdit({ type: 'transition', transition: { ...pair, type, duration } });
   };
   return <>
-    <div className="inspector-track-selection"><Icon name="layers" size={17} /><strong title={layer.name}>{layer.name}</strong><span>Track transitions & fades</span></div>
     {boundary && <InspectorSection id="transition" title="Transition" icon="curve" modified={boundary.type !== 'cut'} help={<HelpPopover label="Transition timing"><p id={`${id}-transition-help`}>Timeline frames after retiming, on this track only. Fade-through-black darkens this row without revealing lower footage. Non-cut transitions need touching clips or an existing dissolve; close a gap explicitly first. A positioned dissolve moves only its right clip to the exact overlap. Conflicts reject the complete edit, never shorten another fade or transition.</p></HelpPopover>}>
       <section className="boundary-inspector" aria-label="Boundary transition">
         <p title={`Transition ${boundaryIndex + 1}`}>{shortName(assets.find((item) => item.id === left?.mediaId)?.name ?? '')} <Icon name="arrow" size={12} /> {shortName(assets.find((item) => item.id === right?.mediaId)?.name ?? '')}</p>
@@ -240,8 +239,8 @@ export function Inspector({ project, assets, selectedClipId, selectedLayerId, bo
 
   return <InspectorExpansionContext value={expansion}><aside className="inspector-panel panel declutter-inspector" aria-label="Clip inspector">
     <InspectorTabs id={inspectorId} section={section} onSection={onSection} />
-    <InspectorExpansionControls expansion={expansion} />
     <div role="tabpanel" id={`${inspectorId}-clip-panel`} aria-labelledby={`${inspectorId}-clip-tab`} hidden={section !== 'clip'}>
+      <InspectorExpansionControls expansion={expansion} />
       {layer ? <>
         {clip && asset && placed ? <div className="selected-clip-name inspector-selection"><Icon name="video" size={17} /><strong title={asset.name}>{shortName(asset.name)}</strong><span>Excerpt {position + 1} · {sourceSeconds(placed.duration)} · {layer.name}</span></div>
           : <div className="selected-clip-name inspector-selection"><Icon name="layers" size={17} /><strong title={layer.name}>{layer.name}</strong><span title="Select a clip for its source range and static bases.">Whole video row</span></div>}
@@ -271,10 +270,7 @@ export function Inspector({ project, assets, selectedClipId, selectedLayerId, bo
       </> : <div className="inspector-empty">Select a video layer or clip in the timeline.</div>}
     </div>
     <div role="tabpanel" id={`${inspectorId}-keyframes-panel`} aria-labelledby={`${inspectorId}-keyframes-tab`} hidden={section !== 'keyframes'}>
-      {layer ? <>
-        <div className="inspector-track-selection"><Icon name="layers" size={17} /><strong title={layer.name}>{layer.name}</strong><span>Whole-row animation</span></div>
-        <KeyframeControls project={project} layer={layer} frame={frame} duration={layout.duration} disabled={drafting} onEdit={onEdit} />
-      </> : <div className="inspector-empty">Select a video track for its shared points.</div>}
+      {layer ? <KeyframeControls project={project} layer={layer} frame={frame} duration={layout.duration} disabled={drafting} onEdit={onEdit} /> : <div className="inspector-empty">Select a video track for its shared points.</div>}
     </div>
     <div role="tabpanel" id={`${inspectorId}-sequence-panel`} aria-labelledby={`${inspectorId}-sequence-tab`} hidden={section !== 'sequence'}>
       {layer ? <SequenceControls project={project} layer={layer} assets={assets} boundaryId={boundaryId} layout={layout} drafting={drafting} onEdit={onEdit} id={colourControlId} /> : <div className="inspector-empty">Select a video track for its transitions and fades.</div>}

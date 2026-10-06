@@ -64,24 +64,27 @@ async function panelFor(page: Page, trigger: Locator): Promise<Locator> {
   return page.locator(`[id="${id}"]`);
 }
 
-test('bulk Inspector expansion covers hidden tabs, absent transitions, mixed state and preferences without document edits', async ({ page }) => {
+test('bulk Clip expansion preserves other tabs, mixed state and preferences without document edits', async ({ page }) => {
   const before = await current(page);
-  const headers = page.locator('.inspector-section > .disclosure-heading > h3 > .disclosure-trigger');
+  const headers = page.locator('[id$="-clip-panel"] .inspector-section > .disclosure-heading > h3 > .disclosure-trigger');
   const collapse = page.getByRole('button', { name: 'Collapse all Inspector settings', exact: true });
   await collapse.focus(); await collapse.press('Enter');
   await expect(page.getByRole('button', { name: 'Expand all Inspector settings', exact: true })).toBeFocused();
   expect(await headers.evaluateAll((nodes) => nodes.every((node) => node.getAttribute('aria-expanded') === 'false'))).toBe(true);
   await inspectorTab(page, 'Sequence');
-  await expect(page.getByRole('button', { name: 'Sequence fades section', exact: true })).toHaveAttribute('aria-expanded', 'false');
+  await expect(page.getByRole('button', { name: 'Sequence fades section', exact: true })).toHaveAttribute('aria-expanded', 'true');
+  await page.getByRole('button', { name: 'Sequence fades section', exact: true }).click();
+  await expect(page.getByRole('button', { name: /^(Expand|Collapse) all Inspector settings$/ })).toHaveCount(0);
   await inspectorTab(page, 'Audio');
-  await expect(page.getByRole('button', { name: 'Music section', exact: true })).toHaveAttribute('aria-expanded', 'false');
+  await expect(page.getByRole('button', { name: 'Music section', exact: true })).toHaveAttribute('aria-expanded', 'true');
   await page.getByRole('button', { name: 'Music section', exact: true }).click();
+  await expect(page.getByRole('button', { name: /^(Expand|Collapse) all Inspector settings$/ })).toHaveCount(0);
+  await inspectorTab(page, 'Clip');
   await expect(page.getByRole('button', { name: 'Expand all Inspector settings', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Expand all Inspector settings', exact: true }).press('Space');
   await expect(collapse).toBeFocused();
   expect(await headers.evaluateAll((nodes) => nodes.every((node) => node.getAttribute('aria-expanded') === 'true'))).toBe(true);
-  expect(await page.evaluate(() => ['source', 'layer-opacity', 'speed', 'colour', 'transition', 'fades', 'music'].map((id) => localStorage.getItem(`pascap-section-${id}`)))).toEqual(Array(7).fill('open'));
-  await inspectorTab(page, 'Clip');
+  expect(await page.evaluate(() => ['source', 'layer-opacity', 'speed', 'colour', 'transition', 'fades', 'music'].map((id) => localStorage.getItem(`pascap-section-${id}`)))).toEqual(['open', 'open', 'open', 'open', 'open', 'closed', 'closed']);
   await page.getByRole('button', { name: 'Source range section', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Expand all Inspector settings', exact: true })).toBeVisible();
   await page.reload(); await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
@@ -96,12 +99,15 @@ test('bulk collapse retains invalid drafts, nested disclosure state and reachabl
   const input = page.getByRole('spinbutton', { name: 'Source IN frame', exact: true, includeHidden: true });
   await input.fill('0.5'); await input.press('Enter');
   await inspectorTab(page, 'Layer keyframes');
-  const list = page.getByRole('button', { name: 'Edit layer keys', exact: true });
-  await list.click(); await expect(list).toHaveAttribute('aria-expanded', 'true');
+  const list = page.getByRole('list', { name: 'Edit layer keys', exact: true, includeHidden: true });
+  await expect(list).toBeVisible();
+  const point = page.getByLabel('Edit layer keyframe 10', { exact: true });
+  await point.click();
+  await inspectorTab(page, 'Clip');
   await page.getByRole('button', { name: 'Collapse all Inspector settings', exact: true }).click();
   await expect(input).toBeAttached(); await expect(input).toBeHidden();
-  await expect(list).toHaveAttribute('aria-expanded', 'true');
-  await inspectorTab(page, 'Clip');
+  await expect(list).toBeAttached();
+  await expect(point.locator('..')).toHaveAttribute('open', '');
   await page.getByRole('button', { name: 'Source timing help', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Source range section', exact: true })).toHaveAttribute('aria-expanded', 'false');
   await page.keyboard.press('Escape');
@@ -245,7 +251,7 @@ const HELP_CONTEXTS = [
   { label: 'Opacity scope', tab: 'Clip', text: 'Layer opacity is applied after the row' },
   { label: 'Colour animation', tab: 'Clip', text: 'Each diamond keys only its own setting' },
   { label: 'Speed timing', tab: 'Clip', text: 'Row keys override, rather than multiply' },
-  { label: 'Keyframe timing', tab: 'Layer keyframes', text: 'Moving a point moves every participating setting.' },
+  { label: 'Animation', tab: 'Layer keyframes', text: 'Moving a point moves every participating setting.' },
   { label: 'Transition timing', tab: 'Sequence', text: 'Conflicts reject the complete edit, never shorten another fade or transition.' },
   { label: 'Fade timing', tab: 'Sequence', text: '0 disables a fade.' },
   { label: 'Audio timing', tab: 'Audio', text: 'Both fades must fit within Duration.' },
@@ -402,26 +408,29 @@ test('hover keeps a valid numeric draft unapplied; clicking help keeps the ordin
   await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
 });
 
-test('collapsing an editable point list keeps its heading help available and its fields mounted', async ({ page }) => {
+test('direct point list keeps timing help available and nested drafts mounted across tabs', async ({ page }) => {
   await inspectorTab(page, 'Layer keyframes');
-  const list = page.getByLabel('Edit layer keys', { exact: true }); await list.click();
-  const trigger = page.getByRole('button', { name: 'Keyframe timing help', exact: true });
+  const list = page.getByRole('list', { name: 'Edit layer keys', exact: true });
+  await expect(list).toBeVisible();
+  await page.getByLabel('Edit layer keyframe 10', { exact: true }).click();
+  const field = page.getByRole('spinbutton', { name: 'Layer keyframe frame 10', exact: true, includeHidden: true });
+  await field.fill('0.5'); await field.press('Enter');
+  const trigger = page.getByRole('button', { name: 'Animation help', exact: true });
   const panel = await panelFor(page, trigger);
   await trigger.click(); await expect(panel).toBeVisible();
-  await list.focus(); await list.press('Enter');
-  await expect(list).toHaveAttribute('aria-expanded', 'false');
-  // Activating another native button is an outside click even from Enter.
-  await expect(panel).toBeHidden(); await expect(trigger).toBeVisible();
+  await expect(panel).toContainText('Absolute project timeline frames');
+  await inspectorTab(page, 'Sequence'); await expect(panel).toBeHidden();
+  await expect(field).toBeAttached(); await expect(field).toBeHidden();
+  await inspectorTab(page, 'Layer keyframes');
+  await expect(field).toHaveValue('0.5'); await expect(field).toHaveAttribute('aria-invalid', 'true');
   await trigger.click(); await expect(panel).toBeVisible();
-  await expect(list).toHaveAttribute('aria-expanded', 'false');
+  await expect(list).toBeVisible();
   await trigger.press('Escape'); await expect(panel).toBeHidden();
-  await list.press('Enter'); await page.getByLabel('Edit layer keyframe 10', { exact: true }).click();
-  await expect(page.getByRole('spinbutton', { name: 'Layer keyframe frame 10', exact: true })).toBeVisible();
+  await field.press('Escape'); await expect(field).toHaveValue('10');
   expect(memory.saves).toBe(0);
 });
 
 for (const context of [
-  { title: 'Edit points', toggle: 'Edit layer keys', help: 'Keyframe timing', tab: 'Layer keyframes' },
   { title: 'Placement & fades', toggle: 'Placement & fades', help: 'Audio timing', tab: 'Audio' },
 ] as const) {
   test(`${context.title} has independent title-level help before opening its editable fields`, async ({ page }) => {
