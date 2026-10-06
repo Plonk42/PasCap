@@ -220,8 +220,9 @@ The shared list has no outer disclosure or per-row list expansion preference.
 Nested point details remain collapsible; drafts and input identity survive point
 reordering and Undo.
 
-Stored colour/opacity participants use the same sliders, units and individual
-colour resets as the main controls, alongside precise numeric fields. Stored
+Stored colour/opacity participants use the same sliders and individual colour
+resets as the main controls, with one precise numeric field to the right of each
+slider (opacity uses the stored 0–1 scale). Stored
 Speed uses the **Layer rate ×** field and Reset to 1×, not clip speed modes or a
 source-frame curve. These controls edit only an existing participant at that
 stored point; they never implicitly join a setting. Each accepted value/reset is

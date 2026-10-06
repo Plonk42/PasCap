@@ -170,9 +170,9 @@ rounded or used to shorten conflicting fades/transitions.
 Each accepted stored rate/reset changes only that existing Speed participant in
 **one Undo step**. Its time, shared easing, other participants/points and the saved
 clip bases stay unchanged; it never implicitly joins Speed or requests a seek.
-Stored colour/opacity participants likewise reuse the main sliders, units and
-individual colour resets with precise numeric fields, targeting only that stored
-participant.
+Stored colour/opacity participants likewise reuse the main sliders and individual
+colour resets, with one precise numeric field beside each slider, targeting only
+that stored participant.
 
 Drag a row marker horizontally or use its one-/ten-frame keyboard moves to move
 all participants and their existing easing in **one Undo step**, using the same

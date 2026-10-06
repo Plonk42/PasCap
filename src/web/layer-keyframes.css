@@ -169,9 +169,19 @@
     min-width: 0;
 }
 
-.layer-keyframe-point-values .keyframe-value>.number-field {
+.layer-keyframe-point-values .setting-exact-value {
     display: grid;
-    margin: 0;
+    grid-template-columns: minmax(0, 1fr) 80px;
+    align-items: center;
+    gap: 4px 10px;
+}
+
+.layer-keyframe-point-values .setting-exact-value>.number-field {
+    display: contents;
+}
+
+.layer-keyframe-point-values .setting-exact-value :is(.number-field-pending, .number-field-error) {
+    grid-column: 1 / -1;
 }
 
 .layer-keyframe-controls .layer-keyframe-point-values label {
