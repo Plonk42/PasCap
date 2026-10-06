@@ -3,7 +3,7 @@ import base from './playwright.config.js';
 
 /** Required scoped Firefox regressions; full Chrome validation is unchanged. */
 export default defineConfig(base, {
-    globalSetup: './scripts/ci/firefox-webgl.ts',
+    globalSetup: ['./scripts/ci/firefox-webgl.ts', './scripts/ci/firefox-audio.ts'],
     use: {
         browserName: 'firefox', channel: undefined,
         launchOptions: {

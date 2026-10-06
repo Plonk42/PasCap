@@ -90,15 +90,16 @@ Chrome remains the full browser validation target. The
 [Firefox configuration](../playwright.firefox.config.ts) runs the same isolated
 synthetic service/fixtures with Playwright's Firefox, not an existing desktop
 Firefox profile. Install it with `npx playwright install --with-deps firefox`.
-GPU-less Linux also needs Xvfb/xauth and Mesa EGL/GLX/DRI: packages `xvfb`, `xauth`,
-`libgl1-mesa-dri`, `libegl-mesa0` and `libglx-mesa0`. After the ordinary build and
-clean browser fixture setup, reproduce the CI graphics environment with:
+GPU-less Linux also needs Xvfb/xauth, Mesa EGL/GLX/DRI and a real audio output service:
+packages `xvfb`, `xauth`, `libgl1-mesa-dri`, `libegl-mesa0`, `libglx-mesa0`,
+`pulseaudio` and `pulseaudio-utils`. After the ordinary build and clean browser
+fixture setup, reproduce the isolated CI graphics/audio environment with:
 
 ```sh
 LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe \
 __GLX_VENDOR_LIBRARY_NAME=mesa \
 __EGL_VENDOR_LIBRARY_FILENAMES=/usr/share/glvnd/egl_vendor.d/50_mesa.json \
-xvfb-run -a npx playwright test --config=playwright.firefox.config.ts \
+bash scripts/ci/firefox.sh npx playwright test --config=playwright.firefox.config.ts \
   tests/browser/music-clock.spec.ts tests/browser/playback-recovery.spec.ts \
   --grep 'streaming music clock|streamed PCM|with music normal speed|with music and a callback-gated cancellation'
 ```
@@ -117,6 +118,21 @@ actual renderer, shader status and readback; renderer sanitization is disabled o
 in the disposable test profile for this evidence, not in the product. The playback
 tests still initialize the real editor/compositor and keep their existing exact
 frame, PCM, drift, range-read and cancellation assertions.
+
+Headless Firefox also needs an available audio backend: a missing service can leave
+`AudioContext.resume()` suspended without rendering samples. The
+[Firefox runner](../scripts/ci/firefox.sh) starts a private PulseAudio server with a
+48 kHz stereo null sink, cookie and Unix socket in an owned temporary directory.
+It never changes the desktop server/default output or accesses sound devices;
+the null sink discards audio **after real Web Audio rendering**, not through a
+mock clock or silent product fallback. Startup and backend queries have bounded
+deadlines, and exit/failure/signals stop only that server and remove its scratch.
+The subsequent [audio prerequisite](../scripts/ci/firefox-audio.ts) has the same
+15-second browser-launch and 10-second probe deadlines as the graphics check.
+It requires a real 48 kHz context, stereo samples passed between real worklets and
+an output timestamp reaching those rendered samples. Missing resume/render/output
+readiness remains an actionable hard failure before the five media tests. Neither
+prerequisite changes the editor's ten-second music-start deadline or test bounds.
 
 The [music-clock regression](../tests/browser/music-clock.spec.ts) requires one
 uninterrupted music start from zero or a nonzero seek, bounded range reads and
