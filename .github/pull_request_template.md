@@ -46,7 +46,7 @@ RC1; do not infer a post-RC promise or release approval. -->
 
 - [ ] Relevant contracts/evidence and, when tracked, issue/Project Status are updated; no duplicate sprint checklist or housekeeping issue is created.
 - [ ] The new task started from verified current remote main before edits/validation, on a new branch in the existing clean/idle checkout by default; any worktree exception has a concrete isolation reason and retirement condition. Its starting SHA is recorded and unrelated work preserved. Same-task continuation follows the disarm/update/revalidation rules.
-- [ ] Approved, reviewed and validated commits are published to this branch/PR, or a concrete blocker is recorded; no direct main push, force-push or protection bypass.
+- [ ] Approved, reviewed and validated commits are published to this branch/PR, or a concrete blocker is recorded; no direct main push or protection bypass. A force-push is permitted only after an explicitly requested task-branch rebase, using an explicit expected-SHA lease and renewed exact-head acceptance under the workflow; never force-push main.
 - [ ] Non-CI acceptance is verified for the exact head before auto-merge is armed. GitHub's actual closing-issue references are read back and contain only fully completed issues, never partial work or deferred hardware/owner gates; negated closing phrases are not safe exclusions.
 - [ ] Required up-to-date PR CI is left to native auto-merge, without session watchers or custom closure automation. Next-session reconciliation removes obsolete progress labels and verifies issue/Project Done; failed CI remains actionable, not accepted.
 - [ ] Original/media safety and unrelated user edits are preserved.
