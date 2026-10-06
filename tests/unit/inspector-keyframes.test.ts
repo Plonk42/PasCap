@@ -19,7 +19,11 @@ describe('dedicated Inspector keyframe controls', () => {
       onEdit: vi.fn(), onPreview: vi.fn(), onSeek: vi.fn(), onPause: vi.fn(),
     })));
     const tabs = [...markup.matchAll(/<button[^>]*role="tab"[^>]*>(.*?)<\/button>/g)].map((match) => match[1]);
-    expect(tabs).toEqual(['Clip', 'Layer keyframes', 'Sequence', 'Audio']);
+    expect(tabs).toEqual(['Clip', 'Keyframes', 'Sequence', 'Audio']);
+    expect(markup).toContain('aria-label="Layer keyframes"');
+    expect(markup).not.toContain('inspector-track-selection');
+    expect(markup).not.toContain('Whole-row animation');
+    expect(markup).not.toContain('Track transitions &amp; fades');
     const panels = [...markup.matchAll(/<div role="tabpanel"[^>]*>/g)].map((match) => match[0]);
     expect(panels).toHaveLength(4);
     expect(panels[1]).not.toContain('hidden');
@@ -53,5 +57,8 @@ describe('dedicated Inspector keyframe controls', () => {
     expect(markup).not.toContain('aria-label="Keyframe Exposure"');
     expect(markup).not.toContain('Speed mode');
     expect(markup).toContain('Outside duration');
+    expect(markup).toContain('<ol class="keyframe-list keyframe-entries" aria-label="Edit layer keys">');
+    expect(markup).not.toContain('Edit points');
+    expect(markup).not.toContain('pascap-layer-key-list');
   });
 });

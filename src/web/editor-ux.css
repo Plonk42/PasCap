@@ -40,8 +40,7 @@
     border-color: #506c56;
 }
 
-.product-workspace .inspector-selection,
-.product-workspace .inspector-track-selection {
+.product-workspace .inspector-selection {
     display: grid;
     grid-template-columns: 18px minmax(0, 1fr);
     column-gap: 8px;
@@ -49,17 +48,14 @@
     border-bottom: 1px solid var(--line);
 }
 
-.inspector-selection>svg,
-.inspector-track-selection>svg {
+.inspector-selection>svg {
     grid-row: 1 / 3;
     align-self: center;
     color: var(--accent);
 }
 
 .inspector-selection>strong,
-.inspector-selection>span,
-.inspector-track-selection>strong,
-.inspector-track-selection>span {
+.inspector-selection>span {
     grid-column: 2;
     min-width: 0;
     overflow: hidden;
