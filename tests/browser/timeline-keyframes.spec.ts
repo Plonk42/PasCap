@@ -4,7 +4,7 @@ import { applyCommand } from '../../src/shared/commands.js';
 import type { MediaAsset } from '../../src/shared/media.js';
 import { createClip, createLayer, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
 import { calculateLayout } from '../../src/shared/timeline.js';
-import { expandedInspectorPreferences, layerKeyframes, sharedPoint } from './editor-helpers.js';
+import { expandedInspectorPreferences, inspectorTab, layerKeyframes, sharedPoint } from './editor-helpers.js';
 import { memoryProjects, type MemoryProjects } from './memory-projects.js';
 
 let memory: MemoryProjects;
@@ -201,6 +201,7 @@ test('a keyboard Speed-point move can extend beyond the old preview duration wit
   const project = sequence(); project.clips = [createClip('first', assets[0]!.id, 0, 60)]; project.layers[0]!.transitions = [];
   project.layers[0]!.keyframes = [sharedPoint(0, { speed: 0.5 }, 'hold'), sharedPoint(110, { speed: 8 }, 'hold')];
   await fixture(page, project); expect(calculateLayout(project).duration).toBe(111);
+  await inspectorTab(page, 'Layer keyframes');
   await marker(page, 110).focus(); await marker(page, 110).press('Shift+ArrowRight');
   const expected = applyCommand(project, { type: 'layer-key-move', layerId: 'video-1', frame: 110, nextFrame: 120 });
   expect(await current(page)).toEqual(expected); await ready(page, expected);
@@ -211,12 +212,15 @@ test('a keyboard Speed-point move can extend beyond the old preview duration wit
 
 test('an empty positioned row has independently movable points and marker selection follows its own track rather than another clip', async ({ page }) => {
   const project = sequence(); project.layers.push({ ...createLayer('empty-overlay', 'Video 2', false), keyframes: [sharedPoint(20, { layerOpacity: 0.5, hue: 30 }, 'hold')] });
-  await fixture(page, project); const start = await begin(page, 20, 'empty-overlay'); await move(page, start, 35, true);
+  await fixture(page, project); await inspectorTab(page, 'Layer keyframes');
+  const start = await begin(page, 20, 'empty-overlay'); await move(page, start, 35, true);
   await expect(layerKeyframes(page, 'Video 2')).toBeVisible(); await page.mouse.up(); await page.keyboard.up('Alt');
   const next = await current(page);
   expect(next.layers[0]).toEqual(project.layers[0]); expect(next.clips).toEqual(project.clips);
   expect(next.layers[1]!.keyframes).toEqual([{ ...project.layers[1]!.keyframes[0]!, frame: 35 }]);
-  await expect(page.locator('.selected-clip-name')).toContainText('Whole video row'); await expect(marker(page, 35, 'empty-overlay')).toBeFocused();
+  await expect(marker(page, 35, 'empty-overlay')).toBeFocused();
+  await inspectorTab(page, 'Clip');
+  await expect(page.locator('.selected-clip-name')).toContainText('Whole video row');
 });
 
 test('horizontal autoscroll uses captured zoom/scroll coordinates and Escape restores the original viewport without saves', async ({ page }) => {
@@ -237,6 +241,7 @@ test('horizontal autoscroll uses captured zoom/scroll coordinates and Escape res
 });
 
 test('moving a point outside duration stores its time without extending footage, and setting navigation can find it', async ({ page }) => {
+  await inspectorTab(page, 'Layer keyframes');
   const before = await current(page); const start = await begin(page); await move(page, start, 160, true);
   await expect(marker(page, 160)).toHaveClass(/moving/); await page.mouse.up(); await page.keyboard.up('Alt');
   const next = await current(page); expect(calculateLayout(next).duration).toBe(120); expect(next.clips).toEqual(before.clips);
@@ -244,8 +249,10 @@ test('moving a point outside duration stores its time without extending footage,
   await expect(marker(page, 160)).toHaveCount(0);
   await expect(layerKeyframes(page, 'Video 1').locator('.layer-keyframe-inspected')).toContainText('Stored point · timeline frame 160');
   await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(119);
+  await inspectorTab(page, 'Clip');
   await page.getByRole('button', { name: 'Previous Exposure keyframe', exact: true }).click();
   await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(80);
   await page.getByRole('button', { name: 'Next Exposure keyframe', exact: true }).click();
+  await inspectorTab(page, 'Layer keyframes');
   await expect(layerKeyframes(page, 'Video 1').locator('.layer-keyframe-inspected')).toContainText('Stored point · timeline frame 160');
 });

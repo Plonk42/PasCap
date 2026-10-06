@@ -17,7 +17,13 @@ Every video track owns Ripple (default on), transitions and opening/closing fade
 Enabling Ripple packs from the current first start; while on, clips continuously
 sequence there, and turning it off retains actual placements. Rows display stored
 bottom-to-top composition order without primary/overlay roles. The UI provides a
-pinned ruler, synchronized native row access, accessible action bounds and contextual heading help. Current usage
+pinned ruler, synchronized native row access, accessible action bounds and contextual
+heading help. Inspector tabs are **Clip / Layer keyframes / Sequence / Audio**: the
+[dedicated Layer keyframes tab](https://github.com/Plonk42/PasCap/issues/26) owns
+the whole-row point list, while Clip keeps
+source/static and playhead settings. Stored participants reuse the main value
+controls with precise numeric editing. Clip/row selection and point navigation
+preserve the chosen tab; explicit boundary buttons open Sequence. Current usage
 and limits are documented in [the user guide](USER_GUIDE.md),
 [layer/resource contracts](LAYERS_AND_KEYFRAMES.md) and
 [development/validation guide](DEVELOPMENT.md).

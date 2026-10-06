@@ -18,11 +18,12 @@ The intended discrete-GPU and long real-flight checks remain deferred.
   insertion target appear when recordings are selected.
 - Centre: docked **Timeline preview** / **Source preview** tabs, never an overlay
   covering other editor controls. Tab arrows and Home/End switch viewer contexts.
-- Right: scrollable **Clip / Sequence / Audio** inspector tabs with readable inputs,
-  independent collapsible sections. Clip contains source/static bases, opacity,
-  speed, colour and one **Layer keyframes** panel for the selected row; Sequence
-  owns the selected track's transitions/fades; Audio owns music. Empty-row selection
-  retains keyframe context and dormant track fades.
+- Right: scrollable **Clip / Layer keyframes / Sequence / Audio** inspector tabs
+  with readable inputs and independent collapsible sections. Clip contains
+  source/static bases and playhead opacity, speed, colour and diamonds. Layer
+  keyframes contains the selected row's whole-point list, participant chips,
+  Animation help and point navigation; Sequence owns that track's transitions/fades;
+  Audio owns music. Empty-row selection retains keyframe context and dormant fades.
 - Bottom: frame-scaled multi-layer timeline, playhead timecode, highlighted active
   insertion layer, one marker per visible row point, dimmed hidden clips and Activity.
   The responsive toolbar keeps Split, Trim start/end, Delete and IN/OUT/Cut range
@@ -50,9 +51,12 @@ retain usable pointer targets. These are UI contracts, not performance certifica
 
 Choosing a layer selects its first excerpt (if present), highlights that row and
 reveals it vertically. Empty-layer selection clears clip selection but retains the
-insertion target **and row-wide Layer keyframes panel/settings**. Automatic row
-reveal never runs under an active trim/shared-point/native clip drag. Selected excerpts and
-source-list **Show** requests are also revealed horizontally; showing the first
+insertion target **and row-wide Layer keyframes context/settings**. Selecting a
+clip or a populated/empty row preserves the user's chosen Inspector tab. Its fields
+refresh for the new editing context without applying the previous row/clip's drafts
+to that selection. Automatic row reveal never runs under an active
+trim/shared-point/native clip drag. Selected excerpts and source-list **Show**
+requests are also revealed horizontally; showing the first
 excerpt restores the normal frame-zero gutter. Selection never changes
 source/static bases, layer order or absolute project-frame row points.
 
@@ -98,17 +102,21 @@ On a focused row marker, Left/Right moves that point one project frame and Shift
 moves ten. Marker keyboard events remain in that context, retaining point/Timeline
 focus while navigating to the moved point, without also firing ordinary playhead-step,
 clip-nudge or other editor shortcuts.
-Click or Enter on a marker selects its row and seeks without editing.
+Click or Enter on a marker selects its row and seeks without editing; marker and
+whole-row point navigation preserve the chosen Inspector tab.
 
 Options are nonmodal disclosures with normal Tab navigation, not custom ARIA menus.
 They use the browser top layer to avoid clipping inside panels. Escape closes and
 returns focus to the trigger; clicking outside closes without stealing focus from
 the clicked control. Inspector tab arrows/Home/End switch contexts without discarding
-mounted section state. Selecting a clip returns to Clip; a transition opens Sequence.
+mounted content or its valid/invalid drafts within the same editing context.
+Selecting a clip or row keeps the chosen tab; explicit Cut/Fade/Dissolve boundary
+buttons open Sequence.
 **Expand all / Collapse all** below the Inspector tabs changes all seven top-level
 settings sections across Clip, Sequence and Audio, including hidden or temporarily
 absent sections. A mixed state offers Expand all. Individual toggles and the existing
-section preferences remain authoritative; nested details and help are excluded.
+section preferences remain authoritative; the Layer keyframes tab's **Edit points**,
+its nested **Time, easing & values**, other nested details and help are excluded.
 Bulk expansion is presentation-only and leaves mounted drafts, processing, history
 and saves unchanged. If preference storage fails, choices still work for the session.
 New preferences keep Source range, Layer & opacity and Speed collapsed, Colour open;
@@ -126,7 +134,8 @@ Shared-point timing help sits beside **Edit points**, audio timing beside
 **Placement & fades**, and startup details beside **Preview needs attention**.
 These title-row help targets remain available without expanding their settings;
 collapsing content does not hide its heading help. Hiding the owning tab/pane
-still dismisses help. The existing Animation button remains beside **Layer keyframes**.
+still dismisses help. **Animation help** sits beside the Layer keyframes heading
+in its dedicated tab, alongside whole-row point navigation.
 Hovering the question-mark target or keyboard focus previews help without moving
 focus or applying a draft; empty space across a section does not activate help.
 The pointer can move into the text without closing it. Click, Enter or Space pins
@@ -168,10 +177,12 @@ validate its two endpoints atomically.
 
 ### Shared row animation
 
-The **Layer keyframes** panel belongs to the selected **entire video row**, not the
-selected clip. It remains available on an empty row and shows participants as chips.
+The dedicated **Layer keyframes** tab belongs to the selected **entire video row**,
+not the selected clip. It remains available on an empty row and contains the shared
+point list, count, whole-row Previous/Next navigation and participant chips.
 Its question-mark **Animation help** button uses the common hover/pin/dismiss
 contract above; explanatory text does not replace the shared point editor.
+**Clip** keeps the source/static bases and playhead value/diamond controls.
 All ten settings (Layer opacity, Clip opacity, Speed and seven colour parameters)
 always expose a diamond beside their control: **◇ hollow/inactive** versus **◆
 filled/active**, with `aria-pressed`. A hollow diamond remains clickable; inactivity
@@ -182,22 +193,24 @@ any existing reset control. Both remain visible, disabled without the correspond
 neighbour, an opened project, or during any document-preview draft. They visit strictly
 earlier/later points where that setting is not `null`, including zero, and skip
 points participating only in unrelated channels. The duplicate sidebar Layer opacity
-controls share this navigation, select their own row and open Clip without stealing
-focus from the activated button. Navigation never saves or creates an Undo step.
+controls share this navigation and select their own row. Navigation preserves the
+chosen Inspector tab and the activated button's focus, rather than forcing Clip;
+it never saves or creates an Undo step.
 
 Clicking joins/leaves **only that setting** at the current absolute project frame.
 The first participant creates the shared point, the last removal deletes it, and
-other participants/easing are preserved. A keyed channel's slider/number is read-only
-where that channel is absent, including points belonging to other channels. Click
-its hollow diamond to capture the displayed value first; there are no slider-created
+other participants/easing are preserved. A keyed channel's main Clip slider/number
+is read-only where that channel is absent, including points belonging to other
+channels. Click its hollow diamond to capture the displayed value first; there are no slider-created
 implicit keys. Unanimated channels edit only the selected clip's static base, or
 the layer's base opacity. Clip Speed modes include Constant/Ramp up/Ramp down and
 the explicitly approved Custom curve with source-frame keys. Its presets, precise
 fields and reversible graph gestures do not create row Speed participation.
 
-**Edit points** exposes one shared list. Each row names the participating setting
-dependencies; its inner **Time, easing & values** provides **Timeline frame**,
-**Shared easing** and participant-specific values. A time edit moves all participants
+**Layer keyframes → Edit points** exposes one shared list. Each row names the
+participating setting dependencies; its inner **Time, easing & values** provides
+**Timeline frame**, **Shared easing** and participant-specific values.
+A time edit moves all participants
 and their existing easing together in **one Undo step**; colliding times/invalid
 values/contextual timing are rejected without changing the committed document,
 never merged or overwritten. One easing is shared at a point,
@@ -206,12 +219,21 @@ endpoint holds and static bases only for entirely unanimated channels. Row
 input identity/focus and project/layer expansion survive time reordering and Undo;
 no persisted point IDs are added.
 
+Stored colour/opacity participants reuse the main sliders, units and individual
+colour resets, with precise numeric fields alongside them. Speed reuses **Layer
+rate ×** and Reset to 1×, not clip mode/preset/source-curve controls. Each accepted
+value or reset targets only that existing stored participant in one Undo step;
+point time, shared easing, other participants and static bases stay unchanged.
+There is no implicit joining. Numeric drafts retain entered precision and apply
+on Enter/blur; Escape restores. Empty, nonfinite, out-of-range or timing-conflicting
+values retain inline errors without clamping or shortening transitions.
+
 Points outside current duration remain stored/list-editable. A central editor-only
 inspection cursor is shared by setting, row, marker and list navigation, advancing
 through several off-duration points even when their previews clamp to the same last
 available frame. Labels identify stored time separately from actual preview; an
-empty timeline has no preview frame. List fields edit the inspected stored point,
-but setting values, diamond state and capture **still use the real playhead**.
+empty timeline has no preview frame. List controls edit their stored point,
+but Clip's setting values, diamond state and capture **still use the real playhead**.
 Manual seek (including the same clamped frame), playback, row/project changes and
 deletion of the inspected point clear inspection. A valid single-point move/Undo
 preserves the cursor and input identity; **Follow playhead** ends inspection explicitly.
@@ -234,11 +256,13 @@ to display it; Speed can naturally recompile clip durations. Other points, sourc
 static clip bases and music are not copied or shifted. The shared time field remains
 an exact alternative, with the same atomic move validation.
 
-Reset speed to 1× changes only an active Speed participant when animated; without
-Speed keys it resets the selected clip's constant/ramp/custom base. It never clears the
-curve or unrelated point participants. Colour **Reset keys** changes only enabled
-colour values at the current point; individual resets also handle unanimated clip
-bases. Trim/move/split/duplicate do not copy or shift row points. The contract is in
+In Clip, Reset speed to 1× changes only an active Speed participant when animated;
+without Speed keys it resets the selected clip's constant/ramp/custom base.
+It never clears the row curve or unrelated point participants. Colour **Reset keys**
+changes only enabled colour values at the current point; individual resets also
+handle unanimated clip bases. Stored-point resets in Layer keyframes target that
+point's existing participant, not a different value at the playhead.
+Trim/move/split/duplicate do not copy or shift row points. The contract is in
 [LAYERS_AND_KEYFRAMES.md](LAYERS_AND_KEYFRAMES.md).
 
 ## Source review and import

@@ -1,15 +1,16 @@
-import type { EditCommand } from '../shared/commands.js';
 import { editableClipSpeed } from '../shared/clip-speed.js';
+import type { EditCommand } from '../shared/commands.js';
 import { activeLayerSetting, evaluateLayerSetting, hasLayerKeys } from '../shared/keyframes.js';
 import type { ProjectDocument, VideoClip, VideoLayer } from '../shared/model.js';
 import { sourceRateAt, type SpeedSettings } from '../shared/speed.js';
+import { ClipSpeedCurve } from './ClipSpeedCurve.js';
 import './declutter.css';
 import { sourceSeconds } from './display.js';
-import { ClipSpeedCurve } from './ClipSpeedCurve.js';
 import { HelpPopover } from './HelpPopover.js';
 import { Icon } from './icons.js';
 import { KeyframeToggle } from './KeyframeToggle.js';
 import { NumberField } from './NumberField.js';
+import { SpeedRateField } from './SettingValueControl.js';
 import type { DraftPreview } from './Timeline.js';
 
 export interface SpeedControlsProps {
@@ -139,7 +140,7 @@ export function SpeedControls({ project, clip, layer, frame, projectDuration, pl
     {!keyed && clip && <BaseSpeedControls clip={clip} disabled={disabled} helpId={helpId} inputContext={inputContext} onChange={updateBase} />}
     {!keyed && clip?.speed.mode === 'curve' && sourceFrameCount !== null && <ClipSpeedCurve key={`${project.id}:${clip.id}`} project={project} clip={clip} speed={clip.speed} sourceFrameCount={sourceFrameCount} frame={frame} sourceFrame={sourceFrame} disabled={disabled} onEdit={onEdit} onPreview={onPreview} onSeek={onSeek} onPause={onPause} />}
     <div className={`layer-setting-heading${clip && !keyed ? ' clip-speed-row-heading' : ''}`}><span title={scope}>Row speed animation<small className="layer-setting-kind">{keyed && <Icon name="curve" size={12} />}<span className="declutter-sr-only">{scope}</span></small></span><span className="layer-setting-actions"><output title={keyed ? `Layer rate at timeline frame ${frame}` : 'Capture the selected clip base rate as a row-wide key'}>{rate.toFixed(2)}×</output><KeyframeToggle layer={layer} setting="speed" label="Speed" frame={frame} value={rate} disabled={disabled} onEdit={onEdit} /></span></div>
-    {(keyed || !clip) && <label className="speed-field" htmlFor={rateId}>Layer rate ×<NumberField id={rateId} aria-label="Layer speed rate" aria-describedby={helpId} min={0.1} max={8} step={0.05} disabled={disabled || !validFrame || !active} value={rate} resetKey={`${layerContext}:${frame}:speed`} hint={rateHint(keyed, active, frame)} onCommit={updateKey} /></label>}
+    {(keyed || !clip) && <SpeedRateField id={rateId} aria-label="Layer speed rate" aria-describedby={helpId} disabled={disabled || !validFrame || !active} value={rate} resetKey={`${layerContext}:${frame}:speed`} hint={rateHint(keyed, active, frame)} onCommit={updateKey} />}
     {graphAvailable && !customCurve && <>
       <svg className="speed-graph" viewBox="0 0 220 55" role="img" aria-label={`${keyed ? 'Layer' : 'Clip base'} speed curve · ${graphRange}`}><path d="M0 48H220" stroke="var(--line)" /><polyline points={speedGraphPoints(clip, layer, projectDuration)} fill="none" stroke="var(--accent)" strokeWidth="2" /></svg>
       <div className="speed-graph-range"><span>{graphRange}</span><span>0–8×</span></div>

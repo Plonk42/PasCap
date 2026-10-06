@@ -5,7 +5,7 @@ import { Icon, type IconName } from './icons.js';
 import './input-controls.css';
 import { readPreference, writePreference } from './preferences.js';
 
-export type InspectorMode = 'clip' | 'sequence' | 'audio';
+export type InspectorMode = 'clip' | 'keyframes' | 'sequence' | 'audio';
 
 const SECTION_DEFAULTS = { source: false, 'layer-opacity': false, speed: false, colour: true, transition: true, fades: true, music: true };
 type SectionId = keyof typeof SECTION_DEFAULTS;

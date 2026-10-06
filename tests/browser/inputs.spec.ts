@@ -40,7 +40,8 @@ async function setProject(page: Page, document: ProjectDocument): Promise<void> 
 }
 
 async function commitNumber(page: Page, name: string, value: string): Promise<void> {
-  if (name.startsWith('Music')) await inspectorTab(page, 'Audio');
+  if (name.includes('keyframe')) await inspectorTab(page, 'Layer keyframes');
+  else if (name.startsWith('Music')) await inspectorTab(page, 'Audio');
   else if (/Opening|Closing|Transition/.test(name)) await inspectorTab(page, 'Sequence');
   else await inspectorTab(page, 'Clip');
   const field = page.getByRole('spinbutton', { name, exact: true });
@@ -137,6 +138,7 @@ test('the shared list labels time/value/easing, retains reordered input focus, a
   document = applyCommand(document, { type: 'layer-add', layer: { ...createLayer('upper', 'Video 2', false), keyframes: [sharedPoint(80, { clipOpacity: 0.4 }, 'hold')] } });
   document = applyCommand(document, { type: 'insert', clip: { ...createClip('other-row', document.clips[1]!.mediaId, 0, 30), layerId: 'upper', start: 90 }, index: 2 });
   await setProject(page, document);
+  await inspectorTab(page, 'Layer keyframes');
   const keys = layerKeyframes(page, 'Video 1');
   await keys.getByRole('button', { name: 'Next layer keyframe', exact: true }).click();
   await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(20);
@@ -183,6 +185,7 @@ test('the shared list labels time/value/easing, retains reordered input focus, a
   await page.evaluate(() => window.pascapLab!.flush());
   await page.reload();
   await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
+  await inspectorTab(page, 'Layer keyframes');
   await expect(layerKeyframes(page, 'Video 1').getByRole('button', { name: 'Edit layer keys', exact: true })).toHaveAttribute('aria-expanded', 'true');
 });
 
@@ -199,6 +202,7 @@ test('row-speed navigation reaches project points and previews outside-duration 
   document = applyCommand(document, { type: 'trim', clipId: 'clip-a', sourceIn: 30, sourceOut: 90 });
   await setProject(page, document);
   expect(document.layers[0]?.keyframes.map((point) => point.frame)).toEqual([5, 35, 40, 110]);
+  await inspectorTab(page, 'Layer keyframes');
   const keys = layerKeyframes(page, 'Video 1');
   for (const frame of [5, 35, 40, calculateLayout(document).duration - 1]) {
     await keys.getByRole('button', { name: 'Next layer keyframe', exact: true }).click();
@@ -219,6 +223,7 @@ test('row-speed navigation reaches project points and previews outside-duration 
   expect((await currentProject(page)).layers[0]?.keyframes).toEqual(document.layers[0]?.keyframes);
   await value.press('Enter');
   await page.evaluate(() => window.pascapLab!.engine.seek(0));
+  await inspectorTab(page, 'Clip');
   const rate = page.getByRole('spinbutton', { name: 'Layer speed rate', exact: true });
   await expect(rate).toBeDisabled();
   const diamond = page.getByRole('complementary', { name: 'Clip inspector' }).getByRole('button', { name: 'Keyframe Speed', exact: true });
@@ -234,6 +239,7 @@ test('row-speed navigation reaches project points and previews outside-duration 
   expect((await currentProject(page)).layers[0]?.keyframes[0]).toEqual(sharedPoint(0, { speed: 1 }));
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   expect((await currentProject(page)).layers[0]?.keyframes).toEqual(points);
+  await inspectorTab(page, 'Layer keyframes');
   await expect(keys.getByRole('button', { name: 'Edit layer keys', exact: true })).toHaveAttribute('aria-expanded', 'true');
 });
 
@@ -316,6 +322,7 @@ test('per-track fade/transition timing and positioned track key numbers use the 
   document = applyCommand(document, { type: 'insert', clip: { ...createClip('overlay', document.clips[1]!.mediaId, 0, 30), layerId: 'upper', start: 5 }, index: 2 });
   await setProject(page, document);
   await page.locator('[data-clip-id="overlay"] .timeline-clip-body').click();
+  await inspectorTab(page, 'Clip');
   const start = page.getByRole('spinbutton', { name: 'Clip timeline start', exact: true });
   await start.fill('80');
   expect((await currentProject(page)).clips[2]?.start).toBe(5);
@@ -351,6 +358,7 @@ test('colour resets target the static base or only participating colours at the 
   const keys = layerKeyframes(page, 'Video 1');
   await editLayerPoint(page, 'Video 1', 5);
   await keys.getByRole('button', { name: 'Go to layer keyframe 5', exact: true }).click();
+  await inspectorTab(page, 'Clip');
   await expect(page.getByRole('slider', { name: 'Exposure', exact: true })).toHaveValue('-0.5');
   await page.getByRole('button', { name: 'Reset Exposure', exact: true }).click();
   document = await currentProject(page);
@@ -359,11 +367,16 @@ test('colour resets target the static base or only participating colours at the 
   await commitNumber(page, 'Layer keyframe frame 5', '8');
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   await expect(keys.locator('[data-keyframe-frame="5"]')).toHaveAttribute('aria-current', 'true');
+  await inspectorTab(page, 'Clip');
   await expect(page.getByRole('slider', { name: 'Exposure', exact: true })).toBeEnabled();
   await page.getByRole('button', { name: 'Redo', exact: true }).click();
+  await inspectorTab(page, 'Layer keyframes');
   await expect(keys.locator('[data-keyframe-frame="8"]')).toBeVisible();
+  await inspectorTab(page, 'Clip');
   await expect(page.getByRole('slider', { name: 'Exposure', exact: true })).toBeDisabled();
+  await inspectorTab(page, 'Layer keyframes');
   await keys.getByRole('button', { name: 'Go to layer keyframe 8', exact: true }).click();
+  await inspectorTab(page, 'Clip');
   await page.getByRole('button', { name: 'Reset Saturation', exact: true }).click();
   await page.getByRole('slider', { name: 'Exposure', exact: true }).fill('0.25');
   document = await currentProject(page);

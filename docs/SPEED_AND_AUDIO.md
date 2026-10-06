@@ -140,20 +140,35 @@ not guaranteed. Originals and full proxies remain unchanged.
 
 ### Editing speed
 
-The diamond explicitly joins/leaves Speed at the current project frame. It captures
-the displayed rate; changing a control never creates implicit endpoint keys.
+In **Clip → Speed**, the diamond explicitly joins/leaves Speed at the current
+project frame. It captures the displayed rate; changing a control never creates
+implicit endpoint keys.
 Immediately after it, native SVG **Previous/Next** buttons visit strictly earlier/
 later points with a non-null Speed value, skipping colour/opacity-only points. They
 stay visible but disabled without a neighbour, an opened project, or during any
-document-preview draft; the existing reset follows Next. Navigation is editor-only, not a
-rate/base change or an Undo/autosave operation.
+document-preview draft. Navigation preserves the chosen Inspector tab and activated
+button's focus; it is editor-only, not a rate/base change or an Undo/autosave operation.
 
-An animated channel is read-only where it does not participate until its hollow
-diamond is clicked. Unanimated Speed uses **Constant speed / Ramp up / Ramp down**
+The main animated rate field is read-only where Speed does not participate until
+its hollow diamond is clicked. Unanimated Speed uses **Constant speed / Ramp up / Ramp down**
 or **Custom curve** clip controls. Reset to 1× affects only the active row Speed
-participant when keyed, otherwise the selected clip's base. All stored point times,
-easing and participant values remain editable in **Layer keyframes → Edit points**,
-even beyond current duration.
+participant at the playhead when keyed, otherwise the selected clip's base.
+
+The dedicated **Layer keyframes** tab contains the whole-row point list, Animation
+help and point navigation. **Edit points → Time, easing & values** edits stored
+point times, easing and existing participants, including beyond current duration
+or on an empty row. A stored Speed participant reuses the **Layer rate ×** numeric
+field and Reset to 1×, not clip mode/preset/source-curve controls. Enter/blur applies
+the precise rate; Escape restores. The same **0.1×–8×** bounds and contextual timing
+validation apply. Invalid drafts retain inline errors rather than being clamped,
+rounded or used to shorten conflicting fades/transitions.
+
+Each accepted stored rate/reset changes only that existing Speed participant in
+**one Undo step**. Its time, shared easing, other participants/points and the saved
+clip bases stay unchanged; it never implicitly joins Speed or requests a seek.
+Stored colour/opacity participants likewise reuse the main sliders, units and
+individual colour resets with precise numeric fields, targeting only that stored
+participant.
 
 Drag a row marker horizontally or use its one-/ten-frame keyboard moves to move
 all participants and their existing easing in **one Undo step**, using the same
@@ -166,15 +181,17 @@ Speed can naturally recompile clip durations and Ripple-derived track starts.
 
 Setting/row/list navigation shares a stored-point inspection cursor, so several
 off-duration Speed points remain reachable even when preview clamps to the same
-last frame. Labels distinguish stored time from actual preview. Rate controls and
+last frame. Marker and whole-row point navigation keep the chosen Inspector tab.
+Labels distinguish stored time from actual preview. The main Clip rate field and
 diamond capture still use the **real playhead**, not the inspected off-duration
-time. Storing/moving a point beyond duration does not extend the sequence merely
-for that point; only actual clip retiming changes duration. Details:
+time; list controls target their stored point. Storing/moving a point beyond
+duration does not extend the sequence merely for that point; only actual clip
+retiming changes duration. Details:
 [LAYERS_AND_KEYFRAMES.md](LAYERS_AND_KEYFRAMES.md).
 
 ### Precise clip-curve editor
 
-With an excerpt selected and no overriding row Speed keys, choose **Speed →
+With an excerpt selected and no overriding row Speed keys, choose **Clip → Speed →
 Custom curve**. A constant rate becomes a flat editable curve; converting an old
 ramp retains its original anchors and easing. Flat, Accelerate, Decelerate, Slow
 centre and Fast centre buttons deliberately replace only this clip's speed points.

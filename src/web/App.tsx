@@ -162,7 +162,7 @@ export function App() {
   const select = useCallback((id: string) => {
     if (selection.current !== id) setCutRange(null);
     selection.current = id; setSelectedId(id);
-    setViewerMode('timeline'); setInspectorMode('clip');
+    setViewerMode('timeline');
     const document = current.current;
     const layerId = document?.clips.find((clip) => clip.id === id)?.layerId;
     if (layerId) {
@@ -596,7 +596,7 @@ export function App() {
   const selectLayer = useCallback((id: string): void => {
     if (drafting.current) return;
     if (selectedLayer.current !== id) setKeyframeInspection(null);
-    setInspectorMode('clip'); setViewerMode('timeline');
+    setViewerMode('timeline');
     selectedLayer.current = id; setSelectedLayerId(id);
     const first = current.current && calculateLayout(current.current).clips.find((item) => item.clip.layerId === id);
     if (first) select(first.clip.id);
@@ -612,7 +612,7 @@ export function App() {
     if (!next) return;
     engine.current?.pause();
     if (selectedLayer.current !== layerId) selectLayer(layerId);
-    setInspectorMode('clip'); setViewerMode('timeline');
+    setViewerMode('timeline');
     const workspace = latestWorkspace.current;
     if (!workspace.layout.inspectorOpen) workspace.update({ inspectorOpen: true, ...(workspace.viewport.width < 980 ? { mediaOpen: false } : {}) }, false);
     setKeyframeInspection(next);
