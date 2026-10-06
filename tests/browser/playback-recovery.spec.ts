@@ -113,7 +113,7 @@ async function openRecoveryProject(page: Page, request: APIRequestContext, withM
             },
         });
         const requestFrame = HTMLVideoElement.prototype.requestVideoFrameCallback;
-        HTMLVideoElement.prototype.requestVideoFrameCallback = function (callback) {
+        HTMLVideoElement.prototype.requestVideoFrameCallback = function(callback) {
             return requestFrame.call(this, (now, metadata) => {
                 const frame = Math.round(metadata.mediaTime * 30_000 / 1_001);
                 if (decoderEvents.length < 300) decoderEvents.push({ kind: 'callback', slot: this.dataset['pascapDecoder'], frame, time: metadata.mediaTime, current: this.currentTime, ready: this.readyState, paused: this.paused, seeking: this.seeking });
@@ -262,6 +262,7 @@ async function attachEvidence(page: Page, browser: Browser, withMusic: boolean, 
             requestedFrame: state.requestedFrame, decodedSourceFrames: state.decodedSourceFrames, decoderReady: state.decoderReady,
             decoders: Array.from(document.querySelectorAll<HTMLVideoElement>('video[data-pascap-decoder]')).map(video => ({ slot: video.dataset['pascapDecoder'], time: video.currentTime, seeking: video.seeking, paused: video.paused, ready: video.readyState })),
             decoderEvents: Reflect.get(window, 'recoveryDecoderEvents'),
+            decodedCallbackRecovery: Reflect.get(window, 'decodedCallbackRecovery'),
             callbackGate: { heldFrame: gate.heldFrame, heldCallbacks: gate.heldCallbacks, releasedCallbacks: gate.releasedCallbacks },
         };
     });
@@ -333,6 +334,52 @@ test('a withheld decoded callback buffers beyond one-frame eligibility, reports 
     } finally {
         await page.evaluate(() => window.playbackRecoveryGate.release?.());
         await attachEvidence(page, browser, false, false);
+    }
+});
+
+test('a genuine decoded callback resolves buffering between display ticks without restarting music', async ({ page, request, browser }) => {
+    test.setTimeout(45_000);
+    const fixture = await openRecoveryProject(page, request, true);
+    try {
+        await page.evaluate(() => {
+            const gate = window.playbackRecoveryGate;
+            gate.targetFrame = 10; gate.atOrAfter = true;
+            Reflect.set(window, 'decodedCallbackRecovery', null);
+            window.pascapLab!.engine.subscribe((state) => {
+                if (state.status !== 'buffering' || !state.playing || !gate.release || gate.heldFrame === null ||
+                    Math.abs(gate.heldFrame - state.requestedFrame) > 1 || Reflect.get(window, 'decodedCallbackRecovery') !== null) return;
+                // Release the genuine metadata after this engine tick has returned,
+                // but before another display tick. Never invent a frame or clock.
+                Reflect.set(window, 'decodedCallbackRecovery', { pending: true });
+                queueMicrotask(() => {
+                    const engine = window.pascapLab!.engine;
+                    const before = engine.diagnostics(); const starts = window.musicStreamEvidence.starts;
+                    const heldFrame = gate.heldFrame;
+                    gate.release!();
+                    Reflect.set(window, 'decodedCallbackRecovery', { pending: false, before, after: engine.diagnostics(), heldFrame, starts, afterStarts: window.musicStreamEvidence.starts });
+                });
+            });
+        });
+        await startPlayback(page);
+        await page.waitForFunction(() => {
+            const result = Reflect.get(window, 'decodedCallbackRecovery') as { pending: boolean } | null;
+            return result?.pending === false || window.pascapLab!.engine.diagnostics().status === 'error';
+        });
+        const recovered = await page.evaluate(() => Reflect.get(window, 'decodedCallbackRecovery') as {
+            before: { status: string; frame: number }; after: { status: string; frame: number; requestedFrame: number; musicDriftFrames: number };
+            heldFrame: number; starts: number; afterStarts: number;
+        });
+        expect(recovered.before.status).toBe('buffering');
+        expect(recovered.after.status).toBe('playing');
+        expect(recovered.after.frame).toBe(recovered.heldFrame);
+        expect(Math.abs(recovered.after.requestedFrame - recovered.after.frame)).toBeLessThanOrEqual(1);
+        expect(recovered.after.musicDriftFrames).toBeLessThanOrEqual(1);
+        expect(recovered.starts).toBe(1); expect(recovered.afterStarts).toBe(1);
+        await waitForCompletion(page); await assertCompleted(page, fixture, true);
+        expect(await page.evaluate(() => window.playbackRecoveryGate.releasedCallbacks)).toBe(1);
+    } finally {
+        await page.evaluate(() => window.playbackRecoveryGate.release?.());
+        await attachEvidence(page, browser, true, false);
     }
 });
 

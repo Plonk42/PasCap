@@ -48,12 +48,13 @@ vi.mock('../../src/preview/decoder.js', () => ({
         droppedFrames = 0;
         readonly aspect = 16 / 9;
         rate: FrameRate = { numerator: 30_000, denominator: 1_001 };
-        constructor(_container: HTMLElement, readonly index: number) { doubles.slots.push(this); }
+        constructor(_container: HTMLElement, readonly index: number, readonly onFrame?: () => void) { doubles.slots.push(this); }
         get ready(): boolean { return !this.video.seeking && this.video.readyState >= 2 && this.decodedFrame >= 0; }
         observe(frame: number): void {
             this.decodedFrame = frame; this.observedFrames++;
             this.video.currentTime = frame * this.rate.denominator / this.rate.numerator;
             Object.assign(this.video, { readyState: 2, seeking: false });
+            this.onFrame?.();
         }
         load = vi.fn(async (url: string, rate: FrameRate, signal: AbortSignal): Promise<void> => {
             if (signal.aborted) throw new DOMException('Cancelled load', 'AbortError');
@@ -260,6 +261,73 @@ async function pendingRecovery(unavailable = false) {
 }
 
 describe('PreviewEngine observed-frame tolerance and recovery', () => {
+    it.each([false, true])('accepts a genuinely delivered frame between display ticks before stale mismatch time restarts playback (music=%s)', async (withMusic) => {
+        const preview = await running(singleProject(withMusic));
+        const slot = slotFor(preview);
+        slot.observe(9); tick(preview, 11); await settle();
+        expect(preview.engine.diagnostics()).toMatchObject({ status: 'buffering', frame: 8, requestedFrame: 11 });
+        expect(preview.compositor.visible).toBeNull();
+        // rVFC is delivered after this display tick. The image is genuinely
+        // ready/exact now; do not wait for a later tick's different clock frame.
+        slot.observe(11);
+        const delivered = preview.engine.diagnostics();
+        vi.clearAllMocks();
+        // The next display callback skips one tick. Its new mismatch must not
+        // inherit the earlier, already-resolved mismatch's grace period.
+        tick(preview, 13); await settle();
+        expect(preview.music.pause).not.toHaveBeenCalled();
+        expect(preview.music.start).not.toHaveBeenCalled();
+        expect(slot.seek).not.toHaveBeenCalled();
+        expect(delivered).toMatchObject({ status: 'playing', frame: 11, requestedFrame: 11 });
+        expect(preview.engine.diagnostics()).toMatchObject({ status: 'buffering', frame: 11, requestedFrame: 13 });
+        slot.observe(13);
+        expect(preview.engine.diagnostics()).toMatchObject({ status: 'playing', frame: 13 });
+        expectSurface(preview, 13);
+    });
+
+    it('does not accept a delivered frame against an obsolete display tick instead of the current audio clock', async () => {
+        const preview = await running(singleProject(true));
+        const slot = slotFor(preview);
+        slot.observe(9); tick(preview, 11);
+        doubles.now = preview.anchor + framesToSeconds(13 - preview.initialFrame + 0.1) * 1000;
+        slot.observe(11);
+        expect(preview.engine.diagnostics()).toMatchObject({ status: 'buffering', frame: 8, requestedFrame: 13 });
+        expect(preview.compositor.visible).toBeNull();
+        expect(preview.music.start).not.toHaveBeenCalled();
+        slot.observe(13);
+        expect(preview.engine.diagnostics()).toMatchObject({ status: 'playing', frame: 13 });
+        expectSurface(preview, 13);
+    });
+
+    it('keeps failed music synchronization explicit when a decoded callback arrives', async () => {
+        const preview = await running(singleProject(true));
+        const slot = slotFor(preview);
+        slot.observe(9); tick(preview, 11);
+        preview.music.sync.mockReturnValueOnce(false);
+        slot.observe(11);
+        expect(preview.engine.diagnostics()).toMatchObject({ status: 'buffering', frame: 8 });
+        expect(preview.compositor.visible).toBeNull();
+        expect(preview.music.start).not.toHaveBeenCalled();
+        slot.observe(11);
+        expect(preview.engine.diagnostics()).toMatchObject({ status: 'playing', frame: 11 });
+        expectSurface(preview, 11);
+    });
+
+    it('does not let a delivered callback bypass a pending owned seek or deliberate pause', async () => {
+        const { preview, slot, pending } = await pendingRecovery();
+        const requested = pending.request();
+        slot.observe(requested.frame);
+        expect(preview.engine.diagnostics()).toMatchObject({ status: 'buffering', playing: true });
+        expect(preview.compositor.visible).toBeNull();
+        expect(preview.music.start).not.toHaveBeenCalled();
+        preview.engine.pause();
+        vi.clearAllMocks();
+        slot.observe(requested.frame); pending.release(); await settle();
+        expect(preview.engine.diagnostics()).toMatchObject({ status: 'paused', playing: false });
+        expect(preview.compositor.drawFrame).not.toHaveBeenCalled();
+        expect(preview.music.start).not.toHaveBeenCalled();
+    });
+
     it('does not retain stale appearance when the accepted texture needs an updated grade', async () => {
         const preview = await running(singleProject(true));
         Object.assign(slotFor(preview).video, { readyState: 1 });
@@ -267,7 +335,8 @@ describe('PreviewEngine observed-frame tolerance and recovery', () => {
         tick(preview, 9);
         expect(preview.engine.diagnostics().status).toBe('buffering');
         expect(preview.compositor.visible).toBeNull();
-        slotFor(preview).observe(9); tick(preview, 9, 0.5);
+        // The delivered source now redraws the evaluated grade immediately.
+        slotFor(preview).observe(9);
         expect(preview.compositor.visible![0]!.clips[0]!.settings.exposure).toBe(1);
     });
 

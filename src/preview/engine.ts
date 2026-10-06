@@ -165,7 +165,7 @@ export class PreviewEngine {
       this.#assignments.splice(index, 1); this.#uploadedFrames.splice(index, 1);
     }
     while (this.#slots.length < count) {
-      this.#slots.push(new VideoDecoderSlot(document.body, this.#nextSlotIndex++));
+      this.#slots.push(new VideoDecoderSlot(document.body, this.#nextSlotIndex++, this.#onDecodedFrame));
       this.#assignments.push(null); this.#uploadedFrames.push(-1);
     }
     this.#compositor.setDecoderCount(count);
@@ -455,12 +455,30 @@ export class PreviewEngine {
     return drawn.length === required.length && drawn.every((layer) => required.includes(layer.clipId));
   }
 
+  #expectedFrame(now: number): number {
+    // rAF may precede a clock anchor established in this display cycle.
+    const elapsed = Math.max(0, now - this.#clockTime);
+    return this.#music.hasMusic ? this.#music.projectFrame() : this.#clockFrame + secondsToFrames(elapsed / 1000, this.#document!.frameRate, 'floor');
+  }
+
+  readonly #onDecodedFrame = (): void => {
+    if (!this.#playing || this.#busy || this.#status !== 'buffering' || !this.#document) return;
+    try {
+      // A real rVFC can resolve a mismatch between display ticks. Accept it
+      // against the CURRENT clock, not the earlier tick's requested frame, so
+      // a later mismatch cannot inherit an already-resolved grace period.
+      const expected = this.#expectedFrame(performance.now());
+      if (expected >= this.#layout.duration || !this.#music.sync(expected)) return;
+      const required = sampleTimeline(this.#document, expected, this.#layout).map((layer) => layer.clipId);
+      if (required.length !== this.#playingClips.length || required.some((id) => !this.#playingClips.includes(id))) return;
+      this.#operationFrame = expected;
+      if (this.#acceptFrame(expected) || this.#acceptNeighbour(expected, required)) this.#emit();
+    } catch (error) { this.#handleError(error); }
+  };
+
   #advance(now: number): void {
     if (!this.#document) return;
-    // rAF's timestamp may precede a clock anchor set by a media promise in this
-    // display cycle. Playback at frame zero must not request a negative frame.
-    const elapsed = Math.max(0, now - this.#clockTime);
-    const expected = this.#music.hasMusic ? this.#music.projectFrame() : this.#clockFrame + secondsToFrames(elapsed / 1000, this.#document.frameRate, 'floor');
+    const expected = this.#expectedFrame(now);
     this.#operationFrame = expected;
     if (expected >= this.#layout.duration) { this.pause(); void this.seek(this.#layout.duration - 1); return; }
     const layers = sampleTimeline(this.#document, expected, this.#layout);
