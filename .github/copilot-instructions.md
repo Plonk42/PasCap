@@ -5,11 +5,16 @@
 - Before starting any new task, fetch verified remote `main` **before edits or
   validation**. Code/mixed changes use a new short-lived branch from that exact
   SHA; pure workflow/instruction text uses the direct-main exception below.
-  **For code/mixed work, use branches in the existing clean, idle checkout by default**, not a new
+  **For code/mixed work, use branches in the current workarea by default**, not a new
   worktree per task/chat/commit or while ordinary PR CI runs. Fast-forward local
   `main` only; it must equal verified `origin/main` before branching. A worktree is
-  an exception for preserving unrelated unfinished work, an active service/test,
-  an unchanged reproduction baseline or explicitly concurrent work. Record its
+  an exception only for substantive unfinished work or a conflicting active
+  session. Open tabs, running editors, development servers and other processes
+  are not isolation reasons: requesting work means expecting changes here.
+  Incidental untracked prototypes, prose documentation updates and formatting
+  are not automatic dirty-tree blockers; inspect their actual scope, preserve
+  them unstaged and exclude them from delivery. Never overwrite conflicting edits
+  or discard files to permit switching. Record the specific conflicting work and
   concrete isolation reason and retirement condition; create it directly from
   freshly fetched `origin/main`, or report a blocker if no safe checkout exists.
   Inspect existing edits/branches/jobs first; never stash, reset, discard or include
@@ -17,7 +22,7 @@
   unmerged PR. Record the starting SHA; if freshness/access/isolation cannot be
   verified, stop and record the blocker. Continuing the same task uses its existing
   branch with the PR update/revalidation rules, not a new branch for every correction.
-- For sequential work, once owned local jobs are settled and the checkout is clean,
+- For sequential work, once owned validation is settled and no conflicting work remains,
   return to local `main`, fetch/fast-forward and verify it before the next branch.
   A published PR awaiting CI may keep its branch without another checkout; never
   delete or change its accepted head merely to reuse the directory. After switching,
@@ -45,7 +50,8 @@
   never `main` or unexpected remote work. Disarm auto-merge/remove closing links
   first, then revalidate/review the rewritten head before rearming. Otherwise use
   normal pushes and merge-based base updates. Preserve unrelated edits; use a worktree only when
-  switching would disturb work or a named isolation need requires it. Record
+  switching would conflict with substantive unfinished work or another active
+  session. Record
   publication blockers and next actions.
 - **Pure workflow/instruction text must be committed and pushed directly to `main`,
   without a PR or full runtime/CI cycle.** Review all outgoing commits, format/save,
@@ -55,8 +61,9 @@
   workflows/scripts/hooks or mixed changes. Other documentation is not automatically
   eligible. The owner approved administrator bypass only for this narrow policy;
   GitHub technically permits broader owner bypass, which the agent must not use.
-  Preserve dirty primary work: a clean exception checkout may publish `HEAD:main`
-  without moving dirty local `main`. Read back remote containment and close any
+  Preserve substantive unfinished primary work or a conflicting active session:
+  a clean exception checkout may publish `HEAD:main` without moving that checkout.
+  Incidental contents alone do not require isolation. Read back remote containment and close any
   actually completed tracked policy issue manually with documentation evidence,
   reason completed and Project Done. No CI wait or fabricated issue is required.
 - Verify non-CI acceptance against live scope/dependencies and the exact PR head

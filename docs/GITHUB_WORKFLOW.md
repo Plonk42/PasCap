@@ -176,11 +176,13 @@ remain on the protected PR path with their applicable checks. Scope is judged fr
 the complete diff and every outgoing commit, not a filename or an issue label.
 
 1. Fetch/read back actual remote `main` before edits or validation; inspect existing
-   work and jobs. Prefer the existing clean, idle checkout on fast-forwarded `main`
-   without creating a task branch or worktree. If dirty/busy primary work must stay
+   work and session ownership. Prefer the current workarea on fast-forwarded `main`
+   without creating a task branch or worktree. If substantive unfinished work or
+   a conflicting active session must stay
    intact, a clean exception checkout based on that exact SHA may publish `HEAD:main`;
-   record its isolation reason and retirement condition. Never move dirty local
-   `main`, stash/reset/discard unrelated work or publish an unreviewed prior task.
+   record its isolation reason and retirement condition. Never move local `main`
+   when substantive work/session conflicts prevent safe preservation; never
+   stash/reset/discard unrelated work or publish an unreviewed prior task.
 2. Format/save the changed text, validate content, local links/anchors, whitespace
    and privacy, then review and stage only this scope. Do not create a PR, issue or
    acceptance checklist merely for a routine instruction edit; substantive tracked
@@ -215,33 +217,46 @@ implementation. A fresh chat is not proof of a fresh Git base.
 Pure workflow/instruction text follows the direct-main gate above; the new-branch
 steps below apply to the normal PR path.
 
-**Branches in the existing clean, idle checkout are the default for sequential
-work.** A new task/chat, logical-step commit or ordinary PR CI wait does not itself
-justify a worktree. Use an additional checkout only to preserve unrelated unfinished
-work, protect an active service/test, compare an unchanged reproduction baseline,
-or support explicitly concurrent work. Record the concrete isolation reason and
+**Branches in the current workarea are the default for sequential work.** A request
+to work means the owner expects changes in that workarea. Open browser tabs,
+running editors, development servers and other processes do not justify isolation,
+nor does a new task/chat, logical-step commit or ordinary PR CI wait.
+Use an additional checkout only when substantive unfinished work or another active
+session would actually conflict. Record the specific work/session conflict and
 retirement condition in the existing issue/PR or handoff; no extra tracker is needed.
 
+Assess actual changes, not merely whether `git status` has entries. Incidental
+untracked prototypes, prose documentation updates and formatting are not automatic
+dirty-tree blockers. Preserve them unstaged, exclude them from task commits and
+continue here when switching/updating can retain them safely. Substantive edits,
+overlapping changes, or files that Git would overwrite remain genuine blockers.
+Never stash, reset, discard, overwrite or commit unrelated work to bypass a blocker;
+if safe preservation cannot be established, use the conflict exception or report it.
+
 1. Inspect the current branch, staged/unstaged/untracked work, linked worktrees,
-   active jobs and relevant PRs. Preserve unfinished work and ongoing validation;
-   do not switch or update a worktree that another task or service is using.
+   relevant PRs and other active sessions. Preserve unfinished work and do not
+   switch or update a checkout when that would conflict with another session.
+   Do not treat a process or an open tab as evidence of such a conflict.
 2. Verify the host/repository and intended `origin`, then fetch remote `main`.
    Read back its actual remote SHA and confirm fetched `origin/main` matches it.
    A failed fetch or cached tracking ref is not an up-to-date starting point. If
    the remote moves during verification, refresh before creating the task branch.
-3. If the existing checkout is clean and idle, use it: switch to local `main` and
+3. If no substantive work/session conflict exists, use this checkout: preserve
+   incidental edits and files, switch to local `main` and
    fast-forward only from `origin/main`. Require local `main` to equal the verified remote SHA with
    no ahead/behind commits before creating a **new** short-lived task branch.
    Never merge a previous PR's head into local `main`, including after squash merge.
-4. If switching would disturb unrelated unfinished work or active jobs, leave it
+4. If switching would conflict with substantive unfinished work or another active
+   session, leave that work
    intact and use a clean isolated worktree with a **new** task branch directly
    from freshly fetched `origin/main`, documenting the exception above. This also
    avoids moving `main` checked out in another worktree. Local-only/ahead/diverged
    `main` is not a valid base: preserve it and use the verified remote base safely,
-   or report a blocker. Review persistent dirty-checkout blockers and their next
+   or report a blocker. Review persistent substantive-work/session blockers and their next
    action instead of silently treating new worktrees as the permanent default.
 5. Verify the new task branch's initial `HEAD` equals that remote SHA and the task
-   worktree is clean. Record the starting `main` SHA in the PR and, when tracked,
+   checkout has no task changes; record any preserved incidental contents separately.
+   Record the starting `main` SHA in the PR and, when tracked,
    its existing work issue. Stop before edits/validation if freshness, access or
    safe isolation cannot be established; never stash/reset/discard unrelated work
    to pass the gate.
@@ -259,16 +274,18 @@ branch for each correction or logical step, or mix a new deliverable into it.
 
 ### Sequential branch handoff
 
-After publishing a reviewed step, settle this session's owned local jobs and verify
-the checkout is clean and idle before switching. Normally, return to local `main`,
+After publishing a reviewed step, settle this session's owned validation and verify
+there is no substantive work/session conflict before switching, preserving incidental
+contents. Normally, return to local `main`,
 fetch/fast-forward only and read back the remote SHA before the next task's branch.
 After an observed squash merge, use its actual remote `main` result, not the old
 task branch history; retire the old local branch only through the safe branch gate
-below. Never switch a directory still serving a test, service or unfinished draft.
+below. Do not interrupt another session's work or this task's ongoing validation;
+an ordinary running development server or open editor is not a switching blocker.
 
 Required remote CI does not need the local directory to stay on the PR branch.
-A published, unchanged candidate awaiting CI may retain its branch while the clean,
-idle checkout returns to current `main`; do not delete the branch, mutate its
+A published, unchanged candidate awaiting CI may retain its branch while the
+non-conflicting checkout returns to current `main`; do not delete the branch, mutate its
 accepted head or infer a merge. Dependent work still waits for its prerequisite on
 `main`; unrelated approved work starts from verified current `main`, never stacks
 on the pending PR. Resume the same task on its existing branch through the normal
@@ -402,7 +419,8 @@ followed by a guarded force-push of the requested task branch only.
 For an explicitly requested rebase:
 
 1. Disable auto-merge and remove closing links before changing the candidate.
-   Verify the requested branch/PR, a clean idle checkout, freshly fetched and
+   Verify the requested branch/PR, a checkout without substantive work/session conflicts,
+   freshly fetched and
    remote-verified `origin/main`, and the task branch's actual remote head SHA.
    Inspect all local/remote work; preserve unrelated changes and stop if ownership
    or isolation is uncertain. Record the old head and new main base.
