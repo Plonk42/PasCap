@@ -261,6 +261,97 @@ async function pendingRecovery(unavailable = false) {
 }
 
 describe('PreviewEngine observed-frame tolerance and recovery', () => {
+    it.each([42, 46])('rejects a stale post-render image from frame %i even between throttled notifications', async (initialFrame) => {
+        const preview = await running(singleProject(true), initialFrame);
+        slotFor(preview).observe(46);
+        const published: { frame: number; audioFrame: number }[] = [];
+        const unsubscribe = preview.engine.subscribe((state) => {
+            if (state.status === 'playing') published.push({
+                frame: state.frame,
+                audioFrame: preview.initialFrame + Math.floor((doubles.now - preview.anchor) * 30_000 / 1_001_000 + 1e-7),
+            });
+        });
+        published.length = 0;
+        const draw = preview.compositor.drawFrame.getMockImplementation()!;
+        preview.compositor.drawFrame.mockImplementationOnce((groups) => {
+            draw(groups);
+            // Recorded witness: request 47 accepts neighbour 46; by publication
+            // the independently rendered audio has reached 48. Model elapsed
+            // render/upload work, not a false audio receipt or changed tolerance.
+            doubles.now = preview.anchor + framesToSeconds(48 - preview.initialFrame + 0.1) * 1000;
+        });
+        tick(preview, 47);
+        expect(published.every(({ frame, audioFrame }) => Math.abs(frame - audioFrame) <= 1), JSON.stringify(published)).toBe(true);
+        expect(preview.engine.diagnostics()).toMatchObject({ status: 'buffering', frame: 46, requestedFrame: 48 });
+        expect(preview.compositor.visible).toBeNull();
+        expect(preview.music.pause).not.toHaveBeenCalled();
+        expect(preview.music.start).not.toHaveBeenCalled();
+        slotFor(preview).observe(48);
+        expect(preview.engine.diagnostics()).toMatchObject({ status: 'playing', frame: 48 });
+        expectSurface(preview, 48);
+        unsubscribe();
+    });
+
+    it('still publishes a real accepted image within one frame after rendering work', async () => {
+        const preview = await running(singleProject(true), 42);
+        slotFor(preview).observe(46);
+        const draw = preview.compositor.drawFrame.getMockImplementation()!;
+        preview.compositor.drawFrame.mockImplementationOnce((groups) => {
+            draw(groups); doubles.now = preview.anchor + framesToSeconds(47 - preview.initialFrame + 0.9) * 1000;
+        });
+        tick(preview, 47);
+        expect(preview.engine.diagnostics()).toMatchObject({ status: 'playing', frame: 46, requestedFrame: 47 });
+        expectSurface(preview, 46); expectUninterrupted(preview);
+    });
+
+    it('rejects an exact pre-render frame when output advances beyond its eligibility', async () => {
+        const preview = await running(singleProject(true), 42);
+        slotFor(preview).observe(47);
+        const draw = preview.compositor.drawFrame.getMockImplementation()!;
+        preview.compositor.drawFrame.mockImplementationOnce((groups) => {
+            draw(groups); doubles.now = preview.anchor + framesToSeconds(49 - preview.initialFrame + 0.1) * 1000;
+        });
+        tick(preview, 47);
+        expect(preview.engine.diagnostics()).toMatchObject({ status: 'buffering', frame: 47, requestedFrame: 49 });
+        expect(preview.compositor.visible).toBeNull();
+        expect(preview.music.pause).not.toHaveBeenCalled();
+        expect(preview.music.start).not.toHaveBeenCalled();
+    });
+
+    it('does not retain a one-frame-old image after rendering crosses an active-clip boundary', async () => {
+        const project = singleProject(true);
+        project.clips[0]!.sourceOut = 48;
+        const right = createClip('right', 'next-video', 100, 120); right.start = 48;
+        project.clips.push(right); project.media.videoIds.push('next-video');
+        project.layers[0]!.transitions = [{ leftId: 'clip', rightId: 'right', type: 'cut', duration: 0 }];
+        const preview = await running(project, 42);
+        slotFor(preview).observe(47);
+        const draw = preview.compositor.drawFrame.getMockImplementation()!;
+        preview.compositor.drawFrame.mockImplementationOnce((groups) => {
+            draw(groups); doubles.now = preview.anchor + framesToSeconds(48 - preview.initialFrame + 0.1) * 1000;
+        });
+        tick(preview, 47);
+        expect(preview.engine.diagnostics()).toMatchObject({ status: 'buffering', frame: 47, requestedFrame: 48 });
+        expect(preview.compositor.visible).toBeNull();
+        expect(preview.music.pause).not.toHaveBeenCalled();
+        expect(preview.music.start).not.toHaveBeenCalled();
+    });
+
+    it('reports an output-clock failure discovered at publication instead of emitting an invalid Playing state', async () => {
+        const preview = await running(singleProject(true), 42);
+        slotFor(preview).observe(46);
+        const draw = preview.compositor.drawFrame.getMockImplementation()!;
+        const music = preview.music as MusicDouble & { projectFrame: Mock<() => number> };
+        preview.compositor.drawFrame.mockImplementationOnce((groups) => {
+            draw(groups); music.projectFrame.mockImplementationOnce(() => { throw new Error('Music output has an invalid presentation clock.'); });
+        });
+        tick(preview, 47);
+        expect(preview.engine.diagnostics()).toMatchObject({ status: 'error', playing: false, message: 'Music output has an invalid presentation clock.' });
+        expect(preview.compositor.visible).toBeNull();
+        expect(preview.music.pause).toHaveBeenCalled();
+        expect(preview.music.start).not.toHaveBeenCalled();
+    });
+
     it.each([
         { observed: 4, requested: 7, delivered: 14 },
         { observed: 9, requested: 12, delivered: 11 },

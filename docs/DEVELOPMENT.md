@@ -101,7 +101,7 @@ __GLX_VENDOR_LIBRARY_NAME=mesa \
 __EGL_VENDOR_LIBRARY_FILENAMES=/usr/share/glvnd/egl_vendor.d/50_mesa.json \
 bash scripts/ci/firefox.sh npx playwright test --config=playwright.firefox.config.ts \
   tests/browser/music-clock.spec.ts tests/browser/playback-recovery.spec.ts \
-  --grep 'streaming music clock|streamed PCM|with music normal speed|with music and a callback-gated cancellation|native-event-ordered video catch-up'
+  --grep 'streaming music clock|streamed PCM|with music normal speed|with music and a callback-gated cancellation|native-event-ordered video catch-up|Playing publication rechecks'
 ```
 
 Firefox remains headless, but its native graphics probe needs a working display:
@@ -131,7 +131,7 @@ The subsequent [audio prerequisite](../scripts/ci/firefox-audio.ts) has the same
 15-second browser-launch and 10-second probe deadlines as the graphics check.
 It requires a real 48 kHz context, stereo samples passed between real worklets and
 an output timestamp reaching those rendered samples. Missing resume/render/output
-readiness remains an actionable hard failure before the six media tests. Neither
+readiness remains an actionable hard failure before the seven media tests. Neither
 prerequisite changes the editor's ten-second music-start deadline or test bounds.
 
 The [music-clock regression](../tests/browser/music-clock.spec.ts) requires one
@@ -148,7 +148,9 @@ withheld metadata to match an advancing clock; exact readiness remains the real
 decoder's responsibility. Deterministic engine tests separately control between-
 display-tick delivery, delayed seek/play/cancellation/deadlines and replay observed /
 requested / delivered schedules **4/7/14, 9/12/11 and 9/12/12**, without guessing
-images or weakening bounds. These six synthetic, memory-only browser checks run in CI;
+images or weakening bounds. The post-render clock/surface check also covers bounded
+synchronous draw work while real output audio advances. These seven synthetic,
+memory-only browser checks run in CI;
 they do not qualify the entire Firefox editor or intended hardware. Attachments
 contain bounded consumed-sample/output-timestamp evidence and at most 500
 decoder/clock state snapshots around music transitions, not private media.
@@ -292,6 +294,16 @@ must not buffer unnecessarily; every additional video-only buffer needs evidence
 that no exact neighbour or retainable accepted image was available. A deliberately
 withheld real callback verifies genuine larger delays remain explicit. Neither a
 universal stall count nor a software-renderer FPS threshold qualifies hardware.
+Playback also rechecks the actual audio-output clock after synchronous rendering,
+including ticks between throttled notifications. An image that was eligible before
+upload/draw but is now stale must clear and buffer without restarting healthy music.
+A bounded native WebGL draw-delay regression checks the post-render status against
+independently observed output audio. Chrome exposes output-clock advancement during
+synchronous JS: the test requires advancement beyond every eligible neighbour and
+explicit buffering with a black surface. Firefox may cache its native timestamp
+until the task yields; its post-render Playing image must still meet that actual
+clock's one-frame bound. Neither case changes clocks or receipts, and both retain
+the independent one-frame A/V, single-epoch and completion assertions.
 
 ## Optional real-media tools
 

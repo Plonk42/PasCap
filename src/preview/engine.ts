@@ -137,6 +137,20 @@ export class PreviewEngine {
   }
   #emit(force = false): void {
     const now = performance.now();
+    if (this.#playing && !this.#busy && this.#status === 'playing' && this.#document && this.#music.hasMusic) {
+      // Upload/draw work can outlive the clock read used to select an image.
+      // Validate every completed playback tick, even if notification is
+      // throttled. A stale image becomes explicit buffering, not Playing.
+      try {
+        const frame = this.#expectedFrame(now);
+        const required = sampleTimeline(this.#document, frame, this.#layout).map((layer) => layer.clipId);
+        if (!this.#canRetainFrame(frame, required)) {
+          this.#operationFrame = frame;
+          if (!this.#mismatchStart) this.#mismatchStart = now;
+          this.#compositor.clear(); this.#setStatus('buffering', 'Waiting for decoded frames'); return;
+        }
+      } catch (error) { this.#handleError(error); return; }
+    }
     if (!force && now - this.#lastEmit < 100) return;
     this.#lastEmit = now;
     const diagnostics = this.diagnostics();
