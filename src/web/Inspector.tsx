@@ -16,6 +16,7 @@ import { KeyframeControls } from './KeyframeControls.js';
 import { KeyframeToggle } from './KeyframeToggle.js';
 import { clipStartRestriction } from './layer-actions.js';
 import { NumberField } from './NumberField.js';
+import { RangeSettingControl } from './SettingValueControl.js';
 import { SpeedControls, SpeedHelp } from './SpeedControls.js';
 import { planTimelineDrop } from './timeline-placement.js';
 import type { DraftPreview } from './Timeline.js';
@@ -33,7 +34,7 @@ interface Props {
 }
 
 const INSPECTOR_MODES: readonly { id: InspectorMode; label: string }[] = [
-  { id: 'clip', label: 'Clip' }, { id: 'sequence', label: 'Sequence' }, { id: 'audio', label: 'Audio' },
+  { id: 'clip', label: 'Clip' }, { id: 'keyframes', label: 'Layer keyframes' }, { id: 'sequence', label: 'Sequence' }, { id: 'audio', label: 'Audio' },
 ];
 
 function commandNumberError(project: ProjectDocument, command: EditCommand, recovery: string): string | null {
@@ -124,9 +125,7 @@ function OpacityControl({ layer, clip, frame, disabled, onEdit, setting, id }: R
     else if (clip) onEdit({ type: 'opacity', clipId: clip.id, opacity });
   };
   return <div className="colour-control layer-keyed-control" data-animated={state.keyed} data-key-at-playhead={state.active}>
-    <span><label htmlFor={id} title={hint}>{label}<SettingScope state={state} baseLabel={isLayerOpacity ? 'Layer base' : 'Clip base'} /></label><span className="colour-control-actions"><output>{Math.round(value * 100)}%</output><KeyframeToggle layer={layer} setting={setting} label={label} frame={frame} value={value} disabled={disabled} onEdit={onEdit} /></span></span>
-    <input id={id} type="range" aria-label={label} aria-describedby={`${id}-hint`} min={0} max={1} step={0.01} disabled={disabled || !state.editable} value={value} title={hint} onChange={(event) => commit(Number(event.target.value))} />
-    <span id={`${id}-hint`} className="declutter-sr-only">{hint}</span>
+    <RangeSettingControl setting={setting} id={id} value={value} disabled={disabled || !state.editable} onCommit={commit} hint={hint} scope={<SettingScope state={state} baseLabel={isLayerOpacity ? 'Layer base' : 'Clip base'} />} actions={<KeyframeToggle layer={layer} setting={setting} label={label} frame={frame} value={value} disabled={disabled} onEdit={onEdit} />} />
   </div>;
 }
 
@@ -142,9 +141,7 @@ function ColourControl({ layer, clip, frame, disabled, onEdit, control, value, i
     if (clip) onEdit({ type: 'colour', clipId: clip.id, colour: { ...clip.colour, [control.key]: nextValue } });
   };
   return <div className="colour-control layer-keyed-control" data-animated={state.keyed} data-key-at-playhead={state.active}>
-    <span><label htmlFor={id} title={hint}>{control.label}<SettingScope state={state} baseLabel="Clip base" /></label><span className="colour-control-actions"><output>{value > 0 && NEUTRAL_COLOUR[control.key] === 0 ? '+' : ''}{value.toFixed(control.key === 'hue' ? 0 : 2)}<small>{control.unit}</small></output><KeyframeToggle layer={layer} setting={control.key} label={control.label} frame={frame} value={value} disabled={disabled} onEdit={onEdit} /><button type="button" className="icon-button" aria-label={`Reset ${control.label}`} title={`Reset only ${control.label} at ${resetTarget}`} disabled={disabled || !state.editable || value === NEUTRAL_COLOUR[control.key]} onClick={() => commit(NEUTRAL_COLOUR[control.key])}><Icon name="reset" size={13} /></button></span></span>
-    <input id={id} type="range" aria-label={control.label} aria-describedby={`${id}-hint`} min={control.min} max={control.max} step={control.step} value={value} disabled={disabled || !state.editable} title={hint} onChange={(event) => commit(Number(event.target.value))} />
-    <span id={`${id}-hint`} className="declutter-sr-only">{hint}</span>
+    <RangeSettingControl setting={control.key} id={id} value={value} disabled={disabled || !state.editable} onCommit={commit} hint={hint} scope={<SettingScope state={state} baseLabel="Clip base" />} resetTitle={`Reset only ${control.label} at ${resetTarget}`} actions={<KeyframeToggle layer={layer} setting={control.key} label={control.label} frame={frame} value={value} disabled={disabled} onEdit={onEdit} />} />
   </div>;
 }
 
@@ -248,7 +245,6 @@ export function Inspector({ project, assets, selectedClipId, selectedLayerId, bo
       {layer ? <>
         {clip && asset && placed ? <div className="selected-clip-name inspector-selection"><Icon name="video" size={17} /><strong title={asset.name}>{shortName(asset.name)}</strong><span>Excerpt {position + 1} · {sourceSeconds(placed.duration)} · {layer.name}</span></div>
           : <div className="selected-clip-name inspector-selection"><Icon name="layers" size={17} /><strong title={layer.name}>{layer.name}</strong><span title="Select a clip for its source range and static bases.">Whole video row</span></div>}
-        <KeyframeControls projectId={project.id} layer={layer} frame={frame} duration={layout.duration} disabled={drafting} onEdit={onEdit} />
         {clip && asset && placed && <InspectorSection id="source" title="Source range" icon="start" badge={sourceSeconds(clip.sourceOut - clip.sourceIn)} modified={clip.sourceIn !== 0 || clip.sourceOut !== asset.metadata.frameCount} help={<HelpPopover label="Source timing"><p id={`${colourControlId}-source-help`}>Original recording frames; OUT is exclusive. Layer keyframes stay in project timeline time when this source range changes.</p></HelpPopover>}>
           <section className="source-range" aria-label="Source range">
             <div className="section-label"><span>{sourceSeconds(asset.metadata.frameCount)} original</span><span>{sourceFrame === null ? 'Playhead outside clip' : `Source frame ${sourceFrame}`}</span></div>
@@ -273,6 +269,12 @@ export function Inspector({ project, assets, selectedClipId, selectedLayerId, bo
         <InspectorSection id="speed" title="Speed" icon="speed" badge={`${speedRate.toFixed(2)}×`} modified={speedRate !== 1 || hasLayerKeys(layer, 'speed') || (clip !== undefined && clip.speed.mode !== 'constant')} help={<SpeedHelp clip={clip ?? null} keyed={hasLayerKeys(layer, 'speed')} helpId={`${colourControlId}-speed-help`} />}><SpeedControls project={project} resetKey={project.id} helpId={`${colourControlId}-speed-help`} clip={clip ?? null} layer={layer} frame={frame} projectDuration={layout.duration} placedDuration={placed?.duration ?? null} disabled={drafting} sourceFrame={sourceFrame} sourceFrameCount={asset?.metadata.frameCount ?? null} onEdit={onEdit} onPreview={onPreview} onSeek={onSeek} onPause={onPause} /></InspectorSection>
         <ColourSection layer={layer} clip={clip ?? null} frame={frame} disabled={drafting} onEdit={onEdit} id={colourControlId} />
       </> : <div className="inspector-empty">Select a video layer or clip in the timeline.</div>}
+    </div>
+    <div role="tabpanel" id={`${inspectorId}-keyframes-panel`} aria-labelledby={`${inspectorId}-keyframes-tab`} hidden={section !== 'keyframes'}>
+      {layer ? <>
+        <div className="inspector-track-selection"><Icon name="layers" size={17} /><strong title={layer.name}>{layer.name}</strong><span>Whole-row animation</span></div>
+        <KeyframeControls project={project} layer={layer} frame={frame} duration={layout.duration} disabled={drafting} onEdit={onEdit} />
+      </> : <div className="inspector-empty">Select a video track for its shared points.</div>}
     </div>
     <div role="tabpanel" id={`${inspectorId}-sequence-panel`} aria-labelledby={`${inspectorId}-sequence-tab`} hidden={section !== 'sequence'}>
       {layer ? <SequenceControls project={project} layer={layer} assets={assets} boundaryId={boundaryId} layout={layout} drafting={drafting} onEdit={onEdit} id={colourControlId} /> : <div className="inspector-empty">Select a video track for its transitions and fades.</div>}

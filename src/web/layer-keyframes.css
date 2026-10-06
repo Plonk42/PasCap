@@ -159,6 +159,18 @@
 
 .layer-keyframe-point-values {
     grid-column: 1 / -1;
+    grid-template-columns: minmax(0, 1fr);
+    margin: 0;
+}
+
+.layer-keyframe-point-values .keyframe-value.colour-control {
+    display: grid;
+    gap: 6px;
+    min-width: 0;
+}
+
+.layer-keyframe-point-values .keyframe-value>.number-field {
+    display: grid;
     margin: 0;
 }
 

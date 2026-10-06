@@ -1,19 +1,20 @@
 import { useId, useState } from 'react';
-import type { EditCommand } from '../shared/commands.js';
+import { applyCommand, type EditCommand } from '../shared/commands.js';
 import { KEYFRAME_SETTINGS, keyframeNeighbors, keySettings, type Interpolation, type LayerKeyframe } from '../shared/keyframes.js';
-import type { VideoLayer } from '../shared/model.js';
+import type { ProjectDocument, VideoLayer } from '../shared/model.js';
 import { formatTimecode } from '../shared/timing.js';
 import './declutter.css';
-import './layer-keyframes.css';
 import { Disclosure } from './Disclosure.js';
 import { HelpPopover } from './HelpPopover.js';
 import { Icon } from './icons.js';
 import { keyframeNavigationFrame, keySeekHint, useKeyframeNavigation } from './keyframe-navigation.js';
+import './layer-keyframes.css';
 import { NumberField } from './NumberField.js';
 import { readPreference, writePreference } from './preferences.js';
+import { RangeSettingControl, SpeedRateField } from './SettingValueControl.js';
 
 export interface KeyframeControlsProps {
-  projectId: string;
+  project: ProjectDocument;
   layer: VideoLayer;
   frame: number;
   duration: number;
@@ -87,6 +88,7 @@ function playheadLabel(frame: number, duration: number, atHead: boolean): string
 }
 
 interface PointRowProps {
+  project: ProjectDocument;
   point: LayerKeyframe;
   keys: readonly LayerKeyframe[];
   row: PointRow;
@@ -101,7 +103,7 @@ interface PointRowProps {
   onSeek: (point: LayerKeyframe) => void;
 }
 
-function KeyframePointRow({ point, keys, row, layerId, context, listId, helpId, duration, current, disabled, onEdit, onSeek }: Readonly<PointRowProps>) {
+function KeyframePointRow({ project, point, keys, row, layerId, context, listId, helpId, duration, current, disabled, onEdit, onSeek }: Readonly<PointRowProps>) {
   const settings = participatingSettings(point);
   return <li className={`keyframe-row${current ? ' current' : ''}`} data-keyframe-frame={point.frame} aria-current={current ? 'true' : undefined}>
     <div className="keyframe-row-header">
@@ -120,7 +122,21 @@ function KeyframePointRow({ point, keys, row, layerId, context, listId, helpId, 
           const value = point.values[setting.key];
           if (value === null) return null;
           const id = `${listId}-${row.id}-${setting.key}`;
-          return <label className="keyframe-value" key={setting.key} htmlFor={id}>{setting.label}<NumberField id={id} aria-label={`${setting.label} keyframe value ${point.frame}`} min={setting.min} max={setting.max} step={setting.step} value={value} disabled={disabled} resetKey={`${context}:${row.id}:${setting.key}`} onCommit={(nextValue) => onEdit({ type: 'layer-key-value', layerId, frame: point.frame, setting: setting.key, value: nextValue })} /></label>;
+          const label = `${setting.label} keyframe value ${point.frame}`;
+          const hint = `${setting.label} at stored timeline frame ${point.frame} on ${project.layers.find((layer) => layer.id === layerId)?.name}. Edits change only this participant, not the playhead, shared easing or static bases.`;
+          const command = (nextValue: number): EditCommand => ({ type: 'layer-key-value', layerId, frame: point.frame, setting: setting.key, value: nextValue });
+          const validate = (nextValue: number): string | null => {
+            try { applyCommand(project, command(nextValue)); return null; }
+            catch (cause) { return cause instanceof Error ? cause.message : 'This value conflicts with the track timing.'; }
+          };
+          const onCommit = (nextValue: number): void => { if (!disabled) onEdit(command(nextValue)); };
+          const resetKey = `${context}:${row.id}:${setting.key}`;
+          return <div className="keyframe-value colour-control" key={setting.key}>
+            {setting.key === 'speed' ? <>
+              <div className="layer-setting-heading"><span>Speed</span><button type="button" className="text-button" aria-label={`Reset ${label} to 1×`} title={hint} disabled={disabled || value === 1} onClick={() => onCommit(1)}><Icon name="reset" size={12} />Reset</button></div>
+              <SpeedRateField id={id} aria-label={label} value={value} disabled={disabled} resetKey={resetKey} hint={hint} validate={validate} onCommit={onCommit} />
+            </> : <RangeSettingControl setting={setting.key} id={id} label={label} value={value} disabled={disabled} hint={hint} resetTitle={hint} exact={{ resetKey, validate }} onCommit={onCommit} />}
+          </div>;
         })}</div>
       </div>
     </details>
@@ -128,7 +144,8 @@ function KeyframePointRow({ point, keys, row, layerId, context, listId, helpId, 
 }
 
 /** One project-time point list for the whole row, never one list per setting or clip. */
-export function KeyframeControls({ projectId, layer, frame, duration, disabled, onEdit }: Readonly<KeyframeControlsProps>) {
+export function KeyframeControls({ project, layer, frame, duration, disabled, onEdit }: Readonly<KeyframeControlsProps>) {
+  const projectId = project.id;
   const navigation = useKeyframeNavigation();
   const unavailable = disabled || navigation.disabled;
   const listId = useId();
@@ -181,7 +198,7 @@ export function KeyframeControls({ projectId, layer, frame, duration, disabled, 
     </div>}
 
     {keys.length > 0 && <Disclosure className="keyframe-list" title="Edit points" label="Edit layer keys" triggerId={listId} contentId={entriesId} open={listOpen} onToggle={setListOpen} help={<HelpPopover label="Keyframe timing"><p id={helpId}>Absolute project timeline frames, independent of clip trims. Moving a point moves every participating setting. Its easing runs to each setting's next participating point; the first and last channel values hold. An unkeyed setting uses each clip's base, or the layer base for layer opacity. Points outside the current duration stay editable; navigation previews the nearest available frame without moving them.</p></HelpPopover>}>
-      <ol className="keyframe-entries" aria-labelledby={listId}>{keys.map((key, index) => <KeyframePointRow key={current.rows[index]!.id} point={key} keys={keys} row={current.rows[index]!} layerId={layer.id} context={context} listId={listId} helpId={helpId} duration={duration} current={(inspection !== null || previewAvailable) && key.frame === navigationFrame} disabled={unavailable} onEdit={onEdit} onSeek={seekPoint} />)}</ol>
+      <ol className="keyframe-entries" aria-labelledby={listId}>{keys.map((key, index) => <KeyframePointRow key={current.rows[index]!.id} project={project} point={key} keys={keys} row={current.rows[index]!} layerId={layer.id} context={context} listId={listId} helpId={helpId} duration={duration} current={(inspection !== null || previewAvailable) && key.frame === navigationFrame} disabled={unavailable} onEdit={onEdit} onSeek={seekPoint} />)}</ol>
     </Disclosure>}
   </fieldset>;
 }
