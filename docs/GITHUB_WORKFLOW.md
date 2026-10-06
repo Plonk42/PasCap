@@ -350,7 +350,7 @@ individually, with GitHub Actions as their expected source. Keep job names uniqu
 Do not add path filters, conditional skips, retries or weaker assertions to satisfy
 protection. CI has read-only repository permissions and no merge/issue-writing job.
 
-The configured protection forbids force-push/deletion and requires
+The configured `main` protection forbids force-push/deletion and requires
 resolved review conversations. The solo workflow requires **zero independent
 approving reviews**; the agent's explicit pre-merge acceptance still applies.
 Administrator enforcement is disabled for the approved pure-text direct-main
@@ -395,7 +395,34 @@ Before making further changes to an armed PR, **disable auto-merge and remove it
 closing links**. Updates invalidate affected acceptance; new commits, base updates
 or conflict resolution require another review/validation before rearming against
 the new head. Update a stale branch by merging remote `main` normally and rerunning
-affected checks, never by force-pushing or weakening the strict requirement.
+affected checks unless the owner explicitly requests a rebase. Never substitute
+a merge for **“rebase a branch on main”**: that request authorizes an actual rebase
+followed by a guarded force-push of the requested task branch only.
+
+For an explicitly requested rebase:
+
+1. Disable auto-merge and remove closing links before changing the candidate.
+   Verify the requested branch/PR, a clean idle checkout, freshly fetched and
+   remote-verified `origin/main`, and the task branch's actual remote head SHA.
+   Inspect all local/remote work; preserve unrelated changes and stop if ownership
+   or isolation is uncertain. Record the old head and new main base.
+2. Rebase the task branch onto that verified `origin/main`, resolving conflicts
+   without discarding intended work. Do not create a merge commit instead. Review
+   the rewritten diff/commits, format/save and rerun affected acceptance checks;
+   prior head-specific acceptance and CI do not accept the rewritten candidate.
+3. Publish to the same task branch with an **explicit expected-remote-SHA lease**:
+   `--force-with-lease=refs/heads/<branch>:<verified-old-remote-sha>`. Never use bare
+   `--force`, force-push `main`, weaken protection or overwrite unexpected remote
+   work. If the lease fails, inspect the new remote work and stop rather than
+   refreshing the lease blindly. If branch protection rejects rewriting, report
+   the blocker; do not silently substitute a merge or bypass protection.
+4. Read back the published head, repeat exact-head non-CI review and closing-issue
+   reference verification, then rearm guarded native squash auto-merge only when
+   accepted. Required up-to-date CI must validate the new candidate before merge.
+
+Without an explicit rebase request, use normal pushes and merge-based base updates.
+This task-branch exception does not change protected-main delivery or authorize
+history rewriting on unrelated branches.
 
 `status:local-complete` / Project Local complete means non-CI implementation is
 complete but protected merge is pending, not delivered. Partial work retains its

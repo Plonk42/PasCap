@@ -38,7 +38,13 @@
 - The owner authorizes publishing approved, reviewed, validated logical-step commits
   to short-lived branches and opening/updating PRs targeting `main`, without repeated
   push approval. Code/mixed changes must use protected PRs: never direct-push them
-  or use administrator bypass. Never force-push. Preserve unrelated edits; use a worktree only when
+  or use administrator bypass. An explicit request to **rebase a branch on main**
+  means an actual rebase onto freshly verified `origin/main`, followed by a
+  force-push with an explicit expected-remote-SHA `--force-with-lease`; never
+  substitute a merge. This authorizes rewriting only the requested task branch,
+  never `main` or unexpected remote work. Disarm auto-merge/remove closing links
+  first, then revalidate/review the rewritten head before rearming. Otherwise use
+  normal pushes and merge-based base updates. Preserve unrelated edits; use a worktree only when
   switching would disturb work or a named isolation need requires it. Record
   publication blockers and next actions.
 - **Pure workflow/instruction text must be committed and pushed directly to `main`,
