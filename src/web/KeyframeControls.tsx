@@ -1,15 +1,10 @@
 import { useId, useState } from 'react';
 import { applyCommand, type EditCommand } from '../shared/commands.js';
-import {
-  KEYFRAME_SETTINGS,
-  keyframeNeighbors,
-  keySettings,
-  type Interpolation,
-  type LayerKeyframe,
-} from '../shared/keyframes.js';
+import { KEYFRAME_SETTINGS, keyframeNeighbors, keySettings, type LayerKeyframe } from '../shared/keyframes.js';
 import type { ProjectDocument, VideoLayer } from '../shared/model.js';
 import { formatTimecode } from '../shared/timing.js';
 import './declutter.css';
+import { EasingSelect } from './EasingSelect.js';
 import { HelpPopover } from './HelpPopover.js';
 import { Icon } from './icons.js';
 import { keyframeNavigationFrame, keySeekHint, useKeyframeNavigation } from './keyframe-navigation.js';
@@ -195,28 +190,22 @@ function KeyframePointRow({
           </label>
           <label className="keyframe-easing" htmlFor={`${listId}-${row.id}-easing`}>
             Shared easing
-            <select
+            <EasingSelect
               id={`${listId}-${row.id}-easing`}
               aria-label={`Layer keyframe interpolation ${point.frame}`}
               aria-describedby={helpId}
               title="Shared by these settings, to each setting's next participating point"
               disabled={disabled}
               value={point.interpolation}
-              onChange={(event) =>
+              onChange={(interpolation) =>
                 onEdit({
                   type: 'layer-key-easing',
                   layerId,
                   frame: point.frame,
-                  interpolation: event.target.value as Interpolation,
+                  interpolation,
                 })
               }
-            >
-              <option value="hold">Hold</option>
-              <option value="linear">Linear</option>
-              <option value="ease-in">Ease in</option>
-              <option value="ease-out">Ease out</option>
-              <option value="smooth">Smooth</option>
-            </select>
+            />
           </label>
           <div className="layer-keyframe-point-values">
             {settings.map((setting) => {

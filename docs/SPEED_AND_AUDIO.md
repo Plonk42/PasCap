@@ -215,6 +215,10 @@ retain full entered decimal precision and commit on Enter/blur; invalid collisio
 out-of-original positions and timing conflicts retain the draft with inline
 errors. They do not automatically seek. Escape restores the field. Easing belongs
 to the left point; the last rate holds without a next interval.
+Custom **To next point**, ramp **Curve** and shared **Shared easing** selectors
+use the same compact selected-shape graph and accessible description. It illustrates
+the existing progress function, not a new rate or interpolation rule; ramp curves
+still exclude Hold. Selection remains native and commits once, with one Undo step.
 
 Drag a point horizontally to change its integer source frame and vertically to
 change its speed, quantised to **0.001×** for pointer movement only. Capture-relative
