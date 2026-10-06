@@ -2,9 +2,10 @@
 
 ## Workflow
 
-- Before starting any new task, fetch verified remote `main` and create a new
-  short-lived branch from its exact current SHA, **before edits or validation**.
-  **Use branches in the existing clean, idle checkout by default**, not a new
+- Before starting any new task, fetch verified remote `main` **before edits or
+  validation**. Code/mixed changes use a new short-lived branch from that exact
+  SHA; pure workflow/instruction text uses the direct-main exception below.
+  **For code/mixed work, use branches in the existing clean, idle checkout by default**, not a new
   worktree per task/chat/commit or while ordinary PR CI runs. Fast-forward local
   `main` only; it must equal verified `origin/main` before branching. A worktree is
   an exception for preserving unrelated unfinished work, an active service/test,
@@ -36,10 +37,22 @@
   no leftover formatting diff after commit; preserve/report unrelated existing edits.
 - The owner authorizes publishing approved, reviewed, validated logical-step commits
   to short-lived branches and opening/updating PRs targeting `main`, without repeated
-  push approval. Never push directly to `main`, force-push or bypass protection,
-  including as administrator. Preserve unrelated edits; use a worktree only when
+  push approval. Code/mixed changes must use protected PRs: never direct-push them
+  or use administrator bypass. Never force-push. Preserve unrelated edits; use a worktree only when
   switching would disturb work or a named isolation need requires it. Record
   publication blockers and next actions.
+- **Pure workflow/instruction text must be committed and pushed directly to `main`,
+  without a PR or full runtime/CI cycle.** Review all outgoing commits, format/save,
+  check content/links/whitespace/privacy, and prove the push is a fast-forward from
+  freshly verified remote `main`. Use `[skip ci]` in the qualifying push's tip commit;
+  never use it for code, tests, dependencies, build/service settings, executable CI
+  workflows/scripts/hooks or mixed changes. Other documentation is not automatically
+  eligible. The owner approved administrator bypass only for this narrow policy;
+  GitHub technically permits broader owner bypass, which the agent must not use.
+  Preserve dirty primary work: a clean exception checkout may publish `HEAD:main`
+  without moving dirty local `main`. Read back remote containment and close any
+  actually completed tracked policy issue manually with documentation evidence,
+  reason completed and Project Done. No CI wait or fabricated issue is required.
 - Verify non-CI acceptance against live scope/dependencies and the exact PR head
   before enabling native squash auto-merge. Add `Closes #N` only in the PR description
   when it completes the entire issue; incremental/investigation/hardware-pending PRs
@@ -47,7 +60,8 @@
   negated prose can still create unintended closing links. Required up-to-date PR CI
   (Node 22/24, native/browser and fail-closed Delivery gate) is the merge/closure gate;
   main push CI is a regression
-  backstop, not a second closure wait. Green CI alone is not product acceptance.
+  backstop, not a second closure wait. The pure-text direct-main exception uses
+  documentation acceptance and remote containment instead. Green CI alone is not product acceptance.
   Disable auto-merge and remove closing links before further changes; revalidate
   changed inputs and rereview before rearming against the new head.
 - At session start and handoff, inspect relevant PRs and pending deliveries using
@@ -145,7 +159,8 @@
 - Keep local checks, required PR CI and consented hardware/real-workload qualification
   separate. Publish validated implementation steps, not unapproved work merely to
   advance tracking. Full-issue closure follows pre-merge acceptance plus protected
-  merge; pending legacy direct-main deliveries still need verified remote evidence.
+  merge, except pure workflow/instruction text accepted through its direct-main
+  documentation gate; pending legacy deliveries retain their recorded evidence gate.
   Never close milestones, release or start media jobs without explicit approval.
   Public updates must contain sanitized evidence.
 - Keep [the roadmap](../docs/ROADMAP.md) as an outcome/dependency index and local

@@ -178,8 +178,8 @@ The validation commands above are complete entry points, not a mandatory chain
 after every edit. Follow the [work-cycle gates](GITHUB_WORKFLOW.md#efficient-development-and-delivery):
 focused feedback during implementation, applicable comprehensive checks before
 PR submission, then asynchronous required PR CI before merge. Keep explicit issue
-acceptance intact. Publish logical-step commits on short-lived branches; never push
-directly to protected `main`. Format/save/review and validate the exact head's
+acceptance intact. Publish code/mixed logical-step commits on short-lived branches;
+pure workflow/instruction text follows the direct-main exception below. Format/save/review and validate the exact head's
 non-CI acceptance before arming native squash auto-merge. A full-delivery PR may
 then use `Closes #N` in its description; partial work merely references its issue.
 
@@ -252,7 +252,8 @@ The [workflow](../.github/workflows/ci.yml) runs:
 - An unconditional **Delivery gate** succeeds only if the Node matrix and native/
   browser job both return `success`, rejecting skipped/cancelled/failed prerequisites.
   Protected `main` requires all three suite checks plus this gate from GitHub Actions,
-  with the PR branch up to date; administrators cannot bypass protection.
+  with the PR branch up to date. Owner/admin bypass is permitted by policy only
+  for pure workflow/instruction text, never for code/mixed delivery.
 - Synthetic fixtures only: no private media/sample helper/native reference work
   or hardware/performance acceptance claim.
 
@@ -275,8 +276,14 @@ reconciliation handles failures, obsolete issue labels and Project Done; that
 housekeeping verifies the enabled native **Item closed → Status Done** workflow's
 result. Progress-label cleanup remains explicit; no board move closes an issue,
 and unattended failure repair is not guaranteed. See the [PR delivery contract](GITHUB_WORKFLOW.md#protected-pr-delivery).
-Trivial formatting-only housekeeping still uses a PR, but needs no invented issue
-or Project entry. Changing an armed PR requires disabling auto-merge/removing closing
+Code/import-formatting housekeeping still uses a PR, but needs no invented issue
+or Project entry. Pure workflow/instruction text is committed/pushed directly to
+`main` with content/link/format/whitespace/privacy checks and `[skip ci]`, without
+a PR or full runtime/CI cycle. Actions workflow code, scripts/hooks, dependencies,
+tests and other configuration or mixed changes are excluded; see the
+[direct-main gate](GITHUB_WORKFLOW.md#direct-main-workflowinstruction-text).
+Administrator enforcement is disabled for this owner-approved route; GitHub cannot
+limit the bypass by paths, so the agent must never use it for code. Changing an armed PR requires disabling auto-merge/removing closing
 links and repeating affected validation/acceptance before rearming.
 
 The raw reader has a deterministic exit-before-read regression and eager bounded
@@ -350,7 +357,7 @@ and [grading equations](COLOUR_AND_TIMING.md#colour).
 
 ## Contributor safety
 
-- **Use short-lived branches in one clean, idle checkout by default.** Worktrees
+- **For code/mixed work, use short-lived branches in one clean, idle checkout by default.** Worktrees
   are exceptions for unrelated unfinished work, an active service/test, an unchanged
   reproduction baseline or explicitly concurrent work; record their isolation
   reason and retirement condition. A new chat, correction or remote CI wait alone
@@ -370,7 +377,8 @@ and [grading equations](COLOUR_AND_TIMING.md#colour).
   deletion/administrative pruning with removing an existing local worktree.
 - **Start each new task from current remote `main`, before edits or validation.**
   Fetch and verify its SHA, fast-forward a clean/idle local `main` only, then create
-  a new short-lived branch in the existing checkout. If switching would disturb
+  a new short-lived branch for code/mixed work; pure workflow/instruction text stays
+  on verified `main` and uses its direct-main gate. If switching would disturb
   unfinished edits or active jobs, preserve them and use an isolated checkout
   directly from freshly fetched `origin/main`, recording the exception. Never reuse
   a previous task/unmerged PR branch or reset/stash unrelated work. Record the starting
