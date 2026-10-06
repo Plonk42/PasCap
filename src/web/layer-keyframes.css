@@ -278,25 +278,3 @@
     color: var(--error);
     outline-color: var(--error);
 }
-
-.timeline-layer-keys-beyond {
-    position: absolute;
-    z-index: 6;
-    min-height: 24px;
-    max-width: 84px;
-    padding: 0 6px;
-    overflow: hidden;
-    color: #edc886;
-    background: #242e26ee;
-    border: 1px dashed #63583e;
-    border-radius: 4px;
-    font-size: 11px;
-    white-space: nowrap;
-}
-
-.timeline-layer-keys-beyond.active,
-.timeline-layer-keys-beyond:is(:hover, :focus-visible) {
-    color: #ffdda3;
-    background: #4a3a24;
-    border-color: #d4b47e;
-}

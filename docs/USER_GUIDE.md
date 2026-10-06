@@ -205,7 +205,7 @@ shared points are allowed per row.
 
 ### Move and inspect shared points
 
-The timeline shows **one marker per visible shared point**, not per clip/channel.
+The timeline shows **one marker per stored shared point**, not per clip/channel.
 Click or Enter selects its row and seeks without editing or changing the chosen
 Inspector tab. Whole-row point navigation also keeps that tab. Drag horizontally to
 move **all participants, values and easing together**; valid release is one Undo
@@ -234,10 +234,11 @@ timing conflict rejects the entire final move, not just one setting or an earlie
 valid draft. Escape, pointer cancellation, lost capture or window blur restores the
 document/preview/scroll; pointer previews never enter autosave or history.
 
-Points outside duration stay stored and list-editable. After a trim leaves a row's
-points past the last frame, a **◆ N after end** button beyond the timeline end opens
-Layer keyframes at the first of them. Setting/row/list navigation
-can inspect successive stored points while preview clamps to the nearest available
+Points outside duration stay stored and list-editable. Points after the last clip
+keep their timeline markers at their own time, like points before the first clip;
+the timeline scrolls far enough to reach them, but playback still stops at the
+last clip frame. Setting/row/list/marker navigation can inspect successive stored
+points while preview clamps to the nearest available
 frame (none on an empty timeline). Labels distinguish **stored time from actual
 preview**: list controls edit the stored point, but Clip's setting values,
 diamonds and capture still use the **real playhead**. Manual seek, playback and

@@ -251,15 +251,15 @@ targets its existing stored participant, even when that point is outside duratio
 
 ## Timeline markers and ruler
 
-There is **one marker per visible row point**, even across multiple clips or a
+There is **one marker per stored row point**, even across multiple clips or a
 dissolve, not one marker per channel/clip. Its title names the row, project time
 and participants; the panel exposes chips/dependencies. **Click or Enter** selects
 the row and seeks without editing or changing the Inspector tab. Whole-row point
-navigation also retains that tab. Off-duration points are not duplicated inside
-clips. Instead, each row with stored points after the last timeline frame shows one
-**◆ N after end** button just past the end of the timeline. It opens **Layer keyframes**,
-inspects the first such point (preview shows the nearest available frame) and
-changes nothing; edit, delete and Previous/Next reach the others from the list.
+navigation also retains that tab. Points after the last clip keep their marker at
+their own project time, like points before the first clip. The scrollable timeline
+widens to reach the last stored point, but duration, playback and seeking still end
+at the last clip frame. Selecting such a marker inspects that stored point (preview
+shows the nearest available frame), highlights it and changes nothing.
 The shared Timeline frame field remains available.
 
 **Drag the marker horizontally to move the whole point:**
@@ -288,9 +288,8 @@ The shared Timeline frame field remains available.
 
 On a focused marker, **Left/Right** moves one project frame and **Shift+Left/Right**
 moves ten, with the same atomic validation and no snapping. Focus and the inspected
-point cursor follow the move; if it no longer has a visible marker, focus stays in
-Timeline. Movement navigates to the point without also firing ordinary playhead-step
-or clip-nudge shortcuts, or leaking other editor shortcuts.
+point cursor follow the move. Movement navigates to the point without also firing
+ordinary playhead-step or clip-nudge shortcuts, or leaking other editor shortcuts.
 Dragging can reach beyond duration, but retaining that point never extends the
 sequence merely for its marker. No other row's points, clip/source/static bases or
 music are copied or shifted; Speed's contextual duration recompilation is the
