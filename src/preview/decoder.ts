@@ -14,7 +14,7 @@ export class VideoDecoderSlot {
   decodedFrame = -1;
   observedFrames = 0;
   lateCallbacks = 0;
-  constructor(container: HTMLElement, readonly index: number) {
+  constructor(container: HTMLElement, readonly index: number, readonly onFrame?: () => void) {
     const video = document.createElement('video');
     video.muted = true; video.playsInline = true; video.preload = 'auto';
     video.disablePictureInPicture = true; video.setAttribute('aria-hidden', 'true');
@@ -37,6 +37,7 @@ export class VideoDecoderSlot {
       this.observedFrames++;
       for (const listener of this.#listeners) listener();
       this.#observe();
+      this.onFrame?.();
     });
   }
   async load(url: string, rate: FrameRate, signal: AbortSignal): Promise<void> {

@@ -101,7 +101,7 @@ __GLX_VENDOR_LIBRARY_NAME=mesa \
 __EGL_VENDOR_LIBRARY_FILENAMES=/usr/share/glvnd/egl_vendor.d/50_mesa.json \
 bash scripts/ci/firefox.sh npx playwright test --config=playwright.firefox.config.ts \
   tests/browser/music-clock.spec.ts tests/browser/playback-recovery.spec.ts \
-  --grep 'streaming music clock|streamed PCM|with music normal speed|with music and a callback-gated cancellation'
+  --grep 'streaming music clock|streamed PCM|with music normal speed|with music and a callback-gated cancellation|genuine decoded callback resolves buffering|video-only catch-up preserves healthy music'
 ```
 
 Firefox remains headless, but its native graphics probe needs a working display:
@@ -113,7 +113,7 @@ media tests when real WebGL2 context creation, production compositor shader
 compilation/linking or exact one-pixel clear/readback is unavailable. Browser launch
 has a 15-second deadline; page creation/graphics probing has a separate 10-second
 deadline. Failure reports the native context reason and setup guidance rather than
-waiting through five preview-readiness timeouts. Success logs the browser version,
+waiting through repeated preview-readiness timeouts. Success logs the browser version,
 actual renderer, shader status and readback; renderer sanitization is disabled only
 in the disposable test profile for this evidence, not in the product. The playback
 tests still initialize the real editor/compositor and keep their existing exact
@@ -131,7 +131,7 @@ The subsequent [audio prerequisite](../scripts/ci/firefox-audio.ts) has the same
 15-second browser-launch and 10-second probe deadlines as the graphics check.
 It requires a real 48 kHz context, stereo samples passed between real worklets and
 an output timestamp reaching those rendered samples. Missing resume/render/output
-readiness remains an actionable hard failure before the five media tests. Neither
+readiness remains an actionable hard failure before the seven media tests. Neither
 prerequisite changes the editor's ten-second music-start deadline or test bounds.
 
 The [music-clock regression](../tests/browser/music-clock.spec.ts) requires one
@@ -139,11 +139,27 @@ uninterrupted music start from zero or a nonzero seek, bounded range reads and
 actual rendered stereo PCM amplitude/placement silence. Its bounded audio-thread
 observer checks every sample in the required frame windows, not UI-thread snapshots
 that can miss complete frames under load. The selected recovery tests
-retain the independent one-frame audio/video bound, pause/seek/restart and genuine
-callback-gated cancellation. These five synthetic, memory-only checks run in CI;
+retain the independent one-frame audio/video bound, pause/seek/restart, genuine
+callback-gated cancellation and current-clock recovery from a real decoded callback
+between display ticks and bounded video-only catch-up without restarting music.
+These seven synthetic, memory-only checks run in CI;
 they do not qualify the entire Firefox editor or intended hardware. Attachments
 contain bounded consumed-sample/output-timestamp evidence and at most 500
 decoder/clock state snapshots around music transitions, not private media.
+Recovery failures also retain at most ten independent A/V violation witnesses:
+the offending state, raw receipt/output timestamps and observation interval.
+These diagnostics never change the frame comparison, tolerance or result.
+During non-busy decoded-frame buffering, real video-frame delivery can accept an
+exact current-clock frame or eligible one-frame neighbour between display ticks,
+resetting only the resolved mismatch's grace period. It cannot accept an obsolete
+request, bypass music sync/full clip-set/source checks, resume pending/cancelled
+seeks or hide genuine persistent gaps. With healthy music and the same active
+clips, a longer video-only mismatch stays explicitly buffering while an owned
+seek catches up to the advancing audio clock; it does not restart/reanchor music.
+Current exact/one-frame source readiness is rechecked after seeking and starting
+video. Catch-up has one five-second deadline, not a fresh deadline per target;
+failure, pause or cancellation stops owned work. Actual music sync failures and
+clip-set boundaries retain full alignment and its explicit audio restart.
 The complete optional Firefox recovery suite still exposes a separate 0.1× video
 seek/rVFC readiness failure, also reproducible without music. Do not hide it with
 a currentTime guess, retries, skipped assertions, privacy changes or a larger bound.
