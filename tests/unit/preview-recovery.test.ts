@@ -28,7 +28,7 @@ interface CompositorDouble {
 interface MusicDouble {
     configure: Mock<(track: MusicTrack | null, signal: AbortSignal) => Promise<void>>;
     start: Mock<(frame: number, signal: AbortSignal) => Promise<void>>;
-    sync: Mock<(frame: number) => boolean>;
+    sync: Mock<() => boolean>;
     pause: Mock<() => void>;
 }
 const doubles = vi.hoisted(() => ({
@@ -124,7 +124,7 @@ vi.mock('../../src/preview/music.js', () => ({
             this.clockFrame = frame; this.clockTime = doubles.now; this.running = true;
         });
         projectFrame = vi.fn(() => this.clockFrame + Math.floor(Math.max(0, doubles.now - this.clockTime) * 30_000 / 1_001_000 + 1e-7));
-        sync = vi.fn((_frame: number) => true);
+        sync = vi.fn(() => true);
         pause = vi.fn((): void => { this.running = false; });
         dispose = vi.fn((): void => { this.pause(); this.track = null; });
     },
