@@ -58,6 +58,10 @@ and verification snapshots remain in Git history; they are not current acceptanc
    releases or running owner-media jobs still needs explicit authorization. Keep optional
    sprint goals/review notes short; they must not become a second mutable backlog.
    Moving work between Project iterations does not accept or close its issues.
+6. **Retire task worktrees.** After an observed merge, at handoff and next-session
+   reconciliation, apply the [worktree lifecycle](#worktree-lifecycle-and-cleanup).
+   Remove safe completed agent-owned trees; record a reason and next action for
+   each retained relevant tree. Remote head-branch deletion is not local cleanup.
 
 Public updates must be sanitized: no private source/project paths, snapshots,
 credentials, recordings, licensed music or generated reports. Real imports,
@@ -193,6 +197,54 @@ resuming paused work, fetch and inspect current `main`/PR state; when a base upd
 is needed, follow the disarm/update/revalidation rules below. Do not restart a
 branch for each correction or logical step, or mix a new deliverable into it.
 
+### Worktree lifecycle and cleanup
+
+Linked worktrees are temporary task isolation, not permanent delivery archives.
+Inspect relevant registered trees at startup, after an observed merge and at handoff.
+An armed but unmerged PR keeps its tree; native auto-merge cannot remove local files.
+If merge happens after the chat ends, the next active session owns reconciliation
+and cleanup. Do not install a cleanup hook, background job or scheduled sweeper.
+
+1. **Classify before deleting.** Inspect `git worktree list --porcelain`, ownership,
+   branch/HEAD, locks, live PR state, dependent tasks and active terminals/processes
+   (including their working directories). Never remove the primary workspace,
+   another task's active tree or a tree serving validation/media/editor work. A
+   clean Git status does not prove a directory is idle or disposable.
+2. **Prove delivery or disposability.** For completed task trees, verify the actual
+   PR is merged to the intended default branch and its recorded merge commit is
+   contained in freshly fetched, remote-verified `main`. With squash merges, the
+   old local head need not be an ancestor: check the accepted PR head/merged result
+   and any later local commits instead. Preserve unpublished/local-only work.
+   Detached baseline/reproduction trees retire when their last dependent task no
+   longer needs them; a closed issue or deleted remote branch alone proves neither.
+3. **Inspect every class of contents.** Review staged/unstaged changes, all untracked
+   files and ignored contents explicitly (`git status --short --untracked-files=all`
+   and `git ls-files --others --ignored --exclude-standard --directory`). Keep
+   unfinished edits, private/user data and still-needed evidence. Ignored does not
+   mean disposable: generated project data may reference originals outside the
+   tree. Only known task-owned disposable synthetic fixtures, caches and builds may
+   leave with the tree; never follow references to delete originals, shared data
+   or sibling evidence directories. Preserve required evidence outside the tree
+   on persistent storage first; do not publish it or erase it as cleanup.
+4. **Remove safely and read back.** Leave the target directory in owned terminals,
+   settle only this session's owned jobs, then use normal `git worktree remove`
+   with the exact verified target. Never use `--force`, recursive bulk deletion,
+   `git clean` or reset/stash to manufacture eligibility. If normal removal refuses
+   or contents/ownership are uncertain, retain it and report the specific blocker.
+   Verify the directory is absent and `git worktree list --porcelain` no longer
+   registers it. Review local branch retirement separately: `git branch -d` only
+   after no worktree uses it and no unique work remains; if squash ancestry causes
+   refusal, keep the branch and report it rather than force-delete.
+   `git worktree prune` removes stale administrative records for already-missing directories;
+   it does not delete existing worktrees or substitute for this review.
+5. **Finish the checkpoint.** Report removed trees and retained-tree reasons/next
+   actions concisely in the handoff and relevant existing issue/PR. Pending PRs,
+   failed acceptance, active jobs, unfinished edits and baseline dependencies are
+   legitimate retention reasons, not silent exceptions. Recheck them at the next
+   checkpoint; do not create a second cleanup ledger or issue for each directory.
+   Keep private absolute paths out of public updates. Retire the workflow task's
+   own tree through the same gate once its PR has actually merged.
+
 ### Repository merge requirements
 
 `main` requires PRs and these GitHub Actions checks, with branches **up to date**:
@@ -290,6 +342,9 @@ and open `status:local-complete` issues, paginating the bounded candidate query:
    their delivery or a verified descendant before manually closing as completed.
    Do not retroactively accept failed/pending work because the workflow changed.
    Their next correction goes through a protected PR, without enrolling new watchers.
+5. Apply the [worktree cleanup gate](#worktree-lifecycle-and-cleanup) to relevant
+   completed task/baseline trees. Verify removal or record why each remains;
+   successful remote branch deletion does not discharge this local obligation.
 
 The native **Item closed** workflow is enabled; the owner configured its action as
 **Status → Done**. No inverse Auto-close issue workflow is enabled. The public API

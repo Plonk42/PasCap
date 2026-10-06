@@ -350,6 +350,14 @@ and [grading equations](COLOUR_AND_TIMING.md#colour).
 
 ## Contributor safety
 
+- Linked task worktrees must be retired after observed merge, at handoff and
+  next-session recovery through the [worktree lifecycle](GITHUB_WORKFLOW.md#worktree-lifecycle-and-cleanup).
+  Pending PRs and active/unfinished work remain intact with a reason and next action.
+  Verify PR/squash delivery, idle ownership and staged/unstaged/untracked/ignored
+  contents before normal removal; ignored data is not automatically disposable.
+  Preserve required evidence outside the tree on persistent storage. Never force
+  removal, bulk-delete, follow original-media references or confuse remote branch
+  deletion/administrative pruning with removing an existing local worktree.
 - **Start each new task from current remote `main`, before edits or validation.**
   Fetch and verify its SHA, fast-forward a clean/idle local `main` only, then create
   a new short-lived branch. With dirty or active work, preserve it and use a clean

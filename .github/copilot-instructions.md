@@ -46,6 +46,15 @@
   move never closes an issue. No custom closure Action, hook, bot or scheduled job.
   Releases, milestone closure, legacy cleanup and real-media jobs still need approval.
 - Reply in English. Keep summaries concise and identify remaining limitations.
+- Retire completed agent-owned worktrees after an observed merge, at handoff and
+  next-session reconciliation using [the GitHub workflow](../docs/GITHUB_WORKFLOW.md).
+  Verify actual PR/squash delivery, ownership, idle state and all staged/unstaged,
+  untracked and ignored contents before normal `git worktree remove`; verify both
+  registration and directory removal. Never force-remove, bulk-delete, prune an
+  existing directory or discard unfinished work/private data/evidence. Keep active,
+  unmerged or unsafe trees with a concrete reason and cleanup next action; pending
+  auto-merge is not completion. GitHub head-branch deletion does not remove local
+  worktrees. Baseline/reproduction trees retire with their last dependent task.
 - Keep active documentation focused on the **current project state**: implemented
   behaviour, usage, contracts, limitations and applicable verification. Update or
   remove superseded descriptions instead of accumulating implementation chronology,

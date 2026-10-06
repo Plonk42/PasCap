@@ -47,4 +47,5 @@ RC1; do not infer a post-RC promise or release approval. -->
 - [ ] Non-CI acceptance is verified for the exact head before auto-merge is armed. GitHub's actual closing-issue references are read back and contain only fully completed issues, never partial work or deferred hardware/owner gates; negated closing phrases are not safe exclusions.
 - [ ] Required up-to-date PR CI is left to native auto-merge, without session watchers or custom closure automation. Next-session reconciliation removes obsolete progress labels and verifies issue/Project Done; failed CI remains actionable, not accepted.
 - [ ] Original/media safety and unrelated user edits are preserved.
+- [ ] Worktree lifecycle is reconciled: safe completed task/baseline trees are removed with directory/registration readback, or each retained relevant tree has a reason and cleanup next action. This PR's tree remains while unmerged and is checked after observed merge/next session; no forced removal or deletion of unfinished work, private data or required evidence.
 - [ ] No private paths/media, credentials, caches or generated reports are included.
