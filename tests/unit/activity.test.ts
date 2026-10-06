@@ -1,33 +1,73 @@
 import { describe, expect, it } from 'vitest';
-import { EMPTY_KEY_VALUES, type Interpolation, type LayerKeyframe, type LayerKeyValues } from '../../src/shared/keyframes.js';
+import {
+  EMPTY_KEY_VALUES,
+  type Interpolation,
+  type LayerKeyframe,
+  type LayerKeyValues,
+} from '../../src/shared/keyframes.js';
 import type { MediaJob } from '../../src/shared/media.js';
 import { createClip, createLayer, createProject, type ProjectDocument } from '../../src/shared/model.js';
 import type { ProjectSummary } from '../../src/shared/projects.js';
 import { summarizeExport } from '../../src/web/ExportDialog.js';
-import { activityResultSummary, activitySummary, isActiveJob, latestCompletedRender, orderActivityJobs } from '../../src/web/Jobs.js';
+import {
+  activityResultSummary,
+  activitySummary,
+  isActiveJob,
+  latestCompletedRender,
+  orderActivityJobs,
+} from '../../src/web/Jobs.js';
 import { filterProjects } from '../../src/web/Projects.js';
 
 function point(frame: number, values: Partial<LayerKeyValues>, interpolation: Interpolation = 'linear'): LayerKeyframe {
   return { frame, interpolation, values: { ...EMPTY_KEY_VALUES, ...values } };
 }
 function job(id: string, overrides: Partial<MediaJob> = {}): MediaJob {
-  return { id, kind: 'prepare', label: `${id}.mp4`, state: 'queued', progress: 0, message: 'Waiting for the media worker', createdAt: '2026-10-03T10:00:00Z', finishedAt: null, outputUrl: null, receiptUrl: null, ...overrides };
+  return {
+    id,
+    kind: 'prepare',
+    label: `${id}.mp4`,
+    state: 'queued',
+    progress: 0,
+    message: 'Waiting for the media worker',
+    createdAt: '2026-10-03T10:00:00Z',
+    finishedAt: null,
+    outputUrl: null,
+    receiptUrl: null,
+    ...overrides,
+  };
 }
 
 function project(id: string, overrides: Partial<ProjectSummary> = {}): ProjectSummary {
-  return { id, title: id, revision: 0, clipCount: 0, duration: 0, updatedAt: '2026-10-03T10:00:00Z', compatible: true, error: null, ...overrides };
+  return {
+    id,
+    title: id,
+    revision: 0,
+    clipCount: 0,
+    duration: 0,
+    updatedAt: '2026-10-03T10:00:00Z',
+    compatible: true,
+    error: null,
+    ...overrides,
+  };
 }
 
 describe('project dialog filtering', () => {
   const entries = [
     project('north-2', { title: 'North flight 2', clipCount: 2, duration: 90, updatedAt: '2026-10-02T12:00:00Z' }),
     project('north-10', { title: 'North flight 10', updatedAt: '2026-10-03T12:00:00Z' }),
-    project('legacy', { title: 'North flight old', compatible: false, error: 'Unsupported project schema version 2; this build requires version 6.' }),
+    project('legacy', {
+      title: 'North flight old',
+      compatible: false,
+      error: 'Unsupported project schema version 2; this build requires version 6.',
+    }),
     project('south', { title: 'South flight', updatedAt: '2026-10-01T12:00:00Z' }),
   ];
 
   it('searches titles and IDs with trimmed case-insensitive terms', () => {
-    expect(filterProjects(entries, '  NORTH   flight ', 'compatible').map((entry) => entry.id)).toEqual(['north-10', 'north-2']);
+    expect(filterProjects(entries, '  NORTH   flight ', 'compatible').map((entry) => entry.id)).toEqual([
+      'north-10',
+      'north-2',
+    ]);
     expect(filterProjects(entries, 'NORTH-2').map((entry) => entry.id)).toEqual(['north-2']);
     expect(filterProjects(entries, 'missing')).toEqual([]);
   });
@@ -59,14 +99,21 @@ describe('project dialog filtering', () => {
 
   it('handles empty lists and unavailable dates deterministically', () => {
     expect(filterProjects([], '', 'compatible')).toEqual([]);
-    expect(filterProjects([project('unknown', { updatedAt: 'unavailable' }), project('dated')], '').map((entry) => entry.id)).toEqual(['dated', 'unknown']);
+    expect(
+      filterProjects([project('unknown', { updatedAt: 'unavailable' }), project('dated')], '').map((entry) => entry.id),
+    ).toEqual(['dated', 'unknown']);
   });
 });
 
 describe('activity ordering and summaries', () => {
   it('orders running jobs, a FIFO queue and all history by finished time', () => {
     const jobs = [
-      job('completed', { state: 'completed', createdAt: '2026-10-03T09:00:00Z', finishedAt: '2026-10-03T12:00:00Z', progress: 1 }),
+      job('completed', {
+        state: 'completed',
+        createdAt: '2026-10-03T09:00:00Z',
+        finishedAt: '2026-10-03T12:00:00Z',
+        progress: 1,
+      }),
       job('queued-new', { createdAt: '2026-10-03T11:00:00Z' }),
       job('cancelled', { state: 'cancelled', createdAt: '2026-10-03T11:00:00Z', finishedAt: '2026-10-03T11:30:00Z' }),
       job('running', { state: 'running', progress: 0.2 }),
@@ -74,31 +121,56 @@ describe('activity ordering and summaries', () => {
       job('failed', { state: 'failed', finishedAt: '2026-10-03T12:30:00Z' }),
     ];
     const source = Object.freeze(jobs.map((entry) => Object.freeze(entry)));
-    expect(orderActivityJobs(source).map((entry) => entry.id)).toEqual(['running', 'queued-old', 'queued-new', 'failed', 'completed', 'cancelled']);
-    expect(source.map((entry) => entry.id)).toEqual(['completed', 'queued-new', 'cancelled', 'running', 'queued-old', 'failed']);
+    expect(orderActivityJobs(source).map((entry) => entry.id)).toEqual([
+      'running',
+      'queued-old',
+      'queued-new',
+      'failed',
+      'completed',
+      'cancelled',
+    ]);
+    expect(source.map((entry) => entry.id)).toEqual([
+      'completed',
+      'queued-new',
+      'cancelled',
+      'running',
+      'queued-old',
+      'failed',
+    ]);
   });
 
   it('uses stable IDs for ties and tolerates missing completion timestamps', () => {
     expect(orderActivityJobs([job('b'), job('a')]).map((entry) => entry.id)).toEqual(['a', 'b']);
-    expect(orderActivityJobs([
-      job('unknown', { state: 'cancelled', createdAt: 'unknown' }),
-      job('known', { state: 'completed' }),
-    ]).map((entry) => entry.id)).toEqual(['known', 'unknown']);
+    expect(
+      orderActivityJobs([
+        job('unknown', { state: 'cancelled', createdAt: 'unknown' }),
+        job('known', { state: 'completed' }),
+      ]).map((entry) => entry.id),
+    ).toEqual(['known', 'unknown']);
   });
 
   it('counts every state and every preparation/render kind', () => {
     expect(activitySummary([])).toBe('No activity yet');
-    expect(activitySummary([
-      job('running', { state: 'running', kind: 'export' }),
-      job('queued'), job('queued-audio', { kind: 'audio' }),
-      job('failed', { state: 'failed' }),
-      job('cancelled', { state: 'cancelled', kind: 'audio' }),
-      job('completed', { state: 'completed', kind: 'reference' }),
-    ])).toBe('1 running · 2 queued · 1 failed · 1 cancelled · 1 completed');
+    expect(
+      activitySummary([
+        job('running', { state: 'running', kind: 'export' }),
+        job('queued'),
+        job('queued-audio', { kind: 'audio' }),
+        job('failed', { state: 'failed' }),
+        job('cancelled', { state: 'cancelled', kind: 'audio' }),
+        job('completed', { state: 'completed', kind: 'reference' }),
+      ]),
+    ).toBe('1 running · 2 queued · 1 failed · 1 cancelled · 1 completed');
   });
 
   it('keeps the latest usable completed render through later failures and preparation jobs', () => {
-    const completed = job('export', { kind: 'export', state: 'completed', finishedAt: '2026-10-03T11:00:00Z', outputUrl: '/api/exports/one/video', receiptUrl: '/api/exports/one/receipt' });
+    const completed = job('export', {
+      kind: 'export',
+      state: 'completed',
+      finishedAt: '2026-10-03T11:00:00Z',
+      outputUrl: '/api/exports/one/video',
+      receiptUrl: '/api/exports/one/receipt',
+    });
     const jobs = [
       completed,
       job('failed', { kind: 'export', state: 'failed', finishedAt: '2026-10-03T12:00:00Z' }),
@@ -106,7 +178,12 @@ describe('activity ordering and summaries', () => {
       job('no-output', { kind: 'export', state: 'completed', finishedAt: '2026-10-03T14:00:00Z' }),
     ];
     expect(latestCompletedRender(jobs)).toBe(completed);
-    const reference = job('reference', { kind: 'reference', state: 'completed', finishedAt: '2026-10-03T15:00:00Z', outputUrl: '/api/reference/video' });
+    const reference = job('reference', {
+      kind: 'reference',
+      state: 'completed',
+      finishedAt: '2026-10-03T15:00:00Z',
+      outputUrl: '/api/reference/video',
+    });
     expect(latestCompletedRender([...jobs, reference])).toBe(reference);
     expect(latestCompletedRender([])).toBeNull();
     expect(latestCompletedRender([jobs[1]!])).toBeNull();
@@ -116,15 +193,23 @@ describe('activity ordering and summaries', () => {
     expect(activityResultSummary(null)).toBe('');
     expect(activityResultSummary(job('clip', { state: 'running', progress: 0.7 }))).toBe('');
     expect(activityResultSummary(job('clip', { state: 'queued' }))).toBe('');
-    expect(activityResultSummary(job('clip', { state: 'failed', message: 'Cannot prepare proxy' }))).toBe('Video preparation failed: clip.mp4. Cannot prepare proxy');
-    expect(activityResultSummary(job('music', { kind: 'audio', state: 'cancelled', message: 'Job cancelled.' }))).toBe('Audio preparation cancelled: music.mp4. Job cancelled.');
+    expect(activityResultSummary(job('clip', { state: 'failed', message: 'Cannot prepare proxy' }))).toBe(
+      'Video preparation failed: clip.mp4. Cannot prepare proxy',
+    );
+    expect(activityResultSummary(job('music', { kind: 'audio', state: 'cancelled', message: 'Job cancelled.' }))).toBe(
+      'Audio preparation cancelled: music.mp4. Job cancelled.',
+    );
     const completed = job('render', { kind: 'export', state: 'completed', progress: 1 });
     expect(activityResultSummary(completed)).toBe('Export completed: render.mp4');
     expect(activityResultSummary({ ...completed, progress: 0.9 })).toBe(activityResultSummary(completed));
   });
 
   it('only treats queued and running jobs as cancellable activity', () => {
-    expect(['queued', 'running', 'completed', 'failed', 'cancelled'].map((state) => isActiveJob(job(state, { state: state as MediaJob['state'] })))).toEqual([true, true, false, false, false]);
+    expect(
+      ['queued', 'running', 'completed', 'failed', 'cancelled'].map((state) =>
+        isActiveJob(job(state, { state: state as MediaJob['state'] })),
+      ),
+    ).toEqual([true, true, false, false, false]);
   });
 });
 
@@ -134,7 +219,8 @@ describe('export snapshot summary', () => {
     const summary = summarizeExport(document);
     expect(summary).toMatchObject({ duration: 0, clips: 0, layers: 1, enabledLayers: 1, layered: false });
     expect(summary.keys).toEqual({ points: 0, settings: 0, speed: 0, colour: 0, clipOpacity: 0, layerOpacity: 0 });
-    expect(document.schemaVersion).toBe(6); expect(document.media).toEqual({ videoIds: [], audioIds: [] });
+    expect(document.schemaVersion).toBe(6);
+    expect(document.media).toEqual({ videoIds: [], audioIds: [] });
     expect(document.layers[0]!.keyframes).toEqual([]);
   });
 
@@ -144,8 +230,13 @@ describe('export snapshot summary', () => {
     primary.speed = { mode: 'constant', rate: 2 };
     document.layers[0]!.keyframes = [point(0, { clipOpacity: 1, ...primary.colour }, 'hold')];
     const overlay = createClip('overlay', 'source', 0, 30);
-    overlay.layerId = 'video-2'; overlay.start = 100;
-    document.layers.push({ ...createLayer('video-2', 'Overlay', false), enabled: false, keyframes: [point(0, { speed: 1, layerOpacity: 1 }), point(200, { brightness: 0.1 }, 'hold')] });
+    overlay.layerId = 'video-2';
+    overlay.start = 100;
+    document.layers.push({
+      ...createLayer('video-2', 'Overlay', false),
+      enabled: false,
+      keyframes: [point(0, { speed: 1, layerOpacity: 1 }), point(200, { brightness: 0.1 }, 'hold')],
+    });
     document.clips = [primary, overlay];
     const before = JSON.stringify(document);
     const summary = summarizeExport(document);
@@ -170,11 +261,17 @@ describe('export snapshot summary', () => {
 
   it('counts each row point once across its clips and counts zero-valued colour members individually', () => {
     const document = createProject('participants', 'Participants');
-    const left = createClip('left', 'source', 0, 30); const right = createClip('right', 'source', 100, 130);
+    const left = createClip('left', 'source', 0, 30);
+    const right = createClip('right', 'source', 100, 130);
     right.colour.hue = 90;
-    document.clips = [left, right]; document.layers[0]!.transitions = [{ leftId: 'left', rightId: 'right', type: 'cut', duration: 0 }];
-    document.layers[0]!.keyframes = [point(0, { speed: 1, exposure: 0, brightness: 0, clipOpacity: 0, layerOpacity: 0 }), point(60, { exposure: 1, shadows: 0 })];
-    const before = JSON.stringify(document); const summary = summarizeExport(document);
+    document.clips = [left, right];
+    document.layers[0]!.transitions = [{ leftId: 'left', rightId: 'right', type: 'cut', duration: 0 }];
+    document.layers[0]!.keyframes = [
+      point(0, { speed: 1, exposure: 0, brightness: 0, clipOpacity: 0, layerOpacity: 0 }),
+      point(60, { exposure: 1, shadows: 0 }),
+    ];
+    const before = JSON.stringify(document);
+    const summary = summarizeExport(document);
     expect(summary).toMatchObject({ duration: 60, clips: 2, layers: 1, enabledLayers: 1, layered: true });
     expect(summary.keys).toEqual({ points: 2, settings: 7, speed: 1, colour: 4, clipOpacity: 1, layerOpacity: 1 });
     expect(JSON.stringify(document)).toBe(before);

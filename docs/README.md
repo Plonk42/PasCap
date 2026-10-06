@@ -7,24 +7,24 @@ and priorities.
 
 ## Start here
 
-| Read | Use it for |
-| --- | --- |
-| [../README.md](../README.md) | Project overview, quick local start and current scope |
-| [USER_GUIDE.md](USER_GUIDE.md) | Projects, no-copy import, repeated excerpts, timeline editing, clip speed curves, row keyframes, music/export and recovery |
-| [DEVELOPMENT.md](DEVELOPMENT.md) | Linux toolchain, commands, synthetic tests, CI, architecture and contributor safety |
-| [DEPLOYMENT.md](DEPLOYMENT.md) | Service-side source paths/API and security; planned local Docker/Podman packaging, **not a runnable container recipe** |
-| [LICENSING.md](LICENSING.md) | Approved project MIT terms, exact production npm notices and separate native/binary distribution review gates |
+| Read                             | Use it for                                                                                                                 |
+| -------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| [../README.md](../README.md)     | Project overview, quick local start and current scope                                                                      |
+| [USER_GUIDE.md](USER_GUIDE.md)   | Projects, no-copy import, repeated excerpts, timeline editing, clip speed curves, row keyframes, music/export and recovery |
+| [DEVELOPMENT.md](DEVELOPMENT.md) | Linux toolchain, commands, synthetic tests, CI, architecture and contributor safety                                        |
+| [DEPLOYMENT.md](DEPLOYMENT.md)   | Service-side source paths/API and security; planned local Docker/Podman packaging, **not a runnable container recipe**     |
+| [LICENSING.md](LICENSING.md)     | Approved project MIT terms, exact production npm notices and separate native/binary distribution review gates              |
 
 ## Processing and editing contracts
 
-| Document | Authority/scope |
-| --- | --- |
-| [COLOUR_AND_TIMING.md](COLOUR_AND_TIMING.md) | SDR grading, fade/dissolve/rational-frame equations and preview/reference scope |
-| [LAYERS_AND_KEYFRAMES.md](LAYERS_AND_KEYFRAMES.md) | Uniform schema-6 tracks, per-track Ripple/transitions/fades, whole-row points, composition and resource bounds |
-| [SPEED_AND_AUDIO.md](SPEED_AND_AUDIO.md) | Source-anchored constant/ramp/custom clip curves versus analytic project-time row Speed, precise curve editing, shared retiming and music/export audio |
-| [TIMELINE_EDITING.md](TIMELINE_EDITING.md) | No-copy import, source ranges, per-track Ripple/independent placement, recoverable trims, marked cuts, history and snapping |
-| [WORKSPACE_AND_RECOVERY.md](WORKSPACE_AND_RECOVERY.md) | Layout, field/keyboard contexts, project bins, serial saves/conflicts, Activity and failure recovery |
-| [UX_HARDENING.md](UX_HARDENING.md) | Visual controls, deterministic raw-reader ownership, relink identity prerequisite, export-space assumptions/disk-full recovery and deferred loading |
+| Document                                               | Authority/scope                                                                                                                                        |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| [COLOUR_AND_TIMING.md](COLOUR_AND_TIMING.md)           | SDR grading, fade/dissolve/rational-frame equations and preview/reference scope                                                                        |
+| [LAYERS_AND_KEYFRAMES.md](LAYERS_AND_KEYFRAMES.md)     | Uniform schema-6 tracks, per-track Ripple/transitions/fades, whole-row points, composition and resource bounds                                         |
+| [SPEED_AND_AUDIO.md](SPEED_AND_AUDIO.md)               | Source-anchored constant/ramp/custom clip curves versus analytic project-time row Speed, precise curve editing, shared retiming and music/export audio |
+| [TIMELINE_EDITING.md](TIMELINE_EDITING.md)             | No-copy import, source ranges, per-track Ripple/independent placement, recoverable trims, marked cuts, history and snapping                            |
+| [WORKSPACE_AND_RECOVERY.md](WORKSPACE_AND_RECOVERY.md) | Layout, field/keyboard contexts, project bins, serial saves/conflicts, Activity and failure recovery                                                   |
+| [UX_HARDENING.md](UX_HARDENING.md)                     | Visual controls, deterministic raw-reader ownership, relink identity prerequisite, export-space assumptions/disk-full recovery and deferred loading    |
 
 Use current row-point and retiming contracts: colour/opacity animation remains
 row-wide, while the separately approved clip-only speed curves use source frames.

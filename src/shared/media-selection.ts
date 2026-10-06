@@ -17,8 +17,13 @@ function validateFrameCount(frameCount: number): void {
 export function validateMediaSelection(range: Readonly<MediaSelection>, frameCount: number): void {
   validateFrameCount(frameCount);
   if (!/^[a-zA-Z0-9_-]{1,100}$/.test(range.mediaId)) throw new Error('Invalid registered media ID.');
-  if (!Number.isSafeInteger(range.sourceIn) || !Number.isSafeInteger(range.sourceOut)
-    || range.sourceIn < 0 || range.sourceIn >= range.sourceOut || range.sourceOut > frameCount) {
+  if (
+    !Number.isSafeInteger(range.sourceIn) ||
+    !Number.isSafeInteger(range.sourceOut) ||
+    range.sourceIn < 0 ||
+    range.sourceIn >= range.sourceOut ||
+    range.sourceOut > frameCount
+  ) {
     throw new Error(`Use whole source frames: 0 ≤ IN < OUT ≤ ${frameCount}. OUT is exclusive.`);
   }
 }
@@ -39,7 +44,8 @@ export function resolveMediaSelection(mediaId: string, frameCount: number, range
 }
 
 export function sourcePointerRatio(clientX: number, left: number, width: number): number {
-  if (![clientX, left, width].every(Number.isFinite) || width <= 0) throw new Error('Invalid source review pointer geometry.');
+  if (![clientX, left, width].every(Number.isFinite) || width <= 0)
+    throw new Error('Invalid source review pointer geometry.');
   return Math.max(0, Math.min(1, (clientX - left) / width));
 }
 
@@ -50,7 +56,12 @@ export function sourceFrameAtRatio(ratio: number, frameCount: number): number {
 }
 
 /** Handles stop at the opposite edge, retaining at least one original frame. */
-export function moveMediaSelectionEdge(range: Readonly<MediaSelection>, edge: MediaSelectionEdge, frame: number, frameCount: number): MediaSelection {
+export function moveMediaSelectionEdge(
+  range: Readonly<MediaSelection>,
+  edge: MediaSelectionEdge,
+  frame: number,
+  frameCount: number,
+): MediaSelection {
   validateMediaSelection(range, frameCount);
   if (!Number.isSafeInteger(frame)) throw new Error('Source range handles need whole source frames.');
   return edge === 'in'
@@ -59,9 +70,15 @@ export function moveMediaSelectionEdge(range: Readonly<MediaSelection>, edge: Me
 }
 
 /** Mark the displayed frame exactly; OUT includes it by marking frame + 1. */
-export function markMediaSelection(range: Readonly<MediaSelection>, edge: MediaSelectionEdge, head: number, frameCount: number): MediaSelection {
+export function markMediaSelection(
+  range: Readonly<MediaSelection>,
+  edge: MediaSelectionEdge,
+  head: number,
+  frameCount: number,
+): MediaSelection {
   validateMediaSelection(range, frameCount);
-  if (!Number.isSafeInteger(head) || head < 0 || head >= frameCount) throw new Error('Mark a decoded frame inside the registered recording.');
+  if (!Number.isSafeInteger(head) || head < 0 || head >= frameCount)
+    throw new Error('Mark a decoded frame inside the registered recording.');
   // If the head is outside the old selection, move the other edge just enough
   // to keep the mark exact and the selection non-empty.
   return edge === 'in'

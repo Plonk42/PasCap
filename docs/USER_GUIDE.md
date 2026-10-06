@@ -343,18 +343,18 @@ the project. A deliberate click away from a number still applies a valid draft
 once, as usual. Settings, nested **Time, easing & values**, music placement and
 storage/render breakdowns remain their existing expandable controls, not help buttons.
 
-| Context | Shortcut |
-| --- | --- |
-| Timeline play/seek | Space; ←/→ one frame; Shift+←/→ ten; Home/End; F to fit |
-| Split / quick trim | S / Q / W |
-| Unwanted timeline range | I / O; Shift+Delete cuts; Escape clears marks |
-| Instance actions | Ctrl+D duplicate; Delete/Backspace remove |
-| Session history | Ctrl+Z; Ctrl+Shift+Z or Ctrl+Y redo |
+| Context                                     | Shortcut                                                                     |
+| ------------------------------------------- | ---------------------------------------------------------------------------- |
+| Timeline play/seek                          | Space; ←/→ one frame; Shift+←/→ ten; Home/End; F to fit                      |
+| Split / quick trim                          | S / Q / W                                                                    |
+| Unwanted timeline range                     | I / O; Shift+Delete cuts; Escape clears marks                                |
+| Instance actions                            | Ctrl+D duplicate; Delete/Backspace remove                                    |
+| Session history                             | Ctrl+Z; Ctrl+Shift+Z or Ctrl+Y redo                                          |
 | Positioned clip / first Ripple anchor nudge | Alt+←/→ one frame; Alt+Shift+←/→ ten; later Ripple starts require Ripple off |
-| Focused trim handle | Arrows one source frame; Shift ten; left Home/right End restore |
-| Focused row marker | Arrows one project frame; Shift ten; Enter selects/seeks |
-| Focused source review | I/O marks source range, not the timeline's unwanted range |
-| Shortcut guide | ? outside form/modal/source controls |
+| Focused trim handle                         | Arrows one source frame; Shift ten; left Home/right End restore              |
+| Focused row marker                          | Arrows one project frame; Shift ten; Enter selects/seeks                     |
+| Focused source review                       | I/O marks source range, not the timeline's unwanted range                    |
+| Shortcut guide                              | ? outside form/modal/source controls                                         |
 
 Keyboard actions respect focused inputs, buttons, source controls, dialogs and
 dividers. Click the preview timecode for an exact frame or **HH:MM:SS:FF** at 30 fps

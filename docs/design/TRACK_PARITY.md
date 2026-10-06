@@ -15,14 +15,14 @@ change related issues' scopes or permit real-media jobs.
 Array order controls composition and row display, never editing privileges.
 The initial generated `video-1` is an ordinary identity, not a required base.
 
-| Boundary / source | Contract |
-| --- | --- |
-| [Model](../../src/shared/model.ts), [layout](../../src/shared/timeline.ts), [commands](../../src/shared/commands.ts) | Required track settings, local pair topology, continuous Ripple and atomic actual-start persistence |
-| [Source trim](../../src/shared/source-range.ts), [marked cuts](../../src/shared/rush-editing.ts), [drop planning](../../src/web/timeline-placement.ts) | Ripple chooses sequence slots versus independent placement; source anchors and contextual maps are shared by ghost and commit |
-| [Inspector](../../src/web/Inspector.tsx), [track controls](../../src/web/Layers.tsx), [action guards](../../src/web/layer-actions.ts) | Every track exposes the same controls, selected-track transitions/fades and accessible setting-specific start/nudge restrictions |
-| [Rows](../../src/web/timeline-rows.ts), [preview](../../src/preview/engine.ts), [pool](../../src/preview/assignment.ts) | Uniform array-order rows; track-local timing and two reusable slots per track |
-| [Composition](../../src/shared/composition.ts), [export planning](../../src/shared/export.ts), [native groups](../../src/server/layered-export.ts) | Independent track dissolves; premultiplied groups followed by serial source-over, without regrading |
-| [Storage](../../src/server/storage.ts), [archive restoration](../../src/server/export-archive.ts) | Strict schema-6 projects/snapshots; old files retained unchanged and incompatible |
+| Boundary / source                                                                                                                                      | Contract                                                                                                                         |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------- |
+| [Model](../../src/shared/model.ts), [layout](../../src/shared/timeline.ts), [commands](../../src/shared/commands.ts)                                   | Required track settings, local pair topology, continuous Ripple and atomic actual-start persistence                              |
+| [Source trim](../../src/shared/source-range.ts), [marked cuts](../../src/shared/rush-editing.ts), [drop planning](../../src/web/timeline-placement.ts) | Ripple chooses sequence slots versus independent placement; source anchors and contextual maps are shared by ghost and commit    |
+| [Inspector](../../src/web/Inspector.tsx), [track controls](../../src/web/Layers.tsx), [action guards](../../src/web/layer-actions.ts)                  | Every track exposes the same controls, selected-track transitions/fades and accessible setting-specific start/nudge restrictions |
+| [Rows](../../src/web/timeline-rows.ts), [preview](../../src/preview/engine.ts), [pool](../../src/preview/assignment.ts)                                | Uniform array-order rows; track-local timing and two reusable slots per track                                                    |
+| [Composition](../../src/shared/composition.ts), [export planning](../../src/shared/export.ts), [native groups](../../src/server/layered-export.ts)     | Independent track dissolves; premultiplied groups followed by serial source-over, without regrading                              |
+| [Storage](../../src/server/storage.ts), [archive restoration](../../src/server/export-archive.ts)                                                      | Strict schema-6 projects/snapshots; old files retained unchanged and incompatible                                                |
 
 The serial heavy-job queue, source identity checks, music envelope, source-frame
 clip speed curves, ten absolute project-time row channels and per-frame ownership
@@ -33,29 +33,29 @@ remain independent of track ordering.
 The reviewed role-dependent boundaries are classified below. This inventory is
 the design rationale, not a second mutable implementation checklist.
 
-| Role-conditioned behavior | Classification and accepted boundary |
-| --- | --- |
-| First-track sequence placement versus other-track absolute starts | **Per-track setting:** required Ripple; shared layout and persisted actual starts use it independently |
-| Insertion slots, drag ghosts, reorder, duplication and deletion gap closing | **Per-track setting:** source/destination Ripple; candidate validation and anchor retention are uniform |
-| IN-handle/keyboard trim, numeric start/nudge and duration/Speed suffix edits | **Per-track setting:** Ripple selects placement semantics; source anchors and atomic timing validation are uniform |
-| Project-owned transitions and opening/closing fades | **Uniform capability:** required track-local topology/fades, including empty-track dormant settings and explicit positioned dissolve placement |
-| Irremovable initial identity and special stack limits | **Composition constraint only:** last-track deletion and actual top/bottom endpoints; no identity privilege |
-| Primary-first/reversed-other row display and row hit tests | **Composition constraint only:** saved bottom-to-top array order drives headers, lanes, reveal, markers and drop targeting |
-| Primary dissolve plus one-source other-track decoder allocation | **Uniform capability:** two reusable slots per track; timing invalidation includes each populated track's settings/order |
-| Primary export plan/group versus single-source overlay passes | **Uniform capability:** independently planned track groups and serial premultiplied source-over; static eligibility uses content, not identity |
-| Global base duration, project fade summaries and schema-5 admission | **Uniform contract:** maximum clip OUT, per-track summaries/settings and strict schema-6 project/receipt admission |
+| Role-conditioned behavior                                                    | Classification and accepted boundary                                                                                                           |
+| ---------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| First-track sequence placement versus other-track absolute starts            | **Per-track setting:** required Ripple; shared layout and persisted actual starts use it independently                                         |
+| Insertion slots, drag ghosts, reorder, duplication and deletion gap closing  | **Per-track setting:** source/destination Ripple; candidate validation and anchor retention are uniform                                        |
+| IN-handle/keyboard trim, numeric start/nudge and duration/Speed suffix edits | **Per-track setting:** Ripple selects placement semantics; source anchors and atomic timing validation are uniform                             |
+| Project-owned transitions and opening/closing fades                          | **Uniform capability:** required track-local topology/fades, including empty-track dormant settings and explicit positioned dissolve placement |
+| Irremovable initial identity and special stack limits                        | **Composition constraint only:** last-track deletion and actual top/bottom endpoints; no identity privilege                                    |
+| Primary-first/reversed-other row display and row hit tests                   | **Composition constraint only:** saved bottom-to-top array order drives headers, lanes, reveal, markers and drop targeting                     |
+| Primary dissolve plus one-source other-track decoder allocation              | **Uniform capability:** two reusable slots per track; timing invalidation includes each populated track's settings/order                       |
+| Primary export plan/group versus single-source overlay passes                | **Uniform capability:** independently planned track groups and serial premultiplied source-over; static eligibility uses content, not identity |
+| Global base duration, project fade summaries and schema-5 admission          | **Uniform contract:** maximum clip OUT, per-track summaries/settings and strict schema-6 project/receipt admission                             |
 
 ## Accepted settings and capabilities
 
-| Setting / capability | New-track default / bound | Location and effect |
-| --- | --- | --- |
-| Ripple | Required boolean; **on**, including the initial track | Native Layer options checkbox and visible row state; enable packs immediately, then continuously sequences |
-| Opening/closing fade | Required integer output-frame lengths; **0/0** | Selected track in Sequence inspector, at actual first/last placements; dormant on empty tracks |
-| Boundary transition | Required track-owned adjacent-pair records; Cut 0, Fade-through-black at least 2, Cross-dissolve at least 1 frame | Boundary button on its own row and the existing transition editor; no role-based enable flag |
-| Enabled / layer opacity / row points | Existing strict values; enabled, opacity 1, empty points | Existing controls on every track; unchanged curve ownership and group composition |
-| Absolute clip start / nudge | Required integer start on every clip | Positioned clips or first Ripple anchor only; later Ripple clips explain how to reorder or turn Ripple off |
-| Add/remove/raise/lower | One to eight tracks; no irremovable identity | Every track exposes the same actions; only the last remaining track and actual composition-stack endpoints restrict actions |
-| Same-track overlap | No independent overlap toggle | Only an exact, explicitly stored adjacent Cross-dissolve overlap is valid; arbitrary/triple overlap remains invalid |
+| Setting / capability                 | New-track default / bound                                                                                         | Location and effect                                                                                                         |
+| ------------------------------------ | ----------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| Ripple                               | Required boolean; **on**, including the initial track                                                             | Native Layer options checkbox and visible row state; enable packs immediately, then continuously sequences                  |
+| Opening/closing fade                 | Required integer output-frame lengths; **0/0**                                                                    | Selected track in Sequence inspector, at actual first/last placements; dormant on empty tracks                              |
+| Boundary transition                  | Required track-owned adjacent-pair records; Cut 0, Fade-through-black at least 2, Cross-dissolve at least 1 frame | Boundary button on its own row and the existing transition editor; no role-based enable flag                                |
+| Enabled / layer opacity / row points | Existing strict values; enabled, opacity 1, empty points                                                          | Existing controls on every track; unchanged curve ownership and group composition                                           |
+| Absolute clip start / nudge          | Required integer start on every clip                                                                              | Positioned clips or first Ripple anchor only; later Ripple clips explain how to reorder or turn Ripple off                  |
+| Add/remove/raise/lower               | One to eight tracks; no irremovable identity                                                                      | Every track exposes the same actions; only the last remaining track and actual composition-stack endpoints restrict actions |
+| Same-track overlap                   | No independent overlap toggle                                                                                     | Only an exact, explicitly stored adjacent Cross-dissolve overlap is valid; arbitrary/triple overlap remains invalid         |
 
 Ripple is a **continuous layout policy**, not a future-edits-only suffix delta.
 Enabling sorts existing placements chronologically, closes gaps in one Undo and
@@ -76,19 +76,19 @@ Affected tracks are the edited track, or source and destination for an explicit
 cross-track move. Music, all absolute row points and other tracks never ripple.
 The complete candidate uses authoritative contextual row-Speed maps before commit.
 
-| Operation | Ripple off | Ripple on |
-| --- | --- | --- |
-| Insert / batch insert / duplicate | Explicit placement; no unrelated clip moves; conflicts reject the whole operation | Insert at a sequence slot, duplicate after the original or append normal Add; continuously re-sequence from the first anchor |
-| Delete | Leave a gap; unaffected starts remain exact | Close the gap, preserving the pre-edit first anchor even when the first clip is removed |
-| OUT trim / numeric source edit / clip speed | Selected clip changes duration at its start; no suffix movement | Keep the selected sequence start and recompile the suffix continuously |
-| Timeline IN handle / keyboard trim | Retain old timeline OUT with the integer-placement solver; reject unrepresentable results | Retain sequence start and recompile the suffix |
-| Split | Right piece follows independently compiled left; no unrelated clip moves | Re-sequence retained pieces/suffix at the original anchor |
-| Marked cut | Retained pieces use pre-edit mapped positions, including the removed gap | Rejoin retained pieces and re-sequence this track only |
-| Nudge / numeric start | Move only selected clip; validate neighbors and transitions | Only first anchor can move; later starts are disabled with a reason to reorder or switch Ripple off |
-| Move / reorder | Explicit target placement; unaffected starts remain fixed | Atomic remove/insert using each affected track's independent toggle; never apply a source track's policy to its destination |
-| Row Speed point/rate/easing edit | Recompile durations at unchanged starts; reject invalid topology | Recompile continuously in saved clip order from first anchor, retaining exact dissolve overlaps |
-| Change Ripple | Capture actual starts when switching off | Enabling packs current chronological order, closing gaps from first current start in one Undo |
-| Reorder tracks | Composition only | Composition only |
+| Operation                                   | Ripple off                                                                                | Ripple on                                                                                                                    |
+| ------------------------------------------- | ----------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| Insert / batch insert / duplicate           | Explicit placement; no unrelated clip moves; conflicts reject the whole operation         | Insert at a sequence slot, duplicate after the original or append normal Add; continuously re-sequence from the first anchor |
+| Delete                                      | Leave a gap; unaffected starts remain exact                                               | Close the gap, preserving the pre-edit first anchor even when the first clip is removed                                      |
+| OUT trim / numeric source edit / clip speed | Selected clip changes duration at its start; no suffix movement                           | Keep the selected sequence start and recompile the suffix continuously                                                       |
+| Timeline IN handle / keyboard trim          | Retain old timeline OUT with the integer-placement solver; reject unrepresentable results | Retain sequence start and recompile the suffix                                                                               |
+| Split                                       | Right piece follows independently compiled left; no unrelated clip moves                  | Re-sequence retained pieces/suffix at the original anchor                                                                    |
+| Marked cut                                  | Retained pieces use pre-edit mapped positions, including the removed gap                  | Rejoin retained pieces and re-sequence this track only                                                                       |
+| Nudge / numeric start                       | Move only selected clip; validate neighbors and transitions                               | Only first anchor can move; later starts are disabled with a reason to reorder or switch Ripple off                          |
+| Move / reorder                              | Explicit target placement; unaffected starts remain fixed                                 | Atomic remove/insert using each affected track's independent toggle; never apply a source track's policy to its destination  |
+| Row Speed point/rate/easing edit            | Recompile durations at unchanged starts; reject invalid topology                          | Recompile continuously in saved clip order from first anchor, retaining exact dissolve overlaps                              |
+| Change Ripple                               | Capture actual starts when switching off                                                  | Enabling packs current chronological order, closing gaps from first current start in one Undo                                |
+| Reorder tracks                              | Composition only                                                                          | Composition only                                                                                                             |
 
 Project-time Speed means a new start can change duration too; a simple suffix delta
 is insufficient. Recompile each later clip at its actual new start, never shift

@@ -5,7 +5,10 @@ import { compileRetiming, speedSchema, type Retiming } from './speed.js';
 
 const MAX_PROJECT_FRAME = 2_147_483_647;
 const frameSchema = z.number().int().nonnegative().max(MAX_PROJECT_FRAME);
-const pointsSchema = z.array(layerKeyframeSchema).max(256).refine(orderedKeys, { message: 'Layer points must have unique ascending project frames.' });
+const pointsSchema = z
+  .array(layerKeyframeSchema)
+  .max(256)
+  .refine(orderedKeys, { message: 'Layer points must have unique ascending project frames.' });
 const cache = new Map<string, Retiming>();
 
 interface RateSegment {
@@ -25,11 +28,16 @@ interface RateSegment {
  */
 function averageProgress(u: number, v: number, interpolation: Interpolation): number {
   switch (interpolation) {
-    case 'hold': return 0;
-    case 'linear': return u + v / 2;
-    case 'ease-in': return u * u + u * v + v * v / 3;
-    case 'ease-out': return 2 * u - u * u + (1 - u) * v - v * v / 3;
-    case 'smooth': return 3 * u * u - 2 * u * u * u + (3 * u - 3 * u * u) * v + (1 - 2 * u) * v * v - v * v * v / 2;
+    case 'hold':
+      return 0;
+    case 'linear':
+      return u + v / 2;
+    case 'ease-in':
+      return u * u + u * v + (v * v) / 3;
+    case 'ease-out':
+      return 2 * u - u * u + (1 - u) * v - (v * v) / 3;
+    case 'smooth':
+      return 3 * u * u - 2 * u * u * u + (3 * u - 3 * u * u) * v + (1 - 2 * u) * v * v - (v * v * v) / 2;
   }
 }
 
@@ -44,7 +52,8 @@ function integrate(segment: RateSegment, elapsed: number): number {
 
 function inverseSegment(segment: RateSegment, amount: number): number {
   if (segment.leftRate === segment.rightRate || segment.interpolation === 'hold') return amount / segment.leftRate;
-  let low = 0; let high = segment.end - segment.begin;
+  let low = 0;
+  let high = segment.end - segment.begin;
   for (let iteration = 0; iteration < 64; iteration++) {
     const middle = (low + high) / 2;
     if (integrate(segment, middle) < amount) low = middle;
@@ -67,11 +76,20 @@ export function compileLayerRetiming(clip: VideoClip, layer: VideoLayer, start: 
   if (sourceOut <= sourceIn) throw new Error('Retiming requires a positive integer source range.');
   start = frameSchema.parse(start);
   const speed = Object.freeze(speedSchema.parse(clip.speed));
-  const points = pointsSchema.parse(layer.keyframes).map((point) => Object.freeze({ ...point, values: Object.freeze(point.values) }));
-  const keys = Object.freeze(points.filter((point) => point.values.speed !== null).map((point) => Object.freeze({ frame: point.frame, interpolation: point.interpolation, value: point.values.speed! })));
+  const points = pointsSchema
+    .parse(layer.keyframes)
+    .map((point) => Object.freeze({ ...point, values: Object.freeze(point.values) }));
+  const keys = Object.freeze(
+    points
+      .filter((point) => point.values.speed !== null)
+      .map((point) =>
+        Object.freeze({ frame: point.frame, interpolation: point.interpolation, value: point.values.speed! }),
+      ),
+  );
   if (!keys.length) {
     const retiming = compileRetiming({ sourceIn, sourceOut, speed });
-    if (start + retiming.duration > MAX_PROJECT_FRAME) throw new RangeError('Layer duration exceeds supported project frames.');
+    if (start + retiming.duration > MAX_PROJECT_FRAME)
+      throw new RangeError('Layer duration exceeds supported project frames.');
     return retiming;
   }
   const cacheKey = JSON.stringify([sourceIn, sourceOut, start, keys]);
@@ -81,9 +99,27 @@ export function compileLayerRetiming(clip: VideoClip, layer: VideoLayer, start: 
   const length = sourceOut - sourceIn;
   const segments: RateSegment[] = [];
   let consumed = 0;
-  const add = (begin: number, end: number, leftRate: number, rightRate: number, interpolation: Interpolation, keyBegin: number, keyEnd: number): void => {
+  const add = (
+    begin: number,
+    end: number,
+    leftRate: number,
+    rightRate: number,
+    interpolation: Interpolation,
+    keyBegin: number,
+    keyEnd: number,
+  ): void => {
     if (end <= begin || consumed >= length) return;
-    const segment = { begin, end, sourceBegin: consumed, sourceEnd: consumed, leftRate, rightRate, interpolation, keyBegin, keyEnd };
+    const segment = {
+      begin,
+      end,
+      sourceBegin: consumed,
+      sourceEnd: consumed,
+      leftRate,
+      rightRate,
+      interpolation,
+      keyBegin,
+      keyEnd,
+    };
     consumed += integrate(segment, end - begin);
     segment.sourceEnd = consumed;
     segments.push(Object.freeze(segment));
@@ -91,7 +127,8 @@ export function compileLayerRetiming(clip: VideoClip, layer: VideoLayer, start: 
   const first = keys[0]!;
   add(start, first.frame, first.value, first.value, 'hold', start, first.frame);
   for (let index = 0; index < keys.length - 1 && consumed < length; index++) {
-    const left = keys[index]!; const right = keys[index + 1]!;
+    const left = keys[index]!;
+    const right = keys[index + 1]!;
     add(Math.max(start, left.frame), right.frame, left.value, right.value, left.interpolation, left.frame, right.frame);
   }
   const last = keys.at(-1)!;
@@ -101,7 +138,8 @@ export function compileLayerRetiming(clip: VideoClip, layer: VideoLayer, start: 
 
   const elapsedAt = (amount: number): number => {
     if (amount <= 0) return 0;
-    let low = 0; let high = segments.length - 1;
+    let low = 0;
+    let high = segments.length - 1;
     while (low < high) {
       const middle = Math.floor((low + high) / 2);
       if (segments[middle]!.sourceEnd < amount) low = middle + 1;
@@ -119,7 +157,8 @@ export function compileLayerRetiming(clip: VideoClip, layer: VideoLayer, start: 
       if (outputFrame <= 0) return sourceIn;
       if (outputFrame >= duration) return sourceOut - 1;
       const frame = start + outputFrame;
-      let low = 0; let high = segments.length - 1;
+      let low = 0;
+      let high = segments.length - 1;
       while (low < high) {
         const middle = Math.floor((low + high) / 2);
         if (segments[middle]!.end < frame) low = middle + 1;

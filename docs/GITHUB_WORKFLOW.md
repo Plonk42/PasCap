@@ -6,9 +6,9 @@ risky changes and GitHub issues only for work worth tracking.
 
 ## Delivering changes
 
-| Change | Route |
-| --- | --- |
-| **Routine:** UI/editor behaviour, docs, tests, small fixes, refactors | Fast local gate, commit, push to `main` |
+| Change                                                                                                                                                             | Route                                            |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------ |
+| **Routine:** UI/editor behaviour, docs, tests, small fixes, refactors                                                                                              | Fast local gate, commit, push to `main`          |
 | **Risky:** playback/A-V clock, decoder/compositor, native export/FFmpeg, project schema or persisted formats, source-media safety, CI/scripts, dependency upgrades | Short-lived branch and PR with squash auto-merge |
 
 When unsure, treat the change as risky.
@@ -18,9 +18,9 @@ When unsure, treat the change as risky.
 1. `git pull --ff-only` on `main`. Leave unrelated uncommitted edits untouched and
    unstaged.
 2. Edit, running the affected unit tests and the dev server while working.
-3. Run the fast gate: `npm run check` plus the affected Playwright specs for UI
-   changes ([commands](DEVELOPMENT.md#fast-local-validation)). Docs-only changes
-   need no test runs.
+3. Run the fast gate: `npm run format`, then `npm run check` plus the affected
+   Playwright specs for UI changes ([commands](DEVELOPMENT.md#fast-local-validation)).
+   Docs-only changes need only `npm run format`.
 4. Commit each coherent step with its tests and doc updates, then
    `git push origin main`. GitHub reports the push as bypassing the PR rule; that
    is expected for routine changes.
@@ -55,13 +55,13 @@ The [CI workflow](../.github/workflows/ci.yml) runs on pull requests, pushes to
 `main` and manual dispatch, with read-only permissions. A newer push to the same
 branch cancels the older run.
 
-| Job | Runs |
-| --- | --- |
-| Checks / Node 22 (and Node 24 on `main`) | `npm run check`; `npm audit` on `main` |
-| Native media / FFmpeg 8.0.1 | Synthetic native suite (`npm run test:media`) |
-| Chrome browser 1/4 to 4/4 | Full Chrome suite sharded by spec file, fresh fixtures per shard |
-| Firefox music and playback | Scoped Firefox regressions ([details](DEVELOPMENT.md#firefox-music-regression-and-optional-investigation)) |
-| Delivery gate | Succeeds only if every job above succeeded |
+| Job                                      | Runs                                                                                                       |
+| ---------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| Checks / Node 22 (and Node 24 on `main`) | `npm run check` (including formatting); `npm audit` on `main`                                              |
+| Native media / FFmpeg 8.0.1              | Synthetic native suite (`npm run test:media`)                                                              |
+| Chrome browser 1/4 to 4/4                | Full Chrome suite sharded by spec file, fresh fixtures per shard                                           |
+| Firefox music and playback               | Scoped Firefox regressions ([details](DEVELOPMENT.md#firefox-music-regression-and-optional-investigation)) |
+| Delivery gate                            | Succeeds only if every job above succeeded                                                                 |
 
 `main` protection: pull requests for non-admin pushes, **Delivery gate** as the
 only required check (branches need not be up to date), linear history, resolved
@@ -84,18 +84,18 @@ head-branch deletion are enabled.
 - [ROADMAP.md](ROADMAP.md) indexes outcomes; issues hold mutable progress. Guides
   describe current behaviour; history belongs in Git and issues.
 
-| Category | Meaning |
-| --- | --- |
-| `bug` | Reproducible incorrect behaviour |
-| `enhancement` | Product feature or improvement |
-| `task` | Engineering, verification, documentation or operations |
+| Category      | Meaning                                                |
+| ------------- | ------------------------------------------------------ |
+| `bug`         | Reproducible incorrect behaviour                       |
+| `enhancement` | Product feature or improvement                         |
+| `task`        | Engineering, verification, documentation or operations |
 
-| Priority | Meaning |
-| --- | --- |
+| Priority      | Meaning                                                |
+| ------------- | ------------------------------------------------------ |
 | `priority:p0` | Data loss, security incident or unusable core workflow |
-| `priority:p1` | Correctness, source safety or a milestone gate |
-| `priority:p2` | Normal planned work (default) |
-| `priority:p3` | Optional improvement |
+| `priority:p1` | Correctness, source safety or a milestone gate         |
+| `priority:p2` | Normal planned work (default)                          |
+| `priority:p3` | Optional improvement                                   |
 
 Areas: `area:editor`, `area:media`, `area:export`, `area:preview`, `area:audio`,
 `area:ci`, `area:container`, `area:licensing` and `area:workflow`.

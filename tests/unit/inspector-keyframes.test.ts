@@ -8,16 +8,38 @@ import { KeyframeNavigationContext } from '../../src/web/keyframe-navigation.js'
 import { KeyframeControls } from '../../src/web/KeyframeControls.js';
 import { RangeSettingControl, SpeedRateField } from '../../src/web/SettingValueControl.js';
 
-const navigation = { inspection: null, duration: 0, disabled: false, onSeekKeyframe: vi.fn(), onFollowPlayhead: vi.fn() };
+const navigation = {
+  inspection: null,
+  duration: 0,
+  disabled: false,
+  onSeekKeyframe: vi.fn(),
+  onFollowPlayhead: vi.fn(),
+};
 
 describe('dedicated Inspector keyframe controls', () => {
   it('labels four mounted tab panels and keeps empty-row points in their own panel', () => {
     const project = createProject('tabs', 'Tabs');
-    const markup = renderToStaticMarkup(createElement(KeyframeNavigationContext.Provider, { value: navigation }, createElement(Inspector, {
-      project, assets: [], selectedClipId: null, selectedLayerId: project.layers[0]!.id,
-      boundaryId: null, frame: 0, drafting: false, section: 'keyframes', onSection: vi.fn(),
-      onEdit: vi.fn(), onPreview: vi.fn(), onSeek: vi.fn(), onPause: vi.fn(),
-    })));
+    const markup = renderToStaticMarkup(
+      createElement(
+        KeyframeNavigationContext.Provider,
+        { value: navigation },
+        createElement(Inspector, {
+          project,
+          assets: [],
+          selectedClipId: null,
+          selectedLayerId: project.layers[0]!.id,
+          boundaryId: null,
+          frame: 0,
+          drafting: false,
+          section: 'keyframes',
+          onSection: vi.fn(),
+          onEdit: vi.fn(),
+          onPreview: vi.fn(),
+          onSeek: vi.fn(),
+          onPause: vi.fn(),
+        }),
+      ),
+    );
     const tabs = [...markup.matchAll(/<button[^>]*role="tab"[^>]*>(.*?)<\/button>/g)].map((match) => match[1]);
     expect(tabs).toEqual(['Clip', 'Keyframes', 'Sequence', 'Audio']);
     expect(markup).toContain('aria-label="Layer keyframes"');
@@ -36,21 +58,59 @@ describe('dedicated Inspector keyframe controls', () => {
 
   it.each(KEYFRAME_SETTINGS)('$label shares its setting-specific bounds and accessible controls', (setting) => {
     const name = `${setting.label} keyframe value 200`;
-    const markup = setting.key === 'speed'
-      ? renderToStaticMarkup(createElement(SpeedRateField, { id: 'rate', value: 1, disabled: false, 'aria-label': name, onCommit: vi.fn() }))
-      : renderToStaticMarkup(createElement(RangeSettingControl, { setting: setting.key, id: 'value', label: name, value: setting.min, disabled: false, hint: 'Stored point 200', exact: { resetKey: 'point' }, onCommit: vi.fn() }));
+    const markup =
+      setting.key === 'speed'
+        ? renderToStaticMarkup(
+            createElement(SpeedRateField, {
+              id: 'rate',
+              value: 1,
+              disabled: false,
+              'aria-label': name,
+              onCommit: vi.fn(),
+            }),
+          )
+        : renderToStaticMarkup(
+            createElement(RangeSettingControl, {
+              setting: setting.key,
+              id: 'value',
+              label: name,
+              value: setting.min,
+              disabled: false,
+              hint: 'Stored point 200',
+              exact: { resetKey: 'point' },
+              onCommit: vi.fn(),
+            }),
+          );
     expect(markup).toContain(`min="${setting.min}"`);
     expect(markup).toContain(`max="${setting.max}"`);
     expect(markup).toContain(`step="${setting.step}"`);
     expect(markup).toContain(`aria-label="${name}"`);
     expect(markup).toContain('type="number"');
-    if (setting.key !== 'speed') { expect(markup).toMatch(/class="setting-exact-value"><input[^>]*type="range"[^>]*><span class="number-field"/); expect(markup).not.toContain('<output'); }
+    if (setting.key !== 'speed') {
+      expect(markup).toMatch(/class="setting-exact-value"><input[^>]*type="range"[^>]*><span class="number-field"/);
+      expect(markup).not.toContain('<output');
+    }
   });
 
   it('renders only existing participants, including off-duration points, without adding diamonds or clip-speed modes', () => {
     const project = createProject('points', 'Points');
-    project.layers[0]!.keyframes = [{ frame: 200, interpolation: 'hold', values: { ...EMPTY_KEY_VALUES, exposure: 0.5, speed: 2 } }];
-    const markup = renderToStaticMarkup(createElement(KeyframeNavigationContext.Provider, { value: navigation }, createElement(KeyframeControls, { project, layer: project.layers[0]!, frame: 0, duration: 0, disabled: false, onEdit: vi.fn() })));
+    project.layers[0]!.keyframes = [
+      { frame: 200, interpolation: 'hold', values: { ...EMPTY_KEY_VALUES, exposure: 0.5, speed: 2 } },
+    ];
+    const markup = renderToStaticMarkup(
+      createElement(
+        KeyframeNavigationContext.Provider,
+        { value: navigation },
+        createElement(KeyframeControls, {
+          project,
+          layer: project.layers[0]!,
+          frame: 0,
+          duration: 0,
+          disabled: false,
+          onEdit: vi.fn(),
+        }),
+      ),
+    );
     expect(markup).toContain('Exposure keyframe value 200');
     expect(markup).toContain('Speed keyframe value 200');
     expect(markup).not.toContain('Brightness keyframe value');

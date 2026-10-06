@@ -5,8 +5,9 @@ import { isNotFound } from '../../src/server/errors.js';
 /** Linux allocated regular-file bytes at progress points; excludes directory metadata and between-sample peaks. */
 export function observedJobBytes(directory: string): number {
   let entries: Dirent[];
-  try { entries = readdirSync(directory, { withFileTypes: true }); }
-  catch (cause) {
+  try {
+    entries = readdirSync(directory, { withFileTypes: true });
+  } catch (cause) {
     if (isNotFound(cause)) return 0;
     throw cause;
   }

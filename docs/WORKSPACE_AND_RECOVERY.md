@@ -547,6 +547,3 @@ certification; those requirements belong to
 [#7](https://github.com/Plonk42/PasCap/issues/7) and
 [#8](https://github.com/Plonk42/PasCap/issues/8). Real-media jobs require explicit
 owner consent.
-
-
-

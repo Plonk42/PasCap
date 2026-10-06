@@ -1,10 +1,18 @@
 import { z } from 'zod';
 import { frameSchema, idSchema, type ProjectDocument } from './model.js';
 
-export const projectSummarySchema = z.object({
-  id: idSchema, title: z.string(), revision: frameSchema, clipCount: z.number().int().nonnegative(),
-  duration: frameSchema, updatedAt: z.string(), compatible: z.boolean(), error: z.string().nullable(),
-}).strict();
+export const projectSummarySchema = z
+  .object({
+    id: idSchema,
+    title: z.string(),
+    revision: frameSchema,
+    clipCount: z.number().int().nonnegative(),
+    duration: frameSchema,
+    updatedAt: z.string(),
+    compatible: z.boolean(),
+    error: z.string().nullable(),
+  })
+  .strict();
 export type ProjectSummary = z.infer<typeof projectSummarySchema>;
 
 /** Imports and timeline references both belong to the project's library. */

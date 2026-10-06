@@ -5,20 +5,36 @@ import { applyCommand } from '../../src/shared/commands.js';
 import type { MediaAsset } from '../../src/shared/media.js';
 import { createClip, createLayer, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
 import { calculateLayout } from '../../src/shared/timeline.js';
-import { editLayerPoint, expandedInspectorPreferences, inspectorTab, layerKeyframes, sharedPoint } from './editor-helpers.js';
+import {
+  editLayerPoint,
+  expandedInspectorPreferences,
+  inspectorTab,
+  layerKeyframes,
+  sharedPoint,
+} from './editor-helpers.js';
 import { memoryProjects } from './memory-projects.js';
 
 test.beforeEach(async ({ page, request }) => {
-  const library = await (await request.get('/api/media')).json() as { assets: MediaAsset[] };
-  const audio = await (await request.get('/api/audio')).json() as { assets: AudioAsset[] };
+  const library = (await (await request.get('/api/media')).json()) as { assets: MediaAsset[] };
+  const audio = (await (await request.get('/api/audio')).json()) as { assets: AudioAsset[] };
   let document = createProject('preview-lab', 'Numeric controls · memory-only');
-  document.media = { videoIds: library.assets.map((asset) => asset.id), audioIds: audio.assets.map((asset) => asset.id) };
+  document.media = {
+    videoIds: library.assets.map((asset) => asset.id),
+    audioIds: audio.assets.map((asset) => asset.id),
+  };
   for (const [index, name] of ['pattern-a.mp4', 'pattern-b.mp4'].entries()) {
     const asset = library.assets.find((item) => item.name === name && item.status === 'ready');
     if (!asset) throw new Error('These tests require the dedicated synthetic browser fixture.');
-    document = applyCommand(document, { type: 'insert', clip: createClip(index === 0 ? 'clip-a' : 'clip-b', asset.id, 15, 105), index });
+    document = applyCommand(document, {
+      type: 'insert',
+      clip: createClip(index === 0 ? 'clip-a' : 'clip-b', asset.id, 15, 105),
+      index,
+    });
   }
-  document = applyCommand(document, { type: 'transition', transition: { leftId: 'clip-a', rightId: 'clip-b', type: 'cross-dissolve', duration: 18 } });
+  document = applyCommand(document, {
+    type: 'transition',
+    transition: { leftId: 'clip-a', rightId: 'clip-b', type: 'cross-dissolve', duration: 18 },
+  });
 
   // Exercise real editor history/autosave without writing even the fixture's project store.
   await memoryProjects(page, document);
@@ -49,7 +65,9 @@ async function commitNumber(page: Page, name: string, value: string): Promise<vo
   await field.press('Enter');
 }
 
-test('Enter and blur each commit once, while Escape and unchanged drafts do not create undo steps', async ({ page }) => {
+test('Enter and blur each commit once, while Escape and unchanged drafts do not create undo steps', async ({
+  page,
+}) => {
   const field = page.getByRole('spinbutton', { name: 'Source IN frame', exact: true });
   const undo = page.getByRole('button', { name: 'Undo', exact: true });
   await field.fill('25');
@@ -79,7 +97,9 @@ test('Enter and blur each commit once, while Escape and unchanged drafts do not 
   expect((await currentProject(page)).clips[0]?.sourceIn).toBe(15);
 });
 
-test('empty, fractional, out-of-bounds and conflicting timing drafts stay editable with inline errors', async ({ page }) => {
+test('empty, fractional, out-of-bounds and conflicting timing drafts stay editable with inline errors', async ({
+  page,
+}) => {
   const field = page.getByRole('spinbutton', { name: 'Source IN frame', exact: true });
   for (const draft of ['', '15.5', '-1', '999']) {
     await field.fill(draft);
@@ -95,12 +115,14 @@ test('empty, fractional, out-of-bounds and conflicting timing drafts stay editab
     await expect(field).toHaveValue('15');
   }
   const out = page.getByRole('spinbutton', { name: 'Source OUT frame', exact: true });
-  await out.fill('999'); await out.press('Enter');
+  await out.fill('999');
+  await out.press('Enter');
   await expect(out.locator('..').getByRole('alert')).toContainText('Enter 120 or less');
   await out.press('Tab');
   expect((await currentProject(page)).clips[0]?.sourceOut).toBe(105);
   await out.press('Escape');
-  await out.fill('25'); await out.press('Enter');
+  await out.fill('25');
+  await out.press('Enter');
   await expect(out.locator('..').getByRole('alert')).toContainText('conflicting fades');
   expect((await currentProject(page)).clips[0]?.sourceOut).toBe(105);
 });
@@ -110,33 +132,51 @@ test('undo and external document updates replace stale drafts without moving inp
   await commitNumber(page, 'Clip speed rate', '1.5');
   await field.fill('3');
   // A programmatic toolbar activation does not blur the focused draft first.
-  await page.getByRole('button', { name: 'Undo', exact: true }).evaluate((button) => (button as HTMLButtonElement).click());
+  await page
+    .getByRole('button', { name: 'Undo', exact: true })
+    .evaluate((button) => (button as HTMLButtonElement).click());
   await expect(field).toHaveValue('1');
   await expect(field).toBeFocused();
   await field.press('Enter');
   await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
 
   await field.fill('4');
-  const next = applyCommand(await currentProject(page), { type: 'speed', clipId: 'clip-a', speed: { mode: 'constant', rate: 2 } });
+  const next = applyCommand(await currentProject(page), {
+    type: 'speed',
+    clipId: 'clip-a',
+    speed: { mode: 'constant', rate: 2 },
+  });
   await setProject(page, next);
   await expect(field).toHaveValue('2');
   await expect(field).toBeFocused();
-  await field.press('Escape'); await field.press('Tab');
+  await field.press('Escape');
+  await field.press('Tab');
   expect((await currentProject(page)).clips[0]?.speed).toEqual({ mode: 'constant', rate: 2 });
 });
 
-test('the shared list labels time/value/easing, retains reordered input focus, and rejects point collisions', async ({ page }) => {
+test('the shared list labels time/value/easing, retains reordered input focus, and rejects point collisions', async ({
+  page,
+}) => {
   let document = await currentProject(page);
   document = applyCommand(document, {
-    type: 'layer-update', layer: {
-      ...document.layers[0]!, keyframes: [
+    type: 'layer-update',
+    layer: {
+      ...document.layers[0]!,
+      keyframes: [
         sharedPoint(20, { clipOpacity: 0.2, exposure: -0.5 }, 'hold'),
         sharedPoint(70, { clipOpacity: 0.8, exposure: 0.5 }, 'smooth'),
-      ]
-    }
+      ],
+    },
   });
-  document = applyCommand(document, { type: 'layer-add', layer: { ...createLayer('upper', 'Video 2', false), keyframes: [sharedPoint(80, { clipOpacity: 0.4 }, 'hold')] } });
-  document = applyCommand(document, { type: 'insert', clip: { ...createClip('other-row', document.clips[1]!.mediaId, 0, 30), layerId: 'upper', start: 90 }, index: 2 });
+  document = applyCommand(document, {
+    type: 'layer-add',
+    layer: { ...createLayer('upper', 'Video 2', false), keyframes: [sharedPoint(80, { clipOpacity: 0.4 }, 'hold')] },
+  });
+  document = applyCommand(document, {
+    type: 'insert',
+    clip: { ...createClip('other-row', document.clips[1]!.mediaId, 0, 30), layerId: 'upper', start: 90 },
+    index: 2,
+  });
   await setProject(page, document);
   await inspectorTab(page, 'Layer keyframes');
   const keys = layerKeyframes(page, 'Video 1');
@@ -154,13 +194,16 @@ test('the shared list labels time/value/easing, retains reordered input focus, a
   expect((await currentProject(page)).layers[0]?.keyframes[0]?.values.clipOpacity).toBe(0.2);
   await draft.press('Enter');
   const time = row.getByRole('spinbutton', { name: 'Layer keyframe frame 20', exact: true });
-  await time.fill('80'); await time.press('Enter');
+  await time.fill('80');
+  await time.press('Enter');
   const moved = keys.getByRole('spinbutton', { name: 'Layer keyframe frame 80', exact: true });
   await expect(moved).toBeFocused();
   expect((await currentProject(page)).layers[0]?.keyframes).toEqual([
-    sharedPoint(70, { clipOpacity: 0.8, exposure: 0.5 }, 'smooth'), sharedPoint(80, { clipOpacity: 0.4, exposure: -0.5 }, 'hold'),
+    sharedPoint(70, { clipOpacity: 0.8, exposure: 0.5 }, 'smooth'),
+    sharedPoint(80, { clipOpacity: 0.4, exposure: -0.5 }, 'hold'),
   ]);
-  await moved.fill('70'); await moved.press('Enter');
+  await moved.fill('70');
+  await moved.press('Enter');
   await expect(moved).toBeFocused();
   await expect(moved).toHaveValue('70');
   await expect(moved).toHaveAttribute('aria-invalid', 'true');
@@ -169,11 +212,16 @@ test('the shared list labels time/value/easing, retains reordered input focus, a
   await moved.press('Escape');
   await expect(moved).toHaveValue('80');
   const remove = keys.getByRole('button', { name: 'Delete layer keyframe 70', exact: true });
-  await remove.focus(); await remove.press('Enter');
-  expect((await currentProject(page)).layers[0]?.keyframes).toEqual([sharedPoint(80, { clipOpacity: 0.4, exposure: -0.5 }, 'hold')]);
+  await remove.focus();
+  await remove.press('Enter');
+  expect((await currentProject(page)).layers[0]?.keyframes).toEqual([
+    sharedPoint(80, { clipOpacity: 0.4, exposure: -0.5 }, 'hold'),
+  ]);
   const value = keys.getByRole('spinbutton', { name: 'Clip opacity keyframe value 80', exact: true });
   await value.fill('0.9');
-  await page.locator('[data-clip-id="other-row"] .timeline-clip-body').evaluate((button) => (button as HTMLButtonElement).click());
+  await page
+    .locator('[data-clip-id="other-row"] .timeline-clip-body')
+    .evaluate((button) => (button as HTMLButtonElement).click());
   const otherKeys = layerKeyframes(page, 'Video 2');
   const otherValue = otherKeys.getByRole('spinbutton', { name: 'Clip opacity keyframe value 80', exact: true });
   await expect(otherKeys.getByRole('list', { name: 'Edit layer keys', exact: true })).toBeVisible();
@@ -185,18 +233,26 @@ test('the shared list labels time/value/easing, retains reordered input focus, a
   await page.reload();
   await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
   await inspectorTab(page, 'Layer keyframes');
-  await expect(layerKeyframes(page, 'Video 1').getByRole('list', { name: 'Edit layer keys', exact: true })).toBeVisible();
+  await expect(
+    layerKeyframes(page, 'Video 1').getByRole('list', { name: 'Edit layer keys', exact: true }),
+  ).toBeVisible();
 });
 
-test('row-speed navigation reaches project points and previews outside-duration points at the nearest frame', async ({ page }) => {
+test('row-speed navigation reaches project points and previews outside-duration points at the nearest frame', async ({
+  page,
+}) => {
   let document = await currentProject(page);
   document = applyCommand(document, {
-    type: 'layer-update', layer: {
-      ...document.layers[0]!, keyframes: [
-        sharedPoint(5, { speed: 2 }, 'hold'), sharedPoint(35, { speed: 2 }, 'smooth'),
-        sharedPoint(40, { speed: 2 }), sharedPoint(110, { speed: 2 }, 'hold'),
-      ]
-    }
+    type: 'layer-update',
+    layer: {
+      ...document.layers[0]!,
+      keyframes: [
+        sharedPoint(5, { speed: 2 }, 'hold'),
+        sharedPoint(35, { speed: 2 }, 'smooth'),
+        sharedPoint(40, { speed: 2 }),
+        sharedPoint(110, { speed: 2 }, 'hold'),
+      ],
+    },
   });
   document = applyCommand(document, { type: 'trim', clipId: 'clip-a', sourceIn: 30, sourceOut: 90 });
   await setProject(page, document);
@@ -209,10 +265,15 @@ test('row-speed navigation reaches project points and previews outside-duration 
   }
   await expect(keys.getByRole('button', { name: 'Next layer keyframe', exact: true })).toBeDisabled();
   await expect(keys.getByRole('button', { name: 'Previous layer keyframe', exact: true })).toBeEnabled();
-  await expect(keys.locator('.layer-keyframe-inspected')).toContainText('Stored point · timeline frame 110 · outside current duration');
+  await expect(keys.locator('.layer-keyframe-inspected')).toContainText(
+    'Stored point · timeline frame 110 · outside current duration',
+  );
   const outside = await editLayerPoint(page, 'Video 1', 110);
   await expect(outside.locator('.keyframe-row-skipped')).toHaveText('Outside duration');
-  await expect(outside.getByRole('button', { name: 'Go to layer keyframe 110', exact: true })).toHaveAttribute('title', `Stored timeline frame 110; preview the nearest available frame ${calculateLayout(document).duration - 1}. The point stays in place.`);
+  await expect(outside.getByRole('button', { name: 'Go to layer keyframe 110', exact: true })).toHaveAttribute(
+    'title',
+    `Stored timeline frame 110; preview the nearest available frame ${calculateLayout(document).duration - 1}. The point stays in place.`,
+  );
   await expect(keys.locator('.keyframe-row-skipped')).toHaveCount(1);
   await keys.getByRole('button', { name: 'Previous layer keyframe', exact: true }).click();
   await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(40);
@@ -225,15 +286,20 @@ test('row-speed navigation reaches project points and previews outside-duration 
   await inspectorTab(page, 'Clip');
   const rate = page.getByRole('spinbutton', { name: 'Layer speed rate', exact: true });
   await expect(rate).toBeDisabled();
-  const diamond = page.getByRole('complementary', { name: 'Clip inspector' }).getByRole('button', { name: 'Keyframe Speed', exact: true });
-  await expect(diamond).toBeEnabled(); await expect(diamond).toHaveAttribute('aria-pressed', 'false');
+  const diamond = page
+    .getByRole('complementary', { name: 'Clip inspector' })
+    .getByRole('button', { name: 'Keyframe Speed', exact: true });
+  await expect(diamond).toBeEnabled();
+  await expect(diamond).toHaveAttribute('aria-pressed', 'false');
   await diamond.click();
   await commitNumber(page, 'Layer speed rate', '1.5');
   const points = (await currentProject(page)).layers[0]!.keyframes;
   expect(points.map((point) => point.frame)).toEqual([0, 5, 35, 40, 110]);
   expect(points.find((point) => point.frame === 35)).toEqual(sharedPoint(35, { speed: 3 }, 'smooth'));
   expect(points.find((point) => point.frame === 0)).toEqual(sharedPoint(0, { speed: 1.5 }));
-  expect((await currentProject(page)).clips.map((clip) => clip.speed)).toEqual(document.clips.map((clip) => clip.speed));
+  expect((await currentProject(page)).clips.map((clip) => clip.speed)).toEqual(
+    document.clips.map((clip) => clip.speed),
+  );
   await page.getByRole('button', { name: 'Reset speed to 1×', exact: true }).click();
   expect((await currentProject(page)).layers[0]?.keyframes[0]).toEqual(sharedPoint(0, { speed: 1 }));
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
@@ -263,15 +329,19 @@ test('speed/ramp numbers commit explicitly and reset to 1× changes only speed i
   expect((await currentProject(page)).clips[0]?.speed).toEqual(ramp);
 });
 
-test('music commits preserve source/timeline units and validate range, duration, gain and combined fades', async ({ page, request }) => {
+test('music commits preserve source/timeline units and validate range, duration, gain and combined fades', async ({
+  page,
+  request,
+}) => {
   await inspectorTab(page, 'Audio');
-  const audio = await (await request.get('/api/audio')).json() as { assets: AudioAsset[] };
+  const audio = (await (await request.get('/api/audio')).json()) as { assets: AudioAsset[] };
   const asset = audio.assets.find((item) => item.status === 'ready');
   if (!asset) throw new Error('Expected prepared synthetic music.');
   await page.getByRole('combobox', { name: 'Music recording', exact: true }).selectOption(asset.id);
   await page.getByText('Placement & fades', { exact: true }).click();
   const out = page.getByRole('spinbutton', { name: 'Music source OUT', exact: true });
-  await out.fill('90'); await out.press('Enter');
+  await out.fill('90');
+  await out.press('Enter');
   await expect(out.locator('..').getByRole('alert')).toContainText('enable Loop music first');
   expect((await currentProject(page)).music?.sourceOut).toBe(asset.metadata.frameCount);
   await out.press('Escape');
@@ -286,18 +356,31 @@ test('music commits preserve source/timeline units and validate range, duration,
   await gain.press('Tab');
   await commitNumber(page, 'Music fade in', '10');
   await commitNumber(page, 'Music fade out', '15');
-  expect((await currentProject(page)).music).toMatchObject({ sourceIn: 15, sourceOut: 90, start: 10, duration: 140, gainDb: -6, fadeIn: 10, fadeOut: 15, loop: true });
+  expect((await currentProject(page)).music).toMatchObject({
+    sourceIn: 15,
+    sourceOut: 90,
+    start: 10,
+    duration: 140,
+    gainDb: -6,
+    fadeIn: 10,
+    fadeOut: 15,
+    loop: true,
+  });
   const duration = page.getByRole('spinbutton', { name: 'Music duration', exact: true });
-  await duration.fill('20'); await duration.press('Enter');
+  await duration.fill('20');
+  await duration.press('Enter');
   await expect(duration.locator('..').getByRole('alert')).toContainText('Enter 25 or greater');
   await duration.press('Escape');
   const fade = page.getByRole('spinbutton', { name: 'Music fade in', exact: true });
-  await fade.fill('126'); await fade.press('Enter');
+  await fade.fill('126');
+  await fade.press('Enter');
   await expect(fade.locator('..').getByRole('alert')).toContainText('Enter 125 or less');
   expect((await currentProject(page)).music?.fadeIn).toBe(10);
 });
 
-test('per-track fade/transition timing and positioned track key numbers use the same explicit commits', async ({ page }) => {
+test('per-track fade/transition timing and positioned track key numbers use the same explicit commits', async ({
+  page,
+}) => {
   await commitNumber(page, 'Opening fade', '12');
   await commitNumber(page, 'Closing fade', '9');
   const transition = page.getByRole('spinbutton', { name: 'Transition duration', exact: true });
@@ -305,20 +388,25 @@ test('per-track fade/transition timing and positioned track key numbers use the 
   expect((await currentProject(page)).layers[0]!.transitions[0]?.duration).toBe(18);
   await transition.press('Enter');
   const opening = page.getByRole('spinbutton', { name: 'Opening fade', exact: true });
-  await opening.fill('80'); await opening.press('Enter');
+  await opening.fill('80');
+  await opening.press('Enter');
   await expect(opening.locator('..').getByRole('alert')).toContainText('Shorten the opening fade');
   expect((await currentProject(page)).layers[0]!.openingFade).toBe(12);
   await opening.press('Escape');
 
   let document = await currentProject(page);
   document = applyCommand(document, {
-    type: 'layer-add', layer: {
-      ...createLayer('upper', 'Video 2', false), keyframes: [
-        sharedPoint(5, { clipOpacity: 0.5 }, 'hold'), sharedPoint(10, { layerOpacity: 0.8 }, 'smooth'),
-      ]
-    }
+    type: 'layer-add',
+    layer: {
+      ...createLayer('upper', 'Video 2', false),
+      keyframes: [sharedPoint(5, { clipOpacity: 0.5 }, 'hold'), sharedPoint(10, { layerOpacity: 0.8 }, 'smooth')],
+    },
   });
-  document = applyCommand(document, { type: 'insert', clip: { ...createClip('overlay', document.clips[1]!.mediaId, 0, 30), layerId: 'upper', start: 5 }, index: 2 });
+  document = applyCommand(document, {
+    type: 'insert',
+    clip: { ...createClip('overlay', document.clips[1]!.mediaId, 0, 30), layerId: 'upper', start: 5 },
+    index: 2,
+  });
   await setProject(page, document);
   await page.locator('[data-clip-id="overlay"] .timeline-clip-body').click();
   await inspectorTab(page, 'Clip');
@@ -332,10 +420,15 @@ test('per-track fade/transition timing and positioned track key numbers use the 
   const edited = await currentProject(page);
   expect(edited.clips[2]).toMatchObject({ start: 80, sourceIn: 0, sourceOut: 30, opacity: 1 });
   expect(edited.clips[2]).not.toHaveProperty('animation');
-  expect(edited.layers[1]?.keyframes).toEqual([sharedPoint(5, { clipOpacity: 0.5 }, 'hold'), sharedPoint(25, { layerOpacity: 0.6 }, 'smooth')]);
+  expect(edited.layers[1]?.keyframes).toEqual([
+    sharedPoint(5, { clipOpacity: 0.5 }, 'hold'),
+    sharedPoint(25, { layerOpacity: 0.6 }, 'smooth'),
+  ]);
 });
 
-test('colour resets target the static base or only participating colours at the active project point', async ({ page }) => {
+test('colour resets target the static base or only participating colours at the active project point', async ({
+  page,
+}) => {
   await page.getByRole('slider', { name: 'Exposure', exact: true }).fill('0.7');
   await page.getByRole('slider', { name: 'Saturation', exact: true }).fill('1.3');
   await page.getByRole('button', { name: 'Reset Exposure', exact: true }).click();
@@ -347,11 +440,11 @@ test('colour resets target the static base or only participating colours at the 
   const base = { ...document.clips[0]!.colour };
   const other = sharedPoint(110, { exposure: 1, saturation: 1.4 }, 'smooth');
   document = applyCommand(document, {
-    type: 'layer-update', layer: {
-      ...document.layers[0]!, keyframes: [
-        sharedPoint(5, { exposure: -0.5, saturation: 0.6, clipOpacity: 0.4 }, 'hold'), other,
-      ]
-    }
+    type: 'layer-update',
+    layer: {
+      ...document.layers[0]!,
+      keyframes: [sharedPoint(5, { exposure: -0.5, saturation: 0.6, clipOpacity: 0.4 }, 'hold'), other],
+    },
   });
   await setProject(page, document);
   const keys = layerKeyframes(page, 'Video 1');
@@ -361,7 +454,9 @@ test('colour resets target the static base or only participating colours at the 
   await expect(page.getByRole('slider', { name: 'Exposure', exact: true })).toHaveValue('-0.5');
   await page.getByRole('button', { name: 'Reset Exposure', exact: true }).click();
   document = await currentProject(page);
-  expect(document.layers[0]?.keyframes[0]).toEqual(sharedPoint(5, { exposure: 0, saturation: 0.6, clipOpacity: 0.4 }, 'hold'));
+  expect(document.layers[0]?.keyframes[0]).toEqual(
+    sharedPoint(5, { exposure: 0, saturation: 0.6, clipOpacity: 0.4 }, 'hold'),
+  );
   expect(document.layers[0]?.keyframes[1]).toEqual(other);
   await commitNumber(page, 'Layer keyframe frame 5', '8');
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
@@ -380,11 +475,21 @@ test('colour resets target the static base or only participating colours at the 
   await page.getByRole('slider', { name: 'Exposure', exact: true }).fill('0.25');
   document = await currentProject(page);
   expect(document.clips[0]?.colour).toEqual(base);
-  expect(document.layers[0]?.keyframes).toEqual([sharedPoint(8, { exposure: 0.25, saturation: 1, clipOpacity: 0.4 }, 'hold'), other]);
+  expect(document.layers[0]?.keyframes).toEqual([
+    sharedPoint(8, { exposure: 0.25, saturation: 1, clipOpacity: 0.4 }, 'hold'),
+    other,
+  ]);
   await page.getByRole('button', { name: 'Reset colour', exact: true }).click();
   const reset = await currentProject(page);
   expect(reset.clips[0]?.colour).toEqual(base);
-  expect(reset.layers[0]?.keyframes).toEqual([sharedPoint(8, { exposure: NEUTRAL_COLOUR.exposure, saturation: NEUTRAL_COLOUR.saturation, clipOpacity: 0.4 }, 'hold'), other]);
+  expect(reset.layers[0]?.keyframes).toEqual([
+    sharedPoint(
+      8,
+      { exposure: NEUTRAL_COLOUR.exposure, saturation: NEUTRAL_COLOUR.saturation, clipOpacity: 0.4 },
+      'hold',
+    ),
+    other,
+  ]);
   await expect(page.getByRole('slider', { name: 'Contrast', exact: true })).toHaveValue('1.2');
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   expect((await currentProject(page)).layers[0]?.keyframes).toEqual(document.layers[0]?.keyframes);

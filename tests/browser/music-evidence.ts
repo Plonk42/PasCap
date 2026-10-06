@@ -1,7 +1,18 @@
 import type { Page } from '@playwright/test';
 
-export interface MusicReceipt { generation: number; startFrame: number; contextFrame: number; samples: number }
-export interface MusicSignalFrame { frame: number; samples: number; peak: number; rightPeak: number; stereoDifference: number }
+export interface MusicReceipt {
+  generation: number;
+  startFrame: number;
+  contextFrame: number;
+  samples: number;
+}
+export interface MusicSignalFrame {
+  frame: number;
+  samples: number;
+  peak: number;
+  rightPeak: number;
+  stereoDifference: number;
+}
 export interface MusicStreamEvidence {
   starts: number;
   pauses: number;
@@ -15,21 +26,37 @@ export interface MusicStreamEvidence {
   ranges: number;
   largestRange: number;
 }
-declare global { interface Window { musicStreamEvidence: MusicStreamEvidence } }
+declare global {
+  interface Window {
+    musicStreamEvidence: MusicStreamEvidence;
+  }
+}
 
 /** Observe actual audio-thread receipts/PCM output, never the engine's inferred frame. */
 export async function installMusicEvidence(page: Page, captureSignal = false): Promise<void> {
   await page.addInitScript((captureSignal) => {
     Reflect.set(globalThis, '__name', (fn: unknown) => fn);
     const evidence: MusicStreamEvidence = {
-      starts: 0, pauses: 0, active: false, underruns: 0, context: null,
-      receipt: null, samples: [], renderedSignal: [], playback: [], ranges: 0, largestRange: 0
+      starts: 0,
+      pauses: 0,
+      active: false,
+      underruns: 0,
+      context: null,
+      receipt: null,
+      samples: [],
+      renderedSignal: [],
+      playback: [],
+      ranges: 0,
+      largestRange: 0,
     };
     window.musicStreamEvidence = evidence;
     if (captureSignal) {
       // Wrap only the synthetic test's processor. Observe its actual render
       // outputs after process(), without changing samples, clock or messages.
-      const observerUrl = URL.createObjectURL(new Blob([`
+      const observerUrl = URL.createObjectURL(
+        new Blob(
+          [
+            `
         const nativeRegister = globalThis.registerProcessor;
         globalThis.registerProcessor = (name, Processor) => {
           if (name !== 'pascap-streaming-music') return nativeRegister(name, Processor);
@@ -68,13 +95,21 @@ export async function installMusicEvidence(page: Page, captureSignal = false): P
             }
           });
         };
-      `], { type: 'text/javascript' }));
+      `,
+          ],
+          { type: 'text/javascript' },
+        ),
+      );
       const observerModules = new WeakMap<Worklet, Promise<void>>();
       const nativeAddModule = AudioWorklet.prototype.addModule;
-      AudioWorklet.prototype.addModule = async function(url, options) {
+      AudioWorklet.prototype.addModule = async function (url, options) {
         let ready = observerModules.get(this);
-        if (!ready) { ready = nativeAddModule.call(this, observerUrl); observerModules.set(this, ready); }
-        await ready; await nativeAddModule.call(this, url, options);
+        if (!ready) {
+          ready = nativeAddModule.call(this, observerUrl);
+          observerModules.set(this, ready);
+        }
+        await ready;
+        await nativeAddModule.call(this, url, options);
       };
     }
     const NativeNode = AudioWorkletNode;
@@ -88,27 +123,45 @@ export async function installMusicEvidence(page: Page, captureSignal = false): P
         let stopped = true;
         this.port.postMessage = (message, transfer) => {
           if (message.kind === 'start') {
-            generation = message.generation; stopped = false;
-            evidence.starts++; evidence.receipt = null;
+            generation = message.generation;
+            stopped = false;
+            evidence.starts++;
+            evidence.receipt = null;
             window.dispatchEvent(new Event('pascap-test-music-start'));
           }
           if (message.kind === 'stop') {
-            stopped = true; evidence.pauses++; evidence.active = false;
+            stopped = true;
+            evidence.pauses++;
+            evidence.active = false;
             window.dispatchEvent(new Event('pascap-test-music-stop'));
           }
           Reflect.apply(post, this.port, [message, transfer]);
         };
         this.port.addEventListener('message', ({ data }) => {
-          if (data.kind === 'test-pcm-signal' && data.generation === generation) { evidence.renderedSignal = data.frames; return; }
+          if (data.kind === 'test-pcm-signal' && data.generation === generation) {
+            evidence.renderedSignal = data.frames;
+            return;
+          }
           if (stopped || data.generation !== generation) return;
           if (data.kind === 'started') evidence.active = true;
-          if (data.kind === 'underrun') { evidence.underruns++; evidence.active = false; }
+          if (data.kind === 'underrun') {
+            evidence.underruns++;
+            evidence.active = false;
+          }
           if (data.kind !== 'started' && data.kind !== 'rendered') return;
-          evidence.receipt = { generation: data.generation, startFrame: data.startFrame, contextFrame: data.contextFrame, samples: data.samples };
-          if (evidence.samples.length < 500) evidence.samples.push({
-            ...evidence.receipt, contextTime: context.currentTime,
-            output: (context as AudioContext).getOutputTimestamp(), now: performance.now()
-          });
+          evidence.receipt = {
+            generation: data.generation,
+            startFrame: data.startFrame,
+            contextFrame: data.contextFrame,
+            samples: data.samples,
+          };
+          if (evidence.samples.length < 500)
+            evidence.samples.push({
+              ...evidence.receipt,
+              contextTime: context.currentTime,
+              output: (context as AudioContext).getOutputTimestamp(),
+              now: performance.now(),
+            });
         });
       }
     };
@@ -119,7 +172,10 @@ export async function installMusicEvidence(page: Page, captureSignal = false): P
       if (range && url.includes('/api/audio/')) {
         const match = /^bytes=(\d+)-(\d+)$/.exec(range);
         evidence.ranges++;
-        evidence.largestRange = Math.max(evidence.largestRange, match ? Number(match[2]) - Number(match[1]) + 1 : Infinity);
+        evidence.largestRange = Math.max(
+          evidence.largestRange,
+          match ? Number(match[2]) - Number(match[1]) + 1 : Infinity,
+        );
       }
       return nativeFetch(...args);
     };
@@ -138,11 +194,18 @@ export async function observeMusicPlayback(page: Page): Promise<void> {
       previous = identity;
       if (evidence.playback.length >= 500) return;
       evidence.playback.push({
-        event, now: performance.now(), state, receipt: evidence.receipt,
+        event,
+        now: performance.now(),
+        state,
+        receipt: evidence.receipt,
         output: evidence.context?.getOutputTimestamp(),
-        videos: Array.from(document.querySelectorAll<HTMLVideoElement>('video[data-pascap-decoder]'), video => ({
-          slot: video.dataset['pascapDecoder'], currentTime: video.currentTime,
-          rate: video.playbackRate, paused: video.paused, seeking: video.seeking, ready: video.readyState,
+        videos: Array.from(document.querySelectorAll<HTMLVideoElement>('video[data-pascap-decoder]'), (video) => ({
+          slot: video.dataset['pascapDecoder'],
+          currentTime: video.currentTime,
+          rate: video.playbackRate,
+          paused: video.paused,
+          seeking: video.seeking,
+          ready: video.readyState,
         })),
       });
     };

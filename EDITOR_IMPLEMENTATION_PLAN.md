@@ -63,19 +63,19 @@ The primary workflow is:
 
 ## 3. Technology stack
 
-| Responsibility | Technology |
-| --- | --- |
-| Frontend | React + TypeScript |
-| Frontend tooling | Vite |
-| Backend | Node.js LTS + TypeScript |
-| API | Fastify, bound to loopback |
-| Shared validation | Zod |
-| Preview compositor | WebGL2 |
-| Preview decoding | Bounded reusable HTML video pool: two for one layer, up to nine for eight layers; one separate source-review decoder |
-| Audio playback | Web Audio |
-| Media preparation/export | Native FFmpeg and ffprobe |
-| Unit tests | Vitest |
-| Browser tests | Playwright |
+| Responsibility           | Technology                                                                                                           |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------- |
+| Frontend                 | React + TypeScript                                                                                                   |
+| Frontend tooling         | Vite                                                                                                                 |
+| Backend                  | Node.js LTS + TypeScript                                                                                             |
+| API                      | Fastify, bound to loopback                                                                                           |
+| Shared validation        | Zod                                                                                                                  |
+| Preview compositor       | WebGL2                                                                                                               |
+| Preview decoding         | Bounded reusable HTML video pool: two for one layer, up to nine for eight layers; one separate source-review decoder |
+| Audio playback           | Web Audio                                                                                                            |
+| Media preparation/export | Native FFmpeg and ffprobe                                                                                            |
+| Unit tests               | Vitest                                                                                                               |
+| Browser tests            | Playwright                                                                                                           |
 
 Use strict TypeScript. Pin dependencies through a lockfile.
 
@@ -90,6 +90,7 @@ Use four independently testable layers:
 ### A. Shared project and timeline model
 
 Responsible for:
+
 - Project schema and validation.
 - Frame-based timing.
 - Transition constraints.
@@ -102,6 +103,7 @@ It must not depend on React, browser APIs or FFmpeg.
 ### B. Browser editor
 
 Responsible for:
+
 - Media library.
 - Timeline interactions.
 - Selected-clip inspector.
@@ -113,6 +115,7 @@ Use HTML/CSS and pointer events for the initial timeline. Canvas is not required
 ### C. Preview engine
 
 Responsible for:
+
 - Mapping timeline positions to source positions.
 - Proxy loading, seeking and playback.
 - GPU colour processing.
@@ -123,6 +126,7 @@ Responsible for:
 ### D. Local media service
 
 Responsible for:
+
 - Registering source files.
 - Probing media.
 - Generating thumbnails and proxies.
@@ -230,6 +234,7 @@ Do not add legacy-data migrations or fallback fields unless explicitly requested
 ### Metadata
 
 Record:
+
 - File identity and fingerprint.
 - Duration and frame rate.
 - Dimensions and codec.
@@ -260,19 +265,20 @@ Start with one heavy media job at a time and bounded FFmpeg threads.
 
 Required controls:
 
-| Control | Initial range | Neutral |
-| --- | ---: | ---: |
-| Exposure | −3 to +3 stops | 0 |
-| Brightness | −0.5 to +0.5 | 0 |
-| Contrast | 0 to 2 | 1 |
-| Hue | −180° to +180° | 0 |
-| Saturation | 0 to 2 | 1 |
-| Highlights | −1 to +1 | 0 |
-| Shadows | −1 to +1 | 0 |
+| Control    |  Initial range | Neutral |
+| ---------- | -------------: | ------: |
+| Exposure   | −3 to +3 stops |       0 |
+| Brightness |   −0.5 to +0.5 |       0 |
+| Contrast   |         0 to 2 |       1 |
+| Hue        | −180° to +180° |       0 |
+| Saturation |         0 to 2 |       1 |
+| Highlights |       −1 to +1 |       0 |
+| Shadows    |       −1 to +1 |       0 |
 
 **Define the mathematics before implementing sliders.** Do not independently approximate FFmpeg filters in a shader and call them equivalent.
 
 Create a written colour specification covering:
+
 - Input/output colour space and range.
 - Transfer-function handling.
 - Processing order.
@@ -284,6 +290,7 @@ Create a written colour specification covering:
 - Gamut clipping.
 
 Use the same specification for:
+
 1. A CPU reference implementation used in tests.
 2. The WebGL shader.
 3. The native export implementation.
@@ -302,6 +309,7 @@ slider was subsequently removed in favour of ruler/playhead scrubbing. Intended-
 GPU and long-flight performance acceptance remain deferred by the user.
 
 Create a small page containing:
+
 - Two prepared proxy clips.
 - A WebGL preview canvas.
 - Play/pause and a timeline-position slider.
@@ -321,6 +329,7 @@ The prototype must:
 ### Measurements
 
 Measure on the target machine:
+
 - Preview frame rate.
 - Slider-to-visible-change latency.
 - Seek latency.
@@ -329,6 +338,7 @@ Measure on the target machine:
 - Memory use over repeated playback.
 
 Initial engineering targets:
+
 - Approximately 29.97 fps at 720p.
 - Colour response within 100 ms.
 - Median warm seek below 250 ms.
@@ -339,6 +349,7 @@ These are **acceptance targets, not promises**. Record hardware, browser, actual
 ### Decision gate
 
 If HTML video elements cannot meet the required seeking/synchronisation behaviour:
+
 - Keep the timeline model and GPU compositor.
 - Evaluate WebCodecs plus a maintained MP4 demuxer.
 - Do not conceal poor seeking behind a polished interface.
@@ -348,6 +359,7 @@ If live-preview/export colour agreement cannot be established, resolve that befo
 ## 9. Preview engine implementation
 
 Expose a small engine API for:
+
 - Loading a project.
 - Seeking to a project frame.
 - Playing/pausing.
@@ -358,6 +370,7 @@ Expose a small engine API for:
 - Disposal.
 
 Implementation requirements:
+
 - Use `requestVideoFrameCallback` where appropriate to observe decoded frames.
 - Use a render loop independent of React.
 - Reuse video decoders rather than creating one per timeline clip.
@@ -382,6 +395,7 @@ Use an original three-area layout:
 - **Bottom:** video timeline and music track.
 
 Required interactions:
+
 - Drag media into the timeline.
 - Hover-scrub prepared recordings without moving the project playhead; set source IN/OUT with handles, numbers or I/O marks.
 - Add/select/hide/reorder overlay layers, set opacity and move excerpts between rows.
@@ -401,6 +415,7 @@ Required interactions:
 Implement keyboard shortcuts for play/pause, split, delete and undo/redo. Ignore editing shortcuts while typing in an input.
 
 During a drag:
+
 - Keep changes transient.
 - Update visible geometry and relevant preview.
 - Commit one undoable command on pointer release.
@@ -445,6 +460,7 @@ Exports must use an immutable snapshot of the project, so later editing does not
 Compile the shared timeline model into native FFmpeg processing.
 
 Requirements:
+
 - Read original footage, not proxies.
 - Apply per-clip colour corrections.
 - Include layer order/visibility/opacity and clip opacity/colour/speed animation, sampled from the same shared model as preview.
@@ -464,6 +480,7 @@ Requirements:
 Avoid a single unbounded filter graph containing dozens of simultaneously decoded originals. Use bounded segment/transition processing or another measured strategy.
 
 Verify:
+
 - Dimensions, frame rate and codec.
 - Duration/frame count against the timeline model.
 - Expected audio presence and duration.
@@ -498,6 +515,7 @@ Verify:
 ### Media integration tests
 
 Use synthetic patterns and short real clips to test:
+
 - Neutral colour identity.
 - Each colour control separately and in combination.
 - Black opening/closing fades.
@@ -526,6 +544,7 @@ Deliver in this order:
 8. **Hardening:** browser tests, performance, recovery, documentation.
 
 At each milestone:
+
 - Run relevant tests.
 - State what works, what remains and known limitations.
 - Do not label unfinished features as complete.

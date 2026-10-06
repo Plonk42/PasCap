@@ -31,16 +31,30 @@ function captureRetiming(clip: VideoClip, supplied: Retiming | undefined): Retim
   // Only omission selects the static map; an explicitly invalid/null map must fail.
   if (supplied === undefined) map = compileRetiming(clip);
   if (!map || !Number.isSafeInteger(map.duration) || map.duration < 1 || map.duration > 2_147_483_647) {
-    throw new ServiceError('The shared retiming map duration must be a positive supported integer project-frame count.', 422);
+    throw new ServiceError(
+      'The shared retiming map duration must be a positive supported integer project-frame count.',
+      422,
+    );
   }
   if (typeof map.sourceAt !== 'function' || typeof map.outputAt !== 'function' || typeof map.rateAt !== 'function') {
     throw new ServiceError('The shared retiming map must expose sourceAt, outputAt and rateAt queries.', 422);
   }
   // Capture the duration and query functions, never materialize a duration-sized map.
-  return Object.freeze({ duration: map.duration, sourceAt: map.sourceAt.bind(map), outputAt: map.outputAt.bind(map), rateAt: map.rateAt.bind(map) });
+  return Object.freeze({
+    duration: map.duration,
+    sourceAt: map.sourceAt.bind(map),
+    outputAt: map.outputAt.bind(map),
+    rateAt: map.rateAt.bind(map),
+  });
 }
 
-async function pumpMappedFrames(options: RawRetimingOptions, retiming: Retiming, reader: RawFrameReader, encoder: Writable, check: () => void): Promise<{ decoded: number; written: number }> {
+async function pumpMappedFrames(
+  options: RawRetimingOptions,
+  retiming: Retiming,
+  reader: RawFrameReader,
+  encoder: Writable,
+  check: () => void,
+): Promise<{ decoded: number; written: number }> {
   const frame = options.frameBuffer ?? Buffer.allocUnsafe(options.frameBytes);
   let decoded = 0;
   let written = 0;
@@ -49,7 +63,12 @@ async function pumpMappedFrames(options: RawRetimingOptions, retiming: Retiming,
   for (let output = 0; output < retiming.duration; output++) {
     check();
     const source = retiming.sourceAt(output);
-    if (!Number.isSafeInteger(source) || source < options.clip.sourceIn || source >= options.clip.sourceOut || source < previousSource) {
+    if (
+      !Number.isSafeInteger(source) ||
+      source < options.clip.sourceIn ||
+      source >= options.clip.sourceOut ||
+      source < previousSource
+    ) {
       throw new ServiceError('The shared retiming map is not a monotonic, in-range discrete source-frame map.', 422);
     }
     previousSource = source;
@@ -60,7 +79,8 @@ async function pumpMappedFrames(options: RawRetimingOptions, retiming: Retiming,
     }
     await writeRawFrame(encoder, frame); // NOSONAR -- serial writes enforce backpressure before reusing the frame buffer.
     written++;
-    if (written === 1 || written % progressStep === 0 || written === retiming.duration) options.onProgress?.(written, retiming.duration);
+    if (written === 1 || written % progressStep === 0 || written === retiming.duration)
+      options.onProgress?.(written, retiming.duration);
   }
   encoder.end();
   // Consume discarded frames at the exclusive OUT too; never hide decode errors.
@@ -69,7 +89,8 @@ async function pumpMappedFrames(options: RawRetimingOptions, retiming: Retiming,
     await reader.requireFrame(frame); // NOSONAR -- discard incrementally, never buffer the remaining excerpt.
     decoded++;
   }
-  if (await reader.readInto(frame)) throw new ServiceError('Original decoder emitted frames outside the selected source range.', 422);
+  if (await reader.readInto(frame))
+    throw new ServiceError('Original decoder emitted frames outside the selected source range.', 422);
   return { decoded, written };
 }
 
@@ -81,8 +102,10 @@ async function pumpMappedFrames(options: RawRetimingOptions, retiming: Retiming,
 export async function retimeRawVideo(request: RawRetimingOptions): Promise<RawRetimingReport> {
   const options = { ...request, clip: clipSchema.parse(request.clip) };
   if (options.signal.aborted) throw new ServiceError('Job cancelled.', 499);
-  if (!Number.isSafeInteger(options.frameBytes) || options.frameBytes < 1) throw new Error('Raw frame size must be a positive safe integer.');
-  if (options.frameBuffer && options.frameBuffer.length !== options.frameBytes) throw new Error('The reusable raw frame buffer has the wrong size.');
+  if (!Number.isSafeInteger(options.frameBytes) || options.frameBytes < 1)
+    throw new Error('Raw frame size must be a positive safe integer.');
+  if (options.frameBuffer && options.frameBuffer.length !== options.frameBytes)
+    throw new Error('The reusable raw frame buffer has the wrong size.');
   Object.freeze(options.clip.speed);
   Object.freeze(options.clip);
   if (options.signal.aborted) throw new ServiceError('Job cancelled.', 499);
@@ -94,7 +117,10 @@ export async function retimeRawVideo(request: RawRetimingOptions): Promise<RawRe
     counts = await pumpMappedFrames(options, retiming, reader, encoder, pass.check);
   });
   return {
-    decodedFrames: counts.decoded, outputFrames: counts.written, frameBytes: options.frameBytes,
-    rawFrameBuffers: 1, largestReadChunkBytes: report.largestReadChunkBytes
+    decodedFrames: counts.decoded,
+    outputFrames: counts.written,
+    frameBytes: options.frameBytes,
+    rawFrameBuffers: 1,
+    largestReadChunkBytes: report.largestReadChunkBytes,
   };
 }

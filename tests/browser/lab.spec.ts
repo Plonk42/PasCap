@@ -3,22 +3,45 @@ import { NEUTRAL_COLOUR } from '../../src/shared/colour.js';
 import { applyCommand } from '../../src/shared/commands.js';
 import { createClip, createProject, projectSchema } from '../../src/shared/model.js';
 import { calculateLayout } from '../../src/shared/timeline.js';
-import { clipAction, closeOptions, expandedInspectorPreferences, freshExportLinks, inspectorTab, openOptions, submitExport } from './editor-helpers.js';
+import {
+  clipAction,
+  closeOptions,
+  expandedInspectorPreferences,
+  freshExportLinks,
+  inspectorTab,
+  openOptions,
+  submitExport,
+} from './editor-helpers.js';
 
 test.beforeEach(async ({ page, request }) => {
   await expandedInspectorPreferences(page);
   // Reset only the dedicated synthetic project, never the user's saved edit.
-  const registered = await (await request.get('/api/media')).json() as { assets: { id: string; name: string }[] };
-  const audio = await (await request.get('/api/audio')).json() as { assets: { id: string }[] };
-  const saved = projectSchema.parse((await (await request.get('/api/projects/preview-lab')).json() as { document: unknown }).document);
+  const registered = (await (await request.get('/api/media')).json()) as { assets: { id: string; name: string }[] };
+  const audio = (await (await request.get('/api/audio')).json()) as { assets: { id: string }[] };
+  const saved = projectSchema.parse(
+    ((await (await request.get('/api/projects/preview-lab')).json()) as { document: unknown }).document,
+  );
   let project = createProject('preview-lab', 'Synthetic editor · disposable');
-  project.media = { videoIds: registered.assets.map((asset) => asset.id), audioIds: audio.assets.map((asset) => asset.id) };
+  project.media = {
+    videoIds: registered.assets.map((asset) => asset.id),
+    audioIds: audio.assets.map((asset) => asset.id),
+  };
   for (const [index, name] of ['pattern-a.mp4', 'pattern-b.mp4'].entries()) {
     const asset = registered.assets.find((item) => item.name === name)!;
-    project = applyCommand(project, { type: 'insert', clip: createClip(index === 0 ? 'clip-a' : 'clip-b', asset.id, 15, 105), index });
+    project = applyCommand(project, {
+      type: 'insert',
+      clip: createClip(index === 0 ? 'clip-a' : 'clip-b', asset.id, 15, 105),
+      index,
+    });
   }
-  project = applyCommand(project, { type: 'transition', transition: { leftId: 'clip-a', rightId: 'clip-b', type: 'cross-dissolve', duration: 18 } });
-  const response = await request.put('/api/projects/preview-lab', { headers: { 'X-PasCap-Client': 'preview-lab' }, data: { document: { ...project, revision: saved.revision }, expectedRevision: saved.revision } });
+  project = applyCommand(project, {
+    type: 'transition',
+    transition: { leftId: 'clip-a', rightId: 'clip-b', type: 'cross-dissolve', duration: 18 },
+  });
+  const response = await request.put('/api/projects/preview-lab', {
+    headers: { 'X-PasCap-Client': 'preview-lab' },
+    data: { document: { ...project, revision: saved.revision }, expectedRevision: saved.revision },
+  });
   expect(response.ok()).toBe(true);
   await page.goto('/?project=preview-lab');
   await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
@@ -44,7 +67,9 @@ test('compact library handles 12 recordings and the editor fits the desktop view
   await expect(page.locator('.media-items')).toHaveClass('media-items grid');
   await page.getByRole('button', { name: 'List view', exact: true }).click();
   await closeOptions(page);
-  expect(await page.locator('.media-items').evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(true);
+  expect(await page.locator('.media-items').evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(
+    true,
+  );
 });
 
 test('removes fixed A/B slots, promotional text and default technical clutter', async ({ page }) => {
@@ -69,19 +94,29 @@ test('seeks by clicking and dragging the timeline ruler without a duplicate posi
   const y = box.y + box.height / 2;
 
   await page.mouse.click(xAt(30), y);
-  await expect.poll(() => page.evaluate(() => {
-    const state = window.pascapLab!.engine.diagnostics();
-    return { status: state.status, frame: state.frame };
-  })).toEqual({ status: 'paused', frame: 30 });
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const state = window.pascapLab!.engine.diagnostics();
+        return { status: state.status, frame: state.frame };
+      }),
+    )
+    .toEqual({ status: 'paused', frame: 30 });
   await page.mouse.move(xAt(30), y);
   await page.mouse.down();
   await page.mouse.move(xAt(90), y, { steps: 6 });
   await page.mouse.up();
-  await expect.poll(() => page.evaluate(() => {
-    const state = window.pascapLab!.engine.diagnostics();
-    return { status: state.status, frame: state.frame };
-  })).toEqual({ status: 'paused', frame: 90 });
-  const playheadLeft = Number.parseFloat(await page.locator('.timeline-playhead').evaluate((element) => (element as HTMLElement).style.left));
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const state = window.pascapLab!.engine.diagnostics();
+        return { status: state.status, frame: state.frame };
+      }),
+    )
+    .toEqual({ status: 'paused', frame: 90 });
+  const playheadLeft = Number.parseFloat(
+    await page.locator('.timeline-playhead').evaluate((element) => (element as HTMLElement).style.left),
+  );
   expect(playheadLeft).toBeCloseTo(leading + 90 * scale);
   expect(await page.locator('.timeline-scroll').evaluate((element) => element.scrollLeft)).toBe(scrollLeft);
 
@@ -91,27 +126,45 @@ test('seeks by clicking and dragging the timeline ruler without a duplicate posi
 });
 
 test('GPU matches CPU for neutral, each control and a combined grade', async ({ page }) => {
-  const settings = [NEUTRAL_COLOUR, ...[
-    { exposure: 1 }, { brightness: 0.1 }, { contrast: 1.3 }, { hue: 45 },
-    { saturation: 0.4 }, { highlights: -0.5 }, { shadows: 0.3 },
-  ].map((change) => ({ ...NEUTRAL_COLOUR, ...change })),
-    { exposure: 0.6, brightness: 0.02, contrast: 1.1, hue: 12, saturation: 1.2, highlights: -0.2, shadows: 0.15 }];
-  const results = await page.evaluate((grades) => grades.map((grade) => window.pascapLab!.verifyColour(grade)), settings);
-  for (const result of results) { expect(result.meanAbsoluteError8Bit).toBeLessThan(0.35); expect(result.maxError8Bit).toBeLessThan(0.7); }
+  const settings = [
+    NEUTRAL_COLOUR,
+    ...[
+      { exposure: 1 },
+      { brightness: 0.1 },
+      { contrast: 1.3 },
+      { hue: 45 },
+      { saturation: 0.4 },
+      { highlights: -0.5 },
+      { shadows: 0.3 },
+    ].map((change) => ({ ...NEUTRAL_COLOUR, ...change })),
+    { exposure: 0.6, brightness: 0.02, contrast: 1.1, hue: 12, saturation: 1.2, highlights: -0.2, shadows: 0.15 },
+  ];
+  const results = await page.evaluate(
+    (grades) => grades.map((grade) => window.pascapLab!.verifyColour(grade)),
+    settings,
+  );
+  for (const result of results) {
+    expect(result.meanAbsoluteError8Bit).toBeLessThan(0.35);
+    expect(result.maxError8Bit).toBeLessThan(0.7);
+  }
 });
 
 test('paused grading changes pixels immediately and saves/reloads the selected clip', async ({ page }) => {
   await page.evaluate(() => window.pascapLab!.engine.seek(30));
-  const before = await page.evaluate(() => Array.from(window.pascapLab!.engine.capturePixels().slice(100_000, 100_004)));
+  const before = await page.evaluate(() =>
+    Array.from(window.pascapLab!.engine.capturePixels().slice(100_000, 100_004)),
+  );
   await page.getByRole('slider', { name: 'Exposure', exact: true }).fill('0.7');
   await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().colourLatencyMs !== null);
   const after = await page.evaluate(() => Array.from(window.pascapLab!.engine.capturePixels().slice(100_000, 100_004)));
   expect(after).not.toEqual(before);
   await page.evaluate(() => window.pascapLab!.flush());
   await expect(page.getByRole('status', { name: 'Saved on this device' })).toContainText('Saved locally');
-  await page.reload(); await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
+  await page.reload();
+  await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
   await expect(page.getByRole('slider', { name: 'Exposure', exact: true })).toHaveValue('0.7');
-  await page.getByRole('button', { name: 'Reset colour' }).click(); await page.evaluate(() => window.pascapLab!.flush());
+  await page.getByRole('button', { name: 'Reset colour' }).click();
+  await page.evaluate(() => window.pascapLab!.flush());
 });
 
 test('seeks before, inside and after every transition and cancels obsolete scrubs', async ({ page }) => {
@@ -121,24 +174,34 @@ test('seeks before, inside and after every transition and cancels obsolete scrub
     await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
     const positions = type === 'cross-dissolve' ? [60, 75, 100] : [60, 89, 90, 110];
     for (const frame of positions) {
-      const result = await page.evaluate(async (position) => { const engine = window.pascapLab!.engine; await engine.seek(position); return engine.diagnostics(); }, frame);
-      expect(result.frame).toBe(frame); expect(result.status).toBe('paused');
+      const result = await page.evaluate(async (position) => {
+        const engine = window.pascapLab!.engine;
+        await engine.seek(position);
+        return engine.diagnostics();
+      }, frame);
+      expect(result.frame).toBe(frame);
+      expect(result.status).toBe('paused');
     }
   }
-  await page.evaluate(async () => { const engine = window.pascapLab!.engine; await Promise.all([engine.seek(1), engine.seek(60), engine.seek(120)]); });
+  await page.evaluate(async () => {
+    const engine = window.pascapLab!.engine;
+    await Promise.all([engine.seek(1), engine.seek(60), engine.seek(120)]);
+  });
   expect(await page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(120);
 });
 
 test('playback and colour updates run outside React, shortcuts ignore text inputs', async ({ page }) => {
   await page.evaluate(() => window.pascapLab!.engine.seek(10));
-  await page.getByRole('textbox', { name: 'Search media' }).focus(); await page.keyboard.press('Space');
+  await page.getByRole('textbox', { name: 'Search media' }).focus();
+  await page.keyboard.press('Space');
   expect(await page.evaluate(() => window.pascapLab!.engine.diagnostics().playing)).toBe(false);
   await page.getByRole('button', { name: 'Play preview' }).click();
   await page.waitForFunction(() => (window.pascapLab?.engine.diagnostics().frame ?? 0) > 20);
   await page.getByRole('slider', { name: 'Saturation', exact: true }).fill('0.2');
   await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().colourLatencyMs !== null);
   await page.getByRole('button', { name: 'Pause preview' }).click();
-  await page.getByRole('button', { name: 'Reset colour' }).click(); await page.evaluate(() => window.pascapLab!.flush());
+  await page.getByRole('button', { name: 'Reset colour' }).click();
+  await page.evaluate(() => window.pascapLab!.flush());
 });
 
 test('disposal removes both decoder elements and stops engine playback', async ({ page }) => {
@@ -160,7 +223,7 @@ test('rejects a trim beyond the registered recording without persisting it', asy
 
 async function dragTrim(page: Page, clipId: string, edge: 'in' | 'out', delta: number): Promise<void> {
   const snap = page.getByRole('button', { name: 'Toggle snapping' });
-  if (await snap.getAttribute('aria-pressed') === 'true') await snap.click();
+  if ((await snap.getAttribute('aria-pressed')) === 'true') await snap.click();
   const handle = page.locator(`[data-clip-id="${clipId}"] [data-trim-handle="${edge}"]`);
   await handle.scrollIntoViewIfNeeded();
   const box = (await handle.boundingBox())!;
@@ -190,7 +253,8 @@ test('drag handles trim non-destructively, restore both ends, ripple and undo on
   expect(project.clips[0]).toMatchObject({ sourceIn: 0, sourceOut: 120 });
   expect(project.clips[1]).toMatchObject({ sourceIn: 15, sourceOut: 105 });
   await page.evaluate(() => window.pascapLab!.flush());
-  await page.reload(); await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
+  await page.reload();
+  await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
   await expect(page.getByRole('spinbutton', { name: 'Source OUT frame' })).toHaveValue('120');
   await expect(page.getByRole('spinbutton', { name: 'Source IN frame' })).toHaveValue('0');
 });
@@ -200,12 +264,16 @@ test('trim drafts do not change the committed project or autosave; Escape cancel
   const box = (await handle.boundingBox())!;
   const scale = Number(await page.locator('.timeline-surface').getAttribute('data-pixels-per-frame'));
   let saves = 0;
-  page.on('request', (request) => { if (request.method() === 'PUT' && request.url().includes('/api/projects/')) saves++; });
-  await page.mouse.move(box.x + 5, box.y + 25); await page.mouse.down();
+  page.on('request', (request) => {
+    if (request.method() === 'PUT' && request.url().includes('/api/projects/')) saves++;
+  });
+  await page.mouse.move(box.x + 5, box.y + 25);
+  await page.mouse.down();
   await page.mouse.move(box.x + 5 + 30 * scale, box.y + 25, { steps: 6 });
   await expect(page.getByRole('spinbutton', { name: 'Source IN frame' })).toHaveValue('45');
   expect(await page.evaluate(() => window.pascapLab!.project()!.clips[0]!.sourceIn)).toBe(15);
-  await page.keyboard.press('Escape'); await page.mouse.up();
+  await page.keyboard.press('Escape');
+  await page.mouse.up();
   await expect(page.getByRole('spinbutton', { name: 'Source IN frame' })).toHaveValue('15');
   expect(saves).toBe(0);
   await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
@@ -220,7 +288,7 @@ test('creates, renames and reopens distinct projects without losing unsaved edit
   const second = projectSchema.parse(await page.evaluate(() => window.pascapLab!.project()));
   expect(second.media).toEqual({ videoIds: [], audioIds: [] });
   // Deliberately seed this editing fixture's bin; a new project does not inherit global media.
-  const registered = await (await request.get('/api/media')).json() as { assets: { id: string; name: string }[] };
+  const registered = (await (await request.get('/api/media')).json()) as { assets: { id: string; name: string }[] };
   second.media.videoIds = [registered.assets.find((asset) => asset.name === 'pattern-a.mp4')!.id];
   await page.evaluate((document) => window.pascapLab!.setDocument(document), second);
   await page.evaluate(() => window.pascapLab!.flush());
@@ -235,12 +303,14 @@ test('creates, renames and reopens distinct projects without losing unsaved edit
   await page.getByRole('button', { name: 'Open Second flight', exact: true }).click();
   await expect(page.getByRole('textbox', { name: 'Project title', exact: true })).toHaveValue('Second flight');
   await expect.poll(() => page.evaluate(() => window.pascapLab!.project()!.clips.length)).toBe(1);
-  await page.reload(); await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
+  await page.reload();
+  await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
   await expect(page.getByRole('textbox', { name: 'Project title', exact: true })).toHaveValue('Second flight');
 });
 
 test('snaps ruler and directly dragged playhead to boundaries, with a toggle', async ({ page }) => {
-  const ruler = page.locator('.timeline-ruler'); const box = (await ruler.boundingBox())!;
+  const ruler = page.locator('.timeline-ruler');
+  const box = (await ruler.boundingBox())!;
   const leading = Number(await page.locator('.timeline-surface').getAttribute('data-leading'));
   const scale = Number(await page.locator('.timeline-surface').getAttribute('data-pixels-per-frame'));
   await page.mouse.click(box.x + leading + 70 * scale, box.y + 18);
@@ -250,8 +320,10 @@ test('snaps ruler and directly dragged playhead to boundaries, with a toggle', a
   await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(70);
   const handle = page.getByRole('button', { name: 'Drag playhead' });
   const head = (await handle.boundingBox())!;
-  await page.mouse.move(head.x + head.width / 2, head.y + 4); await page.mouse.down();
-  await page.mouse.move(box.x + leading + 110 * scale, head.y + 4, { steps: 6 }); await page.mouse.up();
+  await page.mouse.move(head.x + head.width / 2, head.y + 4);
+  await page.mouse.down();
+  await page.mouse.move(box.x + leading + 110 * scale, head.y + 4, { steps: 6 });
+  await page.mouse.up();
   await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(110);
 });
 
@@ -266,12 +338,16 @@ test('constant speed retimes only the selected clip and split respects mapped so
   await page.evaluate(() => window.pascapLab!.engine.seek(60));
   await clipAction(page, 'Split at playhead');
   project = projectSchema.parse(await page.evaluate(() => window.pascapLab!.project()));
-  expect(project.clips).toHaveLength(3); expect(project.clips[0]?.sourceOut).toBe(45);
-  expect(project.clips[1]?.sourceIn).toBe(45); expect(project.clips[1]?.speed).toEqual({ mode: 'constant', rate: 0.5 });
+  expect(project.clips).toHaveLength(3);
+  expect(project.clips[0]?.sourceOut).toBe(45);
+  expect(project.clips[1]?.sourceIn).toBe(45);
+  expect(project.clips[1]?.speed).toEqual({ mode: 'constant', rate: 0.5 });
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   await page.getByRole('spinbutton', { name: 'Clip speed rate' }).fill('2');
   await page.getByRole('spinbutton', { name: 'Clip speed rate' }).press('Enter');
-  expect(calculateLayout(projectSchema.parse(await page.evaluate(() => window.pascapLab!.project()))).duration).toBe(117);
+  expect(calculateLayout(projectSchema.parse(await page.evaluate(() => window.pascapLab!.project()))).duration).toBe(
+    117,
+  );
 });
 
 test('each ramp curve saves and restores along with independent colour', async ({ page }) => {
@@ -279,12 +355,18 @@ test('each ramp curve saves and restores along with independent colour', async (
   for (const curve of ['linear', 'ease-in', 'ease-out', 'smooth']) {
     await page.getByRole('combobox', { name: 'Ramp curve' }).selectOption(curve);
     await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
-    const state = await page.evaluate(async () => { const engine = window.pascapLab!.engine; await engine.seek(30); engine.capturePixels(); return engine.diagnostics(); });
+    const state = await page.evaluate(async () => {
+      const engine = window.pascapLab!.engine;
+      await engine.seek(30);
+      engine.capturePixels();
+      return engine.diagnostics();
+    });
     expect(state.status, state.message).toBe('paused');
     expect(await page.evaluate(() => window.pascapLab!.project()!.clips[0]!.speed.mode)).toBe('ramp');
   }
   await page.getByRole('slider', { name: 'Exposure', exact: true }).fill('0.6');
-  await page.evaluate(() => window.pascapLab!.flush()); await page.reload();
+  await page.evaluate(() => window.pascapLab!.flush());
+  await page.reload();
   await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
   await expect(page.getByRole('combobox', { name: 'Ramp curve' })).toHaveValue('smooth');
   await expect(page.getByRole('slider', { name: 'Exposure', exact: true })).toHaveValue('0.6');
@@ -293,7 +375,7 @@ test('each ramp curve saves and restores along with independent colour', async (
 
 test('music waveform, placement, looping, gain, fades and audio-clock preview work', async ({ page, request }) => {
   await inspectorTab(page, 'Audio');
-  const audio = await (await request.get('/api/audio')).json() as { assets: { id: string }[] };
+  const audio = (await (await request.get('/api/audio')).json()) as { assets: { id: string }[] };
   await page.getByRole('combobox', { name: 'Music recording' }).selectOption(audio.assets[0]!.id);
   await page.getByText('Placement & fades', { exact: true }).click();
   await page.getByRole('spinbutton', { name: 'Music timeline start' }).fill('10');
@@ -311,12 +393,19 @@ test('music waveform, placement, looping, gain, fades and audio-clock preview wo
   await page.getByRole('spinbutton', { name: 'Music fade out', exact: true }).press('Enter');
   await expect(page.getByRole('img', { name: 'Music waveform' })).toBeVisible();
   await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
-  await page.evaluate(async () => { await window.pascapLab!.engine.seek(50); await window.pascapLab!.engine.play(); });
-  await page.waitForFunction(() => (window.pascapLab?.engine.diagnostics().frame ?? 0) > 105, undefined, { timeout: 12_000 });
+  await page.evaluate(async () => {
+    await window.pascapLab!.engine.seek(50);
+    await window.pascapLab!.engine.play();
+  });
+  await page.waitForFunction(() => (window.pascapLab?.engine.diagnostics().frame ?? 0) > 105, undefined, {
+    timeout: 12_000,
+  });
   await page.getByRole('button', { name: 'Pause preview' }).click();
   const state = await page.evaluate(() => window.pascapLab!.engine.diagnostics());
-  expect(state.audioClock).toBe(true); expect(state.status, state.message).not.toBe('error');
-  await page.evaluate(() => window.pascapLab!.flush()); await page.reload();
+  expect(state.audioClock).toBe(true);
+  expect(state.status, state.message).not.toBe('error');
+  await page.evaluate(() => window.pascapLab!.flush());
+  await page.reload();
   await inspectorTab(page, 'Audio');
   await expect(page.getByRole('spinbutton', { name: 'Music gain' })).toHaveValue('-6');
   await expect(page.getByRole('checkbox', { name: 'Loop music' })).toBeChecked();
@@ -324,45 +413,95 @@ test('music waveform, placement, looping, gain, fades and audio-clock preview wo
 
 test('music drag placement is one undoable edit and Escape discards its draft', async ({ page, request }) => {
   await inspectorTab(page, 'Audio');
-  const audio = await (await request.get('/api/audio')).json() as { assets: { id: string }[] };
+  const audio = (await (await request.get('/api/audio')).json()) as { assets: { id: string }[] };
   await page.getByRole('combobox', { name: 'Music recording' }).selectOption(audio.assets[0]!.id);
   await page.getByRole('button', { name: 'Toggle snapping' }).click();
-  const body = page.getByRole('button', { name: 'Move music track' }); const box = (await body.boundingBox())!;
+  const body = page.getByRole('button', { name: 'Move music track' });
+  const box = (await body.boundingBox())!;
   const scale = Number(await page.locator('.timeline-surface').getAttribute('data-pixels-per-frame'));
-  await page.mouse.move(box.x + 25, box.y + 25); await page.mouse.down();
-  await page.mouse.move(box.x + 25 + 20 * scale, box.y + 25, { steps: 6 }); await page.mouse.up();
+  await page.mouse.move(box.x + 25, box.y + 25);
+  await page.mouse.down();
+  await page.mouse.move(box.x + 25 + 20 * scale, box.y + 25, { steps: 6 });
+  await page.mouse.up();
   expect(await page.evaluate(() => window.pascapLab!.project()!.music!.start)).toBe(20);
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   expect(await page.evaluate(() => window.pascapLab!.project()!.music!.start)).toBe(0);
   const restored = (await body.boundingBox())!;
-  await page.mouse.move(restored.x + 25, restored.y + 25); await page.mouse.down();
+  await page.mouse.move(restored.x + 25, restored.y + 25);
+  await page.mouse.down();
   await page.mouse.move(restored.x + 25 + 10 * scale, restored.y + 25, { steps: 3 });
-  await page.keyboard.press('Escape'); await page.mouse.up();
+  await page.keyboard.press('Escape');
+  await page.mouse.up();
   expect(await page.evaluate(() => window.pascapLab!.project()!.music!.start)).toBe(0);
 });
 
-test('plays both ramp directions across dissolves and music source wraps on repeated playback', async ({ page, request }) => {
+test('plays both ramp directions across dissolves and music source wraps on repeated playback', async ({
+  page,
+  request,
+}) => {
   test.setTimeout(40_000);
-  const audio = await (await request.get('/api/audio')).json() as { assets: { id: string }[] };
+  const audio = (await (await request.get('/api/audio')).json()) as { assets: { id: string }[] };
   await page.getByRole('button', { name: 'Add recording-03.mp4 to timeline' }).click();
   let project = projectSchema.parse(await page.evaluate(() => window.pascapLab!.project()));
   for (const [index, clip] of project.clips.entries()) {
     project = applyCommand(project, { type: 'trim', clipId: clip.id, sourceIn: 15, sourceOut: 75 });
-    project = applyCommand(project, { type: 'speed', clipId: clip.id, speed: { mode: 'ramp', startRate: index === 1 ? 2 : 0.5, endRate: index === 1 ? 0.5 : 2, curve: index === 0 ? 'linear' : index === 1 ? 'smooth' : 'ease-out', anchorIn: 15, anchorOut: 75 } });
+    project = applyCommand(project, {
+      type: 'speed',
+      clipId: clip.id,
+      speed: {
+        mode: 'ramp',
+        startRate: index === 1 ? 2 : 0.5,
+        endRate: index === 1 ? 0.5 : 2,
+        curve: index === 0 ? 'linear' : index === 1 ? 'smooth' : 'ease-out',
+        anchorIn: 15,
+        anchorOut: 75,
+      },
+    });
   }
-  for (const boundary of project.layers[0]!.transitions) project = applyCommand(project, { type: 'transition', transition: { leftId: boundary.leftId, rightId: boundary.rightId, type: 'cross-dissolve', duration: 12 } });
+  for (const boundary of project.layers[0]!.transitions)
+    project = applyCommand(project, {
+      type: 'transition',
+      transition: { leftId: boundary.leftId, rightId: boundary.rightId, type: 'cross-dissolve', duration: 12 },
+    });
   const duration = calculateLayout(project).duration;
-  project = applyCommand(project, { type: 'music', music: { mediaId: audio.assets[0]!.id, sourceIn: 30, sourceOut: 60, start: 10, duration: duration - 10, gainDb: -9, fadeIn: 6, fadeOut: 12, loop: true } });
+  project = applyCommand(project, {
+    type: 'music',
+    music: {
+      mediaId: audio.assets[0]!.id,
+      sourceIn: 30,
+      sourceOut: 60,
+      start: 10,
+      duration: duration - 10,
+      gainDb: -9,
+      fadeIn: 6,
+      fadeOut: 12,
+      loop: true,
+    },
+  });
   await page.evaluate((document) => window.pascapLab!.setDocument(document), project);
   await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
   for (let pass = 0; pass < 2; pass++) {
-    await page.evaluate(async () => { const engine = window.pascapLab!.engine; await engine.seek(0); await engine.play(); });
-    await page.waitForFunction(() => {
-      const state = window.pascapLab!.engine.diagnostics();
-      return state.status === 'error' || (state.status === 'paused' && !state.playing && state.frame === state.duration - 1);
-    }, undefined, { timeout: 15_000 });
+    await page.evaluate(async () => {
+      const engine = window.pascapLab!.engine;
+      await engine.seek(0);
+      await engine.play();
+    });
+    await page.waitForFunction(
+      () => {
+        const state = window.pascapLab!.engine.diagnostics();
+        return (
+          state.status === 'error' ||
+          (state.status === 'paused' && !state.playing && state.frame === state.duration - 1)
+        );
+      },
+      undefined,
+      { timeout: 15_000 },
+    );
     const state = await page.evaluate(() => window.pascapLab!.engine.diagnostics());
-    expect(state.status, state.message).toBe('paused'); expect(state.frame).toBe(duration - 1); expect(state.audioClock).toBe(true); expect(state.decoderCount).toBe(2);
+    expect(state.status, state.message).toBe('paused');
+    expect(state.frame).toBe(duration - 1);
+    expect(state.audioClock).toBe(true);
+    expect(state.decoderCount).toBe(2);
   }
 });
 
@@ -374,29 +513,56 @@ test('speed changes while playing pause and reload the mapped frame without losi
   await page.getByRole('spinbutton', { name: 'Clip speed rate' }).press('Enter');
   await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
   const project = projectSchema.parse(await page.evaluate(() => window.pascapLab!.project()));
-  expect(project.clips[0]?.speed).toEqual({ mode: 'constant', rate: 1.5 }); expect(project.clips[0]?.colour.exposure).toBe(0.4);
+  expect(project.clips[0]?.speed).toEqual({ mode: 'constant', rate: 1.5 });
+  expect(project.clips[0]?.colour.exposure).toBe(0.4);
   expect(await page.evaluate(() => window.pascapLab!.engine.diagnostics().playing)).toBe(false);
 });
 
-test('exports a multi-clip retimed/graded music edit and serves verified snapshot outputs', async ({ page, request }) => {
+test('exports a multi-clip retimed/graded music edit and serves verified snapshot outputs', async ({
+  page,
+  request,
+}) => {
   test.setTimeout(90_000);
-  const audio = await (await request.get('/api/audio')).json() as { assets: { id: string }[] };
+  const audio = (await (await request.get('/api/audio')).json()) as { assets: { id: string }[] };
   await page.getByRole('button', { name: 'Add recording-03.mp4 to timeline' }).click();
   let project = projectSchema.parse(await page.evaluate(() => window.pascapLab!.project()));
-  for (const clip of project.clips) project = applyCommand(project, { type: 'trim', clipId: clip.id, sourceIn: 15, sourceOut: 45 });
-  project = applyCommand(project, { type: 'speed', clipId: project.clips[0]!.id, speed: { mode: 'constant', rate: 0.5 } });
-  project = applyCommand(project, { type: 'music', music: { mediaId: audio.assets[0]!.id, sourceIn: 0, sourceOut: 30, start: 10, duration: 102, gainDb: -6, fadeIn: 5, fadeOut: 10, loop: true } });
+  for (const clip of project.clips)
+    project = applyCommand(project, { type: 'trim', clipId: clip.id, sourceIn: 15, sourceOut: 45 });
+  project = applyCommand(project, {
+    type: 'speed',
+    clipId: project.clips[0]!.id,
+    speed: { mode: 'constant', rate: 0.5 },
+  });
+  project = applyCommand(project, {
+    type: 'music',
+    music: {
+      mediaId: audio.assets[0]!.id,
+      sourceIn: 0,
+      sourceOut: 30,
+      start: 10,
+      duration: 102,
+      gainDb: -6,
+      fadeIn: 5,
+      fadeOut: 10,
+      loop: true,
+    },
+  });
   await page.evaluate((document) => window.pascapLab!.setDocument(document), project);
   await page.getByRole('button', { name: 'Export video', exact: true }).click();
   const accepted = await submitExport(page);
   const { outputUrl: file, receiptUrl } = await freshExportLinks(page, request, accepted, 60_000);
-  const receipt = await (await request.get(receiptUrl)).json() as { snapshot: unknown; verification: { frameCount: number; hasAudio: boolean; width: number } };
-  expect(receipt.verification.frameCount).toBe(calculateLayout(project).duration); expect(receipt.verification.width).toBe(1280); expect(receipt.verification.hasAudio).toBe(true);
+  const receipt = (await (await request.get(receiptUrl)).json()) as {
+    snapshot: unknown;
+    verification: { frameCount: number; hasAudio: boolean; width: number };
+  };
+  expect(receipt.verification.frameCount).toBe(calculateLayout(project).duration);
+  expect(receipt.verification.width).toBe(1280);
+  expect(receipt.verification.hasAudio).toBe(true);
   expect(projectSchema.parse(receipt.snapshot).clips[0]?.speed).toEqual({ mode: 'constant', rate: 0.5 });
   expect((await request.get(file, { headers: { Range: 'bytes=0-99' } })).status()).toBe(206);
   const parsed = projectSchema.parse(receipt.snapshot);
   await page.getByRole('textbox', { name: 'Project title', exact: true }).fill('Later edit does not change render');
-  const again = await (await request.get(receiptUrl)).json() as { snapshot: unknown };
+  const again = (await (await request.get(receiptUrl)).json()) as { snapshot: unknown };
   expect(projectSchema.parse(again.snapshot)).toEqual(parsed);
 });
 
@@ -406,10 +572,22 @@ test('export cancellation stops native work and publishes no incomplete output l
   await page.getByRole('radio', { name: '4K final', exact: true }).check();
   const accepted = await submitExport(page);
   const cancel = page.getByRole('button', { name: `Cancel ${accepted.label}`, exact: true });
-  await expect(cancel).toBeVisible(); await cancel.click();
-  await expect(page.locator('.activity-job').filter({ hasText: accepted.label }).first()).toHaveAttribute('data-state', 'cancelled', { timeout: 15_000 });
-  const queue = await (await request.get('/api/jobs')).json() as { jobs: { id: string; kind: string; state: string; outputUrl: string | null; receiptUrl: string | null }[] };
-  expect(queue.jobs.find((job) => job.id === accepted.id)).toMatchObject({ kind: 'export', state: 'cancelled', outputUrl: null, receiptUrl: null });
+  await expect(cancel).toBeVisible();
+  await cancel.click();
+  await expect(page.locator('.activity-job').filter({ hasText: accepted.label }).first()).toHaveAttribute(
+    'data-state',
+    'cancelled',
+    { timeout: 15_000 },
+  );
+  const queue = (await (await request.get('/api/jobs')).json()) as {
+    jobs: { id: string; kind: string; state: string; outputUrl: string | null; receiptUrl: string | null }[];
+  };
+  expect(queue.jobs.find((job) => job.id === accepted.id)).toMatchObject({
+    kind: 'export',
+    state: 'cancelled',
+    outputUrl: null,
+    receiptUrl: null,
+  });
 });
 
 test('rejects transition-overlapping drag and stops outward handles at source limits', async ({ page }) => {
@@ -427,7 +605,10 @@ test('batch adds full recordings with independent instances and one undo step', 
   await page.getByRole('button', { name: 'Add selected', exact: true }).click();
   let project = projectSchema.parse(await page.evaluate(() => window.pascapLab!.project()));
   expect(project.clips).toHaveLength(4);
-  expect(project.clips.slice(2).map((clip) => [clip.sourceIn, clip.sourceOut])).toEqual([[0, 120], [0, 120]]);
+  expect(project.clips.slice(2).map((clip) => [clip.sourceIn, clip.sourceOut])).toEqual([
+    [0, 120],
+    [0, 120],
+  ]);
   expect(new Set(project.clips.map((clip) => clip.id)).size).toBe(4);
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   project = projectSchema.parse(await page.evaluate(() => window.pascapLab!.project()));
@@ -435,7 +616,9 @@ test('batch adds full recordings with independent instances and one undo step', 
 });
 
 test('drags a source between excerpts, keeps the full recording, then reorders it', async ({ page }) => {
-  const source = page.getByRole('article').filter({ has: page.getByRole('button', { name: 'Add recording-03.mp4 to timeline', exact: true }) });
+  const source = page
+    .getByRole('article')
+    .filter({ has: page.getByRole('button', { name: 'Add recording-03.mp4 to timeline', exact: true }) });
   const target = page.locator('.timeline-surface');
   const project = projectSchema.parse(await page.evaluate(() => window.pascapLab!.project()));
   const scale = Number(await target.getAttribute('data-pixels-per-frame'));
@@ -460,9 +643,16 @@ test('seeks across five excerpts including a new recording using only two reusab
   const layout = calculateLayout(project);
   for (const placed of [...layout.clips, ...[...layout.clips].reverse()]) {
     const frame = placed.start + 35;
-    const state = await page.evaluate(async (position) => { const engine = window.pascapLab!.engine; await engine.seek(position); engine.capturePixels(); return engine.diagnostics(); }, frame);
-    expect(state.status).toBe('paused'); expect(state.frame).toBe(frame);
-    expect(state.assignedClipIds).toContain(placed.clip.id); expect(state.decoderCount).toBe(2);
+    const state = await page.evaluate(async (position) => {
+      const engine = window.pascapLab!.engine;
+      await engine.seek(position);
+      engine.capturePixels();
+      return engine.diagnostics();
+    }, frame);
+    expect(state.status).toBe('paused');
+    expect(state.frame).toBe(frame);
+    expect(state.assignedClipIds).toContain(placed.clip.id);
+    expect(state.decoderCount).toBe(2);
   }
   await expect(page.locator('video[data-pascap-decoder]')).toHaveCount(2);
 });
@@ -480,8 +670,13 @@ test('split, delete and undo work on named timeline clips', async ({ page }) => 
 test('an empty or single-clip timeline works without the old two-clip requirement', async ({ page }) => {
   await clipAction(page, 'Delete selected clip');
   await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
-  const one = await page.evaluate(async () => { await window.pascapLab!.engine.seek(20); window.pascapLab!.engine.capturePixels(); return window.pascapLab!.engine.diagnostics(); });
-  expect(one.duration).toBe(90); expect(one.decoderCount).toBe(2);
+  const one = await page.evaluate(async () => {
+    await window.pascapLab!.engine.seek(20);
+    window.pascapLab!.engine.capturePixels();
+    return window.pascapLab!.engine.diagnostics();
+  });
+  expect(one.duration).toBe(90);
+  expect(one.decoderCount).toBe(2);
   await clipAction(page, 'Delete selected clip');
   await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'empty');
   await expect(page.getByRole('button', { name: 'Play preview', exact: true })).toBeDisabled();
@@ -502,9 +697,15 @@ test('changing a later boundary and grading one duplicate leaves other excerpts 
   expect(project.layers[0]!.transitions[0]?.duration).toBe(18);
   expect(project.layers[0]!.transitions[1]).toMatchObject({ type: 'cross-dissolve', duration: 30 });
   const region = calculateLayout(project).transitions[1]!;
-  const state = await page.evaluate(async (position) => {
-    const engine = window.pascapLab!.engine; await engine.seek(position); engine.capturePixels(); return engine.diagnostics();
-  }, Math.floor((region.start + region.end) / 2));
+  const state = await page.evaluate(
+    async (position) => {
+      const engine = window.pascapLab!.engine;
+      await engine.seek(position);
+      engine.capturePixels();
+      return engine.diagnostics();
+    },
+    Math.floor((region.start + region.end) / 2),
+  );
   expect(state.status).toBe('paused');
   expect(state.assignedClipIds).toContain(project.clips[1]!.id);
   expect(state.assignedClipIds).toContain(project.clips[2]!.id);
@@ -517,32 +718,51 @@ test('playback crosses different recordings and dissolves with only two decoder 
   await page.getByRole('button', { name: 'Add recording-03.mp4 to timeline', exact: true }).click();
   const base = projectSchema.parse(await page.evaluate(() => window.pascapLab!.project()));
   let project = base;
-  for (const clip of base.clips) project = applyCommand(project, { type: 'trim', clipId: clip.id, sourceIn: 15, sourceOut: 75 });
-  project = applyCommand(project, { type: 'transition', transition: { leftId: project.clips[1]!.id, rightId: project.clips[2]!.id, type: 'cross-dissolve', duration: 18 } });
+  for (const clip of base.clips)
+    project = applyCommand(project, { type: 'trim', clipId: clip.id, sourceIn: 15, sourceOut: 75 });
+  project = applyCommand(project, {
+    type: 'transition',
+    transition: { leftId: project.clips[1]!.id, rightId: project.clips[2]!.id, type: 'cross-dissolve', duration: 18 },
+  });
   await page.evaluate((document) => window.pascapLab!.setDocument(document), project);
   await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
-  await page.evaluate(async () => { await window.pascapLab!.engine.seek(0); await window.pascapLab!.engine.play(); });
+  await page.evaluate(async () => {
+    await window.pascapLab!.engine.seek(0);
+    await window.pascapLab!.engine.play();
+  });
   try {
-    await page.waitForFunction(() => {
-      const state = window.pascapLab!.engine.diagnostics();
-      return state.status === 'error' || (!state.playing && state.frame === state.duration - 1);
-    }, undefined, { timeout: 45_000 });
+    await page.waitForFunction(
+      () => {
+        const state = window.pascapLab!.engine.diagnostics();
+        return state.status === 'error' || (!state.playing && state.frame === state.duration - 1);
+      },
+      undefined,
+      { timeout: 45_000 },
+    );
   } finally {
     // Synthetic diagnostics only: renderer, frame progress and element state.
     // Preserve useful evidence even when the bounded completion check fails.
     const diagnostics = await page.evaluate(() => ({
       preview: window.pascapLab!.engine.diagnostics(),
       decoders: Array.from(document.querySelectorAll<HTMLVideoElement>('video[data-pascap-decoder]'), (video) => ({
-        index: video.dataset['pascapDecoder'], currentTime: video.currentTime,
-        paused: video.paused, ended: video.ended, seeking: video.seeking,
-        readyState: video.readyState, error: video.error?.message ?? null,
+        index: video.dataset['pascapDecoder'],
+        currentTime: video.currentTime,
+        paused: video.paused,
+        ended: video.ended,
+        seeking: video.seeking,
+        readyState: video.readyState,
+        error: video.error?.message ?? null,
       })),
     }));
     console.log('Synthetic bounded playback diagnostics:', JSON.stringify(diagnostics));
-    await test.info().attach('bounded-playback-diagnostics', { body: JSON.stringify(diagnostics, null, 2), contentType: 'application/json' });
+    await test.info().attach('bounded-playback-diagnostics', {
+      body: JSON.stringify(diagnostics, null, 2),
+      contentType: 'application/json',
+    });
   }
   const state = await page.evaluate(() => window.pascapLab!.engine.diagnostics());
-  expect(state.status, state.message).not.toBe('error'); expect(state.frame).toBe(143);
+  expect(state.status, state.message).not.toBe('error');
+  expect(state.frame).toBe(143);
   expect(state.decoderCount).toBe(2);
   await expect(page.locator('video[data-pascap-decoder]')).toHaveCount(2);
 });
@@ -551,10 +771,12 @@ test('pointer cancellation restores the committed source range', async ({ page }
   const handle = page.locator('[data-clip-id="clip-a"] [data-trim-handle="in"]');
   const box = (await handle.boundingBox())!;
   const scale = Number(await page.locator('.timeline-surface').getAttribute('data-pixels-per-frame'));
-  await page.mouse.move(box.x + 5, box.y + 20); await page.mouse.down();
+  await page.mouse.move(box.x + 5, box.y + 20);
+  await page.mouse.down();
   await page.mouse.move(box.x + 5 + 20 * scale, box.y + 20, { steps: 4 });
   await expect(page.getByRole('spinbutton', { name: 'Source IN frame' })).toHaveValue('35');
-  await handle.dispatchEvent('pointercancel'); await page.mouse.up();
+  await handle.dispatchEvent('pointercancel');
+  await page.mouse.up();
   await expect(page.getByRole('spinbutton', { name: 'Source IN frame' })).toHaveValue('15');
   await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
 });

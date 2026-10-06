@@ -83,12 +83,12 @@ of your originals. Keep source recordings at their registered paths; explicit
 relinking is a tracked next step. Deleting a project does not delete original
 recordings, shared proxies or successful exports.
 
-| Environment variable | Purpose |
-| --- | --- |
-| `PASCAP_MEDIA_ROOTS` | JSON array of approved absolute footage roots, e.g. `["/home/you/Videos","/mnt/footage"]`; defaults to the service user's Videos folder |
-| `PASCAP_DATA_DIR` | Writable persistent data/cache directory, separate from footage |
-| `PASCAP_PORT` | Local service port, default `4318` |
-| `PASCAP_FFMPEG`, `PASCAP_FFPROBE` | Native executable paths if not on `PATH` |
+| Environment variable              | Purpose                                                                                                                                 |
+| --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `PASCAP_MEDIA_ROOTS`              | JSON array of approved absolute footage roots, e.g. `["/home/you/Videos","/mnt/footage"]`; defaults to the service user's Videos folder |
+| `PASCAP_DATA_DIR`                 | Writable persistent data/cache directory, separate from footage                                                                         |
+| `PASCAP_PORT`                     | Local service port, default `4318`                                                                                                      |
+| `PASCAP_FFMPEG`, `PASCAP_FFPROBE` | Native executable paths if not on `PATH`                                                                                                |
 
 Missing mounts and symlinks fail explicitly. In the eventual container package,
 originals will be read-only bind mounts and application data will be a separate

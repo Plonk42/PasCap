@@ -1,7 +1,7 @@
 ---
 name: github-issue
-description: "Log and triage a PasCap GitHub issue from a short request. Use /github-issue to search for duplicates, record scoped bugs, feature proposals or tasks, and apply category, priority, area, status, outcome milestone and linked Project tracking."
-argument-hint: "Describe the bug, feature proposal or task to log"
+description: 'Log and triage a PasCap GitHub issue from a short request. Use /github-issue to search for duplicates, record scoped bugs, feature proposals or tasks, and apply category, priority, area, status, outcome milestone and linked Project tracking.'
+argument-hint: 'Describe the bug, feature proposal or task to log'
 user-invocable: true
 disable-model-invocation: true
 ---

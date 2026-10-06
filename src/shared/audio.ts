@@ -3,12 +3,26 @@ import { fingerprintSchema } from './media.js';
 import { frameSchema, idSchema } from './model.js';
 import type { MusicTrack } from './model.js';
 
-export const audioAssetSchema = z.object({
-  id: idSchema, name: z.string(), sourcePath: z.string(), fingerprint: fingerprintSchema,
-  metadata: z.object({ codec: z.string(), sampleRate: z.number().int().positive(), channels: z.number().int().positive(), durationSeconds: z.number().positive(), frameCount: frameSchema.positive() }).strict(),
-  status: z.enum(['registered', 'queued', 'preparing', 'ready', 'error']), error: z.string().nullable(),
-  waveform: z.array(z.number().min(0).max(1)).max(2048),
-}).strict();
+export const audioAssetSchema = z
+  .object({
+    id: idSchema,
+    name: z.string(),
+    sourcePath: z.string(),
+    fingerprint: fingerprintSchema,
+    metadata: z
+      .object({
+        codec: z.string(),
+        sampleRate: z.number().int().positive(),
+        channels: z.number().int().positive(),
+        durationSeconds: z.number().positive(),
+        frameCount: frameSchema.positive(),
+      })
+      .strict(),
+    status: z.enum(['registered', 'queued', 'preparing', 'ready', 'error']),
+    error: z.string().nullable(),
+    waveform: z.array(z.number().min(0).max(1)).max(2048),
+  })
+  .strict();
 export type AudioAsset = z.infer<typeof audioAssetSchema>;
 
 export function musicGainAt(music: MusicTrack, frame: number): number {

@@ -61,18 +61,18 @@ cleanup; no new Iteration dates or Project field/view changes are implied here.
 
 [Milestone](https://github.com/Plonk42/PasCap/milestone/1)
 
-| Issue | Scope |
-| --- | --- |
-| [#1 — Deterministic raw-frame reader tests](https://github.com/Plonk42/PasCap/issues/1) | Retain the locally verified exit-before-read fix; verify fresh Node 22/24 CI without hiding failures or weakening exact frame/resource checks |
-| [#2 — Explicit verified source relinking](https://github.com/Plonk42/PasCap/issues/2) | Approve the [strong identity/atomic relink design](design/SOURCE_RELINK.md), then implement confirmed moved/remounted-original recovery; never guess from names |
-| [#3 — Export disk preflight](https://github.com/Plonk42/PasCap/issues/3) | Explain scratch needs and handle low space without destroying original/successful data |
-| [#4 — Entry bundle loading](https://github.com/Plonk42/PasCap/issues/4) | Measure and reduce initial JS without suppressing the warning or changing per-frame ownership |
-| [#5 — License and redistribution notices](https://github.com/Plonk42/PasCap/issues/5) | Approved MIT project terms, retained npm notices and the separate GPL-enabled native distribution contract |
-| [#12 — GitHub workflow](https://github.com/Plonk42/PasCap/issues/12) | Keep instructions/forms, categorized priorities, next actions and iteration/dependency tracking aligned |
-| [#13 — Shared-point movement/navigation](https://github.com/Plonk42/PasCap/issues/13) | Retrospective delivered-feature record; preserve whole-point transactions, independent channel navigation and dated evidence |
-| [#14 — Precise clip speed](https://github.com/Plonk42/PasCap/issues/14) | Track approved source-frame curves and locally verified graph/numeric/native delivery separately from remote acceptance |
-| [#16 — Compact contextual help](https://github.com/Plonk42/PasCap/issues/16) | Heading-level hover/pinned question-mark buttons accessible even when collapsed, with independent expansion and preserved drafts/focus/editable panels |
-| [#25 — Uniform video tracks](https://github.com/Plonk42/PasCap/issues/25) | Strict schema-6 track parity: per-track continuous Ripple, transitions/fades, uniform composition order and bounded simultaneous-dissolve preview/native export; [approved design record](design/TRACK_PARITY.md) |
+| Issue                                                                                   | Scope                                                                                                                                                                                                             |
+| --------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [#1 — Deterministic raw-frame reader tests](https://github.com/Plonk42/PasCap/issues/1) | Retain the locally verified exit-before-read fix; verify fresh Node 22/24 CI without hiding failures or weakening exact frame/resource checks                                                                     |
+| [#2 — Explicit verified source relinking](https://github.com/Plonk42/PasCap/issues/2)   | Approve the [strong identity/atomic relink design](design/SOURCE_RELINK.md), then implement confirmed moved/remounted-original recovery; never guess from names                                                   |
+| [#3 — Export disk preflight](https://github.com/Plonk42/PasCap/issues/3)                | Explain scratch needs and handle low space without destroying original/successful data                                                                                                                            |
+| [#4 — Entry bundle loading](https://github.com/Plonk42/PasCap/issues/4)                 | Measure and reduce initial JS without suppressing the warning or changing per-frame ownership                                                                                                                     |
+| [#5 — License and redistribution notices](https://github.com/Plonk42/PasCap/issues/5)   | Approved MIT project terms, retained npm notices and the separate GPL-enabled native distribution contract                                                                                                        |
+| [#12 — GitHub workflow](https://github.com/Plonk42/PasCap/issues/12)                    | Keep instructions/forms, categorized priorities, next actions and iteration/dependency tracking aligned                                                                                                           |
+| [#13 — Shared-point movement/navigation](https://github.com/Plonk42/PasCap/issues/13)   | Retrospective delivered-feature record; preserve whole-point transactions, independent channel navigation and dated evidence                                                                                      |
+| [#14 — Precise clip speed](https://github.com/Plonk42/PasCap/issues/14)                 | Track approved source-frame curves and locally verified graph/numeric/native delivery separately from remote acceptance                                                                                           |
+| [#16 — Compact contextual help](https://github.com/Plonk42/PasCap/issues/16)            | Heading-level hover/pinned question-mark buttons accessible even when collapsed, with independent expansion and preserved drafts/focus/editable panels                                                            |
+| [#25 — Uniform video tracks](https://github.com/Plonk42/PasCap/issues/25)               | Strict schema-6 track parity: per-track continuous Ripple, transitions/fades, uniform composition order and bounded simultaneous-dissolve preview/native export; [approved design record](design/TRACK_PARITY.md) |
 
 Done means a repeatable, documented local foundation—not more CapCut-style effects.
 The initial publication includes README/user/developer guides, pinned CI and issue
@@ -95,11 +95,11 @@ or private-media/hardware qualification work.
 
 [Milestone](https://github.com/Plonk42/PasCap/milestone/2)
 
-| Issue | Scope |
-| --- | --- |
-| [#6 — Intended-GPU preview](https://github.com/Plonk42/PasCap/issues/6) | Record the actual renderer and test nominal playback, scrubbing, ramps/dissolves and row animation |
+| Issue                                                                               | Scope                                                                                                          |
+| ----------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| [#6 — Intended-GPU preview](https://github.com/Plonk42/PasCap/issues/6)             | Record the actual renderer and test nominal playback, scrubbing, ramps/dissolves and row animation             |
 | [#7 — Complete 5–10 minute flight edit](https://github.com/Plonk42/PasCap/issues/7) | Consented, licensed inputs; save/reopen, full preview, verified draft/final exports and interruption behaviour |
-| [#8 — A/V and resource soak](https://github.com/Plonk42/PasCap/issues/8) | Measure browser/GPU/native children/scratch and audible loop/buffering behaviour over realistic duration |
+| [#8 — A/V and resource soak](https://github.com/Plonk42/PasCap/issues/8)            | Measure browser/GPU/native children/scratch and audible loop/buffering behaviour over realistic duration       |
 
 The long-flight run uses intended-GPU findings and export-space safety from v0.1.
 Synthetic/SwiftShader CI cannot close the hardware gate. Failures must produce
@@ -109,11 +109,11 @@ reproducible follow-ups, not relaxed frame/pixel/timing assertions.
 
 [Milestone](https://github.com/Plonk42/PasCap/milestone/3)
 
-| Issue | Scope |
-| --- | --- |
-| [#9 — Explicit container networking](https://github.com/Plonk42/PasCap/issues/9) | Internal bind configuration plus exact host-loopback Host/Origin/client protection |
-| [#10 — Reproducible local OCI package](https://github.com/Plonk42/PasCap/issues/10) | Built UI/service/native toolchain, read-only source binds, persistent data, non-root/rootless startup and shutdown |
-| [#11 — Both-runtime acceptance](https://github.com/Plonk42/PasCap/issues/11) | Read-only-mount, permissions, persistence, cancellation/reaping and native short-export parity on Docker and Podman |
+| Issue                                                                               | Scope                                                                                                               |
+| ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| [#9 — Explicit container networking](https://github.com/Plonk42/PasCap/issues/9)    | Internal bind configuration plus exact host-loopback Host/Origin/client protection                                  |
+| [#10 — Reproducible local OCI package](https://github.com/Plonk42/PasCap/issues/10) | Built UI/service/native toolchain, read-only source binds, persistent data, non-root/rootless startup and shutdown  |
+| [#11 — Both-runtime acceptance](https://github.com/Plonk42/PasCap/issues/11)        | Read-only-mount, permissions, persistence, cancellation/reaping and native short-export parity on Docker and Podman |
 
 Implementation follows [the deployment contract](DEPLOYMENT.md). Licensing and
 network configuration precede distribution; both-runtime acceptance follows the

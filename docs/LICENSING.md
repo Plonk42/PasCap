@@ -23,25 +23,25 @@ from the obligations for **redistributing the native executables themselves**.
 
 The five direct production dependencies are:
 
-| Package | Locked version | License |
-| --- | --- | --- |
-| @fastify/static | 10.1.5 | MIT |
-| fastify | 5.12.5 | MIT |
-| react | 19.3.0 | MIT |
-| react-dom | 19.3.0 | MIT |
-| zod | 4.6.5 | MIT |
+| Package         | Locked version | License |
+| --------------- | -------------- | ------- |
+| @fastify/static | 10.1.5         | MIT     |
+| fastify         | 5.12.5         | MIT     |
+| react           | 19.3.0         | MIT     |
+| react-dom       | 19.3.0         | MIT     |
+| zod             | 4.6.5          | MIT     |
 
 The locked production closure contains **74 installations**, including nested
 versions. React, React DOM, scheduler and Zod are embedded in browser chunks;
 server-only dependencies are still part of a complete built-application package.
 Use the actual graph, not only the direct-dependency list:
 
-| License family | Production installations | Required treatment |
-| --- | ---: | --- |
-| MIT | 60 | Retain each upstream copyright and permission/disclaimer text |
-| ISC | 5 | Retain each upstream copyright and permission/disclaimer text |
-| BSD-3-Clause | 4 | Preserve copyright, conditions/disclaimer in source and binary documentation; do not imply endorsement |
-| BlueOak-1.0.0 | 5 | Supply the license text or its permitted license link |
+| License family | Production installations | Required treatment                                                                                     |
+| -------------- | -----------------------: | ------------------------------------------------------------------------------------------------------ |
+| MIT            |                       60 | Retain each upstream copyright and permission/disclaimer text                                          |
+| ISC            |                        5 | Retain each upstream copyright and permission/disclaimer text                                          |
+| BSD-3-Clause   |                        4 | Preserve copyright, conditions/disclaimer in source and binary documentation; do not imply endorsement |
+| BlueOak-1.0.0  |                        5 | Supply the license text or its permitted license link                                                  |
 
 Non-MIT entries are fastq 1.20.3, inherits 2.0.4, semver 7.8.5,
 setprototypeof 1.2.0 and split2 4.2.0 (ISC); fast-uri 3.1.8 and 4.2.1,

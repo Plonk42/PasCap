@@ -345,4 +345,3 @@ are tracked in [#6](https://github.com/Plonk42/PasCap/issues/6),
 explicit owner consent. Consult
 [GitHub Actions](https://github.com/Plonk42/PasCap/actions) for actual-commit CI,
 not a cumulative historical test total.
-

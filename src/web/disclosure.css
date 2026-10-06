@@ -1,58 +1,58 @@
-.heading-disclosure>.disclosure-heading {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    min-width: 0;
+.heading-disclosure > .disclosure-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
 }
 
 .disclosure-title {
-    flex: 1;
-    min-width: 0;
-    margin: 0;
-    font: inherit;
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font: inherit;
 }
 
 .disclosure-trigger {
-    display: flex;
-    align-items: center;
-    gap: 7px;
-    width: 100%;
-    min-height: 32px;
-    padding: 5px 0;
-    color: inherit;
-    background: transparent;
-    text-align: left;
-    font: inherit;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  min-height: 32px;
+  padding: 5px 0;
+  color: inherit;
+  background: transparent;
+  text-align: left;
+  font: inherit;
 }
 
-.disclosure-trigger>svg {
-    flex: 0 0 auto;
+.disclosure-trigger > svg {
+  flex: 0 0 auto;
 }
 
-.disclosure-trigger>svg:first-child {
-    transition: transform 120ms ease;
+.disclosure-trigger > svg:first-child {
+  transition: transform 120ms ease;
 }
 
-.disclosure-trigger[aria-expanded="false"]>svg:first-child {
-    transform: rotate(-90deg);
+.disclosure-trigger[aria-expanded='false'] > svg:first-child {
+  transform: rotate(-90deg);
 }
 
 .disclosure-title-text {
-    flex: 1;
-    min-width: 0;
+  flex: 1;
+  min-width: 0;
 }
 
-.disclosure-heading>.editor-help {
-    flex: 0 0 auto;
-    margin: 0;
+.disclosure-heading > .editor-help {
+  flex: 0 0 auto;
+  margin: 0;
 }
 
 .disclosure-content[hidden] {
-    display: none;
+  display: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .disclosure-trigger>svg:first-child {
-        transition: none;
-    }
+  .disclosure-trigger > svg:first-child {
+    transition: none;
+  }
 }

@@ -47,13 +47,13 @@ old sample digests or completed exports cannot repair that missing evidence.
 Introduce **video registry version 2**, with required evidence on every accepted
 video asset. Keep the existing required fields, plus:
 
-| Field | Proposed invariant |
-| --- | --- |
-| `content` | Required `{ algorithm: 'sha256-full-v1', digest, size }`; SHA-256 of **every original byte**, excluding paths/filesystem metadata; immutable |
-| `cacheKey` | Required immutable complete 64-character digest, initialized from `content.digest`; independent of the current location fingerprint |
-| `locationRevision` | Required non-negative integer, starting at zero and incrementing only by a confirmed relink |
-| `id` | Immutable `media-` plus the first 32 content-digest characters for new registrations; compare the **full** digest before deduplication, rejecting a truncated-ID collision |
-| `sourcePath` / `fingerprint` | Current explicitly confirmed service-side absolute path and its filesystem/sampled evidence; replace together, never use their new digest as the cache key |
+| Field                        | Proposed invariant                                                                                                                                                         |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `content`                    | Required `{ algorithm: 'sha256-full-v1', digest, size }`; SHA-256 of **every original byte**, excluding paths/filesystem metadata; immutable                               |
+| `cacheKey`                   | Required immutable complete 64-character digest, initialized from `content.digest`; independent of the current location fingerprint                                        |
+| `locationRevision`           | Required non-negative integer, starting at zero and incrementing only by a confirmed relink                                                                                |
+| `id`                         | Immutable `media-` plus the first 32 content-digest characters for new registrations; compare the **full** digest before deduplication, rejecting a truncated-ID collision |
+| `sourcePath` / `fingerprint` | Current explicitly confirmed service-side absolute path and its filesystem/sampled evidence; replace together, never use their new digest as the cache key                 |
 
 Reject omitted/unknown fields, unsupported algorithms, invalid digests, duplicate
 IDs, mismatched content/cache keys and invalid revisions. No optional/null legacy

@@ -16,19 +16,49 @@ export interface KeyframeDragPlan {
 }
 
 /** Capture-relative project frames: neither live preview retiming nor scrolling can change the origin. */
-export function keyframeFrameAtPointer(frame: number, startX: number, clientX: number, startScroll: number, scrollLeft: number, scale: number): number {
-  if (![frame, startX, clientX, startScroll, scrollLeft, scale].every(Number.isFinite) || scale <= 0) throw new Error('Keyframe movement needs valid timeline geometry.');
-  return Math.max(0, Math.min(2_147_483_647, frame + Math.round((clientX - startX + scrollLeft - startScroll) / scale)));
+export function keyframeFrameAtPointer(
+  frame: number,
+  startX: number,
+  clientX: number,
+  startScroll: number,
+  scrollLeft: number,
+  scale: number,
+): number {
+  if (![frame, startX, clientX, startScroll, scrollLeft, scale].every(Number.isFinite) || scale <= 0)
+    throw new Error('Keyframe movement needs valid timeline geometry.');
+  return Math.max(
+    0,
+    Math.min(2_147_483_647, frame + Math.round((clientX - startX + scrollLeft - startScroll) / scale)),
+  );
 }
 
-export function planKeyframeDrag(project: ProjectDocument, layerId: string, frame: number, nextFrame: number, targets: readonly number[], tolerance: number): KeyframeDragPlan {
+export function planKeyframeDrag(
+  project: ProjectDocument,
+  layerId: string,
+  frame: number,
+  nextFrame: number,
+  targets: readonly number[],
+  tolerance: number,
+): KeyframeDragPlan {
   const snapped = snapFrame(nextFrame, targets, tolerance);
   const command: MoveKey = { type: 'layer-key-move', layerId, frame, nextFrame: snapped };
   try {
     const document = applyCommand(project, command);
-    return { frame: snapped, document, command: snapped === frame ? null : command, guide: snapped === nextFrame ? null : snapped, error: '' };
+    return {
+      frame: snapped,
+      document,
+      command: snapped === frame ? null : command,
+      guide: snapped === nextFrame ? null : snapped,
+      error: '',
+    };
   } catch (cause) {
-    return { frame: snapped, document: project, command: null, guide: null, error: cause instanceof Error ? cause.message : 'Cannot move this shared point.' };
+    return {
+      frame: snapped,
+      document: project,
+      command: null,
+      guide: null,
+      error: cause instanceof Error ? cause.message : 'Cannot move this shared point.',
+    };
   }
 }
 
@@ -72,7 +102,8 @@ export interface TimelineKeyframeDraft extends KeyframeDragPlan {
 
 /** Pointer capture owns one shared-point transaction. Only release can enter history/autosave. */
 export function useTimelineKeyframes(options: Options) {
-  const latest = useRef(options); latest.current = options;
+  const latest = useRef(options);
+  latest.current = options;
   const session = useRef<Session | null>(null);
   const animation = useRef(0);
   const [draft, setDraft] = useState<TimelineKeyframeDraft | null>(null);
@@ -80,23 +111,32 @@ export function useTimelineKeyframes(options: Options) {
   const clear = useCallback((restoreScroll: boolean, restoreFrame?: number): Session | null => {
     const active = session.current;
     if (!active) return null;
-    session.current = null; cancelAnimationFrame(animation.current); animation.current = 0;
+    session.current = null;
+    cancelAnimationFrame(animation.current);
+    animation.current = 0;
     const { viewport, onPreview } = latest.current;
     if (restoreScroll && viewport.current) viewport.current.scrollLeft = active.startScroll;
-    setDraft(null); onPreview(null, restoreFrame);
+    setDraft(null);
+    onPreview(null, restoreFrame);
     if (active.element.hasPointerCapture(active.pointerId)) active.element.releasePointerCapture(active.pointerId);
     return active;
   }, []);
-  const cancel = useCallback((): void => { clear(true); }, [clear]);
+  const cancel = useCallback((): void => {
+    clear(true);
+  }, [clear]);
   useEffect(() => {
     const escape = (event: globalThis.KeyboardEvent): void => {
       if (event.key !== 'Escape' || !session.current) return;
-      event.preventDefault(); event.stopImmediatePropagation(); cancel();
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      cancel();
     };
-    window.addEventListener('keydown', escape, true); window.addEventListener('blur', cancel);
+    window.addEventListener('keydown', escape, true);
+    window.addEventListener('blur', cancel);
     return () => {
       cancelAnimationFrame(animation.current);
-      window.removeEventListener('keydown', escape, true); window.removeEventListener('blur', cancel);
+      window.removeEventListener('keydown', escape, true);
+      window.removeEventListener('blur', cancel);
     };
   }, [cancel]);
   useEffect(() => {
@@ -111,18 +151,41 @@ export function useTimelineKeyframes(options: Options) {
     const travel = active.pointerX - active.startX + viewport.scrollLeft - active.startScroll;
     if (!active.moved && Math.abs(travel) < 3) return;
     active.moved = true;
-    const frame = keyframeFrameAtPointer(active.origin, active.startX, active.pointerX, active.startScroll, viewport.scrollLeft, active.scale);
-    const plan = planKeyframeDrag(active.project, active.layerId, active.origin, frame, current.snapping && !active.alt ? active.targets : [], 8 / active.scale);
-    if (plan.frame === active.plan.frame && plan.error === active.plan.error && plan.guide === active.plan.guide) return;
+    const frame = keyframeFrameAtPointer(
+      active.origin,
+      active.startX,
+      active.pointerX,
+      active.startScroll,
+      viewport.scrollLeft,
+      active.scale,
+    );
+    const plan = planKeyframeDrag(
+      active.project,
+      active.layerId,
+      active.origin,
+      frame,
+      current.snapping && !active.alt ? active.targets : [],
+      8 / active.scale,
+    );
+    if (plan.frame === active.plan.frame && plan.error === active.plan.error && plan.guide === active.plan.guide)
+      return;
     active.plan = plan;
     setDraft({ ...plan, layerId: active.layerId, origin: active.origin, width: active.width });
-    current.onPreview({ document: plan.document, frame: previewFrameFor(plan.frame, calculateLayout(plan.document).duration) });
+    current.onPreview({
+      document: plan.document,
+      frame: previewFrameFor(plan.frame, calculateLayout(plan.document).duration),
+    });
   };
-  const latestUpdate = useRef(update); latestUpdate.current = update;
+  const latestUpdate = useRef(update);
+  latestUpdate.current = update;
   const autoScroll = (): void => {
-    const active = session.current; const viewport = latest.current.viewport.current;
+    const active = session.current;
+    const viewport = latest.current.viewport.current;
     if (!active || !viewport) return;
-    if (!active.moved) { animation.current = requestAnimationFrame(autoScroll); return; }
+    if (!active.moved) {
+      animation.current = requestAnimationFrame(autoScroll);
+      return;
+    }
     const bounds = viewport.getBoundingClientRect();
     let velocity = 0;
     if (active.pointerX < bounds.left + 28) velocity = -Math.min(14, (bounds.left + 28 - active.pointerX) / 3);
@@ -135,22 +198,41 @@ export function useTimelineKeyframes(options: Options) {
   const begin = (event: PointerEvent<HTMLButtonElement>, layerId: string, frame: number): void => {
     const { viewport, disabled, project, scale, width, onPause, onSelectLayer, onPreview } = latest.current;
     if (disabled || session.current || event.button !== 0 || !viewport.current) return;
-    event.preventDefault(); event.stopPropagation();
+    event.preventDefault();
+    event.stopPropagation();
     const plan: KeyframeDragPlan = { frame, document: project, command: null, guide: null, error: '' };
     session.current = {
-      pointerId: event.pointerId, element: event.currentTarget, project, layerId, origin: frame,
-      startX: event.clientX, pointerX: event.clientX, startScroll: viewport.current.scrollLeft, scale, width,
-      playhead: latest.current.frame, moved: false, alt: event.altKey, targets: [...new Set([...snapPoints(project), latest.current.frame])], plan,
+      pointerId: event.pointerId,
+      element: event.currentTarget,
+      project,
+      layerId,
+      origin: frame,
+      startX: event.clientX,
+      pointerX: event.clientX,
+      startScroll: viewport.current.scrollLeft,
+      scale,
+      width,
+      playhead: latest.current.frame,
+      moved: false,
+      alt: event.altKey,
+      targets: [...new Set([...snapPoints(project), latest.current.frame])],
+      plan,
     };
     event.currentTarget.setPointerCapture(event.pointerId);
-    onPause(); onSelectLayer(layerId);
-    setDraft({ ...plan, layerId, origin: frame, width }); onPreview({ document: project, frame: latest.current.frame });
+    onPause();
+    onSelectLayer(layerId);
+    setDraft({ ...plan, layerId, origin: frame, width });
+    onPreview({ document: project, frame: latest.current.frame });
     animation.current = requestAnimationFrame(autoScroll);
   };
   const move = (event: PointerEvent<HTMLButtonElement>): void => {
     const active = session.current;
     if (event.pointerId !== active?.pointerId) return;
-    event.preventDefault(); event.stopPropagation(); active.pointerX = event.clientX; active.alt = event.altKey; update();
+    event.preventDefault();
+    event.stopPropagation();
+    active.pointerX = event.clientX;
+    active.alt = event.altKey;
+    update();
   };
   const focusMarker = (layerId: string, frame: number): void => {
     requestAnimationFrame(() => {
@@ -164,20 +246,46 @@ export function useTimelineKeyframes(options: Options) {
   const finish = (event: PointerEvent<HTMLButtonElement>): void => {
     const active = session.current;
     if (event.pointerId !== active?.pointerId) return;
-    event.preventDefault(); event.stopPropagation(); active.pointerX = event.clientX; active.alt = event.altKey; update();
-    clear(false, active.plan.error ? undefined : previewFrameFor(active.plan.frame, calculateLayout(active.plan.document).duration));
-    if (active.plan.error) { latest.current.onError(active.plan.error); focusMarker(active.layerId, active.origin); return; }
+    event.preventDefault();
+    event.stopPropagation();
+    active.pointerX = event.clientX;
+    active.alt = event.altKey;
+    update();
+    clear(
+      false,
+      active.plan.error
+        ? undefined
+        : previewFrameFor(active.plan.frame, calculateLayout(active.plan.document).duration),
+    );
+    if (active.plan.error) {
+      latest.current.onError(active.plan.error);
+      focusMarker(active.layerId, active.origin);
+      return;
+    }
     if (active.plan.command) latest.current.onEdit(active.plan.command);
-    latest.current.onSeekKeyframe(active.layerId, active.plan.frame); focusMarker(active.layerId, active.plan.frame);
+    latest.current.onSeekKeyframe(active.layerId, active.plan.frame);
+    focusMarker(active.layerId, active.plan.frame);
   };
   const keyboard = (event: KeyboardEvent<HTMLButtonElement>, layerId: string, frame: number): void => {
     if (latest.current.disabled || session.current || !['ArrowLeft', 'ArrowRight'].includes(event.key)) return;
-    event.preventDefault(); event.stopPropagation();
+    event.preventDefault();
+    event.stopPropagation();
     const delta = (event.key === 'ArrowLeft' ? -1 : 1) * (event.shiftKey ? 10 : 1);
-    const plan = planKeyframeDrag(latest.current.project, layerId, frame, Math.max(0, Math.min(2_147_483_647, frame + delta)), [], 0);
-    if (plan.error) { latest.current.onError(plan.error); return; }
+    const plan = planKeyframeDrag(
+      latest.current.project,
+      layerId,
+      frame,
+      Math.max(0, Math.min(2_147_483_647, frame + delta)),
+      [],
+      0,
+    );
+    if (plan.error) {
+      latest.current.onError(plan.error);
+      return;
+    }
     if (plan.command) latest.current.onEdit(plan.command);
-    latest.current.onSeekKeyframe(layerId, plan.frame); focusMarker(layerId, plan.frame);
+    latest.current.onSeekKeyframe(layerId, plan.frame);
+    focusMarker(layerId, plan.frame);
   };
 
   return { draft, active: session.current !== null, begin, move, finish, cancel, keyboard };
