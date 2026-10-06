@@ -255,8 +255,12 @@ There is **one marker per visible row point**, even across multiple clips or a
 dissolve, not one marker per channel/clip. Its title names the row, project time
 and participants; the panel exposes chips/dependencies. **Click or Enter** selects
 the row and seeks without editing or changing the Inspector tab. Whole-row point
-navigation also retains that tab. Off-duration points stay in the list rather
-than being duplicated inside clips. The shared Timeline frame field remains available.
+navigation also retains that tab. Off-duration points are not duplicated inside
+clips. Instead, each row with stored points after the last timeline frame shows one
+**◆ N after end** button just past the end of the timeline. It opens **Layer keyframes**,
+inspects the first such point (preview shows the nearest available frame) and
+changes nothing; edit, delete and Previous/Next reach the others from the list.
+The shared Timeline frame field remains available.
 
 **Drag the marker horizontally to move the whole point:**
 

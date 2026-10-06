@@ -234,7 +234,9 @@ timing conflict rejects the entire final move, not just one setting or an earlie
 valid draft. Escape, pointer cancellation, lost capture or window blur restores the
 document/preview/scroll; pointer previews never enter autosave or history.
 
-Points outside duration stay stored and list-editable. Setting/row/list navigation
+Points outside duration stay stored and list-editable. After a trim leaves a row's
+points past the last frame, a **◆ N after end** button beyond the timeline end opens
+Layer keyframes at the first of them. Setting/row/list navigation
 can inspect successive stored points while preview clamps to the nearest available
 frame (none on an empty timeline). Labels distinguish **stored time from actual
 preview**: list controls edit the stored point, but Clip's setting values,
