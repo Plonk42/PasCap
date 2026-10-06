@@ -27,6 +27,21 @@ function median(values: number[]): number | null {
   return sorted.length % 2 ? sorted[middle]! : (sorted[middle - 1]! + sorted[middle]!) / 2;
 }
 
+function waitForMedia<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const abort = (): void => reject(new DOMException('Obsolete media operation cancelled.', 'AbortError'));
+    signal.addEventListener('abort', abort, { once: true });
+    void promise.then((value) => { signal.removeEventListener('abort', abort); resolve(value); }, (error: unknown) => {
+      signal.removeEventListener('abort', abort); reject(error);
+    });
+    if (signal.aborted) { signal.removeEventListener('abort', abort); abort(); }
+  });
+}
+
+function sameClips(left: readonly string[], right: readonly string[]): boolean {
+  return left.length === right.length && left.every((id) => right.includes(id));
+}
+
 /** Appearance may change stacking/visibility, but never source clocks or music. */
 function timingKey(project: ProjectDocument): string {
   return JSON.stringify({
@@ -180,7 +195,7 @@ export class PreviewEngine {
     return index;
   }
   #slotFor(clipId: string): VideoDecoderSlot { return this.#slots[this.#slotIndex(clipId)]!; }
-  async #prepareLayers(layers: readonly PreviewLayer[], signal: AbortSignal): Promise<void> {
+  async #prepareLayers(layers: readonly PreviewLayer[], signal: AbortSignal, mediaSignal = signal): Promise<void> {
     if (!this.#isCurrent(signal)) return;
     const next = allocateDecoders(this.#assignments, layers.map((layer) => layer.clipId));
     next.forEach((id, index) => { if (id !== this.#assignments[index]) this.#uploadedFrames[index] = -1; });
@@ -188,9 +203,9 @@ export class PreviewEngine {
     const rate = this.#document!.frameRate;
     await Promise.all(layers.map(async (layer) => {
       const slot = this.#slotFor(layer.clipId);
-      await slot.load(this.#proxyUrl(layer.mediaId), rate, signal);
+      await slot.load(this.#proxyUrl(layer.mediaId), rate, mediaSignal);
       if (!this.#isCurrent(signal) || this.#assignments[this.#slots.indexOf(slot)] !== layer.clipId) return;
-      await slot.seek(layer.sourceFrame, signal);
+      await slot.seek(layer.sourceFrame, mediaSignal);
     }));
   }
   #nextClips(frame: number): PlacedClip[] {
@@ -429,14 +444,14 @@ export class PreviewEngine {
     catch (error) { this.#handleError(error); }
     this.#emit();
   };
-  #acceptFrame(frame: number): boolean {
+  #acceptFrame(frame: number, publish = true): boolean {
     if (!this.#drawFrame(frame)) return false;
     this.#mismatchStart = 0;
-    if (this.#status === 'buffering') this.#setStatus('playing', 'Playing');
+    if (publish && this.#status === 'buffering') this.#setStatus('playing', 'Playing');
     return true;
   }
 
-  #acceptNeighbour(expected: number, required: readonly string[]): boolean {
+  #acceptNeighbour(expected: number, required: readonly string[], publish = true): boolean {
     // A floored source map is many-to-one during slow motion. Its inverse is
     // not the nearest displayed project frame. Test the actual one-frame
     // neighbours against every source and its project-time grade instead.
@@ -444,7 +459,7 @@ export class PreviewEngine {
       if (candidate < 0 || candidate >= this.#layout.duration) continue;
       const layers = sampleTimeline(this.#document!, candidate, this.#layout);
       if (layers.length !== required.length || layers.some((layer) => !required.includes(layer.clipId))) continue;
-      if (this.#acceptFrame(candidate)) return true;
+      if (this.#acceptFrame(candidate, publish)) return true;
     }
     return false;
   }
@@ -475,6 +490,72 @@ export class PreviewEngine {
       if (this.#acceptFrame(expected) || this.#acceptNeighbour(expected, required)) this.#emit();
     } catch (error) { this.#handleError(error); }
   };
+
+  async #catchUpVideo(): Promise<void> {
+    if (this.#busy || !this.#playing || !this.#document) return;
+    // Keep the current music epoch and its owning signal. Replacing/aborting
+    // that signal would cancel healthy audio merely because video is late.
+    const signal = this.#controller.signal;
+    const timeout = AbortSignal.timeout(5_000);
+    const mediaSignal = AbortSignal.any([signal, timeout]);
+    this.#busy = true;
+    for (const id of this.#playingClips) this.#slotFor(id).pause();
+    try {
+      await this.#catchUpVideoLoop(signal, mediaSignal);
+    } catch (error) {
+      if (this.#isCurrent(signal)) this.#handleError(timeout.aborted ? new Error('Video catch-up did not deliver the current audio frame within 5 seconds.') : error);
+    }
+  }
+
+  async #catchUpVideoLoop(signal: AbortSignal, mediaSignal: AbortSignal): Promise<void> {
+    while (this.#isCurrent(signal) && this.#playing) {
+      mediaSignal.throwIfAborted();
+      const frame = this.#expectedFrame(performance.now());
+      if (frame >= this.#layout.duration) { this.pause(); void this.seek(this.#layout.duration - 1); return; }
+      const layers = sampleTimeline(this.#document!, frame, this.#layout);
+      const required = layers.map((layer) => layer.clipId);
+      const changed = !sameClips(required, this.#playingClips);
+      if (!this.#music.sync(frame) || changed) {
+        this.#busy = false; await this.#alignPlayback(frame, changed); return;
+      }
+      this.#operationFrame = frame;
+      await this.#prepareLayers(layers, signal, mediaSignal);
+      if (!this.#isCurrent(signal) || !this.#playing) return;
+      mediaSignal.throwIfAborted();
+      // The audio clock keeps advancing during the owned seek. A delivered
+      // old request cannot qualify a different current project frame.
+      const current = this.#expectedFrame(performance.now());
+      const ready = this.#readyCatchUpLayers(current, required);
+      if (!ready) continue;
+      if (await this.#resumeCaughtUpVideo(ready, current, signal, mediaSignal)) return;
+    }
+  }
+
+  #readyCatchUpLayers(frame: number, required: readonly string[]): PreviewLayer[] | null {
+    if (frame >= this.#layout.duration || !this.#music.sync(frame)) return null;
+    const layers = sampleTimeline(this.#document!, frame, this.#layout);
+    const ids = layers.map((layer) => layer.clipId);
+    if (!sameClips(ids, required)) return null;
+    this.#operationFrame = frame;
+    return this.#acceptFrame(frame, false) || this.#acceptNeighbour(frame, ids, false) ? layers : null;
+  }
+
+  async #resumeCaughtUpVideo(layers: readonly PreviewLayer[], frame: number, signal: AbortSignal, mediaSignal: AbortSignal): Promise<boolean> {
+    for (const layer of layers) {
+      const placed = this.#layout.clips.find((item) => item.clip.id === layer.clipId)!;
+      this.#slotFor(layer.clipId).setRate(placed.retiming.rateAt(frame - placed.start));
+    }
+    await waitForMedia(Promise.all(layers.map((layer) => this.#slotFor(layer.clipId).play())), mediaSignal);
+    if (!this.#isCurrent(signal) || !this.#playing) return true;
+    mediaSignal.throwIfAborted();
+    const current = this.#expectedFrame(performance.now());
+    if (!this.#readyCatchUpLayers(current, layers.map((layer) => layer.clipId))) {
+      for (const layer of layers) this.#slotFor(layer.clipId).pause();
+      return false;
+    }
+    this.#busy = false; this.#setStatus('playing', 'Playing'); this.#preloadNext(current);
+    return true;
+  }
 
   #advance(now: number): void {
     if (!this.#document) return;
@@ -510,7 +591,10 @@ export class PreviewEngine {
     if (actual >= 0) this.#maxClockError = Math.max(this.#maxClockError, error);
     this.#compositor.clear(); this.#setStatus('buffering', 'Waiting for decoded frames');
     if (!this.#mismatchStart) this.#mismatchStart = now;
-    if (now - this.#mismatchStart > framesToSeconds(1, this.#document.frameRate) * 1000) void this.#alignPlayback(expected, false);
+    if (now - this.#mismatchStart > framesToSeconds(1, this.#document.frameRate) * 1000) {
+      if (this.#music.hasMusic) void this.#catchUpVideo();
+      else void this.#alignPlayback(expected, false);
+    }
   }
   #handleError(error: unknown): void {
     if (error instanceof DOMException && error.name === 'AbortError') return;

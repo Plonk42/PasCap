@@ -23,6 +23,7 @@ interface PlaybackEvidence {
     driftViolations: number;
     maximumAVDriftFrames: number;
     avDriftViolations: number;
+    avDriftSamples: unknown[];
     bufferingEntries: number;
     firstBufferingFrame: number | null;
     avoidableBuffering: number;
@@ -81,6 +82,7 @@ async function openRecoveryProject(page: Page, request: APIRequestContext, withM
             notifications: 0, playingMusicNotifications: 0,
             maximumMusicDriftFrames: 0, driftViolations: 0,
             maximumAVDriftFrames: 0, avDriftViolations: 0,
+            avDriftSamples: [],
             bufferingEntries: 0, firstBufferingFrame: null,
             avoidableBuffering: 0, bufferingFrames: [],
             minimumDecoderCount: 2, maximumDecoderCount: 2,
@@ -179,10 +181,22 @@ async function openRecoveryProject(page: Page, request: APIRequestContext, withM
                 // rendering-thread timestamp, not engine.musicDriftFrames or frame.
                 const music = window.musicStreamEvidence;
                 const receipt = music.receipt;
-                const sourceSamples = receipt && music.context ? receipt.samples + music.context.getOutputTimestamp().contextTime! * 48_000 - receipt.contextFrame : NaN;
+                const observedAt = performance.now();
+                const output = music.context?.getOutputTimestamp();
+                const sourceSamples = receipt && output ? receipt.samples + output.contextTime! * 48_000 - receipt.contextFrame : NaN;
                 const audioFrame = Math.floor((receipt?.startFrame ?? NaN) + sourceSamples / (48_000 * 1_001 / 30_000) + 1e-7);
                 const avDrift = Math.abs(audioFrame - state.frame);
-                if (!Number.isFinite(avDrift) || avDrift > 1) evidence.avDriftViolations++;
+                if (!Number.isFinite(avDrift) || avDrift > 1) {
+                    evidence.avDriftViolations++;
+                    // Failure-only bounded witnesses, not a changed clock, frame
+                    // comparison or allowance. Preserve the exact offending state,
+                    // raw consumed-sample receipt and device timestamp for triage.
+                    if (evidence.avDriftSamples.length < 10) evidence.avDriftSamples.push({
+                        state, receipt, output, observedAt, audioFrame, avDrift,
+                        currentState: window.pascapLab!.engine.diagnostics(),
+                        outputAfter: music.context?.getOutputTimestamp(), finishedAt: performance.now(),
+                    });
+                }
                 evidence.maximumAVDriftFrames = Math.max(evidence.maximumAVDriftFrames, avDrift);
             }
         });
@@ -263,6 +277,7 @@ async function attachEvidence(page: Page, browser: Browser, withMusic: boolean, 
             decoders: Array.from(document.querySelectorAll<HTMLVideoElement>('video[data-pascap-decoder]')).map(video => ({ slot: video.dataset['pascapDecoder'], time: video.currentTime, seeking: video.seeking, paused: video.paused, ready: video.readyState })),
             decoderEvents: Reflect.get(window, 'recoveryDecoderEvents'),
             decodedCallbackRecovery: Reflect.get(window, 'decodedCallbackRecovery'),
+            videoCatchUpRecovery: Reflect.get(window, 'videoCatchUpRecovery'),
             callbackGate: { heldFrame: gate.heldFrame, heldCallbacks: gate.heldCallbacks, releasedCallbacks: gate.releasedCallbacks },
         };
     });
@@ -376,6 +391,44 @@ test('a genuine decoded callback resolves buffering between display ticks withou
         expect(recovered.after.musicDriftFrames).toBeLessThanOrEqual(1);
         expect(recovered.starts).toBe(1); expect(recovered.afterStarts).toBe(1);
         await waitForCompletion(page); await assertCompleted(page, fixture, true);
+        expect(await page.evaluate(() => window.playbackRecoveryGate.releasedCallbacks)).toBe(1);
+    } finally {
+        await page.evaluate(() => window.playbackRecoveryGate.release?.());
+        await attachEvidence(page, browser, true, false);
+    }
+});
+
+test('video-only catch-up preserves healthy music through a genuinely delayed callback and exact seek', async ({ page, request, browser }) => {
+    test.setTimeout(45_000);
+    const fixture = await openRecoveryProject(page, request, true);
+    try {
+        await page.evaluate(() => {
+            const gate = window.playbackRecoveryGate;
+            gate.targetFrame = 10; gate.atOrAfter = true;
+            Reflect.set(window, 'videoCatchUpRecovery', null);
+            const currentTime = Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, 'currentTime')!;
+            Object.defineProperty(HTMLMediaElement.prototype, 'currentTime', {
+                ...currentTime,
+                set(this: HTMLMediaElement, value: number) {
+                    currentTime.set!.call(this, value);
+                    if (this.dataset['pascapDecoder'] === undefined || !gate.release || gate.heldFrame === null) return;
+                    const requested = Math.floor(value * 30_000 / 1_001);
+                    if (requested <= gate.heldFrame + 1) return;
+                    // Release the genuine delayed metadata only after recovery
+                    // requests a different exact source. The actual decoder must
+                    // subsequently deliver that new image; no frame is invented.
+                    Reflect.set(window, 'videoCatchUpRecovery', { requested, held: gate.heldFrame, starts: window.musicStreamEvidence.starts });
+                    queueMicrotask(() => gate.release?.());
+                },
+            });
+        });
+        await startPlayback(page);
+        await waitForCompletion(page);
+        const recovered = await page.evaluate(() => Reflect.get(window, 'videoCatchUpRecovery') as { requested: number; held: number; starts: number } | null);
+        expect(recovered).not.toBeNull();
+        expect(recovered!.requested - recovered!.held).toBeGreaterThan(1);
+        expect(recovered!.starts).toBe(1);
+        await assertCompleted(page, fixture, true);
         expect(await page.evaluate(() => window.playbackRecoveryGate.releasedCallbacks)).toBe(1);
     } finally {
         await page.evaluate(() => window.playbackRecoveryGate.release?.());

@@ -443,7 +443,79 @@ describe('PreviewEngine observed-frame tolerance and recovery', () => {
         expect(slot.decodedFrame).toBe(recoveryFrame); expect(slot.ready).toBe(true);
         expect(preview.engine.diagnostics()).toMatchObject({ status: 'playing', playing: true, frame: recoveryFrame });
         expectSurface(preview, recoveryFrame);
-        expect(preview.music.start).toHaveBeenCalledExactlyOnceWith(recoveryFrame, pending.request().signal);
+        expect(preview.music.pause).not.toHaveBeenCalled();
+        expect(preview.music.start).not.toHaveBeenCalled();
+    });
+
+    it('catches up to the current audio frame after a delayed video seek without reanchoring healthy music', async () => {
+        const { preview, slot, pending, recoveryFrame } = await pendingRecovery();
+        doubles.now = preview.anchor + framesToSeconds(14 - preview.initialFrame + 0.1) * 1000;
+        pending.release(); await settle();
+        expect(slot.seek.mock.calls.map(([frame]) => frame)).toEqual([recoveryFrame, 14]);
+        expect(preview.engine.diagnostics()).toMatchObject({ status: 'playing', playing: true, frame: 14 });
+        expectSurface(preview, 14);
+        expect(preview.music.pause).not.toHaveBeenCalled();
+        expect(preview.music.start).not.toHaveBeenCalled();
+    });
+
+    it('retains one catch-up deadline and reports failure when the current audio frame never arrives', async () => {
+        vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+        vi.spyOn(AbortSignal, 'timeout').mockImplementation((milliseconds) => {
+            const controller = new AbortController();
+            setTimeout(() => controller.abort(new DOMException('Deadline reached', 'TimeoutError')), milliseconds);
+            return controller.signal;
+        });
+        try {
+            const { preview, slot, pending } = await pendingRecovery();
+            expect(AbortSignal.timeout).toHaveBeenCalledExactlyOnceWith(5_000);
+            await vi.advanceTimersByTimeAsync(5_000);
+            expect(preview.engine.diagnostics()).toMatchObject({ status: 'error', playing: false, message: 'Video catch-up did not deliver the current audio frame within 5 seconds.' });
+            expect(pending.request().signal.aborted).toBe(true);
+            expect(preview.compositor.visible).toBeNull();
+            expect(preview.music.pause).toHaveBeenCalled();
+            expect(preview.music.start).not.toHaveBeenCalled();
+            pending.release(); await settle();
+            expect(slot.play).not.toHaveBeenCalled();
+        } finally { vi.useRealTimers(); }
+    });
+
+    it('rechecks delayed video play against the live audio clock within the same catch-up budget', async () => {
+        const timeout = vi.spyOn(AbortSignal, 'timeout');
+        const { preview, slot, pending, recoveryFrame } = await pendingRecovery();
+        slot.play.mockImplementationOnce(async () => {
+            Object.assign(slot.video, { paused: false });
+            doubles.now = preview.anchor + framesToSeconds(14 - preview.initialFrame + 0.1) * 1000;
+        });
+        pending.release(); await settle();
+        expect(slot.seek.mock.calls.map(([frame]) => frame)).toEqual([recoveryFrame, 14]);
+        expect(timeout).toHaveBeenCalledExactlyOnceWith(5_000);
+        expect(preview.engine.diagnostics()).toMatchObject({ status: 'playing', frame: 14 });
+        expect(preview.music.pause).not.toHaveBeenCalled();
+        expect(preview.music.start).not.toHaveBeenCalled();
+    });
+
+    it('fully realigns a genuine music sync failure encountered during video catch-up', async () => {
+        const { preview, pending } = await pendingRecovery();
+        preview.music.sync.mockReturnValueOnce(false).mockReturnValueOnce(false);
+        pending.release(); await settle();
+        expect(preview.music.pause).toHaveBeenCalled();
+        expect(preview.music.start).toHaveBeenCalledTimes(1);
+        expect(preview.engine.diagnostics().status).toBe('playing');
+    });
+
+    it('does not resume cancelled catch-up while a genuine video play promise is still pending', async () => {
+        const { preview, slot, pending } = await pendingRecovery();
+        let release!: () => void;
+        const play = new Promise<void>((resolve) => { release = resolve; });
+        slot.play.mockImplementationOnce(async () => { await play; });
+        pending.release(); await settle();
+        expect(slot.play).toHaveBeenCalledOnce();
+        expect(preview.engine.diagnostics().status).toBe('buffering');
+        preview.engine.pause(); vi.clearAllMocks();
+        release(); await settle();
+        expect(preview.engine.diagnostics()).toMatchObject({ status: 'paused', playing: false });
+        expect(preview.music.start).not.toHaveBeenCalled();
+        expect(preview.compositor.drawFrame).not.toHaveBeenCalled();
     });
 
     it('reports a required recovery seek failure instead of restarting with a wrong source', async () => {
