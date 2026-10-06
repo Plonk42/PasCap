@@ -101,7 +101,7 @@ __GLX_VENDOR_LIBRARY_NAME=mesa \
 __EGL_VENDOR_LIBRARY_FILENAMES=/usr/share/glvnd/egl_vendor.d/50_mesa.json \
 bash scripts/ci/firefox.sh npx playwright test --config=playwright.firefox.config.ts \
   tests/browser/music-clock.spec.ts tests/browser/playback-recovery.spec.ts \
-  --grep 'streaming music clock|streamed PCM|with music normal speed|with music and a callback-gated cancellation|genuine decoded callback resolves buffering|video-only catch-up preserves healthy music'
+  --grep 'streaming music clock|streamed PCM|with music normal speed|with music and a callback-gated cancellation|native-event-ordered video catch-up'
 ```
 
 Firefox remains headless, but its native graphics probe needs a working display:
@@ -131,7 +131,7 @@ The subsequent [audio prerequisite](../scripts/ci/firefox-audio.ts) has the same
 15-second browser-launch and 10-second probe deadlines as the graphics check.
 It requires a real 48 kHz context, stereo samples passed between real worklets and
 an output timestamp reaching those rendered samples. Missing resume/render/output
-readiness remains an actionable hard failure before the seven media tests. Neither
+readiness remains an actionable hard failure before the six media tests. Neither
 prerequisite changes the editor's ten-second music-start deadline or test bounds.
 
 The [music-clock regression](../tests/browser/music-clock.spec.ts) requires one
@@ -140,9 +140,15 @@ actual rendered stereo PCM amplitude/placement silence. Its bounded audio-thread
 observer checks every sample in the required frame windows, not UI-thread snapshots
 that can miss complete frames under load. The selected recovery tests
 retain the independent one-frame audio/video bound, pause/seek/restart, genuine
-callback-gated cancellation and current-clock recovery from a real decoded callback
-between display ticks and bounded video-only catch-up without restarting music.
-These seven synthetic, memory-only checks run in CI;
+callback-gated cancellation and native-event-ordered video catch-up without
+restarting music. The catch-up case starts from source frame 4, holds and pauses
+on a genuine advancing playback callback (never a pending seek), then releases the callback
+chain on the recovery's actual native seek event. Release never waits for that
+withheld metadata to match an advancing clock; exact readiness remains the real
+decoder's responsibility. Deterministic engine tests separately control between-
+display-tick delivery, delayed seek/play/cancellation/deadlines and replay observed /
+requested / delivered schedules **4/7/14, 9/12/11 and 9/12/12**, without guessing
+images or weakening bounds. These six synthetic, memory-only browser checks run in CI;
 they do not qualify the entire Firefox editor or intended hardware. Attachments
 contain bounded consumed-sample/output-timestamp evidence and at most 500
 decoder/clock state snapshots around music transitions, not private media.

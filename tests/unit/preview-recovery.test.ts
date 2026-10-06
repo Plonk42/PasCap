@@ -261,6 +261,33 @@ async function pendingRecovery(unavailable = false) {
 }
 
 describe('PreviewEngine observed-frame tolerance and recovery', () => {
+    it.each([
+        { observed: 4, requested: 7, delivered: 14 },
+        { observed: 9, requested: 12, delivered: 11 },
+        { observed: 9, requested: 12, delivered: 12 },
+    ])('requires owned current-source delivery for replay $observed/$requested/$delivered without restarting music', async ({ observed, requested, delivered }) => {
+        const preview = await running(singleProject(true), observed);
+        const slot = slotFor(preview); const pending = holdNextSeek(slot);
+        tick(preview, requested - 1); await settle();
+        expect(preview.engine.diagnostics()).toMatchObject({ status: 'buffering', frame: observed });
+        tick(preview, requested, 0.25); await settle();
+        expect(pending.request().frame).toBe(requested);
+        // Replay metadata captured by the test before that seek. Even eligible
+        // metadata cannot publish Playing while the owned seek is incomplete;
+        // future metadata (the 4/7/14 CI case) must not satisfy exact readiness.
+        slot.observe(delivered);
+        expect(preview.engine.diagnostics()).toMatchObject({ status: 'buffering', frame: observed, requestedFrame: requested });
+        expect(preview.compositor.visible).toBeNull();
+        expect(slot.play).not.toHaveBeenCalled();
+        expect(preview.music.start).not.toHaveBeenCalled();
+        pending.release(); await settle();
+        expect(slot.decodedFrame).toBe(requested);
+        expect(preview.engine.diagnostics()).toMatchObject({ status: 'playing', frame: requested });
+        expectSurface(preview, requested);
+        expect(preview.music.pause).not.toHaveBeenCalled();
+        expect(preview.music.start).not.toHaveBeenCalled();
+    });
+
     it.each([false, true])('accepts a genuinely delivered frame between display ticks before stale mismatch time restarts playback (music=%s)', async (withMusic) => {
         const preview = await running(singleProject(withMusic));
         const slot = slotFor(preview);
