@@ -71,7 +71,7 @@ export async function installMusicEvidence(page: Page, captureSignal = false): P
       `], { type: 'text/javascript' }));
       const observerModules = new WeakMap<Worklet, Promise<void>>();
       const nativeAddModule = AudioWorklet.prototype.addModule;
-      AudioWorklet.prototype.addModule = async function (url, options) {
+      AudioWorklet.prototype.addModule = async function(url, options) {
         let ready = observerModules.get(this);
         if (!ready) { ready = nativeAddModule.call(this, observerUrl); observerModules.set(this, ready); }
         await ready; await nativeAddModule.call(this, url, options);
@@ -83,7 +83,7 @@ export async function installMusicEvidence(page: Page, captureSignal = false): P
         super(context, name, options);
         if (name !== 'pascap-streaming-music') return;
         evidence.context = context as AudioContext;
-        const post = this.port.postMessage.bind(this.port);
+        const post = this.port.postMessage;
         let generation = -1;
         let stopped = true;
         this.port.postMessage = (message, transfer) => {
@@ -96,7 +96,7 @@ export async function installMusicEvidence(page: Page, captureSignal = false): P
             stopped = true; evidence.pauses++; evidence.active = false;
             window.dispatchEvent(new Event('pascap-test-music-stop'));
           }
-          post(message, Array.isArray(transfer) ? { transfer } : transfer);
+          Reflect.apply(post, this.port, [message, transfer]);
         };
         this.port.addEventListener('message', ({ data }) => {
           if (data.kind === 'test-pcm-signal' && data.generation === generation) { evidence.renderedSignal = data.frames; return; }

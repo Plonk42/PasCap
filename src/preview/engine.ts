@@ -209,6 +209,12 @@ export class PreviewEngine {
     return index;
   }
   #slotFor(clipId: string): VideoDecoderSlot { return this.#slots[this.#slotIndex(clipId)]!; }
+  #setPlaybackRates(layers: readonly PreviewLayer[], frame: number): void {
+    for (const layer of layers) {
+      const placed = this.#layout.clips.find((item) => item.clip.id === layer.clipId)!;
+      this.#slotFor(layer.clipId).setRate(placed.retiming.rateAt(frame - placed.start));
+    }
+  }
   async #prepareLayers(layers: readonly PreviewLayer[], signal: AbortSignal, mediaSignal = signal): Promise<void> {
     if (!this.#isCurrent(signal)) return;
     const next = allocateDecoders(this.#assignments, layers.map((layer) => layer.clipId));
@@ -436,10 +442,7 @@ export class PreviewEngine {
       if (!this.#isCurrent(signal) || !this.#playing) return;
       layers = sampleTimeline(this.#document, frame, this.#layout);
       this.#drawFrame(frame); this.#playingClips = layers.map((layer) => layer.clipId);
-      layers.forEach((layer) => {
-        const placed = this.#layout.clips.find((item) => item.clip.id === layer.clipId)!;
-        this.#slotFor(layer.clipId).setRate(placed.retiming.rateAt(frame - placed.start));
-      });
+      this.#setPlaybackRates(layers, frame);
       await this.#music.start(frame, signal);
       if (!this.#isCurrent(signal) || !this.#playing) return;
       await Promise.all(this.#playingClips.map((id) => this.#slotFor(id).play()));
@@ -497,7 +500,7 @@ export class PreviewEngine {
       // against the CURRENT clock, not the earlier tick's requested frame, so
       // a later mismatch cannot inherit an already-resolved grace period.
       const expected = this.#expectedFrame(performance.now());
-      if (expected >= this.#layout.duration || !this.#music.sync(expected)) return;
+      if (expected >= this.#layout.duration || !this.#music.sync()) return;
       const required = sampleTimeline(this.#document, expected, this.#layout).map((layer) => layer.clipId);
       if (required.length !== this.#playingClips.length || required.some((id) => !this.#playingClips.includes(id))) return;
       this.#operationFrame = expected;
@@ -527,48 +530,39 @@ export class PreviewEngine {
       const frame = this.#expectedFrame(performance.now());
       if (frame >= this.#layout.duration) { this.pause(); void this.seek(this.#layout.duration - 1); return; }
       const layers = sampleTimeline(this.#document!, frame, this.#layout);
-      const required = layers.map((layer) => layer.clipId);
-      const changed = !sameClips(required, this.#playingClips);
-      if (!this.#music.sync(frame) || changed) {
+      const changed = !sameClips(layers.map((layer) => layer.clipId), this.#playingClips);
+      if (!this.#music.sync() || changed) {
         this.#busy = false; await this.#alignPlayback(frame, changed); return;
       }
       this.#operationFrame = frame;
       await this.#prepareLayers(layers, signal, mediaSignal);
       if (!this.#isCurrent(signal) || !this.#playing) return;
       mediaSignal.throwIfAborted();
-      // The audio clock keeps advancing during the owned seek. A delivered
-      // old request cannot qualify a different current project frame.
-      const current = this.#expectedFrame(performance.now());
-      const ready = this.#readyCatchUpLayers(current, required);
-      if (!ready) continue;
-      if (await this.#resumeCaughtUpVideo(ready, current, signal, mediaSignal)) return;
+      const current = this.#acceptCurrentVideo();
+      if (current === null) continue;
+      this.#setPlaybackRates(sampleTimeline(this.#document!, current, this.#layout), current);
+      await waitForMedia(Promise.all(this.#playingClips.map((id) => this.#slotFor(id).play())), mediaSignal);
+      if (!this.#isCurrent(signal) || !this.#playing) return;
+      mediaSignal.throwIfAborted();
+      const presented = this.#acceptCurrentVideo();
+      if (presented === null) {
+        for (const id of this.#playingClips) this.#slotFor(id).pause();
+        continue;
+      }
+      this.#busy = false; this.#setStatus('playing', 'Playing'); this.#preloadNext(presented); return;
     }
   }
 
-  #readyCatchUpLayers(frame: number, required: readonly string[]): PreviewLayer[] | null {
-    if (frame >= this.#layout.duration || !this.#music.sync(frame)) return null;
+  #acceptCurrentVideo(): number | null {
+    // Seeking and play() are asynchronous; each boundary needs its own check
+    // against the advancing audio clock, with the same active clip set.
+    const frame = this.#expectedFrame(performance.now());
+    if (frame >= this.#layout.duration || !this.#music.sync()) return null;
     const layers = sampleTimeline(this.#document!, frame, this.#layout);
     const ids = layers.map((layer) => layer.clipId);
-    if (!sameClips(ids, required)) return null;
+    if (!sameClips(ids, this.#playingClips)) return null;
     this.#operationFrame = frame;
-    return this.#acceptFrame(frame, false) || this.#acceptNeighbour(frame, ids, false) ? layers : null;
-  }
-
-  async #resumeCaughtUpVideo(layers: readonly PreviewLayer[], frame: number, signal: AbortSignal, mediaSignal: AbortSignal): Promise<boolean> {
-    for (const layer of layers) {
-      const placed = this.#layout.clips.find((item) => item.clip.id === layer.clipId)!;
-      this.#slotFor(layer.clipId).setRate(placed.retiming.rateAt(frame - placed.start));
-    }
-    await waitForMedia(Promise.all(layers.map((layer) => this.#slotFor(layer.clipId).play())), mediaSignal);
-    if (!this.#isCurrent(signal) || !this.#playing) return true;
-    mediaSignal.throwIfAborted();
-    const current = this.#expectedFrame(performance.now());
-    if (!this.#readyCatchUpLayers(current, layers.map((layer) => layer.clipId))) {
-      for (const layer of layers) this.#slotFor(layer.clipId).pause();
-      return false;
-    }
-    this.#busy = false; this.#setStatus('playing', 'Playing'); this.#preloadNext(current);
-    return true;
+    return this.#acceptFrame(frame, false) || this.#acceptNeighbour(frame, ids, false) ? frame : null;
   }
 
   #advance(now: number): void {
@@ -577,16 +571,13 @@ export class PreviewEngine {
     this.#operationFrame = expected;
     if (expected >= this.#layout.duration) { this.pause(); void this.seek(this.#layout.duration - 1); return; }
     const layers = sampleTimeline(this.#document, expected, this.#layout);
-    if (!this.#music.sync(expected)) { void this.#alignPlayback(expected, false); return; }
+    if (!this.#music.sync()) { void this.#alignPlayback(expected, false); return; }
     const required = layers.map((layer) => layer.clipId);
     if (required.some((id) => !this.#playingClips.includes(id))) { void this.#alignPlayback(expected, true); return; }
     const removed = this.#playingClips.filter((id) => !required.includes(id));
     removed.forEach((id) => this.#slotFor(id).pause()); this.#playingClips = required;
     if (removed.length) this.#preloadNext(expected);
-    layers.forEach((layer) => {
-      const position = this.#layout.clips.find((item) => item.clip.id === layer.clipId)!;
-      this.#slotFor(layer.clipId).setRate(position.retiming.rateAt(expected - position.start));
-    });
+    this.#setPlaybackRates(layers, expected);
     if (this.#acceptFrame(expected)) return;
     if (this.#acceptNeighbour(expected, required)) return;
     // The already uploaded, accepted image remains within the same one-frame

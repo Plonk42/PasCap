@@ -98,7 +98,7 @@ describe('sample-owned bounded streaming music', () => {
     expect(node.startCommand().chunks).toHaveLength(MUSIC_QUEUE_CHUNKS);
     expect(node.startCommand().chunks.every(chunk => chunk.data.length === MUSIC_CHUNK_SAMPLES * MUSIC_CHANNELS)).toBe(true);
     expect(node.context.createBuffer).not.toHaveBeenCalled(); expect(node.context.decodeAudioData).not.toHaveBeenCalled();
-    expect(playback.projectFrame()).toBe(20); expect(playback.sync(20)).toBe(true);
+    expect(playback.projectFrame()).toBe(20); expect(playback.sync()).toBe(true);
   });
   it.each([0, 1920, 4800])('preserves %s real samples rendered before startup acknowledgement', async delay => {
     await configured(); await playback.resumeContext(); holdStart = true;
@@ -109,18 +109,18 @@ describe('sample-owned bounded streaming music', () => {
     node.emit({ kind: 'started', generation: command.generation, contextStart: 10 * MUSIC_SAMPLE_RATE });
     await pending; expect(playback.projectFrame()).toBe(20 + Math.floor(delay / MUSIC_SAMPLES_PER_FRAME));
     advance(delay + 3600); expect(playback.projectFrame()).toBe(20 + Math.floor((delay + 3600) / MUSIC_SAMPLES_PER_FRAME));
-    expect(playback.errorFrames).toBeCloseTo(0); expect(playback.sync(playback.projectFrame())).toBe(true);
+    expect(playback.errorFrames).toBeCloseTo(0); expect(playback.sync()).toBe(true);
   });
   it.each([-1.1, 1.1, -2, 2])('rejects genuine rendered-source drift of %s frames without reanchoring', async drift => {
     await configured(); await started(); advance(6400, drift * MUSIC_SAMPLES_PER_FRAME);
-    expect(playback.projectFrame()).toBe(23); expect(playback.sync(23)).toBe(false);
+    expect(playback.projectFrame()).toBe(23); expect(playback.sync()).toBe(false);
     expect(playback.errorFrames).toBeCloseTo(Math.abs(drift));
     expect(nodes[0]!.commands.filter(command => command.kind === 'start')).toHaveLength(1);
   });
   it('does not add video quantisation to sub-frame rendered audio drift', async () => {
     await configured(); await started(); advance(Math.round(1.75 * MUSIC_SAMPLES_PER_FRAME), 0.5 * MUSIC_SAMPLES_PER_FRAME);
-    expect(playback.projectFrame()).toBe(21); expect(playback.sync(21)).toBe(true); expect(playback.errorFrames).toBeCloseTo(0.5);
-    advance(3000, 1.01 * MUSIC_SAMPLES_PER_FRAME); expect(playback.sync(21)).toBe(false);
+    expect(playback.projectFrame()).toBe(21); expect(playback.sync()).toBe(true); expect(playback.errorFrames).toBeCloseTo(0.5);
+    advance(3000, 1.01 * MUSIC_SAMPLES_PER_FRAME); expect(playback.sync()).toBe(false);
   });
   it.each(['pause', 'dispose', 'abort'] as const)('invalidates a pending first-sample acknowledgement on %s', async action => {
     await configured(); await playback.resumeContext(); holdStart = true;
@@ -130,7 +130,7 @@ describe('sample-owned bounded streaming music', () => {
     if (action === 'abort') controller.abort(); else playback[action]();
     expect(await pending).toMatchObject({ name: 'AbortError' });
     node.emit({ kind: 'started', generation: command.generation, contextStart: 0 });
-    expect(playback.projectFrame()).toBe(0); expect(playback.sync(20)).toBe(true);
+    expect(playback.projectFrame()).toBe(0); expect(playback.sync()).toBe(true);
     expect(node.commands.filter(item => item.kind === 'stop')).toHaveLength(1);
   });
   it('ignores old acknowledgements and receipts after a warm seek/restart', async () => {
@@ -138,7 +138,7 @@ describe('sample-owned bounded streaming music', () => {
     node.context.currentTime = 11; await started(40); const current = node.startCommand();
     node.emit({ kind: 'started', generation: previous.generation, contextStart: 0 });
     node.emit({ kind: 'rendered', generation: previous.generation, samples: 0, contextFrame: 99 });
-    expect(playback.projectFrame()).toBe(40); expect(playback.sync(40)).toBe(true); expect(current.generation).not.toBe(previous.generation);
+    expect(playback.projectFrame()).toBe(40); expect(playback.sync()).toBe(true); expect(current.generation).not.toBe(previous.generation);
     expect(contexts).toHaveLength(1); expect(nodes).toHaveLength(1);
   });
   it('cannot submit a stale start when pause occurs at the completed-prefill continuation boundary', async () => {
@@ -146,7 +146,7 @@ describe('sample-owned bounded streaming music', () => {
     boundary.prefill = () => playback.pause();
     await expect(started()).rejects.toMatchObject({ name: 'AbortError' });
     expect(nodes[0]!.commands.filter(command => command.kind === 'start')).toHaveLength(0);
-    expect(playback.sync(20)).toBe(true);
+    expect(playback.sync()).toBe(true);
   });
   it('uses exactly released credits for serial bounded refill and exposes real underruns', async () => {
     await configured(); const node = await started(); const generation = node.startCommand().generation;
@@ -154,8 +154,8 @@ describe('sample-owned bounded streaming music', () => {
     node.emit({ kind: 'credit', generation, count: 1 });
     await vi.waitFor(() => expect(node.commands.filter(command => command.kind === 'chunk')).toHaveLength(1));
     expect(requests.length - before).toBe(1);
-    node.emit({ kind: 'underrun', generation }); expect(playback.sync(20)).toBe(false);
-    playback.pause(); expect(playback.sync(20)).toBe(true);
+    node.emit({ kind: 'underrun', generation }); expect(playback.sync()).toBe(false);
+    playback.pause(); expect(playback.sync()).toBe(true);
   });
   it('reads a short selected loop only once per bounded block, with a fresh guarded range on each refill', async () => {
     await configured(track({ sourceIn: 10, sourceOut: 11, loop: true }));
@@ -182,12 +182,12 @@ describe('sample-owned bounded streaming music', () => {
     fetchPcm.mockImplementationOnce(async () => new Response(new Uint8Array(400), { headers: { 'content-type': 'application/octet-stream', 'content-length': '400' } }));
     await expect(started()).rejects.toThrow('exact bounded PCM16 range');
     expect(nodes[0]!.commands.filter(command => command.kind === 'start')).toHaveLength(0);
-    expect(playback.sync(20)).toBe(true);
+    expect(playback.sync()).toBe(true);
   });
   it('reports a genuine processor exception after a good receipt instead of advancing silently', async () => {
     await configured(); const node = await started(); advance(128);
     node.onprocessorerror!();
-    expect(() => playback.sync(20)).toThrow('audio processor failed');
+    expect(() => playback.sync()).toThrow('audio processor failed');
     playback.pause(); await expect(started(40)).rejects.toThrow('audio processor failed');
     await playback.configure(null, new AbortController().signal);
     await expect(started(40)).resolves.toBe(node); expect(playback.hasMusic).toBe(false);
@@ -207,11 +207,11 @@ describe('sample-owned bounded streaming music', () => {
     const node = nodes[0]!;
     node.emit({ kind: 'failed', generation: node.startCommand().generation, message: 'Malformed PCM block' });
     expect(await pending).toMatchObject({ message: 'Malformed PCM block' });
-    expect(playback.sync(20)).toBe(true);
+    expect(playback.sync()).toBe(true);
   });
   it.each(['suspended', 'closed'])('reports an unexpectedly %s context rather than accepting a stale receipt', async state => {
     await configured(); await started(); contexts[0]!.state = state;
-    expect(() => playback.sync(20)).toThrow('stopped unexpectedly');
+    expect(() => playback.sync()).toThrow('stopped unexpectedly');
   });
   it('reports an invalid output timestamp while still allowing idempotent source cancellation and disposal', async () => {
     await configured(); const node = await started(); advance(6400); expect(playback.projectFrame()).toBe(23);

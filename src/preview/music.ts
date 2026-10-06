@@ -275,7 +275,7 @@ export class MusicPlayback {
     return position;
   }
   projectFrame(): number { return Math.floor(this.#projectPosition() + 1e-7); }
-  sync(_frame: number): boolean {
+  sync(): boolean {
     if (this.#run?.error) throw this.#run.error;
     if (!this.#track || !this.#running) return true;
     if (this.#context!.state !== 'running') throw new Error('Music audio context stopped unexpectedly. Retry preview explicitly.');
