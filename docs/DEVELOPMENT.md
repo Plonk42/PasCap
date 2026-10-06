@@ -350,6 +350,16 @@ and [grading equations](COLOUR_AND_TIMING.md#colour).
 
 ## Contributor safety
 
+- **Use short-lived branches in one clean, idle checkout by default.** Worktrees
+  are exceptions for unrelated unfinished work, an active service/test, an unchanged
+  reproduction baseline or explicitly concurrent work; record their isolation
+  reason and retirement condition. A new chat, correction or remote CI wait alone
+  needs no extra checkout. Once local jobs settle and edits are saved/committed,
+  return to fresh, verified local `main` for the next task's branch. A published PR
+  can keep its branch while CI runs without keeping the directory on that branch;
+  preserve its accepted head and wait for dependencies to land. Verify ignored
+  build/fixture/dependency inputs after switching; never reset user data to reuse
+  the directory. See the [branch handoff](GITHUB_WORKFLOW.md#sequential-branch-handoff).
 - Linked task worktrees must be retired after observed merge, at handoff and
   next-session recovery through the [worktree lifecycle](GITHUB_WORKFLOW.md#worktree-lifecycle-and-cleanup).
   Pending PRs and active/unfinished work remain intact with a reason and next action.
@@ -360,9 +370,10 @@ and [grading equations](COLOUR_AND_TIMING.md#colour).
   deletion/administrative pruning with removing an existing local worktree.
 - **Start each new task from current remote `main`, before edits or validation.**
   Fetch and verify its SHA, fast-forward a clean/idle local `main` only, then create
-  a new short-lived branch. With dirty or active work, preserve it and use a clean
-  isolated worktree directly from freshly fetched `origin/main`. Never reuse a
-  previous task/unmerged PR branch or reset/stash unrelated work. Record the starting
+  a new short-lived branch in the existing checkout. If switching would disturb
+  unfinished edits or active jobs, preserve them and use an isolated checkout
+  directly from freshly fetched `origin/main`, recording the exception. Never reuse
+  a previous task/unmerged PR branch or reset/stash unrelated work. Record the starting
   SHA; stop if freshness or safe isolation cannot be verified. Same-task continuation
   follows the [startup and PR-update rules](GITHUB_WORKFLOW.md#start-every-new-task-from-current-main).
 - **Format before committing, not afterward.** Use each changed file's configured
