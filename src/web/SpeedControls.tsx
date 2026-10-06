@@ -6,6 +6,7 @@ import { sourceRateAt, type SpeedSettings } from '../shared/speed.js';
 import { ClipSpeedCurve } from './ClipSpeedCurve.js';
 import './declutter.css';
 import { sourceSeconds } from './display.js';
+import { EasingSelect } from './EasingSelect.js';
 import { HelpPopover } from './HelpPopover.js';
 import { Icon } from './icons.js';
 import { KeyframeToggle } from './KeyframeToggle.js';
@@ -143,17 +144,16 @@ function BaseSpeedControls({
           </div>
           <label className="speed-field">
             Curve
-            <select
+            <EasingSelect
               aria-label="Ramp curve"
               value={speed.curve}
               disabled={disabled}
-              onChange={(event) => onChange({ ...speed, curve: event.target.value as typeof speed.curve })}
-            >
-              <option value="linear">Linear</option>
-              <option value="ease-in">Ease in</option>
-              <option value="ease-out">Ease out</option>
-              <option value="smooth">Smooth (S curve)</option>
-            </select>
+              allowHold={false}
+              ramp
+              onChange={(curve) => {
+                if (curve !== 'hold') onChange({ ...speed, curve });
+              }}
+            />
           </label>
         </>
       )}

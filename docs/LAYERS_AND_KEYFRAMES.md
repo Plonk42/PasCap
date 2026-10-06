@@ -206,6 +206,10 @@ an inner **Time, easing & values** disclosure.
 Its Timeline frame field moves
 **every participant and the point's existing easing together in one Undo step**;
 Shared easing affects all of them, each toward its own next participating point.
+The native easing selector shows a compact graph of the selected progress shape:
+time runs left to right and value progress bottom to top. Hold stays flat until
+the exact next point, then jumps. The graph adds no focus stop; its text description
+is available with the selector. Native option hover does not preview an unselected shape.
 The row delete action removes the whole point. Time/value fields apply on Enter/blur,
 Escape restores, and frame collisions/invalid values/timing are rejected atomically,
 never merged or overwritten. Reordering and Undo preserve drafts and field identity/focus

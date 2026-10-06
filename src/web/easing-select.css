@@ -1,0 +1,46 @@
+.easing-choice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+}
+
+.easing-choice > select {
+  flex: 1;
+  width: 0;
+  min-width: 0;
+}
+
+.easing-graph {
+  flex: 0 0 72px;
+  width: 72px;
+  height: 42px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: #151e18;
+}
+
+.easing-graph-axes {
+  fill: none;
+  stroke: var(--line);
+  stroke-width: 1;
+}
+
+.easing-graph > polyline {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+
+.easing-description {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

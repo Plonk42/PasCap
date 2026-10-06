@@ -14,6 +14,7 @@ import { formatTimecode } from '../shared/timing.js';
 import { clipCurvePoints, previewClipSource, speedRatePosition, stepClipSpeedRate } from './clip-speed-geometry.js';
 import { Icon } from './icons.js';
 import { useKeyframeNavigation } from './keyframe-navigation.js';
+import { EasingSelect } from './EasingSelect.js';
 import { NumberField } from './NumberField.js';
 import type { DraftPreview } from './Timeline.js';
 import { useClipSpeedDrag } from './use-clip-speed-drag.js';
@@ -432,24 +433,18 @@ export function ClipSpeedCurve({
         </label>
         <label className="clip-speed-easing">
           To next point
-          <select
+          <EasingSelect
             aria-label="Clip speed keyframe easing"
             disabled={unavailable || selectedIndex === current.keyframes.length - 1}
             value={selected.interpolation}
-            onChange={(event) =>
+            onChange={(interpolation) =>
               change(
                 updateClipSpeedKey(current, selected.frame, {
-                  interpolation: event.currentTarget.value as Interpolation,
+                  interpolation,
                 }),
               )
             }
-          >
-            <option value="hold">Hold</option>
-            <option value="linear">Linear</option>
-            <option value="ease-in">Ease in</option>
-            <option value="ease-out">Ease out</option>
-            <option value="smooth">Smooth</option>
-          </select>
+          />
         </label>
       </div>
       {outside && (
