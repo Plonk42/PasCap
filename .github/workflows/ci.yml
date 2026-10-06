@@ -22,7 +22,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node: [22, 24]
+        # Pull requests check Node 22 only; pushes to main also cover Node 24.
+        node: ${{ github.event_name == 'pull_request' && fromJSON('[22]') || fromJSON('[22, 24]') }}
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
       - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
@@ -31,14 +32,14 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run check
-      - run: npm audit --audit-level=high
+      - if: github.event_name != 'pull_request'
+        run: npm audit --audit-level=high
 
-  integration:
-    name: Native media and browser / FFmpeg 8.0.1
+  native:
+    name: Native media / FFmpeg 8.0.1
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: 30
     env:
-      CI: true
       PASCAP_DATA_DIR: .pascap/ci
       PASCAP_MEDIA_ROOTS: "[]"
       PASCAP_FFMPEG: ${{ github.workspace }}/.ci/ffmpeg/bin/ffmpeg
@@ -49,30 +50,73 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - name: Install native build dependencies
-        run: sudo -n apt-get update && sudo -n apt-get install -y --no-install-recommends build-essential pkg-config nasm libx264-dev
-      - name: Cache tested FFmpeg build
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
-        with:
-          path: .ci/ffmpeg
-          key: ffmpeg-${{ runner.os }}-${{ runner.arch }}-ubuntu24-${{ hashFiles('scripts/ci/setup-ffmpeg.sh') }}
-      - name: Build or verify FFmpeg 8.0.1
-        run: bash scripts/ci/setup-ffmpeg.sh "$GITHUB_WORKSPACE/.ci/ffmpeg"
-      - name: Report native toolchain
-        run: '"$PASCAP_FFMPEG" -version && "$PASCAP_FFPROBE" -version'
+      - uses: ./.github/actions/setup-ffmpeg
       - run: npm ci
-      - name: Install test browsers
-        run: npx playwright install --with-deps chrome firefox
-      - name: Install Firefox software graphics and audio dependencies
-        run: sudo -n apt-get install -y --no-install-recommends xvfb xauth libgl1-mesa-dri libegl-mesa0 libglx-mesa0 pulseaudio pulseaudio-utils
-      - run: npm run build
       - name: Native synthetic media tests
         run: npm run test:media
+
+  chrome:
+    name: Chrome browser ${{ matrix.shard }}/4
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    env:
+      PASCAP_DATA_DIR: .pascap/ci
+      PASCAP_MEDIA_ROOTS: "[]"
+      PASCAP_FFMPEG: ${{ github.workspace }}/.ci/ffmpeg/bin/ffmpeg
+      PASCAP_FFPROBE: ${{ github.workspace }}/.ci/ffmpeg/bin/ffprobe
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: 22
+          cache: npm
+      - uses: ./.github/actions/setup-ffmpeg
+      - run: npm ci
+      - name: Install Chrome
+        run: npx playwright install --with-deps chrome
+      - run: npm run build
       - name: Prepare isolated browser fixtures
         run: npx tsx scripts/fixtures.ts --browser
       - name: Browser regression tests
-        run: npx playwright test --reporter=dot,html
-      - name: Prepare clean Firefox music fixtures
+        run: npx playwright test --shard=${{ matrix.shard }}/4 --reporter=dot,html
+      - name: Retain failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: chrome-${{ matrix.shard }}-diagnostics-${{ github.run_attempt }}
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  firefox:
+    name: Firefox music and playback
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      PASCAP_DATA_DIR: .pascap/ci
+      PASCAP_MEDIA_ROOTS: "[]"
+      PASCAP_FFMPEG: ${{ github.workspace }}/.ci/ffmpeg/bin/ffmpeg
+      PASCAP_FFPROBE: ${{ github.workspace }}/.ci/ffmpeg/bin/ffprobe
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: 22
+          cache: npm
+      - uses: ./.github/actions/setup-ffmpeg
+      - run: npm ci
+      - name: Install Firefox
+        run: npx playwright install --with-deps firefox
+      - name: Install Firefox software graphics and audio dependencies
+        run: sudo -n apt-get install -y --no-install-recommends xvfb xauth libgl1-mesa-dri libegl-mesa0 libglx-mesa0 pulseaudio pulseaudio-utils
+      - run: npm run build
+      - name: Prepare isolated browser fixtures
         run: npx tsx scripts/fixtures.ts --browser
       - name: Firefox music and playback regressions
         env:
@@ -85,29 +129,30 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: integration-diagnostics-${{ github.run_attempt }}
+          name: firefox-diagnostics-${{ github.run_attempt }}
           path: |
             playwright-report/
             test-results/
           if-no-files-found: ignore
           retention-days: 7
 
-  # Required alongside the three suite checks. Branch protection can accept skipped
-  # checks, so this unconditional job only succeeds when every prerequisite did.
+  # The only required check. Skipped/cancelled/failed jobs must not pass, so it runs
+  # unconditionally and requires literal success from every suite.
   delivery:
     name: Delivery gate
-    needs: [checks, integration]
+    needs: [checks, native, chrome, firefox]
     if: ${{ always() }}
     runs-on: ubuntu-24.04
     timeout-minutes: 1
     env:
-      CHECKS_RESULT: ${{ needs.checks.result }}
-      INTEGRATION_RESULT: ${{ needs.integration.result }}
+      RESULTS: checks=${{ needs.checks.result }} native=${{ needs.native.result }} chrome=${{ needs.chrome.result }} firefox=${{ needs.firefox.result }}
     steps:
       - name: Require successful suites
         shell: bash
         run: |
-          if [[ "$CHECKS_RESULT" != success || "$INTEGRATION_RESULT" != success ]]; then
-            printf 'Delivery blocked: checks=%s integration=%s\n' "$CHECKS_RESULT" "$INTEGRATION_RESULT"
-            exit 1
-          fi
+          for result in $RESULTS; do
+            if [[ "${result#*=}" != success ]]; then
+              printf 'Delivery blocked: %s\n' "$RESULTS"
+              exit 1
+            fi
+          done

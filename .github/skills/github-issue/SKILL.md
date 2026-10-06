@@ -12,16 +12,12 @@ Turn the text following `/github-issue` into one scoped GitHub issue, or reuse a
 existing matching issue. Invocation authorizes logging and triage, **not product
 implementation**, publication, iteration admission, issue closure or media jobs.
 Do not run this workflow merely because an example invocation appears in chat.
-The standing protected-PR/pre-merge-acceptance policy applies when delivering
-approved work, not while merely logging an issue; see the
-[GitHub workflow](../../../docs/GITHUB_WORKFLOW.md#protected-pr-delivery).
+Delivering the work later follows the
+[GitHub workflow](../../../docs/GITHUB_WORKFLOW.md), not this skill.
 
 Explicit `/github-issue` invocation requests tracking. Do not invoke this skill
-implicitly for trivial non-functional formatting/import sorting/typos or a request
-to commit/push already-reviewed housekeeping: those need no issue or Project card.
-Substantive bugs/features/engineering work still use scoped issues. Housekeeping
-also uses protected PRs. Pre-merge acceptance and native auto-merge/eligible closure
-belong to approved delivery, never issue logging; no custom closure automation.
+implicitly for routine changes (UI tweaks, small fixes, formatting, typos): those
+need no issue or Project card.
 
 ## Inspect first
 
@@ -66,11 +62,10 @@ belong to approved delivery, never issue logging; no custom closure automation.
 - Apply only relevant live `area:*` labels. The current areas are editor, media,
   export, preview, audio, ci, container, licensing and workflow. Documentation and
   accessibility are modifiers, not primary categories. Do not create labels ad hoc.
-- Every open issue needs **exactly one** `status:*` and a concrete next action.
-  New unapproved proposals default to `status:backlog`; actionable selected work can
-  be `status:ready`. Use `status:blocked` for a real prerequisite/decision/consent
-  blocking the stated next step, and name it. Logging alone is never `in-progress`
-  implementation or `local-complete`. Preserve a reused issue's actual delivery state.
+- Optionally set one `status:*` label: `status:backlog` for a new proposal,
+  `status:ready` for selected actionable work or `status:blocked` naming the real
+  prerequisite/decision/consent. Status labels are planning aids; they are not
+  updated per commit. Preserve a reused issue's existing labels.
 - Assign one existing **outcome milestone** using its live scope, not a made-up
   deadline. Current outcomes: v0.1 local editor hardening; v0.2 real-workload
   qualification; v0.3 Docker/Podman delivery. A milestone assignment is a planning
@@ -114,12 +109,9 @@ credentials, licensed recordings/music or generated diagnostic reports.
    labels, relationships, assignees and metadata. Resolve conflicting primary labels
    deliberately instead of appending another category/priority/status.
 2. Add the **same issue** once to the repository-linked Project, not a draft card or
-   duplicate. Explicitly set its native Status to match its issue progress label:
-   Backlog, Ready, In progress, Blocked or Local complete. Done is for verified
-   closed issues only. Logging does not run publication or delivery closure; the
-   standing protected-PR and pre-merge acceptance policies are in the GitHub
-   workflow. Native closed-issue → Done is permitted when available, but never
-   Project Done → issue closure or a custom closure workflow.
+   duplicate, with Status Backlog, Ready or Blocked to match its label. Done is set
+   by the Project's native closed-issue workflow; never enable Project Done →
+   issue closure or a custom closure workflow.
 3. If Project/dependency access is unavailable, record the exact limitation and next
    action on the actual work issue and continue what is accessible. Do not create a
    fallback sprint issue/checklist or claim unavailable synchronization succeeded.
