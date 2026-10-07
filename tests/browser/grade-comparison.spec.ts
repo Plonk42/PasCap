@@ -876,6 +876,7 @@ test('comparison during music playback preserves the real worklet epoch and stri
     { length: duration },
     (_, frame) => sampleTimeline(comparison.playback, frame)[0]!.sourceFrame,
   );
+  await observeMusicPlayback(page);
   await page.evaluate((sourceFrames) => {
     const engine = window.pascapLab!.engine;
     // Observe actual texture uploads, so a later decoded callback cannot be
