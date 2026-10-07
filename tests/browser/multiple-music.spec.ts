@@ -393,7 +393,12 @@ for (const width of [1440, 1024, 720, 640])
       .attach(`music-lanes-${width}-before`, { body: await page.screenshot(), contentType: 'image/png' });
     const box = (await viewport.boundingBox())!;
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-    await page.mouse.wheel(0, 2000);
+    // Gecko bounds a native wheel event to a page of travel. Exercise successive
+    // wheel gestures, rather than assuming one large delta reaches the final lane.
+    const extent = await viewport.evaluate((element) => element.scrollHeight);
+    for (let travelled = 0; travelled < extent; travelled += box.height / 2) {
+      await page.mouse.wheel(0, box.height / 2);
+    }
     const last = page.locator('[data-music-lane="lane-7"]');
     const button = last.getByRole('button', { name: `Select music track 8: ${song.name}`, exact: true });
     await expect(button).toBeInViewport();
