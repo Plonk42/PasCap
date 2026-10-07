@@ -76,17 +76,20 @@ async function openRecoveryProject(
     expect(audio, 'The existing prepared synthetic WAV is required.').toBeDefined();
     project.media.audioIds = [audio!.id];
     // Music covers the entire playback, without a source wrap or placement boundary.
-    project.music = {
-      mediaId: audio!.id,
-      sourceIn: 0,
-      sourceOut: 120,
-      start: 0,
-      duration: 90,
-      gainDb: -12,
-      fadeIn: 0,
-      fadeOut: 0,
-      loop: false,
-    };
+    project.music = [
+      {
+        id: 'recovery-music',
+        mediaId: audio!.id,
+        sourceIn: 0,
+        sourceOut: 120,
+        start: 0,
+        duration: 90,
+        gainDb: -12,
+        fadeIn: 0,
+        fadeOut: 0,
+        loop: false,
+      },
+    ];
   }
   const memory = await memoryProjects(page, project);
   await installMusicEvidence(page);

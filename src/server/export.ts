@@ -22,6 +22,7 @@ import {
 } from '../shared/export.js';
 import { mediaAssetSchema, type MediaAsset, type MediaJob, type VideoMetadata } from '../shared/media.js';
 import type { MusicTrack, ProjectDocument } from '../shared/model.js';
+import { forEachSerial } from '../shared/serial.js';
 import { validateSourceRanges } from '../shared/source-range.js';
 import { framesToSeconds, PROJECT_FPS, sameRate } from '../shared/timing.js';
 import { ServiceError } from './errors.js';
@@ -73,7 +74,8 @@ export interface ExportReceipt {
   snapshot: ProjectDocument;
   profile: ExportProfile;
   sources: { id: string; sourcePath: string; fingerprint: MediaAsset['fingerprint']; metadata: VideoMetadata }[];
-  musicSource: AudioAsset | null;
+  /** Unique registered originals; instance identities/placements are in settings.audio. */
+  musicSources: AudioAsset[];
   settings: {
     target: ExportProfileSettings;
     codec: 'h264';
@@ -90,7 +92,7 @@ export interface ExportReceipt {
     grading: string;
     layered: LayeredRenderReport | null;
     scratchPolicy: string;
-    audio: ExportMusicPlan | null;
+    audio: ExportMusicPlan[];
     audioPlacement: string;
   };
   timeline: ExportPlan | LayeredExportPlan;
@@ -161,8 +163,9 @@ export async function preflightExport(
   resolveAudio?: AudioResolver,
 ): Promise<ExportPreflight> {
   const inputs = captureInputs(document, profile, library);
-  if (inputs.snapshot.music)
-    validateExportAudio(inputs.snapshot.music, await resolveRequiredAudio(inputs.snapshot.music.mediaId, resolveAudio));
+  await forEachSerial(inputs.snapshot.music, async (music) => {
+    validateExportAudio(music, await resolveRequiredAudio(music.mediaId, resolveAudio));
+  });
   return readExportSpace(library.config.dataDir, inputs.snapshot, inputs.profile);
 }
 
@@ -187,7 +190,7 @@ export function startExport(
   resolveAudio?: AudioResolver,
 ): MediaJob {
   const inputs = captureInputs(document, profile, library);
-  if (inputs.snapshot.music && !resolveAudio)
+  if (inputs.snapshot.music.length > 0 && !resolveAudio)
     throw new ServiceError('A music source resolver is required for this export.', 422);
   return library.jobs.submit(
     'export',
@@ -499,30 +502,159 @@ async function prepareMusic(
 }
 
 /** Silence prefix streams in constant memory; adelay would allocate a duration-sized delay buffer. */
-function musicGraph(music: ExportMusicPlan): string {
+function musicGraph(music: ExportMusicPlan, input: number, output: string): string {
   if (music.activeSamples === 0)
-    return `anullsrc=r=48000:cl=stereo,atrim=end_sample=${music.videoSamples},asetpts=N/SR/TB[audio]`;
+    return `anullsrc=r=48000:cl=stereo,atrim=end_sample=${music.videoSamples},asetpts=N/SR/TB,aformat=sample_fmts=dblp[${output}]`;
   const fades = [
     ...(music.fadeInSamples ? [`afade=t=in:ss=0:ns=${music.fadeInSamples}:curve=tri`] : []),
     ...(music.fadeOutSamples
       ? [`afade=t=out:ss=${music.durationSamples - music.fadeOutSamples}:ns=${music.fadeOutSamples}:curve=tri`]
       : []),
   ];
-  const track = `[1:a]atrim=end_sample=${music.activeSamples},asetpts=N/SR/TB,volume=${music.gain.toPrecision(17)},${[...fades, 'aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo'].join(',')}[music];`;
+  const track = `[${input}:a]atrim=end_sample=${music.activeSamples},asetpts=N/SR/TB,aformat=sample_fmts=dblp:sample_rates=48000:channel_layouts=stereo,volume=${music.gain.toPrecision(17)}:precision=double,${[...fades, 'anull'].join(',')}[music];`;
   const prefix = music.startSamples
-    ? `anullsrc=r=48000:cl=stereo,atrim=end_sample=${music.startSamples},asetpts=N/SR/TB,aformat=sample_fmts=fltp[lead];[lead][music]concat=n=2:v=0:a=1`
+    ? `anullsrc=r=48000:cl=stereo,atrim=end_sample=${music.startSamples},asetpts=N/SR/TB,aformat=sample_fmts=dblp[lead];[lead][music]concat=n=2:v=0:a=1`
     : '[music]anull';
   return (
     track +
     prefix +
-    `,apad=whole_len=${music.videoSamples},atrim=end_sample=${music.videoSamples},asetpts=N/SR/TB[audio]`
+    `,apad=whole_len=${music.videoSamples},atrim=end_sample=${music.videoSamples},asetpts=N/SR/TB[${output}]`
   );
+}
+
+async function verifyMusicAccumulator(
+  filename: string,
+  samples: number,
+  library: MediaLibrary,
+  directory: string,
+  context: JobContext,
+): Promise<void> {
+  const streams = await inspectStreams(library.config, path.join(directory, filename), context.signal);
+  const pcm = streams.streams.filter((stream) => stream.codec_type === 'audio');
+  if (
+    pcm.length !== 1 ||
+    pcm[0]!.codec_name !== 'pcm_f64le' ||
+    pcm[0]!.time_base !== '1/48000' ||
+    pcm[0]!.duration_ts !== samples ||
+    Number(pcm[0]!['sample_rate']) !== 48000 ||
+    Number(pcm[0]!['channels']) !== 2
+  )
+    throw new ServiceError('Music accumulator differs from the exact double-precision stereo sample contract.', 422);
+}
+
+/** One original decode, then at most two intermediate audio inputs in one child.
+ * Never retain all sources: selected PCM + prior accumulator + next accumulator
+ * are the maximum three scratch files. Floating point preserves values outside
+ * [-1,1] across every pass; the final AAC mux performs the sole clamp.
+ */
+async function prepareMixedMusic(
+  music: readonly ExportMusicPlan[],
+  sources: readonly AudioAsset[],
+  library: MediaLibrary,
+  directory: string,
+  context: JobContext,
+): Promise<string | null> {
+  if (!music.length) return null;
+  let accumulator: string | null = null;
+  await forEachSerial(music, async (track, index) => {
+    checkCancelled(context);
+    if (!track.activeSamples) return;
+    const asset = sources.find((source) => source.id === track.mediaId);
+    if (!asset) throw new ServiceError('Music mix lost a captured registered original.', 500);
+    await assertSourceIdentity(asset.sourcePath, asset.fingerprint, true);
+    checkCancelled(context);
+    context.update(
+      0.83 + (0.02 * index) / music.length,
+      `Trimming original music instance ${index + 1} / ${music.length} to exact PCM`,
+    );
+    await prepareMusic(asset, track, library, directory, context);
+    await assertSourceIdentity(asset.sourcePath, asset.fingerprint, true);
+    checkCancelled(context);
+    const filename = `music-accumulator-${index}.wav`;
+    const args = [...BASE_ARGS, '-xerror', '-err_detect', 'explode'];
+    if (accumulator) args.push('-threads', '2', '-i', accumulator);
+    args.push(...(track.loop ? ['-stream_loop', '-1'] : []), '-threads', '2', '-i', 'music.wav');
+    const placed = musicGraph(track, accumulator ? 1 : 0, 'placed');
+    const graph = accumulator
+      ? placed +
+        ';[0:a]aformat=sample_fmts=dblp[lower];[lower][placed]amix=inputs=2:duration=longest:dropout_transition=0:normalize=0[audio]'
+      : placed + ';[placed]anull[audio]';
+    args.push(
+      '-filter_complex_threads',
+      '2',
+      '-filter_threads',
+      '2',
+      '-filter_complex',
+      graph,
+      '-map',
+      '[audio]',
+      '-vn',
+      '-sn',
+      '-dn',
+      '-c:a',
+      'pcm_f64le',
+      '-ar',
+      '48000',
+      '-ac',
+      '2',
+      '-threads',
+      '2',
+      '-rf64',
+      'auto',
+      filename,
+    );
+    context.update(
+      0.83 + (0.02 * (index + 0.5)) / music.length,
+      `Mixing music instance ${index + 1} / ${music.length} without normalization or clipping`,
+    );
+    checkCancelled(context);
+    await runProcess(library.config.ffmpeg, args, { cwd: directory, signal: context.signal });
+    await verifyMusicAccumulator(filename, track.videoSamples, library, directory, context);
+    checkCancelled(context);
+    await rm(path.join(directory, 'music.wav'));
+    if (accumulator) await rm(path.join(directory, accumulator));
+    accumulator = filename;
+  });
+  if (accumulator === null) {
+    const filename = 'music-silence.wav';
+    checkCancelled(context);
+    await runProcess(
+      library.config.ffmpeg,
+      [
+        ...BASE_ARGS,
+        '-f',
+        'lavfi',
+        '-i',
+        `anullsrc=r=48000:cl=stereo,atrim=end_sample=${music[0]!.videoSamples},asetpts=N/SR/TB`,
+        '-vn',
+        '-sn',
+        '-dn',
+        '-c:a',
+        'pcm_f64le',
+        '-ar',
+        '48000',
+        '-ac',
+        '2',
+        '-threads',
+        '2',
+        '-filter_threads',
+        '2',
+        '-rf64',
+        'auto',
+        filename,
+      ],
+      { cwd: directory, signal: context.signal },
+    );
+    await verifyMusicAccumulator(filename, music[0]!.videoSamples, library, directory, context);
+    accumulator = filename;
+  }
+  return accumulator;
 }
 
 async function muxExport(
   inputs: ExportInputs,
   chunkFiles: EncodedChunk[],
-  music: ExportMusicPlan | null,
+  music: string | null,
   library: MediaLibrary,
   directory: string,
   partial: string,
@@ -536,8 +668,7 @@ async function muxExport(
       chunkFiles.map((chunk) => `file ${chunk.filename}\nduration ${seconds(chunk.duration)}\n`).join(''),
   );
   const args = [...BASE_ARGS, '-threads', '2', '-f', 'concat', '-safe', '1', '-i', 'chunks.ffconcat'];
-  if (music?.activeSamples)
-    args.push(...(inputs.snapshot.music!.loop ? ['-stream_loop', '-1'] : []), '-threads', '2', '-i', 'music.wav');
+  if (music) args.push('-threads', '2', '-i', music);
   if (music)
     args.push(
       '-filter_complex_threads',
@@ -545,7 +676,7 @@ async function muxExport(
       '-filter_threads',
       '2',
       '-filter_complex',
-      musicGraph(music),
+      "[1:a]aeval=exprs='clip(val(0),-1,1)|clip(val(1),-1,1)',aformat=sample_fmts=fltp[audio]",
       '-map',
       '0:v:0',
       '-map',
@@ -656,7 +787,7 @@ async function verifyExport(
     video.colourRange !== 'tv' ||
     video.frameCount !== inputs.plan.duration ||
     !sameRate(video.frameRate, inputs.snapshot.frameRate) ||
-    video.hasAudio !== (inputs.snapshot.music !== null)
+    video.hasAudio !== inputs.snapshot.music.length > 0
   ) {
     throw new ServiceError(
       'Export verification failed: dimensions, frame count, codec, colour, rate or audio differs from the snapshot.',
@@ -668,10 +799,10 @@ async function verifyExport(
   if (videoStream?.time_base !== '1/30000' || videoStream['profile'] !== 'High')
     throw new ServiceError('Export H.264 profile or track timebase differs from the target.', 422);
   const audioStreams = streams.streams.filter((stream) => stream.codec_type === 'audio');
-  if (audioStreams.length !== (inputs.snapshot.music ? 1 : 0))
+  if (audioStreams.length !== (inputs.snapshot.music.length > 0 ? 1 : 0))
     throw new ServiceError('Export has an unexpected number of audio streams.', 422);
   let audio: ExportAudioVerification | null = null;
-  if (inputs.snapshot.music) {
+  if (inputs.snapshot.music.length > 0) {
     const stream = audioStreams[0]!;
     const match = /^(\d+)\/(\d+)$/.exec(stream.time_base);
     const durationSeconds = (Number(stream.duration_ts) * Number(match?.[1])) / Number(match?.[2]);
@@ -720,9 +851,9 @@ async function verifyExport(
   return { ...video, audio, fullDecode: true, faststart: true };
 }
 
-async function checkSources(assets: MediaAsset[], music: AudioAsset | null): Promise<void> {
+async function checkSources(assets: MediaAsset[], music: readonly AudioAsset[]): Promise<void> {
   for (const asset of assets) await assertSourceIdentity(asset.sourcePath, asset.fingerprint, true); // NOSONAR -- source checks are intentionally serial.
-  if (music) await assertSourceIdentity(music.sourcePath, music.fingerprint, true);
+  for (const asset of music) await assertSourceIdentity(asset.sourcePath, asset.fingerprint, true); // NOSONAR -- preserve every original, including music-only conclusions.
 }
 
 async function renderClips(
@@ -879,29 +1010,27 @@ async function renderCapturedExport(
     await mkdir(work, { mode: 0o700 });
     context.update(0.01, 'Validating immutable export snapshot and original source identities');
     const uniqueAssets = [...new Map(inputs.assets.map((asset) => [asset.id, asset])).values()];
-    await checkSources(uniqueAssets, null);
-    const musicSource = inputs.snapshot.music
-      ? validateExportAudio(
-          inputs.snapshot.music,
-          await resolveRequiredAudio(inputs.snapshot.music.mediaId, resolveAudio),
-        )
-      : null;
-    if (musicSource) await assertSourceIdentity(musicSource.sourcePath, musicSource.fingerprint, true);
-    const music = inputs.snapshot.music ? planExportMusic(inputs.snapshot.music, inputs.plan.duration) : null;
+    await checkSources(uniqueAssets, []);
+    const audioById = new Map<string, AudioAsset>();
+    await forEachSerial(inputs.snapshot.music, async (track) => {
+      checkCancelled(context);
+      const asset = audioById.get(track.mediaId) ?? (await resolveRequiredAudio(track.mediaId, resolveAudio));
+      audioById.set(track.mediaId, validateExportAudio(track, asset));
+    });
+    const musicSources = [...audioById.values()];
+    await checkSources([], musicSources);
+    const music = inputs.snapshot.music.map((track) => planExportMusic(track, inputs.plan.duration));
     checkCancelled(context);
     const target = EXPORT_PROFILES[inputs.profile];
     const { chunks, retiming, layered } = await renderVideo(inputs, { library, directory: work, context, target });
     checkCancelled(context);
-    if (musicSource && music?.activeSamples) {
-      context.update(0.83, 'Trimming only the selected original music range to bounded PCM');
-      await prepareMusic(musicSource, music, library, work, context);
-    }
+    const mixedMusic = await prepareMixedMusic(music, musicSources, library, work, context);
     context.update(0.85, 'Assembling exact-clock H.264 chunks without re-encoding video');
-    await muxExport(inputs, chunks, music, library, work, partial, context);
+    await muxExport(inputs, chunks, mixedMusic, library, work, partial, context);
     context.update(0.93, 'Verifying video timing, dimensions, SDR, AAC and full native decode');
     const verification = await verifyExport(partial, inputs, library, context);
     context.update(0.97, 'Rechecking original fingerprints before publishing');
-    await checkSources(uniqueAssets, musicSource);
+    await checkSources(uniqueAssets, musicSources);
     checkCancelled(context);
     const receipt: ExportReceipt = {
       kind: 'export',
@@ -916,7 +1045,7 @@ async function renderCapturedExport(
         fingerprint: asset.fingerprint,
         metadata: asset.metadata,
       })),
-      musicSource,
+      musicSources,
       timeline: inputs.plan,
       retiming,
       verification,
@@ -940,11 +1069,11 @@ async function renderCapturedExport(
           ? 'shared sampleTimeline evaluates independently participating layer point channels at absolute project frames across every clip in the row; row-owned Opacity supplies the same source coverage for every dissolve participant, using the row setting when unkeyed; source frames use placed.retiming.sourceAt(projectFrame - placed.start); at most two reusable in-memory CPU-reference 65³ Float32 LUTs, tetrahedral approximation (not bitwise); clip brightness after grading, coverage independent of black fades; C=sum(G*b*o*w), A=sum(o*w), result=C+lower*(1-A), no group opacity multiplier; source-over encoded BT.709; black padding after grade'
           : 'One static CPU-reference 65³ LUT per instance, native tetrahedral interpolation before output-frame black fades',
         scratchPolicy: layered
-          ? 'At most three full lossless timeline representations (a span collection counts as one) and two RGB clip files. Each track is graded once into a premultiplied RGBA16 group, then source-overed onto the lower accumulator without regrading. Delete lower/group after their bounded composition pass and clip files immediately after their last span. One final H.264 encode. No LUT files. Disk scales with three timelines + two clips + the H.264 chunk and final MP4 + selected PCM; not a fixed GB limit. All owned scratch/partials removed on failure/cancel; successful exports never overwritten.'
-          : 'At most two complete lossless clips; delete the previous clip immediately after its tail. Keep compressed chunks and selected PCM until mux/verification. Peak disk scales with two clips + chunks + selected PCM + final MP4, not all lossless clips. All scratch removed before publication; failed/cancelled job directory removed.',
+          ? 'At most three full lossless timeline representations (a span collection counts as one) and two RGB clip files. Each track is graded once into a premultiplied RGBA16 group, then source-overed onto the lower accumulator without regrading. Delete lower/group after their bounded composition pass and clip files immediately after their last span. One final H.264 encode. No LUT files. Audio retains at most one selected PCM16 file and two stereo Float64 accumulators, deleting consumed inputs after each serial pass. Disk scales with duration, not a fixed GB limit. All owned scratch/partials removed on failure/cancel; successful exports never overwritten.'
+          : 'At most two complete lossless clips; delete the previous clip immediately after its tail. Keep compressed chunks until mux/verification. Audio retains at most one selected PCM16 file and two stereo Float64 accumulators, deleting consumed inputs after each serial pass. Peak disk scales with two clips + chunks + bounded audio files + final MP4, not all originals. All scratch removed before publication; failed/cancelled job directory removed.',
         audio: music,
         audioPlacement:
-          '48 kHz stereo AAC (mono duplicated without attenuation), linear afade, explicit gain, selected-range loop; streamed silence prefix and pad/trim to video duration; no normalization or source-video audio',
+          '48 kHz stereo AAC (mono duplicated without attenuation), independent identified instances, linear afade, explicit gain, selected-range loop; streamed silence prefixes and pad/trim to full project duration, max(video OUTs, music OUTs), including music-only black tails; serial pairwise floating accumulation with Float64 files, normalize=0, one final [-1,1] clamp before AAC; one mixed audio input, no source-video audio',
       },
     };
     await atomicWrite(path.join(directory, 'receipt.json'), `${JSON.stringify(receipt, null, 2)}\n`);

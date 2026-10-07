@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { applyCommand, EditHistory } from '../../src/shared/commands.js';
 import { COLOUR_CONTROLS } from '../../src/shared/colour.js';
+import { applyCommand, EditHistory } from '../../src/shared/commands.js';
 import { EMPTY_KEY_VALUES, KEYFRAME_SETTINGS } from '../../src/shared/keyframes.js';
 import { createClip, createProject } from '../../src/shared/model.js';
 import { validateNumberDraft } from '../../src/web/NumberField.js';

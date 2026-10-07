@@ -128,6 +128,7 @@ export class PreviewEngine {
   #document: ProjectDocument | null = null;
   #layout: TimelineLayout = { clips: [], transitions: [], duration: 0 };
   #controller = new AbortController();
+  #catchUpController: AbortController | null = null;
   readonly #preloads = new Map<VideoDecoderSlot, { clipId: string; controller: AbortController }>();
   #operationFrame = 0;
   readonly #listeners = new Set<(diagnostics: PreviewDiagnostics) => void>();
@@ -234,6 +235,13 @@ export class PreviewEngine {
         const frame = this.#expectedFrame(now);
         const required = sampleTimeline(this.#document, frame, this.#layout).map((layer) => layer.clipId);
         if (!this.#canRetainFrame(frame, required)) {
+          // A clock crossing into a genuine empty composition needs no decoded
+          // callback. Draw current black (or finish), never retain ended footage
+          // or call it a video mismatch. Nonempty images keep the one-frame bound.
+          if (!required.length) {
+            this.#advance(now);
+            return;
+          }
           this.#operationFrame = frame;
           if (!this.#mismatchStart) this.#mismatchStart = now;
           this.#compositor.clear();
@@ -275,6 +283,8 @@ export class PreviewEngine {
   #beginOperation(): AbortSignal {
     this.#music.pause();
     this.#controller.abort();
+    this.#catchUpController?.abort();
+    this.#catchUpController = null;
     this.#cancelPreloads();
     this.#controller = new AbortController();
     this.#busy = true;
@@ -430,10 +440,10 @@ export class PreviewEngine {
       const ids = new Set(snapshot.clips.map((clip) => clip.id));
       this.#assignments = this.#assignments.map((id) => (id !== null && ids.has(id) ? id : null));
       this.#compositor.clear();
-      await this.#music.configure(snapshot.clips.length ? snapshot.music : null, signal);
+      await this.#music.configure(snapshot.music, signal);
       if (!this.#isCurrent(signal)) return;
       if (!this.#compositor.available) throw new Error('WebGL context is unavailable.');
-      if (!snapshot.clips.length) {
+      if (!this.#layout.duration) {
         this.#busy = false;
         this.#setStatus('empty', 'Add footage to the timeline');
         return;
@@ -569,6 +579,8 @@ export class PreviewEngine {
     this.#music.pause();
     this.#playing = false;
     this.#controller.abort();
+    this.#catchUpController?.abort();
+    this.#catchUpController = null;
     this.#cancelPreloads();
     this.#busy = false;
     for (const slot of this.#slots) slot.pause();
@@ -666,11 +678,28 @@ export class PreviewEngine {
   readonly #tick = (now: number): void => {
     if (this.#disposed) return;
     this.#raf = requestAnimationFrame(this.#tick);
-    if (!this.#playing || this.#busy || !this.#document) {
+    if (!this.#playing || !this.#document) {
       this.#emit();
       return;
     }
     try {
+      if (this.#busy && this.#catchUpController) {
+        const frame = this.#expectedFrame(now);
+        if (
+          frame >= this.#layout.duration ||
+          (!sampleTimeline(this.#document, frame, this.#layout).length && this.#music.sync())
+        ) {
+          // Cancel only the now-unneeded video seek, not healthy music's epoch.
+          // Its late callback cannot turn a black conclusion back into footage.
+          this.#catchUpController.abort();
+          this.#catchUpController = null;
+          this.#busy = false;
+        }
+      }
+      if (this.#busy) {
+        this.#emit();
+        return;
+      }
       this.#advance(now);
     } catch (error) {
       this.#handleError(error);
@@ -742,18 +771,22 @@ export class PreviewEngine {
     // that signal would cancel healthy audio merely because video is late.
     const signal = this.#controller.signal;
     const timeout = AbortSignal.timeout(5_000);
-    const mediaSignal = AbortSignal.any([signal, timeout]);
+    const controller = new AbortController();
+    this.#catchUpController = controller;
+    const mediaSignal = AbortSignal.any([signal, timeout, controller.signal]);
     this.#busy = true;
     for (const id of this.#playingClips) this.#slotFor(id).pause();
     try {
       await this.#catchUpVideoLoop(signal, mediaSignal);
     } catch (error) {
-      if (this.#isCurrent(signal))
+      if (this.#isCurrent(signal) && !controller.signal.aborted)
         this.#handleError(
           timeout.aborted
             ? new Error('Video catch-up did not deliver the current audio frame within 5 seconds.')
             : error,
         );
+    } finally {
+      if (this.#catchUpController === controller) this.#catchUpController = null;
     }
   }
 
@@ -767,35 +800,48 @@ export class PreviewEngine {
         return;
       }
       const layers = sampleTimeline(this.#document!, frame, this.#layout);
-      const changed = !sameClips(
-        layers.map((layer) => layer.clipId),
-        this.#playingClips,
-      );
-      if (!this.#music.sync() || changed) {
-        this.#busy = false;
-        await this.#alignPlayback(frame, changed);
-        return;
-      }
+      if (await this.#leaveVideoCatchUp(frame, layers)) return;
       this.#operationFrame = frame;
       await this.#prepareLayers(layers, signal, mediaSignal);
       if (!this.#isCurrent(signal) || !this.#playing) return;
       mediaSignal.throwIfAborted();
       const current = this.#acceptCurrentVideo();
       if (current === null) continue;
-      this.#setPlaybackRates(sampleTimeline(this.#document!, current, this.#layout), current);
-      await waitForMedia(Promise.all(this.#playingClips.map((id) => this.#slotFor(id).play())), mediaSignal);
-      if (!this.#isCurrent(signal) || !this.#playing) return;
-      mediaSignal.throwIfAborted();
-      const presented = this.#acceptCurrentVideo();
-      if (presented === null) {
-        for (const id of this.#playingClips) this.#slotFor(id).pause();
-        continue;
-      }
-      this.#busy = false;
-      this.#setStatus('playing', 'Playing');
-      this.#preloadNext(presented);
-      return;
+      if (await this.#restartCaughtUpVideo(current, signal, mediaSignal)) return;
     }
+  }
+
+  async #restartCaughtUpVideo(frame: number, signal: AbortSignal, mediaSignal: AbortSignal): Promise<boolean> {
+    this.#setPlaybackRates(sampleTimeline(this.#document!, frame, this.#layout), frame);
+    await waitForMedia(Promise.all(this.#playingClips.map((id) => this.#slotFor(id).play())), mediaSignal);
+    if (!this.#isCurrent(signal) || !this.#playing) return true;
+    mediaSignal.throwIfAborted();
+    const presented = this.#acceptCurrentVideo();
+    if (presented === null) {
+      for (const id of this.#playingClips) this.#slotFor(id).pause();
+      return false;
+    }
+    this.#busy = false;
+    this.#setStatus('playing', 'Playing');
+    this.#preloadNext(presented);
+    return true;
+  }
+
+  async #leaveVideoCatchUp(frame: number, layers: readonly PreviewLayer[]): Promise<boolean> {
+    const changed = !sameClips(
+      layers.map((layer) => layer.clipId),
+      this.#playingClips,
+    );
+    const synchronized = this.#music.sync();
+    if (synchronized && !layers.length) {
+      this.#busy = false;
+      this.#advance(performance.now());
+      return true;
+    }
+    if (synchronized && !changed) return false;
+    this.#busy = false;
+    await this.#alignPlayback(frame, changed);
+    return true;
   }
 
   #acceptCurrentVideo(): number | null {

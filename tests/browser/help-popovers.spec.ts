@@ -80,17 +80,20 @@ test.beforeEach(async ({ page, request }) => {
   const track = audio[0];
   if (!track) throw new Error('Help checks require the dedicated prepared synthetic audio fixture.');
   document.media.audioIds = [track.id];
-  document.music = {
-    mediaId: track.id,
-    sourceIn: 0,
-    sourceOut: Math.min(60, track.metadata.frameCount),
-    start: 0,
-    duration: 240,
-    gainDb: 0,
-    fadeIn: 0,
-    fadeOut: 0,
-    loop: true,
-  };
+  document.music = [
+    {
+      id: 'help-music',
+      mediaId: track.id,
+      sourceIn: 0,
+      sourceOut: Math.min(60, track.metadata.frameCount),
+      start: 0,
+      duration: 240,
+      gainDb: 0,
+      fadeIn: 0,
+      fadeOut: 0,
+      loop: true,
+    },
+  ];
   memory = await memoryProjects(page, document);
   await expandedInspectorPreferences(page);
   await page.addInitScript('globalThis.__name = (fn) => fn;');

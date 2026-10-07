@@ -12,14 +12,14 @@ import type { ProjectDocument, VideoClip } from '../shared/model.js';
 import { MAX_CLIP_SPEED_KEYS, type SpeedCurve } from '../shared/speed.js';
 import { formatTimecode } from '../shared/timing.js';
 import { clipCurvePoints, previewClipSource, speedRatePosition, stepClipSpeedRate } from './clip-speed-geometry.js';
+import './clip-speed.css';
+import { EasingSelect } from './EasingSelect.js';
 import { Icon } from './icons.js';
 import { useKeyframeNavigation } from './keyframe-navigation.js';
-import { EasingSelect } from './EasingSelect.js';
 import { NumberField } from './NumberField.js';
 import { RateValueControl } from './SettingValueControl.js';
 import type { DraftPreview } from './Timeline.js';
 import { useClipSpeedDrag } from './use-clip-speed-drag.js';
-import './clip-speed.css';
 
 interface Props {
   project: ProjectDocument;

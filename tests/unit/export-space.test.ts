@@ -135,21 +135,48 @@ describe('duration-dependent planning allowance, not a codec guarantee', () => {
     document.clips.push({ ...createClip('hidden', 'video', 0, 60), layerId: 'hidden', start: 100 });
     expect(estimateExportSpace(document, 'draft720').losslessBytes).toBe(1280 * 720 * (30 * 4 + 3 * 160 * 8));
   });
-  it('budgets only the selected PCM once regardless of looping and none for inactive music', () => {
+  it('budgets bounded selected PCM and floating accumulators regardless of looping', () => {
     const document = documentWithClips();
-    document.music = {
-      mediaId: 'music',
-      sourceIn: 6,
-      sourceOut: 12,
-      start: 0,
-      duration: 30,
-      gainDb: 0,
-      fadeIn: 0,
-      fadeOut: 0,
-      loop: true,
-    };
-    expect(estimateExportSpace(document, 'draft720').audioBytes).toBe((19219 - 9610) * 4);
-    document.music.start = 40;
+    document.music = [
+      {
+        id: 'music-instance',
+        mediaId: 'music',
+        sourceIn: 6,
+        sourceOut: 12,
+        start: 0,
+        duration: 30,
+        gainDb: 0,
+        fadeIn: 0,
+        fadeOut: 0,
+        loop: true,
+      },
+    ];
+    const videoSamples = Math.round((30 * 48000 * 1001) / 30000);
+    expect(estimateExportSpace(document, 'draft720').audioBytes).toBe((19219 - 9610) * 4 + videoSamples * 16 * 2);
+    document.music.push(
+      ...Array.from({ length: 7 }, (_, index) => ({
+        ...document.music[0]!,
+        id: `instance-${index}`,
+        sourceIn: 0,
+        sourceOut: 18,
+      })),
+    );
+    expect(estimateExportSpace(document, 'draft720').audioBytes).toBe(
+      Math.round((18 * 48000 * 1001) / 30000) * 4 + videoSamples * 16 * 2,
+    );
+    document.music = document.music.map((track) => ({ ...track, start: 40 }));
+    const extended = estimateExportSpace(document, 'draft720');
+    expect(extended.audioBytes).toBe(
+      Math.round((18 * 48000 * 1001) / 30000) * 4 + Math.round((70 * 48000 * 1001) / 30000) * 16 * 2,
+    );
+    expect(extended.losslessBytes).toBe(1280 * 720 * (30 * 4 + 70 * 8 * 3));
+    expect(extended.encodedBytes).toBe(1280 * 720 * 70 * 2);
+    document.music.reverse();
+    expect(estimateExportSpace(document, 'draft720')).toEqual(extended);
+    const uhd = estimateExportSpace(document, 'final4k');
+    expect(uhd.audioBytes).toBe(extended.audioBytes);
+    expect(uhd.losslessBytes).toBe(3840 * 2160 * (30 * 4 + 70 * 8 * 3));
+    document.music = [];
     expect(estimateExportSpace(document, 'draft720').audioBytes).toBe(0);
   });
   it('remains finite for the maximum supported timeline and grows with duration, not a fixed GB bound', () => {
@@ -159,6 +186,24 @@ describe('duration-dependent planning allowance, not a codec guarantee', () => {
     const long = estimateExportSpace(document, 'final4k');
     expect(Number.isFinite(long.totalBytes)).toBe(true);
     expect(long.totalBytes).toBeGreaterThan(short.totalBytes * 1_000_000);
+    document.music = [
+      {
+        id: 'maximum-tail',
+        mediaId: 'music',
+        sourceIn: 0,
+        sourceOut: 1,
+        start: 2_147_483_646,
+        duration: 1,
+        gainDb: 0,
+        fadeIn: 0,
+        fadeOut: 0,
+        loop: false,
+      },
+    ];
+    document.clips[0]!.sourceOut = 30;
+    expect(Number.isFinite(estimateExportSpace(document, 'final4k').totalBytes)).toBe(true);
+    document.music[0]!.start++;
+    expect(() => estimateExportSpace(document, 'draft720')).toThrow('integer project-frame range');
   });
   it.each([
     { bytes: 0, text: '0 B' },

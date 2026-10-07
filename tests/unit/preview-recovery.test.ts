@@ -46,7 +46,7 @@ interface MusicDouble {
   clockFrame: number;
   clockTime: number;
   running: boolean;
-  configure: Mock<(track: MusicTrack | null, signal: AbortSignal) => Promise<void>>;
+  configure: Mock<(tracks: readonly MusicTrack[], signal: AbortSignal) => Promise<void>>;
   resumeContext: Mock<() => Promise<void>>;
   start: Mock<(frame: number, signal: AbortSignal) => Promise<void>>;
   sync: Mock<() => boolean>;
@@ -163,7 +163,7 @@ vi.mock('../../src/preview/compositor.js', () => ({
 
 vi.mock('../../src/preview/music.js', () => ({
   MusicPlayback: class {
-    track: MusicTrack | null = null;
+    tracks: readonly MusicTrack[] = [];
     clockFrame = 0;
     clockTime = 0;
     running = false;
@@ -172,15 +172,15 @@ vi.mock('../../src/preview/music.js', () => ({
       doubles.music.push(this);
     }
     get hasMusic(): boolean {
-      return this.track !== null;
+      return this.tracks.length > 0;
     }
     get clockSeconds(): number {
       return doubles.now / 1000;
     }
-    configure = vi.fn(async (track: MusicTrack | null, signal: AbortSignal): Promise<void> => {
+    configure = vi.fn(async (tracks: readonly MusicTrack[], signal: AbortSignal): Promise<void> => {
       if (signal.aborted) throw new DOMException('Cancelled music configuration', 'AbortError');
       this.pause();
-      this.track = track;
+      this.tracks = tracks;
     });
     resumeContext = vi.fn(async (): Promise<void> => {});
     start = vi.fn(async (frame: number, signal: AbortSignal): Promise<void> => {
@@ -198,7 +198,7 @@ vi.mock('../../src/preview/music.js', () => ({
     });
     dispose = vi.fn((): void => {
       this.pause();
-      this.track = null;
+      this.tracks = [];
     });
   },
 }));
@@ -247,17 +247,20 @@ function singleProject(withMusic = false): ProjectDocument {
   project.media.videoIds = ['video'];
   if (withMusic) {
     project.media.audioIds = ['song'];
-    project.music = {
-      mediaId: 'song',
-      sourceIn: 0,
-      sourceOut: 600,
-      start: 0,
-      duration: 600,
-      gainDb: 0,
-      fadeIn: 0,
-      fadeOut: 0,
-      loop: false,
-    };
+    project.music = [
+      {
+        id: 'song-instance',
+        mediaId: 'song',
+        sourceIn: 0,
+        sourceOut: 600,
+        start: 0,
+        duration: 600,
+        gainDb: 0,
+        fadeIn: 0,
+        fadeOut: 0,
+        loop: false,
+      },
+    ];
   }
   return project;
 }
@@ -1098,6 +1101,134 @@ describe('PreviewEngine observed-frame tolerance and recovery', () => {
   });
 });
 
+describe('PreviewEngine music-owned black conclusions', () => {
+  function conclusion(): ProjectDocument {
+    const project = singleProject(true);
+    project.clips[0]!.sourceOut = 10;
+    project.layers[0]!.closingFade = 3;
+    project.music = [
+      { ...project.music[0]!, id: 'longest', duration: 18, fadeOut: 4 },
+      { ...project.music[0]!, id: 'shorter-last', start: 6, duration: 6 },
+    ];
+    return project;
+  }
+
+  it('keeps one music epoch through every black frame, then pauses on the final music frame', async () => {
+    const preview = await running(conclusion(), 8);
+    const slot = slotFor(preview);
+    expect(preview.engine.diagnostics().duration).toBe(18);
+    expect(preview.compositor.visible![0]!.clips[0]!.brightness).toBe(0.5);
+    slot.observe(9);
+    tick(preview, 9);
+    expect(preview.compositor.visible![0]!.clips[0]!.brightness).toBe(0);
+    for (let frame = 10; frame < 18; frame++) {
+      tick(preview, frame);
+      expect(preview.engine.diagnostics()).toMatchObject({
+        status: 'playing',
+        frame,
+        activeDecoders: 0,
+        audioClock: true,
+      });
+      expectSurface(preview, frame);
+      expect(preview.engine.capturePixels()).toEqual(new Uint8Array([0, 0, 0, 255]));
+      expect(preview.music.running).toBe(true);
+      expectUninterrupted(preview);
+    }
+    expect(slot.play).not.toHaveBeenCalled();
+    expect(slot.pause).toHaveBeenCalledOnce();
+    tick(preview, 18);
+    await settle();
+    expect(preview.engine.diagnostics()).toMatchObject({ status: 'paused', playing: false, frame: 17, duration: 18 });
+    expectSurface(preview, 17);
+    expect(preview.music.running).toBe(false);
+    expect(preview.music.start).not.toHaveBeenCalled();
+    expect(slot.seek).not.toHaveBeenCalled();
+  });
+
+  it('seeks and restarts within a black conclusion without asking for an ended video source', async () => {
+    const preview = await paused(conclusion(), 8);
+    await preview.engine.seek(14);
+    expect(preview.engine.diagnostics()).toMatchObject({ status: 'paused', frame: 14 });
+    expectSurface(preview, 14);
+    for (const slot of doubles.slots) {
+      expect(slot.load).not.toHaveBeenCalled();
+      expect(slot.seek).not.toHaveBeenCalled();
+    }
+    await preview.engine.play();
+    await settle();
+    expect(preview.engine.diagnostics()).toMatchObject({ status: 'playing', frame: 14, activeDecoders: 0 });
+    expect(preview.music.start).toHaveBeenCalledExactlyOnceWith(14, expect.any(AbortSignal));
+    expectSurface(preview, 14);
+  });
+
+  it('replaces footage with current black when the real output clock crosses video OUT during a draw', async () => {
+    const preview = await running(conclusion(), 8);
+    slotFor(preview).observe(9);
+    const draw = preview.compositor.drawFrame.getMockImplementation()!;
+    preview.compositor.drawFrame.mockImplementationOnce((groups) => {
+      draw(groups);
+      doubles.now = preview.anchor + framesToSeconds(10 - preview.initialFrame + 0.1) * 1000;
+    });
+    tick(preview, 9);
+    expect(preview.engine.diagnostics()).toMatchObject({
+      status: 'playing',
+      frame: 10,
+      requestedFrame: 10,
+      activeDecoders: 0,
+    });
+    expectSurface(preview, 10);
+    expectUninterrupted(preview);
+  });
+
+  it('cancels only a withheld video catch-up at video OUT and ignores its late source without restarting music', async () => {
+    const project = conclusion();
+    project.clips[0]!.sourceOut = 14;
+    const preview = await running(project, 8);
+    const slot = slotFor(preview);
+    const pending = holdNextSeek(slot);
+    tick(preview, 11);
+    tick(preview, 12, 0.25);
+    await settle();
+    expect(pending.request().frame).toBe(12);
+    expect(preview.engine.diagnostics()).toMatchObject({ status: 'buffering', playing: true });
+    const stalls = preview.engine.diagnostics().stalls;
+    tick(preview, 14);
+    await settle();
+    expect(pending.request().signal.aborted).toBe(true);
+    expect(preview.engine.diagnostics()).toMatchObject({ status: 'playing', frame: 14, activeDecoders: 0, stalls });
+    expectSurface(preview, 14);
+    expect(preview.music.pause).not.toHaveBeenCalled();
+    expect(preview.music.start).not.toHaveBeenCalled();
+    expect(preview.music.running).toBe(true);
+    slot.observe(12);
+    pending.release();
+    await settle();
+    expectSurface(preview, 14);
+    expect(slot.play).not.toHaveBeenCalled();
+    tick(preview, 17);
+    expect(preview.engine.diagnostics()).toMatchObject({ status: 'playing', frame: 17 });
+    expectSurface(preview, 17);
+    tick(preview, 18);
+    await settle();
+    expect(preview.engine.diagnostics()).toMatchObject({ status: 'paused', playing: false, frame: 17 });
+  });
+
+  it('does not treat an empty video composition as permission to ignore a real music failure', async () => {
+    const preview = await running(conclusion(), 8);
+    preview.music.sync.mockImplementationOnce(() => {
+      throw new Error('Required music range failed');
+    });
+    tick(preview, 10);
+    expect(preview.engine.diagnostics()).toMatchObject({
+      status: 'error',
+      playing: false,
+      message: 'Required music range failed',
+    });
+    expect(preview.music.pause).toHaveBeenCalled();
+    expect(preview.music.start).not.toHaveBeenCalled();
+  });
+});
+
 describe('PreviewEngine editor-only ungraded comparison', () => {
   it('starts graded and ignores mode requests without a loaded document', () => {
     const engine = new PreviewEngine(new EventTarget() as HTMLCanvasElement);
@@ -1398,7 +1529,7 @@ describe('PreviewEngine editor-only ungraded comparison', () => {
     preview.engine.subscribe((state) => modes.push(state.ungraded));
     await preview.engine.loadProject(reloaded, proxyUrl, 12);
     preview.project = submitted;
-    expect(preview.engine.diagnostics()).toMatchObject({ ungraded: true, status: 'paused', frame: 12, duration: 30 });
+    expect(preview.engine.diagnostics()).toMatchObject({ ungraded: true, status: 'paused', frame: 12, duration: 600 });
     expect(modes.length).toBeGreaterThan(1);
     expect(modes.every(Boolean)).toBe(true);
     expectSurface(preview, 12, true);

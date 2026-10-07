@@ -216,6 +216,7 @@ export function App() {
   const [review, setReview] = useState<ReviewTarget | null>(null);
   const [reviewPinned, setReviewPinned] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedMusicId, setSelectedMusicId] = useState<string | null>(null);
   const [selectedLayerId, setSelectedLayerId] = useState(EMPTY_PROJECT.layers[0]!.id);
   const [keyframeInspection, setKeyframeInspection] = useState<KeyframeInspection | null>(null);
   const [ranges, setRanges] = useState<MediaSelections>({});
@@ -242,6 +243,7 @@ export function App() {
   const latestAssets = useRef<MediaAsset[]>([]);
   const latestAudio = useRef<AudioAsset[]>([]);
   const selection = useRef<string | null>(null);
+  const musicSelection = useRef<string | null>(null);
   const selectedLayer = useRef(EMPTY_PROJECT.layers[0]!.id);
   const sourceRanges = useRef<MediaSelections>({});
   const drafting = useRef(false);
@@ -283,6 +285,16 @@ export function App() {
       transitions?.find((item) => item.leftId === id) ?? transitions?.find((item) => item.rightId === id);
     setBoundaryId(boundary?.leftId ?? null);
   }, []);
+  const selectMusic = useCallback((id: string): void => {
+    if (drafting.current || !current.current?.music.some((track) => track.id === id)) return;
+    musicSelection.current = id;
+    setSelectedMusicId(id);
+    setInspectorMode('audio');
+    setViewerMode('timeline');
+    const workspace = latestWorkspace.current;
+    if (!workspace.layout.inspectorOpen)
+      workspace.update({ inspectorOpen: true, ...(workspace.viewport.width < 980 ? { mediaOpen: false } : {}) }, false);
+  }, []);
   const refresh = useCallback(async (options?: RequestOptions) => {
     const sequence = ++refreshSequence.current;
     const generation = jobGeneration.current;
@@ -302,9 +314,9 @@ export function App() {
   const validate = useCallback((document: ProjectDocument): void => {
     projectSchema.parse(document);
     validateSourceRanges(document, new Map(latestAssets.current.map((asset) => [asset.id, asset.metadata.frameCount])));
-    if (document.music) {
-      const asset = latestAudio.current.find((item) => item.id === document.music!.mediaId);
-      if (!asset || document.music.sourceOut > asset.metadata.frameCount)
+    for (const music of document.music) {
+      const asset = latestAudio.current.find((item) => item.id === music.mediaId);
+      if (!asset || music.sourceOut > asset.metadata.frameCount)
         throw new Error('Music range exceeds the registered original.');
     }
   }, []);
@@ -317,6 +329,16 @@ export function App() {
       }
       current.current = next;
       setProject(next);
+      const addedMusic = next.music.find((track) => !previous?.music.some((item) => item.id === track.id));
+      const nextMusicId =
+        addedMusic?.id ??
+        next.music.find((track) => track.id === musicSelection.current)?.id ??
+        next.music[0]?.id ??
+        null;
+      if (musicSelection.current !== nextMusicId) {
+        musicSelection.current = nextMusicId;
+        setSelectedMusicId(nextMusicId);
+      }
       autosave.current?.update(next);
       setHistoryState({ canUndo: history.current?.canUndo ?? false, canRedo: history.current?.canRedo ?? false });
       if (!next.layers.some((layer) => layer.id === selectedLayer.current)) {
@@ -626,6 +648,8 @@ export function App() {
       setBoundaryId(null);
       selection.current = null;
       setSelectedId(null);
+      musicSelection.current = loaded.music[0]?.id ?? null;
+      setSelectedMusicId(musicSelection.current);
       selectedLayer.current = loaded.layers[0]!.id;
       setSelectedLayerId(selectedLayer.current);
       let choices: MediaSelections = {};
@@ -695,6 +719,8 @@ export function App() {
     setBoundaryId(null);
     selection.current = null;
     setSelectedId(null);
+    musicSelection.current = null;
+    setSelectedMusicId(null);
     selectedLayer.current = EMPTY_PROJECT.layers[0]!.id;
     setSelectedLayerId(selectedLayer.current);
     sourceRanges.current = {};
@@ -1684,7 +1710,7 @@ export function App() {
                     canRenderReference={
                       !needsLayeredExport(visible) &&
                       visible.clips.length === 2 &&
-                      visible.music === null &&
+                      visible.music.length === 0 &&
                       visible.clips.every((clip) => clip.speed.mode === 'constant' && clip.speed.rate === 1) &&
                       layout.duration <= 3600 &&
                       draft === null
@@ -1770,6 +1796,8 @@ export function App() {
                     assets={projectAudio}
                     busy={busy || !project || connection.state !== 'ready'}
                     drafting={draft !== null || !project}
+                    selectedMusicId={selectedMusicId}
+                    onSelectMusic={selectMusic}
                     error={actionError}
                     onBrowseVisibility={musicImportVisibility}
                     onEdit={edit}
@@ -1807,6 +1835,8 @@ export function App() {
             selectedClipId={selectedId}
             selectedLayerId={selectedLayerId}
             onSelectLayer={selectLayer}
+            selectedMusicId={selectedMusicId}
+            onSelectMusic={selectMusic}
             selectedBoundaryId={boundaryId}
             frame={diagnostics?.frame ?? 0}
             onSelect={select}

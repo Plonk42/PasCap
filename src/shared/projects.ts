@@ -21,5 +21,5 @@ export function projectVideoIds(project: ProjectDocument): Set<string> {
 }
 
 export function projectAudioIds(project: ProjectDocument): Set<string> {
-  return new Set([...project.media.audioIds, ...(project.music ? [project.music.mediaId] : [])]);
+  return new Set([...project.media.audioIds, ...project.music.map((track) => track.mediaId)]);
 }

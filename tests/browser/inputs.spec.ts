@@ -343,7 +343,7 @@ test('music commits preserve source/timeline units and validate range, duration,
   await out.fill('90');
   await out.press('Enter');
   await expect(out.locator('..').getByRole('alert')).toContainText('enable Loop music first');
-  expect((await currentProject(page)).music?.sourceOut).toBe(asset.metadata.frameCount);
+  expect((await currentProject(page)).music[0]?.sourceOut).toBe(asset.metadata.frameCount);
   await out.press('Escape');
   await page.getByRole('checkbox', { name: 'Loop music', exact: true }).check();
   await commitNumber(page, 'Music source IN', '15');
@@ -352,11 +352,11 @@ test('music commits preserve source/timeline units and validate range, duration,
   await commitNumber(page, 'Music duration', '140');
   const gain = page.getByRole('spinbutton', { name: 'Music gain', exact: true });
   await gain.fill('-6');
-  expect((await currentProject(page)).music?.gainDb).toBe(0);
+  expect((await currentProject(page)).music[0]?.gainDb).toBe(0);
   await gain.press('Tab');
   await commitNumber(page, 'Music fade in', '10');
   await commitNumber(page, 'Music fade out', '15');
-  expect((await currentProject(page)).music).toMatchObject({
+  expect((await currentProject(page)).music[0]).toMatchObject({
     sourceIn: 15,
     sourceOut: 90,
     start: 10,
@@ -375,7 +375,7 @@ test('music commits preserve source/timeline units and validate range, duration,
   await fade.fill('126');
   await fade.press('Enter');
   await expect(fade.locator('..').getByRole('alert')).toContainText('Enter 125 or less');
-  expect((await currentProject(page)).music?.fadeIn).toBe(10);
+  expect((await currentProject(page)).music[0]?.fadeIn).toBe(10);
 });
 
 test('per-track fade/transition timing and positioned track key numbers use the same explicit commits', async ({

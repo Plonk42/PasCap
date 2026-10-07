@@ -76,6 +76,46 @@ afterEach(async () => {
 });
 
 describe('multiple-project store', () => {
+  it('round-trips eight identified music instances and never rewrites invalid or obsolete music data', async () => {
+    const directory = await temp();
+    const store = new ProjectStore(directory);
+    const document = createProject('eight-music', 'Independent music');
+    document.music = Array.from({ length: 8 }, (_, index) => ({
+      id: `instance-${index}`,
+      mediaId: index % 2 ? 'second-source' : 'repeated-source',
+      sourceIn: index,
+      sourceOut: 100 + index,
+      start: index * 25,
+      duration: 100,
+      gainDb: index === 0 ? 0 : -index,
+      fadeIn: index,
+      fadeOut: index * 2,
+      loop: index % 2 === 0,
+    }));
+    const saved = await store.save(document, 0);
+    expect(saved.music).toEqual(document.music);
+    expect(await store.load(document.id)).toEqual(saved);
+    expect((await store.list())[0]!.duration).toBe(275);
+    const filename = path.join(directory, 'projects', `${document.id}.json`);
+    const bytes = await readFile(filename);
+    for (const music of [
+      null,
+      document.music[0],
+      [document.music[0], document.music[0]],
+      [...document.music, { ...document.music[0], id: 'ninth' }],
+      [{ ...document.music[0], start: 2_147_483_647 }],
+    ]) {
+      await expect(store.save({ ...saved, music } as ProjectDocument, 1)).rejects.toThrow();
+      expect(await readFile(filename)).toEqual(bytes);
+    }
+    const obsolete = JSON.stringify({ ...document, id: 'preserved-v7', schemaVersion: 7, music: null });
+    const obsoletePath = path.join(directory, 'projects', 'preserved-v7.json');
+    await writeFile(obsoletePath, obsolete);
+    await expect(store.load('preserved-v7')).rejects.toThrow('version 8');
+    expect((await store.list()).find((item) => item.id === 'preserved-v7')!.compatible).toBe(false);
+    expect(await readFile(obsoletePath, 'utf8')).toBe(obsolete);
+    expect(await store.load(document.id)).toEqual(saved);
+  });
   it('creates independent UUID documents at revision one and lists recent retimed durations', async () => {
     const directory = await temp();
     const store = new ProjectStore(directory);
@@ -86,7 +126,7 @@ describe('multiple-project store', () => {
     expect(first.id).not.toBe(second.id);
     expect(first.title).toBe('First flight');
     expect(first.revision).toBe(1);
-    expect(first.schemaVersion).toBe(7);
+    expect(first.schemaVersion).toBe(8);
     expect(first.layers[0]!.keyframes).toEqual([]);
     const clip = { ...createClip('clip-a', 'registered-video', 0, 120), speed: { mode: 'constant' as const, rate: 2 } };
     const saved = await store.save({ ...first, clips: [clip] }, 1);
@@ -112,7 +152,7 @@ describe('multiple-project store', () => {
     expect((await readdir(path.join(directory, 'projects'))).some((name) => name.endsWith('.tmp'))).toBe(false);
   });
 
-  it('round-trips 256 strict row points and rejects malformed v7 data without changing confirmed bytes', async () => {
+  it('round-trips 256 strict row points and rejects malformed v8 data without changing confirmed bytes', async () => {
     const directory = await temp();
     const store = new ProjectStore(directory);
     const document = createProject('strict-row', 'Shared row');
@@ -122,7 +162,7 @@ describe('multiple-project store', () => {
     );
     document.layers[0]!.keyframes[0] = point(0, { ...NEUTRAL_COLOUR, opacity: 0, speed: 1.25 }, 'smooth');
     const saved = await store.save(document, 0);
-    expect(saved.schemaVersion).toBe(7);
+    expect(saved.schemaVersion).toBe(8);
     expect(saved.layers[0]!.keyframes).toHaveLength(256);
     expect(Object.keys(saved.layers[0]!.keyframes[0]!.values)).toEqual(KEYFRAME_SETTINGS.map((setting) => setting.key));
     expect(saved.layers[0]!.keyframes.at(-1)!.frame).toBeGreaterThan(saved.clips[0]!.sourceOut);
@@ -509,8 +549,8 @@ describe('multiple-project HTTP API', () => {
     const first = projectSchema.parse(firstResponse.json().document);
     const second = projectSchema.parse(secondResponse.json().document);
     expect(first.revision).toBe(1);
-    expect(first.schemaVersion).toBe(7);
-    expect(second.schemaVersion).toBe(7);
+    expect(first.schemaVersion).toBe(8);
+    expect(second.schemaVersion).toBe(8);
     expect(second.id).not.toBe(first.id);
     expect((await service.app.inject({ url: '/api/projects', headers })).json().projects).toHaveLength(2);
     expect((await service.app.inject({ url: `/api/projects/${first.id}`, headers })).json().document).toEqual(first);
@@ -611,7 +651,7 @@ describe('multiple-project HTTP API', () => {
     expect((await service.app.inject({ url: '/api/projects', headers })).json().projects[0].compatible).toBe(false);
     const load = await service.app.inject({ url: '/api/projects/old', headers });
     expect(load.statusCode).toBe(422);
-    expect(load.json().error).toContain('version 7');
+    expect(load.json().error).toContain('version 8');
     expect(
       (
         await service.app.inject({
@@ -636,7 +676,7 @@ describe('multiple-project HTTP API', () => {
     ).toBe(400);
   });
 
-  it('exposes an unsupported-version input as unavailable and refuses load, rename or v7 overwrite', async () => {
+  it('exposes an unsupported-version input as unavailable and refuses load, rename or v8 overwrite', async () => {
     const directory = await temp();
     const unsupported = unsupportedProject(3, 'legacy-v3', 'Original v3');
     const bytes = `${JSON.stringify(unsupported, null, 2)}\n`;
@@ -659,7 +699,7 @@ describe('multiple-project HTTP API', () => {
     const loaded = await service.app.inject({ url: '/api/projects/legacy-v3', headers });
     expect(loaded.statusCode).toBe(422);
     expect(loaded.json().error).toContain('schema version 3');
-    expect(loaded.json().error).toContain('requires version 7');
+    expect(loaded.json().error).toContain('requires version 8');
     expect(
       (
         await service.app.inject({
@@ -691,9 +731,11 @@ describe('multiple-project HTTP API', () => {
     await mkdir(sources);
     const videoPath = path.join(sources, 'video.mp4');
     const musicPath = path.join(sources, 'music.wav');
+    const secondMusicPath = path.join(sources, 'second-music.wav');
     // Unit-only identity bytes: no decoder or preparation process is launched.
     await writeFile(videoPath, 'disposable video identity');
     await writeFile(musicPath, 'disposable music identity');
+    await writeFile(secondMusicPath, 'disposable second music identity');
     const video = mediaAssetSchema.parse({
       id: 'video-unit',
       name: 'video.mp4',
@@ -723,23 +765,44 @@ describe('multiple-project HTTP API', () => {
       fingerprint: await fingerprintFile(musicPath),
       waveform: [],
     });
+    const secondMusic = audioAssetSchema.parse({
+      ...registryAsset(sources, 'second-music-unit', 'registered'),
+      sourcePath: secondMusicPath,
+      fingerprint: await fingerprintFile(secondMusicPath),
+      waveform: [],
+    });
     await atomicWrite(path.join(dataDir, 'library.json'), JSON.stringify({ version: 1, assets: [video] }));
-    await atomicWrite(path.join(dataDir, 'audio.json'), JSON.stringify({ version: 1, assets: [music] }));
+    await atomicWrite(path.join(dataDir, 'audio.json'), JSON.stringify({ version: 1, assets: [music, secondMusic] }));
     const service = await serviceAt(dataDir);
     const document = projectSchema.parse({
       ...createProject('preview-lab', 'Video and music'),
       clips: [createClip('clip-a', video.id, 0, 120)],
-      music: {
-        mediaId: music.id,
-        sourceIn: 0,
-        sourceOut: 59,
-        start: 10,
-        duration: 50,
-        gainDb: -6,
-        fadeIn: 5,
-        fadeOut: 5,
-        loop: false,
-      },
+      music: [
+        {
+          id: 'music-instance',
+          mediaId: music.id,
+          sourceIn: 0,
+          sourceOut: 59,
+          start: 10,
+          duration: 50,
+          gainDb: -6,
+          fadeIn: 5,
+          fadeOut: 5,
+          loop: false,
+        },
+        {
+          id: 'second-music-instance',
+          mediaId: secondMusic.id,
+          sourceIn: 2,
+          sourceOut: 52,
+          start: 40,
+          duration: 80,
+          gainDb: -12,
+          fadeIn: 8,
+          fadeOut: 10,
+          loop: true,
+        },
+      ],
     });
     const saved = await service.app.inject({
       method: 'PUT',
@@ -749,8 +812,11 @@ describe('multiple-project HTTP API', () => {
     });
     expect(saved.statusCode).toBe(200);
     const current = projectSchema.parse(saved.json().document);
+    expect(current.music).toEqual(document.music);
+    const confirmedPath = path.join(dataDir, 'projects', 'preview-lab.json');
+    const confirmedBytes = await readFile(confirmedPath);
     const videoTooLong = { ...current, clips: [createClip('clip-a', video.id, 0, 121)] };
-    const musicTooLong = { ...current, music: { ...current.music!, sourceOut: 60 } };
+    const musicTooLong = { ...current, music: [current.music[0]!, { ...current.music[1]!, sourceOut: 60 }] };
     expect(
       (
         await service.app.inject({
@@ -778,13 +844,14 @@ describe('multiple-project HTTP API', () => {
           url: '/api/projects/preview-lab',
           headers,
           payload: {
-            document: { ...current, music: { ...current.music!, mediaId: 'missing-audio' } },
+            document: { ...current, music: [current.music[0]!, { ...current.music[1]!, mediaId: 'missing-audio' }] },
             expectedRevision: 1,
           },
         })
       ).statusCode,
     ).toBe(404);
-    await writeFile(musicPath, 'changed disposable identity');
+    expect(await readFile(confirmedPath)).toEqual(confirmedBytes);
+    await writeFile(secondMusicPath, 'changed disposable second identity');
     expect(
       (
         await service.app.inject({
@@ -798,6 +865,9 @@ describe('multiple-project HTTP API', () => {
     expect((await service.projects.load('preview-lab')).revision).toBe(1);
     expect(service.library.list()).toEqual([video]);
     expect(service.audio.get(music.id).metadata).toEqual(music.metadata);
+    expect(await readFile(confirmedPath)).toEqual(confirmedBytes);
+    expect(service.audio.get(secondMusic.id).metadata).toEqual(secondMusic.metadata);
+    expect(await fingerprintFile(musicPath)).toEqual(music.fingerprint);
     expect(service.jobs.list()).toEqual([]);
   });
 });

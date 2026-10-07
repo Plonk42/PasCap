@@ -57,7 +57,7 @@ export function placementSnapPoints(
     ...clips.flatMap((placed) => [placed.start, placed.end]),
     ...transitions.flatMap((region) => [region.start, region.boundary, region.end]),
   ];
-  if (project.music) points.push(project.music.start, project.music.start + project.music.duration);
+  points.push(...project.music.flatMap((track) => [track.start, track.start + track.duration]));
   return [...new Set(points)].filter((point) => point >= 0).sort((left, right) => left - right);
 }
 

@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import { mkdtemp, readdir, readFile, rm } from 'node:fs/promises';
+import { readdirSync } from 'node:fs';
+import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
@@ -9,15 +10,17 @@ import { renderExport, startExport, type ExportReceipt } from '../../src/server/
 import { fingerprintFile } from '../../src/server/files.js';
 import { extractComparisonFrame } from '../../src/server/library.js';
 import { probeVideo } from '../../src/server/probe.js';
+import * as nativeProcesses from '../../src/server/process.js';
 import { runProcess } from '../../src/server/process.js';
 import { audioAssetSchema, musicGainAt, type AudioAsset } from '../../src/shared/audio.js';
 import { gradePixel, NEUTRAL_COLOUR } from '../../src/shared/colour.js';
 import { applyCommand } from '../../src/shared/commands.js';
 import { estimateExportSpace } from '../../src/shared/export-space.js';
-import { EXPORT_PROFILES, exportAudioSample } from '../../src/shared/export.js';
+import { EXPORT_PROFILES, exportAudioSample, planExportMusic, type ExportMusicPlan } from '../../src/shared/export.js';
 import type { MediaAsset } from '../../src/shared/media.js';
 import { createClip, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
 import { removeMarkedRange } from '../../src/shared/rush-editing.js';
+import { forEachSerial } from '../../src/shared/serial.js';
 import { compileRetiming, type SpeedSettings } from '../../src/shared/speed.js';
 import { calculateLayout, sampleTimeline } from '../../src/shared/timeline.js';
 import { framesToSeconds } from '../../src/shared/timing.js';
@@ -120,6 +123,129 @@ async function rawAudio(config: ServiceConfig, filename: string): Promise<Float3
   );
 }
 
+/** Bounded disposable PCM evidence, both channels, before lossy AAC encoding. */
+async function stereoPCM(config: ServiceConfig, filename: string): Promise<Float64Array> {
+  const bytes = await runProcess(
+    config.ffmpeg,
+    [
+      '-v',
+      'error',
+      '-nostdin',
+      '-threads',
+      '2',
+      '-i',
+      filename,
+      '-map',
+      '0:a:0',
+      '-vn',
+      '-ar',
+      '48000',
+      '-ac',
+      '2',
+      '-filter_threads',
+      '2',
+      '-threads',
+      '2',
+      '-f',
+      'f64le',
+      'pipe:1',
+    ],
+    { maxBytes: 2 * 1024 * 1024 },
+  );
+  return new Float64Array(Uint8Array.from(bytes).buffer);
+}
+
+/** Independent integer-sample oracle: no FFmpeg envelopes/mix/clamp filters. */
+function expectedMusicPCM(plans: readonly ExportMusicPlan[], sources: ReadonlyMap<string, Float64Array>): Float64Array {
+  const expected = new Float64Array(plans[0]!.videoSamples * 2);
+  for (const plan of plans) {
+    const source = sources.get(plan.mediaId)!;
+    const selected = plan.sourceOutSamples - plan.sourceInSamples;
+    for (let offset = 0; offset < plan.activeSamples; offset++) {
+      // Independently rounded IN/OUT can select one fewer sample than duration.
+      // Non-looping audio pads that sample with silence, never reads beyond OUT.
+      if (!plan.loop && offset >= selected) continue;
+      const envelope =
+        plan.gain *
+        (plan.fadeInSamples && offset < plan.fadeInSamples ? offset / plan.fadeInSamples : 1) *
+        (plan.fadeOutSamples && offset >= plan.durationSamples - plan.fadeOutSamples
+          ? (plan.durationSamples - offset) / plan.fadeOutSamples
+          : 1);
+      const original = plan.sourceInSamples + (plan.loop ? offset % selected : offset);
+      for (let channel = 0; channel < 2; channel++) {
+        const value = source[original * 2 + channel];
+        expect(value, `registered source sample ${original}, channel ${channel}`).toBeDefined();
+        expected[(plan.startSamples + offset) * 2 + channel]! += value! * envelope;
+      }
+    }
+  }
+  return expected;
+}
+
+function assertPCM(actual: Float64Array, expected: Float64Array, label: string): void {
+  expect(actual, `${label} exact stereo sample count`).toHaveLength(expected.length);
+  let maximum = 0;
+  let worst = 0;
+  for (let index = 0; index < expected.length; index++) {
+    if (!Number.isFinite(actual[index]) || !Number.isFinite(expected[index])) {
+      maximum = Infinity;
+      worst = index;
+      break;
+    }
+    const error = Math.abs(actual[index]! - expected[index]!);
+    if (error > maximum) {
+      maximum = error;
+      worst = index;
+    }
+  }
+  expect(maximum, `${label} sample ${Math.floor(worst / 2)}, channel ${worst % 2}`).toBeLessThan(1e-12);
+}
+
+/** Encode independently reconstructed final Float32 PCM with the same AAC codec.
+ * This deliberately does not use the production accumulator or clamp graph.
+ */
+async function referenceAAC(
+  config: ServiceConfig,
+  directory: string,
+  expected: Float64Array,
+  frames: number,
+): Promise<Float64Array> {
+  const name = randomUUID();
+  const pcm = path.join(directory, `${name}.f32`);
+  const encoded = path.join(directory, `${name}.m4a`);
+  const final = Float32Array.from(expected, (value) => Math.max(-1, Math.min(1, value)));
+  await writeFile(pcm, new Uint8Array(final.buffer));
+  try {
+    await runProcess(config.ffmpeg, [
+      '-v',
+      'error',
+      '-nostdin',
+      '-n',
+      '-f',
+      'f32le',
+      '-ar',
+      '48000',
+      '-ac',
+      '2',
+      '-i',
+      pcm,
+      '-c:a',
+      'aac',
+      '-b:a',
+      '192k',
+      '-threads:a',
+      '2',
+      '-t',
+      framesToSeconds(frames).toFixed(9),
+      encoded,
+    ]);
+    return await stereoPCM(config, encoded);
+  } finally {
+    await rm(pcm, { force: true });
+    await rm(encoded, { force: true });
+  }
+}
+
 describe.skipIf(!enabled)('production native export · opt-in disposable media only', () => {
   let directory: string;
   let config: ServiceConfig;
@@ -127,7 +253,9 @@ describe.skipIf(!enabled)('production native export · opt-in disposable media o
   let assets: MediaAsset[];
   let originals: Map<string, Buffer>;
   let audio: AudioAsset;
+  let mixSources: AudioAsset[];
   let audioSamples: Float32Array;
+  let sourcePCM: Map<string, Float64Array>;
   let savedDocument: Buffer;
   let successfulDirectory: string;
   beforeAll(async () => {
@@ -238,6 +366,48 @@ describe.skipIf(!enabled)('production native export · opt-in disposable media o
       error: null,
       waveform: [],
     });
+    mixSources = [audio];
+    sourcePCM = new Map([
+      [
+        audio.id,
+        Float64Array.from({ length: audioSamples.length * 2 }, (_, index) => audioSamples[Math.floor(index / 2)]!),
+      ],
+    ]);
+    await forEachSerial([1, -1], async (polarity) => {
+      const filename = path.join(directory, 'synthetic-sources', `opposing-${polarity}.wav`);
+      await runProcess(config.ffmpeg, [
+        '-hide_banner',
+        '-loglevel',
+        'error',
+        '-nostdin',
+        '-n',
+        '-f',
+        'lavfi',
+        '-i',
+        `aevalsrc=${polarity}*0.5*sin(2*PI*880*t)|${-polarity}*0.5*sin(2*PI*880*t):s=48000:d=${framesToSeconds(24)}`,
+        '-c:a',
+        'pcm_s16le',
+        '-ar',
+        '48000',
+        '-ac',
+        '2',
+        '-threads',
+        '2',
+        filename,
+      ]);
+      const samples = await rawAudio(config, filename);
+      mixSources.push(
+        audioAssetSchema.parse({
+          ...audio,
+          id: polarity > 0 ? 'positive-music' : 'negative-music',
+          name: path.basename(filename),
+          sourcePath: filename,
+          fingerprint: await fingerprintFile(filename),
+          metadata: { ...audio.metadata, channels: 2, durationSeconds: samples.length / 48000, frameCount: 23 },
+        }),
+      );
+      sourcePCM.set(mixSources.at(-1)!.id, await stereoPCM(config, filename));
+    });
   });
   afterAll(async () => {
     await fixture?.jobs.close();
@@ -251,8 +421,9 @@ describe.skipIf(!enabled)('production native export · opt-in disposable media o
   }
   async function completed(project: ProjectDocument, profile: 'draft720' | 'final4k' = 'draft720') {
     const job = startExport(project, profile, fixture.library, async (id) => {
-      expect(id).toBe(audio.id);
-      return audio;
+      const source = mixSources.find((item) => item.id === id);
+      expect(source, `captured audio source ${id}`).toBeDefined();
+      return source!;
     });
     const result = await fixture.jobs.wait(job.id);
     expect(result.state, result.message).toBe('completed');
@@ -448,24 +619,28 @@ describe.skipIf(!enabled)('production native export · opt-in disposable media o
 
   it('places, loops ONLY the selected music range, applies linear fades/gain and pads AAC to the complete video', async () => {
     const project = document(36);
-    project.music = {
-      mediaId: audio.id,
-      sourceIn: 6,
-      sourceOut: 12,
-      start: 3,
-      duration: 24,
-      gainDb: -6,
-      fadeIn: 6,
-      fadeOut: 6,
-      loop: true,
-    };
+    project.music = [
+      {
+        id: 'music-instance',
+        mediaId: audio.id,
+        sourceIn: 6,
+        sourceOut: 12,
+        start: 3,
+        duration: 24,
+        gainDb: -6,
+        fadeIn: 6,
+        fadeOut: 6,
+        loop: true,
+      },
+    ];
     const result = await completed(project);
     const samples = await rawAudio(config, result.filename);
     expect(result.receipt.verification.audio).toMatchObject({ codec: 'aac', sampleRate: 48000, channels: 2 });
     expect(result.receipt.verification.audio!.durationErrorSeconds).toBeLessThanOrEqual(framesToSeconds(1));
-    const start = exportAudioSample(project.music.start);
-    const sourceIn = exportAudioSample(project.music.sourceIn);
-    const selected = exportAudioSample(project.music.sourceOut) - sourceIn;
+    const track = project.music[0]!;
+    const start = exportAudioSample(track.start);
+    const sourceIn = exportAudioSample(track.sourceIn);
+    const selected = exportAudioSample(track.sourceOut) - sourceIn;
     for (const frame of [1, 6, 9, 15, 24, 29, 33]) {
       const center = exportAudioSample(frame);
       const first = center - 240;
@@ -474,7 +649,7 @@ describe.skipIf(!enabled)('production native export · opt-in disposable media o
       for (let sample = first; sample < first + count; sample++) {
         const offset = sample - start;
         const original = offset < 0 ? 0 : audioSamples[sourceIn + (offset % selected)]!;
-        const gain = musicGainAt(project.music, (sample * 30000) / (48000 * 1001));
+        const gain = musicGainAt(track, (sample * 30000) / (48000 * 1001));
         expectedEnergy += (original * gain) ** 2;
       }
       const expected = Math.sqrt(expectedEnergy / count);
@@ -502,26 +677,547 @@ describe.skipIf(!enabled)('production native export · opt-in disposable media o
   it('also supports non-looping music and a music placement entirely after the video', async () => {
     for (const start of [2, 20]) {
       const project = document(12);
-      project.music = {
-        mediaId: audio.id,
-        sourceIn: 6,
-        sourceOut: 14,
-        start,
-        duration: 8,
-        gainDb: 0,
-        fadeIn: 0,
-        fadeOut: 0,
-        loop: false,
-      };
+      project.music = [
+        {
+          id: 'music-instance',
+          mediaId: audio.id,
+          sourceIn: 6,
+          sourceOut: 14,
+          start,
+          duration: 8,
+          gainDb: 0,
+          fadeIn: 0,
+          fadeOut: 0,
+          loop: false,
+        },
+      ];
       const result = await completed(project);
       const samples = await rawAudio(config, result.filename);
       expect(result.receipt.verification.hasAudio).toBe(true);
-      if (start === 20) expect(rms(samples, 0, exportAudioSample(12))).toBeLessThan(0.0001);
-      else {
+      if (start === 20) {
+        expect(result.receipt.verification.frameCount).toBe(28);
+        expect(result.receipt.settings.pipeline).toBe('sequential-layered');
+        expect(result.receipt.settings.audio[0]!.activeSamples).toBe(exportAudioSample(8));
+        expect(result.receipt.settings.audio[0]!.videoSamples).toBe(exportAudioSample(28));
+        expect(rms(samples, 0, exportAudioSample(19))).toBeLessThan(0.0001);
+        expect(rms(samples, exportAudioSample(22), 480)).toBeGreaterThan(0.07);
+        for (const frame of [12, 19, 22, 27]) {
+          const pixels = await extractComparisonFrame(config, result.filename, frame, 'tv');
+          expect(
+            pixels.every((value) => value <= 1),
+            `black music-only frame ${frame}`,
+          ).toBe(true);
+        }
+      } else {
         expect(rms(samples, exportAudioSample(5), 480)).toBeGreaterThan(0.07);
         expect(rms(samples, exportAudioSample(11), 480)).toBeLessThan(0.001);
       }
     }
+  }, 120_000);
+
+  it.each([
+    { profile: 'draft720' as const, videoFrames: 6, projectFrames: 36, fadeOut: 6 },
+    { profile: 'final4k' as const, videoFrames: 3, projectFrames: 6, fadeOut: 2 },
+  ])(
+    'exports an immutable $profile music conclusion with exact black-tail frames and independently ending fades',
+    async ({ profile, videoFrames, projectFrames, fadeOut }) => {
+      const project = document(videoFrames);
+      project.layers[0]!.closingFade = profile === 'final4k' ? 1 : 2;
+      const long = {
+        id: 'longest-first',
+        mediaId: audio.id,
+        sourceIn: 6,
+        sourceOut: 12,
+        start: 0,
+        duration: projectFrames,
+        gainDb: -6,
+        fadeIn: 0,
+        fadeOut,
+        loop: true,
+      };
+      project.music = [
+        long,
+        { ...long, id: 'shorter-last', start: 1, duration: 1, fadeOut: 1, gainDb: -12, loop: false },
+      ];
+      const captured = structuredClone(project);
+      const capturedLong = captured.music[0]!;
+      const plans = captured.music.map((track) => planExportMusic(track, projectFrames));
+      const originalRun = nativeProcesses.runProcess;
+      const accumulators: number[] = [];
+      const processSpy = vi
+        .spyOn(nativeProcesses, 'runProcess')
+        .mockImplementation(async (binary, args, options = {}) => {
+          const result = await originalRun(binary, args, options);
+          const match = /^music-accumulator-(\d+)\.wav$/.exec(args.at(-1)!);
+          if (binary === config.ffmpeg && match) {
+            const index = Number(match[1]);
+            const actual = await stereoPCM(config, path.join(options.cwd!, args.at(-1)!));
+            assertPCM(
+              actual,
+              expectedMusicPCM(plans.slice(0, index + 1), sourcePCM),
+              `${profile} accumulator ${index}`,
+            );
+            accumulators.push(index);
+          }
+          return result;
+        });
+      let release = (): void => {};
+      const gate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      const busy = fixture.jobs.submit('prepare', 'Synthetic scheduling gate', async () => gate);
+      let jobId = '';
+      try {
+        const job = startExport(project, profile, fixture.library, () => audio);
+        jobId = job.id;
+        expect(job.state).toBe('queued');
+        project.title = 'Later editor changes';
+        project.music[0]!.duration += 5;
+        project.music[1]!.gainDb = -30;
+        project.clips[0]!.sourceOut++;
+        release();
+        await fixture.jobs.wait(busy.id);
+        const result = await fixture.jobs.wait(jobId);
+        expect(result.state, result.message).toBe('completed');
+        const outputDirectory = path.join(directory, 'renders', jobId);
+        expect((await readdir(outputDirectory)).sort()).toEqual(['export.mp4', 'receipt.json']);
+        const receipt = JSON.parse(await readFile(path.join(outputDirectory, 'receipt.json'), 'utf8')) as ExportReceipt;
+        expect(receipt.snapshot).toEqual(captured);
+        expect(receipt.timeline.duration).toBe(projectFrames);
+        expect(receipt.verification).toMatchObject({
+          width: EXPORT_PROFILES[profile].width,
+          height: EXPORT_PROFILES[profile].height,
+          frameCount: projectFrames,
+          fullDecode: true,
+          faststart: true,
+          hasAudio: true,
+          codec: 'h264',
+          pixelFormat: 'yuv420p',
+          colourRange: 'tv',
+        });
+        expect(receipt.verification.audio!.durationErrorSeconds).toBeLessThanOrEqual(framesToSeconds(1));
+        expect(receipt.settings.pipeline).toBe('sequential-layered');
+        const layered = receipt.settings.layered!;
+        expect(layered.layerPasses).toBe(1);
+        expect(layered.peakOriginalVideoDecoders).toBe(1);
+        expect(layered.peakIntermediateVideoDecoders).toBeLessThanOrEqual(2);
+        expect(layered.peakNativeVideoChildren).toBeLessThanOrEqual(3);
+        expect(layered.rawFrameBuffers).toBe(4);
+        expect(layered.rawBufferBytes).toBe(EXPORT_PROFILES[profile].width * EXPORT_PROFILES[profile].height * 22);
+        expect(layered.peakLosslessTimelineRepresentations).toBeLessThanOrEqual(3);
+        expect(receipt.retiming[0]).toMatchObject({ decodedFrames: videoFrames, outputFrames: videoFrames });
+        expect(receipt.settings.audio.map((track) => [track.id, track.activeSamples, track.videoSamples])).toEqual([
+          [long.id, exportAudioSample(projectFrames), exportAudioSample(projectFrames)],
+          ['shorter-last', exportAudioSample(1), exportAudioSample(projectFrames)],
+        ]);
+        expect(receipt.musicSources).toEqual([audio]);
+        expect(accumulators).toEqual([0, 1]);
+        const filename = path.join(outputDirectory, 'export.mp4');
+        const rgb = await rawVideo(config, { ...assets[0]!, sourcePath: filename });
+        expect(rgb).toHaveLength(projectFrames * FRAME_BYTES);
+        for (let frame = 0; frame < projectFrames; frame++) {
+          const pixels = rgb.subarray(frame * FRAME_BYTES, (frame + 1) * FRAME_BYTES);
+          assertPixels(captured, frame, pixels, originals);
+          if (frame >= videoFrames - 1)
+            expect(
+              pixels.every((value) => value <= 1),
+              `black conclusion frame ${frame}`,
+            ).toBe(true);
+        }
+        const samples = await rawAudio(config, filename);
+        const sourceIn = exportAudioSample(capturedLong.sourceIn);
+        const selected = exportAudioSample(capturedLong.sourceOut) - sourceIn;
+        for (const frame of [videoFrames, projectFrames - 1]) {
+          const first = exportAudioSample(frame) - 240;
+          let expectedEnergy = 0;
+          for (let sample = first; sample < first + 480; sample++) {
+            const expected =
+              audioSamples[sourceIn + (sample % selected)]! *
+              musicGainAt(capturedLong, (sample * 30000) / (48000 * 1001));
+            expectedEnergy += expected ** 2;
+          }
+          expect(
+            Math.abs(rms(samples, first, 480) - Math.sqrt(expectedEnergy / 480)),
+            `audible tail/fade frame ${frame}`,
+          ).toBeLessThan(0.004);
+        }
+        expect(rms(samples, exportAudioSample(videoFrames), 480)).toBeGreaterThan(0.03);
+        expect(rms(samples, exportAudioSample(projectFrames - 1) - 240, 480)).toBeLessThan(
+          rms(samples, exportAudioSample(videoFrames), 480),
+        );
+        expect(project.title).toBe('Later editor changes');
+        await forEachSerial([...assets, ...mixSources], async (source) =>
+          expect(await fingerprintFile(source.sourcePath)).toEqual(source.fingerprint),
+        );
+        expect(await readFile(path.join(directory, 'projects', `${fixture.document.id}.json`))).toEqual(savedDocument);
+      } finally {
+        release();
+        processSpy.mockRestore();
+      }
+    },
+    120_000,
+  );
+
+  it('mixes eight instances with serial native children, three scratch files and no intermediate clipping or normalization', async () => {
+    const project = document(36);
+    const positive = mixSources[1]!;
+    const negative = mixSources[2]!;
+    const base = {
+      id: 'mix',
+      mediaId: positive.id,
+      sourceIn: 0,
+      sourceOut: 12,
+      start: 0,
+      duration: 36,
+      gainDb: 12,
+      fadeIn: 0,
+      fadeOut: 0,
+      loop: true,
+    };
+    project.music = [
+      ...Array.from({ length: 6 }, (_, index) => ({
+        ...base,
+        id: `opposing-${index}`,
+        mediaId: index < 3 ? positive.id : negative.id,
+      })),
+      {
+        ...base,
+        id: 'retained-tone',
+        mediaId: audio.id,
+        sourceIn: 6,
+        sourceOut: 12,
+        start: 3,
+        duration: 24,
+        gainDb: -6,
+        fadeIn: 6,
+        fadeOut: 6,
+      },
+      {
+        ...base,
+        id: 'late-conclusion',
+        mediaId: audio.id,
+        sourceIn: 6,
+        sourceOut: 12,
+        start: 40,
+        duration: 6,
+        gainDb: -6,
+        fadeOut: 2,
+        loop: false,
+      },
+    ];
+    const captured = structuredClone(project.music);
+    const updates: number[] = [];
+    const submit = fixture.jobs.submit.bind(fixture.jobs);
+    const progressSpy = vi.spyOn(fixture.jobs, 'submit').mockImplementation((kind, label, task, settled = null) =>
+      submit(
+        kind,
+        label,
+        async (context) =>
+          task({
+            ...context,
+            update: (progress, message) => {
+              updates.push(progress);
+              context.update(progress, message);
+            },
+          }),
+        settled,
+      ),
+    );
+    const originalRun = nativeProcesses.runProcess;
+    let activeAudioChildren = 0;
+    let peakAudioChildren = 0;
+    let peakFiles = 0;
+    const audioInputs: number[] = [];
+    const decoded: string[] = [];
+    const intermediatePeaks: number[] = [];
+    let mixed: Float32Array | null = null;
+    const processSpy = vi
+      .spyOn(nativeProcesses, 'runProcess')
+      .mockImplementation(async (binary, args, options = {}) => {
+        const output = args.at(-1)!;
+        const audioPass =
+          binary === config.ffmpeg && (output === 'music.wav' || /^music-accumulator-\d+\.wav$/.test(output));
+        const inputs = args.flatMap((value, index) => (value === '-i' ? [args[index + 1]!] : []));
+        if (audioPass) {
+          activeAudioChildren++;
+          peakAudioChildren = Math.max(peakAudioChildren, activeAudioChildren);
+          audioInputs.push(inputs.length);
+          if (output === 'music.wav') {
+            expect(inputs).toHaveLength(1);
+            decoded.push(inputs[0]!);
+          } else
+            expect(
+              inputs.every((filename) => filename === 'music.wav' || filename.startsWith('music-accumulator-')),
+            ).toBe(true);
+          expect(args).not.toContain('adelay');
+          const graph = args[args.indexOf('-filter_complex') + 1] ?? '';
+          expect(graph).not.toContain('clip(');
+          if (inputs.length === 2)
+            expect(graph).toContain('amix=inputs=2:duration=longest:dropout_transition=0:normalize=0');
+        }
+        if (binary === config.ffmpeg && output.endsWith('export.partial.mp4')) {
+          expect(inputs).toHaveLength(2);
+          expect(inputs[0]).toBe('chunks.ffconcat');
+          expect(inputs[1]).toMatch(/^music-accumulator-/);
+          expect(args[args.indexOf('-filter_complex') + 1]).toContain('clip(val(0),-1,1)|clip(val(1),-1,1)');
+          mixed = await rawAudio(config, path.join(options.cwd!, inputs[1]!));
+        }
+        try {
+          const result = await originalRun(binary, args, options);
+          if (audioPass) {
+            const filenames = readdirSync(options.cwd!).filter(
+              (name) => name === 'music.wav' || name.startsWith('music-accumulator-'),
+            );
+            peakFiles = Math.max(peakFiles, filenames.length);
+            expect(filenames.length).toBeLessThanOrEqual(3);
+            if (output.startsWith('music-accumulator-')) {
+              const samples = await rawAudio(config, path.join(options.cwd!, output));
+              intermediatePeaks.push(samples.reduce((peak, value) => Math.max(peak, Math.abs(value)), 0));
+              const index = Number(/^music-accumulator-(\d+)\.wav$/.exec(output)![1]);
+              assertPCM(
+                await stereoPCM(config, path.join(options.cwd!, output)),
+                expectedMusicPCM(
+                  captured.slice(0, index + 1).map((track) => planExportMusic(track, 46)),
+                  sourcePCM,
+                ),
+                `eight-instance accumulator ${index}`,
+              );
+            }
+          }
+          return result;
+        } finally {
+          if (audioPass) activeAudioChildren--;
+        }
+      });
+    let result: Awaited<ReturnType<typeof completed>>;
+    try {
+      result = await completed(project);
+    } finally {
+      processSpy.mockRestore();
+      progressSpy.mockRestore();
+    }
+    expect(peakAudioChildren).toBe(1);
+    expect(peakFiles).toBe(3);
+    expect(Math.max(...audioInputs)).toBe(2);
+    expect(decoded).toEqual([
+      positive.sourcePath,
+      positive.sourcePath,
+      positive.sourcePath,
+      negative.sourcePath,
+      negative.sourcePath,
+      negative.sourcePath,
+      audio.sourcePath,
+      audio.sourcePath,
+    ]);
+    expect(intermediatePeaks[2]).toBeGreaterThan(5.9);
+    expect(intermediatePeaks[5]).toBeLessThan(0.00001);
+    expect(updates.every((value, index) => index === 0 || value >= updates[index - 1]!)).toBe(true);
+    expect(project.music).toEqual(captured);
+    expect(result.receipt.snapshot.music).toEqual(captured);
+    expect(result.receipt.musicSources.map((source) => source.id)).toEqual([positive.id, negative.id, audio.id]);
+    expect(result.receipt.settings.audio.map((plan) => plan.id)).toEqual(captured.map((track) => track.id));
+    expect(result.receipt.settings.resources).toMatchObject({
+      maxMusicTracks: 8,
+      maxOriginalAudioDecoders: 1,
+      maxIntermediateAudioInputs: 2,
+      maxNativeAudioChildrenPerPass: 1,
+      maxAudioScratchFiles: 3,
+      audioAccumulatorBits: 64,
+    });
+    expect(result.receipt.timeline.duration).toBe(46);
+    expect(result.receipt.settings.pipeline).toBe('sequential-layered');
+    expect(result.receipt.settings.audio[7]).toMatchObject({
+      sourceInSamples: 9610,
+      sourceOutSamples: 19219,
+      startSamples: 64064,
+      durationSamples: 9610,
+      fadeOutSamples: 3203,
+      videoSamples: 73674,
+    });
+    const accumulated = mixed as unknown as Float32Array;
+    expect(accumulated).toHaveLength(exportAudioSample(46));
+    expect(accumulated[73673], 'non-looping source OUT pads the final unmatched sample').toBe(0);
+    for (let sample = 0; sample < accumulated.length; sample++) {
+      const frame = sample / ((48000 * 1001) / 30000);
+      const expected = captured.slice(6).reduce((sum, track) => {
+        const selectedStart = exportAudioSample(track.sourceIn);
+        const selectedLength = exportAudioSample(track.sourceOut) - selectedStart;
+        const offset = sample - exportAudioSample(track.start);
+        const source =
+          offset >= 0 && offset < exportAudioSample(track.duration) && (track.loop || offset < selectedLength)
+            ? audioSamples[selectedStart + (offset % selectedLength)]!
+            : 0;
+        return sum + source * musicGainAt(track, frame);
+      }, 0);
+      expect(accumulated[sample], `unclipped mixed sample ${sample}`).toBeCloseTo(expected, 4);
+    }
+    const encoded = await rawAudio(config, result.filename);
+    for (const frame of [1, 6, 9, 15, 24, 29, 33, 41, 44, 45]) {
+      const first = exportAudioSample(frame) - 240;
+      expect(Math.abs(rms(encoded, first, 480) - rms(accumulated, first, 480))).toBeLessThan(0.004);
+    }
+    for (const frame of [0, 18, 35, 36, 40, 45])
+      assertPixels(project, frame, await extractComparisonFrame(config, result.filename, frame, 'tv'), originals);
+    await forEachSerial(mixSources, async (source) =>
+      expect(await fingerprintFile(source.sourcePath)).toEqual(source.fingerprint),
+    );
+    expect(await readFile(path.join(directory, 'projects', `${fixture.document.id}.json`))).toEqual(savedDocument);
+  }, 120_000);
+
+  it('clamps only the completed native sum before AAC, including positive and negative stereo overflow', async () => {
+    const project = document(12);
+    project.music = Array.from({ length: 2 }, (_, index) => ({
+      id: `overflow-${index}`,
+      mediaId: mixSources[1]!.id,
+      sourceIn: 0,
+      sourceOut: 12,
+      start: 0,
+      duration: 12,
+      gainDb: 12,
+      fadeIn: 0,
+      fadeOut: 0,
+      loop: false,
+    }));
+    const originalRun = nativeProcesses.runProcess;
+    let peak = 0;
+    let clamped: Float32Array | null = null;
+    const expectedPCM = expectedMusicPCM(
+      project.music.map((track) => planExportMusic(track, 12)),
+      sourcePCM,
+    );
+    const intermediateIndices: number[] = [];
+    const processSpy = vi
+      .spyOn(nativeProcesses, 'runProcess')
+      .mockImplementation(async (binary, args, options = {}) => {
+        if (binary === config.ffmpeg && args.at(-1)!.endsWith('export.partial.mp4')) {
+          const mix = args[args.lastIndexOf('-i') + 1]!;
+          const source = await rawAudio(config, path.join(options.cwd!, mix));
+          assertPCM(await stereoPCM(config, path.join(options.cwd!, mix)), expectedPCM, 'overflow final accumulator');
+          peak = source.reduce((maximum, value) => Math.max(maximum, Math.abs(value)), 0);
+          const graph = args[args.indexOf('-filter_complex') + 1]!;
+          expect(graph).toContain('clip(val(0),-1,1)|clip(val(1),-1,1)');
+          const bytes = await originalRun(
+            binary,
+            [
+              '-v',
+              'error',
+              '-nostdin',
+              '-i',
+              mix,
+              '-af',
+              "aeval=exprs='clip(val(0),-1,1)|clip(val(1),-1,1)'",
+              '-f',
+              'f32le',
+              'pipe:1',
+            ],
+            { cwd: options.cwd! },
+          );
+          clamped = floats(bytes);
+          expect(clamped).toHaveLength(source.length * 2);
+          for (let sample = 0; sample < source.length; sample++) {
+            for (let channel = 0; channel < 2; channel++) {
+              const index = sample * 2 + channel;
+              const expected = Math.fround(Math.max(-1, Math.min(1, expectedPCM[index]!)));
+              expect(clamped[index], `sole final clamp sample ${sample}, channel ${channel}`).toBe(expected);
+            }
+          }
+        }
+        const result = await originalRun(binary, args, options);
+        const match = /^music-accumulator-(\d+)\.wav$/.exec(args.at(-1)!);
+        if (binary === config.ffmpeg && match) {
+          const index = Number(match[1]);
+          assertPCM(
+            await stereoPCM(config, path.join(options.cwd!, args.at(-1)!)),
+            expectedMusicPCM(
+              project.music.slice(0, index + 1).map((track) => planExportMusic(track, 12)),
+              sourcePCM,
+            ),
+            `overflow accumulator ${index}`,
+          );
+          intermediateIndices.push(index);
+        }
+        return result;
+      });
+    let result: Awaited<ReturnType<typeof completed>>;
+    try {
+      result = await completed(project);
+    } finally {
+      processSpy.mockRestore();
+    }
+    expect(peak).toBeGreaterThan(3.9);
+    expect(intermediateIndices).toEqual([0, 1]);
+    const encoded = await rawAudio(config, result.filename);
+    const expected = clamped as unknown as Float32Array;
+    const firstChannel = Float32Array.from({ length: expected.length / 2 }, (_, index) => expected[index * 2]!);
+    const reference = await referenceAAC(config, directory, expectedPCM, 12);
+    const actualStereo = await stereoPCM(config, result.filename);
+    assertPCM(actualStereo, reference, 'same-AAC independently reconstructed final clamp');
+    const referenceChannel = Float32Array.from({ length: reference.length / 2 }, (_, index) => reference[index * 2]!);
+    // Independently encoding this clipped anti-phase signal reproduces substantial
+    // codec loss: PCM RMS parity is not an AAC contract. Keep the 0.004 gate
+    // against the same-codec reference AND exact sample gates before encoding.
+    expect(
+      Math.abs(rms(referenceChannel, exportAudioSample(3), 2048) - rms(firstChannel, exportAudioSample(3), 2048)),
+    ).toBeGreaterThan(0.05);
+    for (const frame of [3, 6, 9])
+      expect(
+        Math.abs(rms(encoded, exportAudioSample(frame), 2048) - rms(referenceChannel, exportAudioSample(frame), 2048)),
+      ).toBeLessThan(0.004);
+  }, 120_000);
+
+  it('fails a missing second original and cancels its active decode without changing originals, saved edits or successful outputs', async () => {
+    const positive = mixSources[1]!;
+    const negative = mixSources[2]!;
+    const project = document(12);
+    project.music = [positive, negative].map((source, index) => ({
+      id: `cancel-${index}`,
+      mediaId: source.id,
+      sourceIn: 0,
+      sourceOut: 12,
+      start: 0,
+      duration: 12,
+      gainDb: 0,
+      fadeIn: 0,
+      fadeOut: 0,
+      loop: false,
+    }));
+    const successful = await readFile(path.join(successfulDirectory, 'export.mp4'));
+    const failed = startExport(project, 'draft720', fixture.library, (id) =>
+      id === positive.id ? positive : { ...negative, sourcePath: path.join(directory, 'missing-second.wav') },
+    );
+    const failure = await fixture.jobs.wait(failed.id);
+    expect(failure.state).toBe('failed');
+    expect(failure.outputUrl).toBeNull();
+    expect(failure.receiptUrl).toBeNull();
+    expect(await readdir(path.join(directory, 'renders'))).not.toContain(failed.id);
+    const originalRun = nativeProcesses.runProcess;
+    let cancelled = false;
+    let jobId = '';
+    const processSpy = vi.spyOn(nativeProcesses, 'runProcess').mockImplementation((binary, args, options = {}) => {
+      const pending = originalRun(binary, args, options);
+      if (binary === config.ffmpeg && args.at(-1) === 'music.wav' && args.includes(negative.sourcePath)) {
+        cancelled = true;
+        fixture.jobs.cancel(jobId);
+      }
+      return pending;
+    });
+    try {
+      const job = startExport(project, 'draft720', fixture.library, (id) => (id === positive.id ? positive : negative));
+      jobId = job.id;
+      const result = await fixture.jobs.wait(job.id);
+      expect(result.state, result.message).toBe('cancelled');
+      expect(cancelled).toBe(true);
+      expect(result.outputUrl).toBeNull();
+      expect(result.receiptUrl).toBeNull();
+    } finally {
+      processSpy.mockRestore();
+    }
+    expect(await readdir(path.join(directory, 'renders'))).not.toContain(jobId);
+    expect(await readFile(path.join(successfulDirectory, 'export.mp4'))).toEqual(successful);
+    expect(await readFile(path.join(directory, 'projects', `${fixture.document.id}.json`))).toEqual(savedDocument);
+    await forEachSerial(mixSources, async (source) =>
+      expect(await fingerprintFile(source.sourcePath)).toEqual(source.fingerprint),
+    );
   }, 120_000);
 
   it('cancels an active raw retimer, removes its entire job directory and preserves successful exports and saved edits', async () => {
@@ -588,17 +1284,20 @@ describe.skipIf(!enabled)('production native export · opt-in disposable media o
     const badAudioJob = startExport(
       {
         ...document(3),
-        music: {
-          mediaId: audio.id,
-          sourceIn: 0,
-          sourceOut: 100,
-          start: 0,
-          duration: 3,
-          gainDb: 0,
-          fadeIn: 0,
-          fadeOut: 0,
-          loop: false,
-        },
+        music: [
+          {
+            id: 'invalid-music-instance',
+            mediaId: audio.id,
+            sourceIn: 0,
+            sourceOut: 100,
+            start: 0,
+            duration: 3,
+            gainDb: 0,
+            fadeIn: 0,
+            fadeOut: 0,
+            loop: false,
+          },
+        ],
       },
       'draft720',
       fixture.library,

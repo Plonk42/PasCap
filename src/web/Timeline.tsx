@@ -26,7 +26,7 @@ import { keyframeNavigationFrame, useKeyframeNavigation } from './keyframe-navig
 import { clipStartRestriction } from './layer-actions.js';
 import './layers.css';
 import { Layers } from './Layers.js';
-import { MusicTimeline } from './MusicTimeline.js';
+import { MusicTimeline, type MusicTimelineGesture } from './MusicTimeline.js';
 import { Popover } from './Popover.js';
 import { RushEditBar, TimelineCutMarks } from './RushEditBar.js';
 import { useTimelineKeyframes, type TimelineKeyframeDraft } from './timeline-keyframes.js';
@@ -44,6 +44,8 @@ interface Props {
   selectedClipId: string | null;
   selectedLayerId: string;
   onSelectLayer: (id: string) => void;
+  selectedMusicId: string | null;
+  onSelectMusic: (id: string) => void;
   selectedBoundaryId: string | null;
   frame: number;
   onSelect: (id: string) => void;
@@ -169,6 +171,12 @@ function countExcerpts(clips: readonly VideoClip[]): Map<string, number> {
   return counts;
 }
 
+function timelineEmptyMessage(project: ProjectDocument): string {
+  return project.music.length
+    ? 'No video clips · music plays over black. Add recordings from Media.'
+    : 'Drop recordings here, or add them from Media.';
+}
+
 function timelineInteractionBlocked(
   draft: ProjectDocument | null,
   keyframeDrag: boolean,
@@ -185,6 +193,80 @@ function timelineSurfaceClassName(error: string, draft: ProjectDocument | null, 
   return classes.join(' ');
 }
 
+function timelineMusicExtent(project: ProjectDocument, gesture: MusicTimelineGesture | null): number {
+  return Math.max(
+    0,
+    ...project.music.map((track) => track.start + track.duration),
+    gesture ? gesture.start + gesture.duration : 0,
+  );
+}
+
+function timelineMusicHeight(project: ProjectDocument): number {
+  return project.music.length ? project.music.length * 70 : 55;
+}
+
+function TimelineMusicLanes(
+  props: Readonly<
+    Pick<
+      Props,
+      | 'project'
+      | 'audioAssets'
+      | 'selectedMusicId'
+      | 'onSelectMusic'
+      | 'frame'
+      | 'onPause'
+      | 'onEdit'
+      | 'onPreview'
+      | 'onError'
+    > & {
+      top: number;
+      leading: number;
+      scale: number;
+      width: number;
+      viewport: { current: HTMLDivElement | null };
+      snapping: boolean;
+      disabled: boolean;
+      onGesture: (gesture: MusicTimelineGesture | null) => void;
+    }
+  >,
+) {
+  if (!props.project.music.length)
+    return (
+      <div className="music-lane-wrapper" style={{ top: props.top }}>
+        <div className="music-track-empty">Music · choose a Recording in Audio to add a track</div>
+      </div>
+    );
+  return props.project.music.map((music, index) => (
+    <div
+      key={music.id}
+      className={`music-lane-wrapper music-instance-lane ${music.id === props.selectedMusicId ? 'selected' : ''}`}
+      data-music-lane={music.id}
+      style={{ top: props.top + index * 70 }}
+    >
+      <MusicTimeline
+        project={props.project}
+        music={music}
+        index={index}
+        selected={music.id === props.selectedMusicId}
+        asset={props.audioAssets.find((asset) => asset.id === music.mediaId)}
+        leading={props.leading}
+        scale={props.scale}
+        width={props.width}
+        viewport={props.viewport}
+        frame={props.frame}
+        snapping={props.snapping}
+        disabled={props.disabled}
+        onSelect={props.onSelectMusic}
+        onPause={props.onPause}
+        onEdit={props.onEdit}
+        onPreview={props.onPreview}
+        onGesture={props.onGesture}
+        onError={props.onError}
+      />
+    </div>
+  ));
+}
+
 export function Timeline(props: Readonly<Props>) {
   const {
     project,
@@ -193,6 +275,8 @@ export function Timeline(props: Readonly<Props>) {
     selectedClipId,
     selectedLayerId,
     onSelectLayer,
+    selectedMusicId,
+    onSelectMusic,
     selectedBoundaryId,
     frame,
     onSelect,
@@ -219,6 +303,7 @@ export function Timeline(props: Readonly<Props>) {
   const [viewportWidth, setViewportWidth] = useState(900);
   const [viewportHeight, setViewportHeight] = useState<number | null>(null);
   const [draft, setDraft] = useState<ProjectDocument | null>(null);
+  const [musicGesture, setMusicGesture] = useState<MusicTimelineGesture | null>(null);
   const [dragError, setDragError] = useState('');
   const [dropPlan, setDropPlan] = useState<DropPlan | null>(null);
   const [verticalScroll, setVerticalScroll] = useState(0);
@@ -234,6 +319,8 @@ export function Timeline(props: Readonly<Props>) {
   const pointerX = useRef(0);
   const latestMove = useRef<(clientX: number) => void>(() => {});
   const restoreScroll = useRef<number | null>(null);
+  const musicRevealReady = useRef(false);
+  const revealTarget = useRef<'video' | 'music'>('video');
   const keyframeNavigation = useKeyframeNavigation();
   const scale = framesToSeconds(1, project.frameRate) * pixelsPerSecond;
   const baselineWidth = Math.max(viewportWidth, 32 + calculateLayout(project).duration * scale + 96);
@@ -242,7 +329,7 @@ export function Timeline(props: Readonly<Props>) {
     frame,
     scale,
     width: baselineWidth,
-    disabled: keyframeNavigation.disabled,
+    disabled: keyframeNavigation.disabled || musicGesture !== null,
     snapping,
     viewport: scroll,
     onPause,
@@ -307,7 +394,7 @@ export function Timeline(props: Readonly<Props>) {
     return () => window.removeEventListener('keydown', escape, true);
   });
 
-  const visible = keyframes.draft?.document ?? draft ?? project;
+  const visible = keyframes.draft?.document ?? draft ?? musicGesture?.document ?? project;
   const layout = calculateLayout(visible);
   const baseLayout = calculateLayout(project);
   const selected = layout.clips.find((placed) => placed.clip.id === selectedClipId);
@@ -324,7 +411,7 @@ export function Timeline(props: Readonly<Props>) {
       : 0;
   // Selection must not move frame zero beneath the mouse. The timeline origin
   // stays fixed; omitted source is still recoverable through handles/Home/End.
-  const leading = drag.current?.leading ?? movement.current?.leading ?? 32;
+  const leading = drag.current?.leading ?? movement.current?.leading ?? musicGesture?.leading ?? 32;
   const unusedTail =
     source && selected && selectedLayer
       ? compileLayerRetiming({ ...selected.clip, sourceOut: source.metadata.frameCount }, selectedLayer, selected.start)
@@ -333,8 +420,8 @@ export function Timeline(props: Readonly<Props>) {
         (layout.duration - selected.end)
       : 0;
   const trailing = Math.max(96, unusedTail * scale + 24);
-  const musicEnd = project.music ? project.music.start + project.music.duration : 0;
-  // Stored points after the last clip stay reachable; they never extend the playable duration.
+  const musicEnd = timelineMusicExtent(project, musicGesture);
+  // Stored points after video or music OUT stay reachable, without extending the playable duration.
   const lastKeyframe = Math.max(0, ...project.layers.flatMap((layer) => layer.keyframes.map((point) => point.frame)));
   const width = Math.max(
     viewportWidth,
@@ -351,21 +438,23 @@ export function Timeline(props: Readonly<Props>) {
     drag.current?.width ?? 0,
     movement.current?.width ?? 0,
     keyframes.draft?.width ?? 0,
+    musicGesture?.width ?? 0,
   );
-  const interactionBlocked = timelineInteractionBlocked(draft, keyframes.active, keyframeNavigation.disabled);
+  const interactionBlocked =
+    musicGesture !== null || timelineInteractionBlocked(draft, keyframes.active, keyframeNavigation.disabled);
   const geometry = drag.current?.edge === 'in' ? calculateLayout(drag.current.base) : layout;
   const rows = timelineRows(project.layers);
   const rowTop = (layerId: string): number => rows.find((row) => row.layer.id === layerId)!.top;
   const selectedRowTop = rows.find((row) => row.layer.id === selectedLayerId)?.top;
   const musicTop = 55 + project.layers.length * 88;
-  const surfaceHeight = musicTop + 55;
+  const surfaceHeight = musicTop + timelineMusicHeight(project);
   const seconds = framesToSeconds(Math.max(layout.duration, baseLayout.duration), project.frameRate);
   let tickStep = 10;
   if (pixelsPerSecond >= 24) tickStep = 5;
   if (pixelsPerSecond >= 60) tickStep = 1;
   const ticks = Array.from({ length: Math.ceil(seconds / tickStep) + 1 }, (_, index) => index * tickStep);
   const fitTimeline = (): void => {
-    if (layout.duration && !drag.current && !keyframes.active)
+    if (layout.duration && !drag.current && !keyframes.active && !musicGesture)
       setPixelsPerSecond(
         Math.max(12, Math.min(180, (viewportWidth - leading - 64) / framesToSeconds(layout.duration))),
       );
@@ -375,16 +464,33 @@ export function Timeline(props: Readonly<Props>) {
   useEffect(() => {
     if (fitRequest > 0) latestFit.current();
   }, [fitRequest]);
+  // A panel resize must retain the last selected lane, not reveal an unrelated video row over music.
+  useLayoutEffect(() => {
+    revealTarget.current = 'video';
+  }, [selectedLayerId, selectedClipId, props.revealRequest]);
+  useLayoutEffect(() => {
+    if (musicRevealReady.current) revealTarget.current = 'music';
+    musicRevealReady.current = true;
+  }, [selectedMusicId]);
   useLayoutEffect(() => {
     const element = scroll.current;
-    if (!element || selectedRowTop === undefined || drag.current || movingClip.current || keyframes.active) return;
+    if (
+      !element ||
+      revealTarget.current !== 'video' ||
+      selectedRowTop === undefined ||
+      drag.current ||
+      movingClip.current ||
+      keyframes.active ||
+      musicGesture
+    )
+      return;
     const top = selectedRowTop;
     if (top < element.scrollTop + 34) element.scrollTop = Math.max(0, top - 40);
     else if (top + 78 > element.scrollTop + element.clientHeight) element.scrollTop = top + 88 - element.clientHeight;
-  }, [selectedLayerId, selectedRowTop, viewportHeight]);
+  }, [selectedLayerId, selectedClipId, props.revealRequest, selectedRowTop, viewportHeight]);
   useEffect(() => {
     const element = scroll.current;
-    if (!element || drag.current || movingClip.current || movement.current || keyframes.active) return;
+    if (!element || drag.current || movingClip.current || movement.current || keyframes.active || musicGesture) return;
     const placed = calculateLayout(project).clips.find((item) => item.clip.id === selectedClipId);
     if (!placed) return;
     const left = 32 + placed.start * scale;
@@ -393,6 +499,29 @@ export function Timeline(props: Readonly<Props>) {
     else if (left > element.scrollLeft + element.clientWidth - 60 || right < element.scrollLeft)
       element.scrollLeft = Math.max(0, left - element.clientWidth / 3);
   }, [selectedClipId, props.revealRequest, project.id]);
+  useLayoutEffect(() => {
+    const element = scroll.current;
+    const index = project.music.findIndex((track) => track.id === selectedMusicId);
+    if (
+      !element ||
+      revealTarget.current !== 'music' ||
+      index < 0 ||
+      musicGesture ||
+      drag.current ||
+      movingClip.current ||
+      keyframes.active
+    )
+      return;
+    const top = musicTop + index * 70;
+    if (top < element.scrollTop + TIMELINE_RULER_HEIGHT) element.scrollTop = Math.max(0, top - TIMELINE_RULER_HEIGHT);
+    else if (top + 64 > element.scrollTop + element.clientHeight)
+      element.scrollTop = Math.max(0, top + 70 - element.clientHeight);
+    const music = project.music[index]!;
+    const left = leading + music.start * scale;
+    if (left < element.scrollLeft + 20) element.scrollLeft = Math.max(0, left - 32);
+    else if (left > element.scrollLeft + element.clientWidth - 60)
+      element.scrollLeft = Math.max(0, left - element.clientWidth / 3);
+  }, [selectedMusicId, viewportHeight]);
   const clearMove = (): void => {
     movingClip.current = false;
     movement.current = null;
@@ -844,7 +973,7 @@ export function Timeline(props: Readonly<Props>) {
         >
           <div
             ref={surface}
-            className={timelineSurfaceClassName(dragError, draft, keyframes.active)}
+            className={`${timelineSurfaceClassName(dragError, draft, keyframes.active)} ${musicGesture ? 'music-drafting' : ''}`}
             style={{ width, height: surfaceHeight }}
             data-pixels-per-frame={scale}
             data-leading={leading}
@@ -905,7 +1034,7 @@ export function Timeline(props: Readonly<Props>) {
             {!geometry.clips.length && (
               <div className="timeline-empty">
                 <Icon name="plus" size={18} />
-                Drop recordings here, or add them from Media.
+                {timelineEmptyMessage(project)}
               </div>
             )}
             {geometry.clips.map((placed, index) => {
@@ -1010,7 +1139,7 @@ export function Timeline(props: Readonly<Props>) {
                       data-trim-handle={edge}
                       role="slider"
                       aria-label={`Trim ${edge === 'in' ? 'start' : 'end'} of ${name}, excerpt ${index + 1}`}
-                      disabled={keyframes.active}
+                      disabled={keyframes.active || musicGesture !== null}
                       aria-valuemin={edge === 'in' ? 0 : clip.sourceIn + 1}
                       aria-valuemax={
                         edge === 'in' ? clip.sourceOut - 1 : (asset?.metadata.frameCount ?? clip.sourceOut)
@@ -1149,27 +1278,38 @@ export function Timeline(props: Readonly<Props>) {
             {keyframes.draft?.guide !== null && keyframes.draft?.guide !== undefined && (
               <div className="snap-guide" style={{ left: leading + keyframes.draft.guide * scale }} />
             )}
-            <div className="music-lane-wrapper" style={{ top: musicTop }}>
-              <MusicTimeline
-                project={project}
-                asset={audioAssets.find((asset) => asset.id === project.music?.mediaId)}
-                leading={leading}
-                scale={scale}
-                frame={frame}
-                snapping={snapping}
-                disabled={keyframes.active || draft !== null}
-                onPause={onPause}
-                onEdit={onEdit}
-                onPreview={onPreview}
-                onError={onError}
-              />
-            </div>
+            {musicGesture?.guide !== null && musicGesture?.guide !== undefined && (
+              <div className="snap-guide" style={{ left: leading + musicGesture.guide * scale }} />
+            )}
+            <TimelineMusicLanes
+              project={project}
+              audioAssets={audioAssets}
+              selectedMusicId={selectedMusicId}
+              onSelectMusic={onSelectMusic}
+              top={musicTop}
+              leading={leading}
+              scale={scale}
+              width={width}
+              viewport={scroll}
+              frame={frame}
+              snapping={snapping}
+              disabled={interactionBlocked || dropPlan !== null}
+              onPause={onPause}
+              onEdit={onEdit}
+              onPreview={onPreview}
+              onGesture={setMusicGesture}
+              onError={onError}
+            />
           </div>
         </div>
       </div>
       <div className="timeline-bottom">
-        <span className={dragError || dropPlan?.error || keyframes.draft?.error ? 'trim-error' : ''}>
-          {timelineInteractionMessage(keyframes.draft, dragError, dropPlan, draft, selected?.clip)}
+        <span
+          className={dragError || dropPlan?.error || keyframes.draft?.error || musicGesture?.error ? 'trim-error' : ''}
+        >
+          {musicGesture
+            ? musicGesture.error || `Music · ${formatTimecode(musicGesture.start)} · release to apply · Esc cancels`
+            : timelineInteractionMessage(keyframes.draft, dragError, dropPlan, draft, selected?.clip)}
         </span>
         <span className="active-layer-readout">
           Insert →{' '}

@@ -102,7 +102,7 @@ function fakeLibrary(): MediaLibrary {
   return library;
 }
 
-describe('schema-7 production dispatch and read-only validation', () => {
+describe('schema-8 production dispatch and read-only validation', () => {
   it('keeps static constant/ramp speed on the cheap path and dispatches shared speed points with their placed map', () => {
     const project = document();
     expect(needsLayeredExport(project)).toBe(false);
@@ -124,11 +124,11 @@ describe('schema-7 production dispatch and read-only validation', () => {
       compileLayerRetiming(project.clips[0]!, project.layers[0]!, placed.start).duration,
     );
     expect(placed.retiming.duration).toBe(planLayeredExport(project).duration);
-    expect(exportRequestSchema.parse({ document: project, profile: 'draft720' }).document.schemaVersion).toBe(7);
+    expect(exportRequestSchema.parse({ document: project, profile: 'draft720' }).document.schemaVersion).toBe(8);
     expect(
       exportRequestSchema.safeParse({ document: { ...project, schemaVersion: 2 }, profile: 'draft720' }).success,
     ).toBe(false);
-    for (const version of [3, 4, 5, 6])
+    for (const version of [3, 4, 5, 6, 7])
       expect(
         exportRequestSchema.safeParse({
           document: unsupportedProject(version, 'old', 'Unsupported export'),
@@ -168,7 +168,7 @@ describe('schema-7 production dispatch and read-only validation', () => {
       expect(planLayeredExport(project).kind).toBe('layered');
     }
   });
-  it('requires explicit v7 media/row/static clip fields, permits eight rows and refuses a ninth or same-row overlap', () => {
+  it('requires explicit v8 media/row/static clip fields, permits eight rows and refuses a ninth or same-row overlap', () => {
     const project = document();
     for (let index = 2; index <= 8; index++) project.layers.push(layer(`video-${index}`));
     expect(projectSchema.safeParse(project).success).toBe(true);
@@ -240,12 +240,12 @@ describe('schema-7 production dispatch and read-only validation', () => {
     expect(Object.isFrozen(snapshot.layers[0]!.keyframes[0]!.values)).toBe(true);
     expect(Object.isFrozen(snapshot.clips[0]!.colour)).toBe(true);
   });
-  it('strictly loads v7 but lists/rejects unsupported versions unchanged, including overwrite attempts', async () => {
+  it('strictly loads v8 but lists/rejects unsupported versions unchanged, including overwrite attempts', async () => {
     const directory = await temp();
     const store = new ProjectStore(directory);
     const saved = await store.save(document(), 0);
     expect(await store.load(saved.id)).toEqual(saved);
-    for (const version of [2, 3, 4, 5, 6]) {
+    for (const version of [2, 3, 4, 5, 6, 7]) {
       const id = `old-v${version}`;
       const title = `Original v${version} document`;
       const unsupported = unsupportedProject(version, id, title);
@@ -258,7 +258,7 @@ describe('schema-7 production dispatch and read-only validation', () => {
         title,
         error: expect.stringContaining(`schema version ${version}`),
       });
-      await expect(store.load(id)).rejects.toThrow('requires version 7');
+      await expect(store.load(id)).rejects.toThrow('requires version 8');
       await expect(store.rename(id, 'No migration', 0)).rejects.toThrow('existing file was not changed');
       await expect(store.save(createProject(id, 'No migration'), 0)).rejects.toThrow('existing file was not changed');
       expect(await readFile(filename, 'utf8')).toBe(bytes);

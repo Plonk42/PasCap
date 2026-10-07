@@ -70,16 +70,29 @@ external desktop file/folder drag-and-drop import**. External drops prevent
 navigation and show Import guidance without a POST. Internal ready-Media-to-Timeline
 dragging remains supported. Imports reference originals; generated proxies/
 thumbnails, project/registry metadata, exports/receipts and scratch are the only
-new local data, not duplicate original footage. Projects use strict schema 7 with
+new local data, not duplicate original footage. Projects use strict schema 8 with
+required `music` array (0–8 independent instances, unique required IDs; `[]` without
+music), and
 required per-track Ripple, transitions, opening/closing fades and numeric
 `VideoLayer.opacity` in 0–1 (1 on new tracks), plus nine nullable point channels:
 `opacity`, `speed` and seven colour settings. Row `opacity` is the sole saved
 Opacity value; saved `clip.opacity` and old `clipOpacity`/`layerOpacity` channels
 are rejected. The row value or its overriding keys supply Opacity to each source
-in a dissolve group, without an additional layer multiplier. v1–v6 projects
+in a dissolve group, without an additional layer multiplier. v1–v7 projects
 and receipt snapshots remain unchanged/incompatible and require project recreation,
-without migration, compatibility defaults or automatic deletion;
-registry/proxy formats and source identity checks are unchanged.
+without migration, compatibility defaults, null/old-format readers or automatic deletion.
+Export receipts remain version 1 with strict v8 snapshots and required captured
+audio-source/instance-plan arrays; invalid arrays/older snapshots remain preserved
+and rejected. Registry/proxy/current PCM formats and source identity checks are unchanged.
+
+Music import populates the project bin/preparation queue, never implicit placement.
+Up to eight independent instances can reference the same or different originals
+without copying them. Project duration is the maximum video clip OUT or music
+start + duration; music can extend it. Video closing fades end at their clip OUT,
+then the picture is black while music continues/fades at its own end. Music-only
+preview is black; native export still requires a video clip and uses layered
+export for music tails. [MULTIPLE_MUSIC.md](design/MULTIPLE_MUSIC.md) specifies
+the current contract and pending validation, not container/release acceptance.
 
 ## Planned architecture and storage layout
 
@@ -109,6 +122,12 @@ Exports must remain accessible through the existing output/download routes and,
 when using a host bind directory, directly on the host. A volume-based package
 will need a documented way to retrieve outputs; it must not hide finished videos
 in disposable storage. Scratch disk remains duration-dependent, not a fixed-GB promise.
+Native audio retains at most selected stereo s16 PCM plus old/new full-project
+Float64 stereo accumulators: **three audio scratch files**, **two intermediate
+audio inputs**, **one audio child per serial pass**, and one original decoded at a
+time. Audio disk planning is maximum selected PCM + two full-project Float64
+stereo timelines, additional to unchanged video buffers/children/LUTs/scratch.
+Do not provision for eight simultaneous original decoders or all selected files.
 
 Saved `sourcePath` values refer to the service/container path, so keep the mapping
 stable across restarts and upgrades. Originals must remain accessible there; moving
@@ -188,6 +207,9 @@ Follow [licensing and distribution](LICENSING.md) for the approved project MIT
 terms, exact npm notices and the separate GPL-enabled FFmpeg/libx264 source,
 native dependency and artifact-review requirements. No built image/source bundle
 or codec/patent clearance is implied by the project license or CI cache.
+
+Sequential implementation of milestone issues is not release approval or milestone
+closure; those operations and real-media qualification require explicit approval.
 
 Before publishing packaging, validate **both Docker and Podman** with disposable
 synthetic media and explicit read-only source bind mounts:

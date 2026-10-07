@@ -1,4 +1,4 @@
-# PasCap colour and timing contract · project v7
+# PasCap colour and timing contract · project v8
 
 This specification is shared by the CPU reference,
 WebGL2 shader and generated native FFmpeg LUTs. It is elementary SDR grading, not
@@ -113,7 +113,8 @@ resets to normal graded preview. Export continues to use the saved grading contr
   Undo while preserving the first current start; turning it off retains actual
   placements. While off, unrelated clips never move with duration edits.
 - Dissolve duration `D` overlaps `D` retimed tail/head frames on its own track;
-  project duration remains the maximum track OUT, not a global sum. At overlapping
+  video OUT uses the placed retiming map, not a global sum. Project duration is
+  the maximum of all clip OUTs and every music start + duration. At overlapping
   frame `j` in `[0, D)`, right weight is `j / D`;
   left weight is `1 − j / D`. The next frame is solely the right clip.
   Both source frames are required even at a zero-weight endpoint.
@@ -125,6 +126,7 @@ resets to normal graded preview. Export continues to use the saved grading contr
 - Opening/closing fades are inside each track's first/last clip at actual
   placements, with no holds. They retain black-RGB/coverage-preserving math,
   never fade the entire composite, and stay stored but dormant on empty tracks.
+  A closing fade ends at its last video clip OUT, not a later music/project OUT.
 - An `N ≥ 2` fade uses endpoint-inclusive weights `j/(N−1)` or `1−j/(N−1)`.
   A one-frame fade is a black frame. This yields two adjoining black frames at
   a black transition's centre. It is intentional, deterministic and testable.
@@ -145,10 +147,33 @@ resets to normal graded preview. Export continues to use the saved grading contr
 - Ripple-off starts are independent absolute project frames; gaps reveal lower
   footage/black. Exact adjacent Cross-dissolve overlap is the only allowed
   same-track overlap; triple overlap is invalid. Total duration is the maximum
-  clip end across all tracks, including hidden-layer tails;
-  empty/entirely hidden regions are black.
+  retimed clip end across all tracks (including hidden-layer tails) and every
+  music instance's start + duration, bounded to 2,147,483,647 frames without clamping.
+  Music can extend the project. Empty/entirely hidden video regions and music-only
+  tails are opaque black, never a frozen last image; music fades at its own end.
 - UI timecode is 30 fps non-drop-frame, labelled NDF. Duration in seconds uses the
   rational rate, so timecode is not a wall-clock duration at 29.97 fps.
+
+## Music sampling and mixing
+
+Strict schema 8 requires a 0–8 `music` array of independent uniquely identified
+instances, `[]` without music. Each has source IN/OUT, start/duration, gain, fades
+and loop; source-video audio remains disabled. At 48 kHz, source/placement/duration/
+fade positions round independently to integer samples using the rational frame
+rate. Each instance's selected source repeats only with explicit Loop, contributes
+silence outside placement, and receives its own `10^(gainDb/20)` linear fade
+envelope before mixing. Sum all instances linearly and **hard-clamp [−1, 1] once
+after all sources**, never per-source or during native pairwise accumulation.
+No normalisation, ducking, effects or hidden gain compensation. Music is not
+retimed/rippled with video; current clip colour/speed and row Opacity are unchanged.
+
+One AudioContext/worklet and output-timestamp epoch retain the exact one-frame
+A/V bound through music-only black regions. Native audio uses serial selected
+s16 PCM and Float64 accumulators, then one final clamp before AAC; output samples
+cover full project duration, including music tails. See
+[SPEED_AND_AUDIO.md](SPEED_AND_AUDIO.md) and
+[MULTIPLE_MUSIC.md](design/MULTIPLE_MUSIC.md) for bounded-resource contracts and
+pending acceptance, not completed-test claims.
 
 ## Preview and reference scope
 
@@ -161,24 +186,31 @@ are not allocated per stored clip; missing observed frames buffer explicitly.
 
 Production export reads originals and uses exact shared retiming. The static fast
 path requires one enabled track with row Opacity 1, no row points, zero origin
-and no internal gaps; supported track fades/dissolves retain bounded chunks.
+and no internal gaps, covering full project duration; supported track fades/dissolves retain bounded chunks.
 Other valid timelines use generalized sequential RGBA16 group and source-over
 passes without regrading, then one final H.264 encode,
-with optional 48 kHz AAC music in both paths. Resource and numeric limits are in
+with optional mixed 48 kHz AAC music in both paths. Music beyond video OUT requires
+layered export to render black through project OUT. Music-only preview is black;
+export requires at least one retained video clip. Resource and numeric limits are in
 [Inspector and resource limits](LAYERS_AND_KEYFRAMES.md#inspector-and-resource-limits).
 
 The diagnostic reference accepts **exactly two normal-speed clips on one
 enabled, zero-origin contiguous track with row Opacity 1**, without music, extra tracks or row points,
 and is limited to 3,600 project frames. It refuses unsupported
 documents regardless of Ripple or track ID.
-It requires a strict schema-7 project snapshot, including explicit project media
+It requires a strict schema-8 project snapshot, including explicit project media
 membership; its reference receipt format remains independently version 1. New
-measurement reports must identify their v7 project snapshot without overwriting
+measurement reports must identify their v8 project snapshot without overwriting
 historical reports; the report identifier is separate from the project schema.
-v1–v6 project documents and receipt snapshots are incompatible and preserved;
+Project identifiers such as `preview-lab`/`preview-lab-v6` are not schema versions
+and are not renamed by this contract.
+v1–v7 project documents and receipt snapshots are incompatible and preserved;
 recreate projects deliberately, with no migration, compatibility defaults or
-automatic deletion. Strict v7 requires row `opacity`; saved `clip.opacity` and
+old-format/null fallback readers or automatic deletion. Strict v8 requires row `opacity`; saved `clip.opacity` and
 old `clipOpacity`/`layerOpacity` point fields are rejected, not defaulted.
-Registry/proxy formats and source guards are unchanged.
+Production export receipts also remain version 1, with strict v8 snapshots and
+required `musicSources` captured-original/`settings.audio` identified-plan arrays;
+older snapshots or invalid arrays are rejected without rewriting receipts/MP4s.
+Registry/proxy/current PCM formats and source guards are unchanged.
 Source ranges and every retained clip key position are validated against registered
 original frame counts, including hidden layer references.

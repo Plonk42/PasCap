@@ -1,10 +1,10 @@
 # Desktop workspace and recovery
 
-The workspace uses **strict schema 7 with uniform video tracks, required per-track
-Ripple/transitions/fades, project-specific video/music bins and draggable shared
-project-time row points**, with per-setting channel navigation. Layout preferences,
+The workspace uses **strict schema 8 with uniform video tracks, required per-track
+Ripple/transitions/fades, 0–8 independently identified music instances, project-specific
+video/music bins and draggable shared project-time row points**, with per-setting channel navigation. Layout preferences,
 stored-point inspection and recovery feedback remain editor-only. Source protection,
-music, coverage-preserving black fades, grouped dissolves and native budgets are
+coverage-preserving black fades, grouped dissolves and native video budgets are
 unchanged. Every row has one required numeric `opacity` in 0–1, initially 1 (100%)
 on new tracks; its sole `opacity` key channel overrides the row value for every
 source, including both dissolve participants. There is no saved `clip.opacity`
@@ -29,7 +29,8 @@ The intended discrete-GPU and long real-flight checks remain deferred.
   (accessible tab name **Layer keyframes**) contains the selected row's directly
   visible whole-point list, participant chips,
   Animation help and point navigation; Sequence owns that track's transitions/fades;
-  Audio owns music. Keyframes and Sequence omit redundant selected-track banners.
+  Audio owns selected-instance music controls (**Music track / Recording / Add music
+  track / Delete selected music track**). Keyframes and Sequence omit redundant selected-track banners.
   Empty-row selection retains keyframe context and dormant fades.
 - Bottom: frame-scaled multi-layer timeline, playhead timecode, highlighted active
   insertion layer, one marker per stored row point, dimmed hidden clips and Activity.
@@ -60,7 +61,7 @@ viewport bounds; below 980 px, one side drawer is visible at a time. Desktop wid
 not overflow horizontally. The CSS floor is 640 px; this is not a mobile editor.
 Denied browser storage leaves layout/section controls usable for the session and
 exposes an explanatory preference warning. Keyframe controls must remain reachable
-in the 270 px inspector and 720 px drawer; the 640 px toolbar and music lane must
+in the 270 px inspector and 720 px drawer; the 640 px toolbar and music lanes must
 retain usable pointer targets. These are UI contracts, not performance certification.
 
 Choosing a layer selects its first excerpt (if present), highlights that row and
@@ -77,7 +78,7 @@ source ranges, clip settings, row Opacity, layer order or absolute project-frame
 The timeline and layer headers both support native vertical scrolling, including
 wheel/trackpad, scrollbars and keyboard focus reveal. They share the same vertical
 position and row geometry; horizontal timeline scrolling does not move the headers.
-All eight rows and the music lane remain reachable at compact timeline heights.
+All eight video rows and up to eight music-instance lanes remain reachable at compact timeline heights.
 Scrolling alone does not seek, edit, create history or save.
 The ruler stays visible at every vertical scroll position while its ticks follow
 horizontal timeline scroll. Header focus and automatic reveal account for the
@@ -305,7 +306,8 @@ Points outside current duration remain stored/list-editable. A central editor-on
 inspection cursor is shared by setting, row, marker and list navigation, advancing
 through several off-duration points even when their previews clamp to the same last
 available frame. Labels identify stored time separately from actual preview; an
-empty timeline has no preview frame. List controls edit their stored point,
+timeline without video or music duration has no preview frame; music-only regions
+preview black at their real project frame. List controls edit their stored point,
 but Clip's setting values, diamond state and capture **still use the real playhead**.
 Manual seek (including the same clamped frame), playback, row/project changes and
 deletion of the inspected point clear inspection. A valid single-point move/Undo
@@ -373,7 +375,7 @@ uncertain write keeps selection and the actual error visible, with guidance to c
 Activity/project state before repeating the import; there is no automatic write retry.
 Late folder reads are aborted on navigation/dismissal. Manual music paths remain
 deliberate imports outside browser roots and never expand configured roots. No original is
-copied: strict schema 7 references original source paths, with only
+copied: strict schema 8 references registered originals in place, with only
 generated proxies/thumbnails, metadata, exports/receipts and scratch written locally.
 
 There is no upload endpoint, browser file picker, optional copy flow or true
@@ -457,6 +459,34 @@ The old entry, its project references and caches remain unchanged; this is a fre
 import, not relinking. Choose the new **Recording** entry separately to place music.
 The serial worker reuses an eligible verified PCM cache without rewriting it.
 
+### Independent music instances
+
+**Audio → Music → Music track** selects one of up to eight identified instances.
+**Recording** chooses a ready/prepared source for the selected instance; **Add music
+track** creates another independent instance, including reuse of the same original.
+The trash action **Delete selected music track** removes only that placement.
+Import merely adds bin membership/preparation and never implicitly places music.
+Selection is editor-only: no seek requirement, history entry or save. Editing,
+changing Recording or removal leaves the other instances, video, row points and
+bin membership untouched; Undo restores a removed instance, not deleted media.
+
+Each instance has its own source IN/OUT, start/duration, gain, fades and selected-range
+loop. Mounted controls retain independent drafts across tab/section hiding and
+instance selection; a former instance's draft cannot apply to a new selection.
+Numeric Enter/blur and completed placement/trim/gain gestures commit once, with
+one Undo step. Invalid edits remain editable/reject atomically, never clamp,
+shorten another instance, merge or save a pointer draft. Escape, cancellation,
+unexpected capture loss or window blur restores a gesture's starting state.
+
+Project duration is **max(all retimed video OUTs, every music start + duration)**,
+including hidden video placements. Music can extend it. A video's closing fade
+ends at its own last clip OUT; afterwards absent active video is opaque black,
+never a frozen last image, while music continues and fades at its own OUT.
+Music-only preview is naturally black; export still requires a retained video clip.
+All music contributions sum after their per-instance gain/fades and hard-clamp
+to [−1, 1] once after all sources. No normalisation, ducking, effects or video audio.
+See [MULTIPLE_MUSIC.md](design/MULTIPLE_MUSIC.md) for strict fields, bounds and pending acceptance.
+
 ## Projects, service connection and errors
 
 Projects are searchable by title/ID with compatibility filtering and recent ordering.
@@ -471,7 +501,13 @@ saved document. It never deletes original recordings, shared registry entries,
 proxies/cache files, successful MP4s or receipts. This is not cache garbage
 collection; another project's membership and immutable export snapshots are unaffected.
 
-Only strict v7 projects and v7 project snapshots in version-1 export receipts are interpreted.
+Only strict v8 projects and v8 project snapshots in version-1 export receipts are interpreted.
+The required `music` array holds 0–8 instances with unique required `id` values and
+complete per-instance source/timing/gain/fades/loop fields; `[]` means no music,
+never null, a singular object or a missing-field default. Receipts require
+`musicSources` captured unique-original and `settings.audio` instance-plan arrays,
+both `[]` without music. Invalid arrays and older snapshots are rejected explicitly;
+their receipts and successful MP4s remain untouched.
 Both `media` arrays are required, unique and limited to 10,000 IDs each; missing
 membership is an invalid document, not an invitation to expose the global library.
 Every layer requires `ripple`, `transitions`, `openingFade` and `closingFade`;
@@ -481,10 +517,11 @@ a missing saved value is invalid, not default-filled. Every point requires exact
 nine nullable fields: `opacity`, `speed` and the seven colour channels. Row
 `opacity` is the sole valid stored value; saved `clip.opacity` and old
 `clipOpacity`/`layerOpacity` channels are invalid, not ignored or defaulted.
-Earlier v1–v6 projects/receipt snapshots are preserved, incompatible
-and never migrated or rewritten with fallback/default local fields. **Create a new
+Earlier v1–v7 projects/receipt snapshots are preserved, incompatible
+and never migrated or rewritten with fallback/default local fields or old-format
+readers. **Create a new
 project** and import its media deliberately; there is no automatic deletion of
-projects, receipts or finished videos, and registry/proxy formats are unchanged.
+projects, receipts or finished videos, and registry/proxy/current PCM formats are unchanged.
 Registered recordings and currently
 verified ready proxies are reusable.
 The live v3 sample appearing incompatible is expected. No sample preparation or
@@ -505,12 +542,17 @@ sources and failed music synchronization remain explicit buffering/errors. Sourc
 wraps and renderer throughput can still interrupt playback; this is not gapless
 audio or intended-GPU/long-run qualification.
 
-Music uses one sample-owned Web Audio worklet with four bounded PCM blocks and
-serial byte-range refill. The actual rendered source origin/output timestamp
+Music uses **one AudioContext/worklet/output clock** with an aggregate **four ×
+128 KiB mixed Float32 blocks**, serial source reads, shared **64 KiB range scratch**,
+one **128 KiB conversion workspace** and one **128 KiB mixed-output workspace**.
+No per-instance queue/clock, full-file or duration-sized silence buffer is added.
+The actual rendered mixed origin/output timestamp
 governs A/V playback; block-updated media-element time does not trigger false
 restarts. Selected-range loops are filled continuously, while true empty-queue,
-processor/read failures and greater-than-one-frame drift remain explicit. Pause
-invalidates the complete epoch and outstanding reads before late work can restart.
+processor/read failures and the unchanged one-project-frame A/V bound remain
+explicit. A missing active source is not silently omitted or replaced by successful
+silence. Pause/seek/edit/cancellation invalidates the complete mix epoch and
+outstanding reads before late work can restart.
 Missing current PCM caches appear as Audio → Music **Retry** preparation actions;
 no read automatically prepares, rewrites or removes older AAC caches. Explicit
 preparation creates the current versioned PCM cache without changing originals,
@@ -552,7 +594,7 @@ invalid release leaves the saved document and history unchanged.
 For an HTTP 409 or incompatible save response, **Review latest save** explains:
 
 1. **Keep editing this draft** — no saved document changes; the save error persists.
-2. **Download unsaved project** — download a strict v7 JSON snapshot with the current
+2. **Download unsaved project** — download a strict v8 JSON snapshot with the current
    local changes/expected revision before replacing them.
 3. **Discard local changes and reload** — explicitly replace local history/document
    with a newly read saved version. It performs no overwrite POST/PUT.
@@ -575,11 +617,13 @@ and returns focus to Activity, without pausing the editor or native job.
 
 Export summarizes contextual duration, clips/layers, track-local Ripple/transitions/
 fades/Opacity, shared row **points and participating settings**, enabled layers, profile
-and a fixed snapshot. A point
+and all independent music instances with a fixed snapshot. A point
 with several channels counts once, not as separate clip/channel keys. Both 720p/4K
 use originals. The static fast path requires one enabled, unanimated,
 zero-origin contiguous track with row Opacity 1; any row point, leading start,
-gap or unsupported coverage uses generalized layered export. That path renders
+gap, unsupported coverage or music beyond video OUT uses generalized layered
+export. Static video must cover full project duration; layered export fills music
+tails with black rather than holding a last image. That path renders
 premultiplied RGBA16 groups, with $C = \sum_i G_i b_i o_i w_i$ and
 $A = \sum_i o_i w_i$, then source-overs as
 $\mathrm{result} = C + \mathrm{lower}(1 - A)$ without regrading or a layer multiplier.
@@ -591,7 +635,12 @@ Preview reuses two slots per track (16 maximum) plus one source reviewer.
 Native limits are four
 raw buffers/22 bytes per pixel, two LUTs, three timeline representations and two
 retained clip files, with serial one-original/two-intermediate/one-encoder passes
-and at most three native video children. Exact byte bounds are in
+and at most three native video children. Audio separately decodes one original at
+a time to selected s16 PCM, then sums serially through Float64 accumulators with
+at most two intermediate audio inputs, one audio child per pass and three scratch
+audio files (selected source + old/new accumulators). One final mixed input clamps
+once before AAC. Audio planning is maximum selected PCM + two full-project Float64
+stereo timelines, duration-dependent and additional to video. Exact byte bounds are in
 [the resource contract](LAYERS_AND_KEYFRAMES.md#inspector-and-resource-limits). Export
 shows free space on its output/scratch volume and an explicitly advisory planning
 allowance, not a compressed-size guarantee or time estimate. Low space/mount

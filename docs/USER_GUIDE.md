@@ -13,18 +13,20 @@ inherit the shared media registry. Importing the same original into another proj
 deliberately adds it to that project's bin and reuses eligible verified proxies.
 Removing an excerpt or music placement does not remove the imported media.
 
-Projects use **strict format v7**, including every track's Ripple, transitions and
+Projects use **strict format v8**, with a required `music` array of 0–8 independent
+instances and unique required instance IDs (`[]` without music), every video track's Ripple, transitions and
 opening/closing fades and required numeric `opacity` in 0–1 (1 on new tracks),
 with nine nullable animation channels: `opacity`, `speed` and seven colour settings.
 Row `opacity` is the sole saved Opacity value; saved `clip.opacity` and old
 `clipOpacity`/`layerOpacity` key channels are invalid, not ignored or defaulted.
-v1–v6 project documents and receipt snapshots
+v1–v7 project documents and receipt snapshots
 stay on disk but are incompatible: there is no migration, compatibility default,
-automatic repair or deletion.
+null fallback, old-format reader, automatic repair or deletion. Export receipts
+remain version 1 with a strict v8 snapshot and required audio-source/instance-plan arrays.
 Create a new project and import its media deliberately. Finished videos remain
 untouched. **Delete project** requires confirmation and deletes only the saved
 project document, not originals, the shared registry/proxy cache or exports/receipts.
-Registry/proxy formats are unchanged.
+Registry/proxy/current PCM cache formats are unchanged.
 
 Keep originals readable at their registered service-side paths. Moving a file,
 changing a mount or disconnecting a drive can fail even with a ready proxy.
@@ -142,7 +144,9 @@ a fade/dissolve. A cross-dissolve explicitly adjusts the right clip to its overl
 with Ripple off, no other clip moves and conflicts reject it.
 Black fades darken only that row's RGB, preserving coverage rather than revealing
 lower footage. Opening/closing fades use actual first/last placements and remain
-stored but dormant on empty tracks. Details: [TIMELINE_EDITING.md](TIMELINE_EDITING.md).
+stored but dormant on empty tracks. A closing fade ends at its last video clip's
+OUT, not a later music OUT; after all video ends the picture is black, never a
+frozen last image. Details: [TIMELINE_EDITING.md](TIMELINE_EDITING.md).
 
 ## Colour, speed and shared row keyframes
 
@@ -280,10 +284,10 @@ document/preview/scroll; pointer previews never enter autosave or history.
 
 Points outside duration stay stored and list-editable. Points after the last clip
 keep their timeline markers at their own time, like points before the first clip;
-the timeline scrolls far enough to reach them, but playback still stops at the
-last clip frame. Setting/row/list/marker navigation can inspect successive stored
+the timeline scrolls far enough to reach them, but points alone do not extend
+playback beyond project duration (the maximum video/music OUT). Setting/row/list/marker navigation can inspect successive stored
 points while preview clamps to the nearest available
-frame (none on an empty timeline). Labels distinguish **stored time from actual
+project frame (black during a music-only region; none without video or music duration). Labels distinguish **stored time from actual
 preview**: list controls edit the stored point, but Clip's setting values,
 diamonds and capture still use the **real playhead**. Manual seek, playback and
 row/project changes clear inspection; **Follow playhead** ends it explicitly.
@@ -299,7 +303,8 @@ Retiming: [SPEED_AND_AUDIO.md](SPEED_AND_AUDIO.md).
 
 Source-video audio is not used. In **Audio → Music**, enter your own standalone
 local file in **Music file path**, choose **Import audio**, wait for preparation,
-then select the ready recording from this project's music bin. No soundtrack is
+then choose a ready **Recording** from this project's music bin and deliberately
+place it with **Add music track**. Importing alone never places music. No soundtrack is
 supplied; use music you own or have permission to use and keep private paths private.
 
 If music was moved, import its new location normally and choose the new **Recording**
@@ -307,20 +312,35 @@ entry after preparation. This does not reconnect or replace the old entry; exist
 projects and caches remain untouched. Reimporting the same unchanged path reuses its
 entry, while a missing old location stays visibly unavailable.
 
-One music track supports waveform placement/edge trims, numeric source IN/OUT,
-start/duration, a native **gain dB** slider with an exact numeric field, linear fades
-and **Loop selected source range**. Without looping, duration must fit that source
-range; looping repeats only it.
-There is no hidden loudness normalisation or video-speed retiming of music.
-Preview uses bounded PCM streaming through Web Audio, not a full-file buffer or
-an approximate media-element clock. Selected-range loops continue without a music
-restart; genuine video buffering or audio read/processor failures stay explicit.
+Use up to **eight independent music instances**, including several from the same
+recording. **Music track** selects the instance to edit; **Add music track** adds
+another from the chosen ready/prepared Recording. Its trash action **Delete selected
+music track** removes only that placement; Undo restores it. Selection creates no
+save/history entry, and editing/removing one instance leaves all others unchanged.
+Each instance has its own waveform placement/edge trims, source IN/OUT,
+start/duration, native **gain dB** slider with an exact numeric field, linear fades
+and **Loop selected source range**. Without looping, duration must fit its source
+range; looping repeats only it. Independent drafts never apply to another instance.
+Each accepted edit or completed gesture is one Undo step; invalid/cancelled edits
+are atomic and never silently clamp timing, save a draft or change other tracks.
+
+Overlapping music sums linearly after each instance's gain/fades, with **one hard
+clamp to −1–1 after the complete sum**, not per track. There is no loudness
+normalisation, ducking, effect or video-speed retiming of music. Preview uses one
+AudioContext/worklet/output clock and one bounded mixed PCM queue, not full-file
+buffers or per-instance clocks/queues. Selected-range loops continue without a
+music restart; genuine video buffering or audio read/processor failures stay explicit.
 If an older prepared recording lacks the current PCM cache, **Audio → Music →
 Retry recording name** explicitly prepares it. No startup/library read starts that
 job, and older caches/originals remain untouched. This cache needs about 11.52 MB
-per minute; project and video-proxy formats are unchanged.
-Native export loops the selected PCM range continuously and pads/trims AAC to video
-duration. The complete video's duration is not extended to fit music.
+per minute; registry/video-proxy/PCM cache formats are unchanged.
+
+**Music can extend the project.** Duration is the maximum of every retimed video
+clip OUT and every music start + duration. Video closing fades remain at their
+clip OUTs, then the picture is black while music continues and fades at each
+instance's own end. Native export uses the layered path for this black tail and
+pads/trims mixed AAC to full project duration, never freezing the last image.
+Music-only preview is black; export requires at least one retained video clip.
 
 Choose **Export** for a **1280×720 draft** or **3840×2160 final**, H.264 SDR BT.709
 from originals, with optional 48 kHz AAC music. The quality cards and storage meter
@@ -339,6 +359,8 @@ resumed or published as finished. Long 4K/layered renders can need substantial
 scratch disk and CPU time; short tests do not qualify long-flight throughput.
 See [SPEED_AND_AUDIO.md](SPEED_AND_AUDIO.md) and
 [Inspector and resource limits](LAYERS_AND_KEYFRAMES.md#inspector-and-resource-limits).
+The [multiple-music contract](design/MULTIPLE_MUSIC.md) specifies schema, mixing,
+resources and pending acceptance; this guide does not claim those tests passed.
 
 ## Workspace and keyboard
 
@@ -431,7 +453,7 @@ in memory and automatic write retries stop. **Retry save** is offered only for
 recoverable transport/server errors. On a revision conflict, **Review latest save**
 offers keeping the draft, **Download unsaved project**, or explicitly discarding
 local changes and reloading. It never silently overwrites or rebases another save.
-Download before discarding; the v7 JSON snapshot is for manual recovery/examination,
+Download before discarding; the v8 JSON snapshot is for manual recovery/examination,
 not a supported JSON-import or migration flow. Unapplied input/pointer drafts are
 not committed project edits.
 

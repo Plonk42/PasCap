@@ -178,6 +178,6 @@ if (process.argv.includes('--browser')) {
   fixture.document = await store.save(fixture.document, fixture.document.revision);
   await fixture.jobs.close();
   console.log(
-    'Disposable schema-7 browser fixture prepared (preview-lab): 12 project recordings, registered music, three verified video proxies.',
+    'Disposable schema-8 browser fixture prepared (preview-lab): 12 project recordings, registered music, no placed music tracks, three verified video proxies.',
   );
 }
