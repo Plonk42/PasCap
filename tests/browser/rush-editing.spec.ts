@@ -1362,3 +1362,246 @@ test('an overlapping source Add clears stale success feedback but keeps the sour
   expect(await current(page)).toEqual(before);
   await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
 });
+
+test('source proxy Play/Pause advances observed frames and stops at exclusive OUT without project edits', async ({
+  page,
+}) => {
+  const before = await current(page);
+  await seek(page, 30);
+  await page.getByRole('button', { name: 'Review pattern-a.mp4', exact: true }).click();
+  await sourceRange(page, 12, 72);
+  await sourceFrame(page, 5);
+  await page.getByRole('button', { name: 'Play source preview', exact: true }).click();
+  await expect(page.locator('.source-preview')).toHaveAttribute('data-source-status', 'playing');
+  await expect
+    .poll(async () => Number(await page.locator('.source-preview').getAttribute('data-source-frame')))
+    .toBeGreaterThan(16);
+  await page.getByRole('button', { name: 'Pause source preview', exact: true }).click();
+  await expect(page.locator('.source-preview')).toHaveAttribute('data-source-status', 'paused');
+  const paused = Number(await page.locator('.source-preview').getAttribute('data-source-frame'));
+  expect(paused).toBeGreaterThanOrEqual(12);
+  expect(paused).toBeLessThan(72);
+  expect(
+    await page.locator('video[data-source-decoder]').evaluate((video: HTMLVideoElement) => ({
+      paused: video.paused,
+      muted: video.muted,
+      volume: video.volume,
+      loop: video.loop,
+    })),
+  ).toEqual({ paused: true, muted: true, volume: 0, loop: false });
+  await page.getByRole('button', { name: 'Play source preview', exact: true }).press('Space');
+  await expect(page.locator('.source-preview')).toHaveAttribute('data-source-status', 'playing');
+  await expect(page.locator('.source-preview')).toHaveAttribute('data-source-status', 'paused');
+  await expect(page.locator('.source-preview')).toHaveAttribute('data-source-frame', '71');
+  await expect(page.locator('video[data-source-decoder]')).toHaveCount(1);
+  expect(await page.locator('video[data-source-decoder]').evaluate((video: HTMLVideoElement) => video.paused)).toBe(
+    true,
+  );
+  await page.getByRole('button', { name: 'Play source preview', exact: true }).press('Enter');
+  await expect(page.locator('.source-preview')).toHaveAttribute('data-source-status', 'playing');
+  const restarted = Number(await page.locator('.source-preview').getAttribute('data-source-frame'));
+  expect(restarted).toBeGreaterThanOrEqual(12);
+  expect(restarted).toBeLessThan(71);
+  await page.getByRole('button', { name: 'Pause source preview', exact: true }).click();
+  await expect(page.locator('.source-preview')).toHaveAttribute('data-source-status', 'paused');
+  expect(await current(page)).toEqual(before);
+  expect(await page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(30);
+  await flush(page);
+  expect(memory.saves).toBe(0);
+  await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
+});
+
+for (const action of ['scrub', 'mark', 'apply', 'reset', 'trim'] as const) {
+  test(`source ${action} pauses proxy playback without timeline history or saves`, async ({ page }) => {
+    const before = await current(page);
+    await page.getByRole('button', { name: 'Review pattern-a.mp4', exact: true }).click();
+    await sourceRange(page, 10, 110);
+    await sourceFrame(page, 20);
+    await page.getByRole('button', { name: 'Play source preview', exact: true }).click();
+    await expect(page.locator('.source-preview')).toHaveAttribute('data-source-status', 'playing');
+    if (action === 'scrub') await sourceFrame(page, 60);
+    if (action === 'mark') await page.getByRole('button', { name: 'Mark source OUT', exact: true }).click();
+    if (action === 'apply') await sourceRange(page, 30, 100);
+    if (action === 'reset') await page.getByRole('button', { name: 'Reset source range', exact: true }).click();
+    if (action === 'trim')
+      await page.getByRole('slider', { name: 'Trim source start', exact: true }).press('ArrowRight');
+    await expect(page.locator('.source-preview')).toHaveAttribute('data-source-status', 'paused');
+    expect(await page.locator('video[data-source-decoder]').evaluate((video: HTMLVideoElement) => video.paused)).toBe(
+      true,
+    );
+    expect(await current(page)).toEqual(before);
+    await flush(page);
+    expect(memory.saves).toBe(0);
+    await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
+  });
+}
+
+test('a one-frame source range remains exact; unapplied numeric drafts are not played or inserted', async ({
+  page,
+}) => {
+  await page.getByRole('button', { name: 'Review pattern-a.mp4', exact: true }).click();
+  await sourceRange(page, 50, 51);
+  await sourceFrame(page, 0);
+  await page.getByRole('spinbutton', { name: 'Source IN', exact: true }).fill('10');
+  await page.getByRole('spinbutton', { name: 'Source OUT', exact: true }).fill('100');
+  await page.getByRole('button', { name: 'Play source preview', exact: true }).click();
+  await expect(page.locator('.source-preview')).toHaveAttribute('data-source-frame', '50');
+  await expect(page.locator('.source-preview')).toHaveAttribute('data-source-status', 'paused');
+  await expect(page.getByRole('spinbutton', { name: 'Source IN', exact: true })).toHaveValue('10');
+  const id = await addExcerpt(page);
+  expect((await current(page)).clips.find((clip) => clip.id === id)).toMatchObject({ sourceIn: 50, sourceOut: 51 });
+});
+
+for (const action of ['pause', 'scrub', 'tab', 'asset', 'project', 'close'] as const) {
+  test(`an actual source native play deferred across ${action} never restarts an obsolete viewer`, async ({ page }) => {
+    await page.getByRole('button', { name: 'Review pattern-a.mp4', exact: true }).click();
+    await sourceFrame(page, 20);
+    await page.evaluate(() => {
+      const video = globalThis.document.querySelector<HTMLVideoElement>('video[data-source-decoder]')!;
+      const nativePlay = video.play.bind(video);
+      const scope = globalThis as unknown as { releaseSourcePlay: () => Promise<void>; oldSource: HTMLVideoElement };
+      scope.oldSource = video;
+      video.play = () => {
+        // Start the real native operation while its resource still exists, but
+        // gate completion across cancellation. Calling play on a disposed,
+        // src-less video can remain pending and is not an obsolete completion.
+        const playing = nativePlay();
+        const released = new Promise<void>((resolve) => {
+          scope.releaseSourcePlay = async () => resolve();
+        });
+        return playing.then(() => released);
+      };
+    });
+    await page.getByRole('button', { name: 'Play source preview', exact: true }).click();
+    await expect(page.locator('.source-preview')).toHaveAttribute('data-source-status', 'starting');
+    await page.waitForFunction(
+      () => typeof (globalThis as unknown as { releaseSourcePlay?: unknown }).releaseSourcePlay === 'function',
+    );
+    if (action === 'pause') await page.getByRole('button', { name: 'Pause source preview', exact: true }).click();
+    if (action === 'scrub') await sourceFrame(page, 55);
+    if (action === 'tab') await page.getByRole('tab', { name: 'Timeline preview', exact: true }).click();
+    if (action === 'asset') await page.getByRole('button', { name: 'Review pattern-b.mp4', exact: true }).click();
+    if (action === 'project') {
+      const other = createProject('browser-source-cancellation', 'Other source review · memory-only');
+      other.media.videoIds = assets.map((asset) => asset.id);
+      memory.seed(other);
+      await page.getByRole('button', { name: 'Open projects', exact: true }).click();
+      await page.getByRole('button', { name: `Open ${other.title}`, exact: true }).click();
+      await ready(page, other);
+    }
+    if (action === 'close') await page.getByRole('button', { name: 'Close source review', exact: true }).click();
+    if (action === 'tab' || action === 'project' || action === 'close')
+      await expect(page.locator('video[data-source-decoder]')).toHaveCount(0);
+    if (action === 'asset')
+      await expect(page.locator('.source-preview')).toHaveAttribute('data-media-id', assets[1]!.id);
+    await page.evaluate(async () => {
+      await (globalThis as unknown as { releaseSourcePlay: () => Promise<void> }).releaseSourcePlay().catch(() => {});
+      await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+    });
+    expect(await page.evaluate(() => (globalThis as unknown as { oldSource: HTMLVideoElement }).oldSource.paused)).toBe(
+      true,
+    );
+    if (action === 'pause' || action === 'scrub') {
+      await expect(page.locator('.source-preview')).toHaveAttribute('data-source-status', 'paused');
+      await expect(page.getByRole('button', { name: 'Play source preview', exact: true })).toBeEnabled();
+    }
+    if (action === 'scrub') await expect(page.locator('.source-preview')).toHaveAttribute('data-source-frame', '55');
+    await flush(page);
+    expect(memory.saves).toBe(0);
+  });
+}
+
+test('source play failure stays explicit and Retry restores the one muted proxy decoder', async ({ page }) => {
+  await page.getByRole('button', { name: 'Review pattern-a.mp4', exact: true }).click();
+  await sourceFrame(page, 20);
+  await page.locator('video[data-source-decoder]').evaluate((video: HTMLVideoElement) => {
+    video.play = () => Promise.reject(new Error('Deliberate source play rejection'));
+  });
+  await page.getByRole('button', { name: 'Play source preview', exact: true }).click();
+  await expect(page.locator('.source-preview [role="alert"]')).toContainText('Deliberate source play rejection');
+  await expect(page.getByRole('button', { name: 'Play source preview', exact: true })).toBeDisabled();
+  await page.getByRole('button', { name: 'Retry source preview', exact: true }).click();
+  await expect(page.locator('.source-preview')).toHaveAttribute('data-source-frame', '20');
+  await expect(page.locator('video[data-source-decoder]')).toHaveCount(1);
+  await page.getByRole('button', { name: 'Play source preview', exact: true }).click();
+  await expect(page.locator('.source-preview')).toHaveAttribute('data-source-status', 'playing');
+  await page.getByRole('button', { name: 'Pause source preview', exact: true }).click();
+  await flush(page);
+  expect(memory.saves).toBe(0);
+});
+
+test('a cancelled never-settling source play has a bounded failure and reachable Retry', async ({ page }) => {
+  await page.getByRole('button', { name: 'Review pattern-a.mp4', exact: true }).click();
+  await sourceFrame(page, 20);
+  await page.locator('video[data-source-decoder]').evaluate((video: HTMLVideoElement) => {
+    video.play = () => new Promise<void>(() => {});
+  });
+  await page.getByRole('button', { name: 'Play source preview', exact: true }).click();
+  await expect(page.locator('.source-preview')).toHaveAttribute('data-source-status', 'starting');
+  await page.getByRole('button', { name: 'Pause source preview', exact: true }).click();
+  await expect(page.locator('.source-preview')).toHaveAttribute('data-source-status', 'paused');
+  await expect(page.locator('.source-preview [role="alert"]')).toContainText('start did not finish within 5 seconds.');
+  await page.getByRole('button', { name: 'Retry source preview', exact: true }).click();
+  await expect(page.locator('.source-preview')).toHaveAttribute('data-source-frame', '20');
+  await expect(page.getByRole('button', { name: 'Play source preview', exact: true })).toBeEnabled();
+  await expect(page.locator('video[data-source-decoder]')).toHaveCount(1);
+  await flush(page);
+  expect(memory.saves).toBe(0);
+});
+
+test('source IN/OUT targets, omitted footage and reversible drafts remain reachable on a short compact viewport', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 720, height: 600 });
+  await page.getByRole('button', { name: 'Review pattern-a.mp4', exact: true }).click();
+  // The compact Media drawer intentionally covers the left of the viewer.
+  await page.getByRole('button', { name: 'Toggle Media panel', exact: true }).click();
+  await sourceRange(page, 25, 90);
+  await sourceFrame(page, 50);
+  const handles = page.locator('.source-trim-handle');
+  const sizes = await handles.evaluateAll((elements) =>
+    elements.map((element) => ({
+      width: element.getBoundingClientRect().width,
+      height: element.getBoundingClientRect().height,
+      text: element.textContent?.trim(),
+    })),
+  );
+  expect(sizes).toEqual([
+    { width: 30, height: 28, text: 'IN' },
+    { width: 30, height: 28, text: 'OUT' },
+  ]);
+  await expect(page.locator('.source-range-description')).toContainText('25 before / 30 after');
+  for (const edge of ['before', 'after'])
+    expect(
+      await page.locator(`.source-range-omitted.${edge}`).evaluate((element) => element.getBoundingClientRect().width),
+    ).toBeGreaterThan(0);
+  const handle = page.getByRole('slider', { name: 'Trim source start', exact: true });
+  // A merely intersecting handle can sit behind the pinned source header in
+  // Firefox. Scroll it into the usable viewport before starting real capture.
+  await handle.evaluate((element) => element.scrollIntoView({ block: 'center' }));
+  const box = await handle.boundingBox();
+  if (!box) throw new Error('Source IN handle must be visible');
+  expect(
+    await handle.evaluate((element) => {
+      const bounds = element.getBoundingClientRect();
+      return element.contains(document.elementFromPoint(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2));
+    }),
+  ).toBe(true);
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width / 2 + 30, box.y + box.height / 2);
+  await expect(page.locator('.source-range-strip')).toHaveAttribute('data-range-draft', 'true');
+  await expect(page.getByRole('button', { name: 'Play source preview', exact: true })).toBeDisabled();
+  await page.keyboard.press('Escape');
+  await page.mouse.up();
+  await expect(page.locator('.source-range-strip')).toHaveAttribute('data-source-in', '25');
+  await expect(page.locator('.source-preview')).toHaveAttribute('data-source-frame', '50');
+  await handle.press('Home');
+  await expect(page.locator('.source-range-strip')).toHaveAttribute('data-source-in', '0');
+  await expect(page.locator('.source-preview')).toHaveAttribute('data-source-frame', '0');
+  await page.getByRole('slider', { name: 'Trim source end', exact: true }).press('End');
+  await expect(page.locator('.source-range-strip')).toHaveAttribute('data-source-out', '120');
+  await expect(page.locator('.source-preview')).toHaveAttribute('data-source-frame', '119');
+  await flush(page);
+  expect(memory.saves).toBe(0);
+});
