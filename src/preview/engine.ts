@@ -152,6 +152,7 @@ export class PreviewEngine {
   #clockFrame = 0;
   #clockTime = 0;
   #lastDrawnFrame = -1;
+  #surfaceKey: string | null = null;
   #dirty = true;
   #lastEmit = 0;
   #publication = 0;
@@ -294,7 +295,7 @@ export class PreviewEngine {
         }
         this.#operationFrame = frame;
         if (!this.#mismatchStart) this.#mismatchStart = now;
-        this.#compositor.clear();
+        this.#clearSurface();
         this.#setStatus('buffering', 'Waiting for decoded frames');
         return false;
       }
@@ -514,7 +515,7 @@ export class PreviewEngine {
       this.#resizePool(this.#poolSize());
       const ids = new Set(snapshot.clips.map((clip) => clip.id));
       this.#assignments = this.#assignments.map((id) => (id !== null && ids.has(id) ? id : null));
-      this.#compositor.clear();
+      this.#clearSurface();
       await this.#music.configure(snapshot.music, signal);
       if (!this.#isCurrent(signal)) return;
       if (!this.#compositor.available) throw new Error('WebGL context is unavailable.');
@@ -541,7 +542,7 @@ export class PreviewEngine {
     const signal = this.#beginOperation();
     const started = performance.now();
     this.#operationFrame = frame;
-    this.#compositor.clear();
+    this.#clearSurface();
     this.#setStatus('seeking', `Seeking frame ${frame}`);
     try {
       await this.#prepareLayers(sampleTimeline(this.#document, frame, this.#layout), signal);
@@ -563,7 +564,7 @@ export class PreviewEngine {
     this.#ungraded = enabled;
     this.#dirty = true;
     if (!this.#playing && !this.#busy && this.#status === 'paused' && !this.#drawFrame(this.#frame))
-      this.#compositor.clear();
+      this.#clearSurface();
     // Playback redraws through the normal advance/readiness paths, never using
     // a possibly stale paused frame. Publication retains its exact A/V checks.
     this.#emit(true);
@@ -596,7 +597,7 @@ export class PreviewEngine {
     this.#colourRequested = performance.now();
     if (changed) this.#cancelPreloads();
     if (!this.#layout.duration || !this.#compositor.available) {
-      this.#compositor.clear();
+      this.#clearSurface();
       return;
     }
     this.#refreshAppearance(frame, required, changed);
@@ -618,7 +619,7 @@ export class PreviewEngine {
       const removed = this.#playingClips.filter((id) => !required.includes(id));
       removed.forEach((id) => this.#slots[this.#assignments.indexOf(id)]?.pause());
       this.#playingClips = [...required];
-      if (!this.#drawFrame(frame)) this.#compositor.clear();
+      if (!this.#drawFrame(frame)) this.#clearSurface();
       this.#preloadNext(frame);
       return;
     }
@@ -661,6 +662,10 @@ export class PreviewEngine {
     for (const slot of this.#slots) slot.pause();
     this.#playingClips = [];
     if (this.#document && this.#status !== 'empty' && this.#status !== 'error') this.#setStatus('paused', 'Paused');
+  }
+  #clearSurface(): void {
+    this.#surfaceKey = null;
+    this.#compositor.clear();
   }
   #drawFrame(frame: number): boolean {
     if (!this.#document || !this.#compositor.available) return false;
@@ -710,15 +715,7 @@ export class PreviewEngine {
         }),
       });
     }
-    this.#compositor.drawFrame(groups);
-    if (frame !== this.#lastDrawnFrame || this.#dirty) {
-      this.#renderedFrames++;
-      if (this.#playing) {
-        this.#renderTimes.push(performance.now());
-        if (this.#renderTimes.length > 300) this.#renderTimes.shift();
-      }
-      this.#lastDrawnFrame = frame;
-    }
+    this.#renderSurface(frame, layers, groups);
     this.#dirty = false;
     this.#frame = frame;
     if (this.#colourRequested) {
@@ -733,11 +730,36 @@ export class PreviewEngine {
     }
     return true;
   }
+  #renderSurface(frame: number, layers: readonly PreviewLayer[], groups: readonly CompositeGroup[]): void {
+    // A held source with identical evaluated appearance is the same image,
+    // even at a later project frame. Avoid queuing redundant expensive grades;
+    // readiness and the final real-output-clock publication checks still run.
+    // Include every composed value and source identity, not inverse source time.
+    const surfaceKey = JSON.stringify({
+      width: this.canvas.width,
+      height: this.canvas.height,
+      sources: layers.map(({ clipId, mediaId, sourceFrame }) => ({ clipId, mediaId, sourceFrame })),
+      groups,
+    });
+    const redraw = this.#dirty || this.#surfaceKey !== surfaceKey;
+    if (redraw) {
+      this.#compositor.drawFrame(groups);
+      this.#surfaceKey = surfaceKey;
+    }
+    if (redraw && (frame !== this.#lastDrawnFrame || this.#dirty)) {
+      this.#renderedFrames++;
+      if (this.#playing) {
+        this.#renderTimes.push(performance.now());
+        if (this.#renderTimes.length > 300) this.#renderTimes.shift();
+      }
+      this.#lastDrawnFrame = frame;
+    }
+  }
   async #alignPlayback(frame: number, boundary: boolean): Promise<void> {
     if (this.#busy || !this.#document || !this.#playing) return;
     const signal = this.#beginOperation();
     this.#operationFrame = frame;
-    this.#compositor.clear();
+    this.#clearSurface();
     this.#setStatus('buffering', boundary ? 'Loading next clip' : 'Waiting for decoded frames');
     if (boundary) this.#boundaryStalls++;
     try {
@@ -986,7 +1008,7 @@ export class PreviewEngine {
     const actual = placed.start + placed.retiming.outputAt(this.#slotFor(observed.clipId).decodedFrame);
     const error = Math.abs(actual - expected);
     if (actual >= 0) this.#maxClockError = Math.max(this.#maxClockError, error);
-    this.#compositor.clear();
+    this.#clearSurface();
     this.#setStatus('buffering', 'Waiting for decoded frames');
     if (!this.#mismatchStart) this.#mismatchStart = now;
     if (now - this.#mismatchStart > framesToSeconds(1, this.#document.frameRate) * 1000) {
@@ -1004,10 +1026,13 @@ export class PreviewEngine {
     this.#music.pause();
     for (const slot of this.#slots) slot.pause();
     this.#playingClips = [];
-    this.#compositor.clear();
+    this.#clearSurface();
     this.#setStatus('error', error instanceof Error ? error.message : 'Preview failed.');
   }
   capturePixels(): Uint8Array {
+    // The presented image can be retained, but WebGL's non-preserved drawing
+    // buffer may be discarded after presentation. Readback always needs a draw.
+    this.#surfaceKey = null;
     if (!this.#drawFrame(this.#frame)) throw new Error('Cannot capture pixels without all required decoded frames.');
     return this.#compositor.readPixels();
   }

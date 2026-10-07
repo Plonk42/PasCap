@@ -586,6 +586,15 @@ sources and failed music synchronization remain explicit buffering/errors. Sourc
 wraps and renderer throughput can still interrupt playback; this is not gapless
 audio or intended-GPU/long-run qualification.
 
+When exact decoded sources and every evaluated composition value are unchanged,
+a held slow-motion image reuses the intact presented surface instead of repeating
+the same GPU grade. Readiness and actual output-clock checks still run at current
+project time. Source, colour, spatial pose, opacity, fade, dissolve, canvas size,
+Compare or a cleared surface changes the identity and requires a new draw.
+Diagnostic pixel capture always redraws first: WebGL may discard its non-preserved
+drawing buffer after presenting the intact image. No extra image buffer or longer
+audio queue is introduced.
+
 Playing publication rechecks that same output-clock/source-set/appearance bound
 after diagnostics construction and before each subscriber, including initial
 subscription. Clip-set eligibility for the accepted frame and its one-frame

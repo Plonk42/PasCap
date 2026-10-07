@@ -7,7 +7,7 @@ import { createClip, createLayer, createProject, projectSchema, type ProjectDocu
 import { calculateLayout, sampleTimeline } from '../../src/shared/timeline.js';
 import { expandedInspectorPreferences, sharedPoint } from './editor-helpers.js';
 import { memoryProjects, type MemoryProjects } from './memory-projects.js';
-import { installMusicEvidence } from './music-evidence.js';
+import { installMusicEvidence, observeMusicPlayback } from './music-evidence.js';
 
 interface PixelSummary {
   checksum: number;
@@ -860,6 +860,7 @@ test('comparison during music playback preserves the real worklet epoch and stri
     { length: duration },
     (_, frame) => sampleTimeline(comparison.playback, frame)[0]!.sourceFrame,
   );
+  await observeMusicPlayback(page);
   await page.evaluate((sourceFrames) => {
     const engine = window.pascapLab!.engine;
     // Observe actual texture uploads, so a later decoded callback cannot be
@@ -1099,6 +1100,10 @@ test('comparison during music playback preserves the real worklet epoch and stri
           pauses: window.musicStreamEvidence.pauses,
           underruns: window.musicStreamEvidence.underruns,
           receipt: window.musicStreamEvidence.receipt,
+          samples: window.musicStreamEvidence.samples,
+          playback: window.musicStreamEvidence.playback,
+          queueEvents: window.musicStreamEvidence.queueEvents,
+          rangeTimings: window.musicStreamEvidence.rangeTimings,
           largestRange: window.musicStreamEvidence.largestRange,
         })),
         null,
