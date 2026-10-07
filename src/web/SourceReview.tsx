@@ -20,10 +20,11 @@ import {
   type MediaSelectionEdge,
 } from '../shared/media-selection.js';
 import type { MediaAsset } from '../shared/media.js';
-import { formatTimecode, secondsToFrames } from '../shared/timing.js';
+import { formatTimecode } from '../shared/timing.js';
 import { mediaReady } from './display.js';
 import { Icon } from './icons.js';
 import { Popover } from './Popover.js';
+import { SourceTransport, type SourceTransportState } from './source-transport.js';
 import './rush-source.css';
 
 export interface RushExcerpt {
@@ -52,9 +53,7 @@ interface Props {
 
 interface Observation {
   key: string;
-  requestedFrame: number;
-  frame: number | null;
-  error: string;
+  state: SourceTransportState;
 }
 interface RangeCommands {
   mark: (edge: MediaSelectionEdge) => void;
@@ -68,6 +67,8 @@ interface RangeProps {
   disabled: boolean;
   onFrame: (frame: number) => void;
   onRange: (range: MediaSelection) => void;
+  onPause: () => void;
+  onDraft: (active: boolean) => void;
   onKeyDown: (event: KeyboardEvent<HTMLElement>) => void;
   ref: Ref<RangeCommands>;
 }
@@ -86,7 +87,7 @@ function message(cause: unknown): string {
   return cause instanceof Error ? cause.message : 'Cannot review this source.';
 }
 
-/** One paused proxy decoder, independent of the project preview and transport. */
+/** One muted proxy decoder, independent of the project preview and transport. */
 export function SourceReview({
   asset,
   frame,
@@ -104,21 +105,19 @@ export function SourceReview({
 }: Readonly<Props>) {
   const host = useRef<HTMLDivElement>(null);
   const preview = useRef<HTMLDivElement>(null);
-  const slot = useRef<VideoDecoderSlot | null>(null);
-  const loaded = useRef('');
-  const loading = useRef<AbortController | null>(null);
-  const seeking = useRef<AbortController | null>(null);
+  const transport = useRef<SourceTransport | null>(null);
   const commands = useRef<RangeCommands | null>(null);
   const [observation, setObservation] = useState<Observation | null>(null);
   const [decoderError, setDecoderError] = useState('');
   const [visible, setVisible] = useState(true);
   const [retry, setRetry] = useState(0);
   const [lastAddedId, setLastAddedId] = useState<string | null>(null);
+  const [rangeDraft, setRangeDraft] = useState(false);
   const requestedFrame = Math.max(0, Math.min(asset.metadata.frameCount - 1, Math.round(frame)));
   const rate = asset.metadata.frameRate;
   const resourceKey = `${asset.id}/${asset.prepared?.verification.verifiedAt}/${asset.metadata.frameCount}/${rate.numerator}/${rate.denominator}/${retry}`;
-  const latest = useRef({ key: resourceKey, frame: requestedFrame, rate });
-  latest.current = { key: resourceKey, frame: requestedFrame, rate };
+  const latest = useRef({ frame: requestedFrame, range, onFrame });
+  latest.current = { frame: requestedFrame, range, onFrame };
 
   useEffect(() => {
     setLastAddedId(null);
@@ -140,7 +139,8 @@ export function SourceReview({
       );
       change();
     });
-    if (preview.current) observer.observe(preview.current);
+    const reviewPanel = preview.current?.closest('.source-review');
+    if (reviewPanel) observer.observe(reviewPanel);
     change();
     document.addEventListener('visibilitychange', change);
     return () => {
@@ -155,7 +155,8 @@ export function SourceReview({
       setDecoderError('Source review requires requestVideoFrameCallback in a current browser.');
       return;
     }
-    const decoder = new VideoDecoderSlot(host.current, 2);
+    let owner: SourceTransport | null = null;
+    const decoder = new VideoDecoderSlot(host.current, 2, () => owner?.observed());
     // This is the visible source viewer, not another project-preview slot.
     delete decoder.video.dataset['pascapDecoder'];
     decoder.video.dataset['sourceDecoder'] = 'true';
@@ -165,116 +166,57 @@ export function SourceReview({
     decoder.video.muted = true;
     decoder.video.volume = 0;
     decoder.video.disableRemotePlayback = true;
-    slot.current = decoder;
     setDecoderError('');
-    return () => {
-      loading.current?.abort();
-      seeking.current?.abort();
-      loaded.current = '';
-      decoder.dispose();
-      if (slot.current === decoder) slot.current = null;
-    };
-  }, [visible]);
-
-  const seekLatest = useCallback((): void => {
-    const decoder = slot.current;
-    const request = latest.current;
-    if (!decoder || loaded.current !== request.key) return;
-    seeking.current?.abort();
-    const controller = new AbortController();
-    seeking.current = controller;
-    setObservation({ key: request.key, requestedFrame: request.frame, frame: null, error: '' });
-    // An aborted seek may have reached seeked before its rVFC. Do not let an
-    // older decodedFrame bypass a reverse seek to a different currentTime.
-    if (
-      decoder.decodedFrame === request.frame &&
-      secondsToFrames(decoder.video.currentTime, request.rate, 'floor') !== request.frame
-    ) {
-      decoder.decodedFrame = -1;
-    }
-    void decoder
-      .seek(request.frame, controller.signal)
-      .then(() => {
-        if (
-          controller.signal.aborted ||
-          slot.current !== decoder ||
-          latest.current.key !== request.key ||
-          latest.current.frame !== request.frame
-        )
-          return;
-        if (
-          !decoder.ready ||
-          decoder.decodedFrame !== request.frame ||
-          secondsToFrames(decoder.video.currentTime, request.rate, 'floor') !== request.frame
-        ) {
-          throw new Error('Source decoder has not delivered the requested exact frame.');
-        }
-        setObservation({ key: request.key, requestedFrame: request.frame, frame: decoder.decodedFrame, error: '' });
-      })
-      .catch((cause: unknown) => {
-        if (
-          !controller.signal.aborted &&
-          slot.current === decoder &&
-          latest.current.key === request.key &&
-          latest.current.frame === request.frame
-        ) {
-          setObservation({ key: request.key, requestedFrame: request.frame, frame: null, error: message(cause) });
-        }
-      });
-  }, []);
-
-  useEffect(() => {
-    const decoder = slot.current;
-    if (!visible || !decoder) return;
-    const controller = new AbortController();
-    loading.current = controller;
-    loaded.current = '';
-    seeking.current?.abort();
-    setObservation({ key: resourceKey, requestedFrame: latest.current.frame, frame: null, error: '' });
     if (!mediaReady(asset) || asset.prepared?.verification.frameCount !== asset.metadata.frameCount) {
-      setObservation({
-        key: resourceKey,
-        requestedFrame: latest.current.frame,
-        frame: null,
-        error: 'Prepare a complete, verified source proxy before reviewing it.',
-      });
-      return () => controller.abort();
+      setDecoderError('Prepare a complete, verified source proxy before reviewing it.');
+      return () => decoder.dispose();
     }
-    // Only the registered proxy endpoint is ever loaded, never sourcePath or an
-    // arbitrary URL. Frame moves do not restart an in-flight resource load.
-    void decoder
-      .load(`/api/media/${encodeURIComponent(asset.id)}/proxy`, rate, controller.signal)
-      .then(() => {
-        if (controller.signal.aborted || slot.current !== decoder || latest.current.key !== resourceKey) return;
-        loaded.current = resourceKey;
-        seekLatest();
-      })
-      .catch((cause: unknown) => {
-        if (!controller.signal.aborted && slot.current === decoder && latest.current.key === resourceKey) {
-          setObservation({
-            key: resourceKey,
-            requestedFrame: latest.current.frame,
-            frame: null,
-            error: message(cause),
-          });
-        }
-      });
+    owner = new SourceTransport(
+      decoder,
+      rate,
+      asset.metadata.frameCount,
+      latest.current.range,
+      latest.current.frame,
+      (state) => {
+        // Hide an obsolete/overshot image before the next paint, including while
+        // the exact final included frame is being reacquired after playback.
+        if (host.current) host.current.style.opacity = state.frame === null ? '0' : '1';
+        setObservation({ key: resourceKey, state });
+        if (state.frame !== null) latest.current.onFrame(state.frame);
+      },
+    );
+    transport.current = owner;
+    setObservation({ key: resourceKey, state: owner.state });
+    // Registered, identity-guarded proxy only. Never play an original or prepare implicitly.
+    void owner.load(`/api/media/${encodeURIComponent(asset.id)}/proxy`);
     return () => {
-      controller.abort();
-      seeking.current?.abort();
-      loaded.current = '';
+      owner?.dispose();
+      if (transport.current === owner) transport.current = null;
     };
-  }, [resourceKey, visible, seekLatest]);
+  }, [resourceKey, visible]);
 
-  useEffect(() => {
-    seekLatest();
-  }, [resourceKey, requestedFrame, visible, seekLatest]);
+  useLayoutEffect(() => {
+    transport.current?.follow(requestedFrame);
+  }, [requestedFrame, resourceKey, visible]);
+  useLayoutEffect(() => {
+    transport.current?.setRange(range);
+    if (disabled) transport.current?.pause();
+  }, [range.sourceIn, range.sourceOut, disabled, resourceKey, visible]);
 
-  const currentObservation =
-    visible && observation?.key === resourceKey && observation.requestedFrame === requestedFrame ? observation : null;
+  const pause = (): void => transport.current?.pause();
+  const scrub = (next: number): void => {
+    pause();
+    transport.current?.seek(next);
+    onFrame(next);
+  };
+
+  const currentObservation = visible && observation?.key === resourceKey ? observation.state : null;
   const observedFrame = currentObservation?.frame ?? null;
-  const error = decoderError || (observation?.key === resourceKey ? observation.error : '');
+  const error = decoderError || currentObservation?.error || '';
   const buffering = observedFrame === null && !error;
+  const playing = currentObservation?.status === 'playing' || currentObservation?.status === 'starting';
+  const steadyTransportLabel = playing ? 'Playing' : 'Paused';
+  const transportLabel = currentObservation?.status === 'starting' ? 'Starting' : steadyTransportLabel;
   const keyboard = (event: KeyboardEvent<HTMLElement>): void => {
     // No source-review shortcut may reach the main preview's window handlers.
     event.stopPropagation();
@@ -342,6 +284,25 @@ export function SourceReview({
           <span className="source-pin-label">{pinned ? 'Pinned' : 'Pin'}</span>
         </button>
         <button
+          className="secondary-button small source-play-button"
+          aria-label={playing ? 'Pause source preview' : 'Play source preview'}
+          title="Play the applied IN–OUT range, muted; stop at OUT − 1"
+          disabled={
+            rangeDraft ||
+            !visible ||
+            disabled ||
+            (!playing && (observedFrame === null || !!error || currentObservation?.pendingPlay))
+          }
+          onKeyDown={keyboard}
+          onClick={() => {
+            if (playing) pause();
+            else transport.current?.play();
+          }}
+        >
+          <Icon name={playing ? 'pause' : 'play'} size={14} />
+          {playing ? 'Pause' : 'Play'}
+        </button>
+        <button
           className="primary-button small"
           type="button"
           aria-label="Add source excerpt to timeline"
@@ -368,6 +329,7 @@ export function SourceReview({
         ref={preview}
         data-media-id={asset.id}
         data-source-frame={observedFrame ?? undefined}
+        data-source-status={currentObservation?.status ?? 'buffering'}
         data-buffering={buffering ? 'true' : 'false'}
         data-source-error={error ? 'true' : 'false'}
         aria-busy={buffering}
@@ -387,7 +349,7 @@ export function SourceReview({
         {buffering && (
           <div className="source-preview-overlay">
             <span className="spinner" />
-            Seeking frame {requestedFrame}…
+            Seeking frame {currentObservation?.requestedFrame ?? requestedFrame}…
           </div>
         )}
         {error && (
@@ -409,18 +371,20 @@ export function SourceReview({
         <span>
           Frame {observedFrame ?? requestedFrame} / {asset.metadata.frameCount - 1}
         </span>
-        <small>Paused · muted</small>
+        <small>{transportLabel} · muted</small>
       </div>
       <SourceRangeEditor
         key={asset.id}
         ref={commands}
         asset={asset}
         range={range}
-        frame={requestedFrame}
+        frame={observedFrame ?? requestedFrame}
         observedFrame={observedFrame}
         disabled={disabled}
-        onFrame={onFrame}
+        onFrame={scrub}
         onRange={onRange}
+        onPause={pause}
+        onDraft={setRangeDraft}
         onKeyDown={keyboard}
       />
       <output
@@ -516,6 +480,8 @@ function SourceRangeEditor({
   disabled,
   onFrame,
   onRange,
+  onPause,
+  onDraft,
   onKeyDown,
   ref,
 }: Readonly<RangeProps>) {
@@ -530,6 +496,11 @@ function SourceRangeEditor({
   const descriptionId = useId();
   const selected = draft ?? range;
   const numbersDirty = numbers.sourceIn !== String(range.sourceIn) || numbers.sourceOut !== String(range.sourceOut);
+
+  useEffect(() => {
+    onDraft(draft !== null);
+    return () => onDraft(false);
+  }, [draft !== null, onDraft]);
 
   useEffect(() => {
     setNumbers({ sourceIn: String(range.sourceIn), sourceOut: String(range.sourceOut) });
@@ -570,11 +541,19 @@ function SourceRangeEditor({
       cancelLatest.current();
     };
     window.addEventListener('keydown', escape, true);
-    return () => window.removeEventListener('keydown', escape, true);
+    const blur = (): void => {
+      if (drag.current) cancelLatest.current();
+    };
+    window.addEventListener('blur', blur);
+    return () => {
+      window.removeEventListener('keydown', escape, true);
+      window.removeEventListener('blur', blur);
+    };
   }, []);
 
   const commit = (next: MediaSelection): void => {
     if (disabled) return;
+    onPause();
     try {
       validateMediaSelection(next, count);
       if (next.mediaId !== asset.id) throw new Error('Source range belongs to a different recording.');
@@ -606,6 +585,7 @@ function SourceRangeEditor({
     if (width <= 0) return;
     event.preventDefault();
     event.stopPropagation();
+    onPause();
     event.currentTarget.focus({ preventScroll: true });
     drag.current = {
       pointerId: event.pointerId,
@@ -672,6 +652,19 @@ function SourceRangeEditor({
       >
         <span className="source-range-track" aria-hidden="true" />
         <span
+          className="source-range-omitted before"
+          style={{ width: `${(selected.sourceIn / count) * 100}%` }}
+          aria-hidden="true"
+        />
+        <span
+          className="source-range-omitted after"
+          style={{
+            left: `${(selected.sourceOut / count) * 100}%`,
+            width: `${((count - selected.sourceOut) / count) * 100}%`,
+          }}
+          aria-hidden="true"
+        />
+        <span
           className="source-range-selection"
           style={{
             left: `${(selected.sourceIn / count) * 100}%`,
@@ -727,7 +720,7 @@ function SourceRangeEditor({
                 event.stopPropagation();
               }}
             >
-              <span />
+              <span>{edge === 'in' ? 'IN' : 'OUT'}</span>
             </button>
           );
         })}
@@ -830,7 +823,7 @@ function SourceRangeEditor({
         {error ||
           (draft
             ? 'Release to apply · Esc to cancel'
-            : `${selected.sourceOut - selected.sourceIn} / ${count} frames · OUT exclusive · I / O`)}
+            : `${selected.sourceOut - selected.sourceIn} selected · ${selected.sourceIn} before / ${count - selected.sourceOut} after · OUT exclusive`)}
       </div>
     </div>
   );

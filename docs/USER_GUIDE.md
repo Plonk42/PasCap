@@ -70,13 +70,23 @@ See [TIMELINE_EDITING.md](TIMELINE_EDITING.md) and [DEPLOYMENT.md](DEPLOYMENT.md
 
 Hover a ready recording to open **Source preview**; horizontal mouse position
 scrubs its full source range without moving the timeline playhead. **Pin** keeps
-that source selected while you hover other rows. Review is paused and muted and
+that source selected while you hover other rows. Review opens paused and muted and
 uses a separate decoder; it never plays or prepares an original implicitly.
 
 Set source **IN/OUT** using handles, **Mark IN/OUT**, focused source **I/O**, or the
 paired numeric fields followed by **Apply**. OUT is exclusive; Mark OUT includes
 the displayed frame. **Reset** restores the full recording. These choices are
 per-project, browser-local state, not portable project-document fields.
+
+The labelled **IN / OUT** handles restore omitted footage as well as trim; hatched
+parts are outside the selected range. Dragging previews the boundary frame; release
+applies, while Escape/capture loss/cancellation/window blur restores the prior choice.
+**Play / Pause** reviews the applied range, muted, from the current frame or IN.
+It stops at the last included frame (OUT − 1), without looping; a one-frame range
+just displays that frame. Numeric drafts are not played or inserted before Apply.
+Scrubbing or changing the range pauses first. Closing, switching sources/projects
+or leaving the Source tab cancels playback. Source playback does not move the
+timeline or music and does not create Undo steps or saves. Failures expose Retry.
 
 Choose **Add excerpt**, mark another range, then add again: each addition creates
 an independent instance and keeps the source pinned at the same frame/range.

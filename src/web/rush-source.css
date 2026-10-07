@@ -3,6 +3,110 @@
   container: rush-source / inline-size;
 }
 
+.source-dock .source-review.rush-source {
+  min-height: 340px;
+}
+
+.source-dock .source-review.rush-source .source-review-readout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 10px;
+  align-items: center;
+  font-size: 11px;
+}
+
+.source-review.rush-source .source-play-button {
+  flex-shrink: 0;
+  min-height: 30px;
+  min-width: 72px;
+}
+
+.source-review.rush-source .source-review-readout small {
+  display: block;
+  grid-column: 1 / -1;
+  font-size: 10px;
+}
+
+.source-dock .source-review.rush-source .source-range-strip {
+  height: 54px;
+  margin: 3px 32px 2px;
+}
+
+.source-review.rush-source .source-range-track,
+.source-review.rush-source .source-range-selection,
+.source-review.rush-source .source-range-omitted {
+  position: absolute;
+  top: 34px;
+  height: 8px;
+  pointer-events: none;
+}
+
+.source-range-omitted {
+  background: repeating-linear-gradient(135deg, #526057 0 2px, #243129 2px 6px);
+}
+
+.source-range-omitted.before {
+  left: 0;
+}
+
+.source-review.rush-source .source-range-selection {
+  background: #9dccaa;
+}
+
+.source-review.rush-source .source-range-strip .source-playhead-input {
+  top: 26px;
+  height: 26px;
+}
+
+.source-review.rush-source .source-range-head {
+  top: 29px;
+  bottom: 6px;
+}
+
+.source-dock .source-review.rush-source .source-trim-handle {
+  top: 0;
+  width: 30px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid #a7d8b3;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 650;
+}
+
+.source-review.rush-source .source-trim-handle span {
+  height: auto;
+  border: 0;
+}
+
+.source-trim-handle::after {
+  content: '';
+  position: absolute;
+  top: 27px;
+  height: 15px;
+  width: 2px;
+  background: #a7d8b3;
+  pointer-events: none;
+}
+
+.source-trim-handle.in::after {
+  right: -1px;
+}
+
+.source-trim-handle.out::after {
+  left: -1px;
+}
+
+.source-trim-handle:active {
+  background: #d0ebd7;
+}
+
+.source-dock .source-review.rush-source .source-range-description {
+  display: block;
+  font-size: 10px;
+  line-height: 1.4;
+}
+
 .source-review.rush-source .source-review-heading {
   position: sticky;
   top: 0;
@@ -207,11 +311,5 @@
 
   .media-panel .media-usage-badge {
     padding-inline: 3px;
-  }
-}
-
-@media (max-height: 760px) {
-  .source-review.rush-source .source-range-description:not(.source-range-error) {
-    display: none;
   }
 }
