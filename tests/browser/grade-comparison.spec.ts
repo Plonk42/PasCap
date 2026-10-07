@@ -1049,9 +1049,9 @@ test('comparison during music playback preserves the real worklet epoch and stri
       await ready.dispose();
       expect(observed.trusted).toBe(true);
       expect(observed.playing).toBe(true);
-      // A real native action can arrive after the previous Playing read while
-      // the decoder legitimately buffers. Compare is enabled in both active
-      // states; errors, paused/completed activation are never acceptable.
+      // Native input and the preceding Playing observation are different tasks.
+      // Decoder buffering may begin between them; the retained post-activation
+      // Playing draw below must still satisfy every source/audio/epoch bound.
       expect(['playing', 'buffering']).toContain(observed.status);
       expect(observed.ungraded).toBe(ungraded);
       expect(observed.detail).toBe(activation === 'click' ? 1 : 0);
