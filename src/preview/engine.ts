@@ -15,6 +15,12 @@ import { VideoDecoderSlot } from './decoder.js';
 import { MusicPlayback } from './music.js';
 
 export type PreviewStatus = 'empty' | 'loading' | 'paused' | 'playing' | 'seeking' | 'buffering' | 'error' | 'disposed';
+/** Authoritative original metadata, never dimensions inferred from a proxy. */
+export interface OriginalDimensions {
+  readonly width: number;
+  readonly height: number;
+}
+export type OriginalDimensionsResolver = (mediaId: string) => OriginalDimensions;
 export interface PreviewDiagnostics {
   status: PreviewStatus;
   message: string;
@@ -126,6 +132,9 @@ export class PreviewEngine {
     throw new Error('No media resolver loaded.');
   };
   #document: ProjectDocument | null = null;
+  #originalDimensions: OriginalDimensionsResolver = () => {
+    throw new Error('No original-dimensions resolver loaded.');
+  };
   #layout: TimelineLayout = { clips: [], transitions: [], duration: 0 };
   #controller = new AbortController();
   #catchUpController: AbortController | null = null;
@@ -477,8 +486,14 @@ export class PreviewEngine {
     });
   }
 
-  async loadProject(document: ProjectDocument, proxyUrl: (mediaId: string) => string, initialFrame = 0): Promise<void> {
+  async loadProject(
+    document: ProjectDocument,
+    proxyUrl: (mediaId: string) => string,
+    originalDimensions: OriginalDimensionsResolver,
+    initialFrame = 0,
+  ): Promise<void> {
     if (this.#disposed) throw new Error('The preview engine is disposed.');
+    if (typeof originalDimensions !== 'function') throw new Error('Original-dimensions resolver is required.');
     if (!Number.isFinite(initialFrame)) throw new Error('Initial preview frame must be finite.');
     const snapshot = projectSchema.parse(document);
     if (!sameRate(snapshot.frameRate, PROJECT_FPS)) throw new Error('Preview requires 30000/1001 fps video.');
@@ -488,6 +503,7 @@ export class PreviewEngine {
     this.#document = snapshot;
     this.#layout = calculateLayout(snapshot);
     this.#proxyUrl = proxyUrl;
+    this.#originalDimensions = originalDimensions;
     this.#frame = Math.max(0, Math.min(Math.round(initialFrame), this.#layout.duration - 1));
     this.#operationFrame = this.#frame;
     this.#lastDrawnFrame = -1;
@@ -561,7 +577,7 @@ export class PreviewEngine {
     this.#colourRequested = performance.now();
     if (!this.#playing && !this.#busy && this.#status === 'paused') this.#drawFrame(this.#frame);
   }
-  /** No music configuration or retiming reload for opacity/colour/stacking edits. */
+  /** No music configuration or retiming reload for opacity/colour/spatial/stacking edits. */
   updateProjectAppearance(document: ProjectDocument): void {
     if (this.#disposed || !this.#document) throw new Error('Load a project before updating its appearance.');
     const snapshot = projectSchema.parse(document);
@@ -670,14 +686,28 @@ export class PreviewEngine {
       const members = layers.filter((layer) => layer.layerId === group.id);
       if (!members.length) continue;
       groups.push({
-        clips: members.map((layer) => ({
-          slot: this.#slotIndex(layer.clipId),
-          settings: this.#ungraded ? NEUTRAL_COLOUR : layer.colour,
-          aspect: this.#slotFor(layer.clipId).aspect,
-          opacity: layer.opacity,
-          blendWeight: layer.blendWeight,
-          brightness: layer.brightness,
-        })),
+        clips: members.map((layer) => {
+          const dimensions = this.#originalDimensions(layer.mediaId);
+          if (
+            !dimensions ||
+            !Number.isInteger(dimensions.width) ||
+            dimensions.width <= 0 ||
+            !Number.isInteger(dimensions.height) ||
+            dimensions.height <= 0
+          )
+            throw new Error('Original media dimensions must be positive integers.');
+          return {
+            slot: this.#slotIndex(layer.clipId),
+            settings: this.#ungraded ? NEUTRAL_COLOUR : layer.colour,
+            aspect: this.#slotFor(layer.clipId).aspect,
+            spatial: layer.spatial,
+            originalWidth: dimensions.width,
+            originalHeight: dimensions.height,
+            opacity: layer.opacity,
+            blendWeight: layer.blendWeight,
+            brightness: layer.brightness,
+          };
+        }),
       });
     }
     this.#compositor.drawFrame(groups);

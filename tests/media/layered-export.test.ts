@@ -128,7 +128,7 @@ function coverage(samples: PreviewLayer[]): number {
   return result;
 }
 
-describe.skipIf(!enabled)('schema-8 layered native export · disposable synthetic sources only', () => {
+describe.skipIf(!enabled)('schema-9 layered native export · disposable synthetic sources only', () => {
   let root: string;
   let config: ServiceConfig;
   let jobs: JobQueue;

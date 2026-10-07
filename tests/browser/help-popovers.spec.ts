@@ -151,11 +151,11 @@ test('bulk Clip expansion preserves other tabs, mixed state and preferences with
   ).toBe(true);
   expect(
     await page.evaluate(() =>
-      ['source', 'layer-opacity', 'speed', 'colour', 'transition', 'fades', 'music'].map((id) =>
+      ['source', 'layer-opacity', 'speed', 'transform', 'colour', 'transition', 'fades', 'music'].map((id) =>
         localStorage.getItem(`pascap-section-${id}`),
       ),
     ),
-  ).toEqual(['open', 'open', 'open', 'open', 'open', 'closed', 'closed']);
+  ).toEqual(['open', 'open', 'open', 'open', 'open', 'open', 'closed', 'closed']);
   await page.getByRole('button', { name: 'Source range section', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Expand all Inspector settings', exact: true })).toBeVisible();
   await page.reload();

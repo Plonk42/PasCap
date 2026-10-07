@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { interpolatedProgress } from '../../src/shared/keyframes.js';
 import type { Interpolation } from '../../src/shared/keyframes.js';
+import { interpolatedProgress } from '../../src/shared/keyframes.js';
+import type { SpatialKeyframe, SpatialMapping, SpatialPose, SpatialSettings } from '../../src/shared/spatial.js';
 import {
   compileSpatialMapping,
   createSpatialSettings,
@@ -14,7 +15,6 @@ import {
   spatialPoseSchema,
   spatialSettingsSchema,
 } from '../../src/shared/spatial.js';
-import type { SpatialKeyframe, SpatialMapping, SpatialPose, SpatialSettings } from '../../src/shared/spatial.js';
 
 const channels = Object.keys(NEUTRAL_SPATIAL_POSE) as (keyof SpatialPose)[];
 const curves: Interpolation[] = ['hold', 'linear', 'ease-in', 'ease-out', 'smooth'];

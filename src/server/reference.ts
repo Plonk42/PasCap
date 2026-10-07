@@ -3,6 +3,7 @@ import path from 'node:path';
 import { generateCube } from '../shared/colour.js';
 import type { MediaJob } from '../shared/media.js';
 import { projectSchema, type ProjectDocument } from '../shared/model.js';
+import { hasSpatialEdits } from '../shared/spatial.js';
 import { blackFadeParts, calculateLayout, layerClips } from '../shared/timeline.js';
 import { framesToSeconds, PROJECT_FPS, sameRate } from '../shared/timing.js';
 import { ServiceError } from './errors.js';
@@ -41,6 +42,8 @@ export function validateReference(project: ProjectDocument, library: MediaLibrar
   }
   if (snapshot.clips.some((clip) => clip.speed.mode !== 'constant' || clip.speed.rate !== 1))
     throw new ServiceError('The diagnostic reference only supports normal speed. Use Export for retimed clips.');
+  if (snapshot.clips.some((clip) => hasSpatialEdits(clip.spatial)))
+    throw new ServiceError('The diagnostic reference does not support spatial edits or spatial keys. Use Export.');
   const layout = calculateLayout(snapshot);
   const [left, right] = layout.clips;
   const transition = snapshot.layers[0]!.transitions[0]!;

@@ -10,20 +10,21 @@ import { atomicWrite } from '../src/server/storage.js';
 import { NEUTRAL_COLOUR, type ColourSettings } from '../src/shared/colour.js';
 import { applyCommand } from '../src/shared/commands.js';
 import { needsLayeredExport } from '../src/shared/export.js';
-import { jobSchema } from '../src/shared/media.js';
+import { jobSchema, mediaAssetSchema } from '../src/shared/media.js';
 import { projectSchema } from '../src/shared/model.js';
 import { forEachSerial } from '../src/shared/serial.js';
+import { hasSpatialEdits } from '../src/shared/spatial.js';
 import { calculateLayout, layerClips } from '../src/shared/timeline.js';
 import { framesToSeconds } from '../src/shared/timing.js';
 
-const reportId = 'preview-v8';
+const reportId = 'preview-v9';
 const measurementProfile = {
   id: 'original-two-excerpts-v6',
   // Diagnostic profile format is independent of the project document schema.
   schemaVersion: 6,
-  projectSchemaVersion: 8,
+  projectSchemaVersion: 9,
   description:
-    'Strict schema-8 original two-excerpt colour/seek/transition/native-reference diagnostic: one enabled zero-origin contiguous track, unit row-owned Opacity, static clip grades, constant 1× speed, no shared project-frame layer points and an empty music array.',
+    'Strict schema-9 original two-excerpt colour/seek/transition/native-reference diagnostic: one enabled zero-origin contiguous track, unit row-owned Opacity, static clip grades, neutral spatial bases without spatial keys, constant 1× speed, no shared project-frame layer points and an empty music array.',
 } as const;
 const url = process.env['PASCAP_MEASURE_URL'] ?? 'http://127.0.0.1:5173';
 const browser = await chromium.launch({
@@ -35,7 +36,7 @@ const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
 // tsx/esbuild preserves nested function names using this helper. Evaluated functions
 // are serialised into the page and cannot otherwise access the Node-side helper.
 await page.addInitScript('globalThis.__name = (fn) => fn;');
-// Keep historical report identifiers/output files separate from new schema-8 measurements.
+// Keep historical report identifiers/output files separate from new schema-9 measurements.
 const directory = path.resolve('.pascap/measurements', reportId);
 await mkdir(directory, { recursive: true });
 try {
@@ -44,17 +45,24 @@ try {
     timeout: 15_000,
   });
   const original = projectSchema.parse(await page.evaluate(() => window.pascapLab!.project()));
+  const library = z
+    .object({ assets: z.array(mediaAssetSchema) })
+    .parse(await page.evaluate(async () => (await fetch('/api/media')).json() as Promise<unknown>));
+  const dimensions = Object.fromEntries(
+    library.assets.map((asset) => [asset.id, { width: asset.metadata.width, height: asset.metadata.height }]),
+  );
   // This is the original two-clip colour/seek comparison, not the production
   // layered renderer. Reject shared layer points/opacity rather than measure a false baseline.
   if (
-    original.schemaVersion !== 8 ||
+    original.schemaVersion !== 9 ||
     original.clips.length !== 2 ||
     original.music.length !== 0 ||
+    original.clips.some((clip) => hasSpatialEdits(clip.spatial)) ||
     needsLayeredExport(original) ||
     original.clips.some((clip) => clip.speed.mode !== 'constant' || clip.speed.rate !== 1)
   )
     throw new Error(
-      'This schema-8 diagnostic expects two normal-speed excerpts on one enabled, opaque, zero-origin contiguous track, without music, extra layers or shared project-frame layer points. Choose a compatible project with PASCAP_MEASURE_URL (for example ?project=sample-taillefer-v6; the identifier is not its schema version); no saved document will be changed.',
+      'This schema-9 diagnostic expects two normal-speed excerpts on one enabled, opaque, zero-origin contiguous track, with neutral spatial bases and no spatial keys, music, extra layers or shared project-frame layer points. Choose a compatible project with PASCAP_MEASURE_URL (for example ?project=sample-taillefer-v6; the identifier is not its schema version); no saved document will be changed.',
     );
   const layout = calculateLayout(original);
   const clips = layerClips(original, original.layers[0]!.id);
@@ -133,12 +141,20 @@ try {
     await forEachSerial([0, 1], async (repetition) => {
       console.log(`Measuring ${type}, pass ${repetition + 1} (engine only; saved edit unchanged)`);
       const result = await page.evaluate(
-        async ({ document, duration }) => {
+        async ({ document, duration, dimensions }) => {
           const engine = window.pascapLab!.engine;
           const isFpsSample = (sample: PreviewDiagnostics): boolean => sample.playing && sample.previewFps > 5;
           const sampleFps = (sample: PreviewDiagnostics): number => sample.previewFps;
           const hasTwoDecoders = (sample: PreviewDiagnostics): boolean => sample.activeDecoders === 2;
-          await engine.loadProject(document, (id) => `/api/media/${id}/proxy`);
+          await engine.loadProject(
+            document,
+            (id) => `/api/media/${id}/proxy`,
+            (id) => {
+              const original = dimensions[id];
+              if (!original) throw new Error('Original media metadata is unavailable.');
+              return original;
+            },
+          );
           await engine.seek(0);
           const before = engine.diagnostics();
           return new Promise<unknown>((resolve, reject) => {
@@ -179,7 +195,7 @@ try {
             void engine.play().catch(reject);
           });
         },
-        { document: snapshot, duration },
+        { document: snapshot, duration, dimensions },
       );
       playback.push({ type, repetition, result });
     });
@@ -247,8 +263,17 @@ try {
       receipt: await page.evaluate(async (url) => (await fetch(url!)).json() as Promise<unknown>, completed.receiptUrl),
     };
     await page.evaluate(
-      async (document) => window.pascapLab!.engine.loadProject(document, (id) => `/api/media/${id}/proxy`),
-      snapshot,
+      ({ document, dimensions }) =>
+        window.pascapLab!.engine.loadProject(
+          document,
+          (id) => `/api/media/${id}/proxy`,
+          (id) => {
+            const original = dimensions[id];
+            if (!original) throw new Error('Original media metadata is unavailable.');
+            return original;
+          },
+        ),
+      { document: snapshot, dimensions },
     );
     const nativeFile = path.resolve('.pascap/renders', job.id, 'reference.mp4');
     await forEachSerial(
@@ -313,7 +338,7 @@ try {
     durationSeconds: framesToSeconds(layout.duration),
     notes: [
       'No saved edit is changed; only the independent engine is exercised.',
-      'Only strict schema-8 projects are measured; schema 1–7 data is incompatible and never migrated or defaulted.',
+      'Only strict schema-9 projects with neutral spatial bases and no spatial keys are measured; schema 1–8 data is incompatible and never migrated or defaulted.',
       'Diagnostic profile and reference receipt schema versions are independent of the project schema.',
       'This retains the original two-excerpt acceptance measurements, not shared-layer-point or layered-throughput certification.',
       'Colour latency is engine update to next paint, not full input-event/React latency.',

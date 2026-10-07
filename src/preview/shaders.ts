@@ -22,6 +22,13 @@ uniform vec2 coverage;
 uniform vec2 brightness;
 uniform vec2 imageAspect;
 uniform float canvasAspect;
+uniform vec3 spatialU0;
+uniform vec3 spatialV0;
+uniform vec3 spatialU1;
+uniform vec3 spatialV1;
+uniform vec4 crop0;
+uniform vec4 crop1;
+uniform vec2 neutralSpatial;
 
 const float alpha = 1.09929682680944;
 const float beta = 0.018053968510807;
@@ -56,11 +63,25 @@ vec3 sampleGraded(sampler2D source, vec4 tone, vec3 extra, float aspect) {
   if (any(lessThan(local, vec2(0.0))) || any(greaterThan(local, vec2(1.0)))) return vec3(0.0);
   return grade(texture(source, local).rgb, tone, extra);
 }
+vec4 sampleSpatial(sampler2D source, vec4 tone, vec3 extra, float aspect,
+                   vec3 rowU, vec3 rowV, vec4 crop, float neutral) {
+  // Exact identity retains the opaque, proxy-aspect letterbox path.
+  if (neutral > 0.5) return vec4(sampleGraded(source, tone, extra, aspect), 1.0);
+  vec3 outputPoint = vec3(uv.x, 1.0 - uv.y, 1.0);
+  vec2 original = vec2(dot(rowU, outputPoint), dot(rowV, outputPoint));
+  // Crop IN is inclusive; OUT is exclusive, without refitting the image.
+  if (original.x < crop.x || original.x >= 1.0 - crop.y ||
+      original.y < crop.z || original.y >= 1.0 - crop.w) return vec4(0.0);
+  return vec4(grade(texture(source, vec2(original.x, 1.0 - original.y)).rgb, tone, extra), 1.0);
+}
 void main() {
-  vec3 left = sampleGraded(source0, tone0, extra0, imageAspect.x);
-  vec3 right = sampleGraded(source1, tone1, extra1, imageAspect.y);
+  vec4 left = sampleSpatial(source0, tone0, extra0, imageAspect.x,
+                            spatialU0, spatialV0, crop0, neutralSpatial.x);
+  vec4 right = sampleSpatial(source1, tone1, extra1, imageAspect.y,
+                             spatialU1, spatialV1, crop1, neutralSpatial.y);
   // A dissolve is ONE premultiplied group, not two source-over draws.
   // Black fades dim graded RGB without reducing the group's coverage.
-  vec3 premultiplied = left * coverage.x * brightness.x + right * coverage.y * brightness.y;
-  outputColour = vec4(premultiplied, coverage.x + coverage.y);
+  vec3 premultiplied = left.rgb * left.a * coverage.x * brightness.x +
+                       right.rgb * right.a * coverage.y * brightness.y;
+  outputColour = vec4(premultiplied, left.a * coverage.x + right.a * coverage.y);
 }`;

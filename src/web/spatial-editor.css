@@ -1,0 +1,35 @@
+.spatial-editor,
+.spatial-pose-fields,
+.spatial-stored {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+.spatial-tools,
+.spatial-selection {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+.spatial-tools > span {
+  flex: 1;
+  font-size: 12px;
+}
+.spatial-selection > select {
+  flex: 1;
+  min-width: 0;
+  width: 0;
+}
+.spatial-pose-field {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.spatial-pose-field > label {
+  font-size: 12px;
+}
+.spatial-stored {
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}

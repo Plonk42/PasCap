@@ -91,6 +91,16 @@ export class ColourLutCache {
   }
 }
 
+function lutLow(value: number): number {
+  if (!Number.isFinite(value) || value < 0 || value > 255)
+    throw new Error('LUT samples require finite RGB values in [0, 255].');
+  return Number.isInteger(value) ? LOW[value]! : Math.min(SIZE - 2, Math.floor((value * (SIZE - 1)) / 255));
+}
+
+function lutFraction(value: number, low: number): number {
+  return Number.isInteger(value) ? FRACTION[value]! : (value * (SIZE - 1)) / 255 - low;
+}
+
 /** Four vertices in the enclosing tetrahedron; destination is a tiny reusable triple. */
 export function sampleColourLut(
   lut: Float32Array,
@@ -99,10 +109,14 @@ export function sampleColourLut(
   blue: number,
   destination: Float64Array,
 ): void {
-  const r = FRACTION[red]!;
-  const g = FRACTION[green]!;
-  const b = FRACTION[blue]!;
-  const first = LOW[red]! * RED_STEP + LOW[green]! * GREEN_STEP + LOW[blue]! * BLUE_STEP;
+  // Keep the exact byte lookup path; spatial bilinear samples retain their fractions.
+  const redLow = lutLow(red);
+  const greenLow = lutLow(green);
+  const blueLow = lutLow(blue);
+  const r = lutFraction(red, redLow);
+  const g = lutFraction(green, greenLow);
+  const b = lutFraction(blue, blueLow);
+  const first = redLow * RED_STEP + greenLow * GREEN_STEP + blueLow * BLUE_STEP;
   let second: number;
   let third: number;
   let high: number;

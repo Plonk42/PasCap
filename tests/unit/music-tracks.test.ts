@@ -29,10 +29,10 @@ function track(id: string, changes: Partial<MusicTrack> = {}): MusicTrack {
   });
 }
 
-describe('strict schema-8 independent music instances', () => {
+describe('strict schema-9 independent music instances', () => {
   it('requires an identified array, allows repeated recordings and accepts exactly eight instances', () => {
     const document = createProject('multiple-music', 'Multiple music');
-    expect(document.schemaVersion).toBe(8);
+    expect(document.schemaVersion).toBe(9);
     expect(document.music).toEqual([]);
     expect(MAX_MUSIC_TRACKS).toBe(8);
     const music = Array.from({ length: 8 }, (_, index) => track(`instance-${index}`, { start: index * 10 }));
