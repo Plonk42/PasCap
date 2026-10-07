@@ -380,7 +380,18 @@ Set source IN/OUT with review handles, numeric **Apply**, **Mark IN/OUT**, or **
 while the review controls are focused. OUT is exclusive: Mark OUT selects through
 the visible frame (`OUT = frame + 1`). At least one original frame is retained.
 Reset restores 0/full frame count. Handle drafts commit only on release; Escape,
-pointer cancellation or lost capture discards them.
+pointer cancellation, lost capture or window blur discards them and restores the
+prior source frame. Labelled 30 × 28 px IN/OUT targets and omitted-footage hatching
+distinguish trimming from the separate source scrubber.
+
+Source **Play / Pause** stays muted and uses the applied IN/OUT, not numeric drafts.
+It starts at the current observed frame when inside the range and before its last
+frame, otherwise IN; it stops and exact-seeks OUT − 1, without looping. A one-frame
+range displays that frame without playing. Scrub/trim/mark/Apply/Reset pause first.
+Pending play and observed callbacks cannot restart after close, hidden viewer,
+recording/project change or tab switch. Playback uses this same sole verified proxy
+decoder, with explicit start/stall failures after five seconds and Retry; no source
+audio/original playback, preparation, timeline/music seek or history/save is added.
 
 Plus, double-click, drag/drop and selected-batch insertion copy the latest choice
 into a new independent timeline instance. Without a choice they select the full

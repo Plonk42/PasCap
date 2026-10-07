@@ -424,6 +424,18 @@ a mouse-following marker. The source viewer is separate from the project playhea
 and stays out of list flow so rows never move under an active hover/drag. Review
 IN/OUT handles, numeric Apply, I/O marks and Reset are non-destructive. OUT is
 exclusive; handle drafts cancel/release independently of timeline history/autosave.
+Visible **IN / OUT** handles have 30 × 28 px targets, separate from the source
+scrubber; hatching identifies omitted footage. Drag feedback previews IN or the
+last included frame (OUT − 1); Escape, pointer cancellation, capture loss or window
+blur restores the applied range and prior source frame.
+**Play / Pause** plays only the verified muted proxy within the applied range,
+from the current observed frame if it precedes the last included frame, otherwise
+from IN. It stops and seeks exactly OUT − 1, without looping or audio. A one-frame
+range simply displays that frame. Numeric drafts do not change the played range.
+Scrubbing, trimming, marking, Apply and Reset pause first; closing, hiding, switching
+recordings/projects or leaving Source preview cancels pending playback and releases
+its sole decoder. Loading/playback failures remain explicit with Retry. Source
+playback never moves the timeline/music, changes excerpts/row points or saves/history.
 Choices persist per project in that browser and affect future insertions only.
 Source **Add excerpt** stays in the pinned review for repeated additions. Its
 sticky header and native nonmodal excerpt popup keep adding/reviewing reachable
