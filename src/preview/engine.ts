@@ -145,6 +145,7 @@ export class PreviewEngine {
   #lastDrawnFrame = -1;
   #dirty = true;
   #lastEmit = 0;
+  #publication = 0;
   #playingClips: string[] = [];
   readonly #uploadedFrames: number[] = [];
   readonly #seekTimes: number[] = [];
@@ -182,7 +183,7 @@ export class PreviewEngine {
   }
   subscribe(listener: (diagnostics: PreviewDiagnostics) => void): () => void {
     this.#listeners.add(listener);
-    listener(this.diagnostics());
+    this.#publish([listener], ++this.#publication);
     return () => {
       this.#listeners.delete(listener);
     };
@@ -225,13 +226,13 @@ export class PreviewEngine {
       musicDriftFrames: this.#music.errorFrames,
     };
   }
-  #emit(force = false): void {
-    const now = performance.now();
+  #validatePlayingPublication(): boolean {
     if (this.#playing && !this.#busy && this.#status === 'playing' && this.#document && this.#music.hasMusic) {
       // Upload/draw work can outlive the clock read used to select an image.
-      // Validate every completed playback tick, even if notification is
-      // throttled. A stale image becomes explicit buffering, not Playing.
+      // Diagnostics and earlier listeners can outlive it too. Reuse the same
+      // source-set/appearance and one-frame test at every dispatch boundary.
       try {
+        const now = performance.now();
         const frame = this.#expectedFrame(now);
         const required = sampleTimeline(this.#document, frame, this.#layout).map((layer) => layer.clipId);
         if (!this.#canRetainFrame(frame, required)) {
@@ -240,23 +241,42 @@ export class PreviewEngine {
           // or call it a video mismatch. Nonempty images keep the one-frame bound.
           if (!required.length) {
             this.#advance(now);
-            return;
+            return false;
           }
           this.#operationFrame = frame;
           if (!this.#mismatchStart) this.#mismatchStart = now;
           this.#compositor.clear();
           this.#setStatus('buffering', 'Waiting for decoded frames');
-          return;
+          return false;
         }
       } catch (error) {
         this.#handleError(error);
-        return;
+        return false;
       }
     }
+    return true;
+  }
+  #publish(listeners: readonly ((diagnostics: PreviewDiagnostics) => void)[], publication: number): void {
+    const diagnostics = this.diagnostics();
+    if (publication !== this.#publication || !this.#validatePlayingPublication()) return;
+    // One snapshot, one bounded pass. A nested publication supersedes this
+    // entire pass, including when diagnostics construction itself reenters.
+    // Never retry obsolete Playing; black advancement can publish next tick.
+    for (const listener of listeners) {
+      if (publication !== this.#publication) return;
+      if (!this.#validatePlayingPublication() || publication !== this.#publication) return;
+      if (this.#listeners.has(listener)) listener(diagnostics);
+    }
+  }
+  #emit(force = false): void {
+    const publication = ++this.#publication;
+    // Keep the post-render surface check even on throttled ticks or with no
+    // subscribers; notification throttling must not retain a stale image.
+    if (!this.#validatePlayingPublication()) return;
+    const now = performance.now();
     if (!force && now - this.#lastEmit < 100) return;
     this.#lastEmit = now;
-    const diagnostics = this.diagnostics();
-    for (const listener of this.#listeners) listener(diagnostics);
+    this.#publish([...this.#listeners], publication);
   }
   #setStatus(status: PreviewStatus, message: string): void {
     if (this.#status === status && this.#message === message) return;
