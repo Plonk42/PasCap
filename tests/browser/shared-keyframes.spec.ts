@@ -19,6 +19,8 @@ import { memoryProjects, type MemoryProjects } from './memory-projects.js';
 let assets: MediaAsset[];
 let memory: MemoryProjects;
 let unexpectedApi: string[];
+const sliderInstructions =
+  'Drag to choose a value; release to apply once. Escape cancels the drag. Exact values apply on Enter or blur.';
 
 test.beforeEach(async ({ page, request }) => {
   unexpectedApi = [];
@@ -140,10 +142,16 @@ for (const target of ['video-1', 'empty'] as const) {
       has: page.getByRole('button', { name: 'Placement section', exact: true }),
     });
     await expect(placement.getByRole('slider', { name: 'Opacity', exact: true })).toHaveCount(0);
-    await expect(opacity.locator('..').getByText('100%', { exact: true })).toBeVisible();
-    await expect(opacity.locator('..').getByText('Not animated', { exact: true })).toHaveCount(1);
+    await expect(placement.getByRole('spinbutton', { name: 'Opacity', exact: true })).toHaveCount(0);
+    await expect(page.locator('.layer-control input[aria-label="Opacity"]')).toHaveCount(0);
+    await expect(colourSection.locator('input[aria-label="Opacity"]')).toHaveCount(2);
+    await expect(opacity.locator('..').getByRole('spinbutton', { name: 'Opacity', exact: true })).toHaveValue('1');
+    await expect(opacity.locator('..').getByText('0–1', { exact: true })).toBeVisible();
+    await expect(
+      colourSection.locator('.colour-control').filter({ has: opacity }).getByText('Not animated', { exact: true }),
+    ).toHaveCount(1);
     await expect(opacity).toHaveAccessibleDescription(
-      'Editing Opacity. Add keyframes to animate this setting on the row.',
+      `Editing Opacity. Add keyframes to animate this setting on the row. Exact Opacity uses 0–1; 1 is 100%. ${sliderInstructions}`,
     );
     await expect(diamond(page, 'Opacity')).toHaveAttribute('aria-pressed', 'false');
     const before = await current(page);
@@ -196,10 +204,19 @@ test('setting tooltips and accessible descriptions explain the editable keyframe
           ? `Editable keyframe at timeline frame 10. Edits change only ${label} at this shared layer point.`
           : `Read-only animated value at timeline frame 0. Click the ${label} diamond to add a keyframe here, then edit the value.`;
       const field = page.getByRole(role, { name, exact: true });
-      await expect(field).toHaveAccessibleDescription(new RegExp(hint.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+      if (role === 'slider') {
+        const opacityHint = label === 'Opacity' ? ' Exact Opacity uses 0–1; 1 is 100%.' : '';
+        await expect(field).toHaveAccessibleDescription(`${hint}${opacityHint} ${sliderInstructions}`);
+      } else {
+        await expect(field).toHaveAccessibleDescription(
+          '1× is recorded speed. Custom curve points belong to one clip and use original source frames; drag a point or enter its exact frame/rate. Their positions stay anchored when trimming or splitting. The logarithmic graph spans 0.1×–8×. Slow motion repeats recorded frames, without generated optical-flow images. ' +
+            `Enter or leave the field to apply. Escape restores the current value. ${hint}`,
+        );
+      }
       if (frame === 10) await expect(field).toBeEnabled();
       else await expect(field).toBeDisabled();
-      if (role === 'slider') await expect(field).toHaveAttribute('title', hint);
+      if (role === 'slider')
+        await expect(page.locator(`label[for="${await field.getAttribute('id')}"]`)).toHaveAttribute('title', hint);
     }
     await expect(page.locator('[id$="-clip-panel"] .layer-setting-kind').filter({ hasText: scope })).toHaveCount(3);
     await openOptions(page, 'Layer options Video 1');
@@ -338,7 +355,7 @@ test('between points keyed controls are read-only until their own diamond explic
   for (const label of ['Exposure', 'Opacity']) {
     const slider = page.getByRole('slider', { name: label, exact: true });
     await expect(slider).toBeDisabled();
-    await expect(slider).toHaveAttribute(
+    await expect(page.locator(`label[for="${await slider.getAttribute('id')}"]`)).toHaveAttribute(
       'title',
       `Read-only animated value at timeline frame 30. Click the ${label} diamond to add a keyframe here, then edit the value.`,
     );
@@ -704,16 +721,18 @@ test('an overlapping row-speed edit is rejected atomically, without a save or hi
   await rate.fill('0.5');
   expect(await current(page)).toEqual(before);
   await rate.press('Enter');
-  await expect(page.locator('.error-banner[role="alert"]')).toContainText(
+  await expect(rate.locator('..').getByRole('alert')).toContainText(
     'Clips on the same track cannot overlap except in an exact adjacent cross-dissolve.',
   );
-  await expect(rate).toHaveValue('1');
+  await expect(rate).toHaveValue('0.5');
+  await expect(rate).toHaveAttribute('aria-invalid', 'true');
   expect(await current(page)).toEqual(before);
   await page.evaluate(() => window.pascapLab!.flush());
   expect(memory.saves).toBe(saves);
   expect(memory.snapshot()).toEqual(document);
   await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
-  await page.getByRole('button', { name: 'Dismiss error', exact: true }).click();
+  await rate.press('Escape');
+  await expect(rate).toHaveValue('1');
   await rate.fill('2');
   await rate.press('Enter');
   const changed = await current(page);

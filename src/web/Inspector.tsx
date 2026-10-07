@@ -28,6 +28,7 @@ import { RangeSettingControl } from './SettingValueControl.js';
 import { SpeedControls, SpeedHelp } from './SpeedControls.js';
 import { planTimelineDrop } from './timeline-placement.js';
 import type { DraftPreview } from './Timeline.js';
+import './ui-controls.css';
 
 export type { InspectorMode } from './InspectorSection.js';
 
@@ -153,6 +154,7 @@ interface LayerControlProps {
   layer: VideoLayer;
   clip: VideoClip | null;
   frame: number;
+  resetKey: string;
   disabled: boolean;
   onEdit: Props['onEdit'];
 }
@@ -176,6 +178,7 @@ function SettingScope({ keyed, scope }: Readonly<{ keyed: boolean; scope: string
 function OpacityControl({
   layer,
   frame,
+  resetKey,
   disabled,
   onEdit,
   id,
@@ -209,6 +212,7 @@ function OpacityControl({
         hint={hint}
         scope={<SettingScope keyed={state.keyed} scope={scope} />}
         resetTitle={`Reset only Opacity at ${resetTarget} to 100%`}
+        exact={{ resetKey: `${resetKey}:opacity:${state.keyed ? 'key' : 'layer'}` }}
         actions={
           <KeyframeToggle
             layer={layer}
@@ -231,6 +235,7 @@ function ColourControl({
   layer,
   clip,
   frame,
+  resetKey,
   disabled,
   onEdit,
   control,
@@ -259,6 +264,7 @@ function ColourControl({
         hint={hint}
         scope={<SettingScope keyed={state.keyed} scope={scope} />}
         resetTitle={`Reset only ${control.label} at ${resetTarget}`}
+        exact={{ resetKey: `${resetKey}:${control.key}:${state.keyed ? 'key' : 'clip'}` }}
         actions={
           <KeyframeToggle
             layer={layer}
@@ -283,7 +289,15 @@ function evaluatedLayerColour(layer: VideoLayer, clip: VideoClip | null, frame: 
   return colour;
 }
 
-function ColourSection({ layer, clip, frame, disabled, onEdit, id }: Readonly<LayerControlProps & { id: string }>) {
+function ColourSection({
+  layer,
+  clip,
+  frame,
+  resetKey,
+  disabled,
+  onEdit,
+  id,
+}: Readonly<LayerControlProps & { id: string }>) {
   const colour = evaluatedLayerColour(layer, clip, frame);
   const opacity = evaluateLayerSetting(layer, 'opacity', frame, layer.opacity);
   const animated =
@@ -323,7 +337,7 @@ function ColourSection({ layer, clip, frame, disabled, onEdit, id }: Readonly<La
       }
     >
       <div className="grade-heading">
-        <span className="grade-context">{gradeLabel}</span>
+        <span className={`grade-context${animated ? '' : ' declutter-sr-only'}`}>{gradeLabel}</span>
         <button
           type="button"
           className="text-button"
@@ -337,13 +351,21 @@ function ColourSection({ layer, clip, frame, disabled, onEdit, id }: Readonly<La
         </button>
       </div>
       <div className="colour-controls">
-        <OpacityControl layer={layer} frame={frame} disabled={disabled} onEdit={onEdit} id={`${id}-opacity`} />
+        <OpacityControl
+          layer={layer}
+          frame={frame}
+          resetKey={resetKey}
+          disabled={disabled}
+          onEdit={onEdit}
+          id={`${id}-opacity`}
+        />
         {COLOUR_CONTROLS.map((control) => (
           <ColourControl
             key={control.key}
             layer={layer}
             clip={clip}
             frame={frame}
+            resetKey={resetKey}
             disabled={disabled}
             onEdit={onEdit}
             control={control}
@@ -796,6 +818,7 @@ export function Inspector({
                 layer={layer}
                 clip={clip ?? null}
                 frame={frame}
+                resetKey={`${inputContext}:${frame}`}
                 disabled={drafting}
                 onEdit={onEdit}
                 id={colourControlId}

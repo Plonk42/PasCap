@@ -301,9 +301,10 @@ buttons, before any existing reset. They remain visible but disabled without the
 relevant neighbour, an opened project, or during any document-preview draft. They seek
 strictly earlier/later points where that channel is not `null` (zero included),
 skipping unrelated participation. **Clip → Colour** contains the single **Opacity**
-slider/diamond/navigation alongside the colour sliders, initially **100%**;
-its buttons visit `opacity` participants, with no sidebar duplicate.
-Without Opacity keys, the slider edits row `opacity` and works on an empty row.
+slider/exact `NumberField`/diamond/navigation alongside the colour controls.
+The numeric value uses **0–1**, initially **1**; the main label may show **100%**.
+Its buttons visit `opacity` participants, with no sidebar duplicate.
+Without Opacity keys, either value control edits row `opacity` and works on an empty row.
 With keys, a missing participant at the real playhead stays read-only until its
 diamond captures it; sliders never create implicit keys. Unkeyed colour remains
 per-clip. Opacity affects composition coverage, not SDR RGB grading.
@@ -403,8 +404,9 @@ are unchanged.
 
 The music waveform is registered/prepared by the backend. Its placement and trim
 gestures are transient and one-step undoable. Numeric controls provide source
-IN/OUT, placement/duration, gain, fades and explicit looping. Music is not retimed
-with video; its own clock drives synchronisation while active.
+IN/OUT, placement/duration and fades; gain uses a native slider with an exact
+`NumberField`, and looping is explicit. Music is not retimed with video;
+its own clock drives synchronisation while active.
 
 ## Media browser and interface scope
 
@@ -431,9 +433,17 @@ Close/hidden/offscreen/project switch releases the one review decoder.
 
 The normal editor shows Media, Preview, the contextual inspector and Timeline.
 Panels are resizable/collapsible with browser-local layout persistence; source
-review occupies a docked viewer tab rather than covering the workspace. Numeric
-inspector fields commit on Enter/blur, retain invalid drafts for correction and
-support Escape. Source-review paired IN/OUT retains its explicit Apply workflow.
+review occupies a docked viewer tab rather than covering the workspace. Main and
+stored Colour/Opacity values, playback rates and gain share native sliders with
+adjacent exact `NumberField` controls, not read-only outputs or number-only layouts.
+Pointer sliding changes only a local control draft; release applies one validated
+document edit and updates the image. Escape, pointer cancellation, lost capture or
+window blur restores the starting value without save/history. Each keyboard slider
+adjustment is an individual validated edit. Numeric fields retain full entered
+precision, commit on Enter/blur, keep invalid drafts editable and restore on Escape.
+Integer source/placement frames, durations and fades retain exact native numeric
+steppers and existing timecode feedback, without arbitrary timing sliders.
+Source-review paired IN/OUT retains its explicit Apply workflow.
 **Clip / Keyframes / Sequence / Audio** separates source/appearance/speed, the
 whole-row point list, transitions/fades and music. The header directly exposes
 panel toggles and help; **Workspace options**

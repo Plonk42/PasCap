@@ -57,9 +57,11 @@ describe('dedicated Inspector keyframe controls', () => {
     expect(clipPanel).toContain('aria-label="Placement section"');
     expect(clipPanel).not.toContain('Layer &amp; opacity');
     const opacity = [...clipPanel.matchAll(/<input[^>]*aria-label="Opacity"[^>]*>/g)].map((match) => match[0]);
-    expect(opacity).toHaveLength(1);
+    expect(opacity).toHaveLength(2);
     expect(opacity[0]).toContain('type="range"');
     expect(opacity[0]).toContain('value="1"');
+    expect(opacity[1]).toContain('type="number"');
+    expect(opacity[1]).toContain('value="1"');
     expect(opacity[0]).not.toContain('disabled');
     expect(clipPanel).toContain('100%');
     expect(clipPanel).toContain('Not animated');
@@ -100,10 +102,8 @@ describe('dedicated Inspector keyframe controls', () => {
     expect(markup).toContain(`step="${setting.step}"`);
     expect(markup).toContain(`aria-label="${name}"`);
     expect(markup).toContain('type="number"');
-    if (setting.key !== 'speed') {
-      expect(markup).toMatch(/class="setting-exact-value"><input[^>]*type="range"[^>]*><span class="number-field"/);
-      expect(markup).not.toContain('<output');
-    }
+    expect(markup).toMatch(/class="value-control"[^>]*><input[^>]*type="range"[^>]*\/><span class="number-field"/);
+    expect(markup).not.toContain('<output');
   });
 
   it('renders only existing participants, including off-duration points, without adding diamonds or clip-speed modes', () => {

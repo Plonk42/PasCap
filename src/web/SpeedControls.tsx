@@ -1,5 +1,5 @@
 import { editableClipSpeed } from '../shared/clip-speed.js';
-import type { EditCommand } from '../shared/commands.js';
+import { applyCommand, type EditCommand } from '../shared/commands.js';
 import { activeLayerSetting, evaluateLayerSetting, hasLayerKeys } from '../shared/keyframes.js';
 import type { ProjectDocument, VideoClip, VideoLayer } from '../shared/model.js';
 import { sourceRateAt, type SpeedSettings } from '../shared/speed.js';
@@ -10,9 +10,8 @@ import { EasingSelect } from './EasingSelect.js';
 import { HelpPopover } from './HelpPopover.js';
 import { Icon } from './icons.js';
 import { KeyframeToggle } from './KeyframeToggle.js';
-import { NumberField } from './NumberField.js';
 import { settingPresentation } from './setting-scope.js';
-import { SpeedRateField } from './SettingValueControl.js';
+import { RateValueControl, SpeedRateField } from './SettingValueControl.js';
 import type { DraftPreview } from './Timeline.js';
 
 export interface SpeedControlsProps {
@@ -47,12 +46,14 @@ function BaseSpeedControls({
   helpId,
   inputContext,
   onChange,
+  validate,
 }: Readonly<{
   clip: VideoClip;
   disabled: boolean;
   helpId: string;
   inputContext: string | number;
   onChange: (speed: SpeedSettings) => void;
+  validate: (speed: SpeedSettings) => string | null;
 }>) {
   const speed = clip.speed;
   return (
@@ -95,52 +96,49 @@ function BaseSpeedControls({
               </button>
             ))}
           </div>
-          <label className="speed-field">
-            Rate ×
-            <NumberField
+          <div className="speed-field">
+            <label htmlFor={`${helpId}-constant-rate`}>Rate ×</label>
+            <RateValueControl
+              id={`${helpId}-constant-rate`}
               aria-label="Clip speed rate"
               aria-describedby={helpId}
-              min={0.1}
-              max={8}
-              step={0.05}
               value={speed.rate}
               disabled={disabled}
               resetKey={inputContext}
-              hint="Selected clip base; used only while this layer has no Speed keys."
+              hint="Selected clip speed; used only while this layer has no Speed keys."
+              validate={(rate) => validate({ mode: 'constant', rate })}
               onCommit={(rate) => onChange({ mode: 'constant', rate })}
             />
-          </label>
+          </div>
         </>
       )}
       {speed.mode === 'ramp' && (
         <>
-          <div className="range-fields">
-            <label>
-              Start ×
-              <NumberField
+          <div className="value-rate-fields">
+            <div className="speed-field">
+              <label htmlFor={`${helpId}-ramp-start`}>Start ×</label>
+              <RateValueControl
+                id={`${helpId}-ramp-start`}
                 aria-label="Ramp start rate"
-                min={0.1}
-                max={8}
-                step={0.1}
                 disabled={disabled}
                 value={speed.startRate}
                 resetKey={`${inputContext}:${speed.anchorIn}:${speed.anchorOut}`}
+                validate={(startRate) => validate({ ...speed, startRate })}
                 onCommit={(startRate) => onChange({ ...speed, startRate })}
               />
-            </label>
-            <label>
-              End ×
-              <NumberField
+            </div>
+            <div className="speed-field">
+              <label htmlFor={`${helpId}-ramp-end`}>End ×</label>
+              <RateValueControl
+                id={`${helpId}-ramp-end`}
                 aria-label="Ramp end rate"
-                min={0.1}
-                max={8}
-                step={0.1}
                 disabled={disabled}
                 value={speed.endRate}
                 resetKey={`${inputContext}:${speed.anchorIn}:${speed.anchorOut}`}
+                validate={(endRate) => validate({ ...speed, endRate })}
                 onCommit={(endRate) => onChange({ ...speed, endRate })}
               />
-            </label>
+            </div>
           </div>
           <label className="speed-field">
             Curve
@@ -261,6 +259,14 @@ export function SpeedControls({
     if (!disabled && validFrame && active)
       onEdit({ type: 'layer-key-value', layerId: layer.id, frame, setting: 'speed', value });
   };
+  const validateEdit = (command: EditCommand): string | null => {
+    try {
+      applyCommand(project, command);
+      return null;
+    } catch (cause) {
+      return cause instanceof Error ? cause.message : 'This speed conflicts with the timeline.';
+    }
+  };
   const reset = (): void => {
     if (keyed) updateKey(1);
     else updateBase({ mode: 'constant', rate: 1 });
@@ -318,6 +324,7 @@ export function SpeedControls({
           helpId={helpId}
           inputContext={inputContext}
           onChange={updateBase}
+          validate={(speed) => validateEdit({ type: 'speed', clipId: clip.id, speed })}
         />
       )}
       {!keyed && clip?.speed.mode === 'curve' && sourceFrameCount !== null && (
@@ -338,20 +345,16 @@ export function SpeedControls({
       )}
       <div className={`layer-setting-heading${clip && !keyed ? ' clip-speed-row-heading' : ''}`}>
         <span title={hint}>
-          Row speed animation
+          <span>Row speed animation</span>
           <small className="layer-setting-kind" title={scope}>
             {keyed && <Icon name="curve" size={12} />}
             <span className="declutter-sr-only">{scope}</span>
           </small>
         </span>
         <span className="layer-setting-actions">
-          <output
-            title={
-              keyed ? `Layer rate at timeline frame ${frame}` : 'Capture the selected clip base rate as a row-wide key'
-            }
-          >
-            {rate.toFixed(2)}×
-          </output>
+          {!keyed && clip && (
+            <output title="Capture the selected clip's current rate as a row-wide key">{rate}×</output>
+          )}
           <KeyframeToggle
             layer={layer}
             setting="speed"
@@ -372,6 +375,9 @@ export function SpeedControls({
           value={rate}
           resetKey={`${layerContext}:${frame}:speed`}
           hint={hint}
+          validate={(value) =>
+            validateEdit({ type: 'layer-key-value', layerId: layer.id, frame, setting: 'speed', value })
+          }
           onCommit={updateKey}
         />
       )}
@@ -381,7 +387,7 @@ export function SpeedControls({
             className="speed-graph"
             viewBox="0 0 220 55"
             role="img"
-            aria-label={`${keyed ? 'Layer' : 'Clip base'} speed curve · ${graphRange}`}
+            aria-label={`${keyed ? 'Layer' : 'Clip'} speed curve · ${graphRange}`}
           >
             <path d="M0 48H220" stroke="var(--line)" />
             <polyline

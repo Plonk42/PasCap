@@ -1,8 +1,9 @@
-import type { ReactNode } from 'react';
+import { useId, type ReactNode } from 'react';
 import { COLOUR_CONTROLS, NEUTRAL_COLOUR } from '../shared/colour.js';
 import { KEYFRAME_SETTINGS, type KeyframeSetting } from '../shared/keyframes.js';
 import { Icon } from './icons.js';
-import { NumberField, type NumberFieldProps } from './NumberField.js';
+import type { NumberFieldProps } from './NumberField.js';
+import { ValueControl, type ValueControlProps } from './ValueControl.js';
 
 type RangeSetting = Exclude<KeyframeSetting, 'speed'>;
 
@@ -17,6 +18,8 @@ interface RangeSettingProps {
   scope?: ReactNode;
   actions?: ReactNode;
   resetTitle?: string;
+  resetKey?: NumberFieldProps['resetKey'];
+  validate?: NumberFieldProps['validate'];
   exact?: Pick<NumberFieldProps, 'resetKey' | 'validate'>;
 }
 
@@ -32,27 +35,17 @@ export function RangeSettingControl({
   scope,
   actions,
   resetTitle,
+  resetKey,
+  validate,
   exact,
 }: Readonly<RangeSettingProps>) {
   const definition = KEYFRAME_SETTINGS.find((item) => item.key === setting)!;
   const colour = COLOUR_CONTROLS.find((item) => item.key === setting);
   const name = label ?? definition.label;
   const neutral = colour ? NEUTRAL_COLOUR[colour.key] : 1;
-  const slider = (
-    <input
-      id={id}
-      type="range"
-      aria-label={name}
-      aria-describedby={`${id}-hint`}
-      min={definition.min}
-      max={definition.max}
-      step={definition.step}
-      value={value}
-      disabled={disabled}
-      title={hint}
-      onChange={(event) => onCommit(Number(event.target.value))}
-    />
-  );
+  const exactHint = setting === 'opacity' ? `${hint} Exact Opacity uses 0–1; 1 is 100%.` : hint;
+  const fieldContext = exact?.resetKey ?? resetKey ?? `${id}:${hint}`;
+  const fieldValidation = exact?.validate ?? validate;
   return (
     <>
       <span>
@@ -61,19 +54,6 @@ export function RangeSettingControl({
           {scope}
         </label>
         <span className="colour-control-actions">
-          {!exact && (
-            <output>
-              {colour ? (
-                <>
-                  {value > 0 && neutral === 0 ? '+' : ''}
-                  {value.toFixed(colour.key === 'hue' ? 0 : 2)}
-                  <small>{colour.unit}</small>
-                </>
-              ) : (
-                `${Math.round(value * 100)}%`
-              )}
-            </output>
-          )}
           {actions}
           <button
             type="button"
@@ -87,36 +67,40 @@ export function RangeSettingControl({
           </button>
         </span>
       </span>
-      {exact ? (
-        <div className="setting-exact-value">
-          {slider}
-          <NumberField
-            aria-label={name}
-            aria-describedby={`${id}-hint`}
-            min={definition.min}
-            max={definition.max}
-            step={definition.step}
-            value={value}
-            disabled={disabled}
-            {...exact}
-            onCommit={onCommit}
-          />
-        </div>
-      ) : (
-        slider
-      )}
+      <ValueControl
+        id={id}
+        aria-label={name}
+        aria-describedby={`${id}-hint`}
+        min={definition.min}
+        max={definition.max}
+        step={definition.step}
+        value={value}
+        disabled={disabled}
+        resetKey={fieldContext}
+        {...(fieldValidation === undefined ? {} : { validate: fieldValidation })}
+        unit={setting === 'opacity' ? '0–1' : (colour?.unit ?? '')}
+        onCommit={onCommit}
+      />
       <span id={`${id}-hint`} className="declutter-sr-only">
-        {hint}
+        {exactHint}
       </span>
     </>
   );
 }
 
+/** All speed rates share the same bounded slider and unrestricted decimal precision. */
+export function RateValueControl(props: Readonly<Omit<ValueControlProps, 'min' | 'max' | 'step' | 'unit'>>) {
+  return <ValueControl {...props} min={0.1} max={8} step={0.05} unit="×" />;
+}
+
 /** A row Speed participant is a rate, never a clip mode or source-time curve. */
 export function SpeedRateField(props: Readonly<Omit<NumberFieldProps, 'min' | 'max' | 'step'>>) {
+  const generatedId = useId();
+  const id = props.id ?? generatedId;
   return (
-    <label className="speed-field" htmlFor={props.id}>
-      Layer rate ×<NumberField {...props} min={0.1} max={8} step={0.05} />
-    </label>
+    <div className="speed-field">
+      <label htmlFor={id}>Layer rate ×</label>
+      <RateValueControl {...props} id={id} />
+    </div>
   );
 }

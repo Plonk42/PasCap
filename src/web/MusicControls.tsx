@@ -1,12 +1,14 @@
 import { lazy, Suspense, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import type { AudioAsset } from '../shared/audio.js';
-import type { EditCommand } from '../shared/commands.js';
+import { applyCommand, type EditCommand } from '../shared/commands.js';
 import type { MusicTrack, ProjectDocument } from '../shared/model.js';
 import { calculateLayout } from '../shared/timeline.js';
 import { Disclosure } from './Disclosure.js';
 import { HelpPopover } from './HelpPopover.js';
+import { Icon } from './icons.js';
 import { Modal } from './Modal.js';
 import { NumberField } from './NumberField.js';
+import { ValueControl } from './ValueControl.js';
 import './declutter.css';
 import { durationLabel, sourceSeconds } from './display.js';
 import './media-import.css';
@@ -131,6 +133,7 @@ export function MusicControls({
           setShowBrowser(true);
         }}
       >
+        <Icon name="folder" size={14} />
         Browse music files
       </button>
       <form
@@ -148,6 +151,7 @@ export function MusicControls({
           onChange={(event) => setFilename(event.target.value)}
         />
         <button type="submit" className="secondary-button small" disabled={blocked || !filename.trim()}>
+          <Icon name="plus" size={14} />
           Import audio
         </button>
       </form>
@@ -193,7 +197,7 @@ export function MusicControls({
         </Modal>
       )}
       <label className="speed-field">
-        Recording
+        <span>Recording</span>
         <select
           aria-label="Music recording"
           disabled={drafting}
@@ -261,9 +265,10 @@ export function MusicControls({
               Fit to video duration
             </button>
           </div>
-          <label className="speed-field">
-            Gain dB
-            <NumberField
+          <div className="speed-field">
+            <label htmlFor={`${helpId}-gain`}>Gain dB</label>
+            <ValueControl
+              id={`${helpId}-gain`}
               aria-label="Music gain"
               min={-60}
               max={12}
@@ -271,9 +276,18 @@ export function MusicControls({
               value={music.gainDb}
               disabled={drafting}
               resetKey={inputContext}
+              unit="dB"
+              validate={(gainDb) => {
+                try {
+                  applyCommand(project, { type: 'music', music: { ...music, gainDb } });
+                  return null;
+                } catch (cause) {
+                  return cause instanceof Error ? cause.message : 'This gain cannot be applied to the music track.';
+                }
+              }}
               onCommit={(gainDb) => update({ gainDb })}
             />
-          </label>
+          </div>
           <label className="music-loop">
             <input
               type="checkbox"
@@ -282,7 +296,7 @@ export function MusicControls({
               disabled={drafting}
               onChange={(event) => update({ loop: event.target.checked })}
             />
-            Loop selected source range
+            <span>Loop selected source range</span>
           </label>
           <MusicTiming helpId={helpId}>
             <div className="range-fields">
