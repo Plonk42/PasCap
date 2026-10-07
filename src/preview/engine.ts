@@ -226,33 +226,72 @@ export class PreviewEngine {
       musicDriftFrames: this.#music.errorFrames,
     };
   }
+  #playingEligibility(document: ProjectDocument, layout: TimelineLayout, accepted: number): Set<number> {
+    // Neighbours need the same active clip set, not identical grades or sourceAt
+    // values. Resolve these expensive queries before the final output-clock read.
+    const drawn = sampleTimeline(document, accepted, layout).map((layer) => layer.clipId);
+    return new Set(
+      [accepted - 1, accepted, accepted + 1].filter((candidate) => {
+        if (candidate < 0 || candidate >= layout.duration) return false;
+        if (candidate === accepted) return true;
+        return sameClips(
+          drawn,
+          sampleTimeline(document, candidate, layout).map((layer) => layer.clipId),
+        );
+      }),
+    );
+  }
   #validatePlayingPublication(): boolean {
-    if (this.#playing && !this.#busy && this.#status === 'playing' && this.#document && this.#music.hasMusic) {
-      // Upload/draw work can outlive the clock read used to select an image.
-      // Diagnostics and earlier listeners can outlive it too. Reuse the same
-      // source-set/appearance and one-frame test at every dispatch boundary.
-      try {
-        const now = performance.now();
-        const frame = this.#expectedFrame(now);
-        const required = sampleTimeline(this.#document, frame, this.#layout).map((layer) => layer.clipId);
-        if (!this.#canRetainFrame(frame, required)) {
-          // A clock crossing into a genuine empty composition needs no decoded
-          // callback. Draw current black (or finish), never retain ended footage
-          // or call it a video mismatch. Nonempty images keep the one-frame bound.
-          if (!required.length) {
-            this.#advance(now);
-            return false;
-          }
-          this.#operationFrame = frame;
-          if (!this.#mismatchStart) this.#mismatchStart = now;
-          this.#compositor.clear();
-          this.#setStatus('buffering', 'Waiting for decoded frames');
+    if (!this.#playing || this.#busy || this.#status !== 'playing' || !this.#document || !this.#music.hasMusic) {
+      return true;
+    }
+    // Upload/draw work can outlive the clock read used to select an image.
+    // Diagnostics and earlier listeners can outlive it too. Reuse the same
+    // source-set/appearance and one-frame test at every dispatch boundary.
+    try {
+      const document = this.#document;
+      const layout = this.#layout;
+      const accepted = this.#frame;
+      const dirty = this.#dirty;
+      const status = this.#status;
+      const busy = this.#busy;
+      const playing = this.#playing;
+      const publication = this.#publication;
+      const current = (): boolean =>
+        !this.#disposed &&
+        this.#document === document &&
+        this.#layout === layout &&
+        this.#frame === accepted &&
+        this.#status === status &&
+        this.#busy === busy &&
+        this.#playing === playing &&
+        this.#publication === publication;
+      const eligible = this.#playingEligibility(document, layout, accepted);
+      if (!current()) return false;
+      const now = performance.now();
+      const frame = this.#expectedFrame(now);
+      if (!current()) return false;
+      // Successful publication does only scalar/membership checks after that
+      // read. An invalidated image may query the failure path, never publish.
+      if (dirty || this.#dirty !== dirty || !eligible.has(frame)) {
+        const required = sampleTimeline(document, frame, layout);
+        if (!current()) return false;
+        // A clock crossing into a genuine empty composition needs no decoded
+        // callback. Draw current black (or finish), never retain ended footage
+        // or call it a video mismatch. Nonempty images keep the one-frame bound.
+        if (!required.length) {
+          this.#advance(performance.now());
           return false;
         }
-      } catch (error) {
-        this.#handleError(error);
+        this.#operationFrame = frame;
+        if (!this.#mismatchStart) this.#mismatchStart = now;
+        this.#compositor.clear();
+        this.#setStatus('buffering', 'Waiting for decoded frames');
         return false;
       }
+    } catch (error) {
+      this.#handleError(error);
+      return false;
     }
     return true;
   }

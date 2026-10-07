@@ -557,7 +557,9 @@ audio or intended-GPU/long-run qualification.
 
 Playing publication rechecks that same output-clock/source-set/appearance bound
 after diagnostics construction and before each subscriber, including initial
-subscription. Work in an earlier subscriber cannot pass an obsolete Playing
+subscription. Clip-set eligibility for the accepted frame and its one-frame
+neighbours is resolved before the final output-clock read; a successful dispatch
+does no timeline sampling after that read. Work in an earlier subscriber cannot pass an obsolete Playing
 snapshot to a later one. A nested notification, pause or seek supersedes the
 remaining dispatch; there is one bounded listener pass, not a publication retry
 loop. A stale video surface clears to explicit buffering without restarting

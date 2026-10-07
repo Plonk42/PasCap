@@ -15,7 +15,8 @@ import { calculateLayout, sampleTimeline } from '../../src/shared/timeline.js';
 import { framesToSeconds, type FrameRate } from '../../src/shared/timing.js';
 
 // Desired recovery regressions, not assertions accepting the existing flicker.
-// Only browser/native boundaries are mocked; schema, layout and source maps stay real.
+// Browser/native boundaries are mocked; the timeline wrapper delegates every
+// query to the real sampler, with an optional synchronous-work hook.
 interface DecoderDouble {
   index: number;
   video: HTMLVideoElement;
@@ -57,7 +58,20 @@ const doubles = vi.hoisted(() => ({
   slots: [] as DecoderDouble[],
   compositors: [] as CompositorDouble[],
   music: [] as MusicDouble[],
+  afterSample: null as ((document: ProjectDocument, frame: number) => void) | null,
 }));
+
+vi.mock('../../src/shared/timeline.js', async (importOriginal) => {
+  const original = await importOriginal<typeof import('../../src/shared/timeline.js')>();
+  return {
+    ...original,
+    sampleTimeline: (...args: Parameters<typeof original.sampleTimeline>) => {
+      const layers = original.sampleTimeline(...args);
+      doubles.afterSample?.(args[0], args[1]);
+      return layers;
+    },
+  };
+});
 
 vi.mock('../../src/preview/decoder.js', () => ({
   VideoDecoderSlot: class {
@@ -208,6 +222,7 @@ const engines: PreviewEngine[] = [];
 let nextCallback = 0;
 beforeEach(() => {
   doubles.now = 1_000;
+  doubles.afterSample = null;
   doubles.slots.length = 0;
   doubles.compositors.length = 0;
   doubles.music.length = 0;
@@ -230,6 +245,7 @@ beforeEach(() => {
   vi.spyOn(performance, 'now').mockImplementation(() => doubles.now);
 });
 afterEach(() => {
+  doubles.afterSample = null;
   engines.splice(0).forEach((engine) => engine.dispose());
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
@@ -551,6 +567,143 @@ describe('PreviewEngine final publication boundary', () => {
     expect(preview.music.pause).not.toHaveBeenCalled();
     for (const slot of doubles.slots) expect(slot.seek).not.toHaveBeenCalled();
   }
+
+  function onEngineSample(preview: RunningPreview, frame: number, work: () => void): Mock {
+    const performed = vi.fn(work);
+    doubles.afterSample = (document, sampledFrame) => {
+      // loadProject parses a clone: never instrument the helper's project.
+      if (document === preview.project || sampledFrame !== frame) return;
+      expect(document).not.toBe(preview.project);
+      doubles.afterSample = null;
+      performed();
+    };
+    return performed;
+  }
+
+  it.each([
+    { sample: 69, path: 'subscription' },
+    { sample: 70, path: 'subscription' },
+    { sample: 69, path: 'next listener' },
+    { sample: 70, path: 'next listener' },
+    { sample: 69, path: 'no subscribers' },
+    { sample: 70, path: 'no subscribers' },
+  ] as const)('rejects audio 71 reached during actual sample $sample ($path)', async ({ sample, path }) => {
+    const preview = await publicationPreview(path === 'next listener' ? 65 : 69);
+    slotFor(preview).observe(69);
+    const published: string[] = [];
+    let work: Mock | undefined;
+    if (path === 'subscription') {
+      advanceAudio(preview, 70);
+      work = onEngineSample(preview, sample, () => advanceAudio(preview, 71));
+      preview.engine.subscribe((state) => published.push(state.status));
+    } else if (path === 'next listener') {
+      let armed = false;
+      preview.engine.subscribe((state) => {
+        if (!armed || state.status !== 'playing') return;
+        armed = false;
+        work = onEngineSample(preview, sample, () => advanceAudio(preview, 71));
+      });
+      preview.engine.subscribe((state) => published.push(state.status));
+      published.length = 0;
+      armed = true;
+      tick(preview, 70);
+    } else {
+      const draw = preview.compositor.drawFrame.getMockImplementation()!;
+      preview.compositor.drawFrame.mockImplementationOnce((groups) => {
+        draw(groups);
+        work = onEngineSample(preview, sample, () => advanceAudio(preview, 71));
+      });
+      tick(preview, 70);
+    }
+    expect(work).toHaveBeenCalledOnce();
+    if (path !== 'no subscribers') expect(published).toEqual(['buffering']);
+    expectVideoOnlyBuffer(preview);
+  });
+
+  it.each([
+    { rate: 1, accepted: 69 },
+    { rate: 0.1, accepted: 68 },
+  ])('keeps real neighbouring samples eligible at rate $rate with the clock read last', async ({ rate, accepted }) => {
+    const project = singleProject(true);
+    project.clips[0]!.sourceOut = 90;
+    project.clips[0]!.speed = { mode: 'constant', rate };
+    project.layers[0]!.keyframes = [
+      { frame: 0, interpolation: 'linear', values: { ...EMPTY_KEY_VALUES, exposure: 0, opacity: 1 } },
+      { frame: 90, interpolation: 'hold', values: { ...EMPTY_KEY_VALUES, exposure: 1, opacity: 0.5 } },
+    ];
+    const preview = await running(project, accepted);
+    const drawn = sampleTimeline(preview.project, accepted);
+    const neighbour = sampleTimeline(preview.project, accepted + 1);
+    expect(drawn[0]!.colour).not.toEqual(neighbour[0]!.colour);
+    expect(drawn[0]!.sourceFrame === neighbour[0]!.sourceFrame).toBe(rate === 0.1);
+    const events: string[] = [];
+    const music = preview.music as MusicDouble & { projectFrame: Mock<() => number> };
+    const projectFrame = music.projectFrame.getMockImplementation()!;
+    music.projectFrame.mockImplementation(() => {
+      events.push('clock');
+      return projectFrame();
+    });
+    const work = vi.fn(() => advanceAudio(preview, accepted + 1));
+    doubles.afterSample = (document, frame) => {
+      if (document === preview.project) return;
+      events.push(`sample ${frame}`);
+      if (frame === accepted && !work.mock.calls.length) work();
+    };
+    const published: number[] = [];
+    preview.engine.subscribe((state) => {
+      if (state.status !== 'playing') return;
+      expect(events.at(-1)).toBe('clock');
+      published.push(state.frame);
+    });
+    expect(work).toHaveBeenCalledOnce();
+    expect(published).toEqual([accepted]);
+    expectSurface(preview, accepted);
+    expectUninterrupted(preview);
+  });
+
+  it.each([70, 71])('advances actual sampling across empty composition/end at audio %i', async (audio) => {
+    const project = singleProject(true);
+    project.clips[0]!.sourceOut = 70;
+    project.music[0]!.duration = 71;
+    const preview = await running(project, 69);
+    const work = onEngineSample(preview, 69, () => advanceAudio(preview, audio));
+    const published: string[] = [];
+    preview.engine.subscribe((state) => published.push(state.status));
+    await settle();
+    expect(work).toHaveBeenCalledOnce();
+    expect(published).not.toContain('playing');
+    expectSurface(preview, 70);
+    expect(preview.engine.diagnostics()).toMatchObject({ status: audio === 70 ? 'playing' : 'paused', frame: 70 });
+    expect(preview.music.running).toBe(audio === 70);
+    if (audio === 70) expect(preview.music.pause).not.toHaveBeenCalled();
+    expect(preview.music.start).not.toHaveBeenCalled();
+    for (const slot of doubles.slots) expect(slot.seek).not.toHaveBeenCalled();
+  });
+
+  it.each(['pause', 'seek', 'dirty', 'nested emit'] as const)(
+    'invalidates the captured eligibility when actual sampling causes %s',
+    async (action) => {
+      const preview = await publicationPreview(69);
+      const work = onEngineSample(preview, 69, () => {
+        if (action === 'pause') preview.engine.pause();
+        else if (action === 'seek') void preview.engine.seek(20);
+        else if (action === 'dirty') preview.engine.updateColour('clip', { ...NEUTRAL_COLOUR, exposure: 1 });
+        else preview.engine.setUngraded(true);
+      });
+      const published: string[] = [];
+      preview.engine.subscribe((state) => published.push(state.status));
+      expect(work).toHaveBeenCalledOnce();
+      expect(published).not.toContain('playing');
+      expect(preview.engine.diagnostics().status).toBe(
+        action === 'pause' ? 'paused' : action === 'seek' ? 'seeking' : 'buffering',
+      );
+      if (action !== 'pause') expect(preview.compositor.visible).toBeNull();
+      await settle();
+      if (action === 'seek') expectSurface(preview, 20);
+      expect(preview.music.start).not.toHaveBeenCalled();
+      if (action === 'dirty' || action === 'nested emit') expect(preview.music.pause).not.toHaveBeenCalled();
+    },
+  );
 
   it.each(['before snapshot', 'after snapshot'] as const)(
     'rejects accepted 69 when diagnostics construction advances audio 70 to 71 (%s)',
