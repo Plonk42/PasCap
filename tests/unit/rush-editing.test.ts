@@ -56,7 +56,7 @@ function point(frame: number, values: Partial<LayerKeyValues>, interpolation: In
   return { frame, interpolation, values: { ...EMPTY_KEY_VALUES, ...values } };
 }
 function row(id: string, keyframes: LayerKeyframe[]): VideoLayer {
-  return { ...createLayer(id, id, false), opacity: 0.8, keyframes };
+  return { ...createLayer(id, id, false), keyframes };
 }
 function rushClip(id: string, layerId: string, start: number, speed: SpeedSettings): VideoClip {
   return {
@@ -64,7 +64,6 @@ function rushClip(id: string, layerId: string, start: number, speed: SpeedSettin
     layerId,
     start,
     speed,
-    opacity: 0.65,
     colour: {
       exposure: 0.6,
       brightness: 0.08,
@@ -81,9 +80,10 @@ function primaryProject(
   keys: LayerKeyframe[] = [],
 ): ProjectDocument {
   const document = createProject('rush', 'Rush editing');
+  document.layers[0]!.opacity = 0.65;
   document.layers[0]!.keyframes = keys;
   document.layers.push(
-    row('upper', [point(10, { layerOpacity: 0.6, exposure: 0.25 }), point(500, { clipOpacity: 0.4, hue: 45 }, 'hold')]),
+    row('upper', [point(10, { opacity: 0.6, exposure: 0.25 }), point(500, { opacity: 0.4, hue: 45 }, 'hold')]),
   );
   // Deliberately interleave an overlay with the primary array order.
   document.clips = [
@@ -109,7 +109,8 @@ function overlayProject(
   const document = createProject('overlay-rush', 'Positioned rush editing');
   document.layers[0]!.keyframes = [point(15, { exposure: 0.5 }), point(1_000, { saturation: 1.2 })];
   const upper = row('upper', keys);
-  document.layers.push(upper, row('other-row', [point(50, { clipOpacity: 0.4 })]));
+  upper.opacity = 0.65;
+  document.layers.push(upper, row('other-row', [point(50, { opacity: 0.4 })]));
   const selected = rushClip('top', upper.id, 50, speed);
   const end = selected.start + compileLayerRetiming(selected, upper, selected.start).duration;
   document.clips = [
@@ -311,7 +312,7 @@ describe('project marks on one selected rush excerpt', () => {
 
   it('uses the placed map after incoming dissolve and absolute row-speed integration', () => {
     const keys = [
-      point(0, { speed: 1, layerOpacity: 0.6, clipOpacity: 0.7, exposure: -0.4 }),
+      point(0, { speed: 1, opacity: 0.7, exposure: -0.4 }),
       point(100, { speed: 3, hue: 15 }),
       point(1_000, { saturation: 0.8 }, 'hold'),
     ];
@@ -381,8 +382,9 @@ describe('atomic source removal on the primary ripple row', () => {
         mediaId: original.mediaId,
         colour: original.colour,
         speed: original.speed,
-        opacity: original.opacity,
       });
+      expect(excerpt).not.toHaveProperty('opacity');
+      expect(next.layers[0]!.opacity).toBe(document.layers[0]!.opacity);
       expect(Object.keys(excerpt)).toEqual(Object.keys(original));
     }
     expect(left.colour).not.toBe(right.colour);
@@ -588,7 +590,7 @@ describe('atomic source removal on the primary ripple row', () => {
     'preserves static settings/source ramp anchors and rephases valid excerpt durations: $name',
     ({ speed }) => {
       const document = primaryProject(speed, [
-        point(15, { exposure: 0.25, clipOpacity: 0.4 }),
+        point(15, { exposure: 0.25, opacity: 0.4 }),
         point(900, { hue: 100 }, 'smooth'),
       ]);
       const next = singleCommit(document, removal('rush', 140, 170));
@@ -601,7 +603,8 @@ describe('atomic source removal on the primary ripple row', () => {
       for (const excerpt of [left, right]) {
         expect(excerpt.clip.speed).toEqual(speed);
         expect(excerpt.clip.colour).toEqual(placed(document, 'rush').clip.colour);
-        expect(excerpt.clip.opacity).toBe(0.65);
+        expect(excerpt.clip).not.toHaveProperty('opacity');
+        expect(next.layers[0]!.opacity).toBe(0.65);
         expect(excerpt.duration).toBe(compileLayerRetiming(excerpt.clip, next.layers[0]!, excerpt.start).duration);
         const samples = Array.from({ length: excerpt.duration }, (_, frame) => excerpt.retiming.sourceAt(frame));
         expect(
@@ -676,9 +679,9 @@ describe('positioned overlay removal without neighbour ripple', () => {
     expect(placed(next, 'upper-after').start).toBe(placed(document, 'upper-after').start);
   });
 
-  it('maps overlay marks/cut placement with absolute row speed, retaining fixed ten-channel points', () => {
+  it('maps overlay marks/cut placement with absolute row speed, retaining fixed nine-channel points', () => {
     const keys = [
-      point(0, { speed: 1, layerOpacity: 0.5, clipOpacity: 0.6, exposure: 0.3 }),
+      point(0, { speed: 1, opacity: 0.6, exposure: 0.3 }),
       point(100, {
         speed: 3,
         brightness: 0.1,
@@ -782,7 +785,7 @@ describe('quick trims retain the displayed original frame', () => {
   });
 
   it('quick-trims through row-speed override using the selected placed context', () => {
-    const keys = [point(0, { speed: 1, exposure: 0.5 }), point(100, { speed: 3 }), point(1_000, { clipOpacity: 0.4 })];
+    const keys = [point(0, { speed: 1, exposure: 0.5 }), point(100, { speed: 3 }), point(1_000, { opacity: 0.4 })];
     const document = primaryProject({ mode: 'constant', rate: 8 }, keys);
     const selected = placed(document, 'rush');
     expect(selected.start).toBe(42);
@@ -885,7 +888,7 @@ describe('quick trims retain the displayed original frame', () => {
   it('does not discard a redo branch for an endpoint quick-trim no-op', () => {
     const document = primaryProject();
     const history = new EditHistory(document);
-    const changed = history.commit({ type: 'opacity', clipId: 'rush', opacity: 0.8 });
+    const changed = history.commit({ type: 'opacity', layerId: BASE_LAYER_ID, opacity: 0.8 });
     history.undo();
     expect(history.commit(trimAtPlayhead(history.current, 'rush', placed(document, 'rush').start, 'in'))).toEqual(
       document,

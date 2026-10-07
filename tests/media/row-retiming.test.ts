@@ -27,7 +27,7 @@ function point(frame: number, values: Partial<LayerKeyValues>, interpolation: In
   return { frame, interpolation, values: { ...EMPTY_KEY_VALUES, ...values } };
 }
 
-describe.skipIf(!enabled)('schema-6 supplied row maps · native pipes and disposable frame-coded originals', () => {
+describe.skipIf(!enabled)('schema-7 supplied row maps · native pipes and disposable frame-coded originals', () => {
   let root: string;
   let config: ServiceConfig;
   let sourcePath: string;

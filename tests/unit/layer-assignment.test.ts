@@ -297,7 +297,6 @@ function expectedGroups(
     return members.length
       ? [
           {
-            opacity: members[0]!.layerOpacity,
             clips: members.map((sample) => ({
               slot: assignments.indexOf(sample.clipId),
               settings: sample.colour,
@@ -324,7 +323,7 @@ function groupPixel(groups: readonly CompositeGroup[], source: (slot: number) =>
         colour[index]! += channel * coverage * clip.brightness;
       });
     }
-    result = result.map((channel, index) => colour[index]! * group.opacity + channel * (1 - alpha * group.opacity));
+    result = result.map((channel, index) => colour[index]! + channel * (1 - alpha));
   }
   return result as unknown as RGB;
 }
@@ -429,11 +428,11 @@ describe('layered observed-frame preview', () => {
   });
   it('groups nine active clips into eight layers and applies shared project-time keys to every row member', async () => {
     const project = makeProject(8, true);
-    project.layers[0]!.keyframes = [point(0, { clipOpacity: 0.2 }), point(59, { clipOpacity: 0.8 }, 'hold')];
-    project.clips[1]!.opacity = 0.3;
+    project.layers[0]!.keyframes = [point(0, { opacity: 0.2 }), point(59, { opacity: 0.8 }, 'hold')];
+    project.layers[0]!.opacity = 0.3;
     project.layers[1]!.keyframes = [
-      point(0, { layerOpacity: 0, exposure: 0 }),
-      point(102, { layerOpacity: 1, exposure: 1 }, 'hold'),
+      point(0, { opacity: 0, exposure: 0 }),
+      point(102, { opacity: 1, exposure: 1 }, 'hold'),
     ];
     const engine = makeEngine();
     await engine.loadProject(project, resolver, 51);
@@ -442,8 +441,10 @@ describe('layered observed-frame preview', () => {
     expect(compositor().groups).toEqual(expectedGroups(project, 51, assignments));
     expect(compositor().groups[0]!.clips).toHaveLength(2);
     for (const clip of compositor().groups[0]!.clips) expect(clip.opacity).toBeCloseTo(0.2 + (0.6 * 51) / 59);
-    expect(project.clips[1]!.opacity).toBe(0.3);
-    expect(compositor().groups[1]!.opacity).toBe(0.5);
+    expect(project.layers[0]!.opacity).toBe(0.3);
+    expect(project.clips.every((clip) => !('opacity' in clip))).toBe(true);
+    expect(compositor().groups.every((group) => Object.keys(group).join() === 'clips')).toBe(true);
+    expect(compositor().groups[1]!.clips[0]!.opacity).toBe(0.5);
     expect(compositor().groups[1]!.clips[0]!.settings.exposure).toBe(0.5);
     expect(
       sampleTimeline(project, 51).map((layer) => liveSlots()[assignments.indexOf(layer.clipId)]!.decodedFrame),
@@ -455,15 +456,13 @@ describe('layered observed-frame preview', () => {
     expect(engine.diagnostics().activeDecoders).toBe(9);
     expect(state.peakSlots).toBe(16);
   });
-  it('keeps black fade brightness independent of clip and layer alpha', async () => {
+  it('keeps black fade brightness independent of evaluated row coverage', async () => {
     const project = makeProject(2);
     project.layers[0]!.openingFade = 5;
-    project.clips[0]!.opacity = 0.3;
-    project.layers[0]!.opacity = 0.7;
+    project.layers[0]!.opacity = 0.3;
     const engine = makeEngine();
     await engine.loadProject(project, resolver, 0);
     expect(compositor().groups[0]).toMatchObject({
-      opacity: 0.7,
       clips: [{ opacity: 0.3, blendWeight: 1, brightness: 0 }],
     });
     await engine.seek(2);
@@ -482,7 +481,7 @@ describe('layered observed-frame preview', () => {
       project.clips.push(right);
       layer.transitions = [{ leftId: left.id, rightId: right.id, type: 'cross-dissolve', duration: 18 }];
       layer.opacity = 0.2 + index / 10;
-      layer.keyframes = [point(0, { exposure: index / 10, clipOpacity: 0.6 })];
+      layer.keyframes = [point(0, { exposure: index / 10 })];
     }
     const engine = makeEngine();
     await engine.loadProject(project, resolver, 51);
@@ -509,14 +508,14 @@ describe('layered observed-frame preview', () => {
     engine.dispose();
     expect(liveSlots()).toEqual([]);
   });
-  it('observes enabled zero-opacity clips but never loads disabled layers', async () => {
+  it('observes clips on enabled zero-opacity rows but never loads disabled layers', async () => {
     const project = makeProject(3);
     project.layers[1]!.opacity = 0;
     project.layers[2]!.enabled = false;
     const engine = makeEngine();
     await engine.loadProject(project, resolver);
     expect(compositor().groups).toHaveLength(2);
-    expect(compositor().groups[1]!.opacity).toBe(0);
+    expect(compositor().groups[1]!.clips[0]!.opacity).toBe(0);
     expect(state.slots.flatMap((slot) => slot.loads.map((load) => load.url))).not.toContain('/overlay-media-2');
     expect(engine.diagnostics().assignedClipIds).toContain('overlay-1');
   });
@@ -642,10 +641,7 @@ describe('live appearance updates and lifecycle', () => {
     const starts = [...music.starts];
     const pauses = music.pauses;
     const appearance = structuredClone(project);
-    appearance.layers[0]!.keyframes = [
-      point(0, { layerOpacity: 0, clipOpacity: 0, exposure: 0.7 }),
-      point(30, { layerOpacity: 1, clipOpacity: 1 }, 'hold'),
-    ];
+    appearance.layers[0]!.keyframes = [point(0, { opacity: 0, exposure: 0.7 }), point(30, { opacity: 1 }, 'hold')];
     appearance.layers = [appearance.layers[0]!, appearance.layers[2]!, appearance.layers[1]!];
     engine.updateProjectAppearance(appearance);
     expect(engine.diagnostics()).toMatchObject({ status: 'playing', frame: 15, activeDecoders: 3 });
@@ -671,7 +667,7 @@ describe('live appearance updates and lifecycle', () => {
     const uploads = compositor().uploads.length;
     engine.updateColour('base', { ...NEUTRAL_COLOUR, saturation: 0.4 });
     expect(compositor().groups[0]!.clips[0]!.settings.saturation).toBe(0.4);
-    project.clips[0]!.opacity = 0.25;
+    project.layers[0]!.opacity = 0.25;
     engine.updateProjectAppearance(project);
     expect(compositor().groups[0]!.clips[0]!.opacity).toBe(0.25);
     expect(calls()).toEqual(before);
@@ -961,7 +957,7 @@ describe('live appearance updates and lifecycle', () => {
       decoderCount: 0,
     });
     compositor().lost = false;
-    project.clips[0]!.opacity = 0.2;
+    project.layers[0]!.opacity = 0.2;
     expect(() => engine.updateProjectAppearance(project)).not.toThrow();
     expect(() => engine.capturePixels()).toThrow(/required decoded frames/);
     expect(liveSlots()).toHaveLength(0);

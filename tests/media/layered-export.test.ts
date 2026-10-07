@@ -60,8 +60,8 @@ const HEIGHT = 90;
 const PIXELS = WIDTH * HEIGHT;
 const FRAME_BYTES = PIXELS * 3;
 // Existing positioned fixtures must keep their independent starts and widths.
-function layer(id: string, opacity = 1): VideoLayer {
-  return { ...createLayer(id, id, false), opacity };
+function layer(id: string): VideoLayer {
+  return createLayer(id, id, false);
 }
 function point(frame: number, values: Partial<LayerKeyValues>, interpolation: Interpolation = 'linear'): LayerKeyframe {
   return { frame, interpolation, values: { ...EMPTY_KEY_VALUES, ...values } };
@@ -121,13 +121,13 @@ function coverage(samples: PreviewLayer[]): number {
   let result = 0;
   for (const id of new Set(samples.map((sample) => sample.layerId))) {
     const group = samples.filter((sample) => sample.layerId === id);
-    const alpha = group.reduce((sum, sample) => sum + sample.opacity * sample.blendWeight, 0) * group[0]!.layerOpacity;
+    const alpha = group.reduce((sum, sample) => sum + sample.opacity * sample.blendWeight, 0);
     result = alpha + result * (1 - alpha);
   }
   return result;
 }
 
-describe.skipIf(!enabled)('schema-6 layered native export · disposable synthetic sources only', () => {
+describe.skipIf(!enabled)('schema-7 layered native export · disposable synthetic sources only', () => {
   let root: string;
   let config: ServiceConfig;
   let jobs: JobQueue;
@@ -245,10 +245,10 @@ describe.skipIf(!enabled)('schema-6 layered native export · disposable syntheti
 
   function simple(frames = 4): ProjectDocument {
     const project = createProject('native-layered', 'Disposable layered export');
-    project.layers.push(layer('video-2', 0.6));
+    project.layers.push({ ...layer('video-2'), opacity: 0.5 });
     project.clips = [
       createClip('base', assets[0]!.id, 0, frames),
-      { ...createClip('overlay', assets[1]!.id, 8, 10), layerId: 'video-2', start: 1, opacity: 0.5 },
+      { ...createClip('overlay', assets[1]!.id, 8, 10), layerId: 'video-2', start: 1 },
     ];
     return projectSchema.parse(project);
   }
@@ -354,33 +354,24 @@ describe.skipIf(!enabled)('schema-6 layered native export · disposable syntheti
     const project = createProject(`concurrent-${count}`, 'Synthetic independent track dissolves');
     const packed = {
       ...createLayer('packed-track', 'Ripple track', true),
-      opacity: 0.75,
+      opacity: 0.6,
       openingFade: 1,
       closingFade: 1,
     };
     packed.keyframes = [
       point(2, {
         speed: 0.5,
-        layerOpacity: 0.75,
-        clipOpacity: 0.35,
+        opacity: 0.35,
         exposure: -0.3,
         brightness: 0.015,
         hue: -20,
         shadows: 0.2,
       }),
-      point(
-        6,
-        { speed: 1.5, layerOpacity: 0.45, clipOpacity: 0.85, exposure: 0.25, brightness: 0.06, hue: 20, shadows: -0.1 },
-        'smooth',
-      ),
-      point(
-        14,
-        { speed: 0.75, layerOpacity: 0.7, clipOpacity: 0.55, exposure: -0.1, brightness: 0.025, hue: -5, shadows: 0.1 },
-        'hold',
-      ),
+      point(6, { speed: 1.5, opacity: 0.85, exposure: 0.25, brightness: 0.06, hue: 20, shadows: -0.1 }, 'smooth'),
+      point(14, { speed: 0.75, opacity: 0.55, exposure: -0.1, brightness: 0.025, hue: -5, shadows: 0.1 }, 'hold'),
     ];
-    const packedLeft = { ...createClip('packed-left', assets[0]!.id, 2, 8, packed.id), start: 2, opacity: 0.6 };
-    const packedRight = { ...createClip('packed-right', assets[1]!.id, 8, 14, packed.id), opacity: 0.4 };
+    const packedLeft = { ...createClip('packed-left', assets[0]!.id, 2, 8, packed.id), start: 2 };
+    const packedRight = createClip('packed-right', assets[1]!.id, 8, 14, packed.id);
     packedLeft.speed = { mode: 'constant', rate: 4 };
     packedRight.speed = { mode: 'constant', rate: 4 };
     packedLeft.colour = { ...NEUTRAL_COLOUR, contrast: 0.9, saturation: 0.8, highlights: -0.2 };
@@ -393,30 +384,27 @@ describe.skipIf(!enabled)('schema-6 layered native export · disposable syntheti
 
     const positioned = {
       ...createLayer('positioned-track', 'Independent track', false),
-      opacity: 0.65,
+      opacity: 0.4,
       openingFade: 1,
       closingFade: 1,
     };
     positioned.keyframes = [
-      point(2, { exposure: -0.2, hue: 25, layerOpacity: 0.3 }, 'ease-in'),
-      point(9, { exposure: 0.3, hue: -20, layerOpacity: 0.8 }, 'hold'),
+      point(2, { exposure: -0.2, hue: 25 }, 'ease-in'),
+      point(9, { exposure: 0.3, hue: -20 }, 'hold'),
     ];
     const positionedLeft = {
       ...createClip('positioned-left', assets[1]!.id, 1, 5, positioned.id),
       start: overlap.end - 4,
-      opacity: 0.4,
     };
     const positionedRight = {
       ...createClip('positioned-right', assets[0]!.id, 11, 15, positioned.id),
       start: overlap.start,
-      opacity: 0.75,
     };
     positionedLeft.colour = { ...NEUTRAL_COLOUR, brightness: 0.025, contrast: 1.1, saturation: 0.7, shadows: 0.2 };
     positionedRight.colour = { ...NEUTRAL_COLOUR, brightness: 0.05, contrast: 0.9, saturation: 1.2, highlights: -0.2 };
     const afterGap = {
       ...createClip('after-gap', assets[1]!.id, 17, 19, positioned.id),
       start: positionedRight.start + 6,
-      opacity: 0.6,
     };
     afterGap.colour = { ...NEUTRAL_COLOUR, brightness: 0.035, saturation: 0.85, shadows: 0.1 };
     positioned.transitions = [
@@ -426,23 +414,21 @@ describe.skipIf(!enabled)('schema-6 layered native export · disposable syntheti
 
     const third = {
       ...createLayer('third-track', 'Another Ripple track', true),
-      opacity: 0.7,
+      opacity: 0.55,
       openingFade: 1,
       closingFade: 1,
     };
     third.keyframes = [
-      point(3, { clipOpacity: 0.2, brightness: 0.015 }),
-      point(9, { clipOpacity: 0.75, brightness: 0.07 }, 'hold'),
+      point(3, { opacity: 0.2, brightness: 0.015 }),
+      point(9, { opacity: 0.75, brightness: 0.07 }, 'hold'),
     ];
     const thirdLeft = {
       ...createClip('third-left', assets[0]!.id, 4, 8, third.id),
       start: positionedLeft.start,
-      opacity: 0.55,
     };
     const thirdRight = {
       ...createClip('third-right', assets[1]!.id, 12, 16, third.id),
       start: overlap.start,
-      opacity: 0.8,
     };
     thirdLeft.colour = { ...NEUTRAL_COLOUR, exposure: -0.2, hue: -15, saturation: 1.1 };
     thirdRight.colour = { ...NEUTRAL_COLOUR, exposure: 0.15, hue: 30, saturation: 0.8 };
@@ -477,8 +463,8 @@ describe.skipIf(!enabled)('schema-6 layered native export · disposable syntheti
         expect(Number.isSafeInteger(sample.sourceFrame)).toBe(true);
         expect(sample.sourceFrame).toBeGreaterThanOrEqual(placed.clip.sourceIn);
         expect(sample.sourceFrame).toBeLessThan(placed.clip.sourceOut);
-        expect(sample.opacity).toBe(evaluateLayerSetting(row, 'clipOpacity', frame, placed.clip.opacity));
-        expect(sample.layerOpacity).toBe(evaluateLayerSetting(row, 'layerOpacity', frame, row.opacity));
+        expect(sample.opacity).toBe(evaluateLayerSetting(row, 'opacity', frame, row.opacity));
+        expect(sample).not.toHaveProperty('layerOpacity');
         for (const { key } of COLOUR_CONTROLS)
           expect(sample.colour[key]).toBe(evaluateLayerSetting(row, key, frame, placed.clip.colour[key]));
         if (hasLayerKeys(row, 'speed'))
@@ -736,13 +722,15 @@ describe.skipIf(!enabled)('schema-6 layered native export · disposable syntheti
 
   it('exports shared row speed/opacity and seven independently participating colour channels across dissolves, gaps and hidden black holds', async () => {
     const project = createProject('native-compound', 'Compound keyed layers');
-    project.layers.push(layer('video-2', 0.85), layer('video-3', 0.55), { ...layer('video-4'), enabled: false });
+    project.layers.push(layer('video-2'), layer('video-3'), { ...layer('video-4'), enabled: false });
+    project.layers[0]!.opacity = 0.7;
+    project.layers[1]!.opacity = 0.6;
+    project.layers[2]!.opacity = 0.45;
     project.layers[0]!.keyframes = [
       point(
         0,
         {
-          layerOpacity: 0.8,
-          clipOpacity: 0.3,
+          opacity: 0.3,
           speed: 0.75,
           exposure: -0.5,
           hue: -25,
@@ -756,8 +744,7 @@ describe.skipIf(!enabled)('schema-6 layered native export · disposable syntheti
       point(
         8,
         {
-          layerOpacity: 0.45,
-          clipOpacity: 0.8,
+          opacity: 0.8,
           speed: 1.5,
           exposure: 0.4,
           hue: 30,
@@ -766,14 +753,14 @@ describe.skipIf(!enabled)('schema-6 layered native export · disposable syntheti
         },
         'ease-out',
       ),
-      point(12, { clipOpacity: 0.4, brightness: 0.06, contrast: 1.25, shadows: -0.1 }),
-      point(18, { layerOpacity: 0.9, speed: 0.6, shadows: 0.15, highlights: 0.2 }, 'hold'),
+      point(12, { opacity: 0.4, brightness: 0.06, contrast: 1.25, shadows: -0.1 }),
+      point(18, { opacity: 0.9, speed: 0.6, shadows: 0.15, highlights: 0.2 }, 'hold'),
     ];
     project.layers[1]!.keyframes = [
-      point(0, { layerOpacity: 0.25, clipOpacity: 0.2, speed: 0.7, hue: 40, highlights: -0.3 }, 'ease-in'),
-      point(6, { clipOpacity: 0.85, exposure: 0.2, shadows: 0.15 }, 'smooth'),
-      point(10, { layerOpacity: 0.8, speed: 2, hue: -35, exposure: 0.4, highlights: -0.1 }, 'smooth'),
-      point(24, { layerOpacity: 0.45, speed: 0.8, clipOpacity: 0.45, hue: 15, shadows: -0.2 }, 'hold'),
+      point(0, { opacity: 0.2, speed: 0.7, hue: 40, highlights: -0.3 }, 'ease-in'),
+      point(6, { opacity: 0.85, exposure: 0.2, shadows: 0.15 }, 'smooth'),
+      point(10, { opacity: 0.8, speed: 2, hue: -35, exposure: 0.4, highlights: -0.1 }, 'smooth'),
+      point(24, { speed: 0.8, opacity: 0.45, hue: 15, shadows: -0.2 }, 'hold'),
     ];
     project.layers[2]!.keyframes = [
       point(0, { brightness: 0.08, hue: -15 }, 'ease-out'),
@@ -790,7 +777,6 @@ describe.skipIf(!enabled)('schema-6 layered native export · disposable syntheti
     left.speed = { mode: 'constant', rate: 0.5 };
     right.speed = { mode: 'constant', rate: 2 };
     for (const [index, clip] of [left, right].entries()) {
-      clip.opacity = 0.7;
       clip.colour = { ...NEUTRAL_COLOUR, exposure: index * 0.2, brightness: index * 0.015, shadows: 0.05 };
     }
     project.clips = [left, right];
@@ -798,16 +784,15 @@ describe.skipIf(!enabled)('schema-6 layered native export · disposable syntheti
     project.layers[0]!.openingFade = 1;
     project.layers[0]!.closingFade = 1;
     const baseEnd = calculateLayout(project).duration;
-    const early = { ...createClip('early-overlay', assets[0]!.id, 1, 6), layerId: 'video-2', start: 2, opacity: 0.6 };
+    const early = { ...createClip('early-overlay', assets[0]!.id, 1, 6), layerId: 'video-2', start: 2 };
     const late = {
       ...createClip('late-overlay', assets[1]!.id, 9, 13),
       layerId: 'video-2',
       start: baseEnd + 2,
-      opacity: 0.7,
     };
     late.speed = { mode: 'constant', rate: 1.25 };
     late.colour = { ...NEUTRAL_COLOUR, exposure: 0.25, saturation: 0.6 };
-    const top = { ...createClip('top-overlay', assets[0]!.id, 4, 9), layerId: 'video-3', start: 4, opacity: 0.45 };
+    const top = { ...createClip('top-overlay', assets[0]!.id, 4, 9), layerId: 'video-3', start: 4 };
     project.clips = [late, left, top, early, right]; // Flat indices deliberately differ from track/chronological order.
     project.layers[1]!.transitions = [{ leftId: early.id, rightId: late.id, type: 'cut', duration: 0 }];
     const hiddenStart = calculateLayout(project).clips.find((placed) => placed.clip.id === late.id)!.end + 2;
@@ -968,7 +953,7 @@ describe.skipIf(!enabled)('schema-6 layered native export · disposable syntheti
     ];
     plain.layers[0]!.transitions = [{ leftId: 'reference-left', rightId: 'reference-right', type: 'cut', duration: 0 }];
     expect(validateReference(plain, library).clips).toHaveLength(2);
-    const neutral: LayerKeyValues = { ...NEUTRAL_COLOUR, layerOpacity: 1, clipOpacity: 1, speed: 1 };
+    const neutral: LayerKeyValues = { ...NEUTRAL_COLOUR, opacity: 1, speed: 1 };
     const variants: ((document: ProjectDocument) => void)[] = [
       ...KEYFRAME_SETTINGS.map(({ key }) => (document: ProjectDocument) => {
         document.layers[0]!.keyframes = [point(20, { [key]: neutral[key]! }, 'smooth')];
@@ -983,7 +968,7 @@ describe.skipIf(!enabled)('schema-6 layered native export · disposable syntheti
         document.layers.push(layer('video-2'));
       },
       (document) => {
-        document.clips[0]!.opacity = 0.5;
+        document.layers[0]!.opacity = 0.5;
       },
     ];
     const before = jobs.list();
@@ -1002,7 +987,7 @@ describe.skipIf(!enabled)('schema-6 layered native export · disposable syntheti
     await unchanged();
   });
 
-  it('preserves RGBA16 premultiplied colour/coverage before H.264, including group opacity and transparent gaps', async () => {
+  it('preserves RGBA16 premultiplied colour/coverage before H.264, including uniform row opacity during dissolves and transparent gaps', async () => {
     const project = simple(3);
     project.clips[0]!.sourceOut = 2;
     const right = createClip('right', assets[1]!.id, 5, 7);
@@ -1010,11 +995,14 @@ describe.skipIf(!enabled)('schema-6 layered native export · disposable syntheti
     project.layers[0]!.transitions = [{ leftId: 'base', rightId: 'right', type: 'cross-dissolve', duration: 1 }];
     project.layers[0]!.openingFade = 1;
     project.layers[0]!.closingFade = 1;
-    project.layers[0]!.opacity = 0.55;
-    project.clips[0]!.opacity = 0.7;
-    right.opacity = 0.8;
+    project.layers[0]!.opacity = 0.7;
     project.clips[1]!.colour = { ...NEUTRAL_COLOUR, exposure: 0.2, brightness: 0.02, hue: -30, shadows: 0.2 };
-    project.layers[1]!.keyframes = [point(0, { clipOpacity: 0.2 }), point(4, { clipOpacity: 0.9 }, 'hold')];
+    project.layers[1]!.keyframes = [point(0, { opacity: 0.2 }), point(4, { opacity: 0.9 }, 'hold')];
+    expect(
+      sampleTimeline(project, 1)
+        .filter((sample) => sample.layerId === 'video-1')
+        .map((sample) => sample.opacity),
+    ).toEqual([0.7, 0.7]);
     const work = path.join(config.dataDir, `raw-layered-${randomUUID()}`);
     await mkdir(work);
     try {
@@ -1110,13 +1098,9 @@ describe.skipIf(!enabled)('schema-6 layered native export · disposable syntheti
     project.clips = [clip];
     clip.speed = { mode: 'constant', rate: 0.5 };
     project.layers[0]!.keyframes = [
-      point(0, { exposure: -1, hue: -20, brightness: 0, saturation: 1, clipOpacity: 0.2, layerOpacity: 1 }, 'smooth'),
+      point(0, { exposure: -1, hue: -20, brightness: 0, saturation: 1, opacity: 0.2 }, 'smooth'),
       point(4, { exposure: 0.1, hue: 10, brightness: 0.03, saturation: 0.9 }),
-      point(
-        7,
-        { layerOpacity: 0.4, clipOpacity: 0.9, exposure: 0.7, hue: 40, brightness: 0.06, saturation: 0.8 },
-        'hold',
-      ),
+      point(7, { opacity: 0.9, exposure: 0.7, hue: 40, brightness: 0.06, saturation: 0.8 }, 'hold'),
     ];
     expect(needsLayeredExport(project)).toBe(true);
     const result = await complete(project);
@@ -1130,8 +1114,8 @@ describe.skipIf(!enabled)('schema-6 layered native export · disposable syntheti
   it('supports overlay-only projects, hidden primary footage and final opaque-black empty holds', async () => {
     for (const hiddenPrimary of [false, true]) {
       const project = createProject(`native-no-primary-${hiddenPrimary}`, 'Overlay only / hidden primary');
-      project.layers.push(layer('video-2', 0.6));
-      project.clips = [{ ...createClip('overlay', assets[1]!.id, 5, 7), layerId: 'video-2', start: 2, opacity: 0.7 }];
+      project.layers.push({ ...layer('video-2'), opacity: 0.7 });
+      project.clips = [{ ...createClip('overlay', assets[1]!.id, 5, 7), layerId: 'video-2', start: 2 }];
       if (hiddenPrimary) {
         project.layers[0]!.enabled = false;
         project.clips.push(createClip('hidden-base', assets[0]!.id, 0, 7));
@@ -1203,13 +1187,13 @@ describe.skipIf(!enabled)('schema-6 layered native export · disposable syntheti
     const uhd = await library.register(uhdPath);
     originals.set(uhd.id, await rawRgb(config, uhdPath));
     const project = simple(3);
-    project.layers.push(layer('video-3', 0.75));
+    project.layers.push(layer('video-3'));
     project.clips[0]!.mediaId = uhd.id;
-    project.layers[0]!.opacity = 0.9;
-    project.clips[0]!.opacity = 0.8;
+    project.layers[0]!.opacity = 0.8;
     project.clips[0]!.colour = { ...NEUTRAL_COLOUR, exposure: 0.15, shadows: 0.25 };
-    project.layers[1]!.keyframes = [point(1, { layerOpacity: 0.7 }), point(2, { layerOpacity: 0.3 }, 'hold')];
-    const top = { ...createClip('uhd-top', assets[1]!.id, 4, 5), layerId: 'video-3', start: 2, opacity: 0.6 };
+    project.layers[1]!.keyframes = [point(1, { opacity: 0.7 }), point(2, { opacity: 0.3 }, 'hold')];
+    project.layers[2]!.opacity = 0.6;
+    const top = { ...createClip('uhd-top', assets[1]!.id, 4, 5), layerId: 'video-3', start: 2 };
     project.layers[2]!.keyframes = [
       point(3, { ...NEUTRAL_COLOUR, brightness: 0.08, hue: -30 }),
       point(6, { ...NEUTRAL_COLOUR, exposure: -0.3, saturation: 0.6 }, 'hold'),
@@ -1237,11 +1221,13 @@ describe.skipIf(!enabled)('schema-6 layered native export · disposable syntheti
 
   it('exports all eight video layers without multiplying decoder or raw-buffer peaks', async () => {
     const project = createProject('native-eight-layers', 'Eight synthetic video layers');
-    for (let index = 1; index < 8; index++) project.layers.push(layer(`video-${index + 1}`, 0.3 + index * 0.07));
+    for (let index = 1; index < 8; index++) project.layers.push(layer(`video-${index + 1}`));
+    project.layers.forEach((row, index) => {
+      row.opacity = 0.4 + index * 0.06;
+    });
     project.clips = project.layers.map((row, index) => ({
       ...createClip(`eight-${index}`, assets[index % 2]!.id, index + 1, index + 3),
       layerId: row.id,
-      opacity: 0.4 + index * 0.06,
       colour: { ...NEUTRAL_COLOUR, exposure: index * 0.025, brightness: index * 0.003, saturation: 0.8 + index * 0.02 },
     }));
     const result = await complete(project);
@@ -1283,7 +1269,7 @@ describe.skipIf(!enabled)('schema-6 layered native export · disposable syntheti
 
   it('owns the queued immutable snapshot without modifying originals or saved user edits', async () => {
     const project = simple(4);
-    project.layers[1]!.keyframes = [point(8, { clipOpacity: 0.4 }, 'hold')];
+    project.layers[1]!.keyframes = [point(8, { opacity: 0.4 }, 'hold')];
     const captured = structuredClone(project);
     let release = (): void => {};
     const gate = new Promise<void>((resolve) => {
@@ -1297,7 +1283,7 @@ describe.skipIf(!enabled)('schema-6 layered native export · disposable syntheti
       expect(job.state).toBe('queued');
       project.title = 'Later user edit';
       project.layers[1]!.opacity = 0;
-      project.layers[1]!.keyframes[0]!.values.clipOpacity = 1;
+      project.layers[1]!.keyframes[0]!.values.opacity = 1;
       release();
       await jobs.wait(busy.id);
       const result = await jobs.wait(id);

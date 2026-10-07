@@ -4,14 +4,13 @@ import { COLOUR_CONTROLS, colourSchema } from './colour.js';
 
 export const interpolationSchema = z.enum(['hold', 'linear', 'ease-in', 'ease-out', 'smooth']);
 export type Interpolation = z.infer<typeof interpolationSchema>;
-export type KeyframeSetting = 'layerOpacity' | 'clipOpacity' | 'speed' | keyof ColourSettings;
+export type KeyframeSetting = 'opacity' | 'speed' | keyof ColourSettings;
 
-/** One ordered control catalogue for the ten independently participating row channels. */
+/** One ordered control catalogue for the nine independently participating row channels. */
 export const KEYFRAME_SETTINGS = Object.freeze(
   (
     [
-      { key: 'layerOpacity', label: 'Layer opacity', min: 0, max: 1, step: 0.01 },
-      { key: 'clipOpacity', label: 'Clip opacity', min: 0, max: 1, step: 0.01 },
+      { key: 'opacity', label: 'Opacity', min: 0, max: 1, step: 0.01 },
       { key: 'speed', label: 'Speed', min: 0.1, max: 8, step: 0.05 },
       ...COLOUR_CONTROLS.map(({ key, label, min, max, step }) => ({ key, label, min, max, step })),
     ] as const
@@ -20,8 +19,7 @@ export const KEYFRAME_SETTINGS = Object.freeze(
 
 const layerKeyValuesSchema = z
   .object({
-    layerOpacity: z.number().min(0).max(1).nullable(),
-    clipOpacity: z.number().min(0).max(1).nullable(),
+    opacity: z.number().min(0).max(1).nullable(),
     speed: z.number().min(0.1).max(8).nullable(),
     exposure: colourSchema.shape.exposure.nullable(),
     brightness: colourSchema.shape.brightness.nullable(),
@@ -34,8 +32,7 @@ const layerKeyValuesSchema = z
   .strict();
 export type LayerKeyValues = z.infer<typeof layerKeyValuesSchema>;
 export const EMPTY_KEY_VALUES: Readonly<LayerKeyValues> = Object.freeze({
-  layerOpacity: null,
-  clipOpacity: null,
+  opacity: null,
   speed: null,
   exposure: null,
   brightness: null,

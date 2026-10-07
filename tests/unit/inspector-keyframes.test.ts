@@ -54,6 +54,20 @@ describe('dedicated Inspector keyframe controls', () => {
     const keysPanel = markup.slice(markup.indexOf(panels[1]!), markup.indexOf(panels[2]!));
     expect(clipPanel).not.toContain('aria-label="Layer keyframes Video 1"');
     expect(keysPanel).toContain('aria-label="Layer keyframes Video 1"');
+    expect(clipPanel).toContain('aria-label="Placement section"');
+    expect(clipPanel).not.toContain('Layer &amp; opacity');
+    const opacity = [...clipPanel.matchAll(/<input[^>]*aria-label="Opacity"[^>]*>/g)].map((match) => match[0]);
+    expect(opacity).toHaveLength(1);
+    expect(opacity[0]).toContain('type="range"');
+    expect(opacity[0]).toContain('value="1"');
+    expect(opacity[0]).not.toContain('disabled');
+    expect(clipPanel).toContain('100%');
+    expect(clipPanel).toContain('Not animated');
+    const colour = clipPanel.slice(clipPanel.indexOf('aria-label="Colour section"'));
+    expect(colour).toContain('aria-label="Opacity"');
+    expect(clipPanel.split('aria-label="Keyframe Opacity"')).toHaveLength(2);
+    expect(clipPanel).not.toContain('Keyframe Layer opacity');
+    expect(clipPanel).not.toContain('Keyframe Clip opacity');
   });
 
   it.each(KEYFRAME_SETTINGS)('$label shares its setting-specific bounds and accessible controls', (setting) => {

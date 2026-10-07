@@ -392,7 +392,7 @@ test('an outside pointer gesture dismisses pinned help before capture so Escape 
 
 const HELP_CONTEXTS = [
   { label: 'Source timing', tab: 'Clip', text: 'Original recording frames; OUT is exclusive.' },
-  { label: 'Opacity scope', tab: 'Clip', text: 'Layer opacity is applied after the row' },
+  { label: 'Placement timing', tab: 'Clip', text: 'Opacity is in Colour and affects the whole row.' },
   { label: 'Colour animation', tab: 'Clip', text: 'Each diamond keys only its own setting' },
   { label: 'Speed timing', tab: 'Clip', text: 'Row keys override, rather than multiply' },
   { label: 'Animation', tab: 'Layer keyframes', text: 'Moving a point moves every participating setting.' },
@@ -407,7 +407,7 @@ const HELP_CONTEXTS = [
 
 const INSPECTOR_HELP_HEADINGS = [
   { title: 'Source range', help: 'Source timing', tab: 'Clip' },
-  { title: 'Layer & opacity', help: 'Opacity scope', tab: 'Clip' },
+  { title: 'Placement', help: 'Placement timing', tab: 'Clip' },
   { title: 'Speed', help: 'Speed timing', tab: 'Clip' },
   { title: 'Colour', help: 'Colour animation', tab: 'Clip' },
   { title: 'Transition', help: 'Transition timing', tab: 'Sequence' },
@@ -571,7 +571,7 @@ test('only the small question-mark target opens help, not the empty space across
 
 test('a pinned help ignores another hover but an explicit second help click replaces it', async ({ page }) => {
   const source = page.getByRole('button', { name: 'Source timing help', exact: true });
-  const opacity = page.getByRole('button', { name: 'Opacity scope help', exact: true });
+  const opacity = page.getByRole('button', { name: 'Placement timing help', exact: true });
   const sourcePanel = await panelFor(page, source);
   const opacityPanel = await panelFor(page, opacity);
   await source.click();
@@ -593,7 +593,7 @@ test('hovering another help replaces only an unpinned preview, without moving fo
   const title = page.getByRole('textbox', { name: 'Project title', exact: true });
   await title.focus();
   const source = page.getByRole('button', { name: 'Source timing help', exact: true });
-  const opacity = page.getByRole('button', { name: 'Opacity scope help', exact: true });
+  const opacity = page.getByRole('button', { name: 'Placement timing help', exact: true });
   const sourcePanel = await panelFor(page, source);
   const opacityPanel = await panelFor(page, opacity);
   await source.hover();

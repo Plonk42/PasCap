@@ -10,9 +10,23 @@ deadline; hardware/real-media work requires explicit owner consent.
 
 ## Current baseline
 
-The local schema-6 editor implements no-copy footage import, projects, source
+The local schema-7 editor implements no-copy footage import, projects, source
 excerpts, layered timelines, colour/speed/opacity row points, music and verified
 720p/4K export, with precise clip-only speed curves as well as overriding row Speed.
+The final approved [#67](https://github.com/Plonk42/PasCap/issues/67) contract has
+one row-owned **Opacity** setting: required numeric `VideoLayer.opacity` in 0–1,
+initially 1 (100%) on new tracks. Its sole row channel, `opacity`, overrides that
+value on every clip, including both dissolve sources, without an additional layer
+multiplier. The single slider/diamond/navigation lives in **Clip → Colour** and
+works on empty rows; **Placement** contains placement only. Without Opacity keys,
+the slider edits the row value; with keys, a missing participant at the real
+playhead is read-only until explicitly captured. Sliders never create keys, and
+unkeyed colour settings remain per-clip. Shared points have nine nullable channels:
+`opacity`, `speed` and seven colour settings. Saved `clip.opacity` and old
+`clipOpacity`/`layerOpacity` channels are rejected; row `opacity` is required and
+valid. v1–v6 projects
+and receipt snapshots are preserved/incompatible and require recreation, without
+migration, defaults or automatic deletion; registry/proxy formats remain unchanged.
 Every video track owns Ripple (default on), transitions and opening/closing fades.
 Enabling Ripple packs from the current first start; while on, clips continuously
 sequence there, and turning it off retains actual placements. Rows display stored
@@ -24,7 +38,7 @@ name **Layer keyframes**, directly shows the whole-row point list and combines
 animation/timing help in its toolbar. Nested point details retain drafts and input
 identity; there is no outer list disclosure or per-row list expansion preference.
 Keyframes and Sequence omit redundant selected-track banners. Clip keeps
-source/static and playhead settings; its Expand all/Collapse all affects only the
+source/clip settings, row Opacity and playhead controls; its Expand all/Collapse all affects only the
 four Clip top-level sections, leaving Sequence, Audio, nested disclosures and help
 unchanged. Stored participants reuse the main value
 controls with precise numeric editing. Clip/row selection and point navigation
@@ -61,18 +75,18 @@ cleanup; no new Iteration dates or Project field/view changes are implied here.
 
 [Milestone](https://github.com/Plonk42/PasCap/milestone/1)
 
-| Issue                                                                                   | Scope                                                                                                                                                                                                             |
-| --------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [#1 — Deterministic raw-frame reader tests](https://github.com/Plonk42/PasCap/issues/1) | Retain the locally verified exit-before-read fix; verify fresh Node 22/24 CI without hiding failures or weakening exact frame/resource checks                                                                     |
-| [#2 — Explicit verified source relinking](https://github.com/Plonk42/PasCap/issues/2)   | Approve the [strong identity/atomic relink design](design/SOURCE_RELINK.md), then implement confirmed moved/remounted-original recovery; never guess from names                                                   |
-| [#3 — Export disk preflight](https://github.com/Plonk42/PasCap/issues/3)                | Explain scratch needs and handle low space without destroying original/successful data                                                                                                                            |
-| [#4 — Entry bundle loading](https://github.com/Plonk42/PasCap/issues/4)                 | Measure and reduce initial JS without suppressing the warning or changing per-frame ownership                                                                                                                     |
-| [#5 — License and redistribution notices](https://github.com/Plonk42/PasCap/issues/5)   | Approved MIT project terms, retained npm notices and the separate GPL-enabled native distribution contract                                                                                                        |
-| [#12 — GitHub workflow](https://github.com/Plonk42/PasCap/issues/12)                    | Keep instructions/forms, categorized priorities, next actions and iteration/dependency tracking aligned                                                                                                           |
-| [#13 — Shared-point movement/navigation](https://github.com/Plonk42/PasCap/issues/13)   | Retrospective delivered-feature record; preserve whole-point transactions, independent channel navigation and dated evidence                                                                                      |
-| [#14 — Precise clip speed](https://github.com/Plonk42/PasCap/issues/14)                 | Track approved source-frame curves and locally verified graph/numeric/native delivery separately from remote acceptance                                                                                           |
-| [#16 — Compact contextual help](https://github.com/Plonk42/PasCap/issues/16)            | Heading-level hover/pinned question-mark buttons accessible even when collapsed, with independent expansion and preserved drafts/focus/editable panels                                                            |
-| [#25 — Uniform video tracks](https://github.com/Plonk42/PasCap/issues/25)               | Strict schema-6 track parity: per-track continuous Ripple, transitions/fades, uniform composition order and bounded simultaneous-dissolve preview/native export; [approved design record](design/TRACK_PARITY.md) |
+| Issue                                                                                   | Scope                                                                                                                                                                                                                                                                                |
+| --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| [#1 — Deterministic raw-frame reader tests](https://github.com/Plonk42/PasCap/issues/1) | Retain the locally verified exit-before-read fix; verify fresh Node 22/24 CI without hiding failures or weakening exact frame/resource checks                                                                                                                                        |
+| [#2 — Explicit verified source relinking](https://github.com/Plonk42/PasCap/issues/2)   | Approve the [strong identity/atomic relink design](design/SOURCE_RELINK.md), then implement confirmed moved/remounted-original recovery; never guess from names                                                                                                                      |
+| [#3 — Export disk preflight](https://github.com/Plonk42/PasCap/issues/3)                | Explain scratch needs and handle low space without destroying original/successful data                                                                                                                                                                                               |
+| [#4 — Entry bundle loading](https://github.com/Plonk42/PasCap/issues/4)                 | Measure and reduce initial JS without suppressing the warning or changing per-frame ownership                                                                                                                                                                                        |
+| [#5 — License and redistribution notices](https://github.com/Plonk42/PasCap/issues/5)   | Approved MIT project terms, retained npm notices and the separate GPL-enabled native distribution contract                                                                                                                                                                           |
+| [#12 — GitHub workflow](https://github.com/Plonk42/PasCap/issues/12)                    | Keep instructions/forms, categorized priorities, next actions and iteration/dependency tracking aligned                                                                                                                                                                              |
+| [#13 — Shared-point movement/navigation](https://github.com/Plonk42/PasCap/issues/13)   | Retrospective delivered-feature record; preserve whole-point transactions, independent channel navigation and dated evidence                                                                                                                                                         |
+| [#14 — Precise clip speed](https://github.com/Plonk42/PasCap/issues/14)                 | Track approved source-frame curves and locally verified graph/numeric/native delivery separately from remote acceptance                                                                                                                                                              |
+| [#16 — Compact contextual help](https://github.com/Plonk42/PasCap/issues/16)            | Heading-level hover/pinned question-mark buttons accessible even when collapsed, with independent expansion and preserved drafts/focus/editable panels                                                                                                                               |
+| [#25 — Uniform video tracks](https://github.com/Plonk42/PasCap/issues/25)               | Uniform track parity: per-track continuous Ripple, transitions/fades, composition order and bounded simultaneous-dissolve preview/native export; [historical schema-6 design record](design/TRACK_PARITY.md), with current v7 usage in the [layer contract](LAYERS_AND_KEYFRAMES.md) |
 
 Done means a repeatable, documented local foundation—not more CapCut-style effects.
 The initial publication includes README/user/developer guides, pinned CI and issue

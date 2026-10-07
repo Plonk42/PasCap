@@ -33,8 +33,7 @@ export function validateReference(project: ProjectDocument, library: MediaLibrar
     );
   if (
     snapshot.layers.length !== 1 ||
-    snapshot.layers.some((layer) => !layer.enabled || layer.opacity !== 1 || layer.keyframes.length > 0) ||
-    snapshot.clips.some((clip) => clip.opacity !== 1)
+    snapshot.layers.some((layer) => !layer.enabled || layer.opacity !== 1 || layer.keyframes.length > 0)
   ) {
     throw new ServiceError(
       'The diagnostic reference does not support video layers, opacity or shared project-frame layer points (including speed). Use Export.',

@@ -213,7 +213,7 @@ function KeyframePointRow({
               if (value === null) return null;
               const id = `${listId}-${row.id}-${setting.key}`;
               const label = `${setting.label} keyframe value ${point.frame}`;
-              const hint = `${setting.label} at stored timeline frame ${point.frame} on ${project.layers.find((layer) => layer.id === layerId)?.name}. Edits change only this participant, not the playhead, shared easing or static bases.`;
+              const hint = `${setting.label} at stored timeline frame ${point.frame} on ${project.layers.find((layer) => layer.id === layerId)?.name}. Edits change only this participant, not the playhead, shared easing or unanimated settings.`;
               const command = (nextValue: number): EditCommand => ({
                 type: 'layer-key-value',
                 layerId,
@@ -270,7 +270,7 @@ function KeyframePointRow({
                       value={value}
                       disabled={disabled}
                       hint={hint}
-                      resetTitle={hint}
+                      resetTitle={setting.key === 'opacity' ? `${hint} Reset only Opacity to 100%.` : hint}
                       exact={{ resetKey, validate }}
                       onCommit={onCommit}
                     />
@@ -380,7 +380,7 @@ export function KeyframeControls({
           </p>
           <div className="animation-legend">
             <span>
-              <span aria-hidden="true">◇</span>Static base · click to capture
+              <span aria-hidden="true">◇</span>Not animated · click to capture
             </span>
             <span>
               <Icon name="curve" size={14} />
@@ -397,8 +397,9 @@ export function KeyframeControls({
           <p id={helpId}>
             Absolute project timeline frames, independent of clip trims. Moving a point moves every participating
             setting. Its easing runs to each setting's next participating point; the first and last channel values hold.
-            An unkeyed setting uses each clip's base, or the layer base for layer opacity. Points outside the current
-            duration stay editable; navigation previews the nearest available frame without moving them.
+            Opacity affects the whole row, with or without keyframes. Other unanimated settings edit the selected clip.
+            Points outside the current duration stay editable; navigation previews the nearest available frame without
+            moving them.
           </p>
         </HelpPopover>
       </div>

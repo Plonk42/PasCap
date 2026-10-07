@@ -24,9 +24,9 @@ describe('durable export receipts', () => {
     const snapshot = createProject('flight', 'Flight');
     snapshot.clips.push(createClip('one', 'source', 0, 10));
     snapshot.layers[0]!.keyframes = [
-      { frame: 5, interpolation: 'smooth', values: { ...EMPTY_KEY_VALUES, clipOpacity: 0.5, exposure: 0.7 } },
+      { frame: 5, interpolation: 'smooth', values: { ...EMPTY_KEY_VALUES, opacity: 0.5, exposure: 0.7 } },
     ];
-    expect(snapshot.schemaVersion).toBe(6);
+    expect(snapshot.schemaVersion).toBe(7);
     const text = JSON.stringify({
       kind: 'export',
       schemaVersion: 1,
@@ -51,7 +51,7 @@ describe('durable export receipts', () => {
     expect(jobs.list()).toHaveLength(1);
     await jobs.close();
   });
-  it.each([3, 4, 5])(
+  it.each([3, 4, 5, 6])(
     'leaves version-1 receipts with unsupported v%s snapshots and their completed outputs unchanged',
     async (version) => {
       const root = await mkdtemp(path.join(os.tmpdir(), 'pascap-archive-'));
@@ -77,7 +77,7 @@ describe('durable export receipts', () => {
         const warnings = await restoreExports(createConfig({ dataDir: root }), jobs);
         expect(warnings).toHaveLength(1);
         expect(warnings[0]).toContain(
-          `Unsupported export snapshot schema version ${version}; this build requires version 6`,
+          `Unsupported export snapshot schema version ${version}; this build requires version 7`,
         );
         expect(jobs.list()).toEqual([]);
         expect(await readFile(path.join(folder, 'receipt.json'), 'utf8')).toBe(text);

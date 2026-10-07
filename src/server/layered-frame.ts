@@ -38,11 +38,10 @@ function validateFrames(accumulator: Buffer, pixels: number, sources: readonly L
 }
 
 function groupCoverage(sources: readonly LayerFrameSource[]): number {
-  const { layerId, layerOpacity } = sources[0]!.sample;
-  if (sources.some((source) => source.sample.layerId !== layerId || source.sample.layerOpacity !== layerOpacity))
+  const { layerId, opacity } = sources[0]!.sample;
+  if (sources.some((source) => source.sample.layerId !== layerId || source.sample.opacity !== opacity))
     throw new Error('Compose one authoritative layer group at a time.');
-  const coverage =
-    sources.reduce((sum, source) => sum + source.sample.opacity * source.sample.blendWeight, 0) * layerOpacity;
+  const coverage = sources.reduce((sum, source) => sum + source.sample.opacity * source.sample.blendWeight, 0);
   if (coverage < 0 || coverage > 1 + 1e-10) throw new Error('Layer coverage must remain in [0, 1].');
   return coverage;
 }
@@ -60,12 +59,7 @@ async function prepareSources(
     prepared.push({
       ...source,
       lut: await cache.get(source.sample.colour, signal), // NOSONAR -- two borrowed slots, never parallel LUT builds.
-      multiplier:
-        source.sample.opacity *
-        source.sample.blendWeight *
-        source.sample.brightness *
-        source.sample.layerOpacity *
-        65535,
+      multiplier: source.sample.opacity * source.sample.blendWeight * source.sample.brightness * 65535,
       fullCanvas:
         source.bounds.x === 0 &&
         source.bounds.y === 0 &&

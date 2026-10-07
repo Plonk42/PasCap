@@ -1,5 +1,4 @@
 import { expect, test, type Page } from '@playwright/test';
-import { COLOUR_CONTROLS } from '../../src/shared/colour.js';
 import { applyCommand } from '../../src/shared/commands.js';
 import { KEYFRAME_SETTINGS } from '../../src/shared/keyframes.js';
 import type { MediaAsset } from '../../src/shared/media.js';
@@ -35,8 +34,7 @@ test.beforeEach(async ({ page, request }) => {
     sharedPoint(
       10,
       {
-        layerOpacity: 0.5,
-        clipOpacity: 0.4,
+        opacity: 0.4,
         speed: 1,
         exposure: 0.5,
         brightness: 0.1,
@@ -51,7 +49,7 @@ test.beforeEach(async ({ page, request }) => {
     sharedPoint(200, { exposure: -0.5 }, 'hold'),
   ];
   initial.layers[1]!.keyframes = [sharedPoint(10, { exposure: 0.5 })];
-  initial.layers[2]!.keyframes = [sharedPoint(200, { layerOpacity: 0.7, speed: 2 }, 'hold')];
+  initial.layers[2]!.keyframes = [sharedPoint(200, { opacity: 0.7, speed: 2 }, 'hold')];
   memory = await memoryProjects(page, initial);
   await expandedInspectorPreferences(page);
   await page.goto(`/?project=${initial.id}`);
@@ -142,6 +140,8 @@ test('all participants reuse their main control bounds and resets with one exact
     );
   }
   const row = await editLayerPoint(page, 'Video 1', 10);
+  expect(KEYFRAME_SETTINGS).toHaveLength(9);
+  await expect(row.locator('.layer-keyframe-point-values').getByRole('spinbutton')).toHaveCount(9);
   for (const setting of KEYFRAME_SETTINGS) {
     const name = `${setting.label} keyframe value 10`;
     await expect(row.getByRole('spinbutton', { name, exact: true })).toBeEnabled();
@@ -154,7 +154,6 @@ test('all participants reuse their main control bounds and resets with one exact
           step: input.getAttribute('step'),
         })),
       ).toEqual(main.get(setting.key));
-      const colour = COLOUR_CONTROLS.find((control) => control.key === setting.key);
       const field = row.getByRole('spinbutton', { name, exact: true });
       await expect(field).toHaveValue(String(initial.layers[0]!.keyframes[0]!.values[setting.key]));
       await field.scrollIntoViewIfNeeded();
@@ -162,7 +161,7 @@ test('all participants reuse their main control bounds and resets with one exact
       const fieldBox = (await field.boundingBox())!;
       expect(fieldBox.x).toBeGreaterThanOrEqual(sliderBox.x + sliderBox.width);
       expect(Math.abs(fieldBox.y + fieldBox.height / 2 - (sliderBox.y + sliderBox.height / 2))).toBeLessThanOrEqual(2);
-      if (colour) await expect(row.getByRole('button', { name: `Reset ${name}`, exact: true })).toBeEnabled();
+      await expect(row.getByRole('button', { name: `Reset ${name}`, exact: true })).toBeEnabled();
     }
   }
   await expect(row.locator('output')).toHaveCount(0);
@@ -183,6 +182,13 @@ test('all participants reuse their main control bounds and resets with one exact
   expect(await current(page)).toEqual(expected);
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   expect(await current(page)).toEqual(before);
+  await row.getByRole('button', { name: 'Reset Opacity keyframe value 10', exact: true }).click();
+  const resetOpacity = structuredClone(before);
+  resetOpacity.layers[0]!.keyframes[0]!.values.opacity = 1;
+  expect(await current(page)).toEqual(resetOpacity);
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  expect(await current(page)).toEqual(before);
+  await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
   const rate = row.getByRole('spinbutton', { name: 'Speed keyframe value 10', exact: true });
   await rate.fill('1.23456789');
   await rate.press('Enter');
@@ -233,9 +239,7 @@ test('invalid stored drafts survive tab changes and cancel, without stale row co
   const empty = await editLayerPoint(page, 'Empty row', 200);
   await empty.getByRole('spinbutton', { name: 'Speed keyframe value 200', exact: true }).fill('3');
   await empty.getByRole('spinbutton', { name: 'Speed keyframe value 200', exact: true }).press('Enter');
-  expect((await current(page)).layers[2]!.keyframes).toEqual([
-    sharedPoint(200, { layerOpacity: 0.7, speed: 3 }, 'hold'),
-  ]);
+  expect((await current(page)).layers[2]!.keyframes).toEqual([sharedPoint(200, { opacity: 0.7, speed: 3 }, 'hold')]);
   expect(calculateLayout(await current(page)).duration).toBe(calculateLayout(initial).duration);
 });
 

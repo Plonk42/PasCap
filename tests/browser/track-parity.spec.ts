@@ -178,22 +178,23 @@ async function captureAt(page: Page, frame: number) {
   return captured;
 }
 
-test('the initial track and every newly added track default to Ripple on with independent strict schema-6 fields', async ({
+test('the initial track and every newly added track default to Ripple on with independent strict schema-7 fields', async ({
   page,
 }) => {
   const before = await current(page);
   for (const layer of before.layers) {
-    expect(layer).toMatchObject({ ripple: true, transitions: [], openingFade: 0, closingFade: 0 });
+    expect(layer).toMatchObject({ opacity: 1, ripple: true, transitions: [], openingFade: 0, closingFade: 0 });
     await openOptions(page, `Layer options ${layer.name}`);
     await expect(page.getByRole('checkbox', { name: `Ripple on layer ${layer.name}`, exact: true })).toBeChecked();
     await expect(page.getByRole('textbox', { name: `Rename layer ${layer.name}`, exact: true })).toBeEnabled();
-    await expect(page.getByRole('slider', { name: `Opacity of layer ${layer.name}`, exact: true })).toBeEnabled();
+    await expect(page.getByRole('slider', { name: `Opacity of layer ${layer.name}`, exact: true })).toHaveCount(0);
+    expect(before.clips.filter((clip) => clip.layerId === layer.id).every((clip) => !('opacity' in clip))).toBe(true);
     await closeOptions(page);
   }
   await page.getByRole('button', { name: 'Add video layer', exact: true }).click();
   const added = await current(page);
   await ready(page, added);
-  expect(added.schemaVersion).toBe(6);
+  expect(added.schemaVersion).toBe(7);
   for (const field of ['transitions', 'openingFade', 'closingFade']) expect(added).not.toHaveProperty(field);
   expect(added.layers.slice(0, 2)).toEqual(before.layers);
   expect(added.clips).toEqual(before.clips);
@@ -214,7 +215,7 @@ for (const row of [0, 1]) {
       layer.ripple = false;
       layer.openingFade = 2;
       layer.closingFade = 3;
-      layer.keyframes = [sharedPoint(15, { exposure: 0.2 }), sharedPoint(500, { layerOpacity: 0.8 }, 'hold')];
+      layer.keyframes = [sharedPoint(15, { exposure: 0.2 }), sharedPoint(500, { opacity: 0.8 }, 'hold')];
       const anchor = index === 0 ? 40 : 200;
       document.clips.push(
         { ...createClip(`a-${index}`, assets[0]!.id, 0, 30, layer.id), start: anchor },
@@ -549,9 +550,9 @@ test('a top-track opening black fade keeps opaque coverage instead of fading or 
   await fixture(page, document);
   const before = await current(page);
   const sampled = sampleTimeline(before, 20);
-  expect(sampled.map((source) => [source.layerId, source.brightness, source.opacity, source.layerOpacity])).toEqual([
-    ['video-1', 1, 1, 1],
-    ['upper', 0, 1, 1],
+  expect(sampled.map((source) => [source.layerId, source.brightness, source.opacity])).toEqual([
+    ['video-1', 1, 1],
+    ['upper', 0, 1],
   ]);
   expect((await captureAt(page, 20)).sum).toBe(0);
   await page.getByRole('button', { name: 'Hide layer Video 2', exact: true }).click();

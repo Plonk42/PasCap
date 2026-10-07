@@ -462,23 +462,6 @@
   line-height: 1.5;
 }
 
-.layer-options .layer-opacity-label {
-  display: grid;
-  gap: 6px;
-  font-size: 12px;
-}
-
-.layer-options .layer-opacity-label > span {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.layer-options .layer-opacity-label input {
-  width: 100%;
-  height: 20px;
-}
-
 .layer-options .layer-name-field[data-dirty='true'] input:not([aria-invalid='true']) {
   border-color: #a99359;
 }

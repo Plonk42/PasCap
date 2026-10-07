@@ -4,7 +4,7 @@ import { interpolatedProgress, interpolationSchema } from '../../src/shared/keyf
 import type { MediaAsset } from '../../src/shared/media.js';
 import { createClip, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
 import { calculateLayout } from '../../src/shared/timeline.js';
-import { editLayerPoint, expandedInspectorPreferences, sharedPoint } from './editor-helpers.js';
+import { editLayerPoint, expandedInspectorPreferences, inspectorTab, sharedPoint } from './editor-helpers.js';
 import { memoryProjects } from './memory-projects.js';
 
 async function current(page: Page): Promise<ProjectDocument> {
@@ -35,7 +35,7 @@ for (const context of ['shared', 'ramp', 'clip'] as const) {
         anchorOut: 120,
       };
     document.clips = [clip];
-    document.layers[0]!.keyframes = [sharedPoint(10, { exposure: 0.2 }, 'smooth')];
+    document.layers[0]!.keyframes = [sharedPoint(10, { exposure: 0.2, opacity: 0.4 }, 'smooth')];
     const unexpected: string[] = [];
     const reads: Record<string, unknown> = {
       '/api/health': { name: 'PasCap', milestone: 'editing-and-export', frameRate: '30000/1001', workerConcurrency: 1 },
@@ -74,6 +74,7 @@ for (const context of ['shared', 'ramp', 'clip'] as const) {
     await page.goto(`/?project=${document.id}`);
     await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
     if (context === 'shared') await editLayerPoint(page, 'Video 1', 10);
+    else await inspectorTab(page, 'Clip');
     const label =
       context === 'shared'
         ? 'Layer keyframe interpolation 10'
@@ -91,6 +92,10 @@ for (const context of ['shared', 'ramp', 'clip'] as const) {
       /Graph: time runs left to right; value progress runs bottom to top/,
     );
     const before = await current(page);
+    expect(before.schemaVersion).toBe(7);
+    expect(before.layers[0]!.opacity).toBe(1);
+    expect(before.clips[0]).not.toHaveProperty('opacity');
+    expect(Object.keys(before.layers[0]!.keyframes[0]!.values)).toHaveLength(9);
     const initialValue = (await select.inputValue())!;
     expect(memory.saves).toBe(0);
     for (const value of interpolationSchema.options.filter((shape) => context !== 'ramp' || shape !== 'hold')) {

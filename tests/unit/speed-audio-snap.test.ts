@@ -23,10 +23,10 @@ function row(keyframes: LayerKeyframe[]): VideoLayer {
 }
 
 describe('shared retiming and recoverable speed edits', () => {
-  it('requires explicit v6 static speed settings; earlier documents are not guessed', () => {
+  it('requires explicit v7 static speed settings; earlier documents are not guessed', () => {
     const project = createProject('flight', 'Flight');
-    expect(project.schemaVersion).toBe(6);
-    for (const schemaVersion of [1, 2, 3, 4, 5])
+    expect(project.schemaVersion).toBe(7);
+    for (const schemaVersion of [1, 2, 3, 4, 5, 6])
       expect(() => projectSchema.parse({ ...project, schemaVersion })).toThrow();
     expect(() => projectSchema.parse(unsupportedProject(4, 'old-flight', 'Unsupported flight'))).toThrow();
     const clip = createClip('a', 'source', 0, 600);
@@ -117,7 +117,7 @@ describe('absolute-project row speed integration', () => {
       clip.speed = { mode: 'constant', rate: 8 };
       const layer = row([
         point(0, { speed: 1 }, interpolation),
-        point(40, { hue: 45, clipOpacity: 0.6 }, 'hold'),
+        point(40, { hue: 45, opacity: 0.6 }, 'hold'),
         point(100, { speed: 3 }, 'hold'),
       ]);
       const before = structuredClone(layer.keyframes);
@@ -165,7 +165,7 @@ describe('absolute-project row speed integration', () => {
     project = applyCommand(project, {
       type: 'layer-add',
       layer: {
-        ...row([point(0, { speed: 1, clipOpacity: 0 }), point(100, { speed: 3, clipOpacity: 1 }, 'hold')]),
+        ...row([point(0, { speed: 1, opacity: 0 }), point(100, { speed: 3, opacity: 1 }, 'hold')]),
         id: 'upper',
         name: 'Upper',
         ripple: false,
@@ -195,7 +195,7 @@ describe('absolute-project row speed integration', () => {
   });
 
   it('retains the exact constant/ramp cache when no row speed participates', () => {
-    const layer = row([point(0, { exposure: 1, clipOpacity: 0.5 }), point(200, { hue: 90 }, 'hold')]);
+    const layer = row([point(0, { exposure: 1, opacity: 0.5 }), point(200, { hue: 90 }, 'hold')]);
     for (const speed of [
       { mode: 'constant' as const, rate: 2.5 },
       { mode: 'ramp' as const, startRate: 0.4, endRate: 3, anchorIn: 2, anchorOut: 42, curve: 'smooth' as const },

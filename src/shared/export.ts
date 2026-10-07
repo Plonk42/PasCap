@@ -69,8 +69,7 @@ export const LAYERED_EXPORT_RESOURCES = Object.freeze({
 export function needsLayeredExport(document: ProjectDocument): boolean {
   if (
     document.layers.length !== 1 ||
-    document.layers.some((layer) => !layer.enabled || layer.opacity !== 1 || layer.keyframes.length > 0) ||
-    document.clips.some((clip) => clip.opacity !== 1)
+    document.layers.some((layer) => !layer.enabled || layer.opacity !== 1 || layer.keyframes.length > 0)
   )
     return true;
   const { clips } = calculateLayout(document);

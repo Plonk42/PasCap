@@ -30,21 +30,18 @@
 }
 
 .layer-keyed-control > span:first-child,
-.layer-setting-heading,
-.layer-options .layer-opacity-heading {
+.layer-setting-heading {
   flex-wrap: wrap;
   gap: 4px 6px;
 }
 
 .layer-keyed-control > span:first-child > label,
-.layer-setting-heading > span:first-child,
-.layer-options .layer-opacity-heading > label {
+.layer-setting-heading > span:first-child {
   min-width: 0;
 }
 
 .layer-keyed-control .colour-control-actions,
-.layer-setting-heading .layer-setting-actions,
-.layer-options .layer-opacity-heading .layer-setting-actions {
+.layer-setting-heading .layer-setting-actions {
   flex: 0 0 auto;
   gap: 4px;
   margin-inline-start: auto;

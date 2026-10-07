@@ -152,8 +152,7 @@
 }
 
 .product-workspace .layer-keyed-control > span:first-child > label,
-.product-workspace .layer-setting-heading > span:first-child,
-.layer-options .layer-opacity-heading > label {
+.product-workspace .layer-setting-heading > span:first-child {
   display: inline-flex;
   align-items: center;
   gap: 5px;

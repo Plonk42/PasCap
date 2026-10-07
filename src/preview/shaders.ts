@@ -20,7 +20,6 @@ uniform vec3 extra0;
 uniform vec3 extra1;
 uniform vec2 coverage;
 uniform vec2 brightness;
-uniform float groupOpacity;
 uniform vec2 imageAspect;
 uniform float canvasAspect;
 
@@ -63,5 +62,5 @@ void main() {
   // A dissolve is ONE premultiplied group, not two source-over draws.
   // Black fades dim graded RGB without reducing the group's coverage.
   vec3 premultiplied = left * coverage.x * brightness.x + right * coverage.y * brightness.y;
-  outputColour = vec4(premultiplied * groupOpacity, (coverage.x + coverage.y) * groupOpacity);
+  outputColour = vec4(premultiplied, coverage.x + coverage.y);
 }`;

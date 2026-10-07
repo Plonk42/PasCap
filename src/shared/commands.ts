@@ -39,7 +39,7 @@ export type EditCommand =
   | { type: 'colour'; clipId: string; colour: ColourSettings }
   | { type: 'speed'; clipId: string; speed: SpeedSettings }
   | { type: 'music'; music: MusicTrack | null }
-  | { type: 'opacity'; clipId: string; opacity: number }
+  | { type: 'opacity'; layerId: string; opacity: number }
   | { type: 'layer-key-toggle'; layerId: string; frame: number; setting: KeyframeSetting; value: number }
   | { type: 'layer-key-value'; layerId: string; frame: number; setting: KeyframeSetting; value: number }
   | { type: 'layer-key-move'; layerId: string; frame: number; nextFrame: number }
@@ -433,7 +433,7 @@ export function applyCommand(document: ProjectDocument, command: EditCommand): P
       next.music = command.music;
       break;
     case 'opacity':
-      next.clips[index] = { ...next.clips[index]!, opacity: command.opacity };
+      requiredLayer(next, command.layerId).opacity = layerSchema.shape.opacity.parse(command.opacity);
       break;
     case 'layer-key-toggle':
     case 'layer-key-value':

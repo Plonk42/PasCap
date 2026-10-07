@@ -821,7 +821,6 @@ export function Timeline(props: Readonly<Props>) {
           scrollTop={verticalScroll}
           surfaceHeight={surfaceHeight}
           viewportHeight={viewportHeight}
-          frame={frame}
           disabled={interactionBlocked}
           onScroll={scrollLayers}
           onSelect={onSelectLayer}

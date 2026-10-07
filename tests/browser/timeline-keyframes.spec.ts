@@ -61,7 +61,7 @@ function sequence(): ProjectDocument {
   ];
   project.layers[0]!.transitions = [{ leftId: 'first', rightId: 'second', type: 'cut', duration: 0 }];
   project.layers[0]!.keyframes = [
-    sharedPoint(20, { ...NEUTRAL_COLOUR, exposure: 0.6, clipOpacity: 0.7, layerOpacity: 0.8, speed: 1 }, 'ease-in'),
+    sharedPoint(20, { ...NEUTRAL_COLOUR, exposure: 0.6, opacity: 0.7, speed: 1 }, 'ease-in'),
     sharedPoint(80, { exposure: -0.3 }, 'hold'),
   ];
   return projectSchema.parse(project);
@@ -349,7 +349,7 @@ test('an empty positioned row has independently movable points and marker select
   const project = sequence();
   project.layers.push({
     ...createLayer('empty-overlay', 'Video 2', false),
-    keyframes: [sharedPoint(20, { layerOpacity: 0.5, hue: 30 }, 'hold')],
+    keyframes: [sharedPoint(20, { opacity: 0.5, hue: 30 }, 'hold')],
   });
   await fixture(page, project);
   await inspectorTab(page, 'Layer keyframes');

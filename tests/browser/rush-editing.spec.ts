@@ -245,7 +245,7 @@ function unchangedOthers(
   editedIds: readonly string[],
   transitions: Readonly<Record<string, readonly Transition[]>> = {},
 ): void {
-  expect(next.schemaVersion).toBe(6);
+  expect(next.schemaVersion).toBe(7);
   expect(next.media).toEqual(before.media);
   expect(next.layers).toEqual(
     before.layers.map((layer) => ({ ...layer, transitions: transitions[layer.id] ?? layer.transitions })),
@@ -505,12 +505,12 @@ test('visible split then S selects each right piece, preserves boundaries and de
   const document = dissolvedSequence();
   document.clips[0] = {
     ...document.clips[0]!,
-    opacity: 0.65,
     colour: { ...document.clips[0]!.colour, contrast: 1.25, saturation: 0.7, hue: 20 },
   };
+  document.layers[0]!.opacity = 0.65;
   document.layers[0]!.keyframes = [
     sharedPoint(20, { exposure: 0.2, speed: 1 }),
-    sharedPoint(400, { speed: 1, clipOpacity: 0.8 }, 'hold'),
+    sharedPoint(400, { speed: 1, opacity: 0.8 }, 'hold'),
   ];
   await fixture(page, document);
   const before = await current(page);
@@ -687,7 +687,7 @@ test('Q and W retain the mapped displayed frame, ripple dissolves and recover bo
   await expect(page.getByRole('button', { name: 'Redo', exact: true })).toBeEnabled();
 });
 
-test('I/O middle removal is transient then one edit, preserving absolute ten-channel row points, music and overlays', async ({
+test('I/O middle removal is transient then one edit, preserving absolute nine-channel row points, music and overlays', async ({
   page,
   request,
 }) => {
@@ -697,8 +697,7 @@ test('I/O middle removal is transient then one edit, preserving absolute ten-cha
     sharedPoint(
       15,
       {
-        layerOpacity: 0.8,
-        clipOpacity: 0.7,
+        opacity: 0.7,
         speed: 1,
         exposure: 0.3,
         brightness: 0.04,
@@ -715,15 +714,19 @@ test('I/O middle removal is transient then one edit, preserving absolute ten-cha
   document.layers.push({
     ...createLayer('upper', 'Video 2', false),
     opacity: 0.75,
-    keyframes: [sharedPoint(200, { layerOpacity: 0.6, hue: 35 }, 'ease-in')],
+    keyframes: [sharedPoint(200, { opacity: 0.6, hue: 35 }, 'ease-in')],
   });
   document.clips[0] = {
     ...document.clips[0]!,
     speed: { mode: 'constant', rate: 2 },
-    opacity: 0.65,
     colour: { ...document.clips[0]!.colour, exposure: -0.2, saturation: 0.6 },
   };
-  document.clips.splice(1, 0, { ...createClip('fixed-overlay', assets[1]!.id, 0, 20), layerId: 'upper', start: 230 });
+  document.layers[0]!.opacity = 0.65;
+  document.clips.splice(1, 0, {
+    ...createClip('fixed-overlay', assets[1]!.id, 0, 20),
+    layerId: 'upper',
+    start: 230,
+  });
   document.music = {
     mediaId: music.id,
     sourceIn: 10,
@@ -909,7 +912,7 @@ test('prefix, suffix and whole Ripple track cuts retain only necessary IDs and u
   page,
 }) => {
   const document = dissolvedSequence();
-  document.layers[0]!.keyframes = [sharedPoint(20, { clipOpacity: 0.7 }), sharedPoint(800, { exposure: 0.5 }, 'hold')];
+  document.layers[0]!.keyframes = [sharedPoint(20, { opacity: 0.7 }), sharedPoint(800, { exposure: 0.5 }, 'hold')];
   const cases = [
     { name: 'prefix', inFrame: 0, outFrame: 20, sourceIn: 35, sourceOut: 105 },
     { name: 'suffix', inFrame: 70, outFrame: 90, sourceIn: 15, sourceOut: 85 },

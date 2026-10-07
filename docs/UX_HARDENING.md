@@ -18,9 +18,18 @@ This guide is not a delivery ledger or a fresh validation result.
   dashed between keys and filled at a participating playhead point. **Animation
   help** explains the states once. Titles and screen-reader descriptions retain
   each setting's scope and capture instructions.
-- All **ten diamonds have adjacent Previous/Next SVG buttons**, followed by
+- All **nine diamonds have adjacent Previous/Next SVG buttons**, followed by
   any reset. Explicit capture, real-playhead values, shared point movement,
   off-duration inspection, every participant and one-step Undo remain unchanged.
+- **Clip → Colour** contains the single **Opacity** slider/diamond/navigation
+  alongside the colour sliders, initially **100%**. Without Opacity keys it edits
+  row `opacity`, including on an empty row; keyed `opacity` overrides that value
+  on every clip and both dissolve sources. Sliders never create keys; animated
+  values without a participant at the real playhead are read-only until explicitly
+  captured with the diamond. Unkeyed colour settings remain per-clip; Opacity
+  controls composition coverage, not SDR RGB grading. **Placement** contains
+  placement only. There is no sidebar duplicate; Layer options contains only
+  rename, Ripple, ordering and deletion, with visibility separate in the sidebar.
 - Timeline tools form **edit** and **marked-range removal** groups. Temporary
   IN/OUT state appears on the buttons and timeline selection rather than adding
   another toolbar row. Compact windows use labelled, focusable icon controls;
@@ -32,7 +41,9 @@ This guide is not a delivery ledger or a fresh validation result.
   uncertainty, errors/recheck and disclosed location/assumptions. Snapshot and
   native processing details remain available in **Rendering details**.
 
-Schema 6 uses uniform video tracks with required Ripple/transitions/fades. Rows
+Schema 7 uses uniform video tracks with required Ripple/transitions/fades and
+numeric `VideoLayer.opacity` in 0–1 (1 on new tracks), plus nine nullable point
+channels: `opacity`, `speed` and seven colour settings. Rows
 follow saved bottom-to-top composition order. Layer options exposes default-on
 Ripple: enabling closes gaps from the first current start in one Undo; while on,
 later clips continuously sequence there. Turning it off keeps actual placements.
@@ -42,8 +53,16 @@ put. Every track can be reordered/deleted except the last remaining track; stack
 endpoint restrictions have accessible reasons.
 
 Track-local black fades preserve coverage; simultaneous track dissolves use the
-same group math. v1–v5 project/receipt snapshots remain unchanged/incompatible,
-without migration; registry/proxy formats do not change. Source-copy prohibition,
+premultiplied group math $C = \sum_i G_i b_i o_i w_i$, $A = \sum_i o_i w_i$ and
+$\mathrm{result} = C + \mathrm{lower}(1 - A)$, without a layer multiplier.
+Here $G_i$ is graded RGB, $b_i$ black-fade brightness, $o_i$ evaluated Opacity and
+$w_i$ dissolve weight. Each source uses the same evaluated row Opacity at that
+project frame, from the row value or its overriding curve.
+v1–v6 project/receipt snapshots remain unchanged/incompatible
+and require recreation, without migration, defaults or automatic deletion.
+Row `opacity` is the required sole stored value, not obsolete; saved `clip.opacity`
+and old `clipOpacity`/`layerOpacity` point channels are invalid.
+Registry/proxy formats do not change. Source-copy prohibition,
 row points, source choices, media preparation, music, Activity and both export
 profiles retain their contracts. The editor targets desktop Linux; the 640 px
 width floor is not a mobile-support claim.
@@ -155,8 +174,8 @@ Four reusable raw buffers use **22 bytes/pixel = 182,476,800 bytes at UHD**; the
 two 65³ Float32 LUTs add **6,591,000 bytes**, excluding native/audio memory.
 One original decoder, two intermediate readers, one encoder and three video children
 per serial pass bound concurrency, not duration-dependent disk use. The static
-fast path requires one enabled opaque, unanimated, zero-origin contiguous track
-and opaque clips; unsupported placement/coverage uses generalized layered export.
+fast path requires one enabled, unanimated, zero-origin contiguous track
+with row Opacity 1; unsupported placement/coverage uses generalized layered export.
 
 Allocated-block sampling at progress callbacks is a measurement procedure, not a
 fixed bound: directory metadata and peaks between samples need separate accounting.

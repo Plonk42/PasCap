@@ -38,8 +38,7 @@
 }
 
 .layer-keyframe-heading,
-.layer-setting-heading,
-.layer-opacity-heading {
+.layer-setting-heading {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -201,16 +200,14 @@
   margin: 4px 0 0;
 }
 
-.layer-keyed-control > .layer-setting-hint,
-.layer-options .layer-keyed-opacity > .layer-setting-hint {
+.layer-keyed-control > .layer-setting-hint {
   display: block;
   font-size: 11px;
   line-height: 1.5;
   color: var(--muted);
 }
 
-.layer-keyed-control input[type='range']:disabled,
-.layer-keyed-opacity input[type='range']:disabled {
+.layer-keyed-control input[type='range']:disabled {
   cursor: not-allowed;
   opacity: 0.55;
 }
@@ -230,20 +227,6 @@
 .layer-setting-actions output {
   font-size: 12px;
   font-variant-numeric: tabular-nums;
-}
-
-.layer-options .layer-opacity-label.layer-keyed-opacity {
-  display: grid;
-  gap: 5px;
-  font-size: 12px;
-}
-
-.layer-options .layer-keyed-opacity > .layer-opacity-heading {
-  gap: 8px;
-}
-
-.layer-options .layer-keyed-opacity input[type='range'] {
-  width: 100%;
 }
 
 .speed-graph-range {

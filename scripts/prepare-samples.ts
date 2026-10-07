@@ -20,6 +20,7 @@ if (!folderArgument)
   );
 const folder = path.resolve(folderArgument);
 const names = ['DJI_0468.MP4', 'DJI_0469.MP4'];
+// Retain this historical identifier; incompatible existing documents are never rewritten.
 const sampleId = 'sample-taillefer-v6';
 const config = createConfig();
 const jobs = new JobQueue();
@@ -45,7 +46,7 @@ try {
   });
   try {
     await store.load(sampleId);
-    console.log('Existing v6 sample project kept unchanged.');
+    console.log('Existing schema-7 sample project kept unchanged (historical identifier retained).');
   } catch (error) {
     if (!(error instanceof ServiceError && error.statusCode === 404)) throw error;
     let project = createProject(sampleId, 'Taillefer · Sample edit');
@@ -66,7 +67,7 @@ try {
     project = applyCommand(project, { type: 'fades', layerId, opening: 12, closing: 12 });
     await store.save(project, 0);
     console.log(
-      `Saved a new v6 sample edit (${sampleId}); earlier v1/v2/v3/v4/v5 projects remain untouched and incompatible. No migration is performed.`,
+      `Saved a new schema-7 sample edit (${sampleId}, historical identifier retained); earlier v1–v6 projects remain untouched and incompatible. No migration is performed.`,
     );
   }
 } catch (error) {

@@ -1,4 +1,4 @@
-# Speed and audio contract · project v6
+# Speed and audio contract · project v7
 
 ## Two distinct retiming contracts
 
@@ -52,7 +52,7 @@ selected original frame, even when output sampling skips it.
 Clip curves belong to **one excerpt instance**. Trims, moves, splits and marked
 cuts retain original-source anchors; split/cut/duplicate copies are independent.
 Every retained piece recompiles/rounds its duration once. Curves are carried in
-the required `speed` field of strict schema 6, without an optional fallback,
+the required `speed` field of strict schema 7, without an optional fallback,
 data migration or project-wide speed field. A mode/preset change
 is a deliberate editing command, not a conversion on load.
 
@@ -66,7 +66,8 @@ base without deleting any clip points.
 
 ### Shared row Speed: absolute project-time rate
 
-Schema-6 layer points require ten nullable channels, including `speed`.
+Schema-7 layer points require nine nullable channels: Opacity (`opacity`),
+Speed (`speed`) and seven colour settings.
 Once any point on the row participates in Speed, the row's rate curve **overrides
 every clip's entire constant/ramp/custom-curve base**, not just an interval between keys. Only
 Speed participants define its intervals; unrelated colour/opacity-only points are
@@ -109,9 +110,23 @@ map is rejected rather than falling back to a clip's static speed.
 All row colour/opacity parameters are sampled at **absolute project time**, not at
 the retimed source frame. A held source image can therefore receive a different
 grade on the next project frame. Native LUT generation and preview redraw both
-follow that rule. Dissolve grouping and layer-opacity equations apply independently
-on every track. Any shared row point, even speed-only, requires the layered
-export path; the static chunk plan cannot silently omit it.
+follow that rule. Every source uses the row's required numeric `opacity` in 0–1,
+initially 1 on new tracks, unless the sole row **Opacity** (`opacity`) channel
+overrides it. Evaluate that one row setting for each source, including both
+dissolve participants; there is no saved `clip.opacity`.
+With graded RGB $G_i$, black-fade brightness $b_i$, evaluated Opacity $o_i$ and
+dissolve weight $w_i$, each track forms one group with $C = \sum_i G_i b_i o_i w_i$
+and $A = \sum_i o_i w_i$. Source-over is
+$\mathrm{result} = C + \mathrm{lower}(1 - A)$, with no layer multiplier; black fades
+change RGB without reducing coverage. Any shared row point, even speed-only,
+requires the layered export path; the static chunk plan cannot silently omit it.
+Opacity is composition coverage, not part of the unchanged SDR RGB grade.
+Its single slider/diamond/navigation is in **Clip → Colour** alongside the colour
+sliders, initially **100%**. Without Opacity keys it edits row `opacity`, even on
+an empty row. With keys, a missing participant at the real playhead is read-only
+until captured with the diamond; sliders never create keys. Unkeyed colour
+settings remain per-clip. **Placement** contains placement only; Layer options
+contains rename, Ripple, ordering and deletion, with visibility separate.
 
 With row Speed keys, moving the same excerpt changes its contextual duration.
 Each track's **Ripple** setting governs placement. While on (the new-track default),
@@ -323,22 +338,30 @@ Native export uses the same placement/loop/gain/fade rules and produces AAC at
 
 ## Versioning
 
-Project schema **v6** requires explicit `media.videoIds` and `media.audioIds` arrays,
-unique and limited to 10,000 IDs each, plus complete clip colour/opacity/constant/ramp/custom-curve
-speed, layer point arrays with all ten nullable value fields, placement and music
+Project schema **v7** requires explicit `media.videoIds` and `media.audioIds` arrays,
+unique and limited to 10,000 IDs each, plus complete clip colour/constant/ramp/custom-curve
+speed, layer point arrays with all nine nullable value fields, placement and music
 source OUT. Every layer also requires `ripple`, `transitions`, `openingFade` and
-`closingFade`; transitions/fades are track-local, with no special first-track
-identity. Layers display and composite in their saved bottom-to-top array order.
+`closingFade`, plus numeric `opacity` in 0–1; 1 is the new-track initial value,
+not a default for missing saved fields. Transitions/fades are track-local, with
+no special first-track identity. Layers display and composite in their saved bottom-to-top array order.
+The sole row `opacity` channel overrides the row's saved `opacity` on every clip,
+including both dissolve sources; otherwise all use the saved row value.
+Required nullable channels are `opacity`, `speed` and the seven colour settings.
+Row `opacity` is valid and required; saved `clip.opacity` and old
+`clipOpacity`/`layerOpacity` channels are rejected, not defaulted.
 New projects have empty video/music bins. Standalone audio imports belong
 to the open project's bin; selected music references also count as membership.
 Global registered music/proxies are reusable on deliberate import, never automatically
-inherited by a new project. Earlier v1–v5 projects and export receipt snapshots remain unchanged
-and incompatible. There is no migration, compatibility fallback or default-field
-injection; create a new project and import its media to reuse registered assets/verified
-ready proxies. Confirmed project deletion affects only its saved document, not originals,
+inherited by a new project. Earlier v1–v6 projects and export receipt snapshots remain unchanged
+and incompatible. There is no migration, compatibility fallback, default-field
+injection or automatic deletion; recreate projects and import their media to reuse
+registered assets/verified ready proxies. Confirmed project deletion affects only
+its saved document, not originals,
 the shared content-deduplicated registry/cache or finished exports/receipts.
-Registry/video-proxy formats and native export are unchanged; preview uses the
-current explicitly prepared PCM cache described above.
+Registry/video-proxy formats, source guards and native resource budgets are unchanged;
+native composition uses the sole Opacity contract without a layer multiplier.
+Preview uses the current explicitly prepared PCM cache described above.
 
 Stored-point inspection remains editor-only, never a persisted field or migration.
 Synthetic correctness checks do not qualify intended-GPU preview,

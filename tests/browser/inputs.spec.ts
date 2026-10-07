@@ -163,14 +163,14 @@ test('the shared list labels time/value/easing, retains reordered input focus, a
     layer: {
       ...document.layers[0]!,
       keyframes: [
-        sharedPoint(20, { clipOpacity: 0.2, exposure: -0.5 }, 'hold'),
-        sharedPoint(70, { clipOpacity: 0.8, exposure: 0.5 }, 'smooth'),
+        sharedPoint(20, { opacity: 0.2, exposure: -0.5 }, 'hold'),
+        sharedPoint(70, { opacity: 0.8, exposure: 0.5 }, 'smooth'),
       ],
     },
   });
   document = applyCommand(document, {
     type: 'layer-add',
-    layer: { ...createLayer('upper', 'Video 2', false), keyframes: [sharedPoint(80, { clipOpacity: 0.4 }, 'hold')] },
+    layer: { ...createLayer('upper', 'Video 2', false), keyframes: [sharedPoint(80, { opacity: 0.4 }, 'hold')] },
   });
   document = applyCommand(document, {
     type: 'insert',
@@ -188,10 +188,10 @@ test('the shared list labels time/value/easing, retains reordered input focus, a
   await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(20);
   const row = await editLayerPoint(page, 'Video 1', 20);
   await expect(keys.getByRole('list')).toHaveAccessibleName('Edit layer keys');
-  await expect(row.locator('.layer-keyframe-dependencies')).toHaveText('Clip opacity · Exposure');
-  const draft = row.getByRole('spinbutton', { name: 'Clip opacity keyframe value 20', exact: true });
+  await expect(row.locator('.layer-keyframe-dependencies')).toHaveText('Opacity · Exposure');
+  const draft = row.getByRole('spinbutton', { name: 'Opacity keyframe value 20', exact: true });
   await draft.fill('0.4');
-  expect((await currentProject(page)).layers[0]?.keyframes[0]?.values.clipOpacity).toBe(0.2);
+  expect((await currentProject(page)).layers[0]?.keyframes[0]?.values.opacity).toBe(0.2);
   await draft.press('Enter');
   const time = row.getByRole('spinbutton', { name: 'Layer keyframe frame 20', exact: true });
   await time.fill('80');
@@ -199,8 +199,8 @@ test('the shared list labels time/value/easing, retains reordered input focus, a
   const moved = keys.getByRole('spinbutton', { name: 'Layer keyframe frame 80', exact: true });
   await expect(moved).toBeFocused();
   expect((await currentProject(page)).layers[0]?.keyframes).toEqual([
-    sharedPoint(70, { clipOpacity: 0.8, exposure: 0.5 }, 'smooth'),
-    sharedPoint(80, { clipOpacity: 0.4, exposure: -0.5 }, 'hold'),
+    sharedPoint(70, { opacity: 0.8, exposure: 0.5 }, 'smooth'),
+    sharedPoint(80, { opacity: 0.4, exposure: -0.5 }, 'hold'),
   ]);
   await moved.fill('70');
   await moved.press('Enter');
@@ -215,20 +215,20 @@ test('the shared list labels time/value/easing, retains reordered input focus, a
   await remove.focus();
   await remove.press('Enter');
   expect((await currentProject(page)).layers[0]?.keyframes).toEqual([
-    sharedPoint(80, { clipOpacity: 0.4, exposure: -0.5 }, 'hold'),
+    sharedPoint(80, { opacity: 0.4, exposure: -0.5 }, 'hold'),
   ]);
-  const value = keys.getByRole('spinbutton', { name: 'Clip opacity keyframe value 80', exact: true });
+  const value = keys.getByRole('spinbutton', { name: 'Opacity keyframe value 80', exact: true });
   await value.fill('0.9');
   await page
     .locator('[data-clip-id="other-row"] .timeline-clip-body')
     .evaluate((button) => (button as HTMLButtonElement).click());
   const otherKeys = layerKeyframes(page, 'Video 2');
-  const otherValue = otherKeys.getByRole('spinbutton', { name: 'Clip opacity keyframe value 80', exact: true });
+  const otherValue = otherKeys.getByRole('spinbutton', { name: 'Opacity keyframe value 80', exact: true });
   await expect(otherKeys.getByRole('list', { name: 'Edit layer keys', exact: true })).toBeVisible();
   await expect(otherValue).toHaveValue('0.4');
   await expect(otherValue).toBeFocused();
-  expect((await currentProject(page)).layers[0]?.keyframes[0]?.values.clipOpacity).toBe(0.4);
-  expect((await currentProject(page)).layers[1]?.keyframes[0]?.values.clipOpacity).toBe(0.4);
+  expect((await currentProject(page)).layers[0]?.keyframes[0]?.values.opacity).toBe(0.4);
+  expect((await currentProject(page)).layers[1]?.keyframes[0]?.values.opacity).toBe(0.4);
   await page.evaluate(() => window.pascapLab!.flush());
   await page.reload();
   await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
@@ -399,7 +399,7 @@ test('per-track fade/transition timing and positioned track key numbers use the 
     type: 'layer-add',
     layer: {
       ...createLayer('upper', 'Video 2', false),
-      keyframes: [sharedPoint(5, { clipOpacity: 0.5 }, 'hold'), sharedPoint(10, { layerOpacity: 0.8 }, 'smooth')],
+      keyframes: [sharedPoint(5, { opacity: 0.5 }, 'hold'), sharedPoint(10, { opacity: 0.8 }, 'smooth')],
     },
   });
   document = applyCommand(document, {
@@ -415,18 +415,20 @@ test('per-track fade/transition timing and positioned track key numbers use the 
   expect((await currentProject(page)).clips[2]?.start).toBe(5);
   await start.press('Enter');
   await editLayerPoint(page, 'Video 2', 10);
-  await commitNumber(page, 'Layer opacity keyframe value 10', '0.6');
+  await commitNumber(page, 'Opacity keyframe value 10', '0.6');
   await commitNumber(page, 'Layer keyframe frame 10', '25');
   const edited = await currentProject(page);
-  expect(edited.clips[2]).toMatchObject({ start: 80, sourceIn: 0, sourceOut: 30, opacity: 1 });
+  expect(edited.clips[2]).toMatchObject({ start: 80, sourceIn: 0, sourceOut: 30 });
+  expect(edited.clips[2]).not.toHaveProperty('opacity');
+  expect(edited.layers[1]!.opacity).toBe(1);
   expect(edited.clips[2]).not.toHaveProperty('animation');
   expect(edited.layers[1]?.keyframes).toEqual([
-    sharedPoint(5, { clipOpacity: 0.5 }, 'hold'),
-    sharedPoint(25, { layerOpacity: 0.6 }, 'smooth'),
+    sharedPoint(5, { opacity: 0.5 }, 'hold'),
+    sharedPoint(25, { opacity: 0.6 }, 'smooth'),
   ]);
 });
 
-test('colour resets target the static base or only participating colours at the active project point', async ({
+test('Colour resets target clip colour and row opacity or only participating Colour settings at the active point', async ({
   page,
 }) => {
   await page.getByRole('slider', { name: 'Exposure', exact: true }).fill('0.7');
@@ -443,7 +445,7 @@ test('colour resets target the static base or only participating colours at the 
     type: 'layer-update',
     layer: {
       ...document.layers[0]!,
-      keyframes: [sharedPoint(5, { exposure: -0.5, saturation: 0.6, clipOpacity: 0.4 }, 'hold'), other],
+      keyframes: [sharedPoint(5, { exposure: -0.5, saturation: 0.6, opacity: 0.4 }, 'hold'), other],
     },
   });
   await setProject(page, document);
@@ -455,7 +457,7 @@ test('colour resets target the static base or only participating colours at the 
   await page.getByRole('button', { name: 'Reset Exposure', exact: true }).click();
   document = await currentProject(page);
   expect(document.layers[0]?.keyframes[0]).toEqual(
-    sharedPoint(5, { exposure: 0, saturation: 0.6, clipOpacity: 0.4 }, 'hold'),
+    sharedPoint(5, { exposure: 0, saturation: 0.6, opacity: 0.4 }, 'hold'),
   );
   expect(document.layers[0]?.keyframes[1]).toEqual(other);
   await commitNumber(page, 'Layer keyframe frame 5', '8');
@@ -476,18 +478,14 @@ test('colour resets target the static base or only participating colours at the 
   document = await currentProject(page);
   expect(document.clips[0]?.colour).toEqual(base);
   expect(document.layers[0]?.keyframes).toEqual([
-    sharedPoint(8, { exposure: 0.25, saturation: 1, clipOpacity: 0.4 }, 'hold'),
+    sharedPoint(8, { exposure: 0.25, saturation: 1, opacity: 0.4 }, 'hold'),
     other,
   ]);
   await page.getByRole('button', { name: 'Reset colour', exact: true }).click();
   const reset = await currentProject(page);
   expect(reset.clips[0]?.colour).toEqual(base);
   expect(reset.layers[0]?.keyframes).toEqual([
-    sharedPoint(
-      8,
-      { exposure: NEUTRAL_COLOUR.exposure, saturation: NEUTRAL_COLOUR.saturation, clipOpacity: 0.4 },
-      'hold',
-    ),
+    sharedPoint(8, { exposure: NEUTRAL_COLOUR.exposure, saturation: NEUTRAL_COLOUR.saturation, opacity: 1 }, 'hold'),
     other,
   ]);
   await expect(page.getByRole('slider', { name: 'Contrast', exact: true })).toHaveValue('1.2');

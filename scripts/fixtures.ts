@@ -85,6 +85,7 @@ export async function preparedFixture(
 ): Promise<{ jobs: JobQueue; library: MediaLibrary; document: ProjectDocument }> {
   const store = new ProjectStore(config.dataDir);
   // Only the disposable browser context keeps the unversioned test ID.
+  // The retained v6 suffix is a historical identifier, not the document schema.
   const projectId = path.resolve(config.dataDir) === browserDataDir ? 'preview-lab' : 'preview-lab-v6';
   let existing: ProjectDocument | null = null;
   try {
@@ -177,6 +178,6 @@ if (process.argv.includes('--browser')) {
   fixture.document = await store.save(fixture.document, fixture.document.revision);
   await fixture.jobs.close();
   console.log(
-    'Disposable schema-6 browser fixture prepared (preview-lab): 12 project recordings, registered music, three verified video proxies.',
+    'Disposable schema-7 browser fixture prepared (preview-lab): 12 project recordings, registered music, three verified video proxies.',
   );
 }
