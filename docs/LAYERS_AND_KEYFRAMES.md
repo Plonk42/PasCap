@@ -1,4 +1,4 @@
-# Layers, shared row points and source review · project v8
+# Layers, shared row points and source review · project v9
 
 ## Video layers
 
@@ -87,12 +87,14 @@ they do not dim another track or reveal lower footage through a transparency fad
 
 ## Strict shared-point model
 
-**A video row/layer owns the animation, not a clip.** All points use absolute integer
+**A video row/layer owns shared row animation, not a clip.** Clip speed curves and
+[spatial transforms](design/SPATIAL_TRANSFORMS.md) instead have their own
+original-source keys. All shared row points use absolute integer
 **project timeline frames**, with one point per frame per row. They affect every
 clip on that row, including clips from different recordings and both participants
 in that track's dissolve. They do not restart at a clip's IN, start or boundary.
 
-Schema 8 requires `layers[].keyframes` as ordered `{ frame, interpolation, values }`
+Schema 9 requires `layers[].keyframes` as ordered `{ frame, interpolation, values }`
 points, with **at most 256 points per row**. Frames are unique, strictly ascending,
 non-negative and at most 2,147,483,647. Every point's `values` object (`LayerKeyValues`)
 requires **all nine nullable fields** below: a number participates; `null` does not. Omitted/unknown
@@ -113,12 +115,15 @@ fields and all-null points are invalid, not repaired with defaults.
 The exact nine required value fields are `opacity`, `speed`, `exposure`,
 `brightness`, `contrast`, `hue`, `saturation`, `highlights` and `shadows`.
 Clip documents contain static colour and **constant, ramp or custom-keyframed**
-speed, with no `opacity` field. Shared row animation has no clip-animation object
-or per-property row key arrays. The explicitly approved clip speed editor stores its own source-frame
-points inside `clip.speed`; it does not change row-channel ownership or precedence.
+speed and required `spatial: { base, keyframes }`, with no `opacity` field.
+Shared row animation has no per-property row key arrays. Clip speed and spatial
+keys use original-source frames in their separate clip-owned settings; neither
+changes row-channel ownership or precedence. Spatial keys capture complete
+eight-value poses, not nullable per-setting participation.
 Trimming, restoring, moving, splitting and duplicating footage **never copy or
 shift row points or change row Opacity**. Split/duplicate create independent source
-ranges, colour and speed settings, retaining original-source ramp/clip-speed anchors.
+ranges, colour, speed and deep-copied spatial settings, retaining original-source
+ramp/clip-speed/spatial anchors, including off-trim and original exclusive-OUT keys.
 A moved clip uses its destination row's saved Opacity or overriding curve and
 animation; both rows' values and points stay where they were. Track Ripple also
 leaves points anchored in project time. Removing the last participant of a channel
@@ -347,12 +352,13 @@ Neither ruler ticks nor those transition buttons are keyframe markers.
 
 Enabled layer groups are composited bottom-to-top over opaque black in encoded
 BT.709 RGB, after each source has its evaluated grade. For group sources $i$, let
-$w_i$ be dissolve weight, $o_i$ evaluated Opacity, $b_i$ black-fade brightness and $G_i$ graded
+$w_i$ be dissolve weight, $o_i$ evaluated Opacity, $b_i$ black-fade brightness,
+$m_i$ spatial source coverage at the pixel and $G_i$ graded
 RGB. Each track's dissolve is **one** group, not two source-over layers; several
 tracks may dissolve simultaneously:
 
-- Premultiplied group RGB: $C = \sum_i G_i b_i o_i w_i$.
-- Group coverage: $A = \sum_i o_i w_i$.
+- Premultiplied group RGB: $C = \sum_i G_i b_i o_i w_i m_i$.
+- Group coverage: $A = \sum_i o_i w_i m_i$.
 - Source-over: $\mathrm{result} = C + \mathrm{lower}(1 - A)$, with no additional layer multiplier.
 
 Preview, CPU numeric tests and native layered export share this sampling/composition
@@ -362,7 +368,13 @@ otherwise the sole `opacity` curve overrides it for every source, including both
 dissolve participants. This is one evaluated setting per row, applied inside the
 group sums, not another multiplier after composing the group. Opacity is coverage,
 not a parameter of SDR RGB grading; unkeyed colour remains per-clip. Black fades
-affect RGB only, not coverage. Full opacity/neutral settings preserve the original
+affect RGB only, not coverage. Nonneutral spatial poses have transparent coverage
+outside the transformed/cropped original; crop never refits or moves its centre.
+Exact neutral poses retain the old opaque black letterbox after grading ($m_i=1$
+over the canvas), not transparent padding. Spatial geometry uses continuous
+`PlacedClip.retiming.sourcePositionAt`, even on a held recorded image; grade and
+Opacity remain project-time values. See [spatial transforms](design/SPATIAL_TRANSFORMS.md).
+Full opacity/neutral settings preserve the original
 single-track behavior. Native LUT interpolation and
 final H.264/YUV quantisation are approximations, not bitwise shader equivalence.
 See [COLOUR_AND_TIMING.md](COLOUR_AND_TIMING.md) for grading/composition equations and
@@ -417,17 +429,17 @@ offscreen/unmount/project-switch releases the review decoder.
 
 The inspector uses **Clip / Keyframes / Sequence / Audio** tabs; Keyframes retains
 the accessible name **Layer keyframes**. Source range,
-Placement (placement only), Speed, Colour (including the sole row Opacity control)
+Placement (placement only), Speed, Transform, Colour (including the sole row Opacity control)
 and playhead diamonds belong to Clip. The shared point list is directly visible in Keyframes,
 with Animation help, participant chips
 and whole-row point navigation. Keyframes and Sequence have no redundant
 selected-track banner. The selected track's Transition/Sequence fades belong to
 Sequence; Music belongs to Audio, with detailed **Placement & fades**.
 Sections retain their expansion in local browser storage.
-New defaults collapse detailed source, placement and speed controls, while Colour stays
+New defaults collapse detailed source, placement, speed and Transform controls, while Colour stays
 open. Existing section preferences are not reset. **Expand all / Collapse all**
-appears only in Clip and affects its four top-level sections: Source range,
-Placement, Speed and Colour. Sequence, Audio, nested point disclosures and
+appears only in Clip and affects its five top-level sections: Source range,
+Placement, Speed, Transform and Colour. Sequence, Audio, nested point disclosures and
 help remain unchanged; the shared list has no expansion preference.
 Hidden tab/section content stays mounted, retaining valid/invalid drafts within
 the same editing context. Row/clip changes refresh that context safely rather than
@@ -458,11 +470,13 @@ The plain static single-layer path retains at most two lossless clips, two
 intermediate decoders and one reusable RGB frame (24.9 MB UHD), plus native memory.
 
 The static fast path is eligible only for one enabled track with row Opacity 1,
-no row points, a zero first start and no internal gaps, covering the **full project
-duration**. Music beyond video OUT requires layered export's trailing black spans,
+no row points, exactly neutral clip spatial bases and no spatial keys, a zero first
+start and no internal gaps, covering the **full project duration**. Music beyond
+video OUT requires layered export's trailing black spans,
 not a held last image. Ripple itself is not
 an eligibility requirement. Other valid timelines, including any speed-only or
-neutral row point, use the generalized layered path; static planning rejects them.
+neutral row point or any spatial edit/key (even neutral keys), use the generalized
+layered path; static planning rejects them.
 That pipeline remains sequential, with at most one original decoder, two intermediate readers and one
 encoder, and at most three native video children per pass. Each enabled populated
 track first renders a premultiplied RGBA16 group from at most two RGB sources;
@@ -474,7 +488,11 @@ Four reusable raw buffers (two RGB8 and two RGBA16) use **22 bytes/pixel =
 additional. Grades use evaluated parameters, not crossfaded endpoint LUTs; there
 are no per-frame LUT files or per-frame native-process launches. Source mapping
 uses the layout's captured `PlacedClip.retiming`; grade/opacity sampling uses
-absolute project time, including repeated source images.
+absolute project time, including repeated source images. Spatial geometry uses
+continuous original-source position from that same map. Inverse mapping and
+bilinear RGB resampling precede the LUT; no transformed image/mask buffer or
+per-frame native process is added. The 22 bytes/pixel, two-LUT and process bounds
+above remain unchanged.
 
 At most two retained lossless clip files and **three** timeline representations
 coexist: lower accumulator, track group and output (or group spans and their joined
@@ -503,7 +521,8 @@ not all sources or loop repetitions. It grows with duration and is additional to
 the unchanged video raw-buffer/child/LUT bounds above. Cancellation/failure removes
 only owned scratch, never originals, saved projects or successful outputs.
 
-Schema **v8 is strict**, including required unique `media.videoIds` / `media.audioIds`
+Schema **v9 is strict**, including required clip `spatial` base/eight-value full-pose
+source-frame keys and required unique `media.videoIds` / `media.audioIds`
 arrays, at most 10,000 IDs each, and all required per-track settings. Project-level
 transitions/fades, saved `clip.opacity` and old `clipOpacity`/`layerOpacity` point
 channels are not accepted. `VideoLayer.opacity` is the required sole stored row
@@ -512,8 +531,8 @@ Points require exactly the nine nullable fields listed above, including `opacity
 The required `music` array contains 0–8 independent instances with unique required
 IDs and complete source IN/OUT/start/duration/gain/fades/loop fields; `[]` without
 music, never a null/singular value or default. Version-1 export receipts require
-a strict v8 snapshot plus captured audio-source/instance-plan arrays.
-Older v1–v7 project documents and export receipt snapshots remain unchanged/incompatible;
+a strict v9 snapshot plus captured audio-source/instance-plan arrays.
+Older v1–v8 project documents and export receipt snapshots remain unchanged/incompatible;
 there are no migrations, compatibility fallback/default fields or automatic deletion
 of projects, receipts or successful videos. Create a new project and deliberately
 import its media; registered media and currently verified ready proxies remain reusable.

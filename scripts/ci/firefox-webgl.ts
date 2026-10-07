@@ -1,4 +1,7 @@
 import { firefox, type FullConfig } from '@playwright/test';
+import { execFile } from 'node:child_process';
+import { mkdir, writeFile } from 'node:fs/promises';
+import path from 'node:path';
 import { fragmentShader, vertexShader } from '../../src/preview/shaders.js';
 
 export interface FirefoxGraphicsReadiness {
@@ -26,6 +29,25 @@ export function requireFirefoxGraphics(result: FirefoxGraphicsReadiness): void {
   ) {
     throw new Error(`${guidance}\n${JSON.stringify(result)}`);
   }
+}
+
+/** Diagnostic only: the bundled native probe cannot qualify/override WebGL. */
+export function nativeFirefoxGraphics(
+  executable: string,
+): Promise<{ stdout: string; stderr: string; error: string | null }> {
+  return new Promise((resolve) => {
+    execFile(
+      executable,
+      ['glx'],
+      {
+        timeout: 5_000,
+        maxBuffer: 32_768,
+        killSignal: 'SIGKILL',
+        env: { ...process.env, MOZ_GFX_DEBUG: '1' },
+      },
+      (error, stdout, stderr) => resolve({ stdout, stderr, error: error?.message ?? null }),
+    );
+  });
 }
 
 /** Real browser/context/shaders/readback, before any media test; no mocked renderer. */
@@ -124,7 +146,40 @@ export default async function firefoxWebGL(config: FullConfig): Promise<void> {
         );
       }),
     ]);
-    requireFirefoxGraphics(result);
+    try {
+      requireFirefoxGraphics(result);
+    } catch (cause) {
+      // about:support is a privileged page unsupported by Juggler navigation.
+      // Run the bundled native GLX/EGL probe in the SAME display/environment,
+      // with strict time/output bounds. This is evidence, never a context retry.
+      const native = await nativeFirefoxGraphics(path.join(path.dirname(firefox.executablePath()), 'gfxtest'));
+      const diagnostics = {
+        browser: browser.version(),
+        readiness: result,
+        environment: Object.fromEntries(
+          [
+            'DISPLAY',
+            'LIBGL_ALWAYS_SOFTWARE',
+            'GALLIUM_DRIVER',
+            '__GLX_VENDOR_LIBRARY_NAME',
+            '__EGL_VENDOR_LIBRARY_FILENAMES',
+          ].map((key) => [key, process.env[key] ?? null]),
+        ),
+        native,
+      };
+      const evidence = JSON.stringify(diagnostics, null, 2);
+      console.error(`Firefox native graphics failure evidence: ${evidence}`);
+      try {
+        const directory = path.resolve(config.rootDir, '../../test-results');
+        await mkdir(directory, { recursive: true });
+        await writeFile(path.join(directory, 'firefox-graphics-prerequisite.json'), evidence);
+      } catch (error) {
+        console.error(
+          `Cannot retain Firefox graphics evidence: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+      throw cause;
+    }
     console.log(`Firefox graphics ready: ${JSON.stringify({ browser: browser.version(), ...result })}`);
   } finally {
     clearTimeout(timer);

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { colourSchema, NEUTRAL_COLOUR } from './colour.js';
 import { layerKeyframeSchema, orderedKeys } from './keyframes.js';
+import { createSpatialSettings, spatialSettingsSchema } from './spatial.js';
 import { NORMAL_SPEED, speedSchema } from './speed.js';
 import { calculateLayout } from './timeline.js';
 import { PROJECT_FPS } from './timing.js';
@@ -28,6 +29,7 @@ export const clipSchema = z
     sourceOut: frameSchema.positive(),
     colour: colourSchema,
     speed: speedSchema,
+    spatial: spatialSettingsSchema,
   })
   .strict()
   .refine((clip) => clip.sourceOut > clip.sourceIn, { message: 'Source OUT must be after IN (exclusive).' });
@@ -96,7 +98,7 @@ export const musicTracksSchema = z
 
 const baseProjectSchema = z
   .object({
-    schemaVersion: z.literal(8),
+    schemaVersion: z.literal(9),
     id: idSchema,
     title: z.string().trim().min(1).max(200),
     media: z
@@ -150,7 +152,7 @@ export function createLayer(id: string, name: string, ripple = true): VideoLayer
 
 export function createProject(id: string, title: string): ProjectDocument {
   return projectSchema.parse({
-    schemaVersion: 8,
+    schemaVersion: 9,
     id,
     title,
     media: { videoIds: [], audioIds: [] },
@@ -179,5 +181,6 @@ export function createClip(
     sourceOut,
     colour: { ...NEUTRAL_COLOUR },
     speed: { ...NORMAL_SPEED },
+    spatial: createSpatialSettings(),
   });
 }

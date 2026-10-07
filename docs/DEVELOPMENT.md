@@ -121,6 +121,25 @@ in the disposable test profile for this evidence, not in the product. The playba
 tests still initialize the real editor/compositor and keep their existing exact
 frame, PCM, drift, range-read and cancellation assertions.
 
+The [grade-comparison music regression](../tests/browser/grade-comparison.spec.ts)
+retains each trusted native pointer/Space/Enter activation and its subsequent real
+Playing draw at observation time. Slow browser-protocol assertions may observe
+legitimate completion later; they do not replace that retained checkpoint with a
+later diagnostics read. All four activations must happen while Playing, render
+their requested mode before the end, and retain one music epoch, exact source
+readiness and the independent one-frame output-clock bound through full completion.
+The memory-only fixture remains 480 project frames; no clock forgery, throughput
+threshold or enlarged playback timeout is used.
+
+On a rejected graphics result, the prerequisite also runs the installed Firefox
+bundle's native `gfxtest glx` once in the same display/Mesa environment, with a
+five-second deadline and 32 KiB limit per output stream. It logs and retains the
+browser/context result, selected graphics environment and native EGL/GLX output
+in the failure artifacts. A successful native GLX probe cannot qualify a rejected
+browser WebGL2 context; there is no context retry, force-enable or fallback.
+The privileged `about:support` page is not navigable through this Firefox build's
+Playwright/Juggler integration, so it is not used as a potentially hanging diagnostic.
+
 Headless Firefox also needs an available audio backend: a missing service can leave
 `AudioContext.resume()` suspended without rendering samples. The
 [Firefox runner](../scripts/ci/firefox.sh) starts a private PulseAudio server with a
@@ -212,7 +231,8 @@ originals in `.pascap/browser-footage/synthetic-sources/` are outside that cache
 `browse-camera-*` means generated patterns, not real recordings. The
 [fixture factory](../scripts/fixtures.ts) uses `preview-lab-v6` outside the browser
 cache and `preview-lab` inside it. These are project identifiers, not schema
-versions; newly generated documents must satisfy strict v8. Bin resets never imply
+versions; newly generated documents must satisfy strict v9, including clip spatial
+base/full-pose keys. Bin resets never imply
 a global-library fallback.
 Neither suite invokes real-source sample preparation or needs private footage/music.
 
@@ -284,14 +304,14 @@ the independent one-frame A/V, single-epoch and completion assertions.
 **Do not run these in CI or without the owner's explicit approval for real jobs.**
 The [sample helper](../scripts/prepare-samples.ts) targets **DJI_0468.MP4 and DJI_0469.MP4
 only**: pass an **explicit folder after `--`**, never rely on a personal-path default.
-It reuses ready proxies but may prepare missing ones; creates only an absent v8
+It reuses ready proxies but may prepare missing ones; creates only an absent v9
 sample, never overwrites or migrates existing edits.
 
 The [measurement helper](../scripts/measure-preview.ts) accepts exactly **two
 1× excerpts on one enabled, zero-origin contiguous track with row Opacity 1**, no music,
-extra layers or shared row points
+extra layers, spatial edits/keys or shared row points
 (even neutral/Speed-only points). `PASCAP_MEASURE_URL` selects that project.
-Measurement metadata must identify the strict v8 snapshot independently of the
+Measurement metadata must identify the strict v9 snapshot independently of the
 report format/identifier; historical reports and receipt snapshots stay untouched.
 `npm run measure -- --skip-playback --reference` skips playback benchmarking but
 **renders a native reference**; `--headed --reference` adds repeated playback. The edit
@@ -316,8 +336,9 @@ requires numeric `opacity` in 0–1, initially 1 (100%) on new tracks. Evaluate 
 row value or its sole overriding `opacity` key channel for each source, including
 both dissolve sources; there is no saved `clip.opacity` or second opacity channel.
 With graded RGB $G_i$,
-black-fade brightness $b_i$, Opacity $o_i$ and dissolve weight $w_i$, group RGB is
-$C = \sum_i G_i b_i o_i w_i$ and coverage is $A = \sum_i o_i w_i$.
+black-fade brightness $b_i$, Opacity $o_i$, dissolve weight $w_i$ and per-pixel
+spatial coverage $m_i$, group RGB is $C = \sum_i G_i b_i o_i w_i m_i$ and
+coverage is $A = \sum_i o_i w_i m_i$.
 Groups merge bottom-to-top as $\mathrm{result} = C + \mathrm{lower}(1 - A)$,
 without regrading or another opacity multiplier. Opacity is composition coverage,
 not SDR RGB grading; unkeyed colour settings remain per-clip. Black fades preserve coverage;
@@ -328,10 +349,28 @@ add **6,591,000 bytes**, excluding native/audio memory. Two retained clip files 
 three timeline representations bound concurrency, **not disk GB**;
 scratch grows with duration ([resource contract](LAYERS_AND_KEYFRAMES.md#inspector-and-resource-limits)).
 The static fast path requires one enabled, unanimated, zero-origin contiguous
-track with row Opacity 1; unsupported placement/coverage uses generalized layered export, regardless
+track with row Opacity 1 and exactly neutral spatial bases without spatial keys;
+any spatial edit/key (even neutral keys) or unsupported placement/coverage uses
+generalized layered export, regardless
 of Ripple or track ID.
 Processing: [row points](LAYERS_AND_KEYFRAMES.md), [retiming/audio](SPEED_AND_AUDIO.md)
 and [grading equations](COLOUR_AND_TIMING.md#colour).
+
+Strict schema 9 requires `clip.spatial: { base, keyframes }`: eight complete pose
+values and 0–256 full-pose original-source keys with required easing. Shared
+[spatial mapping](../src/shared/spatial.ts) uses unrounded original-aspect contain
+fit, original-centre pivot and half-open crop bounds; crop does not refit.
+`PlacedClip.retiming.sourcePositionAt` supplies continuous geometry while
+`sourceAt` supplies recorded-image identity, allowing geometry on held images
+without optical flow. Exact neutral poses preserve old opaque black letterboxing
+after grading; nonneutral uncovered pixels have zero coverage. Native inverse
+RGB resampling precedes grading, reusing the same four raw buffers/two LUTs and
+serial process limits. Source keys remain at their original anchors through
+trim/cut/split/duplicate/move; new pieces have independent deep copies. The fifth
+Clip section **Transform** is collapsed by default and uses explicit full-pose
+source-frame capture, stored-key navigation and release-only sliders. See
+[the spatial contract](design/SPATIAL_TRANSFORMS.md), not historical benchmark
+reports, for current geometry/schema/UI facts.
 
 Up to eight independently identified music instances share one bounded mixed queue,
 AudioContext/worklet and output clock. Apply each source's gain/fades, sum linearly,
@@ -366,7 +405,8 @@ Layer options contains rename, Ripple, ordering and deletion, with visibility se
 - Never modify/copy/delete owner's originals or commit private paths/device IDs,
   saved project IDs, real media/cache or reports. Preserve fingerprints, symlink
   rejection, cache exclusion and HTTP guards.
-- Keep **strict schema 8**: required unique video/audio membership, all nine nullable
+- Keep **strict schema 9**: required clip spatial base/full-pose source-frame keys,
+  required unique video/audio membership, all nine nullable
   channels and per-layer `ripple`, `transitions`, `openingFade`, `closingFade` and
   numeric `opacity` in 0–1. A new track starts at 1; a missing saved field is invalid.
   The channels are `opacity` (sole UI **Opacity**), `speed` and seven colour
@@ -375,7 +415,7 @@ Layer options contains rename, Ripple, ordering and deletion, with visibility se
   transitions/fades, compatibility fields/defaults/migration or mandatory first-track
   ID. Require a 0–8 `music` array with unique instance IDs and complete independent
   settings, plus captured audio-source/instance-plan arrays in current receipts.
-  Preserve incompatible v1–v7 projects/receipt snapshots and finished videos,
+  Preserve incompatible v1–v8 projects/receipt snapshots and finished videos,
   without automatic deletion; recreate projects deliberately. Registry/proxy formats,
   source protections and native resource budgets remain unchanged.
 - Reuse `JobQueue`, library and backpressured raw/retime helpers: one heavy job,

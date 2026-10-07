@@ -186,6 +186,12 @@ export function compileClipSpeedCurve(sourceIn: number, sourceOut: number, speed
   };
   return {
     duration,
+    sourcePositionAt: (frame) => {
+      finite(frame);
+      if (frame <= 0) return sourceIn;
+      if (frame >= duration) return sourceOut;
+      return sourceAtTime((frame * total) / duration);
+    },
     sourceAt: (frame) =>
       Math.max(sourceIn, Math.min(sourceOut - 1, Math.floor(sourceAtTime((finite(frame) * total) / duration) + 1e-8))),
     outputAt: (source) => {

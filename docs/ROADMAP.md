@@ -10,9 +10,12 @@ deadline; hardware/real-media work requires explicit owner consent.
 
 ## Current baseline
 
-The local schema-8 contract covers no-copy footage import, projects, source
+The local schema-9 contract covers no-copy footage import, projects, source
 excerpts, layered timelines, colour/speed/opacity row points, music and verified
 720p/4K export, with precise clip-only speed curves as well as overriding row Speed.
+Clip-owned crop/scale/translation/rotation and full-pose source-frame animation
+are specified by [#20's current contract](design/SPATIAL_TRANSFORMS.md), without
+claiming qualification or changing milestone status.
 The final approved [#67](https://github.com/Plonk42/PasCap/issues/67) contract has
 one row-owned **Opacity** setting: required numeric `VideoLayer.opacity` in 0–1,
 initially 1 (100%) on new tracks. Its sole row channel, `opacity`, overrides that
@@ -24,12 +27,12 @@ playhead is read-only until explicitly captured. Sliders never create keys, and
 unkeyed colour settings remain per-clip. Shared points have nine nullable channels:
 `opacity`, `speed` and seven colour settings. Saved `clip.opacity` and old
 `clipOpacity`/`layerOpacity` channels are rejected; row `opacity` is required and
-valid. v1–v7 projects
+valid. v1–v8 projects
 and receipt snapshots are preserved/incompatible and require recreation, without
 migration, defaults, null/old-format readers or automatic deletion;
-registry/proxy/current PCM formats remain unchanged. Schema 8 requires a 0–8
+registry/proxy/current PCM formats remain unchanged. Schema 9 requires a 0–8
 identified-instance music array (`[]` without music); version-1 export receipts
-require strict v8 snapshots and captured audio-source/instance-plan arrays.
+require strict v9 snapshots and captured audio-source/instance-plan arrays.
 Music can extend duration to maximum video/music OUT: closing video fades finish
 at clip OUT, then black while music continues/fades at its own end. One mixed
 output clock and final-only linear-sum clamp retain bounded resources; see
@@ -47,7 +50,8 @@ animation/timing help in its toolbar. Nested point details retain drafts and inp
 identity; there is no outer list disclosure or per-row list expansion preference.
 Keyframes and Sequence omit redundant selected-track banners. Clip keeps
 source/clip settings, row Opacity and playhead controls; its Expand all/Collapse all affects only the
-four Clip top-level sections, leaving Sequence, Audio, nested disclosures and help
+five Clip top-level sections (Source range, Placement, Speed, Transform and Colour),
+leaving Sequence, Audio, nested disclosures and help
 unchanged. Stored participants reuse the main value
 controls with precise numeric editing. Clip/row selection and point navigation
 preserve the chosen tab; explicit boundary buttons open Sequence. Current usage
@@ -98,7 +102,7 @@ cleanup; no new Iteration dates or Project field/view changes are implied here.
 | [#13 — Shared-point movement/navigation](https://github.com/Plonk42/PasCap/issues/13)   | Retrospective delivered-feature record; preserve whole-point transactions, independent channel navigation and dated evidence                                                                                                                                                         |
 | [#14 — Precise clip speed](https://github.com/Plonk42/PasCap/issues/14)                 | Track approved source-frame curves and locally verified graph/numeric/native delivery separately from remote acceptance                                                                                                                                                              |
 | [#16 — Compact contextual help](https://github.com/Plonk42/PasCap/issues/16)            | Heading-level hover/pinned question-mark buttons accessible even when collapsed, with independent expansion and preserved drafts/focus/editable panels                                                                                                                               |
-| [#25 — Uniform video tracks](https://github.com/Plonk42/PasCap/issues/25)               | Uniform track parity: per-track continuous Ripple, transitions/fades, composition order and bounded simultaneous-dissolve preview/native export; [historical schema-6 design record](design/TRACK_PARITY.md), with current v8 usage in the [layer contract](LAYERS_AND_KEYFRAMES.md) |
+| [#25 — Uniform video tracks](https://github.com/Plonk42/PasCap/issues/25)               | Uniform track parity: per-track continuous Ripple, transitions/fades, composition order and bounded simultaneous-dissolve preview/native export; [historical schema-6 design record](design/TRACK_PARITY.md), with current v9 usage in the [layer contract](LAYERS_AND_KEYFRAMES.md) |
 
 Done means a repeatable, documented local foundation—not more CapCut-style effects.
 The initial publication includes README/user/developer guides, pinned CI and issue
@@ -154,7 +158,7 @@ bundle private footage or promise GPU-native encoding.
 - No new rendering effect is scheduled from an inspection checklist alone.
 - [The implementation plan](../EDITOR_IMPLEMENTATION_PLAN.md) is retained as design
   history, not an approved implementation backlog.
-- Titles, transforms, masks, optical flow, HDR, cloud/mobile/collaboration and native
+- Titles, general-purpose masks, optical flow, HDR, cloud/mobile/collaboration and native
   GPU encoding remain outside the current delivery milestones.
 
 Proposals should explain a user problem, scope, observable acceptance and

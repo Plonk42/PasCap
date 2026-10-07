@@ -25,6 +25,7 @@ import { clipStartRestriction } from './layer-actions.js';
 import { NumberField } from './NumberField.js';
 import { settingPresentation } from './setting-scope.js';
 import { RangeSettingControl } from './SettingValueControl.js';
+import { TransformSection } from './SpatialControls.js';
 import { SpeedControls, SpeedHelp } from './SpeedControls.js';
 import { planTimelineDrop } from './timeline-placement.js';
 import type { DraftPreview } from './Timeline.js';
@@ -814,6 +815,15 @@ export function Inspector({
                   onPause={onPause}
                 />
               </InspectorSection>
+              <TransformSection
+                project={project}
+                clip={clip ?? null}
+                sourceFrameCount={asset?.metadata.frameCount ?? 0}
+                frame={frame}
+                disabled={drafting}
+                onEdit={onEdit}
+                onSeek={onSeek}
+              />
               <ColourSection
                 layer={layer}
                 clip={clip ?? null}

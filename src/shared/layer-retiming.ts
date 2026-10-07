@@ -150,22 +150,31 @@ export function compileLayerRetiming(clip: VideoClip, layer: VideoLayer, start: 
   };
   const duration = Math.max(1, Math.round(elapsedAt(length)));
   if (start + duration > MAX_PROJECT_FRAME) throw new RangeError('Layer duration exceeds supported project frames.');
+  const sourceAtTime = (outputFrame: number): number => {
+    const frame = start + outputFrame;
+    let low = 0;
+    let high = segments.length - 1;
+    while (low < high) {
+      const middle = Math.floor((low + high) / 2);
+      if (segments[middle]!.end < frame) low = middle + 1;
+      else high = middle;
+    }
+    const segment = segments[low]!;
+    return sourceIn + segment.sourceBegin + integrate(segment, frame - segment.begin);
+  };
   const retiming: Retiming = Object.freeze({
     duration,
+    sourcePositionAt: (outputFrame: number): number => {
+      requireFinite(outputFrame);
+      if (outputFrame <= 0) return sourceIn;
+      if (outputFrame >= duration) return sourceOut;
+      return Math.max(sourceIn, Math.min(sourceOut, sourceAtTime(outputFrame)));
+    },
     sourceAt: (outputFrame: number): number => {
       requireFinite(outputFrame);
       if (outputFrame <= 0) return sourceIn;
       if (outputFrame >= duration) return sourceOut - 1;
-      const frame = start + outputFrame;
-      let low = 0;
-      let high = segments.length - 1;
-      while (low < high) {
-        const middle = Math.floor((low + high) / 2);
-        if (segments[middle]!.end < frame) low = middle + 1;
-        else high = middle;
-      }
-      const segment = segments[low]!;
-      const source = sourceIn + segment.sourceBegin + integrate(segment, frame - segment.begin);
+      const source = sourceAtTime(outputFrame);
       return Math.max(sourceIn, Math.min(sourceOut - 1, Math.floor(source + 1e-8)));
     },
     outputAt: (sourceFrame: number): number => {

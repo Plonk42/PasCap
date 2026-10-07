@@ -643,7 +643,7 @@ test('common widgets fit 270px inspectors and the desktop/drawer width matrix wi
             };
           }),
       );
-      expect(widgets.length, `${width}px ${tab}`).toBe(tab === 'Clip' ? 9 : tab === 'Layer keyframes' ? 3 : 1);
+      expect(widgets.length, `${width}px ${tab}`).toBe(tab === 'Clip' ? 17 : tab === 'Layer keyframes' ? 3 : 1);
       for (const widget of widgets) {
         expect(widget.inputs, `${width}px ${widget.name}`).toBe(2);
         expect(widget.outputs).toBe(0);

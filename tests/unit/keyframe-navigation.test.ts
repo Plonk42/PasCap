@@ -264,7 +264,7 @@ describe('one editor-only stored-point cursor', () => {
     expect(history.canUndo).toBe(false);
     expect(history.canRedo).toBe(false);
     expect(projectSchema.parse(history.current)).toEqual(document);
-    expect(history.current.schemaVersion).toBe(8);
+    expect(history.current.schemaVersion).toBe(9);
   });
 
   it.each([-1, NaN, Infinity, 0.5, 2_147_483_648])(

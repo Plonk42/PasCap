@@ -13,16 +13,17 @@ inherit the shared media registry. Importing the same original into another proj
 deliberately adds it to that project's bin and reuses eligible verified proxies.
 Removing an excerpt or music placement does not remove the imported media.
 
-Projects use **strict format v8**, with a required `music` array of 0–8 independent
+Projects use **strict format v9**, with required clip spatial base/full-pose
+source-frame keys and a required `music` array of 0–8 independent
 instances and unique required instance IDs (`[]` without music), every video track's Ripple, transitions and
 opening/closing fades and required numeric `opacity` in 0–1 (1 on new tracks),
 with nine nullable animation channels: `opacity`, `speed` and seven colour settings.
 Row `opacity` is the sole saved Opacity value; saved `clip.opacity` and old
 `clipOpacity`/`layerOpacity` key channels are invalid, not ignored or defaulted.
-v1–v7 project documents and receipt snapshots
+v1–v8 project documents and receipt snapshots
 stay on disk but are incompatible: there is no migration, compatibility default,
 null fallback, old-format reader, automatic repair or deletion. Export receipts
-remain version 1 with a strict v8 snapshot and required audio-source/instance-plan arrays.
+remain version 1 with a strict v9 snapshot and required audio-source/instance-plan arrays.
 Create a new project and import its media deliberately. Finished videos remain
 untouched. **Delete project** requires confirmation and deletes only the saved
 project document, not originals, the shared registry/proxy cache or exports/receipts.
@@ -193,7 +194,7 @@ Ungraded means the **composed timeline preview without grading**, not an
 original-resolution view or an isolated selected clip. It neutralizes all evaluated
 colour settings across enabled rows, including clip bases, row colour keys and both
 dissolve participants. Exact observed source frames, retiming, row Opacity,
-visibility, black fades, stacking and music remain unchanged.
+spatial geometry/coverage, visibility, black fades, stacking and music remain unchanged.
 
 Comparison is editor-only: toggling never seeks, saves, enters Undo history, changes
 exports, schema, proxies or originals, or adds decoders. Same-project seeks,
@@ -230,7 +231,52 @@ the row has Speed keys. The override notice explains it; removing those Speed
 participants reveals the clip curve unchanged. Row colour/opacity animation is
 unaffected. Details: [SPEED_AND_AUDIO.md](SPEED_AND_AUDIO.md#precise-clip-curve-editor).
 
-### Opt in to animation
+### Crop, scale, translate and rotate an excerpt
+
+Select an excerpt and open **Clip → Transform** (collapsed initially). Its eight
+controls are **Crop left / Crop right / Crop top / Crop bottom / Scale / Translate X /
+Translate Y / Rotation °**, each with a native slider and exact number field.
+Scale preserves aspect and accepts **0.1–8**. Translation accepts **−2–2** as
+fractions of the whole output width/height, not source pixels. Rotation is
+clockwise, **−180°–180°**, around the original image centre. Crop fractions each
+stay below 1 and opposite crops must sum to less than 1; cropping never refits or
+recentres the retained image. Uncovered pixels from nonneutral transforms reveal
+lower tracks; exact neutral poses retain the old opaque black letterbox.
+
+- Without keys, values edit this clip's saved base. Click the single **Transform
+  keyframe at displayed source frame** diamond to capture all eight evaluated
+  values at the real displayed integer source frame. With animation, main values
+  are read-only at a source frame without a key until explicitly captured; sliders
+  never add keys. Capture requires the real playhead inside the selected excerpt.
+- All eight values use **To next point** easing together; one key overrides the
+  entire base, holding before the first/after the last key. Rotation interpolates
+  numerically, not by shortest arc: +170° to −170° passes through 0°.
+- **Selected Transform keyframe**, **Previous/Next** and **Preview stored key**
+  reach keys outside the trim and at the original exclusive OUT. The stored
+  source time is shown separately from the actual preview's source frame; preview
+  uses the closest mapped image rather than an unavailable or invented frame.
+  Stored **Source frame**, easing and pose fields edit that selected key; time and
+  value edits do not seek automatically. Easing is disabled on the last key.
+- Numeric Enter/blur applies exact values; Escape restores. Invalid crop sums,
+  collisions, fractional/out-of-original frames and out-of-bounds values stay
+  editable with errors, never silently clamp or overwrite. Slider movement is
+  local only; valid release changes the image in one Undo. Escape, cancellation,
+  capture loss or window blur cancels it without saving; keyboard adjustments
+  are individual validated edits.
+- The trash action removes only the selected full-pose key. Removing the last
+  key reveals the unchanged base. **Reset transform** deliberately restores the
+  neutral base and clears all spatial keys in one Undo.
+
+Up to **256** full-pose keys belong to each clip, separately from the row's
+Keyframes tab. Trims/restoration, moves and Ripple retain original-source anchors;
+splits, cuts and duplicates retain independent deep copies, including off-trim
+keys. Retiming drives geometry continuously even while a recorded image is held;
+there is no optical flow. Transform edits do not change timing, row Opacity,
+music, originals or proxies. Native Export supports these transforms through the
+layered path; the diagnostic two-clip reference does not.
+Details: [spatial transforms](design/SPATIAL_TRANSFORMS.md).
+
+### Opt in to shared row animation
 
 The dedicated **Keyframes** Inspector tab (accessible name **Layer keyframes**)
 belongs to the selected **whole video row**, even an empty one, not to a clip.
@@ -390,8 +436,8 @@ Trash icons delete; × closes or dismisses. Icon-only actions keep accessible na
 and tooltips. See the [editor control catalogue](design/EDITOR_CONTROLS.md) for
 control conventions and vocabulary.
 
-**Expand all / Collapse all** appears only in Clip and controls its four top-level
-sections: **Source range**, **Placement**, **Speed** and **Colour**. Sequence,
+**Expand all / Collapse all** appears only in Clip and controls its five top-level
+sections: **Source range**, **Placement**, **Speed**, **Transform** and **Colour**. Sequence,
 Audio, nested disclosures and help remain unchanged.
 
 The header directly exposes **Media / Inspector toggles and keyboard help**.
@@ -401,7 +447,7 @@ Escape cancels its drag. Compact desktop windows use one side drawer at a time.
 Layout/section preferences do not change rendering. Numbers/titles apply on
 Enter/blur, Escape restores, and invalid text remains editable. Numeric values retain
 full entered precision, independent of slider steps, without clamping or rounding.
-Colour/Opacity, playback rates and gain use a native slider with one adjacent exact
+Colour/Opacity/Transform, playback rates and gain use a native slider with one adjacent exact
 numeric field in both main and stored controls, not read-only outputs or number-only
 layouts. Pointer sliding updates only the local control value; the image updates
 on release after one validated edit. Escape, pointer cancellation, lost capture or
