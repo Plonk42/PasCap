@@ -282,7 +282,16 @@ for (const [width, height] of [
           gl.bindFramebuffer(gl.FRAMEBUFFER, null);
           const floating = new Float32Array(4);
           const floatOutput = (groups: typeof mixedFixture.groups) => {
-            compositor.drawFrame(groups);
+            // Bind the real program, uniforms, textures and VAO without another
+            // full-resolution diagnostic raster. The actual 81 probe draws below
+            // retain the full viewport coordinates on their 1-pixel float target.
+            gl.enable(gl.SCISSOR_TEST);
+            gl.scissor(0, 0, 0, 0);
+            try {
+              compositor.drawFrame(groups);
+            } finally {
+              gl.disable(gl.SCISSOR_TEST);
+            }
             gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
             const output = points.map(([x, y]) => {
               gl.viewport(-x!, -(height - 1 - y!), width, height);
@@ -345,6 +354,10 @@ void main() { colour = sampleTexture ? texture(source, coordinate) : value; }`,
             throw new Error(gl.getProgramInfoLog(constantProgram)!);
           gl.useProgram(constantProgram);
           gl.viewport(0, 0, 1, 1);
+          // clear() ignores the viewport. These independent 1-pixel blend
+          // probes must not clear the entire UHD drawing buffer twenty times.
+          gl.enable(gl.SCISSOR_TEST);
+          gl.scissor(0, 0, 1, 1);
           gl.enable(gl.BLEND);
           const constantBlends = [0.23, 0.3969, 0.51, 0.63, 0.8].flatMap((alpha) =>
             [0.27, 0.49, 0.51, 0.77].map((fraction) => {
@@ -359,6 +372,7 @@ void main() { colour = sampleTexture ? texture(source, coordinate) : value; }`,
             }),
           );
           gl.disable(gl.BLEND);
+          gl.disable(gl.SCISSOR_TEST);
           // Direct texture() probe removes even the neutral grading roundtrip.
           // The source is the existing asymmetric synthetic texture, not data
           // read from a composed fixture or its expected output.
