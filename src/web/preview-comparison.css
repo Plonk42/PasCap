@@ -1,0 +1,65 @@
+/* Restore only this compact preview heading, otherwise hidden by workspace.css. */
+.preview-panel .preview-heading.preview-comparison-heading,
+.product-workspace .viewer-panel .preview-heading.preview-comparison-heading {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  height: auto;
+  min-height: 36px;
+  padding: 4px 1px 8px;
+}
+
+.preview-comparison-controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  min-width: 0;
+  margin-left: auto;
+}
+
+.preview-comparison-controls .preview-quality {
+  white-space: nowrap;
+}
+
+.preview-comparison-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  gap: 5px;
+  min-width: 28px;
+  min-height: 28px;
+  padding: 4px 8px;
+  border: 1px solid #4b6052;
+  border-radius: 5px;
+  background: #223027;
+  color: #d0e2d3;
+  font-size: 11px;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+.preview-comparison-toggle[aria-pressed='true'] {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+  color: var(--accent);
+}
+
+.preview-comparison-overlay {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  max-width: calc(100% - 16px);
+  padding: 4px 8px;
+  border: 1px solid #66815c;
+  border-radius: 4px;
+  background: #18291deb;
+  color: #e2f2dc;
+  font-size: 11px;
+  font-weight: 550;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+  pointer-events: none;
+}

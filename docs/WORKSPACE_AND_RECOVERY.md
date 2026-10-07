@@ -162,6 +162,24 @@ The preview timecode accepts nominal 30 fps NDF **HH:MM:SS:FF** or an integer
 timeline frame; it is not rounded wall-clock seconds. Out-of-range/invalid input
 stays editable with an error and never seeks. Escape returns to the current display.
 
+### Preview colour comparison
+
+The **Timeline preview** heading's native **Compare** button has the accessible
+name **Show ungraded preview**. Active mode shows **Ungraded** on the button and
+as a canvas badge. Pointer activation and focused Enter/Space work paused or playing;
+there is no global comparison shortcut. **Source preview** is unaffected.
+
+The ungraded view is the composed preview without grading, not original-resolution
+footage or the selected clip in isolation. All evaluated colour settings are neutral
+across enabled rows, including static clip bases, row colour keys and both dissolve
+participants. Exact observed source frames and retiming, clip and existing layer
+opacity, visibility, black fades, stacking and music are preserved.
+
+This mode belongs only to the editor's preview engine: toggling causes no seek,
+save/history entry, export, schema, proxy or original change, or new decoder.
+Same-project seeks, appearance updates and timing reloads retain it; changing project
+or reloading the editor with a fresh engine restores normal graded preview.
+
 ## Numbers, titles and animation
 
 Inspector number fields keep a local text draft. Enter or leaving the field applies

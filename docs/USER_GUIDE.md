@@ -147,6 +147,24 @@ repeats frames and acceleration drops them; there is no optical-flow synthesis.
 Speed changes output duration: Ripple-on tracks re-sequence, off keeps independent starts,
 and incompatible fades/transitions/overlaps reject the edit rather than being shrunk.
 
+### Compare graded and ungraded preview
+
+The **Timeline preview** heading has a native **Compare** button, accessible as
+**Show ungraded preview**. When active, it reads **Ungraded** and the canvas shows
+an **Ungraded** badge. Click or use the focused button's Enter/Space to toggle while
+paused or playing; there is no global shortcut. **Source preview** is unchanged.
+
+Ungraded means the **composed timeline preview without grading**, not an
+original-resolution view or an isolated selected clip. It neutralizes all evaluated
+colour settings across enabled rows, including clip bases, row colour keys and both
+dissolve participants. Exact observed source frames, retiming, clip and layer opacity,
+visibility, black fades, stacking and music remain unchanged.
+
+Comparison is editor-only: toggling never seeks, saves, enters Undo history, changes
+exports, schema, proxies or originals, or adds decoders. Same-project seeks,
+appearance edits and timing reloads retain the mode; changing project or reloading
+the editor with a fresh preview engine resets to normal graded preview.
+
 ### Precise clip speed curves
 
 Select the excerpt, open **Clip → Speed**, and choose **Custom curve**. Start from

@@ -473,6 +473,10 @@ export function App() {
     if (engine.current?.diagnostics().playing) engine.current.pause();
     else void engine.current?.play();
   }, []);
+  const toggleUngraded = useCallback(() => {
+    if (drafting.current) return;
+    engine.current?.setUngraded(!engine.current.diagnostics().ungraded);
+  }, []);
   const revealClip = (id: string): void => {
     if (drafting.current || !current.current) return;
     const placed = calculateLayout(current.current).clips.find((item) => item.clip.id === id);
@@ -1608,6 +1612,7 @@ export function App() {
                 duration={layout.duration}
                 drafting={draft !== null}
                 onTogglePlayback={togglePlayback}
+                onToggleUngraded={toggleUngraded}
                 onSeek={seek}
                 onRetry={retryPreview}
                 onMedia={openMedia}
