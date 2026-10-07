@@ -38,7 +38,7 @@ export type EditCommand =
   | { type: 'duplicate'; clipId: string; newClipId: string }
   | { type: 'colour'; clipId: string; colour: ColourSettings }
   | { type: 'speed'; clipId: string; speed: SpeedSettings }
-  | { type: 'music'; music: MusicTrack | null }
+  | { type: 'music'; music: MusicTrack[] }
   | { type: 'opacity'; layerId: string; opacity: number }
   | { type: 'layer-key-toggle'; layerId: string; frame: number; setting: KeyframeSetting; value: number }
   | { type: 'layer-key-value'; layerId: string; frame: number; setting: KeyframeSetting; value: number }

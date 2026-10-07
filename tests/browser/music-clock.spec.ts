@@ -20,17 +20,20 @@ for (const startFrame of [0, 40])
     const project = createProject('music-clock', 'Synthetic music clock');
     project.clips = [createClip('clock-clip', video.id, 0, 90)];
     project.media = { videoIds: [video.id], audioIds: [song.id] };
-    project.music = {
-      mediaId: song.id,
-      sourceIn: 0,
-      sourceOut: 120,
-      start: 0,
-      duration: 90,
-      gainDb: -12,
-      fadeIn: 0,
-      fadeOut: 0,
-      loop: false,
-    };
+    project.music = [
+      {
+        id: 'clock-music',
+        mediaId: song.id,
+        sourceIn: 0,
+        sourceOut: 120,
+        start: 0,
+        duration: 90,
+        gainDb: -12,
+        fadeIn: 0,
+        fadeOut: 0,
+        loop: false,
+      },
+    ];
     const memory = await memoryProjects(page, project);
     await installMusicEvidence(page);
     await page.goto(`/?project=${project.id}`);
@@ -84,17 +87,20 @@ test('streamed PCM reaches the output with placement silence, real gain, selecte
   const project = createProject('music-signal', 'Synthetic PCM signal');
   project.clips = [createClip('signal-clip', video.id, 0, 90)];
   project.media = { videoIds: [video.id], audioIds: [song.id] };
-  project.music = {
-    mediaId: song.id,
-    sourceIn: 10,
-    sourceOut: 25,
-    start: 10,
-    duration: 60,
-    gainDb: -6,
-    fadeIn: 6,
-    fadeOut: 6,
-    loop: true,
-  };
+  project.music = [
+    {
+      id: 'signal-music',
+      mediaId: song.id,
+      sourceIn: 10,
+      sourceOut: 25,
+      start: 10,
+      duration: 60,
+      gainDb: -6,
+      fadeIn: 6,
+      fadeOut: 6,
+      loop: true,
+    },
+  ];
   const memory = await memoryProjects(page, project);
   await installMusicEvidence(page, true);
   await page.goto(`/?project=${project.id}`);

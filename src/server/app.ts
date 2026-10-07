@@ -260,9 +260,9 @@ export async function createApp(config = createConfig()) {
         throw new ServiceError(`Clip ${clip.id} exceeds its registered source frames.`, 422);
       sources.set(`video:${asset.id}`, asset);
     }
-    if (body.document.music !== null) {
-      const asset = audio.get(body.document.music.mediaId);
-      if (body.document.music.sourceOut > asset.metadata.frameCount)
+    for (const track of body.document.music) {
+      const asset = audio.get(track.mediaId);
+      if (track.sourceOut > asset.metadata.frameCount)
         throw new ServiceError('Music exceeds its registered source frames.', 422);
       sources.set(`audio:${asset.id}`, asset);
     }

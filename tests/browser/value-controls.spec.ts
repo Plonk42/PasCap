@@ -68,17 +68,20 @@ test.beforeEach(async ({ page, request }) => {
   document.media.audioIds = [music.id];
   document.clips = [createClip('one', assets[0]!.id, 0, 120)];
   expect(music.metadata.frameCount).toBeGreaterThanOrEqual(120);
-  document.music = {
-    mediaId: music.id,
-    sourceIn: 0,
-    sourceOut: 120,
-    start: 0,
-    duration: 120,
-    gainDb: 0,
-    fadeIn: 0,
-    fadeOut: 0,
-    loop: false,
-  };
+  document.music = [
+    {
+      id: 'value-music',
+      mediaId: music.id,
+      sourceIn: 0,
+      sourceOut: 120,
+      start: 0,
+      duration: 120,
+      gainDb: 0,
+      fadeIn: 0,
+      fadeOut: 0,
+      loop: false,
+    },
+  ];
   memory = await memoryProjects(page, document);
   await expandedInspectorPreferences(page);
   await page.goto(`/?project=${document.id}`);
@@ -259,7 +262,10 @@ const constantEdit: ValueEdit = (_document, rate) => ({
   clipId: 'one',
   speed: { mode: 'constant', rate },
 });
-const gainEdit: ValueEdit = (document, gainDb) => ({ type: 'music', music: { ...document.music!, gainDb } });
+const gainEdit: ValueEdit = (document, gainDb) => ({
+  type: 'music',
+  music: document.music.map((track) => (track.id === 'value-music' ? { ...track, gainDb } : track)),
+});
 
 test('all main colour, Opacity, constant-rate and Gain sliders draft locally and release as exactly one edit', async ({
   page,

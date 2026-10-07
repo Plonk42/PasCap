@@ -58,3 +58,41 @@ export function decodeMusicRange(
   }
   return output;
 }
+
+/** Accumulate one source without limiting it or retaining another source buffer. */
+export function accumulateMusicRange(
+  output: Float32Array<ArrayBuffer>,
+  bytes: ArrayBuffer | DataView<ArrayBuffer>,
+  track: MusicTrack,
+  frame: number,
+  offset: number,
+): void {
+  if (
+    bytes.byteLength === 0 ||
+    bytes.byteLength > MUSIC_CHUNK_SAMPLES * MUSIC_BYTES_PER_SAMPLE ||
+    bytes.byteLength % MUSIC_BYTES_PER_SAMPLE ||
+    !Number.isSafeInteger(offset) ||
+    offset < 0 ||
+    output.length > MUSIC_CHUNK_SAMPLES * MUSIC_CHANNELS ||
+    output.length % MUSIC_CHANNELS ||
+    offset * MUSIC_CHANNELS + bytes.byteLength / 2 > output.length
+  ) {
+    throw new Error('Music mix requires a complete bounded stereo PCM16 range and output.');
+  }
+  const input = bytes instanceof DataView ? bytes : new DataView(bytes);
+  for (let sample = 0; sample < bytes.byteLength / MUSIC_BYTES_PER_SAMPLE; sample++) {
+    const gain = musicGainAt(track, frame + sample / MUSIC_SAMPLES_PER_FRAME) / 32_768;
+    for (let channel = 0; channel < MUSIC_CHANNELS; channel++) {
+      const destination = (offset + sample) * MUSIC_CHANNELS + channel;
+      output[destination] = output[destination]! + input.getInt16((sample * MUSIC_CHANNELS + channel) * 2, true) * gain;
+    }
+  }
+}
+
+/** Limit only the completed sum; limiting a participant would destroy cancellation. */
+export function clampMusicMix(output: Float32Array<ArrayBuffer>): void {
+  for (let sample = 0; sample < output.length; sample++) {
+    if (!Number.isFinite(output[sample])) throw new Error('Music mix contains a nonfinite sample.');
+    output[sample] = Math.max(-1, Math.min(1, output[sample]!));
+  }
+}

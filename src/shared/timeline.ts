@@ -163,10 +163,17 @@ export function calculateLayout(project: ProjectDocument): TimelineLayout {
   validateTopology(project);
   const tracks = project.layers.map((layer) => placeLayer(project, layer));
   const clips = tracks.flatMap((track) => track.clips);
+  const duration = Math.max(
+    0,
+    ...clips.map((clip) => clip.end),
+    ...project.music.map((track) => track.start + track.duration),
+  );
+  if (!Number.isSafeInteger(duration) || duration > 2_147_483_647)
+    throw new Error('Project duration exceeds the supported integer project-frame range.');
   return {
     clips,
     transitions: tracks.flatMap((track) => track.transitions),
-    duration: Math.max(0, ...clips.map((clip) => clip.end)),
+    duration,
   };
 }
 

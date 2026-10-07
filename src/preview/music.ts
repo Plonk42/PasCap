@@ -1,6 +1,7 @@
-import type { MusicTrack } from '../shared/model.js';
+import { musicTracksSchema, type MusicTrack } from '../shared/model.js';
 import {
-  decodeMusicRange,
+  accumulateMusicRange,
+  clampMusicMix,
   MUSIC_BYTES_PER_SAMPLE,
   MUSIC_CHANNELS,
   MUSIC_CHUNK_SAMPLES,
@@ -113,8 +114,7 @@ export class MusicPlayback {
   #node: AudioWorkletNode | null = null;
   #setupPromise: Promise<void> | null = null;
   #processorError: Error | null = null;
-  #track: MusicTrack | null = null;
-  #samples = 0;
+  #tracks: { track: MusicTrack; samples: number }[] = [];
   #run: PlaybackRun | null = null;
   #running = false;
   #clockTime = 0;
@@ -135,16 +135,16 @@ export class MusicPlayback {
     return this.#lastErrorFrames;
   }
   get hasMusic(): boolean {
-    return this.#track !== null;
+    return this.#tracks.length > 0;
   }
-  #url(): string {
-    return new URL(`/api/audio/${this.#track!.mediaId}/playback`, location.href).href;
+  #url(track: MusicTrack): string {
+    return new URL(`/api/audio/${track.mediaId}/playback`, location.href).href;
   }
   #requireCurrent(signal: AbortSignal, generation: number): void {
     if (signal.aborted || this.#disposed || generation !== this.#generation) throw aborted();
   }
-  async #fetch(init: RequestInit, signal: AbortSignal): Promise<Response> {
-    const response = await fetch(this.#url(), {
+  async #fetch(track: MusicTrack, init: RequestInit, signal: AbortSignal): Promise<Response> {
+    const response = await fetch(this.#url(track), {
       ...init,
       signal: AbortSignal.any([signal, AbortSignal.timeout(10_000)]),
     });
@@ -169,23 +169,29 @@ export class MusicPlayback {
     }
     return response;
   }
-  async configure(track: MusicTrack | null, signal: AbortSignal): Promise<void> {
+  async configure(tracks: readonly MusicTrack[], signal: AbortSignal): Promise<void> {
     this.pause();
-    this.#track = track ? { ...track } : null;
-    this.#samples = 0;
+    this.#tracks = [];
     this.#lastErrorFrames = 0;
     const generation = this.#generation;
-    if (!track) return;
-    const response = await this.#fetch({ method: 'HEAD' }, signal);
+    const snapshot = musicTracksSchema.parse(tracks);
+    const configured: { track: MusicTrack; samples: number }[] = [];
+    const deadline = AbortSignal.any([signal, AbortSignal.timeout(10_000)]);
+    await forEachSerial(snapshot, async (track) => {
+      this.#requireCurrent(deadline, generation);
+      const response = await abortable(this.#fetch(track, { method: 'HEAD' }, deadline), deadline);
+      this.#requireCurrent(deadline, generation);
+      const samples = Number(response.headers.get('content-length')) / MUSIC_BYTES_PER_SAMPLE;
+      if (
+        !Number.isSafeInteger(samples) ||
+        samples <= 0 ||
+        samples < Math.round(track.sourceOut * MUSIC_SAMPLES_PER_FRAME)
+      )
+        throw new Error(`Music instance ${track.id} exceeds the complete prepared PCM16 sample range.`);
+      configured.push({ track, samples });
+    });
     this.#requireCurrent(signal, generation);
-    const samples = Number(response.headers.get('content-length')) / MUSIC_BYTES_PER_SAMPLE;
-    if (
-      !Number.isSafeInteger(samples) ||
-      samples <= 0 ||
-      samples < Math.round(track.sourceOut * MUSIC_SAMPLES_PER_FRAME)
-    )
-      throw new Error('Music exceeds the complete prepared PCM16 sample range.');
-    this.#samples = samples;
+    this.#tracks = configured;
   }
   async #setup(): Promise<void> {
     if (!this.#context) this.#context = new AudioContext({ sampleRate: MUSIC_SAMPLE_RATE });
@@ -206,7 +212,7 @@ export class MusicPlayback {
     await this.#setupPromise;
   }
   async resumeContext(signal?: AbortSignal): Promise<void> {
-    if (!this.#track) return;
+    if (!this.hasMusic) return;
     const generation = this.#generation;
     const deadline = AbortSignal.any([signal ?? new AbortController().signal, AbortSignal.timeout(10_000)]);
     await abortable(this.#setup(), deadline, 'Music audio module did not load within 10 seconds.');
@@ -220,18 +226,25 @@ export class MusicPlayback {
     run.controller.abort();
     this.#node?.port.postMessage({ kind: 'stop', generation: run.generation });
   }
-  async #readRange(run: PlaybackRun, source: number, samples: number): Promise<ArrayBuffer> {
-    if (source + samples > this.#samples) throw new Error('Music range exceeds its prepared source samples.');
+  async #readRange(
+    run: PlaybackRun,
+    track: MusicTrack,
+    totalSamples: number,
+    source: number,
+    samples: number,
+  ): Promise<ArrayBuffer> {
+    if (source + samples > totalSamples) throw new Error('Music range exceeds its prepared source samples.');
     const begin = source * MUSIC_BYTES_PER_SAMPLE;
     const length = samples * MUSIC_BYTES_PER_SAMPLE;
     const response = await this.#fetch(
+      track,
       { headers: { Range: `bytes=${begin}-${begin + length - 1}` } },
       run.controller.signal,
     );
     if (
       response.status !== 206 ||
       response.headers.get('content-range') !==
-        `bytes ${begin}-${begin + length - 1}/${this.#samples * MUSIC_BYTES_PER_SAMPLE}` ||
+        `bytes ${begin}-${begin + length - 1}/${totalSamples * MUSIC_BYTES_PER_SAMPLE}` ||
       Number(response.headers.get('content-length')) !== length
     ) {
       await response.body?.cancel();
@@ -239,10 +252,13 @@ export class MusicPlayback {
     }
     return readBytes(response, length);
   }
-  async #readChunk(run: PlaybackRun): Promise<MusicChunk> {
-    const track = this.#track!;
+  async #mixTrack(
+    run: PlaybackRun,
+    track: MusicTrack,
+    samples: number,
+    data: Float32Array<ArrayBuffer>,
+  ): Promise<void> {
     const offset = run.queued;
-    const data = new Float32Array(MUSIC_CHUNK_SAMPLES * MUSIC_CHANNELS);
     const sourceIn = Math.round(track.sourceIn * MUSIC_SAMPLES_PER_FRAME);
     const selectedSamples = Math.round(track.sourceOut * MUSIC_SAMPLES_PER_FRAME) - sourceIn;
     let loopBytes: ArrayBuffer | null = null;
@@ -258,16 +274,27 @@ export class MusicPlayback {
           if (track.loop && selectedSamples <= MUSIC_CHUNK_SAMPLES) {
             // Reuse a bounded short selection only within this block. Each refill
             // still makes a fresh identity-guarded read, not one request per wrap.
-            loopBytes ??= await this.#readRange(run, sourceIn, selectedSamples);
+            loopBytes ??= await this.#readRange(run, track, samples, sourceIn, selectedSamples);
             const begin = (read.source - sourceIn) * MUSIC_BYTES_PER_SAMPLE;
             bytes = new DataView(loopBytes, begin, read.samples * MUSIC_BYTES_PER_SAMPLE);
-          } else bytes = await this.#readRange(run, read.source, read.samples);
+          } else bytes = await this.#readRange(run, track, samples, read.source, read.samples);
           this.#requireCurrent(run.controller.signal, run.generation);
-          data.set(decodeMusicRange(bytes, track, frame), filled * MUSIC_CHANNELS);
+          accumulateMusicRange(data, bytes, track, frame, filled);
         }
         filled += read.samples;
       },
     );
+  }
+  async #readChunk(run: PlaybackRun): Promise<MusicChunk> {
+    const offset = run.queued;
+    const data = new Float32Array(MUSIC_CHUNK_SAMPLES * MUSIC_CHANNELS);
+    // One mixed block and one <=64 KiB read/short-loop scratch, not eight queues.
+    await forEachSerial(this.#tracks, async ({ track, samples }) => {
+      this.#requireCurrent(run.controller.signal, run.generation);
+      await this.#mixTrack(run, track, samples, data);
+    });
+    this.#requireCurrent(run.controller.signal, run.generation);
+    clampMusicMix(data);
     run.queued += MUSIC_CHUNK_SAMPLES;
     return { offset, data };
   }
@@ -340,7 +367,7 @@ export class MusicPlayback {
     this.pause();
     const generation = this.#generation;
     this.#requireCurrent(signal, generation);
-    if (!this.#track) {
+    if (!this.hasMusic) {
       this.#clockFrame = frame;
       this.#clockTime = this.clockSeconds;
       this.#running = true;
@@ -432,7 +459,7 @@ export class MusicPlayback {
   }
   sync(): boolean {
     if (this.#run?.error) throw this.#run.error;
-    if (!this.#track || !this.#running) return true;
+    if (!this.hasMusic || !this.#running) return true;
     if (this.#context!.state !== 'running')
       throw new Error('Music audio context stopped unexpectedly. Retry preview explicitly.');
     return !this.#run?.underrun && this.#lastErrorFrames <= 1;
@@ -460,7 +487,7 @@ export class MusicPlayback {
     if (this.#disposed) return;
     this.pause();
     this.#disposed = true;
-    this.#track = null;
+    this.#tracks = [];
     if (this.#node) {
       this.#node.port.postMessage({ kind: 'dispose' });
       this.#node.port.onmessage = null;

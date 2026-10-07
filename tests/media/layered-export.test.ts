@@ -21,6 +21,7 @@ import { estimateExportSpace } from '../../src/shared/export-space.js';
 import {
   EXPORT_PROFILES,
   LAYERED_EXPORT_RESOURCES,
+  exportAudioSample,
   needsLayeredExport,
   planExport,
   planLayeredExport,
@@ -127,7 +128,7 @@ function coverage(samples: PreviewLayer[]): number {
   return result;
 }
 
-describe.skipIf(!enabled)('schema-7 layered native export · disposable synthetic sources only', () => {
+describe.skipIf(!enabled)('schema-8 layered native export · disposable synthetic sources only', () => {
   let root: string;
   let config: ServiceConfig;
   let jobs: JobQueue;
@@ -1244,27 +1245,36 @@ describe.skipIf(!enabled)('schema-7 layered native export · disposable syntheti
     );
   });
 
-  it('reuses the selected-range 48 kHz music/mux/verification path for an extended layered duration', async () => {
+  it('reuses selected-range 48 kHz music for a black conclusion beyond every video track OUT', async () => {
     const project = simple(4);
     project.clips[1]!.start = 5;
-    project.music = {
-      mediaId: music.id,
-      sourceIn: 2,
-      sourceOut: 6,
-      start: 1,
-      duration: 5,
-      gainDb: -6,
-      fadeIn: 1,
-      fadeOut: 1,
-      loop: true,
-    };
+    project.music = [
+      {
+        id: 'layered-music-instance',
+        mediaId: music.id,
+        sourceIn: 2,
+        sourceOut: 6,
+        start: 1,
+        duration: 12,
+        gainDb: -6,
+        fadeIn: 1,
+        fadeOut: 3,
+        loop: true,
+      },
+    ];
     const result = await complete(project);
     bounds(result.receipt);
     await parity(project, result.filename);
+    expect(result.receipt.timeline.duration).toBe(13);
+    expect(result.receipt.verification.frameCount).toBe(13);
+    expect(sampleTimeline(project, 12)).toEqual([]);
+    expect(result.receipt.settings.audio[0]!.activeSamples).toBe(exportAudioSample(12));
+    expect(result.receipt.settings.audio[0]!.videoSamples).toBe(exportAudioSample(13));
     expect(result.receipt.verification.audio).toMatchObject({ codec: 'aac', sampleRate: 48000, channels: 2 });
     expect(result.receipt.verification.audio!.durationErrorSeconds).toBeLessThanOrEqual(framesToSeconds(1));
-    expect(result.receipt.musicSource).toEqual(music);
+    expect(result.receipt.musicSources).toEqual([music]);
     expect(await fingerprintFile(music.sourcePath)).toEqual(music.fingerprint);
+    await unchanged();
   });
 
   it('owns the queued immutable snapshot without modifying originals or saved user edits', async () => {

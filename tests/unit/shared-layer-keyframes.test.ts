@@ -79,7 +79,7 @@ const primitive: Record<Interpolation, (u: number) => number> = {
   smooth: (u) => u * u * u - (u * u * u * u) / 2,
 };
 
-describe('strict schema-7 row points and independently participating settings', () => {
+describe('strict schema-8 row points and independently participating settings', () => {
   it('exports an ordered immutable nine-setting catalogue and explicit all-null template', () => {
     const settings = [
       'opacity',
@@ -100,10 +100,10 @@ describe('strict schema-7 row points and independently participating settings', 
     expect(KEYFRAME_SETTINGS.every(Object.isFrozen)).toBe(true);
   });
 
-  it('requires version 7, explicit media membership, row opacity and clip settings without legacy fields', () => {
+  it('requires version 8, explicit media membership, row opacity and clip settings without legacy fields', () => {
     const project = createProject('strict', 'Strict');
     const clip = createClip('one', 'source', 0, 20);
-    expect(project.schemaVersion).toBe(7);
+    expect(project.schemaVersion).toBe(8);
     expect(project.media).toEqual({ videoIds: [], audioIds: [] });
     expect(project.layers[0]).toEqual(row());
     expect(Object.keys(clip)).toEqual([
@@ -116,7 +116,7 @@ describe('strict schema-7 row points and independently participating settings', 
       'colour',
       'speed',
     ]);
-    expect(projectSchema.safeParse({ ...project, schemaVersion: 6 }).success).toBe(false);
+    expect(projectSchema.safeParse({ ...project, schemaVersion: 7 }).success).toBe(false);
     expect(project.layers[0]!.opacity).toBe(1);
     expect(clip).not.toHaveProperty('opacity');
     const { opacity: _opacity, ...withoutOpacity } = row();
