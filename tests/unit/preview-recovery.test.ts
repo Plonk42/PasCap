@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import type { CompositeGroup } from '../../src/preview/compositor.js';
 import { PreviewEngine } from '../../src/preview/engine.js';
+import { NEUTRAL_COLOUR } from '../../src/shared/colour.js';
 import { EMPTY_KEY_VALUES } from '../../src/shared/keyframes.js';
 import {
   createClip,
@@ -36,12 +37,17 @@ type Texture = { sourceFrame: number; url: string };
 type Surface = { clips: (CompositeGroup['clips'][number] & Texture)[] }[];
 interface CompositorDouble {
   visible: Surface | null;
+  setDecoderCount: Mock<(count: number) => void>;
   clear: Mock<() => void>;
   uploadVideo: Mock<(index: number, video: HTMLVideoElement) => void>;
   drawFrame: Mock<(groups: readonly CompositeGroup[]) => void>;
 }
 interface MusicDouble {
+  clockFrame: number;
+  clockTime: number;
+  running: boolean;
   configure: Mock<(track: MusicTrack | null, signal: AbortSignal) => Promise<void>>;
+  resumeContext: Mock<() => Promise<void>>;
   start: Mock<(frame: number, signal: AbortSignal) => Promise<void>>;
   sync: Mock<() => boolean>;
   pause: Mock<() => void>;
@@ -255,6 +261,69 @@ function singleProject(withMusic = false): ProjectDocument {
   }
   return project;
 }
+function gradedProject(withMusic = false): ProjectDocument {
+  const project = singleProject(withMusic);
+  project.clips[0]!.colour = {
+    exposure: 0.7,
+    brightness: 0.1,
+    contrast: 1.2,
+    hue: 20,
+    saturation: 0.8,
+    highlights: -0.2,
+    shadows: 0.3,
+  };
+  return project;
+}
+function gradedLayersProject(): ProjectDocument {
+  const project = gradedProject(true);
+  const lower = project.layers[0]!;
+  const left = project.clips[0]!;
+  left.speed = { mode: 'constant', rate: 2 };
+  const right = createClip('right', 'other-video', 100, 115, lower.id);
+  right.start = 20;
+  right.speed = { mode: 'constant', rate: 0.5 };
+  right.colour = { ...left.colour, hue: -40, saturation: 1.4 };
+  lower.opacity = 0.55;
+  lower.openingFade = 6;
+  lower.closingFade = 8;
+  lower.transitions = [{ leftId: left.id, rightId: right.id, type: 'cross-dissolve', duration: 10 }];
+  lower.keyframes = [
+    { frame: 0, interpolation: 'linear', values: { ...EMPTY_KEY_VALUES, exposure: -1, opacity: 0.6 } },
+    { frame: 50, interpolation: 'hold', values: { ...EMPTY_KEY_VALUES, exposure: 1, opacity: 0.3 } },
+  ];
+  const upper = createLayer('upper', 'Upper');
+  upper.opacity = 0.75;
+  upper.openingFade = 35;
+  upper.closingFade = 10;
+  upper.keyframes = [
+    {
+      frame: 0,
+      interpolation: 'smooth',
+      values: { ...EMPTY_KEY_VALUES, ...left.colour, opacity: 0.35 },
+    },
+    {
+      frame: 60,
+      interpolation: 'hold',
+      values: {
+        ...EMPTY_KEY_VALUES,
+        exposure: -0.8,
+        brightness: -0.1,
+        contrast: 0.6,
+        hue: -75,
+        saturation: 1.7,
+        highlights: 0.4,
+        shadows: -0.5,
+        opacity: 0.7,
+      },
+    },
+  ];
+  const top = createClip('upper-clip', 'upper-video', 200, 275, upper.id);
+  top.speed = { mode: 'constant', rate: 1.25 };
+  project.layers.push(upper);
+  project.clips.push(right, top);
+  project.media.videoIds.push('other-video', 'upper-video');
+  return project;
+}
 interface RunningPreview {
   project: ProjectDocument;
   engine: PreviewEngine;
@@ -263,6 +332,31 @@ interface RunningPreview {
   initialFrame: number;
   anchor: number;
   initialStalls: number;
+}
+async function paused(project: ProjectDocument, initialFrame = 8): Promise<RunningPreview> {
+  const snapshot = projectSchema.parse(project);
+  const engine = new PreviewEngine(new EventTarget() as HTMLCanvasElement);
+  engines.push(engine);
+  await engine.loadProject(snapshot, proxyUrl, initialFrame);
+  await settle();
+  const preview = {
+    project: snapshot,
+    engine,
+    compositor: doubles.compositors[0]!,
+    music: doubles.music[0]!,
+    initialFrame,
+    anchor: doubles.now,
+    initialStalls: engine.diagnostics().stalls,
+  };
+  expect(engine.diagnostics()).toMatchObject({
+    status: 'paused',
+    playing: false,
+    frame: initialFrame,
+    ungraded: false,
+  });
+  expectSurface(preview, initialFrame);
+  vi.clearAllMocks();
+  return preview;
 }
 async function running(project: ProjectDocument, initialFrame = 8): Promise<RunningPreview> {
   const snapshot = projectSchema.parse(project);
@@ -300,7 +394,7 @@ function tick(preview: RunningPreview, expected: number, fraction = 0.1): void {
 function observeAt(preview: RunningPreview, frame: number): void {
   for (const layer of sampleTimeline(preview.project, frame)) slotFor(preview, layer.clipId).observe(layer.sourceFrame);
 }
-function expectSurface(preview: RunningPreview, frame: number): void {
+function expectSurface(preview: RunningPreview, frame: number, ungraded = false): void {
   const layers = sampleTimeline(preview.project, frame, calculateLayout(preview.project));
   expect(preview.compositor.visible).toEqual(
     preview.project.layers.flatMap((group) => {
@@ -312,7 +406,7 @@ function expectSurface(preview: RunningPreview, frame: number): void {
                 slot: preview.engine.diagnostics().assignedClipIds.indexOf(layer.clipId),
                 sourceFrame: layer.sourceFrame,
                 url: proxyUrl(layer.mediaId),
-                settings: layer.colour,
+                settings: ungraded ? NEUTRAL_COLOUR : layer.colour,
                 aspect: 16 / 9,
                 opacity: layer.opacity,
                 blendWeight: layer.blendWeight,
@@ -323,6 +417,21 @@ function expectSurface(preview: RunningPreview, frame: number): void {
         : [];
     }),
   );
+}
+function expectNoMediaOperations(preview: RunningPreview): void {
+  expect(preview.compositor.setDecoderCount).not.toHaveBeenCalled();
+  expect(preview.music.configure).not.toHaveBeenCalled();
+  expect(preview.music.resumeContext).not.toHaveBeenCalled();
+  expect(preview.music.start).not.toHaveBeenCalled();
+  expect(preview.music.pause).not.toHaveBeenCalled();
+  for (const slot of doubles.slots) {
+    expect(slot.load).not.toHaveBeenCalled();
+    expect(slot.seek).not.toHaveBeenCalled();
+    expect(slot.play).not.toHaveBeenCalled();
+    expect(slot.pause).not.toHaveBeenCalled();
+    expect(slot.setRate).not.toHaveBeenCalled();
+    expect(slot.dispose).not.toHaveBeenCalled();
+  }
 }
 function expectUninterrupted(preview: RunningPreview): void {
   expect(preview.engine.diagnostics()).toMatchObject({
@@ -336,6 +445,21 @@ function expectUninterrupted(preview: RunningPreview): void {
   for (const slot of doubles.slots) expect(slot.seek).not.toHaveBeenCalled();
 }
 
+function holdNextLoad(slot: DecoderDouble, completeAfterAbort = false) {
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const load = slot.load.getMockImplementation()!;
+  slot.load.mockImplementationOnce(async (...args) => {
+    // Keep a real boundary promise pending even after cancellation, to check
+    // that late completion cannot draw or restore an obsolete project mode.
+    await gate;
+    if (completeAfterAbort && args[2].aborted) return;
+    await load(...args);
+  });
+  return { release };
+}
 function holdNextSeek(slot: DecoderDouble) {
   let release!: () => void;
   let fail!: (error: Error) => void;
@@ -971,5 +1095,604 @@ describe('PreviewEngine observed-frame tolerance and recovery', () => {
     expectSurface(preview, 10);
     expect(preview.compositor.visible).toEqual([]);
     expectUninterrupted(preview);
+  });
+});
+
+describe('PreviewEngine editor-only ungraded comparison', () => {
+  it('starts graded and ignores mode requests without a loaded document', () => {
+    const engine = new PreviewEngine(new EventTarget() as HTMLCanvasElement);
+    engines.push(engine);
+    const listener = vi.fn();
+    engine.subscribe(listener);
+    const before = engine.diagnostics();
+    vi.clearAllMocks();
+    engine.setUngraded(true);
+    engine.setUngraded(false);
+    expect(engine.diagnostics()).toEqual(before);
+    expect(engine.diagnostics().ungraded).toBe(false);
+    expect(listener).not.toHaveBeenCalled();
+    expect(doubles.compositors[0]!.drawFrame).not.toHaveBeenCalled();
+    expect(doubles.compositors[0]!.clear).not.toHaveBeenCalled();
+    expect(doubles.compositors[0]!.setDecoderCount).not.toHaveBeenCalled();
+    expect(doubles.slots).toHaveLength(2);
+    for (const slot of doubles.slots) {
+      expect(slot.load).not.toHaveBeenCalled();
+      expect(slot.seek).not.toHaveBeenCalled();
+      expect(slot.pause).not.toHaveBeenCalled();
+      expect(slot.play).not.toHaveBeenCalled();
+      expect(slot.setRate).not.toHaveBeenCalled();
+    }
+    expect(doubles.music[0]!.configure).not.toHaveBeenCalled();
+    expect(doubles.music[0]!.start).not.toHaveBeenCalled();
+    expect(doubles.music[0]!.pause).not.toHaveBeenCalled();
+  });
+
+  it.each([false, true])('redraws the same paused textures without touching media (music=%s)', async (withMusic) => {
+    const preview = await paused(gradedProject(withMusic), 13);
+    const document = structuredClone(preview.project);
+    const graded = structuredClone(preview.compositor.visible);
+    const slots = [...doubles.slots];
+    const before = preview.engine.diagnostics();
+    const listener = vi.fn();
+    preview.engine.subscribe(listener);
+    vi.clearAllMocks();
+
+    preview.engine.setUngraded(true);
+    expectSurface(preview, 13, true);
+    expect(preview.engine.diagnostics()).toEqual({
+      ...before,
+      ungraded: true,
+      renderedFrames: before.renderedFrames + 1,
+    });
+    expect(listener).toHaveBeenCalledTimes(1);
+    expect(listener.mock.lastCall![0]).toMatchObject({ ungraded: true, status: 'paused', frame: 13 });
+
+    preview.engine.setUngraded(false);
+    expect(preview.compositor.visible).toEqual(graded);
+    expect(preview.engine.diagnostics()).toEqual({ ...before, renderedFrames: before.renderedFrames + 2 });
+    expect(listener).toHaveBeenCalledTimes(2);
+    expect(listener.mock.lastCall![0].ungraded).toBe(false);
+    expect(preview.compositor.drawFrame).toHaveBeenCalledTimes(2);
+    expect(preview.compositor.uploadVideo).not.toHaveBeenCalled();
+    expect(preview.compositor.clear).not.toHaveBeenCalled();
+    expect(doubles.slots).toEqual(slots);
+    expect(preview.project).toEqual(document);
+    expect(projectSchema.parse(preview.project)).toEqual(document);
+    expectNoMediaOperations(preview);
+  });
+
+  it('preserves a non-widescreen source aspect and uses the current mode for pixel capture', async () => {
+    const preview = await paused(gradedProject(true));
+    slotFor(preview).aspect = 4 / 3;
+    preview.engine.capturePixels();
+    const graded = structuredClone(preview.compositor.visible)!;
+    expect(graded[0]!.clips[0]!.aspect).toBe(4 / 3);
+    vi.clearAllMocks();
+    preview.engine.setUngraded(true);
+    preview.engine.capturePixels();
+    expect(preview.compositor.visible).toEqual(
+      graded.map((group) => ({
+        ...group,
+        clips: group.clips.map((clip) => ({ ...clip, settings: NEUTRAL_COLOUR })),
+      })),
+    );
+    preview.engine.setUngraded(false);
+    preview.engine.capturePixels();
+    expect(preview.compositor.visible).toEqual(graded);
+    expect(preview.compositor.uploadVideo).not.toHaveBeenCalled();
+    expectNoMediaOperations(preview);
+  });
+
+  it.each([3, 25, 47])('neutralizes every evaluated source grade but not composition at frame %i', async (frame) => {
+    const preview = await paused(gradedLayersProject(), frame);
+    const document = structuredClone(preview.project);
+    const graded = structuredClone(preview.compositor.visible)!;
+    const before = preview.engine.diagnostics();
+    expect(graded).toHaveLength(2);
+    for (const clip of graded.flatMap((group) => group.clips)) expect(clip.settings).not.toEqual(NEUTRAL_COLOUR);
+    expect(graded.flatMap((group) => group.clips).some((clip) => clip.brightness < 1)).toBe(true);
+    expect(graded.flatMap((group) => group.clips).every((clip) => clip.opacity > 0 && clip.opacity < 1)).toBe(true);
+    if (frame === 25) {
+      expect(graded[0]!.clips).toHaveLength(2);
+      expect(graded[0]!.clips.map((clip) => clip.blendWeight)).toEqual([0.5, 0.5]);
+      expect(graded[0]!.clips.map((clip) => clip.sourceFrame)).toEqual([50, 102]);
+      for (const clip of graded[0]!.clips) expect(clip.opacity).toBeCloseTo(0.45, 12);
+      expect(graded[1]!.clips[0]!.settings).not.toEqual(preview.project.clips[2]!.colour);
+    }
+
+    preview.engine.setUngraded(true);
+    expectSurface(preview, frame, true);
+    expect(preview.compositor.visible).toEqual(
+      graded.map((group) => ({
+        ...group,
+        clips: group.clips.map((clip) => ({ ...clip, settings: NEUTRAL_COLOUR })),
+      })),
+    );
+    expect(preview.engine.diagnostics()).toMatchObject({
+      ungraded: true,
+      frame,
+      duration: before.duration,
+      requestedFrame: before.requestedFrame,
+      decodedSourceFrames: before.decodedSourceFrames,
+      assignedClipIds: before.assignedClipIds,
+      decoderCount: 4,
+    });
+    preview.engine.setUngraded(false);
+    expect(preview.compositor.visible).toEqual(graded);
+    expect(preview.project).toEqual(document);
+    expect(preview.compositor.uploadVideo).not.toHaveBeenCalled();
+    expectNoMediaOperations(preview);
+  });
+
+  it.each([17, 22])('preserves fade-through-black brightness while bypassing colour at frame %i', async (frame) => {
+    const project = gradedProject();
+    project.clips[0]!.sourceOut = 20;
+    const right = createClip('right', 'other-video', 100, 120);
+    right.start = 20;
+    right.colour = { ...project.clips[0]!.colour, hue: -40 };
+    project.clips.push(right);
+    project.media.videoIds.push('other-video');
+    project.layers[0]!.opacity = 0.7;
+    project.layers[0]!.transitions = [{ leftId: 'clip', rightId: 'right', type: 'fade-through-black', duration: 10 }];
+    const preview = await paused(project, frame);
+    const graded = structuredClone(preview.compositor.visible)!;
+    expect(graded[0]!.clips[0]!.brightness).toBe(0.5);
+    preview.engine.setUngraded(true);
+    expectSurface(preview, frame, true);
+    expect(preview.compositor.visible![0]!.clips[0]!.brightness).toBe(0.5);
+    expect(preview.compositor.visible![0]!.clips[0]!.opacity).toBe(0.7);
+    preview.engine.setUngraded(false);
+    expect(preview.compositor.visible).toEqual(graded);
+    expectNoMediaOperations(preview);
+  });
+
+  it.each([true, false])('waits for exact paused readiness without seeking when ungraded=%s', async (enabled) => {
+    const preview = await paused(gradedProject(true));
+    if (!enabled) preview.engine.setUngraded(true);
+    const slot = slotFor(preview);
+    const before = preview.engine.diagnostics();
+    Object.assign(slot.video, { readyState: 1 });
+    const listener = vi.fn();
+    preview.engine.subscribe(listener);
+    vi.clearAllMocks();
+
+    preview.engine.setUngraded(enabled);
+    expect(preview.engine.diagnostics()).toMatchObject({ ungraded: enabled, status: 'paused', frame: 8 });
+    expect(preview.engine.diagnostics().renderedFrames).toBe(before.renderedFrames);
+    expect(listener).toHaveBeenCalledTimes(1);
+    expect(listener.mock.lastCall![0].ungraded).toBe(enabled);
+    expect(preview.compositor.clear).toHaveBeenCalledOnce();
+    expect(preview.compositor.visible).toBeNull();
+    expect(preview.compositor.drawFrame).not.toHaveBeenCalled();
+    expectNoMediaOperations(preview);
+
+    slot.observe(10); // A real callback for the wrong source is not paused readiness.
+    expect(preview.compositor.drawFrame).not.toHaveBeenCalled();
+    expect(preview.compositor.visible).toBeNull();
+    slot.observe(8);
+    expectSurface(preview, 8, enabled);
+    expect(preview.compositor.drawFrame).toHaveBeenCalledOnce();
+    expect(preview.compositor.uploadVideo).not.toHaveBeenCalled();
+    expect(listener).toHaveBeenCalledTimes(2);
+    expectNoMediaOperations(preview);
+  });
+
+  it('requires all dissolve and layer sources before redrawing a paused bypass', async () => {
+    const preview = await paused(gradedLayersProject(), 25);
+    const right = slotFor(preview, 'right');
+    const upper = slotFor(preview, 'upper-clip');
+    Object.assign(right.video, { readyState: 1 });
+    Object.assign(upper.video, { readyState: 1 });
+    preview.engine.setUngraded(true);
+    expect(preview.compositor.visible).toBeNull();
+    right.observe(102);
+    expect(preview.compositor.visible).toBeNull();
+    expect(preview.compositor.drawFrame).not.toHaveBeenCalled();
+    expect(preview.compositor.uploadVideo).not.toHaveBeenCalled();
+    upper.observe(sampleTimeline(preview.project, 25).find((layer) => layer.clipId === 'upper-clip')!.sourceFrame);
+    expectSurface(preview, 25, true);
+    expect(preview.compositor.drawFrame).toHaveBeenCalledOnce();
+    expect(preview.compositor.uploadVideo).not.toHaveBeenCalled();
+    expectNoMediaOperations(preview);
+  });
+
+  it.each([false, true])('treats an unchanged loaded mode as a complete no-op (ungraded=%s)', async (enabled) => {
+    const preview = await paused(gradedProject(true));
+    preview.engine.setUngraded(enabled);
+    const before = preview.engine.diagnostics();
+    const surface = structuredClone(preview.compositor.visible);
+    const listener = vi.fn();
+    preview.engine.subscribe(listener);
+    vi.clearAllMocks();
+    preview.engine.setUngraded(enabled);
+    preview.engine.setUngraded(enabled);
+    expect(preview.engine.diagnostics()).toEqual(before);
+    expect(preview.compositor.visible).toEqual(surface);
+    expect(listener).not.toHaveBeenCalled();
+    expect(preview.compositor.drawFrame).not.toHaveBeenCalled();
+    expect(preview.compositor.uploadVideo).not.toHaveBeenCalled();
+    expect(preview.compositor.clear).not.toHaveBeenCalled();
+    expectNoMediaOperations(preview);
+  });
+
+  it('resets on disposal, ignores disposed requests and leaves a fresh engine graded', async () => {
+    const preview = await paused(gradedProject(true));
+    preview.engine.setUngraded(true);
+    preview.engine.dispose();
+    expect(preview.engine.diagnostics()).toMatchObject({ status: 'disposed', playing: false, ungraded: false });
+    const before = preview.engine.diagnostics();
+    const listener = vi.fn();
+    preview.engine.subscribe(listener);
+    vi.clearAllMocks();
+    preview.engine.setUngraded(true);
+    preview.engine.setUngraded(false);
+    expect(preview.engine.diagnostics()).toEqual(before);
+    expect(listener).not.toHaveBeenCalled();
+    expect(preview.compositor.drawFrame).not.toHaveBeenCalled();
+    expect(preview.compositor.clear).not.toHaveBeenCalled();
+    expectNoMediaOperations(preview);
+    const fresh = new PreviewEngine(new EventTarget() as HTMLCanvasElement);
+    engines.push(fresh);
+    expect(fresh.diagnostics()).toMatchObject({ status: 'empty', ungraded: false });
+  });
+
+  it('retains all static grade edits made during bypass and reveals them when disabled', async () => {
+    const preview = await paused(gradedProject(true));
+    const document = structuredClone(preview.project);
+    preview.engine.setUngraded(true);
+    vi.clearAllMocks();
+    const edited = {
+      exposure: -1.25,
+      brightness: -0.2,
+      contrast: 0.7,
+      hue: -110,
+      saturation: 1.6,
+      highlights: 0.5,
+      shadows: -0.4,
+    };
+    preview.engine.updateColour('clip', edited);
+    expectSurface(preview, 8, true);
+    expect(preview.engine.diagnostics().ungraded).toBe(true);
+    expect(preview.project).toEqual(document);
+    expect(edited.exposure).toBe(-1.25);
+    preview.engine.setUngraded(false);
+    expect(preview.compositor.visible![0]!.clips[0]!.settings).toEqual(edited);
+    expect(preview.engine.diagnostics()).toMatchObject({ status: 'paused', ungraded: false, frame: 8 });
+    expect(preview.compositor.uploadVideo).not.toHaveBeenCalled();
+    expectNoMediaOperations(preview);
+  });
+
+  it('reveals the latest evaluated row and static grades after appearance edits during bypass', async () => {
+    const preview = await paused(gradedLayersProject(), 25);
+    const original = structuredClone(preview.project);
+    preview.engine.setUngraded(true);
+    const edited = structuredClone(preview.project);
+    edited.clips[0]!.colour.hue = 90;
+    edited.clips[1]!.colour.saturation = 0.2;
+    edited.layers[0]!.keyframes[0]!.values.exposure = 2;
+    edited.layers[0]!.keyframes[1]!.values.exposure = -2;
+    edited.layers[1]!.keyframes[0]!.values.hue = 120;
+    const submitted = structuredClone(edited);
+    vi.clearAllMocks();
+    preview.engine.updateProjectAppearance(edited);
+    expectSurface(preview, 25, true);
+    expect(preview.project).toEqual(original);
+    expect(edited).toEqual(submitted);
+    preview.project = submitted;
+    preview.engine.setUngraded(false);
+    expectSurface(preview, 25);
+    expect(preview.compositor.visible![0]!.clips[0]!.settings).toMatchObject({ exposure: 0, hue: 90 });
+    expect(preview.compositor.visible![0]!.clips[1]!.settings.saturation).toBe(0.2);
+    expect(preview.compositor.visible![1]!.clips[0]!.settings).not.toEqual(NEUTRAL_COLOUR);
+    expect(preview.compositor.uploadVideo).not.toHaveBeenCalled();
+    expectNoMediaOperations(preview);
+  });
+
+  it('preserves bypass through a same-project timing reload without persisting it', async () => {
+    const preview = await paused(gradedProject(true));
+    preview.engine.setUngraded(true);
+    const reloaded = structuredClone(preview.project);
+    reloaded.clips[0]!.speed = { mode: 'constant', rate: 2 };
+    const submitted = structuredClone(reloaded);
+    const modes: boolean[] = [];
+    preview.engine.subscribe((state) => modes.push(state.ungraded));
+    await preview.engine.loadProject(reloaded, proxyUrl, 12);
+    preview.project = submitted;
+    expect(preview.engine.diagnostics()).toMatchObject({ ungraded: true, status: 'paused', frame: 12, duration: 30 });
+    expect(modes.length).toBeGreaterThan(1);
+    expect(modes.every(Boolean)).toBe(true);
+    expectSurface(preview, 12, true);
+    expect(reloaded).toEqual(submitted);
+    expect(projectSchema.parse(reloaded)).toEqual(submitted);
+    preview.engine.setUngraded(false);
+    expectSurface(preview, 12);
+  });
+
+  it.each([false, true])('resets mode for a new project ID (empty=%s)', async (empty) => {
+    const preview = await paused(gradedProject(true));
+    preview.engine.setUngraded(true);
+    const next = empty ? createProject('next-project', 'Empty') : gradedProject(true);
+    next.id = 'next-project';
+    const submitted = structuredClone(next);
+    await preview.engine.loadProject(next, proxyUrl, empty ? 0 : 8);
+    preview.project = submitted;
+    expect(preview.engine.diagnostics()).toMatchObject({ ungraded: false, status: empty ? 'empty' : 'paused' });
+    if (empty) expect(preview.compositor.visible).toBeNull();
+    else expectSurface(preview, 8);
+    expect(next).toEqual(submitted);
+    expect(projectSchema.parse(next)).toEqual(submitted);
+  });
+
+  it.each([
+    { operation: 'load', enabled: true },
+    { operation: 'load', enabled: false },
+    { operation: 'seek', enabled: true },
+    { operation: 'seek', enabled: false },
+  ] as const)('uses the latest mode after busy $operation (ungraded=$enabled)', async ({ operation, enabled }) => {
+    const preview = await paused(gradedProject(true));
+    const slot = slotFor(preview);
+    const pending = operation === 'load' ? holdNextLoad(slot) : holdNextSeek(slot);
+    const completion =
+      operation === 'load' ? preview.engine.loadProject(preview.project, proxyUrl, 12) : preview.engine.seek(12);
+    await settle();
+    expect(slot.load).toHaveBeenCalledOnce();
+    const signal = operation === 'load' ? slot.load.mock.calls[0]![2] : slot.seek.mock.calls[0]![1];
+    const before = preview.engine.diagnostics();
+    const listener = vi.fn();
+    preview.engine.subscribe(listener);
+    vi.clearAllMocks();
+    preview.engine.setUngraded(true);
+    preview.engine.setUngraded(false);
+    if (enabled) preview.engine.setUngraded(true);
+    expect(signal.aborted).toBe(false);
+    expect(preview.engine.diagnostics()).toMatchObject({
+      ungraded: enabled,
+      status: operation === 'load' ? 'loading' : 'seeking',
+      frame: before.frame,
+      requestedFrame: 12,
+      renderedFrames: before.renderedFrames,
+    });
+    expect(listener).toHaveBeenCalledTimes(enabled ? 3 : 2);
+    expect(listener.mock.lastCall![0].ungraded).toBe(enabled);
+    expect(preview.compositor.drawFrame).not.toHaveBeenCalled();
+    expect(preview.compositor.clear).not.toHaveBeenCalled();
+    expectNoMediaOperations(preview);
+    pending.release();
+    await completion;
+    await settle();
+    expect(preview.engine.diagnostics()).toMatchObject({ status: 'paused', frame: 12, ungraded: enabled });
+    expectSurface(preview, 12, enabled);
+  });
+
+  it.each([false, true])('ignores late successful loads after cancellation (ungraded=%s)', async (enabled) => {
+    const preview = await paused(gradedProject(true));
+    preview.engine.setUngraded(!enabled);
+    const slot = slotFor(preview);
+    const pending = holdNextLoad(slot, true);
+    const obsolete = preview.engine.loadProject(preview.project, proxyUrl, 12);
+    await settle();
+    const signal = slot.load.mock.calls[0]![2];
+    const next = gradedProject(true);
+    next.id = 'next-project';
+    next.clips[0]!.mediaId = 'next-video';
+    next.clips[0]!.sourceIn = 20;
+    next.clips[0]!.sourceOut = 80;
+    next.media.videoIds = ['next-video'];
+    const submitted = structuredClone(next);
+    await preview.engine.loadProject(next, proxyUrl, 4);
+    preview.project = submitted;
+    expect(signal.aborted).toBe(true);
+    expect(preview.engine.diagnostics().ungraded).toBe(false);
+    preview.engine.setUngraded(enabled);
+    const before = preview.engine.diagnostics();
+    const listener = vi.fn();
+    preview.engine.subscribe(listener);
+    vi.clearAllMocks();
+    pending.release();
+    await obsolete;
+    await settle();
+    expect(preview.engine.diagnostics()).toEqual(before);
+    expectSurface(preview, 4, enabled);
+    expect(slot.decodedFrame).toBe(24);
+    expect(next).toEqual(submitted);
+    expect(listener).not.toHaveBeenCalled();
+    expect(preview.compositor.drawFrame).not.toHaveBeenCalled();
+    expectNoMediaOperations(preview);
+  });
+
+  it.each([false, true])('schedules modes without new clocks or music epochs (music=%s)', async (withMusic) => {
+    const preview = await running(gradedProject(withMusic));
+    const epoch = { clockFrame: preview.music.clockFrame, clockTime: preview.music.clockTime };
+    const document = structuredClone(preview.project);
+    for (const [enabled, frame] of [
+      [true, 10],
+      [false, 12],
+    ] as const) {
+      observeAt(preview, frame);
+      doubles.now = preview.anchor + framesToSeconds(frame - preview.initialFrame + 0.1) * 1000;
+      const before = preview.engine.diagnostics();
+      const listener = vi.fn();
+      const unsubscribe = preview.engine.subscribe(listener);
+      vi.clearAllMocks();
+      preview.engine.setUngraded(enabled);
+      expect(listener).toHaveBeenCalledOnce();
+      expect(listener.mock.lastCall![0]).toMatchObject({ ungraded: enabled, playing: true });
+      expect(preview.engine.diagnostics()).toMatchObject({
+        ungraded: enabled,
+        frame: before.frame,
+        renderedFrames: before.renderedFrames,
+      });
+      expect(preview.compositor.drawFrame).not.toHaveBeenCalled();
+      expect(preview.compositor.uploadVideo).not.toHaveBeenCalled();
+      expectNoMediaOperations(preview);
+      tick(preview, frame);
+      expectSurface(preview, frame, enabled);
+      expect(preview.engine.diagnostics()).toMatchObject({
+        status: 'playing',
+        playing: true,
+        frame,
+        ungraded: enabled,
+      });
+      expect(preview.music).toMatchObject({ ...epoch, running: true });
+      expect(preview.music.configure).not.toHaveBeenCalled();
+      expect(preview.music.pause).not.toHaveBeenCalled();
+      expect(preview.music.start).not.toHaveBeenCalled();
+      for (const slot of doubles.slots) {
+        expect(slot.load).not.toHaveBeenCalled();
+        expect(slot.seek).not.toHaveBeenCalled();
+        expect(slot.play).not.toHaveBeenCalled();
+      }
+      unsubscribe();
+    }
+    expect(preview.project).toEqual(document);
+  });
+
+  it.each(['clip', 'row'] as const)('preserves held-source neighbour mapping (%s speed)', async (mode) => {
+    const project = gradedProject(true);
+    project.clips[0]!.sourceOut = 6;
+    project.layers[0]!.keyframes = [
+      {
+        frame: 0,
+        interpolation: 'linear',
+        values: { ...EMPTY_KEY_VALUES, exposure: -1, speed: mode === 'row' ? 0.1 : null },
+      },
+      {
+        frame: 50,
+        interpolation: 'hold',
+        values: { ...EMPTY_KEY_VALUES, exposure: 1, speed: mode === 'row' ? 0.1 : null },
+      },
+    ];
+    if (mode === 'clip') project.clips[0]!.speed = { mode: 'constant', rate: 0.1 };
+    const map = calculateLayout(project).clips[0]!.retiming;
+    expect([map.sourceAt(9), map.sourceAt(10), map.outputAt(0)]).toEqual([0, 1, 0]);
+    const preview = await running(project);
+    const document = structuredClone(preview.project);
+    const slot = slotFor(preview);
+    slot.observe(0);
+    preview.engine.setUngraded(true);
+    expectNoMediaOperations(preview);
+    tick(preview, 10);
+    expect(preview.engine.diagnostics()).toMatchObject({
+      status: 'playing',
+      frame: 9,
+      requestedFrame: 10,
+      ungraded: true,
+    });
+    expectSurface(preview, 9, true);
+    expect(preview.compositor.uploadVideo).not.toHaveBeenCalled();
+    slot.observe(1);
+    vi.clearAllMocks();
+    preview.engine.setUngraded(false);
+    expectNoMediaOperations(preview);
+    tick(preview, 11);
+    expect(preview.engine.diagnostics()).toMatchObject({
+      status: 'playing',
+      frame: 11,
+      requestedFrame: 11,
+      ungraded: false,
+    });
+    expectSurface(preview, 11);
+    expect(preview.project).toEqual(document);
+    expect(preview.music.pause).not.toHaveBeenCalled();
+    expect(preview.music.start).not.toHaveBeenCalled();
+    expect(slot.seek).not.toHaveBeenCalled();
+  });
+
+  it.each([true, false])('rejects stale retained appearance (ungraded=%s)', async (enabled) => {
+    const preview = await running(gradedProject(true));
+    if (!enabled) {
+      preview.engine.setUngraded(true);
+      tick(preview, 8);
+    }
+    Object.assign(slotFor(preview).video, { readyState: 1 });
+    vi.clearAllMocks();
+    preview.engine.setUngraded(enabled);
+    expect(preview.compositor.visible).toBeNull();
+    expect(preview.engine.diagnostics()).toMatchObject({ status: 'buffering', playing: true, ungraded: enabled });
+    expectNoMediaOperations(preview);
+    tick(preview, 8, 0.5);
+    expect(preview.compositor.visible).toBeNull();
+    expect(preview.compositor.drawFrame).not.toHaveBeenCalled();
+    expect(preview.music.pause).not.toHaveBeenCalled();
+    expect(preview.music.start).not.toHaveBeenCalled();
+    slotFor(preview).observe(8);
+    expectSurface(preview, 8, enabled);
+    expect(preview.engine.diagnostics()).toMatchObject({ status: 'playing', frame: 8, ungraded: enabled });
+    expect(preview.music.pause).not.toHaveBeenCalled();
+    expect(preview.music.start).not.toHaveBeenCalled();
+    expect(slotFor(preview).seek).not.toHaveBeenCalled();
+  });
+
+  it.each([true, false])('keeps exact post-render A/V rejection (ungraded=%s)', async (enabled) => {
+    const preview = await running(gradedProject(true), 42);
+    if (!enabled) {
+      preview.engine.setUngraded(true);
+      tick(preview, 42);
+    }
+    const published: { frame: number; audioFrame: number }[] = [];
+    preview.engine.subscribe((state) => {
+      if (state.status === 'playing')
+        published.push({
+          frame: state.frame,
+          audioFrame: preview.initialFrame + Math.floor(((doubles.now - preview.anchor) * 30_000) / 1_001_000 + 1e-7),
+        });
+    });
+    published.length = 0;
+    slotFor(preview).observe(47);
+    vi.clearAllMocks();
+    preview.engine.setUngraded(enabled);
+    expect(preview.compositor.drawFrame).not.toHaveBeenCalled();
+    const draw = preview.compositor.drawFrame.getMockImplementation()!;
+    preview.compositor.drawFrame.mockImplementationOnce((groups) => {
+      draw(groups);
+      doubles.now = preview.anchor + framesToSeconds(49 - preview.initialFrame + 0.1) * 1000;
+    });
+    tick(preview, 47);
+    expect(preview.engine.diagnostics()).toMatchObject({
+      status: 'buffering',
+      frame: 47,
+      requestedFrame: 49,
+      ungraded: enabled,
+    });
+    expect(preview.compositor.visible).toBeNull();
+    expect(
+      published.every(({ frame, audioFrame }) => Math.abs(frame - audioFrame) <= 1),
+      JSON.stringify(published),
+    ).toBe(true);
+    expect(preview.music.pause).not.toHaveBeenCalled();
+    expect(preview.music.start).not.toHaveBeenCalled();
+    slotFor(preview).observe(49);
+    expectSurface(preview, 49, enabled);
+    expect(preview.engine.diagnostics()).toMatchObject({ status: 'playing', frame: 49, ungraded: enabled });
+    expect(published).toHaveLength(1);
+    expect(published[0]).toEqual({ frame: 49, audioFrame: 49 });
+    expect(preview.music.pause).not.toHaveBeenCalled();
+    expect(preview.music.start).not.toHaveBeenCalled();
+  });
+
+  it.each([true, false])('keeps the latest mode after video catch-up (ungraded=%s)', async (enabled) => {
+    const { preview, slot, pending, recoveryFrame } = await pendingRecovery();
+    const epoch = { clockFrame: preview.music.clockFrame, clockTime: preview.music.clockTime };
+    const edited = structuredClone(preview.project);
+    edited.clips[0]!.colour = { ...gradedProject().clips[0]!.colour };
+    preview.engine.updateProjectAppearance(edited);
+    preview.project = edited;
+    vi.clearAllMocks();
+    preview.engine.setUngraded(true);
+    preview.engine.setUngraded(false);
+    if (enabled) preview.engine.setUngraded(true);
+    expect(pending.request().signal.aborted).toBe(false);
+    expect(preview.engine.diagnostics()).toMatchObject({ status: 'buffering', playing: true, ungraded: enabled });
+    expect(preview.compositor.drawFrame).not.toHaveBeenCalled();
+    expectNoMediaOperations(preview);
+    pending.release();
+    await settle();
+    expect(slot.decodedFrame).toBe(recoveryFrame);
+    expectSurface(preview, recoveryFrame, enabled);
+    expect(preview.engine.diagnostics()).toMatchObject({ status: 'playing', frame: recoveryFrame, ungraded: enabled });
+    expect(preview.music).toMatchObject({ ...epoch, running: true });
+    expect(preview.music.configure).not.toHaveBeenCalled();
+    expect(preview.music.pause).not.toHaveBeenCalled();
+    expect(preview.music.start).not.toHaveBeenCalled();
   });
 });

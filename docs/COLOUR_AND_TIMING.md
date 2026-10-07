@@ -80,6 +80,27 @@ that track's RGB, **not alpha**, preserving its coverage of lower footage.
 Enabled layer groups blend bottom-to-top over opaque black, with no implicit linear-
 light blend or extra tone map. See [LAYERS_AND_KEYFRAMES.md](LAYERS_AND_KEYFRAMES.md).
 
+### Editor-only ungraded comparison
+
+Timeline preview comparison replaces **all evaluated colour settings** with the
+shared `NEUTRAL_COLOUR` value for every enabled row and both participants in each
+dissolve, bypassing static clip grades and evaluated row colour keys alike. Future
+colour controls added to `NEUTRAL_COLOUR` are automatically bypassed, without a
+separate per-control comparison list. Stored grades and keys are unchanged.
+
+Only grading is neutralized: exact observed source frames and `PlacedClip.retiming`,
+row Opacity, visibility, dissolve weights, black fades, stacking
+and music retain their normal contract. Ungraded is still the composed preview,
+not an original-resolution or isolated-selected-clip view; Source preview is unchanged.
+
+The Timeline preview heading's native **Compare** button is accessible as **Show
+ungraded preview**; active mode reads **Ungraded** with a matching canvas badge.
+It works paused or playing via pointer or focused Enter/Space, with no global shortcut.
+Toggling is editor-only: no seek, save/history entry, export, schema, proxy or original
+change, or additional decoder. Same-project seeks, appearance updates and timing
+reloads preserve the mode; changing project or reloading with a fresh preview engine
+resets to normal graded preview. Export continues to use the saved grading contract.
+
 ## Timing
 
 - Project placements, row points and output durations use integer **project frames**;
