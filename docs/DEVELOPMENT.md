@@ -212,7 +212,7 @@ originals in `.pascap/browser-footage/synthetic-sources/` are outside that cache
 `browse-camera-*` means generated patterns, not real recordings. The
 [fixture factory](../scripts/fixtures.ts) uses `preview-lab-v6` outside the browser
 cache and `preview-lab` inside it. These are project identifiers, not schema
-versions; newly generated documents must satisfy strict v9, including clip spatial
+versions; newly generated documents must satisfy strict v10, including row colour and clip spatial
 base/full-pose keys. Bin resets never imply
 a global-library fallback.
 Neither suite invokes real-source sample preparation or needs private footage/music.
@@ -285,14 +285,14 @@ the independent one-frame A/V, single-epoch and completion assertions.
 **Do not run these in CI or without the owner's explicit approval for real jobs.**
 The [sample helper](../scripts/prepare-samples.ts) targets **DJI_0468.MP4 and DJI_0469.MP4
 only**: pass an **explicit folder after `--`**, never rely on a personal-path default.
-It reuses ready proxies but may prepare missing ones; creates only an absent v9
+It reuses ready proxies but may prepare missing ones; creates only an absent v10
 sample, never overwrites or migrates existing edits.
 
 The [measurement helper](../scripts/measure-preview.ts) accepts exactly **two
 1× excerpts on one enabled, zero-origin contiguous track with row Opacity 1**, no music,
 extra layers, spatial edits/keys or shared row points
 (even neutral/Speed-only points). `PASCAP_MEASURE_URL` selects that project.
-Measurement metadata must identify the strict v9 snapshot independently of the
+Measurement uses static row Colour and metadata must identify the strict v10 snapshot independently of the
 report format/identifier; historical reports and receipt snapshots stay untouched.
 `npm run measure -- --skip-playback --reference` skips playback benchmarking but
 **renders a native reference**; `--headed --reference` adds repeated playback. The edit
@@ -322,7 +322,7 @@ spatial coverage $m_i$, group RGB is $C = \sum_i G_i b_i o_i w_i m_i$ and
 coverage is $A = \sum_i o_i w_i m_i$.
 Groups merge bottom-to-top as $\mathrm{result} = C + \mathrm{lower}(1 - A)$,
 without regrading or another opacity multiplier. Opacity is composition coverage,
-not SDR RGB grading; unkeyed colour settings remain per-clip. Black fades preserve coverage;
+not SDR RGB grading; unkeyed colour settings are row-owned. Black fades preserve coverage;
 each dissolve remains one group. Serial limits: one original decoder, two intermediate readers,
 one encoder and three native video children per pass. Four raw buffers (two RGB8,
 two RGBA16) use **22 bytes/pixel = 182,476,800 bytes at UHD**; two 65³ Float32 LUTs
@@ -337,7 +337,7 @@ of Ripple or track ID.
 Processing: [row points](LAYERS_AND_KEYFRAMES.md), [retiming/audio](SPEED_AND_AUDIO.md)
 and [grading equations](COLOUR_AND_TIMING.md#colour).
 
-Strict schema 9 requires `clip.spatial: { base, keyframes }`: eight complete pose
+Strict schema 10 requires `clip.spatial: { base, keyframes }`: eight complete pose
 values and 0–256 full-pose original-source keys with required easing. Shared
 [spatial mapping](../src/shared/spatial.ts) uses unrounded original-aspect contain
 fit, original-centre pivot and half-open crop bounds; crop does not refit.
@@ -386,7 +386,10 @@ Layer options contains rename, Ripple, ordering and deletion, with visibility se
 - Never modify/copy/delete owner's originals or commit private paths/device IDs,
   saved project IDs, real media/cache or reports. Preserve fingerprints, symlink
   rejection, cache exclusion and HTTP guards.
-- Keep **strict schema 9**: required clip spatial base/full-pose source-frame keys,
+- Keep **strict schema 10**: required row `colour`; reject saved `clip.colour`
+  and `clip.correction`. Grade sources once with evaluated row Colour, retaining
+  two LUT buffers and existing raw/process budgets. Main Colour controls and keys
+  have identical row scope and work empty. See [row appearance](design/ROW_APPEARANCE.md). Required clip spatial base/full-pose source-frame keys,
   required unique video/audio membership, all nine nullable
   channels and per-layer `ripple`, `transitions`, `openingFade`, `closingFade` and
   numeric `opacity` in 0–1. A new track starts at 1; a missing saved field is invalid.
@@ -396,7 +399,7 @@ Layer options contains rename, Ripple, ordering and deletion, with visibility se
   transitions/fades, compatibility fields/defaults/migration or mandatory first-track
   ID. Require a 0–8 `music` array with unique instance IDs and complete independent
   settings, plus captured audio-source/instance-plan arrays in current receipts.
-  Preserve incompatible v1–v8 projects/receipt snapshots and finished videos,
+  Preserve incompatible v1–v9 projects/receipt snapshots and finished videos,
   without automatic deletion; recreate projects deliberately. Registry/proxy formats,
   source protections and native resource budgets remain unchanged.
 - Reuse `JobQueue`, library and backpressured raw/retime helpers: one heavy job,

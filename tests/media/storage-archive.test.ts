@@ -14,20 +14,20 @@ import { unsupportedProject } from '../unit/project-fixtures.js';
 const enabled = process.env['PASCAP_MEDIA_TESTS'] === '1';
 const roots: string[] = [];
 async function temp(): Promise<string> {
-  const root = await mkdtemp(path.join(os.tmpdir(), 'pascap-schema9-storage-media-'));
+  const root = await mkdtemp(path.join(os.tmpdir(), 'pascap-schema10-storage-media-'));
   roots.push(root);
   return root;
 }
 
-describe.skipIf(!enabled)('schema-9 storage/archive integration · generated files only, no migrations', () => {
+describe.skipIf(!enabled)('schema-10 storage/archive integration · generated files only, no migrations', () => {
   afterEach(async () => {
     await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
   });
 
-  it('loads strict v9 points/bins and lists/rejects unsupported versions including v8 without rewriting them', async () => {
+  it('loads strict v10 points/bins and lists/rejects unsupported versions through v9 without rewriting them', async () => {
     const root = await temp();
     const store = new ProjectStore(root);
-    const project = createProject('strict-v9', 'Strict current document');
+    const project = createProject('strict-v10', 'Strict current document');
     project.media = { videoIds: ['generated-original', 'unplaced-original'], audioIds: ['unplaced-music'] };
     project.clips = [createClip('current-clip', 'generated-original', 0, 4)];
     project.layers[0]!.keyframes = [
@@ -35,13 +35,13 @@ describe.skipIf(!enabled)('schema-9 storage/archive integration · generated fil
       { frame: 5000, interpolation: 'ease-out', values: { ...EMPTY_KEY_VALUES, exposure: 0.25 } },
     ];
     const saved = await store.save(project, 0);
-    expect(saved.schemaVersion).toBe(9);
+    expect(saved.schemaVersion).toBe(10);
     expect(saved.media).toEqual(project.media);
     expect(await store.load(saved.id)).toEqual(saved);
     const currentPath = path.join(root, 'projects', `${saved.id}.json`);
     const currentBytes = await readFile(currentPath);
     const old = [];
-    for (const version of [1, 2, 3, 4, 5, 6, 7, 8]) {
+    for (const version of [1, 2, 3, 4, 5, 6, 7, 8, 9]) {
       const id = `original-v${version}`;
       const title = `Preserved original version ${version}`;
       const document = unsupportedProject(version, id, title);
@@ -49,7 +49,7 @@ describe.skipIf(!enabled)('schema-9 storage/archive integration · generated fil
       const filename = path.join(root, 'projects', `${id}.json`);
       await writeFile(filename, bytes);
       old.push({ id, title, version, filename, bytes });
-      await expect(store.load(id)).rejects.toThrow(`schema version ${version}; this build requires version 9`);
+      await expect(store.load(id)).rejects.toThrow(`schema version ${version}; this build requires version 10`);
       await expect(store.rename(id, 'Must not rewrite an older file', 0)).rejects.toThrow(
         'existing file was not changed',
       );
@@ -71,7 +71,7 @@ describe.skipIf(!enabled)('schema-9 storage/archive integration · generated fil
         revision: 0,
         clipCount: 0,
         duration: 0,
-        error: expect.stringContaining(`requires version 9`),
+        error: expect.stringContaining(`requires version 10`),
       });
       expect(await readFile(entry.filename)).toEqual(entry.bytes);
     }
@@ -208,7 +208,7 @@ describe.skipIf(!enabled)('schema-9 storage/archive integration · generated fil
     expect((await store.list()).every((summary) => !summary.compatible)).toBe(true);
   });
 
-  it('restores only strict v9 snapshots in version-1 receipts and preserves earlier outputs/receipts byte-for-byte', async () => {
+  it('restores only strict v10 snapshots in version-1 receipts and preserves earlier outputs/receipts byte-for-byte', async () => {
     const root = await temp();
     const config = createConfig({ dataDir: root });
     const jobs = new JobQueue();
@@ -242,7 +242,7 @@ describe.skipIf(!enabled)('schema-9 storage/archive integration · generated fil
     try {
       const current = await archive(snapshot, 'v9');
       const older = [];
-      for (const version of [1, 2, 3, 4, 5, 6, 7, 8]) {
+      for (const version of [1, 2, 3, 4, 5, 6, 7, 8, 9]) {
         const document = unsupportedProject(version, `old-${version}`, `Original ${version}`);
         older.push({ ...(await archive(document, `v${version}`)), version });
       }
@@ -280,7 +280,7 @@ describe.skipIf(!enabled)('schema-9 storage/archive integration · generated fil
           ),
         );
       const warnings = await restoreExports(config, jobs);
-      expect(warnings).toHaveLength(17);
+      expect(warnings).toHaveLength(18);
       expect(jobs.list().map((job) => job.id)).toEqual([current.id]);
       expect(jobs.get(current.id)).toMatchObject({
         kind: 'export',
@@ -291,7 +291,7 @@ describe.skipIf(!enabled)('schema-9 storage/archive integration · generated fil
       });
       for (const entry of older) {
         expect(warnings.find((warning) => warning.startsWith(`${entry.id}:`))).toContain(
-          `Unsupported export snapshot schema version ${entry.version}; this build requires version 9`,
+          `Unsupported export snapshot schema version ${entry.version}; this build requires version 10`,
         );
         expect(warnings.find((warning) => warning.startsWith(`${entry.id}:`))).toContain(
           'successful output were not changed',
@@ -308,7 +308,7 @@ describe.skipIf(!enabled)('schema-9 storage/archive integration · generated fil
         expect(await readFile(path.join(entry.folder, 'receipt.json'))).toEqual(entry.receipt);
         expect(await readFile(path.join(entry.folder, 'export.mp4'))).toEqual(entry.output);
       }
-      expect(await restoreExports(config, jobs)).toHaveLength(17);
+      expect(await restoreExports(config, jobs)).toHaveLength(18);
       expect(jobs.list()).toHaveLength(1);
     } finally {
       await jobs.close();

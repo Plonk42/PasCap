@@ -113,7 +113,7 @@ describe('durable export receipts', () => {
       fadeOut: index,
       loop: false,
     }));
-    expect(snapshot.schemaVersion).toBe(9);
+    expect(snapshot.schemaVersion).toBe(10);
     const receipt = receiptFixture(snapshot, id);
     expect(receipt.musicSources).toHaveLength(2);
     expect(receipt.settings.audio).toHaveLength(8);
@@ -160,6 +160,24 @@ describe('durable export receipts', () => {
   });
 
   const invalidReceipts: { name: string; change: (receipt: ReceiptFixture) => void }[] = [
+    {
+      name: 'missing row colour',
+      change: (receipt) => {
+        Reflect.deleteProperty(receipt.snapshot.layers[0]!, 'colour');
+      },
+    },
+    {
+      name: 'forbidden clip correction',
+      change: (receipt) => {
+        Object.assign(receipt.snapshot.clips[0]!, { correction: receipt.snapshot.layers[0]!.colour });
+      },
+    },
+    {
+      name: 'old clip colour',
+      change: (receipt) => {
+        Object.assign(receipt.snapshot.clips[0]!, { colour: receipt.snapshot.layers[0]!.colour });
+      },
+    },
     {
       name: 'missing clip spatial settings',
       change: (receipt) => {
@@ -394,7 +412,7 @@ describe('durable export receipts', () => {
       }
     },
   );
-  it.each([3, 4, 5, 6, 7, 8])(
+  it.each([1, 2, 3, 4, 5, 6, 7, 8, 9])(
     'leaves version-1 receipts with unsupported v%s snapshots and their completed outputs unchanged',
     async (version) => {
       const root = await mkdtemp(path.join(os.tmpdir(), 'pascap-archive-'));
@@ -420,7 +438,7 @@ describe('durable export receipts', () => {
         const warnings = await restoreExports(createConfig({ dataDir: root }), jobs);
         expect(warnings).toHaveLength(1);
         expect(warnings[0]).toContain(
-          `Unsupported export snapshot schema version ${version}; this build requires version 9`,
+          `Unsupported export snapshot schema version ${version}; this build requires version 10`,
         );
         expect(jobs.list()).toEqual([]);
         expect(await readFile(path.join(folder, 'receipt.json'), 'utf8')).toBe(text);

@@ -710,7 +710,7 @@ describe('live appearance updates and lifecycle', () => {
     await engine.loadProject(project, resolver, originalDimensions, 10);
     const before = calls();
     const uploads = compositor().uploads.length;
-    engine.updateColour('base', { ...NEUTRAL_COLOUR, saturation: 0.4 });
+    engine.updateColour(project.layers[0]!.id, { ...NEUTRAL_COLOUR, saturation: 0.4 });
     expect(compositor().groups[0]!.clips[0]!.settings.saturation).toBe(0.4);
     project.layers[0]!.opacity = 0.25;
     engine.updateProjectAppearance(project);
@@ -858,7 +858,7 @@ describe('live appearance updates and lifecycle', () => {
     const loading = engine.loadProject(project, resolver, originalDimensions, 10);
     await settle();
     const appearance = structuredClone(project);
-    appearance.clips[0]!.colour.exposure = 0.6;
+    appearance.layers[0]!.colour.exposure = 0.6;
     engine.updateProjectAppearance(appearance);
     appearance.layers[1]!.enabled = false;
     engine.updateProjectAppearance(appearance);

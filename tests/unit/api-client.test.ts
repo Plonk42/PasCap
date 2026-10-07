@@ -368,8 +368,8 @@ describe('registered API methods', () => {
     await expect(api.save(project, 0)).rejects.toMatchObject({ status: 200, kind: 'response' });
   });
 
-  it('uses complete schema-9 project mocks and rejects a version-8 response without changing it', async () => {
-    expect(project.schemaVersion).toBe(9);
+  it('uses complete schema-10 project mocks and rejects a version-8 response without changing it', async () => {
+    expect(project.schemaVersion).toBe(10);
     expect(project.layers[0]!.keyframes).toEqual([]);
     const unsupported = unsupportedProject(8, project.id, project.title);
     const before = JSON.stringify(unsupported);
@@ -400,7 +400,7 @@ describe('registered API methods', () => {
   });
 
   it.each(['clip opacity', 'layerOpacity', 'clipOpacity'])(
-    'rejects a removed %s in a v9 response without dropping it or retrying',
+    'rejects a removed %s in a v10 response without dropping it or retrying',
     async (removed) => {
       const layer = project.layers[0]!;
       const legacyLayer =

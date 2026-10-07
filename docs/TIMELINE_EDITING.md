@@ -2,8 +2,15 @@
 
 ## Source footage and excerpt instances
 
+Appearance is row-owned: complete required `layer.colour` plus the sole Opacity,
+with shared project-time keys. Every clip on the same row shares Colour with or
+without keys; different treatments require different rows. Moving adopts destination
+appearance; trim/split/cut/duplicate preserve row bases and absolute points.
+Main Colour edits work on empty rows. There is no clip colour/correction field.
+See [row appearance](design/ROW_APPEARANCE.md).
+
 The media library describes complete recordings belonging to the open project's
-bin, not every globally registered source. Strict schema 9 requires unique
+bin, not every globally registered source. Strict schema 10 requires unique
 `media.videoIds` and `media.audioIds` arrays (10,000 IDs maximum each). Imports add
 membership even without timeline placement; clip/music references also remain
 visible. New projects start with both arrays empty. Importing an existing source
@@ -11,12 +18,12 @@ deliberately reuses the global content-deduplicated registry/proxy cache; switch
 projects never automatically adopts that global library. An insertion creates
 a unique clip-instance ID and copies the latest media-review IN/OUT, or
 `sourceIn = 0`, `sourceOut = registered frameCount` without a choice. New clips have
-neutral static colour, normal constant speed and a complete neutral spatial base
+normal constant speed and a complete neutral spatial base
 with no spatial keys, with no saved opacity field.
 They use the destination row's `opacity` value or its overriding Opacity keys.
-New clips have no clip animation; existing row curves immediately apply at their project placement.
+New clips start without custom speed or spatial keys; existing row curves immediately apply at their project placement.
 The original and full proxy remain unchanged; no extra crop file is generated.
-Multiple insertions of one recording have independent source ranges, colour,
+Multiple insertions of one recording have independent source ranges,
 clip speed and spatial settings.
 
 For several excerpts from one rush, set source IN/OUT and **Add excerpt**, then
@@ -86,7 +93,7 @@ Import guidance, **without a POST**. Internal dragging of ready registered Media
 into Timeline remains unchanged. Uncertain registration results are not retried
 automatically; check Media/Activity before resubmitting.
 
-Strict schema 9 requires clip spatial settings, per-track Ripple, transitions and fades, and a required
+Strict schema 10 requires row colour, clip spatial settings, per-track Ripple, transitions and fades, and a required
 0–8 identified-instance `music` array (`[]` without music); registry/proxy/PCM
 formats are unchanged. Only generated proxies/thumbnails, metadata,
 exports/receipts and scratch are created, not duplicate originals. Keep originals
@@ -232,7 +239,7 @@ and undoable, and never move music, other tracks or absolute row points.
   Unchanged adjacent pairs retain their transition; new pairs become cuts.
 - Ripple-on deletion closes the gap; Ripple-off deletion leaves other placements intact.
   Split finds the original source boundary through the placed map and preserves
-  independent clip colour/speed, including source-ramp anchors. Row Opacity is
+  independent clip speed, including source-ramp anchors. Row Colour and Opacity are
   unchanged and applies to both pieces. It creates a cut between the pieces on
   that track. Each piece retimes/rounds independently,
   so total duration can change. Invalid edits never enter history.
@@ -246,7 +253,7 @@ and undoable, and never move music, other tracks or absolute row points.
 - **Trim/cut/move/split/duplicate never copy or shift row points.** Track Ripple
   leaves their project times fixed. Moving between rows leaves both rows' points
   and saved Opacity values intact, using the destination row value or curve;
-  source ranges, colour, clip speed and spatial settings remain independent.
+  source ranges, clip speed and spatial settings remain independent.
   Splits/cuts/duplicates copy complete spatial poses and key arrays independently;
   trims/moves/Ripple never shift, rescale or discard their original-source anchors.
 - **Alt+Left/Right** nudges a positioned clip or the first Ripple anchor one frame;
@@ -261,7 +268,7 @@ and undoable, and never move music, other tracks or absolute row points.
 
 ## Row points, time ruler and transitions
 
-Schema-9 shared row points belong to the **whole video row**, not individual clips. One ordered
+Schema-10 shared row points belong to the **whole video row**, not individual clips. One ordered
 point at a project frame has nine required nullable channels: **Opacity**
 (`opacity`), Speed and seven colour settings, participating independently.
 Every `VideoLayer` also requires numeric `opacity` in 0–1, initially 1 (100%) on
@@ -272,7 +279,7 @@ Points survive clip trimming/removal and may remain beyond current duration.
 Each channel uses the point's shared easing
 toward its **next participating point**, holds before/after its own endpoints and
 uses its unkeyed value only when it has no participation on the row: the saved row
-value for Opacity, the individual clip's colour or speed setting otherwise.
+value for Opacity, row colour for colour, and individual clip speed for Speed.
 
 The selected layer, including an empty one, has one **Keyframes** tab (accessible
 name **Layer keyframes**) with its directly visible shared point list. Clip keeps
@@ -329,7 +336,7 @@ Its buttons visit `opacity` participants, with no sidebar duplicate.
 Without Opacity keys, either value control edits row `opacity` and works on an empty row.
 With keys, a missing participant at the real playhead stays read-only until its
 diamond captures it; sliders never create implicit keys. Unkeyed colour remains
-per-clip. Opacity affects composition coverage, not SDR RGB grading.
+row-owned with or without keys. Opacity affects composition coverage, not SDR RGB grading.
 **Clip → Placement** contains placement only. Layer options remains limited to
 rename, Ripple, ordering and deletion, with visibility separate.
 
@@ -412,12 +419,12 @@ insertion remains boundary-based even with Snap off or Alt held; only an explici
 move of its retained first clip changes the anchor. The
 toggle persists for the current timeline session, not the renderable document.
 
-Projects are named separate **version-9** documents with required clip spatial
+Projects are named separate **version-10** documents with required row colour, clip spatial
 base/full-pose source-frame keys and per-layer Ripple,
 transitions, opening/closing fades and numeric `opacity` in 0–1. New layers start
 at 1 (100%); a missing saved field is invalid. Switching flushes autosave first,
 blocks on failed saves, and resets session selection/history; successful export
-snapshots are independent of the open project. Earlier v1–v8 projects and receipt
+snapshots are independent of the open project. Earlier v1–v9 projects and receipt
 snapshots remain incompatible and preserved, without migration/fabricated defaults.
 There is no automatic deletion. Row `opacity` is the required sole stored value;
 saved `clip.opacity` and old `clipOpacity`/`layerOpacity` point fields are rejected,
@@ -432,7 +439,7 @@ are unchanged.
 The required `music` array holds **0–8 independent instances**, each with a unique
 required `id`, registered `mediaId`, source IN/OUT, start/duration, gain, fades and
 loop flag. No null/singular fallback, omitted-field default or old-format reader
-is accepted. Version-1 export receipts require a strict v9 snapshot and captured
+is accepted. Version-1 export receipts require a strict v10 snapshot and captured
 audio-source/instance-plan arrays; older snapshots/invalid arrays are rejected
 while the receipt and finished output remain preserved. Current PCM format is unchanged.
 

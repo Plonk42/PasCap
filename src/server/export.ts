@@ -289,7 +289,8 @@ async function retimeClip(
   const filename = `clip-${index}.nut`;
   await assertSourceIdentity(asset.sourcePath, asset.fingerprint, true);
   checkCancelled(context);
-  await atomicWrite(path.join(directory, lut), generateCube(clip.colour, EXPORT_RESOURCES.lutSize));
+  const row = inputs.snapshot.layers.find((layer) => layer.id === clip.layerId)!;
+  await atomicWrite(path.join(directory, lut), generateCube(row.colour, EXPORT_RESOURCES.lutSize));
   const decodeFilter =
     `trim=start_frame=${clip.sourceIn}:end_frame=${clip.sourceOut},setpts=PTS-STARTPTS,` +
     `scale=${target.width}:${target.height}:force_original_aspect_ratio=decrease:force_divisible_by=2:flags=bicubic:` +

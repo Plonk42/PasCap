@@ -126,7 +126,7 @@ describe('layer layout, compositing and edit commands', () => {
   });
   it('layer deletion is one undoable operation restoring its clips/grades/keys', () => {
     const project = layered();
-    project.clips[1]!.colour = { ...NEUTRAL_COLOUR, exposure: 0.7, saturation: 0.4 };
+    project.layers[1]!.colour = { ...NEUTRAL_COLOUR, exposure: 0.7, saturation: 0.4 };
     project.layers[1]!.keyframes = [point(20, { opacity: 0.3, hue: 45 }, 'smooth'), point(100, { opacity: 0.8 })];
     const history = new EditHistory(project);
     history.commit({ type: 'layer-remove', layerId: 'upper' });
@@ -152,9 +152,9 @@ describe('layer layout, compositing and edit commands', () => {
       colour: { exposure: 0.4 },
       opacity: 0.75,
     });
-    history.commit({ type: 'colour', clipId: copy.id, colour: { ...copy.colour, exposure: 1 } });
-    expect(history.current.clips.find((clip) => clip.id === original.id)?.colour.exposure).toBe(0);
-    history.undo();
+    expect(copy).not.toHaveProperty('colour');
+    expect(copy).not.toHaveProperty('correction');
+    expect(history.current.layers[1]!.colour).toEqual(project.layers[1]!.colour);
     history.undo();
     expect(history.current).toEqual(project);
   });
@@ -221,16 +221,17 @@ describe('project-frame shared row settings', () => {
     }
   });
   it('interpolates grading parameters, not independently graded endpoint pixels', () => {
-    const clip = createClip('one', 'source', 0, 100);
     const layer = {
       ...createProject('p', 'P').layers[0]!,
       keyframes: [point(0, { exposure: -1, saturation: 0.5 }), point(80, { exposure: 1, saturation: 1.5 })],
     };
-    expect(colourAt(clip, layer, 40)).toEqual(NEUTRAL_COLOUR);
+    expect(colourAt(layer, 40)).toEqual(NEUTRAL_COLOUR);
   });
   it('keeps all seven static grade controls and unkeyed channels independent of participating parameters', () => {
     const clip = createClip('one', 'source', 300, 400);
-    clip.colour = {
+    clip.speed = { mode: 'constant', rate: 0.5 };
+    const layer = { ...createProject('p', 'P').layers[0]!, opacity: 0.7 };
+    layer.colour = {
       exposure: 0.7,
       brightness: 0.09,
       contrast: 0.8,
@@ -239,10 +240,8 @@ describe('project-frame shared row settings', () => {
       highlights: 0.25,
       shadows: -0.2,
     };
-    clip.speed = { mode: 'constant', rate: 0.5 };
-    const layer = { ...createProject('p', 'P').layers[0]!, opacity: 0.7 };
     for (const frame of [-10, 0, 50, 500]) {
-      expect(colourAt(clip, layer, frame)).toEqual(clip.colour);
+      expect(colourAt(layer, frame)).toEqual(layer.colour);
       expect(opacityAt(layer, frame)).toBe(0.7);
     }
     layer.keyframes = [
@@ -250,12 +249,12 @@ describe('project-frame shared row settings', () => {
       point(25, { hue: 90 }, 'hold'),
       point(100, { exposure: 1, opacity: 1 }),
     ];
-    expect(colourAt(clip, layer, 50)).toEqual({ ...clip.colour, exposure: 0, hue: 90 });
+    expect(colourAt(layer, 50)).toEqual({ ...layer.colour, exposure: 0, hue: 90 });
     expect(opacityAt(layer, 50)).toBe(0.5);
     expect(layer.opacity).toBe(0.7);
     expect(compileLayerRetiming(clip, layer, 50)).toBe(compileRetiming(clip));
-    expect(clip.colour.exposure).toBe(0.7);
-    expect(clip.colour.hue).toBe(30);
+    expect(layer.colour.exposure).toBe(0.7);
+    expect(layer.colour.hue).toBe(30);
   });
   it('opacity/speed/colour points survive trim/restoration/split at their absolute project frames', () => {
     let project = applyCommand(createProject('p', 'P'), {
@@ -263,7 +262,11 @@ describe('project-frame shared row settings', () => {
       clip: createClip('a', 'source', 0, 100),
       index: 0,
     });
-    project = applyCommand(project, { type: 'colour', clipId: 'a', colour: { ...NEUTRAL_COLOUR, brightness: 0.1 } });
+    project = applyCommand(project, {
+      type: 'colour',
+      layerId: 'video-1',
+      colour: { ...NEUTRAL_COLOUR, brightness: 0.1 },
+    });
     project = applyCommand(project, {
       type: 'layer-key-toggle',
       layerId: 'video-1',
@@ -322,7 +325,7 @@ describe('project-frame shared row settings', () => {
     expect(project).toEqual(original);
     project = applyCommand(project, { type: 'split', clipId: 'a', sourceFrame: 50, newClipId: 'b' });
     expect(project.layers[0]!.keyframes).toEqual(keys);
-    expect(project.clips[1]!.colour).toEqual(project.clips[0]!.colour);
+    expect(project.layers[0]!.colour).toEqual(original.layers[0]!.colour);
     expect(project.clips[1]!.speed).toEqual(project.clips[0]!.speed);
     expect(project.clips.every((clip) => !('animation' in clip))).toBe(true);
     const layout = calculateLayout(project);

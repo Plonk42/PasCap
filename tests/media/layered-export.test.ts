@@ -128,7 +128,7 @@ function coverage(samples: PreviewLayer[]): number {
   return result;
 }
 
-describe.skipIf(!enabled)('schema-9 layered native export · disposable synthetic sources only', () => {
+describe.skipIf(!enabled)('schema-10 layered native export · disposable synthetic sources only', () => {
   let root: string;
   let config: ServiceConfig;
   let jobs: JobQueue;
@@ -375,8 +375,7 @@ describe.skipIf(!enabled)('schema-9 layered native export · disposable syntheti
     const packedRight = createClip('packed-right', assets[1]!.id, 8, 14, packed.id);
     packedLeft.speed = { mode: 'constant', rate: 4 };
     packedRight.speed = { mode: 'constant', rate: 4 };
-    packedLeft.colour = { ...NEUTRAL_COLOUR, contrast: 0.9, saturation: 0.8, highlights: -0.2 };
-    packedRight.colour = { ...NEUTRAL_COLOUR, contrast: 1.2, saturation: 1.1, highlights: 0.15 };
+    packed.colour = { ...NEUTRAL_COLOUR, contrast: 0.9, saturation: 0.8, highlights: -0.2 };
     packed.transitions = [{ leftId: packedLeft.id, rightId: packedRight.id, type: 'cross-dissolve', duration: 2 }];
     project.layers = [packed];
     project.clips = [packedLeft, packedRight];
@@ -401,13 +400,11 @@ describe.skipIf(!enabled)('schema-9 layered native export · disposable syntheti
       ...createClip('positioned-right', assets[0]!.id, 11, 15, positioned.id),
       start: overlap.start,
     };
-    positionedLeft.colour = { ...NEUTRAL_COLOUR, brightness: 0.025, contrast: 1.1, saturation: 0.7, shadows: 0.2 };
-    positionedRight.colour = { ...NEUTRAL_COLOUR, brightness: 0.05, contrast: 0.9, saturation: 1.2, highlights: -0.2 };
+    positioned.colour = { ...NEUTRAL_COLOUR, brightness: 0.025, contrast: 1.1, saturation: 0.7, shadows: 0.2 };
     const afterGap = {
       ...createClip('after-gap', assets[1]!.id, 17, 19, positioned.id),
       start: positionedRight.start + 6,
     };
-    afterGap.colour = { ...NEUTRAL_COLOUR, brightness: 0.035, saturation: 0.85, shadows: 0.1 };
     positioned.transitions = [
       { leftId: positionedLeft.id, rightId: positionedRight.id, type: 'cross-dissolve', duration: 2 },
       { leftId: positionedRight.id, rightId: afterGap.id, type: 'cut', duration: 0 },
@@ -431,8 +428,7 @@ describe.skipIf(!enabled)('schema-9 layered native export · disposable syntheti
       ...createClip('third-right', assets[1]!.id, 12, 16, third.id),
       start: overlap.start,
     };
-    thirdLeft.colour = { ...NEUTRAL_COLOUR, exposure: -0.2, hue: -15, saturation: 1.1 };
-    thirdRight.colour = { ...NEUTRAL_COLOUR, exposure: 0.15, hue: 30, saturation: 0.8 };
+    third.colour = { ...NEUTRAL_COLOUR, exposure: -0.2, hue: -15, saturation: 1.1 };
     third.transitions = [{ leftId: thirdLeft.id, rightId: thirdRight.id, type: 'cross-dissolve', duration: 2 }];
     const empty = { ...createLayer('empty-track', 'Dormant timing', false), openingFade: 7, closingFade: 9 };
     const hidden = { ...createLayer('hidden-track', 'Hidden tail', false), enabled: false };
@@ -467,7 +463,7 @@ describe.skipIf(!enabled)('schema-9 layered native export · disposable syntheti
         expect(sample.opacity).toBe(evaluateLayerSetting(row, 'opacity', frame, row.opacity));
         expect(sample).not.toHaveProperty('layerOpacity');
         for (const { key } of COLOUR_CONTROLS)
-          expect(sample.colour[key]).toBe(evaluateLayerSetting(row, key, frame, placed.clip.colour[key]));
+          expect(sample.colour[key]).toBe(evaluateLayerSetting(row, key, frame, row.colour[key]));
         if (hasLayerKeys(row, 'speed'))
           expect(placed.retiming.rateAt(frame - placed.start)).toBeCloseTo(
             evaluateLayerSetting(row, 'speed', frame, 1),
@@ -777,9 +773,7 @@ describe.skipIf(!enabled)('schema-9 layered native export · disposable syntheti
     const right = createClip('right', assets[1]!.id, 3, 11);
     left.speed = { mode: 'constant', rate: 0.5 };
     right.speed = { mode: 'constant', rate: 2 };
-    for (const [index, clip] of [left, right].entries()) {
-      clip.colour = { ...NEUTRAL_COLOUR, exposure: index * 0.2, brightness: index * 0.015, shadows: 0.05 };
-    }
+    project.layers[0]!.colour = { ...NEUTRAL_COLOUR, exposure: 0.2, brightness: 0.015, shadows: 0.05 };
     project.clips = [left, right];
     project.layers[0]!.transitions = [{ leftId: left.id, rightId: right.id, type: 'cross-dissolve', duration: 2 }];
     project.layers[0]!.openingFade = 1;
@@ -792,7 +786,6 @@ describe.skipIf(!enabled)('schema-9 layered native export · disposable syntheti
       start: baseEnd + 2,
     };
     late.speed = { mode: 'constant', rate: 1.25 };
-    late.colour = { ...NEUTRAL_COLOUR, exposure: 0.25, saturation: 0.6 };
     const top = { ...createClip('top-overlay', assets[0]!.id, 4, 9), layerId: 'video-3', start: 4 };
     project.clips = [late, left, top, early, right]; // Flat indices deliberately differ from track/chronological order.
     project.layers[1]!.transitions = [{ leftId: early.id, rightId: late.id, type: 'cut', duration: 0 }];
@@ -812,7 +805,7 @@ describe.skipIf(!enabled)('schema-9 layered native export · disposable syntheti
         const row = project.layers.find((row) => row.id === sample.layerId)!;
         expect(sample.sourceFrame).toBe(placed.retiming.sourceAt(frame - placed.start));
         for (const { key } of COLOUR_CONTROLS)
-          expect(sample.colour[key]).toBe(evaluateLayerSetting(row, key, frame, placed.clip.colour[key]));
+          expect(sample.colour[key]).toBe(evaluateLayerSetting(row, key, frame, row.colour[key]));
         if (hasLayerKeys(row, 'speed'))
           expect(placed.retiming.rateAt(frame - placed.start)).toBeCloseTo(
             evaluateLayerSetting(row, 'speed', frame, 1),
@@ -909,7 +902,7 @@ describe.skipIf(!enabled)('schema-9 layered native export · disposable syntheti
     project.clips[0]!.speed = { mode: 'constant', rate: 0.5 };
     project.clips[1]!.speed = { mode: 'constant', rate: 2 };
     project.clips[2]!.speed = { mode: 'ramp', startRate: 3, endRate: 4, curve: 'ease-out', anchorIn: 0, anchorOut: 20 };
-    project.clips[1]!.colour = { ...NEUTRAL_COLOUR, brightness: 0.04 };
+    project.layers[0]!.colour = { ...NEUTRAL_COLOUR, brightness: 0.04 };
     project.layers[0]!.transitions = [
       { leftId: 'row-left', rightId: 'row-right', type: 'cross-dissolve', duration: 2 },
       { leftId: 'row-right', rightId: 'row-tail', type: 'cut', duration: 0 },
@@ -945,6 +938,38 @@ describe.skipIf(!enabled)('schema-9 layered native export · disposable syntheti
     expect(result.receipt.settings.grading).toContain('absolute project frames');
     await unchanged();
   }, 120_000);
+
+  it.each(['draft720', 'final4k'] as const)(
+    'grades both dissolve sources once with shared keyed row Colour, opacity and black fades at %s',
+    async (profile) => {
+      const project = createProject(`row-appearance-${profile}`, 'Joint appearance · synthetic');
+      const row = project.layers[0]!;
+      row.colour = { ...NEUTRAL_COLOUR, contrast: 1.1, brightness: 0.02, saturation: 0.85 };
+      row.opacity = 0.8;
+      row.openingFade = 1;
+      row.closingFade = 1;
+      row.keyframes = [point(0, { exposure: 0.15, opacity: 0.65 }), point(4, { exposure: -0.1, opacity: 0.9 })];
+      const left = createClip('joint-left', assets[0]!.id, 1, 4);
+      const right = { ...createClip('joint-right', assets[1]!.id, 5, 8), start: 2 };
+      project.clips = [left, right];
+      row.transitions = [{ leftId: left.id, rightId: right.id, type: 'cross-dissolve', duration: 1 }];
+      const lower = layer('joint-lower');
+      project.layers.unshift(lower);
+      project.clips.push(createClip('lower', assets[2]!.id, 0, 5, lower.id));
+      const before = structuredClone(project);
+      for (const frame of [0, 2, 4]) {
+        const sources = sampleTimeline(project, frame).filter((sample) => sample.layerId === row.id);
+        expect(sources.length).toBeGreaterThan(0);
+        for (const source of sources) expect(source.colour).toEqual(sources[0]!.colour);
+        expect(project.clips.every((clip) => !('colour' in clip) && !('correction' in clip))).toBe(true);
+      }
+      const result = await complete(project, profile);
+      bounds(result.receipt);
+      await parity(project, result.filename);
+      expect(result.receipt.snapshot).toEqual(before);
+      expect(project).toEqual(before);
+    },
+  );
 
   it('rejects every shared setting even at neutral values and keeps the two-clip 1x diagnostic restricted and read-only', async () => {
     const plain = createProject('native-reference-guard', 'Plain diagnostic validation');
@@ -997,7 +1022,7 @@ describe.skipIf(!enabled)('schema-9 layered native export · disposable syntheti
     project.layers[0]!.openingFade = 1;
     project.layers[0]!.closingFade = 1;
     project.layers[0]!.opacity = 0.7;
-    project.clips[1]!.colour = { ...NEUTRAL_COLOUR, exposure: 0.2, brightness: 0.02, hue: -30, shadows: 0.2 };
+    project.layers[0]!.colour = { ...NEUTRAL_COLOUR, exposure: 0.2, brightness: 0.02, hue: -30, shadows: 0.2 };
     project.layers[1]!.keyframes = [point(0, { opacity: 0.2 }), point(4, { opacity: 0.9 }, 'hold')];
     expect(
       sampleTimeline(project, 1)
@@ -1081,7 +1106,12 @@ describe.skipIf(!enabled)('schema-9 layered native export · disposable syntheti
       point(3, { exposure: -0.2 }),
       point(6, { brightness: 0.1, exposure: 0.5, hue: 25, shadows: 0.3 }, 'hold'),
     ];
-    project.clips[2]!.colour = { ...NEUTRAL_COLOUR, brightness: 0.1, exposure: 0.4, highlights: -0.2 };
+    project.layers.find((row) => row.id === project.clips[2]!.layerId)!.colour = {
+      ...NEUTRAL_COLOUR,
+      brightness: 0.1,
+      exposure: 0.4,
+      highlights: -0.2,
+    };
     const result = await complete(project);
     bounds(result.receipt);
     await parity(project, result.filename);
@@ -1191,7 +1221,7 @@ describe.skipIf(!enabled)('schema-9 layered native export · disposable syntheti
     project.layers.push(layer('video-3'));
     project.clips[0]!.mediaId = uhd.id;
     project.layers[0]!.opacity = 0.8;
-    project.clips[0]!.colour = { ...NEUTRAL_COLOUR, exposure: 0.15, shadows: 0.25 };
+    project.layers[0]!.colour = { ...NEUTRAL_COLOUR, exposure: 0.15, shadows: 0.25 };
     project.layers[1]!.keyframes = [point(1, { opacity: 0.7 }), point(2, { opacity: 0.3 }, 'hold')];
     project.layers[2]!.opacity = 0.6;
     const top = { ...createClip('uhd-top', assets[1]!.id, 4, 5), layerId: 'video-3', start: 2 };
@@ -1225,11 +1255,16 @@ describe.skipIf(!enabled)('schema-9 layered native export · disposable syntheti
     for (let index = 1; index < 8; index++) project.layers.push(layer(`video-${index + 1}`));
     project.layers.forEach((row, index) => {
       row.opacity = 0.4 + index * 0.06;
+      row.colour = {
+        ...NEUTRAL_COLOUR,
+        exposure: index * 0.025,
+        brightness: index * 0.003,
+        saturation: 0.8 + index * 0.02,
+      };
     });
     project.clips = project.layers.map((row, index) => ({
       ...createClip(`eight-${index}`, assets[index % 2]!.id, index + 1, index + 3),
       layerId: row.id,
-      colour: { ...NEUTRAL_COLOUR, exposure: index * 0.025, brightness: index * 0.003, saturation: 0.8 + index * 0.02 },
     }));
     const result = await complete(project);
     bounds(result.receipt);

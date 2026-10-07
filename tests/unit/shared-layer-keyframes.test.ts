@@ -79,7 +79,7 @@ const primitive: Record<Interpolation, (u: number) => number> = {
   smooth: (u) => u * u * u - (u * u * u * u) / 2,
 };
 
-describe('strict schema-9 row points and independently participating settings', () => {
+describe('strict schema-10 row points and independently participating settings', () => {
   it('exports an ordered immutable nine-setting catalogue and explicit all-null template', () => {
     const settings = [
       'opacity',
@@ -100,10 +100,10 @@ describe('strict schema-9 row points and independently participating settings', 
     expect(KEYFRAME_SETTINGS.every(Object.isFrozen)).toBe(true);
   });
 
-  it('requires version 9, explicit media membership, row opacity and clip settings without legacy fields', () => {
+  it('requires version 10, explicit media membership, row opacity and clip settings without legacy fields', () => {
     const project = createProject('strict', 'Strict');
     const clip = createClip('one', 'source', 0, 20);
-    expect(project.schemaVersion).toBe(9);
+    expect(project.schemaVersion).toBe(10);
     expect(project.media).toEqual({ videoIds: [], audioIds: [] });
     expect(project.layers[0]).toEqual(row());
     expect(Object.keys(clip)).toEqual([
@@ -113,7 +113,6 @@ describe('strict schema-9 row points and independently participating settings', 
       'start',
       'sourceIn',
       'sourceOut',
-      'colour',
       'speed',
       'spatial',
     ]);
@@ -407,33 +406,27 @@ describe('independent row interpolation and unchanged CPU composition', () => {
   });
 
   it('interpolates each grading parameter rather than endpoint pixels or whole grades', () => {
-    const clip = createClip('colour', 'source', 0, 100);
-    clip.colour = { ...NEUTRAL_COLOUR, brightness: 0.12, hue: 30, contrast: 1.2 };
     const layer = row([
       point(0, { exposure: -1, saturation: 0.5 }),
       point(50, { shadows: -0.4 }, 'hold'),
       point(100, { exposure: 1, saturation: 1.5 }),
     ]);
-    const middle = colourAt(clip, layer, 50);
-    expect(middle).toEqual({ ...clip.colour, exposure: 0, saturation: 1, shadows: -0.4 });
-    expect(clip.colour.shadows).toBe(0);
+    layer.colour = { ...NEUTRAL_COLOUR, brightness: 0.12, hue: 30, contrast: 1.2 };
+    const middle = colourAt(layer, 50);
+    expect(middle).toEqual({ ...layer.colour, exposure: 0, saturation: 1, shadows: -0.4 });
+    expect(layer.colour.shadows).toBe(0);
     const pixel = gradePixel([0.4, 0.3, 0.2], middle);
-    const first = gradePixel([0.4, 0.3, 0.2], colourAt(clip, layer, 0));
-    const last = gradePixel([0.4, 0.3, 0.2], colourAt(clip, layer, 100));
+    const first = gradePixel([0.4, 0.3, 0.2], colourAt(layer, 0));
+    const last = gradePixel([0.4, 0.3, 0.2], colourAt(layer, 100));
     expect(pixel[0]).not.toBeCloseTo((first[0] + last[0]) / 2, 5);
   });
 
-  it('overrides row opacity uniformly while unkeyed colour keeps independent clip fallbacks', () => {
+  it('overrides row opacity uniformly while both dissolve sources share unkeyed row colour', () => {
     let project = sequence([point(0, { exposure: -1, opacity: 0.4 }), point(100, { exposure: 1 })], [100, 100]);
     project = applyCommand(project, {
       type: 'colour',
-      clipId: 'clip-0',
-      colour: { ...NEUTRAL_COLOUR, brightness: 0.1 },
-    });
-    project = applyCommand(project, {
-      type: 'colour',
-      clipId: 'clip-1',
-      colour: { ...NEUTRAL_COLOUR, brightness: -0.1, saturation: 1.4 },
+      layerId: BASE_LAYER_ID,
+      colour: { ...NEUTRAL_COLOUR, brightness: 0.1, saturation: 1.4 },
     });
     project = applyCommand(project, { type: 'opacity', layerId: BASE_LAYER_ID, opacity: 0.9 });
     project = applyCommand(project, {
@@ -444,11 +437,11 @@ describe('independent row interpolation and unchanged CPU composition', () => {
     expect(samples).toHaveLength(2);
     expect(samples.map((sample) => sample.sourceFrame)).toEqual([90, 10]);
     expect(samples.map((sample) => sample.colour.exposure)).toEqual([0.8, 0.8]);
-    expect(samples.map((sample) => sample.colour.brightness)).toEqual([0.1, -0.1]);
-    expect(samples.map((sample) => sample.colour.saturation)).toEqual([1, 1.4]);
+    expect(samples.map((sample) => sample.colour.brightness)).toEqual([0.1, 0.1]);
+    expect(samples.map((sample) => sample.colour.saturation)).toEqual([1.4, 1.4]);
     expect(samples.map((sample) => sample.opacity)).toEqual([0.4, 0.4]);
     const staticLayer = { ...row(), opacity: 0.9 };
-    expect(colourAt(project.clips[1]!, staticLayer, 90)).toEqual(project.clips[1]!.colour);
+    expect(colourAt(staticLayer, 90)).toEqual(staticLayer.colour);
     expect(opacityAt(staticLayer, 90)).toBe(0.9);
     expect(project.layers[0]!.opacity).toBe(0.9);
     expect(project.clips.every((clip) => !('opacity' in clip))).toBe(true);
@@ -818,7 +811,7 @@ describe('contextual trims, splits, duplicates and fixed row key times', () => {
       [40, 85],
     ]);
     expect(split.clips[1]!.speed).toEqual(original.clips[0]!.speed);
-    expect(split.clips[1]!.colour).toEqual(original.clips[0]!.colour);
+    expect(split.layers[0]!.colour).toEqual(original.layers[0]!.colour);
     expect(split.clips[1]).not.toHaveProperty('animation');
     expect(split.layers[1]!.keyframes).toEqual(keys);
     expect(layout.clips[1]!.retiming.rateAt(0)).toBeCloseTo(2.28);

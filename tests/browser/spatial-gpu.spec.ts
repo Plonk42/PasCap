@@ -191,7 +191,7 @@ const cases: { name: string; groups: CompositeGroup[] }[] = [
               opacity: 0.63,
               blendWeight: 0.63,
               brightness: 0.7,
-              settings: { ...NEUTRAL_COLOUR, contrast: 1.1, brightness: -0.03, highlights: -0.2 },
+              settings: { ...NEUTRAL_COLOUR, exposure: 0.4, hue: 19, saturation: 0.8, shadows: 0.1 },
             },
           ),
         ],
@@ -249,7 +249,15 @@ for (const [width, height] of [
             group.clips.map((source) => {
               compositor.drawFrame([
                 {
-                  clips: [{ ...source, opacity: 1, blendWeight: 1, brightness: 1, settings: neutralColour }],
+                  clips: [
+                    {
+                      ...source,
+                      opacity: 1,
+                      blendWeight: 1,
+                      brightness: 1,
+                      settings: neutralColour,
+                    },
+                  ],
                 },
               ]);
               return points.map(([x, y]) => {
@@ -290,7 +298,15 @@ for (const [width, height] of [
             group.clips.map((source) =>
               floatOutput([
                 {
-                  clips: [{ ...source, opacity: 1, blendWeight: 1, brightness: 1, settings: neutralColour }],
+                  clips: [
+                    {
+                      ...source,
+                      opacity: 1,
+                      blendWeight: 1,
+                      brightness: 1,
+                      settings: neutralColour,
+                    },
+                  ],
                 },
               ]),
             ),

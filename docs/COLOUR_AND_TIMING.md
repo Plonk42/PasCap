@@ -1,10 +1,17 @@
-# PasCap colour and timing contract · project v9
+# PasCap colour and timing contract · project v10
 
 This specification is shared by the CPU reference,
 WebGL2 shader and generated native FFmpeg LUTs. It is elementary SDR grading, not
 highlight recovery. Originals remain untouched.
 
 ## Colour
+
+The row's required `colour` (or evaluated colour keys) grades sampled RGB once.
+Every clip on that row shares this treatment, whether keys are used or not.
+Clips have no colour/correction field. Exactly neutral Colour short-circuits.
+Grading precedes black fades and coverage/group composition. Native paths use
+row-only LUTs and retain at most two reused LUT arrays.
+See [row appearance](design/ROW_APPEARANCE.md) for ownership, UI and strict storage.
 
 - Input/output: full-range normalised nonlinear R′G′B′, BT.709 primaries and transfer.
   Limited-range BT.709 Y′CbCr footage is converted with the BT.709 matrix first.
@@ -50,8 +57,8 @@ highlight recovery. Originals remain untouched.
 
 Shared row opacity, colour and Speed points use integer **project frames** and
 override each participating channel across every clip on that row. Clip-instance
-custom speed and spatial keys instead use integer **original-source frames**; unkeyed colour
-and clip speed settings remain independent per clip. **Opacity** is one row-owned
+custom speed and spatial keys instead use integer **original-source frames**; unkeyed row colour
+uses `layer.colour`. Clip speed and spatial settings remain per clip. **Opacity** is one row-owned
 setting: `VideoLayer.opacity` is a required number in 0–1, initially 1 on a new
 track. Without Opacity participants, every source uses that row value; otherwise
 the row's sole `opacity` channel overrides it, including both dissolve sources.
@@ -92,7 +99,7 @@ light blend or extra tone map. See [LAYERS_AND_KEYFRAMES.md](LAYERS_AND_KEYFRAME
 
 Timeline preview comparison replaces **all evaluated colour settings** with the
 shared `NEUTRAL_COLOUR` value for every enabled row and both participants in each
-dissolve, bypassing static clip grades and evaluated row colour keys alike. Future
+dissolve, bypassing row colour bases and evaluated row colour keys alike. Future
 colour controls added to `NEUTRAL_COLOUR` are automatically bypassed, without a
 separate per-control comparison list. Stored grades and keys are unchanged.
 
@@ -151,7 +158,7 @@ resets to normal graded preview. Export continues to use the saved grading contr
   A completed drag is one undoable command; pointer drafts are not saved.
 - Constant/ramp/keyframed speed changes output duration/source mapping using the shared
   contract in [SPEED_AND_AUDIO.md](SPEED_AND_AUDIO.md). Transitions/fades stay in
-  output frames. Grading remains independent per clip instance and before blending.
+  output frames. Shared row Colour grades each source once before blending.
 - Ripple-off starts are independent absolute project frames; gaps reveal lower
   footage/black. Exact adjacent Cross-dissolve overlap is the only allowed
   same-track overlap; triple overlap is invalid. Total duration is the maximum
@@ -164,7 +171,7 @@ resets to normal graded preview. Export continues to use the saved grading contr
 
 ## Music sampling and mixing
 
-Strict schema 9 requires a 0–8 `music` array of independent uniquely identified
+Strict schema 10 requires a 0–8 `music` array of independent uniquely identified
 instances, `[]` without music. Each has source IN/OUT, start/duration, gain, fades
 and loop; source-video audio remains disabled. At 48 kHz, source/placement/duration/
 fade positions round independently to integer samples using the rational frame
@@ -173,7 +180,7 @@ silence outside placement, and receives its own `10^(gainDb/20)` linear fade
 envelope before mixing. Sum all instances linearly and **hard-clamp [−1, 1] once
 after all sources**, never per-source or during native pairwise accumulation.
 No normalisation, ducking, effects or hidden gain compensation. Music is not
-retimed/rippled with video; current clip colour/speed and row Opacity are unchanged.
+retimed/rippled with video; clip speed and row Colour/Opacity are unchanged.
 
 One AudioContext/worklet and output-timestamp epoch retain the exact one-frame
 A/V bound through music-only black regions. Native audio uses serial selected
@@ -204,22 +211,22 @@ export requires at least one retained video clip. Resource and numeric limits ar
 [Inspector and resource limits](LAYERS_AND_KEYFRAMES.md#inspector-and-resource-limits).
 
 The diagnostic reference accepts **exactly two normal-speed clips on one
-enabled, zero-origin contiguous track with row Opacity 1**, exactly neutral spatial
+enabled, zero-origin contiguous track with row Opacity 1 and static row Colour**, exactly neutral spatial
 bases without spatial keys, without music, extra tracks or row points,
 and is limited to 3,600 project frames. It refuses unsupported
 documents regardless of Ripple or track ID.
-It requires a strict schema-9 project snapshot, including explicit project media
+It requires a strict schema-10 project snapshot, including explicit project media
 membership; its reference receipt format remains independently version 1. New
-measurement reports must identify their v9 project snapshot without overwriting
+measurement reports must identify their v10 project snapshot without overwriting
 historical reports; the report identifier is separate from the project schema.
 Project identifiers such as `preview-lab`/`preview-lab-v6` are not schema versions
 and are not renamed by this contract.
-v1–v8 project documents and receipt snapshots are incompatible and preserved;
+v1–v9 project documents and receipt snapshots are incompatible and preserved;
 recreate projects deliberately, with no migration, compatibility defaults or
-old-format/null fallback readers or automatic deletion. Strict v9 requires clip
-`spatial` base/full-pose keys and row `opacity`; saved `clip.opacity` and
+old-format/null fallback readers or automatic deletion. Strict v10 requires
+row `colour`, clip `spatial` base/full-pose keys and row `opacity`; saved `clip.colour`, `clip.correction`, `clip.opacity` and
 old `clipOpacity`/`layerOpacity` point fields are rejected, not defaulted.
-Production export receipts also remain version 1, with strict v9 snapshots and
+Production export receipts also remain version 1, with strict v10 snapshots and
 required `musicSources` captured-original/`settings.audio` identified-plan arrays;
 older snapshots or invalid arrays are rejected without rewriting receipts/MP4s.
 Registry/proxy/current PCM formats and source guards are unchanged.

@@ -1,4 +1,4 @@
-# Multiple music instances · strict project schema 9
+# Multiple music instances · strict project schema 10
 
 Current contract for [#35](https://github.com/Plonk42/PasCap/issues/35). This specifies
 the required behaviour, not completed implementation, test evidence or release
@@ -10,7 +10,7 @@ Usage belongs in [the user guide](../USER_GUIDE.md) and
 
 ## Strict document and instance identity
 
-- `schemaVersion` is exactly **9**. Required `music: MusicTrack[]` contains **0–8**
+- `schemaVersion` is exactly **10**. Required `music: MusicTrack[]` contains **0–8**
   independent instances; `[]` means no music. Omitted fields, `null`, a single
   object, unknown fields and duplicate instance IDs are invalid. There are no
   migrations, compatibility readers, null fallbacks or injected defaults.
@@ -35,7 +35,7 @@ Usage belongs in [the user guide](../USER_GUIDE.md) and
   Schema 9 also requires clip-owned spatial base/full-pose source-frame keys;
   [spatial transforms](SPATIAL_TRANSFORMS.md) do not change music or row Opacity.
 
-v1–v8 projects and receipt snapshots are incompatible and preserved byte-for-byte,
+v1–v9 projects and receipt snapshots are incompatible and preserved byte-for-byte,
 along with finished exports. Recreate projects deliberately; do not rewrite,
 repair or delete them automatically. Registry, video-proxy and current
 `pcm16-48k-stereo-mono-unity-v3` PCM cache formats and source guards are unchanged.
@@ -192,7 +192,7 @@ for those video budgets.
 
 ## Receipts, preservation and acceptance
 
-Export receipt format remains **version 1**, with a strict **schema-9 project
+Export receipt format remains **version 1**, with a strict **schema-10 project
 snapshot**. Required `musicSources` is an array of captured unique registered
 audio assets; required `settings.audio` is an array of instance plans carrying
 `id`/`mediaId` and independent timing/gain/fades/loop sample positions. Both are

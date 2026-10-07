@@ -17,39 +17,40 @@ and priorities.
 
 ## Processing and editing contracts
 
-| Document                                                     | Authority/scope                                                                                                                                         |
-| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [COLOUR_AND_TIMING.md](COLOUR_AND_TIMING.md)                 | SDR grading, fade/dissolve/rational-frame equations and preview/reference scope                                                                         |
-| [LAYERS_AND_KEYFRAMES.md](LAYERS_AND_KEYFRAMES.md)           | Uniform schema-9 video tracks, sole Opacity/nine-channel row points, per-track Ripple/transitions/fades, spatial coverage and music resource bounds     |
-| [SPEED_AND_AUDIO.md](SPEED_AND_AUDIO.md)                     | Source-anchored constant/ramp/custom clip curves versus analytic project-time row Speed, precise curve editing, shared retiming and music/export audio  |
-| [TIMELINE_EDITING.md](TIMELINE_EDITING.md)                   | No-copy import, source ranges, per-track Ripple/independent placement, recoverable trims, marked cuts, history and snapping                             |
-| [WORKSPACE_AND_RECOVERY.md](WORKSPACE_AND_RECOVERY.md)       | Layout, field/keyboard contexts, project bins, serial saves/conflicts, Activity and failure recovery                                                    |
-| [UX_HARDENING.md](UX_HARDENING.md)                           | Visual controls, deterministic raw-reader ownership, relink identity prerequisite, export-space assumptions/disk-full recovery and deferred loading     |
-| [design/MULTIPLE_MUSIC.md](design/MULTIPLE_MUSIC.md)         | Strict schema-9 identified music arrays, corrected project duration/black tails, final-only summed clipping, one bounded clock and serial native mixing |
-| [design/SPATIAL_TRANSFORMS.md](design/SPATIAL_TRANSFORMS.md) | Required clip base/full-pose source-frame keys, crop/affine geometry, neutral letterboxing, per-pixel coverage and Transform controls                   |
+| Document                                                     | Authority/scope                                                                                                                                            |
+| ------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [COLOUR_AND_TIMING.md](COLOUR_AND_TIMING.md)                 | SDR grading, fade/dissolve/rational-frame equations and preview/reference scope                                                                            |
+| [LAYERS_AND_KEYFRAMES.md](LAYERS_AND_KEYFRAMES.md)           | Uniform schema-10 video tracks, row Colour/Opacity/nine-channel row points, per-track Ripple/transitions/fades, spatial coverage and music resource bounds |
+| [SPEED_AND_AUDIO.md](SPEED_AND_AUDIO.md)                     | Source-anchored constant/ramp/custom clip curves versus analytic project-time row Speed, precise curve editing, shared retiming and music/export audio     |
+| [TIMELINE_EDITING.md](TIMELINE_EDITING.md)                   | No-copy import, source ranges, per-track Ripple/independent placement, recoverable trims, marked cuts, history and snapping                                |
+| [WORKSPACE_AND_RECOVERY.md](WORKSPACE_AND_RECOVERY.md)       | Layout, field/keyboard contexts, project bins, serial saves/conflicts, Activity and failure recovery                                                       |
+| [UX_HARDENING.md](UX_HARDENING.md)                           | Visual controls, deterministic raw-reader ownership, relink identity prerequisite, export-space assumptions/disk-full recovery and deferred loading        |
+| [design/MULTIPLE_MUSIC.md](design/MULTIPLE_MUSIC.md)         | Strict schema-10 identified music arrays, corrected project duration/black tails, final-only summed clipping, one bounded clock and serial native mixing   |
+| [design/SPATIAL_TRANSFORMS.md](design/SPATIAL_TRANSFORMS.md) | Required clip base/full-pose source-frame keys, crop/affine geometry, neutral letterboxing, per-pixel coverage and Transform controls                      |
 
 Use the final approved [#67](https://github.com/Plonk42/PasCap/issues/67) contract:
 one required numeric row `opacity`, initially 1 (100%) on new tracks, with the sole
 row key channel `opacity` overriding that value on every clip. Its single slider
 is in **Clip → Colour**, works on empty rows and never creates implicit keys;
 **Placement** contains placement only. Opacity is composition coverage, not SDR
-RGB grading; unkeyed colour settings remain per-clip. Nine nullable point fields
+RGB grading; unkeyed colour settings are row-owned. Nine nullable point fields
 are required: `opacity`, `speed` and seven colour settings. Saved `clip.opacity`
 and old `clipOpacity`/`layerOpacity` channels are rejected, not the valid row value.
 Colour animation remains row-wide, while the separately approved clip-only speed
 curves use source frames.
-Schema 9 additionally requires clip `spatial: { base, keyframes }`: a complete
+Schema 10 requires row-owned Colour and Opacity with identical static/keyed scope,
+and rejects saved `clip.colour` and `clip.correction`. It also requires clip `spatial: { base, keyframes }`: a complete
 eight-value pose and 0–256 full-pose original-source keys with required easing.
 Clip transforms preserve off-trim/exclusive-OUT anchors through edits and use
 continuous placed retiming for geometry, without optical flow. They are separate
 from row animation; the sole row Opacity contract is unchanged.
-Schema 9 requires `music: MusicTrack[]`, 0–8 independent uniquely
+Schema 10 requires `music: MusicTrack[]`, 0–8 independent uniquely
 identified instances (`[]` without music). Project duration is maximum video clip
 OUT or music start + duration: music can extend it, with video closing fades at
-clip OUT then black while music continues/fades at its own end. Clip colour/speed
-and sole Opacity are unchanged. Version-1 export receipts require strict v9
+clip OUT then black while music continues/fades at its own end. Clip speed,
+row Colour and sole Opacity are unchanged. Version-1 export receipts require strict v10
 snapshots and captured audio-source/instance-plan arrays; preserve incompatible
-v1–v8 documents/receipts/MP4s, recreate deliberately, and never migrate/default
+v1–v9 documents/receipts/MP4s, recreate deliberately, and never migrate/default
 or use null/older readers. Registry/proxy/current PCM formats remain unchanged.
 The #35 contract has pending implementation/validation acceptance; no passed
 tests, release or milestone closure is claimed by this documentation update.

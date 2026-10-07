@@ -1,13 +1,13 @@
 import type { ColourSettings, RGB } from './colour.js';
 import { gradePixel } from './colour.js';
 import { evaluateLayerSetting } from './keyframes.js';
-import type { VideoClip, VideoLayer } from './model.js';
+import type { VideoLayer } from './model.js';
 import type { PreviewLayer } from './timeline.js';
 
-export function colourAt(clip: VideoClip, layer: VideoLayer, projectFrame: number): ColourSettings {
-  const colour = { ...clip.colour };
+export function colourAt(layer: VideoLayer, projectFrame: number): ColourSettings {
+  const colour = { ...layer.colour };
   for (const setting of Object.keys(colour) as (keyof ColourSettings)[])
-    colour[setting] = evaluateLayerSetting(layer, setting, projectFrame, clip.colour[setting]);
+    colour[setting] = evaluateLayerSetting(layer, setting, projectFrame, layer.colour[setting]);
   return colour;
 }
 /** One evaluated source coverage for every clip in the row; visibility is separate. */

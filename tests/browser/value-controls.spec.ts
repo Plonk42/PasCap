@@ -104,7 +104,10 @@ async function ready(page: Page, document: ProjectDocument): Promise<void> {
         return { status: state?.status, duration: state?.duration };
       }),
     )
-    .toEqual({ status: 'paused', duration: calculateLayout(document).duration });
+    .toEqual({
+      status: calculateLayout(document).duration ? 'paused' : 'empty',
+      duration: calculateLayout(document).duration,
+    });
   await expect(page.getByRole('tab', { name: 'Clip', exact: true })).toBeVisible();
 }
 
@@ -254,8 +257,8 @@ async function preciseEdit(
 const opacityEdit: ValueEdit = (_document, opacity) => ({ type: 'opacity', layerId: 'video-1', opacity });
 const exposureEdit: ValueEdit = (document, exposure) => ({
   type: 'colour',
-  clipId: 'one',
-  colour: { ...document.clips[0]!.colour, exposure },
+  layerId: document.layers[0]!.id,
+  colour: { ...document.layers[0]!.colour, exposure },
 });
 const constantEdit: ValueEdit = (_document, rate) => ({
   type: 'speed',
@@ -267,6 +270,56 @@ const gainEdit: ValueEdit = (document, gainDb) => ({
   music: document.music.map((track) => (track.id === 'value-music' ? { ...track, gainDb } : track)),
 });
 
+test('row Colour captures its base and keeps precise release-only edits identical across clip selection', async ({
+  page,
+}) => {
+  const document = await current(page);
+  const second = { ...createClip('two', assets[1]!.id, 0, 120), start: 120 };
+  document.clips.push(second);
+  document.layers[0]!.transitions = [{ leftId: 'one', rightId: 'two', type: 'cut', duration: 0 }];
+  await fixture(page, document);
+  await page.locator('[data-clip-id="one"] .timeline-clip-body').click();
+  await preciseEdit(page, 'Exposure', 0.5, exposureEdit);
+  const base = controls(page, 'Exposure').exact;
+  await base.fill('0.5');
+  await base.press('Enter');
+  await page.getByRole('button', { name: 'Keyframe Exposure', exact: true }).click();
+  let changed = await current(page);
+  expect(changed.layers[0]!.colour.exposure).toBe(0.5);
+  expect(changed.layers[0]!.keyframes[0]!.values.exposure).toBe(0.5);
+  expect(changed.clips).toEqual(document.clips);
+  await page.getByRole('button', { name: 'Keyframe Exposure', exact: true }).click();
+  expect((await current(page)).layers[0]!.colour.exposure).toBe(0.5);
+  await expect(page.getByRole('button', { name: 'Clip correction', exact: true })).toHaveCount(0);
+  await pointerEdit(page, 'Exposure', exposureEdit);
+  await preciseEdit(page, 'Exposure', -0.123456789, exposureEdit);
+  const before = await checkpoint(page);
+  await base.fill('4');
+  await base.press('Enter');
+  await expect(base).toHaveValue('4');
+  await unchanged(page, before);
+  await base.press('Escape');
+  await page.locator('[data-clip-id="two"] .timeline-clip-body').click();
+  await expect(base).toHaveValue('0.5');
+  changed = await current(page);
+  expect(changed.layers[0]!.colour.exposure).toBe(0.5);
+  expect(changed.clips).toEqual(document.clips);
+});
+
+test('empty rows expose all eight editable row appearance widgets and no clip colour scope', async ({ page }) => {
+  const document = await current(page);
+  document.clips = [];
+  document.music = [];
+  await fixture(page, document);
+  await preciseEdit(page, 'Exposure', 0.123456789, exposureEdit);
+  for (const name of ['Opacity', ...COLOUR_CONTROLS.map((control) => control.label)]) {
+    await expect(page.getByRole('slider', { name, exact: true })).toBeEnabled();
+    await expect(page.getByRole('button', { name: `Keyframe ${name}`, exact: true })).toBeEnabled();
+  }
+  await expect(page.getByRole('button', { name: 'Clip correction', exact: true })).toHaveCount(0);
+  expect((await current(page)).layers[0]!.colour).toEqual(document.layers[0]!.colour);
+});
+
 test('all main colour, Opacity, constant-rate and Gain sliders draft locally and release as exactly one edit', async ({
   page,
 }) => {
@@ -274,8 +327,8 @@ test('all main colour, Opacity, constant-rate and Gain sliders draft locally and
   for (const control of COLOUR_CONTROLS) {
     await pointerEdit(page, control.label, (document, value) => ({
       type: 'colour',
-      clipId: 'one',
-      colour: { ...document.clips[0]!.colour, [control.key]: value },
+      layerId: document.layers[0]!.id,
+      colour: { ...document.layers[0]!.colour, [control.key]: value },
     }));
   }
   await pointerEdit(page, 'Clip speed rate', constantEdit);
