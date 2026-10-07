@@ -994,7 +994,8 @@ test('comparison during music playback preserves the real worklet epoch and stri
     pauses: window.musicStreamEvidence.pauses,
     generation: window.musicStreamEvidence.receipt?.generation,
   }));
-  expect(initial.state.status, initial.state.message).toBe('playing');
+  expect(initial.state.playing).toBe(true);
+  expect(['playing', 'buffering']).toContain(initial.state.status);
   expect(initial.starts).toBe(1);
   expect(initial.generation).toBeDefined();
   try {
@@ -1032,7 +1033,10 @@ test('comparison during music playback preserves the real worklet epoch and stri
       await ready.dispose();
       expect(observed.trusted).toBe(true);
       expect(observed.playing).toBe(true);
-      expect(observed.status).toBe('playing');
+      // Native input and the preceding Playing observation are different tasks.
+      // Decoder buffering may begin between them; the retained post-activation
+      // Playing draw below must still satisfy every source/audio/epoch bound.
+      expect(['playing', 'buffering']).toContain(observed.status);
       expect(observed.ungraded).toBe(ungraded);
       expect(observed.detail).toBe(activation === 'click' ? 1 : 0);
       expect(observed.frame).toBeLessThan(duration - 1);
