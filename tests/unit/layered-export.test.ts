@@ -38,7 +38,7 @@ import {
   type ProjectDocument,
   type VideoLayer,
 } from '../../src/shared/model.js';
-import { compileRetiming } from '../../src/shared/speed.js';
+import { compileRetiming, type Retiming } from '../../src/shared/speed.js';
 import { calculateLayout, type PreviewLayer } from '../../src/shared/timeline.js';
 import { framesToSeconds, PROJECT_FPS } from '../../src/shared/timing.js';
 import { unsupportedProject } from './project-fixtures.js';
@@ -339,6 +339,147 @@ describe('schema-7 production dispatch and read-only validation', () => {
 });
 
 describe('bounded project-frame row speed and native pipe ownership without FFmpeg', () => {
+  it('rejects supplied partial continuous-query maps and bad endpoints before starting children', async () => {
+    const directory = await temp();
+    const clip = createClip('invalid-map', 'video', 7, 19);
+    const baseline = compileRetiming(clip);
+    const { sourcePositionAt: omitted, ...partial } = baseline;
+    expect(typeof omitted).toBe('function');
+    const request = {
+      ffmpeg: '/must-not-start-invalid-retiming',
+      cwd: directory,
+      clip,
+      decodeArgs: [],
+      encodeArgs: [],
+      frameBytes: 6,
+      signal: new AbortController().signal,
+    };
+    for (const sourcePositionAt of [undefined, null, 7]) {
+      await expect(
+        retimeRawVideo({
+          ...request,
+          retiming: { ...baseline, sourcePositionAt } as unknown as Retiming,
+        }),
+      ).rejects.toThrow('sourceAt, sourcePositionAt, outputAt and rateAt');
+    }
+    await expect(retimeRawVideo({ ...request, retiming: partial as Retiming })).rejects.toThrow('sourcePositionAt');
+    for (const invalid of [NaN, Infinity, -Infinity, 6, 20]) {
+      await expect(
+        retimeRawVideo({
+          ...request,
+          retiming: { ...baseline, sourcePositionAt: () => invalid },
+        }),
+      ).rejects.toThrow('selected source endpoints');
+    }
+    await expect(
+      retimeRawVideo({
+        ...request,
+        retiming: { ...baseline, sourcePositionAt: (output) => (output === 0 ? 7 : 18) },
+      }),
+    ).rejects.toThrow('selected source endpoints');
+    await expect(
+      retimeRawVideo({
+        ...request,
+        retiming: {
+          ...baseline,
+          sourcePositionAt: () => {
+            throw new Error('continuous query failed');
+          },
+        },
+      }),
+    ).rejects.toThrow('continuous query failed');
+    expect(await readdir(directory)).toEqual([]);
+  });
+
+  it.each([
+    [7, 9.5, 8.5, 10],
+    [7, 6.5, 8, 9],
+    [7, 19.5, 19.5, 19.5],
+    [7, NaN, 8, 9],
+    [7, Infinity, 8, 9],
+    [7, -Infinity, 8, 9],
+  ])('rejects invalid continuous positions %# despite a valid discrete decoder map', async (...positions) => {
+    const directory = await temp();
+    const clip = createClip('invalid-continuous', 'video', 7, 19);
+    const map: Retiming = {
+      duration: 4,
+      sourceAt: (output) => 7 + output,
+      sourcePositionAt: (output) => (output >= 4 ? 19 : positions[output]!),
+      outputAt: () => 0,
+      rateAt: () => 1,
+    };
+    await expect(
+      retimeRawVideo({
+        ffmpeg: process.execPath,
+        cwd: directory,
+        clip,
+        retiming: map,
+        decodeArgs: ['-e', 'process.stdout.write(Buffer.alloc(12*6));'],
+        encodeArgs: ['-e', 'process.stdin.resume();'],
+        frameBytes: 6,
+        signal: new AbortController().signal,
+      }),
+    ).rejects.toThrow('finite, monotonic, in-range continuous source-position map');
+  });
+
+  it('rejects a throwing interior continuous query through the native ownership path', async () => {
+    const directory = await temp();
+    const clip = createClip('throwing-continuous', 'video', 7, 19);
+    const baseline = compileRetiming(clip);
+    await expect(
+      retimeRawVideo({
+        ffmpeg: process.execPath,
+        cwd: directory,
+        clip,
+        retiming: {
+          ...baseline,
+          sourcePositionAt: (output) => {
+            if (output === 1) throw new Error('interior continuous query failed');
+            return baseline.sourcePositionAt(output);
+          },
+        },
+        decodeArgs: ['-e', 'process.stdout.write(Buffer.alloc(12*6));'],
+        encodeArgs: ['-e', 'process.stdin.resume();'],
+        frameBytes: 6,
+        signal: new AbortController().signal,
+      }),
+    ).rejects.toThrow('interior continuous query failed');
+  });
+
+  it('binds the original continuous query and keeps only bounded per-output validation', async () => {
+    const directory = await temp();
+    const clip = createClip('bound-continuous', 'video', 7, 19);
+    const queried: number[] = [];
+    const map = {
+      duration: 4,
+      sourceIn: 7,
+      sourceAt: (output: number) => 7 + output,
+      sourcePositionAt(output: number): number {
+        queried.push(output);
+        return output >= this.duration ? 19 : this.sourceIn + output / 2;
+      },
+      outputAt: () => 0,
+      rateAt: () => 1,
+    };
+    const report = await retimeRawVideo({
+      ffmpeg: process.execPath,
+      cwd: directory,
+      clip,
+      retiming: map,
+      decodeArgs: ['-e', 'process.stdout.write(Buffer.alloc(12*6));'],
+      encodeArgs: ['-e', 'process.stdin.resume();'],
+      frameBytes: 6,
+      signal: new AbortController().signal,
+      onProgress: () => {
+        map.sourcePositionAt = () => {
+          throw new Error('replacement must not be called');
+        };
+      },
+    });
+    expect(queried).toEqual([0, 4, 0, 1, 2, 3]);
+    expect(report).toMatchObject({ decodedFrames: 12, outputFrames: 4, rawFrameBuffers: 1 });
+  });
+
   for (const interpolation of ['hold', 'linear', 'ease-in', 'ease-out', 'smooth'] as const) {
     it(`uses the exact shared compound speed-key map (${interpolation}) and owns the captured keys`, async () => {
       const directory = await temp();

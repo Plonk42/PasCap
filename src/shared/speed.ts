@@ -50,6 +50,8 @@ export interface RetimedClip {
 export interface Retiming {
   duration: number;
   sourceAt: (outputFrame: number) => number;
+  /** Continuous original-source coordinate; exclusive OUT at/after duration. */
+  sourcePositionAt: (outputFrame: number) => number;
   outputAt: (sourceFrame: number) => number;
   rateAt: (outputFrame: number) => number;
 }
@@ -111,6 +113,12 @@ export function compileRetiming(clip: RetimedClip): Retiming {
     const effective = length / duration;
     result = {
       duration,
+      sourcePositionAt: (frame) => {
+        finiteFrame(frame);
+        if (frame <= 0) return clip.sourceIn;
+        if (frame >= duration) return clip.sourceOut;
+        return clip.sourceIn + frame * effective;
+      },
       sourceAt: (frame) =>
         Math.max(
           clip.sourceIn,
@@ -151,6 +159,12 @@ export function compileRetiming(clip: RetimedClip): Retiming {
     };
     result = {
       duration,
+      sourcePositionAt: (frame) => {
+        finiteFrame(frame);
+        if (frame <= 0) return clip.sourceIn;
+        if (frame >= duration) return clip.sourceOut;
+        return inverse((frame * total) / duration);
+      },
       sourceAt: (frame) =>
         Math.max(
           clip.sourceIn,
