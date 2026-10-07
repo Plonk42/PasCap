@@ -121,6 +121,25 @@ in the disposable test profile for this evidence, not in the product. The playba
 tests still initialize the real editor/compositor and keep their existing exact
 frame, PCM, drift, range-read and cancellation assertions.
 
+The [grade-comparison music regression](../tests/browser/grade-comparison.spec.ts)
+retains each trusted native pointer/Space/Enter activation and its subsequent real
+Playing draw at observation time. Slow browser-protocol assertions may observe
+legitimate completion later; they do not replace that retained checkpoint with a
+later diagnostics read. All four activations must happen while Playing, render
+their requested mode before the end, and retain one music epoch, exact source
+readiness and the independent one-frame output-clock bound through full completion.
+The memory-only fixture remains 480 project frames; no clock forgery, throughput
+threshold or enlarged playback timeout is used.
+
+On a rejected graphics result, the prerequisite also runs the installed Firefox
+bundle's native `gfxtest glx` once in the same display/Mesa environment, with a
+five-second deadline and 32 KiB limit per output stream. It logs and retains the
+browser/context result, selected graphics environment and native EGL/GLX output
+in the failure artifacts. A successful native GLX probe cannot qualify a rejected
+browser WebGL2 context; there is no context retry, force-enable or fallback.
+The privileged `about:support` page is not navigable through this Firefox build's
+Playwright/Juggler integration, so it is not used as a potentially hanging diagnostic.
+
 Headless Firefox also needs an available audio backend: a missing service can leave
 `AudioContext.resume()` suspended without rendering samples. The
 [Firefox runner](../scripts/ci/firefox.sh) starts a private PulseAudio server with a
