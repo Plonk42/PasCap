@@ -203,7 +203,7 @@ test('selected context precedes compact animation controls and adjusted sections
   await expect(page.locator('.layer-keyframe-scope')).toHaveCount(0);
   await expect(page.locator('.layer-keyed-control>.layer-setting-hint')).toHaveCount(0);
   const control = page.getByRole('button', { name: 'Keyframe Exposure', exact: true });
-  await expect(control).toHaveAccessibleDescription(/static base/);
+  await expect(control).toHaveAccessibleDescription(/Not animated/);
   await page.getByRole('slider', { name: 'Exposure', exact: true }).fill('0.4');
   await expect(
     page.getByRole('button', { name: 'Colour section', exact: true }).locator('.inspector-section-modified'),

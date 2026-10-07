@@ -10,11 +10,9 @@ export function colourAt(clip: VideoClip, layer: VideoLayer, projectFrame: numbe
     colour[setting] = evaluateLayerSetting(layer, setting, projectFrame, clip.colour[setting]);
   return colour;
 }
-export function opacityAt(clip: VideoClip, layer: VideoLayer, projectFrame: number): number {
-  return evaluateLayerSetting(layer, 'clipOpacity', projectFrame, clip.opacity);
-}
-export function layerOpacityAt(layer: VideoLayer, projectFrame: number): number {
-  return layer.enabled ? evaluateLayerSetting(layer, 'layerOpacity', projectFrame, layer.opacity) : 0;
+/** One evaluated source coverage for every clip in the row; visibility is separate. */
+export function opacityAt(layer: VideoLayer, projectFrame: number): number {
+  return evaluateLayerSetting(layer, 'opacity', projectFrame, layer.opacity);
 }
 
 /** Encoded BT.709, premultiplied within a dissolve, source-over across layers. */
@@ -31,9 +29,7 @@ export function compositePixel(layers: readonly PreviewLayer[], sampleSource: (l
       alpha += coverage;
       for (let channel = 0; channel < 3; channel++) colour[channel]! += graded[channel]! * coverage * layer.brightness;
     }
-    const opacity = group[0]!.layerOpacity;
-    for (let channel = 0; channel < 3; channel++)
-      result[channel] = colour[channel]! * opacity + result[channel]! * (1 - alpha * opacity);
+    for (let channel = 0; channel < 3; channel++) result[channel] = colour[channel]! + result[channel]! * (1 - alpha);
   }
   return result;
 }

@@ -20,7 +20,7 @@ interface RangeSettingProps {
   exact?: Pick<NumberFieldProps, 'resetKey' | 'validate'>;
 }
 
-/** The same setting-specific slider, units and colour reset in either edit context. */
+/** The same setting-specific slider, units and reset in either edit context. */
 export function RangeSettingControl({
   setting,
   id,
@@ -37,7 +37,7 @@ export function RangeSettingControl({
   const definition = KEYFRAME_SETTINGS.find((item) => item.key === setting)!;
   const colour = COLOUR_CONTROLS.find((item) => item.key === setting);
   const name = label ?? definition.label;
-  const neutral = colour ? NEUTRAL_COLOUR[colour.key] : null;
+  const neutral = colour ? NEUTRAL_COLOUR[colour.key] : 1;
   const slider = (
     <input
       id={id}
@@ -75,18 +75,16 @@ export function RangeSettingControl({
             </output>
           )}
           {actions}
-          {neutral !== null && (
-            <button
-              type="button"
-              className="icon-button"
-              aria-label={`Reset ${name}`}
-              title={resetTitle ?? hint}
-              disabled={disabled || value === neutral}
-              onClick={() => onCommit(neutral)}
-            >
-              <Icon name="reset" size={13} />
-            </button>
-          )}
+          <button
+            type="button"
+            className="icon-button"
+            aria-label={`Reset ${name}`}
+            title={resetTitle ?? (setting === 'opacity' ? 'Reset only Opacity to 100%' : hint)}
+            disabled={disabled || value === neutral}
+            onClick={() => onCommit(neutral)}
+          >
+            <Icon name="reset" size={13} />
+          </button>
         </span>
       </span>
       {exact ? (

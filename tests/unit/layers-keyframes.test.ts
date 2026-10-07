@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { NEUTRAL_COLOUR } from '../../src/shared/colour.js';
 import { applyCommand, EditHistory } from '../../src/shared/commands.js';
-import { colourAt, compositePixel, layerOpacityAt, opacityAt } from '../../src/shared/composition.js';
+import { colourAt, compositePixel, opacityAt } from '../../src/shared/composition.js';
 import {
   EMPTY_KEY_VALUES,
   evaluateLayerSetting,
@@ -36,6 +36,56 @@ function layered() {
   });
 }
 describe('layer layout, compositing and edit commands', () => {
+  it('defaults every row to full opacity and edits an empty row in one Undo without creating keys', () => {
+    const document = createProject('empty-opacity', 'Empty opacity');
+    document.layers.push(createLayer('other', 'Other'));
+    expect(document.layers.map((layer) => layer.opacity)).toEqual([1, 1]);
+    const history = new EditHistory(document);
+    history.commit({ type: 'opacity', layerId: 'video-1', opacity: 0.23456789 });
+    expect(history.current.layers[0]).toEqual({ ...document.layers[0]!, opacity: 0.23456789 });
+    expect(history.current.layers[1]).toEqual(document.layers[1]);
+    expect(history.current.clips).toEqual([]);
+    expect(history.current.layers[0]!.keyframes).toEqual([]);
+    expect(history.undo()).toEqual(document);
+    expect(history.canUndo).toBe(false);
+    expect(history.redo().layers[0]!.opacity).toBe(0.23456789);
+  });
+  it('edits every clip on one row uniformly and keeps the other row, timing and clip settings independent', () => {
+    const document = layered();
+    const history = new EditHistory(document);
+    const beforeLayout = calculateLayout(document);
+    history.commit({ type: 'duplicate', clipId: 'top', newClipId: 'later' });
+    const populated = history.current;
+    history.commit({ type: 'opacity', layerId: 'upper', opacity: 0.3 });
+    expect(history.current.clips).toEqual(populated.clips);
+    expect(history.current.layers[0]).toEqual(populated.layers[0]);
+    expect(history.current.layers[1]!.keyframes).toEqual([]);
+    for (const frame of [50, 150])
+      expect(sampleTimeline(history.current, frame).find((sample) => sample.layerId === 'upper')!.opacity).toBe(0.3);
+    expect(sampleTimeline(history.current, 50)[0]!.opacity).toBe(1);
+    expect(calculateLayout(history.current).clips.map(({ start, end }) => [start, end])).toEqual(
+      calculateLayout(populated).clips.map(({ start, end }) => [start, end]),
+    );
+    expect(beforeLayout.duration).toBe(120);
+    expect(history.undo()).toEqual(populated);
+    expect(history.undo()).toEqual(document);
+    expect(history.canUndo).toBe(false);
+  });
+  it.each([-1, 1.1, NaN, Infinity])('rejects row opacity %s atomically without discarding redo', (opacity) => {
+    const document = layered();
+    const history = new EditHistory(document);
+    const changed = history.commit({ type: 'opacity', layerId: 'upper', opacity: 0.3 });
+    history.undo();
+    expect(() => history.commit({ type: 'opacity', layerId: 'upper', opacity })).toThrow();
+    expect(history.current).toEqual(document);
+    expect(history.canUndo).toBe(false);
+    expect(history.canRedo).toBe(true);
+    expect(() => history.commit({ type: 'opacity', layerId: 'missing', opacity: 0.5 })).toThrow(
+      'Layer no longer exists',
+    );
+    expect(history.current).toEqual(document);
+    expect(history.redo()).toEqual(changed);
+  });
   it('preserves primary ripple and positions overlays independently with gaps/tails', () => {
     const project = layered();
     const layout = calculateLayout(project);
@@ -45,7 +95,7 @@ describe('layer layout, compositing and edit commands', () => {
     expect(sampleTimeline(project, 50)).toHaveLength(2);
     expect(sampleTimeline(project, 110).map((layer) => layer.clipId)).toEqual(['top']);
   });
-  it('composites source-over in layer order and supports hidden/half-opacity groups', () => {
+  it('composites source-over in layer order and supports hidden rows and half-opacity rows', () => {
     const project = layered();
     const pixel = compositePixel(sampleTimeline(project, 50), (layer) =>
       layer.mediaId === 'red' ? [1, 0, 0] : [0, 0, 1],
@@ -77,21 +127,19 @@ describe('layer layout, compositing and edit commands', () => {
   it('layer deletion is one undoable operation restoring its clips/grades/keys', () => {
     const project = layered();
     project.clips[1]!.colour = { ...NEUTRAL_COLOUR, exposure: 0.7, saturation: 0.4 };
-    project.layers[1]!.keyframes = [
-      point(20, { layerOpacity: 0.2, clipOpacity: 0.3, hue: 45 }, 'smooth'),
-      point(100, { layerOpacity: 0.8 }),
-    ];
+    project.layers[1]!.keyframes = [point(20, { opacity: 0.3, hue: 45 }, 'smooth'), point(100, { opacity: 0.8 })];
     const history = new EditHistory(project);
     history.commit({ type: 'layer-remove', layerId: 'upper' });
     expect(history.current.clips).toHaveLength(1);
     expect(history.undo().clips).toHaveLength(2);
-    expect(history.current.layers[1]?.opacity).toBe(0.5);
+    expect(history.current.clips[1]).not.toHaveProperty('opacity');
+    expect(history.current.layers[1]!.opacity).toBe(0.5);
     expect(history.current).toEqual(project);
     expect(history.redo().layers.map((layer) => layer.id)).toEqual(['video-1']);
   });
   it('duplicates independent static clip settings while retaining one shared row curve as one undo step', () => {
     const project = layered();
-    project.layers[1]!.keyframes = [point(20, { exposure: 0.4, clipOpacity: 0.75 }, 'smooth')];
+    project.layers[1]!.keyframes = [point(20, { exposure: 0.4, opacity: 0.75 }, 'smooth')];
     const history = new EditHistory(project);
     const original = history.current.clips[1]!;
     history.commit({ type: 'duplicate', clipId: original.id, newClipId: 'copy' });
@@ -119,7 +167,7 @@ describe('layer layout, compositing and edit commands', () => {
   });
   it('moving a primary clip into an overlay repairs boundaries and rejects bad placements atomically', () => {
     let project = layered();
-    project.layers[1]!.keyframes = [point(0, { clipOpacity: 0, hue: -90 }), point(100, { clipOpacity: 1, hue: 90 })];
+    project.layers[1]!.keyframes = [point(0, { opacity: 0, hue: -90 }), point(100, { opacity: 1, hue: 90 })];
     const keys = structuredClone(project.layers[1]!.keyframes);
     project = applyCommand(project, { type: 'place', clipId: 'bottom', layerId: 'video-1', start: 0, index: 0 });
     expect(() =>
@@ -159,15 +207,15 @@ describe('project-frame shared row settings', () => {
     for (const interpolation of ['hold', 'linear', 'ease-in', 'ease-out', 'smooth'] as const) {
       const layer = {
         keyframes: [
-          point(0, { clipOpacity: 0 }, interpolation),
+          point(0, { opacity: 0 }, interpolation),
           point(25, { hue: 90 }, 'hold'),
-          point(100, { clipOpacity: 1 }, interpolation),
+          point(100, { opacity: 1 }, interpolation),
         ],
       };
-      expect(evaluateLayerSetting(layer, 'clipOpacity', -10, 1)).toBe(0);
-      expect(evaluateLayerSetting(layer, 'clipOpacity', 100, 0)).toBe(1);
-      expect(evaluateLayerSetting(layer, 'clipOpacity', 150, 0)).toBe(1);
-      expect(evaluateLayerSetting(layer, 'clipOpacity', 50, 1)).toBeCloseTo(
+      expect(evaluateLayerSetting(layer, 'opacity', -10, 1)).toBe(0);
+      expect(evaluateLayerSetting(layer, 'opacity', 100, 0)).toBe(1);
+      expect(evaluateLayerSetting(layer, 'opacity', 150, 0)).toBe(1);
+      expect(evaluateLayerSetting(layer, 'opacity', 50, 1)).toBeCloseTo(
         { hold: 0, linear: 0.5, 'ease-in': 0.25, 'ease-out': 0.75, smooth: 0.5 }[interpolation],
       );
     }
@@ -191,22 +239,20 @@ describe('project-frame shared row settings', () => {
       highlights: 0.25,
       shadows: -0.2,
     };
-    clip.opacity = 0.7;
     clip.speed = { mode: 'constant', rate: 0.5 };
-    const layer = { ...createProject('p', 'P').layers[0]!, opacity: 0.25 };
+    const layer = { ...createProject('p', 'P').layers[0]!, opacity: 0.7 };
     for (const frame of [-10, 0, 50, 500]) {
       expect(colourAt(clip, layer, frame)).toEqual(clip.colour);
-      expect(opacityAt(clip, layer, frame)).toBe(0.7);
-      expect(layerOpacityAt(layer, frame)).toBe(0.25);
+      expect(opacityAt(layer, frame)).toBe(0.7);
     }
     layer.keyframes = [
-      point(0, { exposure: -1, clipOpacity: 0 }),
+      point(0, { exposure: -1, opacity: 0 }),
       point(25, { hue: 90 }, 'hold'),
-      point(100, { exposure: 1, clipOpacity: 1 }),
+      point(100, { exposure: 1, opacity: 1 }),
     ];
     expect(colourAt(clip, layer, 50)).toEqual({ ...clip.colour, exposure: 0, hue: 90 });
-    expect(opacityAt(clip, layer, 50)).toBe(0.5);
-    expect(layerOpacityAt(layer, 50)).toBe(0.25);
+    expect(opacityAt(layer, 50)).toBe(0.5);
+    expect(layer.opacity).toBe(0.7);
     expect(compileLayerRetiming(clip, layer, 50)).toBe(compileRetiming(clip));
     expect(clip.colour.exposure).toBe(0.7);
     expect(clip.colour.hue).toBe(30);
@@ -222,14 +268,14 @@ describe('project-frame shared row settings', () => {
       type: 'layer-key-toggle',
       layerId: 'video-1',
       frame: 10,
-      setting: 'clipOpacity',
+      setting: 'opacity',
       value: 0,
     });
     project = applyCommand(project, {
       type: 'layer-key-toggle',
       layerId: 'video-1',
       frame: 80,
-      setting: 'clipOpacity',
+      setting: 'opacity',
       value: 1,
     });
     project = applyCommand(project, {
@@ -291,16 +337,16 @@ describe('project-frame shared row settings', () => {
   it('keeps row points in project time, rejects point collisions and validates source ranges separately', () => {
     const project = layered();
     project.layers[1]!.keyframes = [
-      point(0, { layerOpacity: 0 }),
-      point(100, { layerOpacity: 1 }),
+      point(0, { opacity: 0 }),
+      point(100, { opacity: 1 }),
       point(150, { exposure: 0.7 }),
     ];
-    expect(sampleTimeline(project, 50)[1]?.layerOpacity).toBe(0.5);
+    expect(sampleTimeline(project, 50)[1]?.opacity).toBe(0.5);
     const before = JSON.stringify(project);
     expect(() =>
       applyCommand(project, {
         type: 'layer-update',
-        layer: { ...project.layers[1]!, keyframes: [point(10, { clipOpacity: 0 }), point(10, { hue: 90 })] },
+        layer: { ...project.layers[1]!, keyframes: [point(10, { opacity: 0 }), point(10, { hue: 90 })] },
       }),
     ).toThrow();
     expect(JSON.stringify(project)).toBe(before);
@@ -328,7 +374,7 @@ describe('project-frame shared row settings', () => {
   it('moves, eases, edits and removes an entire shared point atomically without merging other settings', () => {
     const project = layered();
     project.layers[1]!.keyframes = [
-      point(10, { clipOpacity: 0.4, exposure: 1, saturation: 0.6 }, 'smooth'),
+      point(10, { opacity: 0.4, exposure: 1, saturation: 0.6 }, 'smooth'),
       point(20, { hue: 45 }, 'hold'),
     ];
     const history = new EditHistory(project);
@@ -345,16 +391,16 @@ describe('project-frame shared row settings', () => {
     history.commit({ type: 'layer-key-easing', layerId: 'upper', frame: 30, interpolation: 'ease-out' });
     history.commit({ type: 'layer-key-value', layerId: 'upper', frame: 30, setting: 'exposure', value: -1 });
     expect(history.current.layers[1]!.keyframes[1]).toEqual(
-      point(30, { clipOpacity: 0.4, exposure: -1, saturation: 0.6 }, 'ease-out'),
+      point(30, { opacity: 0.4, exposure: -1, saturation: 0.6 }, 'ease-out'),
     );
-    expect(keySettings(history.current.layers[1]!.keyframes[1]!)).toEqual(['clipOpacity', 'exposure', 'saturation']);
+    expect(keySettings(history.current.layers[1]!.keyframes[1]!)).toEqual(['opacity', 'exposure', 'saturation']);
     history.commit({ type: 'layer-key-remove', layerId: 'upper', frame: 30 });
     expect(history.current.layers[1]!.keyframes).toEqual([project.layers[1]!.keyframes[1]]);
     expect(history.undo().layers[1]!.keyframes[1]).toEqual(
-      point(30, { clipOpacity: 0.4, exposure: -1, saturation: 0.6 }, 'ease-out'),
+      point(30, { opacity: 0.4, exposure: -1, saturation: 0.6 }, 'ease-out'),
     );
     expect(project.layers[1]!.keyframes[0]).toEqual(
-      point(10, { clipOpacity: 0.4, exposure: 1, saturation: 0.6 }, 'smooth'),
+      point(10, { opacity: 0.4, exposure: 1, saturation: 0.6 }, 'smooth'),
     );
   });
 });

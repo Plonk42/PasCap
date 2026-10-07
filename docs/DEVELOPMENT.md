@@ -211,7 +211,9 @@ there. It seeds twelve video memberships, music and proxies. Separate import-tes
 originals in `.pascap/browser-footage/synthetic-sources/` are outside that cache;
 `browse-camera-*` means generated patterns, not real recordings. The
 [fixture factory](../scripts/fixtures.ts) uses `preview-lab-v6` outside the browser
-cache and `preview-lab` inside it; bin resets never imply a global-library fallback.
+cache and `preview-lab` inside it. These are project identifiers, not schema
+versions; newly generated documents must satisfy strict v7. Bin resets never imply
+a global-library fallback.
 Neither suite invokes real-source sample preparation or needs private footage/music.
 
 The [music-browser regression](../tests/browser/music-browser.spec.ts) uses memory-only
@@ -282,13 +284,15 @@ the independent one-frame A/V, single-epoch and completion assertions.
 **Do not run these in CI or without the owner's explicit approval for real jobs.**
 The [sample helper](../scripts/prepare-samples.ts) targets **DJI_0468.MP4 and DJI_0469.MP4
 only**: pass an **explicit folder after `--`**, never rely on a personal-path default.
-It reuses ready proxies but may prepare missing ones; creates only an absent v6
+It reuses ready proxies but may prepare missing ones; creates only an absent v7
 sample, never overwrites or migrates existing edits.
 
 The [measurement helper](../scripts/measure-preview.ts) accepts exactly **two
-1× excerpts on one enabled, opaque, zero-origin contiguous track**, no music,
-extra layers, non-unit opacity or shared row points
+1× excerpts on one enabled, zero-origin contiguous track with row Opacity 1**, no music,
+extra layers or shared row points
 (even neutral/Speed-only points). `PASCAP_MEASURE_URL` selects that project.
+Measurement metadata must identify the strict v7 snapshot independently of the
+report format/identifier; historical reports and receipt snapshots stay untouched.
 `npm run measure -- --skip-playback --reference` skips playback benchmarking but
 **renders a native reference**; `--headed --reference` adds repeated playback. The edit
 is not saved, but reports/output are written. Keep the tab visible and check the
@@ -307,18 +311,34 @@ total-process memory; reports expose private paths/snapshots, so review before s
 
 Preview reuses **two decoder/texture slots per track, up to 16 for eight**, plus one
 source reviewer, not one per clip. Each track can dissolve independently. Generalized
-layered export renders premultiplied RGBA16 track groups, then merges bottom-to-top
-without regrading. Serial limits: one original decoder, two intermediate readers,
+layered export renders premultiplied RGBA16 track groups. Every `VideoLayer`
+requires numeric `opacity` in 0–1, initially 1 (100%) on new tracks. Evaluate that
+row value or its sole overriding `opacity` key channel for each source, including
+both dissolve sources; there is no saved `clip.opacity` or second opacity channel.
+With graded RGB $G_i$,
+black-fade brightness $b_i$, Opacity $o_i$ and dissolve weight $w_i$, group RGB is
+$C = \sum_i G_i b_i o_i w_i$ and coverage is $A = \sum_i o_i w_i$.
+Groups merge bottom-to-top as $\mathrm{result} = C + \mathrm{lower}(1 - A)$,
+without regrading or another opacity multiplier. Opacity is composition coverage,
+not SDR RGB grading; unkeyed colour settings remain per-clip. Black fades preserve coverage;
+each dissolve remains one group. Serial limits: one original decoder, two intermediate readers,
 one encoder and three native video children per pass. Four raw buffers (two RGB8,
 two RGBA16) use **22 bytes/pixel = 182,476,800 bytes at UHD**; two 65³ Float32 LUTs
 add **6,591,000 bytes**, excluding native/audio memory. Two retained clip files and
 three timeline representations bound concurrency, **not disk GB**;
 scratch grows with duration ([resource contract](LAYERS_AND_KEYFRAMES.md#inspector-and-resource-limits)).
-The static fast path requires one enabled, opaque, unanimated, zero-origin contiguous
-track and opaque clips; unsupported placement/coverage uses generalized layered export, regardless
+The static fast path requires one enabled, unanimated, zero-origin contiguous
+track with row Opacity 1; unsupported placement/coverage uses generalized layered export, regardless
 of Ripple or track ID.
 Processing: [row points](LAYERS_AND_KEYFRAMES.md), [retiming/audio](SPEED_AND_AUDIO.md)
 and [grading equations](COLOUR_AND_TIMING.md#colour).
+
+The single **Opacity** slider/diamond/navigation belongs in **Clip → Colour**
+alongside the colour sliders, initially **100%**, and works on an empty row.
+Without Opacity keys, it edits row `opacity`; with keys, only participation at the
+real playhead permits editing, with the diamond explicitly capturing a missing
+participant. Sliders never create keys. **Placement** contains placement only;
+Layer options contains rename, Ripple, ordering and deletion, with visibility separate.
 
 ## Contributor safety
 
@@ -335,11 +355,16 @@ and [grading equations](COLOUR_AND_TIMING.md#colour).
 - Never modify/copy/delete owner's originals or commit private paths/device IDs,
   saved project IDs, real media/cache or reports. Preserve fingerprints, symlink
   rejection, cache exclusion and HTTP guards.
-- Keep **strict schema 6**: required unique video/audio membership, all ten nullable
-  channels and per-layer `ripple`, `transitions`, `openingFade`, `closingFade`.
-  No project-level transitions/fades, compatibility fields/defaults/migration or
-  mandatory first-track ID. Preserve incompatible v1–v5 projects/receipt snapshots
-  and finished videos; registry/proxy formats remain unchanged.
+- Keep **strict schema 7**: required unique video/audio membership, all nine nullable
+  channels and per-layer `ripple`, `transitions`, `openingFade`, `closingFade` and
+  numeric `opacity` in 0–1. A new track starts at 1; a missing saved field is invalid.
+  The channels are `opacity` (sole UI **Opacity**), `speed` and seven colour
+  settings. Row `opacity` is the sole valid stored value; reject saved `clip.opacity`
+  and old `clipOpacity`/`layerOpacity` channels. No project-level
+  transitions/fades, compatibility fields/defaults/migration or mandatory first-track
+  ID. Preserve incompatible v1–v6 projects/receipt snapshots and finished videos,
+  without automatic deletion; recreate projects deliberately. Registry/proxy formats,
+  source protections and native resource budgets remain unchanged.
 - Reuse `JobQueue`, library and backpressured raw/retime helpers: one heavy job,
   bounded threads/buffers, cancellation and owned-scratch cleanup. Keep serial awaits/
   [serial helpers](../src/shared/serial.ts), not parallel media work to satisfy lint.

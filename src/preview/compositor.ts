@@ -14,7 +14,6 @@ export interface CompositeClip {
 }
 export interface CompositeGroup {
   clips: readonly CompositeClip[];
-  opacity: number;
 }
 
 function compile(gl: WebGL2RenderingContext, kind: number, source: string): WebGLShader {
@@ -95,7 +94,6 @@ export class Compositor {
         'extra1',
         'coverage',
         'brightness',
-        'groupOpacity',
         'imageAspect',
         'canvasAspect',
       ];
@@ -230,7 +228,6 @@ export class Compositor {
       sources[1]!.opacity * sources[1]!.blendWeight,
     );
     gl.uniform2f(this.#location('brightness'), sources[0]!.brightness, sources[1]!.brightness);
-    gl.uniform1f(this.#location('groupOpacity'), group.opacity);
     gl.uniform2f(this.#location('imageAspect'), sources[0]!.aspect, sources[1]!.aspect);
     gl.uniform1f(this.#location('canvasAspect'), this.canvas.width / this.canvas.height);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
@@ -282,9 +279,7 @@ export function verifyGpuColour(settings: ColourSettings): GpuComparison {
       pixels[index * 4 + 3] = 255;
     }
     compositor.uploadPixels(0, pixels, 17, 17);
-    compositor.drawFrame([
-      { opacity: 1, clips: [{ slot: 0, settings, aspect: 1, opacity: 1, blendWeight: 1, brightness: 1 }] },
-    ]);
+    compositor.drawFrame([{ clips: [{ slot: 0, settings, aspect: 1, opacity: 1, blendWeight: 1, brightness: 1 }] }]);
     const rendered = compositor.readPixels();
     let sum = 0;
     let maximum = 0;
@@ -340,7 +335,6 @@ function comparisonSource(
     brightness = 1;
   }
   if (test === 3 && group === 1) brightness = 0;
-  const clipOpacity = test === 1 || test === 3 ? 1 : random();
   return {
     layer: {
       clipId: `test-${group}-${source}`,
@@ -348,13 +342,12 @@ function comparisonSource(
       layerId: `layer-${group}`,
       sourceFrame: 0,
       colour: settings,
-      opacity: clipOpacity,
+      opacity,
       blendWeight,
       brightness,
       weight: brightness * blendWeight,
-      layerOpacity: opacity,
     },
-    clip: { slot, settings, aspect: 1, opacity: clipOpacity, blendWeight, brightness },
+    clip: { slot, settings, aspect: 1, opacity, blendWeight, brightness },
   };
 }
 
@@ -365,7 +358,7 @@ function comparisonGroup(
 ): { layers: PreviewLayer[]; group: CompositeGroup } {
   let opacity = random();
   let progress = random();
-  if (test === 1) opacity = 1;
+  if (test === 1 || test === 3) opacity = 1;
   if (test === 2) opacity = 0;
   if (test === 4) progress = 0;
   if (test === 6) progress = 1;
@@ -375,7 +368,7 @@ function comparisonGroup(
   );
   return {
     layers: sources.map((source) => source.layer),
-    group: { opacity, clips: sources.map((source) => source.clip) },
+    group: { clips: sources.map((source) => source.clip) },
   };
 }
 

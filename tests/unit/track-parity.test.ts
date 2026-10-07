@@ -106,10 +106,10 @@ function rejected(document: ProjectDocument, command: EditCommand, message: stri
   expect(history.canRedo).toBe(false);
 }
 
-describe('strict uniform schema-6 tracks', () => {
+describe('strict uniform schema-7 tracks', () => {
   it('uses Ripple ON for the initial track and every newly created track', () => {
     const initial = createProject('new', 'New');
-    expect(initial.schemaVersion).toBe(6);
+    expect(initial.schemaVersion).toBe(7);
     expect(initial.layers).toEqual([createLayer(BASE_LAYER_ID, 'Video 1')]);
     for (const id of [BASE_LAYER_ID, ...Array.from({ length: 8 }, (_, index) => `arbitrary-${index}`)]) {
       expect(createLayer(id, 'Track')).toEqual({
@@ -132,7 +132,7 @@ describe('strict uniform schema-6 tracks', () => {
   it('requires every new track field, rejects old global fields and never injects fallbacks', () => {
     const document = fixture();
     expect(projectSchema.parse(document)).toEqual(document);
-    for (const field of ['ripple', 'transitions', 'openingFade', 'closingFade'] as const) {
+    for (const field of ['opacity', 'ripple', 'transitions', 'openingFade', 'closingFade'] as const) {
       const { [field]: _missing, ...incomplete } = document.layers[0]!;
       expect(projectSchema.safeParse({ ...document, layers: [incomplete, ...document.layers.slice(1)] }).success).toBe(
         false,
@@ -140,7 +140,7 @@ describe('strict uniform schema-6 tracks', () => {
     }
     for (const extra of [{ transitions: [] }, { openingFade: 0 }, { closingFade: 0 }])
       expect(projectSchema.safeParse({ ...document, ...extra }).success).toBe(false);
-    for (const schemaVersion of [1, 2, 3, 4, 5])
+    for (const schemaVersion of [1, 2, 3, 4, 5, 6])
       expect(projectSchema.safeParse({ ...document, schemaVersion }).success).toBe(false);
     expect(projectSchema.safeParse(unsupportedProject(5, 'old', 'Unsupported topology')).success).toBe(false);
     expect(document).not.toHaveProperty('transitions');
@@ -216,9 +216,12 @@ describe('independent Ripple toggles and packed placements', () => {
         TRACK_IDS.filter((id) => id !== layerId),
       );
       expectOtherTracks(document, hidden, layerId);
-      const translucent = oneStep(document, { type: 'layer-update', layer: { ...layer, opacity: 0.23456789 } });
+      const translucent = oneStep(document, { type: 'opacity', layerId, opacity: 0.23456789 });
+      expect(translucent.layers.find((item) => item.id === layerId)).toEqual({ ...layer, opacity: 0.23456789 });
       expect(translucent.clips).toEqual(document.clips);
-      expect(sampleTimeline(translucent, 20).map((sample) => [sample.layerId, sample.layerOpacity])).toEqual(
+      expect(starts(translucent, layerId)).toEqual(starts(document, layerId));
+      expect(calculateLayout(translucent).duration).toBe(calculateLayout(document).duration);
+      expect(sampleTimeline(translucent, 20).map((sample) => [sample.layerId, sample.opacity])).toEqual(
         TRACK_IDS.map((id) => [id, id === layerId ? 0.23456789 : 1]),
       );
       expectOtherTracks(document, translucent, layerId);
@@ -393,7 +396,8 @@ describe('independent Ripple toggles and packed placements', () => {
         layer.keyframes = [point(0, 1), point(600, 1)];
       });
       selected.colour.exposure = 0.123456789;
-      selected.opacity = 0.654321;
+      document.layers.find((layer) => layer.id === layerId)!.opacity = 0.654321;
+      document.layers.find((layer) => layer.id === targetId)!.opacity = 0.345678;
       const plan = planTimelineDrop(
         document,
         { kind: 'clip', clipId: selected.id, grabFrame: 0 },
@@ -417,6 +421,8 @@ describe('independent Ripple toggles and packed placements', () => {
         layerId: targetId,
         start: plan.start,
       });
+      expect(next.clips.find((clip) => clip.id === selected.id)).not.toHaveProperty('opacity');
+      expect(sampleTimeline(next, plan.start).find((sample) => sample.clipId === selected.id)!.opacity).toBe(0.345678);
       for (const layer of next.layers) {
         const original = document.layers.find((item) => item.id === layer.id)!;
         expect({ ...layer, transitions: original.transitions }).toEqual(original);
@@ -621,7 +627,7 @@ describe('track-owned transitions, fades, gaps and group composition', () => {
       expect(weights).toEqual([0, 0.5, 1, 1, 0.5, 0]);
       for (const frame of [10, end - 1]) {
         const sample = sampleTimeline(next, frame).find((item) => item.layerId === layerId)!;
-        expect(sample).toMatchObject({ opacity: 1, layerOpacity: 1, blendWeight: 1 });
+        expect(sample).toMatchObject({ opacity: 1, blendWeight: 1 });
         expect(compositePixel([sample], () => [1, 1, 1])).toEqual([0, 0, 0]);
       }
       expectOtherTracks(document, next, layerId);

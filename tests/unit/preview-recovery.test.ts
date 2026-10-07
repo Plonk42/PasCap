@@ -34,7 +34,7 @@ interface DecoderDouble {
   dispose: Mock<() => void>;
 }
 type Texture = { sourceFrame: number; url: string };
-type Surface = { opacity: number; clips: (CompositeGroup['clips'][number] & Texture)[] }[];
+type Surface = { clips: (CompositeGroup['clips'][number] & Texture)[] }[];
 interface CompositorDouble {
   visible: Surface | null;
   setDecoderCount: Mock<(count: number) => void>;
@@ -144,7 +144,6 @@ vi.mock('../../src/preview/compositor.js', () => ({
       // Real drawFrame clears internally as part of a completed replacement draw.
       // This spy models standalone engine clears, which leave no accepted image.
       this.visible = groups.map((group) => ({
-        opacity: group.opacity,
         clips: group.clips.map((clip) => {
           const texture = this.textures.get(clip.slot);
           if (!texture) throw new Error('Cannot draw an unuploaded source');
@@ -407,7 +406,6 @@ function expectSurface(preview: RunningPreview, frame: number, ungraded = false)
       return members.length
         ? [
             {
-              opacity: members[0]!.layerOpacity,
               clips: members.map((layer) => ({
                 slot: preview.engine.diagnostics().assignedClipIds.indexOf(layer.clipId),
                 sourceFrame: layer.sourceFrame,

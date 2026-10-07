@@ -57,8 +57,28 @@ PasCap is a solo, pre-release project: optimize for fast iteration. Details are 
 
 - Shared integer-frame layout/retiming (`PlacedClip.retiming`) is authoritative for
   UI, preview and native export. Per-frame rendering stays outside React.
-- Strict schema 6 with uniform tracks, each requiring `ripple`, `transitions`,
+- Strict schema 7 with uniform tracks, each requiring `ripple`, `transitions`,
   `openingFade` and `closingFade`; rows show the saved bottom-to-top order.
+- Final approved [#67](https://github.com/Plonk42/PasCap/issues/67): **Opacity** is
+  one row-owned setting, not a clip setting. `VideoLayer.opacity` is a required
+  number in 0–1; new tracks start at 1 (100%). No saved `clip.opacity` field.
+  The sole row key channel is `opacity`; points require all nine nullable channels:
+  `opacity`, `speed` and the seven colour settings. Reject missing row opacity,
+  saved `clip.opacity` and old `clipOpacity`/`layerOpacity` channels; do not supply
+  compatibility defaults. `layer.opacity` is the valid sole stored row value.
+  Put the single **Opacity** slider/diamond/navigation in **Clip → Colour** beside
+  the colour sliders, usable on empty rows too. Without Opacity keys, the slider
+  edits `row.opacity`; keys override that value on every clip, including both
+  dissolve sources. Sliders never create keys; an animated channel without a
+  participant at the real playhead is read-only until its diamond captures it.
+  **Placement** contains placement only; Layer options contains only rename,
+  Ripple, ordering and deletion. Visibility stays separate. Unkeyed colour
+  settings remain per-clip; Opacity is composition coverage, not SDR RGB grading.
+  Group composition is $C = \sum_i G_i b_i o_i w_i$, $A = \sum_i o_i w_i$,
+  $\mathrm{result} = C + \mathrm{lower}(1 - A)$, evaluating row Opacity for each
+  source with no additional layer multiplier.
+  Preserve incompatible v1–v6 projects/receipt snapshots; require recreation,
+  without migrations, compatibility defaults or automatic deletion.
 - Heavy native work stays serial with bounded children/buffers, exact frame counts
   and source identity guards.
 - Read and update the relevant contract guide when behaviour changes:

@@ -222,11 +222,11 @@ describe.skipIf(!enabled)('clip speed curves · exact native maps on disposable 
     };
     document.clips = [
       { ...createClip('base', assets[0]!.id, 2, 22), speed },
-      { ...createClip('upper', assets[1]!.id, 10, 20), layerId: 'upper', start: 3, opacity: 0.6, speed },
+      { ...createClip('upper', assets[1]!.id, 10, 20), layerId: 'upper', start: 3, speed },
     ];
     document.layers.push({
       ...createLayer('upper', 'Upper', false),
-      opacity: 0.8,
+      opacity: 0.6,
       keyframes: [
         { frame: 0, interpolation: 'linear', values: { ...EMPTY_KEY_VALUES, speed: 2 } },
         { frame: 20, interpolation: 'hold', values: { ...EMPTY_KEY_VALUES, speed: 0.5 } },

@@ -58,7 +58,7 @@ describe('project dialog filtering', () => {
     project('legacy', {
       title: 'North flight old',
       compatible: false,
-      error: 'Unsupported project schema version 2; this build requires version 6.',
+      error: 'Unsupported project schema version 6; this build requires version 7.',
     }),
     project('south', { title: 'South flight', updatedAt: '2026-10-01T12:00:00Z' }),
   ];
@@ -92,7 +92,7 @@ describe('project dialog filtering', () => {
     const unavailable = Object.freeze(entries[2]!);
     const filtered = filterProjects(Object.freeze([unavailable]), 'old', 'unsupported');
     expect(filtered[0]).toBe(unavailable);
-    expect(filtered[0]?.error).toContain('schema version 2');
+    expect(filtered[0]?.error).toBe('Unsupported project schema version 6; this build requires version 7.');
     expect(filtered[0]?.compatible).toBe(false);
     expect(filtered[0]?.clipCount).toBe(0);
   });
@@ -214,12 +214,12 @@ describe('activity ordering and summaries', () => {
 });
 
 describe('export snapshot summary', () => {
-  it('summarizes an empty strict version 6 project without adding defaults', () => {
+  it('summarizes an empty strict version 7 project without adding defaults', () => {
     const document = createProject('empty', 'Empty');
     const summary = summarizeExport(document);
     expect(summary).toMatchObject({ duration: 0, clips: 0, layers: 1, enabledLayers: 1, layered: false });
-    expect(summary.keys).toEqual({ points: 0, settings: 0, speed: 0, colour: 0, clipOpacity: 0, layerOpacity: 0 });
-    expect(document.schemaVersion).toBe(6);
+    expect(summary.keys).toEqual({ points: 0, settings: 0, speed: 0, colour: 0, opacity: 0 });
+    expect(document.schemaVersion).toBe(7);
     expect(document.media).toEqual({ videoIds: [], audioIds: [] });
     expect(document.layers[0]!.keyframes).toEqual([]);
   });
@@ -228,34 +228,34 @@ describe('export snapshot summary', () => {
     const document: ProjectDocument = createProject('layers', 'Layers');
     const primary = createClip('primary', 'source', 0, 60);
     primary.speed = { mode: 'constant', rate: 2 };
-    document.layers[0]!.keyframes = [point(0, { clipOpacity: 1, ...primary.colour }, 'hold')];
+    document.layers[0]!.keyframes = [point(0, { opacity: 1, ...primary.colour }, 'hold')];
     const overlay = createClip('overlay', 'source', 0, 30);
     overlay.layerId = 'video-2';
     overlay.start = 100;
     document.layers.push({
       ...createLayer('video-2', 'Overlay', false),
       enabled: false,
-      keyframes: [point(0, { speed: 1, layerOpacity: 1 }), point(200, { brightness: 0.1 }, 'hold')],
+      keyframes: [point(0, { speed: 1 }), point(200, { brightness: 0.1 }, 'hold')],
     });
     document.clips = [primary, overlay];
     const before = JSON.stringify(document);
     const summary = summarizeExport(document);
     expect(summary).toMatchObject({ duration: 130, clips: 2, layers: 2, enabledLayers: 1, layered: true });
-    expect(summary.keys).toEqual({ points: 3, settings: 11, speed: 1, colour: 8, clipOpacity: 1, layerOpacity: 1 });
+    expect(summary.keys).toEqual({ points: 3, settings: 10, speed: 1, colour: 8, opacity: 1 });
     expect(JSON.stringify(document)).toBe(before);
   });
 
-  it('distinguishes shared speed points from the static-only export path and still detects clip opacity', () => {
+  it('distinguishes shared speed points from the static-only export path and still detects row opacity', () => {
     const document = createProject('speed', 'Speed');
     const clip = createClip('clip', 'source', 0, 60);
     document.layers[0]!.keyframes = [point(0, { speed: 2 })];
     document.clips = [clip];
     const summary = summarizeExport(document);
     expect(summary).toMatchObject({ duration: 30, layered: true });
-    expect(summary.keys).toEqual({ points: 1, settings: 1, speed: 1, colour: 0, clipOpacity: 0, layerOpacity: 0 });
+    expect(summary.keys).toEqual({ points: 1, settings: 1, speed: 1, colour: 0, opacity: 0 });
     document.layers[0]!.keyframes = [];
     expect(summarizeExport(document)).toMatchObject({ duration: 60, layered: false });
-    clip.opacity = 0.5;
+    document.layers[0]!.opacity = 0.5;
     expect(summarizeExport(document).layered).toBe(true);
   });
 
@@ -267,13 +267,13 @@ describe('export snapshot summary', () => {
     document.clips = [left, right];
     document.layers[0]!.transitions = [{ leftId: 'left', rightId: 'right', type: 'cut', duration: 0 }];
     document.layers[0]!.keyframes = [
-      point(0, { speed: 1, exposure: 0, brightness: 0, clipOpacity: 0, layerOpacity: 0 }),
+      point(0, { speed: 1, exposure: 0, brightness: 0, opacity: 0 }),
       point(60, { exposure: 1, shadows: 0 }),
     ];
     const before = JSON.stringify(document);
     const summary = summarizeExport(document);
     expect(summary).toMatchObject({ duration: 60, clips: 2, layers: 1, enabledLayers: 1, layered: true });
-    expect(summary.keys).toEqual({ points: 2, settings: 7, speed: 1, colour: 4, clipOpacity: 1, layerOpacity: 1 });
+    expect(summary.keys).toEqual({ points: 2, settings: 6, speed: 1, colour: 4, opacity: 1 });
     expect(JSON.stringify(document)).toBe(before);
   });
 });
