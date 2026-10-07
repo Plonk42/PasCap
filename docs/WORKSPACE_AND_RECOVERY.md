@@ -386,9 +386,22 @@ No hidden write retry or original overwrite occurs; accepted registrations remai
 kept if a later source or queue admission fails.
 
 Hover X maps a prepared recording's review button across its complete source.
-Source preview has its own one muted paused decoder, observed-frame checks,
+Source preview has its own one muted proxy decoder, observed-frame checks,
 buffering/error/retry state and release on close/hidden/offscreen/project change.
 It never moves the project playhead or prepares/plays an original implicitly.
+
+Its sticky header keeps native **Play / Pause** alongside **Add excerpt**, even
+when short-height source controls scroll. Play uses the applied IN/OUT, not numeric
+drafts, starting at the observed frame if inside and before OUT − 1, otherwise IN.
+It stops and exact-seeks OUT − 1, without looping or audio; a one-frame range only
+displays that frame. Scrub/trim/mark/Apply/Reset pause first. Pending play cannot
+restart after cancellation, a source/project switch, close, hidden viewer or tab
+switch; start/stall failures are explicit after five seconds with Retry.
+Labelled 30 × 28 px IN/OUT handles, omitted-footage hatching and boundary-frame
+feedback remain separate from the source scrubber. Escape, capture loss, pointer
+cancellation and window blur restore a trim draft and its prior source frame.
+This source-only playback adds no timeline/music seek, history/save, decoder,
+original access or implicit preparation.
 
 Pin holds that source while hovering other rows. Explicit click/focus can select
 another prepared source. IN/OUT handles/Apply/I/O marks/Reset stay recoverable.
