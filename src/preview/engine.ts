@@ -128,6 +128,7 @@ export class PreviewEngine {
   #document: ProjectDocument | null = null;
   #layout: TimelineLayout = { clips: [], transitions: [], duration: 0 };
   #controller = new AbortController();
+  #catchUpController: AbortController | null = null;
   readonly #preloads = new Map<VideoDecoderSlot, { clipId: string; controller: AbortController }>();
   #operationFrame = 0;
   readonly #listeners = new Set<(diagnostics: PreviewDiagnostics) => void>();
@@ -144,6 +145,7 @@ export class PreviewEngine {
   #lastDrawnFrame = -1;
   #dirty = true;
   #lastEmit = 0;
+  #publication = 0;
   #playingClips: string[] = [];
   readonly #uploadedFrames: number[] = [];
   readonly #seekTimes: number[] = [];
@@ -181,7 +183,7 @@ export class PreviewEngine {
   }
   subscribe(listener: (diagnostics: PreviewDiagnostics) => void): () => void {
     this.#listeners.add(listener);
-    listener(this.diagnostics());
+    this.#publish([listener], ++this.#publication);
     return () => {
       this.#listeners.delete(listener);
     };
@@ -224,31 +226,96 @@ export class PreviewEngine {
       musicDriftFrames: this.#music.errorFrames,
     };
   }
-  #emit(force = false): void {
-    const now = performance.now();
-    if (this.#playing && !this.#busy && this.#status === 'playing' && this.#document && this.#music.hasMusic) {
-      // Upload/draw work can outlive the clock read used to select an image.
-      // Validate every completed playback tick, even if notification is
-      // throttled. A stale image becomes explicit buffering, not Playing.
-      try {
-        const frame = this.#expectedFrame(now);
-        const required = sampleTimeline(this.#document, frame, this.#layout).map((layer) => layer.clipId);
-        if (!this.#canRetainFrame(frame, required)) {
-          this.#operationFrame = frame;
-          if (!this.#mismatchStart) this.#mismatchStart = now;
-          this.#compositor.clear();
-          this.#setStatus('buffering', 'Waiting for decoded frames');
-          return;
-        }
-      } catch (error) {
-        this.#handleError(error);
-        return;
-      }
+  #playingEligibility(document: ProjectDocument, layout: TimelineLayout, accepted: number): Set<number> {
+    // Neighbours need the same active clip set, not identical grades or sourceAt
+    // values. Resolve these expensive queries before the final output-clock read.
+    const drawn = sampleTimeline(document, accepted, layout).map((layer) => layer.clipId);
+    return new Set(
+      [accepted - 1, accepted, accepted + 1].filter((candidate) => {
+        if (candidate < 0 || candidate >= layout.duration) return false;
+        if (candidate === accepted) return true;
+        return sameClips(
+          drawn,
+          sampleTimeline(document, candidate, layout).map((layer) => layer.clipId),
+        );
+      }),
+    );
+  }
+  #validatePlayingPublication(): boolean {
+    if (!this.#playing || this.#busy || this.#status !== 'playing' || !this.#document || !this.#music.hasMusic) {
+      return true;
     }
+    // Upload/draw work can outlive the clock read used to select an image.
+    // Diagnostics and earlier listeners can outlive it too. Reuse the same
+    // source-set/appearance and one-frame test at every dispatch boundary.
+    try {
+      const document = this.#document;
+      const layout = this.#layout;
+      const accepted = this.#frame;
+      const dirty = this.#dirty;
+      const status = this.#status;
+      const busy = this.#busy;
+      const playing = this.#playing;
+      const publication = this.#publication;
+      const current = (): boolean =>
+        !this.#disposed &&
+        this.#document === document &&
+        this.#layout === layout &&
+        this.#frame === accepted &&
+        this.#status === status &&
+        this.#busy === busy &&
+        this.#playing === playing &&
+        this.#publication === publication;
+      const eligible = this.#playingEligibility(document, layout, accepted);
+      if (!current()) return false;
+      const now = performance.now();
+      const frame = this.#expectedFrame(now);
+      if (!current()) return false;
+      // Successful publication does only scalar/membership checks after that
+      // read. An invalidated image may query the failure path, never publish.
+      if (dirty || this.#dirty !== dirty || !eligible.has(frame)) {
+        const required = sampleTimeline(document, frame, layout);
+        if (!current()) return false;
+        // A clock crossing into a genuine empty composition needs no decoded
+        // callback. Draw current black (or finish), never retain ended footage
+        // or call it a video mismatch. Nonempty images keep the one-frame bound.
+        if (!required.length) {
+          this.#advance(performance.now());
+          return false;
+        }
+        this.#operationFrame = frame;
+        if (!this.#mismatchStart) this.#mismatchStart = now;
+        this.#compositor.clear();
+        this.#setStatus('buffering', 'Waiting for decoded frames');
+        return false;
+      }
+    } catch (error) {
+      this.#handleError(error);
+      return false;
+    }
+    return true;
+  }
+  #publish(listeners: readonly ((diagnostics: PreviewDiagnostics) => void)[], publication: number): void {
+    const diagnostics = this.diagnostics();
+    if (publication !== this.#publication || !this.#validatePlayingPublication()) return;
+    // One snapshot, one bounded pass. A nested publication supersedes this
+    // entire pass, including when diagnostics construction itself reenters.
+    // Never retry obsolete Playing; black advancement can publish next tick.
+    for (const listener of listeners) {
+      if (publication !== this.#publication) return;
+      if (!this.#validatePlayingPublication() || publication !== this.#publication) return;
+      if (this.#listeners.has(listener)) listener(diagnostics);
+    }
+  }
+  #emit(force = false): void {
+    const publication = ++this.#publication;
+    // Keep the post-render surface check even on throttled ticks or with no
+    // subscribers; notification throttling must not retain a stale image.
+    if (!this.#validatePlayingPublication()) return;
+    const now = performance.now();
     if (!force && now - this.#lastEmit < 100) return;
     this.#lastEmit = now;
-    const diagnostics = this.diagnostics();
-    for (const listener of this.#listeners) listener(diagnostics);
+    this.#publish([...this.#listeners], publication);
   }
   #setStatus(status: PreviewStatus, message: string): void {
     if (this.#status === status && this.#message === message) return;
@@ -275,6 +342,8 @@ export class PreviewEngine {
   #beginOperation(): AbortSignal {
     this.#music.pause();
     this.#controller.abort();
+    this.#catchUpController?.abort();
+    this.#catchUpController = null;
     this.#cancelPreloads();
     this.#controller = new AbortController();
     this.#busy = true;
@@ -430,10 +499,10 @@ export class PreviewEngine {
       const ids = new Set(snapshot.clips.map((clip) => clip.id));
       this.#assignments = this.#assignments.map((id) => (id !== null && ids.has(id) ? id : null));
       this.#compositor.clear();
-      await this.#music.configure(snapshot.clips.length ? snapshot.music : null, signal);
+      await this.#music.configure(snapshot.music, signal);
       if (!this.#isCurrent(signal)) return;
       if (!this.#compositor.available) throw new Error('WebGL context is unavailable.');
-      if (!snapshot.clips.length) {
+      if (!this.#layout.duration) {
         this.#busy = false;
         this.#setStatus('empty', 'Add footage to the timeline');
         return;
@@ -569,6 +638,8 @@ export class PreviewEngine {
     this.#music.pause();
     this.#playing = false;
     this.#controller.abort();
+    this.#catchUpController?.abort();
+    this.#catchUpController = null;
     this.#cancelPreloads();
     this.#busy = false;
     for (const slot of this.#slots) slot.pause();
@@ -666,11 +737,28 @@ export class PreviewEngine {
   readonly #tick = (now: number): void => {
     if (this.#disposed) return;
     this.#raf = requestAnimationFrame(this.#tick);
-    if (!this.#playing || this.#busy || !this.#document) {
+    if (!this.#playing || !this.#document) {
       this.#emit();
       return;
     }
     try {
+      if (this.#busy && this.#catchUpController) {
+        const frame = this.#expectedFrame(now);
+        if (
+          frame >= this.#layout.duration ||
+          (!sampleTimeline(this.#document, frame, this.#layout).length && this.#music.sync())
+        ) {
+          // Cancel only the now-unneeded video seek, not healthy music's epoch.
+          // Its late callback cannot turn a black conclusion back into footage.
+          this.#catchUpController.abort();
+          this.#catchUpController = null;
+          this.#busy = false;
+        }
+      }
+      if (this.#busy) {
+        this.#emit();
+        return;
+      }
       this.#advance(now);
     } catch (error) {
       this.#handleError(error);
@@ -742,18 +830,22 @@ export class PreviewEngine {
     // that signal would cancel healthy audio merely because video is late.
     const signal = this.#controller.signal;
     const timeout = AbortSignal.timeout(5_000);
-    const mediaSignal = AbortSignal.any([signal, timeout]);
+    const controller = new AbortController();
+    this.#catchUpController = controller;
+    const mediaSignal = AbortSignal.any([signal, timeout, controller.signal]);
     this.#busy = true;
     for (const id of this.#playingClips) this.#slotFor(id).pause();
     try {
       await this.#catchUpVideoLoop(signal, mediaSignal);
     } catch (error) {
-      if (this.#isCurrent(signal))
+      if (this.#isCurrent(signal) && !controller.signal.aborted)
         this.#handleError(
           timeout.aborted
             ? new Error('Video catch-up did not deliver the current audio frame within 5 seconds.')
             : error,
         );
+    } finally {
+      if (this.#catchUpController === controller) this.#catchUpController = null;
     }
   }
 
@@ -767,35 +859,48 @@ export class PreviewEngine {
         return;
       }
       const layers = sampleTimeline(this.#document!, frame, this.#layout);
-      const changed = !sameClips(
-        layers.map((layer) => layer.clipId),
-        this.#playingClips,
-      );
-      if (!this.#music.sync() || changed) {
-        this.#busy = false;
-        await this.#alignPlayback(frame, changed);
-        return;
-      }
+      if (await this.#leaveVideoCatchUp(frame, layers)) return;
       this.#operationFrame = frame;
       await this.#prepareLayers(layers, signal, mediaSignal);
       if (!this.#isCurrent(signal) || !this.#playing) return;
       mediaSignal.throwIfAborted();
       const current = this.#acceptCurrentVideo();
       if (current === null) continue;
-      this.#setPlaybackRates(sampleTimeline(this.#document!, current, this.#layout), current);
-      await waitForMedia(Promise.all(this.#playingClips.map((id) => this.#slotFor(id).play())), mediaSignal);
-      if (!this.#isCurrent(signal) || !this.#playing) return;
-      mediaSignal.throwIfAborted();
-      const presented = this.#acceptCurrentVideo();
-      if (presented === null) {
-        for (const id of this.#playingClips) this.#slotFor(id).pause();
-        continue;
-      }
-      this.#busy = false;
-      this.#setStatus('playing', 'Playing');
-      this.#preloadNext(presented);
-      return;
+      if (await this.#restartCaughtUpVideo(current, signal, mediaSignal)) return;
     }
+  }
+
+  async #restartCaughtUpVideo(frame: number, signal: AbortSignal, mediaSignal: AbortSignal): Promise<boolean> {
+    this.#setPlaybackRates(sampleTimeline(this.#document!, frame, this.#layout), frame);
+    await waitForMedia(Promise.all(this.#playingClips.map((id) => this.#slotFor(id).play())), mediaSignal);
+    if (!this.#isCurrent(signal) || !this.#playing) return true;
+    mediaSignal.throwIfAborted();
+    const presented = this.#acceptCurrentVideo();
+    if (presented === null) {
+      for (const id of this.#playingClips) this.#slotFor(id).pause();
+      return false;
+    }
+    this.#busy = false;
+    this.#setStatus('playing', 'Playing');
+    this.#preloadNext(presented);
+    return true;
+  }
+
+  async #leaveVideoCatchUp(frame: number, layers: readonly PreviewLayer[]): Promise<boolean> {
+    const changed = !sameClips(
+      layers.map((layer) => layer.clipId),
+      this.#playingClips,
+    );
+    const synchronized = this.#music.sync();
+    if (synchronized && !layers.length) {
+      this.#busy = false;
+      this.#advance(performance.now());
+      return true;
+    }
+    if (synchronized && !changed) return false;
+    this.#busy = false;
+    await this.#alignPlayback(frame, changed);
+    return true;
   }
 
   #acceptCurrentVideo(): number | null {

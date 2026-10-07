@@ -3,6 +3,8 @@ import { MusicRenderer } from '../../src/preview/music-renderer.js';
 import { musicGainAt } from '../../src/shared/audio.js';
 import { musicSchema } from '../../src/shared/model.js';
 import {
+  accumulateMusicRange,
+  clampMusicMix,
   decodeMusicRange,
   MUSIC_CHUNK_SAMPLES,
   MUSIC_QUEUE_CHUNKS,
@@ -11,6 +13,7 @@ import {
 } from '../../src/shared/music-stream.js';
 
 const track = musicSchema.parse({
+  id: 'song-instance',
   mediaId: 'song',
   sourceIn: 1,
   sourceOut: 3,
@@ -77,6 +80,62 @@ describe('strict sample-frame music reads', () => {
   );
   it.each([0, 1, 3, 65540])('rejects %s malformed/oversized PCM bytes', (length) => {
     expect(() => decodeMusicRange(new ArrayBuffer(length), track, 10)).toThrow('bounded stereo PCM16');
+  });
+});
+
+describe('one bounded mixed block and a sole post-sum clamp', () => {
+  function pcm(left: number, right: number, samples = 4): ArrayBuffer {
+    const bytes = new ArrayBuffer(samples * 4);
+    const view = new DataView(bytes);
+    for (let sample = 0; sample < samples; sample++) {
+      view.setInt16(sample * 4, left, true);
+      view.setInt16(sample * 4 + 2, right, true);
+    }
+    return bytes;
+  }
+  it('sums eight sources without clipping individual gains and preserves opposing cancellation', () => {
+    const output = new Float32Array(8);
+    const music = { ...track, gainDb: 12, fadeIn: 0, fadeOut: 0 };
+    for (let index = 0; index < 4; index++) accumulateMusicRange(output, pcm(16384, -16384), music, 15, 0);
+    expect(output[0]).toBeGreaterThan(7);
+    expect(output[1]).toBeLessThan(-7);
+    for (let index = 0; index < 4; index++) accumulateMusicRange(output, pcm(-16384, 16384), music, 15, 0);
+    clampMusicMix(output);
+    for (const sample of output) expect(sample).toBeCloseTo(0, 6);
+  });
+  it('applies independent envelopes at the same project time and leaves untouched placement silence', () => {
+    const output = new Float32Array(16);
+    const first = { ...track, gainDb: 0 };
+    const second = { ...track, id: 'second', start: 11, gainDb: -6, fadeIn: 4 };
+    accumulateMusicRange(output, pcm(8192, -16384), first, 12, 2);
+    accumulateMusicRange(output, pcm(16384, 8192), second, 12, 2);
+    clampMusicMix(output);
+    for (let sample = 0; sample < 4; sample++) {
+      const frame = 12 + sample / MUSIC_SAMPLES_PER_FRAME;
+      expect(output[(sample + 2) * 2]).toBeCloseTo(
+        0.25 * musicGainAt(first, frame) + 0.5 * musicGainAt(second, frame),
+        7,
+      );
+      expect(output[(sample + 2) * 2 + 1]).toBeCloseTo(
+        -0.5 * musicGainAt(first, frame) + 0.25 * musicGainAt(second, frame),
+        7,
+      );
+    }
+    expect([...output.subarray(0, 4), ...output.subarray(12)]).toEqual(Array(8).fill(0));
+  });
+  it('clamps completed positive/negative overflow only once and rejects nonfinite samples', () => {
+    const output = new Float32Array([3, -3, 0.123456, -0.123456]);
+    clampMusicMix(output);
+    expect([...output]).toEqual([1, -1, Math.fround(0.123456), Math.fround(-0.123456)]);
+    expect(() => clampMusicMix(new Float32Array([NaN, 0]))).toThrow('nonfinite');
+  });
+  it('rejects malformed source/output bounds instead of silently dropping participants', () => {
+    const output = new Float32Array(8);
+    for (const offset of [-1, 0.5, NaN, 1])
+      expect(() => accumulateMusicRange(output, pcm(1, 1), track, 15, offset)).toThrow('bounded');
+    for (const length of [0, 1, 3, 65540])
+      expect(() => accumulateMusicRange(output, new ArrayBuffer(length), track, 15, 0)).toThrow('bounded');
+    expect(() => accumulateMusicRange(new Float32Array(3), pcm(1, 1, 1), track, 15, 0)).toThrow('bounded');
   });
 });
 

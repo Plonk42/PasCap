@@ -33,6 +33,7 @@ const SOURCE_COUNTS = new Map([
   ['other', 180],
 ]);
 const MUSIC = {
+  id: 'music-instance',
   mediaId: 'music',
   sourceIn: 10,
   sourceOut: 500,
@@ -98,7 +99,7 @@ function primaryProject(
     { leftId: 'rush', rightId: 'after', type: 'cut', duration: 0 },
     { leftId: 'after', rightId: 'last', type: 'cut', duration: 0 },
   ];
-  document.music = MUSIC;
+  document.music = [MUSIC];
   for (const item of calculateLayout(document).clips) item.clip.start = item.start;
   return projectSchema.parse(document);
 }
@@ -124,7 +125,7 @@ function overlayProject(
     { leftId: 'upper-before', rightId: 'top', type: 'cut', duration: 0 },
     { leftId: 'top', rightId: 'upper-after', type: 'cut', duration: 0 },
   ];
-  document.music = MUSIC;
+  document.music = [MUSIC];
   return projectSchema.parse(document);
 }
 function placed(project: ProjectDocument, id: string) {

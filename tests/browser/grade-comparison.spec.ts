@@ -1,4 +1,4 @@
-import { expect, test as browserTest, type Locator, type Page } from '@playwright/test';
+import { test as browserTest, expect, type Locator, type Page } from '@playwright/test';
 import type { PreviewDiagnostics } from '../../src/preview/engine.js';
 import type { AudioAsset } from '../../src/shared/audio.js';
 import { COLOUR_CONTROLS, NEUTRAL_COLOUR } from '../../src/shared/colour.js';
@@ -216,17 +216,20 @@ const test = browserTest.extend<{ comparison: ComparisonFixture }>({
         speed: { mode: 'constant', rate: 0.25 },
       },
     ];
-    playback.music = {
-      mediaId: song!.id,
-      sourceIn: 0,
-      sourceOut: 120,
-      start: 0,
-      duration: 480,
-      gainDb: -12,
-      fadeIn: 0,
-      fadeOut: 0,
-      loop: true,
-    };
+    playback.music = [
+      {
+        id: 'comparison-music-track',
+        mediaId: song!.id,
+        sourceIn: 0,
+        sourceOut: 120,
+        start: 0,
+        duration: 480,
+        gainDb: -12,
+        fadeIn: 0,
+        fadeOut: 0,
+        loop: true,
+      },
+    ];
     projectSchema.parse(playback);
 
     const guard = {

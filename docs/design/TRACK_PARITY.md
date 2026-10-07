@@ -5,13 +5,16 @@ related to [#17](https://github.com/Plonk42/PasCap/issues/17) and
 [#24](https://github.com/Plonk42/PasCap/issues/24).
 This record retains the accepted schema-6 decisions, not the current persistence
 or opacity contract. [#67](https://github.com/Plonk42/PasCap/issues/67) supersedes its
-two-opacity descriptions with strict schema 7: required numeric `VideoLayer.opacity`
+two-opacity descriptions with the sole row contract retained in schema 8: required numeric `VideoLayer.opacity`
 (1 on new tracks), no saved `clip.opacity`, and the sole row key channel `opacity`
 overriding the row value on every source, without an additional group multiplier.
 The single **Opacity** control is in **Clip → Colour**; **Placement** contains
 placement only. The accepted schema-6 body below remains historical. Track visibility,
 Ripple, transitions/fades, grouped dissolves and resource bounds retain their
-semantics. Current usage belongs in
+semantics. [#35's current schema-8 contract](MULTIPLE_MUSIC.md) supersedes the
+historical body's video-only duration/single-music assumptions: music can extend
+project OUT, with closing video fades at clip OUT then black through the music
+tail. The historical body/identifiers are unchanged. Current usage belongs in
 [the layer contract](../LAYERS_AND_KEYFRAMES.md), [editing guide](../TIMELINE_EDITING.md)
 and [retiming contract](../SPEED_AND_AUDIO.md). Publication, verification and remaining
 acceptance belong on the work issue, not here. This does not authorize migrations,

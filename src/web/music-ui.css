@@ -1,0 +1,74 @@
+.music-controls .music-instance-picker {
+  margin-block: 12px;
+}
+
+.music-controls .music-instance-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.music-controls .music-instance-picker select {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.music-controls [data-music-controls-id][hidden] {
+  display: none;
+}
+
+.music-lane-wrapper.music-instance-lane {
+  height: 70px;
+  border-bottom: 1px solid #414963;
+  background: #191d2d;
+}
+
+.music-lane-wrapper.music-instance-lane.selected {
+  background: #252b40;
+}
+
+.music-instance-lane .music-lane-select {
+  position: sticky;
+  left: 0;
+  display: block;
+  height: 26px;
+  max-width: min(260px, 100%);
+  padding: 0 8px;
+  border: 0;
+  border-radius: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  color: #c7d0f0;
+  background: #202639;
+}
+
+.music-instance-lane .music-lane-select[aria-pressed='true'] {
+  color: #fff1d5;
+  background: #363c53;
+}
+
+.music-lane-wrapper.music-instance-lane .music-timeline-clip {
+  top: 27px;
+}
+
+.music-instance-lane .music-timeline-clip.selected {
+  border-color: #efd09a;
+  box-shadow: 0 0 0 1px #efd09a;
+}
+
+.music-instance-lane .music-timeline-clip.invalid {
+  border-color: #f39090;
+  background: #66343b;
+  box-shadow: 0 0 0 1px #f39090;
+}
+
+.music-instance-lane .music-body > span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+}

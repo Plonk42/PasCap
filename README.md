@@ -24,7 +24,7 @@ deployment targets.
 - Draggable timeline keyframes and setting-specific Previous/Next navigation.
 - Direct panel/help controls, compact visual animation states and grouped editing tools.
 - Track-local cuts, fade-through-black, cross-dissolves and opening/closing fades.
-- One music track with waveform, gain, fades and explicit range looping.
+- Up to eight independent music instances with waveforms, gain, fades and explicit range looping; overlapping sources sum linearly with one final hard clamp.
 - Native original-based H.264 SDR exports at **1280×720** or **3840×2160**, with progress, cancellation and verification receipts.
 - Export-space preflight, disclosed planning assumptions and safe disk-full recovery.
 
@@ -61,7 +61,7 @@ directory, and do not expose the unauthenticated service to a network.
 1. Create a project from **Projects**.
 2. Use **Import → Browse footage**, select originals and register them. Browsing alone starts no media work. Alternatively, explicitly register a whole folder by path.
 3. Wait for proxy preparation in **Activity**. Review a recording, mark source IN/OUT, and add excerpts or drag prepared media onto a video row.
-4. Trim, reorder, grade and animate the edit; add standalone music in **Audio**.
+4. Trim, reorder, grade and animate the edit; import standalone music in **Audio**, then use **Recording / Add music track** and **Music track** to place/select independent instances.
 5. Choose **Export** and a draft/final preset, review its storage check, then start. Export reads the original recordings, not the proxies.
 
 Rows follow composition order: row 1 is below row 2 in the image, row 3 is above
@@ -82,6 +82,14 @@ not the SDR RGB grade, with no additional layer multiplier or sidebar duplicate.
 **Clip → Placement** contains placement only.
 Layer options contains only rename, Ripple, ordering and deletion; visibility
 remains a separate sidebar control.
+
+Project duration is the maximum of all retimed video clip ends and every music
+instance's start + duration. Music can continue beyond video: the final video
+closing fade ends at its clip OUT, then the picture is black while music continues
+and fades at its own end. Music-only preview is black; export still requires at
+least one video clip. Imports never implicitly place music, and instance edits
+or removal leave the other instances unchanged. There is no normalisation,
+ducking, audio effect or source-video audio.
 
 Read the [user guide](docs/USER_GUIDE.md) for the full workflow and shortcuts.
 Filesystem file drops and browser upload pickers are intentionally disabled:
@@ -106,15 +114,18 @@ Missing mounts and symlinks fail explicitly. In the eventual container package,
 originals will be read-only bind mounts and application data will be a separate
 persistent writable mount. See [deployment design](docs/DEPLOYMENT.md).
 
-**Project format:** strict schema **v7**, with required per-track Ripple,
+**Project format:** strict schema **v8**, with required `music` array (0–8
+instances, unique required IDs; `[]` without music), per-track Ripple,
 transitions, fades and numeric `VideoLayer.opacity` (0–1; new tracks start at 1),
 and exactly nine nullable point channels: `opacity`, `speed` and seven colour
 settings. Row `opacity` is required and valid; saved `clip.opacity` and old
 `clipOpacity`/`layerOpacity` channels are rejected, not ignored or defaulted.
-v1–v6 projects and receipt snapshots remain unchanged
+v1–v7 projects and receipt snapshots remain unchanged
 on disk but are incompatible: recreate projects and import media deliberately.
-Registry/proxy formats and source protections do not change. There are no
-migrations, default-filled legacy fields or automatic deletions.
+Export receipts remain version 1 with a strict v8 snapshot and required captured
+audio-source/instance-plan arrays. Registry/proxy/current PCM cache formats and
+source protections do not change. There are no migrations, null fallbacks,
+compatibility readers, default-filled legacy fields or automatic deletions.
 Unsaved in-memory changes are not guaranteed to survive forced
 shutdown. See [workspace and recovery](docs/WORKSPACE_AND_RECOVERY.md).
 
@@ -153,6 +164,7 @@ real-workload qualification, and local Docker/Podman packaging. See
 - [Timing and colour contract](docs/COLOUR_AND_TIMING.md)
 - [Layers and keyframes](docs/LAYERS_AND_KEYFRAMES.md)
 - [Speed, audio and export](docs/SPEED_AND_AUDIO.md)
+- [Multiple music/schema-8 contract](docs/design/MULTIPLE_MUSIC.md) — required behaviour; implementation/validation acceptance remains pending, not a test or release claim.
 - [Deployment target](docs/DEPLOYMENT.md)
 - [Historical feasibility study](docs/FEASIBILITY_REPORT.md)
 

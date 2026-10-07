@@ -12,8 +12,10 @@ import {
   EXPORT_PROFILES,
   exportAudioSample,
   exportRequestSchema,
+  needsLayeredExport,
   planExport,
   planExportMusic,
+  planLayeredExport,
 } from '../../src/shared/export.js';
 import { mediaAssetSchema, type MediaAsset } from '../../src/shared/media.js';
 import { createClip, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
@@ -107,19 +109,39 @@ function audioAsset() {
 }
 
 describe('strict production export request and immutable validation', () => {
-  it('offers exactly 720p and UHD profiles, accepts no-music v7 and rejects empty/legacy/unknown requests', () => {
+  it('offers exactly 720p and UHD profiles, accepts no-music v8 and rejects empty/legacy/unknown requests', () => {
     expect(EXPORT_PROFILES.draft720).toMatchObject({ width: 1280, height: 720 });
     expect(EXPORT_PROFILES.final4k).toMatchObject({ width: 3840, height: 2160 });
     const document = documentWithClips();
-    expect(exportRequestSchema.parse({ document, profile: 'draft720' }).document.music).toBeNull();
-    expect(exportRequestSchema.parse({ document, profile: 'draft720' }).document.schemaVersion).toBe(7);
+    expect(exportRequestSchema.parse({ document, profile: 'draft720' }).document.music).toEqual([]);
+    expect(exportRequestSchema.parse({ document, profile: 'draft720' }).document.schemaVersion).toBe(8);
     for (const request of [
       { document: createProject('empty', 'Empty'), profile: 'draft720' },
+      {
+        document: {
+          ...createProject('music-only', 'Music only'),
+          music: [
+            {
+              id: 'audio-only',
+              mediaId: 'music',
+              sourceIn: 0,
+              sourceOut: 30,
+              start: 0,
+              duration: 30,
+              gainDb: 0,
+              fadeIn: 0,
+              fadeOut: 0,
+              loop: false,
+            },
+          ],
+        },
+        profile: 'draft720',
+      },
       { document, profile: 'reference' },
       { document, profile: 'draft720', normalize: true },
       { document: { ...document, schemaVersion: 1 }, profile: 'draft720' },
       { document: { ...document, schemaVersion: 2 }, profile: 'draft720' },
-      ...[3, 4, 5, 6].map((version) => ({
+      ...[3, 4, 5, 6, 7].map((version) => ({
         document: unsupportedProject(version, `old-export-v${version}`, 'Unsupported export'),
         profile: 'draft720',
       })),
@@ -145,20 +167,42 @@ describe('strict production export request and immutable validation', () => {
   });
   it('parses and deeply freezes an independent snapshot instead of retaining the editor document', () => {
     const document = documentWithClips();
+    document.music = [
+      {
+        id: 'captured',
+        mediaId: 'music',
+        sourceIn: 6,
+        sourceOut: 18,
+        start: 3,
+        duration: 24,
+        gainDb: -6,
+        fadeIn: 6,
+        fadeOut: 6,
+        loop: true,
+      },
+    ];
+    document.music.push({ ...document.music[0]!, id: 'second', start: 50 });
     const snapshot = validateExport(document, fakeLibrary());
     document.title = 'Later edit';
     document.clips[0]!.sourceIn = 10;
     document.clips[0]!.colour.brightness = 0.2;
+    document.music[0]!.gainDb = 12;
+    document.music.splice(1, 1);
     expect(snapshot.title).toBe('Export unit');
     expect(snapshot.clips[0]!.sourceIn).toBe(7);
     expect(snapshot.clips[0]!.colour.brightness).toBe(0);
     expect(Object.isFrozen(snapshot)).toBe(true);
     expect(Object.isFrozen(snapshot.clips[0]!.speed)).toBe(true);
     expect(Object.isFrozen(snapshot.clips[0]!.colour)).toBe(true);
+    expect(snapshot.music).toHaveLength(2);
+    expect(snapshot.music[0]!.gainDb).toBe(-6);
+    expect(Object.isFrozen(snapshot.music)).toBe(true);
+    expect(Object.isFrozen(snapshot.music[1])).toBe(true);
   });
   it('requires a resolver only for music and validates its identity and exact selected source bounds', () => {
     const document = documentWithClips();
     const music = {
+      id: 'music-instance',
       mediaId: 'music',
       sourceIn: 6,
       sourceOut: 18,
@@ -169,7 +213,7 @@ describe('strict production export request and immutable validation', () => {
       fadeOut: 6,
       loop: true,
     };
-    document.music = music;
+    document.music = [music];
     expect(() => startExport(document, 'draft720', fakeLibrary())).toThrow('resolver');
     expect(validateExportAudio(music, audioAsset()).metadata.sampleRate).toBe(48000);
     expect(() => validateExportAudio({ ...music, sourceOut: 61 }, audioAsset())).toThrow('source bounds');
@@ -208,6 +252,54 @@ describe('strict production export request and immutable validation', () => {
 });
 
 describe('sequential output-frame chunk planning', () => {
+  it('uses layered black tails only when music OUT exceeds video OUT, retaining clip fades and full audio ranges', () => {
+    const document = documentWithClips();
+    document.layers[0]!.closingFade = 3;
+    const music = {
+      id: 'conclusion',
+      mediaId: 'music',
+      sourceIn: 6,
+      sourceOut: 18,
+      start: 6,
+      duration: 24,
+      gainDb: -6,
+      fadeIn: 3,
+      fadeOut: 6,
+      loop: true,
+    };
+    document.music = [music];
+    expect(needsLayeredExport(document)).toBe(false);
+    expect(planExport(document).duration).toBe(30);
+    document.music = [
+      { ...music, start: 60 },
+      { ...music, id: 'shorter', start: 20 },
+    ];
+    const captured = structuredClone(document);
+    const layout = calculateLayout(document);
+    expect(layout.duration).toBe(84);
+    expect(needsLayeredExport(document)).toBe(true);
+    expect(() => planExport(document)).toThrow('layered exporter');
+    const plan = planLayeredExport(document);
+    expect(plan.duration).toBe(84);
+    expect(plan.chunks).toEqual([]);
+    expect(plan.layers[0]!.plan).toMatchObject({ duration: 30, clips: [{ duration: 30, fadeOut: 3 }] });
+    expect(plan.layers[0]!.plan.chunks).toEqual([
+      { kind: 'body', clipIndex: 0, sourceIn: 0, sourceOut: 30, start: 0, duration: 30 },
+    ]);
+    expect(sampleTimeline(document, 29, layout)[0]!.brightness).toBe(0);
+    expect(sampleTimeline(document, 30, layout)).toEqual([]);
+    expect(sampleTimeline(document, 83, layout)).toEqual([]);
+    const audio = document.music.map((track) => planExportMusic(track, plan.duration));
+    for (const [index, track] of document.music.entries()) {
+      expect(audio[index]!.activeSamples).toBe(exportAudioSample(track.duration));
+      expect(audio[index]!.videoSamples).toBe(exportAudioSample(84));
+      expect(audio[index]!.sourceInSamples).toBe(exportAudioSample(6));
+      expect(audio[index]!.sourceOutSamples).toBe(exportAudioSample(18));
+      expect(audio[index]!.fadeOutSamples).toBe(exportAudioSample(6));
+      expect(musicGainAt(track, track.start + track.duration - 3)).toBe(audio[index]!.gain / 2);
+    }
+    expect(document).toEqual(captured);
+  });
   it('covers many independently retimed instances exactly, excluding only dissolve heads/tails', () => {
     const document = documentWithClips(5);
     document.clips[0]!.speed = { mode: 'constant', rate: 0.5 };
@@ -289,6 +381,7 @@ describe('sequential output-frame chunk planning', () => {
   });
   it('uses 48 kHz sample positions and the unnormalized shared linear music envelope', () => {
     const music = {
+      id: 'music-instance',
       mediaId: 'music',
       sourceIn: 6,
       sourceOut: 12,
@@ -300,6 +393,7 @@ describe('sequential output-frame chunk planning', () => {
       loop: true,
     };
     const plan = planExportMusic(music, 36);
+    expect(plan).toMatchObject({ id: music.id, mediaId: music.mediaId, loop: true });
     expect(plan.sourceInSamples).toBe(9610);
     expect(plan.sourceOutSamples).toBe(19219);
     expect(plan.videoSamples).toBe(57658);

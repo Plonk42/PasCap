@@ -3,8 +3,8 @@ import type { PreviewDiagnostics } from '../preview/engine.js';
 import { formatTimecode } from '../shared/timing.js';
 import { HelpPopover } from './HelpPopover.js';
 import { Icon } from './icons.js';
-import { TimecodeField } from './TimecodeField.js';
 import './preview-comparison.css';
+import { TimecodeField } from './TimecodeField.js';
 
 interface Props {
   canvas: RefObject<HTMLCanvasElement | null>;
@@ -176,7 +176,7 @@ export function PreviewPanel({
       <div className="transport">
         <span className="transport-note">
           <span className={`transport-dot ${status}`} />
-          {duration ? label : 'No clips'}
+          {duration ? label : 'Empty timeline'}
         </span>
         <div className="transport-buttons">
           <button

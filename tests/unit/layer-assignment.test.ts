@@ -46,7 +46,8 @@ interface TestCompositor {
   uploads: { slot: number; video: HTMLVideoElement }[];
 }
 interface TestMusic {
-  configured: (MusicTrack | null)[];
+  configured: MusicTrack[][];
+  readonly hasMusic: boolean;
   starts: number[];
   pauses: number;
   resumes: number;
@@ -176,7 +177,7 @@ vi.mock('../../src/preview/compositor.js', () => ({
 
 vi.mock('../../src/preview/music.js', () => ({
   MusicPlayback: class implements TestMusic {
-    readonly configured: (MusicTrack | null)[] = [];
+    readonly configured: MusicTrack[][] = [];
     readonly starts: number[] = [];
     pauses = 0;
     resumes = 0;
@@ -188,9 +189,9 @@ vi.mock('../../src/preview/music.js', () => ({
     constructor() {
       state.music.push(this);
     }
-    async configure(track: MusicTrack | null): Promise<void> {
-      this.configured.push(track);
-      this.hasMusic = track !== null;
+    async configure(tracks: readonly MusicTrack[]): Promise<void> {
+      this.configured.push([...tracks]);
+      this.hasMusic = tracks.length > 0;
     }
     async resumeContext(): Promise<void> {
       this.resumes++;
@@ -620,19 +621,59 @@ describe('layered observed-frame preview', () => {
 });
 
 describe('live appearance updates and lifecycle', () => {
-  it('updates keys, opacity, colour and stacking while playing without timing/media/music reload', async () => {
-    const project = makeProject(3);
-    project.music = {
-      mediaId: 'music',
+  it('configures every music instance, extends duration to the maximum OUT and previews music-only projects as black', async () => {
+    const project = makeProject();
+    project.music = Array.from({ length: 8 }, (_, index) => ({
+      id: `music-${index}`,
+      mediaId: `source-${index}`,
       sourceIn: 0,
       sourceOut: 60,
-      start: 0,
-      duration: 60,
-      gainDb: 0,
+      start: index * 20,
+      duration: 600,
+      gainDb: -index,
       fadeIn: 0,
       fadeOut: 0,
-      loop: false,
-    };
+      loop: true,
+    }));
+    const engine = makeEngine();
+    await engine.loadProject(project, resolver, 15);
+    const music = state.music[0]!;
+    expect(music.configured).toEqual([project.music]);
+    expect(engine.diagnostics()).toMatchObject({ duration: 740, frame: 15 });
+    const altered = structuredClone(project);
+    altered.music[7]!.gainDb = -12;
+    expect(() => engine.updateProjectAppearance(altered)).toThrow('preserve project timing');
+    await engine.loadProject({ ...project, clips: [] }, resolver);
+    expect(music.configured.at(-1)).toEqual(project.music);
+    expect(music.hasMusic).toBe(true);
+    expect(engine.diagnostics()).toMatchObject({ duration: 740, frame: 0, status: 'paused', decoderCount: 0 });
+    expect(compositor().groups).toEqual([]);
+    expect(engine.capturePixels()).toEqual(new Uint8Array([0, 0, 0, 255]));
+    await engine.play();
+    animationFrame(1000 + framesToSeconds(739) * 1000 + 0.001);
+    expect(engine.diagnostics()).toMatchObject({ status: 'playing', frame: 739, activeDecoders: 0, audioClock: true });
+    expect(music.starts).toEqual([0]);
+    animationFrame(1000 + framesToSeconds(740) * 1000 + 0.001);
+    await settle();
+    expect(engine.diagnostics()).toMatchObject({ status: 'paused', playing: false, frame: 739 });
+    expect(compositor().groups).toEqual([]);
+  });
+  it('updates keys, opacity, colour and stacking while playing without timing/media/music reload', async () => {
+    const project = makeProject(3);
+    project.music = [
+      {
+        id: 'music-instance',
+        mediaId: 'music',
+        sourceIn: 0,
+        sourceOut: 60,
+        start: 0,
+        duration: 60,
+        gainDb: 0,
+        fadeIn: 0,
+        fadeOut: 0,
+        loop: false,
+      },
+    ];
     const engine = makeEngine();
     await engine.loadProject(project, resolver, 15);
     await engine.play();
@@ -703,17 +744,20 @@ describe('live appearance updates and lifecycle', () => {
         document.clips[1]!.start++;
       },
       (document) => {
-        document.music = {
-          mediaId: 'music',
-          sourceIn: 0,
-          sourceOut: 60,
-          start: 0,
-          duration: 60,
-          gainDb: 0,
-          fadeIn: 0,
-          fadeOut: 0,
-          loop: false,
-        };
+        document.music = [
+          {
+            id: 'music-instance',
+            mediaId: 'music',
+            sourceIn: 0,
+            sourceOut: 60,
+            start: 0,
+            duration: 60,
+            gainDb: 0,
+            fadeIn: 0,
+            fadeOut: 0,
+            loop: false,
+          },
+        ];
       },
       (document) => {
         document.id = 'another-project';

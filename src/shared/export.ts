@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import {
+  MAX_MUSIC_TRACKS,
   MAX_VIDEO_LAYERS,
   projectSchema,
   type MusicTrack,
@@ -49,6 +50,12 @@ export const EXPORT_RESOURCES = Object.freeze({
   lutSize: 65,
   audioSampleRate: 48_000,
   audioChannels: 2,
+  maxMusicTracks: MAX_MUSIC_TRACKS,
+  maxOriginalAudioDecoders: 1,
+  maxIntermediateAudioInputs: 2,
+  maxNativeAudioChildrenPerPass: 1,
+  maxAudioScratchFiles: 3,
+  audioAccumulatorBits: 64,
 });
 
 /** Sequential passes, never one decoder per project layer or one process per frame. */
@@ -65,15 +72,19 @@ export const LAYERED_EXPORT_RESOURCES = Object.freeze({
   intermediateBitsPerChannel: 16,
 });
 
-/** Static chunks support only an opaque, unanimated, zero-origin contiguous track. */
+/** Static chunks support only an opaque, unanimated, zero-origin contiguous track
+ * covering the entire project, including every music instance's OUT. */
 export function needsLayeredExport(document: ProjectDocument): boolean {
   if (
     document.layers.length !== 1 ||
     document.layers.some((layer) => !layer.enabled || layer.opacity !== 1 || layer.keyframes.length > 0)
   )
     return true;
-  const { clips } = calculateLayout(document);
-  return clips.some((placed, index) => (index === 0 ? placed.start !== 0 : placed.start > clips[index - 1]!.end));
+  const { clips, duration } = calculateLayout(document);
+  return (
+    (clips.at(-1)?.end ?? 0) < duration ||
+    clips.some((placed, index) => (index === 0 ? placed.start !== 0 : placed.start > clips[index - 1]!.end))
+  );
 }
 
 export interface ExportClipPlan {
@@ -203,7 +214,7 @@ export function planExport(document: ProjectDocument): ExportPlan {
   const snapshot = exportDocumentSchema.parse(document);
   if (needsLayeredExport(snapshot))
     throw new Error(
-      'Multiple/disabled tracks, opacity, shared row points, gaps or leading starts require the layered exporter, not a static chunk plan.',
+      'Multiple/disabled tracks, opacity, shared row points, gaps, leading starts or music beyond video OUT require the layered exporter, not a static chunk plan.',
     );
   const layout = calculateLayout(snapshot);
   validateDuration(layout);
@@ -256,6 +267,9 @@ export function exportAudioSample(frame: number): number {
   return samples;
 }
 export interface ExportMusicPlan {
+  id: string;
+  mediaId: string;
+  loop: boolean;
   sourceInSamples: number;
   sourceOutSamples: number;
   startSamples: number;
@@ -266,11 +280,15 @@ export interface ExportMusicPlan {
   videoSamples: number;
   gain: number;
 }
-export function planExportMusic(music: MusicTrack, videoFrames: number): ExportMusicPlan {
-  const videoSamples = exportAudioSample(videoFrames);
+/** videoSamples is the complete project duration, including music-only black tails. */
+export function planExportMusic(music: MusicTrack, projectFrames: number): ExportMusicPlan {
+  const videoSamples = exportAudioSample(projectFrames);
   const startSamples = exportAudioSample(music.start);
   const durationSamples = exportAudioSample(music.duration);
   return {
+    id: music.id,
+    mediaId: music.mediaId,
+    loop: music.loop,
     sourceInSamples: exportAudioSample(music.sourceIn),
     sourceOutSamples: exportAudioSample(music.sourceOut),
     startSamples,

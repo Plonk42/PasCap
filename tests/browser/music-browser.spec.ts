@@ -220,7 +220,7 @@ test('real explicit confirmation persists only importing-project audio membershi
   await expect(page.getByRole('button', { name: 'Browse music files', exact: true })).toBeFocused();
   await page.evaluate(() => window.pascapLab!.flush());
   expect(memory.snapshot().media).toEqual({ videoIds: [], audioIds: [importedId] });
-  expect(memory.snapshot().music).toBeNull();
+  expect(memory.snapshot().music).toEqual([]);
   expect(memory.snapshot().clips).toEqual([]);
   expect({ ...memory.snapshot(), revision: beforeProject.revision, media: beforeProject.media }).toEqual(beforeProject);
   expect(memory.snapshot(otherProject.id)).toEqual(otherProject);
@@ -313,7 +313,7 @@ test('importing moved music creates a new bin entry without relinking the old so
   await expect(modal).toHaveCount(0);
   await page.evaluate(() => window.pascapLab!.flush());
   expect(memory.snapshot().media.audioIds).toEqual([previous.asset.id, imported.asset.id]);
-  expect(memory.snapshot().music).toBeNull();
+  expect(memory.snapshot().music).toEqual([]);
   expect({ ...memory.snapshot(), revision: before.revision, media: before.media }).toEqual(before);
   await expect(
     page.locator(`select[aria-label="Music recording"] option[value="${previous.asset.id}"]`),
@@ -374,7 +374,7 @@ test('the retained manual path uses its separate unrestricted endpoint and adds 
   await page.evaluate(() => window.pascapLab!.flush());
   expect(writes).toEqual([{ pathname: '/api/audio/register', body: { path: manualPath } }]);
   expect(memory.snapshot().media.audioIds).toEqual([music.id]);
-  expect(memory.snapshot().music).toBeNull();
+  expect(memory.snapshot().music).toEqual([]);
   await expect(page.getByRole('textbox', { name: 'Music file path', exact: true })).toHaveValue(manualPath);
 });
 
@@ -593,7 +593,7 @@ test('an uncertain write retains selection, shows the actual transport uncertain
   expect(writes).toEqual([{ pathname: '/api/audio/register-selected', body: { path: firstPath } }]);
   expect(memory.saves).toBe(0);
   expect(memory.snapshot().media.audioIds).toEqual([]);
-  expect(memory.snapshot().music).toBeNull();
+  expect(memory.snapshot().music).toEqual([]);
 });
 
 test('pending registration blocks Escape, Cancel and duplicate submit; accepted work is not reclassified by a failed status read', async ({
@@ -642,7 +642,7 @@ test('pending registration blocks Escape, Cancel and duplicate submit; accepted 
     await expect(modal).toHaveCount(0);
     await page.evaluate(() => window.pascapLab!.flush());
     expect(memory.snapshot().media.audioIds).toEqual([music.id]);
-    expect(memory.snapshot().music).toBeNull();
+    expect(memory.snapshot().music).toEqual([]);
     await expect(page.locator('.activity-footer-error')).toContainText('request was accepted');
     await page.getByRole('button', { name: 'Open activity', exact: true }).click();
     const activity = page.getByRole('region', { name: 'Activity', exact: true });

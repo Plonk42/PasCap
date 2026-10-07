@@ -76,17 +76,20 @@ async function openRecoveryProject(
     expect(audio, 'The existing prepared synthetic WAV is required.').toBeDefined();
     project.media.audioIds = [audio!.id];
     // Music covers the entire playback, without a source wrap or placement boundary.
-    project.music = {
-      mediaId: audio!.id,
-      sourceIn: 0,
-      sourceOut: 120,
-      start: 0,
-      duration: 90,
-      gainDb: -12,
-      fadeIn: 0,
-      fadeOut: 0,
-      loop: false,
-    };
+    project.music = [
+      {
+        id: 'recovery-music',
+        mediaId: audio!.id,
+        sourceIn: 0,
+        sourceOut: 120,
+        start: 0,
+        duration: 90,
+        gainDb: -12,
+        fadeIn: 0,
+        fadeOut: 0,
+        loop: false,
+      },
+    ];
   }
   const memory = await memoryProjects(page, project);
   await installMusicEvidence(page);
@@ -646,6 +649,338 @@ test('Playing publication rechecks real audio output after bounded render-thread
     }
     await assertCompleted(page, fixture, true);
   } finally {
+    await attachEvidence(page, browser, true, false);
+  }
+});
+
+test('Playing publication rechecks real audio output after an earlier subscriber', async ({
+  page,
+  request,
+  browser,
+  browserName,
+}) => {
+  test.setTimeout(45_000);
+  const fixture = await openRecoveryProject(page, request, true);
+  interface SubscriberEvidence {
+    delayedDispatches: number;
+    playingDispatches: number;
+    violations: number;
+    violationSamples: unknown[];
+    witness: {
+      frame: number;
+      requested: number;
+      audioFrame: number;
+      elapsed: number;
+      after?: { status: string; frame: number; requestedFrame: number };
+      presentedFrame?: number;
+      pixel?: number[];
+      musicStarts?: number;
+    } | null;
+  }
+  try {
+    await page.evaluate(() => {
+      const engine = window.pascapLab!.engine;
+      const evidence: SubscriberEvidence = {
+        delayedDispatches: 0,
+        playingDispatches: 0,
+        violations: 0,
+        violationSamples: [],
+        witness: null,
+      };
+      Reflect.set(window, 'subscriberClockAdvance', evidence);
+      const unsubscribeEarlier = engine.subscribe((state) => {
+        const music = window.musicStreamEvidence;
+        const receipt = music.receipt;
+        if (
+          state.status !== 'playing' ||
+          !state.playing ||
+          !state.audioClock ||
+          state.requestedFrame < 10 ||
+          !receipt ||
+          !music.context ||
+          evidence.delayedDispatches !== 0
+        )
+          return;
+        evidence.delayedDispatches++;
+        const started = performance.now();
+        let audioFrame = state.frame;
+        // One bounded real subscriber workload, after the published snapshot
+        // was constructed but before the later listener receives it. Only the
+        // actual output timestamp and consumed-sample receipt supply the clock.
+        while (audioFrame < state.frame + 3 && performance.now() - started < 500) {
+          const output = music.context.getOutputTimestamp();
+          const samples = receipt.samples + output.contextTime! * 48_000 - receipt.contextFrame;
+          audioFrame = Math.floor(receipt.startFrame + samples / ((48_000 * 1_001) / 30_000) + 1e-7);
+        }
+        const witness = {
+          frame: state.frame,
+          requested: state.requestedFrame,
+          audioFrame,
+          elapsed: performance.now() - started,
+        };
+        evidence.witness = witness;
+        queueMicrotask(() => {
+          const after = engine.diagnostics();
+          const output = music.context!.getOutputTimestamp();
+          const samples = receipt.samples + output.contextTime! * 48_000 - receipt.contextFrame;
+          const presentedFrame = Math.floor(receipt.startFrame + samples / ((48_000 * 1_001) / 30_000) + 1e-7);
+          const gl = engine.canvas.getContext('webgl2')!;
+          const pixel = new Uint8Array(4);
+          gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
+          evidence.witness = {
+            ...witness,
+            after,
+            presentedFrame,
+            pixel: Array.from(pixel),
+            musicStarts: music.starts,
+          };
+        });
+      });
+      Reflect.set(window, 'unsubscribeRecoverySubscribers', [unsubscribeEarlier]);
+      const unsubscribeLater = engine.subscribe((state) => {
+        if (state.status !== 'playing' || !state.playing || !state.audioClock) return;
+        evidence.playingDispatches++;
+        const music = window.musicStreamEvidence;
+        const receipt = music.receipt;
+        const output = music.context?.getOutputTimestamp();
+        const samples = receipt && output ? receipt.samples + output.contextTime! * 48_000 - receipt.contextFrame : NaN;
+        const audioFrame = Math.floor((receipt?.startFrame ?? NaN) + samples / ((48_000 * 1_001) / 30_000) + 1e-7);
+        const drift = Math.abs(audioFrame - state.frame);
+        if (!Number.isFinite(drift) || drift > 1) {
+          evidence.violations++;
+          if (evidence.violationSamples.length < 10)
+            evidence.violationSamples.push({ state, receipt, output, audioFrame, drift });
+        }
+      });
+      Reflect.set(window, 'unsubscribeRecoverySubscribers', [unsubscribeEarlier, unsubscribeLater]);
+    });
+    await startPlayback(page);
+    await waitForCompletion(page);
+    const evidence = await page.evaluate(() => Reflect.get(window, 'subscriberClockAdvance') as SubscriberEvidence);
+    expect(evidence.delayedDispatches).toBe(1);
+    expect(evidence.playingDispatches).toBeGreaterThan(0);
+    expect(evidence.violations, JSON.stringify(evidence.violationSamples)).toBe(0);
+    expect(evidence.witness).not.toBeNull();
+    const witness = evidence.witness!;
+    expect(witness.requested).toBeGreaterThanOrEqual(10);
+    expect(witness.musicStarts).toBe(1);
+    // Chrome exposes real advancement within the synchronous subscriber.
+    // Firefox may cache its native timestamp until the task yields; every
+    // later Playing dispatch still has the unchanged independent one-frame bound.
+    if (browserName === 'chromium') expect(witness.audioFrame - witness.frame).toBeGreaterThanOrEqual(3);
+    if (witness.audioFrame - witness.frame >= 3) {
+      expect(witness.after?.status, JSON.stringify(witness)).toBe('buffering');
+      expect(witness.after?.requestedFrame).toBeGreaterThanOrEqual(witness.audioFrame);
+      expect(witness.pixel).toEqual([0, 0, 0, 255]);
+    } else if (witness.after?.status === 'playing') {
+      expect(Math.abs(witness.presentedFrame! - witness.after.frame), JSON.stringify(witness)).toBeLessThanOrEqual(1);
+    } else {
+      expect(witness.after?.status, JSON.stringify(witness)).toBe('buffering');
+      expect(witness.pixel).toEqual([0, 0, 0, 255]);
+    }
+    await assertCompleted(page, fixture, true);
+  } finally {
+    await page.evaluate(() => {
+      const unsubscribe = Reflect.get(window, 'unsubscribeRecoverySubscribers') as (() => void)[] | undefined;
+      unsubscribe?.forEach((handler) => handler());
+      Reflect.deleteProperty(window, 'unsubscribeRecoverySubscribers');
+    });
+    await test.info().attach('synthetic-subscriber-publication', {
+      body: JSON.stringify(await page.evaluate(() => Reflect.get(window, 'subscriberClockAdvance')), null, 2),
+      contentType: 'application/json',
+    });
+    await attachEvidence(page, browser, true, false);
+  }
+});
+
+test('Playing publication rechecks real audio output after timeline sampling', async ({
+  page,
+  request,
+  browser,
+  browserName,
+}) => {
+  test.setTimeout(45_000);
+  const fixture = await openRecoveryProject(page, request, true);
+  interface SamplingEvidence {
+    armed: boolean;
+    delayedSamples: number;
+    playingDispatches: number;
+    violations: number;
+    violationSamples: unknown[];
+    witness: {
+      frame: number;
+      requested: number;
+      sourceFrame: number;
+      sample: unknown;
+      receipt: unknown;
+      outputBefore: unknown;
+      outputAfter: unknown;
+      audioFrameBefore: number;
+      audioFrame: number;
+      elapsed: number;
+      after?: { status: string; frame: number; requestedFrame: number };
+      presentedFrame?: number;
+      pixel?: number[];
+      musicStarts?: number;
+    } | null;
+  }
+  try {
+    await page.evaluate(() => {
+      const engine = window.pascapLab!.engine;
+      const evidence: SamplingEvidence = {
+        armed: false,
+        delayedSamples: 0,
+        playingDispatches: 0,
+        violations: 0,
+        violationSamples: [],
+        witness: null,
+      };
+      Reflect.set(window, 'samplingClockAdvance', evidence);
+      const flatMap = Array.prototype.flatMap;
+      Reflect.set(window, 'restoreRecoveryFlatMap', () => {
+        Array.prototype.flatMap = flatMap;
+      });
+      Array.prototype.flatMap = function (this: unknown[], ...args) {
+        // Delegate the actual sampling callback/arguments unchanged. Match both
+        // its single active PlacedClip input and its returned sample, not React
+        // arrays or the independent playback observers.
+        const result = Reflect.apply(flatMap, this, args);
+        const placed = this[0] as { clip?: { id?: string } } | undefined;
+        const sample = result[0] as { clipId?: string } | undefined;
+        if (
+          !evidence.armed ||
+          evidence.delayedSamples !== 0 ||
+          this.length !== 1 ||
+          placed?.clip?.id !== 'recovery-clip' ||
+          sample?.clipId !== 'recovery-clip'
+        )
+          return result;
+        evidence.armed = false;
+        const state = engine.diagnostics();
+        const music = window.musicStreamEvidence;
+        const receipt = music.receipt;
+        if (state.status !== 'playing' || !state.playing || !state.audioClock || !receipt || !music.context)
+          return result;
+        evidence.delayedSamples++;
+        const outputBefore = music.context.getOutputTimestamp();
+        let outputAfter = outputBefore;
+        const started = performance.now();
+        let audioFrame = Math.floor(
+          receipt.startFrame +
+            (receipt.samples + outputBefore.contextTime! * 48_000 - receipt.contextFrame) /
+              ((48_000 * 1_001) / 30_000) +
+            1e-7,
+        );
+        const audioFrameBefore = audioFrame;
+        // Cost inside the real sampleTimeline call, before returning its native
+        // result: the audio thread advances while synchronous sampling is busy.
+        // No clock, receipt, source frame or sample metadata is substituted.
+        while (audioFrame < state.frame + 3 && performance.now() - started < 500) {
+          outputAfter = music.context.getOutputTimestamp();
+          const samples = receipt.samples + outputAfter.contextTime! * 48_000 - receipt.contextFrame;
+          audioFrame = Math.floor(receipt.startFrame + samples / ((48_000 * 1_001) / 30_000) + 1e-7);
+        }
+        const witness = {
+          frame: state.frame,
+          requested: state.requestedFrame,
+          sourceFrame: state.decodedSourceFrames[state.assignedClipIds.indexOf('recovery-clip')]!,
+          sample,
+          receipt,
+          outputBefore,
+          outputAfter,
+          audioFrameBefore,
+          audioFrame,
+          elapsed: performance.now() - started,
+        };
+        evidence.witness = witness;
+        queueMicrotask(() => {
+          const after = engine.diagnostics();
+          const output = music.context!.getOutputTimestamp();
+          const samples = receipt.samples + output.contextTime! * 48_000 - receipt.contextFrame;
+          const presentedFrame = Math.floor(receipt.startFrame + samples / ((48_000 * 1_001) / 30_000) + 1e-7);
+          const gl = engine.canvas.getContext('webgl2')!;
+          const pixel = new Uint8Array(4);
+          gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
+          evidence.witness = {
+            ...witness,
+            after,
+            presentedFrame,
+            pixel: Array.from(pixel),
+            musicStarts: music.starts,
+          };
+        });
+        return result;
+      };
+      const unsubscribeEarlier = engine.subscribe((state) => {
+        if (
+          state.status === 'playing' &&
+          state.playing &&
+          state.audioClock &&
+          state.requestedFrame >= 10 &&
+          evidence.delayedSamples === 0
+        )
+          evidence.armed = true;
+      });
+      Reflect.set(window, 'unsubscribeRecoverySampling', [unsubscribeEarlier]);
+      const unsubscribeLater = engine.subscribe((state) => {
+        if (state.status !== 'playing' || !state.playing || !state.audioClock) return;
+        evidence.playingDispatches++;
+        const music = window.musicStreamEvidence;
+        const receipt = music.receipt;
+        const output = music.context?.getOutputTimestamp();
+        const samples = receipt && output ? receipt.samples + output.contextTime! * 48_000 - receipt.contextFrame : NaN;
+        const audioFrame = Math.floor((receipt?.startFrame ?? NaN) + samples / ((48_000 * 1_001) / 30_000) + 1e-7);
+        const drift = Math.abs(audioFrame - state.frame);
+        if (!Number.isFinite(drift) || drift > 1) {
+          evidence.violations++;
+          if (evidence.violationSamples.length < 10)
+            evidence.violationSamples.push({ state, receipt, output, audioFrame, drift });
+        }
+      });
+      Reflect.set(window, 'unsubscribeRecoverySampling', [unsubscribeEarlier, unsubscribeLater]);
+    });
+    await startPlayback(page);
+    await waitForCompletion(page);
+    const evidence = await page.evaluate(() => Reflect.get(window, 'samplingClockAdvance') as SamplingEvidence);
+    expect(evidence.delayedSamples).toBe(1);
+    expect(evidence.playingDispatches).toBeGreaterThan(0);
+    expect(evidence.violations, JSON.stringify(evidence.violationSamples)).toBe(0);
+    expect(evidence.witness).not.toBeNull();
+    const witness = evidence.witness!;
+    expect(witness.requested).toBeGreaterThanOrEqual(10);
+    expect(Number.isInteger(witness.sourceFrame)).toBe(true);
+    expect(witness.sample).toMatchObject({ clipId: 'recovery-clip' });
+    expect(witness.musicStarts).toBe(1);
+    // Same native-clock branch as the earlier-subscriber regression: Firefox
+    // may cache timestamps within synchronous JS, without relaxing any dispatch.
+    if (browserName === 'chromium') {
+      expect(witness.audioFrame - witness.frame).toBeGreaterThanOrEqual(3);
+      expect(witness.audioFrame).toBeGreaterThan(witness.audioFrameBefore);
+    }
+    if (witness.audioFrame - witness.frame >= 3) {
+      expect(witness.after?.status, JSON.stringify(witness)).toBe('buffering');
+      expect(witness.after?.requestedFrame).toBeGreaterThanOrEqual(witness.audioFrame);
+      expect(witness.pixel).toEqual([0, 0, 0, 255]);
+    } else if (witness.after?.status === 'playing') {
+      expect(Math.abs(witness.presentedFrame! - witness.after.frame), JSON.stringify(witness)).toBeLessThanOrEqual(1);
+    } else {
+      expect(witness.after?.status, JSON.stringify(witness)).toBe('buffering');
+      expect(witness.pixel).toEqual([0, 0, 0, 255]);
+    }
+    await assertCompleted(page, fixture, true);
+  } finally {
+    await page.evaluate(() => {
+      const restore = Reflect.get(window, 'restoreRecoveryFlatMap') as (() => void) | undefined;
+      restore?.();
+      Reflect.deleteProperty(window, 'restoreRecoveryFlatMap');
+      const unsubscribe = Reflect.get(window, 'unsubscribeRecoverySampling') as (() => void)[] | undefined;
+      unsubscribe?.forEach((handler) => handler());
+      Reflect.deleteProperty(window, 'unsubscribeRecoverySampling');
+    });
+    await test.info().attach('synthetic-sampling-publication', {
+      body: JSON.stringify(await page.evaluate(() => Reflect.get(window, 'samplingClockAdvance')), null, 2),
+      contentType: 'application/json',
+    });
     await attachEvidence(page, browser, true, false);
   }
 });

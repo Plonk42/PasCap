@@ -4,7 +4,7 @@ import { calculateLayout } from './timeline.js';
 export function snapPoints(project: ProjectDocument): number[] {
   const layout = calculateLayout(project);
   const points = layout.clips.flatMap((clip) => [clip.start, clip.end]);
-  if (project.music) points.push(project.music.start, project.music.start + project.music.duration);
+  for (const track of project.music) points.push(track.start, track.start + track.duration);
   return [
     ...new Set([0, ...points, ...layout.transitions.flatMap((region) => [region.start, region.boundary, region.end])]),
   ].sort((a, b) => a - b);

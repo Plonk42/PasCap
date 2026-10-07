@@ -874,7 +874,7 @@ export function Inspector({
           aria-labelledby={`${inspectorId}-audio-tab`}
           hidden={section !== 'audio'}
         >
-          <InspectorSection id="music" title="Music" icon="music" modified={project.music !== null}>
+          <InspectorSection id="music" title="Music" icon="music" modified={project.music.length > 0}>
             {children}
           </InspectorSection>
         </div>

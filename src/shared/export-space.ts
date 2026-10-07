@@ -2,6 +2,7 @@ import { z } from 'zod';
 import {
   EXPORT_PROFILES,
   EXPORT_RESOURCES,
+  exportAudioSample,
   LAYERED_EXPORT_RESOURCES,
   needsLayeredExport,
   planExportMusic,
@@ -38,7 +39,8 @@ export type ExportPreflight = z.infer<typeof exportPreflightSchema>;
  * Planning allowance, NOT a prediction or an FFV1/H.264 upper bound.
  * Budget two uncompressed bgr0 clips / up to three RGBA16 timelines (lower,
  * track group and output; a span collection counts as one), one byte/pixel/frame for
- * EACH of the encoded chunks and final MP4, selected s16 stereo PCM, then 25%
+ * EACH of the encoded chunks and final MP4, the largest selected s16 stereo PCM
+ * plus two full-project Float64 stereo accumulators (serial three-file peak), then 25%
  * plus the start reserve for containers/LUTs/receipts/other overhead.
  * Compression, frame content and concurrent filesystem users change actual use.
  */
@@ -59,8 +61,18 @@ export function estimateExportSpace(document: ProjectDocument, profile: ExportPr
     : 0;
   const losslessBytes = pixels * (clipFrames * 4 + timelineFrames * 8);
   const encodedBytes = pixels * layout.duration * 2;
-  const music = document.music ? planExportMusic(document.music, layout.duration) : null;
-  const audioBytes = music && music.activeSamples > 0 ? (music.sourceOutSamples - music.sourceInSamples) * 4 : 0;
+  const music = document.music.map((track) => planExportMusic(track, layout.duration));
+  const selectedPcmBytes = Math.max(
+    0,
+    ...music.map((track) => (track.activeSamples > 0 ? (track.sourceOutSamples - track.sourceInSamples) * 4 : 0)),
+  );
+  const accumulatorBytes = music.length
+    ? exportAudioSample(layout.duration) *
+      EXPORT_RESOURCES.audioChannels *
+      (EXPORT_RESOURCES.audioAccumulatorBits / 8) *
+      (EXPORT_RESOURCES.maxAudioScratchFiles - 1)
+    : 0;
+  const audioBytes = selectedPcmBytes + accumulatorBytes;
   const subtotal = losslessBytes + encodedBytes + audioBytes;
   const overheadBytes = Math.ceil(subtotal * 0.25) + MIN_EXPORT_FREE_BYTES;
   return exportSpaceEstimateSchema.parse({

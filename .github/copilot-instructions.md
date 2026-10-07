@@ -57,7 +57,7 @@ PasCap is a solo, pre-release project: optimize for fast iteration. Details are 
 
 - Shared integer-frame layout/retiming (`PlacedClip.retiming`) is authoritative for
   UI, preview and native export. Per-frame rendering stays outside React.
-- Strict schema 7 with uniform tracks, each requiring `ripple`, `transitions`,
+- Strict schema 8 with uniform tracks, each requiring `ripple`, `transitions`,
   `openingFade` and `closingFade`; rows show the saved bottom-to-top order.
 - Final approved [#67](https://github.com/Plonk42/PasCap/issues/67): **Opacity** is
   one row-owned setting, not a clip setting. `VideoLayer.opacity` is a required
@@ -77,8 +77,13 @@ PasCap is a solo, pre-release project: optimize for fast iteration. Details are 
   Group composition is $C = \sum_i G_i b_i o_i w_i$, $A = \sum_i o_i w_i$,
   $\mathrm{result} = C + \mathrm{lower}(1 - A)$, evaluating row Opacity for each
   source with no additional layer multiplier.
-  Preserve incompatible v1–v6 projects/receipt snapshots; require recreation,
+  Preserve incompatible v1–v7 projects/receipt snapshots; require recreation,
   without migrations, compatibility defaults or automatic deletion.
+- Music is a required 0–8 array of independently identified instances, never null
+  or singular. Duration is the maximum of all video and music OUTs. After the last
+  active video, preview/export is opaque black while music continues to its own OUT;
+  video fades remain inside their clips. Mix serially after per-instance gain/fades
+  and clamp once after the complete sum, with one bounded queue/output clock.
 - Heavy native work stays serial with bounded children/buffers, exact frame counts
   and source identity guards.
 - Read and update the relevant contract guide when behaviour changes:

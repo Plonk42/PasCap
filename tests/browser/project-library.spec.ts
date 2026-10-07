@@ -125,7 +125,7 @@ test('audio imports persist in the new project bin without assigning a music tra
   await expect(page.locator('select[aria-label="Music recording"] option')).toHaveCount(2);
   await page.evaluate(() => window.pascapLab!.flush());
   expect(memory.snapshot(id).media.audioIds).toEqual([music.id]);
-  expect(memory.snapshot(id).music).toBeNull();
+  expect(memory.snapshot(id).music).toEqual([]);
   await page.reload();
   await expect(page.locator('select[aria-label="Music recording"] option')).toHaveCount(2);
 });
@@ -225,54 +225,57 @@ test('a failed or stale deletion keeps the confirmation and current project with
   await expect(page.getByRole('button', { name: `Delete ${initialTitle}`, exact: true })).toBeFocused();
 });
 
-test('unavailable schema-6 projects can be explicitly deleted without being opened or migrated to schema 7', async ({
-  page,
-}) => {
-  let deleted = false;
-  let reads = 0;
-  await page.route('**/api/projects', async (route) => {
-    if (route.request().method() !== 'GET') {
-      await route.fallback();
-      return;
-    }
-    await route.fulfill({
-      json: {
-        projects: deleted
-          ? []
-          : [
-              {
-                id: 'old-v6',
-                title: 'Old dual-opacity project',
-                revision: 0,
-                clipCount: 0,
-                duration: 0,
-                updatedAt: '2026-10-03T10:00:00Z',
-                compatible: false,
-                error: 'Unsupported project schema version 6; this build requires version 7.',
-              },
-            ],
-      },
+for (const oldVersion of [6, 7])
+  test(`unavailable schema-${oldVersion} projects can be explicitly deleted without being opened or migrated to schema 8`, async ({
+    page,
+  }) => {
+    let deleted = false;
+    let reads = 0;
+    await page.route('**/api/projects', async (route) => {
+      if (route.request().method() !== 'GET') {
+        await route.fallback();
+        return;
+      }
+      await route.fulfill({
+        json: {
+          projects: deleted
+            ? []
+            : [
+                {
+                  id: 'old-v6',
+                  title: 'Old dual-opacity project',
+                  revision: 0,
+                  clipCount: 0,
+                  duration: 0,
+                  updatedAt: '2026-10-03T10:00:00Z',
+                  compatible: false,
+                  error: `Unsupported project schema version ${oldVersion}; this build requires version 8.`,
+                },
+              ],
+        },
+      });
     });
+    await page.route('**/api/projects/old-v6', async (route) => {
+      if (route.request().method() !== 'DELETE') {
+        reads++;
+        await route.abort('blockedbyclient');
+        return;
+      }
+      expect(route.request().postDataJSON()).toEqual({ expectedRevision: null });
+      deleted = true;
+      await route.fulfill({ json: { deleted: true } });
+    });
+    await page.getByRole('button', { name: 'Open projects', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Open Old dual-opacity project', exact: true })).toBeDisabled();
+    await expect(
+      page.getByText(`Unsupported project schema version ${oldVersion}; this build requires version 8.`, {
+        exact: true,
+      }),
+    ).toBeVisible();
+    await page.getByRole('button', { name: 'Delete Old dual-opacity project', exact: true }).click();
+    await page.getByRole('button', { name: 'Delete project', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Delete Old dual-opacity project', exact: true })).toHaveCount(0);
+    expect(deleted).toBe(true);
+    expect(reads).toBe(0);
+    expect(await page.evaluate(() => window.pascapLab!.project()!.id)).toBe(initialId);
   });
-  await page.route('**/api/projects/old-v6', async (route) => {
-    if (route.request().method() !== 'DELETE') {
-      reads++;
-      await route.abort('blockedbyclient');
-      return;
-    }
-    expect(route.request().postDataJSON()).toEqual({ expectedRevision: null });
-    deleted = true;
-    await route.fulfill({ json: { deleted: true } });
-  });
-  await page.getByRole('button', { name: 'Open projects', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Open Old dual-opacity project', exact: true })).toBeDisabled();
-  await expect(
-    page.getByText('Unsupported project schema version 6; this build requires version 7.', { exact: true }),
-  ).toBeVisible();
-  await page.getByRole('button', { name: 'Delete Old dual-opacity project', exact: true }).click();
-  await page.getByRole('button', { name: 'Delete project', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Delete Old dual-opacity project', exact: true })).toHaveCount(0);
-  expect(deleted).toBe(true);
-  expect(reads).toBe(0);
-  expect(await page.evaluate(() => window.pascapLab!.project()!.id)).toBe(initialId);
-});

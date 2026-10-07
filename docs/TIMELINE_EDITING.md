@@ -3,7 +3,7 @@
 ## Source footage and excerpt instances
 
 The media library describes complete recordings belonging to the open project's
-bin, not every globally registered source. Strict schema 7 requires unique
+bin, not every globally registered source. Strict schema 8 requires unique
 `media.videoIds` and `media.audioIds` arrays (10,000 IDs maximum each). Imports add
 membership even without timeline placement; clip/music references also remain
 visible. New projects start with both arrays empty. Importing an existing source
@@ -34,6 +34,13 @@ not the raw source-range length at non-1× speed. A row Speed curve uses absolut
 project time and can give the same source excerpt a different duration at another
 start/layer. Without Speed participants, the clip's static constant/source-ramp
 map applies. See [SPEED_AND_AUDIO.md](SPEED_AND_AUDIO.md).
+
+Project duration is the maximum of all retimed clip ends (including hidden
+layers) and every independent music instance's start + duration. Music can extend
+the project. After the last active video clip OUT, preview/export is opaque black,
+not a frozen last image, while music continues/fades to its own OUT. Each video
+closing fade remains inside its last clip and ends at that clip's OUT. Music-only
+preview is allowed; export still requires at least one video clip.
 
 ## Importing recordings from the filesystem
 
@@ -73,7 +80,8 @@ Import guidance, **without a POST**. Internal dragging of ready registered Media
 into Timeline remains unchanged. Uncertain registration results are not retried
 automatically; check Media/Activity before resubmitting.
 
-Strict schema 7 requires per-track Ripple, transitions and fades; registry/proxy
+Strict schema 8 requires per-track Ripple, transitions and fades, and a required
+0–8 identified-instance `music` array (`[]` without music); registry/proxy/PCM
 formats are unchanged. Only generated proxies/thumbnails, metadata,
 exports/receipts and scratch are created, not duplicate originals. Keep originals
 accessible at their registered paths: moving files or disconnecting a drive fails
@@ -239,7 +247,7 @@ and undoable, and never move music, other tracks or absolute row points.
 
 ## Row points, time ruler and transitions
 
-Schema-7 points belong to the **whole video row**, not individual clips. One ordered
+Schema-8 points belong to the **whole video row**, not individual clips. One ordered
 point at a project frame has nine required nullable channels: **Opacity**
 (`opacity`), Speed and seven colour settings, participating independently.
 Every `VideoLayer` also requires numeric `opacity` in 0–1, initially 1 (100%) on
@@ -314,7 +322,8 @@ rename, Ripple, ordering and deletion, with visibility separate.
 Setting buttons, row navigation and list time buttons share a central **editor-only
 stored-point inspection cursor**. It advances through several off-duration points
 instead of repeatedly choosing the same point from a clamped playhead. Preview
-uses the nearest available frame, or no preview on an empty timeline; labels
+uses the nearest available project frame, black in a music-only region, or no
+preview without video or music duration; labels
 distinguish stored time from actual preview. List fields edit the stored point;
 setting values/diamonds/capture still use the real playhead. Manual seek, playback,
 row/project changes and deletion of the inspected point clear inspection; valid
@@ -386,11 +395,11 @@ insertion remains boundary-based even with Snap off or Alt held; only an explici
 move of its retained first clip changes the anchor. The
 toggle persists for the current timeline session, not the renderable document.
 
-Projects are named separate **version-7** documents with required per-layer Ripple,
+Projects are named separate **version-8** documents with required per-layer Ripple,
 transitions, opening/closing fades and numeric `opacity` in 0–1. New layers start
 at 1 (100%); a missing saved field is invalid. Switching flushes autosave first,
 blocks on failed saves, and resets session selection/history; successful export
-snapshots are independent of the open project. Earlier v1–v6 projects and receipt
+snapshots are independent of the open project. Earlier v1–v7 projects and receipt
 snapshots remain incompatible and preserved, without migration/fabricated defaults.
 There is no automatic deletion. Row `opacity` is the required sole stored value;
 saved `clip.opacity` and old `clipOpacity`/`layerOpacity` point fields are rejected,
@@ -402,11 +411,27 @@ receipts. Removing an excerpt is not removing that recording from the import bin
 existing live v3 sample appearing incompatible is expected. Registry/proxy formats
 are unchanged.
 
-The music waveform is registered/prepared by the backend. Its placement and trim
-gestures are transient and one-step undoable. Numeric controls provide source
-IN/OUT, placement/duration and fades; gain uses a native slider with an exact
-`NumberField`, and looping is explicit. Music is not retimed with video;
-its own clock drives synchronisation while active.
+The required `music` array holds **0–8 independent instances**, each with a unique
+required `id`, registered `mediaId`, source IN/OUT, start/duration, gain, fades and
+loop flag. No null/singular fallback, omitted-field default or old-format reader
+is accepted. Version-1 export receipts require a strict v8 snapshot and captured
+audio-source/instance-plan arrays; older snapshots/invalid arrays are rejected
+while the receipt and finished output remain preserved. Current PCM format is unchanged.
+
+Each music instance has its own backend-prepared waveform and timeline lane.
+**Audio → Music → Music track** selects the instance; **Add music track** uses a
+ready/prepared Recording and the selected-track trash action removes only that
+placement. Import never implicitly places music. Selection creates no save/history
+entry, and editing/removing one instance leaves all others and imported media intact.
+Independent drafts cannot apply to another instance. Placement/trim gestures are
+transient and commit once; each accepted edit/add/remove is one Undo step.
+Invalid release/cancellation is atomic with no committed draft/history/save.
+Numeric controls provide source IN/OUT, placement/duration and fades; gain uses a
+native slider with an exact `NumberField`, and looping is explicit per instance.
+Music is not retimed or rippled with video. All instances sum linearly after their
+gain/fades and clamp once after the complete mix; one AudioContext/worklet/output
+clock drives synchronisation, never per-instance clocks or queues.
+See [the multiple-music contract](design/MULTIPLE_MUSIC.md).
 
 ## Media browser and interface scope
 

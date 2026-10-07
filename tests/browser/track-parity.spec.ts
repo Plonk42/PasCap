@@ -178,7 +178,7 @@ async function captureAt(page: Page, frame: number) {
   return captured;
 }
 
-test('the initial track and every newly added track default to Ripple on with independent strict schema-7 fields', async ({
+test('the initial track and every newly added track default to Ripple on with independent strict schema-8 fields', async ({
   page,
 }) => {
   const before = await current(page);
@@ -194,7 +194,7 @@ test('the initial track and every newly added track default to Ripple on with in
   await page.getByRole('button', { name: 'Add video layer', exact: true }).click();
   const added = await current(page);
   await ready(page, added);
-  expect(added.schemaVersion).toBe(7);
+  expect(added.schemaVersion).toBe(8);
   for (const field of ['transitions', 'openingFade', 'closingFade']) expect(added).not.toHaveProperty(field);
   expect(added.layers.slice(0, 2)).toEqual(before.layers);
   expect(added.clips).toEqual(before.clips);
@@ -228,17 +228,20 @@ for (const row of [0, 1]) {
       ];
     }
     document.media.audioIds = [music.id];
-    document.music = {
-      mediaId: music.id,
-      sourceIn: 0,
-      sourceOut: 60,
-      start: 17,
-      duration: 90,
-      gainDb: -9,
-      fadeIn: 4,
-      fadeOut: 5,
-      loop: true,
-    };
+    document.music = [
+      {
+        id: 'parity-music',
+        mediaId: music.id,
+        sourceIn: 0,
+        sourceOut: 60,
+        start: 17,
+        duration: 90,
+        gainDb: -9,
+        fadeIn: 4,
+        fadeOut: 5,
+        loop: true,
+      },
+    ];
     await fixture(page, document);
     const before = await current(page);
     const saves = memory.saves;

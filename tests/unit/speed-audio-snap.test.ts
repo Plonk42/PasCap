@@ -23,10 +23,10 @@ function row(keyframes: LayerKeyframe[]): VideoLayer {
 }
 
 describe('shared retiming and recoverable speed edits', () => {
-  it('requires explicit v7 static speed settings; earlier documents are not guessed', () => {
+  it('requires explicit v8 static speed settings; earlier documents are not guessed', () => {
     const project = createProject('flight', 'Flight');
-    expect(project.schemaVersion).toBe(7);
-    for (const schemaVersion of [1, 2, 3, 4, 5, 6])
+    expect(project.schemaVersion).toBe(8);
+    for (const schemaVersion of [1, 2, 3, 4, 5, 6, 7])
       expect(() => projectSchema.parse({ ...project, schemaVersion })).toThrow();
     expect(() => projectSchema.parse(unsupportedProject(4, 'old-flight', 'Unsupported flight'))).toThrow();
     const clip = createClip('a', 'source', 0, 600);
@@ -231,6 +231,7 @@ describe('absolute-project row speed integration', () => {
 
 describe('music and snapping', () => {
   const music = {
+    id: 'song-instance',
     mediaId: 'song',
     sourceIn: 30,
     sourceOut: 90,
@@ -256,7 +257,7 @@ describe('music and snapping', () => {
     expect(musicGainAt(music, 130)).toBe(0);
   });
   it('rejects music without explicit loop when the track exceeds the selected source', () => {
-    expect(() => projectSchema.parse({ ...createProject('p', 'P'), music: { ...music, loop: false } })).toThrow();
+    expect(() => projectSchema.parse({ ...createProject('p', 'P'), music: [{ ...music, loop: false }] })).toThrow();
   });
   it('snaps to the closest clip or music boundary only within tolerance', () => {
     const project = applyCommand(createProject('p', 'P'), {
@@ -264,9 +265,11 @@ describe('music and snapping', () => {
       clip: createClip('a', 'source', 0, 100),
       index: 0,
     });
-    const points = snapPoints({ ...project, music });
+    const points = snapPoints({ ...project, music: [music, { ...music, id: 'second', start: 40 }] });
     expect(points).toContain(10);
     expect(points).toContain(130);
+    expect(points).toContain(40);
+    expect(points).toContain(160);
     expect(snapFrame(97, points, 4)).toBe(100);
     expect(snapFrame(94, points, 4)).toBe(94);
     expect(snapFrame(128, points, 4)).toBe(130);

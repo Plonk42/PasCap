@@ -1,4 +1,4 @@
-# Speed and audio contract · project v7
+# Speed and audio contract · project v8
 
 ## Two distinct retiming contracts
 
@@ -52,7 +52,7 @@ selected original frame, even when output sampling skips it.
 Clip curves belong to **one excerpt instance**. Trims, moves, splits and marked
 cuts retain original-source anchors; split/cut/duplicate copies are independent.
 Every retained piece recompiles/rounds its duration once. Curves are carried in
-the required `speed` field of strict schema 7, without an optional fallback,
+the required `speed` field of strict schema 8, without an optional fallback,
 data migration or project-wide speed field. A mode/preset change
 is a deliberate editing command, not a conversion on load.
 
@@ -66,7 +66,7 @@ base without deleting any clip points.
 
 ### Shared row Speed: absolute project-time rate
 
-Schema-7 layer points require nine nullable channels: Opacity (`opacity`),
+Schema-8 layer points require nine nullable channels: Opacity (`opacity`),
 Speed (`speed`) and seven colour settings.
 Once any point on the row participates in Speed, the row's rate curve **overrides
 every clip's entire constant/ramp/custom-curve base**, not just an interval between keys. Only
@@ -216,8 +216,8 @@ last frame. Marker and whole-row point navigation keep the chosen Inspector tab.
 Labels distinguish stored time from actual preview. The main Clip rate field and
 diamond capture still use the **real playhead**, not the inspected off-duration
 time; list controls target their stored point. Storing/moving a point beyond
-duration does not extend the sequence merely for that point; only actual clip
-retiming changes duration. Details:
+duration does not extend the sequence merely for that point; actual clip
+retiming or a music instance's OUT can change project duration. Details:
 [LAYERS_AND_KEYFRAMES.md](LAYERS_AND_KEYFRAMES.md).
 
 ### Precise clip-curve editor
@@ -270,6 +270,14 @@ separate; an explicit override notice appears when row Speed suppresses clip spe
 
 ## Music
 
+Strict schema 8 requires `music: MusicTrack[]`, with **0–8 independent instances**
+and unique required instance `id` values; `[]` means no music. Each instance
+requires `mediaId`, `sourceIn`, `sourceOut`, `start`, `duration`, `gainDb`, `fadeIn`,
+`fadeOut` and `loop`. Several instances can use the same registered recording
+without sharing edits. A missing array/ID, null/singular music, unknown fields or
+duplicate IDs are errors, never defaulted or migrated. Detailed bounds and pending
+acceptance are in [MULTIPLE_MUSIC.md](design/MULTIPLE_MUSIC.md).
+
 **Audio → Music → Browse music files** opens a keyboard-accessible native modal
 beside the manual **Music file path / Import audio** form. Choose one radio-selected
 file inside a configured `PASCAP_MEDIA_ROOTS` location, then explicitly **Import
@@ -288,7 +296,7 @@ Importing a different location creates a **new music entry**, even when a move o
 hard link retains the original filesystem identity. The selected file is verified
 at its own path; an older entry's missing path does not block that new import.
 Existing entries and project references are not reassociated or removed. Select
-the new entry in **Recording** to place it. Verified fingerprint-matching PCM can
+the new entry in **Recording** for deliberate placement. Verified fingerprint-matching PCM can
 be reused through the serial worker; originals and old caches remain untouched.
 
 Standalone music import requires exactly one audio stream and no video footage.
@@ -296,9 +304,27 @@ Embedded cover artwork explicitly marked as an attached picture is accepted and
 ignored during audio-only playback preparation; video soundtracks remain rejected.
 Original files are referenced in place and are never stripped or rewritten.
 
-One registered audio file, with explicit source IN/OUT, timeline start/duration,
-gain dB, fade durations and loop flag. A non-looping duration cannot exceed the
-selected source range; a looping track repeats **only that selected range**.
+**Music track** selects an instance. **Add music track** creates an independent
+instance of the chosen ready/prepared **Recording**, up to eight; the trash action
+**Delete selected music track** removes only that instance. Import never implicitly
+places music. Selection is editor-only; edits, recording changes and removal leave
+other instances, videos, row points and bin membership untouched. Each instance
+retains independent drafts; selection never applies one instance's text to another.
+Each accepted add/edit/remove or completed gesture is one Undo step; invalid or
+cancelled gestures restore atomically without a committed edit/history/save.
+
+Every instance has explicit source IN/OUT, timeline start/duration, gain dB,
+fade durations and loop flag. A non-looping duration cannot exceed its selected
+source range; looping repeats **only that range**. Source OUT must fit the registered
+original and exceed IN; fade IN + OUT must fit duration. Timeline OUT must fit
+0–2,147,483,647; overflow rejects the edit rather than shortening it.
+
+Project duration is **max(all retimed video clip OUTs, every music start + duration)**,
+including hidden video placements. Music can extend it. Each video closing fade
+ends inside its last clip at that clip's OUT, then no active video means **opaque
+black**, never a held last image. Music continues and fades at each instance's
+own OUT. Music-only preview is naturally black; export requires at least one video
+clip. A music tail uses layered export through full project duration.
 
 Gain dB pairs a bounded native slider with an exact `NumberField`, using the same
 local-draft/release-only gesture and full-precision numeric entry as playback rates.
@@ -306,15 +332,21 @@ Source IN/OUT, timeline start, duration and fades retain exact native numeric fi
 with their existing units and timecode feedback, not arbitrary timing sliders.
 Loop stays a checkbox.
 
-Linear amplitude envelope: `10^(gainDb/20)` multiplied by `offset/fadeIn` within
-the opening fade and `(duration-offset)/fadeOut` within the closing fade. Outside
-the track's timeline range the signal is silence. No hidden loudness correction.
-Source-video audio stays disabled.
+Each instance's linear amplitude envelope is `10^(gainDb/20)` multiplied by
+`offset/fadeIn` within its opening fade and `(duration-offset)/fadeOut` within its
+closing fade. A zero fade is absent. Outside its placement the instance contributes
+silence. Sum all active sources linearly **after per-instance gain/fades**, then
+hard-clamp to **[−1, 1] once after the complete sum**, separately for each channel.
+Never clamp a source or intermediate sum: opposite-polarity contributions must
+remain able to cancel. No normalisation, ducking, effects or hidden gain compensation.
+Source-video audio stays disabled; clip colour/speed and sole row Opacity are unchanged.
 
 The preview streams **PCM16 48 kHz stereo** in exact bounded HTTP byte ranges into
-one **AudioWorklet**, not a media-element clock or a whole-file decoded buffer.
-The rendering thread owns consecutive source samples and their context-frame
-receipts. Its first real rendered sample supplies the clock origin; video starts
+one mixed stereo queue and **one AudioContext/AudioWorklet**, not per-instance
+queues/worklets, a media-element clock or whole-file buffers. Read and accumulate
+sources serially into one output block, then clamp once and transfer that mixed
+block. The rendering thread owns consecutive mixed samples and their context-frame
+receipts. Its first real rendered mixed sample supplies the clock origin; video starts
 only once the output device reaches that origin. Project time follows the audio
 output timestamp, not graph processing ahead of the speakers or an approximate
 HTMLMediaElement currentTime. Elapsed rendering before acknowledgement is retained.
@@ -333,12 +365,18 @@ incompatible mismatches, new sources and failed music synchronization still expo
 buffering and require exact source readiness before recovery.
 Placement, source IN/OUT, duration and loop boundaries use independently rounded
 integer 48 kHz sample positions, matching native audio placement. Selected-range
-wraps are filled into consecutive blocks without a music restart; valid placement
-silence is distinct from an underrun. Gain/fades are applied to the actual streamed
-samples. Four 16,384-sample stereo Float32 transfer blocks retain at most 512 KiB,
-plus bounded 64 KiB range/short-selection scratch and one 128 KiB conversion workspace. Receipts have one
-unacknowledged message and reads are serial/credit-controlled. No memory grows with
-song/project duration. Target-browser long-run A/V/audio behaviour still needs
+wraps are filled into consecutive mixed blocks without a music restart; valid placement
+silence is distinct from an underrun. Gain/fades are applied to each source's streamed
+samples before mixing. **Four** 16,384-sample stereo Float32 queue/transfer blocks
+retain at most **512 KiB total**, not per instance, plus shared bounded **64 KiB**
+range/short-selection scratch, one **128 KiB conversion workspace** and one
+**128 KiB mixed-output workspace**. Receipts have one unacknowledged message and
+reads are serial/credit-controlled. There are no duration-sized silence buffers
+or per-track queues. Audio-buffer bounds do not scale with song/project duration
+or instance count; instance metadata is bounded by eight entries.
+Missing active-source data is an explicit failure, never an omitted track or
+successful silence. Pause/seek/edit/cancellation invalidate the whole mix epoch.
+Target-browser long-run A/V/audio behaviour still needs
 qualification; synthetic music regressions are not full Firefox qualification.
 Short loop selections are reused only within one block; each refill still performs
 a fresh guarded range read, rather than reading originals again for every wrap.
@@ -351,17 +389,34 @@ preview caches remain unchanged but are not current playback input. Missing curr
 PCM caches appear as an explicit **Retry** preparation action in Audio → Music;
 startup/library reads never prepare, rewrite or delete them. Prepare deliberately
 to create the current cache, retaining originals and older generated files. Project
-schema, registry and video-proxy formats are unchanged; native export still reads
-original audio and is not changed by the preview transport.
-Native export uses the same placement/loop/gain/fade rules and produces AAC at
-48 kHz. The output audio is padded/trimmed to the complete video duration.
+schema is 8; registry, video-proxy and PCM cache formats are unchanged. Native export
+still reads original audio, not the preview transport.
+
+Native mixing decodes **one original at a time** to exact selected **48 kHz stereo
+s16 PCM**, then serially places/loops/envelopes it and pairwise-sums with the previous
+**Float64 stereo accumulator**. The next full-project accumulator preserves amplitudes
+outside −1–1: no intermediate clipping/normalisation. At most **two intermediate
+audio inputs**, **one native audio child per pass** and **three audio scratch files**
+(selected PCM + old/new accumulators) coexist; consumed inputs are deleted before
+the next instance. One final mixed input is hard-clamped once before **48 kHz AAC**.
+Audio silence/padding/sample count follows **full project duration**, including
+black music tails, not the last video OUT. Existing video buffer/child/LUT bounds
+remain unchanged.
+
+Advisory audio disk planning is **maximum selected s16 PCM size + two full-project
+Float64 stereo timelines**, not the sum of all originals or loop repetitions.
+It is duration-dependent, not a fixed-GB guarantee; see
+[export storage](UX_HARDENING.md#issue-3-export-storage-and-recovery). Failure or
+cancellation cleans only owned scratch/partials and preserves completed outputs.
 
 ## Versioning
 
-Project schema **v7** requires explicit `media.videoIds` and `media.audioIds` arrays,
+Project schema **v8** requires explicit `media.videoIds` and `media.audioIds` arrays,
 unique and limited to 10,000 IDs each, plus complete clip colour/constant/ramp/custom-curve
 speed, layer point arrays with all nine nullable value fields, placement and music
-source OUT. Every layer also requires `ripple`, `transitions`, `openingFade` and
+source OUT. `music` is a required 0–8 array with unique required instance IDs and
+all per-instance fields above; `[]` is the sole no-music representation, not null
+or a compatibility default. Every layer also requires `ripple`, `transitions`, `openingFade` and
 `closingFade`, plus numeric `opacity` in 0–1; 1 is the new-track initial value,
 not a default for missing saved fields. Transitions/fades are track-local, with
 no special first-track identity. Layers display and composite in their saved bottom-to-top array order.
@@ -371,17 +426,25 @@ Required nullable channels are `opacity`, `speed` and the seven colour settings.
 Row `opacity` is valid and required; saved `clip.opacity` and old
 `clipOpacity`/`layerOpacity` channels are rejected, not defaulted.
 New projects have empty video/music bins. Standalone audio imports belong
-to the open project's bin; selected music references also count as membership.
+to the open project's bin; every music instance's references also count as membership.
 Global registered music/proxies are reusable on deliberate import, never automatically
-inherited by a new project. Earlier v1–v6 projects and export receipt snapshots remain unchanged
-and incompatible. There is no migration, compatibility fallback, default-field
+inherited by a new project. Earlier v1–v7 projects and export receipt snapshots remain unchanged
+and incompatible. There is no migration, compatibility reader, null fallback, default-field
 injection or automatic deletion; recreate projects and import their media to reuse
 registered assets/verified ready proxies. Confirmed project deletion affects only
 its saved document, not originals,
 the shared content-deduplicated registry/cache or finished exports/receipts.
-Registry/video-proxy formats, source guards and native resource budgets are unchanged;
+Registry/video-proxy/current PCM formats, source guards and native video budgets are unchanged;
 native composition uses the sole Opacity contract without a layer multiplier.
 Preview uses the current explicitly prepared PCM cache described above.
+
+Export receipts remain **version 1** with a strict **v8** snapshot, required
+`musicSources` captured unique-original array and `settings.audio` identified
+instance-plan array (`[]` for each without music). Plans preserve independent
+timing/gain/fades/loop; several may refer to the same captured original. The plan
+field `videoSamples` represents **full project duration**, including music tails.
+Invalid arrays/older snapshots are rejected and their receipt/finished MP4 remains
+untouched; no singular/null reader or automatic conversion is permitted.
 
 Stored-point inspection remains editor-only, never a persisted field or migration.
 Synthetic correctness checks do not qualify intended-GPU preview,

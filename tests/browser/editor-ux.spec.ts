@@ -274,17 +274,20 @@ for (const width of [1440, 1024, 720, 640]) {
     if (!music) throw new Error('The dedicated synthetic audio fixture must already be prepared.');
     const document = await current(page);
     document.media.audioIds = [music.id];
-    document.music = {
-      mediaId: music.id,
-      sourceIn: 0,
-      sourceOut: Math.min(60, music.metadata.frameCount),
-      start: 0,
-      duration: 120,
-      gainDb: 0,
-      fadeIn: 0,
-      fadeOut: 0,
-      loop: true,
-    };
+    document.music = [
+      {
+        id: 'ux-music',
+        mediaId: music.id,
+        sourceIn: 0,
+        sourceOut: Math.min(60, music.metadata.frameCount),
+        start: 0,
+        duration: 120,
+        gainDb: 0,
+        fadeIn: 0,
+        fadeOut: 0,
+        loop: true,
+      },
+    ];
     await page.evaluate((next) => window.pascapLab!.setDocument(next), document);
     await page.setViewportSize({ width, height: 720 });
     await seek(page, 30);
@@ -314,7 +317,9 @@ for (const width of [1440, 1024, 720, 640]) {
       expect(bounds.width).toBeGreaterThanOrEqual(24);
       expect(bounds.height).toBeGreaterThanOrEqual(24);
     }
-    const track = page.getByRole('button', { name: 'Move music track', exact: true });
+    const track = page
+      .locator('[data-music-id="ux-music"]')
+      .getByRole('button', { name: `Move music track 1: ${music.name}`, exact: true });
     await expect(track).toBeInViewport();
     expect(await page.evaluate(() => globalThis.document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     const box = (await track.boundingBox())!;

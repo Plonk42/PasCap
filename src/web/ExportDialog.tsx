@@ -40,11 +40,15 @@ export function summarizeExport(project: ProjectDocument) {
       }
     }
   }
+  const layout = calculateLayout(project);
+  const videoDuration = layout.clips.reduce((duration, clip) => Math.max(duration, clip.end), 0);
   return {
-    duration: calculateLayout(project).duration,
+    duration: layout.duration,
+    musicTail: layout.duration - videoDuration,
     clips: project.clips.length,
     layers: project.layers.length,
     enabledLayers: project.layers.filter((layer) => layer.enabled).length,
+    musicTracks: project.music.length,
     keys,
     keyframeCount: keys.points,
     layered: needsLayeredExport(project),
@@ -122,7 +126,12 @@ export function ExportDialog({
       <dl className="activity-export-summary">
         <div>
           <dt>Duration</dt>
-          <dd>{durationLabel(framesToSeconds(summary.duration))}</dd>
+          <dd>
+            {durationLabel(framesToSeconds(summary.duration))}
+            {summary.musicTail > 0 && (
+              <small>{durationLabel(framesToSeconds(summary.musicTail))} music-only black tail</small>
+            )}
+          </dd>
         </div>
         <div>
           <dt>Clips</dt>
@@ -140,6 +149,13 @@ export function ExportDialog({
           <dd>
             {summary.keyframeCount}
             <small>{summary.keys.settings} participating settings</small>
+          </dd>
+        </div>
+        <div>
+          <dt>Music tracks</dt>
+          <dd>
+            {summary.musicTracks}
+            {summary.musicTracks > 0 && <small>Linear mix · final clipping</small>}
           </dd>
         </div>
       </dl>
@@ -185,9 +201,16 @@ export function ExportDialog({
           <p>
             The submitted edit includes clip grades and speed, each track’s Ripple, transitions and fades, enabled
             layers, bottom-to-top composition order, row Opacity and keyframes
-            {project.music ? ', and the selected music track' : '; no music track is selected'}. Later edits do not
-            change a submitted render.
+            {summary.musicTracks ? `, and all ${summary.musicTracks} music tracks` : '; no music tracks are placed'}.
+            Later edits do not change a submitted render.
           </p>
+          {summary.musicTracks > 0 && (
+            <p>
+              Music instances retain independent ranges, placement, gain, fades and looping. Overlaps sum linearly, then
+              the final mix is hard-clamped to −1…1, without normalization or ducking. Export reaches the last video or
+              music OUT. Video closing fades stay on their last clips; any remaining music continues over black.
+            </p>
+          )}
           <p>After submission, rendering continues in Activity and the editor remains available.</p>
         </section>
         <p className="activity-hint">

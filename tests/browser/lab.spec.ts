@@ -1,6 +1,8 @@
 import { expect, test, type Page } from '@playwright/test';
+import type { ExportReceipt } from '../../src/server/export.js';
 import { NEUTRAL_COLOUR } from '../../src/shared/colour.js';
 import { applyCommand } from '../../src/shared/commands.js';
+import { planExportMusic } from '../../src/shared/export.js';
 import { createClip, createProject, projectSchema } from '../../src/shared/model.js';
 import { calculateLayout } from '../../src/shared/timeline.js';
 import {
@@ -391,7 +393,7 @@ test('music waveform, placement, looping, gain, fades and audio-clock preview wo
   await page.getByRole('spinbutton', { name: 'Music fade in', exact: true }).press('Enter');
   await page.getByRole('spinbutton', { name: 'Music fade out', exact: true }).fill('15');
   await page.getByRole('spinbutton', { name: 'Music fade out', exact: true }).press('Enter');
-  await expect(page.getByRole('img', { name: 'Music waveform' })).toBeVisible();
+  await expect(page.getByRole('img', { name: 'Waveform for music track 1:', exact: false })).toBeVisible();
   await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
   await page.evaluate(async () => {
     await window.pascapLab!.engine.seek(50);
@@ -416,23 +418,23 @@ test('music drag placement is one undoable edit and Escape discards its draft', 
   const audio = (await (await request.get('/api/audio')).json()) as { assets: { id: string }[] };
   await page.getByRole('combobox', { name: 'Music recording' }).selectOption(audio.assets[0]!.id);
   await page.getByRole('button', { name: 'Toggle snapping' }).click();
-  const body = page.getByRole('button', { name: 'Move music track' });
+  const body = page.getByRole('button', { name: 'Move music track 1:', exact: false });
   const box = (await body.boundingBox())!;
   const scale = Number(await page.locator('.timeline-surface').getAttribute('data-pixels-per-frame'));
   await page.mouse.move(box.x + 25, box.y + 25);
   await page.mouse.down();
   await page.mouse.move(box.x + 25 + 20 * scale, box.y + 25, { steps: 6 });
   await page.mouse.up();
-  expect(await page.evaluate(() => window.pascapLab!.project()!.music!.start)).toBe(20);
+  expect(await page.evaluate(() => window.pascapLab!.project()!.music[0]!.start)).toBe(20);
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
-  expect(await page.evaluate(() => window.pascapLab!.project()!.music!.start)).toBe(0);
+  expect(await page.evaluate(() => window.pascapLab!.project()!.music[0]!.start)).toBe(0);
   const restored = (await body.boundingBox())!;
   await page.mouse.move(restored.x + 25, restored.y + 25);
   await page.mouse.down();
   await page.mouse.move(restored.x + 25 + 10 * scale, restored.y + 25, { steps: 3 });
   await page.keyboard.press('Escape');
   await page.mouse.up();
-  expect(await page.evaluate(() => window.pascapLab!.project()!.music!.start)).toBe(0);
+  expect(await page.evaluate(() => window.pascapLab!.project()!.music[0]!.start)).toBe(0);
 });
 
 test('plays both ramp directions across dissolves and music source wraps on repeated playback', async ({
@@ -466,17 +468,20 @@ test('plays both ramp directions across dissolves and music source wraps on repe
   const duration = calculateLayout(project).duration;
   project = applyCommand(project, {
     type: 'music',
-    music: {
-      mediaId: audio.assets[0]!.id,
-      sourceIn: 30,
-      sourceOut: 60,
-      start: 10,
-      duration: duration - 10,
-      gainDb: -9,
-      fadeIn: 6,
-      fadeOut: 12,
-      loop: true,
-    },
+    music: [
+      {
+        id: 'ramp-music',
+        mediaId: audio.assets[0]!.id,
+        sourceIn: 30,
+        sourceOut: 60,
+        start: 10,
+        duration: duration - 10,
+        gainDb: -9,
+        fadeIn: 6,
+        fadeOut: 12,
+        loop: true,
+      },
+    ],
   });
   await page.evaluate((document) => window.pascapLab!.setDocument(document), project);
   await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
@@ -535,29 +540,34 @@ test('exports a multi-clip retimed/graded music edit and serves verified snapsho
   });
   project = applyCommand(project, {
     type: 'music',
-    music: {
-      mediaId: audio.assets[0]!.id,
-      sourceIn: 0,
-      sourceOut: 30,
-      start: 10,
-      duration: 102,
-      gainDb: -6,
-      fadeIn: 5,
-      fadeOut: 10,
-      loop: true,
-    },
+    music: [
+      {
+        id: 'export-music',
+        mediaId: audio.assets[0]!.id,
+        sourceIn: 0,
+        sourceOut: 30,
+        start: 10,
+        duration: 102,
+        gainDb: -6,
+        fadeIn: 5,
+        fadeOut: 10,
+        loop: true,
+      },
+    ],
   });
   await page.evaluate((document) => window.pascapLab!.setDocument(document), project);
   await page.getByRole('button', { name: 'Export video', exact: true }).click();
   const accepted = await submitExport(page);
   const { outputUrl: file, receiptUrl } = await freshExportLinks(page, request, accepted, 60_000);
-  const receipt = (await (await request.get(receiptUrl)).json()) as {
-    snapshot: unknown;
-    verification: { frameCount: number; hasAudio: boolean; width: number };
-  };
+  const receipt = (await (await request.get(receiptUrl)).json()) as ExportReceipt;
   expect(receipt.verification.frameCount).toBe(calculateLayout(project).duration);
   expect(receipt.verification.width).toBe(1280);
-  expect(receipt.verification.hasAudio).toBe(true);
+  expect(receipt.verification.audio).toMatchObject({ codec: 'aac', sampleRate: 48_000, channels: 2 });
+  expect(receipt.musicSources.map((source) => source.id)).toEqual([audio.assets[0]!.id]);
+  expect(receipt.settings.audio).toEqual(
+    project.music.map((track) => planExportMusic(track, calculateLayout(project).duration)),
+  );
+  expect(receipt).not.toHaveProperty('musicSource');
   expect(projectSchema.parse(receipt.snapshot).clips[0]?.speed).toEqual({ mode: 'constant', rate: 0.5 });
   expect((await request.get(file, { headers: { Range: 'bytes=0-99' } })).status()).toBe(206);
   const parsed = projectSchema.parse(receipt.snapshot);

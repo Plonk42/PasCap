@@ -245,7 +245,7 @@ function unchangedOthers(
   editedIds: readonly string[],
   transitions: Readonly<Record<string, readonly Transition[]>> = {},
 ): void {
-  expect(next.schemaVersion).toBe(7);
+  expect(next.schemaVersion).toBe(8);
   expect(next.media).toEqual(before.media);
   expect(next.layers).toEqual(
     before.layers.map((layer) => ({ ...layer, transitions: transitions[layer.id] ?? layer.transitions })),
@@ -727,17 +727,20 @@ test('I/O middle removal is transient then one edit, preserving absolute nine-ch
     layerId: 'upper',
     start: 230,
   });
-  document.music = {
-    mediaId: music.id,
-    sourceIn: 10,
-    sourceOut: 100,
-    start: 25,
-    duration: 180,
-    gainDb: -9,
-    fadeIn: 5,
-    fadeOut: 10,
-    loop: true,
-  };
+  document.music = [
+    {
+      id: 'rush-music',
+      mediaId: music.id,
+      sourceIn: 10,
+      sourceOut: 100,
+      start: 25,
+      duration: 180,
+      gainDb: -9,
+      fadeIn: 5,
+      fadeOut: 10,
+      loop: true,
+    },
+  ];
   document.media.audioIds = [music.id];
   await fixture(page, document);
   const before = await current(page);
