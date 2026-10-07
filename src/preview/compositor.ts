@@ -1,5 +1,6 @@
 import { gradePixel, NEUTRAL_COLOUR, type ColourSettings, type RGB } from '../shared/colour.js';
 import { compositePixel } from '../shared/composition.js';
+import { compileSpatialMapping, NEUTRAL_SPATIAL_POSE, type SpatialPose } from '../shared/spatial.js';
 import type { PreviewLayer } from '../shared/timeline.js';
 import { MAX_DECODER_SLOTS } from './assignment.js';
 import { fragmentShader, vertexShader } from './shaders.js';
@@ -8,6 +9,9 @@ export interface CompositeClip {
   slot: number;
   settings: ColourSettings;
   aspect: number;
+  spatial: SpatialPose;
+  originalWidth: number;
+  originalHeight: number;
   opacity: number;
   blendWeight: number;
   brightness: number;
@@ -96,6 +100,13 @@ export class Compositor {
         'brightness',
         'imageAspect',
         'canvasAspect',
+        'spatialU0',
+        'spatialV0',
+        'spatialU1',
+        'spatialV1',
+        'crop0',
+        'crop1',
+        'neutralSpatial',
       ];
       for (const name of names) {
         const location = gl.getUniformLocation(program, name);
@@ -199,13 +210,36 @@ export class Compositor {
       slot: group.clips[0]!.slot,
       settings: { ...NEUTRAL_COLOUR },
       aspect: this.canvas.width / this.canvas.height,
+      spatial: { ...NEUTRAL_SPATIAL_POSE },
+      originalWidth: this.canvas.width,
+      originalHeight: this.canvas.height,
       opacity: 0,
       blendWeight: 0,
       brightness: 0,
     };
     const sources = [group.clips[0]!, group.clips[1] ?? empty];
+    const mappings = sources.map((source) =>
+      compileSpatialMapping(
+        source.spatial,
+        source.originalWidth,
+        source.originalHeight,
+        this.canvas.width,
+        this.canvas.height,
+      ),
+    );
     for (const [index, source] of sources.entries()) {
       const settings = source.settings;
+      const mapping = mappings[index]!;
+      const [a, b, c, d, e, f] = mapping.affine;
+      gl.uniform3f(this.#location(`spatialU${index}`), a, b, c);
+      gl.uniform3f(this.#location(`spatialV${index}`), d, e, f);
+      gl.uniform4f(
+        this.#location(`crop${index}`),
+        mapping.cropLeft,
+        mapping.cropRight,
+        mapping.cropTop,
+        mapping.cropBottom,
+      );
       gl.activeTexture(gl.TEXTURE0 + index);
       gl.bindTexture(gl.TEXTURE_2D, this.#texture(source.slot));
       gl.uniform4f(
@@ -228,6 +262,7 @@ export class Compositor {
       sources[1]!.opacity * sources[1]!.blendWeight,
     );
     gl.uniform2f(this.#location('brightness'), sources[0]!.brightness, sources[1]!.brightness);
+    gl.uniform2f(this.#location('neutralSpatial'), Number(mappings[0]!.neutral), Number(mappings[1]!.neutral));
     gl.uniform2f(this.#location('imageAspect'), sources[0]!.aspect, sources[1]!.aspect);
     gl.uniform1f(this.#location('canvasAspect'), this.canvas.width / this.canvas.height);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
@@ -279,7 +314,23 @@ export function verifyGpuColour(settings: ColourSettings): GpuComparison {
       pixels[index * 4 + 3] = 255;
     }
     compositor.uploadPixels(0, pixels, 17, 17);
-    compositor.drawFrame([{ clips: [{ slot: 0, settings, aspect: 1, opacity: 1, blendWeight: 1, brightness: 1 }] }]);
+    compositor.drawFrame([
+      {
+        clips: [
+          {
+            slot: 0,
+            settings,
+            aspect: 1,
+            spatial: { ...NEUTRAL_SPATIAL_POSE },
+            originalWidth: 17,
+            originalHeight: 17,
+            opacity: 1,
+            blendWeight: 1,
+            brightness: 1,
+          },
+        ],
+      },
+    ]);
     const rendered = compositor.readPixels();
     let sum = 0;
     let maximum = 0;
@@ -341,13 +392,25 @@ function comparisonSource(
       mediaId: String(slot),
       layerId: `layer-${group}`,
       sourceFrame: 0,
+      sourcePosition: 0,
+      spatial: { ...NEUTRAL_SPATIAL_POSE },
       colour: settings,
       opacity,
       blendWeight,
       brightness,
       weight: brightness * blendWeight,
     },
-    clip: { slot, settings, aspect: 1, opacity, blendWeight, brightness },
+    clip: {
+      slot,
+      settings,
+      aspect: 1,
+      spatial: { ...NEUTRAL_SPATIAL_POSE },
+      originalWidth: 1,
+      originalHeight: 1,
+      opacity,
+      blendWeight,
+      brightness,
+    },
   };
 }
 

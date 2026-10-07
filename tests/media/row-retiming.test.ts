@@ -294,7 +294,7 @@ describe.skipIf(!enabled)('schema-7 supplied row maps · native pipes and dispos
           ffmpeg: '/must-not-run-invalid-row-map',
           retiming: { ...baseline, sourceAt: null } as unknown as Retiming,
         }),
-      ).rejects.toThrow('sourceAt, outputAt and rateAt');
+      ).rejects.toThrow('sourceAt, sourcePositionAt, outputAt and rateAt');
       expect(await readdir(work)).toEqual([]);
       await unchanged();
     } finally {
@@ -318,6 +318,7 @@ describe.skipIf(!enabled)('schema-7 supplied row maps · native pipes and dispos
         const retiming: Retiming = {
           duration: sources.length,
           sourceAt: (output) => sources[output]!,
+          sourcePositionAt: (output) => 7 + Math.max(0, Math.min(1, output / sources.length)) * 12,
           outputAt: () => 0,
           rateAt: () => 1,
         };

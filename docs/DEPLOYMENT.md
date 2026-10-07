@@ -70,7 +70,8 @@ external desktop file/folder drag-and-drop import**. External drops prevent
 navigation and show Import guidance without a POST. Internal ready-Media-to-Timeline
 dragging remains supported. Imports reference originals; generated proxies/
 thumbnails, project/registry metadata, exports/receipts and scratch are the only
-new local data, not duplicate original footage. Projects use strict schema 8 with
+new local data, not duplicate original footage. Projects use strict schema 9 with
+required clip `spatial` base/full-pose original-source keys and
 required `music` array (0–8 independent instances, unique required IDs; `[]` without
 music), and
 required per-track Ripple, transitions, opening/closing fades and numeric
@@ -78,10 +79,10 @@ required per-track Ripple, transitions, opening/closing fades and numeric
 `opacity`, `speed` and seven colour settings. Row `opacity` is the sole saved
 Opacity value; saved `clip.opacity` and old `clipOpacity`/`layerOpacity` channels
 are rejected. The row value or its overriding keys supply Opacity to each source
-in a dissolve group, without an additional layer multiplier. v1–v7 projects
+in a dissolve group, without an additional layer multiplier. v1–v8 projects
 and receipt snapshots remain unchanged/incompatible and require project recreation,
 without migration, compatibility defaults, null/old-format readers or automatic deletion.
-Export receipts remain version 1 with strict v8 snapshots and required captured
+Export receipts remain version 1 with strict v9 snapshots and required captured
 audio-source/instance-plan arrays; invalid arrays/older snapshots remain preserved
 and rejected. Registry/proxy/current PCM formats and source identity checks are unchanged.
 

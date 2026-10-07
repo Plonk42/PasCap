@@ -843,7 +843,16 @@ export function App() {
       const frame = draft?.frame ?? requestedFrame.current ?? engine.current.diagnostics().frame;
       if (!draft) requestedFrame.current = null;
       void engine.current
-        .loadProject(document, (id) => `/api/media/${id}/proxy`, frame)
+        .loadProject(
+          document,
+          (id) => `/api/media/${id}/proxy`,
+          (id) => {
+            const asset = latestAssets.current.find((item) => item.id === id);
+            if (!asset) throw new Error('Original media metadata is unavailable.');
+            return { width: asset.metadata.width, height: asset.metadata.height };
+          },
+          frame,
+        )
         .catch((cause: unknown) => setError(cause instanceof Error ? cause.message : 'Cannot load preview'));
     } else {
       try {
@@ -1287,7 +1296,16 @@ export function App() {
     if (!document) return;
     setViewerMode('timeline');
     void engine.current
-      .loadProject(document, (id) => `/api/media/${id}/proxy`, engine.current.diagnostics().frame)
+      .loadProject(
+        document,
+        (id) => `/api/media/${id}/proxy`,
+        (id) => {
+          const asset = latestAssets.current.find((item) => item.id === id);
+          if (!asset) throw new Error('Original media metadata is unavailable.');
+          return { width: asset.metadata.width, height: asset.metadata.height };
+        },
+        engine.current.diagnostics().frame,
+      )
       .catch((cause: unknown) => setError(message(cause, 'Preview could not be retried.')));
   };
   const reviewSource = (next: ReviewTarget, pin: boolean): void => {

@@ -11,6 +11,7 @@ import {
   type MusicTrack,
   type ProjectDocument,
 } from '../../src/shared/model.js';
+import { evaluateSpatial } from '../../src/shared/spatial.js';
 import { calculateLayout, sampleTimeline } from '../../src/shared/timeline.js';
 import { framesToSeconds, type FrameRate } from '../../src/shared/timing.js';
 
@@ -257,6 +258,7 @@ async function settle(): Promise<void> {
   for (let index = 0; index < 24; index++) await Promise.resolve();
 }
 const proxyUrl = (id: string): string => `https://preview.invalid/proxy/${id}`;
+const originalDimensions = (_id: string) => ({ width: 1920, height: 1080 });
 function singleProject(withMusic = false): ProjectDocument {
   const project = createProject('recovery', 'Observed frame recovery');
   project.clips = [createClip('clip', 'video', 0, 60)];
@@ -356,7 +358,7 @@ async function paused(project: ProjectDocument, initialFrame = 8): Promise<Runni
   const snapshot = projectSchema.parse(project);
   const engine = new PreviewEngine(new EventTarget() as HTMLCanvasElement);
   engines.push(engine);
-  await engine.loadProject(snapshot, proxyUrl, initialFrame);
+  await engine.loadProject(snapshot, proxyUrl, originalDimensions, initialFrame);
   await settle();
   const preview = {
     project: snapshot,
@@ -381,7 +383,7 @@ async function running(project: ProjectDocument, initialFrame = 8): Promise<Runn
   const snapshot = projectSchema.parse(project);
   const engine = new PreviewEngine(new EventTarget() as HTMLCanvasElement);
   engines.push(engine);
-  await engine.loadProject(snapshot, proxyUrl, initialFrame);
+  await engine.loadProject(snapshot, proxyUrl, originalDimensions, initialFrame);
   await engine.play();
   await settle();
   const preview = {
@@ -427,6 +429,9 @@ function expectSurface(preview: RunningPreview, frame: number, ungraded = false)
                 url: proxyUrl(layer.mediaId),
                 settings: ungraded ? NEUTRAL_COLOUR : layer.colour,
                 aspect: 16 / 9,
+                spatial: layer.spatial,
+                originalWidth: 1920,
+                originalHeight: 1080,
                 opacity: layer.opacity,
                 blendWeight: layer.blendWeight,
                 brightness: layer.brightness,
@@ -543,6 +548,66 @@ async function pendingRecovery(unavailable = false) {
   return { preview, slot, pending, recoveryFrame };
 }
 
+describe('exact intact-surface reuse', () => {
+  it('always redraws diagnostic readback after the native drawing buffer may have been discarded', async () => {
+    const preview = await paused(gradedProject());
+    preview.compositor.visible = null;
+    preview.engine.capturePixels();
+    expectSurface(preview, preview.initialFrame);
+    preview.compositor.visible = null;
+    preview.engine.capturePixels();
+    expectSurface(preview, preview.initialFrame);
+    expect(preview.compositor.drawFrame).toHaveBeenCalledTimes(2);
+    expectNoMediaOperations(preview);
+  });
+
+  it('reuses a held graded image at current project time, but redraws a new source, Compare and a cleared seek', async () => {
+    const project = gradedProject(true);
+    project.clips[0]!.speed = { mode: 'constant', rate: 0.25 };
+    const preview = await running(project, 0);
+    const rendered = preview.engine.diagnostics().renderedFrames;
+    for (const frame of [1, 2, 3]) {
+      tick(preview, frame);
+      expect(preview.engine.diagnostics()).toMatchObject({ status: 'playing', frame, renderedFrames: rendered });
+      expectSurface(preview, frame);
+    }
+    expect(preview.compositor.drawFrame).not.toHaveBeenCalled();
+    expect(preview.compositor.uploadVideo).not.toHaveBeenCalled();
+    expectUninterrupted(preview);
+    observeAt(preview, 4);
+    tick(preview, 4);
+    expectSurface(preview, 4);
+    expect(preview.compositor.drawFrame).toHaveBeenCalledTimes(1);
+    preview.engine.setUngraded(true);
+    tick(preview, 5);
+    expectSurface(preview, 5, true);
+    expect(preview.compositor.drawFrame).toHaveBeenCalledTimes(2);
+    await preview.engine.seek(5);
+    expectSurface(preview, 5, true);
+    expect(preview.compositor.drawFrame).toHaveBeenCalledTimes(3);
+  });
+
+  it.each(['exposure', 'opacity'] as const)(
+    'redraws project-time %s animation on every held source frame',
+    async (channel) => {
+      const project = gradedProject(true);
+      project.clips[0]!.speed = { mode: 'constant', rate: 0.25 };
+      project.layers[0]!.keyframes = [
+        { frame: 0, interpolation: 'linear', values: { ...EMPTY_KEY_VALUES, [channel]: 0 } },
+        { frame: 4, interpolation: 'hold', values: { ...EMPTY_KEY_VALUES, [channel]: 1 } },
+      ];
+      const preview = await running(project, 0);
+      for (const frame of [1, 2, 3]) {
+        tick(preview, frame);
+        expectSurface(preview, frame);
+      }
+      expect(preview.compositor.drawFrame).toHaveBeenCalledTimes(3);
+      expect(preview.compositor.uploadVideo).not.toHaveBeenCalled();
+      expectUninterrupted(preview);
+    },
+  );
+});
+
 describe('PreviewEngine final publication boundary', () => {
   async function publicationPreview(initialFrame = 65): Promise<RunningPreview> {
     const project = singleProject(true);
@@ -608,6 +673,8 @@ describe('PreviewEngine final publication boundary', () => {
       armed = true;
       tick(preview, 70);
     } else {
+      // Force actual raster work rather than an identical intact surface.
+      preview.engine.canvas.width += 1;
       const draw = preview.compositor.drawFrame.getMockImplementation()!;
       preview.compositor.drawFrame.mockImplementationOnce((groups) => {
         draw(groups);
@@ -913,6 +980,8 @@ describe('PreviewEngine observed-frame tolerance and recovery', () => {
           });
       });
       published.length = 0;
+      // This witness concerns actual raster delay, not unchanged-image reuse.
+      preview.engine.canvas.width += 1;
       const draw = preview.compositor.drawFrame.getMockImplementation()!;
       preview.compositor.drawFrame.mockImplementationOnce((groups) => {
         draw(groups);
@@ -1600,6 +1669,95 @@ describe('PreviewEngine music-owned black conclusions', () => {
   });
 });
 
+describe('PreviewEngine spatial appearance', () => {
+  it('uses original metadata independently of the proxy aspect and rejects invalid dimensions', async () => {
+    const project = singleProject();
+    const engine = new PreviewEngine(new EventTarget() as HTMLCanvasElement);
+    engines.push(engine);
+    const dimensions = vi.fn((_id: string) => ({ width: 4031, height: 3017 }));
+    await engine.loadProject(project, proxyUrl, dimensions, 8);
+    expect(dimensions).toHaveBeenCalledWith('video');
+    expect(doubles.compositors[0]!.visible![0]!.clips[0]).toMatchObject({
+      aspect: 16 / 9,
+      originalWidth: 4031,
+      originalHeight: 3017,
+      spatial: project.clips[0]!.spatial.base,
+    });
+    await engine.loadProject(project, proxyUrl, () => ({ width: 0, height: 3017 }));
+    expect(engine.diagnostics()).toMatchObject({
+      status: 'error',
+      message: 'Original media dimensions must be positive integers.',
+    });
+    expect(doubles.compositors[0]!.visible).toBeNull();
+  });
+
+  it('redraws spatial appearance edits and preserves pose during ungraded comparison without media operations', async () => {
+    const preview = await paused(gradedProject(true));
+    const edited = structuredClone(preview.project);
+    Object.assign(edited.clips[0]!.spatial.base, { scale: 1.2, rotation: 23, translateX: 0.11, cropBottom: 0.2 });
+    preview.engine.updateProjectAppearance(edited);
+    preview.project = edited;
+    expectSurface(preview, 8);
+    expectNoMediaOperations(preview);
+    expect(preview.compositor.uploadVideo).not.toHaveBeenCalled();
+    preview.engine.setUngraded(true);
+    expectSurface(preview, 8, true);
+    expect(preview.compositor.visible![0]!.clips[0]!.spatial).toEqual(edited.clips[0]!.spatial.base);
+    expectNoMediaOperations(preview);
+  });
+
+  it.each(['clip', 'row'] as const)(
+    'samples continuous spatial animation on held decoded frames (%s speed)',
+    async (mode) => {
+      const project = singleProject(true);
+      project.clips[0]!.sourceOut = 6;
+      if (mode === 'clip') project.clips[0]!.speed = { mode: 'constant', rate: 0.1 };
+      else
+        project.layers[0]!.keyframes = [
+          { frame: 0, interpolation: 'hold', values: { ...EMPTY_KEY_VALUES, speed: 0.1 } },
+        ];
+      const spatial = project.clips[0]!.spatial;
+      spatial.keyframes = [
+        { frame: 0, interpolation: 'linear', values: { ...spatial.base } },
+        { frame: 6, interpolation: 'hold', values: { ...spatial.base, translateX: 0.6, rotation: 60 } },
+      ];
+      const preview = await running(project, 2);
+      const slot = slotFor(preview);
+      const before = structuredClone(preview.compositor.visible![0]!.clips[0]!.spatial);
+      tick(preview, 3);
+      expect(slot.decodedFrame).toBe(0);
+      const map = calculateLayout(project).clips[0]!.retiming;
+      expect(map.sourceAt(2)).toBe(map.sourceAt(3));
+      expect(map.sourcePositionAt(3)).toBeGreaterThan(map.sourcePositionAt(2));
+      const after = preview.compositor.visible![0]!.clips[0]!.spatial;
+      expect(after).toEqual(evaluateSpatial(spatial, map.sourcePositionAt(3)));
+      expect(after.translateX).toBeGreaterThan(before.translateX);
+      expectSurface(preview, 3);
+      expect(preview.compositor.uploadVideo).not.toHaveBeenCalled();
+      expect(slot.load).not.toHaveBeenCalled();
+      expect(slot.seek).not.toHaveBeenCalled();
+      expect(preview.music.configure).not.toHaveBeenCalled();
+      expect(preview.music.start).not.toHaveBeenCalled();
+    },
+  );
+
+  it('cannot retain a dirty spatial image while a required decoder is unavailable', async () => {
+    const preview = await running(singleProject(true));
+    Object.assign(slotFor(preview).video, { readyState: 1 });
+    const edited = structuredClone(preview.project);
+    edited.clips[0]!.spatial.base.rotation = 31;
+    preview.engine.updateProjectAppearance(edited);
+    preview.project = edited;
+    tick(preview, 9);
+    expect(preview.engine.diagnostics().status).toBe('buffering');
+    expect(preview.compositor.visible).toBeNull();
+    expect(preview.music.start).not.toHaveBeenCalled();
+    slotFor(preview).observe(9);
+    expectSurface(preview, 9);
+    expect(preview.compositor.visible![0]!.clips[0]!.spatial.rotation).toBe(31);
+  });
+});
+
 describe('PreviewEngine editor-only ungraded comparison', () => {
   it('starts graded and ignores mode requests without a loaded document', () => {
     const engine = new PreviewEngine(new EventTarget() as HTMLCanvasElement);
@@ -1898,7 +2056,7 @@ describe('PreviewEngine editor-only ungraded comparison', () => {
     const submitted = structuredClone(reloaded);
     const modes: boolean[] = [];
     preview.engine.subscribe((state) => modes.push(state.ungraded));
-    await preview.engine.loadProject(reloaded, proxyUrl, 12);
+    await preview.engine.loadProject(reloaded, proxyUrl, originalDimensions, 12);
     preview.project = submitted;
     expect(preview.engine.diagnostics()).toMatchObject({ ungraded: true, status: 'paused', frame: 12, duration: 600 });
     expect(modes.length).toBeGreaterThan(1);
@@ -1916,7 +2074,7 @@ describe('PreviewEngine editor-only ungraded comparison', () => {
     const next = empty ? createProject('next-project', 'Empty') : gradedProject(true);
     next.id = 'next-project';
     const submitted = structuredClone(next);
-    await preview.engine.loadProject(next, proxyUrl, empty ? 0 : 8);
+    await preview.engine.loadProject(next, proxyUrl, originalDimensions, empty ? 0 : 8);
     preview.project = submitted;
     expect(preview.engine.diagnostics()).toMatchObject({ ungraded: false, status: empty ? 'empty' : 'paused' });
     if (empty) expect(preview.compositor.visible).toBeNull();
@@ -1935,7 +2093,9 @@ describe('PreviewEngine editor-only ungraded comparison', () => {
     const slot = slotFor(preview);
     const pending = operation === 'load' ? holdNextLoad(slot) : holdNextSeek(slot);
     const completion =
-      operation === 'load' ? preview.engine.loadProject(preview.project, proxyUrl, 12) : preview.engine.seek(12);
+      operation === 'load'
+        ? preview.engine.loadProject(preview.project, proxyUrl, originalDimensions, 12)
+        : preview.engine.seek(12);
     await settle();
     expect(slot.load).toHaveBeenCalledOnce();
     const signal = operation === 'load' ? slot.load.mock.calls[0]![2] : slot.seek.mock.calls[0]![1];
@@ -1971,7 +2131,7 @@ describe('PreviewEngine editor-only ungraded comparison', () => {
     preview.engine.setUngraded(!enabled);
     const slot = slotFor(preview);
     const pending = holdNextLoad(slot, true);
-    const obsolete = preview.engine.loadProject(preview.project, proxyUrl, 12);
+    const obsolete = preview.engine.loadProject(preview.project, proxyUrl, originalDimensions, 12);
     await settle();
     const signal = slot.load.mock.calls[0]![2];
     const next = gradedProject(true);
@@ -1981,7 +2141,7 @@ describe('PreviewEngine editor-only ungraded comparison', () => {
     next.clips[0]!.sourceOut = 80;
     next.media.videoIds = ['next-video'];
     const submitted = structuredClone(next);
-    await preview.engine.loadProject(next, proxyUrl, 4);
+    await preview.engine.loadProject(next, proxyUrl, originalDimensions, 4);
     preview.project = submitted;
     expect(signal.aborted).toBe(true);
     expect(preview.engine.diagnostics().ungraded).toBe(false);

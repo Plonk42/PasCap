@@ -24,6 +24,7 @@ import {
   type VideoClip,
   type VideoLayer,
 } from './model.js';
+import { spatialSettingsSchema, type SpatialSettings } from './spatial.js';
 import type { SpeedSettings } from './speed.js';
 import { calculateLayout, layerClips, type TimelineLayout } from './timeline.js';
 
@@ -38,6 +39,7 @@ export type EditCommand =
   | { type: 'duplicate'; clipId: string; newClipId: string }
   | { type: 'colour'; clipId: string; colour: ColourSettings }
   | { type: 'speed'; clipId: string; speed: SpeedSettings }
+  | { type: 'spatial'; clipId: string; spatial: SpatialSettings }
   | { type: 'music'; music: MusicTrack[] }
   | { type: 'opacity'; layerId: string; opacity: number }
   | { type: 'layer-key-toggle'; layerId: string; frame: number; setting: KeyframeSetting; value: number }
@@ -429,6 +431,10 @@ export function applyCommand(document: ProjectDocument, command: EditCommand): P
     case 'speed':
       next.clips[index] = { ...next.clips[index]!, speed: { ...command.speed } };
       break;
+    case 'spatial':
+      next.clips[index] = { ...next.clips[index]!, spatial: spatialSettingsSchema.parse(command.spatial) };
+      // Appearance-only replacement must not normalize or rewrite stored timing.
+      return projectSchema.parse(next);
     case 'music':
       next.music = command.music;
       break;

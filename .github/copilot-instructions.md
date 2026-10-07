@@ -57,8 +57,27 @@ PasCap is a solo, pre-release project: optimize for fast iteration. Details are 
 
 - Shared integer-frame layout/retiming (`PlacedClip.retiming`) is authoritative for
   UI, preview and native export. Per-frame rendering stays outside React.
-- Strict schema 8 with uniform tracks, each requiring `ripple`, `transitions`,
+- Strict schema 9 with uniform tracks, each requiring `ripple`, `transitions`,
   `openingFade` and `closingFade`; rows show the saved bottom-to-top order.
+- Every clip requires strict `spatial: { base, keyframes }`: eight complete pose
+  values and 0–256 ascending original-source full-pose keys with required easing.
+  Without keys, the base holds; keys override the full pose with endpoint holds.
+  Deleting all keys reveals the unchanged base; Reset transform clears keys and
+  restores the neutral base deliberately. No nullable spatial participants.
+  Retain/deep-copy original anchors through trims, cuts, splits and duplication,
+  including off-trim keys and original exclusive OUT. Evaluate geometry with
+  `PlacedClip.retiming.sourcePositionAt`; `sourceAt` remains recorded-image identity.
+  Scale is 0.1–8, translation −2–2 output-width/height fractions, rotation
+  −180°–180° clockwise with numeric, not shortest-arc interpolation. Crop fractions
+  retain positive width/height, without refit or moving the original-centre pivot;
+  use unrounded original-aspect contain fit and top-left half-open crop bounds.
+  Exact neutral rendering preserves opaque black letterboxing after grading;
+  nonneutral uncovered pixels are transparent. Clip → Transform is the fifth
+  section, collapsed by default, with one full-pose source-frame capture diamond,
+  read-only animated main values without a key at the real displayed source frame,
+  stored-key navigation/exact fields and release-only value sliders. Any spatial
+  edit/key requires layered export; native 22 bytes/pixel, two LUTs and process
+  bounds remain unchanged. See [spatial transforms](../docs/design/SPATIAL_TRANSFORMS.md).
 - Final approved [#67](https://github.com/Plonk42/PasCap/issues/67): **Opacity** is
   one row-owned setting, not a clip setting. `VideoLayer.opacity` is a required
   number in 0–1; new tracks start at 1 (100%). No saved `clip.opacity` field.
@@ -74,10 +93,14 @@ PasCap is a solo, pre-release project: optimize for fast iteration. Details are 
   **Placement** contains placement only; Layer options contains only rename,
   Ripple, ordering and deletion. Visibility stays separate. Unkeyed colour
   settings remain per-clip; Opacity is composition coverage, not SDR RGB grading.
-  Group composition is $C = \sum_i G_i b_i o_i w_i$, $A = \sum_i o_i w_i$,
+  Group composition is $C = \sum_i G_i b_i o_i w_i m_i$, $A = \sum_i o_i w_i m_i$,
   $\mathrm{result} = C + \mathrm{lower}(1 - A)$, evaluating row Opacity for each
-  source with no additional layer multiplier.
-  Preserve incompatible v1–v7 projects/receipt snapshots; require recreation,
+  source with no additional layer multiplier; $m_i$ is spatial source coverage,
+  including opaque neutral letterboxing. Black fades never reduce that coverage.
+  Version-1 export receipts require strict v9 snapshots and captured audio-source/
+  instance-plan arrays; receipt, registry/proxy/PCM and benchmark format versions
+  remain independent and unchanged.
+  Preserve incompatible v1–v8 projects/receipt snapshots; require recreation,
   without migrations, compatibility defaults or automatic deletion.
 - Music is a required 0–8 array of independently identified instances, never null
   or singular. Duration is the maximum of all video and music OUTs. After the last
@@ -90,6 +113,7 @@ PasCap is a solo, pre-release project: optimize for fast iteration. Details are 
   [timeline](../docs/TIMELINE_EDITING.md),
   [layers/keyframes/resources](../docs/LAYERS_AND_KEYFRAMES.md),
   [speed/audio](../docs/SPEED_AND_AUDIO.md),
+  [spatial transforms](../docs/design/SPATIAL_TRANSFORMS.md),
   [workspace/recovery](../docs/WORKSPACE_AND_RECOVERY.md) and
   [development](../docs/DEVELOPMENT.md). Guides describe current behaviour only;
   history belongs in Git and issues.

@@ -15,6 +15,12 @@ import { VideoDecoderSlot } from './decoder.js';
 import { MusicPlayback } from './music.js';
 
 export type PreviewStatus = 'empty' | 'loading' | 'paused' | 'playing' | 'seeking' | 'buffering' | 'error' | 'disposed';
+/** Authoritative original metadata, never dimensions inferred from a proxy. */
+export interface OriginalDimensions {
+  readonly width: number;
+  readonly height: number;
+}
+export type OriginalDimensionsResolver = (mediaId: string) => OriginalDimensions;
 export interface PreviewDiagnostics {
   status: PreviewStatus;
   message: string;
@@ -126,6 +132,9 @@ export class PreviewEngine {
     throw new Error('No media resolver loaded.');
   };
   #document: ProjectDocument | null = null;
+  #originalDimensions: OriginalDimensionsResolver = () => {
+    throw new Error('No original-dimensions resolver loaded.');
+  };
   #layout: TimelineLayout = { clips: [], transitions: [], duration: 0 };
   #controller = new AbortController();
   #catchUpController: AbortController | null = null;
@@ -143,6 +152,7 @@ export class PreviewEngine {
   #clockFrame = 0;
   #clockTime = 0;
   #lastDrawnFrame = -1;
+  #surfaceKey: string | null = null;
   #dirty = true;
   #lastEmit = 0;
   #publication = 0;
@@ -285,7 +295,7 @@ export class PreviewEngine {
         }
         this.#operationFrame = frame;
         if (!this.#mismatchStart) this.#mismatchStart = now;
-        this.#compositor.clear();
+        this.#clearSurface();
         this.#setStatus('buffering', 'Waiting for decoded frames');
         return false;
       }
@@ -477,8 +487,14 @@ export class PreviewEngine {
     });
   }
 
-  async loadProject(document: ProjectDocument, proxyUrl: (mediaId: string) => string, initialFrame = 0): Promise<void> {
+  async loadProject(
+    document: ProjectDocument,
+    proxyUrl: (mediaId: string) => string,
+    originalDimensions: OriginalDimensionsResolver,
+    initialFrame = 0,
+  ): Promise<void> {
     if (this.#disposed) throw new Error('The preview engine is disposed.');
+    if (typeof originalDimensions !== 'function') throw new Error('Original-dimensions resolver is required.');
     if (!Number.isFinite(initialFrame)) throw new Error('Initial preview frame must be finite.');
     const snapshot = projectSchema.parse(document);
     if (!sameRate(snapshot.frameRate, PROJECT_FPS)) throw new Error('Preview requires 30000/1001 fps video.');
@@ -488,6 +504,7 @@ export class PreviewEngine {
     this.#document = snapshot;
     this.#layout = calculateLayout(snapshot);
     this.#proxyUrl = proxyUrl;
+    this.#originalDimensions = originalDimensions;
     this.#frame = Math.max(0, Math.min(Math.round(initialFrame), this.#layout.duration - 1));
     this.#operationFrame = this.#frame;
     this.#lastDrawnFrame = -1;
@@ -498,7 +515,7 @@ export class PreviewEngine {
       this.#resizePool(this.#poolSize());
       const ids = new Set(snapshot.clips.map((clip) => clip.id));
       this.#assignments = this.#assignments.map((id) => (id !== null && ids.has(id) ? id : null));
-      this.#compositor.clear();
+      this.#clearSurface();
       await this.#music.configure(snapshot.music, signal);
       if (!this.#isCurrent(signal)) return;
       if (!this.#compositor.available) throw new Error('WebGL context is unavailable.');
@@ -525,7 +542,7 @@ export class PreviewEngine {
     const signal = this.#beginOperation();
     const started = performance.now();
     this.#operationFrame = frame;
-    this.#compositor.clear();
+    this.#clearSurface();
     this.#setStatus('seeking', `Seeking frame ${frame}`);
     try {
       await this.#prepareLayers(sampleTimeline(this.#document, frame, this.#layout), signal);
@@ -547,7 +564,7 @@ export class PreviewEngine {
     this.#ungraded = enabled;
     this.#dirty = true;
     if (!this.#playing && !this.#busy && this.#status === 'paused' && !this.#drawFrame(this.#frame))
-      this.#compositor.clear();
+      this.#clearSurface();
     // Playback redraws through the normal advance/readiness paths, never using
     // a possibly stale paused frame. Publication retains its exact A/V checks.
     this.#emit(true);
@@ -561,7 +578,7 @@ export class PreviewEngine {
     this.#colourRequested = performance.now();
     if (!this.#playing && !this.#busy && this.#status === 'paused') this.#drawFrame(this.#frame);
   }
-  /** No music configuration or retiming reload for opacity/colour/stacking edits. */
+  /** No music configuration or retiming reload for opacity/colour/spatial/stacking edits. */
   updateProjectAppearance(document: ProjectDocument): void {
     if (this.#disposed || !this.#document) throw new Error('Load a project before updating its appearance.');
     const snapshot = projectSchema.parse(document);
@@ -580,7 +597,7 @@ export class PreviewEngine {
     this.#colourRequested = performance.now();
     if (changed) this.#cancelPreloads();
     if (!this.#layout.duration || !this.#compositor.available) {
-      this.#compositor.clear();
+      this.#clearSurface();
       return;
     }
     this.#refreshAppearance(frame, required, changed);
@@ -602,7 +619,7 @@ export class PreviewEngine {
       const removed = this.#playingClips.filter((id) => !required.includes(id));
       removed.forEach((id) => this.#slots[this.#assignments.indexOf(id)]?.pause());
       this.#playingClips = [...required];
-      if (!this.#drawFrame(frame)) this.#compositor.clear();
+      if (!this.#drawFrame(frame)) this.#clearSurface();
       this.#preloadNext(frame);
       return;
     }
@@ -646,6 +663,10 @@ export class PreviewEngine {
     this.#playingClips = [];
     if (this.#document && this.#status !== 'empty' && this.#status !== 'error') this.#setStatus('paused', 'Paused');
   }
+  #clearSurface(): void {
+    this.#surfaceKey = null;
+    this.#compositor.clear();
+  }
   #drawFrame(frame: number): boolean {
     if (!this.#document || !this.#compositor.available) return false;
     const layers = sampleTimeline(this.#document, frame, this.#layout);
@@ -670,25 +691,31 @@ export class PreviewEngine {
       const members = layers.filter((layer) => layer.layerId === group.id);
       if (!members.length) continue;
       groups.push({
-        clips: members.map((layer) => ({
-          slot: this.#slotIndex(layer.clipId),
-          settings: this.#ungraded ? NEUTRAL_COLOUR : layer.colour,
-          aspect: this.#slotFor(layer.clipId).aspect,
-          opacity: layer.opacity,
-          blendWeight: layer.blendWeight,
-          brightness: layer.brightness,
-        })),
+        clips: members.map((layer) => {
+          const dimensions = this.#originalDimensions(layer.mediaId);
+          if (
+            !dimensions ||
+            !Number.isInteger(dimensions.width) ||
+            dimensions.width <= 0 ||
+            !Number.isInteger(dimensions.height) ||
+            dimensions.height <= 0
+          )
+            throw new Error('Original media dimensions must be positive integers.');
+          return {
+            slot: this.#slotIndex(layer.clipId),
+            settings: this.#ungraded ? NEUTRAL_COLOUR : layer.colour,
+            aspect: this.#slotFor(layer.clipId).aspect,
+            spatial: layer.spatial,
+            originalWidth: dimensions.width,
+            originalHeight: dimensions.height,
+            opacity: layer.opacity,
+            blendWeight: layer.blendWeight,
+            brightness: layer.brightness,
+          };
+        }),
       });
     }
-    this.#compositor.drawFrame(groups);
-    if (frame !== this.#lastDrawnFrame || this.#dirty) {
-      this.#renderedFrames++;
-      if (this.#playing) {
-        this.#renderTimes.push(performance.now());
-        if (this.#renderTimes.length > 300) this.#renderTimes.shift();
-      }
-      this.#lastDrawnFrame = frame;
-    }
+    this.#renderSurface(frame, layers, groups);
     this.#dirty = false;
     this.#frame = frame;
     if (this.#colourRequested) {
@@ -703,11 +730,36 @@ export class PreviewEngine {
     }
     return true;
   }
+  #renderSurface(frame: number, layers: readonly PreviewLayer[], groups: readonly CompositeGroup[]): void {
+    // A held source with identical evaluated appearance is the same image,
+    // even at a later project frame. Avoid queuing redundant expensive grades;
+    // readiness and the final real-output-clock publication checks still run.
+    // Include every composed value and source identity, not inverse source time.
+    const surfaceKey = JSON.stringify({
+      width: this.canvas.width,
+      height: this.canvas.height,
+      sources: layers.map(({ clipId, mediaId, sourceFrame }) => ({ clipId, mediaId, sourceFrame })),
+      groups,
+    });
+    const redraw = this.#dirty || this.#surfaceKey !== surfaceKey;
+    if (redraw) {
+      this.#compositor.drawFrame(groups);
+      this.#surfaceKey = surfaceKey;
+    }
+    if (redraw && (frame !== this.#lastDrawnFrame || this.#dirty)) {
+      this.#renderedFrames++;
+      if (this.#playing) {
+        this.#renderTimes.push(performance.now());
+        if (this.#renderTimes.length > 300) this.#renderTimes.shift();
+      }
+      this.#lastDrawnFrame = frame;
+    }
+  }
   async #alignPlayback(frame: number, boundary: boolean): Promise<void> {
     if (this.#busy || !this.#document || !this.#playing) return;
     const signal = this.#beginOperation();
     this.#operationFrame = frame;
-    this.#compositor.clear();
+    this.#clearSurface();
     this.#setStatus('buffering', boundary ? 'Loading next clip' : 'Waiting for decoded frames');
     if (boundary) this.#boundaryStalls++;
     try {
@@ -956,7 +1008,7 @@ export class PreviewEngine {
     const actual = placed.start + placed.retiming.outputAt(this.#slotFor(observed.clipId).decodedFrame);
     const error = Math.abs(actual - expected);
     if (actual >= 0) this.#maxClockError = Math.max(this.#maxClockError, error);
-    this.#compositor.clear();
+    this.#clearSurface();
     this.#setStatus('buffering', 'Waiting for decoded frames');
     if (!this.#mismatchStart) this.#mismatchStart = now;
     if (now - this.#mismatchStart > framesToSeconds(1, this.#document.frameRate) * 1000) {
@@ -974,10 +1026,13 @@ export class PreviewEngine {
     this.#music.pause();
     for (const slot of this.#slots) slot.pause();
     this.#playingClips = [];
-    this.#compositor.clear();
+    this.#clearSurface();
     this.#setStatus('error', error instanceof Error ? error.message : 'Preview failed.');
   }
   capturePixels(): Uint8Array {
+    // The presented image can be retained, but WebGL's non-preserved drawing
+    // buffer may be discarded after presentation. Readback always needs a draw.
+    this.#surfaceKey = null;
     if (!this.#drawFrame(this.#frame)) throw new Error('Cannot capture pixels without all required decoded frames.');
     return this.#compositor.readPixels();
   }

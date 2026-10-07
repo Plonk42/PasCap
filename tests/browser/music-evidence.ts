@@ -34,6 +34,8 @@ export interface MusicStreamEvidence {
   renderQuanta: unknown[];
   receiptSampleViolations: number;
   playback: unknown[];
+  queueEvents: unknown[];
+  rangeTimings: unknown[];
   ranges: number;
   largestRange: number;
 }
@@ -64,6 +66,8 @@ export async function installMusicEvidence(
         renderQuanta: [],
         receiptSampleViolations: 0,
         playback: [],
+        queueEvents: [],
+        rangeTimings: [],
         ranges: 0,
         largestRange: 0,
       };
@@ -207,6 +211,15 @@ export async function installMusicEvidence(
           let generation = -1;
           let stopped = true;
           this.port.postMessage = (message, transfer) => {
+            if (['start', 'stop', 'chunk'].includes(message.kind) && evidence.queueEvents.length < 500)
+              evidence.queueEvents.push({
+                direction: 'sent',
+                kind: message.kind,
+                generation: message.generation,
+                offset: message.chunk?.offset,
+                now: performance.now(),
+                contextTime: context.currentTime,
+              });
             if (message.kind === 'start') {
               generation = message.generation;
               stopped = false;
@@ -230,6 +243,13 @@ export async function installMusicEvidence(
               return;
             }
             if (stopped || data.generation !== generation) return;
+            if (['started', 'credit', 'underrun'].includes(data.kind) && evidence.queueEvents.length < 500)
+              evidence.queueEvents.push({
+                direction: 'received',
+                ...data,
+                now: performance.now(),
+                contextTime: context.currentTime,
+              });
             if (data.kind === 'started') evidence.active = true;
             if (data.kind === 'underrun') {
               evidence.underruns++;
@@ -254,6 +274,7 @@ export async function installMusicEvidence(
       };
       const nativeFetch = window.fetch;
       window.fetch = async (...args) => {
+        const started = performance.now();
         const range = new Headers(args[1]?.headers).get('Range');
         const url = args[0] instanceof Request ? args[0].url : args[0].toString();
         if (range && url.includes('/api/audio/')) {
@@ -264,7 +285,10 @@ export async function installMusicEvidence(
             match ? Number(match[2]) - Number(match[1]) + 1 : Infinity,
           );
         }
-        return nativeFetch(...args);
+        const response = await nativeFetch(...args);
+        if (range && url.includes('/api/audio/') && evidence.rangeTimings.length < 500)
+          evidence.rangeTimings.push({ range, started, completed: performance.now(), status: response.status });
+        return response;
       };
     },
     { captureSignal, reference },

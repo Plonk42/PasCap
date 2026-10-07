@@ -8,6 +8,7 @@ import {
   type Transition,
   type VideoLayer,
 } from './model.js';
+import { hasSpatialEdits } from './spatial.js';
 import { blackFadeParts, calculateLayout, type PlacedClip, type TimelineLayout } from './timeline.js';
 import { PROJECT_FPS, sameRate } from './timing.js';
 
@@ -77,6 +78,7 @@ export const LAYERED_EXPORT_RESOURCES = Object.freeze({
 export function needsLayeredExport(document: ProjectDocument): boolean {
   if (
     document.layers.length !== 1 ||
+    document.clips.some((clip) => hasSpatialEdits(clip.spatial)) ||
     document.layers.some((layer) => !layer.enabled || layer.opacity !== 1 || layer.keyframes.length > 0)
   )
     return true;
@@ -214,7 +216,7 @@ export function planExport(document: ProjectDocument): ExportPlan {
   const snapshot = exportDocumentSchema.parse(document);
   if (needsLayeredExport(snapshot))
     throw new Error(
-      'Multiple/disabled tracks, opacity, shared row points, gaps, leading starts or music beyond video OUT require the layered exporter, not a static chunk plan.',
+      'Multiple/disabled tracks, opacity, shared row points, spatial edits, gaps, leading starts or music beyond video OUT require the layered exporter, not a static chunk plan.',
     );
   const layout = calculateLayout(snapshot);
   validateDuration(layout);

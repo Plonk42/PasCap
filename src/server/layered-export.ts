@@ -461,9 +461,23 @@ class SequentialLayeredRenderer {
       await readers[index]!.requireFrame(this.#rgb[index]!); // NOSONAR -- at most two reusable intermediate frames.
       const sourceClip = document.clips[clip.index]!;
       const sample = samples.find((item) => item.clipId === sourceClip.id);
-      if (sample?.sourceFrame !== maps[index]!.sourceAt(clip.offset + frame))
+      if (!sample || sample.sourceFrame !== maps[index]!.sourceAt(clip.offset + frame))
         throw new Error('Layered sample differs from the exact shared sourceAt map.');
-      sources.push({ sample, rgb: this.#rgb[index]!, bounds: fittedContent(assets[clip.index]!.metadata, target) });
+      const sourcePosition = maps[index]!.sourcePositionAt(clip.offset + frame);
+      if (
+        !Number.isFinite(sourcePosition) ||
+        sourcePosition < sourceClip.sourceIn ||
+        sourcePosition > sourceClip.sourceOut ||
+        sample.sourcePosition !== sourcePosition
+      )
+        throw new Error('Layered sample differs from the exact shared continuous source-position map.');
+      const { width, height } = assets[clip.index]!.metadata;
+      sources.push({
+        sample,
+        rgb: this.#rgb[index]!,
+        original: { width, height },
+        bounds: fittedContent({ width, height }, target),
+      });
     }
     return sources;
   }

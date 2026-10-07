@@ -7,7 +7,7 @@ import { createClip, createLayer, createProject, projectSchema, type ProjectDocu
 import { calculateLayout, sampleTimeline } from '../../src/shared/timeline.js';
 import { expandedInspectorPreferences, sharedPoint } from './editor-helpers.js';
 import { memoryProjects, type MemoryProjects } from './memory-projects.js';
-import { installMusicEvidence } from './music-evidence.js';
+import { installMusicEvidence, observeMusicPlayback } from './music-evidence.js';
 
 interface PixelSummary {
   checksum: number;
@@ -21,6 +21,22 @@ interface PlaybackObservations {
   notifications: number;
   gradedDraws: number;
   ungradedDraws: number;
+  activations: {
+    frame: number;
+    timestamp: number;
+    detail: number;
+    playing: boolean;
+    status: string;
+    trusted: boolean;
+    ungraded: boolean;
+    checkpoint?: {
+      state: PreviewDiagnostics;
+      starts: number;
+      pauses: number;
+      active: boolean;
+      generation: number | undefined;
+    };
+  }[];
   maximumAVDrift: number;
   violations: string[];
   samples: { frame: number; requestedFrame: number; sourceFrame: number; ungraded: boolean; generation: number }[];
@@ -844,6 +860,7 @@ test('comparison during music playback preserves the real worklet epoch and stri
     { length: duration },
     (_, frame) => sampleTimeline(comparison.playback, frame)[0]!.sourceFrame,
   );
+  await observeMusicPlayback(page);
   await page.evaluate((sourceFrames) => {
     const engine = window.pascapLab!.engine;
     // Observe actual texture uploads, so a later decoded callback cannot be
@@ -880,11 +897,29 @@ test('comparison during music playback preserves the real worklet epoch and stri
       notifications: 0,
       gradedDraws: 0,
       ungradedDraws: 0,
+      activations: [],
       maximumAVDrift: 0,
       violations: [],
       samples: [],
     };
     window.gradeComparisonPlayback = evidence;
+    const button = document.querySelector<HTMLButtonElement>('.preview-comparison-toggle')!;
+    button.addEventListener(
+      'click',
+      (event) => {
+        const state = engine.diagnostics();
+        evidence.activations.push({
+          frame: state.frame,
+          timestamp: event.timeStamp,
+          detail: event.detail,
+          playing: state.playing,
+          status: state.status,
+          trusted: event.isTrusted,
+          ungraded: !state.ungraded,
+        });
+      },
+      { capture: true },
+    );
     let rendered = window.pascapLab!.engine.diagnostics().renderedFrames;
     window.pascapLab!.engine.subscribe((state) => {
       if (state.status === 'error' && evidence.violations.length < 10) evidence.violations.push(state.message);
@@ -916,6 +951,24 @@ test('comparison during music playback preserves the real worklet epoch and stri
         if (state.renderedFrames > rendered) {
           if (state.ungraded) evidence.ungradedDraws++;
           else evidence.gradedDraws++;
+          const activation = evidence.activations.at(-1);
+          if (
+            activation &&
+            !activation.checkpoint &&
+            state.ungraded === activation.ungraded &&
+            state.frame >= activation.frame + 2
+          ) {
+            // Retain the actual Playing draw in this task. CI protocol/DOM
+            // checks can take several seconds while real output audio advances;
+            // a later diagnostics read may correctly observe completion instead.
+            activation.checkpoint = {
+              state,
+              starts: music.starts,
+              pauses: music.pauses,
+              active: music.active,
+              generation: receipt?.generation,
+            };
+          }
           if (evidence.samples.length < 24)
             evidence.samples.push({
               frame: state.frame,
@@ -942,7 +995,8 @@ test('comparison during music playback preserves the real worklet epoch and stri
     pauses: window.musicStreamEvidence.pauses,
     generation: window.musicStreamEvidence.receipt?.generation,
   }));
-  expect(initial.state.status, initial.state.message).toBe('playing');
+  expect(initial.state.playing).toBe(true);
+  expect(['playing', 'buffering']).toContain(initial.state.status);
   expect(initial.starts).toBe(1);
   expect(initial.generation).toBeDefined();
   try {
@@ -953,36 +1007,46 @@ test('comparison during music playback preserves the real worklet epoch and stri
       ['click', false],
     ] as const;
     for (const [activation, ungraded] of activations) {
-      const before = await page.evaluate(() => window.pascapLab!.engine.diagnostics().frame);
       if (activation === 'click') await compareButton(page).click();
       else await compareButton(page).press(activation);
-      await expectMode(page, ungraded);
       const ready = await page.waitForFunction(
-        ({ before, ungraded, duration }) => {
+        ({ ungraded, duration }) => {
           const state = window.pascapLab!.engine.diagnostics();
-          const reached =
-            state.status === 'error' ||
-            (!state.playing && state.frame === duration - 1) ||
-            (state.playing && state.status === 'playing' && state.ungraded === ungraded && state.frame >= before + 2);
-          // Capture readiness and its clock/epoch evidence in the same task.
-          // A later task may legitimately observe a new buffering interval.
-          return reached
-            ? {
-                state,
-                starts: window.musicStreamEvidence.starts,
-                pauses: window.musicStreamEvidence.pauses,
-                active: window.musicStreamEvidence.active,
-                generation: window.musicStreamEvidence.receipt?.generation,
-              }
+          const activation = window.gradeComparisonPlayback.activations.at(-1);
+          const button = document.querySelector<HTMLButtonElement>('.preview-comparison-toggle')!;
+          const badge = document.querySelector('.preview-comparison-overlay');
+          const modeReady =
+            button.getAttribute('aria-pressed') === String(ungraded) &&
+            button.textContent === (ungraded ? 'Ungraded' : 'Compare') &&
+            button.tagName === 'BUTTON' &&
+            Boolean(badge) === ungraded &&
+            state.ungraded === ungraded;
+          if (activation?.checkpoint && modeReady) return activation;
+          // Completion is only an explicit failure escape, never a substitute
+          // for a trusted activation followed by a real Playing draw.
+          return state.status === 'error' || (!state.playing && state.frame === duration - 1)
+            ? { ...activation, checkpoint: null }
             : null;
         },
-        { before, ungraded, duration },
+        { ungraded, duration },
       );
-      const checkpoint = (await ready.jsonValue())!;
+      const observed = (await ready.jsonValue())!;
       await ready.dispose();
+      expect(observed.trusted).toBe(true);
+      expect(observed.playing).toBe(true);
+      // Native input and the preceding Playing observation are different tasks.
+      // Decoder buffering may begin between them; the retained post-activation
+      // Playing draw below must still satisfy every source/audio/epoch bound.
+      expect(['playing', 'buffering']).toContain(observed.status);
+      expect(observed.ungraded).toBe(ungraded);
+      expect(observed.detail).toBe(activation === 'click' ? 1 : 0);
+      expect(observed.frame).toBeLessThan(duration - 1);
+      expect(observed.checkpoint, 'Each native activation must produce a Playing draw before completion.').toBeTruthy();
+      const checkpoint = observed.checkpoint!;
       expect(checkpoint.state.status, checkpoint.state.message).toBe('playing');
       expect(checkpoint.state.playing).toBe(true);
-      expect(checkpoint.state.frame).toBeGreaterThanOrEqual(before + 2);
+      expect(checkpoint.state.frame).toBeGreaterThanOrEqual(observed.frame! + 2);
+      expect(checkpoint.state.frame).toBeLessThan(duration - 1);
       expect(checkpoint.state.ungraded).toBe(ungraded);
       expect(checkpoint.starts).toBe(initial.starts);
       expect(checkpoint.pauses).toBe(initial.pauses);
@@ -1015,6 +1079,7 @@ test('comparison during music playback preserves the real worklet epoch and stri
       sourceFrames[duration - 1],
     );
     expect(result.observations.violations).toEqual([]);
+    expect(result.observations.activations).toHaveLength(4);
     expect(result.observations.notifications).toBeGreaterThan(2);
     expect(result.observations.gradedDraws).toBeGreaterThan(0);
     expect(result.observations.ungradedDraws).toBeGreaterThan(0);
@@ -1035,6 +1100,10 @@ test('comparison during music playback preserves the real worklet epoch and stri
           pauses: window.musicStreamEvidence.pauses,
           underruns: window.musicStreamEvidence.underruns,
           receipt: window.musicStreamEvidence.receipt,
+          samples: window.musicStreamEvidence.samples,
+          playback: window.musicStreamEvidence.playback,
+          queueEvents: window.musicStreamEvidence.queueEvents,
+          rangeTimings: window.musicStreamEvidence.rangeTimings,
           largestRange: window.musicStreamEvidence.largestRange,
         })),
         null,

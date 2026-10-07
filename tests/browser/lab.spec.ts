@@ -23,9 +23,20 @@ test.beforeEach(async ({ page, request }) => {
   const saved = projectSchema.parse(
     ((await (await request.get('/api/projects/preview-lab')).json()) as { document: unknown }).document,
   );
+  // Import specs deliberately extend the shared registry. This project's bin
+  // must retain the exact twelve baseline fixtures, not adopt those imports.
+  const videos = [
+    'pattern-a.mp4',
+    'pattern-b.mp4',
+    ...Array.from({ length: 10 }, (_, index) => `recording-${String(index + 3).padStart(2, '0')}.mp4`),
+  ].map((name) => {
+    const matches = registered.assets.filter((asset) => asset.name === name);
+    expect(matches, `Exactly one baseline recording ${name}`).toHaveLength(1);
+    return matches[0]!;
+  });
   let project = createProject('preview-lab', 'Synthetic editor · disposable');
   project.media = {
-    videoIds: registered.assets.map((asset) => asset.id),
+    videoIds: videos.map((asset) => asset.id),
     audioIds: audio.assets.map((asset) => asset.id),
   };
   for (const [index, name] of ['pattern-a.mp4', 'pattern-b.mp4'].entries()) {

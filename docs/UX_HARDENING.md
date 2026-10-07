@@ -41,7 +41,8 @@ This guide is not a delivery ledger or a fresh validation result.
   uncertainty, errors/recheck and disclosed location/assumptions. Snapshot and
   native processing details remain available in **Rendering details**.
 
-Schema 8 uses a required 0–8 `music` array with unique required instance IDs and
+Schema 9 requires clip spatial base/full-pose source-frame keys and uses a
+required 0–8 `music` array with unique required instance IDs and
 uniform video tracks with required Ripple/transitions/fades and
 numeric `VideoLayer.opacity` in 0–1 (1 on new tracks), plus nine nullable point
 channels: `opacity`, `speed` and seven colour settings. Rows
@@ -54,22 +55,34 @@ put. Every track can be reordered/deleted except the last remaining track; stack
 endpoint restrictions have accessible reasons.
 
 Track-local black fades preserve coverage; simultaneous track dissolves use the
-premultiplied group math $C = \sum_i G_i b_i o_i w_i$, $A = \sum_i o_i w_i$ and
+premultiplied group math $C = \sum_i G_i b_i o_i w_i m_i$, $A = \sum_i o_i w_i m_i$ and
 $\mathrm{result} = C + \mathrm{lower}(1 - A)$, without a layer multiplier.
 Here $G_i$ is graded RGB, $b_i$ black-fade brightness, $o_i$ evaluated Opacity and
-$w_i$ dissolve weight. Each source uses the same evaluated row Opacity at that
+$w_i$ dissolve weight and $m_i$ spatial pixel coverage. Exact neutral poses
+preserve opaque black letterboxing after grading; nonneutral uncovered pixels
+reveal lower footage. Each source uses the same evaluated row Opacity at that
 project frame, from the row value or its overriding curve.
-v1–v7 project/receipt snapshots remain unchanged/incompatible
+v1–v8 project/receipt snapshots remain unchanged/incompatible
 and require recreation, without migration, defaults or automatic deletion.
 Row `opacity` is the required sole stored value, not obsolete; saved `clip.opacity`
 and old `clipOpacity`/`layerOpacity` point channels are invalid.
 Registry/proxy/current PCM formats do not change. Version-1 export receipts require
-strict v8 snapshots and captured audio-source/instance-plan arrays, rejecting
+strict v9 snapshots and captured audio-source/instance-plan arrays, rejecting
 invalid arrays/older snapshots without rewriting successful exports. No null
 fallback or old-format reader is permitted. Source-copy prohibition,
 row points, source choices, media preparation, Activity and both export
 profiles retain their contracts. The editor targets desktop Linux; the 640 px
 width floor is not a mobile-support claim.
+
+**Clip → Transform** is the fifth top-level section, collapsed for new
+preferences and included in Clip's bulk expansion. Native sliders/exact fields
+and one full-pose source-frame diamond retain explicit capture, read-only keyed
+main values without a key at the real displayed source frame, release-only
+drafts and editable invalid numbers. Stored-key navigation distinguishes stored
+source time from the closest actually mapped preview, including off-trim and
+original exclusive-OUT anchors. This is clip-local, not another row channel.
+See [the spatial contract](design/SPATIAL_TRANSFORMS.md); no fresh UI acceptance
+or throughput result is implied.
 
 **Audio → Music** uses native **Music track / Recording** selectors, **Add music
 track** and selected-instance trash deletion. Ready/prepared recordings can be
@@ -196,7 +209,9 @@ two 65³ Float32 LUTs add **6,591,000 bytes**, excluding native/audio memory.
 One original decoder, two intermediate readers, one encoder and three video children
 per serial pass bound concurrency, not duration-dependent disk use. The static
 fast path requires one enabled, unanimated, zero-origin contiguous track
-with row Opacity 1; unsupported placement/coverage uses generalized layered export.
+with row Opacity 1, exactly neutral spatial bases and no spatial keys; spatial
+edits/keys (even neutral keys) or unsupported placement/coverage use generalized
+layered export, with unchanged raw-buffer/LUT/process budgets.
 
 That static track must cover full project duration; music-only tails require
 layered black, without stretching video closing fades or holding a last image.

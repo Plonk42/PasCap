@@ -1,4 +1,4 @@
-# Speed and audio contract · project v8
+# Speed and audio contract · project v9
 
 ## Two distinct retiming contracts
 
@@ -52,7 +52,7 @@ selected original frame, even when output sampling skips it.
 Clip curves belong to **one excerpt instance**. Trims, moves, splits and marked
 cuts retain original-source anchors; split/cut/duplicate copies are independent.
 Every retained piece recompiles/rounds its duration once. Curves are carried in
-the required `speed` field of strict schema 8, without an optional fallback,
+the required `speed` field of strict schema 9, without an optional fallback,
 data migration or project-wide speed field. A mode/preset change
 is a deliberate editing command, not a conversion on load.
 
@@ -66,7 +66,7 @@ base without deleting any clip points.
 
 ### Shared row Speed: absolute project-time rate
 
-Schema-8 layer points require nine nullable channels: Opacity (`opacity`),
+Schema-9 layer points require nine nullable channels: Opacity (`opacity`),
 Speed (`speed`) and seven colour settings.
 Once any point on the row participates in Speed, the row's rate curve **overrides
 every clip's entire constant/ramp/custom-curve base**, not just an interval between keys. Only
@@ -107,6 +107,15 @@ retiming/span checks consume that same map. Native output requires a monotonic,
 integer, in-range `sourceAt` result and exact frame counts; a malformed supplied
 map is rejected rather than falling back to a clip's static speed.
 
+Clip spatial geometry evaluates at the same map's continuous
+`sourcePositionAt(localOutputFrame)`, while `sourceAt` identifies the integer
+recorded image. Slow motion may animate crop/scale/translation/rotation over a
+held image without optical flow. Row Speed changes this continuous map, not the
+clip's stored spatial keys: trim/move/split/cut/duplicate retain original-source
+anchors, including off-trim and original exclusive-OUT keys, with independent
+deep copies for new pieces. Spatial edits are appearance-only and do not change
+speed, placement or duration. See [spatial transforms](design/SPATIAL_TRANSFORMS.md).
+
 All row colour/opacity parameters are sampled at **absolute project time**, not at
 the retimed source frame. A held source image can therefore receive a different
 grade on the next project frame. Native LUT generation and preview redraw both
@@ -115,11 +124,14 @@ initially 1 on new tracks, unless the sole row **Opacity** (`opacity`) channel
 overrides it. Evaluate that one row setting for each source, including both
 dissolve participants; there is no saved `clip.opacity`.
 With graded RGB $G_i$, black-fade brightness $b_i$, evaluated Opacity $o_i$ and
-dissolve weight $w_i$, each track forms one group with $C = \sum_i G_i b_i o_i w_i$
-and $A = \sum_i o_i w_i$. Source-over is
+dissolve weight $w_i$ and spatial pixel coverage $m_i$, each track forms one group
+with $C = \sum_i G_i b_i o_i w_i m_i$ and $A = \sum_i o_i w_i m_i$. Source-over is
 $\mathrm{result} = C + \mathrm{lower}(1 - A)$, with no layer multiplier; black fades
 change RGB without reducing coverage. Any shared row point, even speed-only,
-requires the layered export path; the static chunk plan cannot silently omit it.
+requires the layered export path; any nonneutral spatial base or spatial key
+(even neutral keys) does too. Exact neutral poses retain opaque black letterboxing
+after grading; nonneutral uncovered pixels reveal lower footage. The static chunk
+plan cannot silently omit these edits.
 Opacity is composition coverage, not part of the unchanged SDR RGB grade.
 Its single native slider/exact `NumberField`/diamond/navigation is in **Clip → Colour**
 alongside the colour controls. Numeric entry is **0–1**, initially **1**; the main
@@ -270,7 +282,7 @@ separate; an explicit override notice appears when row Speed suppresses clip spe
 
 ## Music
 
-Strict schema 8 requires `music: MusicTrack[]`, with **0–8 independent instances**
+Strict schema 9 requires `music: MusicTrack[]`, with **0–8 independent instances**
 and unique required instance `id` values; `[]` means no music. Each instance
 requires `mediaId`, `sourceIn`, `sourceOut`, `start`, `duration`, `gainDb`, `fadeIn`,
 `fadeOut` and `loop`. Several instances can use the same registered recording
@@ -389,7 +401,7 @@ preview caches remain unchanged but are not current playback input. Missing curr
 PCM caches appear as an explicit **Retry** preparation action in Audio → Music;
 startup/library reads never prepare, rewrite or delete them. Prepare deliberately
 to create the current cache, retaining originals and older generated files. Project
-schema is 8; registry, video-proxy and PCM cache formats are unchanged. Native export
+schema is 9; registry, video-proxy and PCM cache formats are unchanged. Native export
 still reads original audio, not the preview transport.
 
 Native mixing decodes **one original at a time** to exact selected **48 kHz stereo
@@ -411,9 +423,11 @@ cancellation cleans only owned scratch/partials and preserves completed outputs.
 
 ## Versioning
 
-Project schema **v8** requires explicit `media.videoIds` and `media.audioIds` arrays,
+Project schema **v9** requires explicit `media.videoIds` and `media.audioIds` arrays,
 unique and limited to 10,000 IDs each, plus complete clip colour/constant/ramp/custom-curve
-speed, layer point arrays with all nine nullable value fields, placement and music
+speed, required clip `spatial: { base, keyframes }` with eight-value base and
+0–256 full-pose source-frame keys with required easing, layer point arrays with
+all nine nullable value fields, placement and music
 source OUT. `music` is a required 0–8 array with unique required instance IDs and
 all per-instance fields above; `[]` is the sole no-music representation, not null
 or a compatibility default. Every layer also requires `ripple`, `transitions`, `openingFade` and
@@ -428,7 +442,7 @@ Row `opacity` is valid and required; saved `clip.opacity` and old
 New projects have empty video/music bins. Standalone audio imports belong
 to the open project's bin; every music instance's references also count as membership.
 Global registered music/proxies are reusable on deliberate import, never automatically
-inherited by a new project. Earlier v1–v7 projects and export receipt snapshots remain unchanged
+inherited by a new project. Earlier v1–v8 projects and export receipt snapshots remain unchanged
 and incompatible. There is no migration, compatibility reader, null fallback, default-field
 injection or automatic deletion; recreate projects and import their media to reuse
 registered assets/verified ready proxies. Confirmed project deletion affects only
@@ -438,7 +452,7 @@ Registry/video-proxy/current PCM formats, source guards and native video budgets
 native composition uses the sole Opacity contract without a layer multiplier.
 Preview uses the current explicitly prepared PCM cache described above.
 
-Export receipts remain **version 1** with a strict **v8** snapshot, required
+Export receipts remain **version 1** with a strict **v9** snapshot, required
 `musicSources` captured unique-original array and `settings.audio` identified
 instance-plan array (`[]` for each without music). Plans preserve independent
 timing/gain/fades/loop; several may refer to the same captured original. The plan

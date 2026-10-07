@@ -12,13 +12,14 @@ const SECTION_DEFAULTS = {
   // Placement retains this browser preference ID; renaming its title must not reset expansion.
   'layer-opacity': false,
   speed: false,
+  transform: false,
   colour: true,
   transition: true,
   fades: true,
   music: true,
 };
 type SectionId = keyof typeof SECTION_DEFAULTS;
-const CLIP_SECTIONS: readonly SectionId[] = ['source', 'layer-opacity', 'speed', 'colour'];
+const CLIP_SECTIONS: readonly SectionId[] = ['source', 'layer-opacity', 'speed', 'transform', 'colour'];
 type Expansion = Record<SectionId, boolean>;
 interface InspectorExpansion {
   sections: Expansion;

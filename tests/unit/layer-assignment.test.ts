@@ -221,6 +221,7 @@ vi.mock('../../src/preview/music.js', () => ({
 
 const engines: PreviewEngine[] = [];
 const resolver = (id: string): string => `/${id}`;
+const originalDimensions = (_id: string) => ({ width: 1920, height: 1080 });
 function makeEngine(): PreviewEngine {
   const engine = new PreviewEngine(new EventTarget() as HTMLCanvasElement);
   engines.push(engine);
@@ -302,6 +303,9 @@ function expectedGroups(
               slot: assignments.indexOf(sample.clipId),
               settings: sample.colour,
               aspect: 16 / 9,
+              spatial: sample.spatial,
+              originalWidth: 1920,
+              originalHeight: 1080,
               opacity: sample.opacity,
               brightness: sample.brightness,
               blendWeight: sample.blendWeight,
@@ -420,7 +424,7 @@ describe('layered observed-frame preview', () => {
       project.clips.push(createClip(id, `media-${index}`, 10, 70));
     }
     const engine = makeEngine();
-    await engine.loadProject(project, resolver);
+    await engine.loadProject(project, resolver, originalDimensions);
     await engine.seek(60 * 30 + 12);
     await engine.seek(20);
     expect(engine.diagnostics()).toMatchObject({ status: 'paused', frame: 20, decoderCount: 2 });
@@ -436,7 +440,7 @@ describe('layered observed-frame preview', () => {
       point(102, { opacity: 1, exposure: 1 }, 'hold'),
     ];
     const engine = makeEngine();
-    await engine.loadProject(project, resolver, 51);
+    await engine.loadProject(project, resolver, originalDimensions, 51);
     const assignments = engine.diagnostics().assignedClipIds;
     expect(engine.diagnostics().decoderCount).toBe(16);
     expect(compositor().groups).toEqual(expectedGroups(project, 51, assignments));
@@ -462,7 +466,7 @@ describe('layered observed-frame preview', () => {
     project.layers[0]!.openingFade = 5;
     project.layers[0]!.opacity = 0.3;
     const engine = makeEngine();
-    await engine.loadProject(project, resolver, 0);
+    await engine.loadProject(project, resolver, originalDimensions, 0);
     expect(compositor().groups[0]).toMatchObject({
       clips: [{ opacity: 0.3, blendWeight: 1, brightness: 0 }],
     });
@@ -485,7 +489,7 @@ describe('layered observed-frame preview', () => {
       layer.keyframes = [point(0, { exposure: index / 10 })];
     }
     const engine = makeEngine();
-    await engine.loadProject(project, resolver, 51);
+    await engine.loadProject(project, resolver, originalDimensions, 51);
     const assignments = engine.diagnostics().assignedClipIds;
     const samples = sampleTimeline(project, 51);
     expect(samples).toHaveLength(16);
@@ -514,7 +518,7 @@ describe('layered observed-frame preview', () => {
     project.layers[1]!.opacity = 0;
     project.layers[2]!.enabled = false;
     const engine = makeEngine();
-    await engine.loadProject(project, resolver);
+    await engine.loadProject(project, resolver, originalDimensions);
     expect(compositor().groups).toHaveLength(2);
     expect(compositor().groups[1]!.clips[0]!.opacity).toBe(0);
     expect(state.slots.flatMap((slot) => slot.loads.map((load) => load.url))).not.toContain('/overlay-media-2');
@@ -526,7 +530,7 @@ describe('layered observed-frame preview', () => {
     project.clips[1]!.start = 30;
     project.clips[1]!.sourceOut = project.clips[1]!.sourceIn + 20;
     const engine = makeEngine();
-    await engine.loadProject(project, resolver, 20);
+    await engine.loadProject(project, resolver, originalDimensions, 20);
     expect(calculateLayout(project).clips.find((clip) => clip.clip.id === 'base')!.end).toBe(10);
     expect(calculateLayout(project).duration).toBe(50);
     expect(compositor().groups).toEqual([]);
@@ -552,7 +556,7 @@ describe('layered observed-frame preview', () => {
     });
     project.layers[1]!.transitions = [{ leftId: 'overlay-1', rightId: 'overlay-next', type: 'cut', duration: 0 }];
     const engine = makeEngine();
-    await engine.loadProject(project, resolver, 5);
+    await engine.loadProject(project, resolver, originalDimensions, 5);
     await settle();
     const before = engine.diagnostics().assignedClipIds;
     expect(before).toContain('overlay-next');
@@ -577,7 +581,7 @@ describe('layered observed-frame preview', () => {
       if (url === '/next-media') throw new Error('Missing future media');
     };
     const engine = makeEngine();
-    await engine.loadProject(project, resolver, 5);
+    await engine.loadProject(project, resolver, originalDimensions, 5);
     await settle();
     expect(engine.diagnostics().status).toBe('paused');
     expect(() => engine.capturePixels()).not.toThrow();
@@ -589,7 +593,7 @@ describe('layered observed-frame preview', () => {
     const blocked = deferred();
     state.onLoad = (url) => (url === '/next-media' ? blocked.promise : Promise.resolve());
     const engine = makeEngine();
-    await engine.loadProject(project, resolver, 5);
+    await engine.loadProject(project, resolver, originalDimensions, 5);
     const obsolete = engine.seek(51);
     await settle();
     state.onLoad = null;
@@ -609,7 +613,7 @@ describe('layered observed-frame preview', () => {
     const project = makeProject();
     project.layers[0]!.keyframes = [point(0, { speed: 0.5 }, 'smooth'), point(59, { speed: 2 }, 'hold')];
     const engine = makeEngine();
-    await engine.loadProject(project, resolver);
+    await engine.loadProject(project, resolver, originalDimensions);
     await engine.play();
     animationFrame(1000, 999);
     expect(engine.diagnostics()).toMatchObject({ status: 'playing', frame: 0 });
@@ -636,14 +640,14 @@ describe('live appearance updates and lifecycle', () => {
       loop: true,
     }));
     const engine = makeEngine();
-    await engine.loadProject(project, resolver, 15);
+    await engine.loadProject(project, resolver, originalDimensions, 15);
     const music = state.music[0]!;
     expect(music.configured).toEqual([project.music]);
     expect(engine.diagnostics()).toMatchObject({ duration: 740, frame: 15 });
     const altered = structuredClone(project);
     altered.music[7]!.gainDb = -12;
     expect(() => engine.updateProjectAppearance(altered)).toThrow('preserve project timing');
-    await engine.loadProject({ ...project, clips: [] }, resolver);
+    await engine.loadProject({ ...project, clips: [] }, resolver, originalDimensions);
     expect(music.configured.at(-1)).toEqual(project.music);
     expect(music.hasMusic).toBe(true);
     expect(engine.diagnostics()).toMatchObject({ duration: 740, frame: 0, status: 'paused', decoderCount: 0 });
@@ -675,7 +679,7 @@ describe('live appearance updates and lifecycle', () => {
       },
     ];
     const engine = makeEngine();
-    await engine.loadProject(project, resolver, 15);
+    await engine.loadProject(project, resolver, originalDimensions, 15);
     await engine.play();
     const before = calls();
     const music = state.music[0]!;
@@ -703,7 +707,7 @@ describe('live appearance updates and lifecycle', () => {
   it('retains updateColour and redraws appearance immediately when paused', async () => {
     const project = makeProject(2);
     const engine = makeEngine();
-    await engine.loadProject(project, resolver, 10);
+    await engine.loadProject(project, resolver, originalDimensions, 10);
     const before = calls();
     const uploads = compositor().uploads.length;
     engine.updateColour('base', { ...NEUTRAL_COLOUR, saturation: 0.4 });
@@ -717,7 +721,7 @@ describe('live appearance updates and lifecycle', () => {
   it('rejects source, speed, placement, music and project changes rather than silently keeping old timing', async () => {
     const project = makeProject(2);
     const engine = makeEngine();
-    await engine.loadProject(project, resolver);
+    await engine.loadProject(project, resolver, originalDimensions);
     const changes: ((document: ProjectDocument) => void)[] = [
       (document) => {
         document.clips[0]!.sourceIn++;
@@ -777,7 +781,7 @@ describe('live appearance updates and lifecycle', () => {
     project.clips.push({ ...createClip('upper-next', 'upper-next-source', 500, 560, layer.id), start: 60 });
     layer.transitions = [{ leftId: left.id, rightId: 'upper-next', type: 'cut', duration: 0 }];
     const engine = makeEngine();
-    await engine.loadProject(project, resolver, 10);
+    await engine.loadProject(project, resolver, originalDimensions, 10);
     const before = calls();
     const uploads = compositor().uploads.length;
     const changed = structuredClone(project);
@@ -796,7 +800,7 @@ describe('live appearance updates and lifecycle', () => {
     const project = makeProject(2);
     project.layers[0]!.keyframes = [point(0, { speed: 0.5 }, 'smooth'), point(59, { speed: 2 }, 'hold')];
     const engine = makeEngine();
-    await engine.loadProject(project, resolver, 15);
+    await engine.loadProject(project, resolver, originalDimensions, 15);
     const before = calls();
     const duration = engine.diagnostics().duration;
     const appearance = structuredClone(project);
@@ -828,7 +832,7 @@ describe('live appearance updates and lifecycle', () => {
   it('hides all groups without stopping playback and observes fresh frames when re-enabled', async () => {
     const project = makeProject(2);
     const engine = makeEngine();
-    await engine.loadProject(project, resolver, 10);
+    await engine.loadProject(project, resolver, originalDimensions, 10);
     await engine.play();
     const hidden = structuredClone(project);
     hidden.layers.forEach((layer) => {
@@ -851,7 +855,7 @@ describe('live appearance updates and lifecycle', () => {
     const blocked = deferred();
     state.onLoad = (url) => (url === '/overlay-media-1' ? blocked.promise : Promise.resolve());
     const engine = makeEngine();
-    const loading = engine.loadProject(project, resolver, 10);
+    const loading = engine.loadProject(project, resolver, originalDimensions, 10);
     await settle();
     const appearance = structuredClone(project);
     appearance.clips[0]!.colour.exposure = 0.6;
@@ -870,7 +874,7 @@ describe('live appearance updates and lifecycle', () => {
   it('aborts a buffering visibility change and reanchors music even when the new frame is black', async () => {
     const project = makeProject(2);
     const engine = makeEngine();
-    await engine.loadProject(project, resolver, 10);
+    await engine.loadProject(project, resolver, originalDimensions, 10);
     await engine.play();
     const blocked = deferred();
     state.onStart = () => blocked.promise;
@@ -896,7 +900,7 @@ describe('live appearance updates and lifecycle', () => {
   it('does not resurrect playback after pause during an asynchronous audio-context resume', async () => {
     const project = makeProject();
     const engine = makeEngine();
-    await engine.loadProject(project, resolver);
+    await engine.loadProject(project, resolver, originalDimensions);
     const blocked = deferred();
     state.onResume = () => blocked.promise;
     const playing = engine.play();
@@ -909,7 +913,7 @@ describe('live appearance updates and lifecycle', () => {
   it('does not restart an obsolete play request when its end-of-timeline reset seek is cancelled', async () => {
     const project = makeProject();
     const engine = makeEngine();
-    await engine.loadProject(project, resolver, 59);
+    await engine.loadProject(project, resolver, originalDimensions, 59);
     const playing = engine.play();
     engine.pause();
     await playing;
@@ -920,7 +924,7 @@ describe('live appearance updates and lifecycle', () => {
     const project = makeProject(3);
     project.clips.splice(1, 1);
     const engine = makeEngine();
-    await engine.loadProject(project, resolver);
+    await engine.loadProject(project, resolver, originalDimensions);
     await engine.play();
     const active = engine
       .diagnostics()
@@ -935,9 +939,9 @@ describe('live appearance updates and lifecycle', () => {
       expect(slot.disposed).toBe(false);
       expect(slot.playing).toBe(true);
     });
-    await engine.loadProject(makeProject(), resolver);
+    await engine.loadProject(makeProject(), resolver, originalDimensions);
     expect(liveSlots()).toHaveLength(2);
-    await engine.loadProject(createProject('empty', 'Empty'), resolver);
+    await engine.loadProject(createProject('empty', 'Empty'), resolver, originalDimensions);
     expect(engine.diagnostics()).toMatchObject({ status: 'empty', decoderCount: 0, assignedClipIds: [] });
     expect(liveSlots()).toHaveLength(0);
     expect(compositor().count).toBe(0);
@@ -948,7 +952,7 @@ describe('live appearance updates and lifecycle', () => {
   it('releases every decoder on context loss and restores a bounded paused pool without leaks', async () => {
     const project = makeProject(8, true);
     const engine = makeEngine();
-    await engine.loadProject(project, resolver, 51);
+    await engine.loadProject(project, resolver, originalDimensions, 51);
     await engine.play();
     compositor().lost = true;
     const lost = new Event('webglcontextlost', { cancelable: true });
@@ -978,7 +982,7 @@ describe('live appearance updates and lifecycle', () => {
   });
   it('restores an empty canvas without recreating decoder textures or video elements', async () => {
     const engine = makeEngine();
-    await engine.loadProject(createProject('empty', 'Empty'), resolver);
+    await engine.loadProject(createProject('empty', 'Empty'), resolver, originalDimensions);
     compositor().lost = true;
     engine.canvas.dispatchEvent(new Event('webglcontextlost', { cancelable: true }));
     engine.canvas.dispatchEvent(new Event('webglcontextrestored'));
@@ -990,7 +994,7 @@ describe('live appearance updates and lifecycle', () => {
   it('reports GPU restoration failure without leaking or throwing out of the context event', async () => {
     const project = makeProject(2);
     const engine = makeEngine();
-    await engine.loadProject(project, resolver);
+    await engine.loadProject(project, resolver, originalDimensions);
     compositor().lost = true;
     engine.canvas.dispatchEvent(new Event('webglcontextlost', { cancelable: true }));
     state.failCompositor = true;

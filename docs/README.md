@@ -7,25 +7,26 @@ and priorities.
 
 ## Start here
 
-| Read                             | Use it for                                                                                                                 |
-| -------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| [../README.md](../README.md)     | Project overview, quick local start and current scope                                                                      |
-| [USER_GUIDE.md](USER_GUIDE.md)   | Projects, no-copy import, repeated excerpts, timeline editing, clip speed curves, row keyframes, music/export and recovery |
-| [DEVELOPMENT.md](DEVELOPMENT.md) | Linux toolchain, commands, synthetic tests, CI, architecture and contributor safety                                        |
-| [DEPLOYMENT.md](DEPLOYMENT.md)   | Service-side source paths/API and security; planned local Docker/Podman packaging, **not a runnable container recipe**     |
-| [LICENSING.md](LICENSING.md)     | Approved project MIT terms, exact production npm notices and separate native/binary distribution review gates              |
+| Read                             | Use it for                                                                                                                            |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| [../README.md](../README.md)     | Project overview, quick local start and current scope                                                                                 |
+| [USER_GUIDE.md](USER_GUIDE.md)   | Projects, no-copy import, repeated excerpts, timeline editing, clip speed curves/transforms, row keyframes, music/export and recovery |
+| [DEVELOPMENT.md](DEVELOPMENT.md) | Linux toolchain, commands, synthetic tests, CI, architecture and contributor safety                                                   |
+| [DEPLOYMENT.md](DEPLOYMENT.md)   | Service-side source paths/API and security; planned local Docker/Podman packaging, **not a runnable container recipe**                |
+| [LICENSING.md](LICENSING.md)     | Approved project MIT terms, exact production npm notices and separate native/binary distribution review gates                         |
 
 ## Processing and editing contracts
 
-| Document                                               | Authority/scope                                                                                                                                         |
-| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [COLOUR_AND_TIMING.md](COLOUR_AND_TIMING.md)           | SDR grading, fade/dissolve/rational-frame equations and preview/reference scope                                                                         |
-| [LAYERS_AND_KEYFRAMES.md](LAYERS_AND_KEYFRAMES.md)     | Uniform schema-8 video tracks, sole Opacity/nine-channel row points, per-track Ripple/transitions/fades, composition and music resource bounds          |
-| [SPEED_AND_AUDIO.md](SPEED_AND_AUDIO.md)               | Source-anchored constant/ramp/custom clip curves versus analytic project-time row Speed, precise curve editing, shared retiming and music/export audio  |
-| [TIMELINE_EDITING.md](TIMELINE_EDITING.md)             | No-copy import, source ranges, per-track Ripple/independent placement, recoverable trims, marked cuts, history and snapping                             |
-| [WORKSPACE_AND_RECOVERY.md](WORKSPACE_AND_RECOVERY.md) | Layout, field/keyboard contexts, project bins, serial saves/conflicts, Activity and failure recovery                                                    |
-| [UX_HARDENING.md](UX_HARDENING.md)                     | Visual controls, deterministic raw-reader ownership, relink identity prerequisite, export-space assumptions/disk-full recovery and deferred loading     |
-| [design/MULTIPLE_MUSIC.md](design/MULTIPLE_MUSIC.md)   | Strict schema-8 identified music arrays, corrected project duration/black tails, final-only summed clipping, one bounded clock and serial native mixing |
+| Document                                                     | Authority/scope                                                                                                                                         |
+| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [COLOUR_AND_TIMING.md](COLOUR_AND_TIMING.md)                 | SDR grading, fade/dissolve/rational-frame equations and preview/reference scope                                                                         |
+| [LAYERS_AND_KEYFRAMES.md](LAYERS_AND_KEYFRAMES.md)           | Uniform schema-9 video tracks, sole Opacity/nine-channel row points, per-track Ripple/transitions/fades, spatial coverage and music resource bounds     |
+| [SPEED_AND_AUDIO.md](SPEED_AND_AUDIO.md)                     | Source-anchored constant/ramp/custom clip curves versus analytic project-time row Speed, precise curve editing, shared retiming and music/export audio  |
+| [TIMELINE_EDITING.md](TIMELINE_EDITING.md)                   | No-copy import, source ranges, per-track Ripple/independent placement, recoverable trims, marked cuts, history and snapping                             |
+| [WORKSPACE_AND_RECOVERY.md](WORKSPACE_AND_RECOVERY.md)       | Layout, field/keyboard contexts, project bins, serial saves/conflicts, Activity and failure recovery                                                    |
+| [UX_HARDENING.md](UX_HARDENING.md)                           | Visual controls, deterministic raw-reader ownership, relink identity prerequisite, export-space assumptions/disk-full recovery and deferred loading     |
+| [design/MULTIPLE_MUSIC.md](design/MULTIPLE_MUSIC.md)         | Strict schema-9 identified music arrays, corrected project duration/black tails, final-only summed clipping, one bounded clock and serial native mixing |
+| [design/SPATIAL_TRANSFORMS.md](design/SPATIAL_TRANSFORMS.md) | Required clip base/full-pose source-frame keys, crop/affine geometry, neutral letterboxing, per-pixel coverage and Transform controls                   |
 
 Use the final approved [#67](https://github.com/Plonk42/PasCap/issues/67) contract:
 one required numeric row `opacity`, initially 1 (100%) on new tracks, with the sole
@@ -37,13 +38,18 @@ are required: `opacity`, `speed` and seven colour settings. Saved `clip.opacity`
 and old `clipOpacity`/`layerOpacity` channels are rejected, not the valid row value.
 Colour animation remains row-wide, while the separately approved clip-only speed
 curves use source frames.
-Schema 8 additionally requires `music: MusicTrack[]`, 0–8 independent uniquely
+Schema 9 additionally requires clip `spatial: { base, keyframes }`: a complete
+eight-value pose and 0–256 full-pose original-source keys with required easing.
+Clip transforms preserve off-trim/exclusive-OUT anchors through edits and use
+continuous placed retiming for geometry, without optical flow. They are separate
+from row animation; the sole row Opacity contract is unchanged.
+Schema 9 requires `music: MusicTrack[]`, 0–8 independent uniquely
 identified instances (`[]` without music). Project duration is maximum video clip
 OUT or music start + duration: music can extend it, with video closing fades at
 clip OUT then black while music continues/fades at its own end. Clip colour/speed
-and sole Opacity are unchanged. Version-1 export receipts require strict v8
+and sole Opacity are unchanged. Version-1 export receipts require strict v9
 snapshots and captured audio-source/instance-plan arrays; preserve incompatible
-v1–v7 documents/receipts/MP4s, recreate deliberately, and never migrate/default
+v1–v8 documents/receipts/MP4s, recreate deliberately, and never migrate/default
 or use null/older readers. Registry/proxy/current PCM formats remain unchanged.
 The #35 contract has pending implementation/validation acceptance; no passed
 tests, release or milestone closure is claimed by this documentation update.

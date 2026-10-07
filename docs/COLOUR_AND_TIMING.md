@@ -1,4 +1,4 @@
-# PasCap colour and timing contract · project v8
+# PasCap colour and timing contract · project v9
 
 This specification is shared by the CPU reference,
 WebGL2 shader and generated native FFmpeg LUTs. It is elementary SDR grading, not
@@ -38,7 +38,10 @@ highlight recovery. Originals remain untouched.
   two in-memory 65³ Float32 LUTs generated from the **evaluated grading parameters**;
   tetrahedral sampling feeds premultiplied RGBA16 composition before final H.264.
   No endpoint-LUT/image crossfade substitutes for parameter animation. Scaling to
-  the fitted target image occurs before grading; padding is black after grading.
+  the fitted target image occurs before grading. Exact neutral spatial poses retain
+  the old opaque black padding after grading. Nonneutral spatial poses inverse-map
+  and resample source RGB before grading, with transparent coverage outside the
+  transformed/cropped original; crop does not refit the image.
   Quantisation, interpolation and 4:2:0 encoding are
   documented differences, not claimed equivalence. Tests measure LUT error and
   GPU/CPU/native pixel error. Extreme slider settings may have larger LUT error.
@@ -47,7 +50,7 @@ highlight recovery. Originals remain untouched.
 
 Shared row opacity, colour and Speed points use integer **project frames** and
 override each participating channel across every clip on that row. Clip-instance
-custom speed keys instead use integer **original-source frames**; unkeyed colour
+custom speed and spatial keys instead use integer **original-source frames**; unkeyed colour
 and clip speed settings remain independent per clip. **Opacity** is one row-owned
 setting: `VideoLayer.opacity` is a required number in 0–1, initially 1 on a new
 track. Without Opacity participants, every source uses that row value; otherwise
@@ -59,7 +62,10 @@ Hold/linear/ease-in/ease-out/smooth interpolation belongs to the left participat
 point; endpoints hold outside the
 keyed interval. Colour evaluates all seven parameter values before applying the
 equations above. Trim/split never copy or shift row points; they retain clip-speed
-anchors, including those outside the excerpt but inside the registered original.
+and spatial anchors, including those outside the excerpt and at the registered
+original's exclusive OUT. Spatial poses evaluate continuously through the placed
+retiming map, not at the floored recorded-image frame; see
+[spatial transforms](design/SPATIAL_TRANSFORMS.md).
 
 The single **Opacity** slider is in **Clip → Colour**, beside the colour sliders,
 and starts at **100%**. It edits row `opacity` without keys and works on an empty
@@ -70,13 +76,15 @@ controls coverage during composition after the unchanged SDR colour math above.
 
 For each enabled layer, source-over uses premultiplied encoded RGB/coverage.
 Let $w_i$ be dissolve weight, $o_i$ evaluated Opacity, $b_i$ black-fade brightness
-and $G_i$ graded RGB. Evaluate the row's Opacity for each source at the same
-project frame. Group RGB and coverage are
-$C = \sum_i G_i b_i o_i w_i$ and $A = \sum_i o_i w_i$.
+and $G_i$ graded RGB, with $m_i$ spatial coverage at the output pixel. Evaluate the
+row's Opacity for each source at the same project frame. Group RGB and coverage are
+$C = \sum_i G_i b_i o_i w_i m_i$ and $A = \sum_i o_i w_i m_i$.
 Source-over is $\mathrm{result} = C + \mathrm{lower}(1 - A)$, with no additional layer multiplier.
 Every track's dissolve is one group, preventing unintended double attenuation;
 independent pairs may dissolve simultaneously on several tracks. Black fades affect
-that track's RGB, **not alpha**, preserving its coverage of lower footage.
+that track's RGB, **not alpha**, preserving its available coverage of lower footage.
+Nonneutral poses use $m_i=0$ outside the transformed/cropped source. Exact neutral
+poses preserve $m_i=1$ over the canvas and ungraded black letterbox RGB.
 Enabled layer groups blend bottom-to-top over opaque black, with no implicit linear-
 light blend or extra tone map. See [LAYERS_AND_KEYFRAMES.md](LAYERS_AND_KEYFRAMES.md).
 
@@ -89,7 +97,7 @@ colour controls added to `NEUTRAL_COLOUR` are automatically bypassed, without a
 separate per-control comparison list. Stored grades and keys are unchanged.
 
 Only grading is neutralized: exact observed source frames and `PlacedClip.retiming`,
-row Opacity, visibility, dissolve weights, black fades, stacking
+spatial geometry/coverage, row Opacity, visibility, dissolve weights, black fades, stacking
 and music retain their normal contract. Ungraded is still the composed preview,
 not an original-resolution or isolated-selected-clip view; Source preview is unchanged.
 
@@ -104,7 +112,7 @@ resets to normal graded preview. Export continues to use the saved grading contr
 ## Timing
 
 - Project placements, row points and output durations use integer **project frames**;
-  source bounds and clip-speed anchors use integer **original-source frames**.
+  source bounds and clip-speed/spatial anchors use integer **original-source frames**.
   Rate: exactly `30000/1001`.
   Seconds exist only at media API / FFmpeg boundaries. Source OUT is exclusive.
 - Cuts consume zero frames. With Ripple on, a track sequences from its first
@@ -132,7 +140,7 @@ resets to normal graded preview. Export continues to use the saved grading contr
   a black transition's centre. It is intentional, deterministic and testable.
 - Incoming/outgoing transition and opening/closing regions must not overlap
   within a clip. Invalid durations/edits are rejected, never silently clamped.
-- Splits copy static settings/clip-speed anchors, preserve exterior boundaries
+- Splits deep-copy static settings/clip-speed/spatial anchors, preserve exterior boundaries
   and add a cut; shared row points stay at their project frames. Pieces recompile
   and round independently. Ripple-on tracks re-sequence; off tracks retain
   unrelated placements. Reordering tracks changes composition, not clip timing.
@@ -156,7 +164,7 @@ resets to normal graded preview. Export continues to use the saved grading contr
 
 ## Music sampling and mixing
 
-Strict schema 8 requires a 0–8 `music` array of independent uniquely identified
+Strict schema 9 requires a 0–8 `music` array of independent uniquely identified
 instances, `[]` without music. Each has source IN/OUT, start/duration, gain, fades
 and loop; source-video audio remains disabled. At 48 kHz, source/placement/duration/
 fade positions round independently to integer samples using the rational frame
@@ -185,7 +193,8 @@ separate source-review decoder. Resources
 are not allocated per stored clip; missing observed frames buffer explicitly.
 
 Production export reads originals and uses exact shared retiming. The static fast
-path requires one enabled track with row Opacity 1, no row points, zero origin
+path requires one enabled track with row Opacity 1, no row points, exactly neutral
+spatial bases without spatial keys, zero origin
 and no internal gaps, covering full project duration; supported track fades/dissolves retain bounded chunks.
 Other valid timelines use generalized sequential RGBA16 group and source-over
 passes without regrading, then one final H.264 encode,
@@ -195,20 +204,22 @@ export requires at least one retained video clip. Resource and numeric limits ar
 [Inspector and resource limits](LAYERS_AND_KEYFRAMES.md#inspector-and-resource-limits).
 
 The diagnostic reference accepts **exactly two normal-speed clips on one
-enabled, zero-origin contiguous track with row Opacity 1**, without music, extra tracks or row points,
+enabled, zero-origin contiguous track with row Opacity 1**, exactly neutral spatial
+bases without spatial keys, without music, extra tracks or row points,
 and is limited to 3,600 project frames. It refuses unsupported
 documents regardless of Ripple or track ID.
-It requires a strict schema-8 project snapshot, including explicit project media
+It requires a strict schema-9 project snapshot, including explicit project media
 membership; its reference receipt format remains independently version 1. New
-measurement reports must identify their v8 project snapshot without overwriting
+measurement reports must identify their v9 project snapshot without overwriting
 historical reports; the report identifier is separate from the project schema.
 Project identifiers such as `preview-lab`/`preview-lab-v6` are not schema versions
 and are not renamed by this contract.
-v1–v7 project documents and receipt snapshots are incompatible and preserved;
+v1–v8 project documents and receipt snapshots are incompatible and preserved;
 recreate projects deliberately, with no migration, compatibility defaults or
-old-format/null fallback readers or automatic deletion. Strict v8 requires row `opacity`; saved `clip.opacity` and
+old-format/null fallback readers or automatic deletion. Strict v9 requires clip
+`spatial` base/full-pose keys and row `opacity`; saved `clip.opacity` and
 old `clipOpacity`/`layerOpacity` point fields are rejected, not defaulted.
-Production export receipts also remain version 1, with strict v8 snapshots and
+Production export receipts also remain version 1, with strict v9 snapshots and
 required `musicSources` captured-original/`settings.audio` identified-plan arrays;
 older snapshots or invalid arrays are rejected without rewriting receipts/MP4s.
 Registry/proxy/current PCM formats and source guards are unchanged.

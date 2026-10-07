@@ -10,6 +10,7 @@ import { audioAssetSchema } from '../../src/shared/audio.js';
 import { planExportMusic } from '../../src/shared/export.js';
 import { EMPTY_KEY_VALUES } from '../../src/shared/keyframes.js';
 import { createClip, createProject, type ProjectDocument } from '../../src/shared/model.js';
+import { NEUTRAL_SPATIAL_POSE } from '../../src/shared/spatial.js';
 import { calculateLayout } from '../../src/shared/timeline.js';
 import { framesToSeconds } from '../../src/shared/timing.js';
 import { unsupportedProject } from './project-fixtures.js';
@@ -90,6 +91,13 @@ describe('durable export receipts', () => {
     await mkdir(folder, { recursive: true });
     const snapshot = createProject('flight', 'Flight');
     snapshot.clips.push(createClip('one', 'source', 0, 10));
+    snapshot.clips[0]!.spatial = {
+      base: { ...NEUTRAL_SPATIAL_POSE, cropLeft: 0.125, scale: 1.23456789 },
+      keyframes: [
+        { frame: 0, interpolation: 'smooth', values: { ...NEUTRAL_SPATIAL_POSE, rotation: -90 } },
+        { frame: 100, interpolation: 'hold', values: { ...NEUTRAL_SPATIAL_POSE, translateX: 0.5 } },
+      ],
+    };
     snapshot.layers[0]!.keyframes = [
       { frame: 5, interpolation: 'smooth', values: { ...EMPTY_KEY_VALUES, opacity: 0.5, exposure: 0.7 } },
     ];
@@ -105,7 +113,7 @@ describe('durable export receipts', () => {
       fadeOut: index,
       loop: false,
     }));
-    expect(snapshot.schemaVersion).toBe(8);
+    expect(snapshot.schemaVersion).toBe(9);
     const receipt = receiptFixture(snapshot, id);
     expect(receipt.musicSources).toHaveLength(2);
     expect(receipt.settings.audio).toHaveLength(8);
@@ -121,6 +129,9 @@ describe('durable export receipts', () => {
       outputUrl: `/api/jobs/${id}/export`,
     });
     expect(await readFile(path.join(folder, 'receipt.json'), 'utf8')).toBe(text);
+    expect(JSON.parse(await readFile(path.join(folder, 'receipt.json'), 'utf8')).snapshot.clips[0].spatial).toEqual(
+      snapshot.clips[0]!.spatial,
+    );
     expect(await readFile(path.join(folder, 'export.mp4'), 'utf8')).toBe('verified output fixture');
     await restoreExports(createConfig({ dataDir: root }), jobs);
     expect(jobs.list()).toHaveLength(1);
@@ -149,6 +160,18 @@ describe('durable export receipts', () => {
   });
 
   const invalidReceipts: { name: string; change: (receipt: ReceiptFixture) => void }[] = [
+    {
+      name: 'missing clip spatial settings',
+      change: (receipt) => {
+        Reflect.deleteProperty(receipt.snapshot.clips[0]!, 'spatial');
+      },
+    },
+    {
+      name: 'unknown clip spatial metadata',
+      change: (receipt) => {
+        Object.assign(receipt.snapshot.clips[0]!.spatial, { legacy: true });
+      },
+    },
     {
       name: 'invalid snapshot fade layout',
       change: (receipt) => {
@@ -371,7 +394,7 @@ describe('durable export receipts', () => {
       }
     },
   );
-  it.each([3, 4, 5, 6, 7])(
+  it.each([3, 4, 5, 6, 7, 8])(
     'leaves version-1 receipts with unsupported v%s snapshots and their completed outputs unchanged',
     async (version) => {
       const root = await mkdtemp(path.join(os.tmpdir(), 'pascap-archive-'));
@@ -397,7 +420,7 @@ describe('durable export receipts', () => {
         const warnings = await restoreExports(createConfig({ dataDir: root }), jobs);
         expect(warnings).toHaveLength(1);
         expect(warnings[0]).toContain(
-          `Unsupported export snapshot schema version ${version}; this build requires version 8`,
+          `Unsupported export snapshot schema version ${version}; this build requires version 9`,
         );
         expect(jobs.list()).toEqual([]);
         expect(await readFile(path.join(folder, 'receipt.json'), 'utf8')).toBe(text);

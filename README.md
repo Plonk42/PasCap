@@ -3,7 +3,7 @@
 [![CI](https://github.com/Plonk42/PasCap/actions/workflows/ci.yml/badge.svg)](https://github.com/Plonk42/PasCap/actions/workflows/ci.yml)
 
 **A local, single-user video editor for Linux.** Review rushes, assemble an edit,
-animate colour and speed, add music, and export a 720p draft or 4K final using
+animate colour, speed and clip transforms, add music, and export a 720p draft or 4K final using
 native FFmpeg. Footage stays on your machine and is **referenced in place, not
 uploaded or copied**.
 
@@ -21,6 +21,7 @@ deployment targets.
 - Recoverable trims, split, duplication, marked-range cutting, snapping, Undo/Redo and source review.
 - Independent clip colour/speed settings, one row-owned Opacity setting, and **shared row-wide keyframes** for Opacity, Speed and seven colour settings.
 - Precise clip-only speed curves with editable presets, draggable source-frame points and exact rate/easing inputs.
+- Clip-only crop, uniform scale, translation and rotation, with full-pose original-source keyframes.
 - Draggable timeline keyframes and setting-specific Previous/Next navigation.
 - Direct panel/help controls, compact visual animation states and grouped editing tools.
 - Track-local cuts, fade-through-black, cross-dissolves and opening/closing fades.
@@ -83,6 +84,13 @@ not the SDR RGB grade, with no additional layer multiplier or sidebar duplicate.
 Layer options contains only rename, Ripple, ordering and deletion; visibility
 remains a separate sidebar control.
 
+**Clip → Transform** edits each excerpt's crop, Scale, Translate X/Y and Rotation.
+Its source-frame diamond captures a complete pose; animated main values require
+a key at the actually displayed source frame. Stored-key navigation reaches
+off-trim and exclusive-OUT anchors without inventing preview frames. Cropping does
+not refit the image; nonneutral uncovered pixels reveal lower layers. Exact neutral
+poses retain opaque black letterboxing. See [spatial transforms](docs/design/SPATIAL_TRANSFORMS.md).
+
 Project duration is the maximum of all retimed video clip ends and every music
 instance's start + duration. Music can continue beyond video: the final video
 closing fade ends at its clip OUT, then the picture is black while music continues
@@ -114,15 +122,16 @@ Missing mounts and symlinks fail explicitly. In the eventual container package,
 originals will be read-only bind mounts and application data will be a separate
 persistent writable mount. See [deployment design](docs/DEPLOYMENT.md).
 
-**Project format:** strict schema **v8**, with required `music` array (0–8
+**Project format:** strict schema **v9**, with required clip `spatial` base and
+0–256 full-pose source-frame keys, required `music` array (0–8
 instances, unique required IDs; `[]` without music), per-track Ripple,
 transitions, fades and numeric `VideoLayer.opacity` (0–1; new tracks start at 1),
 and exactly nine nullable point channels: `opacity`, `speed` and seven colour
 settings. Row `opacity` is required and valid; saved `clip.opacity` and old
 `clipOpacity`/`layerOpacity` channels are rejected, not ignored or defaulted.
-v1–v7 projects and receipt snapshots remain unchanged
+v1–v8 projects and receipt snapshots remain unchanged
 on disk but are incompatible: recreate projects and import media deliberately.
-Export receipts remain version 1 with a strict v8 snapshot and required captured
+Export receipts remain version 1 with a strict v9 snapshot and required captured
 audio-source/instance-plan arrays. Registry/proxy/current PCM cache formats and
 source protections do not change. There are no migrations, null fallbacks,
 compatibility readers, default-filled legacy fields or automatic deletions.
@@ -164,14 +173,15 @@ real-workload qualification, and local Docker/Podman packaging. See
 - [Timing and colour contract](docs/COLOUR_AND_TIMING.md)
 - [Layers and keyframes](docs/LAYERS_AND_KEYFRAMES.md)
 - [Speed, audio and export](docs/SPEED_AND_AUDIO.md)
-- [Multiple music/schema-8 contract](docs/design/MULTIPLE_MUSIC.md) — required behaviour; implementation/validation acceptance remains pending, not a test or release claim.
+- [Spatial transforms/schema-9 contract](docs/design/SPATIAL_TRANSFORMS.md)
+- [Multiple music/schema-9 contract](docs/design/MULTIPLE_MUSIC.md) — required behaviour; implementation/validation acceptance remains pending, not a test or release claim.
 - [Deployment target](docs/DEPLOYMENT.md)
 - [Historical feasibility study](docs/FEASIBILITY_REPORT.md)
 
 The original [implementation plan](EDITOR_IMPLEMENTATION_PLAN.md) and feature
 inspection worksheets are retained as design history, not a promise to reproduce
 CapCut's feature catalogue. No CapCut assets/source or Derusher implementation
-is included. Titles, transforms, masks, HDR, optical flow and cloud collaboration
+is included. Titles, general-purpose masks, HDR, optical flow and cloud collaboration
 are not part of the current editor.
 
 ### Footage service API

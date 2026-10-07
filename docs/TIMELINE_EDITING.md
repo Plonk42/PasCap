@@ -3,7 +3,7 @@
 ## Source footage and excerpt instances
 
 The media library describes complete recordings belonging to the open project's
-bin, not every globally registered source. Strict schema 8 requires unique
+bin, not every globally registered source. Strict schema 9 requires unique
 `media.videoIds` and `media.audioIds` arrays (10,000 IDs maximum each). Imports add
 membership even without timeline placement; clip/music references also remain
 visible. New projects start with both arrays empty. Importing an existing source
@@ -11,11 +11,13 @@ deliberately reuses the global content-deduplicated registry/proxy cache; switch
 projects never automatically adopts that global library. An insertion creates
 a unique clip-instance ID and copies the latest media-review IN/OUT, or
 `sourceIn = 0`, `sourceOut = registered frameCount` without a choice. New clips have
-neutral static colour and normal constant speed, with no saved opacity field.
+neutral static colour, normal constant speed and a complete neutral spatial base
+with no spatial keys, with no saved opacity field.
 They use the destination row's `opacity` value or its overriding Opacity keys.
-They have no clip animation; any existing row curves immediately apply at their project placement.
+New clips have no clip animation; existing row curves immediately apply at their project placement.
 The original and full proxy remain unchanged; no extra crop file is generated.
-Multiple insertions of one recording have independent source ranges, colour and clip speed.
+Multiple insertions of one recording have independent source ranges, colour,
+clip speed and spatial settings.
 
 For several excerpts from one rush, set source IN/OUT and **Add excerpt**, then
 mark the next range and add again. Successful additions leave Source preview pinned
@@ -34,6 +36,10 @@ not the raw source-range length at non-1× speed. A row Speed curve uses absolut
 project time and can give the same source excerpt a different duration at another
 start/layer. Without Speed participants, the clip's static constant/source-ramp
 map applies. See [SPEED_AND_AUDIO.md](SPEED_AND_AUDIO.md).
+Clip spatial animation uses the same map's continuous `sourcePositionAt` for
+geometry and integer `sourceAt` for the recorded image. Transform edits do not
+change placement or duration; slow motion can move geometry on a held image
+without optical flow. See [spatial transforms](design/SPATIAL_TRANSFORMS.md).
 
 Project duration is the maximum of all retimed clip ends (including hidden
 layers) and every independent music instance's start + duration. Music can extend
@@ -80,7 +86,7 @@ Import guidance, **without a POST**. Internal dragging of ready registered Media
 into Timeline remains unchanged. Uncertain registration results are not retried
 automatically; check Media/Activity before resubmitting.
 
-Strict schema 8 requires per-track Ripple, transitions and fades, and a required
+Strict schema 9 requires clip spatial settings, per-track Ripple, transitions and fades, and a required
 0–8 identified-instance `music` array (`[]` without music); registry/proxy/PCM
 formats are unchanged. Only generated proxies/thumbnails, metadata,
 exports/receipts and scratch are created, not duplicate originals. Keep originals
@@ -127,6 +133,9 @@ registered paths and bytes. This is data safety, not compatibility code.
   transition validation as handles.
 - Trim/restoration never copies or shifts row points. Original-source static ramp
   anchors are retained; the row animation override continues across the new range.
+  Clip spatial keys also retain original-source positions, including outside the
+  new trim and at the original exclusive OUT; restoring a range restores access
+  to those unchanged anchors, not a rewritten animation.
 
 The selected excerpt's left/right trim edges are keyboard sliders. Arrow keys
 move by one original source frame; Shift moves by ten. Home at the left edge requests
@@ -158,7 +167,9 @@ from that track's own Ripple setting, not its row number or identity.
 - Middle removal keeps a left excerpt with the original ID and a right excerpt with
   a fresh ID. Prefix/suffix removal keeps only the retained excerpt; a whole-range
   removal deletes it. Retained pieces share the original media but have independent
-  ranges/static settings, including original-source ramp anchors. No proxy is cut.
+  ranges/settings, including original-source ramp anchors and deep-copied spatial
+  base/full-pose keys. Off-trim and original exclusive-OUT anchors remain stored.
+  No proxy is cut.
 - With Ripple on, the track closes the removed gap and recalculates later starts/durations
   without changing their order, original-source ranges or static settings. The new
   left/right boundary is a cut. Existing valid incoming/outgoing transitions are
@@ -226,7 +237,8 @@ and undoable, and never move music, other tracks or absolute row points.
   that track. Each piece retimes/rounds independently,
   so total duration can change. Invalid edits never enter history.
 - **Clip actions → Duplicate** / **Ctrl+D** copies the complete source excerpt,
-  static grade and constant/ramp/custom speed into an independent ID; it does not
+  static grade, constant/ramp/custom speed and deep-copied spatial base/keys into
+  an independent ID; it does not
   copy or change row Opacity. Ripple-on duplicates insert after the original with
   new cut boundaries. Ripple-off duplicates start immediately
   after the original's contextual end and acquire their own contextual duration;
@@ -234,7 +246,9 @@ and undoable, and never move music, other tracks or absolute row points.
 - **Trim/cut/move/split/duplicate never copy or shift row points.** Track Ripple
   leaves their project times fixed. Moving between rows leaves both rows' points
   and saved Opacity values intact, using the destination row value or curve;
-  source ranges, colour and clip speed remain independent.
+  source ranges, colour, clip speed and spatial settings remain independent.
+  Splits/cuts/duplicates copy complete spatial poses and key arrays independently;
+  trims/moves/Ripple never shift, rescale or discard their original-source anchors.
 - **Alt+Left/Right** nudges a positioned clip or the first Ripple anchor one frame;
   adding Shift nudges ten. Clip actions also exposes frame-nudge buttons, and
   Clip → Placement has **Timeline start frame** on every track. Later Ripple
@@ -247,7 +261,7 @@ and undoable, and never move music, other tracks or absolute row points.
 
 ## Row points, time ruler and transitions
 
-Schema-8 points belong to the **whole video row**, not individual clips. One ordered
+Schema-9 shared row points belong to the **whole video row**, not individual clips. One ordered
 point at a project frame has nine required nullable channels: **Opacity**
 (`opacity`), Speed and seven colour settings, participating independently.
 Every `VideoLayer` also requires numeric `opacity` in 0–1, initially 1 (100%) on
@@ -357,11 +371,13 @@ the last remaining one; Raise/Lower are limited only by composition endpoints an
 active interaction state. Track order/deletion and cross-track moves are undoable.
 Each track's dissolve is one premultiplied group; simultaneous dissolves on
 different tracks are allowed. With graded RGB $G_i$, black-fade brightness $b_i$,
-evaluated Opacity $o_i$ and dissolve weight $w_i$, the group has
-$C = \sum_i G_i b_i o_i w_i$, $A = \sum_i o_i w_i$ and source-over
+evaluated Opacity $o_i$, dissolve weight $w_i$ and spatial coverage $m_i$, the group has
+$C = \sum_i G_i b_i o_i w_i m_i$, $A = \sum_i o_i w_i m_i$ and source-over
 $\mathrm{result} = C + \mathrm{lower}(1 - A)$, with no layer multiplier.
 At a project frame, each source uses the same evaluated row Opacity, from the
 saved row value or overriding `opacity` curve; it is not applied again to the group.
+Nonneutral transformed/cropped pixels outside the original have zero coverage;
+exact neutral poses retain the old opaque black letterboxing after grading.
 
 A nonempty one-layer project uses **two reusable video elements/textures**; eight
 tracks use **16**, two slots per track, never one per stored clip.
@@ -376,7 +392,8 @@ All row opacity/colour channels use project time, so coverage and grading can ch
 even on held source frames. Appearance-only edits update rendering without reloading
 unchanged timing/music. Source/static-speed/row-Speed/placement edits pause and reload
 the placed map; moving/easing a point with Speed participation is also timing-changing.
-Opacity changes remain appearance-only; black fades preserve coverage and grouped
+Opacity and spatial changes remain appearance-only; continuous spatial geometry
+can change on a held recorded image. Black fades preserve coverage and grouped
 dissolves use the source-over contract above. See
 [LAYERS_AND_KEYFRAMES.md](LAYERS_AND_KEYFRAMES.md).
 
@@ -395,11 +412,12 @@ insertion remains boundary-based even with Snap off or Alt held; only an explici
 move of its retained first clip changes the anchor. The
 toggle persists for the current timeline session, not the renderable document.
 
-Projects are named separate **version-8** documents with required per-layer Ripple,
+Projects are named separate **version-9** documents with required clip spatial
+base/full-pose source-frame keys and per-layer Ripple,
 transitions, opening/closing fades and numeric `opacity` in 0–1. New layers start
 at 1 (100%); a missing saved field is invalid. Switching flushes autosave first,
 blocks on failed saves, and resets session selection/history; successful export
-snapshots are independent of the open project. Earlier v1–v7 projects and receipt
+snapshots are independent of the open project. Earlier v1–v8 projects and receipt
 snapshots remain incompatible and preserved, without migration/fabricated defaults.
 There is no automatic deletion. Row `opacity` is the required sole stored value;
 saved `clip.opacity` and old `clipOpacity`/`layerOpacity` point fields are rejected,
@@ -414,7 +432,7 @@ are unchanged.
 The required `music` array holds **0–8 independent instances**, each with a unique
 required `id`, registered `mediaId`, source IN/OUT, start/duration, gain, fades and
 loop flag. No null/singular fallback, omitted-field default or old-format reader
-is accepted. Version-1 export receipts require a strict v8 snapshot and captured
+is accepted. Version-1 export receipts require a strict v9 snapshot and captured
 audio-source/instance-plan arrays; older snapshots/invalid arrays are rejected
 while the receipt and finished output remain preserved. Current PCM format is unchanged.
 
@@ -471,7 +489,7 @@ Close/hidden/offscreen/project switch releases the one review decoder.
 The normal editor shows Media, Preview, the contextual inspector and Timeline.
 Panels are resizable/collapsible with browser-local layout persistence; source
 review occupies a docked viewer tab rather than covering the workspace. Main and
-stored Colour/Opacity values, playback rates and gain share native sliders with
+stored Colour/Opacity/Transform values, playback rates and gain share native sliders with
 adjacent exact `NumberField` controls, not read-only outputs or number-only layouts.
 Pointer sliding changes only a local control draft; release applies one validated
 document edit and updates the image. Escape, pointer cancellation, lost capture or
@@ -481,7 +499,7 @@ precision, commit on Enter/blur, keep invalid drafts editable and restore on Esc
 Integer source/placement frames, durations and fades retain exact native numeric
 steppers and existing timecode feedback, without arbitrary timing sliders.
 Source-review paired IN/OUT retains its explicit Apply workflow.
-**Clip / Keyframes / Sequence / Audio** separates source/appearance/speed, the
+**Clip / Keyframes / Sequence / Audio** separates source/appearance/speed/Transform, the
 whole-row point list, transitions/fades and music. The header directly exposes
 panel toggles and help; **Workspace options**
 holds layout reset and Diagnostics. **Layer options**
@@ -491,7 +509,8 @@ Diagnostic counters, shader tests and the two-clip native comparison tool remain
 hidden behind Diagnostics. **Export** uses the bounded native multi-clip
 renderer, with profiles for 720p drafts and 4K finals. The diagnostic two-excerpt
 reference remains limited to two normal-speed clips on one enabled,
-zero-origin contiguous track with row Opacity 1, without music/extra tracks/shared row points,
+zero-origin contiguous track with row Opacity 1 and neutral spatial bases without
+spatial keys, without music/extra tracks/shared row points,
 including Speed-only points, and at most 3,600 project frames.
 Clip sections collapse independently and retain expansion across reloads; collapsing
 a section never disables its processing.

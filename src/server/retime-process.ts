@@ -36,16 +36,35 @@ function captureRetiming(clip: VideoClip, supplied: Retiming | undefined): Retim
       422,
     );
   }
-  if (typeof map.sourceAt !== 'function' || typeof map.outputAt !== 'function' || typeof map.rateAt !== 'function') {
-    throw new ServiceError('The shared retiming map must expose sourceAt, outputAt and rateAt queries.', 422);
+  if (
+    typeof map.sourceAt !== 'function' ||
+    typeof map.sourcePositionAt !== 'function' ||
+    typeof map.outputAt !== 'function' ||
+    typeof map.rateAt !== 'function'
+  ) {
+    throw new ServiceError(
+      'The shared retiming map must expose sourceAt, sourcePositionAt, outputAt and rateAt queries.',
+      422,
+    );
   }
   // Capture the duration and query functions, never materialize a duration-sized map.
-  return Object.freeze({
+  const captured = Object.freeze({
     duration: map.duration,
     sourceAt: map.sourceAt.bind(map),
+    sourcePositionAt: map.sourcePositionAt.bind(map),
     outputAt: map.outputAt.bind(map),
     rateAt: map.rateAt.bind(map),
   });
+  if (
+    captured.sourcePositionAt(0) !== clip.sourceIn ||
+    captured.sourcePositionAt(captured.duration) !== clip.sourceOut
+  ) {
+    throw new ServiceError(
+      'The shared retiming map continuous source positions must match the selected source endpoints.',
+      422,
+    );
+  }
+  return captured;
 }
 
 async function pumpMappedFrames(
@@ -59,6 +78,7 @@ async function pumpMappedFrames(
   let decoded = 0;
   let written = 0;
   let previousSource = options.clip.sourceIn - 1;
+  let previousPosition = options.clip.sourceIn;
   const progressStep = Math.max(1, Math.floor(retiming.duration / 500));
   for (let output = 0; output < retiming.duration; output++) {
     check();
@@ -72,6 +92,19 @@ async function pumpMappedFrames(
       throw new ServiceError('The shared retiming map is not a monotonic, in-range discrete source-frame map.', 422);
     }
     previousSource = source;
+    const position = retiming.sourcePositionAt(output);
+    if (
+      !Number.isFinite(position) ||
+      position < options.clip.sourceIn ||
+      position > options.clip.sourceOut ||
+      position < previousPosition
+    ) {
+      throw new ServiceError(
+        'The shared retiming map is not a finite, monotonic, in-range continuous source-position map.',
+        422,
+      );
+    }
+    previousPosition = position;
     while (options.clip.sourceIn + decoded <= source) {
       await reader.requireFrame(frame); // NOSONAR -- serial reads are the one-frame memory contract.
       decoded++;

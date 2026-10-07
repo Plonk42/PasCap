@@ -1,4 +1,4 @@
-# Multiple music instances · strict project schema 8
+# Multiple music instances · strict project schema 9
 
 Current contract for [#35](https://github.com/Plonk42/PasCap/issues/35). This specifies
 the required behaviour, not completed implementation, test evidence or release
@@ -10,7 +10,7 @@ Usage belongs in [the user guide](../USER_GUIDE.md) and
 
 ## Strict document and instance identity
 
-- `schemaVersion` is exactly **8**. Required `music: MusicTrack[]` contains **0–8**
+- `schemaVersion` is exactly **9**. Required `music: MusicTrack[]` contains **0–8**
   independent instances; `[]` means no music. Omitted fields, `null`, a single
   object, unknown fields and duplicate instance IDs are invalid. There are no
   migrations, compatibility readers, null fallbacks or injected defaults.
@@ -32,8 +32,10 @@ Usage belongs in [the user guide](../USER_GUIDE.md) and
   channels remain `opacity`, `speed` and the seven colour settings. There is no
   clip opacity or second opacity channel. Clip colour and constant/ramp/custom
   source-frame speed retain their current ownership and retiming.
+  Schema 9 also requires clip-owned spatial base/full-pose source-frame keys;
+  [spatial transforms](SPATIAL_TRANSFORMS.md) do not change music or row Opacity.
 
-v1–v7 projects and receipt snapshots are incompatible and preserved byte-for-byte,
+v1–v8 projects and receipt snapshots are incompatible and preserved byte-for-byte,
 along with finished exports. Recreate projects deliberately; do not rewrite,
 repair or delete them automatically. Registry, video-proxy and current
 `pcm16-48k-stereo-mono-unity-v3` PCM cache formats and source guards are unchanged.
@@ -61,7 +63,8 @@ least one retained video clip; this is not an audio-only export feature.
 
 A music tail beyond video OUT requires the **layered exporter**, which fills
 trailing black frames through project OUT. The static fast path still requires
-one enabled, opaque, unanimated, zero-origin contiguous video track, now covering
+one enabled, opaque, unanimated, zero-origin contiguous video track with exactly
+neutral spatial bases and no spatial keys, covering
 the entire project duration. No frozen-last-image or shortened-audio shortcut is
 permitted.
 
@@ -189,7 +192,7 @@ for those video budgets.
 
 ## Receipts, preservation and acceptance
 
-Export receipt format remains **version 1**, with a strict **schema-8 project
+Export receipt format remains **version 1**, with a strict **schema-9 project
 snapshot**. Required `musicSources` is an array of captured unique registered
 audio assets; required `settings.audio` is an array of instance plans carrying
 `id`/`mediaId` and independent timing/gain/fades/loop sample positions. Both are

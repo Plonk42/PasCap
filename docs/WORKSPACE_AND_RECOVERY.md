@@ -1,6 +1,6 @@
 # Desktop workspace and recovery
 
-The workspace uses **strict schema 8 with uniform video tracks, required per-track
+The workspace uses **strict schema 9 with required clip spatial settings, uniform video tracks, required per-track
 Ripple/transitions/fades, 0–8 independently identified music instances, project-specific
 video/music bins and draggable shared project-time row points**, with per-setting channel navigation. Layout preferences,
 stored-point inspection and recovery feedback remain editor-only. Source protection,
@@ -24,7 +24,7 @@ The intended discrete-GPU and long real-flight checks remain deferred.
   covering other editor controls. Tab arrows and Home/End switch viewer contexts.
 - Right: scrollable **Clip / Keyframes / Sequence / Audio** inspector tabs
   with readable inputs and independent collapsible sections. Clip contains
-  source/clip settings, placement and playhead speed, colour and diamonds. Its
+  source/clip settings, placement and playhead speed, Transform, colour and diamonds. Its
   Colour section also contains the single row-owned Opacity control. Keyframes
   (accessible tab name **Layer keyframes**) contains the selected row's directly
   visible whole-point list, participant chips,
@@ -139,20 +139,20 @@ the clicked control. Inspector tab arrows/Home/End switch contexts without disca
 mounted content or its valid/invalid drafts within the same editing context.
 Selecting a clip or row keeps the chosen tab; explicit Cut/Fade/Dissolve boundary
 buttons open Sequence.
-**Expand all / Collapse all** appears only in Clip and changes its four top-level
-sections: **Source range**, **Placement**, **Speed** and **Colour**, including
+**Expand all / Collapse all** appears only in Clip and changes its five top-level
+sections: **Source range**, **Placement**, **Speed**, **Transform** and **Colour**, including
 temporarily absent Clip sections. A mixed state offers Expand all. Individual toggles
 and the existing section preferences remain authoritative. Sequence and Audio
 sections, nested **Time, easing & values**, other nested details and help are unchanged.
 Bulk expansion is presentation-only and leaves mounted drafts, processing, history
 and saves unchanged. If preference storage fails, choices still work for the session.
-New preferences keep Source range, Placement and Speed collapsed, Colour open;
+New preferences keep Source range, Placement, Speed and Transform collapsed, Colour open;
 existing expansion preferences remain respected. Help/reset details are contextual,
 not repeated across the main workspace. Collapsing never disables processing.
 
 All inline help uses a small **question-mark button**, including animation, source,
-opacity, speed, colour, keyframe/transition/fade/audio timing and startup details.
-Inspector Source range, Placement, Speed, Colour, Transition and Sequence
+opacity, speed, Transform, colour, keyframe/transition/fade/audio timing and startup details.
+Inspector Source range, Placement, Speed, Transform, Colour, Transition and Sequence
 fades put help beside their titles, reachable even when collapsed. Expansion and
 help are independent native buttons in normal section → help → fields Tab order;
 help never opens or closes the settings. Hidden content remains mounted, retaining
@@ -197,7 +197,7 @@ there is no global comparison shortcut. **Source preview** is unaffected.
 The ungraded view is the composed preview without grading, not original-resolution
 footage or the selected clip in isolation. All evaluated colour settings are neutral
 across enabled rows, including static clip bases, row colour keys and both dissolve
-participants. Exact observed source frames and retiming, row Opacity,
+participants. Exact observed source frames and retiming, spatial geometry/coverage, row Opacity,
 visibility, black fades, stacking and music are preserved.
 
 This mode belongs only to the editor's preview engine: toggling causes no seek,
@@ -207,7 +207,7 @@ or reloading the editor with a fresh engine restores normal graded preview.
 
 ## Numbers, titles and animation
 
-Colour/Opacity values, playback rates and music gain share a bounded native slider
+Colour/Opacity/Transform values, playback rates and music gain share a bounded native slider
 with an adjacent exact `NumberField` in main controls and stored-participant editors.
 The field is the sole numeric value display, not a read-only output or number-only
 layout. Opacity numeric entry always uses **0–1**, initially **1**; the main label may
@@ -239,6 +239,34 @@ names are invalid. Layer rename lives in **Layer options**, accepts 1–100 trim
 characters, and commits as one undoable operation.
 Mode/select controls and per-control colour resets apply directly;
 animated channels without participation at the playhead are read-only until captured.
+
+### Clip Transform animation
+
+**Clip → Transform** is clip-owned, not another shared row channel or marker.
+Its **Crop left / Crop right / Crop top / Crop bottom / Scale / Translate X /
+Translate Y / Rotation °** sliders and exact fields edit the saved base without
+keys. With keys, main values require a full-pose key at the actually displayed
+integer source frame at the real playhead; otherwise they are read-only. The
+single **Transform keyframe at displayed source frame** diamond explicitly
+captures the complete continuously evaluated pose; sliders never create keys.
+Capture is unavailable outside the selected clip or during blocked/draft states.
+
+**Selected Transform keyframe**, its **Previous/Next** buttons and **Preview stored
+key** reach off-trim/original-exclusive-OUT keys using the closest mapped image.
+Labels distinguish stored source time from actual displayed source time. Stored
+**Source frame**, **To next point** easing and eight pose fields edit the selected
+key, not the real-playhead pose. The last easing selector is disabled without a
+next key. Time/value edits do not seek automatically; navigation does not save.
+This selection is distinct from the shared row inspection cursor below.
+
+Deleting the last key reveals the unchanged base; **Reset transform** instead
+clears every spatial key and restores the neutral base in one Undo. Exact numeric
+drafts and sliders follow the common apply/release/cancel rules above; collisions,
+invalid crop sums and out-of-original keys retain errors without clamping/merging.
+Selecting another clip refreshes context without applying the former draft.
+There is no Transform canvas gizmo or graph drag. Exact neutral poses retain old
+opaque black letterboxing; nonneutral uncovered pixels reveal lower layers.
+Full schema, geometry and animation details: [spatial transforms](design/SPATIAL_TRANSFORMS.md).
 
 ### Shared row animation
 
@@ -375,7 +403,7 @@ uncertain write keeps selection and the actual error visible, with guidance to c
 Activity/project state before repeating the import; there is no automatic write retry.
 Late folder reads are aborted on navigation/dismissal. Manual music paths remain
 deliberate imports outside browser roots and never expand configured roots. No original is
-copied: strict schema 8 references registered originals in place, with only
+copied: strict schema 9 references registered originals in place, with only
 generated proxies/thumbnails, metadata, exports/receipts and scratch written locally.
 
 There is no upload endpoint, browser file picker, optional copy flow or true
@@ -514,7 +542,10 @@ saved document. It never deletes original recordings, shared registry entries,
 proxies/cache files, successful MP4s or receipts. This is not cache garbage
 collection; another project's membership and immutable export snapshots are unaffected.
 
-Only strict v8 projects and v8 project snapshots in version-1 export receipts are interpreted.
+Only strict v9 projects and v9 project snapshots in version-1 export receipts are interpreted.
+Every clip requires complete spatial base/full-pose source-frame keys with easing;
+missing spatial data is invalid, not default-filled. Original-source keys remain
+stored outside trims and at original exclusive OUT, without extending duration.
 The required `music` array holds 0–8 instances with unique required `id` values and
 complete per-instance source/timing/gain/fades/loop fields; `[]` means no music,
 never null, a singular object or a missing-field default. Receipts require
@@ -530,7 +561,7 @@ a missing saved value is invalid, not default-filled. Every point requires exact
 nine nullable fields: `opacity`, `speed` and the seven colour channels. Row
 `opacity` is the sole valid stored value; saved `clip.opacity` and old
 `clipOpacity`/`layerOpacity` channels are invalid, not ignored or defaulted.
-Earlier v1–v7 projects/receipt snapshots are preserved, incompatible
+Earlier v1–v8 projects/receipt snapshots are preserved, incompatible
 and never migrated or rewritten with fallback/default local fields or old-format
 readers. **Create a new
 project** and import its media deliberately; there is no automatic deletion of
@@ -554,6 +585,15 @@ set or stale appearance cannot reuse that image. Genuine larger mismatches, miss
 sources and failed music synchronization remain explicit buffering/errors. Source
 wraps and renderer throughput can still interrupt playback; this is not gapless
 audio or intended-GPU/long-run qualification.
+
+When exact decoded sources and every evaluated composition value are unchanged,
+a held slow-motion image reuses the intact presented surface instead of repeating
+the same GPU grade. Readiness and actual output-clock checks still run at current
+project time. Source, colour, spatial pose, opacity, fade, dissolve, canvas size,
+Compare or a cleared surface changes the identity and requires a new draw.
+Diagnostic pixel capture always redraws first: WebGL may discard its non-preserved
+drawing buffer after presenting the intact image. No extra image buffer or longer
+audio queue is introduced.
 
 Playing publication rechecks that same output-clock/source-set/appearance bound
 after diagnostics construction and before each subscriber, including initial
@@ -617,7 +657,7 @@ invalid release leaves the saved document and history unchanged.
 For an HTTP 409 or incompatible save response, **Review latest save** explains:
 
 1. **Keep editing this draft** — no saved document changes; the save error persists.
-2. **Download unsaved project** — download a strict v8 JSON snapshot with the current
+2. **Download unsaved project** — download a strict v9 JSON snapshot with the current
    local changes/expected revision before replacing them.
 3. **Discard local changes and reload** — explicitly replace local history/document
    with a newly read saved version. It performs no overwrite POST/PUT.
@@ -643,15 +683,18 @@ fades/Opacity, shared row **points and participating settings**, enabled layers,
 and all independent music instances with a fixed snapshot. A point
 with several channels counts once, not as separate clip/channel keys. Both 720p/4K
 use originals. The static fast path requires one enabled, unanimated,
-zero-origin contiguous track with row Opacity 1; any row point, leading start,
+zero-origin contiguous track with row Opacity 1, exactly neutral spatial bases
+and no spatial keys; any spatial edit/key (even neutral keys), row point, leading start,
 gap, unsupported coverage or music beyond video OUT uses generalized layered
 export. Static video must cover full project duration; layered export fills music
 tails with black rather than holding a last image. That path renders
-premultiplied RGBA16 groups, with $C = \sum_i G_i b_i o_i w_i$ and
-$A = \sum_i o_i w_i$, then source-overs as
+premultiplied RGBA16 groups, with $C = \sum_i G_i b_i o_i w_i m_i$ and
+$A = \sum_i o_i w_i m_i$, then source-overs as
 $\mathrm{result} = C + \mathrm{lower}(1 - A)$ without regrading or a layer multiplier.
 Here $G_i$ is graded RGB, $b_i$ black-fade brightness, $o_i$ the row's evaluated
-Opacity for each source and $w_i$ dissolve weight. Both dissolve sources use the
+Opacity for each source, $w_i$ dissolve weight and $m_i$ per-pixel spatial coverage.
+Nonneutral uncovered pixels reveal lower layers; exact neutral poses retain
+opaque black letterboxing after grading. Both dissolve sources use the
 same row value or overriding `opacity` curve at that project frame, with no second
 group multiplier. Black fades change $b_i$, not coverage.
 Preview reuses two slots per track (16 maximum) plus one source reviewer.

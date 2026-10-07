@@ -38,7 +38,8 @@ import {
   type ProjectDocument,
   type VideoLayer,
 } from '../../src/shared/model.js';
-import { compileRetiming } from '../../src/shared/speed.js';
+import { NEUTRAL_SPATIAL_POSE } from '../../src/shared/spatial.js';
+import { compileRetiming, type Retiming } from '../../src/shared/speed.js';
 import { calculateLayout, type PreviewLayer } from '../../src/shared/timeline.js';
 import { framesToSeconds, PROJECT_FPS } from '../../src/shared/timing.js';
 import { unsupportedProject } from './project-fixtures.js';
@@ -102,7 +103,7 @@ function fakeLibrary(): MediaLibrary {
   return library;
 }
 
-describe('schema-8 production dispatch and read-only validation', () => {
+describe('schema-9 production dispatch and read-only validation', () => {
   it('keeps static constant/ramp speed on the cheap path and dispatches shared speed points with their placed map', () => {
     const project = document();
     expect(needsLayeredExport(project)).toBe(false);
@@ -124,11 +125,11 @@ describe('schema-8 production dispatch and read-only validation', () => {
       compileLayerRetiming(project.clips[0]!, project.layers[0]!, placed.start).duration,
     );
     expect(placed.retiming.duration).toBe(planLayeredExport(project).duration);
-    expect(exportRequestSchema.parse({ document: project, profile: 'draft720' }).document.schemaVersion).toBe(8);
+    expect(exportRequestSchema.parse({ document: project, profile: 'draft720' }).document.schemaVersion).toBe(9);
     expect(
       exportRequestSchema.safeParse({ document: { ...project, schemaVersion: 2 }, profile: 'draft720' }).success,
     ).toBe(false);
-    for (const version of [3, 4, 5, 6, 7])
+    for (const version of [3, 4, 5, 6, 7, 8])
       expect(
         exportRequestSchema.safeParse({
           document: unsupportedProject(version, 'old', 'Unsupported export'),
@@ -168,7 +169,47 @@ describe('schema-8 production dispatch and read-only validation', () => {
       expect(planLayeredExport(project).kind).toBe('layered');
     }
   });
-  it('requires explicit v8 media/row/static clip fields, permits eight rows and refuses a ninth or same-row overlap', () => {
+  it('validates spatial anchors against registered originals and freezes the complete captured settings', () => {
+    const project = document();
+    project.clips[0]!.spatial.keyframes = [
+      { frame: 0, interpolation: 'smooth', values: { ...NEUTRAL_SPATIAL_POSE } },
+      { frame: 100, interpolation: 'hold', values: { ...NEUTRAL_SPATIAL_POSE, scale: 2 } },
+    ];
+    const library = fakeLibrary();
+    const snapshot = validateExport(project, library);
+    expect(snapshot.clips[0]!.spatial).toEqual(project.clips[0]!.spatial);
+    expect(Object.isFrozen(snapshot.clips[0]!.spatial)).toBe(true);
+    expect(Object.isFrozen(snapshot.clips[0]!.spatial.base)).toBe(true);
+    expect(Object.isFrozen(snapshot.clips[0]!.spatial.keyframes)).toBe(true);
+    expect(Object.isFrozen(snapshot.clips[0]!.spatial.keyframes[1]!.values)).toBe(true);
+    project.clips[0]!.spatial.keyframes[1]!.frame = 101;
+    expect(() => validateExport(project, library)).toThrow('spatial keys exceed');
+    expect(snapshot.clips[0]!.spatial.keyframes[1]!.frame).toBe(100);
+    expect(library.jobs.list()).toEqual([]);
+  });
+  it.each(['base', 'neutral-key'] as const)(
+    'rejects %s spatial references before native work or source reads',
+    async (kind) => {
+      const project = document();
+      project.clips.push(createClip('right', 'video', 20, 32));
+      project.layers[0]!.transitions = [{ leftId: 'left', rightId: 'right', type: 'cut', duration: 0 }];
+      if (kind === 'base') project.clips[0]!.spatial.base.rotation = 1;
+      else
+        project.clips[0]!.spatial.keyframes = [
+          { frame: 100, interpolation: 'hold', values: { ...NEUTRAL_SPATIAL_POSE } },
+        ];
+      const library = fakeLibrary();
+      const before = structuredClone(project);
+      expect(() => validateReference(project, library)).toThrow('spatial');
+      await expect(
+        renderReference(project, library, { id: 'unused', signal: new AbortController().signal, update: () => {} }),
+      ).rejects.toThrow('spatial');
+      expect(library.get).not.toHaveBeenCalled();
+      expect(library.jobs.list()).toEqual([]);
+      expect(project).toEqual(before);
+    },
+  );
+  it('requires explicit v9 media/row/static clip fields, permits eight rows and refuses a ninth or same-row overlap', () => {
     const project = document();
     for (let index = 2; index <= 8; index++) project.layers.push(layer(`video-${index}`));
     expect(projectSchema.safeParse(project).success).toBe(true);
@@ -240,12 +281,12 @@ describe('schema-8 production dispatch and read-only validation', () => {
     expect(Object.isFrozen(snapshot.layers[0]!.keyframes[0]!.values)).toBe(true);
     expect(Object.isFrozen(snapshot.clips[0]!.colour)).toBe(true);
   });
-  it('strictly loads v8 but lists/rejects unsupported versions unchanged, including overwrite attempts', async () => {
+  it('strictly loads v9 but lists/rejects unsupported versions unchanged, including overwrite attempts', async () => {
     const directory = await temp();
     const store = new ProjectStore(directory);
     const saved = await store.save(document(), 0);
     expect(await store.load(saved.id)).toEqual(saved);
-    for (const version of [2, 3, 4, 5, 6, 7]) {
+    for (const version of [2, 3, 4, 5, 6, 7, 8]) {
       const id = `old-v${version}`;
       const title = `Original v${version} document`;
       const unsupported = unsupportedProject(version, id, title);
@@ -258,7 +299,7 @@ describe('schema-8 production dispatch and read-only validation', () => {
         title,
         error: expect.stringContaining(`schema version ${version}`),
       });
-      await expect(store.load(id)).rejects.toThrow('requires version 8');
+      await expect(store.load(id)).rejects.toThrow('requires version 9');
       await expect(store.rename(id, 'No migration', 0)).rejects.toThrow('existing file was not changed');
       await expect(store.save(createProject(id, 'No migration'), 0)).rejects.toThrow('existing file was not changed');
       expect(await readFile(filename, 'utf8')).toBe(bytes);
@@ -339,6 +380,147 @@ describe('schema-8 production dispatch and read-only validation', () => {
 });
 
 describe('bounded project-frame row speed and native pipe ownership without FFmpeg', () => {
+  it('rejects supplied partial continuous-query maps and bad endpoints before starting children', async () => {
+    const directory = await temp();
+    const clip = createClip('invalid-map', 'video', 7, 19);
+    const baseline = compileRetiming(clip);
+    const { sourcePositionAt: omitted, ...partial } = baseline;
+    expect(typeof omitted).toBe('function');
+    const request = {
+      ffmpeg: '/must-not-start-invalid-retiming',
+      cwd: directory,
+      clip,
+      decodeArgs: [],
+      encodeArgs: [],
+      frameBytes: 6,
+      signal: new AbortController().signal,
+    };
+    for (const sourcePositionAt of [undefined, null, 7]) {
+      await expect(
+        retimeRawVideo({
+          ...request,
+          retiming: { ...baseline, sourcePositionAt } as unknown as Retiming,
+        }),
+      ).rejects.toThrow('sourceAt, sourcePositionAt, outputAt and rateAt');
+    }
+    await expect(retimeRawVideo({ ...request, retiming: partial as Retiming })).rejects.toThrow('sourcePositionAt');
+    for (const invalid of [NaN, Infinity, -Infinity, 6, 20]) {
+      await expect(
+        retimeRawVideo({
+          ...request,
+          retiming: { ...baseline, sourcePositionAt: () => invalid },
+        }),
+      ).rejects.toThrow('selected source endpoints');
+    }
+    await expect(
+      retimeRawVideo({
+        ...request,
+        retiming: { ...baseline, sourcePositionAt: (output) => (output === 0 ? 7 : 18) },
+      }),
+    ).rejects.toThrow('selected source endpoints');
+    await expect(
+      retimeRawVideo({
+        ...request,
+        retiming: {
+          ...baseline,
+          sourcePositionAt: () => {
+            throw new Error('continuous query failed');
+          },
+        },
+      }),
+    ).rejects.toThrow('continuous query failed');
+    expect(await readdir(directory)).toEqual([]);
+  });
+
+  it.each([
+    [7, 9.5, 8.5, 10],
+    [7, 6.5, 8, 9],
+    [7, 19.5, 19.5, 19.5],
+    [7, NaN, 8, 9],
+    [7, Infinity, 8, 9],
+    [7, -Infinity, 8, 9],
+  ])('rejects invalid continuous positions %# despite a valid discrete decoder map', async (...positions) => {
+    const directory = await temp();
+    const clip = createClip('invalid-continuous', 'video', 7, 19);
+    const map: Retiming = {
+      duration: 4,
+      sourceAt: (output) => 7 + output,
+      sourcePositionAt: (output) => (output >= 4 ? 19 : positions[output]!),
+      outputAt: () => 0,
+      rateAt: () => 1,
+    };
+    await expect(
+      retimeRawVideo({
+        ffmpeg: process.execPath,
+        cwd: directory,
+        clip,
+        retiming: map,
+        decodeArgs: ['-e', 'process.stdout.write(Buffer.alloc(12*6));'],
+        encodeArgs: ['-e', 'process.stdin.resume();'],
+        frameBytes: 6,
+        signal: new AbortController().signal,
+      }),
+    ).rejects.toThrow('finite, monotonic, in-range continuous source-position map');
+  });
+
+  it('rejects a throwing interior continuous query through the native ownership path', async () => {
+    const directory = await temp();
+    const clip = createClip('throwing-continuous', 'video', 7, 19);
+    const baseline = compileRetiming(clip);
+    await expect(
+      retimeRawVideo({
+        ffmpeg: process.execPath,
+        cwd: directory,
+        clip,
+        retiming: {
+          ...baseline,
+          sourcePositionAt: (output) => {
+            if (output === 1) throw new Error('interior continuous query failed');
+            return baseline.sourcePositionAt(output);
+          },
+        },
+        decodeArgs: ['-e', 'process.stdout.write(Buffer.alloc(12*6));'],
+        encodeArgs: ['-e', 'process.stdin.resume();'],
+        frameBytes: 6,
+        signal: new AbortController().signal,
+      }),
+    ).rejects.toThrow('interior continuous query failed');
+  });
+
+  it('binds the original continuous query and keeps only bounded per-output validation', async () => {
+    const directory = await temp();
+    const clip = createClip('bound-continuous', 'video', 7, 19);
+    const queried: number[] = [];
+    const map = {
+      duration: 4,
+      sourceIn: 7,
+      sourceAt: (output: number) => 7 + output,
+      sourcePositionAt(output: number): number {
+        queried.push(output);
+        return output >= this.duration ? 19 : this.sourceIn + output / 2;
+      },
+      outputAt: () => 0,
+      rateAt: () => 1,
+    };
+    const report = await retimeRawVideo({
+      ffmpeg: process.execPath,
+      cwd: directory,
+      clip,
+      retiming: map,
+      decodeArgs: ['-e', 'process.stdout.write(Buffer.alloc(12*6));'],
+      encodeArgs: ['-e', 'process.stdin.resume();'],
+      frameBytes: 6,
+      signal: new AbortController().signal,
+      onProgress: () => {
+        map.sourcePositionAt = () => {
+          throw new Error('replacement must not be called');
+        };
+      },
+    });
+    expect(queried).toEqual([0, 4, 0, 1, 2, 3]);
+    expect(report).toMatchObject({ decodedFrames: 12, outputFrames: 4, rawFrameBuffers: 1 });
+  });
+
   for (const interpolation of ['hold', 'linear', 'ease-in', 'ease-out', 'smooth'] as const) {
     it(`uses the exact shared compound speed-key map (${interpolation}) and owns the captured keys`, async () => {
       const directory = await temp();
@@ -538,6 +720,8 @@ describe('bounded CPU-reference animated LUTs and premultiplied groups', () => {
       mediaId: id,
       layerId,
       sourceFrame: 11,
+      sourcePosition: 11,
+      spatial: { ...NEUTRAL_SPATIAL_POSE },
       colour,
       weight: blendWeight,
       blendWeight,
@@ -562,6 +746,7 @@ describe('bounded CPU-reference animated LUTs and premultiplied groups', () => {
       sample: current,
       rgb: input.get(current.clipId)!,
       bounds,
+      original: target,
     });
     const unchanged = [...input.values()].map((rgb) => Buffer.from(rgb));
     await composeLayerFrame(buffer, target, [source(lower)], cache, signal);
@@ -591,13 +776,15 @@ describe('bounded CPU-reference animated LUTs and premultiplied groups', () => {
       mediaId: 'video',
       layerId: 'video-2',
       sourceFrame: 0,
+      sourcePosition: 0,
+      spatial: { ...NEUTRAL_SPATIAL_POSE },
       colour: { ...strong },
       weight: 0,
       blendWeight: 1,
       brightness: 0,
       opacity: 1,
     };
-    const source = { sample: current, rgb: Buffer.alloc(12, 200), bounds: { x: 0, y: 0, ...target } };
+    const source = { sample: current, rgb: Buffer.alloc(12, 200), bounds: { x: 0, y: 0, ...target }, original: target };
     const cache = new ColourLutCache();
     const signal = new AbortController().signal;
     await composeLayerFrame(buffer, target, [source], cache, signal);
@@ -622,6 +809,8 @@ describe('bounded CPU-reference animated LUTs and premultiplied groups', () => {
       mediaId: 'video',
       layerId: 'video-1',
       sourceFrame: 0,
+      sourcePosition: 0,
+      spatial: { ...NEUTRAL_SPATIAL_POSE },
       colour: { ...NEUTRAL_COLOUR, brightness: 0.2, shadows: 0.4 },
       weight: 1,
       blendWeight: 1,
@@ -631,7 +820,7 @@ describe('bounded CPU-reference animated LUTs and premultiplied groups', () => {
     await composeLayerFrame(
       buffer,
       target,
-      [{ sample, rgb, bounds: { x: 1, y: 0, width: 2, height: 2 } }],
+      [{ sample, rgb, bounds: { x: 1, y: 0, width: 2, height: 2 }, original: { width: 100, height: 100 } }],
       new ColourLutCache(),
       new AbortController().signal,
     );
@@ -656,6 +845,8 @@ describe('bounded CPU-reference animated LUTs and premultiplied groups', () => {
       mediaId: 'video',
       layerId: 'video-1',
       sourceFrame: 0,
+      sourcePosition: 0,
+      spatial: { ...NEUTRAL_SPATIAL_POSE },
       colour: { ...NEUTRAL_COLOUR },
       weight: 0.5,
       blendWeight: 0.5,
@@ -666,6 +857,7 @@ describe('bounded CPU-reference animated LUTs and premultiplied groups', () => {
       sample: current,
       rgb: Buffer.alloc(12),
       bounds: { x: 0, y: 0, width: 2, height: 2 },
+      original: { width: 2, height: 2 },
     };
     await expect(
       composeLayerFrame(

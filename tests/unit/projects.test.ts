@@ -28,6 +28,7 @@ import {
   type ProjectDocument,
 } from '../../src/shared/model.js';
 import { projectSummarySchema } from '../../src/shared/projects.js';
+import { createSpatialSettings, NEUTRAL_SPATIAL_POSE } from '../../src/shared/spatial.js';
 import { calculateLayout } from '../../src/shared/timeline.js';
 import { framesToSeconds, PROJECT_FPS } from '../../src/shared/timing.js';
 import { unsupportedProject } from './project-fixtures.js';
@@ -76,6 +77,44 @@ afterEach(async () => {
 });
 
 describe('multiple-project store', () => {
+  it('round-trips explicit spatial poses/anchors and preserves v8 files against load, rename and overwrite', async () => {
+    const directory = await temp();
+    const store = new ProjectStore(directory);
+    const document = createProject('spatial-saved', 'Spatial saved');
+    document.clips = [createClip('excerpt', 'registered-video', 20, 80)];
+    document.clips[0]!.spatial = {
+      base: { ...NEUTRAL_SPATIAL_POSE, scale: 1.23456789, cropLeft: 0.2 },
+      keyframes: [
+        { frame: 0, interpolation: 'smooth', values: { ...NEUTRAL_SPATIAL_POSE, rotation: -170 } },
+        { frame: 100, interpolation: 'hold', values: { ...NEUTRAL_SPATIAL_POSE, rotation: 170 } },
+      ],
+    };
+    const saved = await store.save(document, 0);
+    expect(await store.load(document.id)).toEqual(saved);
+    const filename = path.join(directory, 'projects', `${document.id}.json`);
+    const bytes = await readFile(filename, 'utf8');
+    for (const spatial of [
+      undefined,
+      { ...createSpatialSettings(), extra: true },
+      { base: { ...NEUTRAL_SPATIAL_POSE, scale: Infinity }, keyframes: [] },
+    ]) {
+      const invalid = { ...saved, clips: [{ ...saved.clips[0]!, spatial }] };
+      await expect(store.save(invalid as ProjectDocument, 1)).rejects.toThrow();
+      expect(await readFile(filename, 'utf8')).toBe(bytes);
+    }
+    const oldId = 'preserved-v8';
+    const old = { ...structuredClone(document), id: oldId, schemaVersion: 8 };
+    Reflect.deleteProperty(old.clips[0]!, 'spatial');
+    const oldBytes = JSON.stringify(old);
+    const oldPath = path.join(directory, 'projects', `${oldId}.json`);
+    await writeFile(oldPath, oldBytes);
+    await expect(store.load(oldId)).rejects.toThrow('requires version 9');
+    await expect(store.rename(oldId, 'No overwrite', 0)).rejects.toThrow('existing file was not changed');
+    await expect(store.save(createProject(oldId, 'No overwrite'), 0)).rejects.toThrow('existing file was not changed');
+    expect((await store.list()).find((summary) => summary.id === oldId)!.compatible).toBe(false);
+    expect(await readFile(oldPath, 'utf8')).toBe(oldBytes);
+    expect(await store.load(saved.id)).toEqual(saved);
+  });
   it('round-trips eight identified music instances and never rewrites invalid or obsolete music data', async () => {
     const directory = await temp();
     const store = new ProjectStore(directory);
@@ -111,7 +150,7 @@ describe('multiple-project store', () => {
     const obsolete = JSON.stringify({ ...document, id: 'preserved-v7', schemaVersion: 7, music: null });
     const obsoletePath = path.join(directory, 'projects', 'preserved-v7.json');
     await writeFile(obsoletePath, obsolete);
-    await expect(store.load('preserved-v7')).rejects.toThrow('version 8');
+    await expect(store.load('preserved-v7')).rejects.toThrow('version 9');
     expect((await store.list()).find((item) => item.id === 'preserved-v7')!.compatible).toBe(false);
     expect(await readFile(obsoletePath, 'utf8')).toBe(obsolete);
     expect(await store.load(document.id)).toEqual(saved);
@@ -126,7 +165,7 @@ describe('multiple-project store', () => {
     expect(first.id).not.toBe(second.id);
     expect(first.title).toBe('First flight');
     expect(first.revision).toBe(1);
-    expect(first.schemaVersion).toBe(8);
+    expect(first.schemaVersion).toBe(9);
     expect(first.layers[0]!.keyframes).toEqual([]);
     const clip = { ...createClip('clip-a', 'registered-video', 0, 120), speed: { mode: 'constant' as const, rate: 2 } };
     const saved = await store.save({ ...first, clips: [clip] }, 1);
@@ -152,7 +191,7 @@ describe('multiple-project store', () => {
     expect((await readdir(path.join(directory, 'projects'))).some((name) => name.endsWith('.tmp'))).toBe(false);
   });
 
-  it('round-trips 256 strict row points and rejects malformed v8 data without changing confirmed bytes', async () => {
+  it('round-trips 256 strict row points and rejects malformed v9 data without changing confirmed bytes', async () => {
     const directory = await temp();
     const store = new ProjectStore(directory);
     const document = createProject('strict-row', 'Shared row');
@@ -162,7 +201,7 @@ describe('multiple-project store', () => {
     );
     document.layers[0]!.keyframes[0] = point(0, { ...NEUTRAL_COLOUR, opacity: 0, speed: 1.25 }, 'smooth');
     const saved = await store.save(document, 0);
-    expect(saved.schemaVersion).toBe(8);
+    expect(saved.schemaVersion).toBe(9);
     expect(saved.layers[0]!.keyframes).toHaveLength(256);
     expect(Object.keys(saved.layers[0]!.keyframes[0]!.values)).toEqual(KEYFRAME_SETTINGS.map((setting) => setting.key));
     expect(saved.layers[0]!.keyframes.at(-1)!.frame).toBeGreaterThan(saved.clips[0]!.sourceOut);
@@ -549,8 +588,8 @@ describe('multiple-project HTTP API', () => {
     const first = projectSchema.parse(firstResponse.json().document);
     const second = projectSchema.parse(secondResponse.json().document);
     expect(first.revision).toBe(1);
-    expect(first.schemaVersion).toBe(8);
-    expect(second.schemaVersion).toBe(8);
+    expect(first.schemaVersion).toBe(9);
+    expect(second.schemaVersion).toBe(9);
     expect(second.id).not.toBe(first.id);
     expect((await service.app.inject({ url: '/api/projects', headers })).json().projects).toHaveLength(2);
     expect((await service.app.inject({ url: `/api/projects/${first.id}`, headers })).json().document).toEqual(first);
@@ -651,7 +690,7 @@ describe('multiple-project HTTP API', () => {
     expect((await service.app.inject({ url: '/api/projects', headers })).json().projects[0].compatible).toBe(false);
     const load = await service.app.inject({ url: '/api/projects/old', headers });
     expect(load.statusCode).toBe(422);
-    expect(load.json().error).toContain('version 8');
+    expect(load.json().error).toContain('version 9');
     expect(
       (
         await service.app.inject({
@@ -676,7 +715,7 @@ describe('multiple-project HTTP API', () => {
     ).toBe(400);
   });
 
-  it('exposes an unsupported-version input as unavailable and refuses load, rename or v8 overwrite', async () => {
+  it('exposes an unsupported-version input as unavailable and refuses load, rename or v9 overwrite', async () => {
     const directory = await temp();
     const unsupported = unsupportedProject(3, 'legacy-v3', 'Original v3');
     const bytes = `${JSON.stringify(unsupported, null, 2)}\n`;
@@ -699,7 +738,7 @@ describe('multiple-project HTTP API', () => {
     const loaded = await service.app.inject({ url: '/api/projects/legacy-v3', headers });
     expect(loaded.statusCode).toBe(422);
     expect(loaded.json().error).toContain('schema version 3');
-    expect(loaded.json().error).toContain('requires version 8');
+    expect(loaded.json().error).toContain('requires version 9');
     expect(
       (
         await service.app.inject({
@@ -815,6 +854,36 @@ describe('multiple-project HTTP API', () => {
     expect(current.music).toEqual(document.music);
     const confirmedPath = path.join(dataDir, 'projects', 'preview-lab.json');
     const confirmedBytes = await readFile(confirmedPath);
+    const spatialWithinOriginal = structuredClone(current);
+    spatialWithinOriginal.clips[0]!.sourceIn = 20;
+    spatialWithinOriginal.clips[0]!.sourceOut = 100;
+    spatialWithinOriginal.clips[0]!.spatial.keyframes = [
+      { frame: 0, interpolation: 'linear', values: { ...NEUTRAL_SPATIAL_POSE } },
+      { frame: 120, interpolation: 'hold', values: { ...NEUTRAL_SPATIAL_POSE, scale: 2 } },
+    ];
+    const acceptedSpatial = await service.app.inject({
+      method: 'PUT',
+      url: '/api/projects/spatial-bounds',
+      headers,
+      payload: { document: { ...spatialWithinOriginal, id: 'spatial-bounds', revision: 0 }, expectedRevision: 0 },
+    });
+    expect(acceptedSpatial.statusCode).toBe(200);
+    expect(projectSchema.parse(acceptedSpatial.json().document).clips[0]!.spatial).toEqual(
+      spatialWithinOriginal.clips[0]!.spatial,
+    );
+    expect(await service.projects.load('spatial-bounds')).toEqual(projectSchema.parse(acceptedSpatial.json().document));
+    // Schema accepts these off-trim anchors; the save boundary checks the registered original.
+    const spatialBeyondOriginal = structuredClone(spatialWithinOriginal);
+    spatialBeyondOriginal.clips[0]!.spatial.keyframes[1]!.frame = 121;
+    const rejectedSpatial = await service.app.inject({
+      method: 'PUT',
+      url: '/api/projects/preview-lab',
+      headers,
+      payload: { document: spatialBeyondOriginal, expectedRevision: 1 },
+    });
+    expect(rejectedSpatial.statusCode).toBe(422);
+    expect(rejectedSpatial.json().error).toContain('spatial keys exceed');
+    expect(await readFile(confirmedPath)).toEqual(confirmedBytes);
     const videoTooLong = { ...current, clips: [createClip('clip-a', video.id, 0, 121)] };
     const musicTooLong = { ...current, music: [current.music[0]!, { ...current.music[1]!, sourceOut: 60 }] };
     expect(

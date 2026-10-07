@@ -2,6 +2,7 @@ import type { ColourSettings } from './colour.js';
 import { colourAt, opacityAt } from './composition.js';
 import { compileLayerRetiming } from './layer-retiming.js';
 import type { ProjectDocument, Transition, VideoClip, VideoLayer } from './model.js';
+import { evaluateSpatial, type SpatialPose } from './spatial.js';
 import type { Retiming } from './speed.js';
 
 export interface PlacedClip {
@@ -28,6 +29,8 @@ export interface PreviewLayer {
   mediaId: string;
   layerId: string;
   sourceFrame: number;
+  sourcePosition: number;
+  spatial: SpatialPose;
   colour: ColourSettings;
   weight: number;
   blendWeight: number;
@@ -230,6 +233,7 @@ export function sampleTimeline(
     const layer = project.layers.find((item) => item.id === placed.clip.layerId)!;
     if (!layer.enabled) return [];
     const sourceFrame = placed.retiming.sourceAt(frame - placed.start);
+    const sourcePosition = placed.retiming.sourcePositionAt(frame - placed.start);
     const { blendWeight, brightness } = clipWeights(placed, frame, layer, layout);
     return [
       {
@@ -237,6 +241,8 @@ export function sampleTimeline(
         mediaId: placed.clip.mediaId,
         layerId: layer.id,
         sourceFrame,
+        sourcePosition,
+        spatial: evaluateSpatial(placed.clip.spatial, sourcePosition),
         colour: colourAt(placed.clip, layer, frame),
         weight: blendWeight * brightness,
         blendWeight,
