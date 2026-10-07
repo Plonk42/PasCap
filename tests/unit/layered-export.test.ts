@@ -102,7 +102,7 @@ function fakeLibrary(): MediaLibrary {
   return library;
 }
 
-describe('schema-6 production dispatch and read-only validation', () => {
+describe('schema-7 production dispatch and read-only validation', () => {
   it('keeps static constant/ramp speed on the cheap path and dispatches shared speed points with their placed map', () => {
     const project = document();
     expect(needsLayeredExport(project)).toBe(false);
@@ -124,11 +124,11 @@ describe('schema-6 production dispatch and read-only validation', () => {
       compileLayerRetiming(project.clips[0]!, project.layers[0]!, placed.start).duration,
     );
     expect(placed.retiming.duration).toBe(planLayeredExport(project).duration);
-    expect(exportRequestSchema.parse({ document: project, profile: 'draft720' }).document.schemaVersion).toBe(6);
+    expect(exportRequestSchema.parse({ document: project, profile: 'draft720' }).document.schemaVersion).toBe(7);
     expect(
       exportRequestSchema.safeParse({ document: { ...project, schemaVersion: 2 }, profile: 'draft720' }).success,
     ).toBe(false);
-    for (const version of [3, 4, 5])
+    for (const version of [3, 4, 5, 6])
       expect(
         exportRequestSchema.safeParse({
           document: unsupportedProject(version, 'old', 'Unsupported export'),
@@ -148,13 +148,10 @@ describe('schema-6 production dispatch and read-only validation', () => {
         project.layers[0]!.opacity = 0.4;
       },
       (project) => {
-        project.layers[0]!.keyframes = [point(10, { layerOpacity: 1 })];
+        project.layers[0]!.opacity = 0;
       },
       (project) => {
-        project.clips[0]!.opacity = 0;
-      },
-      (project) => {
-        project.layers[0]!.keyframes = [point(7, { clipOpacity: 1 }, 'hold')];
+        project.layers[0]!.keyframes = [point(7, { opacity: 1 }, 'hold')];
       },
       (project) => {
         project.layers[0]!.keyframes = [point(7, { ...NEUTRAL_COLOUR })];
@@ -171,7 +168,7 @@ describe('schema-6 production dispatch and read-only validation', () => {
       expect(planLayeredExport(project).kind).toBe('layered');
     }
   });
-  it('requires explicit v6 media/row/static clip fields, permits eight rows and refuses a ninth or same-row overlap', () => {
+  it('requires explicit v7 media/row/static clip fields, permits eight rows and refuses a ninth or same-row overlap', () => {
     const project = document();
     for (let index = 2; index <= 8; index++) project.layers.push(layer(`video-${index}`));
     expect(projectSchema.safeParse(project).success).toBe(true);
@@ -185,9 +182,10 @@ describe('schema-6 production dispatch and read-only validation', () => {
     expect(projectSchema.safeParse({ ...project, clips: [{ ...project.clips[0], colour: undefined }] }).success).toBe(
       false,
     );
-    expect(projectSchema.safeParse({ ...project, clips: [{ ...project.clips[0], opacity: undefined }] }).success).toBe(
-      false,
-    );
+    expect(projectSchema.safeParse({ ...project, clips: [{ ...project.clips[0], opacity: 1 }] }).success).toBe(false);
+    expect(
+      projectSchema.safeParse({ ...project, layers: [{ ...project.layers[0], opacity: undefined }] }).success,
+    ).toBe(false);
     expect(projectSchema.safeParse({ ...project, clips: [{ ...project.clips[0], speed: undefined }] }).success).toBe(
       false,
     );
@@ -214,7 +212,7 @@ describe('schema-6 production dispatch and read-only validation', () => {
     ];
     project.layers[0]!.transitions = [{ type: 'cross-dissolve', leftId: 'left', rightId: 'right', duration: 2 }];
     project.layers[1]!.transitions = [{ type: 'cut', leftId: 'overlay-early', rightId: 'overlay-late', duration: 0 }];
-    project.layers[0]!.keyframes = [point(3, { clipOpacity: 0.65, exposure: 0.4 }, 'hold')];
+    project.layers[0]!.keyframes = [point(3, { opacity: 0.65, exposure: 0.4 }, 'hold')];
     const plan = planLayeredExport(project);
     expect(plan.duration).toBe(20);
     expect(plan.layers[0]!.plan.duration).toBe(10);
@@ -234,6 +232,7 @@ describe('schema-6 production dispatch and read-only validation', () => {
     expect(snapshot.clips).toHaveLength(5);
     project.layers[0]!.opacity = 0;
     project.layers[0]!.keyframes[0]!.values.exposure = -1;
+    expect(snapshot.clips[0]).not.toHaveProperty('opacity');
     expect(snapshot.layers[0]!.opacity).toBe(1);
     expect(snapshot.layers[0]!.keyframes[0]!.values.exposure).toBe(0.4);
     expect(Object.isFrozen(snapshot.layers[0]!.keyframes)).toBe(true);
@@ -241,12 +240,12 @@ describe('schema-6 production dispatch and read-only validation', () => {
     expect(Object.isFrozen(snapshot.layers[0]!.keyframes[0]!.values)).toBe(true);
     expect(Object.isFrozen(snapshot.clips[0]!.colour)).toBe(true);
   });
-  it('strictly loads v6 but lists/rejects unsupported versions unchanged, including overwrite attempts', async () => {
+  it('strictly loads v7 but lists/rejects unsupported versions unchanged, including overwrite attempts', async () => {
     const directory = await temp();
     const store = new ProjectStore(directory);
     const saved = await store.save(document(), 0);
     expect(await store.load(saved.id)).toEqual(saved);
-    for (const version of [2, 3, 4, 5]) {
+    for (const version of [2, 3, 4, 5, 6]) {
       const id = `old-v${version}`;
       const title = `Original v${version} document`;
       const unsupported = unsupportedProject(version, id, title);
@@ -259,7 +258,7 @@ describe('schema-6 production dispatch and read-only validation', () => {
         title,
         error: expect.stringContaining(`schema version ${version}`),
       });
-      await expect(store.load(id)).rejects.toThrow('requires version 6');
+      await expect(store.load(id)).rejects.toThrow('requires version 7');
       await expect(store.rename(id, 'No migration', 0)).rejects.toThrow('existing file was not changed');
       await expect(store.save(createProject(id, 'No migration'), 0)).rejects.toThrow('existing file was not changed');
       expect(await readFile(filename, 'utf8')).toBe(bytes);
@@ -314,16 +313,16 @@ describe('schema-6 production dispatch and read-only validation', () => {
         project.layers.push(layer());
       },
       (project: ProjectDocument) => {
-        project.clips[0]!.opacity = 0.5;
+        project.layers[0]!.opacity = 0.5;
       },
       (project: ProjectDocument) => {
-        project.layers[0]!.keyframes.push(point(2, { layerOpacity: 0 }, 'hold'));
+        project.layers[0]!.keyframes.push(point(2, { opacity: 0 }, 'hold'));
       },
       (project: ProjectDocument) => {
         project.layers[0]!.keyframes.push(point(7, { ...NEUTRAL_COLOUR }));
       },
       (project: ProjectDocument) => {
-        project.layers[0]!.keyframes.push(point(7, { clipOpacity: 0.5 }, 'smooth'));
+        project.layers[0]!.keyframes.push(point(7, { opacity: 0.5 }, 'smooth'));
       },
       (project: ProjectDocument) => {
         project.layers[0]!.keyframes.push(point(7, { speed: 1 }, 'hold'));
@@ -350,7 +349,7 @@ describe('bounded project-frame row speed and native pipe ownership without FFmp
       rateLayer.keyframes = [
         point(2, { speed: 0.35 }, interpolation),
         point(11, { speed: 3 }, 'ease-out'),
-        point(14, { exposure: 0.5, clipOpacity: 0.3 }, 'hold'),
+        point(14, { exposure: 0.5, opacity: 0.3 }, 'hold'),
         point(16, { speed: 0.7 }, 'smooth'),
         point(25, { speed: 2 }, 'hold'),
       ];
@@ -521,7 +520,7 @@ describe('bounded CPU-reference animated LUTs and premultiplied groups', () => {
       expect(Math.abs(actual[channel]! - correct[channel]!)).toBeLessThan(1 / 255);
     expect(Math.abs(correct[0] - (left[0] + right[0]) / 2)).toBeGreaterThan(4 / 255);
   });
-  it('applies dissolve group opacity once, over a lower group, matching authoritative compositePixel', async () => {
+  it('applies the sole row opacity through a dissolve over a lower group, matching compositePixel', async () => {
     const target = { width: 8, height: 4 };
     const pixels = target.width * target.height;
     const buffer = Buffer.alloc(pixels * 8);
@@ -534,7 +533,6 @@ describe('bounded CPU-reference animated LUTs and premultiplied groups', () => {
       colour: ColourSettings,
       blendWeight: number,
       opacity: number,
-      layerOpacity: number,
     ): PreviewLayer => ({
       clipId: id,
       mediaId: id,
@@ -545,11 +543,11 @@ describe('bounded CPU-reference animated LUTs and premultiplied groups', () => {
       blendWeight,
       brightness: 1,
       opacity,
-      layerOpacity,
     });
-    const lower = sample('lower', 'video-1', { ...NEUTRAL_COLOUR }, 1, 1, 1);
-    const left = sample('left', 'video-2', strong, 0.4, 0.65, 0.7);
-    const right = sample('right', 'video-2', warm, 0.6, 0.35, 0.7);
+    const lower = sample('lower', 'video-1', { ...NEUTRAL_COLOUR }, 1, 1);
+    // Both sources use the row's evaluated opacity; dissolve weights retain independent source coverage.
+    const left = sample('left', 'video-2', strong, 0.4, 0.65);
+    const right = sample('right', 'video-2', warm, 0.6, 0.65);
     const input = new Map<string, Buffer>();
     for (const [index, current] of [lower, left, right].entries()) {
       const rgb = Buffer.alloc(pixels * 3);
@@ -598,7 +596,6 @@ describe('bounded CPU-reference animated LUTs and premultiplied groups', () => {
       blendWeight: 1,
       brightness: 0,
       opacity: 1,
-      layerOpacity: 1,
     };
     const source = { sample: current, rgb: Buffer.alloc(12, 200), bounds: { x: 0, y: 0, ...target } };
     const cache = new ColourLutCache();
@@ -630,7 +627,6 @@ describe('bounded CPU-reference animated LUTs and premultiplied groups', () => {
       blendWeight: 1,
       brightness: 1,
       opacity: 1,
-      layerOpacity: 1,
     };
     await composeLayerFrame(
       buffer,
@@ -665,7 +661,6 @@ describe('bounded CPU-reference animated LUTs and premultiplied groups', () => {
       blendWeight: 0.5,
       brightness: 1,
       opacity: 1,
-      layerOpacity: 1,
     };
     const source: LayerFrameSource = {
       sample: current,

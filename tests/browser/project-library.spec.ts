@@ -225,7 +225,7 @@ test('a failed or stale deletion keeps the confirmation and current project with
   await expect(page.getByRole('button', { name: `Delete ${initialTitle}`, exact: true })).toBeFocused();
 });
 
-test('unavailable schema-5 projects can be explicitly deleted without being opened or migrated to schema 6', async ({
+test('unavailable schema-6 projects can be explicitly deleted without being opened or migrated to schema 7', async ({
   page,
 }) => {
   let deleted = false;
@@ -241,20 +241,20 @@ test('unavailable schema-5 projects can be explicitly deleted without being open
           ? []
           : [
               {
-                id: 'old-v5',
-                title: 'Old track-role project',
+                id: 'old-v6',
+                title: 'Old dual-opacity project',
                 revision: 0,
                 clipCount: 0,
                 duration: 0,
                 updatedAt: '2026-10-03T10:00:00Z',
                 compatible: false,
-                error: 'Unsupported project schema version 5; this build requires version 6.',
+                error: 'Unsupported project schema version 6; this build requires version 7.',
               },
             ],
       },
     });
   });
-  await page.route('**/api/projects/old-v5', async (route) => {
+  await page.route('**/api/projects/old-v6', async (route) => {
     if (route.request().method() !== 'DELETE') {
       reads++;
       await route.abort('blockedbyclient');
@@ -265,13 +265,13 @@ test('unavailable schema-5 projects can be explicitly deleted without being open
     await route.fulfill({ json: { deleted: true } });
   });
   await page.getByRole('button', { name: 'Open projects', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Open Old track-role project', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Open Old dual-opacity project', exact: true })).toBeDisabled();
   await expect(
-    page.getByText('Unsupported project schema version 5; this build requires version 6.', { exact: true }),
+    page.getByText('Unsupported project schema version 6; this build requires version 7.', { exact: true }),
   ).toBeVisible();
-  await page.getByRole('button', { name: 'Delete Old track-role project', exact: true }).click();
+  await page.getByRole('button', { name: 'Delete Old dual-opacity project', exact: true }).click();
   await page.getByRole('button', { name: 'Delete project', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Delete Old track-role project', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Delete Old dual-opacity project', exact: true })).toHaveCount(0);
   expect(deleted).toBe(true);
   expect(reads).toBe(0);
   expect(await page.evaluate(() => window.pascapLab!.project()!.id)).toBe(initialId);

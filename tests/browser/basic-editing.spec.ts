@@ -96,7 +96,11 @@ test('default editor keeps rare options, speed/layer details, sequence and music
 }) => {
   await expect(page.getByRole('slider', { name: 'Exposure', exact: true })).toBeVisible();
   await expect(page.getByRole('combobox', { name: 'Speed mode', exact: true })).toBeHidden();
-  await expect(page.getByRole('slider', { name: 'Layer opacity', exact: true })).toBeHidden();
+  await expect(page.getByRole('slider', { name: 'Opacity', exact: true })).toBeVisible();
+  await expect(page.getByRole('slider', { name: 'Opacity', exact: true })).toHaveValue('1');
+  await expect(page.getByLabel('Placement section', { exact: true })).toBeVisible();
+  await expect(page.getByRole('spinbutton', { name: 'Clip timeline start', exact: true })).toBeHidden();
+  await expect(page.getByRole('slider', { name: 'Layer opacity', exact: true })).toHaveCount(0);
   await expect(page.getByRole('spinbutton', { name: 'Opening fade', exact: true })).toBeHidden();
   await expect(page.getByRole('combobox', { name: 'Music recording', exact: true })).toBeHidden();
   await expect(page.getByRole('combobox', { name: 'Filter media' })).toBeHidden();
@@ -227,7 +231,7 @@ test('duplicate preserves static settings without copying row points, and overla
     clipId: 'moving',
     colour: { ...document.clips[1]!.colour, contrast: 1.3, saturation: 0.7 },
   });
-  document = applyCommand(document, { type: 'opacity', clipId: 'moving', opacity: 0.6 });
+  document = applyCommand(document, { type: 'opacity', layerId: document.clips[1]!.layerId, opacity: 0.6 });
   document = applyCommand(document, {
     type: 'layer-update',
     layer: {

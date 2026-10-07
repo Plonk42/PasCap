@@ -1,4 +1,4 @@
-# Layers, shared row points and source review · project v6
+# Layers, shared row points and source review · project v7
 
 ## Video layers
 
@@ -9,10 +9,11 @@ an editing role. The initial Video 1 identity is conventional, not mandatory or
 privileged. Every track can be reordered or deleted, except the last remaining
 track; only actual top/bottom stack endpoints restrict Raise/Lower.
 
-Every layer requires `ripple`, `transitions`, `openingFade` and `closingFade`.
-New tracks default to **Ripple on**, empty transitions and zero fades. In **Layer
-options**, enabling Ripple packs clips in chronological order from the first clip's
-current project-frame start, closing gaps in **one Undo step** and retaining valid
+Every `VideoLayer` requires `ripple`, `transitions`, `openingFade`, `closingFade`
+and numeric `opacity` in 0–1. New tracks start with **Ripple on**, empty transitions,
+zero fades and **Opacity 1 (100%)**; missing fields are invalid, not default-filled.
+In **Layer options**, enabling Ripple packs clips in chronological order from the
+first clip's current project-frame start, closing gaps in **one Undo step** and retaining valid
 existing dissolves. While on, saved clip order continuously sequences from that
 anchor: each next start is the preceding OUT minus any incoming dissolve duration.
 Contextual row Speed is recompiled at each new start, and commands persist actual
@@ -43,7 +44,7 @@ Opening/closing fades belong to the track's first/last clips at actual placement
 fit with other transition regions and remain stored but dormant on an empty track.
 
 **+ Layer** creates/selects a track. Sidebar controls select and hide/show;
-**Layer options** contains rename, Ripple, static opacity, raise/lower and delete. Layer
+**Layer options** contains only rename, Ripple, raise/lower and delete. Layer
 names apply on Enter/blur, Escape restores, and a rename is one Undo step. Selecting
 an empty row retains both its **Layer keyframes** context and the target for Media
 **+**/double-click/batch insertion. A populated layer selects its first excerpt and
@@ -60,18 +61,21 @@ playhead handle/timecode; click/drag seeking uses the same integer-frame geometr
 Dropping on the ruler never targets a row concealed underneath it.
 Unavailable Raise/Lower/Delete actions have contextual accessible reasons for the
 actual stack endpoint, last remaining track or active interaction state.
-Drag existing excerpts between rows, or use Clip → Layer & opacity. Deleting a layer
+Drag existing excerpts between rows, or use Clip → Placement. Deleting a layer
 and its clips is one undoable command. Existing moves preserve the grabbed offset
 and show the actual final placement ghost, including duration at the destination
 row/time; red invalid placements are not committed. Ripple-on rows remain sequenced
 even with snapping disabled. Start/nudge and duplication retain contextual timing
 validation and source-ramp/curve anchors; they never copy row points.
 
-Visibility and layer opacity are renderable state, not preview-only switches.
+Visibility and Opacity are renderable state, not preview-only switches.
 Disabled layers do not decode/draw, but their placements still contribute to total
-duration; an entirely hidden tail therefore exports black. Layer opacity multiplies
-the complete layer group once. Each clip has an independent static opacity base;
-a row's Clip opacity curve overrides it on **every** clip in that row. Black
+duration; an entirely hidden tail therefore exports black. **Opacity** is one
+row-owned setting, stored only as required `VideoLayer.opacity`, not on a clip.
+With no Opacity participants, every source uses the row's saved value. The sole
+row key channel, `opacity`, overrides that value on **every** clip in the row,
+including both dissolve sources. There is no saved `clip.opacity`, separate
+group-opacity channel or additional layer multiplier. Black
 transitions/fades darken only their track's RGB without removing its alpha coverage;
 they do not dim another track or reveal lower footage through a transparency fade.
 
@@ -82,35 +86,38 @@ they do not dim another track or reveal lower footage through a transparency fad
 clip on that row, including clips from different recordings and both participants
 in that track's dissolve. They do not restart at a clip's IN, start or boundary.
 
-Schema 6 requires `layers[].keyframes` as ordered `{ frame, interpolation, values }`
+Schema 7 requires `layers[].keyframes` as ordered `{ frame, interpolation, values }`
 points, with **at most 256 points per row**. Frames are unique, strictly ascending,
-non-negative and at most 2,147,483,647. Every `values` object requires **all ten
-nullable fields** below: a number participates; `null` does not. Omitted/unknown
+non-negative and at most 2,147,483,647. Every point's `values` object (`LayerKeyValues`)
+requires **all nine nullable fields** below: a number participates; `null` does not. Omitted/unknown
 fields and all-null points are invalid, not repaired with defaults.
 
-| Channel        | Value          | Base when this channel has no row keys                 |
-| -------------- | -------------- | ------------------------------------------------------ |
-| `layerOpacity` | 0–1            | Layer's static `opacity`, after group composition      |
-| `clipOpacity`  | 0–1            | Each clip's static `opacity`, before group composition |
-| `speed`        | 0.1×–8×        | Each clip's constant/ramp/custom-keyframed speed       |
-| `exposure`     | −3 to +3 stops | Each clip's static colour value                        |
-| `brightness`   | −0.5 to +0.5   | Each clip's static colour value                        |
-| `contrast`     | 0–2            | Each clip's static colour value                        |
-| `hue`          | −180° to +180° | Each clip's static colour value                        |
-| `saturation`   | 0–2            | Each clip's static colour value                        |
-| `highlights`   | −1 to +1       | Each clip's static colour value                        |
-| `shadows`      | −1 to +1       | Each clip's static colour value                        |
+| Channel                   | Value          | Value when this channel has no row keys                 |
+| ------------------------- | -------------- | ------------------------------------------------------- |
+| Opacity (`opacity`)       | 0–1            | The row's required `opacity`, initially 1 on new tracks |
+| Speed (`speed`)           | 0.1×–8×        | Each clip's constant/ramp/custom-keyframed speed        |
+| Exposure (`exposure`)     | −3 to +3 stops | Each clip's static colour value                         |
+| Brightness (`brightness`) | −0.5 to +0.5   | Each clip's static colour value                         |
+| Contrast (`contrast`)     | 0–2            | Each clip's static colour value                         |
+| Hue (`hue`)               | −180° to +180° | Each clip's static colour value                         |
+| Saturation (`saturation`) | 0–2            | Each clip's static colour value                         |
+| Highlights (`highlights`) | −1 to +1       | Each clip's static colour value                         |
+| Shadows (`shadows`)       | −1 to +1       | Each clip's static colour value                         |
 
-Clip documents contain static colour/opacity and **constant, ramp or custom-keyframed**
-speed. Shared row animation has no clip-animation object or per-property row key
-arrays. The explicitly approved clip speed editor stores its own source-frame
+The exact nine required value fields are `opacity`, `speed`, `exposure`,
+`brightness`, `contrast`, `hue`, `saturation`, `highlights` and `shadows`.
+Clip documents contain static colour and **constant, ramp or custom-keyframed**
+speed, with no `opacity` field. Shared row animation has no clip-animation object
+or per-property row key arrays. The explicitly approved clip speed editor stores its own source-frame
 points inside `clip.speed`; it does not change row-channel ownership or precedence.
 Trimming, restoring, moving, splitting and duplicating footage **never copy or
-shift row points**. Split/duplicate create independent source/static bases, retaining
-original-source ramp/clip-speed anchors. A moved clip uses its destination row's animation;
-the old and new rows' points stay where they were. Track Ripple also leaves
-points anchored in project time. Removing the last participant of a channel reveals
-its existing static base; it does not replace that base with the deleted value.
+shift row points or change row Opacity**. Split/duplicate create independent source
+ranges, colour and speed settings, retaining original-source ramp/clip-speed anchors.
+A moved clip uses its destination row's saved Opacity or overriding curve and
+animation; both rows' values and points stay where they were. Track Ripple also
+leaves points anchored in project time. Removing the last participant of a channel
+reveals its existing unkeyed value: row `opacity` for Opacity, the clip's own colour
+or speed setting otherwise. It does not replace that value with the deleted key.
 
 Points beyond the current project duration remain stored and list-editable. They
 are not constrained by any recording's length and are not discarded when footage
@@ -129,7 +136,7 @@ at frame 20; that middle point does not interrupt Exposure's interval.
 
 Before the first/after the last participating point, that channel holds its endpoint
 value across the entire row. A single participating point therefore overrides the
-channel everywhere. A channel with no participating points uses the bases above,
+channel everywhere. A channel with no participating points uses the values above,
 even if other channels on the row are animated.
 
 For normalized interval progress $u$, the **left participating point** supplies:
@@ -144,7 +151,7 @@ For normalized interval progress $u$, the **left participating point** supplies:
 
 Colour interpolates **parameter values**, then grades the sampled source RGB.
 It does not blend separately graded endpoint pictures; hue interpolates numerically
-in degrees. Grade/opacity evaluation uses **project time**, so it can change on
+in degrees. Grade and Opacity coverage use **project time**, so they can change on
 consecutive output frames even when slow motion holds the same source frame.
 
 A participating Speed channel overrides each clip's whole constant/ramp/custom base.
@@ -162,8 +169,8 @@ empty row without a selected clip. It shows point
 count, whole-row Previous/Next navigation, **Animation help** and participant chips
 for the current or inspected stored point. The toolbar's Animation help includes
 point-timing guidance, with no separate Keyframe timing help button.
-**Clip** keeps source/static bases and the setting controls/diamonds evaluated at
-the real playhead. Every animatable
+**Clip** keeps source/clip settings, row Opacity and the setting controls/diamonds
+evaluated at the real playhead. Every animatable
 setting always has its own diamond beside its main control, immediately
 followed by native SVG Previous/Next buttons:
 
@@ -179,26 +186,35 @@ followed by native SVG Previous/Next buttons:
 The setting's Previous/Next buttons visit **strictly earlier/later** points where
 `values[setting] !== null`; zero is a participant, and points belonging only to
 other channels are skipped. There is no wrap or revisit of the current point.
-All ten settings keep both buttons visible, disabled when the relevant neighbour
+All nine settings keep both buttons visible, disabled when the relevant neighbour
 is absent, no project is open, or any document-preview draft is active. Native Tab order is
 diamond → Previous → Next → any existing reset control. Navigation preserves the
 chosen Inspector tab and activated button's focus instead of forcing Clip, and
 changes no document, history or autosave state.
 
-The duplicate Layer opacity diamond/buttons in the sidebar's **Layer options** use
-the same context. They select their own row, including an empty row, and retain
-the chosen Inspector tab without stealing focus from the activated navigation button.
+**Clip → Colour** contains the single **Opacity** slider/value/diamond/Previous/Next
+controls alongside the colour sliders. The slider starts at **100%**, stores 0–1,
+and without Opacity keys edits the selected row's `opacity`, including on an empty
+row with no selected clip. Opacity navigation visits only `opacity` participants.
+**Clip → Placement** contains placement controls only. There is no duplicate
+opacity control or navigation in Placement or the sidebar;
+**Layer options** is limited to rename, Ripple, ordering and deletion. Stored Opacity
+participants remain editable in the shared Keyframes list.
+Unkeyed colour controls still edit the selected clip; sharing the Colour section
+does not make Opacity per-clip or part of the SDR RGB grading transform. Opacity
+controls composition coverage after grading.
 
 Once a channel is animated anywhere on the row, its main Clip value control is
 read-only at frames where that channel does not participate, including at points
 belonging only to other settings. **Click its hollow diamond to capture a value before editing**.
 Setting tooltips and screen-reader context say **Keyframe at playhead** for an
 editable participant, or **Animated · add a keyframe to edit** for a read-only
-animated value. Clip, sidebar Layer opacity and Row speed animation use the same
+animated value. Clip's Opacity, colour and Row speed animation use the same
 terms and explain which diamond adds a keyframe at the current timeline frame.
-Sliders/numbers never implicitly create keys. Unanimated channels edit the selected
-clip's static base, or the layer base for Layer opacity. On an empty row, diamonds
-can create animation; clip-base editing requires a selected clip.
+Sliders/numbers never implicitly create keys. Unanimated Opacity edits the row's
+saved `opacity`; unanimated colour and speed edit the selected clip's settings.
+On an empty row, Opacity remains editable without keys and diamonds can create
+animation for any channel; unkeyed colour/speed editing requires a selected clip.
 
 In **Keyframes**, the shared list has no outer disclosure or per-row list expansion
 preference. Each shared row lists its participating setting dependencies and has
@@ -226,8 +242,8 @@ mode, preset or source-frame curve editor.
 
 Only existing non-null participants get value editors. Each accepted value/reset
 changes that participant at its stored frame in **one Undo step**, without changing
-point time, shared easing, other participants/points or static bases, and without
-requesting a seek. No slider, numeric edit or reset implicitly joins a channel.
+point time, shared easing, other participants/points, row `opacity` or clip settings,
+and without requesting a seek. No slider, numeric edit or reset implicitly joins a channel.
 Numeric drafts preserve entered precision; empty, nonfinite, out-of-bounds and
 contextually invalid values remain editable with inline errors, never silently
 clamped or rounded. A Speed timing conflict rejects the edit without shortening
@@ -300,7 +316,7 @@ moves ten, with the same atomic validation and no snapping. Focus and the inspec
 point cursor follow the move. Movement navigates to the point without also firing
 ordinary playhead-step or clip-nudge shortcuts, or leaking other editor shortcuts.
 Dragging can reach beyond duration, but retaining that point never extends the
-sequence merely for its marker. No other row's points, clip/source/static bases or
+sequence merely for its marker. No other row's points/values, clip settings/source ranges or
 music are copied or shifted; Speed's contextual duration recompilation is the
 natural timing exception. There is no cross-row point move.
 
@@ -312,21 +328,26 @@ Neither ruler ticks nor those transition buttons are keyframe markers.
 ## Group composition
 
 Enabled layer groups are composited bottom-to-top over opaque black in encoded
-BT.709 RGB, after each source has its evaluated grade. For group sources `i`, let
-`wᵢ` be dissolve weight, `oᵢ` clip opacity, `bᵢ` black-fade brightness and `Gᵢ` graded
+BT.709 RGB, after each source has its evaluated grade. For group sources $i$, let
+$w_i$ be dissolve weight, $o_i$ evaluated Opacity, $b_i$ black-fade brightness and $G_i$ graded
 RGB. Each track's dissolve is **one** group, not two source-over layers; several
 tracks may dissolve simultaneously:
 
-- Premultiplied group RGB: `C = sum(Gᵢ × bᵢ × oᵢ × wᵢ)`.
-- Group coverage: `A = sum(oᵢ × wᵢ)`.
-- With layer opacity `l`, source-over: `result = l × C + lower × (1 − l × A)`.
+- Premultiplied group RGB: $C = \sum_i G_i b_i o_i w_i$.
+- Group coverage: $A = \sum_i o_i w_i$.
+- Source-over: $\mathrm{result} = C + \mathrm{lower}(1 - A)$, with no additional layer multiplier.
 
 Preview, CPU numeric tests and native layered export share this sampling/composition
-contract. Each source's grade/clip opacity and the complete group's layer opacity
-are evaluated at the same project frame. Full opacity/neutral
-settings preserve the original single-track behavior. Native LUT interpolation and
+contract. Each source's grade and row Opacity are evaluated at the same project frame.
+With no Opacity participants, each source uses the row's required `opacity` value;
+otherwise the sole `opacity` curve overrides it for every source, including both
+dissolve participants. This is one evaluated setting per row, applied inside the
+group sums, not another multiplier after composing the group. Opacity is coverage,
+not a parameter of SDR RGB grading; unkeyed colour remains per-clip. Black fades
+affect RGB only, not coverage. Full opacity/neutral settings preserve the original
+single-track behavior. Native LUT interpolation and
 final H.264/YUV quantisation are approximations, not bitwise shader equivalence.
-See [COLOUR_AND_TIMING.md](COLOUR_AND_TIMING.md) for the unchanged equations and
+See [COLOUR_AND_TIMING.md](COLOUR_AND_TIMING.md) for grading/composition equations and
 [GitHub Actions](https://github.com/Plonk42/PasCap/actions) for actual-commit CI;
 synthetic checks do not establish intended-GPU or long-flight performance.
 
@@ -367,16 +388,17 @@ offscreen/unmount/project-switch releases the review decoder.
 
 The inspector uses **Clip / Keyframes / Sequence / Audio** tabs; Keyframes retains
 the accessible name **Layer keyframes**. Source range,
-Layer & opacity, Speed, Colour and playhead diamonds belong to Clip. The shared
-point list is directly visible in Keyframes, with Animation help, participant chips
+Placement (placement only), Speed, Colour (including the sole row Opacity control)
+and playhead diamonds belong to Clip. The shared point list is directly visible in Keyframes,
+with Animation help, participant chips
 and whole-row point navigation. Keyframes and Sequence have no redundant
 selected-track banner. The selected track's Transition/Sequence fades belong to
 Sequence; Music belongs to Audio, with detailed **Placement & fades**.
 Sections retain their expansion in local browser storage.
-New defaults collapse detailed source, layer and speed controls, while Colour stays
+New defaults collapse detailed source, placement and speed controls, while Colour stays
 open. Existing section preferences are not reset. **Expand all / Collapse all**
 appears only in Clip and affects its four top-level sections: Source range,
-Layer & opacity, Speed and Colour. Sequence, Audio, nested point disclosures and
+Placement, Speed and Colour. Sequence, Audio, nested point disclosures and
 help remain unchanged; the shared list has no expansion preference.
 Hidden tab/section content stays mounted, retaining valid/invalid drafts within
 the same editing context. Row/clip changes refresh that context safely rather than
@@ -400,15 +422,15 @@ Export reads one original at a time through the shared backpressured frame mappe
 The plain static single-layer path retains at most two lossless clips, two
 intermediate decoders and one reusable RGB frame (24.9 MB UHD), plus native memory.
 
-The static fast path is eligible only for one enabled, opaque track with opaque
-clips, no row points, a zero first start and no internal gaps. Ripple itself is not
+The static fast path is eligible only for one enabled track with row Opacity 1,
+no row points, a zero first start and no internal gaps. Ripple itself is not
 an eligibility requirement. Other valid timelines, including any speed-only or
 neutral row point, use the generalized layered path; static planning rejects them.
 That pipeline remains sequential, with at most one original decoder, two intermediate readers and one
 encoder, and at most three native video children per pass. Each enabled populated
 track first renders a premultiplied RGBA16 group from at most two RGB sources;
 subsequent source-over passes merge group and lower accumulator without regrading
-or applying opacity twice. Final H.264 is encoded once.
+or applying another opacity multiplier. Final H.264 is encoded once.
 Four reusable raw buffers (two RGB8 and two RGBA16) use **22 bytes/pixel =
 182,476,800 bytes at UHD**; two reusable **65³ Float32 LUTs** add
 **6,591,000 bytes**, with native codec/pipe/filter memory and selected audio PCM
@@ -432,11 +454,15 @@ qualification remain separate work in
 [#7](https://github.com/Plonk42/PasCap/issues/7) and
 [#8](https://github.com/Plonk42/PasCap/issues/8).
 
-Schema **v6 is strict**, including required unique `media.videoIds` / `media.audioIds`
+Schema **v7 is strict**, including required unique `media.videoIds` / `media.audioIds`
 arrays, at most 10,000 IDs each, and all required per-track settings. Project-level
-transitions/fades are not accepted. Older v1–v5 project documents and export receipt snapshots
-remain unchanged/incompatible; no migrations, compatibility fallback/default fields
-or automatic successful-video deletion occur. Create a new project and deliberately
+transitions/fades, saved `clip.opacity` and old `clipOpacity`/`layerOpacity` point
+channels are not accepted. `VideoLayer.opacity` is the required sole stored row
+value, a number in 0–1; 1 is a new-track initial value, not a missing-field default.
+Points require exactly the nine nullable fields listed above, including `opacity`.
+Older v1–v6 project documents and export receipt snapshots remain unchanged/incompatible;
+there are no migrations, compatibility fallback/default fields or automatic deletion
+of projects, receipts or successful videos. Create a new project and deliberately
 import its media; registered media and currently verified ready proxies remain reusable.
 Registry/proxy formats and source identity checks are unchanged.
 Confirmed project deletion removes only its saved document, preserving originals,

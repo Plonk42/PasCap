@@ -584,7 +584,6 @@ export class PreviewEngine {
       const members = layers.filter((layer) => layer.layerId === group.id);
       if (!members.length) continue;
       groups.push({
-        opacity: members[0]!.layerOpacity,
         clips: members.map((layer) => ({
           slot: this.#slotIndex(layer.clipId),
           settings: layer.colour,

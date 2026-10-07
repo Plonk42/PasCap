@@ -27,7 +27,6 @@ export const clipSchema = z
     sourceOut: frameSchema.positive(),
     colour: colourSchema,
     speed: speedSchema,
-    opacity: z.number().min(0).max(1),
   })
   .strict()
   .refine((clip) => clip.sourceOut > clip.sourceIn, { message: 'Source OUT must be after IN (exclusive).' });
@@ -51,6 +50,7 @@ export const layerSchema = z
     id: idSchema,
     name: z.string().trim().min(1).max(100),
     enabled: z.boolean(),
+    // Row-wide source coverage when Opacity has no participating points.
     opacity: z.number().min(0).max(1),
     keyframes: z
       .array(layerKeyframeSchema)
@@ -85,7 +85,7 @@ export const musicSchema = z
 
 const baseProjectSchema = z
   .object({
-    schemaVersion: z.literal(6),
+    schemaVersion: z.literal(7),
     id: idSchema,
     title: z.string().trim().min(1).max(200),
     media: z
@@ -139,7 +139,7 @@ export function createLayer(id: string, name: string, ripple = true): VideoLayer
 
 export function createProject(id: string, title: string): ProjectDocument {
   return projectSchema.parse({
-    schemaVersion: 6,
+    schemaVersion: 7,
     id,
     title,
     media: { videoIds: [], audioIds: [] },
@@ -168,6 +168,5 @@ export function createClip(
     sourceOut,
     colour: { ...NEUTRAL_COLOUR },
     speed: { ...NORMAL_SPEED },
-    opacity: 1,
   });
 }

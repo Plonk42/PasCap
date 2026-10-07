@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { settingPresentation } from '../../src/web/setting-scope.js';
 
 describe('setting scope wording', () => {
-  it.each(['Exposure', 'Layer opacity', 'Speed'])('explains both animated states consistently for %s', (label) => {
+  it.each(['Exposure', 'Opacity', 'Speed'])('explains both animated states consistently for %s', (label) => {
     const context = { keyed: true, baseAvailable: true, baseLabel: 'Clip' as const, label, frame: 30 };
     expect(settingPresentation({ ...context, active: true })).toEqual({
       scope: 'Keyframe at playhead',
@@ -14,28 +14,43 @@ describe('setting scope wording', () => {
     });
   });
 
-  it.each(['Clip', 'Layer'] as const)('names the editable static %s base', (baseLabel) => {
+  it.each(['Exposure', 'Opacity', 'Speed'])('labels unkeyed %s as Not animated without static-base jargon', (label) => {
     expect(
-      settingPresentation({ keyed: false, active: false, baseAvailable: true, baseLabel, label: 'Opacity', frame: 0 }),
+      settingPresentation({ keyed: false, active: false, baseAvailable: true, baseLabel: 'Clip', label, frame: 0 }),
     ).toEqual({
-      scope: `${baseLabel} base`,
-      hint: `Editing the static ${baseLabel.toLowerCase()} base. This setting has no keyframes on the layer.`,
+      scope: 'Not animated',
+      hint: `Editing ${label}. Add keyframes to animate this setting on the row.`,
     });
   });
 
-  it('explains how to edit an empty layer without inventing a clip base', () => {
+  it.each(['Exposure', 'Speed'])('explains %s on an empty layer without inventing a static layer base', (label) => {
     expect(
       settingPresentation({
         keyed: false,
         active: false,
         baseAvailable: false,
         baseLabel: 'Clip',
-        label: 'Speed',
+        label,
         frame: 0,
       }),
     ).toEqual({
       scope: 'No clip selected',
-      hint: 'Select a clip to edit its static base, or click the Speed diamond to animate this setting on the layer.',
+      hint: `Select a clip to edit ${label}, or click the ${label} diamond to animate this setting on the row.`,
+    });
+  });
+  it('keeps unkeyed Opacity available on an empty row', () => {
+    expect(
+      settingPresentation({
+        keyed: false,
+        active: false,
+        baseAvailable: true,
+        baseLabel: 'Layer',
+        label: 'Opacity',
+        frame: 0,
+      }),
+    ).toEqual({
+      scope: 'Not animated',
+      hint: 'Editing Opacity. Add keyframes to animate this setting on the row.',
     });
   });
 });

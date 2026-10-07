@@ -12,7 +12,7 @@ function fixture() {
   const point: LayerKeyframe = {
     frame: 20,
     interpolation: 'ease-in',
-    values: { ...EMPTY_KEY_VALUES, ...NEUTRAL_COLOUR, layerOpacity: 0.8, clipOpacity: 0.7, speed: 1 },
+    values: { ...EMPTY_KEY_VALUES, ...NEUTRAL_COLOUR, opacity: 0.7, speed: 1 },
   };
   const other: LayerKeyframe = { frame: 80, interpolation: 'hold', values: { ...EMPTY_KEY_VALUES, exposure: 0.5 } };
   project.layers[0]!.keyframes = [point, other];
@@ -36,7 +36,7 @@ describe('capture-relative marker geometry', () => {
 });
 
 describe('shared-point drag planning', () => {
-  it('moves all ten participants/easing across another point atomically and changes no other project data', () => {
+  it('moves all nine participants/easing across another point atomically and changes no other project data', () => {
     const { project, point, other } = fixture();
     const bytes = JSON.stringify(project);
     const plan = planKeyframeDrag(project, 'video-1', 20, 90, [], 0);

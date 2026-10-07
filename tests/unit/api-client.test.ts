@@ -4,7 +4,7 @@ import type { AudioAsset } from '../../src/shared/audio.js';
 import type { ExportPreflight } from '../../src/shared/export-space.js';
 import { EMPTY_KEY_VALUES } from '../../src/shared/keyframes.js';
 import type { MediaJob } from '../../src/shared/media.js';
-import { createProject } from '../../src/shared/model.js';
+import { createClip, createProject } from '../../src/shared/model.js';
 import { api, ApiError, request, type ServiceHealth } from '../../src/web/api.js';
 import { unsupportedProject } from './project-fixtures.js';
 
@@ -368,10 +368,10 @@ describe('registered API methods', () => {
     await expect(api.save(project, 0)).rejects.toMatchObject({ status: 200, kind: 'response' });
   });
 
-  it('uses complete schema-6 project mocks and rejects an unsupported-version response without changing it', async () => {
-    expect(project.schemaVersion).toBe(6);
+  it('uses complete schema-7 project mocks and rejects a version-6 response without changing it', async () => {
+    expect(project.schemaVersion).toBe(7);
     expect(project.layers[0]!.keyframes).toEqual([]);
-    const unsupported = unsupportedProject(3, project.id, project.title);
+    const unsupported = unsupportedProject(6, project.id, project.title);
     const before = JSON.stringify(unsupported);
     fetchMock.mockResolvedValueOnce(jsonResponse({ document: unsupported }));
     await expect(api.load(project.id)).rejects.toMatchObject({ status: 200, kind: 'response', retryable: false });
@@ -379,11 +379,11 @@ describe('registered API methods', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
-  it('validates all ten required nullable members in a shared row point, including zero participation', async () => {
+  it('validates all nine required nullable members in a shared row point, including zero participation', async () => {
     const point = {
       frame: 100,
       interpolation: 'linear' as const,
-      values: { ...EMPTY_KEY_VALUES, exposure: 0, clipOpacity: 0 },
+      values: { ...EMPTY_KEY_VALUES, exposure: 0, opacity: 0 },
     };
     const document = { ...project, layers: [{ ...project.layers[0]!, keyframes: [point] }] };
     fetchMock.mockResolvedValueOnce(jsonResponse({ document }));
@@ -398,6 +398,39 @@ describe('registered API methods', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(vi.getTimerCount()).toBe(0);
   });
+
+  it.each(['clip opacity', 'layerOpacity', 'clipOpacity'])(
+    'rejects a removed %s in a v7 response without dropping it or retrying',
+    async (removed) => {
+      const layer = project.layers[0]!;
+      const legacyLayer =
+        removed === 'clip opacity'
+          ? layer
+          : {
+              ...layer,
+              keyframes: [
+                {
+                  frame: 0,
+                  interpolation: 'linear',
+                  values: { ...EMPTY_KEY_VALUES, opacity: 0.5, [removed]: null },
+                },
+              ],
+            };
+      const response = {
+        document: {
+          ...project,
+          layers: [legacyLayer],
+          clips: removed === 'clip opacity' ? [{ ...createClip('legacy', 'video', 0, 10), opacity: 1 }] : project.clips,
+        },
+      };
+      const bytes = JSON.stringify(response);
+      fetchMock.mockResolvedValueOnce(jsonResponse(response));
+      await expect(api.load(project.id)).rejects.toMatchObject({ status: 200, kind: 'response', retryable: false });
+      expect(JSON.stringify(response)).toBe(bytes);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(vi.getTimerCount()).toBe(0);
+    },
+  );
 });
 
 describe('API response and transport failures', () => {

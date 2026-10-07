@@ -107,19 +107,19 @@ function audioAsset() {
 }
 
 describe('strict production export request and immutable validation', () => {
-  it('offers exactly 720p and UHD profiles, accepts no-music v6 and rejects empty/legacy/unknown requests', () => {
+  it('offers exactly 720p and UHD profiles, accepts no-music v7 and rejects empty/legacy/unknown requests', () => {
     expect(EXPORT_PROFILES.draft720).toMatchObject({ width: 1280, height: 720 });
     expect(EXPORT_PROFILES.final4k).toMatchObject({ width: 3840, height: 2160 });
     const document = documentWithClips();
     expect(exportRequestSchema.parse({ document, profile: 'draft720' }).document.music).toBeNull();
-    expect(exportRequestSchema.parse({ document, profile: 'draft720' }).document.schemaVersion).toBe(6);
+    expect(exportRequestSchema.parse({ document, profile: 'draft720' }).document.schemaVersion).toBe(7);
     for (const request of [
       { document: createProject('empty', 'Empty'), profile: 'draft720' },
       { document, profile: 'reference' },
       { document, profile: 'draft720', normalize: true },
       { document: { ...document, schemaVersion: 1 }, profile: 'draft720' },
       { document: { ...document, schemaVersion: 2 }, profile: 'draft720' },
-      ...[3, 4, 5].map((version) => ({
+      ...[3, 4, 5, 6].map((version) => ({
         document: unsupportedProject(version, `old-export-v${version}`, 'Unsupported export'),
         profile: 'draft720',
       })),

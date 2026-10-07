@@ -70,9 +70,15 @@ external desktop file/folder drag-and-drop import**. External drops prevent
 navigation and show Import guidance without a POST. Internal ready-Media-to-Timeline
 dragging remains supported. Imports reference originals; generated proxies/
 thumbnails, project/registry metadata, exports/receipts and scratch are the only
-new local data, not duplicate original footage. Projects use strict schema 6 with
-required per-track Ripple, transitions and opening/closing fades. v1–v5 projects
-and receipt snapshots remain unchanged/incompatible, without migration;
+new local data, not duplicate original footage. Projects use strict schema 7 with
+required per-track Ripple, transitions, opening/closing fades and numeric
+`VideoLayer.opacity` in 0–1 (1 on new tracks), plus nine nullable point channels:
+`opacity`, `speed` and seven colour settings. Row `opacity` is the sole saved
+Opacity value; saved `clip.opacity` and old `clipOpacity`/`layerOpacity` channels
+are rejected. The row value or its overriding keys supply Opacity to each source
+in a dissolve group, without an additional layer multiplier. v1–v6 projects
+and receipt snapshots remain unchanged/incompatible and require project recreation,
+without migration, compatibility defaults or automatic deletion;
 registry/proxy formats and source identity checks are unchanged.
 
 ## Planned architecture and storage layout

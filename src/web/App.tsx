@@ -363,12 +363,17 @@ export function App() {
     [publish, validate],
   );
   const edit = useCallback(
-    (command: EditCommand): void => {
+    (input: EditCommand | readonly EditCommand[]): void => {
       if (!current.current) return;
       try {
-        const next = applyCommand(current.current, command);
+        const commands = 'type' in input ? [input] : input;
+        if (!commands.length) return;
+        // Validate the whole transaction before one history/autosave publication.
+        let next = current.current;
+        for (const command of commands) next = applyCommand(next, command);
         validate(next);
-        if (command.type === 'trim' || command.type === 'trim-place') {
+        const command = commands.length === 1 ? commands[0] : undefined;
+        if (command && (command.type === 'trim' || command.type === 'trim-place')) {
           const placed = calculateLayout(next).clips.find((item) => item.clip.id === command.clipId)!;
           const previous = current.current.clips.find((item) => item.id === command.clipId)!;
           requestedFrame.current = previous.sourceIn !== command.sourceIn ? placed.start : placed.end - 1;
