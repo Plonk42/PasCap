@@ -1,4 +1,4 @@
-import { colourSchema, type ColourSettings } from '../shared/colour.js';
+import { colourSchema, NEUTRAL_COLOUR, type ColourSettings } from '../shared/colour.js';
 import { projectSchema, type ProjectDocument } from '../shared/model.js';
 import {
   calculateLayout,
@@ -19,6 +19,7 @@ export interface PreviewDiagnostics {
   status: PreviewStatus;
   message: string;
   playing: boolean;
+  ungraded: boolean;
   frame: number;
   duration: number;
   requestedFrame: number;
@@ -133,6 +134,7 @@ export class PreviewEngine {
   #raf = 0;
   #disposed = false;
   #playing = false;
+  #ungraded = false;
   #busy = false;
   #status: PreviewStatus = 'empty';
   #message = 'Add footage to the timeline';
@@ -193,6 +195,7 @@ export class PreviewEngine {
       status: this.#status,
       message: this.#message,
       playing: this.#playing,
+      ungraded: this.#ungraded,
       frame: this.#frame,
       duration: this.#layout.duration,
       requestedFrame: this.#operationFrame,
@@ -412,6 +415,7 @@ export class PreviewEngine {
     if (!sameRate(snapshot.frameRate, PROJECT_FPS)) throw new Error('Preview requires 30000/1001 fps video.');
     this.pause();
     const signal = this.#beginOperation();
+    if (snapshot.id !== this.#document?.id) this.#ungraded = false;
     this.#document = snapshot;
     this.#layout = calculateLayout(snapshot);
     this.#proxyUrl = proxyUrl;
@@ -467,6 +471,17 @@ export class PreviewEngine {
     } catch (error) {
       if (this.#isCurrent(signal)) this.#handleError(error);
     }
+  }
+  /** Editor-only grade bypass: keep source clocks, coverage and the saved grade. */
+  setUngraded(enabled: boolean): void {
+    if (this.#disposed || !this.#document || this.#ungraded === enabled) return;
+    this.#ungraded = enabled;
+    this.#dirty = true;
+    if (!this.#playing && !this.#busy && this.#status === 'paused' && !this.#drawFrame(this.#frame))
+      this.#compositor.clear();
+    // Playback redraws through the normal advance/readiness paths, never using
+    // a possibly stale paused frame. Publication retains its exact A/V checks.
+    this.#emit(true);
   }
   updateColour(clipId: string, settings: ColourSettings): void {
     if (!this.#document) return;
@@ -586,7 +601,7 @@ export class PreviewEngine {
       groups.push({
         clips: members.map((layer) => ({
           slot: this.#slotIndex(layer.clipId),
-          settings: layer.colour,
+          settings: this.#ungraded ? NEUTRAL_COLOUR : layer.colour,
           aspect: this.#slotFor(layer.clipId).aspect,
           opacity: layer.opacity,
           blendWeight: layer.blendWeight,
@@ -697,8 +712,15 @@ export class PreviewEngine {
   }
 
   readonly #onDecodedFrame = (): void => {
-    if (!this.#playing || this.#busy || this.#status !== 'buffering' || !this.#document) return;
+    if (this.#disposed || this.#busy || !this.#document) return;
     try {
+      if (!this.#playing) {
+        // A paused appearance redraw can wait for a real decoded callback;
+        // toggling the grade must not initiate a load or seek to obtain it.
+        if (this.#status === 'paused' && this.#dirty && this.#drawFrame(this.#frame)) this.#emit(true);
+        return;
+      }
+      if (this.#status !== 'buffering') return;
       // A real rVFC can resolve a mismatch between display ticks. Accept it
       // against the CURRENT clock, not the earlier tick's requested frame, so
       // a later mismatch cannot inherit an already-resolved grace period.
@@ -880,6 +902,7 @@ export class PreviewEngine {
     if (this.#disposed) return;
     this.pause();
     this.#disposed = true;
+    this.#ungraded = false;
     cancelAnimationFrame(this.#raf);
     this.canvas.removeEventListener('webglcontextlost', this.#onContextLost);
     this.canvas.removeEventListener('webglcontextrestored', this.#onContextRestored);

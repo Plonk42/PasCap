@@ -4,6 +4,7 @@ import { formatTimecode } from '../shared/timing.js';
 import { HelpPopover } from './HelpPopover.js';
 import { Icon } from './icons.js';
 import { TimecodeField } from './TimecodeField.js';
+import './preview-comparison.css';
 
 interface Props {
   canvas: RefObject<HTMLCanvasElement | null>;
@@ -11,6 +12,7 @@ interface Props {
   duration: number;
   drafting: boolean;
   onTogglePlayback: () => void;
+  onToggleUngraded: () => void;
   onSeek: (frame: number) => void;
   onRetry: () => void;
   onMedia: () => void;
@@ -91,6 +93,7 @@ export function PreviewPanel({
   duration,
   drafting,
   onTogglePlayback,
+  onToggleUngraded,
   onSeek,
   onRetry,
   onMedia,
@@ -111,11 +114,25 @@ export function PreviewPanel({
   const caption = previewCaption(loading, diagnostics, startupError);
   return (
     <section className="preview-panel" aria-label="Preview">
-      <div className="preview-heading">
+      <div className="preview-heading preview-comparison-heading">
         <h2>Preview</h2>
-        <span className="preview-quality" title={diagnostics?.renderer}>
-          720p · 29.97 fps
-        </span>
+        <div className="preview-comparison-controls">
+          <span className="preview-quality" title={diagnostics?.renderer}>
+            720p · 29.97 fps
+          </span>
+          <button
+            type="button"
+            className="preview-comparison-toggle"
+            aria-label="Show ungraded preview"
+            aria-pressed={diagnostics?.ungraded ?? false}
+            title="Preview only: bypass all colour adjustments on every layer, keeping opacity, fades and transitions. Saved grades and exports are unchanged."
+            disabled={controlsUnavailable || failed || !diagnostics || status === 'disposed'}
+            onClick={onToggleUngraded}
+          >
+            <Icon name="colour" size={14} />
+            {diagnostics?.ungraded ? 'Ungraded' : 'Compare'}
+          </button>
+        </div>
       </div>
       <div className="canvas-stage">
         <canvas ref={canvas} aria-label="WebGL live video preview" />
@@ -154,6 +171,7 @@ export function PreviewPanel({
             {diagnostics?.message}
           </div>
         )}
+        {diagnostics?.ungraded && <span className="preview-comparison-overlay">Ungraded · colour bypassed</span>}
       </div>
       <div className="transport">
         <span className="transport-note">
