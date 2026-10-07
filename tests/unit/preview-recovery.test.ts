@@ -548,6 +548,66 @@ async function pendingRecovery(unavailable = false) {
   return { preview, slot, pending, recoveryFrame };
 }
 
+describe('exact intact-surface reuse', () => {
+  it('always redraws diagnostic readback after the native drawing buffer may have been discarded', async () => {
+    const preview = await paused(gradedProject());
+    preview.compositor.visible = null;
+    preview.engine.capturePixels();
+    expectSurface(preview, preview.initialFrame);
+    preview.compositor.visible = null;
+    preview.engine.capturePixels();
+    expectSurface(preview, preview.initialFrame);
+    expect(preview.compositor.drawFrame).toHaveBeenCalledTimes(2);
+    expectNoMediaOperations(preview);
+  });
+
+  it('reuses a held graded image at current project time, but redraws a new source, Compare and a cleared seek', async () => {
+    const project = gradedProject(true);
+    project.clips[0]!.speed = { mode: 'constant', rate: 0.25 };
+    const preview = await running(project, 0);
+    const rendered = preview.engine.diagnostics().renderedFrames;
+    for (const frame of [1, 2, 3]) {
+      tick(preview, frame);
+      expect(preview.engine.diagnostics()).toMatchObject({ status: 'playing', frame, renderedFrames: rendered });
+      expectSurface(preview, frame);
+    }
+    expect(preview.compositor.drawFrame).not.toHaveBeenCalled();
+    expect(preview.compositor.uploadVideo).not.toHaveBeenCalled();
+    expectUninterrupted(preview);
+    observeAt(preview, 4);
+    tick(preview, 4);
+    expectSurface(preview, 4);
+    expect(preview.compositor.drawFrame).toHaveBeenCalledTimes(1);
+    preview.engine.setUngraded(true);
+    tick(preview, 5);
+    expectSurface(preview, 5, true);
+    expect(preview.compositor.drawFrame).toHaveBeenCalledTimes(2);
+    await preview.engine.seek(5);
+    expectSurface(preview, 5, true);
+    expect(preview.compositor.drawFrame).toHaveBeenCalledTimes(3);
+  });
+
+  it.each(['exposure', 'opacity'] as const)(
+    'redraws project-time %s animation on every held source frame',
+    async (channel) => {
+      const project = gradedProject(true);
+      project.clips[0]!.speed = { mode: 'constant', rate: 0.25 };
+      project.layers[0]!.keyframes = [
+        { frame: 0, interpolation: 'linear', values: { ...EMPTY_KEY_VALUES, [channel]: 0 } },
+        { frame: 4, interpolation: 'hold', values: { ...EMPTY_KEY_VALUES, [channel]: 1 } },
+      ];
+      const preview = await running(project, 0);
+      for (const frame of [1, 2, 3]) {
+        tick(preview, frame);
+        expectSurface(preview, frame);
+      }
+      expect(preview.compositor.drawFrame).toHaveBeenCalledTimes(3);
+      expect(preview.compositor.uploadVideo).not.toHaveBeenCalled();
+      expectUninterrupted(preview);
+    },
+  );
+});
+
 describe('PreviewEngine final publication boundary', () => {
   async function publicationPreview(initialFrame = 65): Promise<RunningPreview> {
     const project = singleProject(true);
@@ -613,6 +673,8 @@ describe('PreviewEngine final publication boundary', () => {
       armed = true;
       tick(preview, 70);
     } else {
+      // Force actual raster work rather than an identical intact surface.
+      preview.engine.canvas.width += 1;
       const draw = preview.compositor.drawFrame.getMockImplementation()!;
       preview.compositor.drawFrame.mockImplementationOnce((groups) => {
         draw(groups);
@@ -919,6 +981,8 @@ describe('PreviewEngine observed-frame tolerance and recovery', () => {
           });
       });
       published.length = 0;
+      // This witness concerns actual raster delay, not unchanged-image reuse.
+      preview.engine.canvas.width += 1;
       const draw = preview.compositor.drawFrame.getMockImplementation()!;
       preview.compositor.drawFrame.mockImplementationOnce((groups) => {
         draw(groups);
