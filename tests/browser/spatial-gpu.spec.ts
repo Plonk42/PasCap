@@ -2,7 +2,8 @@ import { expect, test } from '@playwright/test';
 import { fileURLToPath } from 'node:url';
 import { build } from 'vite';
 import type { CompositeClip, CompositeGroup } from '../../src/preview/compositor.js';
-import { gradePixel, NEUTRAL_COLOUR, type RGB } from '../../src/shared/colour.js';
+import { CURVE_CHANNELS, HSL_BANDS } from '../../src/shared/advanced-colour.js';
+import { createColourSettings, gradePixel, NEUTRAL_COLOUR, type RGB } from '../../src/shared/colour.js';
 import { NEUTRAL_SPATIAL_POSE, type SpatialPose } from '../../src/shared/spatial.js';
 
 // Bundle the real compositor in memory only: no editor, fixtures, original media,
@@ -155,7 +156,35 @@ function reference(
   return lower;
 }
 
-const cases: { name: string; groups: CompositeGroup[] }[] = [
+const advanced = createColourSettings();
+advanced.exposure = 0.2;
+HSL_BANDS.forEach((band, i) => {
+  advanced.hsl[band] = { hue: i % 2 ? 5 : -4, saturation: -0.1, lightness: 0.012 };
+});
+CURVE_CHANNELS.forEach((channel, c) => {
+  advanced.curves[channel] = Array.from({ length: 16 }, (_, i) => ({ x: i / 15, y: (i / 15) ** (1 + c * 0.025) }));
+});
+const allCases: { name: string; groups: CompositeGroup[] }[] = [
+  {
+    name: 'advanced static row grade with spatial dissolve opacity and black fade',
+    groups: [
+      { clips: [clip(1, {}, { settings: advanced, opacity: 0.9 })] },
+      {
+        clips: [
+          clip(
+            0,
+            { scale: 0.83, rotation: 21, cropRight: 0.18 },
+            { settings: advanced, opacity: 0.63, blendWeight: 0.37, brightness: 0.4 },
+          ),
+          clip(
+            1,
+            { translateX: 0.21, cropTop: 0.23 },
+            { settings: advanced, opacity: 0.63, blendWeight: 0.63, brightness: 0.7 },
+          ),
+        ],
+      },
+    ],
+  },
   { name: 'identity opaque letterbox', groups: [{ clips: [clip(0)] }] },
   {
     name: 'identity letterbox covers lower row',
@@ -201,11 +230,16 @@ const cases: { name: string; groups: CompositeGroup[] }[] = [
   },
 ];
 
-for (const [width, height] of [
-  [1280, 720],
-  [3840, 2160],
+for (const [width, height, advancedOnly] of [
+  [1280, 720, true],
+  [3840, 2160, true],
+  [1280, 720, false],
+  [3840, 2160, false],
 ] as const) {
-  test(`pure GPU spatial numeric parity at ${width}×${height}`, async ({ page }, testInfo) => {
+  const cases = advancedOnly ? allCases.slice(0, 1) : allCases.slice(1);
+  test(`${advancedOnly ? 'advanced colour' : 'pure GPU'} spatial numeric parity at ${width}×${height}`, async ({
+    page,
+  }, testInfo) => {
     await page.route('**/*', (route) =>
       route.fulfill({ contentType: 'text/html', body: '<!doctype html><title>Synthetic GPU only</title>' }),
     );
@@ -311,6 +345,11 @@ for (const [width, height] of [
               ]),
             ),
           );
+          // Establish slot zero for the independent raw-texture probe even
+          // when the final advanced fixture's last participant used slot one.
+          compositor.drawFrame([
+            { clips: [{ ...mixedFixture.groups[0]!.clips[0]!, slot: 0, settings: neutralColour }] },
+          ]);
           // Constant output has NO texture, geometry mapping or grade. Values
           // around half-byte boundaries distinguish preblend conversion from
           // converting only the final source-over result.
@@ -559,13 +598,12 @@ test('synthetic orientation and dyadic half-open crop edges preserve lower cover
   );
   await page.goto('/');
   await page.addScriptTag({ content: compositorScript });
-  const result = await page.evaluate(() => {
+  const result = await page.evaluate((settings) => {
     const gpu = (globalThis as unknown as { SpatialGpu: typeof import('../../src/preview/compositor.js') }).SpatialGpu;
     const canvas = document.createElement('canvas');
     canvas.width = 8;
     canvas.height = 8;
     const compositor = new gpu.Compositor(canvas);
-    const settings = { exposure: 0, brightness: 0, contrast: 1, hue: 0, saturation: 1, highlights: 0, shadows: 0 };
     const spatial = {
       cropLeft: 0,
       cropRight: 0,
@@ -639,7 +677,7 @@ test('synthetic orientation and dyadic half-open crop edges preserve lower cover
       compositor.dispose();
       compositor.gl.getExtension('WEBGL_lose_context')?.loseContext();
     }
-  });
+  }, NEUTRAL_COLOUR);
   expect(result.error).toBe(0);
   expect(result.neutral).toEqual([
     [255, 0, 0, 255],

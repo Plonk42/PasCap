@@ -17,14 +17,14 @@ import { hasSpatialEdits } from '../src/shared/spatial.js';
 import { calculateLayout, layerClips } from '../src/shared/timeline.js';
 import { framesToSeconds } from '../src/shared/timing.js';
 
-const reportId = 'preview-v10';
+const reportId = 'preview-v11';
 const measurementProfile = {
   id: 'original-two-excerpts-v6',
   // Diagnostic profile format is independent of the project document schema.
   schemaVersion: 6,
-  projectSchemaVersion: 10,
+  projectSchemaVersion: 11,
   description:
-    'Strict schema-10 original two-excerpt row-colour/seek/transition/native-reference diagnostic: one enabled zero-origin contiguous track, unit row-owned Opacity, static row Colour, neutral spatial bases without spatial keys, constant 1× speed, no shared project-frame layer points and an empty music array.',
+    'Strict schema-11 original two-excerpt row-colour/HSL/curves/seek/transition/native-reference diagnostic: one enabled zero-origin contiguous track, unit row-owned Opacity, static row Colour, neutral spatial bases without spatial keys, constant 1× speed, no shared project-frame layer points and an empty music array.',
 } as const;
 const url = process.env['PASCAP_MEASURE_URL'] ?? 'http://127.0.0.1:5173';
 const browser = await chromium.launch({
@@ -36,7 +36,7 @@ const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
 // tsx/esbuild preserves nested function names using this helper. Evaluated functions
 // are serialised into the page and cannot otherwise access the Node-side helper.
 await page.addInitScript('globalThis.__name = (fn) => fn;');
-// Keep historical report identifiers/output files separate from new schema-10 measurements.
+// Keep historical report identifiers/output files separate from new schema-11 measurements.
 const directory = path.resolve('.pascap/measurements', reportId);
 await mkdir(directory, { recursive: true });
 try {
@@ -54,7 +54,7 @@ try {
   // This is the original two-clip colour/seek comparison, not the production
   // layered renderer. Reject shared layer points/opacity rather than measure a false baseline.
   if (
-    original.schemaVersion !== 10 ||
+    original.schemaVersion !== 11 ||
     original.clips.length !== 2 ||
     original.music.length !== 0 ||
     original.clips.some((clip) => hasSpatialEdits(clip.spatial)) ||
@@ -62,7 +62,7 @@ try {
     original.clips.some((clip) => clip.speed.mode !== 'constant' || clip.speed.rate !== 1)
   )
     throw new Error(
-      'This schema-10 diagnostic expects two normal-speed excerpts on one enabled, opaque, zero-origin contiguous track, with static row Colour, neutral spatial bases and no spatial keys, music, extra layers or shared project-frame layer points. Choose a compatible project with PASCAP_MEASURE_URL; no saved document will be changed.',
+      'This schema-11 diagnostic expects two normal-speed excerpts on one enabled, opaque, zero-origin contiguous track, with static row Colour, neutral spatial bases and no spatial keys, music, extra layers or shared project-frame layer points. Choose a compatible project with PASCAP_MEASURE_URL; no saved document will be changed.',
     );
   const layout = calculateLayout(original);
   const clips = layerClips(original, original.layers[0]!.id);
@@ -75,7 +75,16 @@ try {
     { ...NEUTRAL_COLOUR, saturation: 0.4 },
     { ...NEUTRAL_COLOUR, highlights: -0.5 },
     { ...NEUTRAL_COLOUR, shadows: 0.3 },
-    { exposure: 0.6, brightness: 0.02, contrast: 1.1, hue: 12, saturation: 1.2, highlights: -0.2, shadows: 0.15 },
+    {
+      ...NEUTRAL_COLOUR,
+      exposure: 0.6,
+      brightness: 0.02,
+      contrast: 1.1,
+      hue: 12,
+      saturation: 1.2,
+      highlights: -0.2,
+      shadows: 0.15,
+    },
   ];
   const gpu = await page.evaluate(
     (settings) => settings.map((grade) => ({ grade, ...window.pascapLab!.verifyColour(grade) })),
@@ -337,7 +346,7 @@ try {
     durationSeconds: framesToSeconds(layout.duration),
     notes: [
       'No saved edit is changed; only the independent engine is exercised.',
-      'Only strict schema-10 projects with static row Colour, neutral spatial bases and no spatial keys are measured; schema 1–9 data is incompatible and never migrated or defaulted.',
+      'Only strict schema-11 projects with static row Colour, HSL and curves, neutral spatial bases and no spatial keys are measured; schema 1–10 data is incompatible and never migrated or defaulted.',
       'Diagnostic profile and reference receipt schema versions are independent of the project schema.',
       'This retains the original two-excerpt acceptance measurements, not shared-layer-point or layered-throughput certification.',
       'Colour latency is engine update to next paint, not full input-event/React latency.',

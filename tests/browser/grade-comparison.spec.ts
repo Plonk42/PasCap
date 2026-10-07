@@ -1,13 +1,13 @@
 import { test as browserTest, expect, type Locator, type Page } from '@playwright/test';
 import type { PreviewDiagnostics } from '../../src/preview/engine.js';
 import type { AudioAsset } from '../../src/shared/audio.js';
-import { COLOUR_CONTROLS, NEUTRAL_COLOUR } from '../../src/shared/colour.js';
+import { COLOUR_CONTROLS, createColourSettings, NEUTRAL_COLOUR } from '../../src/shared/colour.js';
 import type { MediaAsset } from '../../src/shared/media.js';
 import { createClip, createLayer, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
 import { calculateLayout, sampleTimeline } from '../../src/shared/timeline.js';
 import { expandedInspectorPreferences, sharedPoint } from './editor-helpers.js';
 import { memoryProjects, type MemoryProjects } from './memory-projects.js';
-import { installMusicEvidence } from './music-evidence.js';
+import { installMusicEvidence, observeMusicPlayback } from './music-evidence.js';
 
 interface PixelSummary {
   checksum: number;
@@ -72,7 +72,7 @@ function singleProject(id: string, title: string, video: MediaAsset): ProjectDoc
   document.media.videoIds = [video.id];
   const clip = createClip('comparison-clip', video.id, 8, 108, document.layers[0]!.id);
   document.layers[0]!.colour = {
-    ...NEUTRAL_COLOUR,
+    ...createColourSettings(),
     exposure: 0.7,
     brightness: 0.02,
     contrast: 1.15,
@@ -81,6 +81,13 @@ function singleProject(id: string, title: string, video: MediaAsset): ProjectDoc
     highlights: -0.25,
     shadows: 0.12,
   };
+  document.layers[0]!.colour.hsl.red = { hue: -12, saturation: -0.3, lightness: 0.04 };
+  document.layers[0]!.colour.curves.master = [
+    { x: 0, y: 0.02 },
+    { x: 0.4, y: 0.53 },
+    { x: 1, y: 0.98 },
+  ];
+  document.layers[0]!.colour.curves.blue[1]!.y = 0.8;
   document.clips = [clip];
   return projectSchema.parse(document);
 }
@@ -99,7 +106,14 @@ function layeredProject(videos: readonly MediaAsset[]): ProjectDocument {
     const sourceOut = [72, 72, 110][index]!;
     const duration = index === 1 ? 72 : 80;
     layer.opacity = 0.9 - index * 0.1;
-    layer.colour = { ...NEUTRAL_COLOUR, hue: 15 + index * 10, exposure: 0.15, saturation: 0.8 };
+    layer.colour = { ...createColourSettings(), hue: 15 + index * 10, exposure: 0.15, saturation: 0.8 };
+    layer.colour.hsl.cyan = { hue: index * 5 - 8, saturation: -0.2, lightness: 0.03 };
+    layer.colour.curves.master = [
+      { x: 0, y: 0.015 },
+      { x: 0.5, y: 0.6 },
+      { x: 1, y: 0.95 },
+    ];
+    layer.colour.curves.red[1]!.y = 0.85;
     layer.openingFade = 12;
     layer.closingFade = 12;
     layer.keyframes = [
@@ -856,6 +870,7 @@ test('comparison during music playback preserves the real worklet epoch and stri
   comparison.guard.allowPCM = true;
   await installMusicEvidence(page);
   await openFixture(page, comparison.playback);
+  await observeMusicPlayback(page);
   const duration = calculateLayout(comparison.playback).duration;
   const sourceFrames = Array.from(
     { length: duration },
@@ -995,7 +1010,8 @@ test('comparison during music playback preserves the real worklet epoch and stri
     pauses: window.musicStreamEvidence.pauses,
     generation: window.musicStreamEvidence.receipt?.generation,
   }));
-  expect(initial.state.status, initial.state.message).toBe('playing');
+  expect(initial.state.playing).toBe(true);
+  expect(['playing', 'buffering']).toContain(initial.state.status);
   expect(initial.starts).toBe(1);
   expect(initial.generation).toBeDefined();
   try {
@@ -1033,7 +1049,10 @@ test('comparison during music playback preserves the real worklet epoch and stri
       await ready.dispose();
       expect(observed.trusted).toBe(true);
       expect(observed.playing).toBe(true);
-      expect(observed.status).toBe('playing');
+      // A real native action can arrive after the previous Playing read while
+      // the decoder legitimately buffers. Compare is enabled in both active
+      // states; errors, paused/completed activation are never acceptable.
+      expect(['playing', 'buffering']).toContain(observed.status);
       expect(observed.ungraded).toBe(ungraded);
       expect(observed.detail).toBe(activation === 'click' ? 1 : 0);
       expect(observed.frame).toBeLessThan(duration - 1);
@@ -1096,6 +1115,10 @@ test('comparison during music playback preserves the real worklet epoch and stri
           pauses: window.musicStreamEvidence.pauses,
           underruns: window.musicStreamEvidence.underruns,
           receipt: window.musicStreamEvidence.receipt,
+          receipts: window.musicStreamEvidence.samples,
+          playback: window.musicStreamEvidence.playback,
+          queueEvents: window.musicStreamEvidence.queueEvents,
+          rangeTimings: window.musicStreamEvidence.rangeTimings,
           largestRange: window.musicStreamEvidence.largestRange,
         })),
         null,

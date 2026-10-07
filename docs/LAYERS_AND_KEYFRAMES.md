@@ -1,9 +1,6 @@
-# Layers, shared row points and source review · project v10
+# Layers, shared row points and source review · project v11
 
-Row-only Colour and Opacity follow
-[row appearance](design/ROW_APPEARANCE.md): required `layer.colour`, required
-no saved `clip.colour` or `clip.correction`. Grade each source once with evaluated
-row Colour. Main Colour controls/keys work on empty rows.
+Required row Colour includes static **HSL ranges** and **Colour curves**, even when the seven scalar channels are animated. Eight named HSL bands and four encoded input/output curves are edited in nested Clip → Colour controls, including on empty rows. They do not add key channels or clip fields. Band/all-HSL and channel/all-curves resets preserve the seven scalar bases, row points and Opacity; Reset keys preserves all advanced settings. Unanimated Reset restores the complete row Colour and Opacity. See [the complete advanced-colour contract](design/HSL_AND_CURVES.md).
 
 ## Video layers
 
@@ -474,7 +471,7 @@ Export reads one original at a time through the shared backpressured frame mappe
 The plain static single-layer path retains at most two lossless clips, two
 intermediate decoders and one reusable RGB frame (24.9 MB UHD), plus native memory.
 
-The static fast path is eligible only for one enabled track with row Opacity 1,
+The static fast path is eligible only with neutral HSL/identity colour curves and one enabled track with row Opacity 1,
 no row points, exactly neutral clip spatial bases and no spatial keys, a zero first
 start and no internal gaps, covering the **full project duration**. Music beyond
 video OUT requires layered export's trailing black spans,
@@ -495,7 +492,10 @@ are no per-frame LUT files or per-frame native-process launches. Source mapping
 uses the layout's captured `PlacedClip.retiming`; grade/opacity sampling uses
 absolute project time, including repeated source images. Spatial geometry uses
 continuous original-source position from that same map. Inverse mapping and
-bilinear RGB resampling precede the LUT; no transformed image/mask buffer or
+bilinear RGB resampling precede grading. Nonneutral HSL/curves use exact complete
+CPU grading (seven scalar controls, HSL, master/RGB curves), not a LUT; neutral
+advanced settings retain scalar LUT grading. Exact grading uses tiny RGB triples
+and can substantially slow UHD export; no transformed image/mask buffer or
 per-frame native process is added. The 22 bytes/pixel, two-LUT and process bounds
 above remain unchanged.
 
@@ -526,7 +526,7 @@ not all sources or loop repetitions. It grows with duration and is additional to
 the unchanged video raw-buffer/child/LUT bounds above. Cancellation/failure removes
 only owned scratch, never originals, saved projects or successful outputs.
 
-Schema **v10 is strict**, including required row `colour`, no clip colour/correction fields, and clip `spatial` base/eight-value full-pose
+Schema **v11 is strict**, including required row `colour`, no clip colour/correction fields, and clip `spatial` base/eight-value full-pose
 source-frame keys and required unique `media.videoIds` / `media.audioIds`
 arrays, at most 10,000 IDs each, and all required per-track settings. Project-level
 transitions/fades, saved `clip.opacity` and old `clipOpacity`/`layerOpacity` point
@@ -536,8 +536,8 @@ Points require exactly the nine nullable fields listed above, including `opacity
 The required `music` array contains 0–8 independent instances with unique required
 IDs and complete source IN/OUT/start/duration/gain/fades/loop fields; `[]` without
 music, never a null/singular value or default. Version-1 export receipts require
-a strict v10 snapshot plus captured audio-source/instance-plan arrays.
-Older v1–v9 project documents and export receipt snapshots remain unchanged/incompatible;
+a strict v11 snapshot plus captured audio-source/instance-plan arrays.
+Older v1–v10 project documents and export receipt snapshots remain unchanged/incompatible;
 there are no migrations, compatibility fallback/default fields or automatic deletion
 of projects, receipts or successful videos. Create a new project and deliberately
 import its media; registered media and currently verified ready proxies remain reusable.

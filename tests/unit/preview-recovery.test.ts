@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import type { CompositeGroup } from '../../src/preview/compositor.js';
 import { PreviewEngine } from '../../src/preview/engine.js';
-import { NEUTRAL_COLOUR } from '../../src/shared/colour.js';
+import { NEUTRAL_COLOUR, scalarColourValues } from '../../src/shared/colour.js';
 import { EMPTY_KEY_VALUES } from '../../src/shared/keyframes.js';
 import {
   createClip,
@@ -285,6 +285,7 @@ function singleProject(withMusic = false): ProjectDocument {
 function gradedProject(withMusic = false): ProjectDocument {
   const project = singleProject(withMusic);
   project.layers[0]!.colour = {
+    ...NEUTRAL_COLOUR,
     exposure: 0.7,
     brightness: 0.1,
     contrast: 1.2,
@@ -320,7 +321,7 @@ function gradedLayersProject(): ProjectDocument {
     {
       frame: 0,
       interpolation: 'smooth',
-      values: { ...EMPTY_KEY_VALUES, ...gradedProject().layers[0]!.colour, opacity: 0.35 },
+      values: { ...EMPTY_KEY_VALUES, ...scalarColourValues(gradedProject().layers[0]!.colour), opacity: 0.35 },
     },
     {
       frame: 60,
@@ -548,6 +549,73 @@ async function pendingRecovery(unavailable = false) {
   return { preview, slot, pending, recoveryFrame };
 }
 
+describe('exact intact-surface reuse', () => {
+  it('always redraws diagnostic readback after the native drawing buffer may have been discarded', async () => {
+    const preview = await paused(gradedProject());
+    preview.compositor.visible = null;
+    preview.engine.capturePixels();
+    expectSurface(preview, preview.initialFrame);
+    preview.compositor.visible = null;
+    preview.engine.capturePixels();
+    expectSurface(preview, preview.initialFrame);
+    expect(preview.compositor.drawFrame).toHaveBeenCalledTimes(2);
+    expectNoMediaOperations(preview);
+  });
+
+  it('reuses a held advanced image at current project time, but redraws a new source, Compare and a cleared seek', async () => {
+    const project = gradedProject(true);
+    project.clips[0]!.speed = { mode: 'constant', rate: 0.25 };
+    project.layers[0]!.colour = structuredClone(project.layers[0]!.colour);
+    project.layers[0]!.colour.hsl.red = { hue: 12, saturation: -0.3, lightness: 0.04 };
+    project.layers[0]!.colour.curves.master = [
+      { x: 0, y: 0.02 },
+      { x: 0.4, y: 0.53 },
+      { x: 1, y: 0.98 },
+    ];
+    const preview = await running(project, 0);
+    const rendered = preview.engine.diagnostics().renderedFrames;
+    for (const frame of [1, 2, 3]) {
+      tick(preview, frame);
+      expect(preview.engine.diagnostics()).toMatchObject({ status: 'playing', frame, renderedFrames: rendered });
+      expectSurface(preview, frame);
+    }
+    expect(preview.compositor.drawFrame).not.toHaveBeenCalled();
+    expect(preview.compositor.uploadVideo).not.toHaveBeenCalled();
+    expectUninterrupted(preview);
+    observeAt(preview, 4);
+    tick(preview, 4);
+    expectSurface(preview, 4);
+    expect(preview.compositor.drawFrame).toHaveBeenCalledTimes(1);
+    preview.engine.setUngraded(true);
+    tick(preview, 5);
+    expectSurface(preview, 5, true);
+    expect(preview.compositor.drawFrame).toHaveBeenCalledTimes(2);
+    await preview.engine.seek(5);
+    expectSurface(preview, 5, true);
+    expect(preview.compositor.drawFrame).toHaveBeenCalledTimes(3);
+  });
+
+  it.each(['exposure', 'opacity'] as const)(
+    'redraws project-time %s animation on every held source frame',
+    async (channel) => {
+      const project = gradedProject(true);
+      project.clips[0]!.speed = { mode: 'constant', rate: 0.25 };
+      project.layers[0]!.keyframes = [
+        { frame: 0, interpolation: 'linear', values: { ...EMPTY_KEY_VALUES, [channel]: 0 } },
+        { frame: 4, interpolation: 'hold', values: { ...EMPTY_KEY_VALUES, [channel]: 1 } },
+      ];
+      const preview = await running(project, 0);
+      for (const frame of [1, 2, 3]) {
+        tick(preview, frame);
+        expectSurface(preview, frame);
+      }
+      expect(preview.compositor.drawFrame).toHaveBeenCalledTimes(3);
+      expect(preview.compositor.uploadVideo).not.toHaveBeenCalled();
+      expectUninterrupted(preview);
+    },
+  );
+});
+
 describe('PreviewEngine final publication boundary', () => {
   async function publicationPreview(initialFrame = 65): Promise<RunningPreview> {
     const project = singleProject(true);
@@ -613,6 +681,9 @@ describe('PreviewEngine final publication boundary', () => {
       armed = true;
       tick(preview, 70);
     } else {
+      // A changed native target requires an actual replacement raster even
+      // when this neighbour has the same source/appearance as the old image.
+      preview.engine.canvas.width += 1;
       const draw = preview.compositor.drawFrame.getMockImplementation()!;
       preview.compositor.drawFrame.mockImplementationOnce((groups) => {
         draw(groups);
@@ -919,6 +990,8 @@ describe('PreviewEngine observed-frame tolerance and recovery', () => {
           });
       });
       published.length = 0;
+      // Exercise real replacement work, not a now-reusable identical image.
+      preview.engine.canvas.width += 1;
       const draw = preview.compositor.drawFrame.getMockImplementation()!;
       preview.compositor.drawFrame.mockImplementationOnce((groups) => {
         draw(groups);
@@ -1961,6 +2034,7 @@ describe('PreviewEngine editor-only ungraded comparison', () => {
     preview.engine.setUngraded(true);
     vi.clearAllMocks();
     const edited = {
+      ...NEUTRAL_COLOUR,
       exposure: -1.25,
       brightness: -0.2,
       contrast: 0.7,

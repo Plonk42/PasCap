@@ -57,8 +57,7 @@ PasCap is a solo, pre-release project: optimize for fast iteration. Details are 
 
 - Shared integer-frame layout/retiming (`PlacedClip.retiming`) is authoritative for
   UI, preview and native export. Per-frame rendering stays outside React.
-- Strict schema 10 with uniform tracks, each requiring `ripple`, `transitions`,
-  `openingFade` and `closingFade`; rows show the saved bottom-to-top order.
+- Strict schema 11 requires row `colour.hsl` with eight complete named bands and `colour.curves` with master/red/green/blue 2–16-point arrays. All Colour is row-owned, keyed or not; clips have no colour/correction. HSL/curves are static in #19 and add no channels to the existing nine nullable row channels. Preserve seven scalar controls and sole Opacity. Process seven-control SDR → encoded HSL → master → RGB curves → fades/coverage. Compare bypasses all colour only. Neutral creators deep-clone nested structures; never repair missing fields on load. Advanced resets never overwrite scalar bases/keys or Opacity; Reset keys never erases advanced settings. Keep existing LUT/buffer/decoder/native budgets and strict gates. See [the advanced colour contract](../docs/design/HSL_AND_CURVES.md).
 - Owner-approved #70: required row `colour` contains all seven SDR channels,
   neutral on new rows, with sole row `opacity` initially 1. Reject saved
   `clip.colour`, `clip.correction` and missing row colour. Static and keyed Colour
@@ -67,8 +66,8 @@ PasCap is a solo, pre-release project: optimize for fast iteration. Details are 
   Ungraded neutralizes only row Colour. Native LUTs use only row Colour, with two
   reused buffers and unchanged bounds. Controls/keys work on empty rows. Moves/new
   clips adopt destination bases/keys/Opacity; trim/split/cut/duplicate preserve
-  row bases and absolute points, without per-clip colour copies. Future HSL,
-  curves and temperature must be row-owned; do not implement #19/#68 here.
+  row bases and absolute points, without per-clip colour copies. HSL and curves
+  retain that ownership; temperature (#68) remains separate row-owned work.
   See [row appearance](../docs/design/ROW_APPEARANCE.md).
 - Every clip requires strict `spatial: { base, keyframes }`: eight complete pose
   values and 0–256 ascending original-source full-pose keys with required easing.
@@ -108,10 +107,10 @@ PasCap is a solo, pre-release project: optimize for fast iteration. Details are 
   $\mathrm{result} = C + \mathrm{lower}(1 - A)$, evaluating row Opacity for each
   source with no additional layer multiplier; $m_i$ is spatial source coverage,
   including opaque neutral letterboxing. Black fades never reduce that coverage.
-  Version-1 export receipts require strict v10 snapshots and captured audio-source/
+  Version-1 export receipts require strict v11 snapshots and captured audio-source/
   instance-plan arrays; receipt, registry/proxy/PCM and benchmark format versions
   remain independent and unchanged.
-  Preserve incompatible v1–v9 projects/receipt snapshots; require recreation,
+  Preserve incompatible v1–v10 projects/receipt snapshots; require recreation,
   without migrations, compatibility defaults or automatic deletion.
 - Music is a required 0–8 array of independently identified instances, never null
   or singular. Duration is the maximum of all video and music OUTs. After the last

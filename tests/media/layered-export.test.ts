@@ -14,8 +14,9 @@ import { MediaLibrary } from '../../src/server/library.js';
 import { runProcess } from '../../src/server/process.js';
 import { renderReference, validateReference } from '../../src/server/reference.js';
 import { ProjectStore } from '../../src/server/storage.js';
+import { evaluateColourCurve, HSL_BANDS } from '../../src/shared/advanced-colour.js';
 import { audioAssetSchema, type AudioAsset } from '../../src/shared/audio.js';
-import { COLOUR_CONTROLS, NEUTRAL_COLOUR } from '../../src/shared/colour.js';
+import { COLOUR_CONTROLS, NEUTRAL_COLOUR, createColourSettings, scalarColourValues } from '../../src/shared/colour.js';
 import { compositePixel } from '../../src/shared/composition.js';
 import { estimateExportSpace } from '../../src/shared/export-space.js';
 import {
@@ -128,7 +129,7 @@ function coverage(samples: PreviewLayer[]): number {
   return result;
 }
 
-describe.skipIf(!enabled)('schema-10 layered native export · disposable synthetic sources only', () => {
+describe.skipIf(!enabled)('schema-11 layered native export · disposable synthetic sources only', () => {
   let root: string;
   let config: ServiceConfig;
   let jobs: JobQueue;
@@ -295,6 +296,118 @@ describe.skipIf(!enabled)('schema-10 layered native export · disposable synthet
     }
     return maximum;
   }
+  it.each(['draft720', 'final4k'] as const)(
+    'routes an otherwise static maximum-point sharp curve to exact layered grading at %s',
+    async (profile) => {
+      const project = createProject('native-sharp', 'Synthetic valid narrow curve');
+      project.clips = [createClip('sharp', assets[0]!.id, 0, 2)];
+      const input = originals.get(assets[0]!.id)![(20 * WIDTH + 20) * 3]! / 255;
+      expect(input).toBeGreaterThan(0);
+      expect(input).toBeLessThan(1);
+      project.layers[0]!.colour.curves.master = [
+        ...Array.from({ length: 7 }, (_, i) => ({ x: (input * i) / 8, y: 0 })),
+        { x: input - 1e-7, y: 0 },
+        { x: input, y: 1 },
+        ...Array.from({ length: 6 }, (_, i) => ({ x: input + ((1 - input) * (i + 1)) / 7, y: 1 })),
+        { x: 1, y: 1 },
+      ];
+      expect(projectSchema.parse(project)).toEqual(project);
+      expect(needsLayeredExport(project)).toBe(true);
+      expect(() => planExport(project)).toThrow('layered exporter');
+      const result = await complete(project, profile);
+      // Grading a steep knee and resampling do not commute. Decode the original
+      // at the production resolution before grading, then independently area-
+      // average the graded pixels to the inspection grid. The old small-image
+      // oracle amplified a one-byte decode/resampling difference into a step.
+      const { width, height } = EXPORT_PROFILES[profile];
+      const decoded = await runProcess(
+        config.ffmpeg,
+        [
+          '-hide_banner',
+          '-loglevel',
+          'error',
+          '-nostdin',
+          '-threads',
+          '2',
+          '-i',
+          assets[0]!.sourcePath,
+          '-frames:v',
+          '2',
+          '-an',
+          '-filter_threads',
+          '2',
+          '-vf',
+          `scale=${width}:${height}:flags=bicubic:in_color_matrix=bt709:out_color_matrix=bt709:in_range=tv:out_range=pc,format=rgb24`,
+          '-threads',
+          '2',
+          '-fps_mode',
+          'passthrough',
+          '-f',
+          'rawvideo',
+          'pipe:1',
+        ],
+        { maxBytes: width * height * 3 * 2 },
+      );
+      expect(decoded).toHaveLength(width * height * 3 * 2);
+      const actual = await rawRgb(config, result.filename);
+      expect(actual).toHaveLength(FRAME_BYTES * 2);
+      const curve = project.layers[0]!.colour.curves.master;
+      const values = Array.from({ length: 256 }, (_, byte) => evaluateColourCurve(curve, byte / 255) * 255);
+      const factor = width / WIDTH;
+      expect(Number.isInteger(factor)).toBe(true);
+      expect(height / HEIGHT).toBe(factor);
+      for (let frame = 0; frame < 2; frame++) {
+        let error = 0;
+        for (let y = 0; y < HEIGHT; y++)
+          for (let x = 0; x < WIDTH; x++) {
+            for (let channel = 0; channel < 3; channel++) {
+              let sum = 0;
+              for (let dy = 0; dy < factor; dy++)
+                for (let dx = 0; dx < factor; dx++) {
+                  const offset = ((frame * height + y * factor + dy) * width + x * factor + dx) * 3 + channel;
+                  sum += values[decoded[offset]!]!;
+                }
+              error += Math.abs(actual[frame * FRAME_BYTES + (y * WIDTH + x) * 3 + channel]! - sum / (factor * factor));
+            }
+          }
+        expect(error / FRAME_BYTES, `sharp-curve frame ${frame} after native input scaling`).toBeLessThan(4);
+      }
+      bounds(result.receipt);
+      expect(result.receipt.verification.frameCount).toBe(2);
+      expect(result.receipt.settings.layered).toMatchObject({ peakLutEntries: 0, lutBytes: 0, lutsGenerated: 0 });
+      await unchanged();
+    },
+  );
+  it.each(['draft720', 'final4k'] as const)(
+    'exports full row HSL/curves with scalar keys at %s without resource growth',
+    async (profile) => {
+      const project = simple(3);
+      const colour = createColourSettings();
+      HSL_BANDS.forEach((band, i) => {
+        colour.hsl[band] = { hue: i % 2 ? 8 : -6, saturation: -0.12, lightness: 0.015 };
+      });
+      colour.curves.master = [
+        { x: 0, y: 0.02 },
+        { x: 0.35, y: 0.4 },
+        { x: 0.7, y: 0.75 },
+        { x: 1, y: 0.98 },
+      ];
+      colour.curves.blue = [
+        { x: 0, y: 0.03 },
+        { x: 1, y: 0.93 },
+      ];
+      project.layers[0]!.colour = colour;
+      project.layers[0]!.keyframes = [point(0, { exposure: -0.15 }), point(2, { exposure: 0.25 })];
+      project.layers[1]!.colour = { ...colour, hue: 12 };
+      const result = await complete(project, profile);
+      await parity(project, result.filename);
+      bounds(result.receipt);
+      expect(result.receipt.verification.frameCount).toBe(3);
+      expect(result.receipt.snapshot.layers[0]!.colour).toEqual(colour);
+      for (const [index, asset] of assets.entries())
+        expect(await readFile(asset.sourcePath)).toEqual(originalBytes[index]);
+    },
+  );
   function bounds(receipt: ExportReceipt): void {
     expect(receipt.settings.pipeline).toBe('sequential-layered');
     expect(receipt.settings.resources).toEqual(LAYERED_EXPORT_RESOURCES);
@@ -979,7 +1092,7 @@ describe.skipIf(!enabled)('schema-10 layered native export · disposable synthet
     ];
     plain.layers[0]!.transitions = [{ leftId: 'reference-left', rightId: 'reference-right', type: 'cut', duration: 0 }];
     expect(validateReference(plain, library).clips).toHaveLength(2);
-    const neutral: LayerKeyValues = { ...NEUTRAL_COLOUR, opacity: 1, speed: 1 };
+    const neutral: LayerKeyValues = { ...scalarColourValues(NEUTRAL_COLOUR), opacity: 1, speed: 1 };
     const variants: ((document: ProjectDocument) => void)[] = [
       ...KEYFRAME_SETTINGS.map(({ key }) => (document: ProjectDocument) => {
         document.layers[0]!.keyframes = [point(20, { [key]: neutral[key]! }, 'smooth')];
@@ -1226,8 +1339,8 @@ describe.skipIf(!enabled)('schema-10 layered native export · disposable synthet
     project.layers[2]!.opacity = 0.6;
     const top = { ...createClip('uhd-top', assets[1]!.id, 4, 5), layerId: 'video-3', start: 2 };
     project.layers[2]!.keyframes = [
-      point(3, { ...NEUTRAL_COLOUR, brightness: 0.08, hue: -30 }),
-      point(6, { ...NEUTRAL_COLOUR, exposure: -0.3, saturation: 0.6 }, 'hold'),
+      point(3, { ...scalarColourValues(NEUTRAL_COLOUR), brightness: 0.08, hue: -30 }),
+      point(6, { ...scalarColourValues(NEUTRAL_COLOUR), exposure: -0.3, saturation: 0.6 }, 'hold'),
     ];
     project.clips.push(top);
     const started = performance.now();

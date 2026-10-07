@@ -1,4 +1,16 @@
 import { z } from 'zod';
+import {
+  applyColourCurves,
+  applyHsl,
+  compileColourCurve,
+  compileHsl,
+  createColourCurves,
+  createHslSettings,
+  curvesSchema,
+  hslSchema,
+  isIdentityCurve,
+  isNeutralHsl,
+} from './advanced-colour.js';
 
 export const colourSchema = z
   .object({
@@ -9,20 +21,35 @@ export const colourSchema = z
     saturation: z.number().min(0).max(2),
     highlights: z.number().min(-1).max(1),
     shadows: z.number().min(-1).max(1),
+    hsl: hslSchema,
+    curves: curvesSchema,
   })
   .strict();
 
 export type ColourSettings = z.infer<typeof colourSchema>;
 export type RGB = readonly [number, number, number];
-export const NEUTRAL_COLOUR: Readonly<ColourSettings> = Object.freeze({
-  exposure: 0,
-  brightness: 0,
-  contrast: 1,
-  hue: 0,
-  saturation: 1,
-  highlights: 0,
-  shadows: 0,
-});
+export function createColourSettings(): ColourSettings {
+  return {
+    exposure: 0,
+    brightness: 0,
+    contrast: 1,
+    hue: 0,
+    saturation: 1,
+    highlights: 0,
+    shadows: 0,
+    hsl: createHslSettings(),
+    curves: createColourCurves(),
+  };
+}
+const neutral = createColourSettings();
+for (const band of Object.values(neutral.hsl)) Object.freeze(band);
+for (const curve of Object.values(neutral.curves)) {
+  curve.forEach(Object.freeze);
+  Object.freeze(curve);
+}
+Object.freeze(neutral.hsl);
+Object.freeze(neutral.curves);
+export const NEUTRAL_COLOUR: Readonly<ColourSettings> = Object.freeze(neutral);
 
 export const COLOUR_CONTROLS = [
   { key: 'exposure', label: 'Exposure', min: -3, max: 3, step: 0.01, unit: 'EV' },
@@ -33,6 +60,14 @@ export const COLOUR_CONTROLS = [
   { key: 'highlights', label: 'Highlights', min: -1, max: 1, step: 0.01, unit: '' },
   { key: 'shadows', label: 'Shadows', min: -1, max: 1, step: 0.01, unit: '' },
 ] as const;
+export type ScalarColourSetting = (typeof COLOUR_CONTROLS)[number]['key'];
+/** Only the seven numeric channels, never static structured settings. */
+export function scalarColourValues(settings: ColourSettings): Record<ScalarColourSetting, number> {
+  return Object.fromEntries(COLOUR_CONTROLS.map(({ key }) => [key, settings[key]])) as Record<
+    ScalarColourSetting,
+    number
+  >;
+}
 
 export function clamp01(value: number): number {
   return Math.max(0, Math.min(1, value));
@@ -51,6 +86,25 @@ export function encode709(value: number): number {
 /** Authoritative SDR transform. See docs/COLOUR_AND_TIMING.md; no FFmpeg eq approximation. */
 export function gradePixel(rgb: RGB, settings: ColourSettings): RGB {
   if (isNeutralColour(settings)) return rgb;
+  const base = gradeScalarPixel(rgb, settings);
+  return applyColourCurves(applyHsl(base, settings.hsl), settings.curves);
+}
+/** Exact frame-owned grade; cache only bounded settings/functions, never pixels. */
+export function compilePixelGrade(settings: ColourSettings): (rgb: RGB) => RGB {
+  if (isNeutralColour(settings)) return (rgb) => rgb;
+  const scalarNeutral = COLOUR_CONTROLS.every(({ key }) => settings[key] === NEUTRAL_COLOUR[key]);
+  const hsl = compileHsl(settings.hsl);
+  const master = compileColourCurve(settings.curves.master);
+  const red = compileColourCurve(settings.curves.red);
+  const green = compileColourCurve(settings.curves.green);
+  const blue = compileColourCurve(settings.curves.blue);
+  return (rgb) => {
+    const base = hsl(scalarNeutral ? rgb : gradeScalarPixel(rgb, settings));
+    return [red(master(base[0])), green(master(base[1])), blue(master(base[2]))];
+  };
+}
+function gradeScalarPixel(rgb: RGB, settings: ColourSettings): RGB {
+  if (COLOUR_CONTROLS.every(({ key }) => settings[key] === NEUTRAL_COLOUR[key])) return rgb;
   const exposure = 2 ** settings.exposure;
   const base = rgb.map(
     (value) => (decode709(clamp01(value)) * exposure - 0.18) * settings.contrast + 0.18 + settings.brightness,
@@ -72,7 +126,11 @@ export function gradePixel(rgb: RGB, settings: ColourSettings): RGB {
 }
 
 export function isNeutralColour(settings: ColourSettings): boolean {
-  return COLOUR_CONTROLS.every(({ key }) => settings[key] === NEUTRAL_COLOUR[key]);
+  return COLOUR_CONTROLS.every(({ key }) => settings[key] === NEUTRAL_COLOUR[key]) && isNeutralAdvancedColour(settings);
+}
+
+export function isNeutralAdvancedColour(settings: ColourSettings): boolean {
+  return isNeutralHsl(settings.hsl) && Object.values(settings.curves).every(isIdentityCurve);
 }
 
 export function generateCube(settings: ColourSettings, size = 65): string {
