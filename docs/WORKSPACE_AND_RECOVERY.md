@@ -40,6 +40,13 @@ The intended discrete-GPU and long real-flight checks remain deferred.
   pinned above scrolling video rows with TIME ticks/separators, playhead handle/timecode and click/drag seeking;
   distinct Cut/Fade/Dissolve buttons open boundary transitions, not keyframes.
 
+Viewer and Inspector tabs use native buttons with consistent padding, borders and
+selected appearance, retaining arrow/Home/End navigation. Keyframes keeps its
+accessible name without repeating its visible tab title in the toolbar.
+Control vocabulary and button/icon conventions follow the
+[editor control catalogue](design/EDITOR_CONTROLS.md). Trash deletes; × closes or
+dismisses. Icon-only actions retain accessible names and tooltips.
+
 Media/Clip widths and Timeline height can be resized by pointer or focused-divider
 arrows (16 px; Shift uses 32 px). Double-click/Home resets a divider. Pointer move
 changes only a transient UI size; release saves the layout preference. Escape,
@@ -85,9 +92,11 @@ preview still block mutations.
 **Layer options → Ripple** is a native checkbox with contextual help and visible
 row state; new tracks default on. Layer options contains only rename, Ripple,
 raise/lower and delete; visibility remains a separate sidebar control.
-**Clip → Colour** contains the single **Opacity** slider/value/diamond/Previous/Next
-controls alongside the colour sliders, initially **100%**. Without Opacity keys
-the slider edits row `opacity`, including on an empty row with no selected clip.
+**Clip → Colour** contains the single **Opacity** native slider/exact
+`NumberField`/diamond/Previous/Next controls alongside the colour controls.
+Numeric entry uses **0–1**, initially **1**; the main label may show **100%**.
+Without Opacity keys, either value control edits row `opacity`, including on an empty
+row with no selected clip.
 With keys, that channel overrides the row value on every clip and both dissolve
 sources; missing participation at the real playhead is read-only until captured
 with the diamond. Sliders never create implicit keys. Unkeyed colour remains
@@ -197,19 +206,38 @@ or reloading the editor with a fresh engine restores normal graded preview.
 
 ## Numbers, titles and animation
 
-Inspector number fields keep a local text draft. Enter or leaving the field applies
-one validated value; Escape restores. Empty, nonfinite, fractional frame, range,
-duplicate key and conflicting timing inputs stay editable with inline errors.
+Colour/Opacity values, playback rates and music gain share a bounded native slider
+with an adjacent exact `NumberField` in main controls and stored-participant editors.
+The field is the sole numeric value display, not a read-only output or number-only
+layout. Opacity numeric entry always uses **0–1**, initially **1**; the main label may
+show **100%**.
+
+Pointer sliding keeps only a transient local control-value draft. Movement updates
+the thumb and numeric value, not the document or preview. Release applies the final
+value as one validated document edit and one Undo step; the image updates then.
+Escape, pointer cancellation, unexpected lost capture or window blur restores the
+starting control value without a save or history entry. An invalid release applies
+nothing; an unchanged value creates no history entry. Each native keyboard slider
+adjustment is an individual validated edit. Timeline/curve-point gestures retain
+their separate live-preview contracts.
+
+Numeric fields keep a local text draft with full entered precision, independent of
+the slider step. Enter or leaving the field applies one validated value; Escape
+restores. Empty, nonfinite, fractional frame, range, duplicate key and conflicting
+timing inputs stay editable with inline errors.
 Numbers are not coerced to zero/clamped/rounded to conceal an invalid edit. An
 unchanged draft creates no undo step, and Enter then blur cannot submit it twice.
+
+Integer source/timeline frames, durations and fades remain exact native `NumberField`
+steppers with explicit frame units and existing timecode feedback, not sliders with
+arbitrary limits. Source-review paired IN/OUT keeps its explicit **Apply** workflow
+to validate both endpoints atomically.
 
 Project titles and layer names follow the same draft/apply/cancel pattern; empty
 names are invalid. Layer rename lives in **Layer options**, accepts 1–100 trimmed
 characters, and commits as one undoable operation.
-Editable sliders, mode/select controls and per-control colour resets remain live;
+Mode/select controls and per-control colour resets apply directly;
 animated channels without participation at the playhead are read-only until captured.
-The paired source-review IN/OUT form deliberately uses an explicit **Apply** to
-validate its two endpoints atomically.
 
 ### Shared row animation
 
@@ -263,9 +291,11 @@ input identity/focus and drafts survive time reordering and Undo;
 no persisted point IDs are added.
 
 Stored colour/opacity participants reuse the main sliders and individual colour
-resets, with one precise numeric field to the right of each slider. Speed reuses
-**Layer rate ×** and Reset to 1×, not clip mode/preset/source-curve controls. Each accepted
-value or reset targets only that existing stored participant in one Undo step;
+resets, with one exact `NumberField` to the right of each slider; Opacity uses **0–1**.
+Speed reuses the **Layer rate ×** slider/exact field and Reset to 1×, not clip
+mode/preset/source-curve controls. The local-draft/release-only slider contract above
+applies to all stored participants too. Each accepted value or reset targets only
+that existing stored participant in one Undo step;
 point time, shared easing, other participants, row `opacity` and clip settings stay unchanged.
 There is no implicit joining. Numeric drafts retain entered precision and apply
 on Enter/blur; Escape restores. Empty, nonfinite, out-of-range or timing-conflicting

@@ -169,6 +169,7 @@ empty row without a selected clip. It shows point
 count, whole-row Previous/Next navigation, **Animation help** and participant chips
 for the current or inspected stored point. The toolbar's Animation help includes
 point-timing guidance, with no separate Keyframe timing help button.
+The toolbar does not repeat the visible Keyframes tab title.
 **Clip** keeps source/clip settings, row Opacity and the setting controls/diamonds
 evaluated at the real playhead. Every animatable
 setting always has its own diamond beside its main control, immediately
@@ -192,10 +193,12 @@ diamond → Previous → Next → any existing reset control. Navigation preserv
 chosen Inspector tab and activated button's focus instead of forcing Clip, and
 changes no document, history or autosave state.
 
-**Clip → Colour** contains the single **Opacity** slider/value/diamond/Previous/Next
-controls alongside the colour sliders. The slider starts at **100%**, stores 0–1,
-and without Opacity keys edits the selected row's `opacity`, including on an empty
-row with no selected clip. Opacity navigation visits only `opacity` participants.
+**Clip → Colour** contains the single **Opacity** native slider/exact
+`NumberField`/diamond/Previous/Next controls alongside the colour controls.
+Its numeric value is **0–1**, initially **1**; the main label may show **100%**.
+Without Opacity keys, either value control edits the selected row's `opacity`,
+including on an empty row with no selected clip. Opacity navigation visits only
+`opacity` participants.
 **Clip → Placement** contains placement controls only. There is no duplicate
 opacity control or navigation in Placement or the sidebar;
 **Layer options** is limited to rename, Ripple, ordering and deletion. Stored Opacity
@@ -226,19 +229,26 @@ The native easing selector shows a compact graph of the selected progress shape:
 time runs left to right and value progress bottom to top. Hold stays flat until
 the exact next point, then jumps. The graph adds no focus stop; its text description
 is available with the selector. Native option hover does not preview an unselected shape.
-The row delete action removes the whole point. Time/value fields apply on Enter/blur,
-Escape restores, and frame collisions/invalid values/timing are rejected atomically,
+The trash-icon delete action removes the whole point; × only closes or dismisses.
+Time/value fields apply on Enter/blur, Escape restores, and frame collisions/invalid
+values/timing are rejected atomically,
 never merged or overwritten. Reordering and Undo preserve drafts and field identity/focus
 without adding persisted point IDs; nested point details remain collapsible.
 This remains one list, not a new list per channel or marker.
 
-Stored colour and opacity participants reuse the main setting-specific sliders,
-bounds and individual colour-reset buttons. Each shows its value once, as a precise
-numeric field to the right of its slider, instead of the main controls' read-only
-readout; exact values use the stored scale (opacity 0–1). The bounds in the
-channel table apply to both controls. Speed uses the
-same **Layer rate ×** numeric field and Reset to 1× as row Speed, never a clip
-mode, preset or source-frame curve editor.
+Main and stored colour/Opacity controls share a native slider with one adjacent
+exact `NumberField` as the value display, not a read-only output. Stored participants
+reuse the same bounds and individual colour-reset buttons; Opacity numeric entry
+uses **0–1** in both contexts. The channel table's bounds apply to both controls.
+Stored Speed uses the same **Layer rate ×** slider/exact field and Reset to 1× as
+main row Speed, never a clip mode, preset or source-frame curve editor.
+
+For main and stored value sliders, pointer movement changes only a transient local
+control draft, not the document or preview. Release applies one validated edit and
+updates the image. Escape, pointer cancellation, lost capture or window blur restores
+the starting value without save/history; each keyboard slider adjustment is an
+individual validated edit. The full value-control contract is in
+[WORKSPACE_AND_RECOVERY.md](WORKSPACE_AND_RECOVERY.md#numbers-titles-and-animation).
 
 Only existing non-null participants get value editors. Each accepted value/reset
 changes that participant at its stored frame in **one Undo step**, without changing

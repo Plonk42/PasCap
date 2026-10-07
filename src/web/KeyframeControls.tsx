@@ -155,7 +155,7 @@ function KeyframePointRow({
           disabled={disabled}
           onClick={() => onEdit({ type: 'layer-key-remove', layerId, frame: point.frame })}
         >
-          ×
+          <Icon name="trash" size={14} />
         </button>
       </div>
       <p
@@ -327,7 +327,7 @@ export function KeyframeControls({
     >
       <legend className="declutter-sr-only">Layer keyframes</legend>
       <div className="keyframe-toolbar">
-        <strong className="keyframe-panel-title">Layer keyframes</strong>
+        <strong className="keyframe-panel-title declutter-sr-only">Layer keyframes</strong>
         <span
           className="keyframe-count"
           title={`${keys.length} shared ${keys.length === 1 ? 'point' : 'points'} on ${layer.name}`}
@@ -370,7 +370,7 @@ export function KeyframeControls({
             title="Remove this whole shared point and all its participating settings"
             onClick={() => onEdit({ type: 'layer-key-remove', layerId: layer.id, frame: atHead.frame })}
           >
-            <Icon name="x" size={14} />
+            <Icon name="trash" size={14} />
           </button>
         )}
         <HelpPopover label="Animation" className="animation-help">

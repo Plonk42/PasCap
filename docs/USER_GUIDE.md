@@ -70,8 +70,8 @@ See [TIMELINE_EDITING.md](TIMELINE_EDITING.md) and [DEPLOYMENT.md](DEPLOYMENT.md
 
 Hover a ready recording to open **Source preview**; horizontal mouse position
 scrubs its full source range without moving the timeline playhead. **Pin** keeps
-that source selected while you hover other rows. Review is muted and uses a
-separate decoder; it never silently plays or prepares an original.
+that source selected while you hover other rows. Review is paused and muted and
+uses a separate decoder; it never plays or prepares an original implicitly.
 
 Set source **IN/OUT** using handles, **Mark IN/OUT**, focused source **I/O**, or the
 paired numeric fields followed by **Apply**. OUT is exclusive; Mark OUT includes
@@ -148,10 +148,10 @@ stored but dormant on empty tracks. Details: [TIMELINE_EDITING.md](TIMELINE_EDIT
 
 Each excerpt has independent colour and constant/ramp/custom speed settings.
 **Opacity** is one setting for the selected **whole video row**, not a clip.
-Find its single slider/diamond/navigation in **Clip → Colour**, alongside Exposure,
-Brightness, Contrast, Hue, Saturation, Highlights and Shadows. A new row starts
-at **100%** (stored as `opacity = 1`, with a 0–1 range).
-Without Opacity keys, the slider edits the row's saved `opacity` and works even
+Find its single native slider/exact numeric field/diamond/navigation in **Clip → Colour**,
+alongside Exposure, Brightness, Contrast, Hue, Saturation, Highlights and Shadows.
+The numeric field uses **0–1**, initially **1**; the main label may show **100%**.
+Without Opacity keys, either value control edits the row's saved `opacity` and works even
 on an empty row. With keys, the row's `opacity` curve overrides that value on every
 clip, including both sources in a dissolve. Removing its final participant reveals
 the unchanged saved row value. There is no saved clip opacity, additional layer
@@ -161,8 +161,10 @@ UI treatment, but controls composition coverage, not the SDR RGB grade.
 **Clip → Placement** contains placement only. Sliders never create implicit keys;
 an animated setting without participation at the real playhead is read-only until
 its hollow diamond captures a key there.
-Speed accepts **0.1×–8×**, including ramp-up/down curves. Slow motion
-repeats frames and acceleration drops them; there is no optical-flow synthesis.
+Speed accepts **0.1×–8×**. Constant, ramp endpoint, custom-point and main/stored row
+rates pair a native slider with an exact numeric field, retaining modes, presets
+and the curve graph. Slow motion repeats frames and acceleration drops them;
+there is no optical-flow synthesis.
 Speed changes output duration: Ripple-on tracks re-sequence, off keeps independent starts,
 and incompatible fades/transitions/overlaps reject the edit rather than being shrunk.
 
@@ -193,13 +195,15 @@ These points belong only to the selected clip, not to every clip in its video ro
 - Drag horizontally for original source time and vertically for speed. The graph
   has a logarithmic 0.1×–8× axis; the vertical line is the displayed source frame.
 - For precise edits, select a point and enter **Source frame**, **Speed ×** and
-  **To next point** easing. Source frames are integers; numeric rates retain the
-  decimal precision you enter. Enter/blur applies, Escape restores.
+  **To next point** easing. Source frames use exact integer fields; Speed × pairs
+  a slider with a field retaining the decimal precision you enter. Enter/blur applies,
+  Escape restores.
 - Click the graph background or a point to seek, then **Add point** at an unkeyed
   displayed source frame. Point Previous/Next and the selector also reach off-trim
   keys. The original OUT anchor previews the last available image.
-- Drag drafts preview live without saving. Valid release is one Undo; Escape,
-  pointer cancellation/capture loss or window blur restores the prior edit.
+- Graph-point drag drafts preview live without saving, unlike value sliders.
+  Valid release is one Undo; Escape, pointer cancellation/capture loss or window blur
+  restores the prior edit.
   Red collisions or timing conflicts never merge, overwrite or shrink transitions.
 - Focus a point: arrows move one source frame or 0.01×; Shift moves ten frames
   or 0.1×. Enter seeks; Delete removes it if at least two points remain.
@@ -261,8 +265,8 @@ reordering and Undo.
 
 Stored colour/opacity participants use the same sliders and individual colour
 resets as the main controls, with one precise numeric field to the right of each
-slider (opacity uses the stored 0–1 scale). Stored
-Speed uses the **Layer rate ×** field and Reset to 1×, not clip speed modes or a
+slider as the sole numeric value display (Opacity uses 0–1 in both contexts). Stored
+Speed uses the **Layer rate ×** slider/exact field and Reset to 1×, not clip speed modes or a
 source-frame curve. These controls edit only an existing participant at that
 stored point; they never implicitly join a setting. Each accepted value/reset is
 one Undo step and leaves the point's time, shared easing, other participants and
@@ -304,8 +308,9 @@ projects and caches remain untouched. Reimporting the same unchanged path reuses
 entry, while a missing old location stays visibly unavailable.
 
 One music track supports waveform placement/edge trims, numeric source IN/OUT,
-start/duration, **gain dB**, linear fades and **Loop selected source range**.
-Without looping, duration must fit that source range; looping repeats only it.
+start/duration, a native **gain dB** slider with an exact numeric field, linear fades
+and **Loop selected source range**. Without looping, duration must fit that source
+range; looping repeats only it.
 There is no hidden loudness normalisation or video-speed retiming of music.
 Preview uses bounded PCM streaming through Web Audio, not a full-file buffer or
 an approximate media-element clock. Selected-range loops continue without a music
@@ -347,6 +352,12 @@ drafts within the same editing context; changing the edited row/clip refreshes i
 fields rather than applying a previous context's draft to the new selection.
 Explicit boundary buttons still open Sequence.
 
+Viewer and Inspector tabs share one native-button appearance and retain their
+arrow/Home/End navigation. Keyframes does not repeat its visible title in the toolbar.
+Trash icons delete; × closes or dismisses. Icon-only actions keep accessible names
+and tooltips. See the [editor control catalogue](design/EDITOR_CONTROLS.md) for
+control conventions and vocabulary.
+
 **Expand all / Collapse all** appears only in Clip and controls its four top-level
 sections: **Source range**, **Placement**, **Speed** and **Colour**. Sequence,
 Audio, nested disclosures and help remain unchanged.
@@ -356,8 +367,16 @@ The header directly exposes **Media / Inspector toggles and keyboard help**.
 Drag panel dividers or use focused arrows; double-click/Home resets a divider and
 Escape cancels its drag. Compact desktop windows use one side drawer at a time.
 Layout/section preferences do not change rendering. Numbers/titles apply on
-Enter/blur, Escape restores, and invalid text remains editable; sliders stay live.
-Source-review paired IN/OUT deliberately requires **Apply**.
+Enter/blur, Escape restores, and invalid text remains editable. Numeric values retain
+full entered precision, independent of slider steps, without clamping or rounding.
+Colour/Opacity, playback rates and gain use a native slider with one adjacent exact
+numeric field in both main and stored controls, not read-only outputs or number-only
+layouts. Pointer sliding updates only the local control value; the image updates
+on release after one validated edit. Escape, pointer cancellation, lost capture or
+window blur restores the starting value without save/history. Each keyboard slider
+adjustment is an individual validated edit. Integer source/timeline frames, durations
+and fades retain exact native numeric steppers and timecode feedback, not arbitrary
+timing sliders. Source-review paired IN/OUT deliberately requires **Apply**.
 
 Clip shows the selected excerpt/row first; section readouts and dots
 indicate adjusted settings without expanding everything. Animated channels use

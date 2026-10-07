@@ -16,6 +16,7 @@ import { Icon } from './icons.js';
 import { useKeyframeNavigation } from './keyframe-navigation.js';
 import { EasingSelect } from './EasingSelect.js';
 import { NumberField } from './NumberField.js';
+import { RateValueControl } from './SettingValueControl.js';
 import type { DraftPreview } from './Timeline.js';
 import { useClipSpeedDrag } from './use-clip-speed-drag.js';
 import './clip-speed.css';
@@ -417,20 +418,18 @@ export function ClipSpeedCurve({
             onCommit={(value) => change(updateClipSpeedKey(current, selected.frame, { frame: value }))}
           />
         </label>
-        <label>
-          Speed ×
-          <NumberField
+        <div className="clip-speed-rate-field">
+          <label htmlFor={`${helpId}-rate`}>Speed ×</label>
+          <RateValueControl
+            id={`${helpId}-rate`}
             aria-label="Clip speed keyframe rate"
             value={selected.rate}
-            min={0.1}
-            max={8}
-            step={0.01}
             disabled={unavailable}
             resetKey={`${context}:${selectedRow.id}:rate`}
             validate={(value) => validation(selected.frame, value, selected.interpolation)}
             onCommit={(value) => change(updateClipSpeedKey(current, selected.frame, { rate: value }))}
           />
-        </label>
+        </div>
         <label className="clip-speed-easing">
           To next point
           <EasingSelect

@@ -121,8 +121,9 @@ $\mathrm{result} = C + \mathrm{lower}(1 - A)$, with no layer multiplier; black f
 change RGB without reducing coverage. Any shared row point, even speed-only,
 requires the layered export path; the static chunk plan cannot silently omit it.
 Opacity is composition coverage, not part of the unchanged SDR RGB grade.
-Its single slider/diamond/navigation is in **Clip → Colour** alongside the colour
-sliders, initially **100%**. Without Opacity keys it edits row `opacity`, even on
+Its single native slider/exact `NumberField`/diamond/navigation is in **Clip → Colour**
+alongside the colour controls. Numeric entry is **0–1**, initially **1**; the main
+label may show **100%**. Without Opacity keys it edits row `opacity`, even on
 an empty row. With keys, a missing participant at the real playhead is read-only
 until captured with the diamond; sliders never create keys. Unkeyed colour
 settings remain per-clip. **Placement** contains placement only; Layer options
@@ -155,6 +156,16 @@ not guaranteed. Originals and full proxies remain unchanged.
 
 ### Editing speed
 
+Playback rates use the shared native slider plus an adjacent exact `NumberField`,
+bounded to **0.1×–8×**: constant speed, ramp endpoints, a selected custom-curve
+point's rate, and main/stored row Speed. Modes, presets and the curve graph remain
+separate controls. Pointer sliding changes only a transient local value draft;
+release applies one validated document edit and updates the image. Escape, pointer
+cancellation, lost capture or window blur restores the starting value without
+save/history. Each keyboard slider adjustment is an individual validated edit.
+Numeric entry retains full precision, applies on Enter/blur and restores on Escape;
+invalid drafts remain editable without clamping or rounding.
+
 In **Clip → Speed**, the diamond explicitly joins/leaves Speed at the current
 project frame. It captures the displayed rate; changing a control never creates
 implicit endpoint keys.
@@ -164,7 +175,7 @@ stay visible but disabled without a neighbour, an opened project, or during any
 document-preview draft. Navigation preserves the chosen Inspector tab and activated
 button's focus; it is editor-only, not a rate/base change or an Undo/autosave operation.
 
-The main animated rate field is read-only where Speed does not participate until
+The main animated rate controls are read-only where Speed does not participate until
 its hollow diamond is clicked. Unanimated Speed uses **Constant speed / Ramp up / Ramp down**
 or **Custom curve** clip controls. Reset to 1× affects only the active row Speed
 participant at the playhead when keyed, otherwise the selected clip's base.
@@ -176,8 +187,8 @@ help button. There is no outer list disclosure or per-row list expansion prefere
 nested **Time, easing & values** details remain collapsible and preserve drafts
 and input identity through reordering and Undo. **Keyframes → Time, easing & values**
 edits stored point times, easing and existing participants, including beyond current duration
-or on an empty row. A stored Speed participant reuses the **Layer rate ×** numeric
-field and Reset to 1×, not clip mode/preset/source-curve controls. Enter/blur applies
+or on an empty row. A stored Speed participant reuses the **Layer rate ×** slider/exact
+`NumberField` and Reset to 1×, not clip mode/preset/source-curve controls. Enter/blur applies
 the precise rate; Escape restores. The same **0.1×–8×** bounds and contextual timing
 validation apply. Invalid drafts retain inline errors rather than being clamped,
 rounded or used to shorten conflicting fades/transitions.
@@ -186,8 +197,9 @@ Each accepted stored rate/reset changes only that existing Speed participant in
 **one Undo step**. Its time, shared easing, other participants/points and the saved
 clip bases stay unchanged; it never implicitly joins Speed or requests a seek.
 Stored colour/opacity participants likewise reuse the main sliders and individual
-colour resets, with one precise numeric field beside each slider, targeting only
-that stored participant.
+colour resets, with one exact `NumberField` beside each slider as the sole numeric
+value display, targeting only that stored participant. Opacity numeric entry uses
+**0–1** in both main and stored controls.
 
 Drag a row marker horizontally or use its one-/ten-frame keyboard moves to move
 all participants and their existing easing in **one Undo step**, using the same
@@ -225,8 +237,9 @@ the closest rendered image when fast playback skips it; the stored key stays
 at its requested source frame. Point arrows and the native
 point selector also reach retained off-trim keys.
 
-**Source frame / Speed × / To next point** provide exact editing. Numeric fields
-retain full entered decimal precision and commit on Enter/blur; invalid collisions,
+**Source frame / Speed × / To next point** provide exact editing: source frame
+uses a native integer `NumberField`; Speed × pairs a slider with an exact field.
+Numeric fields retain full entered decimal precision and commit on Enter/blur; invalid collisions,
 out-of-original positions and timing conflicts retain the draft with inline
 errors. They do not automatically seek. Escape restores the field. Easing belongs
 to the left point; the last rate holds without a next interval.
@@ -235,8 +248,9 @@ use the same compact selected-shape graph and accessible description. It illustr
 the existing progress function, not a new rate or interpolation rule; ramp curves
 still exclude Hold. Selection remains native and commits once, with one Undo step.
 
-Drag a point horizontally to change its integer source frame and vertically to
-change its speed, quantised to **0.001×** for pointer movement only. Capture-relative
+Graph-point dragging is separate from the release-only value slider. Drag a point
+horizontally to change its integer source frame and vertically to change its speed,
+quantised to **0.001×** for pointer movement only. Capture-relative
 geometry does not drift as duration changes. Valid drafts preview the complete
 new layout while retaining the displayed original source position, but do not
 enter committed history/autosave. Valid release is **one Undo**. Red collision/
@@ -285,6 +299,12 @@ Original files are referenced in place and are never stripped or rewritten.
 One registered audio file, with explicit source IN/OUT, timeline start/duration,
 gain dB, fade durations and loop flag. A non-looping duration cannot exceed the
 selected source range; a looping track repeats **only that selected range**.
+
+Gain dB pairs a bounded native slider with an exact `NumberField`, using the same
+local-draft/release-only gesture and full-precision numeric entry as playback rates.
+Source IN/OUT, timeline start, duration and fades retain exact native numeric fields
+with their existing units and timecode feedback, not arbitrary timing sliders.
+Loop stays a checkbox.
 
 Linear amplitude envelope: `10^(gainDb/20)` multiplied by `offset/fadeIn` within
 the opening fade and `(duration-offset)/fadeOut` within the closing fade. Outside
