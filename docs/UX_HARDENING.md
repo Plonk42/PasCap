@@ -41,7 +41,8 @@ This guide is not a delivery ledger or a fresh validation result.
   uncertainty, errors/recheck and disclosed location/assumptions. Snapshot and
   native processing details remain available in **Rendering details**.
 
-Schema 7 uses uniform video tracks with required Ripple/transitions/fades and
+Schema 8 uses a required 0–8 `music` array with unique required instance IDs and
+uniform video tracks with required Ripple/transitions/fades and
 numeric `VideoLayer.opacity` in 0–1 (1 on new tracks), plus nine nullable point
 channels: `opacity`, `speed` and seven colour settings. Rows
 follow saved bottom-to-top composition order. Layer options exposes default-on
@@ -58,14 +59,30 @@ $\mathrm{result} = C + \mathrm{lower}(1 - A)$, without a layer multiplier.
 Here $G_i$ is graded RGB, $b_i$ black-fade brightness, $o_i$ evaluated Opacity and
 $w_i$ dissolve weight. Each source uses the same evaluated row Opacity at that
 project frame, from the row value or its overriding curve.
-v1–v6 project/receipt snapshots remain unchanged/incompatible
+v1–v7 project/receipt snapshots remain unchanged/incompatible
 and require recreation, without migration, defaults or automatic deletion.
 Row `opacity` is the required sole stored value, not obsolete; saved `clip.opacity`
 and old `clipOpacity`/`layerOpacity` point channels are invalid.
-Registry/proxy formats do not change. Source-copy prohibition,
-row points, source choices, media preparation, music, Activity and both export
+Registry/proxy/current PCM formats do not change. Version-1 export receipts require
+strict v8 snapshots and captured audio-source/instance-plan arrays, rejecting
+invalid arrays/older snapshots without rewriting successful exports. No null
+fallback or old-format reader is permitted. Source-copy prohibition,
+row points, source choices, media preparation, Activity and both export
 profiles retain their contracts. The editor targets desktop Linux; the 640 px
 width floor is not a mobile-support claim.
+
+**Audio → Music** uses native **Music track / Recording** selectors, **Add music
+track** and selected-instance trash deletion. Ready/prepared recordings can be
+reused by independent instances; import never implicitly places one. Selection
+is editor-only; edits/removal leave other instances and bin membership intact.
+Independent drafts never apply to another selection. Each valid commit/completed
+gesture is one Undo step; invalid/cancelled operations remain atomic.
+Project duration is maximum video OUT or music start + duration. Music can extend
+it: closing video fades end at their clip OUT, followed by opaque black while
+music continues/fades at its own OUT, never a frozen image. Music-only preview is
+black; export requires a retained video clip. The
+[multiple-music contract](design/MULTIPLE_MUSIC.md) records pending acceptance,
+not a fresh UI or runtime validation result.
 
 ## Issue #1: deterministic raw-reader ownership
 
@@ -147,10 +164,14 @@ The displayed allowance is duration/profile dependent:
 
 - Up to the two largest enabled retimed clips at **4 uncompressed bytes/pixel**.
 - For generalized layered export, up to **three** timeline representations at
-  **8 uncompressed bytes/pixel**; disabled-layer tails still count in timeline duration.
+  **8 uncompressed bytes/pixel**; disabled-layer tails and music OUTs count in full
+  project duration. Music beyond video OUT requires this path's black tail.
 - Encoded chunks plus final MP4, each budgeted at **1 byte/pixel/frame**.
-- Selected active music PCM once, **48 kHz stereo s16**, not a whole original or
-  every loop repetition.
+- **Maximum selected music PCM size**, **48 kHz stereo s16**, plus **two full-project
+  Float64 stereo timelines**. Only one selected source and old/new accumulators
+  coexist; not the sum of all original/selected files or every loop repetition.
+  With $S$ project samples and $L_i$ selected source samples, audio planning is
+  $4\max_i L_i + 2\times16S$ bytes when music exists, zero without music, before overhead.
 - A **25% margin plus 16 MiB start reserve** for containers, LUTs, receipts and other
   overhead.
 
@@ -176,6 +197,23 @@ One original decoder, two intermediate readers, one encoder and three video chil
 per serial pass bound concurrency, not duration-dependent disk use. The static
 fast path requires one enabled, unanimated, zero-origin contiguous track
 with row Opacity 1; unsupported placement/coverage uses generalized layered export.
+
+That static track must cover full project duration; music-only tails require
+layered black, without stretching video closing fades or holding a last image.
+Audio processes **one original at a time** into selected s16 PCM and serially
+pairwise-sums with a **Float64 stereo accumulator**. At most **two intermediate
+audio inputs**, **one native audio child per pass** and **three audio scratch files**
+(selected PCM + old/new accumulators) coexist, deleting consumed inputs before the
+next instance. Apply per-instance gain/fades, sum without normalisation or
+intermediate clipping, then hard-clamp once before final AAC. There is no ducking,
+effect or video audio. These audio allocations are additional to the unchanged
+video bounds above and remain duration-dependent on disk.
+
+Preview instances share one AudioContext/worklet/output clock and **four × 128 KiB**
+mixed queue blocks total, serial source reads with **64 KiB** range scratch, one
+**128 KiB conversion workspace** and one **128 KiB mixed-output workspace**. No
+per-track queues/full-file buffers; exact one-frame A/V, source failure/underrun and
+epoch cancellation remain strict. No new validation results are claimed here.
 
 Allocated-block sampling at progress callbacks is a measurement procedure, not a
 fixed bound: directory metadata and peaks between samples need separate accounting.

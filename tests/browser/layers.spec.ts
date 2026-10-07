@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import type { ExportReceipt } from '../../src/server/export.js';
 import { applyCommand } from '../../src/shared/commands.js';
 import { createClip, createLayer, createProject, projectSchema } from '../../src/shared/model.js';
 import { calculateLayout, sampleTimeline } from '../../src/shared/timeline.js';
@@ -366,17 +367,16 @@ test('layered native UI export includes keyed opacity and colour in an immutable
   await page.getByRole('button', { name: 'Export video', exact: true }).click();
   const accepted = await submitExport(page);
   const { receiptUrl } = await freshExportLinks(page, request, accepted, 90_000);
-  const receipt = (await (await request.get(receiptUrl)).json()) as {
-    snapshot: unknown;
-    verification: { frameCount: number };
-    settings: { pipeline: string };
-  };
+  const receipt = (await (await request.get(receiptUrl)).json()) as ExportReceipt;
   const snapshot = projectSchema.parse(receipt.snapshot);
-  expect(snapshot.schemaVersion).toBe(7);
+  expect(snapshot.schemaVersion).toBe(8);
   expect(snapshot.layers).toHaveLength(2);
   expect(snapshot.layers[1]?.keyframes).toEqual(document.layers[1]?.keyframes);
   expect(snapshot.clips[1]).not.toHaveProperty('animation');
   expect(receipt.settings.pipeline).toBe('sequential-layered');
+  expect(receipt.musicSources).toEqual([]);
+  expect(receipt.settings.audio).toEqual([]);
+  expect(receipt.verification.audio).toBeNull();
   expect(receipt.verification.frameCount).toBe(calculateLayout(document).duration);
   await seek(page, 0);
   await page.getByRole('slider', { name: 'Exposure', exact: true }).fill('0.7');
@@ -442,17 +442,20 @@ test('plays three simultaneous sources through row-wide rate/grade curves, a tra
   const duration = calculateLayout(project).duration;
   project = applyCommand(project, {
     type: 'music',
-    music: {
-      mediaId: music.assets[0]!.id,
-      sourceIn: 0,
-      sourceOut: 30,
-      start: 0,
-      duration,
-      gainDb: -9,
-      fadeIn: 5,
-      fadeOut: 5,
-      loop: true,
-    },
+    music: [
+      {
+        id: 'layers-music',
+        mediaId: music.assets[0]!.id,
+        sourceIn: 0,
+        sourceOut: 30,
+        start: 0,
+        duration,
+        gainDb: -9,
+        fadeIn: 5,
+        fadeOut: 5,
+        loop: true,
+      },
+    ],
   });
   await page.evaluate((document) => window.pascapLab!.setDocument(document), project);
   await page.waitForFunction((expected) => {

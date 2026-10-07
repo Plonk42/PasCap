@@ -63,6 +63,7 @@ describe('authoritative colour transform', () => {
       for (const control of COLOUR_CONTROLS)
         expect(colourSchema.safeParse({ ...NEUTRAL_COLOUR, [control.key]: value }).success).toBe(false);
       const music = {
+        id: 'music-instance',
         mediaId: 'music',
         sourceIn: 0,
         sourceOut: 60,

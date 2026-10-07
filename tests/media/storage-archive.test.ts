@@ -14,20 +14,20 @@ import { unsupportedProject } from '../unit/project-fixtures.js';
 const enabled = process.env['PASCAP_MEDIA_TESTS'] === '1';
 const roots: string[] = [];
 async function temp(): Promise<string> {
-  const root = await mkdtemp(path.join(os.tmpdir(), 'pascap-schema7-storage-media-'));
+  const root = await mkdtemp(path.join(os.tmpdir(), 'pascap-schema8-storage-media-'));
   roots.push(root);
   return root;
 }
 
-describe.skipIf(!enabled)('schema-7 storage/archive integration · generated files only, no migrations', () => {
+describe.skipIf(!enabled)('schema-8 storage/archive integration · generated files only, no migrations', () => {
   afterEach(async () => {
     await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
   });
 
-  it('loads strict v7 points/bins and lists/rejects unsupported versions including v6 without rewriting them', async () => {
+  it('loads strict v8 points/bins and lists/rejects unsupported versions including v7 without rewriting them', async () => {
     const root = await temp();
     const store = new ProjectStore(root);
-    const project = createProject('strict-v7', 'Strict current document');
+    const project = createProject('strict-v8', 'Strict current document');
     project.media = { videoIds: ['generated-original', 'unplaced-original'], audioIds: ['unplaced-music'] };
     project.clips = [createClip('current-clip', 'generated-original', 0, 4)];
     project.layers[0]!.keyframes = [
@@ -35,13 +35,13 @@ describe.skipIf(!enabled)('schema-7 storage/archive integration · generated fil
       { frame: 5000, interpolation: 'ease-out', values: { ...EMPTY_KEY_VALUES, exposure: 0.25 } },
     ];
     const saved = await store.save(project, 0);
-    expect(saved.schemaVersion).toBe(7);
+    expect(saved.schemaVersion).toBe(8);
     expect(saved.media).toEqual(project.media);
     expect(await store.load(saved.id)).toEqual(saved);
     const currentPath = path.join(root, 'projects', `${saved.id}.json`);
     const currentBytes = await readFile(currentPath);
     const old = [];
-    for (const version of [1, 2, 3, 4, 5, 6]) {
+    for (const version of [1, 2, 3, 4, 5, 6, 7]) {
       const id = `original-v${version}`;
       const title = `Preserved original version ${version}`;
       const document = unsupportedProject(version, id, title);
@@ -49,7 +49,7 @@ describe.skipIf(!enabled)('schema-7 storage/archive integration · generated fil
       const filename = path.join(root, 'projects', `${id}.json`);
       await writeFile(filename, bytes);
       old.push({ id, title, version, filename, bytes });
-      await expect(store.load(id)).rejects.toThrow(`schema version ${version}; this build requires version 7`);
+      await expect(store.load(id)).rejects.toThrow(`schema version ${version}; this build requires version 8`);
       await expect(store.rename(id, 'Must not rewrite an older file', 0)).rejects.toThrow(
         'existing file was not changed',
       );
@@ -71,7 +71,7 @@ describe.skipIf(!enabled)('schema-7 storage/archive integration · generated fil
         revision: 0,
         clipCount: 0,
         duration: 0,
-        error: expect.stringContaining(`requires version 7`),
+        error: expect.stringContaining(`requires version 8`),
       });
       expect(await readFile(entry.filename)).toEqual(entry.bytes);
     }
@@ -124,12 +124,12 @@ describe.skipIf(!enabled)('schema-7 storage/archive integration · generated fil
     expect(await readFile(filename)).toEqual(bytes);
   });
 
-  it('rejects malformed v7 and removed opacity fields without synthesizing missing current fields', async () => {
+  it('rejects malformed v8 and removed opacity fields without synthesizing missing current fields', async () => {
     const root = await temp();
     const store = new ProjectStore(root);
     const directory = path.join(root, 'projects');
     await mkdir(directory);
-    const valid = createProject('malformed-v7', 'Must remain strict');
+    const valid = createProject('malformed-v8', 'Must remain strict');
     valid.clips = [createClip('current', 'generated-original', 0, 4)];
     const missingMedia: Record<string, unknown> = { ...valid };
     delete missingMedia['media'];
@@ -204,7 +204,7 @@ describe.skipIf(!enabled)('schema-7 storage/archive integration · generated fil
     expect((await store.list()).every((summary) => !summary.compatible)).toBe(true);
   });
 
-  it('restores only strict v7 snapshots in version-1 receipts and preserves earlier outputs/receipts byte-for-byte', async () => {
+  it('restores only strict v8 snapshots in version-1 receipts and preserves earlier outputs/receipts byte-for-byte', async () => {
     const root = await temp();
     const config = createConfig({ dataDir: root });
     const jobs = new JobQueue();
@@ -225,6 +225,8 @@ describe.skipIf(!enabled)('schema-7 storage/archive integration · generated fil
           createdAt: '2026-10-03T00:00:00.000Z',
           snapshot: document,
           profile: 'draft720',
+          musicSources: [],
+          settings: { audio: [] },
           verification: { frameCount: 2, fullDecode: true, faststart: true },
         }),
       );
@@ -234,15 +236,15 @@ describe.skipIf(!enabled)('schema-7 storage/archive integration · generated fil
       return { id, folder, receipt, output };
     }
     try {
-      const current = await archive(snapshot, 'v7');
+      const current = await archive(snapshot, 'v8');
       const older = [];
-      for (const version of [1, 2, 3, 4, 5, 6]) {
+      for (const version of [1, 2, 3, 4, 5, 6, 7]) {
         const document = unsupportedProject(version, `old-${version}`, `Original ${version}`);
         older.push({ ...(await archive(document, `v${version}`)), version });
       }
       const missingRow: Record<string, unknown> = { ...snapshot.layers[0]! };
       delete missingRow['keyframes'];
-      const malformed = await archive({ ...snapshot, layers: [missingRow] }, 'Malformed v7');
+      const malformed = await archive({ ...snapshot, layers: [missingRow] }, 'Malformed v8');
       const missingTiming = [];
       for (const field of ['opacity', 'ripple', 'transitions', 'openingFade', 'closingFade']) {
         const row: Record<string, unknown> = { ...snapshot.layers[0]! };
@@ -274,7 +276,7 @@ describe.skipIf(!enabled)('schema-7 storage/archive integration · generated fil
           ),
         );
       const warnings = await restoreExports(config, jobs);
-      expect(warnings).toHaveLength(15);
+      expect(warnings).toHaveLength(16);
       expect(jobs.list().map((job) => job.id)).toEqual([current.id]);
       expect(jobs.get(current.id)).toMatchObject({
         kind: 'export',
@@ -285,7 +287,7 @@ describe.skipIf(!enabled)('schema-7 storage/archive integration · generated fil
       });
       for (const entry of older) {
         expect(warnings.find((warning) => warning.startsWith(`${entry.id}:`))).toContain(
-          `Unsupported export snapshot schema version ${entry.version}; this build requires version 7`,
+          `Unsupported export snapshot schema version ${entry.version}; this build requires version 8`,
         );
         expect(warnings.find((warning) => warning.startsWith(`${entry.id}:`))).toContain(
           'successful output were not changed',
@@ -302,7 +304,7 @@ describe.skipIf(!enabled)('schema-7 storage/archive integration · generated fil
         expect(await readFile(path.join(entry.folder, 'receipt.json'))).toEqual(entry.receipt);
         expect(await readFile(path.join(entry.folder, 'export.mp4'))).toEqual(entry.output);
       }
-      expect(await restoreExports(config, jobs)).toHaveLength(15);
+      expect(await restoreExports(config, jobs)).toHaveLength(16);
       expect(jobs.list()).toHaveLength(1);
     } finally {
       await jobs.close();

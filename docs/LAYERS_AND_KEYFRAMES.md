@@ -1,4 +1,4 @@
-# Layers, shared row points and source review · project v7
+# Layers, shared row points and source review · project v8
 
 ## Video layers
 
@@ -43,6 +43,12 @@ dissolve overlap is the only allowed same-track overlap; triple overlap is inval
 Opening/closing fades belong to the track's first/last clips at actual placements,
 fit with other transition regions and remain stored but dormant on an empty track.
 
+Project duration is the maximum of all retimed clip OUTs (including hidden layers)
+and every music start + duration. Music can extend it. Closing fades end at their
+last video clip OUTs, not at music/project OUT; no active video means opaque black
+while music continues/fades at its own end, never a frozen last image. Music-only
+preview is black; export still requires at least one retained video clip.
+
 **+ Layer** creates/selects a track. Sidebar controls select and hide/show;
 **Layer options** contains only rename, Ripple, raise/lower and delete. Layer
 names apply on Enter/blur, Escape restores, and a rename is one Undo step. Selecting
@@ -86,7 +92,7 @@ they do not dim another track or reveal lower footage through a transparency fad
 clip on that row, including clips from different recordings and both participants
 in that track's dissolve. They do not restart at a clip's IN, start or boundary.
 
-Schema 7 requires `layers[].keyframes` as ordered `{ frame, interpolation, values }`
+Schema 8 requires `layers[].keyframes` as ordered `{ frame, interpolation, values }`
 points, with **at most 256 points per row**. Frames are unique, strictly ascending,
 non-negative and at most 2,147,483,647. Every point's `values` object (`LayerKeyValues`)
 requires **all nine nullable fields** below: a number participates; `null` does not. Omitted/unknown
@@ -264,7 +270,8 @@ remain editable in this list. Setting buttons, row Previous/Next, marker navigat
 and list time buttons share **one editor-only stored-point inspection cursor**.
 Successive navigation advances from that stored time, so several off-duration
 points can be inspected even when every seek clamps to the same last preview frame.
-The point stays stored at its own time; an empty timeline has no frame to preview.
+The point stays stored at its own time; without any video or music duration there
+is no preview frame. A music-only region has a real project frame with a black picture.
 
 Labels distinguish stored time from the actual preview/playhead. List fields target
 their stored point, while Clip's setting values, diamond state and diamond capture
@@ -293,7 +300,8 @@ the row and seeks without editing or changing the Inspector tab. Whole-row point
 navigation also retains that tab. Points after the last clip keep their marker at
 their own project time, like points before the first clip. The scrollable timeline
 widens to reach the last stored point, but duration, playback and seeking still end
-at the last clip frame. Selecting such a marker inspects that stored point (preview
+at the last project frame, determined by the maximum video/music OUT, not points.
+Selecting such a marker inspects that stored point (preview
 shows the nearest available frame), highlights it and changes nothing.
 The shared Timeline frame field remains available.
 
@@ -432,19 +440,27 @@ tracks**, supporting independent simultaneous dissolves. Unused slots are availa
 for preloading. Source review adds at most one decoder while visible. No decoder or
 texture is allocated per stored clip.
 
-Music adds one AudioWorklet, with up to four 128 KiB stereo Float32 transfer
-blocks, bounded 64 KiB range/short-selection scratch and one 128 KiB conversion workspace. Its serial
-credit-controlled refill and one-unacknowledged-receipt protocol are bounded
-independently of duration; no full-file audio buffer or decoder per loop is used.
-Current PCM preview preparation remains a serial native job; its generated cache
-grows about 11.52 MB per minute. Native export bounds below are unchanged.
+Up to **eight identified music instances** share one AudioContext/AudioWorklet and
+one output timestamp clock with the unchanged one-project-frame A/V bound.
+Sources are read/accumulated serially into a single mixed stream: per-instance
+gain/fades, linear sum, **one final [−1, 1] clamp**. No normalisation, ducking,
+effects or source-video audio. The aggregate queue remains **four × 128 KiB stereo
+Float32 blocks (512 KiB)**, with shared bounded **64 KiB range/short-selection
+scratch**, one **128 KiB conversion workspace** and one **128 KiB mixed-output
+workspace**. Serial credit-controlled refill and one unacknowledged receipt remain
+bounded independently of duration/count; no per-track queue/clock, full-file
+buffer or duration-sized silence allocation. Current PCM preparation stays serial
+with the unchanged cache format, about 11.52 MB per minute. See
+[MULTIPLE_MUSIC.md](design/MULTIPLE_MUSIC.md) for independent editing and pending acceptance.
 
 Export reads one original at a time through the shared backpressured frame mapper.
 The plain static single-layer path retains at most two lossless clips, two
 intermediate decoders and one reusable RGB frame (24.9 MB UHD), plus native memory.
 
 The static fast path is eligible only for one enabled track with row Opacity 1,
-no row points, a zero first start and no internal gaps. Ripple itself is not
+no row points, a zero first start and no internal gaps, covering the **full project
+duration**. Music beyond video OUT requires layered export's trailing black spans,
+not a held last image. Ripple itself is not
 an eligibility requirement. Other valid timelines, including any speed-only or
 neutral row point, use the generalized layered path; static planning rejects them.
 That pipeline remains sequential, with at most one original decoder, two intermediate readers and one
@@ -463,7 +479,7 @@ absolute project time, including repeated source images.
 At most two retained lossless clip files and **three** timeline representations
 coexist: lower accumulator, track group and output (or group spans and their joined
 group). A span collection counts as one. Inputs are deleted after their serial pass.
-Selected PCM and the final MP4 remain through verification. Scratch grows
+The final mixed audio and MP4 remain through verification. Scratch grows
 with those duration-dependent representations, not simultaneously decoded
 originals: these are concurrency bounds, not a fixed memory/disk-in-GB promise.
 Animated LUT generation/CPU passes can be slow, and long 4K/slow-motion edits may
@@ -475,17 +491,33 @@ qualification remain separate work in
 [#7](https://github.com/Plonk42/PasCap/issues/7) and
 [#8](https://github.com/Plonk42/PasCap/issues/8).
 
-Schema **v7 is strict**, including required unique `media.videoIds` / `media.audioIds`
+Audio native work is separate and serial: **one original at a time** to exact
+selected **48 kHz stereo s16 PCM**, then pairwise floating addition with an old
+**Float64 stereo accumulator** into the next full-project accumulator. Intermediate
+values are never clipped or normalised; the final mixed AAC input clamps once.
+At most **two intermediate audio inputs**, **one native audio child per pass** and
+**three audio scratch files** (selected PCM + old/new accumulators) coexist;
+consumed inputs are deleted before the next instance. Advisory audio disk planning
+is **maximum selected PCM size + two full-project Float64 stereo timelines**,
+not all sources or loop repetitions. It grows with duration and is additional to
+the unchanged video raw-buffer/child/LUT bounds above. Cancellation/failure removes
+only owned scratch, never originals, saved projects or successful outputs.
+
+Schema **v8 is strict**, including required unique `media.videoIds` / `media.audioIds`
 arrays, at most 10,000 IDs each, and all required per-track settings. Project-level
 transitions/fades, saved `clip.opacity` and old `clipOpacity`/`layerOpacity` point
 channels are not accepted. `VideoLayer.opacity` is the required sole stored row
 value, a number in 0–1; 1 is a new-track initial value, not a missing-field default.
 Points require exactly the nine nullable fields listed above, including `opacity`.
-Older v1–v6 project documents and export receipt snapshots remain unchanged/incompatible;
+The required `music` array contains 0–8 independent instances with unique required
+IDs and complete source IN/OUT/start/duration/gain/fades/loop fields; `[]` without
+music, never a null/singular value or default. Version-1 export receipts require
+a strict v8 snapshot plus captured audio-source/instance-plan arrays.
+Older v1–v7 project documents and export receipt snapshots remain unchanged/incompatible;
 there are no migrations, compatibility fallback/default fields or automatic deletion
 of projects, receipts or successful videos. Create a new project and deliberately
 import its media; registered media and currently verified ready proxies remain reusable.
-Registry/proxy formats and source identity checks are unchanged.
+Registry/proxy/current PCM formats and source identity checks are unchanged.
 Confirmed project deletion removes only its saved document, preserving originals,
 the shared registry/proxy cache and exports/receipts. The live v3 sample appearing
 incompatible is expected, not a reason to rewrite it.

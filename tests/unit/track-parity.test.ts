@@ -48,17 +48,20 @@ function fixture(selectedId = 'middle', ripple = false): ProjectDocument {
   );
   for (const layer of document.layers)
     layer.transitions = [cut(`${layer.id}-a`, `${layer.id}-b`), cut(`${layer.id}-b`, `${layer.id}-c`)];
-  document.music = {
-    mediaId: 'song',
-    sourceIn: 7,
-    sourceOut: 307,
-    start: 19,
-    duration: 200,
-    gainDb: -6,
-    fadeIn: 3,
-    fadeOut: 5,
-    loop: false,
-  };
+  document.music = [
+    {
+      id: 'song-instance',
+      mediaId: 'song',
+      sourceIn: 7,
+      sourceOut: 307,
+      start: 19,
+      duration: 200,
+      gainDb: -6,
+      fadeIn: 3,
+      fadeOut: 5,
+      loop: false,
+    },
+  ];
   return projectSchema.parse(document);
 }
 function starts(document: ProjectDocument, layerId: string): number[] {
@@ -106,10 +109,10 @@ function rejected(document: ProjectDocument, command: EditCommand, message: stri
   expect(history.canRedo).toBe(false);
 }
 
-describe('strict uniform schema-7 tracks', () => {
+describe('strict uniform schema-8 tracks', () => {
   it('uses Ripple ON for the initial track and every newly created track', () => {
     const initial = createProject('new', 'New');
-    expect(initial.schemaVersion).toBe(7);
+    expect(initial.schemaVersion).toBe(8);
     expect(initial.layers).toEqual([createLayer(BASE_LAYER_ID, 'Video 1')]);
     for (const id of [BASE_LAYER_ID, ...Array.from({ length: 8 }, (_, index) => `arbitrary-${index}`)]) {
       expect(createLayer(id, 'Track')).toEqual({
@@ -140,7 +143,7 @@ describe('strict uniform schema-7 tracks', () => {
     }
     for (const extra of [{ transitions: [] }, { openingFade: 0 }, { closingFade: 0 }])
       expect(projectSchema.safeParse({ ...document, ...extra }).success).toBe(false);
-    for (const schemaVersion of [1, 2, 3, 4, 5, 6])
+    for (const schemaVersion of [1, 2, 3, 4, 5, 6, 7])
       expect(projectSchema.safeParse({ ...document, schemaVersion }).success).toBe(false);
     expect(projectSchema.safeParse(unsupportedProject(5, 'old', 'Unsupported topology')).success).toBe(false);
     expect(document).not.toHaveProperty('transitions');
@@ -811,7 +814,7 @@ describe('uniform export planning and explicitly revised resource bounds', () =>
     ]);
   });
 
-  it('plans concurrent dissolves on every track in composition order with exact flat indices and hidden tails', () => {
+  it('plans concurrent dissolves on every track in composition order with exact flat indices, hidden tails and music OUT', () => {
     const document = fixture('middle', true);
     document.layers.forEach((layer) => {
       layer.ripple = true;
@@ -823,7 +826,7 @@ describe('uniform export planning and explicitly revised resource bounds', () =>
     const plan = planLayeredExport(document);
     const layout = calculateLayout(document);
     expect(plan.layers.map((layer) => layer.id)).toEqual(TRACK_IDS);
-    expect(plan.duration).toBe(125);
+    expect(plan.duration).toBe(219);
     expect(plan.chunks).toEqual([]);
     expect(plan).not.toHaveProperty('primary');
     expect(plan).not.toHaveProperty('baseDuration');
@@ -844,6 +847,7 @@ describe('uniform export planning and explicitly revised resource bounds', () =>
     expect(plan.layers[2]!.enabled).toBe(false);
     expect(plan.layers[2]!.plan.duration).toBe(125);
     expect(sampleTimeline(document, 124)).toEqual([]);
+    expect(sampleTimeline(document, 218)).toEqual([]);
   });
 
   it('retains serial native ownership while explicitly budgeting four buffers, 22 bytes/pixel and three timelines', () => {

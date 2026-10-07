@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MusicPlayback } from '../../src/preview/music.js';
+import { musicGainAt } from '../../src/shared/audio.js';
 import { musicSchema, type MusicTrack } from '../../src/shared/model.js';
 import {
   MUSIC_BYTES_PER_SAMPLE,
@@ -124,8 +125,10 @@ const fetchPcm = vi.fn<typeof fetch>(async (_url, init) => {
     },
   });
 });
+const defaultFetchPcm = fetchPcm.getMockImplementation()!;
 function track(overrides: Partial<MusicTrack> = {}): MusicTrack {
   return musicSchema.parse({
+    id: 'song-instance',
     mediaId: 'song',
     sourceIn: 10,
     sourceOut: 130,
@@ -139,7 +142,7 @@ function track(overrides: Partial<MusicTrack> = {}): MusicTrack {
   });
 }
 async function configured(music = track()): Promise<void> {
-  await playback.configure(music, new AbortController().signal);
+  await playback.configure([music], new AbortController().signal);
 }
 async function started(frame = 20): Promise<WorkletDouble> {
   await playback.start(frame, new AbortController().signal);
@@ -157,7 +160,7 @@ beforeEach(() => {
   requests.length = 0;
   holdStart = false;
   boundary.prefill = null;
-  fetchPcm.mockClear();
+  fetchPcm.mockReset().mockImplementation(defaultFetchPcm);
   vi.stubGlobal('location', { href: 'http://127.0.0.1:4318/' });
   vi.stubGlobal('AudioContext', ContextDouble);
   vi.stubGlobal('AudioWorkletNode', WorkletDouble);
@@ -173,6 +176,248 @@ afterEach(() => {
 });
 
 describe('sample-owned bounded streaming music', () => {
+  it('skips an empty array without metadata reads or creating an audio context', async () => {
+    await playback.configure([], new AbortController().signal);
+    await playback.resumeContext();
+    await playback.start(17, new AbortController().signal);
+    expect(playback.hasMusic).toBe(false);
+    expect(requests).toEqual([]);
+    expect(contexts).toEqual([]);
+    expect(nodes).toEqual([]);
+  });
+  it('mixes eight sources serially into four shared blocks, with one clock/worklet and no per-track clamp', async () => {
+    const music = Array.from({ length: 8 }, (_, index) =>
+      track({ id: `instance-${index}`, mediaId: `song-${index}`, gainDb: 12 }),
+    );
+    const seen: string[] = [];
+    let concurrent = 0;
+    let peak = 0;
+    fetchPcm.mockImplementation(async (url, init) => {
+      concurrent++;
+      peak = Math.max(peak, concurrent);
+      try {
+        const response = await defaultFetchPcm(url, init);
+        seen.push(`${init?.method ?? 'GET'} ${String(url)}`);
+        if (init?.method === 'HEAD') return response;
+        const bytes = await response.arrayBuffer();
+        if (/song-[4-7]\//.test(String(url))) {
+          const values = new DataView(bytes);
+          for (let offset = 0; offset < bytes.byteLength; offset += 2)
+            values.setInt16(offset, -values.getInt16(offset, true), true);
+        }
+        return new Response(bytes, { status: response.status, headers: response.headers });
+      } finally {
+        concurrent--;
+      }
+    });
+    await playback.configure(music, new AbortController().signal);
+    music[0]!.gainDb = -60; // Configuration owns its validated snapshot.
+    const node = await started();
+    expect(peak).toBe(1);
+    expect(contexts).toHaveLength(1);
+    expect(nodes).toHaveLength(1);
+    expect(seen.filter((value) => value.startsWith('HEAD'))).toHaveLength(8);
+    expect(seen.filter((value) => value.startsWith('GET'))).toHaveLength(32);
+    expect(node.startCommand().chunks).toHaveLength(4);
+    for (const chunk of node.startCommand().chunks) {
+      expect(chunk.data.byteLength).toBe(128 * 1024);
+      expect(chunk.data.every((value) => Math.abs(value) < 0.000001)).toBe(true);
+    }
+    const before = seen.length;
+    node.emit({ kind: 'credit', generation: node.startCommand().generation, count: 1 });
+    await vi.waitFor(() => expect(node.commands.filter((command) => command.kind === 'chunk')).toHaveLength(1));
+    expect(seen.length - before).toBe(8);
+    expect(peak).toBe(1);
+    advance(4800);
+    expect(playback.projectFrame()).toBe(22);
+    expect(playback.errorFrames).toBeCloseTo(0);
+    expect(playback.sync()).toBe(true);
+  });
+  it('sums independent placement, gain, fades and short selected loops in the same project-time block', async () => {
+    const first = track({
+      id: 'first',
+      sourceIn: 10,
+      sourceOut: 11,
+      start: 1,
+      duration: 30,
+      loop: true,
+      gainDb: -6,
+      fadeIn: 2,
+      fadeOut: 2,
+    });
+    const second = track({
+      id: 'second',
+      mediaId: 'other',
+      sourceIn: 0,
+      sourceOut: 4,
+      start: 4,
+      duration: 4,
+      gainDb: 0,
+      fadeIn: 1,
+      fadeOut: 1,
+    });
+    await playback.configure([first, second], new AbortController().signal);
+    const node = await started(0);
+    const data = node.startCommand().chunks[0]!.data;
+    for (const sample of [0, 1602, 4805, 6407, 8008, 11211, 12813, 16000]) {
+      const frame = sample / MUSIC_SAMPLES_PER_FRAME;
+      const gain = musicGainAt(first, frame) + musicGainAt(second, frame);
+      expect(data[sample * 2]).toBeCloseTo(0.25 * gain, 6);
+      expect(data[sample * 2 + 1]).toBeCloseTo(-0.25 * gain, 6);
+    }
+    expect(playback.sync()).toBe(true);
+  });
+  it('keeps the same output-clock epoch through late music fades and valid trailing silence', async () => {
+    const longest = track({ id: 'longest-first', sourceOut: 11, duration: 18, loop: true, gainDb: -6, fadeOut: 4 });
+    const shorter = track({ id: 'shorter-last', mediaId: 'other', start: 6, duration: 6 });
+    await playback.configure([longest, shorter], new AbortController().signal);
+    const node = await started(10);
+    const chunks = node.startCommand().chunks;
+    expect(chunks).toHaveLength(MUSIC_QUEUE_CHUNKS);
+    for (const chunk of chunks) {
+      expect(chunk.data.byteLength).toBe(128 * 1024);
+      let maximumError = 0;
+      for (let sample = 0; sample < MUSIC_CHUNK_SAMPLES; sample++) {
+        const frame = 10 + (chunk.offset + sample) / MUSIC_SAMPLES_PER_FRAME;
+        const expected = 0.25 * (musicGainAt(longest, frame) + musicGainAt(shorter, frame));
+        maximumError = Math.max(
+          maximumError,
+          Math.abs(chunk.data[sample * 2]! - expected),
+          Math.abs(chunk.data[sample * 2 + 1]! + expected),
+        );
+      }
+      expect(maximumError).toBeLessThan(0.5e-6);
+    }
+    advance(Math.ceil(7 * MUSIC_SAMPLES_PER_FRAME));
+    expect(playback.projectFrame()).toBe(17);
+    expect(playback.sync()).toBe(true);
+    advance(Math.round(8 * MUSIC_SAMPLES_PER_FRAME));
+    expect(playback.projectFrame()).toBe(18);
+    expect(playback.sync()).toBe(true);
+    expect(playback.errorFrames).toBeCloseTo(0);
+    const reads = requests.length;
+    node.emit({ kind: 'credit', generation: node.startCommand().generation, count: 1 });
+    await vi.waitFor(() => expect(node.commands.filter((command) => command.kind === 'chunk')).toHaveLength(1));
+    expect(node.commands.find((command) => command.kind === 'chunk')!.chunk.data.every((value) => value === 0)).toBe(
+      true,
+    );
+    expect(requests).toHaveLength(reads);
+    expect(node.commands.filter((command) => command.kind === 'start')).toHaveLength(1);
+    expect(node.commands.filter((command) => command.kind === 'stop')).toHaveLength(0);
+    expect(contexts).toHaveLength(1);
+    expect(nodes).toHaveLength(1);
+    playback.pause();
+    expect(node.commands.filter((command) => command.kind === 'stop')).toHaveLength(1);
+  });
+  it('does not clamp a loud participant before an opposing source, and clips completed stereo overflow', async () => {
+    fetchPcm.mockImplementation(async (url, init) => {
+      const response = await defaultFetchPcm(url, init);
+      if (init?.method === 'HEAD') return response;
+      const bytes = await response.arrayBuffer();
+      const data = new DataView(bytes);
+      const polarity = String(url).includes('/negative/') ? -1 : 1;
+      for (let offset = 0; offset < bytes.byteLength; offset += 4) {
+        data.setInt16(offset, polarity * 16384, true);
+        data.setInt16(offset + 2, -polarity * 16384, true);
+      }
+      return new Response(bytes, { status: response.status, headers: response.headers });
+    });
+    const positive = track({ id: 'positive', mediaId: 'positive', gainDb: 12 });
+    const negative = track({ id: 'negative', mediaId: 'negative', gainDb: 6 });
+    await playback.configure([positive, negative], new AbortController().signal);
+    const node = await started();
+    const expected = 0.5 * (10 ** (12 / 20) - 10 ** (6 / 20));
+    for (const chunk of node.startCommand().chunks) {
+      expect(chunk.data[0]).toBeCloseTo(expected, 6);
+      expect(chunk.data[1]).toBeCloseTo(-expected, 6);
+    }
+    await playback.configure([positive, { ...positive, id: 'second-positive' }], new AbortController().signal);
+    await started();
+    for (const chunk of node.startCommand().chunks) {
+      expect(chunk.data[0]).toBe(1);
+      expect(chunk.data[1]).toBe(-1);
+    }
+    expect(nodes).toHaveLength(1);
+    expect(contexts).toHaveLength(1);
+  });
+  it('keeps a second-source HEAD failure explicit and does not retain a partially configured mix', async () => {
+    fetchPcm.mockImplementation(async (url, init) =>
+      String(url).includes('/missing/') ? new Response(null, { status: 409 }) : defaultFetchPcm(url, init),
+    );
+    await expect(
+      playback.configure([track(), track({ id: 'second', mediaId: 'missing' })], new AbortController().signal),
+    ).rejects.toThrow('Music request failed (409)');
+    expect(playback.hasMusic).toBe(false);
+    expect(nodes).toEqual([]);
+  });
+  it('requires each source-specific exact range and cannot start from a partial successful mix', async () => {
+    fetchPcm.mockImplementation(async (url, init) =>
+      String(url).includes('/other/') && init?.method !== 'HEAD'
+        ? new Response(new Uint8Array(4), {
+            status: 200,
+            headers: { 'content-type': 'application/octet-stream', 'content-length': '4' },
+          })
+        : defaultFetchPcm(url, init),
+    );
+    await playback.configure([track(), track({ id: 'second', mediaId: 'other' })], new AbortController().signal);
+    await expect(started()).rejects.toThrow('exact bounded PCM16 range');
+    expect(nodes[0]!.commands.some((command) => command.kind === 'start')).toBe(false);
+  });
+  it('aborts a pending second-source read without submitting stale chunks, then restarts one mixed epoch', async () => {
+    await playback.configure([track(), track({ id: 'second', mediaId: 'other' })], new AbortController().signal);
+    let pendingSignal: AbortSignal | null = null;
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    fetchPcm.mockImplementation(async (url, init) => {
+      if (String(url).includes('/other/')) {
+        pendingSignal = init!.signal as AbortSignal;
+        await new Promise<void>((resolve, reject) => {
+          const cancel = (): void => reject(new DOMException('Cancelled read', 'AbortError'));
+          pendingSignal!.addEventListener('abort', cancel, { once: true });
+          void gate.then(resolve).finally(() => pendingSignal!.removeEventListener('abort', cancel));
+        });
+      }
+      return defaultFetchPcm(url, init);
+    });
+    const outcome = started().catch((error: unknown) => error);
+    await vi.waitFor(() => expect(pendingSignal).not.toBeNull());
+    playback.pause();
+    expect(await outcome).toMatchObject({ name: 'AbortError' });
+    expect((pendingSignal as unknown as AbortSignal).aborted).toBe(true);
+    release();
+    expect(nodes[0]!.commands.some((command) => command.kind === 'start' || command.kind === 'chunk')).toBe(false);
+    fetchPcm.mockImplementation(defaultFetchPcm);
+    const node = await started(40);
+    expect(node.commands.filter((command) => command.kind === 'start')).toHaveLength(1);
+    expect(contexts).toHaveLength(1);
+    expect(nodes).toHaveLength(1);
+    expect(playback.projectFrame()).toBe(40);
+  });
+  it('bounds a blocked second metadata request within the single configuration deadline', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    vi.spyOn(AbortSignal, 'timeout').mockImplementation((milliseconds) => {
+      const controller = new AbortController();
+      setTimeout(() => controller.abort(new DOMException('Deadline reached', 'TimeoutError')), milliseconds);
+      return controller.signal;
+    });
+    try {
+      fetchPcm.mockImplementation(async (url, init) =>
+        String(url).includes('/blocked/') ? new Promise<Response>(() => {}) : defaultFetchPcm(url, init),
+      );
+      const outcome = playback
+        .configure([track(), track({ id: 'second', mediaId: 'blocked' })], new AbortController().signal)
+        .catch((error: unknown) => error);
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(await outcome).toMatchObject({ message: expect.stringContaining('within 10 seconds') });
+      expect(playback.hasMusic).toBe(false);
+      expect(nodes).toEqual([]);
+    } finally {
+      vi.clearAllTimers();
+      vi.useRealTimers();
+    }
+  });
   it('configures by read-only metadata and lazily allocates one 48 kHz context/worklet, without an audio element or whole-file decoding', async () => {
     await configured();
     expect(requests).toHaveLength(1);
@@ -337,7 +582,7 @@ describe('sample-owned bounded streaming music', () => {
     expect(() => playback.sync()).toThrow('audio processor failed');
     playback.pause();
     await expect(started(40)).rejects.toThrow('audio processor failed');
-    await playback.configure(null, new AbortController().signal);
+    await playback.configure([], new AbortController().signal);
     await expect(started(40)).resolves.toBe(node);
     expect(playback.hasMusic).toBe(false);
   });

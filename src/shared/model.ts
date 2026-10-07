@@ -8,6 +8,7 @@ import { PROJECT_FPS } from './timing.js';
 /** Conventional initial identity only; it has no editing or stacking privileges. */
 export const BASE_LAYER_ID = 'video-1';
 export const MAX_VIDEO_LAYERS = 8;
+export const MAX_MUSIC_TRACKS = 8;
 
 export const idSchema = z.string().regex(/^[a-zA-Z0-9_-]{1,100}$/);
 export const frameSchema = z.number().int().nonnegative().max(2_147_483_647);
@@ -64,6 +65,7 @@ export const layerSchema = z
   .strict();
 export const musicSchema = z
   .object({
+    id: idSchema,
     mediaId: idSchema,
     sourceIn: frameSchema,
     sourceOut: frameSchema.positive(),
@@ -81,11 +83,20 @@ export const musicSchema = z
       music.sourceOut > music.sourceIn &&
       (music.loop || music.duration <= music.sourceOut - music.sourceIn),
     { message: 'Music source range, fades or non-looping duration are invalid.' },
-  );
+  )
+  .refine((music) => music.start + music.duration <= 2_147_483_647, {
+    message: 'Music timeline OUT exceeds the supported integer project-frame range.',
+  });
+export const musicTracksSchema = z
+  .array(musicSchema)
+  .max(MAX_MUSIC_TRACKS)
+  .refine((tracks) => new Set(tracks.map((track) => track.id)).size === tracks.length, {
+    message: 'Music instance IDs must be unique.',
+  });
 
 const baseProjectSchema = z
   .object({
-    schemaVersion: z.literal(7),
+    schemaVersion: z.literal(8),
     id: idSchema,
     title: z.string().trim().min(1).max(200),
     media: z
@@ -104,7 +115,7 @@ const baseProjectSchema = z
     colourProfile: z.literal('bt709-sdr'),
     layers: z.array(layerSchema).min(1).max(MAX_VIDEO_LAYERS),
     clips: z.array(clipSchema).max(1_000),
-    music: musicSchema.nullable(),
+    music: musicTracksSchema,
     revision: frameSchema,
   })
   .strict();
@@ -139,7 +150,7 @@ export function createLayer(id: string, name: string, ripple = true): VideoLayer
 
 export function createProject(id: string, title: string): ProjectDocument {
   return projectSchema.parse({
-    schemaVersion: 7,
+    schemaVersion: 8,
     id,
     title,
     media: { videoIds: [], audioIds: [] },
@@ -147,7 +158,7 @@ export function createProject(id: string, title: string): ProjectDocument {
     colourProfile: 'bt709-sdr',
     layers: [createLayer(BASE_LAYER_ID, 'Video 1')],
     clips: [],
-    music: null,
+    music: [],
     revision: 0,
   });
 }

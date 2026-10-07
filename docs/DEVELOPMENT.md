@@ -212,7 +212,7 @@ originals in `.pascap/browser-footage/synthetic-sources/` are outside that cache
 `browse-camera-*` means generated patterns, not real recordings. The
 [fixture factory](../scripts/fixtures.ts) uses `preview-lab-v6` outside the browser
 cache and `preview-lab` inside it. These are project identifiers, not schema
-versions; newly generated documents must satisfy strict v7. Bin resets never imply
+versions; newly generated documents must satisfy strict v8. Bin resets never imply
 a global-library fallback.
 Neither suite invokes real-source sample preparation or needs private footage/music.
 
@@ -284,14 +284,14 @@ the independent one-frame A/V, single-epoch and completion assertions.
 **Do not run these in CI or without the owner's explicit approval for real jobs.**
 The [sample helper](../scripts/prepare-samples.ts) targets **DJI_0468.MP4 and DJI_0469.MP4
 only**: pass an **explicit folder after `--`**, never rely on a personal-path default.
-It reuses ready proxies but may prepare missing ones; creates only an absent v7
+It reuses ready proxies but may prepare missing ones; creates only an absent v8
 sample, never overwrites or migrates existing edits.
 
 The [measurement helper](../scripts/measure-preview.ts) accepts exactly **two
 1× excerpts on one enabled, zero-origin contiguous track with row Opacity 1**, no music,
 extra layers or shared row points
 (even neutral/Speed-only points). `PASCAP_MEASURE_URL` selects that project.
-Measurement metadata must identify the strict v7 snapshot independently of the
+Measurement metadata must identify the strict v8 snapshot independently of the
 report format/identifier; historical reports and receipt snapshots stay untouched.
 `npm run measure -- --skip-playback --reference` skips playback benchmarking but
 **renders a native reference**; `--headed --reference` adds repeated playback. The edit
@@ -333,6 +333,17 @@ of Ripple or track ID.
 Processing: [row points](LAYERS_AND_KEYFRAMES.md), [retiming/audio](SPEED_AND_AUDIO.md)
 and [grading equations](COLOUR_AND_TIMING.md#colour).
 
+Up to eight independently identified music instances share one bounded mixed queue,
+AudioContext/worklet and output clock. Apply each source's gain/fades, sum linearly,
+then clamp once after the full mix. Native audio stays serial: one original decoder,
+at most two intermediate inputs and three scratch files (selected PCM plus old/new
+Float64 accumulators). Audio storage planning is maximum selected PCM plus two full
+project accumulators. Project duration includes every music OUT; absent active video
+is opaque black, not a held last image, while music continues/fades at its own OUT.
+Video closing fades remain inside their last clips. The static export path must
+cover the full project; music tails use layered export. Export still requires video.
+See [the multiple-music contract](design/MULTIPLE_MUSIC.md).
+
 The single **Opacity** slider/diamond/navigation belongs in **Clip → Colour**
 alongside the colour sliders, initially **100%**, and works on an empty row.
 Without Opacity keys, it edits row `opacity`; with keys, only participation at the
@@ -355,14 +366,16 @@ Layer options contains rename, Ripple, ordering and deletion, with visibility se
 - Never modify/copy/delete owner's originals or commit private paths/device IDs,
   saved project IDs, real media/cache or reports. Preserve fingerprints, symlink
   rejection, cache exclusion and HTTP guards.
-- Keep **strict schema 7**: required unique video/audio membership, all nine nullable
+- Keep **strict schema 8**: required unique video/audio membership, all nine nullable
   channels and per-layer `ripple`, `transitions`, `openingFade`, `closingFade` and
   numeric `opacity` in 0–1. A new track starts at 1; a missing saved field is invalid.
   The channels are `opacity` (sole UI **Opacity**), `speed` and seven colour
   settings. Row `opacity` is the sole valid stored value; reject saved `clip.opacity`
   and old `clipOpacity`/`layerOpacity` channels. No project-level
   transitions/fades, compatibility fields/defaults/migration or mandatory first-track
-  ID. Preserve incompatible v1–v6 projects/receipt snapshots and finished videos,
+  ID. Require a 0–8 `music` array with unique instance IDs and complete independent
+  settings, plus captured audio-source/instance-plan arrays in current receipts.
+  Preserve incompatible v1–v7 projects/receipt snapshots and finished videos,
   without automatic deletion; recreate projects deliberately. Registry/proxy formats,
   source protections and native resource budgets remain unchanged.
 - Reuse `JobQueue`, library and backpressured raw/retime helpers: one heavy job,

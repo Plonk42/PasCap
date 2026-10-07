@@ -133,9 +133,13 @@ export function Layers({
   onEdit: (command: EditCommand) => void;
 }>) {
   const viewport = useRef<HTMLElement>(null);
+  const synchronizedScroll = useRef<number | null>(null);
   const reasonId = useId();
   useLayoutEffect(() => {
-    if (viewport.current && viewport.current.scrollTop !== scrollTop) viewport.current.scrollTop = scrollTop;
+    if (viewport.current && viewport.current.scrollTop !== scrollTop) {
+      viewport.current.scrollTop = scrollTop;
+      synchronizedScroll.current = viewport.current.scrollTop;
+    }
   }, [scrollTop, surfaceHeight, viewportHeight]);
   const move = (index: number, delta: number): void => {
     const ids = project.layers.map((layer) => layer.id);
@@ -148,7 +152,13 @@ export function Layers({
       className="layer-sidebar declutter-layers"
       aria-label="Video layers"
       style={{ height: viewportHeight ?? undefined }}
-      onScroll={(event) => onScroll(event.currentTarget.scrollTop)}
+      onScroll={(event) => {
+        const top = event.currentTarget.scrollTop;
+        // A queued synchronization event must not overwrite a newer native timeline focus scroll.
+        if (top === synchronizedScroll.current) return;
+        synchronizedScroll.current = null;
+        onScroll(top);
+      }}
     >
       <div className="layer-sidebar-surface" style={{ height: surfaceHeight }}>
         <div

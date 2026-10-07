@@ -9,7 +9,7 @@ export interface MemoryProjects {
   readonly saves: number;
 }
 
-/** Strict schema-7 project CRUD and optimistic revisions, never the on-disk project store. */
+/** Strict schema-8 project CRUD and optimistic revisions, never the on-disk project store. */
 export async function memoryProjects(page: Page, initial: ProjectDocument): Promise<MemoryProjects> {
   const documents = new Map([[initial.id, projectSchema.parse(initial)]]);
   let saves = 0;
