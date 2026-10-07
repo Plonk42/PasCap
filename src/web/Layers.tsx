@@ -1,13 +1,10 @@
 import { useId, useLayoutEffect, useRef, useState } from 'react';
 import type { EditCommand } from '../shared/commands.js';
-import { activeLayerSetting, evaluateLayerSetting, hasLayerKeys } from '../shared/keyframes.js';
 import type { ProjectDocument, VideoLayer } from '../shared/model.js';
 import { HelpPopover } from './HelpPopover.js';
 import { Icon } from './icons.js';
-import { KeyframeToggle } from './KeyframeToggle.js';
 import { layerActionRestrictions } from './layer-actions.js';
 import { Popover } from './Popover.js';
-import { settingPresentation } from './setting-scope.js';
 import { timelineRows } from './timeline-rows.js';
 
 function layerNameError(draft: string): string | null {
@@ -114,82 +111,12 @@ function LayerName({
   );
 }
 
-function LayerOpacity({
-  layer,
-  frame,
-  disabled,
-  onEdit,
-}: Readonly<{ layer: VideoLayer; frame: number; disabled: boolean; onEdit: (command: EditCommand) => void }>) {
-  const fieldId = useId();
-  const hintId = `${fieldId}-hint`;
-  const keyed = hasLayerKeys(layer, 'layerOpacity');
-  const active = activeLayerSetting(layer, 'layerOpacity', frame);
-  const value = evaluateLayerSetting(layer, 'layerOpacity', frame, layer.opacity);
-  const validFrame = Number.isSafeInteger(frame) && frame >= 0 && frame <= 2_147_483_647;
-  const editable = validFrame && (!keyed || active);
-  const { scope, hint } = settingPresentation({
-    keyed,
-    active,
-    baseAvailable: true,
-    baseLabel: 'Layer',
-    label: 'Layer opacity',
-    frame,
-  });
-  const commit = (opacity: number): void => {
-    if (disabled || !editable) return;
-    if (keyed) onEdit({ type: 'layer-key-value', layerId: layer.id, frame, setting: 'layerOpacity', value: opacity });
-    else onEdit({ type: 'layer-update', layer: { ...layer, opacity } });
-  };
-  return (
-    <div className="layer-opacity-label layer-keyed-opacity">
-      <span className="layer-opacity-heading">
-        <label htmlFor={fieldId} title={hint}>
-          Opacity
-          <small className="layer-setting-kind" title={scope}>
-            {keyed && <Icon name="curve" size={12} />}
-            <span className="declutter-sr-only">{scope}</span>
-          </small>
-        </label>
-        <span className="layer-setting-actions">
-          <output>{Math.round(value * 100)}%</output>
-          <KeyframeToggle
-            layer={layer}
-            setting="layerOpacity"
-            label="Layer opacity"
-            frame={frame}
-            value={value}
-            disabled={disabled}
-            onEdit={onEdit}
-          />
-        </span>
-      </span>
-      <input
-        id={fieldId}
-        type="range"
-        aria-label={`Opacity of layer ${layer.name}`}
-        aria-describedby={hintId}
-        min={0}
-        max={1}
-        step={0.01}
-        value={value}
-        disabled={disabled || !editable}
-        title={hint}
-        onChange={(event) => commit(Number(event.target.value))}
-      />
-      <span id={hintId} className="declutter-sr-only">
-        {hint}
-      </span>
-    </div>
-  );
-}
-
 export function Layers({
   project,
   selectedId,
   scrollTop,
   surfaceHeight,
   viewportHeight,
-  frame,
   disabled,
   onScroll,
   onSelect,
@@ -200,7 +127,6 @@ export function Layers({
   scrollTop: number;
   surfaceHeight: number;
   viewportHeight: number | null;
-  frame: number;
   disabled: boolean;
   onScroll: (top: number) => void;
   onSelect: (id: string) => void;
@@ -298,7 +224,6 @@ export function Layers({
                           </p>
                         </HelpPopover>
                       </div>
-                      <LayerOpacity layer={layer} frame={frame} disabled={disabled} onEdit={onEdit} />
                       <div className="layer-options-actions">
                         <button
                           className="secondary-button small"

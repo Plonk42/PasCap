@@ -145,10 +145,10 @@ function interleaved(): LayerKeyframe[] {
   );
 }
 
-test('unkeyed static bases retain their hollow diamonds and both visible disabled navigation buttons', async ({
-  page,
-}) => {
+test('unkeyed settings retain their hollow diamonds and both visible disabled navigation buttons', async ({ page }) => {
   const document = await current(page);
+  expect(KEYFRAME_SETTINGS).toHaveLength(9);
+  await expect(inspector(page).getByRole('button', { name: /^Keyframe / })).toHaveCount(9);
   for (const { label } of KEYFRAME_SETTINGS) {
     const toggle = diamond(page, label);
     await expect(toggle).toBeEnabled();
@@ -261,7 +261,7 @@ test('diamond, previous, next and reset keep native Tab order and keyboard activ
   await readOnly(page, document);
 });
 
-test('all ten setting buttons remain present and disabled throughout a native trim draft', async ({ page }) => {
+test('all nine setting buttons remain present and disabled throughout a native trim draft', async ({ page }) => {
   const document = sequence(interleaved());
   await fixture(page, document);
   await seek(page, 45);
@@ -308,19 +308,19 @@ test('no opened project keeps all setting buttons visible and disabled without a
   expect(memory.saves).toBe(0);
 });
 
-test('duplicate sidebar opacity navigation selects its row, preserves Inspector context and shares the cursor without stealing focus', async ({
+test('single opacity navigation on a selected empty row preserves Inspector context and shares the cursor without stealing focus', async ({
   page,
 }) => {
-  let document = sequence([sharedPoint(10, { layerOpacity: 0 }), sharedPoint(100, { layerOpacity: 0.5 })]);
+  let document = sequence([sharedPoint(10, { opacity: 0 }), sharedPoint(100, { opacity: 0.5 })]);
   document = applyCommand(document, {
     type: 'layer-add',
     layer: {
       ...createLayer('upper', 'Video 2', false),
       keyframes: [
-        sharedPoint(20, { layerOpacity: 0 }),
-        sharedPoint(130, { layerOpacity: 0.5 }),
+        sharedPoint(20, { opacity: 0 }),
+        sharedPoint(130, { opacity: 0.5 }),
         sharedPoint(140, { brightness: 0 }),
-        sharedPoint(160, { layerOpacity: 1 }),
+        sharedPoint(160, { opacity: 1 }),
       ],
     },
   });
@@ -332,43 +332,52 @@ test('duplicate sidebar opacity navigation selects its row, preserves Inspector 
   await expect(inspector(page)).toBeHidden();
   await openOptions(page, 'Layer options Video 2');
   const options = page.getByRole('group', { name: 'Layer options Video 2', exact: true });
-  const next = options.getByRole('button', { name: 'Next Layer opacity keyframe', exact: true });
+  await expect(options.getByRole('slider')).toHaveCount(0);
+  await expect(options.getByRole('button', { name: /Opacity keyframe/ })).toHaveCount(0);
+  await closeOptions(page);
+  await page.getByRole('button', { name: 'Toggle Clip panel', exact: true }).click();
+  await page.getByRole('button', { name: 'Select layer Video 2', exact: true }).click();
+  await expect(page.getByRole('tab', { name: 'Sequence', exact: true })).toHaveAttribute('aria-selected', 'true');
+  await inspectorTab(page, 'Clip');
+  const next = step(page, 'Opacity', 'Next');
   await next.focus();
   await next.press('Enter');
   await previewAt(page, 20);
   await expect(next).toBeFocused();
   await expect(inspector(page)).toBeVisible();
-  await expect(page.getByRole('tab', { name: 'Sequence', exact: true })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('tab', { name: 'Clip', exact: true })).toHaveAttribute('aria-selected', 'true');
   await closeOptions(page);
   await inspectorTab(page, 'Clip');
   await expect(page.locator('.selected-clip-name')).toContainText('Whole video row');
   await inspectorTab(page, 'Layer keyframes');
   await expect(layerKeyframes(page, 'Video 2')).toBeVisible();
   await expect(page.locator('.layer-control.selected')).toHaveAttribute('data-layer-id', 'upper');
-  await openOptions(page, 'Layer options Video 2');
+  await inspectorTab(page, 'Clip');
   await next.press('Space');
   await previewAt(page, 119);
   await expect(next).toBeFocused();
+  await inspectorTab(page, 'Layer keyframes');
   await expect(layerKeyframes(page, 'Video 2').locator('.layer-keyframe-inspected')).toContainText(
     'Stored point · timeline frame 130',
   );
   await closeOptions(page);
   await inspectorTab(page, 'Clip');
-  await expect(step(page, 'Layer opacity', 'Next')).toHaveAttribute('title', /Stored timeline frame 160;/);
+  await expect(step(page, 'Opacity', 'Next')).toHaveAttribute('title', /Stored timeline frame 160;/);
   await inspectorTab(page, 'Layer keyframes');
   await layerKeyframes(page, 'Video 2').getByRole('button', { name: 'Next layer keyframe', exact: true }).click();
   await expect(layerKeyframes(page, 'Video 2').locator('.layer-keyframe-inspected')).toContainText(
     'Stored point · timeline frame 140',
   );
   await inspectorTab(page, 'Clip');
-  await step(page, 'Layer opacity', 'Next').click();
+  await step(page, 'Opacity', 'Next').click();
   await inspectorTab(page, 'Layer keyframes');
   await expect(layerKeyframes(page, 'Video 2').locator('.layer-keyframe-inspected')).toContainText(
     'Stored point · timeline frame 160',
   );
-  await openOptions(page, 'Layer options Video 2');
-  await expect(options.getByRole('button', { name: 'Next Layer opacity keyframe', exact: true })).toBeDisabled();
-  await options.getByRole('button', { name: 'Previous Layer opacity keyframe', exact: true }).click();
+  await inspectorTab(page, 'Clip');
+  await expect(step(page, 'Opacity', 'Next')).toBeDisabled();
+  await step(page, 'Opacity', 'Previous').click();
+  await inspectorTab(page, 'Layer keyframes');
   await expect(layerKeyframes(page, 'Video 2').locator('.layer-keyframe-inspected')).toContainText(
     'Stored point · timeline frame 130',
   );
@@ -502,7 +511,7 @@ test('row and project switches discard the old stored cursor even when layer IDs
     type: 'layer-add',
     layer: {
       ...createLayer('upper', 'Video 2', false),
-      keyframes: [sharedPoint(30, { layerOpacity: 0 }), sharedPoint(130, { layerOpacity: 1 })],
+      keyframes: [sharedPoint(30, { opacity: 0 }), sharedPoint(130, { opacity: 1 })],
     },
   });
   await fixture(page, document);
@@ -513,9 +522,9 @@ test('row and project switches discard the old stored cursor even when layer IDs
   await inspectorTab(page, 'Layer keyframes');
   await expect(layerKeyframes(page, 'Video 2').locator('.layer-keyframe-inspected')).toHaveCount(0);
   await inspectorTab(page, 'Clip');
-  await expect(step(page, 'Layer opacity', 'Next')).toHaveAttribute('title', /Stored timeline frame 130;/);
+  await expect(step(page, 'Opacity', 'Next')).toHaveAttribute('title', /Stored timeline frame 130;/);
   await expect(step(page, 'Exposure', 'Next')).toBeDisabled();
-  await step(page, 'Layer opacity', 'Next').click();
+  await step(page, 'Opacity', 'Next').click();
   await page.getByRole('button', { name: 'Select layer Video 1', exact: true }).click();
   await inspectorTab(page, 'Layer keyframes');
   await expect(layerKeyframes(page, 'Video 1').locator('.layer-keyframe-inspected')).toHaveCount(0);

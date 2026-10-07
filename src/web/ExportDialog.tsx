@@ -28,13 +28,14 @@ export interface ExportDialogProps {
 }
 
 export function summarizeExport(project: ProjectDocument) {
-  const keys = { points: 0, settings: 0, speed: 0, colour: 0, clipOpacity: 0, layerOpacity: 0 };
+  const keys = { points: 0, settings: 0, speed: 0, colour: 0, opacity: 0 };
   for (const layer of project.layers) {
     keys.points += layer.keyframes.length;
     for (const point of layer.keyframes) {
       for (const setting of keySettings(point)) {
         keys.settings++;
-        if (setting === 'speed' || setting === 'clipOpacity' || setting === 'layerOpacity') keys[setting]++;
+        if (setting === 'speed') keys.speed++;
+        else if (setting === 'opacity') keys.opacity++;
         else keys.colour++;
       }
     }
@@ -183,7 +184,7 @@ export function ExportDialog({
           <h3>Fixed snapshot</h3>
           <p>
             The submitted edit includes clip grades and speed, each track’s Ripple, transitions and fades, enabled
-            layers, bottom-to-top composition order, opacity and keyframes
+            layers, bottom-to-top composition order, row Opacity and keyframes
             {project.music ? ', and the selected music track' : '; no music track is selected'}. Later edits do not
             change a submitted render.
           </p>
@@ -191,7 +192,7 @@ export function ExportDialog({
         </section>
         <p className="activity-hint">
           {settings.width} × {settings.height} · {summary.keys.speed} speed values · {summary.keys.colour} colour values
-          · {summary.keys.clipOpacity} clip opacity · {summary.keys.layerOpacity} layer opacity.
+          · {summary.keys.opacity} opacity values.
         </p>
         {summary.layered ? (
           <aside className="activity-export-warning" aria-labelledby={`${id}-resources`}>

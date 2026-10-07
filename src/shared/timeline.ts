@@ -1,5 +1,5 @@
 import type { ColourSettings } from './colour.js';
-import { colourAt, layerOpacityAt, opacityAt } from './composition.js';
+import { colourAt, opacityAt } from './composition.js';
 import { compileLayerRetiming } from './layer-retiming.js';
 import type { ProjectDocument, Transition, VideoClip, VideoLayer } from './model.js';
 import type { Retiming } from './speed.js';
@@ -33,7 +33,6 @@ export interface PreviewLayer {
   blendWeight: number;
   brightness: number;
   opacity: number;
-  layerOpacity: number;
 }
 
 /** Ripple follows saved clip order. Positioned tracks follow chronological starts;
@@ -219,7 +218,7 @@ export function sampleTimeline(
 ): PreviewLayer[] {
   if (!Number.isInteger(frame) || frame < 0 || frame >= layout.duration) return [];
   const active = layout.clips.filter((placed) => frame >= placed.start && frame < placed.end);
-  const opacities = new Map(project.layers.map((layer) => [layer.id, layerOpacityAt(layer, frame)]));
+  const opacities = new Map(project.layers.map((layer) => [layer.id, opacityAt(layer, frame)]));
   return active.flatMap((placed) => {
     const layer = project.layers.find((item) => item.id === placed.clip.layerId)!;
     if (!layer.enabled) return [];
@@ -235,8 +234,7 @@ export function sampleTimeline(
         weight: blendWeight * brightness,
         blendWeight,
         brightness,
-        opacity: opacityAt(placed.clip, layer, frame),
-        layerOpacity: opacities.get(layer.id)!,
+        opacity: opacities.get(layer.id)!,
       },
     ];
   });

@@ -13,9 +13,14 @@ inherit the shared media registry. Importing the same original into another proj
 deliberately adds it to that project's bin and reuses eligible verified proxies.
 Removing an excerpt or music placement does not remove the imported media.
 
-Projects use **strict format v6**, including every track's Ripple, transitions and
-opening/closing fades. v1–v5 project documents and export snapshots
-stay on disk but are incompatible: there is no migration or automatic repair.
+Projects use **strict format v7**, including every track's Ripple, transitions and
+opening/closing fades and required numeric `opacity` in 0–1 (1 on new tracks),
+with nine nullable animation channels: `opacity`, `speed` and seven colour settings.
+Row `opacity` is the sole saved Opacity value; saved `clip.opacity` and old
+`clipOpacity`/`layerOpacity` key channels are invalid, not ignored or defaulted.
+v1–v6 project documents and receipt snapshots
+stay on disk but are incompatible: there is no migration, compatibility default,
+automatic repair or deletion.
 Create a new project and import its media deliberately. Finished videos remain
 untouched. **Delete project** requires confirmation and deletes only the saved
 project document, not originals, the shared registry/proxy cache or exports/receipts.
@@ -100,7 +105,8 @@ except the last remaining track. Scroll over the tracks or layer headers to
 reach all rows and music. The time ruler and its playhead handle/timecode remain
 visible while scrolling; its ticks follow horizontal scroll, and clicking/dragging
 it seeks without editing a row. Layer options explains unavailable actions at
-stack endpoints or on the last remaining track.
+stack endpoints or on the last remaining track. It contains only rename, Ripple,
+Raise/Lower and Delete; visibility stays in the sidebar and Opacity in **Clip → Colour**.
 
 Select an excerpt and drag an edge inward to shorten it or outward to restore
 omitted footage up to the original bounds. The dashed extent shows available source.
@@ -140,9 +146,22 @@ stored but dormant on empty tracks. Details: [TIMELINE_EDITING.md](TIMELINE_EDIT
 
 ## Colour, speed and shared row keyframes
 
-Each excerpt has independent static colour, clip opacity and constant/ramp/custom speed
-bases. **Colour** provides Exposure, Brightness, Contrast, Hue, Saturation, Highlights
-and Shadows. Speed accepts **0.1×–8×**, including ramp-up/down curves. Slow motion
+Each excerpt has independent colour and constant/ramp/custom speed settings.
+**Opacity** is one setting for the selected **whole video row**, not a clip.
+Find its single slider/diamond/navigation in **Clip → Colour**, alongside Exposure,
+Brightness, Contrast, Hue, Saturation, Highlights and Shadows. A new row starts
+at **100%** (stored as `opacity = 1`, with a 0–1 range).
+Without Opacity keys, the slider edits the row's saved `opacity` and works even
+on an empty row. With keys, the row's `opacity` curve overrides that value on every
+clip, including both sources in a dissolve. Removing its final participant reveals
+the unchanged saved row value. There is no saved clip opacity, additional layer
+multiplier or duplicate sidebar control/navigation.
+Unkeyed colour controls still edit only the selected clip. Opacity shares their
+UI treatment, but controls composition coverage, not the SDR RGB grade.
+**Clip → Placement** contains placement only. Sliders never create implicit keys;
+an animated setting without participation at the real playhead is read-only until
+its hollow diamond captures a key there.
+Speed accepts **0.1×–8×**, including ramp-up/down curves. Slow motion
 repeats frames and acceleration drops them; there is no optical-flow synthesis.
 Speed changes output duration: Ripple-on tracks re-sequence, off keeps independent starts,
 and incompatible fades/transitions/overlaps reject the edit rather than being shrunk.
@@ -181,19 +200,21 @@ The dedicated **Keyframes** Inspector tab (accessible name **Layer keyframes**)
 belongs to the selected **whole video row**, even an empty one, not to a clip.
 It contains the point count, participant chips, whole-row Previous/Next navigation
 and a directly visible shared point list. The toolbar's **Animation help** combines
-animation and point-timing guidance. **Clip** keeps source/static settings and the
-diamonds and value controls that use the real playhead. All row points use absolute project
-frames and affect every clip on that row. Ten settings participate independently:
-Layer opacity, Clip opacity, Speed and the seven colour controls. At most 256
+animation and point-timing guidance. **Clip** keeps source/clip settings, row Opacity
+and the diamonds and value controls that use the real playhead. All row points use absolute project
+frames and affect every clip on that row. Nine settings participate independently:
+Opacity (`opacity`), Speed and the seven colour controls. At most 256
 shared points are allowed per row.
 
 - Every setting has a **hollow ◇ / filled ◆ diamond**. Hollow means inactive but
   clickable. Click at the **real playhead** to capture/join that setting; click filled
   to remove only its participation. First participation creates the point; removing
   the last participant deletes it. Sliders never create implicit keys.
-- With no keys for a channel, its static base remains editable. Once animated, its
-  value is read-only where it does not participate: click the hollow diamond first.
-  Removing its final participation reveals the existing base, not a new default.
+- With no Opacity keys, edit the row value, even on an empty row; unkeyed colour
+  and speed edit the selected clip. Once a channel is animated, its value is
+  read-only where it does not participate: click the hollow diamond first.
+  Removing its final participation reveals its existing unkeyed value, not a
+  new default or the removed key's value.
 - Each point shares an easing, but every channel interpolates to its **own next
   participating point**, skipping unrelated settings; its endpoints hold outside
   that interval. A single point therefore overrides that channel across the row.
@@ -227,7 +248,7 @@ Speed uses the **Layer rate ×** field and Reset to 1×, not clip speed modes or
 source-frame curve. These controls edit only an existing participant at that
 stored point; they never implicitly join a setting. Each accepted value/reset is
 one Undo step and leaves the point's time, shared easing, other participants and
-static bases unchanged. Invalid or out-of-bounds numeric drafts remain editable
+saved row/clip settings unchanged. Invalid or out-of-bounds numeric drafts remain editable
 with errors; timing conflicts reject the edit rather than shortening transitions.
 
 Occupied frames never merge or overwrite points. A red collision or Speed-related
@@ -298,8 +319,8 @@ See [SPEED_AND_AUDIO.md](SPEED_AND_AUDIO.md) and
 
 ## Workspace and keyboard
 
-Use **Clip / Keyframes / Sequence / Audio** for source/static and playhead
-settings, the whole-row point list, track transitions/fades and music, respectively.
+Use **Clip / Keyframes / Sequence / Audio** for source/clip settings, row Opacity
+and playhead controls, the whole-row point list, track transitions/fades and music, respectively.
 Keyframes retains the accessible tab name **Layer keyframes**. Keyframes and
 Sequence use the selected row without a redundant selected-track banner.
 Selecting an excerpt or a populated/empty row preserves the chosen tab and updates
@@ -309,7 +330,7 @@ fields rather than applying a previous context's draft to the new selection.
 Explicit boundary buttons still open Sequence.
 
 **Expand all / Collapse all** appears only in Clip and controls its four top-level
-sections: **Source range**, **Layer & opacity**, **Speed** and **Colour**. Sequence,
+sections: **Source range**, **Placement**, **Speed** and **Colour**. Sequence,
 Audio, nested disclosures and help remain unchanged.
 
 The header directly exposes **Media / Inspector toggles and keyboard help**.
@@ -325,12 +346,13 @@ indicate adjusted settings without expanding everything. Animated channels use
 an amber curve/diamond: dashed between keys, filled when the setting participates
 at the playhead. **Animation help** in the Keyframes toolbar explains scope,
 capture and point timing; there is no separate Keyframe timing help button.
-No static or animated control is removed. Search/filter clear actions,
+All nine settings retain their unkeyed values, explicit capture and stored-point editing.
+Search/filter clear actions,
 mixed select-all and always-visible media Add simplify the library.
 
 Inline help is a small **? button**, not an expandable text section. Find it
-beside the relevant title—**Source range**, **Layer &
-opacity**, **Speed**, **Colour**, **Transition**, **Sequence fades**
+beside the relevant title—**Source range**, **Placement**,
+**Speed**, **Colour**, **Transition**, **Sequence fades**
 or **Placement & fades**—even when that section is collapsed. Help and expansion
 are separate buttons; no scrolling to the end of a section is needed. Startup
 details are next to **Preview needs attention**.
@@ -372,7 +394,7 @@ in memory and automatic write retries stop. **Retry save** is offered only for
 recoverable transport/server errors. On a revision conflict, **Review latest save**
 offers keeping the draft, **Download unsaved project**, or explicitly discarding
 local changes and reloading. It never silently overwrites or rebases another save.
-Download before discarding; the v6 JSON snapshot is for manual recovery/examination,
+Download before discarding; the v7 JSON snapshot is for manual recovery/examination,
 not a supported JSON-import or migration flow. Unapplied input/pointer drafts are
 not committed project edits.
 

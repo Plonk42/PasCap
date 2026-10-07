@@ -19,7 +19,7 @@ deployment targets.
 - No-copy footage browsing, verified editing proxies, thumbnails and reusable source excerpts.
 - Up to eight uniform video tracks, each with Ripple on by default; turn it off for independent placement.
 - Recoverable trims, split, duplication, marked-range cutting, snapping, Undo/Redo and source review.
-- Independent clip colour/speed bases and **shared row-wide keyframes** for opacity, speed and seven colour settings.
+- Independent clip colour/speed settings, one row-owned Opacity setting, and **shared row-wide keyframes** for Opacity, Speed and seven colour settings.
 - Precise clip-only speed curves with editable presets, draggable source-frame points and exact rate/easing inputs.
 - Draggable timeline keyframes and setting-specific Previous/Next navigation.
 - Direct panel/help controls, compact visual animation states and grouped editing tools.
@@ -71,6 +71,18 @@ while on, later clips remain continuously sequenced, retaining dissolve overlaps
 Turning it off keeps actual placements for independent edits. Music, other tracks
 and absolute row points do not move with it.
 
+**Clip → Colour** contains the single **Opacity** slider alongside the colour
+sliders, initially **100%**. Without Opacity keys it edits the selected row's
+`opacity` value, including on an empty row; the row's `opacity` curve overrides
+that value on every clip when animated, including both dissolve sources.
+Sliders never create keys. An animated setting without participation at the real
+playhead is read-only until its hollow diamond captures a key there.
+Unkeyed colour settings remain per-clip. Opacity controls composition coverage,
+not the SDR RGB grade, with no additional layer multiplier or sidebar duplicate.
+**Clip → Placement** contains placement only.
+Layer options contains only rename, Ripple, ordering and deletion; visibility
+remains a separate sidebar control.
+
 Read the [user guide](docs/USER_GUIDE.md) for the full workflow and shortcuts.
 Filesystem file drops and browser upload pickers are intentionally disabled:
 no import flow duplicates your original footage.
@@ -94,10 +106,16 @@ Missing mounts and symlinks fail explicitly. In the eventual container package,
 originals will be read-only bind mounts and application data will be a separate
 persistent writable mount. See [deployment design](docs/DEPLOYMENT.md).
 
-**Project format:** strict schema **v6**, with required per-track Ripple,
-transitions and fades. v1–v5 projects and receipt snapshots remain unchanged on
-disk but are incompatible; registry/proxy formats do not change. There are no
-automatic migrations or default-filled legacy fields. Unsaved in-memory changes are not guaranteed to survive forced
+**Project format:** strict schema **v7**, with required per-track Ripple,
+transitions, fades and numeric `VideoLayer.opacity` (0–1; new tracks start at 1),
+and exactly nine nullable point channels: `opacity`, `speed` and seven colour
+settings. Row `opacity` is required and valid; saved `clip.opacity` and old
+`clipOpacity`/`layerOpacity` channels are rejected, not ignored or defaulted.
+v1–v6 projects and receipt snapshots remain unchanged
+on disk but are incompatible: recreate projects and import media deliberately.
+Registry/proxy formats and source protections do not change. There are no
+migrations, default-filled legacy fields or automatic deletions.
+Unsaved in-memory changes are not guaranteed to survive forced
 shutdown. See [workspace and recovery](docs/WORKSPACE_AND_RECOVERY.md).
 
 ## Development and CI

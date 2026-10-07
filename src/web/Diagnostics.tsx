@@ -75,7 +75,7 @@ export function Diagnostics({
           className="secondary-button small"
           disabled={!canRenderReference || referenceBusy}
           onClick={onReference}
-          title="Strict schema 6: one enabled, opaque, unanimated, zero-origin contiguous track with two normal-speed excerpts and no music. Use Export for complete edits."
+          title="Strict schema 7: one enabled, opaque, unanimated, zero-origin contiguous track with two normal-speed excerpts and no music. Use Export for complete edits."
         >
           Render 720p reference
         </button>

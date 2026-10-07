@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { gradePixel, NEUTRAL_COLOUR } from '../../src/shared/colour.js';
 import { applyCommand, EditHistory, type EditCommand } from '../../src/shared/commands.js';
-import { colourAt, compositePixel, layerOpacityAt, opacityAt } from '../../src/shared/composition.js';
+import { colourAt, compositePixel, opacityAt } from '../../src/shared/composition.js';
 import {
   activeLayerSetting,
   EMPTY_KEY_VALUES,
@@ -79,11 +79,10 @@ const primitive: Record<Interpolation, (u: number) => number> = {
   smooth: (u) => u * u * u - (u * u * u * u) / 2,
 };
 
-describe('strict schema-6 row points and independently participating settings', () => {
-  it('exports an ordered immutable ten-setting catalogue and explicit all-null template', () => {
+describe('strict schema-7 row points and independently participating settings', () => {
+  it('exports an ordered immutable nine-setting catalogue and explicit all-null template', () => {
     const settings = [
-      'layerOpacity',
-      'clipOpacity',
+      'opacity',
       'speed',
       'exposure',
       'brightness',
@@ -95,16 +94,16 @@ describe('strict schema-6 row points and independently participating settings', 
     ];
     expect(KEYFRAME_SETTINGS.map((setting) => setting.key)).toEqual(settings);
     expect(Object.keys(EMPTY_KEY_VALUES)).toEqual(settings);
-    expect(Object.values(EMPTY_KEY_VALUES)).toEqual(Array(10).fill(null));
+    expect(Object.values(EMPTY_KEY_VALUES)).toEqual(Array(9).fill(null));
     expect(Object.isFrozen(EMPTY_KEY_VALUES)).toBe(true);
     expect(Object.isFrozen(KEYFRAME_SETTINGS)).toBe(true);
     expect(KEYFRAME_SETTINGS.every(Object.isFrozen)).toBe(true);
   });
 
-  it('requires version 6, explicit media membership, row points and static clip settings without legacy fields', () => {
+  it('requires version 7, explicit media membership, row opacity and clip settings without legacy fields', () => {
     const project = createProject('strict', 'Strict');
     const clip = createClip('one', 'source', 0, 20);
-    expect(project.schemaVersion).toBe(6);
+    expect(project.schemaVersion).toBe(7);
     expect(project.media).toEqual({ videoIds: [], audioIds: [] });
     expect(project.layers[0]).toEqual(row());
     expect(Object.keys(clip)).toEqual([
@@ -116,9 +115,18 @@ describe('strict schema-6 row points and independently participating settings', 
       'sourceOut',
       'colour',
       'speed',
-      'opacity',
     ]);
-    expect(projectSchema.safeParse({ ...project, schemaVersion: 3 }).success).toBe(false);
+    expect(projectSchema.safeParse({ ...project, schemaVersion: 6 }).success).toBe(false);
+    expect(project.layers[0]!.opacity).toBe(1);
+    expect(clip).not.toHaveProperty('opacity');
+    const { opacity: _opacity, ...withoutOpacity } = row();
+    expect(projectSchema.safeParse({ ...project, layers: [withoutOpacity] }).success).toBe(false);
+    for (const opacity of [null, undefined, -0.1, 1.1, NaN, Infinity])
+      expect(projectSchema.safeParse({ ...project, layers: [{ ...row(), opacity }] }).success).toBe(false);
+    for (const opacity of [0, 0.23456789, 1]) {
+      expect(projectSchema.parse({ ...project, layers: [{ ...row(), opacity }] }).layers[0]!.opacity).toBe(opacity);
+      expect(clipSchema.safeParse({ ...clip, opacity }).success).toBe(false);
+    }
     expect(projectSchema.safeParse(unsupportedProject(4, 'old', 'Unsupported row')).success).toBe(false);
     expect(projectSchema.safeParse({ ...project, media: undefined }).success).toBe(false);
     expect(projectSchema.safeParse({ ...project, layers: [{ ...row(), opacityKeys: [] }] }).success).toBe(false);
@@ -132,6 +140,17 @@ describe('strict schema-6 row points and independently participating settings', 
 
   it('rejects empty points, missing/extra values, noninteger times and unknown easing', () => {
     expect(layerKeyframeSchema.safeParse(point(0, {})).success).toBe(false);
+    for (const removed of ['layerOpacity', 'clipOpacity'])
+      for (const value of [null, 0, 1]) {
+        const current = point(0, { opacity: 0 });
+        expect(
+          layerKeyframeSchema.safeParse({ ...current, values: { ...current.values, [removed]: value } }).success,
+        ).toBe(false);
+        const { opacity: _opacity, ...otherValues } = current.values;
+        expect(
+          layerKeyframeSchema.safeParse({ ...current, values: { ...otherValues, [removed]: value } }).success,
+        ).toBe(false);
+      }
     const { speed: _speed, ...incomplete } = point(0, { exposure: 0 }).values;
     expect(layerKeyframeSchema.safeParse({ ...point(0, { exposure: 0 }), values: incomplete }).success).toBe(false);
     expect(
@@ -143,8 +162,8 @@ describe('strict schema-6 row points and independently participating settings', 
     for (const frame of [-1, 0.5, NaN, Infinity, 2_147_483_648])
       expect(layerKeyframeSchema.safeParse(point(frame, { exposure: 0 })).success).toBe(false);
     expect(layerKeyframeSchema.safeParse({ ...point(0, { exposure: 0 }), interpolation: 'cubic' }).success).toBe(false);
-    expect(layerKeyframeSchema.parse(point(0, { clipOpacity: 0, exposure: 0 }))).toEqual(
-      point(0, { clipOpacity: 0, exposure: 0 }),
+    expect(layerKeyframeSchema.parse(point(0, { opacity: 0, exposure: 0 }))).toEqual(
+      point(0, { opacity: 0, exposure: 0 }),
     );
   });
 
@@ -157,7 +176,7 @@ describe('strict schema-6 row points and independently participating settings', 
 
   it('enforces ascending unique points and a 256-point maximum, including empty rows', () => {
     const project = createProject('limit', 'Limit');
-    const keys = Array.from({ length: 256 }, (_, frame) => point(frame, { clipOpacity: 0.5 }));
+    const keys = Array.from({ length: 256 }, (_, frame) => point(frame, { opacity: 0.5 }));
     expect(projectSchema.parse({ ...project, layers: [row(keys)] }).layers[0]!.keyframes).toHaveLength(256);
     expect(projectSchema.safeParse({ ...project, layers: [row([...keys, point(256, { hue: 10 })])] }).success).toBe(
       false,
@@ -199,16 +218,16 @@ describe('strict schema-6 row points and independently participating settings', 
       type: 'layer-key-toggle',
       layerId: BASE_LAYER_ID,
       frame: 20,
-      setting: 'clipOpacity',
+      setting: 'opacity',
       value: 0.4,
     });
     const layer = project.layers[0]!;
-    expect(layer.keyframes).toEqual([point(20, { exposure: 0, clipOpacity: 0.4 }, 'smooth')]);
-    expect(keySettings(layer.keyframes[0]!)).toEqual(['clipOpacity', 'exposure']);
-    expect(hasLayerKeys(layer, 'clipOpacity')).toBe(true);
+    expect(layer.keyframes).toEqual([point(20, { exposure: 0, opacity: 0.4 }, 'smooth')]);
+    expect(keySettings(layer.keyframes[0]!)).toEqual(['opacity', 'exposure']);
+    expect(hasLayerKeys(layer, 'opacity')).toBe(true);
     expect(hasLayerKeys(layer, 'brightness')).toBe(false);
-    expect(activeLayerSetting(layer, 'clipOpacity', 20)).toBe(true);
-    expect(activeLayerSetting(layer, 'clipOpacity', 19)).toBe(false);
+    expect(activeLayerSetting(layer, 'opacity', 20)).toBe(true);
+    expect(activeLayerSetting(layer, 'opacity', 19)).toBe(false);
     project = applyCommand(project, {
       type: 'layer-key-toggle',
       layerId: BASE_LAYER_ID,
@@ -216,19 +235,19 @@ describe('strict schema-6 row points and independently participating settings', 
       setting: 'exposure',
       value: 1,
     });
-    expect(project.layers[0]!.keyframes).toEqual([point(20, { clipOpacity: 0.4 }, 'smooth')]);
+    expect(project.layers[0]!.keyframes).toEqual([point(20, { opacity: 0.4 }, 'smooth')]);
     project = applyCommand(project, {
       type: 'layer-key-toggle',
       layerId: BASE_LAYER_ID,
       frame: 20,
-      setting: 'clipOpacity',
+      setting: 'opacity',
       value: 0.4,
     });
     expect(project.layers[0]!.keyframes).toEqual([]);
   });
 
-  it('can independently toggle all ten participants at one frame', () => {
-    let project = createProject('ten', 'Ten');
+  it('can independently toggle all nine participants at one frame', () => {
+    let project = createProject('nine', 'Nine');
     for (const setting of KEYFRAME_SETTINGS)
       project = applyCommand(project, {
         type: 'layer-key-toggle',
@@ -253,7 +272,7 @@ describe('strict schema-6 row points and independently participating settings', 
   it('updates only existing participants and validates removals without implicit keys', () => {
     const project = {
       ...createProject('values', 'Values'),
-      layers: [row([point(10, { exposure: 1, clipOpacity: 0.5 }, 'hold')])],
+      layers: [row([point(10, { exposure: 1, opacity: 0.5 }, 'hold')])],
     };
     const changed = applyCommand(project, {
       type: 'layer-key-value',
@@ -262,7 +281,7 @@ describe('strict schema-6 row points and independently participating settings', 
       setting: 'exposure',
       value: -1,
     });
-    expect(changed.layers[0]!.keyframes).toEqual([point(10, { exposure: -1, clipOpacity: 0.5 }, 'hold')]);
+    expect(changed.layers[0]!.keyframes).toEqual([point(10, { exposure: -1, opacity: 0.5 }, 'hold')]);
     expect(project.layers[0]!.keyframes[0]!.values.exposure).toBe(1);
     expect(() =>
       applyCommand(project, {
@@ -323,10 +342,7 @@ describe('strict schema-6 row points and independently participating settings', 
     const document = {
       ...createProject('move', 'Move'),
       layers: [
-        row([
-          point(10, { layerOpacity: 0.2, clipOpacity: 0.7, speed: 2, exposure: 1, hue: 90 }, 'ease-in'),
-          point(20, { shadows: 0.5 }),
-        ]),
+        row([point(10, { opacity: 0.7, speed: 2, exposure: 1, hue: 90 }, 'ease-in'), point(20, { shadows: 0.5 })]),
       ],
     };
     const history = new EditHistory(document);
@@ -406,8 +422,8 @@ describe('independent row interpolation and unchanged CPU composition', () => {
     expect(pixel[0]).not.toBeCloseTo((first[0] + last[0]) / 2, 5);
   });
 
-  it('overrides properties on different clips in the row with independent static fallbacks', () => {
-    let project = sequence([point(0, { exposure: -1, clipOpacity: 0.4 }), point(100, { exposure: 1 })], [100, 100]);
+  it('overrides row opacity uniformly while unkeyed colour keeps independent clip fallbacks', () => {
+    let project = sequence([point(0, { exposure: -1, opacity: 0.4 }), point(100, { exposure: 1 })], [100, 100]);
     project = applyCommand(project, {
       type: 'colour',
       clipId: 'clip-0',
@@ -418,7 +434,7 @@ describe('independent row interpolation and unchanged CPU composition', () => {
       clipId: 'clip-1',
       colour: { ...NEUTRAL_COLOUR, brightness: -0.1, saturation: 1.4 },
     });
-    project = applyCommand(project, { type: 'opacity', clipId: 'clip-1', opacity: 0.9 });
+    project = applyCommand(project, { type: 'opacity', layerId: BASE_LAYER_ID, opacity: 0.9 });
     project = applyCommand(project, {
       type: 'transition',
       transition: { leftId: 'clip-0', rightId: 'clip-1', type: 'cross-dissolve', duration: 20 },
@@ -430,24 +446,35 @@ describe('independent row interpolation and unchanged CPU composition', () => {
     expect(samples.map((sample) => sample.colour.brightness)).toEqual([0.1, -0.1]);
     expect(samples.map((sample) => sample.colour.saturation)).toEqual([1, 1.4]);
     expect(samples.map((sample) => sample.opacity)).toEqual([0.4, 0.4]);
-    const staticLayer = row();
+    const staticLayer = { ...row(), opacity: 0.9 };
     expect(colourAt(project.clips[1]!, staticLayer, 90)).toEqual(project.clips[1]!.colour);
-    expect(opacityAt(project.clips[1]!, staticLayer, 90)).toBe(0.9);
+    expect(opacityAt(staticLayer, 90)).toBe(0.9);
+    expect(project.layers[0]!.opacity).toBe(0.9);
+    expect(project.clips.every((clip) => !('opacity' in clip))).toBe(true);
   });
 
-  it('applies row opacity once to a dissolve group, not once per source', () => {
-    const project = applyCommand(sequence([point(0, { layerOpacity: 0.5, clipOpacity: 0.4 })], [100, 100]), {
+  it('uses uniform row coverage during a dissolve without a second multiplier and restores the row setting', () => {
+    const project = applyCommand(sequence([], [100, 100]), {
       type: 'transition',
       transition: { leftId: 'clip-0', rightId: 'clip-1', type: 'cross-dissolve', duration: 20 },
     });
-    const pixel = compositePixel(sampleTimeline(project, 90), (sample) =>
-      sample.clipId === 'clip-0' ? [1, 0, 0] : [0, 0, 1],
-    );
-    expect(pixel[0]).toBeCloseTo(0.1);
+    project.layers[0]!.opacity = 0.6;
+    const sourcePixel = (sample: ReturnType<typeof sampleTimeline>[number]): [number, number, number] =>
+      sample.clipId === 'clip-0' ? [1, 0, 0] : [0, 0, 1];
+    const pixel = compositePixel(sampleTimeline(project, 90), sourcePixel);
+    expect(pixel[0]).toBeCloseTo(0.3);
     expect(pixel[1]).toBeCloseTo(0);
-    expect(pixel[2]).toBeCloseTo(0.1);
+    expect(pixel[2]).toBeCloseTo(0.3);
+    expect(sampleTimeline(project, 90).map((sample) => sample.opacity)).toEqual([0.6, 0.6]);
+    project.layers[0]!.keyframes = [point(0, { opacity: 0.4 })];
+    expect(sampleTimeline(project, 90).map((sample) => sample.opacity)).toEqual([0.4, 0.4]);
+    const overridden = compositePixel(sampleTimeline(project, 90), sourcePixel);
+    expect(overridden[0]).toBeCloseTo(0.2);
+    expect(overridden[1]).toBeCloseTo(0);
+    expect(overridden[2]).toBeCloseTo(0.2);
+    project.layers[0]!.keyframes = [];
+    expect(sampleTimeline(project, 90).map((sample) => sample.opacity)).toEqual([0.6, 0.6]);
     project.layers[0]!.enabled = false;
-    expect(layerOpacityAt(project.layers[0]!, 90)).toBe(0);
     expect(sampleTimeline(project, 90)).toEqual([]);
     expect(calculateLayout(project).duration).toBe(180);
   });

@@ -68,7 +68,7 @@ export function KeyframeToggle({
         <span id={descriptionId} className="declutter-sr-only">
           {animated
             ? 'This setting follows the whole row’s animation curve. Capture a key at the playhead before editing between points.'
-            : 'This setting uses its static base. The diamond captures that value for the whole video row.'}
+            : 'Not animated. The diamond captures the displayed value to animate this setting on the whole video row.'}
         </span>
       </button>
       <button

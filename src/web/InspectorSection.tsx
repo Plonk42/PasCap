@@ -9,6 +9,7 @@ export type InspectorMode = 'clip' | 'keyframes' | 'sequence' | 'audio';
 
 const SECTION_DEFAULTS = {
   source: false,
+  // Placement retains this browser preference ID; renaming its title must not reset expansion.
   'layer-opacity': false,
   speed: false,
   colour: true,

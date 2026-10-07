@@ -8,7 +8,7 @@ interface SettingContext {
 }
 
 /** One vocabulary for the visible tooltip and screen-reader setting context. */
-export function settingPresentation({ keyed, active, baseAvailable, baseLabel, label, frame }: SettingContext) {
+export function settingPresentation({ keyed, active, baseAvailable, label, frame }: SettingContext) {
   if (keyed && active)
     return {
       scope: 'Keyframe at playhead',
@@ -22,10 +22,10 @@ export function settingPresentation({ keyed, active, baseAvailable, baseLabel, l
   if (!baseAvailable)
     return {
       scope: 'No clip selected',
-      hint: `Select a clip to edit its static base, or click the ${label} diamond to animate this setting on the layer.`,
+      hint: `Select a clip to edit ${label}, or click the ${label} diamond to animate this setting on the row.`,
     };
   return {
-    scope: `${baseLabel} base`,
-    hint: `Editing the static ${baseLabel.toLowerCase()} base. This setting has no keyframes on the layer.`,
+    scope: 'Not animated',
+    hint: `Editing ${label}. Add keyframes to animate this setting on the row.`,
   };
 }

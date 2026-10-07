@@ -139,7 +139,7 @@ export function Projects({
       footer={
         <>
           <span className="activity-hint">
-            Version 6 · independent track settings and project-specific media. Older projects remain unchanged unless
+            Version 7 · independent track settings and project-specific media. Older projects remain unchanged unless
             explicitly deleted; no migration.
           </span>
           <button className="secondary-button" onClick={onClose} disabled={submitting}>
@@ -169,7 +169,7 @@ export function Projects({
           <span>Project filter</span>
           <select value={filter} onChange={(event) => setFilter(event.target.value as ProjectFilter)}>
             <option value="all">All projects</option>
-            <option value="compatible">Compatible (version 6)</option>
+            <option value="compatible">Compatible (version 7)</option>
             <option value="unsupported">Unavailable / unsupported</option>
           </select>
         </label>
@@ -213,7 +213,7 @@ export function Projects({
             {!project.compatible && (
               <p className="activity-project-reason">
                 {project.error ||
-                  'This project is unsupported or invalid. Version 6 is required; the original is preserved without migration.'}
+                  'This project is unsupported or invalid. Version 7 is required; the original is preserved without migration.'}
               </p>
             )}
             <div className="activity-project-actions">

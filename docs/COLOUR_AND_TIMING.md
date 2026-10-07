@@ -1,4 +1,4 @@
-# PasCap colour and timing contract · project v6
+# PasCap colour and timing contract · project v7
 
 This specification is shared by the CPU reference,
 WebGL2 shader and generated native FFmpeg LUTs. It is elementary SDR grading, not
@@ -47,17 +47,33 @@ highlight recovery. Originals remain untouched.
 
 Shared row opacity, colour and Speed points use integer **project frames** and
 override each participating channel across every clip on that row. Clip-instance
-custom speed keys instead use integer **original-source frames**; static clip
-colour/opacity bases remain independent. Hold/linear/ease-in/ease-out/smooth
-interpolation belongs to the left participating point; endpoints hold outside the
+custom speed keys instead use integer **original-source frames**; unkeyed colour
+and clip speed settings remain independent per clip. **Opacity** is one row-owned
+setting: `VideoLayer.opacity` is a required number in 0–1, initially 1 on a new
+track. Without Opacity participants, every source uses that row value; otherwise
+the row's sole `opacity` channel overrides it, including both dissolve sources.
+There is no saved `clip.opacity` or second opacity channel. The nine required
+nullable point fields are `opacity`, `speed`, `exposure`, `brightness`, `contrast`,
+`hue`, `saturation`, `highlights` and `shadows`.
+Hold/linear/ease-in/ease-out/smooth interpolation belongs to the left participating
+point; endpoints hold outside the
 keyed interval. Colour evaluates all seven parameter values before applying the
 equations above. Trim/split never copy or shift row points; they retain clip-speed
 anchors, including those outside the excerpt but inside the registered original.
 
+The single **Opacity** slider is in **Clip → Colour**, beside the colour sliders,
+and starts at **100%**. It edits row `opacity` without keys and works on an empty
+row. With keys, only a participant at the real playhead is editable; the hollow
+diamond explicitly captures a missing participant. Sliders never create keys.
+This shared UI placement does not make Opacity an RGB grading parameter: it
+controls coverage during composition after the unchanged SDR colour math above.
+
 For each enabled layer, source-over uses premultiplied encoded RGB/coverage.
-Let `w` be dissolve weight, `o` clip opacity, `b` black-fade brightness and `G` graded
-RGB. Group RGB is `C = Σ(G × o × w × b)` and coverage is `A = Σ(o × w)`.
-Layer opacity `l` is applied once: `result = l × C + lower × (1 − l × A)`.
+Let $w_i$ be dissolve weight, $o_i$ evaluated Opacity, $b_i$ black-fade brightness
+and $G_i$ graded RGB. Evaluate the row's Opacity for each source at the same
+project frame. Group RGB and coverage are
+$C = \sum_i G_i b_i o_i w_i$ and $A = \sum_i o_i w_i$.
+Source-over is $\mathrm{result} = C + \mathrm{lower}(1 - A)$, with no additional layer multiplier.
 Every track's dissolve is one group, preventing unintended double attenuation;
 independent pairs may dissolve simultaneously on several tracks. Black fades affect
 that track's RGB, **not alpha**, preserving its coverage of lower footage.
@@ -123,19 +139,25 @@ separate source-review decoder. Resources
 are not allocated per stored clip; missing observed frames buffer explicitly.
 
 Production export reads originals and uses exact shared retiming. The static fast
-path requires one enabled opaque track, opaque clips, no row points, zero origin
+path requires one enabled track with row Opacity 1, no row points, zero origin
 and no internal gaps; supported track fades/dissolves retain bounded chunks.
 Other valid timelines use generalized sequential RGBA16 group and source-over
 passes without regrading, then one final H.264 encode,
 with optional 48 kHz AAC music in both paths. Resource and numeric limits are in
 [Inspector and resource limits](LAYERS_AND_KEYFRAMES.md#inspector-and-resource-limits).
 
-The diagnostic reference accepts **exactly two normal-speed clips on one enabled,
-opaque, zero-origin contiguous track**, without music, extra tracks, nontrivial
-opacity or row points, and is limited to 3,600 project frames. It refuses unsupported
+The diagnostic reference accepts **exactly two normal-speed clips on one
+enabled, zero-origin contiguous track with row Opacity 1**, without music, extra tracks or row points,
+and is limited to 3,600 project frames. It refuses unsupported
 documents regardless of Ripple or track ID.
-It requires a strict schema-6 project snapshot, including explicit project media
+It requires a strict schema-7 project snapshot, including explicit project media
 membership; its reference receipt format remains independently version 1. New
-measurement reports use `preview-v6` without overwriting historical reports.
+measurement reports must identify their v7 project snapshot without overwriting
+historical reports; the report identifier is separate from the project schema.
+v1–v6 project documents and receipt snapshots are incompatible and preserved;
+recreate projects deliberately, with no migration, compatibility defaults or
+automatic deletion. Strict v7 requires row `opacity`; saved `clip.opacity` and
+old `clipOpacity`/`layerOpacity` point fields are rejected, not defaulted.
+Registry/proxy formats and source guards are unchanged.
 Source ranges and every retained clip key position are validated against registered
 original frame counts, including hidden layer references.

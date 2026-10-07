@@ -86,7 +86,7 @@ describe('multiple-project store', () => {
     expect(first.id).not.toBe(second.id);
     expect(first.title).toBe('First flight');
     expect(first.revision).toBe(1);
-    expect(first.schemaVersion).toBe(6);
+    expect(first.schemaVersion).toBe(7);
     expect(first.layers[0]!.keyframes).toEqual([]);
     const clip = { ...createClip('clip-a', 'registered-video', 0, 120), speed: { mode: 'constant' as const, rate: 2 } };
     const saved = await store.save({ ...first, clips: [clip] }, 1);
@@ -112,7 +112,7 @@ describe('multiple-project store', () => {
     expect((await readdir(path.join(directory, 'projects'))).some((name) => name.endsWith('.tmp'))).toBe(false);
   });
 
-  it('round-trips 256 strict row points and rejects malformed v6 data without changing confirmed bytes', async () => {
+  it('round-trips 256 strict row points and rejects malformed v7 data without changing confirmed bytes', async () => {
     const directory = await temp();
     const store = new ProjectStore(directory);
     const document = createProject('strict-row', 'Shared row');
@@ -120,13 +120,9 @@ describe('multiple-project store', () => {
     document.layers[0]!.keyframes = Array.from({ length: 256 }, (_, index) =>
       point(index * 10, { exposure: index % 2 }),
     );
-    document.layers[0]!.keyframes[0] = point(
-      0,
-      { ...NEUTRAL_COLOUR, layerOpacity: 1, clipOpacity: 0, speed: 1.25 },
-      'smooth',
-    );
+    document.layers[0]!.keyframes[0] = point(0, { ...NEUTRAL_COLOUR, opacity: 0, speed: 1.25 }, 'smooth');
     const saved = await store.save(document, 0);
-    expect(saved.schemaVersion).toBe(6);
+    expect(saved.schemaVersion).toBe(7);
     expect(saved.layers[0]!.keyframes).toHaveLength(256);
     expect(Object.keys(saved.layers[0]!.keyframes[0]!.values)).toEqual(KEYFRAME_SETTINGS.map((setting) => setting.key));
     expect(saved.layers[0]!.keyframes.at(-1)!.frame).toBeGreaterThan(saved.clips[0]!.sourceOut);
@@ -145,12 +141,14 @@ describe('multiple-project store', () => {
     const { keyframes: _keyframes, ...missingPoints } = saved.layers[0]!;
     const malformedRows: unknown[] = [
       [...saved.layers[0]!.keyframes, point(2560, { hue: 90 })],
-      [point(10, { clipOpacity: 0 }), point(10, { hue: 90 })],
+      [point(10, { opacity: 0 }), point(10, { hue: 90 })],
       [point(20, { exposure: 0 }), point(10, { hue: 90 })],
       [point(0, {})],
       [{ ...first, values: missingValue }],
       [{ ...first, values: { ...first.values, shadows: undefined } }],
       [{ ...first, values: { ...first.values, legacy: 1 } }],
+      [{ ...first, values: { ...first.values, layerOpacity: null } }],
+      [{ ...first, values: { ...first.values, clipOpacity: null } }],
       [{ ...first, frame: -1 }],
       [{ ...first, frame: 0.5 }],
       [{ ...first, frame: 2_147_483_648 }],
@@ -160,6 +158,9 @@ describe('multiple-project store', () => {
     const invalid: unknown[] = [
       ...malformedRows.map((keyframes) => ({ ...saved, layers: [{ ...saved.layers[0]!, keyframes }] })),
       { ...saved, layers: [missingPoints] },
+      { ...saved, layers: [{ ...saved.layers[0]!, opacity: undefined }] },
+      { ...saved, layers: [{ ...saved.layers[0]!, opacity: null }] },
+      { ...saved, clips: [{ ...saved.clips[0]!, opacity: 1 }] },
       { ...saved, layers: [{ ...saved.layers[0]!, opacityKeys: [] }] },
       { ...saved, clips: [{ ...saved.clips[0]!, animation: { opacity: [], colour: [] } }] },
       {
@@ -508,8 +509,8 @@ describe('multiple-project HTTP API', () => {
     const first = projectSchema.parse(firstResponse.json().document);
     const second = projectSchema.parse(secondResponse.json().document);
     expect(first.revision).toBe(1);
-    expect(first.schemaVersion).toBe(6);
-    expect(second.schemaVersion).toBe(6);
+    expect(first.schemaVersion).toBe(7);
+    expect(second.schemaVersion).toBe(7);
     expect(second.id).not.toBe(first.id);
     expect((await service.app.inject({ url: '/api/projects', headers })).json().projects).toHaveLength(2);
     expect((await service.app.inject({ url: `/api/projects/${first.id}`, headers })).json().document).toEqual(first);
@@ -610,7 +611,7 @@ describe('multiple-project HTTP API', () => {
     expect((await service.app.inject({ url: '/api/projects', headers })).json().projects[0].compatible).toBe(false);
     const load = await service.app.inject({ url: '/api/projects/old', headers });
     expect(load.statusCode).toBe(422);
-    expect(load.json().error).toContain('version 6');
+    expect(load.json().error).toContain('version 7');
     expect(
       (
         await service.app.inject({
@@ -635,7 +636,7 @@ describe('multiple-project HTTP API', () => {
     ).toBe(400);
   });
 
-  it('exposes an unsupported-version input as unavailable and refuses load, rename or v6 overwrite', async () => {
+  it('exposes an unsupported-version input as unavailable and refuses load, rename or v7 overwrite', async () => {
     const directory = await temp();
     const unsupported = unsupportedProject(3, 'legacy-v3', 'Original v3');
     const bytes = `${JSON.stringify(unsupported, null, 2)}\n`;
@@ -658,7 +659,7 @@ describe('multiple-project HTTP API', () => {
     const loaded = await service.app.inject({ url: '/api/projects/legacy-v3', headers });
     expect(loaded.statusCode).toBe(422);
     expect(loaded.json().error).toContain('schema version 3');
-    expect(loaded.json().error).toContain('requires version 6');
+    expect(loaded.json().error).toContain('requires version 7');
     expect(
       (
         await service.app.inject({

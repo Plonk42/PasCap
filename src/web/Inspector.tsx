@@ -1,19 +1,14 @@
 import { useId, type KeyboardEvent, type ReactNode } from 'react';
 import { COLOUR_CONTROLS, NEUTRAL_COLOUR, type ColourSettings } from '../shared/colour.js';
 import { applyCommand, type EditCommand } from '../shared/commands.js';
-import { colourAt, layerOpacityAt, opacityAt } from '../shared/composition.js';
-import {
-  activeLayerSetting,
-  evaluateLayerSetting,
-  hasLayerKeys,
-  type KeyframeSetting,
-  type LayerKeyValues,
-} from '../shared/keyframes.js';
+import { colourAt } from '../shared/composition.js';
+import { activeLayerSetting, evaluateLayerSetting, hasLayerKeys, type KeyframeSetting } from '../shared/keyframes.js';
 import type { MediaAsset } from '../shared/media.js';
 import type { ProjectDocument, Transition, VideoClip, VideoLayer } from '../shared/model.js';
 import { sourceRateAt } from '../shared/speed.js';
 import { calculateLayout, type TimelineLayout } from '../shared/timeline.js';
 import { formatTimecode } from '../shared/timing.js';
+import { colourResetCommands } from './colour-reset.js';
 import { shortName, sourceSeconds } from './display.js';
 import { HelpPopover } from './HelpPopover.js';
 import { Icon } from './icons.js';
@@ -46,7 +41,7 @@ interface Props {
   drafting: boolean;
   section: InspectorMode;
   onSection: (section: InspectorMode) => void;
-  onEdit: (command: EditCommand) => void;
+  onEdit: (command: EditCommand | readonly EditCommand[]) => void;
   children?: ReactNode;
   onPreview: (draft: DraftPreview | null, restoreFrame?: number) => void;
   onSeek: (frame: number) => void;
@@ -159,7 +154,7 @@ interface LayerControlProps {
   clip: VideoClip | null;
   frame: number;
   disabled: boolean;
-  onEdit: (command: EditCommand) => void;
+  onEdit: Props['onEdit'];
 }
 
 function settingState(layer: VideoLayer, setting: KeyframeSetting, frame: number, baseAvailable: boolean) {
@@ -180,49 +175,45 @@ function SettingScope({ keyed, scope }: Readonly<{ keyed: boolean; scope: string
 
 function OpacityControl({
   layer,
-  clip,
   frame,
   disabled,
   onEdit,
-  setting,
   id,
-}: Readonly<LayerControlProps & { setting: 'layerOpacity' | 'clipOpacity'; id: string }>) {
-  const isLayerOpacity = setting === 'layerOpacity';
-  const label = isLayerOpacity ? 'Layer opacity' : 'Clip opacity';
-  const state = settingState(layer, setting, frame, isLayerOpacity || clip !== null);
-  let value = evaluateLayerSetting(layer, setting, frame, clip?.opacity ?? 1);
-  if (isLayerOpacity) value = layerOpacityAt({ ...layer, enabled: true }, frame);
-  else if (clip) value = opacityAt(clip, layer, frame);
+}: Readonly<Omit<LayerControlProps, 'clip'> & { id: string }>) {
+  const state = settingState(layer, 'opacity', frame, true);
+  const value = evaluateLayerSetting(layer, 'opacity', frame, layer.opacity);
   const { scope, hint } = settingPresentation({
     ...state,
-    baseLabel: isLayerOpacity ? 'Layer' : 'Clip',
-    label,
+    baseLabel: 'Layer',
+    label: 'Opacity',
     frame,
   });
+  const resetTarget = state.keyed ? `timeline frame ${frame}` : 'the selected row';
   const commit = (opacity: number): void => {
     if (disabled || !state.editable) return;
     if (state.keyed) {
-      onEdit({ type: 'layer-key-value', layerId: layer.id, frame, setting, value: opacity });
+      onEdit({ type: 'layer-key-value', layerId: layer.id, frame, setting: 'opacity', value: opacity });
       return;
     }
-    if (isLayerOpacity) onEdit({ type: 'layer-update', layer: { ...layer, opacity } });
-    else if (clip) onEdit({ type: 'opacity', clipId: clip.id, opacity });
+    onEdit({ type: 'opacity', layerId: layer.id, opacity });
   };
   return (
     <div className="colour-control layer-keyed-control" data-animated={state.keyed} data-key-at-playhead={state.active}>
       <RangeSettingControl
-        setting={setting}
+        setting="opacity"
         id={id}
+        label="Opacity"
         value={value}
         disabled={disabled || !state.editable}
         onCommit={commit}
         hint={hint}
         scope={<SettingScope keyed={state.keyed} scope={scope} />}
+        resetTitle={`Reset only Opacity at ${resetTarget} to 100%`}
         actions={
           <KeyframeToggle
             layer={layer}
-            setting={setting}
-            label={label}
+            setting="opacity"
+            label="Opacity"
             frame={frame}
             value={value}
             disabled={disabled}
@@ -248,7 +239,7 @@ function ColourControl({
 }: Readonly<LayerControlProps & { control: ColourControlDefinition; value: number; id: string }>) {
   const state = settingState(layer, control.key, frame, clip !== null);
   const { scope, hint } = settingPresentation({ ...state, baseLabel: 'Clip', label: control.label, frame });
-  const resetTarget = state.keyed ? `timeline frame ${frame}` : 'the selected clip base';
+  const resetTarget = state.keyed ? `timeline frame ${frame}` : 'the selected clip';
   const commit = (nextValue: number): void => {
     if (disabled || !state.editable) return;
     if (state.keyed) {
@@ -294,37 +285,23 @@ function evaluatedLayerColour(layer: VideoLayer, clip: VideoClip | null, frame: 
 
 function ColourSection({ layer, clip, frame, disabled, onEdit, id }: Readonly<LayerControlProps & { id: string }>) {
   const colour = evaluatedLayerColour(layer, clip, frame);
-  const animated = COLOUR_CONTROLS.some((control) => hasLayerKeys(layer, control.key));
-  const point = layer.keyframes.find((key) => key.frame === frame);
-  const activeColours = point ? COLOUR_CONTROLS.filter((control) => point.values[control.key] !== null) : [];
-  const canResetKeys = activeColours.some((control) => point!.values[control.key] !== NEUTRAL_COLOUR[control.key]);
-  const canResetBase =
-    clip !== null && COLOUR_CONTROLS.some((control) => clip.colour[control.key] !== NEUTRAL_COLOUR[control.key]);
-  const adjusted = COLOUR_CONTROLS.filter(
-    (control) => colour[control.key] !== NEUTRAL_COLOUR[control.key] || hasLayerKeys(layer, control.key),
-  ).length;
-  const canReset = animated ? canResetKeys : canResetBase;
+  const opacity = evaluateLayerSetting(layer, 'opacity', frame, layer.opacity);
+  const animated =
+    hasLayerKeys(layer, 'opacity') || COLOUR_CONTROLS.some((control) => hasLayerKeys(layer, control.key));
+  const resetCommands = colourResetCommands(layer, clip, frame);
+  const adjusted =
+    COLOUR_CONTROLS.filter(
+      (control) => colour[control.key] !== NEUTRAL_COLOUR[control.key] || hasLayerKeys(layer, control.key),
+    ).length + Number(opacity !== 1 || hasLayerKeys(layer, 'opacity'));
+  const canReset = resetCommands.length > 0;
   const resetTitle = animated
-    ? 'Reset only the enabled colour settings at this shared point. Other participants, points and clip bases stay unchanged.'
-    : "Reset the selected clip's static base grade.";
-  let gradeLabel = clip ? 'Selected clip base' : 'Layer colour · no selected clip';
+    ? 'Reset only the enabled Colour settings, including Opacity, at this shared point. Other settings and points stay unchanged.'
+    : 'Reset Colour on the selected clip and Opacity on the whole row. Row points stay unchanged.';
+  let gradeLabel = clip ? 'Selected clip · row Opacity' : 'Row Opacity · no selected clip';
   if (animated) gradeLabel = `Layer colour · timeline frame ${frame}`;
   const reset = (): void => {
     if (disabled || !canReset) return;
-    if (!animated) {
-      if (clip) onEdit({ type: 'colour', clipId: clip.id, colour: { ...NEUTRAL_COLOUR } });
-      return;
-    }
-    if (!point) return;
-    const values: LayerKeyValues = { ...point.values };
-    for (const control of activeColours) values[control.key] = NEUTRAL_COLOUR[control.key];
-    onEdit({
-      type: 'layer-update',
-      layer: {
-        ...layer,
-        keyframes: layer.keyframes.map((key) => (key.frame === point.frame ? { ...key, values } : key)),
-      },
-    });
+    onEdit(resetCommands);
   };
   return (
     <InspectorSection
@@ -336,9 +313,11 @@ function ColourSection({ layer, clip, frame, disabled, onEdit, id }: Readonly<La
         <HelpPopover label="Colour animation">
           <p>
             Each diamond keys only its own setting for this whole layer, in project timeline time. A keyed channel
-            overrides that setting on every clip in the row; an unkeyed channel uses each clip's static base. Between
-            points, click the diamond before editing. Reset keys changes only this point's enabled colour settings; the
-            individual reset buttons also handle unkeyed clip bases.
+            overrides that setting on every clip in the row. Opacity always affects the whole row, even without
+            keyframes or clips; other unanimated Colour settings edit the selected clip. Between points, click the
+            diamond before editing. Reset keys changes only this point's enabled Colour settings, including Opacity;
+            individual resets change only their own setting. Without Colour animation, Reset restores the selected
+            clip's Colour and the row's Opacity to 100% in one Undo step.
           </p>
         </HelpPopover>
       }
@@ -358,6 +337,7 @@ function ColourSection({ layer, clip, frame, disabled, onEdit, id }: Readonly<La
         </button>
       </div>
       <div className="colour-controls">
+        <OpacityControl layer={layer} frame={frame} disabled={disabled} onEdit={onEdit} id={`${id}-opacity`} />
         {COLOUR_CONTROLS.map((control) => (
           <ColourControl
             key={control.key}
@@ -621,7 +601,9 @@ export function Inspector({
                 <div className="selected-clip-name inspector-selection">
                   <Icon name="layers" size={17} />
                   <strong title={layer.name}>{layer.name}</strong>
-                  <span title="Select a clip for its source range and static bases.">Whole video row</span>
+                  <span title="Opacity edits this whole row. Select a clip for source, Colour and speed settings.">
+                    Whole video row
+                  </span>
                 </div>
               )}
               {clip && asset && placed && (
@@ -704,19 +686,19 @@ export function Inspector({
               )}
               <InspectorSection
                 id="layer-opacity"
-                title="Layer & opacity"
+                title="Placement"
                 icon="layers"
                 help={
-                  <HelpPopover label="Opacity scope">
+                  <HelpPopover label="Placement timing">
                     <p>
-                      Layer opacity is applied after the row's clips are combined, including dissolves. Clip opacity
-                      keys are also row-wide: they replace each clip's base opacity, before the combined layer opacity
-                      is applied. Unkeyed channels keep their static bases.
+                      Move the selected excerpt to a video layer or edit its timeline start. With Ripple on, only the
+                      first clip's anchor can be edited here; drag later clips to reorder. Other tracks, music and row
+                      keyframes stay at their project times. Opacity is in Colour and affects the whole row.
                     </p>
                   </HelpPopover>
                 }
               >
-                <section className="layer-inspector" aria-label="Layer appearance">
+                <section className="layer-inspector" aria-label="Clip placement">
                   {clip && placed && (
                     <>
                       <label className="speed-field">
@@ -771,24 +753,7 @@ export function Inspector({
                       </label>
                     </>
                   )}
-                  <OpacityControl
-                    layer={layer}
-                    clip={clip ?? null}
-                    frame={frame}
-                    disabled={drafting}
-                    onEdit={onEdit}
-                    setting="layerOpacity"
-                    id={`${colourControlId}-layer-opacity`}
-                  />
-                  <OpacityControl
-                    layer={layer}
-                    clip={clip ?? null}
-                    frame={frame}
-                    disabled={drafting}
-                    onEdit={onEdit}
-                    setting="clipOpacity"
-                    id={`${colourControlId}-clip-opacity`}
-                  />
+                  {!clip && <p className="control-hint">Select an excerpt to edit its placement.</p>}
                 </section>
               </InspectorSection>
               <InspectorSection
