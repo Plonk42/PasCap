@@ -90,8 +90,7 @@ function layeredProject(videos: readonly MediaAsset[]): ProjectDocument {
         0,
         {
           speed: rate,
-          layerOpacity: 0.85 - index * 0.15,
-          clipOpacity: 0.8 - index * 0.1,
+          opacity: 0.8 - index * 0.1,
           exposure: 0.7 - index * 0.5,
           brightness: 0.03,
           contrast: 1.25,
@@ -106,8 +105,7 @@ function layeredProject(videos: readonly MediaAsset[]): ProjectDocument {
       // acquire fabricated speed/opacity participation to satisfy the schema.
       sharedPoint(40, { exposure: -0.4, hue: -25, saturation: 1.4 }),
       sharedPoint(143, {
-        layerOpacity: 0.55 + index * 0.1,
-        clipOpacity: 0.65 + index * 0.05,
+        opacity: 0.65 + index * 0.05,
         exposure: 0.4,
         brightness: -0.02,
         contrast: 0.8,
@@ -133,7 +131,6 @@ function layeredProject(videos: readonly MediaAsset[]): ProjectDocument {
         layer.id,
       );
       clip.start = member ? duration - (index === 1 ? 0 : 16) : 0;
-      clip.opacity = 0.6 + member * 0.2;
       // The retained row Speed must override this deliberately different base.
       clip.speed = { mode: 'constant', rate: 1.6 };
       clip.colour = { ...NEUTRAL_COLOUR, exposure: member ? -1 : 1, hue: member ? -70 : 65, saturation: 0.3 };
@@ -214,6 +211,9 @@ const test = browserTest.extend<{ comparison: ComparisonFixture }>({
       {
         ...createClip('music-comparison-clip', videos[0]!.id, 0, 120, playback.layers[0]!.id),
         colour: { ...single.clips[0]!.colour },
+        // Sixteen seconds leaves time for four real native activations under
+        // software rendering without guessing a particular callback schedule.
+        speed: { mode: 'constant', rate: 0.25 },
       },
     ];
     playback.music = {
@@ -221,11 +221,11 @@ const test = browserTest.extend<{ comparison: ComparisonFixture }>({
       sourceIn: 0,
       sourceOut: 120,
       start: 0,
-      duration: 120,
+      duration: 480,
       gainDb: -12,
       fadeIn: 0,
       fadeOut: 0,
-      loop: false,
+      loop: true,
     };
     projectSchema.parse(playback);
 
@@ -777,10 +777,18 @@ for (const width of [1440, 1280, 1024, 900, 720]) {
     await openFixture(page, comparison.single);
     const inspector = page.getByRole('complementary', { name: 'Clip inspector', exact: true });
     await expect(inspector).toBeVisible();
-    await expect(page.getByRole('slider', { name: 'Resize Clip panel', exact: true })).toHaveAttribute(
-      'aria-valuenow',
-      '270',
-    );
+    const divider = page.getByRole('slider', { name: 'Resize Clip panel', exact: true });
+    if (width >= 980) await expect(divider).toHaveAttribute('aria-valuenow', '270');
+    else {
+      // Narrow workspaces deliberately use an overlay drawer, not a resizable
+      // desktop sidebar. Close it through its native header action to compare.
+      await expect(divider).toHaveCount(0);
+      expect(
+        await page.evaluate(() => JSON.parse(localStorage.getItem('pascap-workspace-layout')!).inspectorWidth),
+      ).toBe(270);
+      await page.getByRole('button', { name: 'Toggle Clip panel', exact: true }).click();
+      await expect(inspector).toBeHidden();
+    }
     const button = compareButton(page);
     await expect(button).toBeInViewport({ ratio: 1 });
     const box = (await button.boundingBox())!;
@@ -828,7 +836,12 @@ test('comparison during music playback preserves the real worklet epoch and stri
   comparison.guard.allowPCM = true;
   await installMusicEvidence(page);
   await openFixture(page, comparison.playback);
-  await page.evaluate(() => {
+  const duration = calculateLayout(comparison.playback).duration;
+  const sourceFrames = Array.from(
+    { length: duration },
+    (_, frame) => sampleTimeline(comparison.playback, frame)[0]!.sourceFrame,
+  );
+  await page.evaluate((sourceFrames) => {
     const engine = window.pascapLab!.engine;
     // Observe actual texture uploads, so a later decoded callback cannot be
     // mistaken for the source image of a legitimately retained Playing frame.
@@ -890,10 +903,10 @@ test('comparison during music playback preserves the real worklet epoch and stri
           evidence.violations.push(`Invalid Playing A/V bound at ${state.frame}: ${drift}`);
         const slot = state.assignedClipIds.indexOf('music-comparison-clip');
         const image = uploaded.get(slot);
-        // IN=0, normal speed: the actually uploaded image must be the exact
-        // source for the displayed frame, including retained-image emissions.
+        // Use the authoritative map, including held slow-motion images, not a
+        // currentTime guess or the earliest inverse of a repeated source frame.
         if (
-          (slot < 0 || !image?.ready || image.frame !== state.frame || state.decoderCount !== 2) &&
+          (slot < 0 || !image?.ready || image.frame !== sourceFrames[state.frame] || state.decoderCount !== 2) &&
           evidence.violations.length < 10
         )
           evidence.violations.push(`Invalid accepted source at ${state.frame}: ${image?.frame}`);
@@ -912,7 +925,7 @@ test('comparison during music playback preserves the real worklet epoch and stri
       }
       rendered = state.renderedFrames;
     });
-  });
+  }, sourceFrames);
   await page.getByRole('button', { name: 'Play preview', exact: true }).click();
   await page.waitForFunction(() => {
     const state = window.pascapLab!.engine.diagnostics();
@@ -941,24 +954,29 @@ test('comparison during music playback preserves the real worklet epoch and stri
       if (activation === 'click') await compareButton(page).click();
       else await compareButton(page).press(activation);
       await expectMode(page, ungraded);
-      await page.waitForFunction(
-        ({ before, ungraded }) => {
+      const ready = await page.waitForFunction(
+        ({ before, ungraded, duration }) => {
           const state = window.pascapLab!.engine.diagnostics();
-          return (
+          const reached =
             state.status === 'error' ||
-            (!state.playing && state.frame === 119) ||
-            (state.playing && state.status === 'playing' && state.ungraded === ungraded && state.frame >= before + 2)
-          );
+            (!state.playing && state.frame === duration - 1) ||
+            (state.playing && state.status === 'playing' && state.ungraded === ungraded && state.frame >= before + 2);
+          // Capture readiness and its clock/epoch evidence in the same task.
+          // A later task may legitimately observe a new buffering interval.
+          return reached
+            ? {
+                state,
+                starts: window.musicStreamEvidence.starts,
+                pauses: window.musicStreamEvidence.pauses,
+                active: window.musicStreamEvidence.active,
+                generation: window.musicStreamEvidence.receipt?.generation,
+              }
+            : null;
         },
-        { before, ungraded },
+        { before, ungraded, duration },
       );
-      const checkpoint = await page.evaluate(() => ({
-        state: window.pascapLab!.engine.diagnostics(),
-        starts: window.musicStreamEvidence.starts,
-        pauses: window.musicStreamEvidence.pauses,
-        active: window.musicStreamEvidence.active,
-        generation: window.musicStreamEvidence.receipt?.generation,
-      }));
+      const checkpoint = (await ready.jsonValue())!;
+      await ready.dispose();
       expect(checkpoint.state.status, checkpoint.state.message).toBe('playing');
       expect(checkpoint.state.playing).toBe(true);
       expect(checkpoint.state.frame).toBeGreaterThanOrEqual(before + 2);
@@ -971,11 +989,13 @@ test('comparison during music playback preserves the real worklet epoch and stri
     // Buffering itself is permitted: software-renderer stall counts are not a
     // correctness gate. Actual accepted source frames and the audio epoch are.
     await page.waitForFunction(
-      () => {
+      (duration) => {
         const state = window.pascapLab!.engine.diagnostics();
-        return state.status === 'error' || (!state.playing && state.status === 'paused' && state.frame === 119);
+        return (
+          state.status === 'error' || (!state.playing && state.status === 'paused' && state.frame === duration - 1)
+        );
       },
-      undefined,
+      duration,
       { timeout: 35_000 },
     );
     const result = await page.evaluate(() => ({
@@ -986,9 +1006,11 @@ test('comparison during music playback preserves the real worklet epoch and stri
       largestRange: window.musicStreamEvidence.largestRange,
     }));
     expect(result.state.status, result.state.message).toBe('paused');
-    expect(result.state.frame).toBe(119);
+    expect(result.state.frame).toBe(duration - 1);
     expect(result.state.decoderReady[result.state.assignedClipIds.indexOf('music-comparison-clip')]).toBe(true);
-    expect(result.state.decodedSourceFrames[result.state.assignedClipIds.indexOf('music-comparison-clip')]).toBe(119);
+    expect(result.state.decodedSourceFrames[result.state.assignedClipIds.indexOf('music-comparison-clip')]).toBe(
+      sourceFrames[duration - 1],
+    );
     expect(result.observations.violations).toEqual([]);
     expect(result.observations.notifications).toBeGreaterThan(2);
     expect(result.observations.gradedDraws).toBeGreaterThan(0);

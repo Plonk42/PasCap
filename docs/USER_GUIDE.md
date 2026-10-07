@@ -176,7 +176,7 @@ paused or playing; there is no global shortcut. **Source preview** is unchanged.
 Ungraded means the **composed timeline preview without grading**, not an
 original-resolution view or an isolated selected clip. It neutralizes all evaluated
 colour settings across enabled rows, including clip bases, row colour keys and both
-dissolve participants. Exact observed source frames, retiming, clip and layer opacity,
+dissolve participants. Exact observed source frames, retiming, row Opacity,
 visibility, black fades, stacking and music remain unchanged.
 
 Comparison is editor-only: toggling never seeks, saves, enters Undo history, changes

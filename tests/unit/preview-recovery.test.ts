@@ -279,19 +279,17 @@ function gradedLayersProject(): ProjectDocument {
   const lower = project.layers[0]!;
   const left = project.clips[0]!;
   left.speed = { mode: 'constant', rate: 2 };
-  left.opacity = 0.4;
   const right = createClip('right', 'other-video', 100, 115, lower.id);
   right.start = 20;
   right.speed = { mode: 'constant', rate: 0.5 };
-  right.opacity = 0.8;
   right.colour = { ...left.colour, hue: -40, saturation: 1.4 };
   lower.opacity = 0.55;
   lower.openingFade = 6;
   lower.closingFade = 8;
   lower.transitions = [{ leftId: left.id, rightId: right.id, type: 'cross-dissolve', duration: 10 }];
   lower.keyframes = [
-    { frame: 0, interpolation: 'linear', values: { ...EMPTY_KEY_VALUES, exposure: -1, layerOpacity: 0.6 } },
-    { frame: 50, interpolation: 'hold', values: { ...EMPTY_KEY_VALUES, exposure: 1, layerOpacity: 0.3 } },
+    { frame: 0, interpolation: 'linear', values: { ...EMPTY_KEY_VALUES, exposure: -1, opacity: 0.6 } },
+    { frame: 50, interpolation: 'hold', values: { ...EMPTY_KEY_VALUES, exposure: 1, opacity: 0.3 } },
   ];
   const upper = createLayer('upper', 'Upper');
   upper.opacity = 0.75;
@@ -301,7 +299,7 @@ function gradedLayersProject(): ProjectDocument {
     {
       frame: 0,
       interpolation: 'smooth',
-      values: { ...EMPTY_KEY_VALUES, ...left.colour, clipOpacity: 0.35, layerOpacity: 0.45 },
+      values: { ...EMPTY_KEY_VALUES, ...left.colour, opacity: 0.35 },
     },
     {
       frame: 60,
@@ -315,14 +313,12 @@ function gradedLayersProject(): ProjectDocument {
         saturation: 1.7,
         highlights: 0.4,
         shadows: -0.5,
-        clipOpacity: 0.7,
-        layerOpacity: 0.8,
+        opacity: 0.7,
       },
     },
   ];
   const top = createClip('upper-clip', 'upper-video', 200, 275, upper.id);
   top.speed = { mode: 'constant', rate: 1.25 };
-  top.opacity = 0.65;
   project.layers.push(upper);
   project.clips.push(right, top);
   project.media.videoIds.push('other-video', 'upper-video');
@@ -1195,14 +1191,12 @@ describe('PreviewEngine editor-only ungraded comparison', () => {
     expect(graded).toHaveLength(2);
     for (const clip of graded.flatMap((group) => group.clips)) expect(clip.settings).not.toEqual(NEUTRAL_COLOUR);
     expect(graded.flatMap((group) => group.clips).some((clip) => clip.brightness < 1)).toBe(true);
-    expect(graded.every((group) => group.opacity > 0 && group.opacity < 1)).toBe(true);
     expect(graded.flatMap((group) => group.clips).every((clip) => clip.opacity > 0 && clip.opacity < 1)).toBe(true);
     if (frame === 25) {
       expect(graded[0]!.clips).toHaveLength(2);
       expect(graded[0]!.clips.map((clip) => clip.blendWeight)).toEqual([0.5, 0.5]);
       expect(graded[0]!.clips.map((clip) => clip.sourceFrame)).toEqual([50, 102]);
-      expect(graded[0]!.clips.map((clip) => clip.opacity)).toEqual([0.4, 0.8]);
-      expect(graded[0]!.opacity).toBeCloseTo(0.45, 12);
+      for (const clip of graded[0]!.clips) expect(clip.opacity).toBeCloseTo(0.45, 12);
       expect(graded[1]!.clips[0]!.settings).not.toEqual(preview.project.clips[2]!.colour);
     }
 
@@ -1233,11 +1227,9 @@ describe('PreviewEngine editor-only ungraded comparison', () => {
   it.each([17, 22])('preserves fade-through-black brightness while bypassing colour at frame %i', async (frame) => {
     const project = gradedProject();
     project.clips[0]!.sourceOut = 20;
-    project.clips[0]!.opacity = 0.6;
     const right = createClip('right', 'other-video', 100, 120);
     right.start = 20;
     right.colour = { ...project.clips[0]!.colour, hue: -40 };
-    right.opacity = 0.8;
     project.clips.push(right);
     project.media.videoIds.push('other-video');
     project.layers[0]!.opacity = 0.7;
@@ -1248,7 +1240,7 @@ describe('PreviewEngine editor-only ungraded comparison', () => {
     preview.engine.setUngraded(true);
     expectSurface(preview, frame, true);
     expect(preview.compositor.visible![0]!.clips[0]!.brightness).toBe(0.5);
-    expect(preview.compositor.visible![0]!.opacity).toBe(0.7);
+    expect(preview.compositor.visible![0]!.clips[0]!.opacity).toBe(0.7);
     preview.engine.setUngraded(false);
     expect(preview.compositor.visible).toEqual(graded);
     expectNoMediaOperations(preview);

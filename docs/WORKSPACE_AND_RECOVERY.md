@@ -187,8 +187,8 @@ there is no global comparison shortcut. **Source preview** is unaffected.
 The ungraded view is the composed preview without grading, not original-resolution
 footage or the selected clip in isolation. All evaluated colour settings are neutral
 across enabled rows, including static clip bases, row colour keys and both dissolve
-participants. Exact observed source frames and retiming, clip and existing layer
-opacity, visibility, black fades, stacking and music are preserved.
+participants. Exact observed source frames and retiming, row Opacity,
+visibility, black fades, stacking and music are preserved.
 
 This mode belongs only to the editor's preview engine: toggling causes no seek,
 save/history entry, export, schema, proxy or original change, or new decoder.

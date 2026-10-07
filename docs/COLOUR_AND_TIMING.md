@@ -89,7 +89,7 @@ colour controls added to `NEUTRAL_COLOUR` are automatically bypassed, without a
 separate per-control comparison list. Stored grades and keys are unchanged.
 
 Only grading is neutralized: exact observed source frames and `PlacedClip.retiming`,
-clip and existing layer opacity, visibility, dissolve weights, black fades, stacking
+row Opacity, visibility, dissolve weights, black fades, stacking
 and music retain their normal contract. Ungraded is still the composed preview,
 not an original-resolution or isolated-selected-clip view; Source preview is unchanged.
 
