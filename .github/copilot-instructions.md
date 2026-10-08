@@ -30,6 +30,15 @@ PasCap is a solo, pre-release project: optimize for fast iteration. Details are 
 
 - While editing: affected unit tests (`npm test -- tests/unit/<file>.test.ts`) and
   the dev server.
+- Check SonarQube for IDE diagnostics on affected code files while editing and
+  before delivery. Fix relevant new findings; never add `NOSONAR`, suppress
+  warnings or exclude files. Report justified exceptions or unavailable analysis.
+- UI/layout/control/interaction changes **must** be checked live in the VS Code
+  integrated browser with Playwright on disposable synthetic or memory-only
+  projects: rendered screenshots before changes and after the final edit, relevant
+  states and viewport sizes. Tests or DOM snapshots alone are not visual
+  validation. Steps: [development](../docs/DEVELOPMENT.md). Report what was
+  inspected; if browser access is unavailable, name the blocker and missing check.
 - Before pushing: `npm run format`, then `npm run check` (formatting, unit/service
   tests, types, build, licenses) plus the affected Playwright specs for UI changes.
   Docs-only changes need only `npm run format`.

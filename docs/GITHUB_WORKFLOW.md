@@ -13,11 +13,16 @@ risky changes and GitHub issues only for work worth tracking.
 
 When unsure, treat the change as risky.
 
+For either route, check SonarQube for IDE diagnostics on affected code files and
+fix relevant new findings without suppressing them
+([details](DEVELOPMENT.md#validation)).
+
 ### Routine changes
 
 1. `git pull --ff-only` on `main`. Leave unrelated uncommitted edits untouched and
    unstaged.
-2. Edit, running the affected unit tests and the dev server while working.
+2. Edit, running the affected unit tests and the dev server while working. UI
+   changes also need [live visual inspection](DEVELOPMENT.md#live-ui-inspection).
 3. Run the fast gate: `npm run format`, then `npm run check` plus the affected
    Playwright specs for UI changes ([commands](DEVELOPMENT.md#fast-local-validation)).
    Docs-only changes need only `npm run format`.
