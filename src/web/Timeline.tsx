@@ -31,6 +31,7 @@ import {
 import { Icon } from './icons.js';
 import { keyframeNavigationFrame, useKeyframeNavigation } from './keyframe-navigation.js';
 import { clipStartRestriction } from './layer-actions.js';
+import './declutter.css';
 import './layers.css';
 import { Layers } from './Layers.js';
 import { createMusicInstance, videoTimelineDuration } from './music-ui.js';
@@ -171,12 +172,6 @@ function nextLayerName(project: ProjectDocument): string {
   let number = 2;
   while (project.layers.some((layer) => layer.name === `Video ${number}`)) number++;
   return `Video ${number}`;
-}
-
-function countExcerpts(clips: readonly VideoClip[]): Map<string, number> {
-  const counts = new Map<string, number>();
-  for (const clip of clips) counts.set(clip.mediaId, (counts.get(clip.mediaId) ?? 0) + 1);
-  return counts;
 }
 
 function timelineEmptyMessage(project: ProjectDocument): string {
@@ -434,7 +429,6 @@ export function Timeline(props: Readonly<Props>) {
   const layout = calculateLayout(visible);
   const baseLayout = calculateLayout(project);
   const selected = layout.clips.find((placed) => placed.clip.id === selectedClipId);
-  const excerptCounts = countExcerpts(project.clips);
   const source = assets.find((asset) => asset.id === selected?.clip.mediaId);
   const selectedLayer = project.layers.find((layer) => layer.id === selected?.clip.layerId);
   const nudgeRestriction = selected ? clipStartRestriction(project, selected.clip) : null;
@@ -861,12 +855,13 @@ export function Timeline(props: Readonly<Props>) {
     }
   };
 
+  const interactionStatus = musicGesture
+    ? musicGesture.error || `Music · ${formatTimecode(musicGesture.start)} · release to apply · Esc cancels`
+    : timelineInteractionMessage(keyframes.draft, dragError, dropPlan, draft, selected?.clip);
   return (
     <section className="timeline-panel panel" id="timeline-pane" tabIndex={-1} aria-label="Video timeline">
       <div className="timeline-toolbar">
-        <h2>
-          Timeline <span className="count">{project.clips.length}</span>
-        </h2>
+        <h2 className="declutter-sr-only">Timeline</h2>
         <Popover label="Clip actions" className="timeline-clip-actions">
           {(close) => (
             <>
@@ -930,7 +925,6 @@ export function Timeline(props: Readonly<Props>) {
           onCutMarked={props.onCutMarked}
           onClearCut={props.onClearCut}
         />
-        <span className="timeline-length">{durationLabel(framesToSeconds(layout.duration))}</span>
         <button
           className={`secondary-button small timeline-view-action ${snapping ? 'active' : ''}`}
           aria-label="Toggle snapping"
@@ -1033,10 +1027,9 @@ export function Timeline(props: Readonly<Props>) {
               {layout.duration > 0 && (
                 <div className="timeline-ruler-playhead" style={{ left: leading + frame * scale }}>
                   <button aria-label="Drag playhead" onPointerDown={beginSeek} onPointerMove={moveSeek} />
-                  <span className="playhead-readout">
-                    {formatTimecode(frame)}
-                    {draft || keyframes.active ? ' · draft' : ''}
-                  </span>
+                  {(draft || keyframes.active) && (
+                    <span className="playhead-readout">{formatTimecode(frame)} · draft</span>
+                  )}
                 </div>
               )}
             </div>
@@ -1049,7 +1042,11 @@ export function Timeline(props: Readonly<Props>) {
                 disabled={interactionBlocked}
                 style={{ top: rowTop(layer.id) - 5 }}
                 onClick={() => onSelectLayer(layer.id)}
-              />
+              >
+                {layer.id === selectedLayerId && !layout.clips.some((item) => item.clip.layerId === layer.id) && (
+                  <span className="timeline-lane-placeholder">Insert here</span>
+                )}
+              </button>
             ))}
             {selected && source && selectedLayer && (
               <div
@@ -1162,11 +1159,6 @@ export function Timeline(props: Readonly<Props>) {
                         {speedLabel(clip)}
                       </small>
                     </span>
-                    {(isSelected || excerptCounts.get(clip.mediaId)! > 1) && (
-                      <span className="timeline-source-range clip-excerpt-badge">
-                        #{index + 1} · {sourceSeconds(clip.sourceIn)} → {sourceSeconds(clip.sourceOut)}
-                      </span>
-                    )}
                   </button>
                   {(['in', 'out'] as const).map((edge) => (
                     <button
@@ -1344,21 +1336,17 @@ export function Timeline(props: Readonly<Props>) {
           </div>
         </div>
       </div>
-      <div className="timeline-bottom">
-        <span
-          className={dragError || dropPlan?.error || keyframes.draft?.error || musicGesture?.error ? 'trim-error' : ''}
-        >
-          {musicGesture
-            ? musicGesture.error || `Music · ${formatTimecode(musicGesture.start)} · release to apply · Esc cancels`
-            : timelineInteractionMessage(keyframes.draft, dragError, dropPlan, draft, selected?.clip)}
-        </span>
-        <span className="active-layer-readout">
-          Insert →{' '}
-          <strong>
-            {project.layers.find((layer) => layer.id === selectedLayerId)?.name ?? project.layers[0]!.name}
-          </strong>
-        </span>
-      </div>
+      {interactionStatus && (
+        <div className="timeline-bottom">
+          <span
+            className={
+              dragError || dropPlan?.error || keyframes.draft?.error || musicGesture?.error ? 'trim-error' : ''
+            }
+          >
+            {interactionStatus}
+          </span>
+        </div>
+      )}
     </section>
   );
 }

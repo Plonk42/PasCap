@@ -13,6 +13,12 @@ export async function openOptions(page: Page, label: string): Promise<void> {
   if ((await trigger.getAttribute('aria-expanded')) !== 'true') await trigger.click();
 }
 
+/** Media/Clip panel toggles live in Workspace options. */
+export async function panelToggle(page: Page, name: 'Media' | 'Clip'): Promise<Locator> {
+  await openOptions(page, 'Workspace options');
+  return page.getByRole('button', { name: `Toggle ${name} panel`, exact: true });
+}
+
 export async function closeOptions(page: Page): Promise<void> {
   const opened = page.locator('.editor-popover[open] > summary');
   await forEachSerial(await opened.all(), (trigger) => trigger.click());
@@ -124,12 +130,14 @@ export async function freshExportLinks(
     .toBe('completed');
   if (!completed?.outputUrl || !completed.receiptUrl)
     throw new Error('The new completed export must publish both a render and a receipt.');
-  const links = page.locator('.activity-render-links');
-  await expect(links.getByRole('link', { name: 'Open render', exact: true })).toBeVisible({ timeout });
-  await expect(links.getByRole('link', { name: 'Open render', exact: true })).toHaveAttribute(
-    'href',
-    completed.outputUrl,
-  );
-  await expect(links.getByRole('link', { name: 'Receipt', exact: true })).toHaveAttribute('href', completed.receiptUrl);
+  // Finished-render links live with their own job in the Activity drawer.
+  const toggle = page.getByRole('button', { name: 'Open activity', exact: true });
+  if ((await toggle.getAttribute('aria-expanded')) !== 'true') await toggle.click();
+  const drawer = page.locator('.activity-drawer');
+  const open = drawer.locator(`a[href="${completed.outputUrl}"]:not([download])`);
+  await expect(open).toHaveCount(1, { timeout });
+  await expect(open).toHaveText('Open');
+  await expect(drawer.locator(`a[href="${completed.outputUrl}"][download]`)).toHaveCount(1);
+  await expect(drawer.locator(`a[href="${completed.receiptUrl}"]`)).toHaveText('Receipt');
   return { outputUrl: completed.outputUrl, receiptUrl: completed.receiptUrl };
 }

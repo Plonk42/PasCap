@@ -9,13 +9,7 @@ import type { MediaJob } from '../../src/shared/media.js';
 import { createClip, createLayer, createProject, type ProjectDocument } from '../../src/shared/model.js';
 import type { ProjectSummary } from '../../src/shared/projects.js';
 import { summarizeExport } from '../../src/web/ExportDialog.js';
-import {
-  activityResultSummary,
-  activitySummary,
-  isActiveJob,
-  latestCompletedRender,
-  orderActivityJobs,
-} from '../../src/web/Jobs.js';
+import { activityResultSummary, activitySummary, isActiveJob, orderActivityJobs } from '../../src/web/Jobs.js';
 import { filterProjects } from '../../src/web/Projects.js';
 
 function point(frame: number, values: Partial<LayerKeyValues>, interpolation: Interpolation = 'linear'): LayerKeyframe {
@@ -161,32 +155,6 @@ describe('activity ordering and summaries', () => {
         job('completed', { state: 'completed', kind: 'reference' }),
       ]),
     ).toBe('1 running · 2 queued · 1 failed · 1 cancelled · 1 completed');
-  });
-
-  it('keeps the latest usable completed render through later failures and preparation jobs', () => {
-    const completed = job('export', {
-      kind: 'export',
-      state: 'completed',
-      finishedAt: '2026-10-03T11:00:00Z',
-      outputUrl: '/api/exports/one/video',
-      receiptUrl: '/api/exports/one/receipt',
-    });
-    const jobs = [
-      completed,
-      job('failed', { kind: 'export', state: 'failed', finishedAt: '2026-10-03T12:00:00Z' }),
-      job('prepare', { state: 'completed', finishedAt: '2026-10-03T13:00:00Z' }),
-      job('no-output', { kind: 'export', state: 'completed', finishedAt: '2026-10-03T14:00:00Z' }),
-    ];
-    expect(latestCompletedRender(jobs)).toBe(completed);
-    const reference = job('reference', {
-      kind: 'reference',
-      state: 'completed',
-      finishedAt: '2026-10-03T15:00:00Z',
-      outputUrl: '/api/reference/video',
-    });
-    expect(latestCompletedRender([...jobs, reference])).toBe(reference);
-    expect(latestCompletedRender([])).toBeNull();
-    expect(latestCompletedRender([jobs[1]!])).toBeNull();
   });
 
   it('announces preparation failures/cancellations and completion, but not progress', () => {

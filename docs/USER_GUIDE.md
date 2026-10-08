@@ -100,9 +100,9 @@ Scrubbing or changing the range pauses first. Closing, switching sources/project
 or leaving the Source tab cancels playback. Source playback does not move the
 timeline or music and does not create Undo steps or saves. Failures expose Retry.
 
-Choose **Add excerpt**, mark another range, then add again: each addition creates
+Choose **Add** (it shows the applied range length, for example **Add 3.00 s**), mark another range, then add again: each addition creates
 an independent instance and keeps the source pinned at the same frame/range.
-The sticky **excerpts from this rush** popup lists existing ranges; **Show** selects,
+The sticky **Show N clips** button lists existing ranges; **Show** selects,
 seeks and reveals one on the timeline. Reuse badges count excerpts, not copied files.
 In Media, a hatched head/tail on a recording's thumbnail shows the omitted part of
 its applied range, like a miniature timeline.
@@ -127,7 +127,7 @@ Rows follow **bottom-to-top composition order**: row 1 renders below row 2, row 
 above row 2, and so on. There is no primary/overlay role or special first-track ID.
 Raise/Lower change composition priority; any track can be reordered or deleted
 except the last remaining track. Scroll over the tracks or layer headers to
-reach all rows and music. The time ruler and its playhead handle/timecode remain
+reach all rows and music. The time ruler and its playhead handle remain
 visible while scrolling; its ticks follow horizontal scroll, and clicking/dragging
 it seeks without editing a row. Layer options explains unavailable actions at
 stack endpoints or on the last remaining track. It contains only rename, Ripple,
@@ -444,8 +444,9 @@ pads/trims mixed AAC to full project duration, never freezing the last image.
 Music-only preview is black; export requires at least one retained video clip.
 
 Choose **Export** for a **1280×720 draft** or **3840×2160 final**, H.264 SDR BT.709
-from originals, with optional 48 kHz AAC music. The quality cards and storage meter
-show the selected preset, free space and an advisory planning allowance. Actual
+from originals, with optional 48 kHz AAC music. The quality cards show the selected
+preset and one line shows free space on the export drive; the advisory planning
+allowance and its meter are in **Storage details**. Actual
 compression/disk use can differ: this is not a guarantee or fixed-GB bound.
 Use **Storage details** for the output location and assumptions, **Refresh storage
 check** after freeing space, or **Retry storage check** after a mount/check error.
@@ -480,12 +481,13 @@ Trash icons delete; × closes or dismisses. Icon-only actions keep accessible na
 and tooltips. See the [editor control catalogue](design/EDITOR_CONTROLS.md) for
 control conventions and vocabulary.
 
-**Expand all / Collapse all** appears only in Clip and controls its four
+**Expand all / Collapse all** is an icon button on the Inspector tab row, shown only
+in Clip; it controls its four
 sections: **Source range**, **Placement**, **Speed** and **Transform**. Track,
 Audio, nested disclosures and help remain unchanged.
 
-The header directly exposes **Media / Inspector toggles and keyboard help**.
-**Workspace options** keeps Reset layout and Diagnostics.
+The header directly exposes keyboard help. **Workspace options** holds the
+**Media panel / Clip panel** toggles, Reset layout and Diagnostics.
 Drag panel dividers or use focused arrows; double-click/Home resets a divider and
 Escape cancels its drag. PasCap is designed for browser windows of at least
 1280 × 720; narrower windows use one side drawer at a time.

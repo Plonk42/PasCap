@@ -91,14 +91,22 @@
 }
 
 .inspector-panel.declutter-inspector > .inspector-tabs.panel-heading {
-  display: grid;
-  grid-template-columns: repeat(4, auto);
+  display: flex;
+  align-items: center;
   gap: 4px;
   min-height: 44px;
   padding: 6px;
 }
 
-.declutter-inspector .inspector-tabs > button {
+.declutter-inspector .inspector-tab-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(min-content, 1fr));
+  flex: 1 1 auto;
+  gap: 4px;
+  min-width: 0;
+}
+
+.declutter-inspector .inspector-tab-list > button {
   min-height: 32px;
   padding: 5px 4px;
   border: 1px solid transparent;
@@ -108,21 +116,16 @@
   white-space: nowrap;
 }
 
-.declutter-inspector .inspector-tabs > button[aria-selected='true'] {
+.declutter-inspector .inspector-tab-list > button[aria-selected='true'] {
   color: #e5f1e3;
   background: #304235;
   border-color: #4f6855;
 }
 
 .inspector-expansion {
-  display: flex;
-  justify-content: flex-end;
-  padding: 2px 10px;
-  border-bottom: 1px solid var(--border);
-}
-
-.inspector-expansion > button {
-  min-height: 28px;
+  flex: 0 0 auto;
+  min-width: 32px;
+  min-height: 32px;
 }
 
 .declutter-inspector > [hidden] {

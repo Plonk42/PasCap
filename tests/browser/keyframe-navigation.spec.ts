@@ -346,7 +346,9 @@ test('single opacity navigation on a selected empty row preserves Inspector cont
   await expect(options.getByRole('slider')).toHaveCount(0);
   await expect(options.getByRole('button', { name: /Opacity keyframe/ })).toHaveCount(0);
   await closeOptions(page);
+  await openOptions(page, 'Workspace options');
   await page.getByRole('button', { name: 'Toggle Clip panel', exact: true }).click();
+  await closeOptions(page);
   await page.getByRole('button', { name: 'Select layer Video 2', exact: true }).click();
   await expect(page.getByRole('tab', { name: 'Track', exact: true })).toHaveAttribute('aria-selected', 'true');
   const next = step(page, 'Opacity', 'Next');

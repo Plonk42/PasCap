@@ -5,7 +5,7 @@ import type { AudioAsset } from '../../src/shared/audio.js';
 import type { AudioDirectory, FootageRoot } from '../../src/shared/footage.js';
 import type { MediaJob } from '../../src/shared/media.js';
 import { createProject } from '../../src/shared/model.js';
-import { inspectorTab } from './editor-helpers.js';
+import { closeOptions, inspectorTab, panelToggle } from './editor-helpers.js';
 import { memoryProjects, type MemoryProjects } from './memory-projects.js';
 
 let memory: MemoryProjects;
@@ -63,8 +63,9 @@ test.beforeEach(async ({ page }) => {
 });
 
 async function audioControls(page: Page): Promise<void> {
-  const toggle = page.getByRole('button', { name: 'Toggle Clip panel', exact: true });
+  const toggle = await panelToggle(page, 'Clip');
   if ((await toggle.getAttribute('aria-pressed')) === 'false') await toggle.click();
+  await closeOptions(page);
   await inspectorTab(page, 'Audio');
   const section = page.getByRole('button', { name: 'Music section', exact: true });
   if ((await section.getAttribute('aria-expanded')) === 'false') await section.click();

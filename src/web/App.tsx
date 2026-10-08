@@ -59,7 +59,7 @@ import { ProjectTitle } from './ProjectTitle.js';
 import { editorShortcut } from './shortcuts.js';
 import { planTimelineDrop } from './timeline-placement.js';
 import { Timeline, type DraftPreview } from './Timeline.js';
-import { DEFAULT_LAYOUT, useWorkspace, WorkspaceResizer } from './workspace.js';
+import { DEFAULT_LAYOUT, defaultTimelineHeight, useWorkspace, WorkspaceResizer } from './workspace.js';
 
 interface EditorDebug {
   engine: PreviewEngine;
@@ -153,7 +153,7 @@ function WorkspacePanels({
     <fieldset className="workspace-panel-controls">
       <legend className="declutter-sr-only">Editor panels</legend>
       <button
-        className={`icon-button ${workspace.layout.mediaOpen ? 'active' : ''}`}
+        className={`secondary-button small ${workspace.layout.mediaOpen ? 'active' : ''}`}
         aria-label="Toggle Media panel"
         aria-controls="media-pane"
         aria-pressed={workspace.layout.mediaOpen}
@@ -166,10 +166,11 @@ function WorkspacePanels({
           })
         }
       >
-        <Icon name="folder" size={17} />
+        <Icon name="folder" size={16} />
+        Media panel
       </button>
       <button
-        className={`icon-button ${workspace.layout.inspectorOpen ? 'active' : ''}`}
+        className={`secondary-button small ${workspace.layout.inspectorOpen ? 'active' : ''}`}
         aria-label="Toggle Clip panel"
         aria-controls="inspector-pane"
         aria-pressed={workspace.layout.inspectorOpen}
@@ -182,7 +183,8 @@ function WorkspacePanels({
           })
         }
       >
-        <Icon name="sliders" size={17} />
+        <Icon name="sliders" size={16} />
+        Clip panel
       </button>
     </fieldset>
   );
@@ -1499,7 +1501,6 @@ export function App() {
             <span className="status-dot" />
             {project ? SAVE_LABEL[saveState.state] : 'Local workspace'}
           </output>
-          <WorkspacePanels workspace={workspace} disabled={draft !== null} />
           <button
             className="icon-button workspace-help"
             aria-label="Keyboard shortcuts"
@@ -1509,6 +1510,7 @@ export function App() {
             <Icon name="help" size={18} />
           </button>
           <Popover label="Workspace options" className="workspace-options">
+            <WorkspacePanels workspace={workspace} disabled={draft !== null} />
             <button
               className="secondary-button small"
               aria-label="Reset workspace layout"
@@ -1676,7 +1678,7 @@ export function App() {
                 onKeyDown={navigateViewerTabs}
                 onClick={() => setViewerMode('source')}
               >
-                Source preview{reviewPinned && <Icon name="pin" size={12} />}
+                Source preview
               </button>
               <span>
                 {reviewAsset && viewerMode === 'source'
@@ -1872,7 +1874,7 @@ export function App() {
             value={workspace.sizes.timeline}
             min={200}
             max={Math.max(200, Math.min(520, workspace.viewport.height - 360))}
-            defaultValue={DEFAULT_LAYOUT.timelineHeight}
+            defaultValue={defaultTimelineHeight(workspace.viewport.height)}
             onChange={(timelineHeight, persist) => workspace.update({ timelineHeight }, persist)}
           />
           <Timeline

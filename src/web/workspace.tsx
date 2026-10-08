@@ -3,32 +3,39 @@ import { useEffect, useRef, useState, type PointerEvent } from 'react';
 export interface WorkspaceLayout {
   mediaWidth: number;
   inspectorWidth: number;
-  timelineHeight: number;
+  /** `null` follows the viewport until the Timeline divider is moved. */
+  timelineHeight: number | null;
   mediaOpen: boolean;
   inspectorOpen: boolean;
 }
 export const DEFAULT_LAYOUT: Readonly<WorkspaceLayout> = Object.freeze({
   mediaWidth: 300,
   inspectorWidth: 320,
-  timelineHeight: 290,
+  timelineHeight: null,
   mediaOpen: true,
   inspectorOpen: true,
 });
 const STORAGE_KEY = 'pascap-workspace-layout';
+/** Short viewports start with a shorter Timeline so the preview row keeps usable height. */
+export function defaultTimelineHeight(viewportHeight: number): number {
+  return viewportHeight < 800 ? 220 : 290;
+}
+function defaultLayout(): WorkspaceLayout {
+  return { ...DEFAULT_LAYOUT, inspectorOpen: window.innerWidth >= 980 };
+}
 export function clampSize(value: number, min: number, max: number): number {
   return Math.max(Math.ceil(min), Math.min(Math.floor(max), Math.round(value)));
+}
+function validSize(value: unknown): boolean {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 180 && value <= 600;
 }
 export function validLayout(value: unknown): value is WorkspaceLayout {
   if (typeof value !== 'object' || value === null) return false;
   const layout = value as Record<string, unknown>;
   return (
-    ['mediaWidth', 'inspectorWidth', 'timelineHeight'].every(
-      (key) =>
-        typeof layout[key] === 'number' &&
-        Number.isFinite(layout[key]) &&
-        Number(layout[key]) >= 180 &&
-        Number(layout[key]) <= 600,
-    ) &&
+    validSize(layout['mediaWidth']) &&
+    validSize(layout['inspectorWidth']) &&
+    (layout['timelineHeight'] === null || validSize(layout['timelineHeight'])) &&
     typeof layout['mediaOpen'] === 'boolean' &&
     typeof layout['inspectorOpen'] === 'boolean'
   );
@@ -37,7 +44,11 @@ export function workspaceSizes(layout: WorkspaceLayout, width: number, height: n
   return {
     media: clampSize(layout.mediaWidth, 240, Math.max(240, Math.min(440, width * 0.29))),
     inspector: clampSize(layout.inspectorWidth, 270, Math.max(270, Math.min(440, width * 0.3))),
-    timeline: clampSize(layout.timelineHeight, 200, Math.max(200, Math.min(520, height - 360))),
+    timeline: clampSize(
+      layout.timelineHeight ?? defaultTimelineHeight(height),
+      200,
+      Math.max(200, Math.min(520, height - 360)),
+    ),
   };
 }
 export function useWorkspace() {
@@ -49,7 +60,7 @@ export function useWorkspace() {
     } catch {
       /* Unavailable UI preferences never prevent opening a project. */
     }
-    return { ...DEFAULT_LAYOUT, inspectorOpen: window.innerWidth >= 980 };
+    return defaultLayout();
   });
   const [viewport, setViewport] = useState({ width: window.innerWidth, height: window.innerHeight });
   const [storageError, setStorageError] = useState('');
@@ -86,7 +97,7 @@ export function useWorkspace() {
     sizes: workspaceSizes(layout, viewport.width, viewport.height),
     viewport,
     storageError,
-    reset: () => update({ ...DEFAULT_LAYOUT, inspectorOpen: viewport.width >= 980 }),
+    reset: () => update(defaultLayout()),
   };
 }
 

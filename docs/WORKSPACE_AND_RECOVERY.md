@@ -27,9 +27,9 @@ before Exposure, preserving neutral-white linear luminance before clipping only.
 They are not Kelvin/HDR/automatic white balance. HSL/curves remain static. See
 [Temperature and Tint](design/TEMPERATURE_AND_TINT.md).
 
-- Header: project picker/title, Undo/Redo, save state, direct **Media / Inspector**
-  toggles and keyboard help, **Workspace options** and Export. Workspace options
-  keeps layout reset and Diagnostics.
+- Header: project picker/title, Undo/Redo, save state, keyboard help,
+  **Workspace options** and Export. Workspace options holds the **Media panel /
+  Clip panel** toggles, layout reset and Diagnostics.
 - Left: independently scrolling Media list/grid with search, import and compact
   status. **Media options** holds filter/sort/view controls. A plain click reviews;
   checkboxes/Ctrl/Shift select. With two or more recordings selected, the
@@ -54,7 +54,7 @@ They are not Kelvin/HDR/automatic white balance. HSL/curves remain static. See
   directly visible; duplication/start nudging remain in Clip actions.
   Rows display the saved bottom-to-top composition array: row 1 renders below row 2,
   row 3 above row 2, and so on, with no primary/overlay role. The thin ruler remains
-  pinned above scrolling video rows with TIME ticks/separators, playhead handle/timecode and click/drag seeking;
+  pinned above scrolling video rows with TIME ticks/separators, playhead handle and click/drag seeking;
   distinct Cut/Fade/Dissolve buttons open boundary transitions, not keyframes.
 
 Viewer and Inspector tabs use native buttons with consistent padding, borders and
@@ -72,7 +72,9 @@ changes only a transient UI size; release saves the layout preference. Escape,
 pointer cancellation and lost capture restore the prior size. Dividers are disabled
 during timeline trim/shared-point/music drafts to preserve captured geometry.
 
-**Workspace options → Reset layout** restores defaults. Side-panel visibility and dimensions are
+**Workspace options → Reset layout** restores defaults. Until its divider is moved, the
+Timeline is 220 px tall on viewports under 800 px high and 290 px otherwise.
+Side-panel visibility and dimensions are
 browser-local UI preferences, never document/history fields. Sizes are clamped to
 viewport bounds. The supported minimum is a **1280 × 720** CSS viewport; 1440 × 900
 is the default desktop size. At supported sizes the workspace does not overflow
@@ -110,8 +112,9 @@ track cannot be deleted. Every other track can be reordered/deleted; the initial
 ID is not a protected base. Actions remain undoable, and active drafts/unavailable
 preview still block mutations.
 
-**Layer options → Ripple** is a native checkbox with contextual help and visible
-row state; new tracks default on. Layer options contains only rename, Ripple,
+**Layer options → Ripple** is a native checkbox with contextual help; the track
+header's Ripple toggle icon shows and switches the same setting. New tracks default on.
+Layer options contains only rename, Ripple,
 raise/lower and delete; visibility remains a separate sidebar control.
 **Track → Colour** contains the single **Opacity** native slider/exact
 `NumberField`/diamond/Previous/Next controls alongside the colour controls.
@@ -160,7 +163,8 @@ the clicked control. Inspector tab arrows/Home/End switch contexts without disca
 mounted content or its valid/invalid drafts within the same editing context.
 Selecting a clip or row keeps the chosen tab; explicit Cut/Fade/Dissolve boundary
 buttons open Track with that boundary expanded.
-**Expand all / Collapse all** appears only in Clip and changes its four
+**Expand all / Collapse all** is an icon button on the Inspector tab row, shown only
+in Clip; it changes its four
 sections: **Source range**, **Placement**, **Speed** and **Transform**, including
 temporarily absent Clip sections. A mixed state offers Expand all. Individual toggles
 and the existing section preferences remain authoritative. Track and Audio
@@ -730,9 +734,9 @@ failures and cancellations. Progress is numeric/bar-based; settled outcomes are
 announced without reading every progress poll aloud. Escape closes a focused drawer
 and returns focus to Activity, without pausing the editor or native job.
 
-Export summarizes contextual duration, clips/layers, track-local Ripple/transitions/
-fades/Opacity, shared row **points and participating settings**, enabled layers, profile
-and all independent music instances with a fixed snapshot. A point
+Export shows the project title, contextual duration and quality up front; its
+Rendering details hold the fixed snapshot with counts of clips/layers (enabled),
+track keyframes and animated settings, and all independent music instances. A point
 with several channels counts once, not as separate clip/channel keys. Both 720p/4K
 use originals. The static fast path requires neutral HSL/identity colour curves and one enabled, unanimated,
 zero-origin contiguous track with row Opacity 1, exactly neutral spatial bases
@@ -760,7 +764,8 @@ audio files (selected source + old/new accumulators). One final mixed input clam
 once before AAC. Audio planning is maximum selected PCM + two full-project Float64
 stereo timelines, duration-dependent and additional to video. Exact byte bounds are in
 [the resource contract](LAYERS_AND_KEYFRAMES.md#inspector-and-resource-limits). Export
-shows free space on its output/scratch volume and an explicitly advisory planning
+shows one line of free space on its output/scratch volume; **Storage details** holds
+the explicitly advisory planning
 allowance, not a compressed-size guarantee or time estimate. Low space/mount
 errors have recheck/recovery actions; genuine ENOSPC cleans only the failed job,
 preserving originals, saved edits and completed outputs. Storage and Rendering
@@ -778,8 +783,9 @@ Cancellation is one request per job until confirmed. **Cancelling…** means acc
 not finished; actual cancelled/failed/completed state controls output links. Queued
 jobs are cancellable. Failed status reads preserve the last-known jobs and show a
 read-only Refresh action. Polling is serial/cancellable; it never automatically
-resubmits a job. Old completed render shortcuts are hidden during submission/active
-renders to avoid mistaking an old receipt for the new output, but remain in history.
+resubmits a job. The Activity status strip shows only the running count and latest
+outcome; each finished render's Open/Download/Receipt links live with its job in the
+Activity drawer (and the Export dialog's completed exports).
 
 Finished MP4/receipt links survive later failures and restored successful history
 is preserved. Owned cancelled/failed scratch is cleaned by the unchanged service;

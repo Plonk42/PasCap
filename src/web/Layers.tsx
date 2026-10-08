@@ -192,14 +192,24 @@ export function Layers({
                   aria-label={`Select layer ${layer.name}`}
                   aria-pressed={layer.id === selectedId}
                   disabled={disabled}
-                  title={
-                    layer.ripple
-                      ? 'Ripple on: later clips follow the first clip’s track anchor'
-                      : 'Ripple off: clips keep independent project-frame starts'
-                  }
+                  title="Select this track"
                   onClick={() => onSelect(layer.id)}
                 >
                   {layer.name}
+                </button>
+                <button
+                  className={`icon-button layer-ripple-toggle ${layer.ripple ? 'active' : ''}`}
+                  aria-label={`Toggle Ripple on ${layer.name}`}
+                  aria-pressed={layer.ripple}
+                  title={
+                    layer.ripple
+                      ? 'Ripple on: later clips follow the first one. Click to keep independent starts.'
+                      : 'Ripple off: clips keep independent starts. Click to pack the track from its first clip.'
+                  }
+                  disabled={disabled}
+                  onClick={() => onEdit({ type: 'layer-update', layer: { ...layer, ripple: !layer.ripple } })}
+                >
+                  <Icon name="ripple" size={15} />
                 </button>
                 <Popover label={`Layer options ${layer.name}`} className="layer-options">
                   {(close) => (
@@ -291,9 +301,6 @@ export function Layers({
                   )}
                 </Popover>
               </div>
-              <span className="layer-kind">
-                {layer.ripple ? 'Ripple on' : 'Ripple off'} · row {index + 1}
-              </span>
             </div>
           );
         })}

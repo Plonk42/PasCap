@@ -1,9 +1,4 @@
 /* Final, scoped presentation layer. Editing/drag geometry and saved data stay unchanged. */
-.product-workspace .workspace-panel-controls {
-  gap: 3px;
-  padding-inline: 6px;
-}
-
 .inspector-loading {
   display: flex;
   align-items: center;
@@ -30,14 +25,6 @@
 .canvas-stage .preview-empty {
   overflow: auto;
   justify-content: safe center;
-}
-
-.product-workspace .workspace-panel-controls .icon-button {
-  border: 1px solid transparent;
-}
-
-.product-workspace .workspace-panel-controls .icon-button[aria-pressed='true'] {
-  border-color: #506c56;
 }
 
 .product-workspace .inspector-selection {

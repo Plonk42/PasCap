@@ -41,8 +41,8 @@ For several excerpts from one rush, set source IN/OUT and **Add excerpt**, then
 mark the next range and add again. Successful additions leave Source preview pinned
 to the same recording/frame, with the applied range unchanged and explicit success
 feedback. The source is not unmounted/reloaded for each addition. Failed insertion
-keeps the review/range and never reports success. **Add excerpt** and a compact
-**excerpts from this rush** popover stay in the sticky source header, including on
+keeps the review/range and never reports success. **Add** (labelled with the applied
+range length) and a compact **Show N clips** popover stay in the sticky source header, including on
 short laptop screens; opening the list does not resize source review. The popup
 shows original ranges/layers; Escape closes just the popup and **Show** selects, seeks and horizontally
 reveals that instance. Library reuse badges count excerpts, not duplicate source files.
@@ -165,8 +165,8 @@ OUT; source/placement quantisation and normal overlap/fade validation still appl
 
 The timeline's visible rush-edit controls expose **Split**, **Trim start**, **Trim end**,
 Delete and **IN / OUT / Cut range** in the existing responsive toolbar, not another
-row covering the lanes. It identifies **Ripple track** versus **Positioned track**
-from that track's own Ripple setting, not its row number or identity.
+row covering the lanes. Each track header has one **Ripple** toggle icon
+(`aria-pressed`) showing and switching that track's own setting in one Undo step.
 
 - **Split / S** maps the playhead through the placed retiming map and creates two
   independent excerpts. On success the right piece is selected and its beginning
@@ -543,8 +543,8 @@ steppers and existing timecode feedback, without arbitrary timing sliders.
 Source-review paired IN/OUT retains its explicit Apply workflow.
 **Clip / Track / Audio** separates clip-owned source/placement/speed/Transform,
 track-owned Colour/keyframes/transitions/fades, and music. The header directly exposes
-panel toggles and help; **Workspace options**
-holds layout reset and Diagnostics. **Layer options**
+help; **Workspace options**
+holds the Media/Clip panel toggles, layout reset and Diagnostics. **Layer options**
 holds only rename/Ripple/stacking/deletion; **Clip actions** holds duplication/nudging,
 while the frequent split/trim/delete/cut actions stay directly visible.
 Diagnostic counters, shader tests and the two-clip native comparison tool remain

@@ -756,3 +756,24 @@ test('cross-layer dragging uses scrolled lane coordinates and inserts before the
     await page.evaluate(() => window.pascapLab!.project()!.clips.find((clip) => clip.id === 'moving')),
   ).toMatchObject({ layerId: 'layer-5', start: 35 });
 });
+
+test('the track header Ripple toggle mirrors Layer options and switches in one Undo step', async ({ page }) => {
+  const toggle = page.getByRole('button', { name: 'Toggle Ripple on Video 1', exact: true });
+  await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+  await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+  expect(await page.evaluate(() => window.pascapLab!.project()!.layers[0]!.ripple)).toBe(false);
+  await openOptions(page, 'Layer options Video 1');
+  await expect(page.getByRole('checkbox', { name: 'Ripple on layer Video 1', exact: true })).not.toBeChecked();
+  await closeOptions(page);
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
+  await expect(page.locator('.layer-kind')).toHaveCount(0);
+  await expect(page.locator('.rush-edit-mode')).toHaveCount(0);
+  // The active empty track names itself as the insertion target; idle timelines show no status line.
+  await expect(page.locator('.timeline-lane-placeholder')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Add video layer', exact: true }).click();
+  await expect(page.locator('[data-layer-lane] .timeline-lane-placeholder')).toHaveText(['Insert here']);
+  await expect(page.locator('.timeline-bottom')).toHaveCount(0);
+});

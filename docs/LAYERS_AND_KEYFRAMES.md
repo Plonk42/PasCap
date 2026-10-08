@@ -74,7 +74,8 @@ Scroll over either the headers or tracks to reach all eight rows and music; nati
 vertical scrollbars and keyboard focus reveal stay synchronized. Horizontal timeline
 scroll is independent and scrolling never changes the project or playhead. The time
 ruler stays pinned above the rows, with horizontally aligned ticks and a visible
-playhead handle/timecode; click/drag seeking uses the same integer-frame geometry.
+playhead handle (timecode only during drafts; the preview transport shows it otherwise);
+click/drag seeking uses the same integer-frame geometry.
 Dropping on the ruler never targets a row concealed underneath it.
 Unavailable Raise/Lower/Delete actions have contextual accessible reasons for the
 actual stack endpoint, last remaining track or active interaction state.

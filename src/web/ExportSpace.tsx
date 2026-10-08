@@ -100,7 +100,10 @@ export function ExportSpace({ state }: Readonly<{ state: ExportSpaceState }>) {
     <section className="export-storage" aria-label="Export storage" data-status={space.status}>
       <div className="export-storage-heading">
         <Icon name={space.status === 'available' ? 'check' : 'warning'} size={17} />
-        <strong>{STORAGE_LABEL[space.status]}</strong>
+        <strong>{formatStorageBytes(space.availableBytes)} free on the export drive</strong>
+        <span className={space.status === 'available' ? 'declutter-sr-only' : 'export-storage-status'}>
+          {STORAGE_LABEL[space.status]}
+        </span>
         <button
           type="button"
           className="icon-button"
@@ -111,30 +114,6 @@ export function ExportSpace({ state }: Readonly<{ state: ExportSpaceState }>) {
           <Icon name="reset" size={14} />
         </button>
       </div>
-      <dl className="export-storage-values">
-        <div>
-          <dt>Free on export volume</dt>
-          <dd>{formatStorageBytes(space.availableBytes)}</dd>
-        </div>
-        <div>
-          <dt>Planning allowance</dt>
-          <dd>{formatStorageBytes(space.estimate.totalBytes)}</dd>
-        </div>
-      </dl>
-      <meter
-        min={0}
-        max={max}
-        low={max * 0.65}
-        high={max * 0.85}
-        optimum={0}
-        value={Math.min(max, space.estimate.totalBytes)}
-        aria-label="Planning allowance compared with available storage"
-        aria-valuetext={`${formatStorageBytes(space.estimate.totalBytes)} planning allowance; ${formatStorageBytes(space.availableBytes)} free. Actual use varies.`}
-      />
-      <p className="export-storage-note">
-        Allowance, not a prediction or guaranteed upper bound. Actual compression and other disk users change the space
-        needed.
-      </p>
       {space.status === 'blocked' && (
         <p className="export-storage-blocked" role="alert">
           Free at least {formatStorageBytes(MIN_EXPORT_FREE_BYTES)} to start, then recheck. A full render may need
@@ -146,6 +125,30 @@ export function ExportSpace({ state }: Readonly<{ state: ExportSpaceState }>) {
       )}
       <details className="export-storage-details">
         <summary>Storage details</summary>
+        <dl className="export-storage-values">
+          <div>
+            <dt>Free on export volume</dt>
+            <dd>{formatStorageBytes(space.availableBytes)}</dd>
+          </div>
+          <div>
+            <dt>Planning allowance</dt>
+            <dd>{formatStorageBytes(space.estimate.totalBytes)}</dd>
+          </div>
+        </dl>
+        <meter
+          min={0}
+          max={max}
+          low={max * 0.65}
+          high={max * 0.85}
+          optimum={0}
+          value={Math.min(max, space.estimate.totalBytes)}
+          aria-label="Planning allowance compared with available storage"
+          aria-valuetext={`${formatStorageBytes(space.estimate.totalBytes)} planning allowance; ${formatStorageBytes(space.availableBytes)} free. Actual use varies.`}
+        />
+        <p className="export-storage-note">
+          Allowance, not a prediction or guaranteed upper bound. Actual compression and other disk users change the
+          space needed.
+        </p>
         <p>Outputs and job-owned temporary files are stored here:</p>
         <output className="export-storage-path">{space.directory}</output>
         <dl>

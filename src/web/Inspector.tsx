@@ -107,7 +107,8 @@ function InspectorTabs({
   id,
   section,
   onSection,
-}: Readonly<{ id: string; section: InspectorMode; onSection: Props['onSection'] }>) {
+  trailing,
+}: Readonly<{ id: string; section: InspectorMode; onSection: Props['onSection']; trailing?: ReactNode }>) {
   const navigate = (event: KeyboardEvent<HTMLButtonElement>, mode: InspectorMode): void => {
     const index = INSPECTOR_MODES.findIndex((item) => item.id === mode);
     let next: number;
@@ -134,23 +135,26 @@ function InspectorTabs({
     event.currentTarget.parentElement?.querySelector<HTMLButtonElement>(`[data-inspector-mode="${target}"]`)?.focus();
   };
   return (
-    <div className="panel-heading inspector-tabs" role="tablist" aria-label="Inspector sections">
-      {INSPECTOR_MODES.map((mode) => (
-        <button
-          key={mode.id}
-          type="button"
-          role="tab"
-          id={`${id}-${mode.id}-tab`}
-          data-inspector-mode={mode.id}
-          aria-selected={section === mode.id}
-          aria-controls={`${id}-${mode.id}-panel`}
-          tabIndex={section === mode.id ? 0 : -1}
-          onClick={() => onSection(mode.id)}
-          onKeyDown={(event) => navigate(event, mode.id)}
-        >
-          {mode.label}
-        </button>
-      ))}
+    <div className="panel-heading inspector-tabs">
+      <div className="inspector-tab-list" role="tablist" aria-label="Inspector sections">
+        {INSPECTOR_MODES.map((mode) => (
+          <button
+            key={mode.id}
+            type="button"
+            role="tab"
+            id={`${id}-${mode.id}-tab`}
+            data-inspector-mode={mode.id}
+            aria-selected={section === mode.id}
+            aria-controls={`${id}-${mode.id}-panel`}
+            tabIndex={section === mode.id ? 0 : -1}
+            onClick={() => onSection(mode.id)}
+            onKeyDown={(event) => navigate(event, mode.id)}
+          >
+            {mode.label}
+          </button>
+        ))}
+      </div>
+      {trailing}
     </div>
   );
 }
@@ -723,7 +727,12 @@ export function Inspector({
   return (
     <InspectorExpansionContext value={expansion}>
       <aside className="inspector-panel panel declutter-inspector" aria-label="Clip inspector">
-        <InspectorTabs id={inspectorId} section={section} onSection={onSection} />
+        <InspectorTabs
+          id={inspectorId}
+          section={section}
+          onSection={onSection}
+          trailing={<InspectorExpansionControls expansion={expansion} hidden={section !== 'clip' || !placed} />}
+        />
         <div
           role="tabpanel"
           id={`${inspectorId}-clip-panel`}
@@ -732,7 +741,6 @@ export function Inspector({
         >
           {layer && clip && placed ? (
             <>
-              <InspectorExpansionControls expansion={expansion} />
               <div className="selected-clip-name inspector-selection">
                 <Icon name="video" size={17} />
                 <strong title={asset?.name}>{asset ? shortName(asset.name) : 'Unavailable recording'}</strong>

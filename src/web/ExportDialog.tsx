@@ -133,31 +133,6 @@ export function ExportDialog({
             )}
           </dd>
         </div>
-        <div>
-          <dt>Clips</dt>
-          <dd>{summary.clips}</dd>
-        </div>
-        <div>
-          <dt>Video layers</dt>
-          <dd>
-            {summary.layers}
-            <small>{summary.enabledLayers} enabled</small>
-          </dd>
-        </div>
-        <div>
-          <dt>Shared layer points</dt>
-          <dd>
-            {summary.keyframeCount}
-            <small>{summary.keys.settings} participating settings</small>
-          </dd>
-        </div>
-        <div>
-          <dt>Music tracks</dt>
-          <dd>
-            {summary.musicTracks}
-            {summary.musicTracks > 0 && <small>Linear mix · final clipping</small>}
-          </dd>
-        </div>
       </dl>
       {!summary.clips && <p className="activity-empty">Add a video clip to the project before exporting.</p>}
       <fieldset className="export-quality-field" disabled={submitting}>
@@ -198,6 +173,28 @@ export function ExportDialog({
         <summary>Rendering details</summary>
         <section className="activity-export-snapshot" id={`${id}-snapshot`}>
           <h3>Fixed snapshot</h3>
+          <dl className="activity-export-counts">
+            <div>
+              <dt>Clips</dt>
+              <dd>{summary.clips}</dd>
+            </div>
+            <div>
+              <dt>Video layers</dt>
+              <dd>
+                {summary.layers} <small>({summary.enabledLayers} enabled)</small>
+              </dd>
+            </div>
+            <div>
+              <dt>Track keyframes</dt>
+              <dd>
+                {summary.keyframeCount} <small>({summary.keys.settings} animated settings)</small>
+              </dd>
+            </div>
+            <div>
+              <dt>Music tracks</dt>
+              <dd>{summary.musicTracks}</dd>
+            </div>
+          </dl>
           <p>
             The submitted edit includes clip grades and speed, each track’s Ripple, transitions and fades, enabled
             layers, bottom-to-top composition order, row Opacity and keyframes

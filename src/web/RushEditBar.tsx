@@ -33,29 +33,6 @@ function markIsSet(marks: ClipCutRange | null, edge: 'inFrame' | 'outFrame'): bo
   return marks !== null && marks[edge] !== null;
 }
 
-function rushTrackMode(project: ProjectDocument, selected: PlacedClip | undefined) {
-  const layer = project.layers.find((item) => item.id === selected?.clip.layerId);
-  if (!layer)
-    return {
-      ripple: false,
-      mode: 'Select an excerpt',
-      modeHint: 'Select an excerpt to see its track’s Ripple setting. Every track has independent Layer options.',
-    };
-  return layer.ripple
-    ? {
-        ripple: true,
-        mode: 'Ripple track',
-        modeHint:
-          'Trim, cut, delete or reorder: later excerpts on this track close up from its first anchor. Other tracks, music and row points stay put.',
-      }
-    : {
-        ripple: false,
-        mode: 'Positioned track',
-        modeHint:
-          'Ripple is off: edits keep other clips at their independent project-frame starts. Enable Ripple in this track’s Layer options to pack it from its current first start.',
-      };
-}
-
 export function TimelineCutMarks({
   marks,
   selected,
@@ -117,14 +94,9 @@ export function RushEditBar({
   const hasIn = markIsSet(marks, 'inFrame');
   const hasOut = markIsSet(marks, 'outFrame');
   const error = markedCutError(project, marks);
-  const { ripple, mode, modeHint } = rushTrackMode(project, selected);
 
   return (
     <div className="rush-edit-bar" aria-label="Rush editing actions">
-      <span className={`rush-edit-mode ${ripple ? 'ripple' : ''}`} title={modeHint}>
-        <Icon name={ripple ? 'list' : 'layers'} size={15} />
-        <span className="declutter-sr-only">{mode}</span>
-      </span>
       <fieldset className="rush-quick-actions">
         <legend className="declutter-sr-only">Edit selected excerpt</legend>
         <button

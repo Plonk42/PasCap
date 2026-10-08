@@ -202,10 +202,7 @@ test('bulk collapse retains invalid drafts, nested disclosure state and reachabl
   await expect(input).toHaveValue('0.5');
   await expect(input).toHaveAttribute('aria-invalid', 'true');
   await page.setViewportSize({ width: 1280, height: 720 });
-  await expect(page.getByRole('button', { name: 'Toggle Clip panel', exact: true })).toHaveAttribute(
-    'aria-pressed',
-    'true',
-  );
+  await expect(page.getByRole('complementary', { name: 'Clip inspector', exact: true })).toBeVisible();
   const bulk = page.getByRole('button', { name: 'Collapse all Inspector settings', exact: true });
   await expect(bulk).toBeInViewport();
   expect((await bulk.boundingBox())!.height).toBeGreaterThanOrEqual(24);
@@ -273,7 +270,7 @@ test('click pins an already-hovered panel until an outside click, without steali
   await expect(trigger).toHaveAttribute('aria-pressed', 'true');
   await page.mouse.move(600, 20);
   await expect(panel).toBeVisible();
-  const outside = page.getByRole('button', { name: 'Toggle Media panel', exact: true });
+  const outside = page.getByRole('button', { name: 'Toggle snapping', exact: true });
   await outside.click();
   await expect(panel).toBeHidden();
   await expect(outside).toBeFocused();
@@ -742,10 +739,7 @@ for (const { width, height } of [
 ]) {
   test(`help remains unclipped with a 24px target and bounded panel at ${width}×${height}`, async ({ page }) => {
     await page.setViewportSize({ width, height });
-    await expect(page.getByRole('button', { name: 'Toggle Clip panel', exact: true })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    );
+    await expect(page.getByRole('complementary', { name: 'Clip inspector', exact: true })).toBeVisible();
     const trigger = page.getByRole('button', { name: 'Speed timing help', exact: true });
     const panel = await panelFor(page, trigger);
     await trigger.scrollIntoViewIfNeeded();
@@ -845,7 +839,7 @@ test.describe('touch help', () => {
     await trigger.tap();
     await expect(panel).toBeVisible();
     await expect(trigger).toHaveAttribute('aria-pressed', 'true');
-    await page.getByRole('button', { name: 'Toggle Media panel', exact: true }).tap();
+    await page.getByRole('button', { name: 'Toggle snapping', exact: true }).tap();
     await expect(panel).toBeHidden();
     expect(await current(page)).toEqual(before);
     expect(memory.saves).toBe(0);

@@ -298,8 +298,11 @@ async function sourceRange(page: Page, sourceIn: number, sourceOut: number): Pro
   await expect(page.locator('.source-range-strip')).toHaveAttribute('data-source-out', String(sourceOut));
 }
 
+/** The Add button names the applied range length it will insert, for example "Add 3.00 s". */
+const ADD_EXCERPT = /^Add \d+\.\d{2} s source excerpt to timeline$/;
+
 async function addExcerpt(page: Page): Promise<string> {
-  await page.getByRole('button', { name: 'Add source excerpt to timeline', exact: true }).click();
+  await page.getByRole('button', { name: ADD_EXCERPT }).click();
   const feedback = page.locator('.source-add-feedback');
   await expect(feedback).toHaveAttribute('data-added-clip-id', /^[a-zA-Z0-9_-]+$/);
   await expect(feedback).toHaveText('Excerpt added · mark another range');
@@ -412,7 +415,7 @@ test('three ranges from one rush keep the source pinned, independent, reloadable
   expect((await current(page)).clips).toEqual(added.clips);
 
   await page.locator('.source-excerpts > summary').click();
-  await expect(page.locator('.source-excerpts > summary')).toHaveText('3 excerpts from this rush');
+  await expect(page.locator('.source-excerpts > summary')).toHaveText('Show 3 clips');
   for (const [index, excerpt] of added.clips.entries()) {
     const row = page.locator(`.source-excerpt-row[data-clip-id="${excerpt.id}"]`);
     await expect(row.locator('.source-excerpt-range')).toHaveAttribute(
@@ -478,7 +481,7 @@ test('rush excerpt popup leaves review geometry and Add reachable on a short lap
   await sourceFrame(page, 30);
   const before = await current(page);
   const sourceBox = await page.locator('.source-preview').boundingBox();
-  const add = page.getByRole('button', { name: 'Add source excerpt to timeline', exact: true });
+  const add = page.getByRole('button', { name: ADD_EXCERPT });
   await expect(add).toBeInViewport();
   const trigger = page.locator('.source-excerpts > summary');
   await trigger.click();
@@ -841,7 +844,10 @@ test('overlay middle cuts keep their gap and neighbours fixed; visible quick tri
   await fixture(page, document);
   await selectClip(page, 'top');
   const before = await current(page);
-  await expect(page.locator('.rush-edit-mode')).toHaveText('Positioned track');
+  await expect(page.getByRole('button', { name: 'Toggle Ripple on Video 2', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'false',
+  );
   const firstTrackTop = await clip(page, 'a').evaluate((element) =>
     Number.parseFloat((element as HTMLElement).style.top),
   );
@@ -1345,7 +1351,7 @@ test('an overlapping source Add clears stale success feedback but keeps the sour
   const saves = memory.saves;
   const excerptCount = added.clips.filter((item) => item.mediaId === assets[0]!.id).length;
   await seek(page, 30); // Direct engine navigation does not close the independent source viewer.
-  await page.getByRole('button', { name: 'Add source excerpt to timeline', exact: true }).click();
+  await page.getByRole('button', { name: ADD_EXCERPT }).click();
   await expect(page.locator('.error-banner')).toContainText(
     'Clips on the same track cannot overlap except in an exact adjacent cross-dissolve.',
   );
