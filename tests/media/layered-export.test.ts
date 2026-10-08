@@ -420,6 +420,8 @@ describe.skipIf(!enabled)('schema-12 layered native export · disposable synthet
       for (const [index, asset] of assets.entries())
         expect(await readFile(asset.sourcePath)).toEqual(originalBytes[index]);
     },
+    // Exact CPU grading of UHD frames; hosted runner speed is not a correctness bound.
+    120_000,
   );
   function bounds(receipt: ExportReceipt): void {
     expect(receipt.settings.pipeline).toBe('sequential-layered');
