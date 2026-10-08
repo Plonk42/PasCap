@@ -64,7 +64,7 @@ preview is black; export still requires at least one retained video clip.
 **Layer options** contains only rename, Ripple, raise/lower and delete. Layer
 names apply on Enter/blur, Escape restores, and a rename is one Undo step. Selecting
 an empty row retains both its **Layer keyframes** context and the target for Media
-**+**/double-click/batch insertion. A populated layer selects its first excerpt and
+**+**/double-click insertion. A populated layer selects its first excerpt and
 reveals its row without changing placement. Selecting a clip or populated/empty
 row preserves the chosen Inspector tab and safely refreshes its editing context.
 Media drops target the row under the pointer: Ripple-on drops choose a sequence
@@ -432,7 +432,7 @@ recording/project change or tab switch. Playback uses this same sole verified pr
 decoder, with explicit start/stall failures after five seconds and Retry; no source
 audio/original playback, preparation, timeline/music seek or history/save is added.
 
-Plus, double-click, drag/drop and selected-batch insertion copy the latest choice
+Plus, double-click and drag/drop (including a dragged multi-selection) copy the latest choice
 into a new independent timeline instance. Without a choice they select the full
 source. Later derushing choices do **not** alter already inserted excerpts, original
 files or full proxies. The viewer stays out of list flow so hovering cannot move

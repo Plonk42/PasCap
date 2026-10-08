@@ -103,9 +103,10 @@ The sticky **excerpts from this rush** popup lists existing ranges; **Show** sel
 seeks and reveals one on the timeline. Reuse badges count excerpts, not copied files.
 In Media, a hatched head/tail on a recording's thumbnail shows the omitted part of
 its applied range, like a miniature timeline.
-Media **+**, double-click, drag/drop and batch insertion also copy the applied range
+Media **+**, double-click and drag/drop (dragging a selected recording carries the
+whole selection) also copy the applied range
 (or the full recording without a choice). Later source choices never alter existing
-excerpts. Plus/double-click/batch target the selected layer; a drop targets its row.
+excerpts. Plus/double-click target the selected layer; a drop targets its row.
 
 ## Assemble, trim and cut
 

@@ -225,9 +225,10 @@ and undoable, and never move music, other tracks or absolute row points.
   recordings can be added; the server validates registered source ranges on save.
 - Ripple-on drops choose the nearest legal sequence slot after temporarily removing
   a moving instance, including retained incoming dissolves. Ripple-off drops target
-  independent row/project placement. Plus/double-click/batch use
+  independent row/project placement. Plus/double-click use
   the selected layer; Ripple-on insertion appends, Ripple-off insertion starts at the
-  playhead, and a batch places its instances consecutively as one history operation.
+  playhead. Dragging any recording of a Media multi-selection drops every selected
+  ready recording consecutively as one history operation.
   Batch cursor positions use each new clip's contextual retiming end. Every path
   copies current source-review ranges, never arbitrary source paths or row points.
 - Existing excerpt drags reorder a Ripple-on track or change independent placement/track,
@@ -476,8 +477,9 @@ recording's applied source-review range, without a text badge; the exact frames
 are the review button's accessible description. Unapplied numeric drafts and
 existing excerpts do not change it. Search is always visible; **Media options**
 holds sort (name/duration/newest), readiness/usage filters and List/Grid. Checkboxes,
-Ctrl-click and Shift-click support selection; batch actions appear only with a
-selection. User imports automatically queue eligible proxies through one heavy
+Ctrl-click and Shift-click support selection; the **Select all** row then shows
+the selection count with **Prepare** (when needed) and **Clear selected**, without
+a separate footer or Add button. User imports automatically queue eligible proxies through one heavy
 worker, reusing ready/in-flight work. Manual preparation remains for legacy
 unprepared sources and explicit failed/cancelled retries; manual batches confirm
 before starting multiple jobs. Startup and hover never queue old recordings.

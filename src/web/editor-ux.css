@@ -269,7 +269,6 @@
 }
 
 .library-visible-count {
-  margin-left: auto;
   color: var(--muted);
   font-size: 11px;
 }
@@ -278,13 +277,32 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  margin-left: auto;
   padding: 2px 6px;
   min-height: 24px;
   border: 1px solid #537059;
   border-radius: 4px;
   color: var(--accent);
   font-size: 11px;
+}
+
+/* Negative block margin keeps the row height stable when a selection appears. */
+.library-selection-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-block: -4px;
+}
+
+.product-workspace .library-selection-actions .secondary-button {
+  min-height: 24px;
+  height: 24px;
+  padding: 0 8px;
+  font-size: 11px;
+}
+
+.library-selection-actions .icon-button {
+  width: 24px;
+  height: 24px;
 }
 
 .product-workspace .media-state > .media-state-icon {

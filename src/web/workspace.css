@@ -509,7 +509,6 @@ body {
 
 .product-workspace .library-search input,
 .product-workspace .library-tools select,
-.product-workspace .library-bulk > button,
 .product-workspace .library-summary {
   font-size: 12px;
 }
@@ -543,17 +542,6 @@ body {
 .product-workspace .media-state small,
 .product-workspace .media-resolution {
   font-size: 10px;
-}
-
-.library-target {
-  border-top: 1px solid var(--line);
-  padding: 7px 12px;
-  color: var(--muted);
-  font-size: 11px;
-}
-
-.library-target strong {
-  color: #d5e7d5;
 }
 
 .product-workspace .inspector-section .disclosure-trigger {

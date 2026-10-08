@@ -3,7 +3,7 @@ import type { ExportReceipt } from '../../src/server/export.js';
 import { NEUTRAL_COLOUR } from '../../src/shared/colour.js';
 import { applyCommand } from '../../src/shared/commands.js';
 import { planExportMusic } from '../../src/shared/export.js';
-import { createClip, createProject, projectSchema } from '../../src/shared/model.js';
+import { createClip, createLayer, createProject, projectSchema } from '../../src/shared/model.js';
 import { calculateLayout } from '../../src/shared/timeline.js';
 import {
   clipAction,
@@ -629,20 +629,96 @@ test('rejects transition-overlapping drag and stops outward handles at source li
   expect(await page.evaluate(() => window.pascapLab!.project()!.clips[0]!.sourceOut)).toBe(120);
 });
 
-test('batch adds full recordings with independent instances and one undo step', async ({ page }) => {
+test('dragging a Media multi-selection inserts every recording into Ripple-on and Ripple-off rows as one undo step', async ({
+  page,
+}) => {
+  const base = projectSchema.parse(await page.evaluate(() => window.pascapLab!.project()));
+  const rippleId = base.layers[0]!.id;
+  await page.evaluate(
+    (document) => window.pascapLab!.setDocument(document),
+    applyCommand(base, { type: 'layer-add', layer: createLayer('positioned', 'Positioned', false) }),
+  );
   await page.getByRole('checkbox', { name: 'Select pattern-a.mp4', exact: true }).check();
   await page.getByRole('checkbox', { name: 'Select pattern-b.mp4', exact: true }).check();
-  await page.getByRole('button', { name: 'Add selected', exact: true }).click();
-  let project = projectSchema.parse(await page.evaluate(() => window.pascapLab!.project()));
-  expect(project.clips).toHaveLength(4);
-  expect(project.clips.slice(2).map((clip) => [clip.sourceIn, clip.sourceOut])).toEqual([
+  const summary = page.locator('.library-summary');
+  await expect(summary).toContainText('2 selected');
+  await expect(page.getByRole('button', { name: 'Add selected' })).toHaveCount(0);
+  await expect(page.getByText('Insert into')).toHaveCount(0);
+  await expect(summary.getByRole('button', { name: 'Clear selected', exact: true })).toBeVisible();
+  const ids = base.media.videoIds.slice(0, 2);
+  const source = page
+    .getByRole('article')
+    .filter({ has: page.getByRole('button', { name: 'Review pattern-b.mp4', exact: true }) });
+  const surface = page.locator('.timeline-surface');
+  const drop = async (layerId: string, frame: number): Promise<void> => {
+    const leading = Number(await surface.getAttribute('data-leading'));
+    const scale = Number(await surface.getAttribute('data-pixels-per-frame'));
+    const area = (await surface.boundingBox())!;
+    const lane = (await page.locator(`[data-layer-lane="${layerId}"]`).boundingBox())!;
+    await source.dragTo(surface, {
+      targetPosition: { x: leading + frame * scale, y: lane.y - area.y + lane.height / 2 },
+    });
+  };
+  const added = async (layerId: string) => {
+    const project = projectSchema.parse(await page.evaluate(() => window.pascapLab!.project()));
+    return calculateLayout(project)
+      .clips.filter((placed) => placed.clip.layerId === layerId)
+      .filter((placed) => !base.clips.some((clip) => clip.id === placed.clip.id))
+      .map((placed) => ({
+        mediaId: placed.clip.mediaId,
+        range: [placed.clip.sourceIn, placed.clip.sourceOut],
+        placed,
+      }));
+  };
+
+  await drop(rippleId, calculateLayout(base).duration + 20);
+  let inserted = await added(rippleId);
+  expect(inserted.map((item) => item.mediaId).sort()).toEqual([...ids].sort());
+  expect(inserted.map((item) => item.range)).toEqual([
     [0, 120],
     [0, 120],
   ]);
-  expect(new Set(project.clips.map((clip) => clip.id)).size).toBe(4);
+  expect(inserted[1]!.placed.start).toBe(inserted[0]!.placed.end);
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
-  project = projectSchema.parse(await page.evaluate(() => window.pascapLab!.project()));
-  expect(project.clips).toHaveLength(2);
+  expect(await added(rippleId)).toEqual([]);
+
+  await drop('positioned', 30);
+  inserted = await added('positioned');
+  expect(inserted.map((item) => item.mediaId).sort()).toEqual([...ids].sort());
+  expect(inserted.map((item) => item.placed.start)).toEqual([30, inserted[0]!.placed.end]);
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  expect(await added('positioned')).toEqual([]);
+  expect(projectSchema.parse(await page.evaluate(() => window.pascapLab!.project())).layers).toHaveLength(2);
+
+  await summary.getByRole('button', { name: 'Clear selected', exact: true }).click();
+  await expect(summary).toContainText('Select all');
+});
+
+test('the selection header keeps Prepare and Clear keyboard reachable without starting work', async ({ page }) => {
+  const posts: string[] = [];
+  page.on('request', (request) => {
+    if (request.method() !== 'GET') posts.push(`${request.method()} ${new URL(request.url()).pathname}`);
+  });
+  const summary = page.locator('.library-summary');
+  await expect(summary.getByRole('button', { name: 'Prepare selected' })).toHaveCount(0);
+  // Both are deliberately unprepared fixtures, so Prepare must confirm before any job.
+  await page.getByRole('checkbox', { name: 'Select recording-05.mp4', exact: true }).check();
+  await page.getByRole('checkbox', { name: 'Select recording-06.mp4', exact: true }).check();
+  await expect(summary).toContainText('2 selected');
+  await page.getByRole('checkbox', { name: 'Select visible recordings', exact: true }).focus();
+  await page.keyboard.press('Tab');
+  await expect(summary.getByRole('button', { name: 'Prepare selected', exact: true })).toBeFocused();
+  await page.keyboard.press('Enter');
+  const confirm = page.getByRole('group', { name: 'Prepare 2 editing proxies?', exact: true });
+  await expect(confirm).toBeVisible();
+  await expect(summary.getByRole('button', { name: 'Prepare selected', exact: true })).toBeDisabled();
+  await confirm.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await expect(confirm).toHaveCount(0);
+  await summary.getByRole('button', { name: 'Clear selected', exact: true }).focus();
+  await page.keyboard.press('Enter');
+  await expect(summary).toContainText('Select all');
+  await expect(summary.getByRole('button', { name: 'Clear selected' })).toHaveCount(0);
+  expect(posts).toEqual([]);
 });
 
 test('drags a source between excerpts, keeps the full recording, then reorders it', async ({ page }) => {
