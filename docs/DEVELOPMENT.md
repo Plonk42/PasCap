@@ -166,13 +166,16 @@ The privileged `about:support` page is not navigable through this Firefox build'
 Playwright/Juggler integration, so it is not used as a potentially hanging diagnostic.
 
 Firefox gives its own startup GLX probe four seconds (`GFX_TEST_TIMEOUT`); if that
-probe is late, Firefox blocks WebGL2 for the whole session (`AllowWebgl2:false`).
-Hosted runs showed this intermittently while the native probe immediately
-afterwards succeeded, consistent with a cold first load of Mesa/LLVM. The
-prerequisite therefore runs the same bundled `gfxtest glx` once **before**
-launching Firefox and logs its duration. This only loads libraries: Firefox still
-runs its own probe and must create the real WebGL2 context; the warm-up result
-is evidence, never a gate, retry or capability override.
+probe is late or fails, Firefox blocks WebGL2 for the whole session
+(`AllowWebgl2:false`). Hosted runs showed this intermittently while the native
+probe immediately afterwards succeeded. A cold first load of Mesa/LLVM is the
+suspected cause but is **not confirmed**: the first hosted warm-up took 195 ms,
+and a local forced probe failure printed no reason on Firefox's stderr. The prerequisite
+runs the same bundled `gfxtest glx` once **before** launching Firefox and logs
+its duration. This only loads libraries: Firefox still runs its own probe and
+must create the real WebGL2 context; the warm-up result is evidence, never a
+gate, retry or capability override. If the failure recurs, compare the logged
+warm-up duration with the failure evidence before changing anything else.
 
 Headless Firefox also needs an available audio backend: a missing service can leave
 `AudioContext.resume()` suspended without rendering samples. The
