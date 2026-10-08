@@ -165,6 +165,15 @@ browser WebGL2 context; there is no context retry, force-enable or fallback.
 The privileged `about:support` page is not navigable through this Firefox build's
 Playwright/Juggler integration, so it is not used as a potentially hanging diagnostic.
 
+Firefox gives its own startup GLX probe four seconds (`GFX_TEST_TIMEOUT`); if that
+probe is late, Firefox blocks WebGL2 for the whole session (`AllowWebgl2:false`).
+Hosted runs showed this intermittently while the native probe immediately
+afterwards succeeded, consistent with a cold first load of Mesa/LLVM. The
+prerequisite therefore runs the same bundled `gfxtest glx` once **before**
+launching Firefox and logs its duration. This only loads libraries: Firefox still
+runs its own probe and must create the real WebGL2 context; the warm-up result
+is evidence, never a gate, retry or capability override.
+
 Headless Firefox also needs an available audio backend: a missing service can leave
 `AudioContext.resume()` suspended without rendering samples. The
 [Firefox runner](../scripts/ci/firefox.sh) starts a private PulseAudio server with a
@@ -250,6 +259,37 @@ need the [live inspection](#live-ui-inspection) below.
   run serves that output.
 - Docs-only changes need only `npm run format`. Never shorten timeouts, add retries
   or weaken assertions for speed.
+
+### CI-only failures and time limits
+
+Hosted runners have four shared vCPUs, no GPU (software WebGL) and variable speed.
+A failure seen only there usually means too little real-time or time-limit
+headroom, not an unreliable test. Treat it as a product or test-budget defect:
+
+1. `GH_TOKEN="$(gh auth token)" npm run ci:failures -- 30` groups failing tests
+   and Firefox prerequisites across the last 30 failed CI runs. A signature seen
+   twice is a bug: open an issue and fix it before more feature work.
+2. Reproduce first with `npm run test:browser:ci-like -- tests/browser/<spec>.spec.ts`:
+   the [CI-like configuration](../playwright.ci-like.config.ts) forces software
+   WebGL without a GPU process and pins the run to two cores
+   (`PASCAP_CI_LIKE_CPUS`, default `0-1`). Run it before pushing playback,
+   compositor or music changes too. It is a diagnostic, not a qualification.
+3. Fix the cause. Never add retries, skips or weaker assertions, and never turn
+   runner speed into a correctness or performance gate.
+
+Every Vitest and Playwright run reports, through the
+[timing reporters](../tests/timing/budget.ts), tests that used at least a third
+of their time limit, in the CI job summary and locally when any qualify. Size a
+heavy test's limit at roughly three times its measured time locally or CI-like;
+raising a limit for legitimately heavy work is fine. Tests installing music
+evidence add an informational `realtime-headroom` annotation: music starts and
+underruns, the lowest queued music at audio-thread receipts and, in Chrome, the
+longest main-thread task. These readings are never asserted.
+
+The [real-time stress workflow](../.github/workflows/realtime-stress.yml) repeats
+the Chrome music/playback regressions five times nightly and on manual dispatch
+(1–20 repeats). It is not a required check; a failure there is an early warning
+to triage like any CI-only failure.
 
 **Browser fixture setup resets `.pascap/browser-tests/`**; never store personal work
 there. It seeds twelve video memberships, music and proxies. Separate import-test

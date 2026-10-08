@@ -3,7 +3,7 @@ import type { AudioAsset } from '../../src/shared/audio.js';
 import type { MediaAsset } from '../../src/shared/media.js';
 import { createClip, createProject, type ProjectDocument } from '../../src/shared/model.js';
 import { memoryProjects, type MemoryProjects } from './memory-projects.js';
-import { installMusicEvidence } from './music-evidence.js';
+import { installMusicEvidence, observeRealtimeHeadroom } from './music-evidence.js';
 
 interface RecoveryFixture {
   memory: MemoryProjects;
@@ -93,6 +93,7 @@ async function openRecoveryProject(
   }
   const memory = await memoryProjects(page, project);
   await installMusicEvidence(page);
+  await observeRealtimeHeadroom(page, test.info());
   await page.addInitScript(() => {
     // Install before nested transpiled callbacks; init-script ordering is unspecified.
     Reflect.set(globalThis, '__name', (fn: unknown) => fn);

@@ -1,0 +1,66 @@
+name: Real-time stress
+
+# Repeats the real-time music/playback regressions on hosted runners to show
+# shrinking headroom before it fails a delivery run. Not a required check.
+on:
+  schedule:
+    - cron: '23 3 * * *'
+  workflow_dispatch:
+    inputs:
+      repeat:
+        description: Repetitions of each real-time test (1-20)
+        type: number
+        default: 5
+  pull_request:
+    branches: [main]
+    paths: [.github/workflows/realtime-stress.yml]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: realtime-stress-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  chrome:
+    name: Chrome real-time repeats
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      PASCAP_DATA_DIR: .pascap/ci
+      PASCAP_MEDIA_ROOTS: '[]'
+      PASCAP_FFMPEG: ${{ github.workspace }}/.ci/ffmpeg/bin/ffmpeg
+      PASCAP_FFPROBE: ${{ github.workspace }}/.ci/ffmpeg/bin/ffprobe
+      REPEAT: ${{ inputs.repeat || 5 }}
+      REALTIME: 'streaming music clock|streamed PCM|with music|held sources|withheld decoded callback|catch-up|Playing publication rechecks|comparison during music playback|actual mixed PCM'
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: 22
+          cache: npm
+      - uses: ./.github/actions/setup-ffmpeg
+      - run: npm ci
+      - name: Install Chrome
+        run: npx playwright install --with-deps chrome
+      - run: npm run build
+      - name: Prepare isolated browser fixtures
+        run: npx tsx scripts/fixtures.ts --browser
+      - name: Repeated real-time regressions
+        shell: bash
+        run: |
+          [[ $REPEAT =~ ^([1-9]|1[0-9]|20)$ ]] || { echo "repeat must be 1-20, got: $REPEAT"; exit 1; }
+          npx playwright test tests/browser/music-clock.spec.ts tests/browser/playback-recovery.spec.ts \
+            tests/browser/grade-comparison.spec.ts tests/browser/multiple-music.spec.ts \
+            --grep "$REALTIME" --repeat-each="$REPEAT" --reporter=dot,html,./tests/timing/playwright-reporter.ts
+      - name: Retain failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: realtime-stress-diagnostics-${{ github.run_attempt }}
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 7

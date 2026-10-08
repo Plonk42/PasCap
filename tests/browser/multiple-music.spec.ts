@@ -12,7 +12,7 @@ import {
 import { calculateLayout } from '../../src/shared/timeline.js';
 import { inspectorTab } from './editor-helpers.js';
 import { memoryProjects, type MemoryProjects } from './memory-projects.js';
-import { installMusicEvidence, observeMusicPlayback } from './music-evidence.js';
+import { installMusicEvidence, observeMusicPlayback, observeRealtimeHeadroom } from './music-evidence.js';
 
 // Exercise actual native gutters/thumbs, not Chrome's default hidden headless scrollbar.
 test.use({
@@ -514,6 +514,7 @@ test('actual mixed PCM gain/fades/placement continues over the last clip fade in
     for (let offset = 0; offset < bytes.length; offset += 2) pcm.push(bytes.readInt16LE(offset));
   }
   await installMusicEvidence(page, true, { pcm, tracks: document.music });
+  await observeRealtimeHeadroom(page, test.info());
   memory.seed(document);
   await page.reload();
   await ready(page, document);

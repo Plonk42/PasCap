@@ -1,5 +1,6 @@
-import type { Page } from '@playwright/test';
+import type { Page, TestInfo } from '@playwright/test';
 import type { MusicTrack } from '../../src/shared/model.js';
+import { MUSIC_CHUNK_SAMPLES } from '../../src/shared/music-format.js';
 
 export interface MusicReceipt {
   generation: number;
@@ -39,10 +40,51 @@ export interface MusicStreamEvidence {
   ranges: number;
   largestRange: number;
 }
+export interface RealtimeHeadroom {
+  document: string;
+  starts: number;
+  underruns: number;
+  /** Lowest queued music in blocks, from real audio-thread receipts. */
+  lowestQueued: number | null;
+  /** Longest main-thread task in milliseconds; null without the Long Tasks API. */
+  longestTask: number | null;
+  longTasks: number;
+}
 declare global {
   interface Window {
     musicStreamEvidence: MusicStreamEvidence;
+    pascapTestHeadroom?: (reading: RealtimeHeadroom) => Promise<void>;
   }
+}
+
+export function describeHeadroom(readings: readonly RealtimeHeadroom[]): string {
+  const total = (values: number[]): number => values.reduce((sum, value) => sum + value, 0);
+  const starts = total(readings.map((reading) => reading.starts));
+  const queued = readings.flatMap((reading) => (reading.lowestQueued === null ? [] : [reading.lowestQueued]));
+  const tasks = readings.flatMap((reading) => (reading.longestTask === null ? [] : [reading.longestTask]));
+  let music = 'no music started';
+  if (starts) {
+    const lowest = queued.length ? `${Math.min(...queued).toFixed(1)} blocks` : 'unreported';
+    music = `music starts ${starts}, underruns ${total(readings.map((reading) => reading.underruns))}, lowest queued ${lowest}`;
+  }
+  let main = 'main-thread long tasks unavailable';
+  if (tasks.length && Math.max(...tasks) > 0)
+    main = `longest main-thread task ${Math.round(Math.max(...tasks))} ms, ${total(
+      readings.map((reading) => reading.longTasks),
+    )} of at least 100 ms`;
+  else if (tasks.length) main = 'no main-thread task over 50 ms';
+  return `${music}; ${main}`;
+}
+
+/** Informational real-time margins, retained as an annotation even when the test fails. */
+export async function observeRealtimeHeadroom(page: Page, testInfo: TestInfo): Promise<void> {
+  const readings = new Map<string, RealtimeHeadroom>();
+  const annotation = { type: 'realtime-headroom', description: describeHeadroom([]) };
+  testInfo.annotations.push(annotation);
+  await page.exposeFunction('pascapTestHeadroom', (reading: RealtimeHeadroom) => {
+    readings.set(reading.document, reading);
+    annotation.description = describeHeadroom([...readings.values()]);
+  });
 }
 
 /** Observe actual audio-thread receipts/PCM output, never the engine's inferred frame. */
@@ -52,7 +94,7 @@ export async function installMusicEvidence(
   reference?: MusicSignalReference,
 ): Promise<void> {
   await page.addInitScript(
-    ({ captureSignal, reference }) => {
+    ({ captureSignal, reference, chunkSamples }) => {
       Reflect.set(globalThis, '__name', (fn: unknown) => fn);
       const evidence: MusicStreamEvidence = {
         starts: 0,
@@ -72,6 +114,42 @@ export async function installMusicEvidence(
         largestRange: 0,
       };
       window.musicStreamEvidence = evidence;
+      const topDocument = window.top === window;
+      const headroom = { lowestQueued: null as number | null, longestTask: null as number | null, longTasks: 0 };
+      const headroomDocument = topDocument ? crypto.randomUUID() : '';
+      let reportedHeadroom = '';
+      const reportHeadroom = (): void => {
+        if (!topDocument) return;
+        const reading = {
+          document: headroomDocument,
+          starts: evidence.starts,
+          underruns: evidence.underruns,
+          ...headroom,
+        };
+        const key = JSON.stringify([
+          reading.starts,
+          reading.underruns,
+          reading.lowestQueued?.toFixed(1),
+          reading.longestTask === null ? null : Math.round(reading.longestTask / 10),
+          reading.longTasks,
+        ]);
+        if (key === reportedHeadroom) return;
+        reportedHeadroom = key;
+        void window.pascapTestHeadroom?.(reading);
+      };
+      if (topDocument) {
+        if (PerformanceObserver.supportedEntryTypes.includes('longtask')) {
+          headroom.longestTask = 0;
+          new PerformanceObserver((list) => {
+            for (const entry of list.getEntries()) {
+              headroom.longestTask = Math.max(headroom.longestTask ?? 0, entry.duration);
+              if (entry.duration >= 100) headroom.longTasks++;
+            }
+            reportHeadroom();
+          }).observe({ type: 'longtask', buffered: true });
+        }
+        window.addEventListener('DOMContentLoaded', reportHeadroom, { once: true });
+      }
       if (captureSignal) {
         // Wrap only the synthetic test's processor. Observe its actual render
         // outputs after process(), without changing samples, clock or messages.
@@ -225,6 +303,7 @@ export async function installMusicEvidence(
               stopped = false;
               evidence.starts++;
               evidence.receipt = null;
+              reportHeadroom();
               window.dispatchEvent(new Event('pascap-test-music-start'));
             }
             if (message.kind === 'stop') {
@@ -254,6 +333,14 @@ export async function installMusicEvidence(
             if (data.kind === 'underrun') {
               evidence.underruns++;
               evidence.active = false;
+              reportHeadroom();
+            }
+            if (data.kind === 'rendered') {
+              const queued = (data.queued - data.samples) / chunkSamples;
+              if (headroom.lowestQueued === null || queued < headroom.lowestQueued) {
+                headroom.lowestQueued = queued;
+                reportHeadroom();
+              }
             }
             if (data.kind !== 'started' && data.kind !== 'rendered') return;
             evidence.receipt = {
@@ -367,7 +454,7 @@ export async function installMusicEvidence(
         }
       };
     },
-    { captureSignal, reference },
+    { captureSignal, reference, chunkSamples: MUSIC_CHUNK_SAMPLES },
   );
 }
 
