@@ -645,7 +645,6 @@ body {
 }
 
 .source-dock .source-review-heading > div > span,
-.source-dock .source-review-readout,
 .source-dock .source-range-description {
   font-size: 11px;
   color: var(--muted);
@@ -664,16 +663,6 @@ body {
 .source-dock .source-range-numbers input {
   font-size: 13px;
   padding: 5px 6px;
-}
-
-.source-dock .source-range-strip {
-  margin-inline: 10px;
-  height: 30px;
-}
-
-.source-dock .source-trim-handle {
-  width: 14px;
-  height: 23px;
 }
 
 .source-review-footer {
@@ -836,8 +825,7 @@ body {
   padding-top: 12px;
 }
 
-.source-dock .source-review-heading > div > span,
-.source-dock .source-review-readout small {
+.source-dock .source-review-heading > div > span {
   display: none;
 }
 

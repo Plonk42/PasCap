@@ -415,10 +415,15 @@ frame (`OUT = frame + 1`). At least one original frame is retained. Home/End on
 a handle restores 0 or the full frame count; there are no separate Mark or Reset
 buttons. Handle drafts commit only on release; Escape,
 pointer cancellation, lost capture or window blur discards them and restores the
-prior source frame. Labelled 30 × 28 px IN/OUT targets and omitted-footage hatching
-distinguish trimming from the separate source scrubber.
+prior source frame. Below the image, a timeline-like **source track** maps the whole
+original from frame 0 (left) to the exclusive OUT (right). It shows the five
+already-prepared snapshots (frames 0, ¼, ½, ¾ and last), hatches the omitted head
+and tail, and uses timeline-style IN/OUT trim handles with 24 px pointer targets;
+clicking or dragging elsewhere on the track scrubs. Missing snapshots show
+**Snapshots unavailable** without changing the track or starting preparation.
 
-Source **Play / Pause** stays muted and uses the applied IN/OUT, not numeric drafts.
+The round source **Play / Pause** button sits at the left of that track. It
+stays muted and uses the applied IN/OUT, not numeric drafts.
 It starts at the current observed frame when inside the range and before its last
 frame, otherwise IN; it stops and exact-seeks OUT − 1, without looping. A one-frame
 range displays that frame without playing. Scrub/trim/mark/Apply pause first.

@@ -1558,44 +1558,63 @@ test('source IN/OUT targets, omitted footage and reversible drafts remain reacha
   await page.getByRole('button', { name: 'Review pattern-a.mp4', exact: true }).click();
   await sourceRange(page, 25, 90);
   await sourceFrame(page, 50);
-  const handles = page.locator('.source-trim-handle');
-  const sizes = await handles.evaluateAll((elements) =>
-    elements.map((element) => ({
-      width: element.getBoundingClientRect().width,
-      height: element.getBoundingClientRect().height,
-      text: element.textContent?.trim(),
-    })),
-  );
-  expect(sizes).toEqual([
-    { width: 30, height: 28, text: 'IN' },
-    { width: 30, height: 28, text: 'OUT' },
+  const dock = page.locator('#source-view');
+  expect(await dock.evaluate((element) => element.scrollHeight - element.clientHeight)).toBe(0);
+  const strip = page.locator('.source-range-strip');
+  const track = (await strip.boundingBox())!;
+  const at = (frame: number) => track.x + (track.width * frame) / 120;
+  const play = page.getByRole('button', { name: 'Play source preview', exact: true });
+  const playBox = (await play.boundingBox())!;
+  expect(playBox).toMatchObject({ width: 36, height: 36 });
+  expect(playBox.x + playBox.width).toBeLessThan(track.x);
+  await expect(play).toBeInViewport();
+  const snapshots = page.locator('.source-filmstrip img');
+  await expect(snapshots).toHaveCount(5);
+  await expect(strip).toHaveAttribute('data-snapshots', 'true');
+  await expect(page.locator('.source-filmstrip-missing')).toHaveCount(0);
+  const handles = await page
+    .locator('.source-trim-handle')
+    .evaluateAll((elements) =>
+      elements.map((element) => ({ ...element.getBoundingClientRect().toJSON(), text: element.textContent })),
+    );
+  expect(handles.map(({ width, height, text }) => ({ width, height, text }))).toEqual([
+    { width: 12, height: track.height, text: '' },
+    { width: 12, height: track.height, text: '' },
   ]);
-  await expect(page.locator('.source-range-description')).toHaveCount(0);
-  for (const edge of ['before', 'after'])
+  expect(Math.abs(handles[0]!.right - at(25))).toBeLessThan(1);
+  expect(Math.abs(handles[1]!.left - at(90))).toBeLessThan(1);
+  for (const [edge, width] of [
+    ['before', at(25) - track.x],
+    ['after', track.x + track.width - at(90)],
+  ] as const)
     expect(
-      await page.locator(`.source-range-omitted.${edge}`).evaluate((element) => element.getBoundingClientRect().width),
-    ).toBeGreaterThan(0);
+      Math.abs(
+        (await page
+          .locator(`.source-range-omitted.${edge}`)
+          .evaluate((element) => element.getBoundingClientRect().width)) - width,
+      ),
+    ).toBeLessThan(1);
   const handle = page.getByRole('slider', { name: 'Trim source start', exact: true });
-  // A merely intersecting handle can sit behind the pinned source header in
-  // Firefox. Scroll it into the usable viewport before starting real capture.
-  await handle.evaluate((element) => element.scrollIntoView({ block: 'center' }));
-  const box = await handle.boundingBox();
-  if (!box) throw new Error('Source IN handle must be visible');
-  expect(
-    await handle.evaluate((element) => {
-      const bounds = element.getBoundingClientRect();
-      return element.contains(document.elementFromPoint(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2));
-    }),
-  ).toBe(true);
+  const box = (await handle.boundingBox())!;
+  // The visible 12 px handle has a wider pointer target on both sides.
+  for (const x of [box.x - 4, box.x + box.width / 2, box.x + box.width + 4])
+    expect(
+      await handle.evaluate((element, point) => element.contains(document.elementFromPoint(point.x, point.y)), {
+        x,
+        y: box.y + box.height / 2,
+      }),
+    ).toBe(true);
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await page.mouse.down();
   await page.mouse.move(box.x + box.width / 2 + 30, box.y + box.height / 2);
-  await expect(page.locator('.source-range-strip')).toHaveAttribute('data-range-draft', 'true');
-  await expect(page.locator('.source-range-description')).toHaveText('Release to apply · Esc to cancel');
+  await expect(strip).toHaveAttribute('data-range-draft', 'true');
+  await expect(page.locator('.source-drag-hint')).toHaveText('Release to apply · Esc to cancel');
+  expect(await strip.boundingBox()).toEqual(track);
   await expect(page.getByRole('button', { name: 'Play source preview', exact: true })).toBeDisabled();
   await page.keyboard.press('Escape');
   await page.mouse.up();
-  await expect(page.locator('.source-range-strip')).toHaveAttribute('data-source-in', '25');
+  await expect(strip).toHaveAttribute('data-source-in', '25');
+  await expect(page.locator('.source-drag-hint')).toHaveCount(0);
   await expect(page.locator('.source-range-description')).toHaveCount(0);
   await expect(page.locator('.source-preview')).toHaveAttribute('data-source-frame', '50');
   await handle.press('Home');
@@ -1605,6 +1624,29 @@ test('source IN/OUT targets, omitted footage and reversible drafts remain reacha
   await expect(page.locator('.source-range-strip')).toHaveAttribute('data-source-out', '120');
   await expect(page.locator('.source-preview')).toHaveAttribute('data-source-frame', '119');
   await flush(page);
+  expect(memory.saves).toBe(0);
+});
+
+test('missing source snapshots degrade explicitly without changing the track or starting preparation', async ({
+  page,
+}) => {
+  const requests: string[] = [];
+  page.on('request', (request) => {
+    if (request.method() !== 'GET') requests.push(`${request.method()} ${new URL(request.url()).pathname}`);
+  });
+  await page.route(/\/api\/media\/[^/]+\/thumbnail\/\d+$/, (route) => route.fulfill({ status: 404, body: '' }));
+  // Reload so no thumbnail can come from the document's already decoded image cache.
+  await fixture(page, sequence());
+  await page.getByRole('button', { name: 'Review pattern-a.mp4', exact: true }).click();
+  await sourceFrame(page, 40);
+  const strip = page.locator('.source-range-strip');
+  await expect(strip).toHaveAttribute('data-snapshots', 'false');
+  await expect(page.locator('.source-filmstrip-missing')).toHaveText('Snapshots unavailable');
+  expect((await strip.boundingBox())!.height).toBe(44);
+  await page.getByRole('slider', { name: 'Trim source start', exact: true }).press('Shift+ArrowRight');
+  await expect(strip).toHaveAttribute('data-source-in', '10');
+  await flush(page);
+  expect(requests).toEqual([]);
   expect(memory.saves).toBe(0);
 });
 

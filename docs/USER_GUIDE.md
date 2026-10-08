@@ -85,10 +85,12 @@ the displayed frame. Drag a handle back to an edge (or press **Home**/**End** on
 to restore the full recording. These choices are per-project, browser-local state,
 not portable project-document fields.
 
-The labelled **IN / OUT** handles restore omitted footage as well as trim; hatched
-parts are outside the selected range. Dragging previews the boundary frame; release
-applies, while Escape/capture loss/cancellation/window blur restores the prior choice.
-**Play / Pause** reviews the applied range, muted, from the current frame or IN.
+The source track under the image shows snapshots across the whole recording, like
+a timeline clip. Its **IN / OUT** handles restore omitted footage as well as trim;
+hatched parts are outside the selected range, and clicking elsewhere on the track
+scrubs. Dragging previews the boundary frame; release applies, while Escape/capture
+loss/cancellation/window blur restores the prior choice. The round **Play / Pause**
+button left of the track reviews the applied range, muted, from the current frame or IN.
 It stops at the last included frame (OUT − 1), without looping; a one-frame range
 just displays that frame. Numeric drafts are not played or inserted before Apply.
 Scrubbing or changing the range pauses first. Closing, switching sources/projects

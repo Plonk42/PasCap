@@ -485,11 +485,15 @@ IN/OUT handles, numeric Apply and I/O marks are non-destructive. OUT is
 exclusive; handle drafts cancel/release independently of timeline history/autosave.
 There are no separate Mark IN/OUT or Reset buttons: Home/End on a handle restores
 that edge. Invalid numeric drafts keep an inline error until Apply or Cancel.
-Visible **IN / OUT** handles have 30 × 28 px targets, separate from the source
-scrubber; hatching identifies omitted footage. Drag feedback previews IN or the
-last included frame (OUT − 1); Escape, pointer cancellation, capture loss or window
-blur restores the applied range and prior source frame.
-**Play / Pause** plays only the verified muted proxy within the applied range,
+The source track below the image spans the whole original with its five prepared
+snapshots; hatching identifies omitted footage and timeline-style **IN / OUT**
+handles (24 px pointer targets) trim, while the rest of the track scrubs. Drag
+feedback previews IN or the last included frame (OUT − 1) with an overlay hint on
+the image; Escape, pointer cancellation, capture loss or window blur restores the
+applied range and prior source frame. Missing snapshots degrade to an explicit
+**Snapshots unavailable** track without starting preparation.
+The round **Play / Pause** button at the left of the source track plays only the
+verified muted proxy within the applied range,
 from the current observed frame if it precedes the last included frame, otherwise
 from IN. It stops and seeks exactly OUT − 1, without looping or audio. A one-frame
 range simply displays that frame. Numeric drafts do not change the played range.
