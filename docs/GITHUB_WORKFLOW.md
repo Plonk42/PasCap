@@ -40,7 +40,20 @@ fix relevant new findings without suppressing them
    the **Delivery gate** passes; don't wait for CI in the session.
 3. If CI fails, the PR stays open: fix it on the same branch. If `main` moved and
    the PR conflicts, merge `main` into the branch. Rebase and force-push with
-   `--force-with-lease` only when explicitly asked.
+   `--force-with-lease` only when explicitly asked, or to drop an already
+   squash-merged base from your own unmerged branch.
+4. Don't stack dependent PRs that change persisted formats or shared playback/
+   compositor code: land each one before branching the next from `main`. One CI
+   problem in a stack blocks every PR above it.
+
+### CI failures
+
+A failure only on hosted runners is a real-condition signal, not flakiness. Group
+recent failures with `npm run ci:failures`, reproduce with the CI-like browser run
+and fix the cause ([steps](DEVELOPMENT.md#ci-only-failures-and-time-limits)). The
+same failing signature twice warrants a bug issue and takes priority over new
+feature work. Time limits may be raised for legitimately heavy work; runner speed
+is never a correctness or performance gate.
 
 ### Commits, closing issues and approvals
 
@@ -67,6 +80,11 @@ branch cancels the older run.
 | Chrome browser 1/4 to 4/4                | Full Chrome suite sharded by spec file, fresh fixtures per shard                                           |
 | Firefox music and playback               | Scoped Firefox regressions ([details](DEVELOPMENT.md#firefox-music-regression-and-optional-investigation)) |
 | Delivery gate                            | Succeeds only if every job above succeeded                                                                 |
+
+The separate [real-time stress workflow](../.github/workflows/realtime-stress.yml)
+repeats the Chrome music/playback regressions nightly and on manual dispatch. It
+is not a required check. Job summaries list tests near their time limits and
+real-time headroom readings.
 
 `main` protection: pull requests for non-admin pushes, **Delivery gate** as the
 only required check (branches need not be up to date), linear history, resolved

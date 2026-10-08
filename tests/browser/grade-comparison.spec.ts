@@ -7,7 +7,7 @@ import { createClip, createLayer, createProject, projectSchema, type ProjectDocu
 import { calculateLayout, sampleTimeline } from '../../src/shared/timeline.js';
 import { expandedInspectorPreferences, sharedPoint } from './editor-helpers.js';
 import { memoryProjects, type MemoryProjects } from './memory-projects.js';
-import { installMusicEvidence, observeMusicPlayback } from './music-evidence.js';
+import { installMusicEvidence, observeMusicPlayback, observeRealtimeHeadroom } from './music-evidence.js';
 
 interface PixelSummary {
   checksum: number;
@@ -874,9 +874,11 @@ test('comparison during music playback preserves the real worklet epoch and stri
   page,
   comparison,
 }) => {
-  test.setTimeout(40_000);
+  // About 18-19 s locally and under CI-like constraints; keep 3x for uncontrolled hosted runners.
+  test.setTimeout(60_000);
   comparison.guard.allowPCM = true;
   await installMusicEvidence(page);
+  await observeRealtimeHeadroom(page, test.info());
   await openFixture(page, comparison.playback);
   await observeMusicPlayback(page);
   const duration = calculateLayout(comparison.playback).duration;

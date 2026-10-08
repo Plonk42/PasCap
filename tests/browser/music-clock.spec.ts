@@ -3,7 +3,7 @@ import type { AudioAsset } from '../../src/shared/audio.js';
 import type { MediaAsset } from '../../src/shared/media.js';
 import { createClip, createProject } from '../../src/shared/model.js';
 import { memoryProjects } from './memory-projects.js';
-import { installMusicEvidence, observeMusicPlayback } from './music-evidence.js';
+import { installMusicEvidence, observeMusicPlayback, observeRealtimeHeadroom } from './music-evidence.js';
 
 for (const startFrame of [0, 40])
   test(`streaming music clock at frame ${startFrame} completes without repeated audio restarts`, async ({
@@ -36,6 +36,7 @@ for (const startFrame of [0, 40])
     ];
     const memory = await memoryProjects(page, project);
     await installMusicEvidence(page);
+    await observeRealtimeHeadroom(page, test.info());
     await page.goto(`/?project=${project.id}`);
     await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
     await observeMusicPlayback(page);
@@ -103,6 +104,7 @@ test('streamed PCM reaches the output with placement silence, real gain, selecte
   ];
   const memory = await memoryProjects(page, project);
   await installMusicEvidence(page, true);
+  await observeRealtimeHeadroom(page, test.info());
   await page.goto(`/?project=${project.id}`);
   await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
   await page.getByRole('button', { name: 'Play preview', exact: true }).click();

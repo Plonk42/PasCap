@@ -82,7 +82,7 @@ jobs:
       - name: Prepare isolated browser fixtures
         run: npx tsx scripts/fixtures.ts --browser
       - name: Browser regression tests
-        run: npx playwright test --shard=${{ matrix.shard }}/4 --reporter=dot,html
+        run: npx playwright test --shard=${{ matrix.shard }}/4 --reporter=dot,html,./tests/timing/playwright-reporter.ts
       - name: Retain failure diagnostics
         if: failure()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -124,7 +124,7 @@ jobs:
           GALLIUM_DRIVER: llvmpipe
           __GLX_VENDOR_LIBRARY_NAME: mesa
           __EGL_VENDOR_LIBRARY_FILENAMES: /usr/share/glvnd/egl_vendor.d/50_mesa.json
-        run: bash scripts/ci/firefox.sh npx playwright test --config=playwright.firefox.config.ts tests/browser/music-clock.spec.ts tests/browser/playback-recovery.spec.ts --grep 'streaming music clock|streamed PCM|with music normal speed|held sources|withheld decoded callback|with music and a callback-gated cancellation|native-event-ordered video catch-up|Playing publication rechecks' --output=test-results/firefox-music --reporter=dot
+        run: bash scripts/ci/firefox.sh npx playwright test --config=playwright.firefox.config.ts tests/browser/music-clock.spec.ts tests/browser/playback-recovery.spec.ts --grep 'streaming music clock|streamed PCM|with music normal speed|held sources|withheld decoded callback|with music and a callback-gated cancellation|native-event-ordered video catch-up|Playing publication rechecks' --output=test-results/firefox-music --reporter=dot,./tests/timing/playwright-reporter.ts
       - name: Retain failure diagnostics
         if: failure()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

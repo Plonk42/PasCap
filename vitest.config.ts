@@ -6,5 +6,6 @@ export default defineConfig({
     testTimeout: 60_000,
     hookTimeout: 60_000,
     maxWorkers: 2,
+    reporters: ['default', './tests/timing/vitest-reporter.ts'],
   },
 });
