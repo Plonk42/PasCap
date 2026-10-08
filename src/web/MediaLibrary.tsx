@@ -3,6 +3,7 @@ import {
   Suspense,
   useCallback,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
@@ -212,6 +213,7 @@ export function MediaLibrary({
     readPreference('pascap-media-view') === 'grid' ? 'grid' : 'list',
   );
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const rangeIdPrefix = useId();
   const selectAll = useRef<HTMLInputElement>(null);
   const [lastSelected, setLastSelected] = useState<string | null>(null);
   const [showImport, setShowImport] = useState(false);
@@ -523,8 +525,10 @@ export function MediaLibrary({
       )}
       <div className={`media-items ${view}`} onScroll={clearHover}>
         {visible.map((asset) => {
-          const range = resolveMediaSelection(asset.id, asset.metadata.frameCount, ranges);
-          const trimmed = range.sourceIn !== 0 || range.sourceOut !== asset.metadata.frameCount;
+          const count = asset.metadata.frameCount;
+          const range = resolveMediaSelection(asset.id, count, ranges);
+          const trimmed = range.sourceIn !== 0 || range.sourceOut !== count;
+          const rangeId = `${rangeIdPrefix}-${asset.id}`;
           const excerptCount = usage.get(asset.id) ?? 0;
           const excerptLabel = `${excerptCount} ${excerptCount === 1 ? 'excerpt' : 'excerpts'}`;
           const usageDescription = excerptCount > 0 ? `, ${excerptLabel} in timeline` : '';
@@ -558,6 +562,7 @@ export function MediaLibrary({
               <button
                 className="media-item-main"
                 aria-label={`Review ${asset.name}`}
+                aria-describedby={trimmed ? rangeId : undefined}
                 onClick={(event) => {
                   choose(event, asset.id);
                   activateReview(asset);
@@ -575,7 +580,7 @@ export function MediaLibrary({
                     : asset.sourcePath
                 }
               >
-                <span className="media-thumb">
+                <span className="media-thumb" data-source-in={range.sourceIn} data-source-out={range.sourceOut}>
                   {asset.prepared ? (
                     <img
                       loading="lazy"
@@ -585,6 +590,20 @@ export function MediaLibrary({
                     />
                   ) : (
                     <Icon name="video" size={23} />
+                  )}
+                  {range.sourceIn > 0 && (
+                    <span
+                      className="media-thumb-omitted before"
+                      style={{ width: `${(range.sourceIn / count) * 100}%` }}
+                      aria-hidden="true"
+                    />
+                  )}
+                  {range.sourceOut < count && (
+                    <span
+                      className="media-thumb-omitted after"
+                      style={{ width: `${((count - range.sourceOut) / count) * 100}%` }}
+                      aria-hidden="true"
+                    />
                   )}
                 </span>
                 <span className="media-item-info">
@@ -606,11 +625,8 @@ export function MediaLibrary({
                     )}
                   </span>
                   {trimmed && (
-                    <span
-                      className="media-range-badge"
-                      title={`Original frames ${range.sourceIn}–${range.sourceOut}, OUT exclusive`}
-                    >
-                      IN {range.sourceIn} · OUT {range.sourceOut}
+                    <span className="declutter-sr-only" id={rangeId}>
+                      Selected source range: frames {range.sourceIn} to {range.sourceOut} of {count}, OUT exclusive
                     </span>
                   )}
                 </span>

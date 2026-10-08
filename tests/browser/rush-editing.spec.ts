@@ -12,7 +12,7 @@ import {
 } from '../../src/shared/model.js';
 import { validateSourceRanges } from '../../src/shared/source-range.js';
 import { calculateLayout, layerClips } from '../../src/shared/timeline.js';
-import { clipAction, expandedInspectorPreferences, sharedPoint } from './editor-helpers.js';
+import { clipAction, closeOptions, expandedInspectorPreferences, openOptions, sharedPoint } from './editor-helpers.js';
 import { memoryProjects, type MemoryProjects } from './memory-projects.js';
 
 const PROJECT_ID = 'browser-rush-editing';
@@ -1648,6 +1648,79 @@ test('missing source snapshots degrade explicitly without changing the track or 
   await flush(page);
   expect(requests).toEqual([]);
   expect(memory.saves).toBe(0);
+});
+
+test('Media thumbnails dim the omitted head/tail of the applied source range, not drafts', async ({ page }) => {
+  const item = page.locator(`.media-item[data-media-id="${assets[0]!.id}"]`);
+  const review = page.getByRole('button', { name: 'Review pattern-a.mp4', exact: true });
+  const zones = () =>
+    item.locator('.media-thumb').evaluate((thumb) => {
+      const bounds = thumb.getBoundingClientRect();
+      const width = (edge: string) =>
+        thumb.querySelector(`.media-thumb-omitted.${edge}`)?.getBoundingClientRect().width;
+      return { thumb: bounds.width, before: width('before'), after: width('after') };
+    });
+  const expectZones = async (sourceIn: number, sourceOut: number) => {
+    const actual = await zones();
+    const expected = (frames: number) => (frames ? (actual.thumb * frames) / 120 : undefined);
+    for (const [edge, frames] of [
+      ['before', sourceIn],
+      ['after', 120 - sourceOut],
+    ] as const) {
+      if (!frames) expect(actual[edge]).toBeUndefined();
+      else expect(Math.abs(actual[edge]! - expected(frames)!)).toBeLessThan(0.5);
+    }
+  };
+  await review.click();
+  await expectZones(0, 120);
+  await expect(review).not.toHaveAccessibleDescription(/Selected source range/);
+  for (const [sourceIn, sourceOut] of [
+    [30, 90],
+    [30, 120],
+    [0, 45],
+    [59, 60],
+  ] as const) {
+    await sourceRange(page, sourceIn, sourceOut);
+    await expect(item.locator('.media-thumb')).toHaveAttribute('data-source-in', String(sourceIn));
+    await expect(item.locator('.media-thumb')).toHaveAttribute('data-source-out', String(sourceOut));
+    await expectZones(sourceIn, sourceOut);
+    await expect(review).toHaveAccessibleDescription(
+      `Selected source range: frames ${sourceIn} to ${sourceOut} of 120, OUT exclusive`,
+    );
+  }
+  await expect(item.getByText(/IN \d+ · OUT \d+/)).toHaveCount(0);
+  // Overlays never intercept the review button, hover marker or Add action.
+  const thumb = (await item.locator('.media-thumb').boundingBox())!;
+  expect(
+    await review.evaluate(
+      (button, point) => {
+        const hit = document.elementFromPoint(point.x, point.y);
+        return button.contains(hit) && !hit?.classList.contains('media-thumb-omitted');
+      },
+      { x: thumb.x + 2, y: thumb.y + thumb.height / 2 },
+    ),
+  ).toBe(true);
+
+  await page.getByRole('spinbutton', { name: 'Source IN', exact: true }).fill('10');
+  await expect(item.locator('.media-thumb')).toHaveAttribute('data-source-in', '59');
+  await expectZones(59, 60);
+  await page.getByRole('spinbutton', { name: 'Source IN', exact: true }).press('Escape');
+  await page.getByRole('slider', { name: 'Trim source end', exact: true }).press('End');
+  await page.getByRole('slider', { name: 'Trim source start', exact: true }).press('Home');
+  await expect(item.locator('.media-thumb')).toHaveAttribute('data-source-in', '0');
+  await expect(item.locator('.media-thumb')).toHaveAttribute('data-source-out', '120');
+  await expectZones(0, 120);
+  await expect(review).not.toHaveAccessibleDescription(/Selected source range/);
+
+  await sourceRange(page, 20, 100);
+  await openOptions(page, 'Media options');
+  await page.getByRole('button', { name: 'Grid view', exact: true }).click();
+  await closeOptions(page);
+  await expect(page.locator('.media-items')).toHaveClass('media-items grid');
+  await expectZones(20, 100);
+  await flush(page);
+  expect(memory.saves).toBe(0);
+  expect(await page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(0);
 });
 
 test('an invalid exact source range keeps its draft, an actionable error and no dangling description', async ({

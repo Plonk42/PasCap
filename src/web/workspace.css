@@ -545,10 +545,6 @@ body {
   font-size: 10px;
 }
 
-.product-workspace .media-range-badge {
-  color: #e0c891;
-}
-
 .library-target {
   border-top: 1px solid var(--line);
   padding: 7px 12px;

@@ -470,7 +470,11 @@ See [the multiple-music contract](design/MULTIPLE_MUSIC.md).
 ## Media browser and interface scope
 
 The default compact list has small thumbnails and independent vertical scrolling;
-the alternative grid uses two columns. Search is always visible; **Media options**
+the alternative grid uses two columns. Each thumbnail maps the whole original
+(frame 0 left, exclusive OUT right) and hatches the head/tail omitted by the
+recording's applied source-review range, without a text badge; the exact frames
+are the review button's accessible description. Unapplied numeric drafts and
+existing excerpts do not change it. Search is always visible; **Media options**
 holds sort (name/duration/newest), readiness/usage filters and List/Grid. Checkboxes,
 Ctrl-click and Shift-click support selection; batch actions appear only with a
 selection. User imports automatically queue eligible proxies through one heavy
