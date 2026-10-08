@@ -284,7 +284,7 @@ function singleProject(withMusic = false): ProjectDocument {
 }
 function gradedProject(withMusic = false): ProjectDocument {
   const project = singleProject(withMusic);
-  project.clips[0]!.colour = {
+  project.layers[0]!.colour = {
     exposure: 0.7,
     brightness: 0.1,
     contrast: 1.2,
@@ -299,11 +299,11 @@ function gradedLayersProject(): ProjectDocument {
   const project = gradedProject(true);
   const lower = project.layers[0]!;
   const left = project.clips[0]!;
+  lower.colour = { ...NEUTRAL_COLOUR, hue: 15, saturation: 0.8 };
   left.speed = { mode: 'constant', rate: 2 };
   const right = createClip('right', 'other-video', 100, 115, lower.id);
   right.start = 20;
   right.speed = { mode: 'constant', rate: 0.5 };
-  right.colour = { ...left.colour, hue: -40, saturation: 1.4 };
   lower.opacity = 0.55;
   lower.openingFade = 6;
   lower.closingFade = 8;
@@ -320,7 +320,7 @@ function gradedLayersProject(): ProjectDocument {
     {
       frame: 0,
       interpolation: 'smooth',
-      values: { ...EMPTY_KEY_VALUES, ...left.colour, opacity: 0.35 },
+      values: { ...EMPTY_KEY_VALUES, ...gradedProject().layers[0]!.colour, opacity: 0.35 },
     },
     {
       frame: 60,
@@ -754,7 +754,8 @@ describe('PreviewEngine final publication boundary', () => {
       const work = onEngineSample(preview, 69, () => {
         if (action === 'pause') preview.engine.pause();
         else if (action === 'seek') void preview.engine.seek(20);
-        else if (action === 'dirty') preview.engine.updateColour('clip', { ...NEUTRAL_COLOUR, exposure: 1 });
+        else if (action === 'dirty')
+          preview.engine.updateColour(preview.project.layers[0]!.id, { ...NEUTRAL_COLOUR, exposure: 1 });
         else preview.engine.setUngraded(true);
       });
       const published: string[] = [];
@@ -921,7 +922,7 @@ describe('PreviewEngine final publication boundary', () => {
     preview.engine.subscribe((state) => {
       if (!armed || state.status !== 'playing') return;
       armed = false;
-      preview.engine.updateColour('clip', { ...NEUTRAL_COLOUR, exposure: 1 });
+      preview.engine.updateColour(preview.project.layers[0]!.id, { ...NEUTRAL_COLOUR, exposure: 1 });
     });
     const published: string[] = [];
     preview.engine.subscribe((state) => published.push(state.status));
@@ -1197,7 +1198,7 @@ describe('PreviewEngine observed-frame tolerance and recovery', () => {
   it('does not retain stale appearance when the accepted texture needs an updated grade', async () => {
     const preview = await running(singleProject(true));
     Object.assign(slotFor(preview).video, { readyState: 1 });
-    preview.engine.updateColour('clip', { ...preview.project.clips[0]!.colour, exposure: 1 });
+    preview.engine.updateColour(preview.project.layers[0]!.id, { ...preview.project.layers[0]!.colour, exposure: 1 });
     tick(preview, 9);
     expect(preview.engine.diagnostics().status).toBe('buffering');
     expect(preview.compositor.visible).toBeNull();
@@ -1295,13 +1296,36 @@ describe('PreviewEngine observed-frame tolerance and recovery', () => {
       const map = calculateLayout(project).clips[0]!.retiming;
       expect([map.sourceAt(9), map.sourceAt(10), map.outputAt(0)]).toEqual([0, 1, 0]);
       const preview = await running(project);
-      slotFor(preview).observe(0);
+      const document = structuredClone(preview.project);
+      const slot = slotFor(preview);
+      slot.observe(0);
+      preview.engine.setUngraded(true);
+      expectNoMediaOperations(preview);
       tick(preview, 10);
-      // Frame 8 is now too old to retain. Frame 9 is an exact, fully graded redraw.
-      expect(preview.engine.diagnostics().frame).toBe(9);
-      expect(preview.compositor.drawFrame).toHaveBeenCalledTimes(1);
-      expectSurface(preview, 9);
-      expectUninterrupted(preview);
+      expect(preview.engine.diagnostics()).toMatchObject({
+        status: 'playing',
+        frame: 9,
+        requestedFrame: 10,
+        ungraded: true,
+      });
+      expectSurface(preview, 9, true);
+      expect(preview.compositor.uploadVideo).not.toHaveBeenCalled();
+      slot.observe(1);
+      vi.clearAllMocks();
+      preview.engine.setUngraded(false);
+      expectNoMediaOperations(preview);
+      tick(preview, 11);
+      expect(preview.engine.diagnostics()).toMatchObject({
+        status: 'playing',
+        frame: 11,
+        requestedFrame: 11,
+        ungraded: false,
+      });
+      expectSurface(preview, 11);
+      expect(preview.project).toEqual(document);
+      expect(preview.music.pause).not.toHaveBeenCalled();
+      expect(preview.music.start).not.toHaveBeenCalled();
+      expect(slot.seek).not.toHaveBeenCalled();
     },
   );
 
@@ -1857,7 +1881,7 @@ describe('PreviewEngine editor-only ungraded comparison', () => {
       expect(graded[0]!.clips.map((clip) => clip.blendWeight)).toEqual([0.5, 0.5]);
       expect(graded[0]!.clips.map((clip) => clip.sourceFrame)).toEqual([50, 102]);
       for (const clip of graded[0]!.clips) expect(clip.opacity).toBeCloseTo(0.45, 12);
-      expect(graded[1]!.clips[0]!.settings).not.toEqual(preview.project.clips[2]!.colour);
+      expect(graded[1]!.clips[0]!.settings).not.toEqual(preview.project.layers[1]!.colour);
     }
 
     preview.engine.setUngraded(true);
@@ -1889,7 +1913,6 @@ describe('PreviewEngine editor-only ungraded comparison', () => {
     project.clips[0]!.sourceOut = 20;
     const right = createClip('right', 'other-video', 100, 120);
     right.start = 20;
-    right.colour = { ...project.clips[0]!.colour, hue: -40 };
     project.clips.push(right);
     project.media.videoIds.push('other-video');
     project.layers[0]!.opacity = 0.7;
@@ -2010,7 +2033,7 @@ describe('PreviewEngine editor-only ungraded comparison', () => {
       highlights: 0.5,
       shadows: -0.4,
     };
-    preview.engine.updateColour('clip', edited);
+    preview.engine.updateColour(preview.project.layers[0]!.id, edited);
     expectSurface(preview, 8, true);
     expect(preview.engine.diagnostics().ungraded).toBe(true);
     expect(preview.project).toEqual(document);
@@ -2027,8 +2050,8 @@ describe('PreviewEngine editor-only ungraded comparison', () => {
     const original = structuredClone(preview.project);
     preview.engine.setUngraded(true);
     const edited = structuredClone(preview.project);
-    edited.clips[0]!.colour.hue = 90;
-    edited.clips[1]!.colour.saturation = 0.2;
+    edited.layers[0]!.colour.hue = 90;
+    edited.layers[0]!.colour.saturation = 0.2;
     edited.layers[0]!.keyframes[0]!.values.exposure = 2;
     edited.layers[0]!.keyframes[1]!.values.exposure = -2;
     edited.layers[1]!.keyframes[0]!.values.hue = 120;
@@ -2041,8 +2064,10 @@ describe('PreviewEngine editor-only ungraded comparison', () => {
     preview.project = submitted;
     preview.engine.setUngraded(false);
     expectSurface(preview, 25);
-    expect(preview.compositor.visible![0]!.clips[0]!.settings).toMatchObject({ exposure: 0, hue: 90 });
-    expect(preview.compositor.visible![0]!.clips[1]!.settings.saturation).toBe(0.2);
+    expect(preview.compositor.visible![0]!.clips[0]!.settings).toMatchObject({ exposure: 0, hue: 90, saturation: 0.2 });
+    expect(preview.compositor.visible![0]!.clips[1]!.settings).toEqual(
+      preview.compositor.visible![0]!.clips[0]!.settings,
+    );
     expect(preview.compositor.visible![1]!.clips[0]!.settings).not.toEqual(NEUTRAL_COLOUR);
     expect(preview.compositor.uploadVideo).not.toHaveBeenCalled();
     expectNoMediaOperations(preview);
@@ -2336,7 +2361,7 @@ describe('PreviewEngine editor-only ungraded comparison', () => {
     const { preview, slot, pending, recoveryFrame } = await pendingRecovery();
     const epoch = { clockFrame: preview.music.clockFrame, clockTime: preview.music.clockTime };
     const edited = structuredClone(preview.project);
-    edited.clips[0]!.colour = { ...gradedProject().clips[0]!.colour };
+    edited.layers[0]!.colour = { ...gradedProject().layers[0]!.colour };
     preview.engine.updateProjectAppearance(edited);
     preview.project = edited;
     vi.clearAllMocks();

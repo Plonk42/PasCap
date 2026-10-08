@@ -17,14 +17,14 @@ import { hasSpatialEdits } from '../src/shared/spatial.js';
 import { calculateLayout, layerClips } from '../src/shared/timeline.js';
 import { framesToSeconds } from '../src/shared/timing.js';
 
-const reportId = 'preview-v9';
+const reportId = 'preview-v10';
 const measurementProfile = {
   id: 'original-two-excerpts-v6',
   // Diagnostic profile format is independent of the project document schema.
   schemaVersion: 6,
-  projectSchemaVersion: 9,
+  projectSchemaVersion: 10,
   description:
-    'Strict schema-9 original two-excerpt colour/seek/transition/native-reference diagnostic: one enabled zero-origin contiguous track, unit row-owned Opacity, static clip grades, neutral spatial bases without spatial keys, constant 1× speed, no shared project-frame layer points and an empty music array.',
+    'Strict schema-10 original two-excerpt row-colour/seek/transition/native-reference diagnostic: one enabled zero-origin contiguous track, unit row-owned Opacity, static row Colour, neutral spatial bases without spatial keys, constant 1× speed, no shared project-frame layer points and an empty music array.',
 } as const;
 const url = process.env['PASCAP_MEASURE_URL'] ?? 'http://127.0.0.1:5173';
 const browser = await chromium.launch({
@@ -36,7 +36,7 @@ const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
 // tsx/esbuild preserves nested function names using this helper. Evaluated functions
 // are serialised into the page and cannot otherwise access the Node-side helper.
 await page.addInitScript('globalThis.__name = (fn) => fn;');
-// Keep historical report identifiers/output files separate from new schema-9 measurements.
+// Keep historical report identifiers/output files separate from new schema-10 measurements.
 const directory = path.resolve('.pascap/measurements', reportId);
 await mkdir(directory, { recursive: true });
 try {
@@ -54,7 +54,7 @@ try {
   // This is the original two-clip colour/seek comparison, not the production
   // layered renderer. Reject shared layer points/opacity rather than measure a false baseline.
   if (
-    original.schemaVersion !== 9 ||
+    original.schemaVersion !== 10 ||
     original.clips.length !== 2 ||
     original.music.length !== 0 ||
     original.clips.some((clip) => hasSpatialEdits(clip.spatial)) ||
@@ -62,7 +62,7 @@ try {
     original.clips.some((clip) => clip.speed.mode !== 'constant' || clip.speed.rate !== 1)
   )
     throw new Error(
-      'This schema-9 diagnostic expects two normal-speed excerpts on one enabled, opaque, zero-origin contiguous track, with neutral spatial bases and no spatial keys, music, extra layers or shared project-frame layer points. Choose a compatible project with PASCAP_MEASURE_URL (for example ?project=sample-taillefer-v6; the identifier is not its schema version); no saved document will be changed.',
+      'This schema-10 diagnostic expects two normal-speed excerpts on one enabled, opaque, zero-origin contiguous track, with static row Colour, neutral spatial bases and no spatial keys, music, extra layers or shared project-frame layer points. Choose a compatible project with PASCAP_MEASURE_URL; no saved document will be changed.',
     );
   const layout = calculateLayout(original);
   const clips = layerClips(original, original.layers[0]!.id);
@@ -115,13 +115,13 @@ try {
   await forEachSerial(grades, async (grade) => {
     colour.push(
       await page.evaluate(
-        async ({ settings, clipId }) => {
+        async ({ settings, layerId }) => {
           const engine = window.pascapLab!.engine;
-          engine.updateColour(clipId, settings);
+          engine.updateColour(layerId, settings);
           await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
           return { grade: settings, latencyMs: engine.diagnostics().colourLatencyMs };
         },
-        { settings: grade, clipId: clips[0]!.id },
+        { settings: grade, layerId: clips[0]!.layerId },
       ),
     );
   });
@@ -208,11 +208,10 @@ try {
   const comparisons: { frame: number; meanAbsoluteError8Bit: number }[] = [];
   let reference: unknown = null;
   if (process.argv.includes('--reference')) {
-    let snapshot = applyCommand(original, { type: 'colour', clipId: clips[0]!.id, colour: grades.at(-1)! });
-    snapshot = applyCommand(snapshot, {
+    const snapshot = applyCommand(original, {
       type: 'colour',
-      clipId: clips[1]!.id,
-      colour: { ...NEUTRAL_COLOUR, exposure: -0.25, hue: -6, saturation: 0.9 },
+      layerId: original.layers[0]!.id,
+      colour: grades.at(-1)!,
     });
     console.log('Rendering an immutable graded reference for browser/native comparison.');
     const response = await page.evaluate(async (document) => {
@@ -338,7 +337,7 @@ try {
     durationSeconds: framesToSeconds(layout.duration),
     notes: [
       'No saved edit is changed; only the independent engine is exercised.',
-      'Only strict schema-9 projects with neutral spatial bases and no spatial keys are measured; schema 1–8 data is incompatible and never migrated or defaulted.',
+      'Only strict schema-10 projects with static row Colour, neutral spatial bases and no spatial keys are measured; schema 1–9 data is incompatible and never migrated or defaulted.',
       'Diagnostic profile and reference receipt schema versions are independent of the project schema.',
       'This retains the original two-excerpt acceptance measurements, not shared-layer-point or layered-throughput certification.',
       'Colour latency is engine update to next paint, not full input-event/React latency.',

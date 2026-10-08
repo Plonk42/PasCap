@@ -10,6 +10,7 @@ void main() {
 // Deliberately implements docs/COLOUR_AND_TIMING.md, not an approximation of eq/hue.
 export const fragmentShader = `#version 300 es
 precision highp float;
+precision highp sampler2D;
 in vec2 uv;
 out vec4 outputColour;
 uniform sampler2D source0;
@@ -41,6 +42,7 @@ float encode709(float v) {
   return v < beta ? 4.5 * v : alpha * pow(v, 0.45) - (alpha - 1.0);
 }
 vec3 grade(vec3 code, vec4 tone, vec3 extra) {
+  if (all(equal(tone, vec4(0.0, 0.0, 1.0, 1.0))) && all(equal(extra, vec3(0.0)))) return code;
   vec3 rgb = vec3(decode709(code.r), decode709(code.g), decode709(code.b));
   rgb = (rgb * exp2(tone.x) - 0.18) * tone.z + 0.18 + tone.y;
   float maskY = clamp(dot(rgb, luma), 0.0, 1.0);
@@ -56,12 +58,15 @@ vec3 grade(vec3 code, vec4 tone, vec3 extra) {
   rgb = clamp(vec3(red, green, blue), 0.0, 1.0);
   return vec3(encode709(rgb.r), encode709(rgb.g), encode709(rgb.b));
 }
+vec3 sampleRgb(sampler2D source, vec2 coordinate) {
+  return texture(source, coordinate).rgb;
+}
 vec3 sampleGraded(sampler2D source, vec4 tone, vec3 extra, float aspect) {
   vec2 local = uv;
   if (aspect > canvasAspect) local.y = (uv.y - 0.5) * aspect / canvasAspect + 0.5;
   else local.x = (uv.x - 0.5) * canvasAspect / aspect + 0.5;
   if (any(lessThan(local, vec2(0.0))) || any(greaterThan(local, vec2(1.0)))) return vec3(0.0);
-  return grade(texture(source, local).rgb, tone, extra);
+  return grade(sampleRgb(source, local), tone, extra);
 }
 vec4 sampleSpatial(sampler2D source, vec4 tone, vec3 extra, float aspect,
                    vec3 rowU, vec3 rowV, vec4 crop, float neutral) {
@@ -72,7 +77,7 @@ vec4 sampleSpatial(sampler2D source, vec4 tone, vec3 extra, float aspect,
   // Crop IN is inclusive; OUT is exclusive, without refitting the image.
   if (original.x < crop.x || original.x >= 1.0 - crop.y ||
       original.y < crop.z || original.y >= 1.0 - crop.w) return vec4(0.0);
-  return vec4(grade(texture(source, vec2(original.x, 1.0 - original.y)).rgb, tone, extra), 1.0);
+  return vec4(grade(sampleRgb(source, vec2(original.x, 1.0 - original.y)), tone, extra), 1.0);
 }
 void main() {
   vec4 left = sampleSpatial(source0, tone0, extra0, imageAspect.x,

@@ -27,7 +27,6 @@ export const clipSchema = z
     start: frameSchema,
     sourceIn: frameSchema,
     sourceOut: frameSchema.positive(),
-    colour: colourSchema,
     speed: speedSchema,
     spatial: spatialSettingsSchema,
   })
@@ -55,6 +54,7 @@ export const layerSchema = z
     enabled: z.boolean(),
     // Row-wide source coverage when Opacity has no participating points.
     opacity: z.number().min(0).max(1),
+    colour: colourSchema,
     keyframes: z
       .array(layerKeyframeSchema)
       .max(256)
@@ -98,7 +98,7 @@ export const musicTracksSchema = z
 
 const baseProjectSchema = z
   .object({
-    schemaVersion: z.literal(9),
+    schemaVersion: z.literal(10),
     id: idSchema,
     title: z.string().trim().min(1).max(200),
     media: z
@@ -142,6 +142,7 @@ export function createLayer(id: string, name: string, ripple = true): VideoLayer
     name,
     enabled: true,
     opacity: 1,
+    colour: { ...NEUTRAL_COLOUR },
     keyframes: [],
     ripple,
     transitions: [],
@@ -152,7 +153,7 @@ export function createLayer(id: string, name: string, ripple = true): VideoLayer
 
 export function createProject(id: string, title: string): ProjectDocument {
   return projectSchema.parse({
-    schemaVersion: 9,
+    schemaVersion: 10,
     id,
     title,
     media: { videoIds: [], audioIds: [] },
@@ -179,7 +180,6 @@ export function createClip(
     start: 0,
     sourceIn,
     sourceOut,
-    colour: { ...NEUTRAL_COLOUR },
     speed: { ...NORMAL_SPEED },
     spatial: createSpatialSettings(),
   });

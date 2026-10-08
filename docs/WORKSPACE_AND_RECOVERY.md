@@ -1,6 +1,6 @@
 # Desktop workspace and recovery
 
-The workspace uses **strict schema 9 with required clip spatial settings, uniform video tracks, required per-track
+The workspace uses **strict schema 10 with required row colour, independent clip spatial settings, uniform video tracks, required per-track
 Ripple/transitions/fades, 0–8 independently identified music instances, project-specific
 video/music bins and draggable shared project-time row points**, with per-setting channel navigation. Layout preferences,
 stored-point inspection and recovery feedback remain editor-only. Source protection,
@@ -13,6 +13,12 @@ are in [the resource contract](LAYERS_AND_KEYFRAMES.md#inspector-and-resource-li
 The intended discrete-GPU and long real-flight checks remain deferred.
 
 ## Layout and navigation
+
+Main **Clip → Colour** edits seven row colour values and sole Opacity, including
+on empty rows. Static and keyed Colour share this row ownership on every clip.
+Different treatments require different rows; there is no per-clip grade or scope
+toggle. Sources are graded once; Ungraded neutralizes row Colour only.
+See [row appearance](design/ROW_APPEARANCE.md) for reset, context and storage details.
 
 - Header: project picker/title, Undo/Redo, save state, direct **Media / Inspector**
   toggles and keyboard help, **Workspace options** and Export. Workspace options
@@ -101,7 +107,7 @@ row with no selected clip.
 With keys, that channel overrides the row value on every clip and both dissolve
 sources; missing participation at the real playhead is read-only until captured
 with the diamond. Sliders never create implicit keys. Unkeyed colour remains
-per-clip; Opacity is composition coverage, not SDR RGB grading.
+row-owned with or without keys. Opacity is composition coverage, not SDR RGB grading.
 **Clip → Placement** contains placement only, without an Opacity or sidebar duplicate.
 Enabling Ripple packs current clips from the first
 current start, closing gaps in one Undo and retaining valid dissolves. While on,
@@ -196,7 +202,7 @@ there is no global comparison shortcut. **Source preview** is unaffected.
 
 The ungraded view is the composed preview without grading, not original-resolution
 footage or the selected clip in isolation. All evaluated colour settings are neutral
-across enabled rows, including static clip bases, row colour keys and both dissolve
+across enabled rows, including row colour bases/keys and both dissolve
 participants. Exact observed source frames and retiming, spatial geometry/coverage, row Opacity,
 visibility, black fades, stacking and music are preserved.
 
@@ -315,7 +321,7 @@ values/contextual timing are rejected without changing the committed document,
 never merged or overwritten. One easing is shared at a point,
 but each channel interpolates toward its own **next participating point**, with
 endpoint holds and unkeyed values only for entirely unanimated channels: row
-`opacity` for Opacity, clip colour/speed settings otherwise. Row
+`opacity` for Opacity, row `colour` for colour, clip speed otherwise. Row
 input identity/focus and drafts survive time reordering and Undo;
 no persisted point IDs are added.
 
@@ -364,7 +370,7 @@ In Clip, Reset speed to 1× changes only an active Speed participant when animat
 without Speed keys it resets the selected clip's constant/ramp/custom base.
 It never clears the row curve or unrelated point participants. Colour **Reset keys**
 changes only enabled colour values at the current point; individual resets also
-handle unanimated clip bases. Stored-point resets in Keyframes target that
+handle unanimated row colour bases. Stored-point resets in Keyframes target that
 point's existing participant, not a different value at the playhead.
 Trim/move/split/duplicate do not copy or shift row points. The contract is in
 [LAYERS_AND_KEYFRAMES.md](LAYERS_AND_KEYFRAMES.md).
@@ -403,7 +409,7 @@ uncertain write keeps selection and the actual error visible, with guidance to c
 Activity/project state before repeating the import; there is no automatic write retry.
 Late folder reads are aborted on navigation/dismissal. Manual music paths remain
 deliberate imports outside browser roots and never expand configured roots. No original is
-copied: strict schema 9 references registered originals in place, with only
+copied: strict schema 10 references registered originals in place, with only
 generated proxies/thumbnails, metadata, exports/receipts and scratch written locally.
 
 There is no upload endpoint, browser file picker, optional copy flow or true
@@ -542,7 +548,7 @@ saved document. It never deletes original recordings, shared registry entries,
 proxies/cache files, successful MP4s or receipts. This is not cache garbage
 collection; another project's membership and immutable export snapshots are unaffected.
 
-Only strict v9 projects and v9 project snapshots in version-1 export receipts are interpreted.
+Only strict v10 projects and v10 project snapshots in version-1 export receipts are interpreted.
 Every clip requires complete spatial base/full-pose source-frame keys with easing;
 missing spatial data is invalid, not default-filled. Original-source keys remain
 stored outside trims and at original exclusive OUT, without extending duration.
@@ -561,7 +567,7 @@ a missing saved value is invalid, not default-filled. Every point requires exact
 nine nullable fields: `opacity`, `speed` and the seven colour channels. Row
 `opacity` is the sole valid stored value; saved `clip.opacity` and old
 `clipOpacity`/`layerOpacity` channels are invalid, not ignored or defaulted.
-Earlier v1–v8 projects/receipt snapshots are preserved, incompatible
+Earlier v1–v9 projects/receipt snapshots are preserved, incompatible
 and never migrated or rewritten with fallback/default local fields or old-format
 readers. **Create a new
 project** and import its media deliberately; there is no automatic deletion of
@@ -608,6 +614,7 @@ healthy music. Crossing into an empty composition advances to black or completio
 Music uses **one AudioContext/worklet/output clock** with an aggregate **four ×
 128 KiB mixed Float32 blocks**, serial source reads, shared **64 KiB range scratch**,
 one **128 KiB conversion workspace** and one **128 KiB mixed-output workspace**.
+Those reads and refills run in one dedicated reader worker, not on the editor thread.
 No per-instance queue/clock, full-file or duration-sized silence buffer is added.
 The actual rendered mixed origin/output timestamp
 governs A/V playback; block-updated media-element time does not trigger false
@@ -657,7 +664,7 @@ invalid release leaves the saved document and history unchanged.
 For an HTTP 409 or incompatible save response, **Review latest save** explains:
 
 1. **Keep editing this draft** — no saved document changes; the save error persists.
-2. **Download unsaved project** — download a strict v9 JSON snapshot with the current
+2. **Download unsaved project** — download a strict v10 JSON snapshot with the current
    local changes/expected revision before replacing them.
 3. **Discard local changes and reload** — explicitly replace local history/document
    with a newly read saved version. It performs no overwrite POST/PUT.

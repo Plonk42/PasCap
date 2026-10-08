@@ -109,10 +109,10 @@ function rejected(document: ProjectDocument, command: EditCommand, message: stri
   expect(history.canRedo).toBe(false);
 }
 
-describe('strict uniform schema-9 tracks', () => {
+describe('strict uniform schema-10 tracks', () => {
   it('uses Ripple ON for the initial track and every newly created track', () => {
     const initial = createProject('new', 'New');
-    expect(initial.schemaVersion).toBe(9);
+    expect(initial.schemaVersion).toBe(10);
     expect(initial.layers).toEqual([createLayer(BASE_LAYER_ID, 'Video 1')]);
     for (const id of [BASE_LAYER_ID, ...Array.from({ length: 8 }, (_, index) => `arbitrary-${index}`)]) {
       expect(createLayer(id, 'Track')).toEqual({
@@ -120,6 +120,7 @@ describe('strict uniform schema-9 tracks', () => {
         name: 'Track',
         enabled: true,
         opacity: 1,
+        colour: { ...NEUTRAL_COLOUR },
         keyframes: [],
         ripple: true,
         transitions: [],
@@ -135,7 +136,7 @@ describe('strict uniform schema-9 tracks', () => {
   it('requires every new track field, rejects old global fields and never injects fallbacks', () => {
     const document = fixture();
     expect(projectSchema.parse(document)).toEqual(document);
-    for (const field of ['opacity', 'ripple', 'transitions', 'openingFade', 'closingFade'] as const) {
+    for (const field of ['colour', 'opacity', 'ripple', 'transitions', 'openingFade', 'closingFade'] as const) {
       const { [field]: _missing, ...incomplete } = document.layers[0]!;
       expect(projectSchema.safeParse({ ...document, layers: [incomplete, ...document.layers.slice(1)] }).success).toBe(
         false,
@@ -143,7 +144,7 @@ describe('strict uniform schema-9 tracks', () => {
     }
     for (const extra of [{ transitions: [] }, { openingFade: 0 }, { closingFade: 0 }])
       expect(projectSchema.safeParse({ ...document, ...extra }).success).toBe(false);
-    for (const schemaVersion of [1, 2, 3, 4, 5, 6, 7, 8])
+    for (const schemaVersion of [1, 2, 3, 4, 5, 6, 7, 8, 9])
       expect(projectSchema.safeParse({ ...document, schemaVersion }).success).toBe(false);
     expect(projectSchema.safeParse(unsupportedProject(5, 'old', 'Unsupported topology')).success).toBe(false);
     expect(document).not.toHaveProperty('transitions');
@@ -398,7 +399,7 @@ describe('independent Ripple toggles and packed placements', () => {
       document.layers.forEach((layer) => {
         layer.keyframes = [point(0, 1), point(600, 1)];
       });
-      selected.colour.exposure = 0.123456789;
+      document.layers.find((layer) => layer.id === layerId)!.colour.exposure = 0.123456789;
       document.layers.find((layer) => layer.id === layerId)!.opacity = 0.654321;
       document.layers.find((layer) => layer.id === targetId)!.opacity = 0.345678;
       const plan = planTimelineDrop(

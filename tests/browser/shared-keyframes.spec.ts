@@ -262,7 +262,7 @@ test('the first hollow diamond creates one point; same-frame channels merge inde
   await baseRate.fill('1.25');
   await baseRate.press('Enter');
   const bases = await current(page);
-  expect(bases.schemaVersion).toBe(9);
+  expect(bases.schemaVersion).toBe(10);
   expect(bases.layers[0]!.opacity).toBe(0.7);
   expect(bases.clips.every((clip) => !('opacity' in clip))).toBe(true);
   expect(bases.layers[0]?.keyframes).toEqual([]);
@@ -371,8 +371,8 @@ test('between points keyed controls are read-only until their own diamond explic
   expect(await current(page)).toEqual(document);
   await page.getByRole('slider', { name: 'Saturation', exact: true }).fill('1.3');
   const staticChange = await current(page);
-  expect(staticChange.layers).toEqual(document.layers);
-  expect(staticChange.clips[0]?.colour.saturation).toBe(1.3);
+  expect(staticChange.layers[0]?.colour.saturation).toBe(1.3);
+  expect(staticChange.clips).toEqual(document.clips);
   expect(staticChange.clips[1]).toEqual(document.clips[1]);
   expect(staticChange.layers[0]?.keyframes.map((point) => point.frame)).toEqual([10, 90]);
   document = staticChange;
@@ -472,19 +472,14 @@ test('moving a shared point moves every participant with one Undo and preserves 
   await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
 });
 
-test('whole-row curves continue across different clips and their dissolve, while unkeyed channels keep each static base', async ({
+test('whole-row curves continue across different clips and their dissolve, while unkeyed channels keep the shared row base', async ({
   page,
 }) => {
   let document = await current(page);
   document = applyCommand(document, {
     type: 'colour',
-    clipId: 'first',
-    colour: { ...document.clips[0]!.colour, exposure: -0.3, contrast: 1.3, saturation: 0.6 },
-  });
-  document = applyCommand(document, {
-    type: 'colour',
-    clipId: 'second',
-    colour: { ...document.clips[1]!.colour, exposure: 1.5, contrast: 0.8, saturation: 1.4 },
+    layerId: 'video-1',
+    colour: { ...document.layers[0]!.colour, exposure: -0.3, contrast: 1.3, saturation: 0.6 },
   });
   document = applyCommand(document, { type: 'opacity', layerId: 'video-1', opacity: 0.35 });
   document = applyCommand(document, { type: 'speed', clipId: 'first', speed: { mode: 'constant', rate: 2 } });
@@ -517,7 +512,7 @@ test('whole-row curves continue across different clips and their dissolve, while
   expect(simultaneous).toHaveLength(2);
   expect(simultaneous[0]?.colour.exposure).toBeCloseTo(0.8);
   expect(simultaneous[1]?.colour.exposure).toBeCloseTo(0.8);
-  expect(simultaneous.map((sample) => sample.colour.saturation)).toEqual([0.6, 1.4]);
+  expect(simultaneous.map((sample) => sample.colour.saturation)).toEqual([0.6, 0.6]);
   expect(simultaneous.map((sample) => sample.sourceFrame)).toEqual([51, 38]);
 
   for (const frame of [0, 20, overlap, layout.clips[0]!.end, layout.duration - 1]) {
@@ -526,11 +521,11 @@ test('whole-row curves continue across different clips and their dissolve, while
     expect(captured.state.decoderCount).toBe(2);
     const progress = frame / 80;
     for (const sample of sampleTimeline(document, frame)) {
-      const clip = document.clips.find((item) => item.id === sample.clipId)!;
       expect(sample.colour.exposure).toBeCloseTo(-0.5 + 2 * progress);
       expect(sample.opacity).toBeCloseTo(0.2 + 0.6 * progress);
-      expect(sample.colour.contrast).toBe(clip.colour.contrast);
-      expect(sample.colour.saturation).toBe(clip.colour.saturation);
+      expect(sample.colour.contrast).toBe(document.layers[0]!.colour.contrast);
+      expect(sample.colour.saturation).toBe(document.layers[0]!.colour.saturation);
+      expect(sample).not.toHaveProperty('correction');
       const slot = captured.state.assignedClipIds.indexOf(sample.clipId);
       expect(slot).toBeGreaterThanOrEqual(0);
       expect(captured.sourceFrames[slot]).toBe(sample.sourceFrame);
@@ -544,8 +539,8 @@ test('whole-row curves continue across different clips and their dissolve, while
   await seek(page, overlap);
   await expect(page.getByRole('slider', { name: 'Exposure', exact: true })).toHaveValue('0.8');
   await expect(page.getByRole('slider', { name: 'Exposure', exact: true })).toBeDisabled();
-  await expect(page.getByRole('slider', { name: 'Contrast', exact: true })).toHaveValue('0.8');
-  await expect(page.getByRole('slider', { name: 'Saturation', exact: true })).toHaveValue('1.4');
+  await expect(page.getByRole('slider', { name: 'Contrast', exact: true })).toHaveValue('1.3');
+  await expect(page.getByRole('slider', { name: 'Saturation', exact: true })).toHaveValue('0.6');
   await expect(page.getByRole('slider', { name: 'Saturation', exact: true })).toBeEnabled();
   expect((await current(page)).clips).toEqual(document.clips);
   expect((await current(page)).layers[0]?.keyframes).toEqual(document.layers[0]?.keyframes);
@@ -656,7 +651,7 @@ test('a row marker opens the selected empty row independently of clips, and keyb
     'aria-label',
     'Select layer Video 2',
   );
-  await expect(page.getByRole('slider', { name: 'Saturation', exact: true })).toBeDisabled();
+  await expect(page.getByRole('slider', { name: 'Saturation', exact: true })).toBeEnabled();
   await expect(diamond(page, 'Saturation')).toBeEnabled();
   await page.getByRole('slider', { name: 'Exposure', exact: true }).fill('0.6');
   const edited = await current(page);
@@ -843,7 +838,7 @@ test('numeric trim, mapped split, duplicate and overlay moves keep absolute row 
   await expect(page.getByRole('button', { name: 'Layer keyframe 5 on Video 2', exact: true })).toHaveCount(1);
   await page.evaluate(() => window.pascapLab!.flush());
   const saved = memory.snapshot();
-  expect(saved.schemaVersion).toBe(9);
+  expect(saved.schemaVersion).toBe(10);
   expect(saved.layers).toEqual(document.layers);
   expect(saved.clips).toEqual(moved.clips);
   for (const layer of saved.layers)

@@ -103,7 +103,7 @@ function fakeLibrary(): MediaLibrary {
   return library;
 }
 
-describe('schema-9 production dispatch and read-only validation', () => {
+describe('schema-10 production dispatch and read-only validation', () => {
   it('keeps static constant/ramp speed on the cheap path and dispatches shared speed points with their placed map', () => {
     const project = document();
     expect(needsLayeredExport(project)).toBe(false);
@@ -125,7 +125,7 @@ describe('schema-9 production dispatch and read-only validation', () => {
       compileLayerRetiming(project.clips[0]!, project.layers[0]!, placed.start).duration,
     );
     expect(placed.retiming.duration).toBe(planLayeredExport(project).duration);
-    expect(exportRequestSchema.parse({ document: project, profile: 'draft720' }).document.schemaVersion).toBe(9);
+    expect(exportRequestSchema.parse({ document: project, profile: 'draft720' }).document.schemaVersion).toBe(10);
     expect(
       exportRequestSchema.safeParse({ document: { ...project, schemaVersion: 2 }, profile: 'draft720' }).success,
     ).toBe(false);
@@ -209,7 +209,7 @@ describe('schema-9 production dispatch and read-only validation', () => {
       expect(project).toEqual(before);
     },
   );
-  it('requires explicit v9 media/row/static clip fields, permits eight rows and refuses a ninth or same-row overlap', () => {
+  it('requires explicit v10 media/row/static clip fields, permits eight rows and refuses a ninth or same-row overlap', () => {
     const project = document();
     for (let index = 2; index <= 8; index++) project.layers.push(layer(`video-${index}`));
     expect(projectSchema.safeParse(project).success).toBe(true);
@@ -279,9 +279,9 @@ describe('schema-9 production dispatch and read-only validation', () => {
     expect(Object.isFrozen(snapshot.layers[0]!.keyframes)).toBe(true);
     expect(Object.isFrozen(snapshot.layers[0]!.keyframes[0])).toBe(true);
     expect(Object.isFrozen(snapshot.layers[0]!.keyframes[0]!.values)).toBe(true);
-    expect(Object.isFrozen(snapshot.clips[0]!.colour)).toBe(true);
+    expect(Object.isFrozen(snapshot.layers[0]!.colour)).toBe(true);
   });
-  it('strictly loads v9 but lists/rejects unsupported versions unchanged, including overwrite attempts', async () => {
+  it('strictly loads v10 but lists/rejects unsupported versions unchanged, including overwrite attempts', async () => {
     const directory = await temp();
     const store = new ProjectStore(directory);
     const saved = await store.save(document(), 0);
@@ -299,7 +299,7 @@ describe('schema-9 production dispatch and read-only validation', () => {
         title,
         error: expect.stringContaining(`schema version ${version}`),
       });
-      await expect(store.load(id)).rejects.toThrow('requires version 9');
+      await expect(store.load(id)).rejects.toThrow('requires version 10');
       await expect(store.rename(id, 'No migration', 0)).rejects.toThrow('existing file was not changed');
       await expect(store.save(createProject(id, 'No migration'), 0)).rejects.toThrow('existing file was not changed');
       expect(await readFile(filename, 'utf8')).toBe(bytes);
@@ -688,7 +688,7 @@ describe('bounded CPU-reference animated LUTs and premultiplied groups', () => {
     clip.start = 20;
     row.keyframes = [point(10, { exposure: -2 }), point(40, { exposure: 2 }, 'hold')];
     expect(compileLayerRetiming(clip, row, clip.start).sourceAt(5)).toBe(205);
-    const settings = colourAt(clip, row, 25);
+    const settings = colourAt(row, 25);
     expect(settings.exposure).toBe(0);
     const cache = new ColourLutCache();
     const lut = await cache.get(settings, new AbortController().signal);
@@ -696,8 +696,8 @@ describe('bounded CPU-reference animated LUTs and premultiplied groups', () => {
     sampleColourLut(lut, 100, 130, 160, actual);
     const source: RGB = [100 / 255, 130 / 255, 160 / 255];
     const correct = gradePixel(source, settings);
-    const left = gradePixel(source, colourAt(clip, row, 10));
-    const right = gradePixel(source, colourAt(clip, row, 40));
+    const left = gradePixel(source, colourAt(row, 10));
+    const right = gradePixel(source, colourAt(row, 40));
     for (let channel = 0; channel < 3; channel++)
       expect(Math.abs(actual[channel]! - correct[channel]!)).toBeLessThan(1 / 255);
     expect(Math.abs(correct[0] - (left[0] + right[0]) / 2)).toBeGreaterThan(4 / 255);

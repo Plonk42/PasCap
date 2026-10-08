@@ -37,7 +37,7 @@ export type EditCommand =
   | { type: 'split'; clipId: string; sourceFrame: number; newClipId: string }
   | { type: 'remove-source-range'; clipId: string; sourceIn: number; sourceOut: number; newClipId: string }
   | { type: 'duplicate'; clipId: string; newClipId: string }
-  | { type: 'colour'; clipId: string; colour: ColourSettings }
+  | { type: 'colour'; layerId: string; colour: ColourSettings }
   | { type: 'speed'; clipId: string; speed: SpeedSettings }
   | { type: 'spatial'; clipId: string; spatial: SpatialSettings }
   | { type: 'music'; music: MusicTrack[] }
@@ -134,7 +134,6 @@ function splitClip(next: ProjectDocument, index: number, command: Extract<EditCo
     ...original,
     id: command.newClipId,
     sourceIn: command.sourceFrame,
-    colour: { ...original.colour },
     start: placed.start + leftDuration,
   };
   next.clips[index] = { ...original, sourceOut: command.sourceFrame, start: placed.start };
@@ -426,8 +425,8 @@ export function applyCommand(document: ProjectDocument, command: EditCommand): P
       duplicateClip(next, index, command.newClipId);
       break;
     case 'colour':
-      next.clips[index] = { ...next.clips[index]!, colour: { ...command.colour } };
-      break;
+      requiredLayer(next, command.layerId).colour = { ...command.colour };
+      return projectSchema.parse(next);
     case 'speed':
       next.clips[index] = { ...next.clips[index]!, speed: { ...command.speed } };
       break;

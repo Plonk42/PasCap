@@ -117,7 +117,7 @@ describe.skipIf(!enabled)('native FFmpeg integration · disposable synthetic sou
       });
       document = applyCommand(document, {
         type: 'colour',
-        clipId: 'clip-a',
+        layerId: document.layers[0]!.id,
         colour: { ...NEUTRAL_COLOUR, brightness: 0.05, shadows: 0.1 },
       });
       document = applyCommand(document, { type: 'fades', layerId: document.layers[0]!.id, opening: 6, closing: 6 });

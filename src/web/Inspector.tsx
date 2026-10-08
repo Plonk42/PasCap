@@ -1,5 +1,5 @@
 import { useId, type KeyboardEvent, type ReactNode } from 'react';
-import { COLOUR_CONTROLS, NEUTRAL_COLOUR, type ColourSettings } from '../shared/colour.js';
+import { COLOUR_CONTROLS, NEUTRAL_COLOUR } from '../shared/colour.js';
 import { applyCommand, type EditCommand } from '../shared/commands.js';
 import { colourAt } from '../shared/composition.js';
 import { activeLayerSetting, evaluateLayerSetting, hasLayerKeys, type KeyframeSetting } from '../shared/keyframes.js';
@@ -153,7 +153,6 @@ function InspectorTabs({
 
 interface LayerControlProps {
   layer: VideoLayer;
-  clip: VideoClip | null;
   frame: number;
   resetKey: string;
   disabled: boolean;
@@ -183,7 +182,7 @@ function OpacityControl({
   disabled,
   onEdit,
   id,
-}: Readonly<Omit<LayerControlProps, 'clip'> & { id: string }>) {
+}: Readonly<LayerControlProps & { id: string }>) {
   const state = settingState(layer, 'opacity', frame, true);
   const value = evaluateLayerSetting(layer, 'opacity', frame, layer.opacity);
   const { scope, hint } = settingPresentation({
@@ -234,7 +233,6 @@ type ColourControlDefinition = (typeof COLOUR_CONTROLS)[number];
 
 function ColourControl({
   layer,
-  clip,
   frame,
   resetKey,
   disabled,
@@ -243,16 +241,16 @@ function ColourControl({
   value,
   id,
 }: Readonly<LayerControlProps & { control: ColourControlDefinition; value: number; id: string }>) {
-  const state = settingState(layer, control.key, frame, clip !== null);
-  const { scope, hint } = settingPresentation({ ...state, baseLabel: 'Clip', label: control.label, frame });
-  const resetTarget = state.keyed ? `timeline frame ${frame}` : 'the selected clip';
+  const state = settingState(layer, control.key, frame, true);
+  const { scope, hint } = settingPresentation({ ...state, baseLabel: 'Layer', label: control.label, frame });
+  const resetTarget = state.keyed ? `timeline frame ${frame}` : 'the selected row';
   const commit = (nextValue: number): void => {
     if (disabled || !state.editable) return;
     if (state.keyed) {
       onEdit({ type: 'layer-key-value', layerId: layer.id, frame, setting: control.key, value: nextValue });
       return;
     }
-    if (clip) onEdit({ type: 'colour', clipId: clip.id, colour: { ...clip.colour, [control.key]: nextValue } });
+    onEdit({ type: 'colour', layerId: layer.id, colour: { ...layer.colour, [control.key]: nextValue } });
   };
   return (
     <div className="colour-control layer-keyed-control" data-animated={state.keyed} data-key-at-playhead={state.active}>
@@ -265,7 +263,7 @@ function ColourControl({
         hint={hint}
         scope={<SettingScope keyed={state.keyed} scope={scope} />}
         resetTitle={`Reset only ${control.label} at ${resetTarget}`}
-        exact={{ resetKey: `${resetKey}:${control.key}:${state.keyed ? 'key' : 'clip'}` }}
+        exact={{ resetKey: `${resetKey}:${control.key}:${state.keyed ? 'key' : 'layer'}` }}
         actions={
           <KeyframeToggle
             layer={layer}
@@ -282,28 +280,12 @@ function ColourControl({
   );
 }
 
-function evaluatedLayerColour(layer: VideoLayer, clip: VideoClip | null, frame: number): ColourSettings {
-  if (clip) return colourAt(clip, layer, frame);
-  const colour: ColourSettings = { ...NEUTRAL_COLOUR };
-  for (const control of COLOUR_CONTROLS)
-    colour[control.key] = evaluateLayerSetting(layer, control.key, frame, NEUTRAL_COLOUR[control.key]);
-  return colour;
-}
-
-function ColourSection({
-  layer,
-  clip,
-  frame,
-  resetKey,
-  disabled,
-  onEdit,
-  id,
-}: Readonly<LayerControlProps & { id: string }>) {
-  const colour = evaluatedLayerColour(layer, clip, frame);
+function ColourSection({ layer, frame, resetKey, disabled, onEdit, id }: Readonly<LayerControlProps & { id: string }>) {
+  const colour = colourAt(layer, frame);
   const opacity = evaluateLayerSetting(layer, 'opacity', frame, layer.opacity);
   const animated =
     hasLayerKeys(layer, 'opacity') || COLOUR_CONTROLS.some((control) => hasLayerKeys(layer, control.key));
-  const resetCommands = colourResetCommands(layer, clip, frame);
+  const resetCommands = colourResetCommands(layer, frame);
   const adjusted =
     COLOUR_CONTROLS.filter(
       (control) => colour[control.key] !== NEUTRAL_COLOUR[control.key] || hasLayerKeys(layer, control.key),
@@ -311,8 +293,8 @@ function ColourSection({
   const canReset = resetCommands.length > 0;
   const resetTitle = animated
     ? 'Reset only the enabled Colour settings, including Opacity, at this shared point. Other settings and points stay unchanged.'
-    : 'Reset Colour on the selected clip and Opacity on the whole row. Row points stay unchanged.';
-  let gradeLabel = clip ? 'Selected clip · row Opacity' : 'Row Opacity · no selected clip';
+    : 'Reset row Colour and Opacity. Row points stay unchanged.';
+  let gradeLabel = 'Row colour · Layer';
   if (animated) gradeLabel = `Layer colour · timeline frame ${frame}`;
   const reset = (): void => {
     if (disabled || !canReset) return;
@@ -328,17 +310,17 @@ function ColourSection({
         <HelpPopover label="Colour animation">
           <p>
             Each diamond keys only its own setting for this whole layer, in project timeline time. A keyed channel
-            overrides that setting on every clip in the row. Opacity always affects the whole row, even without
-            keyframes or clips; other unanimated Colour settings edit the selected clip. Between points, click the
-            diamond before editing. Reset keys changes only this point's enabled Colour settings, including Opacity;
-            individual resets change only their own setting. Without Colour animation, Reset restores the selected
-            clip's Colour and the row's Opacity to 100% in one Undo step.
+            overrides the saved row colour on every clip in the row. Row Colour and Opacity have the same scope with or
+            without keys, and work even without clips. Different colour treatments require different rows. Between
+            points, click the diamond before editing. Reset keys changes only this point's enabled Colour settings,
+            including Opacity; individual resets change only their own setting. Without Colour animation, Reset restores
+            the selected row's Colour and Opacity to neutral in one Undo step.
           </p>
         </HelpPopover>
       }
     >
       <div className="grade-heading">
-        <span className={`grade-context${animated ? '' : ' declutter-sr-only'}`}>{gradeLabel}</span>
+        <span className="grade-context">{gradeLabel}</span>
         <button
           type="button"
           className="text-button"
@@ -364,7 +346,6 @@ function ColourSection({
           <ColourControl
             key={control.key}
             layer={layer}
-            clip={clip}
             frame={frame}
             resetKey={resetKey}
             disabled={disabled}
@@ -433,7 +414,7 @@ function SequenceControls({
             </p>
             <div className="transition-fields">
               <label>
-                Type
+                <span>Type</span>
                 <select
                   aria-label="Transition type"
                   aria-describedby={transitionGap ? `${id}-transition-gap` : `${id}-transition-help`}
@@ -624,7 +605,7 @@ export function Inspector({
                 <div className="selected-clip-name inspector-selection">
                   <Icon name="layers" size={17} />
                   <strong title={layer.name}>{layer.name}</strong>
-                  <span title="Opacity edits this whole row. Select a clip for source, Colour and speed settings.">
+                  <span title="Colour and Opacity edit this whole row. Select a clip for source, speed and transform settings.">
                     Whole video row
                   </span>
                 </div>
@@ -725,7 +706,7 @@ export function Inspector({
                   {clip && placed && (
                     <>
                       <label className="speed-field">
-                        Video layer
+                        <span>Video layer</span>
                         <select
                           aria-label="Clip video layer"
                           disabled={drafting}
@@ -826,7 +807,6 @@ export function Inspector({
               />
               <ColourSection
                 layer={layer}
-                clip={clip ?? null}
                 frame={frame}
                 resetKey={`${inputContext}:${frame}`}
                 disabled={drafting}

@@ -1,7 +1,7 @@
 import { COLOUR_CONTROLS, NEUTRAL_COLOUR } from '../shared/colour.js';
 import type { EditCommand } from '../shared/commands.js';
 import { hasLayerKeys } from '../shared/keyframes.js';
-import type { VideoClip, VideoLayer } from '../shared/model.js';
+import type { VideoLayer } from '../shared/model.js';
 
 function resetPointCommands(layer: VideoLayer, frame: number): EditCommand[] {
   const point = layer.keyframes.find((key) => key.frame === frame);
@@ -27,13 +27,13 @@ function resetPointCommands(layer: VideoLayer, frame: number): EditCommand[] {
 }
 
 /** Apply the complete reset as one editor transaction; never join an absent channel. */
-export function colourResetCommands(layer: VideoLayer, clip: VideoClip | null, frame: number): EditCommand[] {
+export function colourResetCommands(layer: VideoLayer, frame: number): EditCommand[] {
   const animated =
     hasLayerKeys(layer, 'opacity') || COLOUR_CONTROLS.some((control) => hasLayerKeys(layer, control.key));
   if (animated) return resetPointCommands(layer, frame);
   const commands: EditCommand[] = [];
-  if (clip && COLOUR_CONTROLS.some((control) => clip.colour[control.key] !== NEUTRAL_COLOUR[control.key]))
-    commands.push({ type: 'colour', clipId: clip.id, colour: { ...NEUTRAL_COLOUR } });
+  if (COLOUR_CONTROLS.some((control) => layer.colour[control.key] !== NEUTRAL_COLOUR[control.key]))
+    commands.push({ type: 'colour', layerId: layer.id, colour: { ...NEUTRAL_COLOUR } });
   if (layer.opacity !== 1) commands.push({ type: 'opacity', layerId: layer.id, opacity: 1 });
   return commands;
 }

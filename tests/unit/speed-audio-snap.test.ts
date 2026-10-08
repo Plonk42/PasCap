@@ -23,9 +23,9 @@ function row(keyframes: LayerKeyframe[]): VideoLayer {
 }
 
 describe('shared retiming and recoverable speed edits', () => {
-  it('requires explicit v9 static speed settings; earlier documents are not guessed', () => {
+  it('requires explicit v10 static speed settings; earlier documents are not guessed', () => {
     const project = createProject('flight', 'Flight');
-    expect(project.schemaVersion).toBe(9);
+    expect(project.schemaVersion).toBe(10);
     for (const schemaVersion of [1, 2, 3, 4, 5, 6, 7, 8])
       expect(() => projectSchema.parse({ ...project, schemaVersion })).toThrow();
     expect(() => projectSchema.parse(unsupportedProject(4, 'old-flight', 'Unsupported flight'))).toThrow();

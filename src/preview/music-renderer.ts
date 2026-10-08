@@ -10,6 +10,9 @@ export class MusicRenderer {
   get played(): number {
     return this.#played;
   }
+  get queued(): number {
+    return this.#queued;
+  }
   get running(): boolean {
     return this.#running;
   }

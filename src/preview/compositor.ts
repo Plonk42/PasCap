@@ -374,11 +374,11 @@ function comparisonSource(
   source: number,
   progress: number,
   opacity: number,
-  dissolve: boolean,
+  settings: ColourSettings,
   random: () => number,
 ): { layer: PreviewLayer; clip: CompositeClip } {
   const slot = (group + source) % 2;
-  const settings = comparisonColour(test, random);
+  const dissolve = group === 0 && test % 2 === 0;
   let blendWeight = 1;
   let brightness = random();
   if (dissolve) {
@@ -426,8 +426,9 @@ function comparisonGroup(
   if (test === 4) progress = 0;
   if (test === 6) progress = 1;
   const dissolve = group === 0 && test % 2 === 0;
+  const settings = comparisonColour(test, random);
   const sources = Array.from({ length: dissolve ? 2 : 1 }, (_, source) =>
-    comparisonSource(test, group, source, progress, opacity, dissolve, random),
+    comparisonSource(test, group, source, progress, opacity, settings, random),
   );
   return {
     layers: sources.map((source) => source.layer),

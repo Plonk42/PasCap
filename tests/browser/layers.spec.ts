@@ -164,7 +164,8 @@ test('shares row opacity and individual colour channels at project points and ke
   expect(sample.colour.exposure).toBeCloseTo(0);
   const points = [sharedPoint(0, { opacity: 0, exposure: -1 }), sharedPoint(60, { opacity: 1, exposure: 1 })];
   expect(project.layers[1]?.keyframes).toEqual(points);
-  expect(project.clips[1]).toMatchObject({ colour: { exposure: 0 } });
+  expect(project.clips[1]).not.toHaveProperty('correction');
+  expect(project.layers[1]!.colour.exposure).toBe(0);
   expect(project.clips[1]).not.toHaveProperty('opacity');
   expect(project.layers[1]!.opacity).toBe(0);
   await expect(page.getByRole('checkbox', { name: 'Animate colour adjustments', exact: true })).toHaveCount(0);
@@ -369,7 +370,7 @@ test('layered native UI export includes keyed opacity and colour in an immutable
   const { receiptUrl } = await freshExportLinks(page, request, accepted, 90_000);
   const receipt = (await (await request.get(receiptUrl)).json()) as ExportReceipt;
   const snapshot = projectSchema.parse(receipt.snapshot);
-  expect(snapshot.schemaVersion).toBe(9);
+  expect(snapshot.schemaVersion).toBe(10);
   expect(snapshot.layers).toHaveLength(2);
   expect(snapshot.layers[1]?.keyframes).toEqual(document.layers[1]?.keyframes);
   expect(snapshot.clips[1]).not.toHaveProperty('animation');
