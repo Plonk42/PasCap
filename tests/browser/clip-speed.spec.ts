@@ -384,7 +384,7 @@ test('row Speed override remains explicit and removing only it restores the clip
   const before = await seedCurve(page, (document) => {
     document.layers[0]!.keyframes = [sharedPoint(0, { speed: 2, exposure: 0.3 }, 'hold')];
   });
-  await expect(page.locator('.clip-speed-override')).toContainText('Row Speed overrides this clip');
+  await expect(page.locator('.clip-speed-override')).toContainText('Overridden by track Speed keyframes');
   await expect(page.getByRole('combobox', { name: 'Speed mode', exact: true })).toBeHidden();
   await page.getByRole('button', { name: 'Keyframe Speed', exact: true }).click();
   await expect(page.getByRole('region', { name: 'Clip speed curve editor' })).toBeVisible();

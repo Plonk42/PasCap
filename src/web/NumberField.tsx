@@ -1,5 +1,6 @@
 import { useId, useState } from 'react';
 import './input-controls.css';
+import { NUMBER_FIELD_INSTRUCTIONS_ID } from './SharedInstructions.js';
 
 export interface NumberConstraints {
   integer?: boolean;
@@ -60,7 +61,6 @@ export function NumberField({
   'aria-describedby': describedBy,
 }: Readonly<NumberFieldProps>) {
   const fieldId = useId();
-  const instructionsId = `${fieldId}-instructions`;
   const hintId = `${fieldId}-hint`;
   const errorId = `${fieldId}-error`;
   const [state, setState] = useState(() => ({ value, resetKey, disabled, draft: String(value), attempted: false }));
@@ -109,7 +109,7 @@ export function NumberField({
         disabled={disabled}
         aria-invalid={error !== null}
         aria-errormessage={error ? errorId : undefined}
-        aria-describedby={[describedBy, instructionsId, hint ? hintId : null, error ? errorId : null]
+        aria-describedby={[describedBy, NUMBER_FIELD_INSTRUCTIONS_ID, hint ? hintId : null, error ? errorId : null]
           .filter(Boolean)
           .join(' ')}
         title={`Enter or leave the field to apply. Escape restores ${value}.`}
@@ -129,9 +129,6 @@ export function NumberField({
           }
         }}
       />
-      <span className="number-field-instructions" id={instructionsId}>
-        Enter or leave the field to apply. Escape restores the current value.
-      </span>
       {hint && (
         <span className="number-field-hint" id={hintId}>
           {hint}

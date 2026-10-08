@@ -142,9 +142,7 @@ export function SpatialControls({ project, clip, sourceFrameCount, frame, disabl
   const active = settings.keyframes.find((key) => key.frame === playhead?.frame);
   const pose = active?.values ?? evaluateSpatial(settings, playhead?.position ?? clip.sourceIn);
   const editable = !settings.keyframes.length || active !== undefined;
-  let scope = 'Clip base';
-  if (settings.keyframes.length)
-    scope = active ? 'Keyframe at displayed source frame' : 'Animated · add a Transform keyframe to edit';
+  const scope = active ? 'Keyframe at displayed source frame' : 'Animated · add a Transform keyframe to edit';
   const selection = useSpatialSelection(settings);
   const index = settings.keyframes.findIndex((key) => key.frame === selection.selected);
   const selected = settings.keyframes[index];
@@ -211,9 +209,11 @@ export function SpatialControls({ project, clip, sourceFrameCount, frame, disabl
           Reset
         </button>
       </div>
-      <p className="control-hint">
-        {playhead ? `Displayed source frame ${playhead.frame}` : 'Playhead outside clip'} · {scope}
-      </p>
+      {settings.keyframes.length > 0 && (
+        <p className="control-hint">
+          {playhead ? `Source frame ${playhead.frame}` : 'Playhead outside clip'} · {scope}
+        </p>
+      )}
       <PoseFields
         pose={pose}
         prefix="Transform"

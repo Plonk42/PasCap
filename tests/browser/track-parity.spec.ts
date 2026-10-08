@@ -325,7 +325,7 @@ for (const row of [0, 1]) {
     await undoOnce(page, before);
     await selectClip(page, `later-${row}`);
     await expect(start).toBeDisabled();
-    await expect(start).toHaveAccessibleDescription(/Ripple is on: this start follows the packed sequence/);
+    await expect(start).toHaveAccessibleDescription(/Later clips follow the first one while Ripple is on/);
     await openOptions(page, 'Clip actions');
     for (const name of ['Move clip one frame earlier', 'Move clip one frame later']) {
       await expect(page.getByRole('button', { name, exact: true })).toBeDisabled();

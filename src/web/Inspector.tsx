@@ -73,13 +73,6 @@ function commandNumberError(project: ProjectDocument, command: EditCommand, reco
   }
 }
 
-function placementHint(layer: VideoLayer | undefined, restriction: string | null): string {
-  if (restriction) return restriction;
-  return layer?.ripple
-    ? 'First clip anchor in project frames; later clips follow it. Row points, music and other tracks stay fixed.'
-    : 'Independent project-frame start; row points, music and other clips stay fixed.';
-}
-
 function trackScope(clips: number): string {
   if (clips === 0) return 'Applies to every clip added to this track';
   return clips === 1 ? 'Applies to the clip on this track' : `Applies to all ${clips} clips on this track`;
@@ -486,7 +479,7 @@ function SequenceControls({
                         </select>
                       </label>
                       <label>
-                        Duration <small>frames</small>
+                        Duration <small>frames · {sourceSeconds(boundary.duration)}</small>
                         <NumberField
                           aria-label="Transition duration"
                           aria-describedby={`${id}-transition-help`}
@@ -729,7 +722,7 @@ export function Inspector({
   const speedRate = layer ? evaluateLayerSetting(layer, 'speed', frame, clipRate) : 1;
   const inputContext = `${project.id}:${layer?.id}:${clip?.id ?? 'row'}`;
   const startRestriction = clip ? clipStartRestriction(project, clip) : null;
-  const startHint = placementHint(layer, startRestriction);
+  const startHint = startRestriction ?? undefined;
 
   return (
     <InspectorExpansionContext value={expansion}>
@@ -817,7 +810,7 @@ export function Inspector({
                           disabled={drafting || startRestriction !== null}
                           value={placed.start}
                           resetKey={inputContext}
-                          hint={startHint}
+                          {...(startHint ? { hint: startHint } : {})}
                           validate={(start) =>
                             commandNumberError(
                               project,
