@@ -99,8 +99,12 @@ framebuffer or additional texture is introduced.
 Rendered-frame/FPS counters count real replacement draws, not duplicate submissions.
 Native grading parses settings and selects exact versus LUT grading once per
 source/frame. Exact grading allocates only tiny RGB triples, never another image,
-large LUT or duration-sized array. This CPU work can substantially slow native
-exports, especially UHD; synthetic correctness does not qualify throughput.
+large LUT or duration-sized array; 8-bit unresampled samples reuse a 256-entry
+BT.709 decode table with bitwise-identical results. Frame composition and LUT
+generation split disjoint row/slice bands across bounded worker threads over the
+existing shared buffers ([resource contract](../LAYERS_AND_KEYFRAMES.md#inspector-and-resource-limits)).
+Exact grading remains the costliest path, especially at UHD; synthetic
+correctness does not qualify throughput.
 Neutral HSL/identity curves retain the existing scalar-only static fast path and,
 when layering is otherwise required, the original scalar 65³ LUT approximation.
 At most two reusable Float32 LUT arrays (6,591,000 bytes) remain available; an

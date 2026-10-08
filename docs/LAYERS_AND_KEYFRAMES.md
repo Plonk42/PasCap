@@ -516,9 +516,17 @@ continuous original-source position from that same map. Inverse mapping and
 bilinear RGB resampling precede grading. Nonneutral HSL/curves use exact complete
 CPU grading (nine scalar controls, HSL, master/RGB curves), not a LUT; neutral
 advanced settings retain scalar LUT grading. Exact grading uses tiny RGB triples
-and can substantially slow UHD export; no transformed image/mask buffer or
+and remains the costliest path, especially at UHD; no transformed image/mask buffer or
 per-frame native process is added. The 22 bytes/pixel, two-LUT and process bounds
 above remain unchanged.
+
+CPU group composition and LUT generation split each frame/LUT into disjoint row/
+blue-slice bands across **at most eight worker threads** (host cores − 1; in process
+with fewer than three cores). Workers share the four raw buffers and two LUTs as
+`SharedArrayBuffer` memory rather than copying them; they add no decoder, LUT, frame
+buffer or native child. One frame or LUT is in flight at a time, every band settles
+before its buffers are reused, and the pool is terminated when the export ends.
+Results are byte-identical to in-process composition.
 
 At most two retained lossless clip files and **three** timeline representations
 coexist: lower accumulator, track group and output (or group spans and their joined
