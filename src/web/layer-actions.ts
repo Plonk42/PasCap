@@ -16,6 +16,6 @@ export function clipStartRestriction(project: ProjectDocument, clip: VideoClip):
   const layer = project.layers.find((item) => item.id === clip.layerId);
   if (!layer) return 'The video track no longer exists.';
   return layer.ripple && layerClips(project, layer.id)[0]?.id !== clip.id
-    ? 'Ripple is on: this start follows the packed sequence. Reorder by dragging, or turn Ripple off in Layer options to set an independent start. The first clip sets the track anchor.'
+    ? 'Later clips follow the first one while Ripple is on. Drag to reorder, or turn Ripple off in Layer options.'
     : null;
 }

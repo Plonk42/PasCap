@@ -105,7 +105,6 @@ function BaseSpeedControls({
               value={speed.rate}
               disabled={disabled}
               resetKey={inputContext}
-              hint="Selected clip speed; used only while this layer has no Speed keys."
               validate={(rate) => validate({ mode: 'constant', rate })}
               onCommit={(rate) => onChange({ mode: 'constant', rate })}
             />
@@ -310,11 +309,10 @@ export function SpeedControls({
           Reset
         </button>
       </div>
-      {clip && !keyed && <div className="clip-speed-scope">Clip speed</div>}
       {clip && keyed && (
         <p className="clip-speed-override">
           <Icon name="curve" size={15} />
-          <span>Row Speed overrides this clip. Its own speed is kept; remove the row's Speed keys to use it.</span>
+          <span>Overridden by track Speed keyframes. This clip keeps its own speed for when they are removed.</span>
         </p>
       )}
       {!keyed && clip && (

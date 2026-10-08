@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState, type CSSProperties, type PointerEvent } from 'react';
 import { NumberField, validateNumberDraft, type NumberFieldProps, type NumberValidation } from './NumberField.js';
+import { SLIDER_INSTRUCTIONS_ID } from './SharedInstructions.js';
 import './value-control.css';
 
 export interface ValueControlProps extends Omit<NumberFieldProps, 'min' | 'max' | 'step'> {
@@ -146,7 +147,6 @@ export function ValueControl(props: Readonly<ValueControlProps>) {
   const generatedId = useId();
   const id = props.id ?? generatedId;
   const errorId = `${id}-slider-error`;
-  const instructionsId = `${id}-slider-instructions`;
   const context: ValueControlContext = {
     value: props.value,
     min: props.min,
@@ -271,7 +271,9 @@ export function ValueControl(props: Readonly<ValueControlProps>) {
         id={id}
         type="range"
         aria-label={props['aria-label']}
-        aria-describedby={[props['aria-describedby'], instructionsId, error ? errorId : null].filter(Boolean).join(' ')}
+        aria-describedby={[props['aria-describedby'], SLIDER_INSTRUCTIONS_ID, error ? errorId : null]
+          .filter(Boolean)
+          .join(' ')}
         aria-invalid={error !== null}
         aria-errormessage={error ? errorId : undefined}
         min={props.min}
@@ -310,9 +312,6 @@ export function ValueControl(props: Readonly<ValueControlProps>) {
         onCommit={(value) => dispatch({ type: 'exact', value })}
       />
       {props.unit && <small className="value-control-unit">{props.unit}</small>}
-      <span id={instructionsId} className="number-field-instructions">
-        Drag to choose a value; release to apply once. Escape cancels the drag. Exact values apply on Enter or blur.
-      </span>
       {error && (
         <span id={errorId} className="number-field-error" role="alert">
           {error} Press Escape on the slider to restore {props.value}.

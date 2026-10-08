@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { Icon } from './icons.js';
 import { popoverPosition, type PopoverPosition } from './popover-position.js';
+import { HELP_INSTRUCTIONS_ID } from './SharedInstructions.js';
 import './help-popover.css';
 
 interface Props {
@@ -185,7 +186,7 @@ export function HelpPopover({ label, className = '', children }: Readonly<Props>
         aria-expanded={mode !== 'closed'}
         aria-pressed={mode === 'pinned'}
         aria-controls={id}
-        aria-describedby={`${id}-instruction`}
+        aria-describedby={HELP_INSTRUCTIONS_ID}
         onPointerDown={(event) => {
           // A draft's blur can remove its hint and move this button before mouseup.
           // Focus on the completed click instead, retaining one ordinary blur commit.
@@ -210,10 +211,6 @@ export function HelpPopover({ label, className = '', children }: Readonly<Props>
       >
         <Icon name="help" size={15} />
       </button>
-      <span className="declutter-sr-only" id={`${id}-instruction`}>
-        Hover or focus to read help. Click to keep it open, or use Down arrow to focus the text. Escape or an outside
-        click closes it.
-      </span>
       <section
         ref={content}
         id={id}

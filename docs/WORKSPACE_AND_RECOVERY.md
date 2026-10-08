@@ -250,7 +250,9 @@ their separate live-preview contracts.
 
 Numeric fields keep a local text draft with full entered precision, independent of
 the slider step. Enter or leaving the field applies one validated value; Escape
-restores. Empty, nonfinite, fractional frame, range, duplicate key and conflicting
+restores. Every field, slider and help button references one shared, hidden
+description of its pattern rather than repeating those instructions per control.
+Visible hints appear only where something is unavailable or overridden. Empty, nonfinite, fractional frame, range, duplicate key and conflicting
 timing inputs stay editable with inline errors.
 Numbers are not coerced to zero/clamped/rounded to conceal an invalid edit. An
 unchanged draft creates no undo step, and Enter then blur cannot submit it twice.
