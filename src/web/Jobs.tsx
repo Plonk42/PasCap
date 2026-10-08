@@ -68,15 +68,6 @@ export function activitySummary(jobs: readonly MediaJob[]): string {
     .join(' · ');
 }
 
-export function latestCompletedRender(jobs: readonly MediaJob[]): MediaJob | null {
-  return (
-    orderActivityJobs(jobs).find(
-      (job) =>
-        job.state === 'completed' && (job.kind === 'export' || job.kind === 'reference') && Boolean(job.outputUrl),
-    ) ?? null
-  );
-}
-
 /** Only settled jobs are announced; progress polling never changes this text. */
 export function activityResultSummary(job: MediaJob | null): string {
   if (!job || isActiveJob(job)) return '';
@@ -110,7 +101,6 @@ export function Jobs({ jobs, onCancel, open, onOpen, onClose, busy, error, onRef
   const ordered = orderActivityJobs(jobs);
   const active = ordered.filter(isActiveJob);
   const history = ordered.filter((job) => !isActiveJob(job));
-  const result = latestCompletedRender(jobs);
   const settled = history[0] ?? null;
   const summary = activitySummary(jobs);
   const resultSummary = activityResultSummary(settled);
@@ -262,21 +252,6 @@ export function Jobs({ jobs, onCancel, open, onOpen, onClose, busy, error, onRef
         >
           {resultSummary}
         </output>
-        {!busy && !active.some((job) => job.kind === 'export' || job.kind === 'reference') && result?.outputUrl && (
-          <div className="activity-render-links" aria-label={`Latest completed render: ${result.label}`}>
-            <a href={result.outputUrl} target="_blank" rel="noreferrer">
-              Open render
-            </a>
-            <a href={result.outputUrl} download>
-              Download
-            </a>
-            {result.receiptUrl && (
-              <a href={result.receiptUrl} target="_blank" rel="noreferrer">
-                Receipt
-              </a>
-            )}
-          </div>
-        )}
         {!open && footerError && (
           <span className="activity-footer-error" role="alert" title={footerError}>
             {footerError}

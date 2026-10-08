@@ -10,17 +10,28 @@
   align-items: center;
   gap: 12px;
   flex: 0 0 auto;
-  min-height: 38px;
-  padding: 5px 12px;
+  min-height: 24px;
+  padding: 0 8px;
   border-top: 1px solid var(--line);
   background: var(--surface);
 }
 
-.activity-footer button,
 .activity-drawer button,
 .activity-modal button {
   min-height: 28px;
   font-size: 13px;
+}
+
+.activity-footer .activity-toggle {
+  min-height: 24px;
+  padding: 0 6px;
+  border-color: transparent;
+  background: transparent;
+  font-size: 12px;
+}
+
+.activity-footer .activity-toggle:is(:hover, :focus-visible, [aria-expanded='true']) {
+  background: var(--surface-raised, rgb(255 255 255 / 6%));
 }
 
 .activity-toggle {
@@ -66,17 +77,11 @@
   flex: 1 1 150px;
 }
 
-.activity-render-links,
 .activity-job-actions {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 12px;
-}
-
-.activity-render-links {
-  flex-shrink: 0;
-  font-size: 12px;
 }
 
 .activity-render-links a,

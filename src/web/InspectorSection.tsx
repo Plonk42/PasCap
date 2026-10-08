@@ -58,20 +58,21 @@ export function useInspectorExpansion() {
 
 export function InspectorExpansionControls({
   expansion,
-}: Readonly<{ expansion: ReturnType<typeof useInspectorExpansion> }>) {
+  hidden,
+}: Readonly<{ expansion: ReturnType<typeof useInspectorExpansion>; hidden: boolean }>) {
+  if (hidden) return null;
+  const label = expansion.allOpen ? 'Collapse all Inspector settings' : 'Expand all Inspector settings';
   return (
     <>
-      <div className="inspector-expansion">
-        <button
-          type="button"
-          className="text-button"
-          aria-label={expansion.allOpen ? 'Collapse all Inspector settings' : 'Expand all Inspector settings'}
-          title="All Clip sections; Track, Audio, nested details and help stay unchanged."
-          onClick={expansion.toggleAll}
-        >
-          {expansion.allOpen ? 'Collapse all' : 'Expand all'}
-        </button>
-      </div>
+      <button
+        type="button"
+        className="icon-button inspector-expansion"
+        aria-label={label}
+        title={`${expansion.allOpen ? 'Collapse' : 'Expand'} all Clip sections`}
+        onClick={expansion.toggleAll}
+      >
+        <Icon name={expansion.allOpen ? 'collapse-all' : 'expand-all'} size={16} />
+      </button>
       {expansion.storageWarning && (
         <output className="control-hint">
           Section preferences cannot be saved in this browser. Your choices remain available for this session.

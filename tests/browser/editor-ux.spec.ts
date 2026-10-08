@@ -10,7 +10,7 @@ import {
 import type { ExportProfile } from '../../src/shared/export.js';
 import type { MediaAsset, MediaJob } from '../../src/shared/media.js';
 import { createClip, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
-import { inspectorTab, openOptions, sharedPoint } from './editor-helpers.js';
+import { inspectorTab, openOptions, panelToggle, sharedPoint } from './editor-helpers.js';
 import { memoryProjects, type MemoryProjects } from './memory-projects.js';
 
 let assets: MediaAsset[];
@@ -141,7 +141,7 @@ async function seek(page: Page, frame: number): Promise<void> {
 
 test('panel and help controls are direct, keyboard accessible, and do not edit the project', async ({ page }) => {
   const before = await current(page);
-  const media = page.getByRole('button', { name: 'Toggle Media panel', exact: true });
+  const media = await panelToggle(page, 'Media');
   await expect(media).toBeVisible();
   await expect(media).toHaveAttribute('aria-controls', 'media-pane');
   await media.focus();
@@ -256,7 +256,7 @@ test('hiding the deferred inspector applies a blur draft once and retains its se
   await page.getByRole('button', { name: 'Source range section', exact: true }).click();
   const input = page.getByRole('spinbutton', { name: 'Source IN frame', exact: true });
   await input.fill('5');
-  const toggle = page.getByRole('button', { name: 'Toggle Clip panel', exact: true });
+  const toggle = await panelToggle(page, 'Clip');
   // Hiding a focused native input itself blurs it; the existing Enter/blur contract must still apply once.
   await toggle.evaluate((button) => (button as HTMLButtonElement).click());
   await expect(input).toBeHidden();
@@ -344,7 +344,9 @@ test('quality choices and storage meter are keyboard usable, with no render on d
   const before = await current(page);
   await page.getByRole('button', { name: 'Export video', exact: true }).click();
   await expect(page.getByRole('region', { name: 'Export storage' })).toContainText('Space checked');
-  await expect(page.getByRole('meter', { name: 'Planning allowance compared with available storage' })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Export storage' })).toContainText('free on the export drive');
+  // One storage line by default; the allowance meter and its caveats are behind Storage details.
+  await expect(page.getByRole('meter', { name: 'Planning allowance compared with available storage' })).toBeHidden();
   const quality = page.getByRole('radio', { name: '720p draft', exact: true });
   await quality.focus();
   await quality.press('ArrowRight');
@@ -352,10 +354,11 @@ test('quality choices and storage meter are keyboard usable, with no render on d
   await expect.poll(() => checks).toEqual(['draft720', 'final4k']);
   expect(submissions).toEqual([]);
   expect(await current(page)).toEqual(before);
+  await page.getByRole('dialog').getByText('Storage details', { exact: true }).click();
+  await expect(page.getByRole('meter', { name: 'Planning allowance compared with available storage' })).toBeVisible();
   await expect(
     page.getByText('Allowance, not a prediction or guaranteed upper bound.', { exact: false }),
   ).toBeVisible();
-  await page.getByRole('dialog').getByText('Storage details', { exact: true }).click();
   await expect(page.locator('.export-storage-path')).toHaveText('/disposable/editor-cache/renders');
   await page.keyboard.press('Escape');
   await expect(page.getByRole('button', { name: 'Export video', exact: true })).toBeFocused();

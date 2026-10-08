@@ -1,12 +1,40 @@
-/* Restore only this compact preview heading, otherwise hidden by workspace.css. */
-.preview-panel .preview-heading.preview-comparison-heading,
-.product-workspace .viewer-panel .preview-heading.preview-comparison-heading {
+/* Restore only this compact preview heading, otherwise hidden by workspace.css.
+   In the docked workspace it sits on the viewer tab row; the tab already names the view. */
+.preview-panel .preview-heading.preview-comparison-heading {
   display: flex;
   flex-wrap: wrap;
   gap: 4px 12px;
   height: auto;
   min-height: 36px;
   padding: 4px 1px 8px;
+}
+
+.product-workspace .preview-column {
+  position: relative;
+}
+
+.product-workspace .viewer-panel .preview-heading.preview-comparison-heading {
+  position: absolute;
+  top: 0;
+  right: 10px;
+  display: flex;
+  align-items: center;
+  height: 42px;
+  min-height: 0;
+  padding: 0;
+}
+
+.product-workspace .preview-comparison-heading > h2 {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.product-workspace .viewer-panel .preview-panel {
+  padding-top: 10px;
 }
 
 .preview-comparison-controls {

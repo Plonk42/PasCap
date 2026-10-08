@@ -168,6 +168,8 @@ test('native keyboard focus reveals hidden headers, selects their own row, and s
   await expect.poll(() => viewport.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
   await alignedRows(page);
   await page.keyboard.press('Tab');
+  await expect(page.getByRole('button', { name: 'Toggle Ripple on Video 8', exact: true })).toBeFocused();
+  await page.keyboard.press('Tab');
   await expect(page.locator('summary[aria-label="Layer options Video 8"]')).toBeFocused();
   const top = page.getByRole('button', { name: 'Select layer Video 1', exact: true });
   await top.focus();
@@ -223,7 +225,7 @@ test('horizontal scrolling remains independent and synchronized vertical extents
 
 for (const { width, height, timelineHeight } of [
   { width: 1440, height: 900, timelineHeight: 290 },
-  { width: 1280, height: 720, timelineHeight: 290 },
+  { width: 1280, height: 720, timelineHeight: 220 },
   { width: 1280, height: 720, timelineHeight: 200 },
 ]) {
   test(`all eight rows remain reachable and aligned in the ${width}×${height} workspace with a ${timelineHeight}px timeline`, async ({
@@ -433,7 +435,8 @@ test('the visible ruler and playhead retain exact seeking after vertical and hor
   await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(100);
   const handle = page.getByRole('button', { name: 'Drag playhead', exact: true });
   await expect(handle).toBeInViewport();
-  await expect(page.locator('.playhead-readout')).toBeInViewport();
+  // The preview transport owns the playhead timecode; the ruler shows only the line and handle.
+  await expect(page.locator('.playhead-readout')).toHaveCount(0);
   const handleBox = (await handle.boundingBox())!;
   await page.mouse.move(handleBox.x + handleBox.width / 2, handleBox.y + 5);
   await page.mouse.down();

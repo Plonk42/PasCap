@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { parseTimecode } from '../../src/web/TimecodeField.js';
-import { clampSize, DEFAULT_LAYOUT, validLayout, workspaceSizes } from '../../src/web/workspace.js';
+import {
+  clampSize,
+  DEFAULT_LAYOUT,
+  defaultTimelineHeight,
+  validLayout,
+  workspaceSizes,
+} from '../../src/web/workspace.js';
 
 describe('workspace bounds remain editor-only and fit desktop sizes', () => {
   it('validates complete preferences and rejects non-finite/malformed sizes', () => {
@@ -35,6 +41,16 @@ describe('workspace bounds remain editor-only and fit desktop sizes', () => {
     expect(clampSize(280.6, 240, 440)).toBe(281);
     expect(clampSize(-20, 240, 440)).toBe(240);
     expect(clampSize(999, 240, 440)).toBe(440);
+  });
+  it('starts short viewports with a shorter Timeline', () => {
+    expect(defaultTimelineHeight(720)).toBe(220);
+    expect(defaultTimelineHeight(799)).toBe(220);
+    expect(defaultTimelineHeight(800)).toBe(290);
+    expect(defaultTimelineHeight(900)).toBe(290);
+    // Until the divider is moved, the Timeline follows the viewport.
+    expect(workspaceSizes(DEFAULT_LAYOUT, 1280, 720).timeline).toBe(220);
+    expect(workspaceSizes(DEFAULT_LAYOUT, 1440, 900).timeline).toBe(290);
+    expect(workspaceSizes({ ...DEFAULT_LAYOUT, timelineHeight: 300 }, 1280, 720).timeline).toBe(300);
   });
 });
 describe('editable non-drop-frame timecode', () => {

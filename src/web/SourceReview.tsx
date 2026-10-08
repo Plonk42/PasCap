@@ -21,7 +21,7 @@ import {
 } from '../shared/media-selection.js';
 import type { MediaAsset } from '../shared/media.js';
 import { formatTimecode } from '../shared/timing.js';
-import { mediaReady } from './display.js';
+import { mediaReady, sourceSeconds } from './display.js';
 import { Icon } from './icons.js';
 import { Popover } from './Popover.js';
 import { SourceTransport, type SourceTransportState } from './source-transport.js';
@@ -288,14 +288,14 @@ export function SourceReview({
         <button
           className="primary-button small"
           type="button"
-          aria-label="Add source excerpt to timeline"
+          aria-label={`Add ${sourceSeconds(range.sourceOut - range.sourceIn)} source excerpt to timeline`}
           title={`Append this range to ${targetLayer} as a new, independent excerpt; omitted source frames remain available`}
           disabled={insertDisabled}
           onKeyDown={keyboard}
           onClick={insertExcerpt}
         >
           <Icon name="plus" size={15} />
-          Add excerpt
+          Add {sourceSeconds(range.sourceOut - range.sourceIn)}
         </button>
         <button
           className="icon-button"
@@ -385,11 +385,10 @@ export function SourceReview({
         }
         readout={
           <div className="source-review-readout">
-            <span>Source {formatTimecode(observedFrame ?? requestedFrame, rate)}</span>
-            <span>
-              Frame {observedFrame ?? requestedFrame} / {asset.metadata.frameCount - 1}
+            <span title={`Frame ${observedFrame ?? requestedFrame} of ${asset.metadata.frameCount - 1}`}>
+              {formatTimecode(observedFrame ?? requestedFrame, rate)}
             </span>
-            <small>{transportLabel} · muted</small>
+            <small>{transportLabel}</small>
           </div>
         }
       />
@@ -420,9 +419,18 @@ function SourceExcerpts({
   onRevealClip: Props['onRevealClip'];
   onKeyDown: (event: KeyboardEvent<HTMLElement>) => void;
 }>) {
-  const label = `${excerpts.length} ${excerpts.length === 1 ? 'excerpt' : 'excerpts'} from this rush`;
+  const count = `${excerpts.length} ${excerpts.length === 1 ? 'clip' : 'clips'}`;
+  const label = `Show ${count} from this rush`;
   return (
-    <Popover className="source-excerpts" label={label} trigger={<span>{label}</span>}>
+    <Popover
+      className="source-excerpts"
+      label={label}
+      trigger={
+        <span>
+          Show {count} <Icon name="chevron-down" size={12} />
+        </span>
+      }
+    >
       {(close) => (
         <>
           <p className="source-excerpts-description">Source IN → OUT · OUT exclusive</p>

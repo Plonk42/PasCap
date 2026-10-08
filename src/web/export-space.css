@@ -124,6 +124,26 @@
   margin-left: auto;
 }
 
+.export-storage-status {
+  font-size: 12px;
+}
+
+.activity-export-counts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 12px;
+  margin: 0 0 8px;
+}
+
+.activity-export-counts dt {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.activity-export-counts dd {
+  margin: 0;
+}
+
 .export-storage[data-status='tight'] .export-storage-heading,
 .export-storage[data-status='blocked'] .export-storage-heading {
   color: #f0cf98;

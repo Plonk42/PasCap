@@ -288,13 +288,11 @@ export function SpeedControls({
     <section className="speed-settings declutter-speed" aria-label="Layer and clip speed">
       <div className="speed-overview">
         <span>
-          {clip && placedDuration !== null ? (
+          {clip && placedDuration !== null && placedDuration !== clip.sourceOut - clip.sourceIn && (
             <>
               {sourceSeconds(clip.sourceOut - clip.sourceIn)} <Icon name="arrow" size={12} />{' '}
               {sourceSeconds(placedDuration)}
             </>
-          ) : (
-            'No selected clip'
           )}
         </span>
         <button

@@ -103,6 +103,16 @@
   opacity: 0.35;
 }
 
+.timeline-lane-placeholder {
+  position: absolute;
+  top: 50%;
+  left: 32px;
+  transform: translateY(-50%);
+  color: #a9c4b1;
+  font-size: 12px;
+  pointer-events: none;
+}
+
 .music-lane-wrapper {
   position: absolute;
   left: 0;
