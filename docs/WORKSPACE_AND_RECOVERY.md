@@ -57,6 +57,8 @@ They are not Kelvin/HDR/automatic white balance. HSL/curves remain static. See
 Viewer and Inspector tabs use native buttons with consistent padding, borders and
 selected appearance, retaining arrow/Home/End navigation. Keyframes keeps its
 accessible name without repeating its visible tab title in the toolbar.
+The Inspector tab row stays pinned while its content scrolls; keyboard focus and
+scroll-into-view reveal controls below that row rather than beneath it.
 Control vocabulary and button/icon conventions follow the
 [editor control catalogue](design/EDITOR_CONTROLS.md). Trash deletes; × closes or
 dismisses. Icon-only actions retain accessible names and tooltips.

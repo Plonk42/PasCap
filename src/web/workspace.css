@@ -478,6 +478,11 @@ body {
   border-bottom: 1px solid var(--line);
 }
 
+/* Focus and reveal scrolling must clear the 44px sticky tab row and its 1px border. */
+.product-workspace .inspector-panel {
+  scroll-padding-top: 45px;
+}
+
 .product-workspace .boundary-button {
   font-size: 10px;
   padding: 2px 6px;
