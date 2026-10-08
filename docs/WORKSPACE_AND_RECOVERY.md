@@ -619,6 +619,7 @@ healthy music. Crossing into an empty composition advances to black or completio
 Music uses **one AudioContext/worklet/output clock** with an aggregate **four ×
 128 KiB mixed Float32 blocks**, serial source reads, shared **64 KiB range scratch**,
 one **128 KiB conversion workspace** and one **128 KiB mixed-output workspace**.
+Those reads and refills run in one dedicated reader worker, not on the editor thread.
 No per-instance queue/clock, full-file or duration-sized silence buffer is added.
 The actual rendered mixed origin/output timestamp
 governs A/V playback; block-updated media-element time does not trigger false

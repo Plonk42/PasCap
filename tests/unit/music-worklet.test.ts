@@ -6,8 +6,12 @@ interface Processor {
   process(inputs: Float32Array[][], outputs: Float32Array[][]): boolean;
 }
 let processor: Processor;
+let reader: { onmessage: ((event: MessageEvent) => void) | null; postMessage: ReturnType<typeof vi.fn> };
 function send(data: object): void {
   processor.port.onmessage!({ data } as MessageEvent);
+}
+function refill(data: object): void {
+  reader.onmessage!({ data } as MessageEvent);
 }
 function chunks(count = 4): MusicChunk[] {
   return Array.from({ length: count }, (_, index) => ({
@@ -40,6 +44,8 @@ beforeEach(async () => {
   );
   await import('../../src/preview/music-worklet.js');
   processor = new Constructor();
+  reader = { onmessage: null, postMessage: vi.fn() };
+  send({ kind: 'connect', port: reader });
 });
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -69,17 +75,29 @@ describe('actual streaming worklet protocol', () => {
       startFrame: 40,
       contextFrame: 1512,
       samples: 512,
+      queued: 4 * MUSIC_CHUNK_SAMPLES,
     });
   });
-  it('releases bounded refill credits, reports a real underrun and cannot consume across it', () => {
+  it('releases bounded refill credits to the reader, reports a real underrun and cannot consume across it', () => {
     send({ kind: 'start', generation: 2, frame: 0, chunks: chunks(1) });
     render(0, MUSIC_CHUNK_SAMPLES);
-    expect(processor.port.postMessage).toHaveBeenCalledWith({ kind: 'credit', generation: 2, count: 1 });
+    expect(reader.postMessage).toHaveBeenCalledWith({ kind: 'credit', generation: 2, count: 1 });
+    expect(processor.port.postMessage.mock.calls.some(([message]) => message.kind === 'credit')).toBe(false);
     expect(render(MUSIC_CHUNK_SAMPLES)[0]!.every((value) => value === 0)).toBe(true);
     expect(processor.port.postMessage).toHaveBeenCalledWith({ kind: 'underrun', generation: 2 });
     const receipts = processor.port.postMessage.mock.calls.length;
     render(MUSIC_CHUNK_SAMPLES + 128);
     expect(processor.port.postMessage.mock.calls).toHaveLength(receipts);
+  });
+  it('plays consecutive reader refills but accepts no epoch control from the reader channel', () => {
+    send({ kind: 'start', generation: 5, frame: 0, chunks: chunks(1) });
+    render(0, MUSIC_CHUNK_SAMPLES / 2);
+    refill({ kind: 'stop', generation: 5 });
+    refill({ kind: 'chunk', generation: 5, chunk: { ...chunks(2)[1]!, offset: MUSIC_CHUNK_SAMPLES } });
+    const output = render(MUSIC_CHUNK_SAMPLES / 2, MUSIC_CHUNK_SAMPLES);
+    expect(output[0]!.subarray(0, MUSIC_CHUNK_SAMPLES / 2).every((value) => value === 0.125)).toBe(true);
+    expect(output[0]!.subarray(MUSIC_CHUNK_SAMPLES / 2).every((value) => value === 0.25)).toBe(true);
+    expect(processor.port.postMessage.mock.calls.some(([message]) => message.kind === 'underrun')).toBe(false);
   });
   it('discards stopped and obsolete epochs and restarts exactly at the deliberate new render origin', () => {
     send({ kind: 'start', generation: 1, frame: 0, chunks: chunks() });
@@ -88,7 +106,7 @@ describe('actual streaming worklet protocol', () => {
     expect(render(128)[0]!.every((value) => value === 0)).toBe(true);
     send({ kind: 'start', generation: 2, frame: 40, chunks: chunks() });
     send({ kind: 'stop', generation: 1 });
-    send({ kind: 'chunk', generation: 1, chunk: chunks(1)[0] });
+    refill({ kind: 'chunk', generation: 1, chunk: chunks(1)[0] });
     render(256);
     expect(processor.port.postMessage).toHaveBeenCalledWith({
       kind: 'started',
