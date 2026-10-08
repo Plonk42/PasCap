@@ -10,6 +10,7 @@ declare function registerProcessor(name: string, processor: typeof AudioWorkletP
 
 class StreamingMusicProcessor extends AudioWorkletProcessor {
   #renderer: MusicRenderer | null = null;
+  #reader: MessagePort | null = null;
   #generation = 0;
   #startFrame = 0;
   #contextStart: number | null = null;
@@ -17,15 +18,25 @@ class StreamingMusicProcessor extends AudioWorkletProcessor {
   #disposed = false;
   constructor() {
     super();
-    this.port.onmessage = ({ data }) => {
-      try {
+    this.port.onmessage = ({ data }) =>
+      this.#guard(data.generation, () => {
         if (data.kind === 'dispose') {
           this.#renderer = null;
           this.#disposed = true;
           return;
         }
+        if (data.kind === 'connect') {
+          // Credits and refill blocks bypass the main thread through the reader worker.
+          this.#reader = data.port as MessagePort;
+          this.#reader.onmessage = ({ data: refill }) =>
+            this.#guard(refill.generation, () => {
+              if (refill.kind === 'chunk') this.#update(refill);
+            });
+          return;
+        }
         if (data.kind === 'start') {
           if (sampleRate !== MUSIC_SAMPLE_RATE) throw new Error('Music requires a 48 kHz rendering context.');
+          if (!this.#reader) throw new Error('Music reader is not connected.');
           this.#generation = data.generation;
           this.#startFrame = data.frame;
           this.#contextStart = null;
@@ -33,15 +44,19 @@ class StreamingMusicProcessor extends AudioWorkletProcessor {
           this.#renderer = new MusicRenderer();
           for (const chunk of data.chunks as MusicChunk[]) this.#renderer.enqueue(chunk);
         } else this.#update(data);
-      } catch (error) {
-        this.#renderer = null;
-        this.port.postMessage({
-          kind: 'failed',
-          generation: data.generation,
-          message: error instanceof Error ? error.message : 'Music rendering failed.',
-        });
-      }
-    };
+      });
+  }
+  #guard(generation: number, action: () => void): void {
+    try {
+      action();
+    } catch (error) {
+      this.#renderer = null;
+      this.port.postMessage({
+        kind: 'failed',
+        generation,
+        message: error instanceof Error ? error.message : 'Music rendering failed.',
+      });
+    }
   }
   #update(data: { generation: number; kind: string; chunk: MusicChunk }): void {
     if (data.generation !== this.#generation) return;
@@ -78,7 +93,7 @@ class StreamingMusicProcessor extends AudioWorkletProcessor {
       });
     }
     if (result.released)
-      this.port.postMessage({ kind: 'credit', generation: this.#generation, count: result.released });
+      this.#reader?.postMessage({ kind: 'credit', generation: this.#generation, count: result.released });
     if (result.underrun) {
       this.port.postMessage({ kind: 'underrun', generation: this.#generation });
       this.#renderer = null;
@@ -91,6 +106,7 @@ class StreamingMusicProcessor extends AudioWorkletProcessor {
         startFrame: this.#startFrame,
         contextFrame: currentFrame + left.length,
         samples: renderer.played,
+        queued: renderer.queued,
       });
     }
     return !this.#disposed;

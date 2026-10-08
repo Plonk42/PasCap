@@ -473,7 +473,8 @@ effects or source-video audio. The aggregate queue remains **four × 128 KiB ste
 Float32 blocks (512 KiB)**, with shared bounded **64 KiB range/short-selection
 scratch**, one **128 KiB conversion workspace** and one **128 KiB mixed-output
 workspace**. Serial credit-controlled refill and one unacknowledged receipt remain
-bounded independently of duration/count; no per-track queue/clock, full-file
+bounded independently of duration/count; one dedicated reader worker owns those
+reads and refills off the editor thread. No per-track queue/clock, full-file
 buffer or duration-sized silence allocation. Current PCM preparation stays serial
 with the unchanged cache format, about 11.52 MB per minute. See
 [MULTIPLE_MUSIC.md](design/MULTIPLE_MUSIC.md) for independent editing and pending acceptance.
