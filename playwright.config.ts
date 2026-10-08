@@ -7,6 +7,7 @@ export default defineConfig({
   workers: 1,
   timeout: 30_000,
   expect: { timeout: 8_000 },
+  reporter: [['list'], ['./tests/timing/playwright-reporter.ts']],
   use: {
     baseURL: 'http://127.0.0.1:4320',
     viewport: { width: 1440, height: 900 },

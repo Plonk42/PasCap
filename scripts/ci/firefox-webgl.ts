@@ -53,6 +53,12 @@ export function nativeFirefoxGraphics(
 /** Real browser/context/shaders/readback, before any media test; no mocked renderer. */
 export default async function firefoxWebGL(config: FullConfig): Promise<void> {
   const use = config.projects[0]!.use;
+  const gfxtest = path.join(path.dirname(firefox.executablePath()), 'gfxtest');
+  // Firefox allows its own startup GLX probe 4 s; load Mesa/LLVM from a cold runner disk first.
+  const warmStarted = performance.now();
+  const warmUp = await nativeFirefoxGraphics(gfxtest);
+  const warmUpMs = Math.round(performance.now() - warmStarted);
+  console.log(`Firefox native graphics warm-up: ${warmUpMs} ms`, warmUp.error ?? '');
   const browser = await firefox
     .launch({ ...use.launchOptions, headless: use.headless ?? true, timeout: 15_000 })
     .catch((cause: unknown) => {
@@ -152,10 +158,11 @@ export default async function firefoxWebGL(config: FullConfig): Promise<void> {
       // about:support is a privileged page unsupported by Juggler navigation.
       // Run the bundled native GLX/EGL probe in the SAME display/environment,
       // with strict time/output bounds. This is evidence, never a context retry.
-      const native = await nativeFirefoxGraphics(path.join(path.dirname(firefox.executablePath()), 'gfxtest'));
+      const native = await nativeFirefoxGraphics(gfxtest);
       const diagnostics = {
         browser: browser.version(),
         readiness: result,
+        warmUp: { milliseconds: warmUpMs, error: warmUp.error },
         environment: Object.fromEntries(
           [
             'DISPLAY',

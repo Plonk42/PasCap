@@ -19,8 +19,9 @@ PasCap is a solo, pre-release project: optimize for fast iteration. Details are 
 - Commit each coherent step with its tests and doc updates, not every small
   correction. Imperative summary; add `(#N)` when tied to an issue, or `Closes #N`
   when the commit (or PR) completes it.
-- Never force-push `main`. Rebase/force-push a task branch only when asked, with
-  `--force-with-lease`.
+- Never force-push `main`. Rebase/force-push a task branch only when asked, or to
+  drop an already squash-merged base from your own unmerged branch, with
+  `--force-with-lease`. Don't stack dependent risky PRs; land each first.
 - Issues are for bugs, features and multi-step work worth tracking. Routine changes
   need no issue, label update, Project card or checkpoint comment.
 - Releases, milestone closure, real-media jobs and legacy tracker cleanup need
@@ -46,6 +47,10 @@ PasCap is a solo, pre-release project: optimize for fast iteration. Details are 
   playback, decoding, native export or test-infrastructure changes.
 - Never weaken assertions, add retries or skip regressions to get green. Don't
   build or reset fixtures while a browser run is serving them.
+- A CI-only failure is a real-condition signal: group it with `npm run ci:failures`,
+  reproduce with `npm run test:browser:ci-like` and fix the cause; a repeated
+  signature becomes a bug before more feature work. Size heavy time limits at about
+  three times measured time; runner speed is never a gate.
 
 ## Product and data safety
 
