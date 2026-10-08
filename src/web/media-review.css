@@ -153,140 +153,258 @@
   overflow-y: auto;
 }
 
+/* Transient drag feedback overlays the image so the strip never moves under the pointer. */
+.source-drag-hint {
+  position: absolute;
+  left: 50%;
+  bottom: 6px;
+  transform: translateX(-50%);
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: #0a140dd9;
+  color: #d5ecdc;
+  font-size: 11px;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 2;
+}
+
 .source-review-readout {
   display: flex;
-  flex-shrink: 0;
-  align-items: center;
-  justify-content: space-between;
-  gap: 6px;
-  padding-top: 3px;
-  font-size: 9px;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 10px;
+  min-width: 0;
+  font-size: 11px;
   font-variant-numeric: tabular-nums;
   color: #b0cbb8;
 }
 
 .source-review-readout small {
   color: var(--muted);
-  font-size: 8px;
+  font-size: 10px;
 }
 
 .source-range-editor {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  gap: 6px;
+}
+
+/* Track-style source range: the whole original maps left (frame 0) to right (exclusive OUT). */
+.source-track {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.source-track .source-play-button {
   flex-shrink: 0;
 }
 
 .source-range-strip {
   position: relative;
-  height: 25px;
-  margin: 0 6px 2px;
+  flex: 1;
+  min-width: 0;
+  height: 44px;
+  /* Room for the outer IN/OUT handles and their wider pointer targets. */
+  margin-inline: 18px;
+  border-radius: 4px;
+  background: #1b2a20;
   touch-action: none;
 }
 
-.source-range-track,
-.source-range-selection {
+.source-range-strip:has(.source-playhead-input:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.source-filmstrip {
   position: absolute;
-  top: 9px;
-  height: 7px;
-  border-radius: 2px;
+  inset: 0;
+  display: flex;
+  overflow: hidden;
+  border-radius: 4px;
   pointer-events: none;
 }
 
-.source-range-track {
+.source-filmstrip img {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* A failed snapshot keeps its slot so the others stay at their source positions. */
+.source-filmstrip img[hidden] {
+  display: block;
+  visibility: hidden;
+}
+
+.source-filmstrip-missing {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  font-size: 11px;
+  pointer-events: none;
+}
+
+.source-range-omitted {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: repeating-linear-gradient(135deg, #050906d6 0 3px, #050906a8 3px 6px);
+  pointer-events: none;
+}
+
+.source-range-omitted.before {
   left: 0;
-  width: 100%;
-  background: #334039;
+  border-radius: 4px 0 0 4px;
+}
+
+.source-range-omitted.after {
+  border-radius: 0 4px 4px 0;
 }
 
 .source-range-selection {
-  background: #739c7e;
-  box-shadow: 0 0 0 1px #93c6a080 inset;
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border: 2px solid var(--accent);
+  pointer-events: none;
 }
 
-.source-range-strip .source-playhead-input {
+.source-playhead-input {
   position: absolute;
   inset: 0;
   width: 100%;
-  height: 25px;
+  height: 100%;
   margin: 0;
   padding: 0;
   border: 0;
   appearance: none;
   background: transparent;
-  cursor: crosshair;
+  cursor: pointer;
+}
+
+.source-playhead-input:focus-visible {
+  outline: none;
 }
 
 .source-playhead-input::-webkit-slider-runnable-track {
-  height: 7px;
+  height: 100%;
   background: transparent;
 }
 
 .source-playhead-input::-moz-range-track {
-  height: 7px;
+  height: 100%;
   background: transparent;
 }
 
 .source-playhead-input::-webkit-slider-thumb {
   appearance: none;
-  width: 9px;
-  height: 11px;
-  margin-top: -2px;
-  border: 1px solid #efd2a4;
-  border-radius: 1px;
-  background: #e6bd7b;
+  width: 2px;
+  height: 44px;
+  border: 0;
+  background: transparent;
 }
 
 .source-playhead-input::-moz-range-thumb {
-  width: 8px;
-  height: 10px;
-  border: 1px solid #efd2a4;
-  border-radius: 1px;
-  background: #e6bd7b;
+  width: 2px;
+  height: 44px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
 }
 
 .source-range-head {
   position: absolute;
-  top: 3px;
-  bottom: 2px;
-  width: 1px;
-  background: #e6bd7b;
+  top: -6px;
+  bottom: -2px;
+  width: 2px;
+  margin-left: -1px;
+  background: #eef8ee;
+  box-shadow: 0 0 0 1px #0a1a0f99;
   pointer-events: none;
+  z-index: 1;
 }
 
+.source-range-head::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -5px;
+  width: 12px;
+  height: 9px;
+  background: #eef8ee;
+  clip-path: polygon(0 0, 100% 0, 100% 55%, 50% 100%, 0 55%);
+}
+
+/* Styled like timeline trim handles; IN sits before its boundary and OUT after it. */
 .source-trim-handle {
   position: absolute;
-  top: 3px;
-  width: 11px;
-  height: 20px;
-  padding: 2px 3px;
-  transform: translateX(-50%);
-  border-radius: 2px;
-  background: #a7d8b3;
-  color: #1a3322;
+  top: 0;
+  bottom: 0;
+  width: 12px;
+  padding: 0;
+  background: var(--accent);
+  color: #284432;
   cursor: ew-resize;
   touch-action: none;
   z-index: 2;
 }
 
-.source-trim-handle span {
+.source-trim-handle::before {
+  content: '';
+  position: absolute;
+  inset: 0 -6px;
+}
+
+.source-trim-handle > span {
   display: block;
-  height: 11px;
-  border-left: 1px solid currentColor;
-  border-right: 1px solid currentColor;
+  width: 2px;
+  height: 20px;
+  margin: auto;
+  border-radius: 2px;
+  background: currentColor;
 }
 
 .source-trim-handle.in {
   transform: translateX(-100%);
-  border-radius: 3px 0 0 3px;
+  border-radius: 4px 0 0 4px;
 }
 
 .source-trim-handle.out {
-  transform: translateX(0);
-  border-radius: 0 3px 3px 0;
+  border-radius: 0 4px 4px 0;
+}
+
+.source-trim-handle:focus-visible {
+  outline-color: #eef8ee;
+  outline-offset: 1px;
+}
+
+.source-trim-handle:active {
+  background: #eef8ee;
+}
+
+.source-range-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 12px;
 }
 
 .source-range-numbers {
   display: flex;
+  flex: 0 1 320px;
   align-items: center;
   gap: 6px;
+  min-width: 0;
 }
 
 .source-range-numbers label {

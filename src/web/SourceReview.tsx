@@ -8,6 +8,7 @@ import {
   useState,
   type KeyboardEvent,
   type PointerEvent,
+  type ReactNode,
   type Ref,
 } from 'react';
 import { VideoDecoderSlot } from '../preview/decoder.js';
@@ -69,6 +70,8 @@ interface RangeProps {
   onPause: () => void;
   onDraft: (active: boolean) => void;
   onKeyDown: (event: KeyboardEvent<HTMLElement>) => void;
+  transport: ReactNode;
+  readout: ReactNode;
   ref: Ref<RangeCommands>;
 }
 interface RangeDrag {
@@ -283,25 +286,6 @@ export function SourceReview({
           <span className="source-pin-label">{pinned ? 'Pinned' : 'Pin'}</span>
         </button>
         <button
-          className="secondary-button small source-play-button"
-          aria-label={playing ? 'Pause source preview' : 'Play source preview'}
-          title="Play the applied IN–OUT range, muted; stop at OUT − 1"
-          disabled={
-            rangeDraft ||
-            !visible ||
-            disabled ||
-            (!playing && (observedFrame === null || !!error || currentObservation?.pendingPlay))
-          }
-          onKeyDown={keyboard}
-          onClick={() => {
-            if (playing) pause();
-            else transport.current?.play();
-          }}
-        >
-          <Icon name={playing ? 'pause' : 'play'} size={14} />
-          {playing ? 'Pause' : 'Play'}
-        </button>
-        <button
           className="primary-button small"
           type="button"
           aria-label="Add source excerpt to timeline"
@@ -351,6 +335,7 @@ export function SourceReview({
             Seeking frame {currentObservation?.requestedFrame ?? requestedFrame}…
           </div>
         )}
+        {rangeDraft && <div className="source-drag-hint">Release to apply · Esc to cancel</div>}
         {error && (
           <div className="source-preview-overlay source-preview-error">
             <span role="alert">{error}</span>
@@ -365,13 +350,6 @@ export function SourceReview({
           </div>
         )}
       </div>
-      <div className="source-review-readout">
-        <span>Source {formatTimecode(observedFrame ?? requestedFrame, rate)}</span>
-        <span>
-          Frame {observedFrame ?? requestedFrame} / {asset.metadata.frameCount - 1}
-        </span>
-        <small>{transportLabel} · muted</small>
-      </div>
       <SourceRangeEditor
         key={asset.id}
         ref={commands}
@@ -385,6 +363,35 @@ export function SourceReview({
         onPause={pause}
         onDraft={setRangeDraft}
         onKeyDown={keyboard}
+        transport={
+          <button
+            className="play-button source-play-button"
+            aria-label={playing ? 'Pause source preview' : 'Play source preview'}
+            title="Play the applied IN–OUT range, muted; stop at OUT − 1"
+            disabled={
+              rangeDraft ||
+              !visible ||
+              disabled ||
+              (!playing && (observedFrame === null || !!error || currentObservation?.pendingPlay))
+            }
+            onKeyDown={keyboard}
+            onClick={() => {
+              if (playing) pause();
+              else transport.current?.play();
+            }}
+          >
+            <Icon name={playing ? 'pause' : 'play'} size={19} />
+          </button>
+        }
+        readout={
+          <div className="source-review-readout">
+            <span>Source {formatTimecode(observedFrame ?? requestedFrame, rate)}</span>
+            <span>
+              Frame {observedFrame ?? requestedFrame} / {asset.metadata.frameCount - 1}
+            </span>
+            <small>{transportLabel} · muted</small>
+          </div>
+        }
       />
       <output
         className="source-add-feedback"
@@ -481,9 +488,14 @@ function SourceRangeEditor({
   onPause,
   onDraft,
   onKeyDown,
+  transport,
+  readout,
   ref,
 }: Readonly<RangeProps>) {
   const count = asset.metadata.frameCount;
+  const snapshots = asset.prepared?.thumbnailFrames ?? [];
+  const [failedSnapshots, setFailedSnapshots] = useState<readonly number[]>([]);
+  const snapshotsAvailable = snapshots.some((sourceFrame) => !failedSnapshots.includes(sourceFrame));
   const strip = useRef<HTMLDivElement>(null);
   const drag = useRef<RangeDrag | null>(null);
   const animation = useRef<number | null>(null);
@@ -640,159 +652,178 @@ function SourceRangeEditor({
 
   return (
     <div className="source-range-editor" data-dirty={numbersDirty || draft !== null}>
-      <div
-        className="source-range-strip"
-        ref={strip}
-        aria-label="Source range"
-        data-source-in={selected.sourceIn}
-        data-source-out={selected.sourceOut}
-        data-range-draft={draft ? 'true' : 'false'}
-      >
-        <span className="source-range-track" aria-hidden="true" />
-        <span
-          className="source-range-omitted before"
-          style={{ width: `${(selected.sourceIn / count) * 100}%` }}
-          aria-hidden="true"
-        />
-        <span
-          className="source-range-omitted after"
-          style={{
-            left: `${(selected.sourceOut / count) * 100}%`,
-            width: `${((count - selected.sourceOut) / count) * 100}%`,
-          }}
-          aria-hidden="true"
-        />
-        <span
-          className="source-range-selection"
-          style={{
-            left: `${(selected.sourceIn / count) * 100}%`,
-            width: `${((selected.sourceOut - selected.sourceIn) / count) * 100}%`,
-          }}
-          aria-hidden="true"
-        />
-        <input
-          className="source-playhead-input"
-          type="range"
-          aria-label="Source playhead"
-          min={0}
-          max={count - 1}
-          step={1}
-          value={frame}
-          aria-valuetext={`Source frame ${frame}, ${formatTimecode(frame, asset.metadata.frameRate)}`}
-          onKeyDown={onKeyDown}
-          onChange={(event) => onFrame(Number(event.target.value))}
-        />
-        <span
-          className="source-range-head"
-          style={{ left: `${count === 1 ? 0 : (frame / (count - 1)) * 100}%` }}
-          aria-hidden="true"
-        />
-        {(['in', 'out'] as const).map((edge) => {
-          const value = edge === 'in' ? selected.sourceIn : selected.sourceOut;
-          return (
-            <button
-              key={edge}
-              className={`source-trim-handle ${edge}`}
-              role="slider"
-              aria-label={`Trim source ${edge === 'in' ? 'start' : 'end'}`}
-              disabled={disabled}
-              style={{ left: `${(value / count) * 100}%` }}
-              aria-valuemin={edge === 'in' ? 0 : selected.sourceIn + 1}
-              aria-valuemax={edge === 'in' ? selected.sourceOut - 1 : count}
-              aria-valuenow={value}
-              aria-valuetext={`${value}, ${formatTimecode(value, asset.metadata.frameRate)}${edge === 'out' ? ', OUT exclusive' : ''}`}
-              title={`Source ${edge === 'in' ? 'IN' : 'OUT (exclusive)'}. Drag to trim or restore; arrows: 1 frame, Shift: 10.`}
-              onPointerDown={(event) => begin(event, edge)}
-              onPointerMove={move}
-              onPointerUp={finish}
-              onPointerCancel={() => cancel()}
-              onLostPointerCapture={() => {
-                if (drag.current) cancel();
-              }}
-              onKeyDown={(event) => {
-                trimKeyboard(event, edge);
-                onKeyDown(event);
-              }}
-              onClick={(event) => {
-                event.preventDefault();
-                event.stopPropagation();
-              }}
-            >
-              <span>{edge === 'in' ? 'IN' : 'OUT'}</span>
-            </button>
-          );
-        })}
-      </div>
-      <form
-        className="source-range-numbers"
-        onSubmit={(event) => {
-          event.preventDefault();
-          if (!numbers.sourceIn.trim() || !numbers.sourceOut.trim()) {
-            setError('Enter whole source frames for IN and OUT.');
-            return;
-          }
-          commit({ mediaId: asset.id, sourceIn: Number(numbers.sourceIn), sourceOut: Number(numbers.sourceOut) });
-        }}
-      >
-        <label>
-          <span>IN</span>
+      <div className="source-track">
+        {transport}
+        <div
+          className="source-range-strip"
+          ref={strip}
+          aria-label="Source range"
+          data-source-in={selected.sourceIn}
+          data-source-out={selected.sourceOut}
+          data-range-draft={draft ? 'true' : 'false'}
+          data-snapshots={snapshotsAvailable ? 'true' : 'false'}
+        >
+          <span className="source-filmstrip" aria-hidden="true">
+            {snapshots.map((sourceFrame) => (
+              <img
+                key={sourceFrame}
+                loading="lazy"
+                draggable={false}
+                hidden={failedSnapshots.includes(sourceFrame)}
+                src={`/api/media/${encodeURIComponent(asset.id)}/thumbnail/${sourceFrame}`}
+                alt=""
+                onError={() => setFailedSnapshots((failed) => [...failed, sourceFrame])}
+              />
+            ))}
+          </span>
+          {!snapshotsAvailable && <span className="source-filmstrip-missing">Snapshots unavailable</span>}
+          <span
+            className="source-range-omitted before"
+            style={{ width: `${(selected.sourceIn / count) * 100}%` }}
+            aria-hidden="true"
+          />
+          <span
+            className="source-range-omitted after"
+            style={{
+              left: `${(selected.sourceOut / count) * 100}%`,
+              width: `${((count - selected.sourceOut) / count) * 100}%`,
+            }}
+            aria-hidden="true"
+          />
+          <span
+            className="source-range-selection"
+            style={{
+              left: `${(selected.sourceIn / count) * 100}%`,
+              width: `${((selected.sourceOut - selected.sourceIn) / count) * 100}%`,
+            }}
+            aria-hidden="true"
+          />
           <input
-            aria-label="Source IN"
-            aria-describedby={error ? errorId : undefined}
-            aria-invalid={!!error}
-            type="number"
+            className="source-playhead-input"
+            type="range"
+            aria-label="Source playhead"
             min={0}
             max={count - 1}
             step={1}
-            value={draft ? selected.sourceIn : numbers.sourceIn}
-            disabled={disabled || draft !== null}
+            value={frame}
+            aria-valuetext={`Source frame ${frame}, ${formatTimecode(frame, asset.metadata.frameRate)}`}
             onKeyDown={onKeyDown}
-            onChange={(event) => setNumbers({ ...numbers, sourceIn: event.target.value })}
+            onChange={(event) => onFrame(Number(event.target.value))}
           />
-        </label>
-        <label>
-          <span>OUT</span>
-          <input
-            aria-label="Source OUT"
-            aria-describedby={error ? errorId : undefined}
-            aria-invalid={!!error}
-            type="number"
-            min={1}
-            max={count}
-            step={1}
-            value={draft ? selected.sourceOut : numbers.sourceOut}
-            disabled={disabled || draft !== null}
-            onKeyDown={onKeyDown}
-            onChange={(event) => setNumbers({ ...numbers, sourceOut: event.target.value })}
+          <span
+            className="source-range-head"
+            style={{ left: `${count === 1 ? 0 : (frame / (count - 1)) * 100}%` }}
+            aria-hidden="true"
           />
-        </label>
-        <button
-          className="secondary-button small"
-          type="submit"
-          aria-label="Apply source range"
-          disabled={disabled || !numbersDirty || draft !== null}
-          onKeyDown={onKeyDown}
+          {(['in', 'out'] as const).map((edge) => {
+            const value = edge === 'in' ? selected.sourceIn : selected.sourceOut;
+            return (
+              <button
+                key={edge}
+                className={`source-trim-handle ${edge}`}
+                role="slider"
+                aria-label={`Trim source ${edge === 'in' ? 'start' : 'end'}`}
+                disabled={disabled}
+                style={{ left: `${(value / count) * 100}%` }}
+                aria-valuemin={edge === 'in' ? 0 : selected.sourceIn + 1}
+                aria-valuemax={edge === 'in' ? selected.sourceOut - 1 : count}
+                aria-valuenow={value}
+                aria-valuetext={`${value}, ${formatTimecode(value, asset.metadata.frameRate)}${edge === 'out' ? ', OUT exclusive' : ''}`}
+                title={`Source ${edge === 'in' ? 'IN' : 'OUT (exclusive)'}. Drag to trim or restore; arrows: 1 frame, Shift: 10.`}
+                onPointerDown={(event) => begin(event, edge)}
+                onPointerMove={move}
+                onPointerUp={finish}
+                onPointerCancel={() => cancel()}
+                onLostPointerCapture={() => {
+                  if (drag.current) cancel();
+                }}
+                onKeyDown={(event) => {
+                  trimKeyboard(event, edge);
+                  onKeyDown(event);
+                }}
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                }}
+              >
+                <span />
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      <div className="source-range-row">
+        {readout}
+        <form
+          className="source-range-numbers"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (!numbers.sourceIn.trim() || !numbers.sourceOut.trim()) {
+              setError('Enter whole source frames for IN and OUT.');
+              return;
+            }
+            commit({ mediaId: asset.id, sourceIn: Number(numbers.sourceIn), sourceOut: Number(numbers.sourceOut) });
+          }}
         >
-          Apply
-        </button>
-        {(draft || numbersDirty) && (
+          <label>
+            <span>IN</span>
+            <input
+              aria-label="Source IN"
+              aria-describedby={error ? errorId : undefined}
+              aria-invalid={!!error}
+              type="number"
+              min={0}
+              max={count - 1}
+              step={1}
+              value={draft ? selected.sourceIn : numbers.sourceIn}
+              disabled={disabled || draft !== null}
+              onKeyDown={onKeyDown}
+              onChange={(event) => setNumbers({ ...numbers, sourceIn: event.target.value })}
+            />
+          </label>
+          <label>
+            <span>OUT</span>
+            <input
+              aria-label="Source OUT"
+              aria-describedby={error ? errorId : undefined}
+              aria-invalid={!!error}
+              type="number"
+              min={1}
+              max={count}
+              step={1}
+              value={draft ? selected.sourceOut : numbers.sourceOut}
+              disabled={disabled || draft !== null}
+              onKeyDown={onKeyDown}
+              onChange={(event) => setNumbers({ ...numbers, sourceOut: event.target.value })}
+            />
+          </label>
           <button
-            className="text-button"
-            type="button"
-            aria-label="Cancel source range"
+            className="secondary-button small"
+            type="submit"
+            aria-label="Apply source range"
+            disabled={disabled || !numbersDirty || draft !== null}
             onKeyDown={onKeyDown}
-            onClick={cancel}
           >
-            Cancel
+            Apply
           </button>
-        )}
-      </form>
+          {(draft || numbersDirty) && (
+            <button
+              className="text-button"
+              type="button"
+              aria-label="Cancel source range"
+              onKeyDown={onKeyDown}
+              onClick={cancel}
+            >
+              Cancel
+            </button>
+          )}
+        </form>
+      </div>
       {error && (
         <div className="source-range-description source-range-error" id={errorId} role="alert">
           {error}
         </div>
       )}
-      {!error && draft && <div className="source-range-description">Release to apply · Esc to cancel</div>}
     </div>
   );
 }
