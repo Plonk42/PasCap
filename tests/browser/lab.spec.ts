@@ -66,7 +66,7 @@ test('compact library handles 12 recordings and the editor fits the desktop view
   const readyMusic = audio.filter((asset) => asset.status === 'ready').length;
   expect(readyMusic).toBeGreaterThan(0);
   await expect(page.getByRole('heading', { name: 'Media 12', exact: true })).toBeVisible();
-  await expect(page.getByRole('slider', { name: 'Exposure', exact: true })).toBeEnabled();
+  await expect(page.getByLabel('Placement section', { exact: true })).toBeEnabled();
   await expect(page.getByRole('region', { name: 'Video timeline' })).toBeInViewport();
   const recordings = page.locator('article.media-item');
   const music = page.getByRole('region', { name: 'Music files', exact: true }).getByRole('article');
@@ -186,6 +186,7 @@ test('paused grading changes pixels immediately and saves/reloads the selected c
   const before = await page.evaluate(() =>
     Array.from(window.pascapLab!.engine.capturePixels().slice(100_000, 100_004)),
   );
+  await inspectorTab(page, 'Track');
   await page.getByRole('slider', { name: 'Exposure', exact: true }).fill('0.7');
   await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().colourLatencyMs !== null);
   const after = await page.evaluate(() => Array.from(window.pascapLab!.engine.capturePixels().slice(100_000, 100_004)));
@@ -194,6 +195,7 @@ test('paused grading changes pixels immediately and saves/reloads the selected c
   await expect(page.getByRole('status', { name: 'Saved on this device' })).toContainText('Saved locally');
   await page.reload();
   await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
+  await inspectorTab(page, 'Track');
   await expect(page.getByRole('slider', { name: 'Exposure', exact: true })).toHaveValue('0.7');
   await page.getByRole('button', { name: 'Reset colour' }).click();
   await page.evaluate(() => window.pascapLab!.flush());
@@ -229,6 +231,7 @@ test('playback and colour updates run outside React, shortcuts ignore text input
   expect(await page.evaluate(() => window.pascapLab!.engine.diagnostics().playing)).toBe(false);
   await page.getByRole('button', { name: 'Play preview' }).click();
   await page.waitForFunction(() => (window.pascapLab?.engine.diagnostics().frame ?? 0) > 20);
+  await inspectorTab(page, 'Track');
   await page.getByRole('slider', { name: 'Saturation', exact: true }).fill('0.2');
   await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().colourLatencyMs !== null);
   await page.getByRole('button', { name: 'Pause preview' }).click();
@@ -396,12 +399,14 @@ test('each ramp curve saves and restores along with shared row Colour', async ({
     expect(state.status, state.message).toBe('paused');
     expect(await page.evaluate(() => window.pascapLab!.project()!.clips[0]!.speed.mode)).toBe('ramp');
   }
+  await inspectorTab(page, 'Track');
   await page.getByRole('slider', { name: 'Exposure', exact: true }).fill('0.6');
   await page.evaluate(() => window.pascapLab!.flush());
   await page.reload();
   await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
-  await expect(page.getByRole('combobox', { name: 'Ramp curve' })).toHaveValue('smooth');
   await expect(page.getByRole('slider', { name: 'Exposure', exact: true })).toHaveValue('0.6');
+  await inspectorTab(page, 'Clip');
+  await expect(page.getByRole('combobox', { name: 'Ramp curve' })).toHaveValue('smooth');
   expect(await page.evaluate(() => window.pascapLab!.project()!.layers[0]!.colour.exposure)).toBe(0.6);
 });
 
@@ -539,7 +544,9 @@ test('plays both ramp directions across dissolves and music source wraps on repe
 });
 
 test('speed changes while playing pause and reload the mapped frame without losing the grade', async ({ page }) => {
+  await inspectorTab(page, 'Track');
   await page.getByRole('slider', { name: 'Exposure', exact: true }).fill('0.4');
+  await inspectorTab(page, 'Clip');
   await page.getByRole('button', { name: 'Play preview' }).click();
   await page.waitForFunction(() => (window.pascapLab?.engine.diagnostics().frame ?? 0) >= 20);
   await page.getByRole('spinbutton', { name: 'Clip speed rate' }).fill('1.5');
@@ -809,6 +816,7 @@ test('changing a later boundary preserves independent excerpts while Colour appl
 }) => {
   await page.getByRole('button', { name: 'Add pattern-a.mp4 to timeline', exact: true }).click();
   await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
+  await inspectorTab(page, 'Track');
   await page.getByRole('slider', { name: 'Exposure', exact: true }).fill('0.8');
   await page.getByRole('button', { name: 'Transition after pattern-b.mp4, excerpt 2 on Video 1', exact: true }).click();
   await page.getByRole('combobox', { name: 'Transition type' }).selectOption('cross-dissolve');

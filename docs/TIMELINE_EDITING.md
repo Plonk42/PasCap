@@ -296,14 +296,14 @@ toward its **next participating point**, holds before/after its own endpoints an
 uses its unkeyed value only when it has no participation on the row: the saved row
 value for Opacity, row colour for colour, and individual clip speed for Speed.
 
-The selected layer, including an empty one, has one **Keyframes** tab (accessible
-name **Layer keyframes**) with its directly visible shared point list. Clip keeps
-the playhead setting controls. Every setting has a clickable hollow/inactive or filled/active diamond with
+The selected layer, including an empty one, has one **Track → Keyframes** section
+(list accessible name **Layer keyframes**) with its directly visible shared point list. Clip keeps
+the playhead Speed and Transform controls; Track keeps Colour and Opacity. Every setting has a clickable hollow/inactive or filled/active diamond with
 `aria-pressed`; inactive is not HTML-disabled. Toggling affects only that channel;
 the first participant creates/last removes the point. Animated values are read-only
 between participating points until explicitly captured with the diamond; no slider
-creates implicit keys. Keyframes shows dependencies and inner **Time, easing
-& values**. Moving its Timeline frame moves all participants and the existing easing
+creates implicit keys. Keyframes shows dependencies and an inner **Edit**
+disclosure. Moving its Timeline frame moves all participants and the existing easing
 in one Undo step, with collision and contextual timing validation. List input
 identity/focus and expansion survive a single-point move and Undo.
 
@@ -344,7 +344,7 @@ All eleven setting diamonds are immediately followed by native SVG **Previous/Ne
 buttons, before any existing reset. They remain visible but disabled without the
 relevant neighbour, an opened project, or during any document-preview draft. They seek
 strictly earlier/later points where that channel is not `null` (zero included),
-skipping unrelated participation. **Clip → Colour** contains the single **Opacity**
+skipping unrelated participation. **Track → Colour** contains the single **Opacity**
 slider/exact `NumberField`/diamond/navigation alongside the colour controls.
 The numeric value uses **0–1**, initially **1**; the main label may show **100%**.
 Its buttons visit `opacity` participants, with no sidebar duplicate.
@@ -368,11 +368,14 @@ Navigation/inspection creates no history entry or save and adds no persisted fie
 
 The thin strip above video rows is the **time ruler**. Its separators/ticks denote
 TIME; clicking/dragging seeks. The distinct **Cut / Fade / Dissolve** boundary
-buttons open transition settings in Sequence, not keyframe controls. Full point
+buttons open that boundary in Track → Transitions, not keyframe controls. Full point
 semantics are in [LAYERS_AND_KEYFRAMES.md](LAYERS_AND_KEYFRAMES.md).
 
-Every track owns its boundary list and opening/closing fades, edited in **Sequence**
-for the selected track. Exactly one record joins each adjacent pair. Cut permits a
+Every track owns its boundary list and opening/closing fades, edited in **Track**
+for the selected track. Track → Transitions lists every boundary left to right;
+the selected one (from a boundary button, the list, or the selected clip's incoming
+boundary, else its outgoing one) is expanded. No earlier choice sticks when the
+selection changes. Exactly one record joins each adjacent pair. Cut permits a
 gap; non-cut transitions require touching clips or that pair's existing dissolve.
 Gapped pairs explain the disabled non-cut choices: explicitly close the gap or
 enable that track's Ripple first. Cross-dissolve duration explicitly sets the right
@@ -538,8 +541,8 @@ precision, commit on Enter/blur, keep invalid drafts editable and restore on Esc
 Integer source/placement frames, durations and fades retain exact native numeric
 steppers and existing timecode feedback, without arbitrary timing sliders.
 Source-review paired IN/OUT retains its explicit Apply workflow.
-**Clip / Keyframes / Sequence / Audio** separates source/appearance/speed/Transform, the
-whole-row point list, transitions/fades and music. The header directly exposes
+**Clip / Track / Audio** separates clip-owned source/placement/speed/Transform,
+track-owned Colour/keyframes/transitions/fades, and music. The header directly exposes
 panel toggles and help; **Workspace options**
 holds layout reset and Diagnostics. **Layer options**
 holds only rename/Ripple/stacking/deletion; **Clip actions** holds duplication/nudging,
@@ -569,4 +572,4 @@ and both-runtime acceptance belong to
 [DEPLOYMENT.md](DEPLOYMENT.md). Actual-commit correctness results are available in
 [GitHub Actions](https://github.com/Plonk42/PasCap/actions).
 
-Row Colour includes static **HSL ranges** and **Colour curves** in nested Clip → Colour sections. They affect every excerpt and both dissolve sources on the row, whether or not its nine scalar channels are keyed. Moves use the destination row's complete colour; clip edits never copy these settings. They are not speed curves or new animation channels. See [the schema-12 HSL/curves contract](design/HSL_AND_CURVES.md).
+Row Colour includes static **HSL ranges** and **Colour curves** in nested Track → Colour sections. They affect every excerpt and both dissolve sources on the row, whether or not its nine scalar channels are keyed. Moves use the destination row's complete colour; clip edits never copy these settings. They are not speed curves or new animation channels. See [the schema-12 HSL/curves contract](design/HSL_AND_CURVES.md).

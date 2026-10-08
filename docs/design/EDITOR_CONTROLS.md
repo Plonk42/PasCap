@@ -82,7 +82,7 @@ rename, Ripple, stacking and deletion. No tab relocation is justified by the aud
 Keep frequent split/trim/delete/cut actions directly in Timeline, not in another
 toolbar. Detailed controls and diagnostics remain contextual/collapsible.
 
-Transform is Clip's fifth top-level section, collapsed by default and included
+Transform is Clip's fourth section, collapsed by default and included
 in Expand all/Collapse all. **Transform animation** heading help remains reachable
 while collapsed. **Crop left/right/top/bottom / Scale / Translate X/Y / Rotation °**
 pair native sliders with exact fields. Main values edit the base without keys,

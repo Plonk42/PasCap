@@ -230,7 +230,7 @@ test('native graph dragging previews live but commits only on release as one Und
   await page.evaluate(() => window.pascapLab!.flush());
   expect(memory.saves).toBe(0);
   await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
-  await expect(page.getByRole('button', { name: 'Keyframe Exposure', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Keyframe Speed', exact: true })).toBeDisabled();
   await expect(page.getByRole('button', { name: 'Split at playhead', exact: true })).toBeDisabled();
   await page.mouse.up();
   await expect(point(page, 70)).toBeFocused();

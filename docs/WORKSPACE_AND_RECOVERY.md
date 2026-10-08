@@ -14,7 +14,7 @@ The intended discrete-GPU and long real-flight checks remain deferred.
 
 ## Layout and navigation
 
-Main **Clip → Colour** edits nine scalar row colour values and sole Opacity, including
+Main **Track → Colour** edits nine scalar row colour values and sole Opacity, including
 on empty rows. Static and keyed Colour share this row ownership on every clip.
 Different treatments require different rows; there is no per-clip grade or scope
 toggle. Sources are graded once; Ungraded neutralizes row Colour only.
@@ -37,16 +37,17 @@ They are not Kelvin/HDR/automatic white balance. HSL/curves remain static. See
   a selected recording inserts the whole selection.
 - Centre: docked **Timeline preview** / **Source preview** tabs, never an overlay
   covering other editor controls. Tab arrows and Home/End switch viewer contexts.
-- Right: scrollable **Clip / Keyframes / Sequence / Audio** inspector tabs
-  with readable inputs and independent collapsible sections. Clip contains
-  source/clip settings, placement and playhead speed, Transform, colour and diamonds. Its
-  Colour section also contains the single row-owned Opacity control. Keyframes
-  (accessible tab name **Layer keyframes**) contains the selected row's directly
-  visible whole-point list, participant chips,
-  Animation help and point navigation; Sequence owns that track's transitions/fades;
+- Right: scrollable **Clip / Track / Audio** inspector tabs
+  with readable inputs and independent collapsible sections, split by ownership.
+  Clip ("Clip N of M · track") contains the selected clip's source range,
+  placement, playhead speed and Transform; an empty row shows one line instead.
+  Track ("Applies to all N clips on this track") contains Colour with the single
+  row-owned Opacity control, Keyframes (the whole-point list, participant chips,
+  Animation help and point navigation), Transitions and Fades;
   Audio owns selected-instance music controls (**Music track / Recording / Add music
-  track / Delete selected music track**). Keyframes and Sequence omit redundant selected-track banners.
-  Empty-row selection retains keyframe context and dormant fades.
+  track / Delete selected music track**).
+  Empty-row selection retains Track context and dormant fades. The chosen tab is
+  a browser-local preference that survives reloads.
 - Bottom: frame-scaled multi-layer timeline, playhead timecode, highlighted active
   insertion layer, one marker per stored row point, dimmed hidden clips and Activity.
   The responsive toolbar keeps Split, Trim start/end, Delete and IN/OUT/Cut range
@@ -85,7 +86,7 @@ certification.
 
 Choosing a layer selects its first excerpt (if present), highlights that row and
 reveals it vertically. Empty-layer selection clears clip selection but retains the
-insertion target **and row-wide Layer keyframes context/settings**. Selecting a
+insertion target **and its Track context/settings**. Selecting a
 clip or a populated/empty row preserves the user's chosen Inspector tab. Its fields
 refresh for the new editing context without applying the previous row/clip's drafts
 to that selection. Automatic row reveal never runs under an active
@@ -112,7 +113,7 @@ preview still block mutations.
 **Layer options → Ripple** is a native checkbox with contextual help and visible
 row state; new tracks default on. Layer options contains only rename, Ripple,
 raise/lower and delete; visibility remains a separate sidebar control.
-**Clip → Colour** contains the single **Opacity** native slider/exact
+**Track → Colour** contains the single **Opacity** native slider/exact
 `NumberField`/diamond/Previous/Next controls alongside the colour controls.
 Numeric entry uses **0–1**, initially **1**; the main label may show **100%**.
 Without Opacity keys, either value control edits row `opacity`, including on an empty
@@ -130,7 +131,8 @@ frame** and nudges work on positioned clips or the first Ripple anchor; later
 Ripple starts are disabled with an accessible explanation to drag to reorder or
 turn Ripple off. Music, other tracks and absolute row points never follow Ripple.
 
-In **Sequence**, boundary controls and **Sequence fades** use the selected track.
+In **Track**, Transitions lists every boundary of the selected track and **Fades**
+edits its opening/closing fades.
 Gapped pairs are Cut only, with a reason to close the gap or enable Ripple before
 adding a non-cut effect. A positioned dissolve edit explicitly adjusts its paired
 right clip; other clips stay fixed and conflicts reject the whole edit. Black
@@ -157,15 +159,15 @@ returns focus to the trigger; clicking outside closes without stealing focus fro
 the clicked control. Inspector tab arrows/Home/End switch contexts without discarding
 mounted content or its valid/invalid drafts within the same editing context.
 Selecting a clip or row keeps the chosen tab; explicit Cut/Fade/Dissolve boundary
-buttons open Sequence.
-**Expand all / Collapse all** appears only in Clip and changes its five top-level
-sections: **Source range**, **Placement**, **Speed**, **Transform** and **Colour**, including
+buttons open Track with that boundary expanded.
+**Expand all / Collapse all** appears only in Clip and changes its four
+sections: **Source range**, **Placement**, **Speed** and **Transform**, including
 temporarily absent Clip sections. A mixed state offers Expand all. Individual toggles
-and the existing section preferences remain authoritative. Sequence and Audio
-sections, nested **Time, easing & values**, other nested details and help are unchanged.
+and the existing section preferences remain authoritative. Track and Audio
+sections, each keyframe's nested **Edit**, other nested details and help are unchanged.
 Bulk expansion is presentation-only and leaves mounted drafts, processing, history
 and saves unchanged. If preference storage fails, choices still work for the session.
-New preferences keep Source range, Placement, Speed and Transform collapsed, Colour open;
+New preferences keep Source range, Placement, Speed and Transform collapsed and Track sections open;
 existing expansion preferences remain respected. Help/reset details are contextual,
 not repeated across the main workspace. Collapsing never disables processing.
 
@@ -294,7 +296,7 @@ Full schema, geometry and animation details: [spatial transforms](design/SPATIAL
 
 ### Shared row animation
 
-The dedicated **Keyframes** tab (accessible name **Layer keyframes**) belongs to
+The **Track → Keyframes** section (list accessible name **Layer keyframes**) belongs to
 the selected **entire video row**, not the selected clip. It remains available on
 an empty row and contains the shared
 point list directly, count, whole-row Previous/Next navigation and participant chips.
@@ -333,7 +335,7 @@ fields and reversible graph gestures do not create row Speed participation.
 
 **Keyframes** exposes one shared list without an outer disclosure or per-row list
 expansion preference. Each row names the participating setting dependencies;
-its inner **Time, easing & values** provides
+its inner **Edit** disclosure (open initially for three or fewer points) provides
 **Timeline frame**, **Shared easing** and participant-specific values.
 A time edit moves all participants
 and their existing easing together in **one Undo step**; colliding times/invalid

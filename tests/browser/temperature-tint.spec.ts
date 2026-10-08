@@ -6,11 +6,16 @@ import { calculateLayout } from '../../src/shared/timeline.js';
 import {
   editLayerPoint,
   expandedInspectorPreferences,
-  inspectorTab,
   layerKeyframes,
+  inspectorTab as openTab,
   sharedPoint,
 } from './editor-helpers.js';
 import { memoryProjects, type MemoryProjects } from './memory-projects.js';
+
+// Temperature/Tint are Track settings beside the keyframe list; "Clip" here means those playhead controls.
+async function inspectorTab(page: Page, name: 'Clip' | 'Layer keyframes'): Promise<void> {
+  await openTab(page, name === 'Clip' ? 'Track' : name);
+}
 
 const channels = [
   { setting: 'temperature', label: 'Temperature', precise: 0.123456789 },
@@ -241,7 +246,9 @@ test('empty-row native controls preserve exact precision, invalid drafts, indivi
   document.layers[0]!.colour.tint = -0.6;
   await fixture(page, document);
   await page.getByRole('button', { name: 'Select layer Empty row', exact: true }).click();
-  await expect(page.locator('.selected-clip-name')).toContainText('Whole video row');
+  await expect(page.locator('[role="tabpanel"]:not([hidden]) .selected-clip-name')).toContainText(
+    'Applies to every clip added to this track',
+  );
   for (const { setting, label, precise } of channels) {
     const { slider, exact, widget } = controls(page, label);
     await expect(slider).toBeEnabled();
@@ -551,7 +558,7 @@ test('channel navigation skips unrelated keys and shares an off-duration cursor 
     await next.press('Enter');
     await previewAt(page, 119);
     await expect(next).toBeFocused();
-    await expect(page.getByRole('tab', { name: 'Clip', exact: true })).toHaveAttribute('aria-selected', 'true');
+    await expect(page.getByRole('tab', { name: 'Track', exact: true })).toHaveAttribute('aria-selected', 'true');
     await expect(diamond(page, 'Temperature')).toHaveAttribute('aria-pressed', 'false');
     await expect(diamond(page, 'Temperature')).toHaveAttribute('title', /timeline frame 119\./);
     await expect(controls(page, 'Temperature').exact).toBeDisabled();

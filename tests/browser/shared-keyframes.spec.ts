@@ -12,6 +12,7 @@ import {
   inspectorTab,
   layerKeyframes,
   openOptions,
+  settingTab,
   sharedPoint,
 } from './editor-helpers.js';
 import { memoryProjects, type MemoryProjects } from './memory-projects.js';
@@ -83,7 +84,6 @@ async function ready(page: Page, document: ProjectDocument): Promise<void> {
   }, calculateLayout(document).duration);
   await inspectorTab(page, 'Layer keyframes');
   await expect(layerKeyframes(page, 'Video 1')).toBeVisible();
-  await inspectorTab(page, 'Clip');
 }
 
 async function fixture(page: Page, document: ProjectDocument): Promise<void> {
@@ -125,24 +125,23 @@ for (const target of ['video-1', 'empty'] as const) {
     await fixture(page, document);
     const layerName = target === 'empty' ? 'Empty row' : 'Video 1';
     await page.getByRole('button', { name: `Select layer ${layerName}`, exact: true }).click();
-    await inspectorTab(page, 'Clip');
+    await inspectorTab(page, 'Track');
     const opacity = page.getByRole('slider', { name: 'Opacity', exact: true });
     await expect(opacity).toHaveCount(1);
     await expect(opacity).toBeVisible();
     await expect(opacity).toBeEnabled();
     await expect(opacity).toHaveValue('1');
-    await expect(page.getByRole('button', { name: 'Placement section', exact: true })).toHaveAttribute(
-      'aria-expanded',
-      'true',
-    );
+    if (target === 'video-1')
+      await expect(
+        page.getByRole('button', { name: 'Placement section', exact: true, includeHidden: true }),
+      ).toHaveAttribute('aria-expanded', 'true');
     expect(await page.evaluate(() => localStorage.getItem('pascap-section-layer-opacity'))).toBe('open');
     const colourSection = page.locator('section.inspector-section').filter({ has: opacity });
     await expect(colourSection.getByRole('button', { name: 'Colour section', exact: true })).toBeVisible();
     const placement = page.locator('section.inspector-section').filter({
-      has: page.getByRole('button', { name: 'Placement section', exact: true }),
+      has: page.getByRole('button', { name: 'Placement section', exact: true, includeHidden: true }),
     });
-    await expect(placement.getByRole('slider', { name: 'Opacity', exact: true })).toHaveCount(0);
-    await expect(placement.getByRole('spinbutton', { name: 'Opacity', exact: true })).toHaveCount(0);
+    await expect(placement.locator('input[aria-label="Opacity"]')).toHaveCount(0);
     await expect(page.locator('.layer-control input[aria-label="Opacity"]')).toHaveCount(0);
     await expect(colourSection.locator('input[aria-label="Opacity"]')).toHaveCount(2);
     await expect(opacity.locator('..').getByRole('spinbutton', { name: 'Opacity', exact: true })).toHaveValue('1');
@@ -199,6 +198,7 @@ test('setting tooltips and accessible descriptions explain the editable keyframe
       ['Opacity', 'slider', 'Opacity'],
       ['Speed', 'spinbutton', 'Layer speed rate'],
     ] as const) {
+      await settingTab(page, label);
       const hint =
         frame === 10
           ? `Editable keyframe at timeline frame 10. Edits change only ${label} at this shared layer point.`
@@ -218,7 +218,7 @@ test('setting tooltips and accessible descriptions explain the editable keyframe
       if (role === 'slider')
         await expect(page.locator(`label[for="${await field.getAttribute('id')}"]`)).toHaveAttribute('title', hint);
     }
-    await expect(page.locator('[id$="-clip-panel"] .layer-setting-kind').filter({ hasText: scope })).toHaveCount(3);
+    await expect(page.locator('#inspector-pane .layer-setting-kind').filter({ hasText: scope })).toHaveCount(3);
     await openOptions(page, 'Layer options Video 1');
     const options = page.getByRole('group', { name: 'Layer options Video 1', exact: true });
     await expect(options.getByRole('slider')).toHaveCount(0);
@@ -254,10 +254,12 @@ test('the first hollow diamond creates one point; same-frame channels merge inde
   page,
 }) => {
   await seek(page, 20);
+  await inspectorTab(page, 'Track');
   await page.getByRole('slider', { name: 'Exposure', exact: true }).fill('0.4');
   await page.getByRole('slider', { name: 'Opacity', exact: true }).fill('0.7');
   await expect(page.getByRole('slider', { name: 'Layer opacity', exact: true })).toHaveCount(0);
   await expect(page.getByRole('slider', { name: 'Clip opacity', exact: true })).toHaveCount(0);
+  await inspectorTab(page, 'Clip');
   const baseRate = page.getByRole('spinbutton', { name: 'Clip speed rate', exact: true });
   await baseRate.fill('1.25');
   await baseRate.press('Enter');
@@ -270,6 +272,7 @@ test('the first hollow diamond creates one point; same-frame channels merge inde
     page.getByRole('combobox', { name: 'Speed mode', exact: true }).locator('option[value="keyframes"]'),
   ).toHaveCount(0);
 
+  await inspectorTab(page, 'Track');
   const exposure = diamond(page, 'Exposure');
   await expect(exposure).toBeEnabled();
   await expect(exposure).toHaveAttribute('aria-pressed', 'false');
@@ -282,6 +285,7 @@ test('the first hollow diamond creates one point; same-frame channels merge inde
   await expect(exposure.locator('[aria-hidden="true"]')).toHaveText('◆');
 
   for (const label of ['Speed', 'Opacity']) {
+    await settingTab(page, label);
     const toggle = diamond(page, label);
     await expect(toggle).toBeEnabled();
     await expect(toggle).toHaveAttribute('aria-pressed', 'false');
@@ -312,7 +316,7 @@ test('the first hollow diamond creates one point; same-frame channels merge inde
   for (const label of ['Opacity', 'Speed', 'Exposure', 'Saturation'])
     await expect(marker).toHaveAttribute('title', new RegExp(label));
 
-  await inspectorTab(page, 'Clip');
+  await inspectorTab(page, 'Track');
   await exposure.click();
   expect((await current(page)).layers[0]?.keyframes).toEqual([
     { ...expected, values: { ...expected.values, exposure: null, saturation: 1 } },
@@ -320,6 +324,7 @@ test('the first hollow diamond creates one point; same-frame channels merge inde
   await expect(marker).toBeVisible();
   await expect(marker).not.toHaveAttribute('title', /Exposure/);
   for (const label of ['Speed', 'Opacity']) {
+    await settingTab(page, label);
     await diamond(page, label).click();
     expect((await current(page)).layers[0]?.keyframes).toHaveLength(1);
     await expect(marker).toBeVisible();
@@ -362,11 +367,13 @@ test('between points keyed controls are read-only until their own diamond explic
     await expect(diamond(page, label)).toBeEnabled();
     await expect(diamond(page, label)).toHaveAttribute('aria-pressed', 'false');
   }
+  await inspectorTab(page, 'Clip');
   const rate = page.getByRole('spinbutton', { name: 'Layer speed rate', exact: true });
   await expect(rate).toBeDisabled();
   await expect(rate).toHaveValue('0.875');
   await expect(diamond(page, 'Speed')).toBeEnabled();
   await expect(diamond(page, 'Speed')).toHaveAttribute('aria-pressed', 'false');
+  await inspectorTab(page, 'Track');
   await expect(page.getByRole('slider', { name: 'Saturation', exact: true })).toBeEnabled();
   expect(await current(page)).toEqual(document);
   await page.getByRole('slider', { name: 'Saturation', exact: true }).fill('1.3');
@@ -381,8 +388,9 @@ test('between points keyed controls are read-only until their own diamond explic
   const captured = (await current(page)).layers[0]!.keyframes.find((point) => point.frame === 30)!;
   expect(captured).toEqual(sharedPoint(30, { exposure: 0.2 }));
   await page.getByRole('slider', { name: 'Exposure', exact: true }).fill('0.6');
-  await expect(rate).toBeDisabled();
   await expect(page.getByRole('slider', { name: 'Opacity', exact: true })).toBeDisabled();
+  await inspectorTab(page, 'Clip');
+  await expect(rate).toBeDisabled();
   expect((await current(page)).layers[0]?.keyframes).toEqual([
     document.layers[0]!.keyframes[0],
     sharedPoint(30, { exposure: 0.6 }),
@@ -406,8 +414,10 @@ test('between points keyed controls are read-only until their own diamond explic
   expect(secondStart).not.toBe(document.clips[1]!.start);
   await expect(page.locator('[data-keyframe-layer="video-1"][data-layer-keyframe="30"]')).toHaveCount(1);
   await seek(page, 10);
-  for (const label of ['Exposure', 'Speed', 'Opacity'])
+  for (const label of ['Exposure', 'Speed', 'Opacity']) {
+    await settingTab(page, label);
     await expect(diamond(page, label)).toHaveAttribute('aria-pressed', 'true');
+  }
   await expect(diamond(page, 'Saturation')).toHaveAttribute('aria-pressed', 'false');
 });
 
@@ -423,7 +433,7 @@ test('moving a shared point moves every participant with one Undo and preserves 
   });
   await fixture(page, document);
   const row = await editLayerPoint(page, 'Video 1', 10);
-  await expect(row.getByLabel('Edit layer keyframe 10', { exact: true })).toHaveText('Time, easing & values');
+  await expect(row.getByLabel('Edit layer keyframe 10', { exact: true })).toHaveText('Edit');
   await expect(row.locator('.layer-keyframe-dependencies')).toHaveText('Opacity · Speed · Exposure · Saturation');
   const time = row.getByRole('spinbutton', { name: 'Layer keyframe frame 10', exact: true });
   const id = await time.getAttribute('id');
@@ -537,6 +547,7 @@ test('whole-row curves continue across different clips and their dissolve, while
     .locator('[data-clip-id="second"] .timeline-clip-body')
     .evaluate((button) => (button as HTMLButtonElement).click());
   await seek(page, overlap);
+  await inspectorTab(page, 'Track');
   await expect(page.getByRole('slider', { name: 'Exposure', exact: true })).toHaveValue('0.8');
   await expect(page.getByRole('slider', { name: 'Exposure', exact: true })).toBeDisabled();
   await expect(page.getByRole('slider', { name: 'Contrast', exact: true })).toHaveValue('1.3');
@@ -577,7 +588,9 @@ for (const rate of [0.25, 4]) {
       expect(captured.sourceFrames[slot]).toBe(Math.floor(frame * rate));
       expect(sample.sourceFrame).toBe(Math.floor(frame * rate));
       expect(sample.colour.exposure).toBe(-0.75 + frame * 0.5);
+      await settingTab(page, 'Exposure');
       await expect(diamond(page, 'Exposure')).toHaveAttribute('aria-pressed', 'true');
+      await settingTab(page, 'Speed');
       await expect(diamond(page, 'Speed')).toHaveAttribute('aria-pressed', String(frame === 0));
       captures.push(captured);
     }
@@ -640,17 +653,20 @@ test('a row marker opens the selected empty row independently of clips, and keyb
 
   await marker.click();
   await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(20);
-  await expect(page.getByRole('tab', { name: 'Sequence', exact: true })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('tab', { name: 'Track', exact: true })).toHaveAttribute('aria-selected', 'true');
   await inspectorTab(page, 'Layer keyframes');
   await expect(layerKeyframes(page, 'Video 2')).toBeVisible();
   await expect(layerKeyframes(page, 'Video 1')).toHaveCount(0);
   await inspectorTab(page, 'Clip');
-  await expect(page.locator('.selected-clip-name')).toContainText('Whole video row');
+  await expect(page.locator('#inspector-pane [role="tabpanel"]:not([hidden])')).toContainText(
+    'Select a clip on Video 2 to edit it.',
+  );
   await expect(page.getByRole('spinbutton', { name: 'Source IN frame', exact: true })).toHaveCount(0);
   await expect(page.locator('.layer-control.selected .layer-select')).toHaveAttribute(
     'aria-label',
     'Select layer Video 2',
   );
+  await inspectorTab(page, 'Track');
   await expect(page.getByRole('slider', { name: 'Saturation', exact: true })).toBeEnabled();
   await expect(diamond(page, 'Saturation')).toBeEnabled();
   await page.getByRole('slider', { name: 'Exposure', exact: true }).fill('0.6');
@@ -658,11 +674,13 @@ test('a row marker opens the selected empty row independently of clips, and keyb
   expect(edited.layers[0]).toEqual(document.layers[0]);
   expect(edited.clips).toEqual(document.clips);
   expect(edited.layers[1]?.keyframes).toEqual([sharedPoint(20, { exposure: 0.6, speed: 2, opacity: 0.4 })]);
-  await inspectorTab(page, 'Layer keyframes');
   await expect(layerKeyframes(page, 'Video 2')).toBeVisible();
 
-  await inspectorTab(page, 'Clip');
-  const field = page.getByRole('spinbutton', { name: 'Layer speed rate', exact: true });
+  // An empty row has no clip to retime; its stored Speed participant stays editable in the list.
+  const field = (await editLayerPoint(page, 'Video 2', 20)).getByRole('spinbutton', {
+    name: 'Speed keyframe value 20',
+    exact: true,
+  });
   await field.fill('3');
   for (const key of ['Control+d', 's', 'Delete', 'ArrowRight', 'Home', 'End', 'Space']) await field.press(key);
   expect(await current(page)).toEqual(edited);
@@ -710,6 +728,7 @@ test('an overlapping row-speed edit is rejected atomically, without a save or hi
     .locator('[data-clip-id="upper-a"] .timeline-clip-body')
     .evaluate((button) => (button as HTMLButtonElement).click());
   await seek(page, 0);
+  await inspectorTab(page, 'Clip');
   const rate = page.getByRole('spinbutton', { name: 'Layer speed rate', exact: true });
   const before = await current(page);
   const saves = memory.saves;
@@ -781,6 +800,7 @@ test('numeric trim, mapped split, duplicate and overlay moves keep absolute row 
     index: 2,
   });
   await fixture(page, document);
+  await inspectorTab(page, 'Clip');
   const sourceIn = page.getByRole('spinbutton', { name: 'Source IN frame', exact: true });
   await sourceIn.fill('10');
   await sourceIn.press('Enter');
@@ -852,6 +872,7 @@ test('numeric trim, mapped split, duplicate and overlay moves keep absolute row 
   await page
     .locator('[data-clip-id="overlay"] .timeline-clip-body')
     .evaluate((button) => (button as HTMLButtonElement).click());
+  await inspectorTab(page, 'Clip');
   await expect(sourceIn).toHaveValue('10');
   await expect(start).toHaveValue('80');
   await expect(page.getByRole('button', { name: 'Layer keyframe 5 on Video 2', exact: true })).toHaveCount(1);

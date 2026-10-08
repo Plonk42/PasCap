@@ -128,12 +128,12 @@ test('bulk Clip expansion preserves other tabs, mixed state and preferences with
   expect(
     await headers.evaluateAll((nodes) => nodes.every((node) => node.getAttribute('aria-expanded') === 'false')),
   ).toBe(true);
-  await inspectorTab(page, 'Sequence');
-  await expect(page.getByRole('button', { name: 'Sequence fades section', exact: true })).toHaveAttribute(
+  await inspectorTab(page, 'Track');
+  await expect(page.getByRole('button', { name: 'Fades section', exact: true })).toHaveAttribute(
     'aria-expanded',
     'true',
   );
-  await page.getByRole('button', { name: 'Sequence fades section', exact: true }).click();
+  await page.getByRole('button', { name: 'Fades section', exact: true }).click();
   await expect(page.getByRole('button', { name: /^(Expand|Collapse) all Inspector settings$/ })).toHaveCount(0);
   await inspectorTab(page, 'Audio');
   await expect(page.getByRole('button', { name: 'Music section', exact: true })).toHaveAttribute(
@@ -164,7 +164,7 @@ test('bulk Clip expansion preserves other tabs, mixed state and preferences with
     'aria-expanded',
     'false',
   );
-  await expect(page.getByRole('button', { name: 'Colour section', exact: true })).toHaveAttribute(
+  await expect(page.getByRole('button', { name: 'Colour section', exact: true, includeHidden: true })).toHaveAttribute(
     'aria-expanded',
     'true',
   );
@@ -184,7 +184,8 @@ test('bulk collapse retains invalid drafts, nested disclosure state and reachabl
   const list = page.getByRole('list', { name: 'Edit layer keys', exact: true, includeHidden: true });
   await expect(list).toBeVisible();
   const point = page.getByLabel('Edit layer keyframe 10', { exact: true });
-  await point.click();
+  // Lists of three or fewer points open their Edit details initially.
+  await expect(point.locator('..')).toHaveAttribute('open', '');
   await inspectorTab(page, 'Clip');
   await page.getByRole('button', { name: 'Collapse all Inspector settings', exact: true }).click();
   await expect(input).toBeAttached();
@@ -332,26 +333,22 @@ test('Escape closes a hover preview before cancelling an underlying invalid nume
 
 test('changing Inspector context without clicking dismisses help whose owner becomes hidden', async ({ page }) => {
   const clipTab = page.getByRole('tab', { name: 'Clip', exact: true });
-  const keyframesTab = page.getByRole('tab', { name: 'Layer keyframes', exact: true });
-  const sequenceTab = page.getByRole('tab', { name: 'Sequence', exact: true });
+  const trackTab = page.getByRole('tab', { name: 'Track', exact: true });
   const audioTab = page.getByRole('tab', { name: 'Audio', exact: true });
   await clipTab.focus();
   await clipTab.press('ArrowRight');
-  await expect(keyframesTab).toHaveAttribute('aria-selected', 'true');
-  await expect(keyframesTab).toBeFocused();
+  await expect(trackTab).toHaveAttribute('aria-selected', 'true');
+  await expect(trackTab).toBeFocused();
   const trigger = page.getByRole('button', { name: 'Animation help', exact: true });
   const panel = await panelFor(page, trigger);
   await trigger.click();
   await expect(panel).toBeVisible();
-  await keyframesTab.focus();
-  await keyframesTab.press('ArrowRight');
-  await expect(sequenceTab).toHaveAttribute('aria-selected', 'true');
-  await expect(sequenceTab).toBeFocused();
-  await expect(panel).toHaveJSProperty('popover', 'manual');
-  await expect.poll(() => panel.evaluate((element) => element.matches(':popover-open'))).toBe(false);
-  await sequenceTab.press('ArrowRight');
+  await trackTab.focus();
+  await trackTab.press('ArrowRight');
   await expect(audioTab).toHaveAttribute('aria-selected', 'true');
   await expect(audioTab).toBeFocused();
+  await expect(panel).toHaveJSProperty('popover', 'manual');
+  await expect.poll(() => panel.evaluate((element) => element.matches(':popover-open'))).toBe(false);
   expect(memory.saves).toBe(0);
 });
 
@@ -395,7 +392,7 @@ test('an outside pointer gesture dismisses pinned help before capture so Escape 
 const HELP_CONTEXTS = [
   { label: 'Source timing', tab: 'Clip', text: 'Original recording frames; OUT is exclusive.' },
   { label: 'Placement timing', tab: 'Clip', text: 'Opacity is in Colour and affects the whole row.' },
-  { label: 'Colour animation', tab: 'Clip', text: 'Each diamond keys only its own setting' },
+  { label: 'Colour animation', tab: 'Track', text: 'Each diamond keys only its own setting' },
   { label: 'Speed timing', tab: 'Clip', text: 'Row keys override, rather than multiply' },
   { label: 'Animation', tab: 'Layer keyframes', text: 'Moving a point moves every participating setting.' },
   {
@@ -411,9 +408,9 @@ const INSPECTOR_HELP_HEADINGS = [
   { title: 'Source range', help: 'Source timing', tab: 'Clip' },
   { title: 'Placement', help: 'Placement timing', tab: 'Clip' },
   { title: 'Speed', help: 'Speed timing', tab: 'Clip' },
-  { title: 'Colour', help: 'Colour animation', tab: 'Clip' },
-  { title: 'Transition', help: 'Transition timing', tab: 'Sequence' },
-  { title: 'Sequence fades', help: 'Fade timing', tab: 'Sequence' },
+  { title: 'Colour', help: 'Colour animation', tab: 'Track' },
+  { title: 'Transitions', help: 'Transition timing', tab: 'Track' },
+  { title: 'Fades', help: 'Fade timing', tab: 'Track' },
 ] as const;
 
 for (const context of INSPECTOR_HELP_HEADINGS) {
@@ -641,7 +638,7 @@ test('direct point list keeps timing help available and nested drafts mounted ac
   await inspectorTab(page, 'Layer keyframes');
   const list = page.getByRole('list', { name: 'Edit layer keys', exact: true });
   await expect(list).toBeVisible();
-  await page.getByLabel('Edit layer keyframe 10', { exact: true }).click();
+  await expect(page.getByLabel('Edit layer keyframe 10', { exact: true }).locator('..')).toHaveAttribute('open', '');
   const field = page.getByRole('spinbutton', { name: 'Layer keyframe frame 10', exact: true, includeHidden: true });
   await field.fill('0.5');
   await field.press('Enter');
@@ -650,7 +647,7 @@ test('direct point list keeps timing help available and nested drafts mounted ac
   await trigger.click();
   await expect(panel).toBeVisible();
   await expect(panel).toContainText('Absolute project timeline frames');
-  await inspectorTab(page, 'Sequence');
+  await inspectorTab(page, 'Audio');
   await expect(panel).toBeHidden();
   await expect(field).toBeAttached();
   await expect(field).toBeHidden();

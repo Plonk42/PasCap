@@ -116,10 +116,12 @@ test('dragging a marker moves all participants/easing with preview-only drafts, 
 }) => {
   const before = await current(page);
   await seek(page, 5);
+  await inspectorTab(page, 'Track');
   const start = await begin(page);
   await move(page, start, 50, true);
   await expect(marker(page, 50)).toHaveClass(/moving/);
   await expect(marker(page, 50)).toHaveAttribute('data-keyframe-origin', '20');
+  await expect(marker(page, 50).locator('.timeline-layer-key-time')).toHaveText('00:00:01:20');
   await expect(page.locator('.timeline-bottom')).toContainText('all participants move together');
   expect(await current(page)).toEqual(before);
   await page.evaluate(() => window.pascapLab!.flush());
@@ -364,7 +366,9 @@ test('an empty positioned row has independently movable points and marker select
   expect(next.layers[1]!.keyframes).toEqual([{ ...project.layers[1]!.keyframes[0]!, frame: 35 }]);
   await expect(marker(page, 35, 'empty-overlay')).toBeFocused();
   await inspectorTab(page, 'Clip');
-  await expect(page.locator('.selected-clip-name')).toContainText('Whole video row');
+  await expect(page.getByRole('tabpanel', { name: 'Clip', exact: true })).toContainText(
+    'Select a clip on Video 2 to edit it.',
+  );
 });
 
 test('horizontal autoscroll uses captured zoom/scroll coordinates and Escape restores the original viewport without saves', async ({
@@ -419,7 +423,6 @@ test('moving a point outside duration stores its time without extending footage,
     'Stored point · timeline frame 160',
   );
   await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(119);
-  await inspectorTab(page, 'Clip');
   await page.getByRole('button', { name: 'Previous Exposure keyframe', exact: true }).click();
   await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(80);
   await page.getByRole('button', { name: 'Next Exposure keyframe', exact: true }).click();

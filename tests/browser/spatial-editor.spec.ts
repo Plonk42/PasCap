@@ -323,7 +323,7 @@ test('bulk expansion includes Transform while heading help and tab navigation re
   await expect(exact(page, 'Scale')).toBeVisible();
   await page.getByRole('tab', { name: 'Clip', exact: true }).focus();
   await page.keyboard.press('ArrowRight');
-  await expect(page.getByRole('tab', { name: 'Layer keyframes', exact: true })).toBeFocused();
+  await expect(page.getByRole('tab', { name: 'Track', exact: true })).toBeFocused();
   await page.keyboard.press('ArrowLeft');
   await expect(exact(page, 'Scale')).toBeVisible();
   expect(await current(page)).toEqual(before);

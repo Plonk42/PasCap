@@ -8,9 +8,10 @@ import {
   closeOptions,
   editLayerPoint,
   expandedInspectorPreferences,
-  inspectorTab,
   layerKeyframes,
   openOptions,
+  inspectorTab as openTab,
+  settingTab,
   sharedPoint,
 } from './editor-helpers.js';
 import { memoryProjects, type MemoryProjects } from './memory-projects.js';
@@ -18,6 +19,12 @@ import { memoryProjects, type MemoryProjects } from './memory-projects.js';
 let assets: MediaAsset[];
 let memory: MemoryProjects;
 let unexpectedApi: string[];
+
+// These cases navigate Colour/Opacity, which share the Track tab with the keyframe list;
+// "Clip" here means the playhead setting controls. Real Clip-tab checks use openTab.
+async function inspectorTab(page: Page, name: 'Clip' | 'Layer keyframes' | 'Sequence' | 'Track'): Promise<void> {
+  await openTab(page, name === 'Clip' ? 'Track' : name);
+}
 
 test.beforeEach(async ({ page, request }) => {
   unexpectedApi = [];
@@ -92,7 +99,6 @@ async function ready(page: Page, document: ProjectDocument): Promise<void> {
   );
   await inspectorTab(page, 'Layer keyframes');
   await expect(layerKeyframes(page, 'Video 1')).toBeVisible();
-  await inspectorTab(page, 'Clip');
 }
 
 async function fixture(page: Page, document: ProjectDocument): Promise<void> {
@@ -148,8 +154,9 @@ function interleaved(): LayerKeyframe[] {
 test('unkeyed settings retain their hollow diamonds and both visible disabled navigation buttons', async ({ page }) => {
   const document = await current(page);
   expect(KEYFRAME_SETTINGS).toHaveLength(11);
-  await expect(inspector(page).getByRole('button', { name: /^Keyframe / })).toHaveCount(11);
+  await expect(inspector(page).getByRole('button', { name: /^Keyframe / })).toHaveCount(10);
   for (const { label } of KEYFRAME_SETTINGS) {
+    await settingTab(page, label);
     const toggle = diamond(page, label);
     await expect(toggle).toBeEnabled();
     await expect(toggle).toHaveAttribute('aria-pressed', 'false');
@@ -161,8 +168,10 @@ test('unkeyed settings retain their hollow diamonds and both visible disabled na
       await expect(button.locator('svg[aria-hidden="true"]')).toHaveCount(1);
     }
   }
+  await inspectorTab(page, 'Track');
   for (const { label } of KEYFRAME_SETTINGS.filter((setting) => setting.key !== 'speed'))
     await expect(inspector(page).getByRole('slider', { name: label, exact: true })).toBeEnabled();
+  await openTab(page, 'Clip');
   await expect(page.getByRole('spinbutton', { name: 'Clip speed rate', exact: true })).toBeEnabled();
   await readOnly(page, document);
 });
@@ -176,6 +185,7 @@ for (const [index, { key, label }] of KEYFRAME_SETTINGS.entries()) {
     const first = 3 + index * 3;
     const middle = 50 + index * 3;
     const last = 89 + index * 3;
+    await settingTab(page, label);
     const previous = step(page, label, 'Previous');
     const next = step(page, label, 'Next');
     await expect(diamond(page, label)).toBeEnabled();
@@ -270,6 +280,7 @@ test('all eleven setting buttons remain present and disabled throughout a native
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await page.mouse.down();
   for (const { label } of KEYFRAME_SETTINGS) {
+    await settingTab(page, label);
     await expect(diamond(page, label)).toBeDisabled();
     for (const direction of ['Previous', 'Next'] as const) {
       await expect(step(page, label, direction)).toBeVisible();
@@ -297,7 +308,9 @@ test('no opened project keeps all setting buttons visible and disabled without a
   const dialog = page.getByRole('dialog', { name: 'Projects', exact: true });
   await expect(dialog).toBeVisible();
   await dialog.getByRole('button', { name: 'Close', exact: true }).click();
-  for (const { label } of KEYFRAME_SETTINGS) {
+  await inspectorTab(page, 'Track');
+  // Speed is clip-owned, so without a project only the ten Track settings exist.
+  for (const { label } of KEYFRAME_SETTINGS.filter((setting) => setting.key !== 'speed')) {
     await expect(diamond(page, label)).toBeDisabled();
     for (const direction of ['Previous', 'Next'] as const) {
       await expect(step(page, label, direction)).toBeVisible();
@@ -337,18 +350,19 @@ test('single opacity navigation on a selected empty row preserves Inspector cont
   await closeOptions(page);
   await page.getByRole('button', { name: 'Toggle Clip panel', exact: true }).click();
   await page.getByRole('button', { name: 'Select layer Video 2', exact: true }).click();
-  await expect(page.getByRole('tab', { name: 'Sequence', exact: true })).toHaveAttribute('aria-selected', 'true');
-  await inspectorTab(page, 'Clip');
+  await expect(page.getByRole('tab', { name: 'Track', exact: true })).toHaveAttribute('aria-selected', 'true');
   const next = step(page, 'Opacity', 'Next');
   await next.focus();
   await next.press('Enter');
   await previewAt(page, 20);
   await expect(next).toBeFocused();
   await expect(inspector(page)).toBeVisible();
-  await expect(page.getByRole('tab', { name: 'Clip', exact: true })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('tab', { name: 'Track', exact: true })).toHaveAttribute('aria-selected', 'true');
   await closeOptions(page);
-  await inspectorTab(page, 'Clip');
-  await expect(page.locator('.selected-clip-name')).toContainText('Whole video row');
+  await openTab(page, 'Clip');
+  await expect(inspector(page).locator('[role="tabpanel"]:not([hidden])')).toContainText(
+    'Select a clip on Video 2 to edit it.',
+  );
   await inspectorTab(page, 'Layer keyframes');
   await expect(layerKeyframes(page, 'Video 2')).toBeVisible();
   await expect(page.locator('.layer-control.selected')).toHaveAttribute('data-layer-id', 'upper');
@@ -422,10 +436,12 @@ test('successive outside-duration setting, row and list navigation keeps one tru
     await expect(diamond(page, 'Exposure')).toHaveAttribute('aria-pressed', 'false');
     await expect(diamond(page, 'Exposure')).toHaveAttribute('title', /timeline frame 119\./);
     await expect(page.getByRole('slider', { name: 'Exposure', exact: true })).toBeDisabled();
+    await openTab(page, 'Clip');
     await expect(
       page.getByRole('region', { name: 'Source range', exact: true }).locator('.section-label'),
     ).toContainText('Source frame 89');
   }
+  await inspectorTab(page, 'Clip');
   await expect(step(page, 'Exposure', 'Next')).toBeDisabled();
   await inspectorTab(page, 'Layer keyframes');
   await keys.getByRole('button', { name: 'Previous layer keyframe', exact: true }).click();
@@ -677,6 +693,7 @@ test('all navigation groups fit the 270px inspector at the default and minimum v
     await page.setViewportSize({ width, height });
     await expect(resizer).toHaveAttribute('aria-valuenow', '270');
     for (const { label } of KEYFRAME_SETTINGS) {
+      await settingTab(page, label);
       await diamond(page, label).scrollIntoViewIfNeeded();
       for (const direction of ['Previous', 'Next'] as const) {
         const button = step(page, label, direction);

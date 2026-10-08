@@ -91,13 +91,11 @@ async function beginMove(page: Page, desiredStart: number, grab = 12, alt = fals
   return Number(await page.locator('.timeline-drop-preview').getAttribute('data-drop-start'));
 }
 
-test('default editor keeps rare options, speed/layer details, sequence and music out of clip context', async ({
+test('default editor keeps rare options, speed/layer details, track settings and music out of clip context', async ({
   page,
 }) => {
-  await expect(page.getByRole('slider', { name: 'Exposure', exact: true })).toBeVisible();
+  await expect(page.getByRole('slider', { name: 'Exposure', exact: true })).toBeHidden();
   await expect(page.getByRole('combobox', { name: 'Speed mode', exact: true })).toBeHidden();
-  await expect(page.getByRole('slider', { name: 'Opacity', exact: true })).toBeVisible();
-  await expect(page.getByRole('slider', { name: 'Opacity', exact: true })).toHaveValue('1');
   await expect(page.getByLabel('Placement section', { exact: true })).toBeVisible();
   await expect(page.getByRole('spinbutton', { name: 'Clip timeline start', exact: true })).toBeHidden();
   await expect(page.getByRole('slider', { name: 'Layer opacity', exact: true })).toHaveCount(0);
@@ -109,9 +107,12 @@ test('default editor keeps rare options, speed/layer details, sequence and music
   await expect(page.getByRole('combobox', { name: 'Filter media' })).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(page.locator('summary[aria-label="Media options"]')).toBeFocused();
-  await inspectorTab(page, 'Sequence');
+  await inspectorTab(page, 'Track');
+  await expect(page.getByRole('slider', { name: 'Exposure', exact: true })).toBeVisible();
+  await expect(page.getByRole('slider', { name: 'Opacity', exact: true })).toBeVisible();
+  await expect(page.getByRole('slider', { name: 'Opacity', exact: true })).toHaveValue('1');
   await expect(page.getByRole('spinbutton', { name: 'Opening fade' })).toBeVisible();
-  await expect(page.getByRole('slider', { name: 'Exposure', exact: true })).toBeHidden();
+  await expect(page.getByLabel('Placement section', { exact: true })).toBeHidden();
   await inspectorTab(page, 'Audio');
   await expect(page.getByRole('combobox', { name: 'Music track', exact: true })).toBeVisible();
   await expect(page.getByRole('spinbutton', { name: 'Opening fade' })).toBeHidden();

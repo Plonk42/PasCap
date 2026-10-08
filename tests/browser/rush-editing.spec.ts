@@ -12,7 +12,14 @@ import {
 } from '../../src/shared/model.js';
 import { validateSourceRanges } from '../../src/shared/source-range.js';
 import { calculateLayout, layerClips } from '../../src/shared/timeline.js';
-import { clipAction, closeOptions, expandedInspectorPreferences, openOptions, sharedPoint } from './editor-helpers.js';
+import {
+  clipAction,
+  closeOptions,
+  expandedInspectorPreferences,
+  inspectorTab,
+  openOptions,
+  sharedPoint,
+} from './editor-helpers.js';
 import { memoryProjects, type MemoryProjects } from './memory-projects.js';
 
 const PROJECT_ID = 'browser-rush-editing';
@@ -438,6 +445,7 @@ test('three ranges from one rush keep the source pinned, independent, reloadable
   const input = page.getByRole('spinbutton', { name: 'Source IN frame', exact: true });
   await input.fill('50');
   await input.press('Enter');
+  await inspectorTab(page, 'Track');
   await page.getByRole('slider', { name: 'Saturation', exact: true }).fill('1.2');
   const edited = await current(page);
   expect(edited.clips.slice(0, 2)).toEqual(added.clips.slice(0, 2));

@@ -462,7 +462,7 @@ without optical flow. Exact neutral poses preserve old opaque black letterboxing
 after grading; nonneutral uncovered pixels have zero coverage. Native inverse
 RGB resampling precedes grading, reusing the same four raw buffers/two LUTs and
 serial process limits. Source keys remain at their original anchors through
-trim/cut/split/duplicate/move; new pieces have independent deep copies. The fifth
+trim/cut/split/duplicate/move; new pieces have independent deep copies. The fourth
 Clip section **Transform** is collapsed by default and uses explicit full-pose
 source-frame capture, stored-key navigation and release-only sliders. See
 [the spatial contract](design/SPATIAL_TRANSFORMS.md), not historical benchmark
@@ -479,7 +479,7 @@ Video closing fades remain inside their last clips. The static export path must
 cover the full project; music tails use layered export. Export still requires video.
 See [the multiple-music contract](design/MULTIPLE_MUSIC.md).
 
-The single **Opacity** slider/diamond/navigation belongs in **Clip → Colour**
+The single **Opacity** slider/diamond/navigation belongs in **Track → Colour**
 alongside the colour sliders, initially **100%**, and works on an empty row.
 Without Opacity keys, it edits row `opacity`; with keys, only participation at the
 real playhead permits editing, with the diamond explicitly capturing a missing

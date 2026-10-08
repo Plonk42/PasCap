@@ -117,7 +117,7 @@ PasCap is a solo, pre-release project: optimize for fast iteration. Details are 
   retain positive width/height, without refit or moving the original-centre pivot;
   use unrounded original-aspect contain fit and top-left half-open crop bounds.
   Exact neutral rendering preserves opaque black letterboxing after grading;
-  nonneutral uncovered pixels are transparent. Clip → Transform is the fifth
+  nonneutral uncovered pixels are transparent. Clip → Transform is the fourth
   section, collapsed by default, with one full-pose source-frame capture diamond,
   read-only animated main values without a key at the real displayed source frame,
   stored-key navigation/exact fields and release-only value sliders. Any spatial
@@ -131,7 +131,7 @@ PasCap is a solo, pre-release project: optimize for fast iteration. Details are 
   `contrast`, `hue`, `saturation`, `highlights`, `shadows`. Reject missing row opacity,
   saved `clip.opacity` and old `clipOpacity`/`layerOpacity` channels; do not supply
   compatibility defaults. `layer.opacity` is the valid sole stored row value.
-  Put the single **Opacity** slider/diamond/navigation in **Clip → Colour** beside
+  Put the single **Opacity** slider/diamond/navigation in **Track → Colour** beside
   the colour sliders, usable on empty rows too. Without Opacity keys, the slider
   edits `row.opacity`; keys override that value on every clip, including both
   dissolve sources. Sliders never create keys; an animated channel without a

@@ -131,7 +131,7 @@ reach all rows and music. The time ruler and its playhead handle/timecode remain
 visible while scrolling; its ticks follow horizontal scroll, and clicking/dragging
 it seeks without editing a row. Layer options explains unavailable actions at
 stack endpoints or on the last remaining track. It contains only rename, Ripple,
-Raise/Lower and Delete; visibility stays in the sidebar and Opacity in **Clip → Colour**.
+Raise/Lower and Delete; visibility stays in the sidebar and Opacity in **Track → Colour**.
 
 Select an excerpt and drag an edge inward to shorten it or outward to restore
 omitted footage up to the original bounds. The dashed extent shows available source.
@@ -160,8 +160,8 @@ preview transiently, commit once on valid release, and cancel with Escape.
 or the **first Ripple anchor only**. Later Ripple clips expose an accessible reason:
 drag to reorder, or turn Ripple off in Layer options to set an independent start.
 
-Boundary **Cut / Fade / Dissolve** and **Sequence fades** belong to the selected
-track in **Sequence**; clicking a boundary button explicitly opens that tab.
+Boundary **Cut / Fade / Dissolve** and **Fades** belong to the selected
+track in **Track**; clicking a boundary button opens that tab with the boundary expanded.
 Gapped pairs are Cut only: explicitly close the gap or enable Ripple before adding
 a fade/dissolve. A cross-dissolve explicitly adjusts the right clip to its overlap;
 with Ripple off, no other clip moves and conflicts reject it.
@@ -176,7 +176,7 @@ frozen last image. Details: [TIMELINE_EDITING.md](TIMELINE_EDITING.md).
 Each excerpt has independent constant/ramp/custom speed and spatial settings.
 All static and keyed Colour belongs to its video row, not the excerpt.
 **Opacity** is one setting for the selected **whole video row**, not a clip.
-Find its single native slider/exact numeric field/diamond/navigation in **Clip → Colour**,
+Find its single native slider/exact numeric field/diamond/navigation in **Track → Colour**,
 alongside Temperature, Tint, Exposure, Brightness, Contrast, Hue, Saturation,
 Highlights and Shadows.
 The numeric field uses **0–1**, initially **1**; the main label may show **100%**.
@@ -200,7 +200,7 @@ and incompatible fades/transitions/overlaps reject the edit rather than being sh
 
 ### Temperature and Tint
 
-In **Clip → Colour**, **Temperature** and **Tint** precede Exposure. Both use
+In **Track → Colour**, **Temperature** and **Tint** precede Exposure. Both use
 normalized **−1…1**, neutral **0**, not Kelvin or automatic white balance.
 Positive Temperature warms, negative cools; positive Tint adds magenta, negative
 adds green. Nonzero settings intentionally colour greys. The common gain formula
@@ -307,7 +307,7 @@ lower tracks; exact neutral poses retain the old opaque black letterbox.
   neutral base and clears all spatial keys in one Undo.
 
 Up to **256** full-pose keys belong to each clip, separately from the row's
-Keyframes tab. Trims/restoration, moves and Ripple retain original-source anchors;
+row's keyframes. Trims/restoration, moves and Ripple retain original-source anchors;
 splits, cuts and duplicates retain independent deep copies, including off-trim
 keys. Retiming drives geometry continuously even while a recorded image is held;
 there is no optical flow. Transform edits do not change timing, row Opacity,
@@ -317,7 +317,7 @@ Details: [spatial transforms](design/SPATIAL_TRANSFORMS.md).
 
 ### Opt in to shared row animation
 
-The dedicated **Keyframes** Inspector tab (accessible name **Layer keyframes**)
+The **Track → Keyframes** section
 belongs to the selected **whole video row**, even an empty one, not to a clip.
 It contains the point count, participant chips, whole-row Previous/Next navigation
 and a directly visible shared point list. The toolbar's **Animation help** combines
@@ -357,7 +357,7 @@ move **all participants, values and easing together**; valid release is one Undo
 step. With Snap on, pointer movement snaps within eight pixels at the captured zoom
 to captured clip/music/transition boundaries and playhead; **Alt** bypasses it.
 Focused marker **←/→** moves one project frame, **Shift+←/→** ten, without snapping
-or also stepping the playhead/nudging a clip. **Keyframes → Time, easing & values**
+or also stepping the playhead/nudging a clip. **Keyframes → Edit**
 on each point provides exact time/value editing with Enter/blur to apply
 and Escape to restore.
 
@@ -465,24 +465,23 @@ resources and pending acceptance; this guide does not claim those tests passed.
 
 ## Workspace and keyboard
 
-Use **Clip / Keyframes / Sequence / Audio** for source/clip settings, row Opacity
-and playhead controls, the whole-row point list, track transitions/fades and music, respectively.
-Keyframes retains the accessible tab name **Layer keyframes**. Keyframes and
-Sequence use the selected row without a redundant selected-track banner.
+Use **Clip** for the selected clip's source range, placement, speed and Transform;
+**Track** for everything the whole row owns (Colour and Opacity, keyframes,
+transitions and fades); and **Audio** for music. Each tab names its scope at the top.
 Selecting an excerpt or a populated/empty row preserves the chosen tab and updates
 its row context safely. Switching tabs hides rather than unmounts content, retaining
 drafts within the same editing context; changing the edited row/clip refreshes its
 fields rather than applying a previous context's draft to the new selection.
-Explicit boundary buttons still open Sequence.
+Explicit boundary buttons open Track with that boundary expanded.
 
 Viewer and Inspector tabs share one native-button appearance and retain their
-arrow/Home/End navigation. Keyframes does not repeat its visible title in the toolbar.
+arrow/Home/End navigation.
 Trash icons delete; × closes or dismisses. Icon-only actions keep accessible names
 and tooltips. See the [editor control catalogue](design/EDITOR_CONTROLS.md) for
 control conventions and vocabulary.
 
-**Expand all / Collapse all** appears only in Clip and controls its five top-level
-sections: **Source range**, **Placement**, **Speed**, **Transform** and **Colour**. Sequence,
+**Expand all / Collapse all** appears only in Clip and controls its four
+sections: **Source range**, **Placement**, **Speed** and **Transform**. Track,
 Audio, nested disclosures and help remain unchanged.
 
 The header directly exposes **Media / Inspector toggles and keyboard help**.
@@ -513,7 +512,7 @@ mixed select-all and always-visible media Add simplify the library.
 
 Inline help is a small **? button**, not an expandable text section. Find it
 beside the relevant title—**Source range**, **Placement**,
-**Speed**, **Colour**, **Transition**, **Sequence fades**
+**Speed**, **Colour**, **Transitions**, **Fades**
 or **Placement & fades**—even when that section is collapsed. Help and expansion
 are separate buttons; no scrolling to the end of a section is needed. Startup
 details are next to **Preview needs attention**.
@@ -523,7 +522,7 @@ You can move the pointer into the help to read it, or press Down arrow to focus
 and scroll its text. Escape or a click elsewhere closes it; Escape closes help
 before cancelling an input draft. Hovering help never applies a field or edits
 the project. A deliberate click away from a number still applies a valid draft
-once, as usual. Settings, nested **Time, easing & values**, music placement and
+once, as usual. Settings, each keyframe's nested **Edit**, music placement and
 storage/render breakdowns remain their existing expandable controls, not help buttons.
 
 | Context                                     | Shortcut                                                                     |

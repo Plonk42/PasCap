@@ -33,8 +33,8 @@ import { keyframeNavigationFrame, useKeyframeNavigation } from './keyframe-navig
 import { clipStartRestriction } from './layer-actions.js';
 import './layers.css';
 import { Layers } from './Layers.js';
-import { MusicTimeline, type MusicTimelineGesture } from './MusicTimeline.js';
 import { createMusicInstance, videoTimelineDuration } from './music-ui.js';
+import { MusicTimeline, type MusicTimelineGesture } from './MusicTimeline.js';
 import { Popover } from './Popover.js';
 import { RushEditBar, TimelineCutMarks } from './RushEditBar.js';
 import { useTimelineKeyframes, type TimelineKeyframeDraft } from './timeline-keyframes.js';
@@ -1242,6 +1242,11 @@ export function Timeline(props: Readonly<Props>) {
                     }}
                   >
                     ◆
+                    {active && (
+                      <span className="timeline-layer-key-time" aria-hidden="true">
+                        {formatTimecode(displayedFrame)}
+                      </span>
+                    )}
                   </button>
                 );
               }),

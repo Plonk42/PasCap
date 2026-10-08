@@ -53,13 +53,13 @@ test('new projects have empty video/audio bins and no stale source review, searc
   await expect(page.locator('.media-item')).toHaveCount(0);
   await expect(page.locator('.source-preview')).toHaveCount(0);
   await expect(page.getByRole('textbox', { name: 'Search media', exact: true })).toHaveValue('');
-  await expect(page.locator('select[aria-label="Music recording"] option')).toHaveCount(1);
+  await expect(page.locator('[data-music-media-id]')).toHaveCount(0);
   await expect(page.getByText('Your media library is empty', { exact: true })).toBeVisible();
   await page.reload();
   await expect(page.locator('.media-item')).toHaveCount(0);
   await open(page, initialTitle);
   await expect(page.locator('.media-item')).toHaveCount(1);
-  await expect(page.locator('select[aria-label="Music recording"] option')).toHaveCount(2);
+  await expect(page.locator('[data-music-media-id]')).toHaveCount(1);
 });
 
 test('reimporting prepared media associates it only with the current project and survives reload without timeline clips', async ({
@@ -122,12 +122,12 @@ test('audio imports persist in the new project bin without assigning a music tra
   if (!(await filename.isVisible())) await page.getByRole('button', { name: 'Music section', exact: true }).click();
   await filename.fill('/memory-only/music.wav');
   await page.getByRole('button', { name: 'Import audio', exact: true }).click();
-  await expect(page.locator('select[aria-label="Music recording"] option')).toHaveCount(2);
+  await expect(page.locator(`[data-music-media-id="${music.id}"]`)).toHaveCount(1);
   await page.evaluate(() => window.pascapLab!.flush());
   expect(memory.snapshot(id).media.audioIds).toEqual([music.id]);
   expect(memory.snapshot(id).music).toEqual([]);
   await page.reload();
-  await expect(page.locator('select[aria-label="Music recording"] option')).toHaveCount(2);
+  await expect(page.locator(`[data-music-media-id="${music.id}"]`)).toHaveCount(1);
 });
 
 test('deleting another project requires confirmation, supports cancel, and leaves the current editor intact', async ({

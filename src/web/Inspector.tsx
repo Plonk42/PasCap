@@ -1,4 +1,4 @@
-import { useId, type KeyboardEvent, type ReactNode } from 'react';
+import { useEffect, useId, type KeyboardEvent, type ReactNode } from 'react';
 import { COLOUR_CONTROLS, isNeutralColour, NEUTRAL_COLOUR } from '../shared/colour.js';
 import { applyCommand, type EditCommand } from '../shared/commands.js';
 import { colourAt } from '../shared/composition.js';
@@ -44,6 +44,7 @@ interface Props {
   drafting: boolean;
   section: InspectorMode;
   onSection: (section: InspectorMode) => void;
+  onSelectBoundary: (leftId: string) => void;
   onEdit: (command: EditCommand | readonly EditCommand[]) => void;
   children?: ReactNode;
   onPreview: (draft: DraftPreview | null, restoreFrame?: number) => void;
@@ -51,12 +52,17 @@ interface Props {
   onPause: () => void;
 }
 
-const INSPECTOR_MODES: readonly { id: InspectorMode; label: string; accessibleLabel?: string }[] = [
+const INSPECTOR_MODES: readonly { id: InspectorMode; label: string }[] = [
   { id: 'clip', label: 'Clip' },
-  { id: 'keyframes', label: 'Keyframes', accessibleLabel: 'Layer keyframes' },
-  { id: 'sequence', label: 'Sequence' },
+  { id: 'track', label: 'Track' },
   { id: 'audio', label: 'Audio' },
 ];
+
+const TRANSITION_LABEL: Record<Transition['type'], string> = {
+  cut: 'Cut',
+  'fade-through-black': 'Fade through black',
+  'cross-dissolve': 'Cross-dissolve',
+};
 
 function commandNumberError(project: ProjectDocument, command: EditCommand, recovery: string): string | null {
   try {
@@ -72,6 +78,11 @@ function placementHint(layer: VideoLayer | undefined, restriction: string | null
   return layer?.ripple
     ? 'First clip anchor in project frames; later clips follow it. Row points, music and other tracks stay fixed.'
     : 'Independent project-frame start; row points, music and other clips stay fixed.';
+}
+
+function trackScope(clips: number): string {
+  if (clips === 0) return 'Applies to every clip added to this track';
+  return clips === 1 ? 'Applies to the clip on this track' : `Applies to all ${clips} clips on this track`;
 }
 
 function transitionHasGap(boundary: Transition | undefined, layout: TimelineLayout): boolean {
@@ -138,7 +149,6 @@ function InspectorTabs({
           role="tab"
           id={`${id}-${mode.id}-tab`}
           data-inspector-mode={mode.id}
-          aria-label={mode.accessibleLabel}
           aria-selected={section === mode.id}
           aria-controls={`${id}-${mode.id}-panel`}
           tabIndex={section === mode.id ? 0 : -1}
@@ -304,9 +314,7 @@ function ColourSection({
   const canReset = resetCommands.length > 0;
   const resetTitle = animated
     ? 'Reset only the enabled Colour settings, including Opacity, at this shared point. Other settings and points stay unchanged.'
-    : 'Reset row Colour and Opacity. Row points stay unchanged.';
-  let gradeLabel = 'Row colour · Layer';
-  if (animated) gradeLabel = `Layer colour · timeline frame ${frame}`;
+    : 'Reset this track’s Colour and Opacity. Keyframes stay unchanged.';
   const reset = (): void => {
     if (disabled || !canReset) return;
     onEdit(resetCommands);
@@ -336,7 +344,6 @@ function ColourSection({
       }
     >
       <div className="grade-heading">
-        <span className="grade-context">{gradeLabel}</span>
         <button
           type="button"
           className="text-button"
@@ -394,20 +401,20 @@ function SequenceControls({
   layout,
   drafting,
   onEdit,
+  onSelectBoundary,
   id,
 }: Readonly<
-  Pick<Props, 'project' | 'assets' | 'boundaryId' | 'drafting' | 'onEdit'> & {
+  Pick<Props, 'project' | 'assets' | 'boundaryId' | 'drafting' | 'onEdit' | 'onSelectBoundary'> & {
     layer: VideoLayer;
     layout: TimelineLayout;
     id: string;
   }
 >) {
   const boundary = layer.transitions.find((item) => item.leftId === boundaryId);
-  const boundaryIndex = boundary ? layer.transitions.indexOf(boundary) : -1;
-  const left = project.clips.find((item) => item.id === boundary?.leftId);
-  const right = project.clips.find((item) => item.id === boundary?.rightId);
   const trackClips = layout.clips.filter((item) => item.clip.layerId === layer.id);
   const transitionGap = transitionHasGap(boundary, layout);
+  const clipName = (clipId: string): string =>
+    shortName(assets.find((item) => item.id === project.clips.find((clip) => clip.id === clipId)?.mediaId)?.name ?? '');
   const setTransition = (type: Transition['type'], duration: number): void => {
     if (!boundary) return;
     const pair = { leftId: boundary.leftId, rightId: boundary.rightId };
@@ -416,12 +423,13 @@ function SequenceControls({
   };
   return (
     <>
-      {boundary && (
+      {layer.transitions.length > 0 && (
         <InspectorSection
           id="transition"
-          title="Transition"
-          icon="curve"
-          modified={boundary.type !== 'cut'}
+          title="Transitions"
+          icon="split"
+          badge={layer.transitions.length}
+          modified={layer.transitions.some((item) => item.type !== 'cut')}
           help={
             <HelpPopover label="Transition timing">
               <p id={`${id}-transition-help`}>
@@ -433,75 +441,91 @@ function SequenceControls({
             </HelpPopover>
           }
         >
-          <section className="boundary-inspector" aria-label="Boundary transition">
-            <p title={`Transition ${boundaryIndex + 1}`}>
-              {shortName(assets.find((item) => item.id === left?.mediaId)?.name ?? '')} <Icon name="arrow" size={12} />{' '}
-              {shortName(assets.find((item) => item.id === right?.mediaId)?.name ?? '')}
-            </p>
-            <div className="transition-fields">
-              <label>
-                <span>Type</span>
-                <select
-                  aria-label="Transition type"
-                  aria-describedby={transitionGap ? `${id}-transition-gap` : `${id}-transition-help`}
+          <ol className="boundary-list" aria-label={`Transitions on ${layer.name}`}>
+            {layer.transitions.map((item) => (
+              <li key={`${item.leftId}:${item.rightId}`} data-selected={item === boundary}>
+                <button
+                  type="button"
+                  className="boundary-choice"
+                  aria-pressed={item === boundary}
                   disabled={drafting}
-                  value={boundary.type}
-                  onChange={(event) =>
-                    setTransition(
-                      event.target.value as Transition['type'],
-                      boundary.type === 'cut' ? 30 : boundary.duration,
-                    )
-                  }
+                  onClick={() => onSelectBoundary(item.leftId)}
                 >
-                  <option value="cut">Cut</option>
-                  <option value="fade-through-black" disabled={transitionGap}>
-                    Fade through black
-                  </option>
-                  <option value="cross-dissolve" disabled={transitionGap}>
-                    Cross-dissolve
-                  </option>
-                </select>
-              </label>
-              <label>
-                Timeline frames
-                <NumberField
-                  aria-label="Transition duration"
-                  aria-describedby={`${id}-transition-help`}
-                  min={boundary.type === 'fade-through-black' ? 2 : 1}
-                  max={2_147_483_647}
-                  integer
-                  step={1}
-                  disabled={drafting || boundary.type === 'cut'}
-                  value={boundary.duration}
-                  resetKey={`${project.id}:${layer.id}:${boundary.leftId}:${boundary.rightId}:${boundary.type}`}
-                  validate={(duration) =>
-                    boundary.type === 'cut'
-                      ? null
-                      : commandNumberError(
-                          project,
-                          { type: 'transition', transition: { ...boundary, duration } },
-                          'Shorten this transition or adjust conflicting fades/placements on this track.',
-                        )
-                  }
-                  onCommit={(duration) => setTransition(boundary.type, duration)}
-                />
-              </label>
-            </div>
-            {transitionGap && (
-              <p className="control-hint" id={`${id}-transition-gap`}>
-                These clips have a gap. Close it explicitly, or enable this track’s Ripple in Layer options, before
-                adding a fade or dissolve.
-              </p>
-            )}
-          </section>
+                  <span>
+                    {clipName(item.leftId)} <Icon name="arrow" size={12} /> {clipName(item.rightId)}
+                  </span>
+                  <small>
+                    {TRANSITION_LABEL[item.type]}
+                    {item.type === 'cut' ? '' : ` · ${sourceSeconds(item.duration)}`}
+                  </small>
+                </button>
+                {item === boundary && (
+                  <section className="boundary-inspector" aria-label="Boundary transition">
+                    <div className="transition-fields">
+                      <label>
+                        <span>Type</span>
+                        <select
+                          aria-label="Transition type"
+                          aria-describedby={transitionGap ? `${id}-transition-gap` : `${id}-transition-help`}
+                          disabled={drafting}
+                          value={boundary.type}
+                          onChange={(event) =>
+                            setTransition(
+                              event.target.value as Transition['type'],
+                              boundary.type === 'cut' ? 30 : boundary.duration,
+                            )
+                          }
+                        >
+                          <option value="cut">Cut</option>
+                          <option value="fade-through-black" disabled={transitionGap}>
+                            Fade through black
+                          </option>
+                          <option value="cross-dissolve" disabled={transitionGap}>
+                            Cross-dissolve
+                          </option>
+                        </select>
+                      </label>
+                      <label>
+                        Duration <small>frames</small>
+                        <NumberField
+                          aria-label="Transition duration"
+                          aria-describedby={`${id}-transition-help`}
+                          min={boundary.type === 'fade-through-black' ? 2 : 1}
+                          max={2_147_483_647}
+                          integer
+                          step={1}
+                          disabled={drafting || boundary.type === 'cut'}
+                          value={boundary.duration}
+                          resetKey={`${project.id}:${layer.id}:${boundary.leftId}:${boundary.rightId}:${boundary.type}`}
+                          validate={(duration) =>
+                            boundary.type === 'cut'
+                              ? null
+                              : commandNumberError(
+                                  project,
+                                  { type: 'transition', transition: { ...boundary, duration } },
+                                  'Shorten this transition or adjust conflicting fades/placements on this track.',
+                                )
+                          }
+                          onCommit={(duration) => setTransition(boundary.type, duration)}
+                        />
+                      </label>
+                    </div>
+                    {transitionGap && (
+                      <p className="control-hint" id={`${id}-transition-gap`}>
+                        These clips have a gap. Close it, or turn on Ripple for this track, before adding a fade or
+                        dissolve.
+                      </p>
+                    )}
+                  </section>
+                )}
+              </li>
+            ))}
+          </ol>
         </InspectorSection>
       )}
-      <div className="inspector-empty" hidden={boundary !== undefined}>
-        Select a transition on {layer.name}.
-      </div>
       <InspectorSection
         id="fades"
-        title="Sequence fades"
+        title="Fades"
         icon="start"
         modified={layer.openingFade > 0 || layer.closingFade > 0}
         help={
@@ -517,7 +541,7 @@ function SequenceControls({
         <section className="edge-fade-settings" aria-label="Sequence fades">
           <div className="range-fields">
             <label>
-              Opening <small>frames</small>
+              Opening <small>frames · {sourceSeconds(layer.openingFade)}</small>
               <NumberField
                 aria-label="Opening fade"
                 aria-describedby={`${id}-fades-help`}
@@ -541,7 +565,7 @@ function SequenceControls({
               />
             </label>
             <label>
-              Closing <small>frames</small>
+              Closing <small>frames · {sourceSeconds(layer.closingFade)}</small>
               <NumberField
                 aria-label="Closing fade"
                 aria-describedby={`${id}-fades-help`}
@@ -571,6 +595,101 @@ function SequenceControls({
   );
 }
 
+function SourceRangeSection({
+  project,
+  clip,
+  asset,
+  sourceFrame,
+  drafting,
+  resetKey,
+  id,
+  onEdit,
+}: Readonly<
+  Pick<Props, 'project' | 'drafting' | 'onEdit'> & {
+    clip: VideoClip;
+    asset: MediaAsset;
+    sourceFrame: number | null;
+    resetKey: string;
+    id: string;
+  }
+>) {
+  const frameCount = asset.metadata.frameCount;
+  const timingError = (changes: Partial<Pick<VideoClip, 'sourceIn' | 'sourceOut'>>): string | null =>
+    clipRangeError(project, clip, changes);
+  return (
+    <InspectorSection
+      id="source"
+      title="Source range"
+      icon="start"
+      badge={sourceSeconds(clip.sourceOut - clip.sourceIn)}
+      modified={clip.sourceIn !== 0 || clip.sourceOut !== frameCount}
+      help={
+        <HelpPopover label="Source timing">
+          <p id={`${id}-source-help`}>
+            Original recording frames; OUT is exclusive. Layer keyframes stay in project timeline time when this source
+            range changes.
+          </p>
+        </HelpPopover>
+      }
+    >
+      <section className="source-range" aria-label="Source range">
+        <div className="section-label">
+          <span>{sourceSeconds(frameCount)} original</span>
+          <span>{sourceFrame === null ? 'Playhead outside clip' : `Source frame ${sourceFrame}`}</span>
+        </div>
+        <div className="range-fields">
+          <label htmlFor={`${id}-in`}>
+            IN <output>{formatTimecode(clip.sourceIn)}</output>
+            <NumberField
+              id={`${id}-in`}
+              aria-label="Source IN frame"
+              aria-describedby={`${id}-source-help`}
+              min={0}
+              max={clip.sourceOut - 1}
+              integer
+              step={1}
+              value={clip.sourceIn}
+              disabled={drafting}
+              resetKey={resetKey}
+              validate={(sourceIn) => timingError({ sourceIn })}
+              onCommit={(sourceIn) => onEdit({ type: 'trim', clipId: clip.id, sourceIn, sourceOut: clip.sourceOut })}
+            />
+          </label>
+          <label htmlFor={`${id}-out`}>
+            OUT <output>{formatTimecode(clip.sourceOut)}</output>
+            <NumberField
+              id={`${id}-out`}
+              aria-label="Source OUT frame"
+              aria-describedby={`${id}-source-help`}
+              min={clip.sourceIn + 1}
+              max={Math.min(frameCount, 2_147_483_647)}
+              integer
+              step={1}
+              value={clip.sourceOut}
+              disabled={drafting}
+              resetKey={resetKey}
+              validate={(sourceOut) => timingError({ sourceOut })}
+              onCommit={(sourceOut) => onEdit({ type: 'trim', clipId: clip.id, sourceIn: clip.sourceIn, sourceOut })}
+            />
+          </label>
+        </div>
+        <div className="range-availability" aria-label="Recoverable source footage">
+          <span>{sourceSeconds(clip.sourceIn)} before</span>
+          <span>{sourceSeconds(frameCount - clip.sourceOut)} after</span>
+        </div>
+        <button
+          className="text-button restore-range"
+          disabled={drafting || (clip.sourceIn === 0 && clip.sourceOut === frameCount)}
+          onClick={() => onEdit({ type: 'trim', clipId: clip.id, sourceIn: 0, sourceOut: frameCount })}
+        >
+          <Icon name="reset" size={13} />
+          Restore full recording
+        </button>
+      </section>
+    </InspectorSection>
+  );
+}
+
 export function Inspector({
   project,
   assets,
@@ -581,6 +700,7 @@ export function Inspector({
   drafting,
   section,
   onSection,
+  onSelectBoundary,
   onEdit,
   onPreview,
   onSeek,
@@ -590,12 +710,19 @@ export function Inspector({
   const inspectorId = useId();
   const colourControlId = useId();
   const expansion = useInspectorExpansion();
+  const { setOpen } = expansion;
   const layer = project.layers.find((item) => item.id === selectedLayerId);
   const clip = project.clips.find((item) => item.id === selectedClipId && item.layerId === selectedLayerId);
   const asset = assets.find((item) => item.id === clip?.mediaId);
-  const position = project.clips.findIndex((item) => item.id === clip?.id);
   const layout = calculateLayout(project);
   const placed = layout.clips.find((item) => item.clip.id === clip?.id);
+  const trackClips = layout.clips.filter((item) => item.clip.layerId === layer?.id);
+  const position = project.clips.findIndex((item) => item.id === clip?.id);
+  const trackPosition = trackClips.findIndex((item) => item.clip.id === clip?.id);
+  useEffect(() => {
+    // A timeline boundary click must reveal its transition even if the section was collapsed.
+    if (boundaryId !== null && section === 'track') setOpen('transition', true);
+  }, [boundaryId, section]);
   const sourceFrame =
     placed && frame >= placed.start && frame < placed.end ? placed.retiming.sourceAt(frame - placed.start) : null;
   const clipRate = clip ? sourceRateAt(clip.speed, sourceFrame ?? clip.sourceIn) : 1;
@@ -603,8 +730,6 @@ export function Inspector({
   const inputContext = `${project.id}:${layer?.id}:${clip?.id ?? 'row'}`;
   const startRestriction = clip ? clipStartRestriction(project, clip) : null;
   const startHint = placementHint(layer, startRestriction);
-  const clipTimingError = (changes: Partial<Pick<VideoClip, 'sourceIn' | 'sourceOut'>>): string | null =>
-    clipRangeError(project, clip, changes);
 
   return (
     <InspectorExpansionContext value={expansion}>
@@ -616,103 +741,27 @@ export function Inspector({
           aria-labelledby={`${inspectorId}-clip-tab`}
           hidden={section !== 'clip'}
         >
-          <InspectorExpansionControls expansion={expansion} />
-          {layer ? (
+          {layer && clip && placed ? (
             <>
-              {clip && asset && placed ? (
-                <div className="selected-clip-name inspector-selection">
-                  <Icon name="video" size={17} />
-                  <strong title={asset.name}>{shortName(asset.name)}</strong>
-                  <span>
-                    Excerpt {position + 1} · {sourceSeconds(placed.duration)} · {layer.name}
-                  </span>
-                </div>
-              ) : (
-                <div className="selected-clip-name inspector-selection">
-                  <Icon name="layers" size={17} />
-                  <strong title={layer.name}>{layer.name}</strong>
-                  <span title="Colour and Opacity edit this whole row. Select a clip for source, speed and transform settings.">
-                    Whole video row
-                  </span>
-                </div>
-              )}
-              {clip && asset && placed && (
-                <InspectorSection
-                  id="source"
-                  title="Source range"
-                  icon="start"
-                  badge={sourceSeconds(clip.sourceOut - clip.sourceIn)}
-                  modified={clip.sourceIn !== 0 || clip.sourceOut !== asset.metadata.frameCount}
-                  help={
-                    <HelpPopover label="Source timing">
-                      <p id={`${colourControlId}-source-help`}>
-                        Original recording frames; OUT is exclusive. Layer keyframes stay in project timeline time when
-                        this source range changes.
-                      </p>
-                    </HelpPopover>
-                  }
-                >
-                  <section className="source-range" aria-label="Source range">
-                    <div className="section-label">
-                      <span>{sourceSeconds(asset.metadata.frameCount)} original</span>
-                      <span>{sourceFrame === null ? 'Playhead outside clip' : `Source frame ${sourceFrame}`}</span>
-                    </div>
-                    <div className="range-fields">
-                      <label htmlFor={`${colourControlId}-in`}>
-                        IN <output>{formatTimecode(clip.sourceIn)}</output>
-                        <NumberField
-                          id={`${colourControlId}-in`}
-                          aria-label="Source IN frame"
-                          aria-describedby={`${colourControlId}-source-help`}
-                          min={0}
-                          max={clip.sourceOut - 1}
-                          integer
-                          step={1}
-                          value={clip.sourceIn}
-                          disabled={drafting}
-                          resetKey={inputContext}
-                          validate={(sourceIn) => clipTimingError({ sourceIn })}
-                          onCommit={(sourceIn) =>
-                            onEdit({ type: 'trim', clipId: clip.id, sourceIn, sourceOut: clip.sourceOut })
-                          }
-                        />
-                      </label>
-                      <label htmlFor={`${colourControlId}-out`}>
-                        OUT <output>{formatTimecode(clip.sourceOut)}</output>
-                        <NumberField
-                          id={`${colourControlId}-out`}
-                          aria-label="Source OUT frame"
-                          aria-describedby={`${colourControlId}-source-help`}
-                          min={clip.sourceIn + 1}
-                          max={Math.min(asset.metadata.frameCount, 2_147_483_647)}
-                          integer
-                          step={1}
-                          value={clip.sourceOut}
-                          disabled={drafting}
-                          resetKey={inputContext}
-                          validate={(sourceOut) => clipTimingError({ sourceOut })}
-                          onCommit={(sourceOut) =>
-                            onEdit({ type: 'trim', clipId: clip.id, sourceIn: clip.sourceIn, sourceOut })
-                          }
-                        />
-                      </label>
-                    </div>
-                    <div className="range-availability" aria-label="Recoverable source footage">
-                      <span>{sourceSeconds(clip.sourceIn)} before</span>
-                      <span>{sourceSeconds(asset.metadata.frameCount - clip.sourceOut)} after</span>
-                    </div>
-                    <button
-                      className="text-button restore-range"
-                      disabled={drafting || (clip.sourceIn === 0 && clip.sourceOut === asset.metadata.frameCount)}
-                      onClick={() =>
-                        onEdit({ type: 'trim', clipId: clip.id, sourceIn: 0, sourceOut: asset.metadata.frameCount })
-                      }
-                    >
-                      <Icon name="reset" size={13} />
-                      Restore full recording
-                    </button>
-                  </section>
-                </InspectorSection>
+              <InspectorExpansionControls expansion={expansion} />
+              <div className="selected-clip-name inspector-selection">
+                <Icon name="video" size={17} />
+                <strong title={asset?.name}>{asset ? shortName(asset.name) : 'Unavailable recording'}</strong>
+                <span>
+                  Clip {trackPosition + 1} of {trackClips.length} · {layer.name}
+                </span>
+              </div>
+              {asset && (
+                <SourceRangeSection
+                  project={project}
+                  clip={clip}
+                  asset={asset}
+                  sourceFrame={sourceFrame}
+                  drafting={drafting}
+                  resetKey={inputContext}
+                  id={colourControlId}
+                  onEdit={onEdit}
+                />
               )}
               <InspectorSection
                 id="layer-opacity"
@@ -783,7 +832,6 @@ export function Inspector({
                       </label>
                     </>
                   )}
-                  {!clip && <p className="control-hint">Select an excerpt to edit its placement.</p>}
                 </section>
               </InspectorSection>
               <InspectorSection
@@ -831,6 +879,26 @@ export function Inspector({
                 onEdit={onEdit}
                 onSeek={onSeek}
               />
+            </>
+          ) : (
+            <div className="inspector-empty">
+              {layer ? `Select a clip on ${layer.name} to edit it.` : 'Select a clip in the timeline.'}
+            </div>
+          )}
+        </div>
+        <div
+          role="tabpanel"
+          id={`${inspectorId}-track-panel`}
+          aria-labelledby={`${inspectorId}-track-tab`}
+          hidden={section !== 'track'}
+        >
+          {layer ? (
+            <>
+              <div className="selected-clip-name inspector-selection">
+                <Icon name="layers" size={17} />
+                <strong title={layer.name}>{layer.name}</strong>
+                <span>{trackScope(trackClips.length)}</span>
+              </div>
               <ColourSection
                 project={project}
                 onPause={onPause}
@@ -842,49 +910,36 @@ export function Inspector({
                 onEdit={onEdit}
                 id={colourControlId}
               />
+              <InspectorSection
+                id="keyframes"
+                title="Keyframes"
+                icon="curve"
+                badge={layer.keyframes.length || undefined}
+                modified={layer.keyframes.length > 0}
+              >
+                <KeyframeControls
+                  project={project}
+                  layer={layer}
+                  frame={frame}
+                  duration={layout.duration}
+                  disabled={drafting}
+                  onEdit={onEdit}
+                />
+              </InspectorSection>
+              <SequenceControls
+                project={project}
+                layer={layer}
+                assets={assets}
+                boundaryId={boundaryId}
+                layout={layout}
+                drafting={drafting}
+                onEdit={onEdit}
+                onSelectBoundary={onSelectBoundary}
+                id={colourControlId}
+              />
             </>
           ) : (
-            <div className="inspector-empty">Select a video layer or clip in the timeline.</div>
-          )}
-        </div>
-        <div
-          role="tabpanel"
-          id={`${inspectorId}-keyframes-panel`}
-          aria-labelledby={`${inspectorId}-keyframes-tab`}
-          hidden={section !== 'keyframes'}
-        >
-          {layer ? (
-            <KeyframeControls
-              project={project}
-              layer={layer}
-              frame={frame}
-              duration={layout.duration}
-              disabled={drafting}
-              onEdit={onEdit}
-            />
-          ) : (
-            <div className="inspector-empty">Select a video track for its shared points.</div>
-          )}
-        </div>
-        <div
-          role="tabpanel"
-          id={`${inspectorId}-sequence-panel`}
-          aria-labelledby={`${inspectorId}-sequence-tab`}
-          hidden={section !== 'sequence'}
-        >
-          {layer ? (
-            <SequenceControls
-              project={project}
-              layer={layer}
-              assets={assets}
-              boundaryId={boundaryId}
-              layout={layout}
-              drafting={drafting}
-              onEdit={onEdit}
-              id={colourControlId}
-            />
-          ) : (
-            <div className="inspector-empty">Select a video track for its transitions and fades.</div>
+            <div className="inspector-empty">Select a video track in the timeline.</div>
           )}
         </div>
         <div

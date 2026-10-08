@@ -60,6 +60,8 @@ async function commitNumber(page: Page, name: string, value: string): Promise<vo
   if (name.includes('keyframe')) await inspectorTab(page, 'Layer keyframes');
   else if (name.startsWith('Music')) await inspectorTab(page, 'Audio');
   else if (/Opening|Closing|Transition/.test(name)) await inspectorTab(page, 'Sequence');
+  else if (/^(Opacity|Temperature|Tint|Exposure|Brightness|Contrast|Hue|Saturation|Highlights|Shadows)$/.test(name))
+    await inspectorTab(page, 'Track');
   else await inspectorTab(page, 'Clip');
   const field = page.getByRole('spinbutton', { name, exact: true });
   await field.fill(value);
@@ -432,6 +434,7 @@ test('per-track fade/transition timing and positioned track key numbers use the 
 test('Colour resets target clip colour and row opacity or only participating Colour settings at the active point', async ({
   page,
 }) => {
+  await inspectorTab(page, 'Track');
   await page.getByRole('slider', { name: 'Exposure', exact: true }).fill('0.7');
   await page.getByRole('slider', { name: 'Saturation', exact: true }).fill('1.3');
   await page.getByRole('button', { name: 'Reset Exposure', exact: true }).click();
@@ -453,7 +456,6 @@ test('Colour resets target clip colour and row opacity or only participating Col
   const keys = layerKeyframes(page, 'Video 1');
   await editLayerPoint(page, 'Video 1', 5);
   await keys.getByRole('button', { name: 'Go to layer keyframe 5', exact: true }).click();
-  await inspectorTab(page, 'Clip');
   await expect(page.getByRole('slider', { name: 'Exposure', exact: true })).toHaveValue('-0.5');
   await page.getByRole('button', { name: 'Reset Exposure', exact: true }).click();
   document = await currentProject(page);
@@ -464,16 +466,11 @@ test('Colour resets target clip colour and row opacity or only participating Col
   await commitNumber(page, 'Layer keyframe frame 5', '8');
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   await expect(keys.locator('[data-keyframe-frame="5"]')).toHaveAttribute('aria-current', 'true');
-  await inspectorTab(page, 'Clip');
   await expect(page.getByRole('slider', { name: 'Exposure', exact: true })).toBeEnabled();
   await page.getByRole('button', { name: 'Redo', exact: true }).click();
-  await inspectorTab(page, 'Layer keyframes');
   await expect(keys.locator('[data-keyframe-frame="8"]')).toBeVisible();
-  await inspectorTab(page, 'Clip');
   await expect(page.getByRole('slider', { name: 'Exposure', exact: true })).toBeDisabled();
-  await inspectorTab(page, 'Layer keyframes');
   await keys.getByRole('button', { name: 'Go to layer keyframe 8', exact: true }).click();
-  await inspectorTab(page, 'Clip');
   await page.getByRole('button', { name: 'Reset Saturation', exact: true }).click();
   await page.getByRole('slider', { name: 'Exposure', exact: true }).fill('0.25');
   document = await currentProject(page);
