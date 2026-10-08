@@ -17,6 +17,29 @@
   box-shadow: 0 0 0 1px var(--accent);
 }
 
+/* The thumbnail maps the whole original: frame 0 left, exclusive OUT right. */
+.media-thumb {
+  position: relative;
+}
+
+.media-thumb-omitted {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: repeating-linear-gradient(135deg, #050906d6 0 3px, #050906a8 3px 6px);
+  pointer-events: none;
+}
+
+.media-thumb-omitted.before {
+  left: 0;
+  box-shadow: inset -1px 0 var(--accent);
+}
+
+.media-thumb-omitted.after {
+  right: 0;
+  box-shadow: inset 1px 0 var(--accent);
+}
+
 .media-hover-marker {
   position: absolute;
   top: 0;
