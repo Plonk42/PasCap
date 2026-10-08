@@ -325,9 +325,12 @@ automated specs, not a full browser-suite run:
 2. Use **Playwright browser controls** to exercise the changed workflow, including
    relevant normal, error/disabled, expanded, popover, pointer and keyboard states.
 3. Capture and inspect **rendered screenshots** for alignment, spacing, clipping,
-   readable values, reachable controls and scrolling, at a desktop and a compact
-   viewport (plus short/narrow cases when affected; see the
-   [responsive matrix](WORKSPACE_AND_RECOVERY.md#layout-and-navigation)).
+   readable values, reachable controls and scrolling at the **1440 × 900** default
+   and the **1280 × 720** minimum supported viewport. When panels are affected,
+   also check their minimum sizes at 1280 × 720: Media 240 px, Inspector 270 px,
+   Timeline 200 px. Size the viewport explicitly; a docked browser panel is often
+   smaller. Smaller windows are best effort and need no live inspection
+   ([supported sizes](WORKSPACE_AND_RECOVERY.md#layout-and-navigation)).
    DOM snapshots and passing tests do not establish visual correctness.
 4. Fix issues and repeat the live checks after the last edit. Run the focused
    specs separately. Never build or reset fixtures while a tab or test run serves

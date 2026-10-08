@@ -71,13 +71,15 @@ during timeline trim/shared-point/music drafts to preserve captured geometry.
 
 **Workspace options → Reset layout** restores defaults. Side-panel visibility and dimensions are
 browser-local UI preferences, never document/history fields. Sizes are clamped to
-viewport bounds; below 980 px, one side drawer is visible at a time. Desktop widths
-1440/1280/1024/900/720 form the responsive regression matrix; the workspace should
-not overflow horizontally. The CSS floor is 640 px; this is not a mobile editor.
+viewport bounds. The supported minimum is a **1280 × 720** CSS viewport; 1440 × 900
+is the default desktop size. At supported sizes the workspace does not overflow
+horizontally, Keyframe controls remain reachable with the Inspector at its 270 px
+minimum, and the toolbar and music lanes retain usable pointer targets. Smaller
+windows are best effort, not a support or validation target: below 980 px one side
+drawer is visible at a time, and the CSS floor is 640 px. This is not a mobile editor.
 Denied browser storage leaves layout/section controls usable for the session and
-exposes an explanatory preference warning. Keyframe controls must remain reachable
-in the 270 px inspector and 720 px drawer; the 640 px toolbar and music lanes must
-retain usable pointer targets. These are UI contracts, not performance certification.
+exposes an explanatory preference warning. These are UI contracts, not performance
+certification.
 
 Choosing a layer selects its first excerpt (if present), highlights that row and
 reveals it vertically. Empty-layer selection clears clip selection but retains the

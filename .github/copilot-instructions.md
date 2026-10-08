@@ -37,8 +37,9 @@ PasCap is a solo, pre-release project: optimize for fast iteration. Details are 
 - UI/layout/control/interaction changes **must** be checked live in the VS Code
   integrated browser with Playwright on disposable synthetic or memory-only
   projects: rendered screenshots before changes and after the final edit, relevant
-  states and viewport sizes. Tests or DOM snapshots alone are not visual
-  validation. Steps: [development](../docs/DEVELOPMENT.md). Report what was
+  states at 1440 × 900 and the 1280 × 720 minimum supported viewport. Smaller
+  windows are best effort and need no checks. Tests or DOM snapshots alone are not
+  visual validation. Steps: [development](../docs/DEVELOPMENT.md). Report what was
   inspected; if browser access is unavailable, name the blocker and missing check.
 - Before pushing: `npm run format`, then `npm run check` (formatting, unit/service
   tests, types, build, licenses) plus the affected Playwright specs for UI changes.
