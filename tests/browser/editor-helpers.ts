@@ -40,6 +40,12 @@ export async function settingTab(page: Page, label: string): Promise<void> {
   if ((await tab.getAttribute('aria-selected')) !== 'true') await tab.dispatchEvent('click');
 }
 
+/** Double-clicking a setting's name resets only that setting; there is no per-control reset button. */
+export async function resetSetting(scope: Page | Locator, name: string): Promise<void> {
+  const id = await scope.getByRole('slider', { name, exact: true }).getAttribute('id');
+  await scope.locator(`[id="${id}-name"]`).dblclick();
+}
+
 /** Audio → Add music track is the single creation path; it lists ready music files. */
 export async function addMusicTrack(page: Page, name?: string): Promise<void> {
   await openOptions(page, 'Add music track');

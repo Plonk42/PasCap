@@ -64,7 +64,9 @@ neither needs replacing merely to make their implementation identical.
   timecode feedback. No clamping, rounding or hidden timing repair.
 - Easing/modes/recordings: native select; selected easing has its existing graph.
 - Boolean settings: native checkbox. Shared row keyframe participation: diamond with
-  `aria-pressed`, followed by Previous/Next and the individual reset.
+  `aria-pressed`, followed by Previous/Next. Double-clicking a setting's name resets
+  only that setting; sections keep one Reset in their header (Colour, Speed,
+  Transform) and HSL/curves name theirs **Reset red** / **Reset all**.
 - Tabs: native buttons with one selected appearance and existing arrow/Home/End
   behavior. Disclosures keep mounted drafts; options use the existing Popover.
 - Buttons: primary for the main confirmed action, secondary for supporting actions,

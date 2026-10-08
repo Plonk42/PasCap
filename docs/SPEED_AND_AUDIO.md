@@ -213,7 +213,7 @@ nested **Edit** details remain collapsible and preserve drafts
 and input identity through reordering and Undo. **Keyframes → Edit**
 edits stored point times, easing and existing participants, including beyond current duration
 or on an empty row. A stored Speed participant reuses the **Layer rate ×** slider/exact
-`NumberField` and Reset to 1×, not clip mode/preset/source-curve controls. Enter/blur applies
+`NumberField` (double-click **Speed** resets it to 1×), not clip mode/preset/source-curve controls. Enter/blur applies
 the precise rate; Escape restores. The same **0.1×–8×** bounds and contextual timing
 validation apply. Invalid drafts retain inline errors rather than being clamped,
 rounded or used to shorten conflicting fades/transitions.

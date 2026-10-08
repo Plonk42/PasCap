@@ -250,16 +250,14 @@ test('diamond, previous, next and reset keep native Tab order and keyboard activ
     { tag: 'BUTTON', label: 'Previous Exposure keyframe' },
     { tag: 'BUTTON', label: 'Next Exposure keyframe' },
   ]);
-  expect(await toggle.evaluate((button) => button.parentElement!.nextElementSibling?.getAttribute('aria-label'))).toBe(
-    'Reset Exposure',
-  );
+  expect(await toggle.evaluate((button) => button.parentElement!.nextElementSibling)).toBeNull();
   await toggle.focus();
   await page.keyboard.press('Tab');
   await expect(previous).toBeFocused();
   await page.keyboard.press('Tab');
   await expect(next).toBeFocused();
   await page.keyboard.press('Tab');
-  await expect(page.getByRole('button', { name: 'Reset Exposure', exact: true })).toBeFocused();
+  await expect(page.getByRole('slider', { name: 'Exposure', exact: true })).toBeFocused();
   await page.keyboard.press('Shift+Tab');
   await expect(next).toBeFocused();
   await next.press('Enter');

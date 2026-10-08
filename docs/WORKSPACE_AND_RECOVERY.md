@@ -349,9 +349,9 @@ endpoint holds and unkeyed values only for entirely unanimated channels: row
 input identity/focus and drafts survive time reordering and Undo;
 no persisted point IDs are added.
 
-Stored colour/opacity participants reuse the main sliders and individual colour
+Stored colour/opacity participants reuse the main sliders and double-click-the-name
 resets, with one exact `NumberField` to the right of each slider; Opacity uses **0–1**.
-Speed reuses the **Layer rate ×** slider/exact field and Reset to 1×, not clip
+Speed reuses the **Layer rate ×** slider/exact field (double-click **Speed** resets to 1×), not clip
 mode/preset/source-curve controls. The local-draft/release-only slider contract above
 applies to all stored participants too. Each accepted value or reset targets only
 that existing stored participant in one Undo step;
@@ -393,8 +393,8 @@ an exact alternative, with the same atomic move validation.
 In Clip, Reset speed to 1× changes only an active Speed participant when animated;
 without Speed keys it resets the selected clip's constant/ramp/custom base.
 It never clears the row curve or unrelated point participants. Colour **Reset keys**
-changes only enabled colour values at the current point; individual resets also
-handle unanimated row colour bases. Stored-point resets in Keyframes target that
+changes only enabled colour values at the current point; double-clicking a setting's
+name resets only that setting, including unanimated row colour bases. Stored-point resets in Keyframes target that
 point's existing participant, not a different value at the playhead.
 Trim/move/split/duplicate do not copy or shift row points. The contract is in
 [LAYERS_AND_KEYFRAMES.md](LAYERS_AND_KEYFRAMES.md).

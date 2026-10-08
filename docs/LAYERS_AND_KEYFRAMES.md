@@ -265,10 +265,10 @@ This remains one list, not a new list per channel or marker.
 
 Main and stored colour/Opacity controls share a native slider with one adjacent
 exact `NumberField` as the value display, not a read-only output. Stored participants
-reuse the same bounds and individual colour-reset buttons; Opacity numeric entry
+reuse the same bounds and double-click-the-name resets; Opacity numeric entry
 uses **0–1** in both contexts. The channel table's bounds apply to both controls.
-Stored Speed uses the same **Layer rate ×** slider/exact field and Reset to 1× as
-main row Speed, never a clip mode, preset or source-frame curve editor.
+Stored Speed uses the same **Layer rate ×** slider/exact field and resets to 1× by
+double-clicking **Speed**, never a clip mode, preset or source-frame curve editor.
 
 For main and stored value sliders, pointer movement changes only a transient local
 control draft, not the document or preview. Release applies one validated edit and

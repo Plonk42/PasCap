@@ -9,6 +9,7 @@ import {
   expandedInspectorPreferences,
   inspectorTab,
   layerKeyframes,
+  resetSetting,
   sharedPoint,
 } from './editor-helpers.js';
 import { memoryProjects, type MemoryProjects } from './memory-projects.js';
@@ -158,7 +159,7 @@ test('all participants reuse their main control bounds and resets with one exact
       const fieldBox = (await field.boundingBox())!;
       expect(fieldBox.x).toBeGreaterThanOrEqual(sliderBox.x + sliderBox.width);
       expect(Math.abs(fieldBox.y + fieldBox.height / 2 - (sliderBox.y + sliderBox.height / 2))).toBeLessThanOrEqual(2);
-      await expect(row.getByRole('button', { name: `Reset ${name}`, exact: true })).toBeEnabled();
+      await expect(row.getByRole('button', { name: `Reset ${name}`, exact: true })).toHaveCount(0);
     }
   }
   await expect(row.locator('output')).toHaveCount(0);
@@ -173,13 +174,13 @@ test('all participants reuse their main control bounds and resets with one exact
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   expect(await current(page)).toEqual(before);
   await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
-  await row.getByRole('button', { name: 'Reset Hue keyframe value 10', exact: true }).click();
+  await resetSetting(row, 'Hue keyframe value 10');
   expected.layers[0]!.keyframes[0]!.values.exposure = 0.5;
   expected.layers[0]!.keyframes[0]!.values.hue = 0;
   expect(await current(page)).toEqual(expected);
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   expect(await current(page)).toEqual(before);
-  await row.getByRole('button', { name: 'Reset Opacity keyframe value 10', exact: true }).click();
+  await resetSetting(row, 'Opacity keyframe value 10');
   const resetOpacity = structuredClone(before);
   resetOpacity.layers[0]!.keyframes[0]!.values.opacity = 1;
   expect(await current(page)).toEqual(resetOpacity);
