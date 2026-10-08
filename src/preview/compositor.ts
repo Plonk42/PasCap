@@ -1,5 +1,5 @@
 import { CURVE_CHANNELS, HSL_BANDS, isIdentityCurve, isNeutralHsl } from '../shared/advanced-colour.js';
-import { gradePixel, NEUTRAL_COLOUR, type ColourSettings, type RGB } from '../shared/colour.js';
+import { gradePixel, NEUTRAL_COLOUR, temperatureTintGains, type ColourSettings, type RGB } from '../shared/colour.js';
 import { compositePixel } from '../shared/composition.js';
 import { compileSpatialMapping, NEUTRAL_SPATIAL_POSE, type SpatialPose } from '../shared/spatial.js';
 import type { PreviewLayer } from '../shared/timeline.js';
@@ -107,6 +107,8 @@ export class Compositor {
         'tone1',
         'extra0',
         'extra1',
+        'correction0',
+        'correction1',
         'coverage',
         'brightness',
         'imageAspect',
@@ -285,6 +287,8 @@ export class Compositor {
     );
     for (const [index, source] of sources.entries()) {
       const settings = source.settings;
+      const gains = temperatureTintGains(settings);
+      gl.uniform3f(this.#location(`correction${index}`), gains[0], gains[1], gains[2]);
       if (this.#advanced) {
         HSL_BANDS.forEach((band, at) => {
           const value = settings.hsl[band];

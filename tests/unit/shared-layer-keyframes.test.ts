@@ -79,11 +79,13 @@ const primitive: Record<Interpolation, (u: number) => number> = {
   smooth: (u) => u * u * u - (u * u * u * u) / 2,
 };
 
-describe('strict schema-11 row points and independently participating settings', () => {
-  it('exports an ordered immutable nine-setting catalogue and explicit all-null template', () => {
+describe('strict schema-12 row points and independently participating settings', () => {
+  it('exports an ordered immutable eleven-setting catalogue and explicit all-null template', () => {
     const settings = [
       'opacity',
       'speed',
+      'temperature',
+      'tint',
       'exposure',
       'brightness',
       'contrast',
@@ -94,16 +96,16 @@ describe('strict schema-11 row points and independently participating settings',
     ];
     expect(KEYFRAME_SETTINGS.map((setting) => setting.key)).toEqual(settings);
     expect(Object.keys(EMPTY_KEY_VALUES)).toEqual(settings);
-    expect(Object.values(EMPTY_KEY_VALUES)).toEqual(Array(9).fill(null));
+    expect(Object.values(EMPTY_KEY_VALUES)).toEqual(Array(11).fill(null));
     expect(Object.isFrozen(EMPTY_KEY_VALUES)).toBe(true);
     expect(Object.isFrozen(KEYFRAME_SETTINGS)).toBe(true);
     expect(KEYFRAME_SETTINGS.every(Object.isFrozen)).toBe(true);
   });
 
-  it('requires version 10, explicit media membership, row opacity and clip settings without legacy fields', () => {
+  it('requires version 12, explicit media membership, row opacity and clip settings without legacy fields', () => {
     const project = createProject('strict', 'Strict');
     const clip = createClip('one', 'source', 0, 20);
-    expect(project.schemaVersion).toBe(11);
+    expect(project.schemaVersion).toBe(12);
     expect(project.media).toEqual({ videoIds: [], audioIds: [] });
     expect(project.layers[0]).toEqual(row());
     expect(Object.keys(clip)).toEqual([
@@ -246,8 +248,8 @@ describe('strict schema-11 row points and independently participating settings',
     expect(project.layers[0]!.keyframes).toEqual([]);
   });
 
-  it('can independently toggle all nine participants at one frame', () => {
-    let project = createProject('nine', 'Nine');
+  it('can independently toggle all eleven participants at one frame', () => {
+    let project = createProject('eleven', 'Eleven');
     for (const setting of KEYFRAME_SETTINGS)
       project = applyCommand(project, {
         type: 'layer-key-toggle',

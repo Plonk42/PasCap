@@ -14,7 +14,7 @@ import { MediaLibrary } from '../../src/server/library.js';
 import { runProcess } from '../../src/server/process.js';
 import { renderReference, validateReference } from '../../src/server/reference.js';
 import { ProjectStore } from '../../src/server/storage.js';
-import { evaluateColourCurve, HSL_BANDS } from '../../src/shared/advanced-colour.js';
+import { HSL_BANDS, evaluateColourCurve } from '../../src/shared/advanced-colour.js';
 import { audioAssetSchema, type AudioAsset } from '../../src/shared/audio.js';
 import { COLOUR_CONTROLS, NEUTRAL_COLOUR, createColourSettings, scalarColourValues } from '../../src/shared/colour.js';
 import { compositePixel } from '../../src/shared/composition.js';
@@ -129,7 +129,7 @@ function coverage(samples: PreviewLayer[]): number {
   return result;
 }
 
-describe.skipIf(!enabled)('schema-11 layered native export · disposable synthetic sources only', () => {
+describe.skipIf(!enabled)('schema-12 layered native export · disposable synthetic sources only', () => {
   let root: string;
   let config: ServiceConfig;
   let jobs: JobQueue;
@@ -383,6 +383,8 @@ describe.skipIf(!enabled)('schema-11 layered native export · disposable synthet
     async (profile) => {
       const project = simple(3);
       const colour = createColourSettings();
+      colour.temperature = 0.8;
+      colour.tint = -0.6;
       HSL_BANDS.forEach((band, i) => {
         colour.hsl[band] = { hue: i % 2 ? 8 : -6, saturation: -0.12, lightness: 0.015 };
       });
@@ -397,13 +399,24 @@ describe.skipIf(!enabled)('schema-11 layered native export · disposable synthet
         { x: 1, y: 0.93 },
       ];
       project.layers[0]!.colour = colour;
-      project.layers[0]!.keyframes = [point(0, { exposure: -0.15 }), point(2, { exposure: 0.25 })];
-      project.layers[1]!.colour = { ...colour, hue: 12 };
+      project.layers[0]!.keyframes = [
+        point(0, { exposure: -0.15, temperature: -0.8 }),
+        point(1, { tint: 0.7 }, 'ease-out'),
+        point(2, { exposure: 0.25, temperature: 0.9, tint: -0.5 }),
+      ];
+      project.layers[1]!.colour = { ...colour, temperature: -0.75, tint: 0.85, hue: 12 };
+      assertSharedSamples(project);
+      const samples = sampleTimeline(project, 1);
+      expect(samples).toHaveLength(2);
+      expect(samples[0]!.colour.temperature).toBeCloseTo(0.05, 12);
+      expect(samples[0]!.colour.tint).toBe(0.7);
+      expect(samples[1]!.colour).toMatchObject({ temperature: -0.75, tint: 0.85 });
       const result = await complete(project, profile);
       await parity(project, result.filename);
       bounds(result.receipt);
       expect(result.receipt.verification.frameCount).toBe(3);
       expect(result.receipt.snapshot.layers[0]!.colour).toEqual(colour);
+      expect(result.receipt.settings.layered).toMatchObject({ peakLutEntries: 0, lutBytes: 0, lutsGenerated: 0 });
       for (const [index, asset] of assets.entries())
         expect(await readFile(asset.sourcePath)).toEqual(originalBytes[index]);
     },
@@ -832,7 +845,7 @@ describe.skipIf(!enabled)('schema-11 layered native export · disposable synthet
     120_000,
   );
 
-  it('exports shared row speed/opacity and seven independently participating colour channels across dissolves, gaps and hidden black holds', async () => {
+  it('exports shared row speed/opacity and nine independently participating colour channels across dissolves, gaps and hidden black holds', async () => {
     const project = createProject('native-compound', 'Compound keyed layers');
     project.layers.push(layer('video-2'), layer('video-3'), { ...layer('video-4'), enabled: false });
     project.layers[0]!.opacity = 0.7;
@@ -844,6 +857,7 @@ describe.skipIf(!enabled)('schema-11 layered native export · disposable synthet
         {
           opacity: 0.3,
           speed: 0.75,
+          temperature: -0.8,
           exposure: -0.5,
           hue: -25,
           saturation: 0.7,
@@ -852,12 +866,13 @@ describe.skipIf(!enabled)('schema-11 layered native export · disposable synthet
         },
         'smooth',
       ),
-      point(4, { brightness: 0.02, contrast: 1.1 }, 'ease-in'),
+      point(4, { brightness: 0.02, contrast: 1.1, tint: 0.6 }, 'ease-in'),
       point(
         8,
         {
           opacity: 0.8,
           speed: 1.5,
+          temperature: 0.9,
           exposure: 0.4,
           hue: 30,
           saturation: 1.2,
@@ -865,18 +880,22 @@ describe.skipIf(!enabled)('schema-11 layered native export · disposable synthet
         },
         'ease-out',
       ),
-      point(12, { opacity: 0.4, brightness: 0.06, contrast: 1.25, shadows: -0.1 }),
+      point(12, { opacity: 0.4, brightness: 0.06, contrast: 1.25, shadows: -0.1, tint: -0.7 }),
       point(18, { opacity: 0.9, speed: 0.6, shadows: 0.15, highlights: 0.2 }, 'hold'),
     ];
     project.layers[1]!.keyframes = [
-      point(0, { opacity: 0.2, speed: 0.7, hue: 40, highlights: -0.3 }, 'ease-in'),
-      point(6, { opacity: 0.85, exposure: 0.2, shadows: 0.15 }, 'smooth'),
-      point(10, { opacity: 0.8, speed: 2, hue: -35, exposure: 0.4, highlights: -0.1 }, 'smooth'),
-      point(24, { speed: 0.8, opacity: 0.45, hue: 15, shadows: -0.2 }, 'hold'),
+      point(0, { opacity: 0.2, speed: 0.7, hue: 40, highlights: -0.3, tint: -0.5 }, 'ease-in'),
+      point(6, { opacity: 0.85, exposure: 0.2, shadows: 0.15, temperature: 0.8 }, 'smooth'),
+      point(10, { opacity: 0.8, speed: 2, hue: -35, exposure: 0.4, highlights: -0.1, tint: 0.65 }, 'smooth'),
+      point(24, { speed: 0.8, opacity: 0.45, hue: 15, shadows: -0.2, temperature: -0.6 }, 'hold'),
     ];
     project.layers[2]!.keyframes = [
-      point(0, { brightness: 0.08, hue: -15 }, 'ease-out'),
-      point(12, { exposure: -0.2, shadows: 0.4, saturation: 1.3, brightness: -0.02, hue: 40 }, 'hold'),
+      point(0, { brightness: 0.08, hue: -15, temperature: -0.7, tint: 0.8 }, 'ease-out'),
+      point(
+        12,
+        { exposure: -0.2, shadows: 0.4, saturation: 1.3, brightness: -0.02, hue: 40, temperature: 0.5, tint: -0.6 },
+        'hold',
+      ),
     ];
     for (const { key } of COLOUR_CONTROLS) {
       expect(hasLayerKeys(project.layers[0]!, key)).toBe(true);
@@ -1059,16 +1078,28 @@ describe.skipIf(!enabled)('schema-11 layered native export · disposable synthet
     async (profile) => {
       const project = createProject(`row-appearance-${profile}`, 'Joint appearance · synthetic');
       const row = project.layers[0]!;
-      row.colour = { ...NEUTRAL_COLOUR, contrast: 1.1, brightness: 0.02, saturation: 0.85 };
+      row.colour = {
+        ...NEUTRAL_COLOUR,
+        temperature: 0.9,
+        tint: -0.7,
+        contrast: 1.1,
+        brightness: 0.02,
+        saturation: 0.85,
+      };
       row.opacity = 0.8;
       row.openingFade = 1;
       row.closingFade = 1;
-      row.keyframes = [point(0, { exposure: 0.15, opacity: 0.65 }), point(4, { exposure: -0.1, opacity: 0.9 })];
+      row.keyframes = [
+        point(0, { exposure: 0.15, opacity: 0.65, temperature: -1 }),
+        point(1, { tint: 0.8 }, 'ease-in'),
+        point(4, { exposure: -0.1, opacity: 0.9, temperature: 1, tint: -0.9 }),
+      ];
       const left = createClip('joint-left', assets[0]!.id, 1, 4);
       const right = { ...createClip('joint-right', assets[1]!.id, 5, 8), start: 2 };
       project.clips = [left, right];
       row.transitions = [{ leftId: left.id, rightId: right.id, type: 'cross-dissolve', duration: 1 }];
       const lower = layer('joint-lower');
+      lower.colour = { ...NEUTRAL_COLOUR, temperature: 0.7, tint: -0.6 };
       project.layers.unshift(lower);
       project.clips.push(createClip('lower', assets[2]!.id, 0, 5, lower.id));
       const before = structuredClone(project);
@@ -1078,6 +1109,7 @@ describe.skipIf(!enabled)('schema-11 layered native export · disposable synthet
         for (const source of sources) expect(source.colour).toEqual(sources[0]!.colour);
         expect(project.clips.every((clip) => !('colour' in clip) && !('correction' in clip))).toBe(true);
       }
+      assertSharedSamples(project);
       const result = await complete(project, profile);
       bounds(result.receipt);
       await parity(project, result.filename);
@@ -1137,7 +1169,16 @@ describe.skipIf(!enabled)('schema-11 layered native export · disposable synthet
     project.layers[0]!.openingFade = 1;
     project.layers[0]!.closingFade = 1;
     project.layers[0]!.opacity = 0.7;
-    project.layers[0]!.colour = { ...NEUTRAL_COLOUR, exposure: 0.2, brightness: 0.02, hue: -30, shadows: 0.2 };
+    project.layers[0]!.colour = {
+      ...NEUTRAL_COLOUR,
+      temperature: 0.8,
+      tint: -0.6,
+      exposure: 0.2,
+      brightness: 0.02,
+      hue: -30,
+      shadows: 0.2,
+    };
+    project.layers[1]!.colour = { ...NEUTRAL_COLOUR, temperature: -0.7, tint: 0.9 };
     project.layers[1]!.keyframes = [point(0, { opacity: 0.2 }), point(4, { opacity: 0.9 }, 'hold')];
     expect(
       sampleTimeline(project, 1)

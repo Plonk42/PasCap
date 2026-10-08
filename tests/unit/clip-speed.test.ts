@@ -38,7 +38,7 @@ describe('strict clip-instance speed curves', () => {
     const document = createProject('curve', 'Curve');
     document.clips = [clip(curve(key(0, 1), key(120, 2)))];
     expect(projectSchema.parse(document)).toEqual(document);
-    expect(document.schemaVersion).toBe(11);
+    expect(document.schemaVersion).toBe(12);
     expect(speedSchema.parse({ mode: 'constant', rate: 1 })).toEqual({ mode: 'constant', rate: 1 });
     expect(() => speedSchema.parse({ mode: 'curve' })).toThrow();
   });

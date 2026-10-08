@@ -3,7 +3,7 @@
 ## Scope and decisions
 
 Controls use native elements, the existing editor layout and strict project
-schema 9, including clip spatial settings and 0–8 independent music instances. No UI framework or icon dependency is introduced. Exact
+schema 12, including complete row Colour, clip spatial settings and 0–8 independent music instances. No UI framework or icon dependency is introduced. Exact
 timing fields stay numeric: replacing them with a duration-dependent slider would
 conceal precision and encourage accidental changes.
 
@@ -46,6 +46,10 @@ neither needs replacing merely to make their implementation identical.
   frame**: absolute project position. **Duration** and **fades** use output frames.
 - **Opacity**, **Speed**, **Colour** and **Ripple** retain their established names.
   Opacity is row-owned coverage, not an additional grading operation.
+- **Temperature / Tint** are row-owned normalized −1…1 scalar Colour controls,
+  neutral 0: positive Temperature warms, positive Tint adds magenta. They precede
+  Exposure, are independently keyable and work on empty rows, with the standard
+  slider/exact-field/reset/diamond/navigation pattern. No Kelvin or AWB label.
 - **Transform** is clip-owned crop, Scale, Translate X/Y and Rotation; its single
   diamond captures the full eight-value source-frame pose, not a row participant.
 

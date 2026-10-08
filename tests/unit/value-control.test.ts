@@ -213,7 +213,7 @@ describe('shared exact values and contextual validation', () => {
     expect(change(initial, 50).commit).toBeNull();
   });
 
-  it('uses the unchanged seven colour bounds and gains from −60 to 12 dB', () => {
+  it('uses all nine colour bounds and gains from −60 to 12 dB', () => {
     for (const setting of COLOUR_CONTROLS)
       expect(KEYFRAME_SETTINGS.find((item) => item.key === setting.key)).toMatchObject({
         min: setting.min,

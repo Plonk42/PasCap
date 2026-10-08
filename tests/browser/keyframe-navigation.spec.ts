@@ -140,15 +140,15 @@ async function readOnly(page: Page, document: ProjectDocument): Promise<void> {
 }
 
 function interleaved(): LayerKeyframe[] {
-  return [3, 50, 90].flatMap((start) =>
+  return [3, 50, 89].flatMap((start) =>
     KEYFRAME_SETTINGS.map(({ key }, index) => sharedPoint(start + index * 3, { [key]: key === 'speed' ? 1 : 0 })),
   );
 }
 
 test('unkeyed settings retain their hollow diamonds and both visible disabled navigation buttons', async ({ page }) => {
   const document = await current(page);
-  expect(KEYFRAME_SETTINGS).toHaveLength(9);
-  await expect(inspector(page).getByRole('button', { name: /^Keyframe / })).toHaveCount(9);
+  expect(KEYFRAME_SETTINGS).toHaveLength(11);
+  await expect(inspector(page).getByRole('button', { name: /^Keyframe / })).toHaveCount(11);
   for (const { label } of KEYFRAME_SETTINGS) {
     const toggle = diamond(page, label);
     await expect(toggle).toBeEnabled();
@@ -175,7 +175,7 @@ for (const [index, { key, label }] of KEYFRAME_SETTINGS.entries()) {
     await fixture(page, document);
     const first = 3 + index * 3;
     const middle = 50 + index * 3;
-    const last = 90 + index * 3;
+    const last = 89 + index * 3;
     const previous = step(page, label, 'Previous');
     const next = step(page, label, 'Next');
     await expect(diamond(page, label)).toBeEnabled();
@@ -261,7 +261,7 @@ test('diamond, previous, next and reset keep native Tab order and keyboard activ
   await readOnly(page, document);
 });
 
-test('all nine setting buttons remain present and disabled throughout a native trim draft', async ({ page }) => {
+test('all eleven setting buttons remain present and disabled throughout a native trim draft', async ({ page }) => {
   const document = sequence(interleaved());
   await fixture(page, document);
   await seek(page, 45);

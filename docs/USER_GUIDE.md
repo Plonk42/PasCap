@@ -13,17 +13,20 @@ inherit the shared media registry. Importing the same original into another proj
 deliberately adds it to that project's bin and reuses eligible verified proxies.
 Removing an excerpt or music placement does not remove the imported media.
 
-Projects use **strict format v11**, with required row colour and clip spatial base/full-pose
+Projects use **strict format v12**, with complete required row colour and clip spatial base/full-pose
 source-frame keys and a required `music` array of 0–8 independent
 instances and unique required instance IDs (`[]` without music), every video track's Ripple, transitions and
 opening/closing fades and required numeric `opacity` in 0–1 (1 on new tracks),
-with nine nullable animation channels: `opacity`, `speed` and seven colour settings.
+with eleven nullable animation channels, in control order: `opacity`, `speed`,
+`temperature`, `tint`, `exposure`, `brightness`, `contrast`, `hue`, `saturation`,
+`highlights`, `shadows`. Row Colour requires Temperature/Tint bases and static
+HSL/curves; missing fields and saved clip colour/correction are invalid.
 Row `opacity` is the sole saved Opacity value; saved `clip.opacity` and old
 `clipOpacity`/`layerOpacity` key channels are invalid, not ignored or defaulted.
-v1–v10 project documents and receipt snapshots
+v1–v11 project documents and receipt snapshots
 stay on disk but are incompatible: there is no migration, compatibility default,
 null fallback, old-format reader, automatic repair or deletion. Export receipts
-remain version 1 with a strict v11 snapshot and required audio-source/instance-plan arrays.
+remain version 1 with a strict v12 snapshot and required audio-source/instance-plan arrays.
 Create a new project and import its media deliberately. Finished videos remain
 untouched. **Delete project** requires confirmation and deletes only the saved
 project document, not originals, the shared registry/proxy cache or exports/receipts.
@@ -161,10 +164,12 @@ frozen last image. Details: [TIMELINE_EDITING.md](TIMELINE_EDITING.md).
 
 ## Colour, speed and shared row keyframes
 
-Each excerpt has independent colour and constant/ramp/custom speed settings.
+Each excerpt has independent constant/ramp/custom speed and spatial settings.
+All static and keyed Colour belongs to its video row, not the excerpt.
 **Opacity** is one setting for the selected **whole video row**, not a clip.
 Find its single native slider/exact numeric field/diamond/navigation in **Clip → Colour**,
-alongside Exposure, Brightness, Contrast, Hue, Saturation, Highlights and Shadows.
+alongside Temperature, Tint, Exposure, Brightness, Contrast, Hue, Saturation,
+Highlights and Shadows.
 The numeric field uses **0–1**, initially **1**; the main label may show **100%**.
 Without Opacity keys, either value control edits the row's saved `opacity` and works even
 on an empty row. With keys, the row's `opacity` curve overrides that value on every
@@ -183,6 +188,30 @@ and the curve graph. Slow motion repeats frames and acceleration drops them;
 there is no optical-flow synthesis.
 Speed changes output duration: Ripple-on tracks re-sequence, off keeps independent starts,
 and incompatible fades/transitions/overlaps reject the edit rather than being shrunk.
+
+### Temperature and Tint
+
+In **Clip → Colour**, **Temperature** and **Tint** precede Exposure. Both use
+normalized **−1…1**, neutral **0**, not Kelvin or automatic white balance.
+Positive Temperature warms, negative cools; positive Tint adds magenta, negative
+adds green. Nonzero settings intentionally colour greys. The common gain formula
+runs in linear RGB before Exposure; it preserves neutral-white linear luminance
+before clipping only, not final brightness or arbitrary coloured pixels.
+
+Sliders, exact fields, individual Reset to 0, diamonds and Previous/Next use the
+same main/stored control rules as other scalar Colour settings. Without keys,
+edit the row base even on an empty row; every clip on that row adopts it. With
+keys, capture explicitly at the real playhead before editing a missing participant.
+Removing the final participant reveals the unchanged saved row base. Slider
+movement stays local until release; valid edits make one Undo step, invalid or
+cancelled edits apply nothing. Numeric entry retains its precision.
+
+Nested **HSL ranges** and **Colour curves** also belong to the row, but remain
+static, with no animation diamonds. They follow scalar grading, so HSL's grey
+protection does not undo Temperature/Tint colouring. Ungraded comparison bypasses
+all these Colour stages, retaining Opacity and geometry. Exact processing:
+[Temperature/Tint](design/TEMPERATURE_AND_TINT.md) and
+[HSL/curves](design/HSL_AND_CURVES.md).
 
 ### Compare graded and ungraded preview
 
@@ -285,8 +314,9 @@ It contains the point count, participant chips, whole-row Previous/Next navigati
 and a directly visible shared point list. The toolbar's **Animation help** combines
 animation and point-timing guidance. **Clip** keeps source/clip settings, row Opacity
 and the diamonds and value controls that use the real playhead. All row points use absolute project
-frames and affect every clip on that row. Nine settings participate independently:
-Opacity (`opacity`), Speed and the seven colour controls. At most 256
+frames and affect every clip on that row. Eleven settings participate independently:
+Opacity (`opacity`), Speed and the nine scalar colour controls, including
+Temperature and Tint. HSL/curves remain static. At most 256
 shared points are allowed per row.
 
 - Every setting has a **hollow ◇ / filled ◆ diamond**. Hollow means inactive but
@@ -464,7 +494,7 @@ indicate adjusted settings without expanding everything. Animated channels use
 an amber curve/diamond: dashed between keys, filled when the setting participates
 at the playhead. **Animation help** in the Keyframes toolbar explains scope,
 capture and point timing; there is no separate Keyframe timing help button.
-All nine settings retain their unkeyed values, explicit capture and stored-point editing.
+All eleven settings retain their unkeyed values, explicit capture and stored-point editing.
 Search/filter clear actions,
 mixed select-all and always-visible media Add simplify the library.
 
@@ -512,7 +542,7 @@ in memory and automatic write retries stop. **Retry save** is offered only for
 recoverable transport/server errors. On a revision conflict, **Review latest save**
 offers keeping the draft, **Download unsaved project**, or explicitly discarding
 local changes and reloading. It never silently overwrites or rebases another save.
-Download before discarding; the v8 JSON snapshot is for manual recovery/examination,
+Download before discarding; the v12 JSON snapshot is for manual recovery/examination,
 not a supported JSON-import or migration flow. Unapplied input/pointer drafts are
 not committed project edits.
 

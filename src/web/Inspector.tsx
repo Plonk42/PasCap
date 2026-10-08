@@ -327,6 +327,11 @@ function ColourSection({
             including Opacity; individual resets change only their own setting. Without Colour animation, Reset restores
             the selected row's Colour and Opacity to neutral in one Undo step.
           </p>
+          <p>
+            Temperature and Tint use −1 to 1, with 0 neutral. Positive Temperature warms; negative cools. Positive Tint
+            adds magenta; negative adds green. They apply linear-RGB gains before Exposure and intentionally colour
+            greys. These are normalized SDR adjustments, not Kelvin estimates, automatic white balance or HDR recovery.
+          </p>
         </HelpPopover>
       }
     >

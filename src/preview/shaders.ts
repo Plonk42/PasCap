@@ -68,6 +68,8 @@ uniform vec4 tone0;
 uniform vec4 tone1;
 uniform vec3 extra0;
 uniform vec3 extra1;
+uniform vec3 correction0;
+uniform vec3 correction1;
 uniform vec2 coverage;
 uniform vec2 brightness;
 uniform vec2 imageAspect;
@@ -98,9 +100,11 @@ float decode709(float v) {
 float encode709(float v) {
   return v < beta ? 4.5 * v : alpha * pow(v, 0.45) - (alpha - 1.0);
 }
-vec3 scalarGrade(vec3 code, vec4 tone, vec3 extra) {
-  if (all(equal(tone, vec4(0.0, 0.0, 1.0, 1.0))) && all(equal(extra, vec3(0.0)))) return code;
+vec3 scalarGrade(vec3 code, vec4 tone, vec3 extra, vec3 correction) {
+  if (all(equal(correction, vec3(1.0))) && all(equal(tone, vec4(0.0, 0.0, 1.0, 1.0))) &&
+      all(equal(extra, vec3(0.0)))) return code;
   vec3 rgb = vec3(decode709(code.r), decode709(code.g), decode709(code.b));
+  rgb *= correction;
   rgb = (rgb * exp2(tone.x) - 0.18) * tone.z + 0.18 + tone.y;
   float maskY = clamp(dot(rgb, luma), 0.0, 1.0);
   rgb += 0.25 * (extra.z * pow(1.0 - maskY, 2.0) + extra.y * maskY * maskY);
@@ -147,7 +151,7 @@ vec3 rangeGrade(vec3 code, int sourceIndex) {
 }
 ${curveFunctions}
 vec3 grade(vec3 code, vec4 tone, vec3 extra, int sourceIndex) {
-  vec3 base = scalarGrade(code, tone, extra);
+  vec3 base = scalarGrade(code, tone, extra, sourceIndex == 0 ? correction0 : correction1);
   ivec4 identity = sourceIndex == 0 ? curveIdentity0 : curveIdentity1;
   if (neutralHsl[sourceIndex] > 0.5 && all(equal(identity, ivec4(1)))) return base;
   vec3 rgb = rangeGrade(base, sourceIndex);
@@ -192,7 +196,7 @@ export const singleFragmentShader = createFragmentShader(true);
 export const scalarFragmentShader =
   fragmentShader.slice(0, fragmentShader.indexOf('float hueComponent')) +
   `vec3 grade(vec3 code, vec4 tone, vec3 extra, int sourceIndex) {
-    return scalarGrade(code, tone, extra);
+    return scalarGrade(code, tone, extra, sourceIndex == 0 ? correction0 : correction1);
   }
 ` +
   fragmentShader.slice(fragmentShader.indexOf('vec3 sampleRgb'));

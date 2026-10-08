@@ -70,19 +70,21 @@ external desktop file/folder drag-and-drop import**. External drops prevent
 navigation and show Import guidance without a POST. Internal ready-Media-to-Timeline
 dragging remains supported. Imports reference originals; generated proxies/
 thumbnails, project/registry metadata, exports/receipts and scratch are the only
-new local data, not duplicate original footage. Projects use strict schema 11 with
-required row Colour, no clip colour/correction fields, required clip `spatial` base/full-pose original-source keys and
+new local data, not duplicate original footage. Projects use strict schema 12 with
+complete required row Colour, including Temperature/Tint and static HSL/curves,
+no clip colour/correction fields, required clip `spatial` base/full-pose original-source keys and
 required `music` array (0–8 independent instances, unique required IDs; `[]` without
 music), and
 required per-track Ripple, transitions, opening/closing fades and numeric
-`VideoLayer.opacity` in 0–1 (1 on new tracks), plus nine nullable point channels:
-`opacity`, `speed` and seven colour settings. Row `opacity` is the sole saved
+`VideoLayer.opacity` in 0–1 (1 on new tracks), plus eleven nullable point channels:
+`opacity`, `speed` and nine scalar colour settings, including `temperature` and
+`tint`. HSL/curves remain static. Row `opacity` is the sole saved
 Opacity value; saved `clip.opacity` and old `clipOpacity`/`layerOpacity` channels
 are rejected. The row value or its overriding keys supply Opacity to each source
-in a dissolve group, without an additional layer multiplier. v1–v10 projects
+in a dissolve group, without an additional layer multiplier. v1–v11 projects
 and receipt snapshots remain unchanged/incompatible and require project recreation,
 without migration, compatibility defaults, null/old-format readers or automatic deletion.
-Export receipts remain version 1 with strict v11 snapshots and required captured
+Export receipts remain version 1 with strict v12 snapshots and required captured
 audio-source/instance-plan arrays; invalid arrays/older snapshots remain preserved
 and rejected. Registry/proxy/current PCM formats and source identity checks are unchanged.
 

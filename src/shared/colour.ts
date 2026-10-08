@@ -14,6 +14,8 @@ import {
 
 export const colourSchema = z
   .object({
+    temperature: z.number().min(-1).max(1),
+    tint: z.number().min(-1).max(1),
     exposure: z.number().min(-3).max(3),
     brightness: z.number().min(-0.5).max(0.5),
     contrast: z.number().min(0).max(2),
@@ -30,6 +32,8 @@ export type ColourSettings = z.infer<typeof colourSchema>;
 export type RGB = readonly [number, number, number];
 export function createColourSettings(): ColourSettings {
   return {
+    temperature: 0,
+    tint: 0,
     exposure: 0,
     brightness: 0,
     contrast: 1,
@@ -52,6 +56,8 @@ Object.freeze(neutral.curves);
 export const NEUTRAL_COLOUR: Readonly<ColourSettings> = Object.freeze(neutral);
 
 export const COLOUR_CONTROLS = [
+  { key: 'temperature', label: 'Temperature', min: -1, max: 1, step: 0.01, unit: '' },
+  { key: 'tint', label: 'Tint', min: -1, max: 1, step: 0.01, unit: '' },
   { key: 'exposure', label: 'Exposure', min: -3, max: 3, step: 0.01, unit: 'EV' },
   { key: 'brightness', label: 'Brightness', min: -0.5, max: 0.5, step: 0.005, unit: '' },
   { key: 'contrast', label: 'Contrast', min: 0, max: 2, step: 0.01, unit: '×' },
@@ -61,7 +67,7 @@ export const COLOUR_CONTROLS = [
   { key: 'shadows', label: 'Shadows', min: -1, max: 1, step: 0.01, unit: '' },
 ] as const;
 export type ScalarColourSetting = (typeof COLOUR_CONTROLS)[number]['key'];
-/** Only the seven numeric channels, never static structured settings. */
+/** Only the nine numeric channels, never static structured settings. */
 export function scalarColourValues(settings: ColourSettings): Record<ScalarColourSetting, number> {
   return Object.fromEntries(COLOUR_CONTROLS.map(({ key }) => [key, settings[key]])) as Record<
     ScalarColourSetting,
@@ -83,31 +89,47 @@ export function encode709(value: number): number {
   return value < BT709_BETA ? 4.5 * value : BT709_ALPHA * value ** 0.45 - (BT709_ALPHA - 1);
 }
 
+/** Normalized SDR axes, preserving neutral-white linear luminance before clipping. */
+export function temperatureTintGains(settings: Pick<ColourSettings, 'temperature' | 'tint'>): RGB {
+  const { temperature, tint } = settings;
+  const red = 2 ** (temperature / 2 + tint / 4);
+  const green = 2 ** (-tint / 4);
+  const blue = 2 ** (-temperature / 2 + tint / 4);
+  const luminance = 0.2126 * red + 0.7152 * green + 0.0722 * blue;
+  return [red / luminance, green / luminance, blue / luminance];
+}
+
 /** Authoritative SDR transform. See docs/COLOUR_AND_TIMING.md; no FFmpeg eq approximation. */
 export function gradePixel(rgb: RGB, settings: ColourSettings): RGB {
   if (isNeutralColour(settings)) return rgb;
-  const base = gradeScalarPixel(rgb, settings);
+  const base = isNeutralScalarColour(settings)
+    ? rgb
+    : gradeScalarPixel(rgb, settings, temperatureTintGains(settings), 2 ** settings.exposure);
   return applyColourCurves(applyHsl(base, settings.hsl), settings.curves);
 }
 /** Exact frame-owned grade; cache only bounded settings/functions, never pixels. */
 export function compilePixelGrade(settings: ColourSettings): (rgb: RGB) => RGB {
   if (isNeutralColour(settings)) return (rgb) => rgb;
-  const scalarNeutral = COLOUR_CONTROLS.every(({ key }) => settings[key] === NEUTRAL_COLOUR[key]);
+  const scalarNeutral = isNeutralScalarColour(settings);
+  const gains = temperatureTintGains(settings);
+  const exposure = 2 ** settings.exposure;
   const hsl = compileHsl(settings.hsl);
   const master = compileColourCurve(settings.curves.master);
   const red = compileColourCurve(settings.curves.red);
   const green = compileColourCurve(settings.curves.green);
   const blue = compileColourCurve(settings.curves.blue);
   return (rgb) => {
-    const base = hsl(scalarNeutral ? rgb : gradeScalarPixel(rgb, settings));
+    const base = hsl(scalarNeutral ? rgb : gradeScalarPixel(rgb, settings, gains, exposure));
     return [red(master(base[0])), green(master(base[1])), blue(master(base[2]))];
   };
 }
-function gradeScalarPixel(rgb: RGB, settings: ColourSettings): RGB {
-  if (COLOUR_CONTROLS.every(({ key }) => settings[key] === NEUTRAL_COLOUR[key])) return rgb;
-  const exposure = 2 ** settings.exposure;
+function isNeutralScalarColour(settings: ColourSettings): boolean {
+  return COLOUR_CONTROLS.every(({ key }) => settings[key] === NEUTRAL_COLOUR[key]);
+}
+function gradeScalarPixel(rgb: RGB, settings: ColourSettings, gains: RGB, exposure: number): RGB {
   const base = rgb.map(
-    (value) => (decode709(clamp01(value)) * exposure - 0.18) * settings.contrast + 0.18 + settings.brightness,
+    (value, channel) =>
+      (decode709(clamp01(value)) * gains[channel]! * exposure - 0.18) * settings.contrast + 0.18 + settings.brightness,
   );
   const y = clamp01(0.2126 * base[0]! + 0.7152 * base[1]! + 0.0722 * base[2]!);
   const low = (1 - y) ** 2;
@@ -126,7 +148,7 @@ function gradeScalarPixel(rgb: RGB, settings: ColourSettings): RGB {
 }
 
 export function isNeutralColour(settings: ColourSettings): boolean {
-  return COLOUR_CONTROLS.every(({ key }) => settings[key] === NEUTRAL_COLOUR[key]) && isNeutralAdvancedColour(settings);
+  return isNeutralScalarColour(settings) && isNeutralAdvancedColour(settings);
 }
 
 export function isNeutralAdvancedColour(settings: ColourSettings): boolean {
@@ -138,12 +160,13 @@ export function generateCube(settings: ColourSettings, size = 65): string {
   if (!Number.isInteger(size) || size < 2 || size > 129)
     throw new Error('LUT size must be an integer between 2 and 129.');
   const lines = ['TITLE "PasCap BT709 linear SDR v1"', `LUT_3D_SIZE ${size}`, 'DOMAIN_MIN 0 0 0', 'DOMAIN_MAX 1 1 1'];
+  const grade = compilePixelGrade(settings);
   // .cube convention: red is the fastest-moving coordinate.
   for (let blue = 0; blue < size; blue++) {
     for (let green = 0; green < size; green++) {
       for (let red = 0; red < size; red++) {
         lines.push(
-          gradePixel([red / (size - 1), green / (size - 1), blue / (size - 1)], settings)
+          grade([red / (size - 1), green / (size - 1), blue / (size - 1)])
             .map((v) => v.toFixed(9))
             .join(' '),
         );

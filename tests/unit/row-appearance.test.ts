@@ -78,6 +78,76 @@ describe('strict row-only Colour and Opacity', () => {
     expect(project.clips).toEqual(clips);
   });
 
+  it('interpolates Temperature independently of Tint and restores each unchanged row base after final removal', () => {
+    const original = fixture();
+    const row = original.layers[0]!;
+    row.colour.temperature = 0.3;
+    row.colour.tint = -0.4;
+    row.keyframes = [
+      { frame: 10, interpolation: 'linear', values: { ...EMPTY_KEY_VALUES, temperature: -0.5, tint: 0.6 } },
+      { frame: 20, interpolation: 'smooth', values: { ...EMPTY_KEY_VALUES, exposure: 0.2 } },
+      { frame: 30, interpolation: 'hold', values: { ...EMPTY_KEY_VALUES, temperature: 0.5 } },
+    ];
+    for (const [frame, temperature] of [
+      [0, -0.5],
+      [20, 0],
+      [40, 0.5],
+    ] as const)
+      expect(colourAt(row, frame)).toEqual({ ...row.colour, temperature, tint: 0.6, exposure: 0.2 });
+
+    const history = new EditHistory(original);
+    const changed = history.commit({
+      type: 'layer-key-value',
+      layerId: row.id,
+      frame: 10,
+      setting: 'temperature',
+      value: 0.123456789,
+    });
+    expect(changed.layers[0]!.keyframes[0]).toEqual({
+      ...row.keyframes[0]!,
+      values: { ...row.keyframes[0]!.values, temperature: 0.123456789 },
+    });
+    expect(changed.layers[0]!.colour).toEqual(row.colour);
+    expect(changed.clips).toEqual(original.clips);
+    expect(history.undo()).toEqual(original);
+    expect(history.canUndo).toBe(false);
+
+    const reset = colourResetCommands(row, 30).reduce((project, command) => applyCommand(project, command), original);
+    expect(reset.layers[0]!.keyframes).toEqual([
+      row.keyframes[0],
+      row.keyframes[1],
+      { ...row.keyframes[2]!, values: { ...row.keyframes[2]!.values, temperature: 0 } },
+    ]);
+    expect(reset.layers[0]!.colour).toEqual(row.colour);
+    expect(reset.clips).toEqual(original.clips);
+
+    let project = original;
+    for (const frame of [10, 30])
+      project = applyCommand(project, {
+        type: 'layer-key-toggle',
+        layerId: row.id,
+        frame,
+        setting: 'temperature',
+        value: 0,
+      });
+    expect(project.layers[0]!.keyframes).toEqual([
+      { ...row.keyframes[0]!, values: { ...row.keyframes[0]!.values, temperature: null } },
+      row.keyframes[1],
+    ]);
+    expect(colourAt(project.layers[0]!, 20)).toEqual({ ...row.colour, tint: 0.6, exposure: 0.2 });
+    project = applyCommand(project, {
+      type: 'layer-key-toggle',
+      layerId: row.id,
+      frame: 10,
+      setting: 'tint',
+      value: 0,
+    });
+    expect(project.layers[0]!.keyframes).toEqual([row.keyframes[1]]);
+    expect(colourAt(project.layers[0]!, 20)).toEqual({ ...row.colour, exposure: 0.2 });
+    expect(project.layers[0]!.colour).toEqual(row.colour);
+    expect(project.clips).toEqual(original.clips);
+  });
+
   it('keeps empty-row colour editable and makes new/moved clips inherit destination appearance only', () => {
     let project = fixture();
     const destination = createLayer('destination', 'Destination');
@@ -143,7 +213,7 @@ describe('strict row-only Colour and Opacity', () => {
 
   it('requires complete row colour and rejects both clip fields and every older schema', () => {
     const project = fixture();
-    for (let schemaVersion = 1; schemaVersion < 11; schemaVersion++)
+    for (let schemaVersion = 1; schemaVersion < 12; schemaVersion++)
       expect(projectSchema.safeParse({ ...project, schemaVersion }).success).toBe(false);
     const { colour: _row, ...missingRow } = project.layers[0]!;
     for (const invalid of [

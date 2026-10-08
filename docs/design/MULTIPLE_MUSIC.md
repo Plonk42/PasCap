@@ -1,4 +1,4 @@
-# Multiple music instances · strict project schema 11
+# Multiple music instances · strict project schema 12
 
 Current contract for [#35](https://github.com/Plonk42/PasCap/issues/35). This specifies
 the required behaviour, not completed implementation, test evidence or release
@@ -10,7 +10,7 @@ Usage belongs in [the user guide](../USER_GUIDE.md) and
 
 ## Strict document and instance identity
 
-- `schemaVersion` is exactly **11**. Required `music: MusicTrack[]` contains **0–8**
+- `schemaVersion` is exactly **12**. Required `music: MusicTrack[]` contains **0–8**
   independent instances; `[]` means no music. Omitted fields, `null`, a single
   object, unknown fields and duplicate instance IDs are invalid. There are no
   migrations, compatibility readers, null fallbacks or injected defaults.
@@ -28,14 +28,16 @@ Usage belongs in [the user guide](../USER_GUIDE.md) and
   membership, each limited to 10,000 IDs. Every music reference also counts as
   visible membership; importing does not place music implicitly.
 - Video contracts do not change: 1–8 uniform tracks, required Ripple/transitions/
-  opening/closing fades and sole row `opacity` in 0–1. All nine nullable point
-  channels remain `opacity`, `speed` and the seven colour settings. There is no
-  clip opacity or second opacity channel. Clip colour and constant/ramp/custom
-  source-frame speed retain their current ownership and retiming.
-  Schema 9 also requires clip-owned spatial base/full-pose source-frame keys;
+  opening/closing fades and sole row `opacity` in 0–1. All eleven nullable point
+  channels are `opacity`, `speed` and nine scalar colour fields, including
+  `temperature` and `tint`. Complete static/keyed Colour remains row-owned;
+  HSL/curves remain static. There is no clip colour/correction, clip opacity or
+  second opacity channel. Clip constant/ramp/custom source-frame speed retains
+  its ownership and retiming. Schema 12 also requires clip-owned spatial
+  base/full-pose source-frame keys;
   [spatial transforms](SPATIAL_TRANSFORMS.md) do not change music or row Opacity.
 
-v1–v10 projects and receipt snapshots are incompatible and preserved byte-for-byte,
+v1–v11 projects and receipt snapshots are incompatible and preserved byte-for-byte,
 along with finished exports. Recreate projects deliberately; do not rewrite,
 repair or delete them automatically. Registry, video-proxy and current
 `pcm16-48k-stereo-mono-unity-v3` PCM cache formats and source guards are unchanged.
@@ -194,7 +196,7 @@ for those video budgets.
 
 ## Receipts, preservation and acceptance
 
-Export receipt format remains **version 1**, with a strict **schema-11 project
+Export receipt format remains **version 1**, with a strict **schema-12 project
 snapshot**. Required `musicSources` is an array of captured unique registered
 audio assets; required `settings.audio` is an array of instance plans carrying
 `id`/`mediaId` and independent timing/gain/fades/loop sample positions. Both are

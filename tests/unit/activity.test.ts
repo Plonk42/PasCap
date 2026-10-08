@@ -58,7 +58,7 @@ describe('project dialog filtering', () => {
     project('legacy', {
       title: 'North flight old',
       compatible: false,
-      error: 'Unsupported project schema version 6; this build requires version 11.',
+      error: 'Unsupported project schema version 6; this build requires version 12.',
     }),
     project('south', { title: 'South flight', updatedAt: '2026-10-01T12:00:00Z' }),
   ];
@@ -92,7 +92,7 @@ describe('project dialog filtering', () => {
     const unavailable = Object.freeze(entries[2]!);
     const filtered = filterProjects(Object.freeze([unavailable]), 'old', 'unsupported');
     expect(filtered[0]).toBe(unavailable);
-    expect(filtered[0]?.error).toBe('Unsupported project schema version 6; this build requires version 11.');
+    expect(filtered[0]?.error).toBe('Unsupported project schema version 6; this build requires version 12.');
     expect(filtered[0]?.compatible).toBe(false);
     expect(filtered[0]?.clipCount).toBe(0);
   });
@@ -214,12 +214,12 @@ describe('activity ordering and summaries', () => {
 });
 
 describe('export snapshot summary', () => {
-  it('summarizes an empty strict version 10 project without adding defaults', () => {
+  it('summarizes an empty strict version 12 project without adding defaults', () => {
     const document = createProject('empty', 'Empty');
     const summary = summarizeExport(document);
     expect(summary).toMatchObject({ duration: 0, clips: 0, layers: 1, enabledLayers: 1, layered: false });
     expect(summary.keys).toEqual({ points: 0, settings: 0, speed: 0, colour: 0, opacity: 0 });
-    expect(document.schemaVersion).toBe(11);
+    expect(document.schemaVersion).toBe(12);
     expect(document.media).toEqual({ videoIds: [], audioIds: [] });
     expect(document.layers[0]!.keyframes).toEqual([]);
   });
@@ -231,7 +231,18 @@ describe('export snapshot summary', () => {
     document.layers[0]!.keyframes = [
       point(
         0,
-        { opacity: 1, exposure: 0, brightness: 0, contrast: 1, hue: 0, saturation: 1, highlights: 0, shadows: 0 },
+        {
+          opacity: 1,
+          temperature: 0,
+          tint: 0,
+          exposure: 0,
+          brightness: 0,
+          contrast: 1,
+          hue: 0,
+          saturation: 1,
+          highlights: 0,
+          shadows: 0,
+        },
         'hold',
       ),
     ];
@@ -247,7 +258,7 @@ describe('export snapshot summary', () => {
     const before = JSON.stringify(document);
     const summary = summarizeExport(document);
     expect(summary).toMatchObject({ duration: 130, clips: 2, layers: 2, enabledLayers: 1, layered: true });
-    expect(summary.keys).toEqual({ points: 3, settings: 10, speed: 1, colour: 8, opacity: 1 });
+    expect(summary.keys).toEqual({ points: 3, settings: 12, speed: 1, colour: 10, opacity: 1 });
     expect(JSON.stringify(document)).toBe(before);
   });
 

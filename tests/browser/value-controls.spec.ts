@@ -306,7 +306,7 @@ test('row Colour captures its base and keeps precise release-only edits identica
   expect(changed.clips).toEqual(document.clips);
 });
 
-test('empty rows expose all eight editable row appearance widgets and no clip colour scope', async ({ page }) => {
+test('empty rows expose all ten editable row appearance widgets and no clip colour scope', async ({ page }) => {
   const document = await current(page);
   document.clips = [];
   document.music = [];
@@ -595,6 +595,41 @@ test('identical-valued clip and row context replacements preserve input identity
   await pointerEdit(page, 'Opacity', opacityEdit);
 });
 
+test('keyboard focus and native reveal clear the sticky inspector tabs at desktop and drawer widths', async ({
+  page,
+}) => {
+  const before = await checkpoint(page);
+  const { slider } = controls(page, 'Opacity');
+  const diamond = page.getByRole('button', { name: 'Keyframe Opacity', exact: true });
+  const toggle = page.getByRole('button', { name: 'Toggle Clip panel', exact: true });
+  // Park the control entirely beneath the sticky tabs, which still lie inside the scrollport.
+  const tuck = () =>
+    slider.evaluate((element) => {
+      const panel = element.closest('.inspector-panel')!;
+      const heading = panel.querySelector(':scope > .panel-heading')!.getBoundingClientRect();
+      panel.scrollTop += element.getBoundingClientRect().y - heading.y;
+    });
+  const unobscured = (element: Element) => {
+    const heading = element.closest('.inspector-panel')!.querySelector(':scope > .panel-heading')!;
+    const box = element.getBoundingClientRect();
+    const hit = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2);
+    return box.top >= heading.getBoundingClientRect().bottom && hit !== null && element.contains(hit);
+  };
+  for (const width of [1440, 720]) {
+    await page.setViewportSize({ width, height: 900 });
+    if (!(await slider.isVisible())) await toggle.click();
+    await expect(slider).toBeVisible();
+    await tuck();
+    await diamond.evaluate((element: HTMLElement) => element.focus({ preventScroll: true }));
+    await page.keyboard.press('Shift+Tab');
+    expect(await page.locator(':focus').evaluate(unobscured)).toBe(true);
+    await tuck();
+    await slider.scrollIntoViewIfNeeded();
+    expect(await slider.evaluate(unobscured)).toBe(true);
+  }
+  await unchanged(page, before);
+});
+
 test('animated channels without a playhead participant disable both inputs, not the explicit capture diamond', async ({
   page,
 }) => {
@@ -703,7 +738,7 @@ test('common widgets fit 270px inspectors and the desktop/drawer width matrix wi
             };
           }),
       );
-      expect(widgets.length, `${width}px ${tab}`).toBe(tab === 'Clip' ? 20 : tab === 'Layer keyframes' ? 3 : 1);
+      expect(widgets.length, `${width}px ${tab}`).toBe(tab === 'Clip' ? 22 : tab === 'Layer keyframes' ? 3 : 1);
       for (const widget of widgets) {
         expect(widget.inputs, `${width}px ${widget.name}`).toBe(2);
         expect(widget.outputs).toBe(0);

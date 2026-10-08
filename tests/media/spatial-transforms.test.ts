@@ -567,8 +567,16 @@ describe.skipIf(!enabled)('spatial transforms · real native FFmpeg, disposable 
     upper.openingFade = 1;
     upper.closingFade = 1;
     upper.keyframes = [
-      { frame: 0, interpolation: 'linear', values: { ...EMPTY_KEY_VALUES, opacity: 0.35 } },
-      { frame: 3, interpolation: 'hold', values: { ...EMPTY_KEY_VALUES, opacity: 0.75 } },
+      {
+        frame: 0,
+        interpolation: 'linear',
+        values: { ...EMPTY_KEY_VALUES, opacity: 0.35, temperature: -0.8, tint: 0.6 },
+      },
+      {
+        frame: 3,
+        interpolation: 'hold',
+        values: { ...EMPTY_KEY_VALUES, opacity: 0.75, temperature: 0.9, tint: -0.7 },
+      },
     ];
     project.layers.push(upper);
     const base = createClip('base', assets[0]!.id, 0, 4);
@@ -576,7 +584,15 @@ describe.skipIf(!enabled)('spatial transforms · real native FFmpeg, disposable 
     const right = createClip('right', assets[2]!.id, 2, 3, upper.id);
     left.speed = right.speed = { mode: 'constant', rate: 1 / 3 };
     right.start = 1;
-    project.layers[0]!.colour = { ...NEUTRAL_COLOUR, exposure: 0.2, contrast: 0.95, saturation: 0.8, brightness: 0.03 };
+    project.layers[0]!.colour = {
+      ...NEUTRAL_COLOUR,
+      temperature: 0.7,
+      tint: -0.5,
+      exposure: 0.2,
+      contrast: 0.95,
+      saturation: 0.8,
+      brightness: 0.03,
+    };
     left.spatial = {
       base: pose({ scale: 3 }),
       keyframes: [
@@ -664,6 +680,8 @@ describe.skipIf(!enabled)('spatial transforms · real native FFmpeg, disposable 
           expect(sample.sourceFrame).toBe(sourceIn); // Repeated recorded image.
           expect(sample.sourcePosition).toBeCloseTo(sourceIn + (frame - start) / 3, 12);
           expect(sample.opacity).toBeCloseTo(0.35 + (0.4 * frame) / 3, 12);
+          expect(sample.colour.temperature).toBeCloseTo(-0.8 + (1.7 * frame) / 3, 12);
+          expect(sample.colour.tint).toBeCloseTo(0.6 - (1.3 * frame) / 3, 12);
         }
       }
       const a = sampleTimeline(project, 1).find((sample) => sample.clipId === 'left')!;
@@ -673,6 +691,7 @@ describe.skipIf(!enabled)('spatial transforms · real native FFmpeg, disposable 
       const dissolve = sampleTimeline(project, 2).filter((sample) => sample.layerId === 'upper');
       expect(dissolve.map((sample) => sample.blendWeight)).toEqual([0.5, 0.5]);
       expect(dissolve[0]!.spatial).not.toEqual(dissolve[1]!.spatial);
+      expect(dissolve[0]!.colour).toEqual(dissolve[1]!.colour);
       expect(sampleTimeline(project, 0).find((sample) => sample.clipId === 'left')!.brightness).toBe(0);
       expect(sampleTimeline(project, 3).find((sample) => sample.clipId === 'right')!.brightness).toBe(0);
       const work = await mkdtemp(path.join(root, 'compound-'));

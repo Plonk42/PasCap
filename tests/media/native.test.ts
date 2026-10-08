@@ -7,7 +7,14 @@ import { createConfig, type ServiceConfig } from '../../src/server/config.js';
 import { extractComparisonFrame } from '../../src/server/library.js';
 import { runProcess } from '../../src/server/process.js';
 import { startReference } from '../../src/server/reference.js';
-import { generateCube, gradePixel, NEUTRAL_COLOUR, type ColourSettings } from '../../src/shared/colour.js';
+import {
+  decode709,
+  encode709,
+  generateCube,
+  gradePixel,
+  NEUTRAL_COLOUR,
+  type ColourSettings,
+} from '../../src/shared/colour.js';
 import { applyCommand } from '../../src/shared/commands.js';
 import { calculateLayout, sampleTimeline } from '../../src/shared/timeline.js';
 
@@ -37,8 +44,18 @@ describe.skipIf(!enabled)('native FFmpeg integration · disposable synthetic sou
   });
 
   it('CPU and native 65³ LUT match every control and a combined grade numerically', async () => {
+    const gainGrades: ColourSettings[] = [
+      { ...NEUTRAL_COLOUR, temperature: 1 },
+      { ...NEUTRAL_COLOUR, temperature: -1 },
+      { ...NEUTRAL_COLOUR, tint: 1 },
+      { ...NEUTRAL_COLOUR, tint: -1 },
+      ...[-1, 1].flatMap((temperature) =>
+        [-1, 1].map((tint) => ({ ...NEUTRAL_COLOUR, temperature, tint, exposure: -1 })),
+      ),
+    ];
     const controls: ColourSettings[] = [
       { ...NEUTRAL_COLOUR },
+      ...gainGrades,
       { ...NEUTRAL_COLOUR, exposure: 0.75 },
       { ...NEUTRAL_COLOUR, brightness: 0.04 },
       { ...NEUTRAL_COLOUR, contrast: 1.25 },
@@ -48,6 +65,8 @@ describe.skipIf(!enabled)('native FFmpeg integration · disposable synthetic sou
       { ...NEUTRAL_COLOUR, shadows: 0.3 },
       {
         ...NEUTRAL_COLOUR,
+        temperature: 0.8,
+        tint: -0.6,
         exposure: 0.6,
         brightness: 0.02,
         contrast: 1.1,
@@ -63,6 +82,7 @@ describe.skipIf(!enabled)('native FFmpeg integration · disposable synthetic sou
       pixels[index * 3 + 1] = (index * 157) % 256;
       pixels[index * 3 + 2] = (index * 29) % 256;
     }
+    [0, 16, 64, 96, 127, 128, 192, 254, 255].forEach((grey, index) => pixels.fill(grey, index * 3, index * 3 + 3));
     await writeFile(path.join(directory, 'pixels.rgb'), pixels);
     for (const settings of controls) {
       await writeFile(path.join(directory, 'grade.cube'), generateCube(settings));
@@ -94,6 +114,13 @@ describe.skipIf(!enabled)('native FFmpeg integration · disposable synthetic sou
         ],
         { cwd: directory },
       );
+      expect(result).toHaveLength(pixels.length);
+      const raw = [
+        2 ** (settings.temperature / 2 + settings.tint / 4),
+        2 ** (-settings.tint / 4),
+        2 ** (-settings.temperature / 2 + settings.tint / 4),
+      ];
+      const whiteLuma = 0.2126 * raw[0]! + 0.7152 * raw[1]! + 0.0722 * raw[2]!;
       let total = 0;
       let max = 0;
       for (let index = 0; index < 17 * 17; index++) {
@@ -102,6 +129,13 @@ describe.skipIf(!enabled)('native FFmpeg integration · disposable synthetic sou
           settings,
         );
         for (let channel = 0; channel < 3; channel++) {
+          // Independently pin normalization, intentional grey tinting and no
+          // clipping before negative exposure, not just CPU/native agreement.
+          if (gainGrades.includes(settings)) {
+            const linear =
+              decode709(pixels[index * 3 + channel]! / 255) * (raw[channel]! / whiteLuma) * 2 ** settings.exposure;
+            expect(expected[channel]).toBeCloseTo(encode709(Math.max(0, Math.min(1, linear))), 12);
+          }
           const error = Math.abs(result[index * 3 + channel]! - expected[channel]! * 255);
           total += error;
           max = Math.max(max, error);

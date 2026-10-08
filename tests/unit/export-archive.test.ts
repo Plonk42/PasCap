@@ -113,7 +113,7 @@ describe('durable export receipts', () => {
       fadeOut: index,
       loop: false,
     }));
-    expect(snapshot.schemaVersion).toBe(11);
+    expect(snapshot.schemaVersion).toBe(12);
     const receipt = receiptFixture(snapshot, id);
     expect(receipt.musicSources).toHaveLength(2);
     expect(receipt.settings.audio).toHaveLength(8);
@@ -412,7 +412,7 @@ describe('durable export receipts', () => {
       }
     },
   );
-  it.each([1, 2, 3, 4, 5, 6, 7, 8, 9])(
+  it.each([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11])(
     'leaves version-1 receipts with unsupported v%s snapshots and their completed outputs unchanged',
     async (version) => {
       const root = await mkdtemp(path.join(os.tmpdir(), 'pascap-archive-'));
@@ -438,7 +438,7 @@ describe('durable export receipts', () => {
         const warnings = await restoreExports(createConfig({ dataDir: root }), jobs);
         expect(warnings).toHaveLength(1);
         expect(warnings[0]).toContain(
-          `Unsupported export snapshot schema version ${version}; this build requires version 11`,
+          `Unsupported export snapshot schema version ${version}; this build requires version 12`,
         );
         expect(jobs.list()).toEqual([]);
         expect(await readFile(path.join(folder, 'receipt.json'), 'utf8')).toBe(text);

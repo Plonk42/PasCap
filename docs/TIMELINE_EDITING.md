@@ -7,10 +7,14 @@ with shared project-time keys. Every clip on the same row shares Colour with or
 without keys; different treatments require different rows. Moving adopts destination
 appearance; trim/split/cut/duplicate preserve row bases and absolute points.
 Main Colour edits work on empty rows. There is no clip colour/correction field.
+Temperature and Tint are row-owned −1…1 scalars, neutral 0, with independent
+explicit key capture. Positive Temperature warms; positive Tint adds magenta.
+Their normalized linear gains precede Exposure and intentionally colour greys.
+HSL/curves remain static. See [Temperature and Tint](design/TEMPERATURE_AND_TINT.md).
 See [row appearance](design/ROW_APPEARANCE.md).
 
 The media library describes complete recordings belonging to the open project's
-bin, not every globally registered source. Strict schema 11 requires unique
+bin, not every globally registered source. Strict schema 12 requires unique
 `media.videoIds` and `media.audioIds` arrays (10,000 IDs maximum each). Imports add
 membership even without timeline placement; clip/music references also remain
 visible. New projects start with both arrays empty. Importing an existing source
@@ -93,7 +97,7 @@ Import guidance, **without a POST**. Internal dragging of ready registered Media
 into Timeline remains unchanged. Uncertain registration results are not retried
 automatically; check Media/Activity before resubmitting.
 
-Strict schema 11 requires row colour, clip spatial settings, per-track Ripple, transitions and fades, and a required
+Strict schema 12 requires complete row colour with Temperature/Tint and static HSL/curves, clip spatial settings, per-track Ripple, transitions and fades, and a required
 0–8 identified-instance `music` array (`[]` without music); registry/proxy/PCM
 formats are unchanged. Only generated proxies/thumbnails, metadata,
 exports/receipts and scratch are created, not duplicate originals. Keep originals
@@ -240,13 +244,13 @@ and undoable, and never move music, other tracks or absolute row points.
 - Ripple-on deletion closes the gap; Ripple-off deletion leaves other placements intact.
   Split finds the original source boundary through the placed map and preserves
   independent clip speed, including source-ramp anchors. Row Colour and Opacity are
-  unchanged and applies to both pieces. It creates a cut between the pieces on
+  unchanged and apply to both pieces. It creates a cut between the pieces on
   that track. Each piece retimes/rounds independently,
   so total duration can change. Invalid edits never enter history.
 - **Clip actions → Duplicate** / **Ctrl+D** copies the complete source excerpt,
-  static grade, constant/ramp/custom speed and deep-copied spatial base/keys into
+  constant/ramp/custom speed and deep-copied spatial base/keys into
   an independent ID; it does not
-  copy or change row Opacity. Ripple-on duplicates insert after the original with
+  copy or change row Colour/Opacity. Ripple-on duplicates insert after the original with
   new cut boundaries. Ripple-off duplicates start immediately
   after the original's contextual end and acquire their own contextual duration;
   occupied placement is rejected atomically.
@@ -268,9 +272,12 @@ and undoable, and never move music, other tracks or absolute row points.
 
 ## Row points, time ruler and transitions
 
-Schema-10 shared row points belong to the **whole video row**, not individual clips. One ordered
-point at a project frame has nine required nullable channels: **Opacity**
-(`opacity`), Speed and seven colour settings, participating independently.
+Schema-12 shared row points belong to the **whole video row**, not individual clips. One ordered
+point at a project frame has eleven required nullable channels: **Opacity**
+(`opacity`), Speed and nine scalar colour settings, participating independently.
+In control order: `opacity`, `speed`, `temperature`, `tint`, `exposure`,
+`brightness`, `contrast`, `hue`, `saturation`, `highlights`, `shadows`.
+Static HSL/curves are not animation channels.
 Every `VideoLayer` also requires numeric `opacity` in 0–1, initially 1 (100%) on
 new tracks. Without Opacity keys, every clip uses the row value; keys override it
 on every clip in the row, including both dissolve sources. There is no saved
@@ -325,7 +332,7 @@ Speed participation may naturally recompile contextual clip durations.
 
 ### Channel navigation and off-duration inspection
 
-All nine setting diamonds are immediately followed by native SVG **Previous/Next**
+All eleven setting diamonds are immediately followed by native SVG **Previous/Next**
 buttons, before any existing reset. They remain visible but disabled without the
 relevant neighbour, an opened project, or during any document-preview draft. They seek
 strictly earlier/later points where that channel is not `null` (zero included),
@@ -419,17 +426,19 @@ insertion remains boundary-based even with Snap off or Alt held; only an explici
 move of its retained first clip changes the anchor. The
 toggle persists for the current timeline session, not the renderable document.
 
-Projects are named separate **version-11** documents with required row colour, clip spatial
+Projects are named separate **version-12** documents with complete required row colour, clip spatial
 base/full-pose source-frame keys and per-layer Ripple,
 transitions, opening/closing fades and numeric `opacity` in 0–1. New layers start
 at 1 (100%); a missing saved field is invalid. Switching flushes autosave first,
 blocks on failed saves, and resets session selection/history; successful export
-snapshots are independent of the open project. Earlier v1–v10 projects and receipt
+snapshots are independent of the open project. Earlier v1–v11 projects and receipt
 snapshots remain incompatible and preserved, without migration/fabricated defaults.
 There is no automatic deletion. Row `opacity` is the required sole stored value;
 saved `clip.opacity` and old `clipOpacity`/`layerOpacity` point fields are rejected,
-not ignored or defaulted. Points require exactly nine nullable channels: `opacity`,
-`speed` and seven colour settings. Recreate projects and deliberately import recordings/music
+not ignored or defaulted. Points require exactly eleven nullable channels: `opacity`,
+`speed` and nine scalar colour fields, including required `temperature` and `tint`.
+Row Colour requires both bases and static HSL/curves; missing fields are invalid.
+Recreate projects and deliberately import recordings/music
 to reuse registered sources/verified ready proxies. Confirmed project deletion removes only its saved
 document, never originals, the shared registry/proxy cache or successful exports/
 receipts. Removing an excerpt is not removing that recording from the import bin. The
@@ -439,7 +448,7 @@ are unchanged.
 The required `music` array holds **0–8 independent instances**, each with a unique
 required `id`, registered `mediaId`, source IN/OUT, start/duration, gain, fades and
 loop flag. No null/singular fallback, omitted-field default or old-format reader
-is accepted. Version-1 export receipts require a strict v11 snapshot and captured
+is accepted. Version-1 export receipts require a strict v12 snapshot and captured
 audio-source/instance-plan arrays; older snapshots/invalid arrays are rejected
 while the receipt and finished output remain preserved. Current PCM format is unchanged.
 
@@ -537,4 +546,4 @@ and both-runtime acceptance belong to
 [DEPLOYMENT.md](DEPLOYMENT.md). Actual-commit correctness results are available in
 [GitHub Actions](https://github.com/Plonk42/PasCap/actions).
 
-Row Colour includes static **HSL ranges** and **Colour curves** in nested Clip → Colour sections. They affect every excerpt and both dissolve sources on the row, whether or not its seven scalar channels are keyed. Moves use the destination row's complete colour; clip edits never copy these settings. They are not speed curves or new animation channels. See [the schema-11 HSL/curves contract](design/HSL_AND_CURVES.md).
+Row Colour includes static **HSL ranges** and **Colour curves** in nested Clip → Colour sections. They affect every excerpt and both dissolve sources on the row, whether or not its nine scalar channels are keyed. Moves use the destination row's complete colour; clip edits never copy these settings. They are not speed curves or new animation channels. See [the schema-12 HSL/curves contract](design/HSL_AND_CURVES.md).
