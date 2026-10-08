@@ -667,6 +667,13 @@ test('common widgets fit 270px inspectors and the desktop/drawer width matrix wi
     }
     for (const tab of ['Clip', 'Layer keyframes', 'Audio'] as const) {
       await inspectorTab(page, tab);
+      if (tab === 'Clip')
+        await inspector
+          .locator('.advanced-colour details')
+          .first()
+          .evaluate((element) => {
+            (element as HTMLDetailsElement).open = true;
+          });
       if (tab === 'Layer keyframes') await editLayerPoint(page, 'Video 1', 0);
       const widgets = await inspector.locator('.value-control').evaluateAll((elements) =>
         elements
@@ -696,7 +703,7 @@ test('common widgets fit 270px inspectors and the desktop/drawer width matrix wi
             };
           }),
       );
-      expect(widgets.length, `${width}px ${tab}`).toBe(tab === 'Clip' ? 17 : tab === 'Layer keyframes' ? 3 : 1);
+      expect(widgets.length, `${width}px ${tab}`).toBe(tab === 'Clip' ? 20 : tab === 'Layer keyframes' ? 3 : 1);
       for (const widget of widgets) {
         expect(widget.inputs, `${width}px ${widget.name}`).toBe(2);
         expect(widget.outputs).toBe(0);

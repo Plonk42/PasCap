@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { NEUTRAL_COLOUR } from '../../src/shared/colour.js';
 import { applyCommand, EditHistory, type EditCommand } from '../../src/shared/commands.js';
 import {
   EMPTY_KEY_VALUES,
@@ -74,6 +75,7 @@ function primaryProject(
   const document = createProject('rush', 'Rush editing');
   document.layers[0]!.opacity = 0.65;
   document.layers[0]!.colour = {
+    ...NEUTRAL_COLOUR,
     exposure: 0.6,
     brightness: 0.08,
     contrast: 1.2,

@@ -194,7 +194,7 @@ test('the initial track and every newly added track default to Ripple on with in
   await page.getByRole('button', { name: 'Add video layer', exact: true }).click();
   const added = await current(page);
   await ready(page, added);
-  expect(added.schemaVersion).toBe(10);
+  expect(added.schemaVersion).toBe(11);
   for (const field of ['transitions', 'openingFade', 'closingFade']) expect(added).not.toHaveProperty(field);
   expect(added.layers.slice(0, 2)).toEqual(before.layers);
   expect(added.clips).toEqual(before.clips);

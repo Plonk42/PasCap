@@ -13,17 +13,17 @@ inherit the shared media registry. Importing the same original into another proj
 deliberately adds it to that project's bin and reuses eligible verified proxies.
 Removing an excerpt or music placement does not remove the imported media.
 
-Projects use **strict format v10**, with required row colour and clip spatial base/full-pose
+Projects use **strict format v11**, with required row colour and clip spatial base/full-pose
 source-frame keys and a required `music` array of 0–8 independent
 instances and unique required instance IDs (`[]` without music), every video track's Ripple, transitions and
 opening/closing fades and required numeric `opacity` in 0–1 (1 on new tracks),
 with nine nullable animation channels: `opacity`, `speed` and seven colour settings.
 Row `opacity` is the sole saved Opacity value; saved `clip.opacity` and old
 `clipOpacity`/`layerOpacity` key channels are invalid, not ignored or defaulted.
-v1–v9 project documents and receipt snapshots
+v1–v10 project documents and receipt snapshots
 stay on disk but are incompatible: there is no migration, compatibility default,
 null fallback, old-format reader, automatic repair or deletion. Export receipts
-remain version 1 with a strict v10 snapshot and required audio-source/instance-plan arrays.
+remain version 1 with a strict v11 snapshot and required audio-source/instance-plan arrays.
 Create a new project and import its media deliberately. Finished videos remain
 untouched. **Delete project** requires confirmation and deletes only the saved
 project document, not originals, the shared registry/proxy cache or exports/receipts.

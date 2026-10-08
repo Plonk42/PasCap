@@ -79,7 +79,7 @@ const primitive: Record<Interpolation, (u: number) => number> = {
   smooth: (u) => u * u * u - (u * u * u * u) / 2,
 };
 
-describe('strict schema-10 row points and independently participating settings', () => {
+describe('strict schema-11 row points and independently participating settings', () => {
   it('exports an ordered immutable nine-setting catalogue and explicit all-null template', () => {
     const settings = [
       'opacity',
@@ -103,7 +103,7 @@ describe('strict schema-10 row points and independently participating settings',
   it('requires version 10, explicit media membership, row opacity and clip settings without legacy fields', () => {
     const project = createProject('strict', 'Strict');
     const clip = createClip('one', 'source', 0, 20);
-    expect(project.schemaVersion).toBe(10);
+    expect(project.schemaVersion).toBe(11);
     expect(project.media).toEqual({ videoIds: [], audioIds: [] });
     expect(project.layers[0]).toEqual(row());
     expect(Object.keys(clip)).toEqual([

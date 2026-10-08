@@ -150,7 +150,16 @@ test('GPU matches CPU for neutral, each control and a combined grade', async ({ 
       { highlights: -0.5 },
       { shadows: 0.3 },
     ].map((change) => ({ ...NEUTRAL_COLOUR, ...change })),
-    { exposure: 0.6, brightness: 0.02, contrast: 1.1, hue: 12, saturation: 1.2, highlights: -0.2, shadows: 0.15 },
+    {
+      ...NEUTRAL_COLOUR,
+      exposure: 0.6,
+      brightness: 0.02,
+      contrast: 1.1,
+      hue: 12,
+      saturation: 1.2,
+      highlights: -0.2,
+      shadows: 0.15,
+    },
   ];
   const results = await page.evaluate(
     (grades) => grades.map((grade) => window.pascapLab!.verifyColour(grade)),

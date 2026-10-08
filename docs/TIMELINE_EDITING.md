@@ -10,7 +10,7 @@ Main Colour edits work on empty rows. There is no clip colour/correction field.
 See [row appearance](design/ROW_APPEARANCE.md).
 
 The media library describes complete recordings belonging to the open project's
-bin, not every globally registered source. Strict schema 10 requires unique
+bin, not every globally registered source. Strict schema 11 requires unique
 `media.videoIds` and `media.audioIds` arrays (10,000 IDs maximum each). Imports add
 membership even without timeline placement; clip/music references also remain
 visible. New projects start with both arrays empty. Importing an existing source
@@ -93,7 +93,7 @@ Import guidance, **without a POST**. Internal dragging of ready registered Media
 into Timeline remains unchanged. Uncertain registration results are not retried
 automatically; check Media/Activity before resubmitting.
 
-Strict schema 10 requires row colour, clip spatial settings, per-track Ripple, transitions and fades, and a required
+Strict schema 11 requires row colour, clip spatial settings, per-track Ripple, transitions and fades, and a required
 0–8 identified-instance `music` array (`[]` without music); registry/proxy/PCM
 formats are unchanged. Only generated proxies/thumbnails, metadata,
 exports/receipts and scratch are created, not duplicate originals. Keep originals
@@ -419,12 +419,12 @@ insertion remains boundary-based even with Snap off or Alt held; only an explici
 move of its retained first clip changes the anchor. The
 toggle persists for the current timeline session, not the renderable document.
 
-Projects are named separate **version-10** documents with required row colour, clip spatial
+Projects are named separate **version-11** documents with required row colour, clip spatial
 base/full-pose source-frame keys and per-layer Ripple,
 transitions, opening/closing fades and numeric `opacity` in 0–1. New layers start
 at 1 (100%); a missing saved field is invalid. Switching flushes autosave first,
 blocks on failed saves, and resets session selection/history; successful export
-snapshots are independent of the open project. Earlier v1–v9 projects and receipt
+snapshots are independent of the open project. Earlier v1–v10 projects and receipt
 snapshots remain incompatible and preserved, without migration/fabricated defaults.
 There is no automatic deletion. Row `opacity` is the required sole stored value;
 saved `clip.opacity` and old `clipOpacity`/`layerOpacity` point fields are rejected,
@@ -439,7 +439,7 @@ are unchanged.
 The required `music` array holds **0–8 independent instances**, each with a unique
 required `id`, registered `mediaId`, source IN/OUT, start/duration, gain, fades and
 loop flag. No null/singular fallback, omitted-field default or old-format reader
-is accepted. Version-1 export receipts require a strict v10 snapshot and captured
+is accepted. Version-1 export receipts require a strict v11 snapshot and captured
 audio-source/instance-plan arrays; older snapshots/invalid arrays are rejected
 while the receipt and finished output remain preserved. Current PCM format is unchanged.
 
@@ -536,3 +536,5 @@ and both-runtime acceptance belong to
 [#11](https://github.com/Plonk42/PasCap/issues/11), with the contract in
 [DEPLOYMENT.md](DEPLOYMENT.md). Actual-commit correctness results are available in
 [GitHub Actions](https://github.com/Plonk42/PasCap/actions).
+
+Row Colour includes static **HSL ranges** and **Colour curves** in nested Clip → Colour sections. They affect every excerpt and both dissolve sources on the row, whether or not its seven scalar channels are keyed. Moves use the destination row's complete colour; clip edits never copy these settings. They are not speed curves or new animation channels. See [the schema-11 HSL/curves contract](design/HSL_AND_CURVES.md).

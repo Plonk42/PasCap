@@ -1,6 +1,6 @@
 # Desktop workspace and recovery
 
-The workspace uses **strict schema 10 with required row colour, independent clip spatial settings, uniform video tracks, required per-track
+The workspace uses **strict schema 11 with required row colour, independent clip spatial settings, uniform video tracks, required per-track
 Ripple/transitions/fades, 0–8 independently identified music instances, project-specific
 video/music bins and draggable shared project-time row points**, with per-setting channel navigation. Layout preferences,
 stored-point inspection and recovery feedback remain editor-only. Source protection,
@@ -197,7 +197,12 @@ stays editable with an error and never seeks. Escape returns to the current disp
 
 The **Timeline preview** heading's native **Compare** button has the accessible
 name **Show ungraded preview**. Active mode shows **Ungraded** on the button and
-as a canvas badge. Pointer activation and focused Enter/Space work paused or playing;
+as a canvas badge. Pointer activation and focused Enter/Space work paused or during
+active playback, including normal decoder buffering. Buffering is not a pause:
+the requested comparison mode is drawn once normal exact source readiness resumes,
+without restarting music. Errors and completion are not active-playback evidence;
+regressions require a subsequent actual Playing draw in the requested mode with
+the same music epoch and unchanged one-frame A/V/source bounds;
 there is no global comparison shortcut. **Source preview** is unaffected.
 
 The ungraded view is the composed preview without grading, not original-resolution
@@ -409,7 +414,7 @@ uncertain write keeps selection and the actual error visible, with guidance to c
 Activity/project state before repeating the import; there is no automatic write retry.
 Late folder reads are aborted on navigation/dismissal. Manual music paths remain
 deliberate imports outside browser roots and never expand configured roots. No original is
-copied: strict schema 10 references registered originals in place, with only
+copied: strict schema 11 references registered originals in place, with only
 generated proxies/thumbnails, metadata, exports/receipts and scratch written locally.
 
 There is no upload endpoint, browser file picker, optional copy flow or true
@@ -548,7 +553,7 @@ saved document. It never deletes original recordings, shared registry entries,
 proxies/cache files, successful MP4s or receipts. This is not cache garbage
 collection; another project's membership and immutable export snapshots are unaffected.
 
-Only strict v10 projects and v10 project snapshots in version-1 export receipts are interpreted.
+Only strict v11 projects and v11 project snapshots in version-1 export receipts are interpreted.
 Every clip requires complete spatial base/full-pose source-frame keys with easing;
 missing spatial data is invalid, not default-filled. Original-source keys remain
 stored outside trims and at original exclusive OUT, without extending duration.
@@ -567,7 +572,7 @@ a missing saved value is invalid, not default-filled. Every point requires exact
 nine nullable fields: `opacity`, `speed` and the seven colour channels. Row
 `opacity` is the sole valid stored value; saved `clip.opacity` and old
 `clipOpacity`/`layerOpacity` channels are invalid, not ignored or defaulted.
-Earlier v1–v9 projects/receipt snapshots are preserved, incompatible
+Earlier v1–v10 projects/receipt snapshots are preserved, incompatible
 and never migrated or rewritten with fallback/default local fields or old-format
 readers. **Create a new
 project** and import its media deliberately; there is no automatic deletion of
@@ -664,7 +669,7 @@ invalid release leaves the saved document and history unchanged.
 For an HTTP 409 or incompatible save response, **Review latest save** explains:
 
 1. **Keep editing this draft** — no saved document changes; the save error persists.
-2. **Download unsaved project** — download a strict v10 JSON snapshot with the current
+2. **Download unsaved project** — download a strict v11 JSON snapshot with the current
    local changes/expected revision before replacing them.
 3. **Discard local changes and reload** — explicitly replace local history/document
    with a newly read saved version. It performs no overwrite POST/PUT.
@@ -689,7 +694,7 @@ Export summarizes contextual duration, clips/layers, track-local Ripple/transiti
 fades/Opacity, shared row **points and participating settings**, enabled layers, profile
 and all independent music instances with a fixed snapshot. A point
 with several channels counts once, not as separate clip/channel keys. Both 720p/4K
-use originals. The static fast path requires one enabled, unanimated,
+use originals. The static fast path requires neutral HSL/identity colour curves and one enabled, unanimated,
 zero-origin contiguous track with row Opacity 1, exactly neutral spatial bases
 and no spatial keys; any spatial edit/key (even neutral keys), row point, leading start,
 gap, unsupported coverage or music beyond video OUT uses generalized layered

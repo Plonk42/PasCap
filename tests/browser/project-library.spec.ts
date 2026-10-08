@@ -249,7 +249,7 @@ for (const oldVersion of [6, 7, 8])
                   duration: 0,
                   updatedAt: '2026-10-03T10:00:00Z',
                   compatible: false,
-                  error: `Unsupported project schema version ${oldVersion}; this build requires version 10.`,
+                  error: `Unsupported project schema version ${oldVersion}; this build requires version 11.`,
                 },
               ],
         },
@@ -268,7 +268,7 @@ for (const oldVersion of [6, 7, 8])
     await page.getByRole('button', { name: 'Open projects', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Open Old dual-opacity project', exact: true })).toBeDisabled();
     await expect(
-      page.getByText(`Unsupported project schema version ${oldVersion}; this build requires version 10.`, {
+      page.getByText(`Unsupported project schema version ${oldVersion}; this build requires version 11.`, {
         exact: true,
       }),
     ).toBeVisible();

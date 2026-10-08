@@ -1,10 +1,10 @@
 import { z } from 'zod';
-import type { ColourSettings } from './colour.js';
+import type { ScalarColourSetting } from './colour.js';
 import { COLOUR_CONTROLS, colourSchema } from './colour.js';
 
 export const interpolationSchema = z.enum(['hold', 'linear', 'ease-in', 'ease-out', 'smooth']);
 export type Interpolation = z.infer<typeof interpolationSchema>;
-export type KeyframeSetting = 'opacity' | 'speed' | keyof ColourSettings;
+export type KeyframeSetting = 'opacity' | 'speed' | ScalarColourSetting;
 
 /** One ordered control catalogue for the nine independently participating row channels. */
 export const KEYFRAME_SETTINGS = Object.freeze(

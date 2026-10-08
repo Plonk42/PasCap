@@ -123,16 +123,16 @@ Missing mounts and symlinks fail explicitly. In the eventual container package,
 originals will be read-only bind mounts and application data will be a separate
 persistent writable mount. See [deployment design](docs/DEPLOYMENT.md).
 
-**Project format:** strict schema **v10**, with required row `colour`, no clip colour/correction field, clip `spatial` base and
+**Project format:** strict schema **v11**, with required row `colour`, no clip colour/correction field, clip `spatial` base and
 0–256 full-pose source-frame keys, required `music` array (0–8
 instances, unique required IDs; `[]` without music), per-track Ripple,
 transitions, fades and numeric `VideoLayer.opacity` (0–1; new tracks start at 1),
 and exactly nine nullable point channels: `opacity`, `speed` and seven colour
 settings. Row `opacity` is required and valid; saved `clip.opacity` and old
 `clipOpacity`/`layerOpacity` channels are rejected, not ignored or defaulted.
-v1–v9 projects and receipt snapshots remain unchanged
+v1–v10 projects and receipt snapshots remain unchanged
 on disk but are incompatible: recreate projects and import media deliberately.
-Export receipts remain version 1 with a strict v10 snapshot and required captured
+Export receipts remain version 1 with a strict v11 snapshot and required captured
 audio-source/instance-plan arrays. Registry/proxy/current PCM cache formats and
 source protections do not change. There are no migrations, null fallbacks,
 compatibility readers, default-filled legacy fields or automatic deletions.
@@ -174,9 +174,9 @@ real-workload qualification, and local Docker/Podman packaging. See
 - [Timing and colour contract](docs/COLOUR_AND_TIMING.md)
 - [Layers and keyframes](docs/LAYERS_AND_KEYFRAMES.md)
 - [Speed, audio and export](docs/SPEED_AND_AUDIO.md)
-- [Row appearance/schema-10 contract](docs/design/ROW_APPEARANCE.md)
-- [Spatial transforms/schema-10 contract](docs/design/SPATIAL_TRANSFORMS.md)
-- [Multiple music/schema-10 contract](docs/design/MULTIPLE_MUSIC.md) — required behaviour; implementation/validation acceptance remains pending, not a test or release claim.
+- [Row appearance/schema-11 contract](docs/design/ROW_APPEARANCE.md)
+- [Spatial transforms/schema-11 contract](docs/design/SPATIAL_TRANSFORMS.md)
+- [Multiple music/schema-11 contract](docs/design/MULTIPLE_MUSIC.md) — required behaviour; implementation/validation acceptance remains pending, not a test or release claim.
 - [Deployment target](docs/DEPLOYMENT.md)
 - [Historical feasibility study](docs/FEASIBILITY_REPORT.md)
 
