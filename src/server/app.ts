@@ -54,11 +54,27 @@ function validateLocalRequest(request: FastifyRequest, reply: FastifyReply, conf
   reply.header('X-Content-Type-Options', 'nosniff').header('Cross-Origin-Resource-Policy', 'same-origin');
 }
 
+function exportFilename(label: string): string {
+  const base = label.replace(/\.mp4$/i, '').replaceAll(/[\p{Cc}/\\]/gu, '_');
+  return `${base || 'export'}.mp4`;
+}
+
+/** Inline stays playable in the browser; the name only drives Save as / download. */
+function contentDisposition(name: string): string {
+  const ascii = name.replaceAll(/[^\x20-\x7e]|["\\]/g, '_');
+  const encoded = encodeURIComponent(name).replaceAll(
+    /['()*]/g,
+    (char) => `%${char.codePointAt(0)!.toString(16).toUpperCase()}`,
+  );
+  return `inline; filename="${ascii}"; filename*=UTF-8''${encoded}`;
+}
+
 export async function serveRegisteredFile(
   request: FastifyRequest,
   reply: FastifyReply,
   filename: string,
   mime: string,
+  downloadName?: string,
 ): Promise<void> {
   const checked = await assertNoSymlinks(filename).catch((error: unknown) => {
     if (isNotFound(error)) throw new ServiceError('Registered output file not found.', 404);
@@ -70,6 +86,7 @@ export async function serveRegisteredFile(
     const info = await file.stat();
     if (!info.isFile()) throw new ServiceError('Only registered regular files can be served.', 422);
     reply.type(mime).header('Accept-Ranges', 'bytes').header('Cache-Control', 'private, no-cache');
+    if (downloadName) reply.header('Content-Disposition', contentDisposition(downloadName));
     const header = request.headers.range;
     if (header) {
       const range = parseByteRange(header, info.size);
@@ -289,7 +306,9 @@ export async function createApp(config = createConfig()) {
   app.post('/api/exports', async (request, reply) => {
     const body = exportRequestSchema.parse(request.body);
     requireExportReserve(await preflightExport(body.document, body.profile, library, (id) => audio.get(id)));
-    return reply.code(202).send({ job: startExport(body.document, body.profile, library, (id) => audio.get(id)) });
+    return reply
+      .code(202)
+      .send({ job: startExport(body.document, body.profile, library, (id) => audio.get(id), body.outputName) });
   });
   for (const type of ['reference', 'export', 'receipt'] as const) {
     app.route({
@@ -306,6 +325,7 @@ export async function createApp(config = createConfig()) {
           reply,
           path.join(config.dataDir, 'renders', id, filename),
           type === 'receipt' ? 'application/json' : 'video/mp4',
+          type === 'export' ? exportFilename(jobs.get(id).label) : undefined,
         );
       },
     });

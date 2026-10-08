@@ -1160,7 +1160,7 @@ export function App() {
         }
       })
     ).ok;
-  const exportProject = async (profile: ExportProfile): Promise<boolean> =>
+  const exportProject = async (profile: ExportProfile, outputName: string): Promise<boolean> =>
     (
       await act(async () => {
         await flushBeforeSwitch();
@@ -1170,6 +1170,7 @@ export function App() {
             await api.export(
               { ...current.current, revision: autosave.current?.revision ?? current.current.revision },
               profile,
+              outputName,
             )
           ).job,
         );

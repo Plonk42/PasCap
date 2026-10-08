@@ -441,6 +441,7 @@ describe.skipIf(!enabled)('production native export · opt-in disposable media o
     expect((await readdir(renderDirectory)).sort()).toEqual(['export.mp4', 'receipt.json']);
     const receipt = JSON.parse(await readFile(path.join(renderDirectory, 'receipt.json'), 'utf8')) as ExportReceipt;
     expect(receipt.profile).toBe(profile);
+    expect(receipt.outputName).toBe(result.label);
     expect(receipt.verification.fullDecode).toBe(true);
     expect(receipt.verification.faststart).toBe(true);
     expect(receipt.verification.frameCount).toBe(calculateLayout(project).duration);

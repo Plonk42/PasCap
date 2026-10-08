@@ -23,7 +23,24 @@ export const exportDocumentSchema = projectSchema
   .refine((document) => sameRate(document.frameRate, PROJECT_FPS), {
     message: 'Exports require the project rate 30000/1001.',
   });
-export const exportRequestSchema = z.object({ document: exportDocumentSchema, profile: exportProfileSchema }).strict();
+export const MAX_EXPORT_NAME_LENGTH = 100;
+/** Used only as a label and download name, never as a path. */
+export const exportOutputNameSchema = z
+  .string()
+  .trim()
+  .min(1, 'Enter an output name.')
+  .max(MAX_EXPORT_NAME_LENGTH, `Use at most ${MAX_EXPORT_NAME_LENGTH} characters.`)
+  .refine((name) => !/[\p{Cc}/\\]/u.test(name), { message: 'Use no slashes or control characters.' });
+export const exportRequestSchema = z
+  .object({
+    document: exportDocumentSchema,
+    profile: exportProfileSchema,
+    outputName: exportOutputNameSchema.optional(),
+  })
+  .strict();
+export function defaultExportName(title: string, profile: ExportProfile): string {
+  return `${title} · ${profile === 'draft720' ? '720p' : '4K'}`;
+}
 export type ExportRequest = z.infer<typeof exportRequestSchema>;
 
 export interface ExportProfileSettings {

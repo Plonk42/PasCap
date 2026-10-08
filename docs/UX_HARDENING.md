@@ -179,6 +179,13 @@ probes, prepares, saves or admits a job. It uses the existing renders volume whe
 present, otherwise the data directory, rejecting symlinked locations. Outputs and
 the job's work directory share that volume.
 
+`POST /api/exports` accepts an optional `outputName` (trimmed, 1–100 characters, no
+slashes or control characters). It becomes the job label, is stored as
+`outputName` in new receipts and names the served MP4 through `Content-Disposition`
+(it is never a filesystem path; the file stays `export.mp4` in its job directory).
+Receipts written before this field existed still restore, with the default
+project-title-plus-quality label.
+
 ### Advisory planning allowance
 
 The displayed allowance is duration/profile dependent:
