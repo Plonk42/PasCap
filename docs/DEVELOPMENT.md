@@ -16,7 +16,7 @@ gates; this update claims no new test results. Nonneutral HSL/curves use exact
 complete CPU grading through layered export; neutral advanced settings retain
 scalar LUT paths. At most two native 65³ Float32 buffers (6,591,000 bytes) remain
 available, without an extra decoder, texture, full-frame buffer or child process.
-Exact advanced grading can substantially slow UHD exports. See
+Exact advanced grading remains the costliest export path, especially at UHD. See
 [HSL_AND_CURVES.md](design/HSL_AND_CURVES.md). New reference/measurement metadata
 identifies strict schema 12; historical reports remain unchanged.
 
@@ -440,7 +440,8 @@ not SDR RGB grading; unkeyed colour settings are row-owned. Black fades preserve
 each dissolve remains one group. Serial limits: one original decoder, two intermediate readers,
 one encoder and three native video children per pass. Four raw buffers (two RGB8,
 two RGBA16) use **22 bytes/pixel = 182,476,800 bytes at UHD**; two 65³ Float32 LUTs
-add **6,591,000 bytes**, excluding native/audio memory. Two retained clip files and
+add **6,591,000 bytes**, excluding native/audio memory. CPU composition/LUT bands
+run on at most eight worker threads sharing those buffers, without copies. Two retained clip files and
 three timeline representations bound concurrency, **not disk GB**;
 scratch grows with duration ([resource contract](LAYERS_AND_KEYFRAMES.md#inspector-and-resource-limits)).
 The static fast path requires one enabled, unanimated, zero-origin contiguous

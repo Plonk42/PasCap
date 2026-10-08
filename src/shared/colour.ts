@@ -1,9 +1,7 @@
 import { z } from 'zod';
 import {
-  applyColourCurves,
-  applyHsl,
-  compileColourCurve,
-  compileHsl,
+  compileColourCurvesInto,
+  compileHslInto,
   createColourCurves,
   createHslSettings,
   curvesSchema,
@@ -101,50 +99,82 @@ export function temperatureTintGains(settings: Pick<ColourSettings, 'temperature
 
 /** Authoritative SDR transform. See docs/COLOUR_AND_TIMING.md; no FFmpeg eq approximation. */
 export function gradePixel(rgb: RGB, settings: ColourSettings): RGB {
-  if (isNeutralColour(settings)) return rgb;
-  const base = isNeutralScalarColour(settings)
-    ? rgb
-    : gradeScalarPixel(rgb, settings, temperatureTintGains(settings), 2 ** settings.exposure);
-  return applyColourCurves(applyHsl(base, settings.hsl), settings.curves);
+  return compilePixelGrade(settings)(rgb);
 }
 /** Exact frame-owned grade; cache only bounded settings/functions, never pixels. */
 export function compilePixelGrade(settings: ColourSettings): (rgb: RGB) => RGB {
   if (isNeutralColour(settings)) return (rgb) => rgb;
-  const scalarNeutral = isNeutralScalarColour(settings);
-  const gains = temperatureTintGains(settings);
-  const exposure = 2 ** settings.exposure;
-  const hsl = compileHsl(settings.hsl);
-  const master = compileColourCurve(settings.curves.master);
-  const red = compileColourCurve(settings.curves.red);
-  const green = compileColourCurve(settings.curves.green);
-  const blue = compileColourCurve(settings.curves.blue);
+  const grade = compileGradeInto(settings);
+  const triple = new Float64Array(3);
   return (rgb) => {
-    const base = hsl(scalarNeutral ? rgb : gradeScalarPixel(rgb, settings, gains, exposure));
-    return [red(master(base[0])), green(master(base[1])), blue(master(base[2]))];
+    triple.set(rgb);
+    grade.encoded(triple);
+    return [triple[0]!, triple[1]!, triple[2]!];
+  };
+}
+export interface PixelGrade {
+  /** Grade an encoded triple in place. */
+  encoded(rgb: Float64Array): void;
+  /** Identical to encoded() on code / 255, with the per-code BT.709 decode tabulated. */
+  bytes(red: number, green: number, blue: number, out: Float64Array): void;
+}
+const DECODED_BYTES = Float64Array.from({ length: 256 }, (_, code) => decode709(clamp01(code / 255)));
+/** The same grade on a reusable triple, for per-pixel native work. */
+export function compileGradeInto(settings: ColourSettings): PixelGrade {
+  const scalar = isNeutralScalarColour(settings) ? null : compileScalarGrade(settings);
+  const hsl = compileHslInto(settings.hsl);
+  const curves = compileColourCurvesInto(settings.curves);
+  return {
+    encoded(rgb) {
+      if (scalar) scalar(decode709(clamp01(rgb[0]!)), decode709(clamp01(rgb[1]!)), decode709(clamp01(rgb[2]!)), rgb);
+      hsl?.(rgb);
+      curves?.(rgb);
+    },
+    bytes(red, green, blue, out) {
+      if (scalar) scalar(DECODED_BYTES[red]!, DECODED_BYTES[green]!, DECODED_BYTES[blue]!, out);
+      else {
+        out[0] = red / 255;
+        out[1] = green / 255;
+        out[2] = blue / 255;
+      }
+      hsl?.(out);
+      curves?.(out);
+    },
   };
 }
 function isNeutralScalarColour(settings: ColourSettings): boolean {
   return COLOUR_CONTROLS.every(({ key }) => settings[key] === NEUTRAL_COLOUR[key]);
 }
-function gradeScalarPixel(rgb: RGB, settings: ColourSettings, gains: RGB, exposure: number): RGB {
-  const base = rgb.map(
-    (value, channel) =>
-      (decode709(clamp01(value)) * gains[channel]! * exposure - 0.18) * settings.contrast + 0.18 + settings.brightness,
-  );
-  const y = clamp01(0.2126 * base[0]! + 0.7152 * base[1]! + 0.0722 * base[2]!);
-  const low = (1 - y) ** 2;
-  const high = y ** 2;
-  const tone = base.map((value) => value + 0.25 * (settings.shadows * low + settings.highlights * high));
-  const luminance = 0.2126 * tone[0]! + 0.7152 * tone[1]! + 0.0722 * tone[2]!;
-  const cb = (tone[2]! - luminance) / 1.8556;
-  const cr = (tone[0]! - luminance) / 1.5748;
+/** Scalar SDR stages from decoded linear input to an encoded triple. */
+function compileScalarGrade(
+  settings: ColourSettings,
+): (linearRed: number, linearGreen: number, linearBlue: number, out: Float64Array) => void {
+  const [redGain, greenGain, blueGain] = temperatureTintGains(settings);
+  const exposure = 2 ** settings.exposure;
+  const { contrast, brightness, saturation, shadows, highlights } = settings;
   const angle = (settings.hue * Math.PI) / 180;
-  const u = settings.saturation * (cb * Math.cos(angle) - cr * Math.sin(angle));
-  const v = settings.saturation * (cb * Math.sin(angle) + cr * Math.cos(angle));
-  const red = luminance + 1.5748 * v;
-  const blue = luminance + 1.8556 * u;
-  const green = (luminance - 0.2126 * red - 0.0722 * blue) / 0.7152;
-  return [encode709(clamp01(red)), encode709(clamp01(green)), encode709(clamp01(blue))];
+  const cos = Math.cos(angle);
+  const sin = Math.sin(angle);
+  return (linearRed, linearGreen, linearBlue, out) => {
+    const baseRed = (linearRed * redGain * exposure - 0.18) * contrast + 0.18 + brightness;
+    const baseGreen = (linearGreen * greenGain * exposure - 0.18) * contrast + 0.18 + brightness;
+    const baseBlue = (linearBlue * blueGain * exposure - 0.18) * contrast + 0.18 + brightness;
+    const y = clamp01(0.2126 * baseRed + 0.7152 * baseGreen + 0.0722 * baseBlue);
+    const tone = 0.25 * (shadows * (1 - y) ** 2 + highlights * y ** 2);
+    const toneRed = baseRed + tone;
+    const toneBlue = baseBlue + tone;
+    const luminance = 0.2126 * toneRed + 0.7152 * (baseGreen + tone) + 0.0722 * toneBlue;
+    const cb = (toneBlue - luminance) / 1.8556;
+    const cr = (toneRed - luminance) / 1.5748;
+    const u = saturation * (cb * cos - cr * sin);
+    const v = saturation * (cb * sin + cr * cos);
+    const red = luminance + 1.5748 * v;
+    const blue = luminance + 1.8556 * u;
+    const green = (luminance - 0.2126 * red - 0.0722 * blue) / 0.7152;
+    out[0] = encode709(clamp01(red));
+    out[1] = encode709(clamp01(green));
+    out[2] = encode709(clamp01(blue));
+  };
 }
 
 export function isNeutralColour(settings: ColourSettings): boolean {

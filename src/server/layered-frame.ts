@@ -1,9 +1,17 @@
 import { endianness } from 'node:os';
 import { setImmediate as yieldToEvents } from 'node:timers/promises';
-import { colourSchema, compilePixelGrade, isNeutralAdvancedColour, type RGB } from '../shared/colour.js';
+import {
+  colourSchema,
+  compileGradeInto,
+  isNeutralAdvancedColour,
+  type ColourSettings,
+  type PixelGrade,
+} from '../shared/colour.js';
+import { forEachSerial } from '../shared/serial.js';
 import { compileSpatialMapping, type SpatialMapping } from '../shared/spatial.js';
 import type { PreviewLayer } from '../shared/timeline.js';
 import { ColourLutCache, checkLayeredCancellation, sampleColourLut } from './layered-colour.js';
+import type { CompositorPool } from './layered-pool.js';
 
 export interface ContentBounds {
   x: number;
@@ -18,13 +26,20 @@ export interface LayerFrameSource {
   /** Registered original dimensions, never the even-rounded decode rectangle. */
   original: { width: number; height: number };
 }
-interface PreparedSource extends LayerFrameSource {
+/** Structured-cloneable per-frame source; its typed arrays may be shared with worker threads. */
+export interface FrameSource {
+  rgb: Uint8Array;
+  bounds: ContentBounds;
   lut: Float32Array | null;
-  exactColour: ((rgb: RGB) => RGB) | null;
+  /** Nonneutral HSL/curves grade exactly per pixel instead of through the LUT. */
+  exactColour: ColourSettings | null;
   multiplier: number;
   coverage: number;
   mapping: SpatialMapping;
   fullCanvas: boolean;
+}
+interface PreparedSource extends Omit<FrameSource, 'exactColour'> {
+  exactColour: PixelGrade | null;
 }
 
 function hasGradedContent(source: PreparedSource, x: number, y: number): boolean {
@@ -106,31 +121,29 @@ function sampleGradedSource(
       graded.fill(0);
       return true;
     }
-    gradeSourceRgb(
-      source,
-      source.rgb[inputOffset]!,
-      source.rgb[inputOffset + 1]!,
-      source.rgb[inputOffset + 2]!,
-      graded,
-    );
+    const red = source.rgb[inputOffset]!;
+    const green = source.rgb[inputOffset + 1]!;
+    const blue = source.rgb[inputOffset + 2]!;
+    if (source.exactColour) source.exactColour.bytes(red, green, blue, graded);
+    else sampleColourLut(source.lut!, red, green, blue, graded);
     return true;
   }
   if (!sampleSpatialRgb(source, x, y, resampled)) return false;
   if (source.multiplier === 0) graded.fill(0);
   // Grade AFTER RGB resampling; never interpolate already graded endpoint colours.
-  else gradeSourceRgb(source, resampled[0]!, resampled[1]!, resampled[2]!, graded);
+  else gradeSampledRgb(source, resampled, graded);
   return true;
 }
 
 /** Advanced knees can amplify even scalar LUT error: evaluate the complete grade
  * on the fractional sampled RGB, before fades/coverage, with only tiny triples. */
-function gradeSourceRgb(source: PreparedSource, red: number, green: number, blue: number, out: Float64Array): void {
+function gradeSampledRgb(source: PreparedSource, rgb: Float64Array, out: Float64Array): void {
   if (source.exactColour) {
-    const rgb = source.exactColour([red / 255, green / 255, blue / 255]);
-    out[0] = rgb[0];
-    out[1] = rgb[1];
-    out[2] = rgb[2];
-  } else sampleColourLut(source.lut!, red, green, blue, out);
+    out[0] = rgb[0]! / 255;
+    out[1] = rgb[1]! / 255;
+    out[2] = rgb[2]! / 255;
+    source.exactColour.encoded(out);
+  } else sampleColourLut(source.lut!, rgb[0]!, rgb[1]!, rgb[2]!, out);
 }
 
 function groupCoverage(sources: readonly LayerFrameSource[]): number {
@@ -147,15 +160,16 @@ async function prepareSources(
   target: { width: number; height: number },
   cache: ColourLutCache,
   signal: AbortSignal,
-): Promise<PreparedSource[]> {
+  pool: CompositorPool | null,
+): Promise<FrameSource[]> {
   if (sources.length > cache.capacity)
     throw new Error('The LUT cache must hold every borrowed grade in the current group.');
-  const prepared: PreparedSource[] = [];
+  const prepared: FrameSource[] = [];
   for (const source of sources) {
     validateBounds(source.bounds, target);
     // Validate and choose the grading path once per source/frame, never per pixel.
     const colour = colourSchema.parse(source.sample.colour);
-    const exactColour = isNeutralAdvancedColour(colour) ? null : compilePixelGrade(colour);
+    const exactColour = isNeutralAdvancedColour(colour) ? null : colour;
     const mapping = compileSpatialMapping(
       source.sample.spatial,
       source.original.width,
@@ -164,8 +178,9 @@ async function prepareSources(
       target.height,
     );
     prepared.push({
-      ...source,
-      lut: exactColour ? null : await cache.get(colour, signal), // NOSONAR -- two borrowed slots, never parallel LUT builds.
+      rgb: source.rgb,
+      bounds: source.bounds,
+      lut: exactColour ? null : await cache.get(colour, signal, pool), // NOSONAR -- two borrowed slots, never parallel LUT builds.
       exactColour,
       multiplier: source.sample.opacity * source.sample.blendWeight * source.sample.brightness * 65535,
       coverage: source.sample.opacity * source.sample.blendWeight,
@@ -192,10 +207,57 @@ export function fittedContent(
 }
 
 /**
+ * Rows [rowStart, rowEnd) of one group, identical in process and in a worker band.
+ * Each pixel reads only its own accumulator entry, so disjoint bands never interact.
+ */
+export function composeRows(
+  output: Uint16Array,
+  width: number,
+  sources: readonly FrameSource[],
+  rowStart: number,
+  rowEnd: number,
+): void {
+  const prepared: PreparedSource[] = sources.map((source) => ({
+    ...source,
+    exactColour: source.exactColour ? compileGradeInto(source.exactColour) : null,
+  }));
+  const graded = new Float64Array(3);
+  const resampled = new Float64Array(3);
+  for (let y = rowStart; y < rowEnd; y++) {
+    for (let x = 0; x < width; x++) {
+      const pixel = y * width + x;
+      let red = 0;
+      let green = 0;
+      let blue = 0;
+      let alpha = 0;
+      const inputOffset = pixel * 3;
+      for (const source of prepared) {
+        if (!sampleGradedSource(source, x, y, inputOffset, resampled, graded)) continue;
+        alpha += source.coverage;
+        red += graded[0]! * source.multiplier;
+        green += graded[1]! * source.multiplier;
+        blue += graded[2]! * source.multiplier;
+      }
+      const keep = 1 - Math.min(1, alpha);
+      const offset = pixel * 4;
+      output[offset] = Math.round(red + output[offset]! * keep);
+      output[offset + 1] = Math.round(green + output[offset + 1]! * keep);
+      output[offset + 2] = Math.round(blue + output[offset + 2]! * keep);
+      output[offset + 3] = Math.round(alpha * 65535 + output[offset + 3]! * keep);
+    }
+  }
+}
+
+function* rowBatches(height: number, rows: number): Generator<number> {
+  for (let row = 0; row < height; row += rows) yield row;
+}
+
+/**
  * A single source-over GROUP, exactly the grouping/coverage rules in compositePixel.
  * RGB is encoded BT.709 and premultiplied; alpha is coverage, never black-fade
  * brightness. RGBA16 avoids rounding at every layer to an 8-bit intermediate.
  * The accumulator is reused in-place only after the previous pipe write completes.
+ * With a pool, frames, accumulator and LUTs must use shared memory.
  */
 export async function composeLayerFrame(
   accumulator: Buffer,
@@ -203,6 +265,7 @@ export async function composeLayerFrame(
   sources: readonly LayerFrameSource[],
   cache: ColourLutCache,
   signal: AbortSignal,
+  pool: CompositorPool | null = null,
 ): Promise<void> {
   checkLayeredCancellation(signal);
   const pixels = target.width * target.height;
@@ -210,39 +273,17 @@ export async function composeLayerFrame(
   if (!sources.length) return;
   const coverage = groupCoverage(sources);
   if (coverage === 0) return;
-  const prepared = await prepareSources(sources, target, cache, signal);
+  const prepared = await prepareSources(sources, target, cache, signal, pool);
   const output = new Uint16Array(accumulator.buffer, accumulator.byteOffset, pixels * 4);
-  const graded = new Float64Array(3);
-  const resampled = new Float64Array(3);
-  let x = 0;
-  let y = 0;
-  for (let pixel = 0; pixel < pixels; pixel++) {
-    let red = 0;
-    let green = 0;
-    let blue = 0;
-    let alpha = 0;
-    const inputOffset = pixel * 3;
-    for (const source of prepared) {
-      if (!sampleGradedSource(source, x, y, inputOffset, resampled, graded)) continue;
-      alpha += source.coverage;
-      red += graded[0]! * source.multiplier;
-      green += graded[1]! * source.multiplier;
-      blue += graded[2]! * source.multiplier;
-    }
-    const keep = 1 - Math.min(1, alpha);
-    const offset = pixel * 4;
-    output[offset] = Math.round(red + output[offset]! * keep);
-    output[offset + 1] = Math.round(green + output[offset + 1]! * keep);
-    output[offset + 2] = Math.round(blue + output[offset + 2]! * keep);
-    output[offset + 3] = Math.round(alpha * 65535 + output[offset + 3]! * keep);
-    if (++x === target.width) {
-      x = 0;
-      y++;
-    }
-    if ((pixel + 1) % 65_536 === 0) {
-      await yieldToEvents(); // NOSONAR -- let cancellation/UI requests interrupt a UHD frame.
+  if (pool) await pool.composeRows(output, target, prepared);
+  else {
+    const rows = Math.max(1, Math.floor(65_536 / target.width));
+    // Let cancellation/UI requests interrupt a UHD frame.
+    await forEachSerial(rowBatches(target.height, rows), async (row) => {
+      composeRows(output, target.width, prepared, row, Math.min(target.height, row + rows));
+      await yieldToEvents();
       checkLayeredCancellation(signal);
-    }
+    });
   }
   checkLayeredCancellation(signal);
 }
