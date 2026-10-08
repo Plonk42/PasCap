@@ -1,17 +1,20 @@
 import { musicTracksSchema, type MusicTrack } from '../shared/model.js';
 import {
-  accumulateMusicRange,
-  clampMusicMix,
   MUSIC_BYTES_PER_SAMPLE,
   MUSIC_CHANNELS,
-  MUSIC_CHUNK_SAMPLES,
-  MUSIC_QUEUE_CHUNKS,
   MUSIC_SAMPLE_RATE,
   MUSIC_SAMPLES_PER_FRAME,
-  musicReadAt,
   type MusicChunk,
 } from '../shared/music-stream.js';
-import { forEachSerial, whileSerial } from '../shared/serial.js';
+import { forEachSerial } from '../shared/serial.js';
+import readerUrl from './music-reader.ts?worker&url';
+import {
+  fetchMusic,
+  musicAborted as aborted,
+  type MusicReaderCommand,
+  type MusicReaderReport,
+  type MusicSource,
+} from './music-source.js';
 import workletUrl from './music-worklet.ts?worker&url';
 
 interface PlaybackRun {
@@ -19,18 +22,12 @@ interface PlaybackRun {
   frame: number;
   controller: AbortController;
   detach: () => void;
-  queued: number;
-  credits: number;
-  pumping: boolean;
   underrun: boolean;
   error: Error | null;
   contextStart: number | null;
+  prefilled: ((chunks: MusicChunk[]) => void) | null;
   started: ((contextStart: number) => void) | null;
   cancelled: ((error?: Error) => void) | null;
-}
-
-function aborted(): DOMException {
-  return new DOMException('Music operation cancelled', 'AbortError');
 }
 
 function abortable<T>(operation: Promise<T>, signal: AbortSignal, deadlineMessage?: string): Promise<T> {
@@ -80,41 +77,14 @@ async function waitForOutput(context: AudioContext, origin: number, signal: Abor
   });
 }
 
-/** Read one exact bounded response; HTML/error bodies or ignored Range requests are not PCM. */
-async function readBytes(response: Response, length: number): Promise<ArrayBuffer> {
-  const reader = response.body?.getReader();
-  if (!reader) throw new Error('Music response has no readable body.');
-  const output = new Uint8Array(length);
-  let offset = 0;
-  let ended = false;
-  try {
-    await whileSerial(
-      () => !ended,
-      async () => {
-        const next = await reader.read();
-        if (next.done) {
-          ended = true;
-          return;
-        }
-        if (next.value.length > length - offset) throw new Error('Music response exceeds its declared bounded range.');
-        output.set(next.value, offset);
-        offset += next.value.length;
-      },
-    );
-    if (offset !== length) throw new Error('Music response ended before its complete PCM range.');
-    return output.buffer;
-  } finally {
-    await reader.cancel();
-    reader.releaseLock();
-  }
-}
-
 export class MusicPlayback {
   #context: AudioContext | null = null;
   #node: AudioWorkletNode | null = null;
+  #reader: Worker | null = null;
   #setupPromise: Promise<void> | null = null;
   #processorError: Error | null = null;
-  #tracks: { track: MusicTrack; samples: number }[] = [];
+  #readerError: Error | null = null;
+  #tracks: MusicSource[] = [];
   #run: PlaybackRun | null = null;
   #running = false;
   #clockTime = 0;
@@ -143,43 +113,18 @@ export class MusicPlayback {
   #requireCurrent(signal: AbortSignal, generation: number): void {
     if (signal.aborted || this.#disposed || generation !== this.#generation) throw aborted();
   }
-  async #fetch(track: MusicTrack, init: RequestInit, signal: AbortSignal): Promise<Response> {
-    const response = await fetch(this.#url(track), {
-      ...init,
-      signal: AbortSignal.any([signal, AbortSignal.timeout(10_000)]),
-    });
-    if (!response.ok) {
-      if (init.method === 'HEAD')
-        throw new Error(
-          `Music request failed (${response.status}). Check source availability and prepare the current music cache explicitly.`,
-        );
-      const message = await readBytes(response, Math.min(Number(response.headers.get('content-length')) || 0, 16_384));
-      let error = `Music request failed (${response.status}).`;
-      try {
-        const body: unknown = JSON.parse(new TextDecoder().decode(message));
-        if (body && typeof body === 'object' && 'error' in body && typeof body.error === 'string') error = body.error;
-      } catch {
-        /* Keep the actual HTTP failure, not an audio default. */
-      }
-      throw new Error(error);
-    }
-    if (response.headers.get('content-type')?.split(';')[0] !== 'application/octet-stream') {
-      await response.body?.cancel();
-      throw new Error('Music response is not the current PCM16 stream.');
-    }
-    return response;
-  }
   async configure(tracks: readonly MusicTrack[], signal: AbortSignal): Promise<void> {
     this.pause();
     this.#tracks = [];
     this.#lastErrorFrames = 0;
     const generation = this.#generation;
     const snapshot = musicTracksSchema.parse(tracks);
-    const configured: { track: MusicTrack; samples: number }[] = [];
+    const configured: MusicSource[] = [];
     const deadline = AbortSignal.any([signal, AbortSignal.timeout(10_000)]);
     await forEachSerial(snapshot, async (track) => {
       this.#requireCurrent(deadline, generation);
-      const response = await abortable(this.#fetch(track, { method: 'HEAD' }, deadline), deadline);
+      const url = this.#url(track);
+      const response = await abortable(fetchMusic(url, { method: 'HEAD' }, deadline), deadline);
       this.#requireCurrent(deadline, generation);
       const samples = Number(response.headers.get('content-length')) / MUSIC_BYTES_PER_SAMPLE;
       if (
@@ -188,7 +133,7 @@ export class MusicPlayback {
         samples < Math.round(track.sourceOut * MUSIC_SAMPLES_PER_FRAME)
       )
         throw new Error(`Music instance ${track.id} exceeds the complete prepared PCM16 sample range.`);
-      configured.push({ track, samples });
+      configured.push({ track, samples, url });
     });
     this.#requireCurrent(signal, generation);
     this.#tracks = configured;
@@ -208,8 +153,21 @@ export class MusicPlayback {
         if (this.#run) this.#fail(this.#run, this.#processorError);
       };
       this.#node.connect(this.#context!.destination);
+      // Refills travel worker-to-worklet: preview rendering on this thread cannot delay them.
+      const channel = new MessageChannel();
+      this.#reader = new Worker(readerUrl, { type: 'module', name: 'pascap-music-reader' });
+      this.#reader.onmessage = this.#onReaderMessage;
+      this.#reader.onerror = () => {
+        this.#readerError = new Error('Music reader failed. Reload the editor before restarting preview.');
+        if (this.#run) this.#fail(this.#run, this.#readerError);
+      };
+      this.#node.port.postMessage({ kind: 'connect', port: channel.port1 }, [channel.port1]);
+      this.#command({ kind: 'connect', port: channel.port2 }, [channel.port2]);
     });
     await this.#setupPromise;
+  }
+  #command(command: MusicReaderCommand, transfer: Transferable[] = []): void {
+    this.#reader?.postMessage(command, transfer);
   }
   async resumeContext(signal?: AbortSignal): Promise<void> {
     if (!this.hasMusic) return;
@@ -226,115 +184,32 @@ export class MusicPlayback {
     run.controller.abort();
     this.#node?.port.postMessage({ kind: 'stop', generation: run.generation });
   }
-  async #readRange(
+  #acceptReceipt(
     run: PlaybackRun,
-    track: MusicTrack,
-    totalSamples: number,
-    source: number,
-    samples: number,
-  ): Promise<ArrayBuffer> {
-    if (source + samples > totalSamples) throw new Error('Music range exceeds its prepared source samples.');
-    const begin = source * MUSIC_BYTES_PER_SAMPLE;
-    const length = samples * MUSIC_BYTES_PER_SAMPLE;
-    const response = await this.#fetch(
-      track,
-      { headers: { Range: `bytes=${begin}-${begin + length - 1}` } },
-      run.controller.signal,
-    );
-    if (
-      response.status !== 206 ||
-      response.headers.get('content-range') !==
-        `bytes ${begin}-${begin + length - 1}/${totalSamples * MUSIC_BYTES_PER_SAMPLE}` ||
-      Number(response.headers.get('content-length')) !== length
-    ) {
-      await response.body?.cancel();
-      throw new Error('Music server did not return the requested exact bounded PCM16 range.');
-    }
-    return readBytes(response, length);
-  }
-  async #mixTrack(
-    run: PlaybackRun,
-    track: MusicTrack,
-    samples: number,
-    data: Float32Array<ArrayBuffer>,
-  ): Promise<void> {
-    const offset = run.queued;
-    const sourceIn = Math.round(track.sourceIn * MUSIC_SAMPLES_PER_FRAME);
-    const selectedSamples = Math.round(track.sourceOut * MUSIC_SAMPLES_PER_FRAME) - sourceIn;
-    let loopBytes: ArrayBuffer | null = null;
-    let filled = 0;
-    await whileSerial(
-      () => filled < MUSIC_CHUNK_SAMPLES,
-      async () => {
-        this.#requireCurrent(run.controller.signal, run.generation);
-        const frame = run.frame + (offset + filled) / MUSIC_SAMPLES_PER_FRAME;
-        const read = musicReadAt(track, frame, MUSIC_CHUNK_SAMPLES - filled);
-        if (read.source !== null) {
-          let bytes: ArrayBuffer | DataView<ArrayBuffer>;
-          if (track.loop && selectedSamples <= MUSIC_CHUNK_SAMPLES) {
-            // Reuse a bounded short selection only within this block. Each refill
-            // still makes a fresh identity-guarded read, not one request per wrap.
-            loopBytes ??= await this.#readRange(run, track, samples, sourceIn, selectedSamples);
-            const begin = (read.source - sourceIn) * MUSIC_BYTES_PER_SAMPLE;
-            bytes = new DataView(loopBytes, begin, read.samples * MUSIC_BYTES_PER_SAMPLE);
-          } else bytes = await this.#readRange(run, track, samples, read.source, read.samples);
-          this.#requireCurrent(run.controller.signal, run.generation);
-          accumulateMusicRange(data, bytes, track, frame, filled);
-        }
-        filled += read.samples;
-      },
-    );
-  }
-  async #readChunk(run: PlaybackRun): Promise<MusicChunk> {
-    const offset = run.queued;
-    const data = new Float32Array(MUSIC_CHUNK_SAMPLES * MUSIC_CHANNELS);
-    // One mixed block and one <=64 KiB read/short-loop scratch, not eight queues.
-    await forEachSerial(this.#tracks, async ({ track, samples }) => {
-      this.#requireCurrent(run.controller.signal, run.generation);
-      await this.#mixTrack(run, track, samples, data);
-    });
-    this.#requireCurrent(run.controller.signal, run.generation);
-    clampMusicMix(data);
-    run.queued += MUSIC_CHUNK_SAMPLES;
-    return { offset, data };
-  }
-  async #pump(run: PlaybackRun): Promise<void> {
-    if (run.pumping) return;
-    run.pumping = true;
-    try {
-      await whileSerial(
-        () => run.credits > 0,
-        async () => {
-          this.#requireCurrent(run.controller.signal, run.generation);
-          run.credits--;
-          const chunk = await this.#readChunk(run);
-          this.#requireCurrent(run.controller.signal, run.generation);
-          this.#node!.port.postMessage({ kind: 'chunk', generation: run.generation, chunk }, [chunk.data.buffer]);
-        },
-      );
-    } catch (error) {
-      if (this.#run === run && !run.controller.signal.aborted)
-        this.#fail(run, error instanceof Error ? error : new Error('Music range read failed.'));
-    } finally {
-      run.pumping = false;
-    }
-  }
-  #acceptReceipt(run: PlaybackRun, data: { startFrame: number; contextFrame: number; samples: number }): void {
+    data: { startFrame: number; contextFrame: number; samples: number; queued: number },
+  ): void {
     // Actual consumed samples and an independent rendering timestamp, not a
     // second reading of an approximate HTMLMediaElement position.
     if (
       run.contextStart === null ||
       data.startFrame !== run.frame ||
       !Number.isSafeInteger(data.contextFrame) ||
+      !Number.isSafeInteger(data.queued) ||
       !Number.isFinite(data.samples) ||
       data.samples < 0 ||
-      data.samples > run.queued
+      data.samples > data.queued
     )
       this.#fail(run, new Error('Music rendered an invalid sample-clock receipt.'));
     else
       this.#lastErrorFrames = Math.abs(data.samples - (data.contextFrame - run.contextStart)) / MUSIC_SAMPLES_PER_FRAME;
     this.#node!.port.postMessage({ kind: 'ack', generation: run.generation });
   }
+  readonly #onReaderMessage = ({ data }: MessageEvent<MusicReaderReport>): void => {
+    const run = this.#run;
+    if (run?.generation !== data.generation || run.controller.signal.aborted) return;
+    if (data.kind === 'prefilled') run.prefilled?.(data.chunks);
+    else this.#fail(run, new Error(data.message));
+  };
   readonly #onMessage = ({ data }: MessageEvent): void => {
     const run = this.#run;
     if (!run || data.generation !== run.generation || run.controller.signal.aborted) return;
@@ -344,14 +219,6 @@ export class MusicPlayback {
       else {
         run.contextStart = data.contextStart;
         run.started?.(data.contextStart);
-      }
-    }
-    if (data.kind === 'credit') {
-      if (!Number.isInteger(data.count) || data.count < 1 || run.credits + data.count > MUSIC_QUEUE_CHUNKS)
-        this.#fail(run, new Error('Music stream exceeded its bounded read credits.'));
-      else {
-        run.credits += data.count;
-        void this.#pump(run);
       }
     }
     if (data.kind === 'rendered') this.#acceptReceipt(run, data);
@@ -374,6 +241,7 @@ export class MusicPlayback {
       return;
     }
     if (this.#processorError) throw this.#processorError;
+    if (this.#readerError) throw this.#readerError;
     const controller = new AbortController();
     const cancel = (): void => {
       controller.abort();
@@ -384,17 +252,16 @@ export class MusicPlayback {
       frame,
       controller,
       detach: () => signal.removeEventListener('abort', cancel),
-      queued: 0,
-      credits: 0,
-      pumping: false,
       underrun: false,
       error: null,
       contextStart: null,
+      prefilled: null,
       started: null,
       cancelled: null,
     };
     this.#lastErrorFrames = 0;
     signal.addEventListener('abort', cancel, { once: true });
+    controller.signal.addEventListener('abort', () => this.#command({ kind: 'stop', generation }), { once: true });
     this.#run = run;
     const preparationTimeout = setTimeout(
       () => this.#fail(run, new Error('Music did not become ready within 10 seconds.')),
@@ -403,9 +270,20 @@ export class MusicPlayback {
     try {
       await abortable(this.resumeContext(controller.signal), controller.signal);
       this.#requireCurrent(controller.signal, generation);
-      const chunks: MusicChunk[] = [];
-      await forEachSerial(Array.from({ length: MUSIC_QUEUE_CHUNKS }), async () => {
-        chunks.push(await this.#readChunk(run));
+      const chunks = await new Promise<MusicChunk[]>((resolve, reject) => {
+        const finish = (): void => {
+          run.prefilled = null;
+          run.cancelled = null;
+        };
+        run.prefilled = (value) => {
+          finish();
+          resolve(value);
+        };
+        run.cancelled = (error?: Error) => {
+          finish();
+          reject(error ?? aborted());
+        };
+        this.#command({ kind: 'prefill', generation, frame, sources: this.#tracks });
       });
       this.#requireCurrent(controller.signal, generation);
       const contextStart = await new Promise<number>((resolve, reject) => {
@@ -493,6 +371,10 @@ export class MusicPlayback {
       this.#node.port.onmessage = null;
       this.#node.port.close();
       this.#node.disconnect();
+    }
+    if (this.#reader) {
+      this.#reader.onmessage = null;
+      this.#reader.terminate();
     }
     void this.#context?.close();
   }

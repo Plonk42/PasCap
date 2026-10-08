@@ -50,6 +50,7 @@ export function encode709(value: number): number {
 
 /** Authoritative SDR transform. See docs/COLOUR_AND_TIMING.md; no FFmpeg eq approximation. */
 export function gradePixel(rgb: RGB, settings: ColourSettings): RGB {
+  if (isNeutralColour(settings)) return rgb;
   const exposure = 2 ** settings.exposure;
   const base = rgb.map(
     (value) => (decode709(clamp01(value)) * exposure - 0.18) * settings.contrast + 0.18 + settings.brightness,
@@ -68,6 +69,10 @@ export function gradePixel(rgb: RGB, settings: ColourSettings): RGB {
   const blue = luminance + 1.8556 * u;
   const green = (luminance - 0.2126 * red - 0.0722 * blue) / 0.7152;
   return [encode709(clamp01(red)), encode709(clamp01(green)), encode709(clamp01(blue))];
+}
+
+export function isNeutralColour(settings: ColourSettings): boolean {
+  return COLOUR_CONTROLS.every(({ key }) => settings[key] === NEUTRAL_COLOUR[key]);
 }
 
 export function generateCube(settings: ColourSettings, size = 65): string {

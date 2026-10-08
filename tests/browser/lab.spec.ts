@@ -363,7 +363,7 @@ test('constant speed retimes only the selected clip and split respects mapped so
   );
 });
 
-test('each ramp curve saves and restores along with independent colour', async ({ page }) => {
+test('each ramp curve saves and restores along with shared row Colour', async ({ page }) => {
   await page.getByRole('combobox', { name: 'Speed mode' }).selectOption('ramp-up');
   for (const curve of ['linear', 'ease-in', 'ease-out', 'smooth']) {
     await page.getByRole('combobox', { name: 'Ramp curve' }).selectOption(curve);
@@ -383,7 +383,7 @@ test('each ramp curve saves and restores along with independent colour', async (
   await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
   await expect(page.getByRole('combobox', { name: 'Ramp curve' })).toHaveValue('smooth');
   await expect(page.getByRole('slider', { name: 'Exposure', exact: true })).toHaveValue('0.6');
-  expect(await page.evaluate(() => window.pascapLab!.project()!.clips[1]!.colour.exposure)).toBe(0);
+  expect(await page.evaluate(() => window.pascapLab!.project()!.layers[0]!.colour.exposure)).toBe(0.6);
 });
 
 test('music waveform, placement, looping, gain, fades and audio-clock preview work', async ({ page, request }) => {
@@ -530,7 +530,7 @@ test('speed changes while playing pause and reload the mapped frame without losi
   await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
   const project = projectSchema.parse(await page.evaluate(() => window.pascapLab!.project()));
   expect(project.clips[0]?.speed).toEqual({ mode: 'constant', rate: 1.5 });
-  expect(project.clips[0]?.colour.exposure).toBe(0.4);
+  expect(project.layers[0]?.colour.exposure).toBe(0.4);
   expect(await page.evaluate(() => window.pascapLab!.engine.diagnostics().playing)).toBe(false);
 });
 
@@ -706,15 +706,17 @@ test('an empty or single-clip timeline works without the old two-clip requiremen
   expect(await page.evaluate(() => window.pascapLab!.engine.diagnostics().duration)).toBe(120);
 });
 
-test('changing a later boundary and grading one duplicate leaves other excerpts independent', async ({ page }) => {
+test('changing a later boundary preserves independent excerpts while Colour applies to their shared row', async ({
+  page,
+}) => {
   await page.getByRole('button', { name: 'Add pattern-a.mp4 to timeline', exact: true }).click();
   await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
   await page.getByRole('slider', { name: 'Exposure', exact: true }).fill('0.8');
   await page.getByRole('button', { name: 'Transition after pattern-b.mp4, excerpt 2 on Video 1', exact: true }).click();
   await page.getByRole('combobox', { name: 'Transition type' }).selectOption('cross-dissolve');
   const project = projectSchema.parse(await page.evaluate(() => window.pascapLab!.project()));
-  expect(project.clips[0]?.colour.exposure).toBe(0);
-  expect(project.clips[2]?.colour.exposure).toBe(0.8);
+  expect(project.layers[0]?.colour.exposure).toBe(0.8);
+  expect(project.clips.every((clip) => !('colour' in clip) && !('correction' in clip))).toBe(true);
   expect(project.layers[0]!.transitions[0]?.duration).toBe(18);
   expect(project.layers[0]!.transitions[1]).toMatchObject({ type: 'cross-dissolve', duration: 30 });
   const region = calculateLayout(project).transitions[1]!;

@@ -435,11 +435,11 @@ test('Colour resets target clip colour and row opacity or only participating Col
   await page.getByRole('slider', { name: 'Saturation', exact: true }).fill('1.3');
   await page.getByRole('button', { name: 'Reset Exposure', exact: true }).click();
   let document = await currentProject(page);
-  expect(document.clips[0]?.colour).toMatchObject({ exposure: 0, saturation: 1.3 });
+  expect(document.layers[0]?.colour).toMatchObject({ exposure: 0, saturation: 1.3 });
   expect(document.layers[0]?.keyframes).toEqual([]);
   await page.getByRole('slider', { name: 'Contrast', exact: true }).fill('1.2');
   document = await currentProject(page);
-  const base = { ...document.clips[0]!.colour };
+  const base = { ...document.layers[0]!.colour };
   const other = sharedPoint(110, { exposure: 1, saturation: 1.4 }, 'smooth');
   document = applyCommand(document, {
     type: 'layer-update',
@@ -476,14 +476,14 @@ test('Colour resets target clip colour and row opacity or only participating Col
   await page.getByRole('button', { name: 'Reset Saturation', exact: true }).click();
   await page.getByRole('slider', { name: 'Exposure', exact: true }).fill('0.25');
   document = await currentProject(page);
-  expect(document.clips[0]?.colour).toEqual(base);
+  expect(document.layers[0]?.colour).toEqual(base);
   expect(document.layers[0]?.keyframes).toEqual([
     sharedPoint(8, { exposure: 0.25, saturation: 1, opacity: 0.4 }, 'hold'),
     other,
   ]);
   await page.getByRole('button', { name: 'Reset colour', exact: true }).click();
   const reset = await currentProject(page);
-  expect(reset.clips[0]?.colour).toEqual(base);
+  expect(reset.layers[0]?.colour).toEqual(base);
   expect(reset.layers[0]?.keyframes).toEqual([
     sharedPoint(8, { exposure: NEUTRAL_COLOUR.exposure, saturation: NEUTRAL_COLOUR.saturation, opacity: 1 }, 'hold'),
     other,

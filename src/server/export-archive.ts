@@ -107,11 +107,11 @@ function parseReceipt(raw: unknown): z.infer<typeof receiptSchema> | null {
     typeof snapshot === 'object' && snapshot !== null && 'schemaVersion' in snapshot
       ? snapshot.schemaVersion
       : undefined;
-  if (rawVersion !== 9) {
+  if (rawVersion !== 10) {
     const version =
       typeof rawVersion === 'string' || typeof rawVersion === 'number' ? String(rawVersion) : 'missing or invalid';
     throw new Error(
-      `Unsupported export snapshot schema version ${version}; this build requires version 9. The existing receipt and successful output were not changed.`,
+      `Unsupported export snapshot schema version ${version}; this build requires version 10. The existing receipt and successful output were not changed.`,
     );
   }
   const parsed = receiptSchema.safeParse(raw);
@@ -136,7 +136,7 @@ async function readCompletedExport(folder: string, id: string): Promise<Archived
   return { receipt, finishedAt: output.mtime.toISOString() };
 }
 
-/** Restore strict v9 snapshots only; older receipts/outputs remain untouched and uninterpreted. */
+/** Restore strict v10 snapshots only; older receipts/outputs remain untouched and uninterpreted. */
 export async function restoreExports(config: ServiceConfig, jobs: JobQueue): Promise<string[]> {
   const directory = path.join(config.dataDir, 'renders');
   let names;

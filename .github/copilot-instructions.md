@@ -66,8 +66,19 @@ PasCap is a solo, pre-release project: optimize for fast iteration. Details are 
 
 - Shared integer-frame layout/retiming (`PlacedClip.retiming`) is authoritative for
   UI, preview and native export. Per-frame rendering stays outside React.
-- Strict schema 9 with uniform tracks, each requiring `ripple`, `transitions`,
+- Strict schema 10 with uniform tracks, each requiring `ripple`, `transitions`,
   `openingFade` and `closingFade`; rows show the saved bottom-to-top order.
+- Owner-approved #70: required row `colour` contains all seven SDR channels,
+  neutral on new rows, with sole row `opacity` initially 1. Reject saved
+  `clip.colour`, `clip.correction` and missing row colour. Static and keyed Colour
+  have identical row ownership; different treatments require different rows.
+  Grade sampled RGB once with evaluated row Colour before fades/coverage.
+  Ungraded neutralizes only row Colour. Native LUTs use only row Colour, with two
+  reused buffers and unchanged bounds. Controls/keys work on empty rows. Moves/new
+  clips adopt destination bases/keys/Opacity; trim/split/cut/duplicate preserve
+  row bases and absolute points, without per-clip colour copies. Future HSL,
+  curves and temperature must be row-owned; do not implement #19/#68 here.
+  See [row appearance](../docs/design/ROW_APPEARANCE.md).
 - Every clip requires strict `spatial: { base, keyframes }`: eight complete pose
   values and 0–256 ascending original-source full-pose keys with required easing.
   Without keys, the base holds; keys override the full pose with endpoint holds.
@@ -101,15 +112,15 @@ PasCap is a solo, pre-release project: optimize for fast iteration. Details are 
   participant at the real playhead is read-only until its diamond captures it.
   **Placement** contains placement only; Layer options contains only rename,
   Ripple, ordering and deletion. Visibility stays separate. Unkeyed colour
-  settings remain per-clip; Opacity is composition coverage, not SDR RGB grading.
+  uses the row base. Opacity is coverage, not SDR RGB grading.
   Group composition is $C = \sum_i G_i b_i o_i w_i m_i$, $A = \sum_i o_i w_i m_i$,
   $\mathrm{result} = C + \mathrm{lower}(1 - A)$, evaluating row Opacity for each
   source with no additional layer multiplier; $m_i$ is spatial source coverage,
   including opaque neutral letterboxing. Black fades never reduce that coverage.
-  Version-1 export receipts require strict v9 snapshots and captured audio-source/
+  Version-1 export receipts require strict v10 snapshots and captured audio-source/
   instance-plan arrays; receipt, registry/proxy/PCM and benchmark format versions
   remain independent and unchanged.
-  Preserve incompatible v1–v8 projects/receipt snapshots; require recreation,
+  Preserve incompatible v1–v9 projects/receipt snapshots; require recreation,
   without migrations, compatibility defaults or automatic deletion.
 - Music is a required 0–8 array of independently identified instances, never null
   or singular. Duration is the maximum of all video and music OUTs. After the last

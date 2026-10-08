@@ -1025,7 +1025,6 @@ export function App() {
         diagnostics?.playing ?? false,
       );
   if (inspection !== keyframeInspection) setKeyframeInspection(inspection);
-  const selectedClip = visible.clips.find((clip) => clip.id === selectedId);
   const referenceBusy = jobs.some((job) => job.kind === 'reference' && ['running', 'queued'].includes(job.state));
   const setSourceRange = (range: MediaSelection): void => {
     try {
@@ -1724,7 +1723,7 @@ export function App() {
                 {(Diagnostics) => (
                   <Diagnostics
                     diagnostics={diagnostics}
-                    colour={selectedClip?.colour ?? null}
+                    colour={visible.layers.find((layer) => layer.id === selectedLayerId)?.colour ?? null}
                     canRenderReference={
                       !needsLayeredExport(visible) &&
                       visible.clips.length === 2 &&

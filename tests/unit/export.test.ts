@@ -109,12 +109,12 @@ function audioAsset() {
 }
 
 describe('strict production export request and immutable validation', () => {
-  it('offers exactly 720p and UHD profiles, accepts no-music v9 and rejects empty/legacy/unknown requests', () => {
+  it('offers exactly 720p and UHD profiles, accepts no-music v10 and rejects empty/legacy/unknown requests', () => {
     expect(EXPORT_PROFILES.draft720).toMatchObject({ width: 1280, height: 720 });
     expect(EXPORT_PROFILES.final4k).toMatchObject({ width: 3840, height: 2160 });
     const document = documentWithClips();
     expect(exportRequestSchema.parse({ document, profile: 'draft720' }).document.music).toEqual([]);
-    expect(exportRequestSchema.parse({ document, profile: 'draft720' }).document.schemaVersion).toBe(9);
+    expect(exportRequestSchema.parse({ document, profile: 'draft720' }).document.schemaVersion).toBe(10);
     for (const request of [
       { document: createProject('empty', 'Empty'), profile: 'draft720' },
       {
@@ -185,15 +185,15 @@ describe('strict production export request and immutable validation', () => {
     const snapshot = validateExport(document, fakeLibrary());
     document.title = 'Later edit';
     document.clips[0]!.sourceIn = 10;
-    document.clips[0]!.colour.brightness = 0.2;
+    document.layers[0]!.colour.brightness = 0.2;
     document.music[0]!.gainDb = 12;
     document.music.splice(1, 1);
     expect(snapshot.title).toBe('Export unit');
     expect(snapshot.clips[0]!.sourceIn).toBe(7);
-    expect(snapshot.clips[0]!.colour.brightness).toBe(0);
+    expect(snapshot.layers[0]!.colour.brightness).toBe(0);
     expect(Object.isFrozen(snapshot)).toBe(true);
     expect(Object.isFrozen(snapshot.clips[0]!.speed)).toBe(true);
-    expect(Object.isFrozen(snapshot.clips[0]!.colour)).toBe(true);
+    expect(Object.isFrozen(snapshot.layers[0]!.colour)).toBe(true);
     expect(snapshot.music).toHaveLength(2);
     expect(snapshot.music[0]!.gainDb).toBe(-6);
     expect(Object.isFrozen(snapshot.music)).toBe(true);

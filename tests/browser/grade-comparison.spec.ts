@@ -71,7 +71,7 @@ function singleProject(id: string, title: string, video: MediaAsset): ProjectDoc
   const document = createProject(id, title);
   document.media.videoIds = [video.id];
   const clip = createClip('comparison-clip', video.id, 8, 108, document.layers[0]!.id);
-  clip.colour = {
+  document.layers[0]!.colour = {
     ...NEUTRAL_COLOUR,
     exposure: 0.7,
     brightness: 0.02,
@@ -99,6 +99,7 @@ function layeredProject(videos: readonly MediaAsset[]): ProjectDocument {
     const sourceOut = [72, 72, 110][index]!;
     const duration = index === 1 ? 72 : 80;
     layer.opacity = 0.9 - index * 0.1;
+    layer.colour = { ...NEUTRAL_COLOUR, hue: 15 + index * 10, exposure: 0.15, saturation: 0.8 };
     layer.openingFade = 12;
     layer.closingFade = 12;
     layer.keyframes = [
@@ -133,7 +134,7 @@ function layeredProject(videos: readonly MediaAsset[]): ProjectDocument {
     ];
     // Keep a static channel active on both participants of each dissolve,
     // alongside row animation. Otherwise fully keyed rows would mask every
-    // clip base and could not expose an incomplete clip-colour bypass.
+    // row base and could not expose an incomplete row-colour bypass.
     const staticChannel = index === 0 ? 'hue' : index === 2 ? 'exposure' : null;
     if (staticChannel) {
       for (const point of layer.keyframes) point.values[staticChannel] = null;
@@ -149,7 +150,6 @@ function layeredProject(videos: readonly MediaAsset[]): ProjectDocument {
       clip.start = member ? duration - (index === 1 ? 0 : 16) : 0;
       // The retained row Speed must override this deliberately different base.
       clip.speed = { mode: 'constant', rate: 1.6 };
-      clip.colour = { ...NEUTRAL_COLOUR, exposure: member ? -1 : 1, hue: member ? -70 : 65, saturation: 0.3 };
       return clip;
     });
     document.clips.push(...clips);
@@ -168,8 +168,8 @@ function layeredProject(videos: readonly MediaAsset[]): ProjectDocument {
 /** Change colour alone; preserve every non-colour channel, easing and source map. */
 function neutralProject(document: ProjectDocument, id: string, title: string): ProjectDocument {
   const neutral = projectSchema.parse({ ...document, id, title });
-  for (const clip of neutral.clips) clip.colour = { ...NEUTRAL_COLOUR };
   for (const layer of neutral.layers) {
+    layer.colour = { ...NEUTRAL_COLOUR };
     layer.keyframes = layer.keyframes.flatMap((point) => {
       const values = { ...point.values };
       for (const { key } of COLOUR_CONTROLS) values[key] = null;
@@ -185,8 +185,8 @@ function nonColourContract(document: ProjectDocument) {
   const colourKeys = new Set<string>(COLOUR_CONTROLS.map(({ key }) => key));
   return {
     ...rest,
-    clips: clips.map(({ colour: _colour, ...clip }) => clip),
-    layers: layers.map((layer) => ({
+    clips,
+    layers: layers.map(({ colour: _colour, ...layer }) => ({
       ...layer,
       keyframes: layer.keyframes.flatMap((point) => {
         const values = Object.fromEntries(Object.entries(point.values).filter(([key]) => !colourKeys.has(key)));
@@ -223,10 +223,10 @@ const test = browserTest.extend<{ comparison: ComparisonFixture }>({
     const other = singleProject('comparison-other', 'Other grade comparison · memory-only', videos[1]!);
     const playback = createProject('comparison-music', 'Music grade comparison · memory-only');
     playback.media = { videoIds: [videos[0]!.id], audioIds: [song!.id] };
+    playback.layers[0]!.colour = { ...single.layers[0]!.colour };
     playback.clips = [
       {
         ...createClip('music-comparison-clip', videos[0]!.id, 0, 120, playback.layers[0]!.id),
-        colour: { ...single.clips[0]!.colour },
         // Sixteen seconds leaves time for four real native activations under
         // software rendering without guessing a particular callback schedule.
         speed: { mode: 'constant', rate: 0.25 },
@@ -551,13 +551,14 @@ test('native click, Space and Enter compare the exact paused frame without seeki
   await expectPristine(page, comparison, comparison.single);
 });
 
-test('bypasses clip and row colour across dissolves, retaining coverage, black fades and speed', async ({
+test('bypasses row colour across dissolves, retaining coverage, black fades and speed', async ({
   page,
   comparison,
 }) => {
   const { layered, neutral } = comparison;
   expect(nonColourContract(neutral)).toEqual(nonColourContract(layered));
-  expect(neutral.clips.every((clip) => JSON.stringify(clip.colour) === JSON.stringify(NEUTRAL_COLOUR))).toBe(true);
+  expect(neutral.clips).toEqual(layered.clips);
+  expect(neutral.layers.every((layer) => JSON.stringify(layer.colour) === JSON.stringify(NEUTRAL_COLOUR))).toBe(true);
   expect(
     neutral.layers.every((layer) =>
       layer.keyframes.every((point) => COLOUR_CONTROLS.every(({ key }) => point.values[key] === null)),
@@ -599,12 +600,12 @@ test('bypasses clip and row colour across dissolves, retaining coverage, black f
     sampleTimeline(layered, 70)
       .filter((sample) => sample.layerId === 'comparison-bottom')
       .map((sample) => sample.colour.hue),
-  ).toEqual([65, -70]);
+  ).toEqual([15, 15]);
   expect(
     sampleTimeline(layered, 70)
       .filter((sample) => sample.layerId === 'comparison-top')
       .map((sample) => sample.colour.exposure),
-  ).toEqual([1, -1]);
+  ).toEqual([0.15, 0.15]);
   expect(sampleTimeline(layered, 72).find((sample) => sample.layerId === 'comparison-black')!.brightness).toBe(0);
   const evidence: {
     frame: number;
@@ -683,7 +684,7 @@ test('a colour edit while bypassed saves once, returns the new grade and has a s
   expect(saved).toEqual({
     ...comparison.single,
     revision: comparison.single.revision + 1,
-    clips: comparison.single.clips.map((clip) => ({ ...clip, colour: { ...clip.colour, exposure: 1.2 } })),
+    layers: comparison.single.layers.map((layer) => ({ ...layer, colour: { ...layer.colour, exposure: 1.2 } })),
   });
   await expectMode(page, true);
   expect(await capture(page, 'bypass-after-edit')).toEqual(bypass);

@@ -449,15 +449,18 @@ describe.skipIf(!enabled)('production native export · opt-in disposable media o
 
   it('exports >2 clips, repeated graded originals, slow/fast and both directions of every ramp with exact numeric pixels', async () => {
     const project = createProject('native-many', 'Many clips and every speed curve');
+    project.layers[0]!.colour = {
+      ...NEUTRAL_COLOUR,
+      contrast: 1.05,
+      shadows: 0.05,
+      hue: 10,
+      exposure: 0.2,
+      brightness: 0.04,
+      saturation: 0.85,
+    };
     project.clips = speeds.map((speed, index) => ({
       ...createClip(`instance-${index}`, assets[index % 2]!.id, 1 + (index % 4), 19 + (index % 4)),
       speed,
-      colour: {
-        ...NEUTRAL_COLOUR,
-        brightness: index * 0.008,
-        exposure: index * 0.025,
-        saturation: 0.85 + index * 0.015,
-      },
     }));
     project.layers[0]!.transitions = project.clips.slice(1).map((clip, index) => {
       const pair = { leftId: project.clips[index]!.id, rightId: clip.id };
@@ -538,7 +541,7 @@ describe.skipIf(!enabled)('production native export · opt-in disposable media o
   it('exports a ripple cut as independent recoverable excerpts with the removed source interval absent from every output frame', async () => {
     const before = document(24);
     before.clips[0]!.speed = { mode: 'constant', rate: 2 };
-    before.clips[0]!.colour = { ...NEUTRAL_COLOUR, exposure: 0.3, brightness: 0.04, saturation: 0.8 };
+    before.layers[0]!.colour = { ...NEUTRAL_COLOUR, exposure: 0.3, brightness: 0.04, saturation: 0.8 };
     before.clips.push(createClip('two', assets[1]!.id, 2, 10));
     before.clips[1]!.start = 12;
     before.layers[0]!.transitions = [{ leftId: 'one', rightId: 'two', type: 'cut', duration: 0 }];
@@ -604,7 +607,7 @@ describe.skipIf(!enabled)('production native export · opt-in disposable media o
   it('renders a few genuine UHD frames, grading before output-frame one-frame black fades', async () => {
     const project = document(6);
     project.clips[0]!.speed = { mode: 'constant', rate: 2 };
-    project.clips[0]!.colour = { ...NEUTRAL_COLOUR, brightness: 0.1, shadows: 0.25 };
+    project.layers[0]!.colour = { ...NEUTRAL_COLOUR, brightness: 0.1, shadows: 0.25 };
     project.layers[0]!.openingFade = 1;
     project.layers[0]!.closingFade = 1;
     const result = await completed(project, 'final4k');

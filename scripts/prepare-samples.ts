@@ -46,7 +46,7 @@ try {
   });
   try {
     await store.load(sampleId);
-    console.log('Existing schema-9 sample project kept unchanged (historical identifier retained).');
+    console.log('Existing schema-10 sample project kept unchanged (historical identifier retained).');
   } catch (error) {
     if (!(error instanceof ServiceError && error.statusCode === 404)) throw error;
     let project = createProject(sampleId, 'Taillefer · Sample edit');
@@ -67,7 +67,7 @@ try {
     project = applyCommand(project, { type: 'fades', layerId, opening: 12, closing: 12 });
     await store.save(project, 0);
     console.log(
-      `Saved a new schema-9 sample edit (${sampleId}, historical identifier retained); earlier v1–v8 projects remain untouched and incompatible. No migration is performed.`,
+      `Saved a new schema-10 sample edit (${sampleId}, historical identifier retained); earlier v1–v9 projects remain untouched and incompatible. No migration is performed.`,
     );
   }
 } catch (error) {

@@ -86,8 +86,8 @@ export async function renderReference(
     const assets = clips.map((clip) => library.get(clip.mediaId));
     for (const asset of assets) await assertSourceIdentity(asset.sourcePath, asset.fingerprint, true); // NOSONAR -- read-only checks are deliberately serial.
     context.update(0.01, 'Generating 65³ LUTs from the CPU colour contract');
-    for (const [index, clip] of clips.entries())
-      await atomicWrite(path.join(directory, `clip-${index}.cube`), generateCube(clip.colour)); // NOSONAR -- bound CPU LUT generation to one at a time.
+    for (const index of clips.keys())
+      await atomicWrite(path.join(directory, `clip-${index}.cube`), generateCube(layer.colour)); // NOSONAR -- bound CPU LUT generation to one at a time.
     const transition = layer.transitions[0]!;
     const black = transition.type === 'fade-through-black' ? blackFadeParts(transition.duration) : { out: 0, in: 0 };
     const chains = clips.map((clip, index) => {

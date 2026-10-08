@@ -13,17 +13,17 @@ inherit the shared media registry. Importing the same original into another proj
 deliberately adds it to that project's bin and reuses eligible verified proxies.
 Removing an excerpt or music placement does not remove the imported media.
 
-Projects use **strict format v9**, with required clip spatial base/full-pose
+Projects use **strict format v10**, with required row colour and clip spatial base/full-pose
 source-frame keys and a required `music` array of 0–8 independent
 instances and unique required instance IDs (`[]` without music), every video track's Ripple, transitions and
 opening/closing fades and required numeric `opacity` in 0–1 (1 on new tracks),
 with nine nullable animation channels: `opacity`, `speed` and seven colour settings.
 Row `opacity` is the sole saved Opacity value; saved `clip.opacity` and old
 `clipOpacity`/`layerOpacity` key channels are invalid, not ignored or defaulted.
-v1–v8 project documents and receipt snapshots
+v1–v9 project documents and receipt snapshots
 stay on disk but are incompatible: there is no migration, compatibility default,
 null fallback, old-format reader, automatic repair or deletion. Export receipts
-remain version 1 with a strict v9 snapshot and required audio-source/instance-plan arrays.
+remain version 1 with a strict v10 snapshot and required audio-source/instance-plan arrays.
 Create a new project and import its media deliberately. Finished videos remain
 untouched. **Delete project** requires confirmation and deletes only the saved
 project document, not originals, the shared registry/proxy cache or exports/receipts.
@@ -171,7 +171,8 @@ on an empty row. With keys, the row's `opacity` curve overrides that value on ev
 clip, including both sources in a dissolve. Removing its final participant reveals
 the unchanged saved row value. There is no saved clip opacity, additional layer
 multiplier or duplicate sidebar control/navigation.
-Unkeyed colour controls still edit only the selected clip. Opacity shares their
+Static and keyed colour controls edit the same row, including on empty rows.
+All clips on that row share the treatment; different looks require different rows. Opacity shares their
 UI treatment, but controls composition coverage, not the SDR RGB grade.
 **Clip → Placement** contains placement only. Sliders never create implicit keys;
 an animated setting without participation at the real playhead is read-only until
@@ -192,7 +193,7 @@ paused or playing; there is no global shortcut. **Source preview** is unchanged.
 
 Ungraded means the **composed timeline preview without grading**, not an
 original-resolution view or an isolated selected clip. It neutralizes all evaluated
-colour settings across enabled rows, including clip bases, row colour keys and both
+colour settings across enabled rows, including row colour bases/keys and both
 dissolve participants. Exact observed source frames, retiming, row Opacity,
 spatial geometry/coverage, visibility, black fades, stacking and music remain unchanged.
 
@@ -292,8 +293,10 @@ shared points are allowed per row.
   clickable. Click at the **real playhead** to capture/join that setting; click filled
   to remove only its participation. First participation creates the point; removing
   the last participant deletes it. Sliders never create implicit keys.
-- With no Opacity keys, edit the row value, even on an empty row; unkeyed colour
-  and speed edit the selected clip. Once a channel is animated, its value is
+- With no Opacity or colour keys, edit the row values, even on an empty row;
+  unkeyed speed edits the selected clip. There is no per-clip colour setting.
+  Moving clips uses destination row bases/keys/Opacity without changing either row.
+  Once a channel is animated, its value is
   read-only where it does not participate: click the hollow diamond first.
   Removing its final participation reveals its existing unkeyed value, not a
   new default or the removed key's value.

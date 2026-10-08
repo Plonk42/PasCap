@@ -41,7 +41,13 @@ async function observe(corruptSample = -1, corruptReceipt = false): Promise<Sign
     observerBlob = blob;
     return 'blob:synthetic-observer';
   });
-  vi.stubGlobal('window', { fetch: vi.fn() });
+  vi.stubGlobal('window', { fetch: vi.fn(), Worker: class {} });
+  vi.stubGlobal(
+    'BroadcastChannel',
+    class {
+      onmessage = null;
+    },
+  );
   vi.stubGlobal(
     'AudioWorklet',
     class {

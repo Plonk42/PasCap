@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { MusicReader, type MusicReaderCommand } from '../../src/preview/music-source.js';
 import { MusicPlayback } from '../../src/preview/music.js';
 import { musicGainAt } from '../../src/shared/audio.js';
 import { musicSchema, type MusicTrack } from '../../src/shared/model.js';
@@ -49,13 +50,54 @@ interface Command {
   frame: number;
   chunks: MusicChunk[];
   chunk: MusicChunk;
+  port: PortDouble;
+}
+/** Asynchronous structured messaging, like the real worker/worklet channel. */
+class PortDouble {
+  onmessage: ((event: MessageEvent) => void) | null = null;
+  other!: PortDouble;
+  readonly postMessage = vi.fn((data: unknown) => {
+    queueMicrotask(() => this.other.onmessage?.({ data } as MessageEvent));
+  });
+}
+class ChannelDouble {
+  readonly port1 = new PortDouble();
+  readonly port2 = new PortDouble();
+  constructor() {
+    this.port1.other = this.port2;
+    this.port2.other = this.port1;
+  }
+}
+/** Runs the actual reader in-process; the main thread only exchanges commands/reports. */
+class ReaderDouble {
+  onmessage: ((event: MessageEvent) => void) | null = null;
+  onerror: (() => void) | null = null;
+  readonly reader = new MusicReader((message) => {
+    queueMicrotask(() => this.onmessage?.({ data: message } as MessageEvent));
+  });
+  readonly postMessage = vi.fn((command: MusicReaderCommand) => {
+    queueMicrotask(() => this.reader.receive(command));
+  });
+  readonly terminate = vi.fn();
+  constructor(
+    readonly url: string,
+    readonly options: WorkerOptions,
+  ) {
+    readers.push(this);
+  }
 }
 class WorkletDouble {
   readonly commands: Command[] = [];
+  reader: PortDouble | null = null;
   readonly port = {
     onmessage: null as ((message: MessageEvent) => void) | null,
     postMessage: vi.fn((command: Command) => {
       this.commands.push(command);
+      if (command.kind === 'connect') {
+        this.reader = command.port;
+        // Refill blocks arrive from the reader worker, never through this main-thread port.
+        command.port.onmessage = ({ data }) => this.commands.push(data as Command);
+      }
       if (command.kind === 'start' && !holdStart)
         this.emit({
           kind: 'started',
@@ -81,6 +123,14 @@ class WorkletDouble {
   startCommand(): Command {
     return this.commands.filter((command) => command.kind === 'start').at(-1)!;
   }
+  credit(count = 1, generation = this.startCommand().generation): void {
+    this.reader!.postMessage({ kind: 'credit', generation, count });
+  }
+  queued(): number {
+    const start = this.startCommand();
+    const refills = this.commands.slice(this.commands.lastIndexOf(start)).filter((command) => command.kind === 'chunk');
+    return (start.chunks.length + refills.length) * MUSIC_CHUNK_SAMPLES;
+  }
   receipt(samples: number, contextFrame: number): void {
     this.emit({
       kind: 'rendered',
@@ -88,11 +138,13 @@ class WorkletDouble {
       startFrame: this.startCommand().frame,
       samples,
       contextFrame,
+      queued: this.queued(),
     });
   }
 }
 const contexts: ContextDouble[] = [];
 const nodes: WorkletDouble[] = [];
+const readers: ReaderDouble[] = [];
 let playback: MusicPlayback;
 let holdStart = false;
 const totalSamples = 480_000;
@@ -157,6 +209,7 @@ function advance(samples: number, drift = 0): void {
 beforeEach(() => {
   contexts.length = 0;
   nodes.length = 0;
+  readers.length = 0;
   requests.length = 0;
   holdStart = false;
   boundary.prefill = null;
@@ -164,6 +217,8 @@ beforeEach(() => {
   vi.stubGlobal('location', { href: 'http://127.0.0.1:4318/' });
   vi.stubGlobal('AudioContext', ContextDouble);
   vi.stubGlobal('AudioWorkletNode', WorkletDouble);
+  vi.stubGlobal('MessageChannel', ChannelDouble);
+  vi.stubGlobal('Worker', ReaderDouble);
   vi.stubGlobal('fetch', fetchPcm);
   vi.stubGlobal('requestAnimationFrame', vi.fn());
   vi.stubGlobal('cancelAnimationFrame', vi.fn());
@@ -224,7 +279,7 @@ describe('sample-owned bounded streaming music', () => {
       expect(chunk.data.every((value) => Math.abs(value) < 0.000001)).toBe(true);
     }
     const before = seen.length;
-    node.emit({ kind: 'credit', generation: node.startCommand().generation, count: 1 });
+    node.credit();
     await vi.waitFor(() => expect(node.commands.filter((command) => command.kind === 'chunk')).toHaveLength(1));
     expect(seen.length - before).toBe(8);
     expect(peak).toBe(1);
@@ -296,7 +351,7 @@ describe('sample-owned bounded streaming music', () => {
     expect(playback.sync()).toBe(true);
     expect(playback.errorFrames).toBeCloseTo(0);
     const reads = requests.length;
-    node.emit({ kind: 'credit', generation: node.startCommand().generation, count: 1 });
+    node.credit();
     await vi.waitFor(() => expect(node.commands.filter((command) => command.kind === 'chunk')).toHaveLength(1));
     expect(node.commands.find((command) => command.kind === 'chunk')!.chunk.data.every((value) => value === 0)).toBe(
       true,
@@ -525,13 +580,37 @@ describe('sample-owned bounded streaming music', () => {
     const node = await started();
     const generation = node.startCommand().generation;
     const before = requests.length;
-    node.emit({ kind: 'credit', generation, count: 1 });
+    node.credit(1, generation);
     await vi.waitFor(() => expect(node.commands.filter((command) => command.kind === 'chunk')).toHaveLength(1));
     expect(requests.length - before).toBe(1);
+    // Reader worker to worklet only: the main thread neither receives credits nor posts blocks.
+    expect(node.port.postMessage.mock.calls.some(([command]) => command.kind === 'chunk')).toBe(false);
+    expect(readers).toHaveLength(1);
+    expect(readers[0]!.options).toEqual({ type: 'module', name: 'pascap-music-reader' });
     node.emit({ kind: 'underrun', generation });
     expect(playback.sync()).toBe(false);
     playback.pause();
     expect(playback.sync()).toBe(true);
+  });
+  it('rejects receipts beyond enqueued samples and credits beyond the bounded queue', async () => {
+    await configured();
+    let node = await started();
+    node.emit({
+      kind: 'rendered',
+      generation: node.startCommand().generation,
+      startFrame: 20,
+      samples: node.queued() + 1,
+      contextFrame: 10 * MUSIC_SAMPLE_RATE + node.queued() + 1,
+      queued: node.queued(),
+    });
+    expect(() => playback.sync()).toThrow('invalid sample-clock receipt');
+    playback.pause();
+    node = await started();
+    const reads = requests.length;
+    node.credit(MUSIC_QUEUE_CHUNKS + 1);
+    await vi.waitFor(() => expect(() => playback.sync()).toThrow('bounded read credits'));
+    expect(requests).toHaveLength(reads);
+    expect(node.commands.at(-1)).toMatchObject({ kind: 'stop', generation: node.startCommand().generation });
   });
   it('reads a short selected loop only once per bounded block, with a fresh guarded range on each refill', async () => {
     await configured(track({ sourceIn: 10, sourceOut: 11, loop: true }));
@@ -539,7 +618,7 @@ describe('sample-owned bounded streaming music', () => {
     const reads = requests.filter((request) => request.method !== 'HEAD');
     expect(reads).toHaveLength(4);
     expect(reads.every((request) => new Headers(request.headers).get('Range') === 'bytes=64064-70471')).toBe(true);
-    node.emit({ kind: 'credit', generation: node.startCommand().generation, count: 1 });
+    node.credit();
     await vi.waitFor(() => expect(node.commands.filter((command) => command.kind === 'chunk')).toHaveLength(1));
     expect(requests.filter((request) => request.method !== 'HEAD')).toHaveLength(5);
   });
@@ -651,6 +730,7 @@ describe('sample-owned bounded streaming music', () => {
     expect(node.port.close).toHaveBeenCalledOnce();
     expect(node.disconnect).toHaveBeenCalledOnce();
     expect(node.context.close).toHaveBeenCalledOnce();
+    expect(readers[0]!.terminate).toHaveBeenCalledOnce();
     await started();
     expect(nodes).toHaveLength(1);
   });

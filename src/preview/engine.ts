@@ -569,11 +569,11 @@ export class PreviewEngine {
     // a possibly stale paused frame. Publication retains its exact A/V checks.
     this.#emit(true);
   }
-  updateColour(clipId: string, settings: ColourSettings): void {
+  updateColour(layerId: string, settings: ColourSettings): void {
     if (!this.#document) return;
-    const clip = this.#document.clips.find((item) => item.id === clipId);
-    if (!clip) throw new Error('The graded clip does not exist.');
-    clip.colour = colourSchema.parse(settings);
+    const layer = this.#document.layers.find((item) => item.id === layerId);
+    if (!layer) throw new Error('The graded row does not exist.');
+    layer.colour = colourSchema.parse(settings);
     this.#dirty = true;
     this.#colourRequested = performance.now();
     if (!this.#playing && !this.#busy && this.#status === 'paused') this.#drawFrame(this.#frame);

@@ -228,8 +228,12 @@ test('duplicate preserves static settings without copying row points, and overla
   let document = await current(page);
   document = applyCommand(document, {
     type: 'colour',
-    clipId: 'moving',
-    colour: { ...document.clips[1]!.colour, contrast: 1.3, saturation: 0.7 },
+    layerId: document.clips[1]!.layerId,
+    colour: {
+      ...document.layers.find((layer) => layer.id === document.clips[1]!.layerId)!.colour,
+      contrast: 1.3,
+      saturation: 0.7,
+    },
   });
   document = applyCommand(document, { type: 'opacity', layerId: document.clips[1]!.layerId, opacity: 0.6 });
   document = applyCommand(document, {

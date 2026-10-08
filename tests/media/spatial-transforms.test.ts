@@ -576,8 +576,7 @@ describe.skipIf(!enabled)('spatial transforms · real native FFmpeg, disposable 
     const right = createClip('right', assets[2]!.id, 2, 3, upper.id);
     left.speed = right.speed = { mode: 'constant', rate: 1 / 3 };
     right.start = 1;
-    left.colour = { ...NEUTRAL_COLOUR, exposure: 0.2, contrast: 0.95 };
-    right.colour = { ...NEUTRAL_COLOUR, saturation: 0.8, brightness: 0.03 };
+    project.layers[0]!.colour = { ...NEUTRAL_COLOUR, exposure: 0.2, contrast: 0.95, saturation: 0.8, brightness: 0.03 };
     left.spatial = {
       base: pose({ scale: 3 }),
       keyframes: [

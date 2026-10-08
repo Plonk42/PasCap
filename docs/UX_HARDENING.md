@@ -26,7 +26,7 @@ This guide is not a delivery ledger or a fresh validation result.
   row `opacity`, including on an empty row; keyed `opacity` overrides that value
   on every clip and both dissolve sources. Sliders never create keys; animated
   values without a participant at the real playhead are read-only until explicitly
-  captured with the diamond. Unkeyed colour settings remain per-clip; Opacity
+  captured with the diamond. Unkeyed colour settings are row-owned; Opacity
   controls composition coverage, not SDR RGB grading. **Placement** contains
   placement only. There is no sidebar duplicate; Layer options contains only
   rename, Ripple, ordering and deletion, with visibility separate in the sidebar.
@@ -67,7 +67,7 @@ and require recreation, without migration, defaults or automatic deletion.
 Row `opacity` is the required sole stored value, not obsolete; saved `clip.opacity`
 and old `clipOpacity`/`layerOpacity` point channels are invalid.
 Registry/proxy/current PCM formats do not change. Version-1 export receipts require
-strict v9 snapshots and captured audio-source/instance-plan arrays, rejecting
+strict v10 snapshots and captured audio-source/instance-plan arrays, rejecting
 invalid arrays/older snapshots without rewriting successful exports. No null
 fallback or old-format reader is permitted. Source-copy prohibition,
 row points, source choices, media preparation, Activity and both export

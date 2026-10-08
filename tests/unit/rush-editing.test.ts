@@ -65,15 +65,6 @@ function rushClip(id: string, layerId: string, start: number, speed: SpeedSettin
     layerId,
     start,
     speed,
-    colour: {
-      exposure: 0.6,
-      brightness: 0.08,
-      contrast: 1.2,
-      hue: 25,
-      saturation: 0.75,
-      highlights: 0.2,
-      shadows: -0.15,
-    },
   };
 }
 function primaryProject(
@@ -82,6 +73,15 @@ function primaryProject(
 ): ProjectDocument {
   const document = createProject('rush', 'Rush editing');
   document.layers[0]!.opacity = 0.65;
+  document.layers[0]!.colour = {
+    exposure: 0.6,
+    brightness: 0.08,
+    contrast: 1.2,
+    hue: 25,
+    saturation: 0.75,
+    highlights: 0.2,
+    shadows: -0.15,
+  };
   document.layers[0]!.keyframes = keys;
   document.layers.push(
     row('upper', [point(10, { opacity: 0.6, exposure: 0.25 }), point(500, { opacity: 0.4, hue: 45 }, 'hold')]),
@@ -381,20 +381,18 @@ describe('atomic source removal on the primary ripple row', () => {
     for (const excerpt of [left, right]) {
       expect(excerpt).toMatchObject({
         mediaId: original.mediaId,
-        colour: original.colour,
         speed: original.speed,
       });
       expect(excerpt).not.toHaveProperty('opacity');
       expect(next.layers[0]!.opacity).toBe(document.layers[0]!.opacity);
       expect(Object.keys(excerpt)).toEqual(Object.keys(original));
     }
-    expect(left.colour).not.toBe(right.colour);
+    expect(next.layers[0]!.colour).toEqual(document.layers[0]!.colour);
     expect(left.speed).not.toBe(right.speed);
-    left.colour.exposure = 1.2;
     if (left.speed.mode === 'constant') left.speed.rate = 1.5;
-    expect(right.colour.exposure).toBe(0.6);
+    expect(right).not.toHaveProperty('correction');
     expect(right.speed).toEqual({ mode: 'constant', rate: 1 });
-    expect(original.colour.exposure).toBe(0.6);
+    expect(original).not.toHaveProperty('colour');
     expect(original.speed).toEqual({ mode: 'constant', rate: 1 });
   });
 
@@ -603,7 +601,7 @@ describe('atomic source removal on the primary ripple row', () => {
       expect(placed(next, 'after').duration).toBe(placed(document, 'after').duration);
       for (const excerpt of [left, right]) {
         expect(excerpt.clip.speed).toEqual(speed);
-        expect(excerpt.clip.colour).toEqual(placed(document, 'rush').clip.colour);
+        expect(next.layers.map((layer) => layer.colour)).toEqual(document.layers.map((layer) => layer.colour));
         expect(excerpt.clip).not.toHaveProperty('opacity');
         expect(next.layers[0]!.opacity).toBe(0.65);
         expect(excerpt.duration).toBe(compileLayerRetiming(excerpt.clip, next.layers[0]!, excerpt.start).duration);

@@ -108,15 +108,15 @@ describe('editing commands and history', () => {
   it('splits preserve colours and external boundaries', () => {
     let project = applyCommand(sequence(), {
       type: 'colour',
-      clipId: 'a',
-      colour: { ...sequence().clips[0]!.colour, exposure: 0.7 },
+      layerId: sequence().layers[0]!.id,
+      colour: { ...sequence().layers[0]!.colour, exposure: 0.7 },
     });
     project = applyCommand(project, {
       type: 'transition',
       transition: { leftId: 'a', rightId: 'b', type: 'cross-dissolve', duration: 10 },
     });
     project = applyCommand(project, { type: 'split', clipId: 'a', sourceFrame: 60, newClipId: 'a2' });
-    expect(project.clips[1]?.colour.exposure).toBe(0.7);
+    expect(project.layers[0]!.colour.exposure).toBe(0.7);
     expect(project.layers[0]!.transitions.map((t) => [t.leftId, t.rightId, t.type])).toEqual([
       ['a', 'a2', 'cut'],
       ['a2', 'b', 'cross-dissolve'],

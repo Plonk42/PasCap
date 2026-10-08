@@ -58,7 +58,7 @@ describe('project dialog filtering', () => {
     project('legacy', {
       title: 'North flight old',
       compatible: false,
-      error: 'Unsupported project schema version 6; this build requires version 9.',
+      error: 'Unsupported project schema version 6; this build requires version 10.',
     }),
     project('south', { title: 'South flight', updatedAt: '2026-10-01T12:00:00Z' }),
   ];
@@ -92,7 +92,7 @@ describe('project dialog filtering', () => {
     const unavailable = Object.freeze(entries[2]!);
     const filtered = filterProjects(Object.freeze([unavailable]), 'old', 'unsupported');
     expect(filtered[0]).toBe(unavailable);
-    expect(filtered[0]?.error).toBe('Unsupported project schema version 6; this build requires version 9.');
+    expect(filtered[0]?.error).toBe('Unsupported project schema version 6; this build requires version 10.');
     expect(filtered[0]?.compatible).toBe(false);
     expect(filtered[0]?.clipCount).toBe(0);
   });
@@ -214,12 +214,12 @@ describe('activity ordering and summaries', () => {
 });
 
 describe('export snapshot summary', () => {
-  it('summarizes an empty strict version 9 project without adding defaults', () => {
+  it('summarizes an empty strict version 10 project without adding defaults', () => {
     const document = createProject('empty', 'Empty');
     const summary = summarizeExport(document);
     expect(summary).toMatchObject({ duration: 0, clips: 0, layers: 1, enabledLayers: 1, layered: false });
     expect(summary.keys).toEqual({ points: 0, settings: 0, speed: 0, colour: 0, opacity: 0 });
-    expect(document.schemaVersion).toBe(9);
+    expect(document.schemaVersion).toBe(10);
     expect(document.media).toEqual({ videoIds: [], audioIds: [] });
     expect(document.layers[0]!.keyframes).toEqual([]);
   });
@@ -228,7 +228,7 @@ describe('export snapshot summary', () => {
     const document: ProjectDocument = createProject('layers', 'Layers');
     const primary = createClip('primary', 'source', 0, 60);
     primary.speed = { mode: 'constant', rate: 2 };
-    document.layers[0]!.keyframes = [point(0, { opacity: 1, ...primary.colour }, 'hold')];
+    document.layers[0]!.keyframes = [point(0, { opacity: 1, ...document.layers[0]!.colour }, 'hold')];
     const overlay = createClip('overlay', 'source', 0, 30);
     overlay.layerId = 'video-2';
     overlay.start = 100;
@@ -263,7 +263,7 @@ describe('export snapshot summary', () => {
     const document = createProject('participants', 'Participants');
     const left = createClip('left', 'source', 0, 30);
     const right = createClip('right', 'source', 100, 130);
-    right.colour.hue = 90;
+    document.layers[0]!.colour.hue = 90;
     document.clips = [left, right];
     document.layers[0]!.transitions = [{ leftId: 'left', rightId: 'right', type: 'cut', duration: 0 }];
     document.layers[0]!.keyframes = [

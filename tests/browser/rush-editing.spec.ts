@@ -245,7 +245,7 @@ function unchangedOthers(
   editedIds: readonly string[],
   transitions: Readonly<Record<string, readonly Transition[]>> = {},
 ): void {
-  expect(next.schemaVersion).toBe(9);
+  expect(next.schemaVersion).toBe(10);
   expect(next.media).toEqual(before.media);
   expect(next.layers).toEqual(
     before.layers.map((layer) => ({ ...layer, transitions: transitions[layer.id] ?? layer.transitions })),
@@ -444,8 +444,8 @@ test('three ranges from one rush keep the source pinned, independent, reloadable
   expect(edited.clips[2]).toEqual({
     ...added.clips[2]!,
     sourceIn: 50,
-    colour: { ...added.clips[2]!.colour, saturation: 1.2 },
   });
+  expect(edited.layers[0]!.colour).toEqual({ ...added.layers[0]!.colour, saturation: 1.2 });
   await flush(page);
   expect(memory.snapshot().clips).toEqual(edited.clips);
   await page.reload();
@@ -503,10 +503,7 @@ test('visible split then S selects each right piece, preserves boundaries and de
   page,
 }) => {
   const document = dissolvedSequence();
-  document.clips[0] = {
-    ...document.clips[0]!,
-    colour: { ...document.clips[0]!.colour, contrast: 1.25, saturation: 0.7, hue: 20 },
-  };
+  document.layers[0]!.colour = { ...document.layers[0]!.colour, contrast: 1.25, saturation: 0.7, hue: 20 };
   document.layers[0]!.opacity = 0.65;
   document.layers[0]!.keyframes = [
     sharedPoint(20, { exposure: 0.2, speed: 1 }),
@@ -719,8 +716,8 @@ test('I/O middle removal is transient then one edit, preserving absolute nine-ch
   document.clips[0] = {
     ...document.clips[0]!,
     speed: { mode: 'constant', rate: 2 },
-    colour: { ...document.clips[0]!.colour, exposure: -0.2, saturation: 0.6 },
   };
+  document.layers[0]!.colour = { ...document.layers[0]!.colour, exposure: -0.2, saturation: 0.6 };
   document.layers[0]!.opacity = 0.65;
   document.clips.splice(1, 0, {
     ...createClip('fixed-overlay', assets[1]!.id, 0, 20),

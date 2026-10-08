@@ -407,7 +407,7 @@ describe('native spatial sampling without transformed frame storage', () => {
 
 describe('fractional tetrahedral grade after RGB interpolation', () => {
   it('keeps fractions and endpoints without rounding, across all six tetrahedral orderings', async () => {
-    const lut = await new ColourLutCache().get({ ...NEUTRAL_COLOUR }, signal());
+    const lut = await new ColourLutCache().get(NEUTRAL_COLOUR, signal());
     const out = new Float64Array(3);
     for (const rgb of [
       [100.1, 100.2, 100.3],
