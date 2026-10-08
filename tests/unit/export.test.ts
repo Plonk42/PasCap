@@ -114,7 +114,7 @@ describe('strict production export request and immutable validation', () => {
     expect(EXPORT_PROFILES.final4k).toMatchObject({ width: 3840, height: 2160 });
     const document = documentWithClips();
     expect(exportRequestSchema.parse({ document, profile: 'draft720' }).document.music).toEqual([]);
-    expect(exportRequestSchema.parse({ document, profile: 'draft720' }).document.schemaVersion).toBe(10);
+    expect(exportRequestSchema.parse({ document, profile: 'draft720' }).document.schemaVersion).toBe(11);
     for (const request of [
       { document: createProject('empty', 'Empty'), profile: 'draft720' },
       {

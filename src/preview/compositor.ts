@@ -1,9 +1,12 @@
+import { CURVE_CHANNELS, HSL_BANDS, isIdentityCurve, isNeutralHsl } from '../shared/advanced-colour.js';
 import { gradePixel, NEUTRAL_COLOUR, type ColourSettings, type RGB } from '../shared/colour.js';
 import { compositePixel } from '../shared/composition.js';
 import { compileSpatialMapping, NEUTRAL_SPATIAL_POSE, type SpatialPose } from '../shared/spatial.js';
 import type { PreviewLayer } from '../shared/timeline.js';
 import { MAX_DECODER_SLOTS } from './assignment.js';
-import { fragmentShader, vertexShader } from './shaders.js';
+import { fragmentShader, scalarFragmentShader, singleFragmentShader, vertexShader } from './shaders.js';
+
+type GradePath = 'full' | 'single' | 'scalar';
 
 export interface CompositeClip {
   slot: number;
@@ -33,12 +36,12 @@ function compile(gl: WebGL2RenderingContext, kind: number, source: string): WebG
   return shader;
 }
 
-function createProgram(gl: WebGL2RenderingContext): WebGLProgram {
+function createProgram(gl: WebGL2RenderingContext, source = fragmentShader): WebGLProgram {
   const vertex = compile(gl, gl.VERTEX_SHADER, vertexShader);
   let fragment: WebGLShader | null = null;
   let program: WebGLProgram | null = null;
   try {
-    fragment = compile(gl, gl.FRAGMENT_SHADER, fragmentShader);
+    fragment = compile(gl, gl.FRAGMENT_SHADER, source);
     program = gl.createProgram();
     if (!program) throw new Error('Cannot allocate the preview program.');
     gl.attachShader(program, vertex);
@@ -61,10 +64,18 @@ export class Compositor {
   readonly gl: WebGL2RenderingContext;
   readonly renderer: string;
   readonly #program: WebGLProgram;
+  #scalarProgram: WebGLProgram | null = null;
+  #singleProgram: WebGLProgram | null = null;
+  readonly #scalarUniforms = new Map<string, WebGLUniformLocation>();
+  readonly #singleUniforms = new Map<string, WebGLUniformLocation>();
+  #gradePath: GradePath = 'full';
+  #advanced = true;
   readonly #vao: WebGLVertexArrayObject;
   readonly #textures: WebGLTexture[] = [];
   readonly #sizes: [number, number][] = [];
   readonly #uniforms = new Map<string, WebGLUniformLocation>();
+  readonly #hslUniform = new Float32Array(32);
+  readonly #curveUniform = new Float32Array(128);
   #disposed = false;
   constructor(readonly canvas: HTMLCanvasElement) {
     const gl = canvas.getContext('webgl2', {
@@ -107,14 +118,26 @@ export class Compositor {
         'crop0',
         'crop1',
         'neutralSpatial',
+        'hsl0[0]',
+        'hsl1[0]',
+        ...[0, 1].flatMap((source) => [0, 1, 2, 3].map((channel) => `curve${source}_${channel}[0]`)),
+        'curveCounts0',
+        'curveCounts1',
+        'curveIdentity0',
+        'curveIdentity1',
+        'neutralHsl',
       ];
       for (const name of names) {
         const location = gl.getUniformLocation(program, name);
         if (location === null) throw new Error(`Missing compositor uniform: ${name}`);
         this.#uniforms.set(name, location);
       }
+      // Compile the three bounded paths before playback. First Compare activation
+      // must never compile/link synchronously against an advancing audio clock.
+      this.#useGrade('scalar');
+      this.#useGrade('single');
       this.setDecoderCount(2);
-      gl.useProgram(program);
+      this.#useGrade('full');
       gl.bindVertexArray(vao);
       gl.uniform1i(this.#location('source0'), 0);
       gl.uniform1i(this.#location('source1'), 1);
@@ -144,8 +167,34 @@ export class Compositor {
       this.#sizes.push([1, 1]);
     }
   }
-  #location(name: string): WebGLUniformLocation {
-    return this.#uniforms.get(name)!;
+  #location(name: string): WebGLUniformLocation | null {
+    const uniforms = this.#gradePath === 'single' ? this.#singleUniforms : this.#scalarUniforms;
+    return (this.#gradePath === 'full' ? this.#uniforms : uniforms).get(name) ?? null;
+  }
+
+  #gradeProgram(path: GradePath): WebGLProgram {
+    if (path === 'full') return this.#program;
+    const existing = path === 'single' ? this.#singleProgram : this.#scalarProgram;
+    if (existing) return existing;
+    const gl = this.gl;
+    const program = createProgram(gl, path === 'single' ? singleFragmentShader : scalarFragmentShader);
+    const uniforms = path === 'single' ? this.#singleUniforms : this.#scalarUniforms;
+    if (path === 'single') this.#singleProgram = program;
+    else this.#scalarProgram = program;
+    for (const name of this.#uniforms.keys()) {
+      const location = gl.getUniformLocation(program, name);
+      if (location !== null) uniforms.set(name, location);
+    }
+    return program;
+  }
+  #useGrade(path: GradePath): void {
+    const gl = this.gl;
+    const program = this.#gradeProgram(path);
+    this.#gradePath = path;
+    this.#advanced = path !== 'scalar';
+    gl.useProgram(program);
+    gl.uniform1i(this.#location('source0'), 0);
+    gl.uniform1i(this.#location('source1'), 1);
   }
   #texture(slot: number): WebGLTexture {
     if (this.#disposed || !Number.isInteger(slot) || !this.#textures[slot])
@@ -218,6 +267,13 @@ export class Compositor {
       brightness: 0,
     };
     const sources = [group.clips[0]!, group.clips[1] ?? empty];
+    const advanced = sources.some(
+      (source) =>
+        !isNeutralHsl(source.settings.hsl) ||
+        CURVE_CHANNELS.some((channel) => !isIdentityCurve(source.settings.curves[channel])),
+    );
+    const advancedPath = group.clips.length === 1 ? 'single' : 'full';
+    this.#useGrade(advanced ? advancedPath : 'scalar');
     const mappings = sources.map((source) =>
       compileSpatialMapping(
         source.spatial,
@@ -229,6 +285,32 @@ export class Compositor {
     );
     for (const [index, source] of sources.entries()) {
       const settings = source.settings;
+      if (this.#advanced) {
+        HSL_BANDS.forEach((band, at) => {
+          const value = settings.hsl[band];
+          this.#hslUniform.set([value.hue, value.saturation, value.lightness, 0], at * 4);
+        });
+        gl.uniform4fv(this.#location(`hsl${index}[0]`), this.#hslUniform);
+        this.#curveUniform.fill(0);
+        CURVE_CHANNELS.forEach((channel, at) =>
+          settings.curves[channel].forEach((point, position) => {
+            this.#curveUniform.set([point.x, point.y], at * 32 + position * 2);
+          }),
+        );
+        for (let channel = 0; channel < 4; channel++)
+          gl.uniform2fv(
+            this.#location(`curve${index}_${channel}[0]`),
+            this.#curveUniform.subarray(channel * 32, (channel + 1) * 32),
+          );
+        gl.uniform4iv(
+          this.#location(`curveCounts${index}`),
+          CURVE_CHANNELS.map((channel) => settings.curves[channel].length),
+        );
+        gl.uniform4iv(
+          this.#location(`curveIdentity${index}`),
+          CURVE_CHANNELS.map((channel) => Number(isIdentityCurve(settings.curves[channel]))),
+        );
+      }
       const mapping = mappings[index]!;
       const [a, b, c, d, e, f] = mapping.affine;
       gl.uniform3f(this.#location(`spatialU${index}`), a, b, c);
@@ -262,6 +344,12 @@ export class Compositor {
       sources[1]!.opacity * sources[1]!.blendWeight,
     );
     gl.uniform2f(this.#location('brightness'), sources[0]!.brightness, sources[1]!.brightness);
+    if (this.#advanced)
+      gl.uniform2f(
+        this.#location('neutralHsl'),
+        Number(isNeutralHsl(sources[0]!.settings.hsl)),
+        Number(isNeutralHsl(sources[1]!.settings.hsl)),
+      );
     gl.uniform2f(this.#location('neutralSpatial'), Number(mappings[0]!.neutral), Number(mappings[1]!.neutral));
     gl.uniform2f(this.#location('imageAspect'), sources[0]!.aspect, sources[1]!.aspect);
     gl.uniform1f(this.#location('canvasAspect'), this.canvas.width / this.canvas.height);
@@ -286,6 +374,8 @@ export class Compositor {
     this.#sizes.length = 0;
     this.gl.deleteVertexArray(this.#vao);
     this.gl.deleteProgram(this.#program);
+    if (this.#scalarProgram) this.gl.deleteProgram(this.#scalarProgram);
+    if (this.#singleProgram) this.gl.deleteProgram(this.#singleProgram);
   }
 }
 
@@ -358,6 +448,7 @@ export function verifyGpuColour(settings: ColourSettings): GpuComparison {
 function comparisonColour(test: number, random: () => number): ColourSettings {
   if (test < 7) return { ...NEUTRAL_COLOUR };
   return {
+    ...NEUTRAL_COLOUR,
     exposure: random() * 1.4 - 0.7,
     brightness: random() * 0.16 - 0.08,
     contrast: 0.7 + random() * 0.6,

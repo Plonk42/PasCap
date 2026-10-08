@@ -109,10 +109,10 @@ function rejected(document: ProjectDocument, command: EditCommand, message: stri
   expect(history.canRedo).toBe(false);
 }
 
-describe('strict uniform schema-10 tracks', () => {
+describe('strict uniform schema-11 tracks', () => {
   it('uses Ripple ON for the initial track and every newly created track', () => {
     const initial = createProject('new', 'New');
-    expect(initial.schemaVersion).toBe(10);
+    expect(initial.schemaVersion).toBe(11);
     expect(initial.layers).toEqual([createLayer(BASE_LAYER_ID, 'Video 1')]);
     for (const id of [BASE_LAYER_ID, ...Array.from({ length: 8 }, (_, index) => `arbitrary-${index}`)]) {
       expect(createLayer(id, 'Track')).toEqual({

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { NEUTRAL_COLOUR } from '../../src/shared/colour.js';
+import { NEUTRAL_COLOUR, scalarColourValues } from '../../src/shared/colour.js';
 import { EditHistory } from '../../src/shared/commands.js';
 import { EMPTY_KEY_VALUES, type LayerKeyframe } from '../../src/shared/keyframes.js';
 import { createClip, createProject } from '../../src/shared/model.js';
@@ -12,7 +12,7 @@ function fixture() {
   const point: LayerKeyframe = {
     frame: 20,
     interpolation: 'ease-in',
-    values: { ...EMPTY_KEY_VALUES, ...NEUTRAL_COLOUR, opacity: 0.7, speed: 1 },
+    values: { ...EMPTY_KEY_VALUES, ...scalarColourValues(NEUTRAL_COLOUR), opacity: 0.7, speed: 1 },
   };
   const other: LayerKeyframe = { frame: 80, interpolation: 'hold', values: { ...EMPTY_KEY_VALUES, exposure: 0.5 } };
   project.layers[0]!.keyframes = [point, other];

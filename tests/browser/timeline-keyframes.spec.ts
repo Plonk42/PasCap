@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { NEUTRAL_COLOUR } from '../../src/shared/colour.js';
+import { NEUTRAL_COLOUR, scalarColourValues } from '../../src/shared/colour.js';
 import { applyCommand } from '../../src/shared/commands.js';
 import type { MediaAsset } from '../../src/shared/media.js';
 import { createClip, createLayer, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
@@ -61,7 +61,7 @@ function sequence(): ProjectDocument {
   ];
   project.layers[0]!.transitions = [{ leftId: 'first', rightId: 'second', type: 'cut', duration: 0 }];
   project.layers[0]!.keyframes = [
-    sharedPoint(20, { ...NEUTRAL_COLOUR, exposure: 0.6, opacity: 0.7, speed: 1 }, 'ease-in'),
+    sharedPoint(20, { ...scalarColourValues(NEUTRAL_COLOUR), exposure: 0.6, opacity: 0.7, speed: 1 }, 'ease-in'),
     sharedPoint(80, { exposure: -0.3 }, 'hold'),
   ];
   return projectSchema.parse(project);

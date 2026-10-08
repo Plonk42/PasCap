@@ -1,24 +1,27 @@
-# Owner-approved row-only Colour and Opacity · schema 10
+# Owner-approved row-only Colour and Opacity · schema 11
+
+Required Colour now includes eight static HSL bands and four master/RGB colour curves. They share row ownership with the seven scalar settings, but add no nullable animation channels. Existing scalar keys override their own bases only; advanced colour remains active. The complete SDR order and editing/reset contract is in [HSL_AND_CURVES.md](HSL_AND_CURVES.md).
 
 ## Ownership and strict storage
 
-Each video row requires complete seven-channel `VideoLayer.colour`, neutral on
-creation, alongside its sole required `opacity`, initially 1. Clips have no colour
-or correction field: both `clip.colour` and `clip.correction` are invalid.
+Each video row requires complete `VideoLayer.colour`, neutral on creation,
+alongside its sole required `opacity`, initially 1. Colour contains the seven
+scalar channels plus required HSL and curves. Clips have no colour or correction
+field: both `clip.colour` and `clip.correction` are invalid.
 The owner-approved scope is identical with or without animation: every clip on
 the same row shares all colour treatment. Different treatments require different
-rows, not a per-clip scope toggle or a separate shot feature. Future HSL, curves
-and temperature controls must also be row-owned; #19/#68 are not implemented here.
-The bounds and neutral values are the existing SDR ColourSettings contract.
+rows, not a per-clip scope toggle or a separate shot feature. Future temperature
+controls must also be row-owned; #68 is not implemented here.
+The scalar bounds and neutral values retain the existing SDR contract.
 No optional legacy field, additive parameter merge, migration or default-on-load exists.
-Schema 10 rejects versions 1–9 without rewriting or deleting their documents.
-Receipt format remains 1 with strict schema-10 snapshots; registry, proxies and
+Schema 11 rejects versions 1–10 without rewriting or deleting their documents.
+Receipt format remains 1 with strict schema-11 snapshots; registry, proxies and
 PCM formats are unchanged. Recreate incompatible projects deliberately.
 
 The seven shared colour channels override **row colour**, independently, in
 absolute project time. Skip unrelated participants, interpolate parameter values
 using the left participant's easing, and hold endpoints. Removing the last key
-reveals the unchanged row base.
+reveals the unchanged row base. HSL and curves remain static.
 Row Speed retains its distinct clip-speed override contract. Opacity ownership,
 source-over composition, spatial coverage and black-fade coverage are unchanged.
 
@@ -33,37 +36,44 @@ Colour, keys and Opacity without changing either row's settings or points.
 
 ## Rendering
 
-Let `grade` be the existing encoded BT.709 SDR transform. Each source is graded as
+Let `grade` be the encoded BT.709 SDR transform, including scalar, HSL and
+master/RGB curve stages. Each source is graded as
 
 $$G_i=\mathrm{grade}(RGB_i, rowColour(t)).$$
 
-There is one SDR grade, not a composed or double-grade transform. An exactly
+There is one ordered SDR grade, not a composed or double-grade transform. An exactly
 neutral row grade returns its input unchanged. Grading precedes black fades,
-dissolve group sums and row Opacity/coverage. Ungraded preview neutralizes row Colour,
+dissolve group sums and row Opacity/coverage. Ungraded preview neutralizes all row Colour,
 preserving observed frames, retiming, geometry, Opacity, fades, stacking and music.
 Appearance edits do not restart unchanged media or alter timing.
 Texture, decoder and full-frame buffer counts stay unchanged. Exact neutral spatial
 poses retain their existing opaque black letterbox path.
 
-Static export generates a 65³ LUT from the row's Colour alone. Static
-nonneutral row colour does not disqualify the cheap path. Row keys and spatial
-edits still require layered export. Layered export generates its LUT from evaluated
-row parameters alone, retaining two reused LUT arrays;
-there is no extra full-frame buffer, decoder or per-frame FFmpeg invocation.
+With neutral HSL and identity curves, static export generates a 65³ scalar LUT
+from the row's Colour alone; nonneutral scalar colour retains this cheap path.
+Row keys, spatial edits or nonneutral HSL/curves require layered export. Scalar-only
+layered grades use evaluated row parameters and at most two reused LUT arrays.
+Advanced grades evaluate the complete scalar/HSL/curve transform exactly on the
+fractional sampled RGB. Source/frame compilation determines neutral stages once,
+without approximating curves or introducing a full-frame buffer, decoder or
+per-frame FFmpeg invocation.
 The native 22 bytes/pixel/four-buffer and serial child-process budgets remain unchanged.
-LUT interpolation and H.264 quantisation remain measured approximations, not
-bitwise shader equivalence. The two-excerpt diagnostic reference and measurement
-helper also grade using the one static row Colour, without independent clip grades.
+Scalar LUT interpolation and H.264 quantisation remain measured approximations,
+not bitwise shader equivalence. Sharp curves are tested after production-resolution
+input scaling: grading and resampling do not commute. The two-excerpt diagnostic
+reference and measurement helper accept static scalar row Colour with neutral HSL
+and identity curves, without independent clip grades.
 
 ## Inspector and history
 
-**Clip → Colour** has eight main widgets: seven row colour controls plus sole
+**Clip → Colour** retains eight main widgets: seven row colour controls plus sole
 Opacity. All use existing slider/exact-field/reset/diamond/channel-navigation
 controls and work on an empty row. An animated channel without participation at
 the real playhead remains read-only until explicitly captured. Sliders never key.
-Individual resets target only the row base or current existing participant;
-Reset keys targets only existing colour/Opacity participants. No reset overwrites
-another point or the saved base beneath a keyed channel.
+The nested static HSL and curve editors share row ownership, with no new diamonds.
+Individual scalar resets target only the row base or current existing participant;
+Reset keys targets only existing colour/Opacity participants, preserving HSL/curves.
+No reset overwrites another point or the saved base beneath a keyed channel.
 
 There is no Clip correction disclosure, control, command or stored field. Collapse
 and tab switches retain mounted drafts; changing editing context resets fields

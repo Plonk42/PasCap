@@ -1,7 +1,7 @@
-# PasCap colour and timing contract · project v10
+# PasCap colour and timing contract · project v11
 
-This specification is shared by the CPU reference,
-WebGL2 shader and generated native FFmpeg LUTs. It is elementary SDR grading, not
+This specification is shared by the CPU reference, WebGL2 shader and native
+scalar LUT or exact advanced-colour export. It is elementary SDR grading, not
 highlight recovery. Originals remain untouched.
 
 ## Colour
@@ -9,8 +9,8 @@ highlight recovery. Originals remain untouched.
 The row's required `colour` (or evaluated colour keys) grades sampled RGB once.
 Every clip on that row shares this treatment, whether keys are used or not.
 Clips have no colour/correction field. Exactly neutral Colour short-circuits.
-Grading precedes black fades and coverage/group composition. Native paths use
-row-only LUTs and retain at most two reused LUT arrays.
+Grading precedes black fades and coverage/group composition. Native scalar paths
+use row-only LUTs and retain at most two reused LUT arrays; advanced grades are exact.
 See [row appearance](design/ROW_APPEARANCE.md) for ownership, UI and strict storage.
 
 - Input/output: full-range normalised nonlinear R′G′B′, BT.709 primaries and transfer.
@@ -40,10 +40,12 @@ See [row appearance](design/ROW_APPEARANCE.md) for ownership, UI and strict stor
 - Grade each decoder independently, then blend **encoded** RGB for dissolves.
   Black fades multiply already-graded encoded RGB. Thus tinted/lifted black cannot
   contaminate fade-to-black. No hidden sharpening, tone mapping or loudness change.
-- Static single-layer export generates a 65³ cube from the CPU transform for
-  FFmpeg `lut3d` tetrahedral interpolation. Layered/animated export reuses at most
-  two in-memory 65³ Float32 LUTs generated from the **evaluated grading parameters**;
-  tetrahedral sampling feeds premultiplied RGBA16 composition before final H.264.
+- With neutral HSL/identity curves, static single-layer export generates a 65³
+  scalar cube for FFmpeg `lut3d` tetrahedral interpolation. Layered/animated export
+  reuses at most two scalar-only in-memory 65³ Float32 LUTs from **evaluated parameters**.
+  Nonneutral HSL/curves instead require layered export and exact complete CPU
+  grading on fractional sampled RGB before premultiplied RGBA16 and final H.264;
+  narrow valid knees never pass through a LUT, including the preceding scalar stage.
   No endpoint-LUT/image crossfade substitutes for parameter animation. Scaling to
   the fitted target image occurs before grading. Exact neutral spatial poses retain
   the old opaque black padding after grading. Nonneutral spatial poses inverse-map
@@ -171,7 +173,7 @@ resets to normal graded preview. Export continues to use the saved grading contr
 
 ## Music sampling and mixing
 
-Strict schema 10 requires a 0–8 `music` array of independent uniquely identified
+Strict schema 11 requires a 0–8 `music` array of independent uniquely identified
 instances, `[]` without music. Each has source IN/OUT, start/duration, gain, fades
 and loop; source-video audio remains disabled. At 48 kHz, source/placement/duration/
 fade positions round independently to integer samples using the rational frame
@@ -200,7 +202,7 @@ separate source-review decoder. Resources
 are not allocated per stored clip; missing observed frames buffer explicitly.
 
 Production export reads originals and uses exact shared retiming. The static fast
-path requires one enabled track with row Opacity 1, no row points, exactly neutral
+path requires neutral HSL/identity curves, one enabled track with row Opacity 1, no row points, exactly neutral
 spatial bases without spatial keys, zero origin
 and no internal gaps, covering full project duration; supported track fades/dissolves retain bounded chunks.
 Other valid timelines use generalized sequential RGBA16 group and source-over
@@ -211,24 +213,27 @@ export requires at least one retained video clip. Resource and numeric limits ar
 [Inspector and resource limits](LAYERS_AND_KEYFRAMES.md#inspector-and-resource-limits).
 
 The diagnostic reference accepts **exactly two normal-speed clips on one
-enabled, zero-origin contiguous track with row Opacity 1 and static row Colour**, exactly neutral spatial
+enabled, zero-origin contiguous track with row Opacity 1 and static scalar row Colour**,
+neutral HSL and identity curves, exactly neutral spatial
 bases without spatial keys, without music, extra tracks or row points,
 and is limited to 3,600 project frames. It refuses unsupported
 documents regardless of Ripple or track ID.
-It requires a strict schema-10 project snapshot, including explicit project media
+It requires a strict schema-11 project snapshot, including explicit project media
 membership; its reference receipt format remains independently version 1. New
-measurement reports must identify their v10 project snapshot without overwriting
+measurement reports must identify their v11 project snapshot without overwriting
 historical reports; the report identifier is separate from the project schema.
 Project identifiers such as `preview-lab`/`preview-lab-v6` are not schema versions
 and are not renamed by this contract.
-v1–v9 project documents and receipt snapshots are incompatible and preserved;
+v1–v10 project documents and receipt snapshots are incompatible and preserved;
 recreate projects deliberately, with no migration, compatibility defaults or
-old-format/null fallback readers or automatic deletion. Strict v10 requires
+old-format/null fallback readers or automatic deletion. Strict v11 requires
 row `colour`, clip `spatial` base/full-pose keys and row `opacity`; saved `clip.colour`, `clip.correction`, `clip.opacity` and
 old `clipOpacity`/`layerOpacity` point fields are rejected, not defaulted.
-Production export receipts also remain version 1, with strict v10 snapshots and
+Production export receipts also remain version 1, with strict v11 snapshots and
 required `musicSources` captured-original/`settings.audio` identified-plan arrays;
 older snapshots or invalid arrays are rejected without rewriting receipts/MP4s.
 Registry/proxy/current PCM formats and source guards are unchanged.
 Source ranges and every retained clip key position are validated against registered
 original frame counts, including hidden layer references.
+
+Row colour also requires static eight-band HSL and master/red/green/blue curves. The processing order is the unchanged seven-control SDR transform, encoded BT.709 HSL, master curve, individual RGB curves, black-fade brightness and group coverage/source-over. The nine nullable animation channels remain unchanged. Compare/Ungraded bypasses the entire colour transform, not geometry or coverage. The precise bounds, circular smoothstep weighting, grey protection, piecewise-linear curves and resource budgets are in [HSL_AND_CURVES.md](design/HSL_AND_CURVES.md).

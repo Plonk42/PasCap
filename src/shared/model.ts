@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { colourSchema, NEUTRAL_COLOUR } from './colour.js';
+import { colourSchema, createColourSettings } from './colour.js';
 import { layerKeyframeSchema, orderedKeys } from './keyframes.js';
 import { createSpatialSettings, spatialSettingsSchema } from './spatial.js';
 import { NORMAL_SPEED, speedSchema } from './speed.js';
@@ -98,7 +98,7 @@ export const musicTracksSchema = z
 
 const baseProjectSchema = z
   .object({
-    schemaVersion: z.literal(10),
+    schemaVersion: z.literal(11),
     id: idSchema,
     title: z.string().trim().min(1).max(200),
     media: z
@@ -142,7 +142,7 @@ export function createLayer(id: string, name: string, ripple = true): VideoLayer
     name,
     enabled: true,
     opacity: 1,
-    colour: { ...NEUTRAL_COLOUR },
+    colour: createColourSettings(),
     keyframes: [],
     ripple,
     transitions: [],
@@ -153,7 +153,7 @@ export function createLayer(id: string, name: string, ripple = true): VideoLayer
 
 export function createProject(id: string, title: string): ProjectDocument {
   return projectSchema.parse({
-    schemaVersion: 10,
+    schemaVersion: 11,
     id,
     title,
     media: { videoIds: [], audioIds: [] },

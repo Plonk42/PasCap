@@ -44,6 +44,7 @@ describe('authoritative colour transform', () => {
   });
   it('clips gamut and rejects incomplete/out-of-range/non-finite settings', () => {
     const result = gradePixel([1, 0.8, 0], {
+      ...NEUTRAL_COLOUR,
       exposure: 3,
       brightness: 0.5,
       contrast: 2,

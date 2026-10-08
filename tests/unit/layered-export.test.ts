@@ -12,7 +12,14 @@ import { runRawVideoPass, writeRawFrame } from '../../src/server/raw-process.js'
 import { renderReference, validateReference } from '../../src/server/reference.js';
 import { retimeRawVideo } from '../../src/server/retime-process.js';
 import { ProjectStore } from '../../src/server/storage.js';
-import { COLOUR_CONTROLS, gradePixel, NEUTRAL_COLOUR, type ColourSettings, type RGB } from '../../src/shared/colour.js';
+import {
+  COLOUR_CONTROLS,
+  gradePixel,
+  NEUTRAL_COLOUR,
+  scalarColourValues,
+  type ColourSettings,
+  type RGB,
+} from '../../src/shared/colour.js';
 import { colourAt, compositePixel } from '../../src/shared/composition.js';
 import {
   exportRequestSchema,
@@ -103,7 +110,7 @@ function fakeLibrary(): MediaLibrary {
   return library;
 }
 
-describe('schema-10 production dispatch and read-only validation', () => {
+describe('schema-11 production dispatch and read-only validation', () => {
   it('keeps static constant/ramp speed on the cheap path and dispatches shared speed points with their placed map', () => {
     const project = document();
     expect(needsLayeredExport(project)).toBe(false);
@@ -125,7 +132,7 @@ describe('schema-10 production dispatch and read-only validation', () => {
       compileLayerRetiming(project.clips[0]!, project.layers[0]!, placed.start).duration,
     );
     expect(placed.retiming.duration).toBe(planLayeredExport(project).duration);
-    expect(exportRequestSchema.parse({ document: project, profile: 'draft720' }).document.schemaVersion).toBe(10);
+    expect(exportRequestSchema.parse({ document: project, profile: 'draft720' }).document.schemaVersion).toBe(11);
     expect(
       exportRequestSchema.safeParse({ document: { ...project, schemaVersion: 2 }, profile: 'draft720' }).success,
     ).toBe(false);
@@ -155,7 +162,7 @@ describe('schema-10 production dispatch and read-only validation', () => {
         project.layers[0]!.keyframes = [point(7, { opacity: 1 }, 'hold')];
       },
       (project) => {
-        project.layers[0]!.keyframes = [point(7, { ...NEUTRAL_COLOUR })];
+        project.layers[0]!.keyframes = [point(7, scalarColourValues(NEUTRAL_COLOUR))];
       },
       ...COLOUR_CONTROLS.map(({ key }) => (project: ProjectDocument) => {
         project.layers[0]!.keyframes = [point(7, { [key]: NEUTRAL_COLOUR[key] })];
@@ -299,7 +306,7 @@ describe('schema-10 production dispatch and read-only validation', () => {
         title,
         error: expect.stringContaining(`schema version ${version}`),
       });
-      await expect(store.load(id)).rejects.toThrow('requires version 10');
+      await expect(store.load(id)).rejects.toThrow('requires version 11');
       await expect(store.rename(id, 'No migration', 0)).rejects.toThrow('existing file was not changed');
       await expect(store.save(createProject(id, 'No migration'), 0)).rejects.toThrow('existing file was not changed');
       expect(await readFile(filename, 'utf8')).toBe(bytes);
@@ -360,7 +367,7 @@ describe('schema-10 production dispatch and read-only validation', () => {
         project.layers[0]!.keyframes.push(point(2, { opacity: 0 }, 'hold'));
       },
       (project: ProjectDocument) => {
-        project.layers[0]!.keyframes.push(point(7, { ...NEUTRAL_COLOUR }));
+        project.layers[0]!.keyframes.push(point(7, scalarColourValues(NEUTRAL_COLOUR)));
       },
       (project: ProjectDocument) => {
         project.layers[0]!.keyframes.push(point(7, { opacity: 0.5 }, 'smooth'));
@@ -637,6 +644,7 @@ describe('bounded project-frame row speed and native pipe ownership without FFmp
 });
 
 const strong: ColourSettings = {
+  ...NEUTRAL_COLOUR,
   exposure: 1.2,
   brightness: -0.09,
   contrast: 1.4,
@@ -646,6 +654,7 @@ const strong: ColourSettings = {
   highlights: -0.8,
 };
 const warm: ColourSettings = {
+  ...NEUTRAL_COLOUR,
   exposure: -0.6,
   brightness: 0.11,
   contrast: 0.72,

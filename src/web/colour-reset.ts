@@ -1,4 +1,4 @@
-import { COLOUR_CONTROLS, NEUTRAL_COLOUR } from '../shared/colour.js';
+import { COLOUR_CONTROLS, createColourSettings, isNeutralColour, NEUTRAL_COLOUR } from '../shared/colour.js';
 import type { EditCommand } from '../shared/commands.js';
 import { hasLayerKeys } from '../shared/keyframes.js';
 import type { VideoLayer } from '../shared/model.js';
@@ -32,8 +32,8 @@ export function colourResetCommands(layer: VideoLayer, frame: number): EditComma
     hasLayerKeys(layer, 'opacity') || COLOUR_CONTROLS.some((control) => hasLayerKeys(layer, control.key));
   if (animated) return resetPointCommands(layer, frame);
   const commands: EditCommand[] = [];
-  if (COLOUR_CONTROLS.some((control) => layer.colour[control.key] !== NEUTRAL_COLOUR[control.key]))
-    commands.push({ type: 'colour', layerId: layer.id, colour: { ...NEUTRAL_COLOUR } });
+  if (!isNeutralColour(layer.colour))
+    commands.push({ type: 'colour', layerId: layer.id, colour: createColourSettings() });
   if (layer.opacity !== 1) commands.push({ type: 'opacity', layerId: layer.id, opacity: 1 });
   return commands;
 }

@@ -67,7 +67,7 @@ and require recreation, without migration, defaults or automatic deletion.
 Row `opacity` is the required sole stored value, not obsolete; saved `clip.opacity`
 and old `clipOpacity`/`layerOpacity` point channels are invalid.
 Registry/proxy/current PCM formats do not change. Version-1 export receipts require
-strict v10 snapshots and captured audio-source/instance-plan arrays, rejecting
+strict v11 snapshots and captured audio-source/instance-plan arrays, rejecting
 invalid arrays/older snapshots without rewriting successful exports. No null
 fallback or old-format reader is permitted. Source-copy prohibition,
 row points, source choices, media preparation, Activity and both export

@@ -113,7 +113,7 @@ describe('durable export receipts', () => {
       fadeOut: index,
       loop: false,
     }));
-    expect(snapshot.schemaVersion).toBe(10);
+    expect(snapshot.schemaVersion).toBe(11);
     const receipt = receiptFixture(snapshot, id);
     expect(receipt.musicSources).toHaveLength(2);
     expect(receipt.settings.audio).toHaveLength(8);
@@ -438,7 +438,7 @@ describe('durable export receipts', () => {
         const warnings = await restoreExports(createConfig({ dataDir: root }), jobs);
         expect(warnings).toHaveLength(1);
         expect(warnings[0]).toContain(
-          `Unsupported export snapshot schema version ${version}; this build requires version 10`,
+          `Unsupported export snapshot schema version ${version}; this build requires version 11`,
         );
         expect(jobs.list()).toEqual([]);
         expect(await readFile(path.join(folder, 'receipt.json'), 'utf8')).toBe(text);

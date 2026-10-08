@@ -1,12 +1,12 @@
 import type { ColourSettings, RGB } from './colour.js';
-import { gradePixel } from './colour.js';
+import { COLOUR_CONTROLS, gradePixel } from './colour.js';
 import { evaluateLayerSetting } from './keyframes.js';
 import type { VideoLayer } from './model.js';
 import type { PreviewLayer } from './timeline.js';
 
 export function colourAt(layer: VideoLayer, projectFrame: number): ColourSettings {
   const colour = { ...layer.colour };
-  for (const setting of Object.keys(colour) as (keyof ColourSettings)[])
+  for (const { key: setting } of COLOUR_CONTROLS)
     colour[setting] = evaluateLayerSetting(layer, setting, projectFrame, layer.colour[setting]);
   return colour;
 }

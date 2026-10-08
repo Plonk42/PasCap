@@ -1,5 +1,5 @@
 import { useId, type KeyboardEvent, type ReactNode } from 'react';
-import { COLOUR_CONTROLS, NEUTRAL_COLOUR } from '../shared/colour.js';
+import { COLOUR_CONTROLS, isNeutralColour, NEUTRAL_COLOUR } from '../shared/colour.js';
 import { applyCommand, type EditCommand } from '../shared/commands.js';
 import { colourAt } from '../shared/composition.js';
 import { activeLayerSetting, evaluateLayerSetting, hasLayerKeys, type KeyframeSetting } from '../shared/keyframes.js';
@@ -8,6 +8,7 @@ import type { ProjectDocument, Transition, VideoClip, VideoLayer } from '../shar
 import { sourceRateAt } from '../shared/speed.js';
 import { calculateLayout, type TimelineLayout } from '../shared/timeline.js';
 import { formatTimecode } from '../shared/timing.js';
+import { AdvancedColour } from './AdvancedColour.js';
 import { colourResetCommands } from './colour-reset.js';
 import { shortName, sourceSeconds } from './display.js';
 import { HelpPopover } from './HelpPopover.js';
@@ -280,7 +281,17 @@ function ColourControl({
   );
 }
 
-function ColourSection({ layer, frame, resetKey, disabled, onEdit, id }: Readonly<LayerControlProps & { id: string }>) {
+function ColourSection({
+  layer,
+  frame,
+  resetKey,
+  disabled,
+  onEdit,
+  id,
+  project,
+  onPause,
+  onPreview,
+}: Readonly<LayerControlProps & { id: string } & Pick<Props, 'project' | 'onPause' | 'onPreview'>>) {
   const colour = colourAt(layer, frame);
   const opacity = evaluateLayerSetting(layer, 'opacity', frame, layer.opacity);
   const animated =
@@ -305,7 +316,7 @@ function ColourSection({ layer, frame, resetKey, disabled, onEdit, id }: Readonl
       id="colour"
       title="Colour"
       icon="colour"
-      modified={adjusted > 0}
+      modified={adjusted > 0 || !isNeutralColour(layer.colour)}
       help={
         <HelpPopover label="Colour animation">
           <p>
@@ -356,6 +367,16 @@ function ColourSection({ layer, frame, resetKey, disabled, onEdit, id }: Readonl
           />
         ))}
       </div>
+      <AdvancedColour
+        key={`${project.id}:${layer.id}`}
+        project={project}
+        layer={layer}
+        frame={frame}
+        disabled={disabled}
+        onEdit={onEdit}
+        onPause={onPause}
+        onPreview={onPreview}
+      />
     </InspectorSection>
   );
 }
@@ -806,6 +827,9 @@ export function Inspector({
                 onSeek={onSeek}
               />
               <ColourSection
+                project={project}
+                onPause={onPause}
+                onPreview={onPreview}
                 layer={layer}
                 frame={frame}
                 resetKey={`${inputContext}:${frame}`}

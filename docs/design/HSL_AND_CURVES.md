@@ -1,0 +1,102 @@
+# Row HSL ranges and colour curves · strict project 11
+
+All colour belongs to the video row, keyed or unkeyed. Clips have no colour or
+correction fields. The seven existing scalar controls and their animation remain
+unchanged. HSL ranges and colour curves are **static row settings**, including on
+empty rows; the nine nullable point channels remain Opacity, Speed and those seven
+scalars. Animation does not suppress or replace the advanced static settings.
+
+## Required data and SDR order
+
+Required `layer.colour.hsl` contains eight named bands: red, orange, yellow, green,
+cyan, blue, purple and magenta. Each requires hue −30…30 degrees, saturation
+−1…1 (multiplier offset) and lightness −0.5…0.5. Centres are 0, 30, 60, 120, 180,
+240, 270 and 300 degrees. Required `layer.colour.curves` contains master, red,
+green and blue arrays, each 2…16 strict `{ x, y }` points with finite coordinates
+in 0…1. Inputs strictly ascend, with first x=0 and last x=1. Endpoint outputs are
+editable; nonmonotonic outputs are valid. No point IDs or preset fields are saved.
+Neutral factories create independent nested objects/arrays. They are only creators,
+never repairs for missing saved fields. Projects 1…10 and their receipt snapshots
+are incompatible and preserved; recreate deliberately. Receipt format remains 1;
+registry, proxy and PCM formats are unchanged. No migration or automatic deletion.
+
+The exact order is existing seven-control SDR grading → encoded BT.709 HSL →
+master curve → separate RGB curves → black-fade brightness → grouped coverage and
+source-over. This is not HDR, scene-linear HSL, white balance, a speed curve or a
+per-clip correction. Compare/Ungraded bypasses **all** colour stages, retaining
+geometry, timing, visibility, Opacity, black fades and music.
+
+## HSL mathematics
+
+Derive hue, saturation and lightness once from incoming encoded RGB. Only the two
+neighbouring circular band centres participate. For interval progress u, right
+weight is `u*u*(3-2*u)`, left weight its complement; the magenta→red interval
+wraps through 360 degrees. Never reclassify a pixel after applying one band.
+Multiply weighted offsets by `smoothstep(0, 0.1, max(R,G,B)-min(R,G,B))`.
+Exact greys, black and white therefore remain unchanged by HSL. Wrap hue after
+adding its weighted degree offset; multiply saturation by one plus its weighted
+offset and add the lightness offset. Clamp resulting saturation/lightness to gamut,
+not editor input. Convert the resulting HSL back to encoded RGB. All-neutral HSL
+returns its input exactly, as do identity curves and an entirely neutral grade.
+
+Curves use piecewise-linear interpolation, first master on each encoded component,
+then that component's channel curve. Outputs need not ascend. Arbitrarily narrow
+valid knees are evaluated analytically in native export, not approximated by a
+65³ advanced-colour LUT. Nonneutral HSL or curves route even otherwise static
+projects through layered export. Each such source evaluates the complete seven
+scalar controls → HSL → master/RGB curves directly on the sampled fractional RGB,
+before black fades and group composition. A scalar-only LUT followed by exact
+curves is insufficient: a sharp curve can amplify that LUT's scalar error.
+The exact CPU path retains full input precision without minimum point spacing,
+rounding or restrictions on valid curve inputs. RGBA16 and final H.264/4:2:0
+quantisation remain measured approximations under the unchanged error gates.
+
+## Editing, resets and resource ownership
+
+Clip → Colour retains the original seven sliders and sole Opacity control. Nested
+HSL ranges and Colour curves contain native band/channel/point selectors, exact
+numeric fields and a compact SVG curve graph. HSL uses native sliders and exact
+fields, with no diamonds. Curve endpoint inputs are locked; outputs remain editable.
+Add inserts a sampled point; delete removes only an interior point. Graph dragging
+edits both coordinates from capture-relative geometry. Drafts never save or enter
+history; release commits one complete validated row-colour command. Invalid final
+positions reject, never commit an earlier valid draft. Escape, cancellation, lost
+capture and window blur restore. Keyboard/exact fields remain usable at 270 px.
+
+Band/all-HSL and channel/all-curves resets affect only their respective static
+settings in one Undo step. Existing Reset keys changes only current participating
+scalar/Opacity keys, never advanced settings or saved row bases. Unanimated Reset
+colour resets the entire row colour and Opacity. Selection/collapse/tab changes
+never apply a former row's draft to another row. Same-row clip selection retains
+row ownership.
+
+GPU uses bounded uniforms for two sources: eight HSL vec4 entries and four arrays
+of at most sixteen vec2 points per source, plus counts/neutral flags. No extra LUT
+texture, decoder, full-frame buffer, per-row uniform multiplier or native child.
+The compositor owns three fixed shader programs, compiled before playback: the
+complete grouped advanced program, its exact single-source specialization and
+the scalar-only fast path. They share geometry, grading equations, the existing
+decoder textures and vertex array. Single-source specialization eliminates unused
+source-1 grade work; dissolves retain the complete grouped shader. Neutral advanced
+rows use the scalar path. Curves use at most four binary subdivisions
+to locate one of their fifteen intervals. Zero-coverage sources are not graded.
+The engine reuses an intact surface only when exact decoded source identities and
+every evaluated composition value are unchanged. It retains one bounded identity
+key, not another image buffer. Project-time animation, new sources and Compare
+force the appropriate redraw; any clear invalidates reuse. Readiness and the final
+actual-output-clock A/V checks still run, including for held slow-motion images.
+Diagnostic pixel capture always redraws: retaining the presented image does not
+preserve WebGL's discarded-after-presentation drawing buffer. No preserved
+framebuffer or additional texture is introduced.
+Rendered-frame/FPS counters count real replacement draws, not duplicate submissions.
+Native grading parses settings and selects exact versus LUT grading once per
+source/frame. Exact grading allocates only tiny RGB triples, never another image,
+large LUT or duration-sized array. This CPU work can substantially slow native
+exports, especially UHD; synthetic correctness does not qualify throughput.
+Neutral HSL/identity curves retain the existing scalar-only static fast path and,
+when layering is otherwise required, the original scalar 65³ LUT approximation.
+At most two reusable Float32 LUT arrays (6,591,000 bytes) remain available; an
+all-advanced export need allocate none. The four raw buffers (22 bytes/pixel),
+serial readers/encoder/children and scratch ownership budgets remain unchanged.
+The full-appearance `generateCube` helper remains available for diagnostics, not
+production export of nonneutral advanced settings.

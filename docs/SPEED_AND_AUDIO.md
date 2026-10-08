@@ -1,8 +1,6 @@
-# Speed and audio contract · project v10
+# Speed and audio contract · project v11
 
-Appearance grades each source once using required row `colour` or its independently
-participating colour keys. Static and keyed Colour share row ownership, without a
-clip grade. This does not change retiming/audio; see [row appearance](design/ROW_APPEARANCE.md).
+Static row HSL and master/RGB colour curves run after the seven evaluated colour controls and before black fades/coverage. They remain active with scalar row keys, add no animation channels, and are unrelated to speed curves. Compare/Ungraded bypasses all colour stages without changing retiming, geometry, Opacity or music. Required data and resource budgets: [HSL_AND_CURVES.md](design/HSL_AND_CURVES.md).
 
 ## Two distinct retiming contracts
 
@@ -56,7 +54,7 @@ selected original frame, even when output sampling skips it.
 Clip curves belong to **one excerpt instance**. Trims, moves, splits and marked
 cuts retain original-source anchors; split/cut/duplicate copies are independent.
 Every retained piece recompiles/rounds its duration once. Curves are carried in
-the required `speed` field of strict schema 10, without an optional fallback,
+the required `speed` field of strict schema 11, without an optional fallback,
 data migration or project-wide speed field. A mode/preset change
 is a deliberate editing command, not a conversion on load.
 
@@ -286,7 +284,7 @@ separate; an explicit override notice appears when row Speed suppresses clip spe
 
 ## Music
 
-Strict schema 10 requires `music: MusicTrack[]`, with **0–8 independent instances**
+Strict schema 11 requires `music: MusicTrack[]`, with **0–8 independent instances**
 and unique required instance `id` values; `[]` means no music. Each instance
 requires `mediaId`, `sourceIn`, `sourceOut`, `start`, `duration`, `gainDb`, `fadeIn`,
 `fadeOut` and `loop`. Several instances can use the same registered recording
@@ -431,7 +429,7 @@ cancellation cleans only owned scratch/partials and preserves completed outputs.
 
 ## Versioning
 
-Project schema **v10** requires explicit `media.videoIds` and `media.audioIds` arrays,
+Project schema **v11** requires explicit `media.videoIds` and `media.audioIds` arrays,
 unique and limited to 10,000 IDs each, plus complete row colour, clip constant/ramp/custom-curve
 speed, required clip `spatial: { base, keyframes }` with eight-value base and
 0–256 full-pose source-frame keys with required easing, layer point arrays with
@@ -450,7 +448,7 @@ Row `opacity` is valid and required; saved `clip.opacity` and old
 New projects have empty video/music bins. Standalone audio imports belong
 to the open project's bin; every music instance's references also count as membership.
 Global registered music/proxies are reusable on deliberate import, never automatically
-inherited by a new project. Earlier v1–v9 projects and export receipt snapshots remain unchanged
+inherited by a new project. Earlier v1–v10 projects and export receipt snapshots remain unchanged
 and incompatible. There is no migration, compatibility reader, null fallback, default-field
 injection or automatic deletion; recreate projects and import their media to reuse
 registered assets/verified ready proxies. Confirmed project deletion affects only
@@ -460,7 +458,7 @@ Registry/video-proxy/current PCM formats, source guards and native video budgets
 native composition uses the sole Opacity contract without a layer multiplier.
 Preview uses the current explicitly prepared PCM cache described above.
 
-Export receipts remain **version 1** with a strict **v10** snapshot, required
+Export receipts remain **version 1** with a strict **v11** snapshot, required
 `musicSources` captured unique-original array and `settings.audio` identified
 instance-plan array (`[]` for each without music). Plans preserve independent
 timing/gain/fades/loop; several may refer to the same captured original. The plan

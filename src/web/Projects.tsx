@@ -139,8 +139,8 @@ export function Projects({
       footer={
         <>
           <span className="activity-hint">
-            Version 10 · row-owned Colour and Opacity, independent track settings and project-specific media. Older
-            projects remain unchanged unless explicitly deleted; no migration.
+            Version 11 · row-owned Colour, HSL, curves and Opacity, independent track settings and project-specific
+            media. Older projects remain unchanged unless explicitly deleted; no migration.
           </span>
           <button className="secondary-button" onClick={onClose} disabled={submitting}>
             Close
@@ -169,7 +169,7 @@ export function Projects({
           <span>Project filter</span>
           <select value={filter} onChange={(event) => setFilter(event.target.value as ProjectFilter)}>
             <option value="all">All projects</option>
-            <option value="compatible">Compatible (version 10)</option>
+            <option value="compatible">Compatible (version 11)</option>
             <option value="unsupported">Unavailable / unsupported</option>
           </select>
         </label>
@@ -213,7 +213,7 @@ export function Projects({
             {!project.compatible && (
               <p className="activity-project-reason">
                 {project.error ||
-                  'This project is unsupported or invalid. Version 10 is required; the original is preserved without migration.'}
+                  'This project is unsupported or invalid. Version 11 is required; the original is preserved without migration.'}
               </p>
             )}
             <div className="activity-project-actions">

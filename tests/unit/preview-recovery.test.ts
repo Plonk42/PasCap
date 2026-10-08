@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import type { CompositeGroup } from '../../src/preview/compositor.js';
 import { PreviewEngine } from '../../src/preview/engine.js';
-import { NEUTRAL_COLOUR } from '../../src/shared/colour.js';
+import { NEUTRAL_COLOUR, scalarColourValues } from '../../src/shared/colour.js';
 import { EMPTY_KEY_VALUES } from '../../src/shared/keyframes.js';
 import {
   createClip,
@@ -285,6 +285,7 @@ function singleProject(withMusic = false): ProjectDocument {
 function gradedProject(withMusic = false): ProjectDocument {
   const project = singleProject(withMusic);
   project.layers[0]!.colour = {
+    ...NEUTRAL_COLOUR,
     exposure: 0.7,
     brightness: 0.1,
     contrast: 1.2,
@@ -320,7 +321,7 @@ function gradedLayersProject(): ProjectDocument {
     {
       frame: 0,
       interpolation: 'smooth',
-      values: { ...EMPTY_KEY_VALUES, ...gradedProject().layers[0]!.colour, opacity: 0.35 },
+      values: { ...EMPTY_KEY_VALUES, ...scalarColourValues(gradedProject().layers[0]!.colour), opacity: 0.35 },
     },
     {
       frame: 60,
@@ -561,9 +562,16 @@ describe('exact intact-surface reuse', () => {
     expectNoMediaOperations(preview);
   });
 
-  it('reuses a held graded image at current project time, but redraws a new source, Compare and a cleared seek', async () => {
+  it('reuses a held advanced image at current project time, but redraws a new source, Compare and a cleared seek', async () => {
     const project = gradedProject(true);
     project.clips[0]!.speed = { mode: 'constant', rate: 0.25 };
+    project.layers[0]!.colour = structuredClone(project.layers[0]!.colour);
+    project.layers[0]!.colour.hsl.red = { hue: 12, saturation: -0.3, lightness: 0.04 };
+    project.layers[0]!.colour.curves.master = [
+      { x: 0, y: 0.02 },
+      { x: 0.4, y: 0.53 },
+      { x: 1, y: 0.98 },
+    ];
     const preview = await running(project, 0);
     const rendered = preview.engine.diagnostics().renderedFrames;
     for (const frame of [1, 2, 3]) {
@@ -673,7 +681,8 @@ describe('PreviewEngine final publication boundary', () => {
       armed = true;
       tick(preview, 70);
     } else {
-      // Force actual raster work rather than an identical intact surface.
+      // A changed native target requires an actual replacement raster even
+      // when this neighbour has the same source/appearance as the old image.
       preview.engine.canvas.width += 1;
       const draw = preview.compositor.drawFrame.getMockImplementation()!;
       preview.compositor.drawFrame.mockImplementationOnce((groups) => {
@@ -981,7 +990,7 @@ describe('PreviewEngine observed-frame tolerance and recovery', () => {
           });
       });
       published.length = 0;
-      // This witness concerns actual raster delay, not unchanged-image reuse.
+      // Exercise real replacement work, not a now-reusable identical image.
       preview.engine.canvas.width += 1;
       const draw = preview.compositor.drawFrame.getMockImplementation()!;
       preview.compositor.drawFrame.mockImplementationOnce((groups) => {
@@ -2025,6 +2034,7 @@ describe('PreviewEngine editor-only ungraded comparison', () => {
     preview.engine.setUngraded(true);
     vi.clearAllMocks();
     const edited = {
+      ...NEUTRAL_COLOUR,
       exposure: -1.25,
       brightness: -0.2,
       contrast: 0.7,

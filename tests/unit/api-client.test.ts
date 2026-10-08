@@ -369,7 +369,7 @@ describe('registered API methods', () => {
   });
 
   it('uses complete schema-10 project mocks and rejects a version-8 response without changing it', async () => {
-    expect(project.schemaVersion).toBe(10);
+    expect(project.schemaVersion).toBe(11);
     expect(project.layers[0]!.keyframes).toEqual([]);
     const unsupported = unsupportedProject(8, project.id, project.title);
     const before = JSON.stringify(unsupported);

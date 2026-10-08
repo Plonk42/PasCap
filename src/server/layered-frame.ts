@@ -1,5 +1,6 @@
 import { endianness } from 'node:os';
 import { setImmediate as yieldToEvents } from 'node:timers/promises';
+import { colourSchema, compilePixelGrade, isNeutralAdvancedColour, type RGB } from '../shared/colour.js';
 import { compileSpatialMapping, type SpatialMapping } from '../shared/spatial.js';
 import type { PreviewLayer } from '../shared/timeline.js';
 import { ColourLutCache, checkLayeredCancellation, sampleColourLut } from './layered-colour.js';
@@ -18,7 +19,8 @@ export interface LayerFrameSource {
   original: { width: number; height: number };
 }
 interface PreparedSource extends LayerFrameSource {
-  lut: Float32Array;
+  lut: Float32Array | null;
+  exactColour: ((rgb: RGB) => RGB) | null;
   multiplier: number;
   coverage: number;
   mapping: SpatialMapping;
@@ -104,8 +106,8 @@ function sampleGradedSource(
       graded.fill(0);
       return true;
     }
-    sampleColourLut(
-      source.lut,
+    gradeSourceRgb(
+      source,
       source.rgb[inputOffset]!,
       source.rgb[inputOffset + 1]!,
       source.rgb[inputOffset + 2]!,
@@ -116,8 +118,19 @@ function sampleGradedSource(
   if (!sampleSpatialRgb(source, x, y, resampled)) return false;
   if (source.multiplier === 0) graded.fill(0);
   // Grade AFTER RGB resampling; never interpolate already graded endpoint colours.
-  else sampleColourLut(source.lut, resampled[0]!, resampled[1]!, resampled[2]!, graded);
+  else gradeSourceRgb(source, resampled[0]!, resampled[1]!, resampled[2]!, graded);
   return true;
+}
+
+/** Advanced knees can amplify even scalar LUT error: evaluate the complete grade
+ * on the fractional sampled RGB, before fades/coverage, with only tiny triples. */
+function gradeSourceRgb(source: PreparedSource, red: number, green: number, blue: number, out: Float64Array): void {
+  if (source.exactColour) {
+    const rgb = source.exactColour([red / 255, green / 255, blue / 255]);
+    out[0] = rgb[0];
+    out[1] = rgb[1];
+    out[2] = rgb[2];
+  } else sampleColourLut(source.lut!, red, green, blue, out);
 }
 
 function groupCoverage(sources: readonly LayerFrameSource[]): number {
@@ -140,6 +153,9 @@ async function prepareSources(
   const prepared: PreparedSource[] = [];
   for (const source of sources) {
     validateBounds(source.bounds, target);
+    // Validate and choose the grading path once per source/frame, never per pixel.
+    const colour = colourSchema.parse(source.sample.colour);
+    const exactColour = isNeutralAdvancedColour(colour) ? null : compilePixelGrade(colour);
     const mapping = compileSpatialMapping(
       source.sample.spatial,
       source.original.width,
@@ -149,7 +165,8 @@ async function prepareSources(
     );
     prepared.push({
       ...source,
-      lut: await cache.get(source.sample.colour, signal), // NOSONAR -- two borrowed slots, never parallel LUT builds.
+      lut: exactColour ? null : await cache.get(colour, signal), // NOSONAR -- two borrowed slots, never parallel LUT builds.
+      exactColour,
       multiplier: source.sample.opacity * source.sample.blendWeight * source.sample.brightness * 65535,
       coverage: source.sample.opacity * source.sample.blendWeight,
       mapping,

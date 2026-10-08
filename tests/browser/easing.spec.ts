@@ -92,7 +92,7 @@ for (const context of ['shared', 'ramp', 'clip'] as const) {
       /Graph: time runs left to right; value progress runs bottom to top/,
     );
     const before = await current(page);
-    expect(before.schemaVersion).toBe(10);
+    expect(before.schemaVersion).toBe(11);
     expect(before.layers[0]!.opacity).toBe(1);
     expect(before.clips[0]).not.toHaveProperty('opacity');
     expect(Object.keys(before.layers[0]!.keyframes[0]!.values)).toHaveLength(9);

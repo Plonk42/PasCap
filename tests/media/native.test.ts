@@ -46,7 +46,16 @@ describe.skipIf(!enabled)('native FFmpeg integration · disposable synthetic sou
       { ...NEUTRAL_COLOUR, saturation: 1.3 },
       { ...NEUTRAL_COLOUR, highlights: -0.4 },
       { ...NEUTRAL_COLOUR, shadows: 0.3 },
-      { exposure: 0.6, brightness: 0.02, contrast: 1.1, hue: 12, saturation: 1.2, highlights: -0.2, shadows: 0.15 },
+      {
+        ...NEUTRAL_COLOUR,
+        exposure: 0.6,
+        brightness: 0.02,
+        contrast: 1.1,
+        hue: 12,
+        saturation: 1.2,
+        highlights: -0.2,
+        shadows: 0.15,
+      },
     ];
     const pixels = Buffer.alloc(17 * 17 * 3);
     for (let index = 0; index < 17 * 17; index++) {

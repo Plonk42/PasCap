@@ -232,6 +232,7 @@ describe('project-frame shared row settings', () => {
     clip.speed = { mode: 'constant', rate: 0.5 };
     const layer = { ...createProject('p', 'P').layers[0]!, opacity: 0.7 };
     layer.colour = {
+      ...NEUTRAL_COLOUR,
       exposure: 0.7,
       brightness: 0.09,
       contrast: 0.8,
