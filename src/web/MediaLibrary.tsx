@@ -18,6 +18,7 @@ import {
 } from '../shared/media-selection.js';
 import type { MediaAsset } from '../shared/media.js';
 import type { ProjectDocument } from '../shared/model.js';
+import { mediaRemovalUsage } from '../shared/projects.js';
 import { durationLabel, MEDIA_DRAG_TYPE, mediaReady, shortName } from './display.js';
 import { Icon } from './icons.js';
 import './media-review.css';
@@ -26,6 +27,7 @@ import './rush-source.css';
 import { Modal } from './Modal.js';
 import { Popover } from './Popover.js';
 import { readPreference, writePreference } from './preferences.js';
+import { RemoveMediaDialog } from './RemoveMediaDialog.js';
 
 interface Props {
   assets: MediaAsset[];
@@ -35,6 +37,7 @@ interface Props {
   onInsert: (mediaIds: string[]) => void;
   onDragMedia: (mediaIds: string[] | null) => void;
   onPrepare: (mediaIds: string[]) => Promise<void>;
+  onRemove: (mediaIds: string[]) => boolean;
   onImport: (directory: string) => Promise<ImportResult>;
   onRegisterPaths: (paths: readonly string[]) => Promise<ImportResult>;
   review: ReviewTarget | null;
@@ -196,6 +199,7 @@ export function MediaLibrary({
   onInsert,
   onDragMedia,
   onPrepare,
+  onRemove,
   onImport,
   onRegisterPaths,
   review,
@@ -222,6 +226,7 @@ export function MediaLibrary({
   const [dropError, setDropError] = useState('');
   const importAccepted = importSucceeded(importResult);
   const [confirmPrepare, setConfirmPrepare] = useState(false);
+  const [removing, setRemoving] = useState<readonly string[] | null>(null);
   const [hover, setHover] = useState<HoverMarker | null>(null);
   const hoverRequest = useRef<HoverRequest | null>(null);
   const hoverAnimation = useRef<number | null>(null);
@@ -240,6 +245,7 @@ export function MediaLibrary({
     setSelected(new Set());
     setLastSelected(null);
     setConfirmPrepare(false);
+    setRemoving(null);
     return () => {
       if (hoverAnimation.current !== null) cancelAnimationFrame(hoverAnimation.current);
       hoverAnimation.current = null;
@@ -391,6 +397,31 @@ export function MediaLibrary({
     setImportResult(null);
     setShowImport(true);
   };
+  const remove = (ids: readonly string[]): void => {
+    const first = visible.findIndex((asset) => ids.includes(asset.id));
+    const remaining = (asset: MediaAsset): boolean => !ids.includes(asset.id);
+    const neighbour =
+      visible.slice(first + 1).find(remaining) ?? visible.slice(0, Math.max(0, first)).reverse().find(remaining);
+    setRemoving(null);
+    if (!onRemove([...ids])) return;
+    setSelected((previous) => new Set([...previous].filter((id) => !ids.includes(id))));
+    setConfirmPrepare(false);
+    // The removed card took focus with it; keep keyboard users in the list without opening a review.
+    requestAnimationFrame(() => {
+      const target = neighbour
+        ? document.querySelector<HTMLElement>(
+            `.media-item[data-media-id="${CSS.escape(neighbour.id)}"] .media-checkbox`,
+          )
+        : document.querySelector<HTMLElement>('[aria-label="Search media"]');
+      target?.focus();
+    });
+  };
+  const requestRemove = (ids: readonly string[]): void => {
+    if (!project || busy || !ids.length) return;
+    if (mediaRemovalUsage(project, { videoIds: ids, audioIds: [] }).clips > 0) setRemoving(ids);
+    else remove(ids);
+  };
+  const removingUsage = removing && project ? mediaRemovalUsage(project, { videoIds: removing, audioIds: [] }) : null;
 
   return (
     <aside className="media-panel panel declutter-media" aria-label="Media library">
@@ -528,6 +559,15 @@ export function MediaLibrary({
                 Prepare
               </button>
             )}
+            <button
+              className="icon-button"
+              aria-label="Remove selected from project"
+              title="Remove the selected recordings from this project; original files are kept"
+              disabled={!project || busy}
+              onClick={() => requestRemove(selectedAssets.map((asset) => asset.id))}
+            >
+              <Icon name="trash" size={14} />
+            </button>
             <button className="icon-button" aria-label="Clear selected" title="Clear selection" onClick={clearSelected}>
               <Icon name="x" size={14} />
             </button>
@@ -693,6 +733,15 @@ export function MediaLibrary({
                 onInsert={onInsert}
                 onPrepare={onPrepare}
               />
+              <button
+                className="icon-button media-remove"
+                aria-label={`Remove ${asset.name} from project`}
+                title="Remove from this project; the original file is kept"
+                disabled={!project || busy}
+                onClick={() => requestRemove([asset.id])}
+              >
+                <Icon name="trash" size={14} />
+              </button>
             </article>
           );
         })}
@@ -723,6 +772,16 @@ export function MediaLibrary({
           </div>
         )}
       </div>
+      {removing && removingUsage && (
+        <RemoveMediaDialog
+          names={removing.map((id) => assets.find((asset) => asset.id === id)?.name ?? id)}
+          clips={removingUsage.clips}
+          music={removingUsage.music}
+          busy={busy}
+          onCancel={() => setRemoving(null)}
+          onConfirm={() => remove(removing)}
+        />
+      )}
       {showImport && (
         <Modal
           className="import-dialog"

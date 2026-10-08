@@ -404,7 +404,10 @@ does not change timeline position, and suppresses stale imagery while loading/se
 The open project's bin contains explicitly imported videos/music plus its timeline
 references, not all global registrations. New projects have empty membership;
 imports deliberately add to the selected bin and reuse the shared content-deduplicated
-registry/cache. Removing excerpts does not discard imported rushes.
+registry/cache. Removing excerpts does not discard imported rushes; **Remove from
+project** deliberately removes a recording's membership together with its
+excerpts/music instances (confirmed when used), in one Undo step, without touching
+originals or caches.
 User library imports/additions automatically queue eligible proxies; ready/active
 work is reused. Startup and hovering unprepared sources do not launch hidden
 preparation jobs or play originals. Cancelled/failed preparation requires an explicit retry.

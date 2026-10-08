@@ -514,6 +514,17 @@ arrays empty and never inherit all globally registered videos/music. Deliberatel
 importing an already registered source into another project adds membership while
 reusing eligible prepared assets, without changing originals.
 
+**Remove from project** is a trash on each Media card (shown on hover, focus or
+selection), on the selection header for all selected recordings, and beside
+**Audio → Music → Recording** for music. An unused recording leaves at once;
+one still used by excerpts or music instances opens a confirmation naming their
+counts, and confirming removes membership and placements atomically. Either is
+one Undo step. Removal releases a source review of that recording and keeps focus
+in the Media list (or on the Recording selector). Originals, registry entries,
+proxies/thumbnails/PCM caches, other projects and exports are never touched.
+Only ready music recordings can be chosen in Recording, so only they can be
+removed there.
+
 Reimport/concurrent additions reuse ready proxies or pending/active preparation;
 they do not encode the same source twice. Registration remains kept when queue
 admission fails. Failed/cancelled/interrupted jobs are not retried automatically;
