@@ -22,6 +22,7 @@ import { assertSourceIdentity } from './files.js';
 import type { JobContext } from './jobs.js';
 import { ColourLutCache, checkLayeredCancellation } from './layered-colour.js';
 import { composeLayerFrame, fittedContent, type LayerFrameSource } from './layered-frame.js';
+import { CompositorPool } from './layered-pool.js';
 import { runProcess } from './process.js';
 import { runRawVideoPass, writeRawFrame, type RawFrameReader, type RawPassReport } from './raw-process.js';
 import { retimeRawVideo, type RawRetimingReport } from './retime-process.js';
@@ -114,6 +115,11 @@ function trackReaders(
 
 function* frameIndices(count: number): Generator<number> {
   for (let index = 0; index < count; index++) yield index;
+}
+
+/** The same four raw buffers, shareable with compositor workers instead of copied. */
+function sharedFrame(bytes: number): Buffer {
+  return Buffer.from(new SharedArrayBuffer(bytes));
 }
 
 /** Already graded/premultiplied RGBA16 groups: apply coverage once, never a second LUT. */
@@ -266,6 +272,7 @@ class SequentialLayeredRenderer {
   readonly #retiming: RawRetimingReport[] = [];
   readonly #report: LayeredRenderReport;
   readonly #totalWork: number;
+  #pool: CompositorPool | null = null;
   #finishedWork = 0;
   #progress = 0.04;
   #clipFiles = 0;
@@ -296,8 +303,8 @@ class SequentialLayeredRenderer {
       )
     )
       throw new ServiceError('Layered inputs differ from their registered original identities or source bounds.', 422);
-    this.#rgba = [Buffer.alloc(pixels * 8), Buffer.alloc(pixels * 8)];
-    this.#rgb = [Buffer.allocUnsafe(pixels * 3), Buffer.allocUnsafe(pixels * 3)];
+    this.#rgba = [sharedFrame(pixels * 8), sharedFrame(pixels * 8)];
+    this.#rgb = [sharedFrame(pixels * 3), sharedFrame(pixels * 3)];
     this.#report = {
       renderedClipIds: [],
       skippedLayerIds: document.layers.filter((layer) => !layer.enabled).map((layer) => layer.id),
@@ -521,7 +528,7 @@ class SequentialLayeredRenderer {
         );
         const sources = await this.readSources(clips, readers, maps, frame, samples);
         const started = performance.now();
-        await composeLayerFrame(this.#rgba[0], target, sources, this.#cache, context.signal);
+        await composeLayerFrame(this.#rgba[0], target, sources, this.#cache, context.signal, this.#pool);
         this.#report.compositionMs += performance.now() - started;
         await writeRawFrame(encoder, this.#rgba[0]);
         if (frame === 0 || (frame + 1) % progressStep === 0 || frame + 1 === span.duration) {
@@ -661,6 +668,15 @@ class SequentialLayeredRenderer {
     return filename;
   }
   async render(): Promise<LayeredRenderResult> {
+    this.#pool = CompositorPool.forHost();
+    try {
+      return await this.renderPasses();
+    } finally {
+      await this.#pool?.close();
+      this.#pool = null;
+    }
+  }
+  private async renderPasses(): Promise<LayeredRenderResult> {
     const started = performance.now();
     let filename: string | null = null;
     await forEachSerial(this.options.plan.layers, async (layer, index) => {

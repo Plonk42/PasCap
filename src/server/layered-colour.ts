@@ -1,7 +1,9 @@
 import { setImmediate as yieldToEvents } from 'node:timers/promises';
-import { colourSchema, compilePixelGrade, type ColourSettings } from '../shared/colour.js';
+import { colourSchema, compileGradeInto, type ColourSettings, type PixelGrade } from '../shared/colour.js';
 import { LAYERED_EXPORT_RESOURCES } from '../shared/export.js';
+import { forEachSerial } from '../shared/serial.js';
 import { ServiceError } from './errors.js';
+import type { CompositorPool } from './layered-pool.js';
 
 const SIZE = LAYERED_EXPORT_RESOURCES.lutSize;
 const RED_STEP = 3;
@@ -17,6 +19,29 @@ for (let value = 0; value < 256; value++) {
 
 export function checkLayeredCancellation(signal: AbortSignal): void {
   if (signal.aborted) throw new ServiceError('Job cancelled.', 499);
+}
+
+function* blueSlices(count: number): Generator<number> {
+  for (let index = 0; index < count; index++) yield index;
+}
+
+/** Fill whole blue slices [blueStart, blueEnd); red is the fastest-moving coordinate. */
+export function fillColourLut(buffer: Float32Array, grade: PixelGrade, blueStart: number, blueEnd: number): void {
+  const rgb = new Float64Array(3);
+  let offset = blueStart * BLUE_STEP;
+  for (let blue = blueStart; blue < blueEnd; blue++) {
+    for (let green = 0; green < SIZE; green++) {
+      for (let red = 0; red < SIZE; red++) {
+        rgb[0] = red / (SIZE - 1);
+        rgb[1] = green / (SIZE - 1);
+        rgb[2] = blue / (SIZE - 1);
+        grade.encoded(rgb);
+        buffer[offset++] = rgb[0];
+        buffer[offset++] = rgb[1];
+        buffer[offset++] = rgb[2];
+      }
+    }
+  }
 }
 
 /**
@@ -39,7 +64,7 @@ export class ColourLutCache {
       generationMs: this.#generationMs,
     };
   }
-  async get(settings: ColourSettings, signal: AbortSignal): Promise<Float32Array> {
+  async get(settings: ColourSettings, signal: AbortSignal, pool: CompositorPool | null = null): Promise<Float32Array> {
     checkLayeredCancellation(signal);
     if (this.#building)
       throw new Error('LUT generation is sequential; concurrent requests would invalidate borrowed LUTs.');
@@ -59,29 +84,23 @@ export class ColourLutCache {
     } else {
       buffer =
         this.#buffers.find((candidate) => ![...this.#entries.values()].includes(candidate)) ??
-        new Float32Array(SIZE ** 3 * 3);
+        new Float32Array(new SharedArrayBuffer(SIZE ** 3 * 3 * Float32Array.BYTES_PER_ELEMENT));
       if (!this.#buffers.includes(buffer)) this.#buffers.push(buffer);
     }
     this.#building = true;
     const started = performance.now();
-    const grade = compilePixelGrade(value);
     try {
-      let offset = 0;
-      for (let blue = 0; blue < SIZE; blue++) {
-        for (let green = 0; green < SIZE; green++) {
-          for (let red = 0; red < SIZE; red++) {
-            const rgb = grade([red / (SIZE - 1), green / (SIZE - 1), blue / (SIZE - 1)]);
-            buffer[offset++] = rgb[0];
-            buffer[offset++] = rgb[1];
-            buffer[offset++] = rgb[2];
-          }
-          // Cancellation remains responsive while building a changing grade.
-          if (green % 16 === 0) {
-            await yieldToEvents(); // NOSONAR -- cooperative CPU work, not waiting for a child.
-            checkLayeredCancellation(signal);
-          }
-        }
+      if (pool) await pool.fillLut(buffer, value, SIZE);
+      else {
+        const grade = compileGradeInto(value);
+        // Cancellation remains responsive while building a changing grade.
+        await forEachSerial(blueSlices(SIZE), async (blue) => {
+          fillColourLut(buffer, grade, blue, blue + 1);
+          await yieldToEvents();
+          checkLayeredCancellation(signal);
+        });
       }
+      checkLayeredCancellation(signal);
       this.#entries.set(key, buffer);
       this.#generated++;
       return buffer;
