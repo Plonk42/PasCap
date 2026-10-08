@@ -12,7 +12,7 @@ async function current(page: Page): Promise<ProjectDocument> {
 }
 
 for (const context of ['shared', 'ramp', 'clip'] as const) {
-  test(`${context} easing graphs keep native selection, exact shapes and one-step Undo in the compact Inspector`, async ({
+  test(`${context} easing graphs keep native selection, exact shapes and one-step Undo in the 270px Inspector`, async ({
     page,
     request,
   }) => {
@@ -70,7 +70,7 @@ for (const context of ['shared', 'ramp', 'clip'] as const) {
         }),
       ),
     );
-    await page.setViewportSize({ width: 1024, height: 900 });
+    await page.setViewportSize({ width: 1280, height: 720 });
     await page.goto(`/?project=${document.id}`);
     await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
     if (context === 'shared') await editLayerPoint(page, 'Video 1', 10);
@@ -127,31 +127,22 @@ for (const context of ['shared', 'ramp', 'clip'] as const) {
     await page.getByRole('button', { name: 'Undo', exact: true }).click();
     expect(await current(page)).toEqual(before);
     await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
-    for (const width of [1024, 720]) {
-      await page.setViewportSize({ width, height: 900 });
-      if (width === 720) {
-        const toggle = page.getByRole('button', { name: 'Toggle Clip panel', exact: true });
-        await expect(toggle).toHaveAttribute('aria-pressed', 'false');
-        await toggle.click();
-      } else {
-        await expect(page.getByRole('slider', { name: 'Resize Clip panel', exact: true })).toHaveAttribute(
-          'aria-valuenow',
-          '270',
-        );
-      }
-      await select.scrollIntoViewIfNeeded();
-      const bounds = (await choice.boundingBox())!;
-      const panel = page.getByRole('complementary', { name: 'Clip inspector', exact: true });
-      const panelBounds = (await panel.boundingBox())!;
-      if (width === 1024) expect(bounds.width).toBeLessThanOrEqual(270);
-      expect(bounds.x).toBeGreaterThanOrEqual(panelBounds.x);
-      expect(bounds.x + bounds.width).toBeLessThanOrEqual(panelBounds.x + panelBounds.width);
-      expect(await panel.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
-      expect(bounds.x).toBeGreaterThanOrEqual(0);
-      expect(bounds.x + bounds.width).toBeLessThanOrEqual(width);
-      expect(await choice.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
-      expect(await page.evaluate(() => globalThis.document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-    }
+    await expect(page.getByRole('slider', { name: 'Resize Clip panel', exact: true })).toHaveAttribute(
+      'aria-valuenow',
+      '270',
+    );
+    await select.scrollIntoViewIfNeeded();
+    const bounds = (await choice.boundingBox())!;
+    const panel = page.getByRole('complementary', { name: 'Clip inspector', exact: true });
+    const panelBounds = (await panel.boundingBox())!;
+    expect(bounds.width).toBeLessThanOrEqual(270);
+    expect(bounds.x).toBeGreaterThanOrEqual(panelBounds.x);
+    expect(bounds.x + bounds.width).toBeLessThanOrEqual(panelBounds.x + panelBounds.width);
+    expect(await panel.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+    expect(bounds.x).toBeGreaterThanOrEqual(0);
+    expect(bounds.x + bounds.width).toBeLessThanOrEqual(1280);
+    expect(await choice.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+    expect(await page.evaluate(() => globalThis.document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     expect(unexpected).toEqual([]);
     expect(calculateLayout(await current(page)).duration).toBe(calculateLayout(before).duration);
   });

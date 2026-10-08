@@ -221,16 +221,20 @@ test('horizontal scrolling remains independent and synchronized vertical extents
   expect(memory.saves).toBe(0);
 });
 
-for (const { width, height } of [
-  { width: 1440, height: 900 },
-  { width: 1024, height: 720 },
-  { width: 720, height: 720 },
-  { width: 640, height: 600 },
-  { width: 1440, height: 480 },
+for (const { width, height, timelineHeight } of [
+  { width: 1440, height: 900, timelineHeight: 290 },
+  { width: 1280, height: 720, timelineHeight: 290 },
+  { width: 1280, height: 720, timelineHeight: 200 },
 ]) {
-  test(`all eight rows remain reachable and aligned in the ${width}×${height} workspace`, async ({ page }) => {
+  test(`all eight rows remain reachable and aligned in the ${width}×${height} workspace with a ${timelineHeight}px timeline`, async ({
+    page,
+  }) => {
     const before = await current(page);
     await page.setViewportSize({ width, height });
+    const resizer = page.getByRole('slider', { name: 'Resize Timeline panel', exact: true });
+    // Shift+ArrowDown shrinks the timeline 32px per step, clamped at its 200px minimum.
+    if (timelineHeight === 200) for (let index = 0; index < 3; index++) await resizer.press('Shift+ArrowDown');
+    await expect(resizer).toHaveAttribute('aria-valuenow', String(timelineHeight));
     const viewport = page.locator('.timeline-scroll');
     const headers = page.getByRole('complementary', { name: 'Video layers', exact: true });
     const viewportHeight = await viewport.evaluate((element) => element.clientHeight);

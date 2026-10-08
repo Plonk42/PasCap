@@ -798,12 +798,15 @@ test('comparison survives seek and timing reload, but clears on project switches
   await expect(page.getByRole('button', { name: 'Redo', exact: true })).toBeDisabled();
 });
 
-for (const width of [1440, 1280, 1024, 900, 720]) {
-  test(`comparison fits ${width}px / 270px inspector with a visible native 28px target`, async ({
+for (const { width, height } of [
+  { width: 1440, height: 900 },
+  { width: 1280, height: 720 },
+]) {
+  test(`comparison fits ${width}×${height} / 270px inspector with a visible native 28px target`, async ({
     page,
     comparison,
   }) => {
-    await page.setViewportSize({ width, height: 720 });
+    await page.setViewportSize({ width, height });
     await page.addInitScript(() =>
       localStorage.setItem(
         'pascap-workspace-layout',
@@ -820,17 +823,7 @@ for (const width of [1440, 1280, 1024, 900, 720]) {
     const inspector = page.getByRole('complementary', { name: 'Clip inspector', exact: true });
     await expect(inspector).toBeVisible();
     const divider = page.getByRole('slider', { name: 'Resize Clip panel', exact: true });
-    if (width >= 980) await expect(divider).toHaveAttribute('aria-valuenow', '270');
-    else {
-      // Narrow workspaces deliberately use an overlay drawer, not a resizable
-      // desktop sidebar. Close it through its native header action to compare.
-      await expect(divider).toHaveCount(0);
-      expect(
-        await page.evaluate(() => JSON.parse(localStorage.getItem('pascap-workspace-layout')!).inspectorWidth),
-      ).toBe(270);
-      await page.getByRole('button', { name: 'Toggle Clip panel', exact: true }).click();
-      await expect(inspector).toBeHidden();
-    }
+    await expect(divider).toHaveAttribute('aria-valuenow', '270');
     const button = compareButton(page);
     await expect(button).toBeInViewport({ ratio: 1 });
     const box = (await button.boundingBox())!;

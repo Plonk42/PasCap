@@ -450,23 +450,21 @@ test('a slow clip-key click previews that exact original image instead of the pr
   expect(memory.saves).toBe(0);
 });
 
-test('custom controls fit a 270px Inspector and 720px drawer with accessible point hit targets', async ({ page }) => {
+test('custom controls fit a 270px Inspector at the default and minimum viewports with accessible point hit targets', async ({
+  page,
+}) => {
   const before = await seedCurve(page);
   const resizer = page.getByRole('slider', { name: 'Resize Clip panel' });
   await resizer.focus();
   for (let index = 0; index < 4; index++) await resizer.press('ArrowRight');
   await expect(resizer).toHaveAttribute('aria-valuenow', '270');
-  for (const width of [1440, 720]) {
-    await page.setViewportSize({ width, height: 720 });
+  for (const { width, height } of [
+    { width: 1440, height: 900 },
+    { width: 1280, height: 720 },
+  ]) {
+    await page.setViewportSize({ width, height });
     const editor = page.getByRole('region', { name: 'Clip speed curve editor' });
-    const toggle = page.getByRole('button', { name: 'Toggle Clip panel', exact: true });
-    // Compact adaptation is a React resize update, not synchronous with setViewportSize.
-    // This fixture has both panels open, so crossing the drawer breakpoint closes Clip.
-    if (width < 980) {
-      await expect(toggle).toHaveAttribute('aria-pressed', 'false');
-      await toggle.click();
-    }
-    await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+    await expect(resizer).toHaveAttribute('aria-valuenow', '270');
     await expect(editor).toBeVisible();
     await point(page, 60).scrollIntoViewIfNeeded();
     await expect(point(page, 60)).toBeInViewport();

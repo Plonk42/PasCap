@@ -415,7 +415,7 @@ test('three ranges from one rush keep the source pinned, independent, reloadable
     await expect(row.locator('.source-excerpt-layer')).toHaveText('Video 1');
     await expect(row.getByRole('button', { name: `Show excerpt ${index + 1} on timeline`, exact: true })).toBeVisible();
   }
-  await page.setViewportSize({ width: 1024, height: 900 });
+  await page.setViewportSize({ width: 1280, height: 720 });
   await page.getByRole('slider', { name: 'Timeline zoom', exact: true }).fill('180');
   await expect
     .poll(() => page.locator('.timeline-scroll').evaluate((element) => element.scrollWidth - element.clientWidth))
@@ -465,7 +465,7 @@ test('three ranges from one rush keep the source pinned, independent, reloadable
 test('rush excerpt popup leaves review geometry and Add reachable on a short laptop screen, with isolated Escape and outside-click addition', async ({
   page,
 }) => {
-  await page.setViewportSize({ width: 1024, height: 720 });
+  await page.setViewportSize({ width: 1280, height: 720 });
   await page.getByRole('button', { name: 'Review pattern-a.mp4', exact: true }).click();
   await sourceFrame(page, 30);
   const before = await current(page);
@@ -1551,13 +1551,11 @@ test('a cancelled never-settling source play has a bounded failure and reachable
   expect(memory.saves).toBe(0);
 });
 
-test('source IN/OUT targets, omitted footage and reversible drafts remain reachable on a short compact viewport', async ({
+test('source IN/OUT targets, omitted footage and reversible drafts remain reachable at the minimum viewport', async ({
   page,
 }) => {
-  await page.setViewportSize({ width: 720, height: 600 });
+  await page.setViewportSize({ width: 1280, height: 720 });
   await page.getByRole('button', { name: 'Review pattern-a.mp4', exact: true }).click();
-  // The compact Media drawer intentionally covers the left of the viewer.
-  await page.getByRole('button', { name: 'Toggle Media panel', exact: true }).click();
   await sourceRange(page, 25, 90);
   await sourceFrame(page, 50);
   const handles = page.locator('.source-trim-handle');

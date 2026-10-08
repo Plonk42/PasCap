@@ -369,7 +369,7 @@ test('listing truncation and per-entry warnings are explicit and browsing remain
   expect(memory.saves).toBe(0);
 });
 
-test('the no-copy browser and explicit path form fit a compact desktop without horizontal overflow', async ({
+test('the no-copy browser and explicit path form fit the minimum viewport without horizontal overflow', async ({
   page,
 }) => {
   await mockDirectory(
@@ -383,7 +383,7 @@ test('the no-copy browser and explicit path form fit a compact desktop without h
       },
     ]),
   );
-  await page.setViewportSize({ width: 720, height: 720 });
+  await page.setViewportSize({ width: 1280, height: 720 });
   await openImport(page);
   await expect(
     page.getByRole('checkbox', { name: 'Select original A very long footage filename with spaces.mp4' }),

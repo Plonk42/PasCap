@@ -654,56 +654,50 @@ test('pending registration blocks Escape, Cancel and duplicate submit; accepted 
   }
 });
 
-for (const width of [640, 720]) {
-  test(`compact ${width}px native keyboard navigation and focus trapping stay reachable without timeline shortcuts or horizontal overflow`, async ({
-    page,
-  }) => {
-    const writes = posts(page);
-    await page.setViewportSize({ width, height: 720 });
-    await expect(page.getByRole('button', { name: 'Toggle Clip panel', exact: true })).toHaveAttribute(
-      'aria-pressed',
-      'false',
-    );
-    const modal = await openBrowser(page);
-    const frame = await page.evaluate(() => window.pascapLab!.engine.diagnostics().frame);
-    const location = modal.getByRole('combobox', { name: 'Music location', exact: true });
-    await location.focus();
-    await page.keyboard.press('Tab');
-    await expect(modal.getByRole('button', { name: 'Refresh music locations', exact: true })).toBeFocused();
-    const first = modal.getByRole('radio', { name: `Select music ${sourceName}`, exact: true });
-    await first.focus();
-    await first.press('Space');
-    await expect(first).toBeChecked();
-    await first.press('ArrowDown');
-    await expect(modal.getByRole('radio', { name: `Select music ${otherName}`, exact: true })).toBeChecked();
-    await expect(modal.locator('input[type="radio"]:checked')).toHaveCount(1);
-    const cancel = modal.getByRole('button', { name: 'Cancel', exact: true });
-    await cancel.focus();
-    await expect(cancel).toBeInViewport();
-    await page.keyboard.press('Tab');
-    // Native Chrome may visit browser chrome (represented by body) at the end
-    // of a modal's tab sequence; it must never focus an inert editor control.
-    expect(
-      await modal.evaluate(
-        (element) =>
-          globalThis.document.activeElement === globalThis.document.body ||
-          element.contains(globalThis.document.activeElement),
-      ),
-    ).toBe(true);
-    await location.focus();
-    await page.keyboard.press('Shift+Tab');
-    await expect(cancel).toBeFocused();
-    expect(await page.evaluate(() => globalThis.document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-    expect(await modal.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
-    const confirm = modal.getByRole('button', { name: 'Import selected music', exact: true });
-    await confirm.focus();
-    await expect(confirm).toBeInViewport();
-    expect((await confirm.boundingBox())!.height).toBeGreaterThanOrEqual(28);
-    await page.keyboard.press('Escape');
-    await expect(modal).toHaveCount(0);
-    await expect(page.getByRole('button', { name: 'Browse music files', exact: true })).toBeFocused();
-    expect(await page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(frame);
-    expect(writes).toEqual([]);
-    expect(memory.saves).toBe(0);
-  });
-}
+test('native keyboard navigation and focus trapping stay reachable at the minimum viewport without timeline shortcuts or horizontal overflow', async ({
+  page,
+}) => {
+  const writes = posts(page);
+  await page.setViewportSize({ width: 1280, height: 720 });
+  const modal = await openBrowser(page);
+  const frame = await page.evaluate(() => window.pascapLab!.engine.diagnostics().frame);
+  const location = modal.getByRole('combobox', { name: 'Music location', exact: true });
+  await location.focus();
+  await page.keyboard.press('Tab');
+  await expect(modal.getByRole('button', { name: 'Refresh music locations', exact: true })).toBeFocused();
+  const first = modal.getByRole('radio', { name: `Select music ${sourceName}`, exact: true });
+  await first.focus();
+  await first.press('Space');
+  await expect(first).toBeChecked();
+  await first.press('ArrowDown');
+  await expect(modal.getByRole('radio', { name: `Select music ${otherName}`, exact: true })).toBeChecked();
+  await expect(modal.locator('input[type="radio"]:checked')).toHaveCount(1);
+  const cancel = modal.getByRole('button', { name: 'Cancel', exact: true });
+  await cancel.focus();
+  await expect(cancel).toBeInViewport();
+  await page.keyboard.press('Tab');
+  // Native Chrome may visit browser chrome (represented by body) at the end
+  // of a modal's tab sequence; it must never focus an inert editor control.
+  expect(
+    await modal.evaluate(
+      (element) =>
+        globalThis.document.activeElement === globalThis.document.body ||
+        element.contains(globalThis.document.activeElement),
+    ),
+  ).toBe(true);
+  await location.focus();
+  await page.keyboard.press('Shift+Tab');
+  await expect(cancel).toBeFocused();
+  expect(await page.evaluate(() => globalThis.document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  expect(await modal.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+  const confirm = modal.getByRole('button', { name: 'Import selected music', exact: true });
+  await confirm.focus();
+  await expect(confirm).toBeInViewport();
+  expect((await confirm.boundingBox())!.height).toBeGreaterThanOrEqual(28);
+  await page.keyboard.press('Escape');
+  await expect(modal).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Browse music files', exact: true })).toBeFocused();
+  expect(await page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(frame);
+  expect(writes).toEqual([]);
+  expect(memory.saves).toBe(0);
+});

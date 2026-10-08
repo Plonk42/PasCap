@@ -661,7 +661,7 @@ test('point moves and history retain input identity and the shared cursor, while
   await expect(page.getByRole('button', { name: 'Redo', exact: true })).toBeEnabled();
 });
 
-test('all navigation groups fit the 270px inspector and responsive 720px drawer without overflow or hidden buttons', async ({
+test('all navigation groups fit the 270px inspector at the default and minimum viewports without overflow or hidden buttons', async ({
   page,
 }) => {
   const document = sequence(interleaved());
@@ -670,15 +670,12 @@ test('all navigation groups fit the 270px inspector and responsive 720px drawer 
   await resizer.focus();
   for (let index = 0; index < 6; index++) await resizer.press('ArrowRight');
   await expect(resizer).toHaveAttribute('aria-valuenow', '270');
-  for (const width of [1440, 720]) {
-    await page.setViewportSize({ width, height: 720 });
-    if (width < 980) {
-      // Compact adaptation is a React resize update, not synchronous with setViewportSize.
-      const toggle = page.getByRole('button', { name: 'Toggle Clip panel', exact: true });
-      await expect(toggle).toHaveAttribute('aria-pressed', 'false');
-      await toggle.click();
-      await expect(toggle).toHaveAttribute('aria-pressed', 'true');
-    }
+  for (const { width, height } of [
+    { width: 1440, height: 900 },
+    { width: 1280, height: 720 },
+  ]) {
+    await page.setViewportSize({ width, height });
+    await expect(resizer).toHaveAttribute('aria-valuenow', '270');
     for (const { label } of KEYFRAME_SETTINGS) {
       await diamond(page, label).scrollIntoViewIfNeeded();
       for (const direction of ['Previous', 'Next'] as const) {

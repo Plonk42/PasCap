@@ -141,19 +141,21 @@ test('pane resize cancels on Escape, persists on release/keyboard and never edit
   await expect(page.getByRole('complementary', { name: 'Clip inspector' })).toBeVisible();
 });
 
-test('workspace fits laptop and compact desktop widths without document overflow', async ({ page }) => {
+test('workspace keeps both side panels without document overflow at the default and minimum viewports', async ({
+  page,
+}) => {
   const before = await page.evaluate(() => window.pascapLab!.project());
-  for (const width of [1440, 1280, 1024, 900, 720]) {
-    await page.setViewportSize({ width, height: 720 });
+  for (const { width, height } of [
+    { width: 1440, height: 900 },
+    { width: 1280, height: 720 },
+  ]) {
+    await page.setViewportSize({ width, height });
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await expect(page.getByRole('region', { name: 'Video timeline' })).toBeInViewport();
     await expect(page.getByRole('button', { name: 'Export video', exact: true })).toBeInViewport();
+    await expect(page.getByRole('complementary', { name: 'Clip inspector' })).toBeVisible();
+    await expect(page.getByRole('complementary', { name: 'Media library' })).toBeVisible();
   }
-  await openOptions(page, 'Workspace options');
-  await page.getByRole('button', { name: 'Toggle Clip panel' }).click();
-  await closeOptions(page);
-  await expect(page.getByRole('complementary', { name: 'Clip inspector' })).toBeVisible();
-  await expect(page.getByRole('complementary', { name: 'Media library' })).toBeHidden();
   expect(await page.evaluate(() => window.pascapLab!.project())).toEqual(before);
   expect(writes).toBe(0);
 });

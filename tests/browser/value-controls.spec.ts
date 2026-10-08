@@ -595,13 +595,12 @@ test('identical-valued clip and row context replacements preserve input identity
   await pointerEdit(page, 'Opacity', opacityEdit);
 });
 
-test('keyboard focus and native reveal clear the sticky inspector tabs at desktop and drawer widths', async ({
+test('keyboard focus and native reveal clear the sticky inspector tabs at the default and minimum viewports', async ({
   page,
 }) => {
   const before = await checkpoint(page);
   const { slider } = controls(page, 'Opacity');
   const diamond = page.getByRole('button', { name: 'Keyframe Opacity', exact: true });
-  const toggle = page.getByRole('button', { name: 'Toggle Clip panel', exact: true });
   // Park the control entirely beneath the sticky tabs, which still lie inside the scrollport.
   const tuck = () =>
     slider.evaluate((element) => {
@@ -615,9 +614,11 @@ test('keyboard focus and native reveal clear the sticky inspector tabs at deskto
     const hit = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2);
     return box.top >= heading.getBoundingClientRect().bottom && hit !== null && element.contains(hit);
   };
-  for (const width of [1440, 720]) {
-    await page.setViewportSize({ width, height: 900 });
-    if (!(await slider.isVisible())) await toggle.click();
+  for (const { width, height } of [
+    { width: 1440, height: 900 },
+    { width: 1280, height: 720 },
+  ]) {
+    await page.setViewportSize({ width, height });
     await expect(slider).toBeVisible();
     await tuck();
     await diamond.evaluate((element: HTMLElement) => element.focus({ preventScroll: true }));
@@ -671,7 +672,7 @@ test('animated channels without a playhead participant disable both inputs, not 
   expect((await current(page)).layers[0]!.keyframes).toEqual([sharedPoint(10, { exposure: 0, speed: 1 })]);
 });
 
-test('common widgets fit 270px inspectors and the desktop/drawer width matrix without overflow or document edits', async ({
+test('common widgets fit 270px inspectors at the default and minimum viewports without overflow or document edits', async ({
   page,
 }) => {
   const document = await current(page);
@@ -681,25 +682,13 @@ test('common widgets fit 270px inspectors and the desktop/drawer width matrix wi
   for (let index = 0; index < 4; index++) await resizer.press('ArrowRight');
   await expect(resizer).toHaveAttribute('aria-valuenow', '270');
   const inspector = page.getByRole('complementary', { name: 'Clip inspector', exact: true });
-  const toggle = page.getByRole('button', { name: 'Toggle Clip panel', exact: true });
-  const mediaToggle = page.getByRole('button', { name: 'Toggle Media panel', exact: true });
-  for (const width of [1440, 1280, 1024, 900, 720]) {
-    await page.setViewportSize({ width, height: 900 });
-    if (width >= 980) {
-      await expect(inspector).toBeVisible();
-      expect((await inspector.boundingBox())!.width).toBe(270);
-    } else {
-      if ((await mediaToggle.getAttribute('aria-pressed')) === 'false') await mediaToggle.click();
-      await expect(inspector).toBeHidden();
-      await expect(page.getByRole('complementary', { name: 'Media library', exact: true })).toBeVisible();
-      await toggle.click();
-      await expect(inspector).toBeVisible();
-      await expect(page.getByRole('complementary', { name: 'Media library', exact: true })).toBeHidden();
-      await toggle.click();
-      await expect(inspector).toBeHidden();
-      await toggle.click();
-      await expect(inspector).toBeVisible();
-    }
+  for (const { width, height } of [
+    { width: 1440, height: 900 },
+    { width: 1280, height: 720 },
+  ]) {
+    await page.setViewportSize({ width, height });
+    await expect(inspector).toBeVisible();
+    expect((await inspector.boundingBox())!.width).toBe(270);
     for (const tab of ['Clip', 'Layer keyframes', 'Audio'] as const) {
       await inspectorTab(page, tab);
       if (tab === 'Clip')
