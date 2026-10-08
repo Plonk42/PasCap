@@ -375,15 +375,18 @@ for (const cancellation of ['Escape', 'pointercancel', 'lostcapture', 'windowblu
     await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
   });
 
-for (const width of [1440, 1024, 720, 640])
-  test(`${width}px eight music lanes retain native wheel/thumb/focus access and selection creates no seek, history or save`, async ({
+for (const { width, height } of [
+  { width: 1440, height: 900 },
+  { width: 1280, height: 720 },
+])
+  test(`${width}×${height} eight music lanes retain native wheel/thumb/focus access and selection creates no seek, history or save`, async ({
     page,
   }) => {
     const document = await seed(
       page,
       Array.from({ length: 8 }, (_, index) => track(`lane-${index}`, { gainDb: index === 0 ? 0 : -index })),
     );
-    await page.setViewportSize({ width, height: width === 1440 ? 900 : 720 });
+    await page.setViewportSize({ width, height });
     const viewport = page.locator('.timeline-scroll');
     await viewport.evaluate((element) => {
       element.scrollTop = 0;

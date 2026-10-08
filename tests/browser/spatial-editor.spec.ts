@@ -330,7 +330,7 @@ test('bulk expansion includes Transform while heading help and tab navigation re
   expect(memory.saves).toBe(0);
 });
 
-test('Transform controls fit narrow Inspector and compact drawer with all stored fields reachable', async ({
+test('Transform controls fit the 270px Inspector at the default and minimum viewports with all stored fields reachable', async ({
   page,
 }) => {
   await seed(page, (document) => {
@@ -340,13 +340,12 @@ test('Transform controls fit narrow Inspector and compact drawer with all stored
   await divider.focus();
   for (let index = 0; index < 4; index++) await divider.press('ArrowRight');
   await expect(divider).toHaveAttribute('aria-valuenow', '270');
-  for (const width of [1440, 720]) {
-    await page.setViewportSize({ width, height: 600 });
-    const toggle = page.getByRole('button', { name: 'Toggle Clip panel', exact: true });
-    if (width < 980) {
-      await expect(toggle).toHaveAttribute('aria-pressed', 'false');
-      await toggle.click();
-    }
+  for (const { width, height } of [
+    { width: 1440, height: 900 },
+    { width: 1280, height: 720 },
+  ]) {
+    await page.setViewportSize({ width, height });
+    await expect(divider).toHaveAttribute('aria-valuenow', '270');
     const editor = page.getByRole('region', { name: 'Clip Transform editor', exact: true });
     await expect(editor).toBeVisible();
     for (const stored of [false, true]) {

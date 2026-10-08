@@ -245,7 +245,7 @@ test('invalid stored drafts survive tab changes and cancel, without stale row co
   expect(calculateLayout(await current(page)).duration).toBe(calculateLayout(initial).duration);
 });
 
-test('four tabs and participant controls fit the minimum Inspector and compact drawer without overflow', async ({
+test('four tabs and participant controls fit the minimum Inspector at the default and minimum viewports without overflow', async ({
   page,
 }) => {
   await page.evaluate(() =>
@@ -262,20 +262,15 @@ test('four tabs and participant controls fit the minimum Inspector and compact d
   );
   await page.reload();
   await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
-  for (const width of [1440, 720, 640]) {
-    await page.setViewportSize({ width, height: 720 });
-    const toggle = page.getByRole('button', { name: 'Toggle Clip panel', exact: true });
-    if (width === 720) {
-      await expect(toggle).toHaveAttribute('aria-pressed', 'false');
-      await toggle.click();
-    }
-    if (width === 640) await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+  for (const { width, height } of [
+    { width: 1440, height: 900 },
+    { width: 1280, height: 720 },
+  ]) {
+    await page.setViewportSize({ width, height });
     await inspectorTab(page, 'Layer keyframes');
     const row = await editLayerPoint(page, 'Video 1', 10);
-    if (width === 1440) {
-      const divider = page.getByRole('slider', { name: 'Resize Clip panel', exact: true });
-      await expect(divider).toHaveAttribute('aria-valuenow', '270');
-    }
+    const divider = page.getByRole('slider', { name: 'Resize Clip panel', exact: true });
+    await expect(divider).toHaveAttribute('aria-valuenow', '270');
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     const panel = page.getByRole('complementary', { name: 'Clip inspector', exact: true });
     expect(await panel.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);

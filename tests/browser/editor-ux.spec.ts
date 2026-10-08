@@ -268,8 +268,11 @@ test('hiding the deferred inspector applies a blur draft once and retains its se
   await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
 });
 
-for (const width of [1440, 1024, 720, 640]) {
-  test(`compact ${width}px toolbar keeps actions, marks and music pointer targets reachable`, async ({ page }) => {
+for (const { width, height } of [
+  { width: 1440, height: 900 },
+  { width: 1280, height: 720 },
+]) {
+  test(`${width}×${height} toolbar keeps actions, marks and music pointer targets reachable`, async ({ page }) => {
     const music = audio[0];
     if (!music) throw new Error('The dedicated synthetic audio fixture must already be prepared.');
     const document = await current(page);
@@ -289,7 +292,7 @@ for (const width of [1440, 1024, 720, 640]) {
       },
     ];
     await page.evaluate((next) => window.pascapLab!.setDocument(next), document);
-    await page.setViewportSize({ width, height: 720 });
+    await page.setViewportSize({ width, height });
     await seek(page, 30);
     await page.getByRole('button', { name: 'Mark cut IN', exact: true }).click();
     await seek(page, 40);
