@@ -1200,6 +1200,13 @@ export function App() {
     });
     if (result.ok) refreshAfterAcceptance();
   };
+  const prepareAudio = async (id: string): Promise<void> => {
+    const result = await act(() => api.prepareAudio(id));
+    if (result.ok) {
+      receiveJob(result.value.job);
+      refreshAfterAcceptance();
+    }
+  };
   const importOriginals = async (operation: () => ReturnType<typeof api.importFolder>): Promise<ImportResult> => {
     if (!current.current) {
       setActionError('Create or open a project before importing recordings.');
@@ -1613,13 +1620,16 @@ export function App() {
             <MediaLibrary
               key={project?.id ?? 'empty'}
               assets={projectAssets}
+              music={projectAudio}
               project={project}
               ranges={ranges}
               busy={busy || !project || connection.state !== 'ready' || draft !== null}
               onInsert={insert}
               onDragMedia={setDraggedMediaIds}
               onPrepare={prepare}
+              onPrepareMusic={prepareAudio}
               onRemove={(videoIds) => removeMedia({ videoIds, audioIds: [] })}
+              onRemoveMusic={(audioIds) => removeMedia({ videoIds: [], audioIds })}
               onImport={importFolder}
               onRegisterPaths={registerPaths}
               review={review}
@@ -1847,16 +1857,8 @@ export function App() {
                     error={actionError}
                     onBrowseVisibility={musicImportVisibility}
                     onEdit={edit}
-                    onRemoveRecording={(id) => removeMedia({ videoIds: [], audioIds: [id] })}
                     onImport={importAudio}
                     onBrowseImport={importSelectedAudio}
-                    onPrepare={async (id) => {
-                      const result = await act(() => api.prepareAudio(id));
-                      if (result.ok) {
-                        receiveJob(result.value.job);
-                        refreshAfterAcceptance();
-                      }
-                    }}
                   />
                 </Inspector>
               )}

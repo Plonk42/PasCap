@@ -515,16 +515,15 @@ arrays empty and never inherit all globally registered videos/music. Deliberatel
 importing an already registered source into another project adds membership while
 reusing eligible prepared assets, without changing originals.
 
-**Remove from project** is a trash on each Media card (shown on hover, focus or
-selection), on the selection header for all selected recordings, and beside
-**Audio → Music → Recording** for music. An unused recording leaves at once;
+**Remove from project** is a trash on each Media card and music file (shown on
+hover, focus or selection) and on the selection header for selected recordings.
+An unused recording leaves at once;
 one still used by excerpts or music instances opens a confirmation naming their
 counts, and confirming removes membership and placements atomically. Either is
 one Undo step. Removal releases a source review of that recording and keeps focus
-in the Media list (or on the Recording selector). Originals, registry entries,
+in the Media list. Originals, registry entries,
 proxies/thumbnails/PCM caches, other projects and exports are never touched.
-Only ready music recordings can be chosen in Recording, so only they can be
-removed there.
+The Audio tab has no project-level removal.
 
 Reimport/concurrent additions reuse ready proxies or pending/active preparation;
 they do not encode the same source twice. Registration remains kept when queue
@@ -539,15 +538,17 @@ Music reimport reuses an entry only for the same absolute path and unchanged sou
 identity. Deliberately importing a moved file or another hard-linked location
 creates a new music entry and verifies the selected path, not a missing old one.
 The old entry, its project references and caches remain unchanged; this is a fresh
-import, not relinking. Choose the new **Recording** entry separately to place music.
+import, not relinking. Add the new entry separately to place music.
 The serial worker reuses an eligible verified PCM cache without rewriting it.
 
 ### Independent music instances
 
-**Audio → Music → Music track** selects one of up to eight identified instances.
-**Recording** chooses a ready/prepared source for the selected instance; **Add music
-track** creates another independent instance, including reuse of the same original.
-The trash action **Delete selected music track** removes only that placement.
+**Audio → Music → Music track** selects one of up to eight identified instances,
+with its trash **Delete selected music track** beside it. **Recording** changes
+the selected instance's ready source. **Add music track** is the only creation
+path: it lists ready music files and creates an independent instance, including
+reuse of the same original; dragging a ready file from Media → Music onto the
+music lane does the same at the drop frame.
 Import merely adds bin membership/preparation and never implicitly places music.
 Selection is editor-only: no seek requirement, history entry or save. Editing,
 changing Recording or removal leaves the other instances, video, row points and
@@ -663,7 +664,7 @@ processor/read failures and the unchanged one-project-frame A/V bound remain
 explicit. A missing active source is not silently omitted or replaced by successful
 silence. Pause/seek/edit/cancellation invalidates the complete mix epoch and
 outstanding reads before late work can restart.
-Missing current PCM caches appear as Audio → Music **Retry** preparation actions;
+Missing current PCM caches appear as **Prepare** actions on the files in Media → Music;
 no read automatically prepares, rewrites or removes older AAC caches. Explicit
 preparation creates the current versioned PCM cache without changing originals,
 project documents, registry/video-proxy formats or finished exports.

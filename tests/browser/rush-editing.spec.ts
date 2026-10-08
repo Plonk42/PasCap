@@ -1822,18 +1822,16 @@ test('removing a music recording removes its tracks after confirmation and keeps
   document.media.audioIds = [music.id];
   await fixture(page, document);
   const before = await current(page);
-  await page.getByRole('tab', { name: 'Audio', exact: true }).click();
-  await expect(page.getByRole('combobox', { name: 'Music recording', exact: true })).toHaveValue(music.id);
-  await page.getByRole('button', { name: `Remove ${music.name} from project`, exact: true }).click();
+  const row = page.locator(`[data-music-media-id="${music.id}"]`);
+  await expect(row).toContainText('1 track');
+  await row.getByRole('button', { name: `Remove ${music.name} from project`, exact: true }).click();
   const dialog = page.getByRole('dialog', { name: `Remove ${music.name} from this project?`, exact: true });
   await expect(dialog).toContainText('1 music track using it will be removed too.');
   await dialog.getByRole('button', { name: 'Remove from project', exact: true }).click();
   await expect(dialog).toHaveCount(0);
-  await expect(page.getByRole('combobox', { name: 'Music recording', exact: true })).toBeFocused();
-  await expect(page.getByRole('combobox', { name: 'Music recording', exact: true })).toHaveValue('');
-  await expect(
-    page.getByRole('combobox', { name: 'Music recording', exact: true }).locator(`option[value="${music.id}"]`),
-  ).toHaveCount(0);
+  await expect(row).toHaveCount(0);
+  await expect(page.getByRole('textbox', { name: 'Search media', exact: true })).toBeFocused();
+  await expect(page.locator('[data-music-lane]')).toHaveCount(0);
   const removed = await current(page);
   expect(removed.music).toEqual([]);
   expect(removed.media).toEqual({ videoIds: before.media.videoIds, audioIds: [] });

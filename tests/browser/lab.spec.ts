@@ -6,6 +6,7 @@ import { planExportMusic } from '../../src/shared/export.js';
 import { createClip, createLayer, createProject, projectSchema } from '../../src/shared/model.js';
 import { calculateLayout } from '../../src/shared/timeline.js';
 import {
+  addMusicTrack,
   clipAction,
   closeOptions,
   expandedInspectorPreferences,
@@ -60,20 +61,29 @@ test.beforeEach(async ({ page, request }) => {
   await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
 });
 
-test('compact library handles 12 recordings and the editor fits the desktop viewport', async ({ page }) => {
+test('compact library handles 12 recordings and the editor fits the desktop viewport', async ({ page, request }) => {
+  const audio = ((await (await request.get('/api/audio')).json()) as { assets: { status: string }[] }).assets;
+  const readyMusic = audio.filter((asset) => asset.status === 'ready').length;
+  expect(readyMusic).toBeGreaterThan(0);
   await expect(page.getByRole('heading', { name: 'Media 12', exact: true })).toBeVisible();
   await expect(page.getByRole('slider', { name: 'Exposure', exact: true })).toBeEnabled();
   await expect(page.getByRole('region', { name: 'Video timeline' })).toBeInViewport();
-  await expect(page.getByRole('article')).toHaveCount(12);
+  const recordings = page.locator('article.media-item');
+  const music = page.getByRole('region', { name: 'Music files', exact: true }).getByRole('article');
+  await expect(recordings).toHaveCount(12);
+  await expect(music).toHaveCount(audio.length);
   await page.getByRole('textbox', { name: 'Search media' }).fill('pattern-a');
-  await expect(page.getByRole('article')).toHaveCount(1);
+  await expect(recordings).toHaveCount(1);
+  await expect(music).toHaveCount(0);
   await expect(page.locator('video[data-pascap-decoder]')).toHaveCount(2);
   await page.getByRole('textbox', { name: 'Search media' }).fill('');
   await openOptions(page, 'Media options');
   await page.getByRole('combobox', { name: 'Filter media' }).selectOption('ready');
-  await expect(page.getByRole('article')).toHaveCount(3);
+  await expect(recordings).toHaveCount(3);
+  await expect(music).toHaveCount(readyMusic);
   await page.getByRole('combobox', { name: 'Filter media' }).selectOption('unprepared');
-  await expect(page.getByRole('article')).toHaveCount(9);
+  await expect(recordings).toHaveCount(9);
+  await expect(music).toHaveCount(audio.length - readyMusic);
   await page.getByRole('combobox', { name: 'Filter media' }).selectOption('all');
   await page.getByRole('combobox', { name: 'Sort media' }).selectOption('recent');
   await page.getByRole('button', { name: 'Grid view', exact: true }).click();
@@ -395,10 +405,9 @@ test('each ramp curve saves and restores along with shared row Colour', async ({
   expect(await page.evaluate(() => window.pascapLab!.project()!.layers[0]!.colour.exposure)).toBe(0.6);
 });
 
-test('music waveform, placement, looping, gain, fades and audio-clock preview work', async ({ page, request }) => {
+test('music waveform, placement, looping, gain, fades and audio-clock preview work', async ({ page }) => {
   await inspectorTab(page, 'Audio');
-  const audio = (await (await request.get('/api/audio')).json()) as { assets: { id: string }[] };
-  await page.getByRole('combobox', { name: 'Music recording' }).selectOption(audio.assets[0]!.id);
+  await addMusicTrack(page);
   await page.getByText('Placement & fades', { exact: true }).click();
   await page.getByRole('spinbutton', { name: 'Music timeline start' }).fill('10');
   await page.getByRole('spinbutton', { name: 'Music timeline start' }).press('Enter');
@@ -433,10 +442,9 @@ test('music waveform, placement, looping, gain, fades and audio-clock preview wo
   await expect(page.getByRole('checkbox', { name: 'Loop music' })).toBeChecked();
 });
 
-test('music drag placement is one undoable edit and Escape discards its draft', async ({ page, request }) => {
+test('music drag placement is one undoable edit and Escape discards its draft', async ({ page }) => {
   await inspectorTab(page, 'Audio');
-  const audio = (await (await request.get('/api/audio')).json()) as { assets: { id: string }[] };
-  await page.getByRole('combobox', { name: 'Music recording' }).selectOption(audio.assets[0]!.id);
+  await addMusicTrack(page);
   await page.getByRole('button', { name: 'Toggle snapping' }).click();
   const body = page.getByRole('button', { name: 'Move music track 1:', exact: false });
   const box = (await body.boundingBox())!;

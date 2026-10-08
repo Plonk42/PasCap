@@ -226,11 +226,9 @@ test('real explicit confirmation persists only importing-project audio membershi
   expect(memory.snapshot(otherProject.id)).toEqual(otherProject);
   expect(writes).toEqual([{ pathname: '/api/audio/register-selected', body: { path: firstPath } }]);
   await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeEnabled();
-  await expect(page.locator(`select[aria-label="Music recording"] option[value="${importedId}"]`)).toHaveJSProperty(
-    'disabled',
-    false,
-    { timeout: 20_000 },
-  );
+  await expect(page.locator(`[data-music-media-id="${importedId}"]`)).toHaveAttribute('data-status', 'ready', {
+    timeout: 20_000,
+  });
   const registered = ((await (await request.get('/api/audio')).json()) as { assets: AudioAsset[] }).assets.find(
     (asset) => asset.id === importedId,
   )!;
@@ -263,8 +261,8 @@ test('real explicit confirmation persists only importing-project audio membershi
   expect(await readFile(playback)).toEqual(cachedBytes);
   await page.reload();
   await audioControls(page);
-  await expect(page.getByRole('combobox', { name: 'Music recording', exact: true })).toHaveValue('');
-  await expect(page.locator('select[aria-label="Music recording"] option')).toHaveCount(2);
+  await expect(page.getByRole('combobox', { name: 'Music track', exact: true })).toHaveValue('');
+  await expect(page.locator('[data-music-media-id]')).toHaveCount(1);
   expect(memory.snapshot().media.audioIds).toEqual([importedId]);
   const after = await stat(firstPath);
   expect([after.size, after.mtimeMs, after.ino]).toEqual([before.size, before.mtimeMs, before.ino]);
@@ -315,12 +313,13 @@ test('importing moved music creates a new bin entry without relinking the old so
   expect(memory.snapshot().media.audioIds).toEqual([previous.asset.id, imported.asset.id]);
   expect(memory.snapshot().music).toEqual([]);
   expect({ ...memory.snapshot(), revision: before.revision, media: before.media }).toEqual(before);
-  await expect(
-    page.locator(`select[aria-label="Music recording"] option[value="${previous.asset.id}"]`),
-  ).toHaveJSProperty('disabled', true);
-  await expect(
-    page.locator(`select[aria-label="Music recording"] option[value="${imported.asset.id}"]`),
-  ).toHaveJSProperty('disabled', false, { timeout: 20_000 });
+  await expect(page.locator(`[data-music-media-id="${previous.asset.id}"]`)).not.toHaveAttribute(
+    'data-status',
+    'ready',
+  );
+  await expect(page.locator(`[data-music-media-id="${imported.asset.id}"]`)).toHaveAttribute('data-status', 'ready', {
+    timeout: 20_000,
+  });
   const listed = ((await (await request.get('/api/audio')).json()) as { assets: AudioAsset[] }).assets;
   const old = listed.find((asset) => asset.id === previous.asset.id)!;
   expect(old.sourcePath).toBe(oldPath);
@@ -370,7 +369,7 @@ test('the retained manual path uses its separate unrestricted endpoint and adds 
   const manualPath = '/disposable-outside-browser-roots/manual.wav';
   await page.getByRole('textbox', { name: 'Music file path', exact: true }).fill(manualPath);
   await page.getByRole('button', { name: 'Import audio', exact: true }).click();
-  await expect(page.locator('select[aria-label="Music recording"] option')).toHaveCount(2);
+  await expect(page.locator('[data-music-media-id]')).toHaveCount(1);
   await page.evaluate(() => window.pascapLab!.flush());
   expect(writes).toEqual([{ pathname: '/api/audio/register', body: { path: manualPath } }]);
   expect(memory.snapshot().media.audioIds).toEqual([music.id]);
@@ -564,7 +563,7 @@ for (const failure of [
     await expect(modal.getByRole('alert')).toContainText('Check Activity');
     await expect(selected).toBeChecked();
     await expect(modal).toBeVisible();
-    await expect(page.locator('select[aria-label="Music recording"] option')).toHaveCount(1);
+    await expect(page.locator('[data-music-media-id]')).toHaveCount(0);
     await modal.getByRole('button', { name: 'Refresh music locations', exact: true }).click();
     await expect(selected).toBeChecked();
     expect(writes).toEqual([{ pathname: '/api/audio/register-selected', body: { path: firstPath } }]);

@@ -23,6 +23,13 @@ export async function inspectorTab(page: Page, name: 'Clip' | 'Layer keyframes' 
   if ((await tab.getAttribute('aria-selected')) !== 'true') await tab.click();
 }
 
+/** Audio → Add music track is the single creation path; it lists ready music files. */
+export async function addMusicTrack(page: Page, name?: string): Promise<void> {
+  await openOptions(page, 'Add music track');
+  const choices = page.getByRole('list', { name: 'Ready music files' }).getByRole('button');
+  await (name ? choices.filter({ hasText: name }).first() : choices.first()).click();
+}
+
 /** Legacy functional tests choose expansion; default compact presentation is tested separately. */
 export async function expandedInspectorPreferences(page: Page): Promise<void> {
   await page.addInitScript(() => {

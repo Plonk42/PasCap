@@ -36,7 +36,8 @@ neither needs replacing merely to make their implementation identical.
   audio term; guides may explain the equivalence for video.
 - **Music track**: an independently identified music instance, not a recording or
   another audio clock. **Recording** identifies its registered source; several
-  instances may reuse it. **Add music track** creates a fresh instance; the trash
+  instances may reuse it. **Add music track** lists ready music files and creates
+  a fresh instance; **Recording** only changes the selected instance; the trash
   action **Delete selected music track** removes only that placement.
 - **Clip**: the timeline instance and its Inspector tab. **Excerpt**: a selected
   original-source range being reviewed/added. A recording is the complete original.

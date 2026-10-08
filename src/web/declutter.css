@@ -457,6 +457,7 @@
   .declutter-media .media-item .media-checkbox,
   .declutter-media .media-item .add-media,
   .declutter-media .media-item .media-remove,
+  .declutter-media .media-music-item .media-remove,
   .declutter-inspector .colour-control-actions .icon-button {
     opacity: 1;
   }

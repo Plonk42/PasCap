@@ -6,6 +6,7 @@ import type { MediaAsset } from '../../src/shared/media.js';
 import { createClip, createLayer, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
 import { calculateLayout } from '../../src/shared/timeline.js';
 import {
+  addMusicTrack,
   editLayerPoint,
   expandedInspectorPreferences,
   inspectorTab,
@@ -337,7 +338,7 @@ test('music commits preserve source/timeline units and validate range, duration,
   const audio = (await (await request.get('/api/audio')).json()) as { assets: AudioAsset[] };
   const asset = audio.assets.find((item) => item.status === 'ready');
   if (!asset) throw new Error('Expected prepared synthetic music.');
-  await page.getByRole('combobox', { name: 'Music recording', exact: true }).selectOption(asset.id);
+  await addMusicTrack(page, asset.name);
   await page.getByText('Placement & fades', { exact: true }).click();
   const out = page.getByRole('spinbutton', { name: 'Music source OUT', exact: true });
   await out.fill('90');

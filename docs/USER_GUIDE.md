@@ -401,20 +401,21 @@ Retiming: [SPEED_AND_AUDIO.md](SPEED_AND_AUDIO.md).
 
 Source-video audio is not used. In **Audio → Music**, enter your own standalone
 local file in **Music file path**, choose **Import audio**, wait for preparation,
-then choose a ready **Recording** from this project's music bin and deliberately
-place it with **Add music track**. Importing alone never places music. The trash
-beside **Recording** removes that recording (and, after confirmation, its music
+then choose **Add music track** and pick the file, or drag it from **Media → Music**
+onto the music lane. Importing alone never places music. The trash on the file in
+**Media → Music** removes that recording (and, after confirmation, its music
 tracks) from this project. No soundtrack is
 supplied; use music you own or have permission to use and keep private paths private.
 
-If music was moved, import its new location normally and choose the new **Recording**
-entry after preparation. This does not reconnect or replace the old entry; existing
+If music was moved, import its new location normally and add the new entry
+after preparation. This does not reconnect or replace the old entry; existing
 projects and caches remain untouched. Reimporting the same unchanged path reuses its
 entry, while a missing old location stays visibly unavailable.
 
 Use up to **eight independent music instances**, including several from the same
 recording. **Music track** selects the instance to edit; **Add music track** adds
-another from the chosen ready/prepared Recording. Its trash action **Delete selected
+another from a ready music file, and **Recording** changes the selected instance's
+file. Its trash action **Delete selected
 music track** removes only that placement; Undo restores it. Selection creates no
 save/history entry, and editing/removing one instance leaves all others unchanged.
 Each instance has its own waveform placement/edge trims, source IN/OUT,

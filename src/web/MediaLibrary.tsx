@@ -10,6 +10,7 @@ import {
   type MouseEvent,
   type PointerEvent,
 } from 'react';
+import type { AudioAsset } from '../shared/audio.js';
 import {
   resolveMediaSelection,
   sourceFrameAtRatio,
@@ -23,6 +24,7 @@ import { durationLabel, MEDIA_DRAG_TYPE, mediaReady, shortName } from './display
 import { Icon } from './icons.js';
 import './media-review.css';
 import './media-import.css';
+import { MediaMusicList, musicMatchesFilter } from './MediaMusicList.js';
 import './rush-source.css';
 import { Modal } from './Modal.js';
 import { Popover } from './Popover.js';
@@ -31,13 +33,16 @@ import { RemoveMediaDialog } from './RemoveMediaDialog.js';
 
 interface Props {
   assets: MediaAsset[];
+  music: AudioAsset[];
   project: ProjectDocument | null;
   ranges: MediaSelections;
   busy: boolean;
   onInsert: (mediaIds: string[]) => void;
   onDragMedia: (mediaIds: string[] | null) => void;
   onPrepare: (mediaIds: string[]) => Promise<void>;
+  onPrepareMusic: (id: string) => Promise<void>;
   onRemove: (mediaIds: string[]) => boolean;
+  onRemoveMusic: (ids: string[]) => boolean;
   onImport: (directory: string) => Promise<ImportResult>;
   onRegisterPaths: (paths: readonly string[]) => Promise<ImportResult>;
   review: ReviewTarget | null;
@@ -193,13 +198,16 @@ function MediaAction({
 
 export function MediaLibrary({
   assets,
+  music,
   project,
   ranges,
   busy,
   onInsert,
   onDragMedia,
   onPrepare,
+  onPrepareMusic,
   onRemove,
+  onRemoveMusic,
   onImport,
   onRegisterPaths,
   review,
@@ -339,6 +347,7 @@ export function MediaLibrary({
     [assets, filter, search, sort, usage],
   );
   const selectedAssets = assets.filter((asset) => selected.has(asset.id));
+  const visibleMusic = music.filter((asset) => musicMatchesFilter(asset, project, search, filter));
   const prepareIds = selectedAssets
     .filter((asset) => !mediaReady(asset) && !['queued', 'preparing'].includes(asset.status))
     .map((asset) => asset.id);
@@ -742,12 +751,12 @@ export function MediaLibrary({
             </article>
           );
         })}
-        {!visible.length && (
+        {!visible.length && !visibleMusic.length && (
           <div className="empty-library">
             <Icon name="folder" size={30} />
-            <strong>{assets.length ? 'No matching recordings' : 'Your media library is empty'}</strong>
+            <strong>{assets.length || music.length ? 'No matching recordings' : 'Your media library is empty'}</strong>
             <p>
-              {assets.length
+              {assets.length || music.length
                 ? 'Try another search or filter.'
                 : 'Browse footage or import a folder. Originals stay in place; only editing proxies are generated.'}
             </p>
@@ -768,6 +777,13 @@ export function MediaLibrary({
             )}
           </div>
         )}
+        <MediaMusicList
+          music={visibleMusic}
+          project={project}
+          busy={busy}
+          onPrepare={onPrepareMusic}
+          onRemove={onRemoveMusic}
+        />
       </div>
       {removing && removingUsage && (
         <RemoveMediaDialog

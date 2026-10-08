@@ -1,12 +1,13 @@
 .music-controls .music-instance-picker {
-  margin-block: 12px;
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  margin-block: 12px 8px;
 }
 
-.music-controls .music-instance-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
+.music-controls .music-instance-picker .speed-field {
+  flex: 1;
+  min-width: 0;
 }
 
 .music-controls .music-instance-picker select {
@@ -15,14 +16,96 @@
 }
 
 .music-controls .music-recording-row {
-  display: flex;
-  align-items: flex-end;
-  gap: 6px;
+  margin-bottom: 10px;
 }
 
-.music-controls .music-recording-row .speed-field {
+.music-controls .music-add {
+  margin-bottom: 12px;
+}
+
+.music-controls .music-add > summary.editor-popover-trigger {
+  display: inline-flex;
+  width: auto;
+  gap: 6px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  font-size: 12px;
+}
+
+.music-add-list {
+  display: grid;
+  gap: 2px;
+  min-width: 220px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.music-add-list button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  text-align: left;
+}
+
+.music-add-list button > span {
   flex: 1;
   min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.music-add-list small {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.media-music {
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px solid var(--line);
+}
+
+.media-music > h3 {
+  margin: 4px 5px 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.media-music-item {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) auto 28px;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 4px 5px;
+  border-radius: 5px;
+}
+
+.media-music-item:hover {
+  background: #243029;
+}
+
+.media-music-item > .media-remove {
+  grid-column: 4;
+  width: 28px;
+  height: 28px;
+  opacity: 0;
+}
+
+.media-music-item:is(:hover, :focus-within) > .media-remove {
+  opacity: 1;
+}
+
+.media-music-icon {
+  display: inline-flex;
+  justify-content: center;
+  color: #b9c6ee;
 }
 
 .music-controls [data-music-controls-id][hidden] {

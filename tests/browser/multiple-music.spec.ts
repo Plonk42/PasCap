@@ -10,7 +10,7 @@ import {
   type ProjectDocument,
 } from '../../src/shared/model.js';
 import { calculateLayout } from '../../src/shared/timeline.js';
-import { inspectorTab } from './editor-helpers.js';
+import { addMusicTrack, inspectorTab } from './editor-helpers.js';
 import { memoryProjects, type MemoryProjects } from './memory-projects.js';
 import { installMusicEvidence, observeMusicPlayback, observeRealtimeHeadroom } from './music-evidence.js';
 
@@ -167,11 +167,13 @@ test('import is bin-only; add, duplicate recording, select, edit and trash retai
     });
   });
   await inspectorTab(page, 'Audio');
-  const add = page.getByRole('button', { name: 'Add music track', exact: true });
+  const add = page.locator('[aria-label="Add music track"]');
   await expect(add).toBeDisabled();
+  await expect(add).toHaveAccessibleDescription(/Import a music file first/);
   await page.getByRole('textbox', { name: 'Music file path', exact: true }).fill('/disposable/synthetic-music.wav');
   await page.getByRole('button', { name: 'Import audio', exact: true }).click();
-  await expect(page.getByRole('combobox', { name: 'Music recording', exact: true }).locator('option')).toHaveCount(2);
+  await expect(page.locator(`[data-music-media-id="${song.id}"]`)).toBeVisible();
+  await expect(page.getByRole('combobox', { name: 'Music recording', exact: true })).toHaveCount(0);
   await flush(page);
   expect(imports).toBe(1);
   expect(memory.saves).toBe(1);
@@ -179,13 +181,14 @@ test('import is bin-only; add, duplicate recording, select, edit and trash retai
   expect(memory.snapshot().clips).toEqual(initial.clips);
   await expect(page.locator('[data-music-lane]')).toHaveCount(0);
 
-  await page.getByRole('combobox', { name: 'Music recording', exact: true }).selectOption(song.id);
+  await addMusicTrack(page, song.name);
   await flush(page);
   const first = (await current(page)).music[0]!;
   expect(first.id).toBeTruthy();
   expect(first).toMatchObject({ mediaId: song.id, duration: 120, start: 0, gainDb: 0 });
   expect(memory.saves).toBe(2);
-  await add.click();
+  await expect(page.getByRole('combobox', { name: 'Music recording', exact: true })).toHaveValue(song.id);
+  await addMusicTrack(page, song.name);
   await flush(page);
   const duplicated = await current(page);
   const second = duplicated.music[1]!;
@@ -238,13 +241,13 @@ test('eight independent instances are the hard limit; removing one re-enables Ad
     Array.from({ length: 7 }, (_, index) => track(`limit-${index}`)),
   );
   await inspectorTab(page, 'Audio');
-  await page.getByRole('button', { name: 'Add music track', exact: true }).click();
+  await addMusicTrack(page);
   await flush(page);
   const eight = await current(page);
   expect(eight.music).toHaveLength(8);
   expect(eight.music.slice(0, 7)).toEqual(document.music);
   expect(new Set(eight.music.map((item) => item.id)).size).toBe(8);
-  const add = page.getByRole('button', { name: 'Add music track', exact: true });
+  const add = page.locator('[aria-label="Add music track"]');
   await expect(add).toBeDisabled();
   await expect(add).toHaveAccessibleDescription(/at most 8 music tracks/);
   expect(memory.saves).toBe(1);
@@ -259,6 +262,27 @@ test('eight independent instances are the hard limit; removing one re-enables Ad
   expect((await current(page)).music).toEqual(document.music);
   await expect(add).toBeEnabled();
   await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
+});
+
+test('dragging a ready music file from Media onto the music lane adds one track at the drop frame', async ({
+  page,
+}) => {
+  await seed(page, []);
+  const row = page.locator(`[data-music-media-id="${song.id}"]`);
+  await expect(row).toHaveAttribute('draggable', 'true');
+  const surface = page.locator('.timeline-surface');
+  const leading = Number(await surface.getAttribute('data-leading'));
+  const scale = Number(await surface.getAttribute('data-pixels-per-frame'));
+  const lane = page.locator('.music-lane-wrapper').first();
+  await expect(lane).toContainText('Drop music here');
+  await row.dragTo(lane, { targetPosition: { x: leading + 30 * scale, y: 20 } });
+  const added = (await current(page)).music;
+  expect(added).toHaveLength(1);
+  expect(added[0]).toMatchObject({ mediaId: song.id, sourceIn: 0, gainDb: 0 });
+  expect(Math.abs(added[0]!.start - 30)).toBeLessThanOrEqual(1);
+  await expect(page.locator('[data-music-lane]')).toHaveCount(1);
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  expect((await current(page)).music).toEqual([]);
 });
 
 test('invalid per-instance numeric drafts survive selection without save, clamping or cross-instance edits; music OUT extends duration', async ({
