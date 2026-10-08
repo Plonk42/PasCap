@@ -719,7 +719,7 @@ test('common widgets fit 270px inspectors at the default and minimum viewports w
               sliderHeight: slider.height,
               appearance: getComputedStyle(range).appearance,
               numberFont: Number.parseFloat(getComputedStyle(exact).fontSize),
-              unitSeparated: !unit || number.right <= unit.left,
+              unitInside: !unit || (unit.left > number.left + number.width / 2 && unit.right <= number.right),
               sameRow: Math.abs(slider.y + slider.height / 2 - number.y - number.height / 2) < 1,
               separated: slider.right <= number.left,
               contained: container.left >= pane.left && container.right <= pane.right && container.right <= innerWidth,
@@ -736,7 +736,7 @@ test('common widgets fit 270px inspectors at the default and minimum viewports w
         expect(widget.sliderHeight).toBeGreaterThanOrEqual(28);
         expect(widget.appearance).toBe('none');
         expect(widget.numberFont).toBeGreaterThanOrEqual(12);
-        expect(widget.unitSeparated).toBe(true);
+        expect(widget.unitInside).toBe(true);
         expect(widget.sameRow).toBe(true);
         expect(widget.separated).toBe(true);
         expect(widget.contained).toBe(true);

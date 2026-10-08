@@ -484,10 +484,12 @@ the alternative grid uses two columns. Each thumbnail maps the whole original
 recording's applied source-review range, without a text badge; the exact frames
 are the review button's accessible description. Unapplied numeric drafts and
 existing excerpts do not change it. Search is always visible; **Media options**
-holds sort (name/duration/newest), readiness/usage filters and List/Grid. Checkboxes,
-Ctrl-click and Shift-click support selection; the **Select all** row then shows
-the selection count with **Prepare** (when needed) and **Clear selected**, without
-a separate footer or Add button. User imports automatically queue eligible proxies through one heavy
+holds sort (name/duration/newest), readiness/usage filters and List/Grid. A plain
+click reviews a recording without selecting it; checkboxes, Ctrl-click and
+Shift-click select. With two or more selected, the **Select all** row shows the
+count with **Prepare** (when needed), remove and **Clear selected**, without
+a separate footer or Add button. Unprepared cards say **Not prepared** under their
+name. User imports automatically queue eligible proxies through one heavy
 worker, reusing ready/in-flight work. Manual preparation remains for legacy
 unprepared sources and explicit failed/cancelled retries; manual batches confirm
 before starting multiple jobs. Startup and hover never queue old recordings.

@@ -91,7 +91,7 @@ const STATUS_ICON = {
 const FILTER_LABEL: Record<string, string> = {
   all: '',
   ready: 'Ready',
-  unprepared: 'Needs proxy',
+  unprepared: 'Not prepared',
   used: 'In timeline',
 };
 const FootageBrowser = lazy(() => import('./FootageBrowser.js').then((module) => ({ default: module.FootageBrowser })));
@@ -180,13 +180,13 @@ function MediaAction({
     <button
       className="icon-button prepare-media"
       aria-label={`Prepare ${asset.name}`}
-      title={asset.error ?? 'Prepare editing proxy'}
+      title={asset.error ?? 'Prepare'}
       disabled={busy}
       onClick={() => {
         void onPrepare([asset.id]);
       }}
     >
-      <Icon name={asset.status === 'error' ? 'reset' : 'download'} size={15} />
+      <Icon name={asset.status === 'error' ? 'reset' : 'wand'} size={15} />
     </button>
   );
 }
@@ -375,10 +375,7 @@ export function MediaLibrary({
       }
     }
     if (event.ctrlKey || event.metaKey) toggle(id);
-    else {
-      setSelected(new Set([id]));
-      setLastSelected(id);
-    }
+    else setLastSelected(id);
   };
   const prepareSelected = (): void => {
     if (prepareIds.length > 1) setConfirmPrepare(true);
@@ -438,12 +435,12 @@ export function MediaLibrary({
             onClick={openImport}
           >
             <Icon name="folder" size={15} />
-            Import
+            Import…
           </button>
           <Popover label="Media options" className="media-options">
             <div className="library-tools">
               <label>
-                Filter
+                <span>Filter</span>
                 <select aria-label="Filter media" value={filter} onChange={(event) => setFilter(event.target.value)}>
                   <option value="all">All recordings</option>
                   <option value="ready">Ready</option>
@@ -452,7 +449,7 @@ export function MediaLibrary({
                 </select>
               </label>
               <label>
-                Sort
+                <span>Sort</span>
                 <select aria-label="Sort media" value={sort} onChange={(event) => setSort(event.target.value)}>
                   <option value="name">Name</option>
                   <option value="duration">Duration</option>
@@ -545,7 +542,7 @@ export function MediaLibrary({
             <Icon name="x" size={12} />
           </button>
         )}
-        {selectedAssets.length > 0 && (
+        {selectedAssets.length > 1 && (
           <span className="library-selection-actions">
             {prepareIds.length > 0 && (
               <button
@@ -555,7 +552,7 @@ export function MediaLibrary({
                 disabled={busy || confirmPrepare}
                 onClick={prepareSelected}
               >
-                <Icon name="download" size={13} />
+                <Icon name="wand" size={13} />
                 Prepare
               </button>
             )}
@@ -613,7 +610,6 @@ export function MediaLibrary({
           const usageDescription = excerptCount > 0 ? `, ${excerptLabel} in timeline` : '';
           let statusLabel = STATUS_LABEL[asset.status];
           if (asset.status === 'ready') statusLabel = excerptCount > 0 ? `${excerptLabel} in timeline` : 'Ready';
-          if (asset.status === 'registered') statusLabel = 'Proxy needed';
           return (
             <article
               key={asset.id}
@@ -702,6 +698,7 @@ export function MediaLibrary({
                         {excerptLabel}
                       </span>
                     )}
+                    {asset.status !== 'ready' && <span className="media-status-text">{statusLabel}</span>}
                   </span>
                   {trimmed && (
                     <span className="declutter-sr-only" id={rangeId}>

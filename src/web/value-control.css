@@ -1,14 +1,10 @@
 .value-control {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(76px, 96px);
+  grid-template-columns: minmax(0, 1fr) 84px;
   align-items: center;
   gap: 4px 8px;
   min-width: 0;
   width: 100%;
-}
-
-.value-control[data-unit='true'] {
-  grid-template-columns: minmax(0, 1fr) minmax(76px, 96px) auto;
 }
 
 .product-workspace .value-control > input[type='range'][aria-label] {
@@ -78,16 +74,23 @@
   padding: 6px 8px;
 }
 
+.product-workspace .value-control[data-unit='true'] .number-field-input {
+  padding-right: calc(var(--value-unit-space, 2ch) + 10px);
+}
+
 .value-control :is(.number-field-hint, .number-field-pending, .number-field-error) {
   grid-column: 1 / -1;
 }
 
 .product-workspace .value-control > .value-control-unit {
-  grid-column: 3;
+  grid-column: 2;
   grid-row: 1;
+  justify-self: end;
+  margin-right: 8px;
   color: var(--muted);
   font-size: 11px;
   white-space: nowrap;
+  pointer-events: none;
 }
 
 .value-rate-fields,

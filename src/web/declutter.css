@@ -349,16 +349,12 @@
   opacity: 1;
 }
 
-.declutter-media .media-state:is(.ready, .error) {
-  width: 8px;
+.declutter-media .media-state {
+  width: 16px;
 }
 
-.declutter-media .media-state:is(.ready, .error) small {
+.declutter-media .media-state small {
   display: none;
-}
-
-.declutter-media .media-state:is(.queued, .preparing, .registered) small {
-  display: inline;
 }
 
 .declutter-media .media-state.ready[data-used='true'] {

@@ -12,6 +12,9 @@
   gap: 5px;
   min-width: 0;
 }
+.inspector-section-content > .spatial-editor {
+  padding: 0 14px 13px;
+}
 .spatial-tools > span {
   flex: 1;
   font-size: 12px;

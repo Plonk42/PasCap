@@ -147,8 +147,9 @@
 
 .media-panel .media-item-info > .media-recording-meta {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 5px;
+  gap: 1px 5px;
   min-width: 0;
 }
 
@@ -157,6 +158,7 @@
 }
 
 .media-panel .media-recording-duration {
+  flex-shrink: 0;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -176,9 +178,16 @@
   white-space: nowrap;
 }
 
+.media-panel .media-status-text {
+  min-width: 0;
+  overflow: hidden;
+  color: #d7c49b;
+  text-overflow: ellipsis;
+}
+
 /* The count lives in recording info, independently of the compact ready dot. */
 .media-panel.declutter-media .media-state.ready[data-used='true'] {
-  width: 8px;
+  width: 16px;
 }
 
 .media-panel.declutter-media .media-state.ready[data-used='true'] small {
