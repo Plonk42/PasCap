@@ -73,6 +73,8 @@ function singleProject(id: string, title: string, video: MediaAsset): ProjectDoc
   const clip = createClip('comparison-clip', video.id, 8, 108, document.layers[0]!.id);
   document.layers[0]!.colour = {
     ...createColourSettings(),
+    temperature: 0.2,
+    tint: -0.15,
     exposure: 0.7,
     brightness: 0.02,
     contrast: 1.15,
@@ -122,6 +124,8 @@ function layeredProject(videos: readonly MediaAsset[]): ProjectDocument {
         {
           speed: rate,
           opacity: 0.8 - index * 0.1,
+          temperature: 0.2 - index * 0.1,
+          tint: -0.15 + index * 0.1,
           exposure: 0.7 - index * 0.5,
           brightness: 0.03,
           contrast: 1.25,
@@ -137,6 +141,8 @@ function layeredProject(videos: readonly MediaAsset[]): ProjectDocument {
       sharedPoint(40, { exposure: -0.4, hue: -25, saturation: 1.4 }),
       sharedPoint(143, {
         opacity: 0.65 + index * 0.05,
+        temperature: -0.2,
+        tint: 0.15,
         exposure: 0.4,
         brightness: -0.02,
         contrast: 0.8,

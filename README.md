@@ -19,7 +19,7 @@ deployment targets.
 - No-copy footage browsing, verified editing proxies, thumbnails and reusable source excerpts.
 - Up to eight uniform video tracks, each with Ripple on by default; turn it off for independent placement.
 - Recoverable trims, split, duplication, marked-range cutting, snapping, Undo/Redo and source review.
-- Independent clip speed/spatial settings, row-owned Colour/Opacity, and **shared row-wide keyframes** for Opacity, Speed and seven colour settings.
+- Independent clip speed/spatial settings, row-owned Colour/Opacity, and **shared row-wide keyframes** for Opacity, Speed and nine scalar colour settings, including Temperature and Tint.
 - Precise clip-only speed curves with editable presets, draggable source-frame points and exact rate/easing inputs.
 - Clip-only crop, uniform scale, translation and rotation, with full-pose original-source keyframes.
 - Draggable timeline keyframes and setting-specific Previous/Next navigation.
@@ -81,6 +81,12 @@ playhead is read-only until its hollow diamond captures a key there.
 Static and keyed Colour have the same row ownership and grade each source once.
 Different colour treatments require different rows. See [row appearance](docs/design/ROW_APPEARANCE.md). Opacity controls composition coverage,
 not the SDR RGB grade, with no additional layer multiplier or sidebar duplicate.
+**Temperature / Tint** use normalized **−1…1** values, neutral **0**: positive
+Temperature warms, positive Tint adds magenta. They are row-owned, independently
+keyable and editable on empty rows. Nonzero settings intentionally colour greys;
+the shared linear-gain formula runs before Exposure, not as Kelvin/HDR/automatic
+white balance. Static HSL/curves add no animation channels. See
+[Temperature and Tint](docs/design/TEMPERATURE_AND_TINT.md).
 **Clip → Placement** contains placement only.
 Layer options contains only rename, Ripple, ordering and deletion; visibility
 remains a separate sidebar control.
@@ -123,16 +129,17 @@ Missing mounts and symlinks fail explicitly. In the eventual container package,
 originals will be read-only bind mounts and application data will be a separate
 persistent writable mount. See [deployment design](docs/DEPLOYMENT.md).
 
-**Project format:** strict schema **v11**, with required row `colour`, no clip colour/correction field, clip `spatial` base and
+**Project format:** strict schema **v12**, with required complete row `colour`, including `temperature` and `tint`, no clip colour/correction field, clip `spatial` base and
 0–256 full-pose source-frame keys, required `music` array (0–8
 instances, unique required IDs; `[]` without music), per-track Ripple,
 transitions, fades and numeric `VideoLayer.opacity` (0–1; new tracks start at 1),
-and exactly nine nullable point channels: `opacity`, `speed` and seven colour
-settings. Row `opacity` is required and valid; saved `clip.opacity` and old
+and exactly eleven nullable point channels: `opacity`, `speed`, `temperature`,
+`tint`, `exposure`, `brightness`, `contrast`, `hue`, `saturation`, `highlights`,
+`shadows`. HSL/curves remain static. Row `opacity` is required and valid; saved `clip.opacity` and old
 `clipOpacity`/`layerOpacity` channels are rejected, not ignored or defaulted.
-v1–v10 projects and receipt snapshots remain unchanged
+v1–v11 projects and receipt snapshots remain unchanged
 on disk but are incompatible: recreate projects and import media deliberately.
-Export receipts remain version 1 with a strict v11 snapshot and required captured
+Export receipts remain version 1 with a strict v12 snapshot and required captured
 audio-source/instance-plan arrays. Registry/proxy/current PCM cache formats and
 source protections do not change. There are no migrations, null fallbacks,
 compatibility readers, default-filled legacy fields or automatic deletions.
@@ -174,9 +181,10 @@ real-workload qualification, and local Docker/Podman packaging. See
 - [Timing and colour contract](docs/COLOUR_AND_TIMING.md)
 - [Layers and keyframes](docs/LAYERS_AND_KEYFRAMES.md)
 - [Speed, audio and export](docs/SPEED_AND_AUDIO.md)
-- [Row appearance/schema-11 contract](docs/design/ROW_APPEARANCE.md)
-- [Spatial transforms/schema-11 contract](docs/design/SPATIAL_TRANSFORMS.md)
-- [Multiple music/schema-11 contract](docs/design/MULTIPLE_MUSIC.md) — required behaviour; implementation/validation acceptance remains pending, not a test or release claim.
+- [Row appearance/schema-12 contract](docs/design/ROW_APPEARANCE.md)
+- [Temperature and Tint/schema-12 contract](docs/design/TEMPERATURE_AND_TINT.md)
+- [Spatial transforms/schema-12 contract](docs/design/SPATIAL_TRANSFORMS.md)
+- [Multiple music/schema-12 contract](docs/design/MULTIPLE_MUSIC.md) — required behaviour; implementation/validation acceptance remains pending, not a test or release claim.
 - [Deployment target](docs/DEPLOYMENT.md)
 - [Historical feasibility study](docs/FEASIBILITY_REPORT.md)
 

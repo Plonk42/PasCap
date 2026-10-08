@@ -76,6 +76,8 @@ function primaryProject(
   document.layers[0]!.opacity = 0.65;
   document.layers[0]!.colour = {
     ...NEUTRAL_COLOUR,
+    temperature: 0.2,
+    tint: -0.3,
     exposure: 0.6,
     brightness: 0.08,
     contrast: 1.2,
@@ -680,9 +682,9 @@ describe('positioned overlay removal without neighbour ripple', () => {
     expect(placed(next, 'upper-after').start).toBe(placed(document, 'upper-after').start);
   });
 
-  it('maps overlay marks/cut placement with absolute row speed, retaining fixed nine-channel points', () => {
+  it('maps overlay marks/cut placement with absolute row speed, retaining fixed eleven-channel points', () => {
     const keys = [
-      point(0, { speed: 1, opacity: 0.6, exposure: 0.3 }),
+      point(0, { speed: 1, opacity: 0.6, temperature: 0.2, tint: -0.3, exposure: 0.3 }),
       point(100, {
         speed: 3,
         brightness: 0.1,

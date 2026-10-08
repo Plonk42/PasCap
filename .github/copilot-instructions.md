@@ -66,8 +66,28 @@ PasCap is a solo, pre-release project: optimize for fast iteration. Details are 
 
 - Shared integer-frame layout/retiming (`PlacedClip.retiming`) is authoritative for
   UI, preview and native export. Per-frame rendering stays outside React.
-- Strict schema 11 requires row `colour.hsl` with eight complete named bands and `colour.curves` with master/red/green/blue 2–16-point arrays. All Colour is row-owned, keyed or not; clips have no colour/correction. HSL/curves are static in #19 and add no channels to the existing nine nullable row channels. Preserve seven scalar controls and sole Opacity. Process seven-control SDR → encoded HSL → master → RGB curves → fades/coverage. Compare bypasses all colour only. Neutral creators deep-clone nested structures; never repair missing fields on load. Advanced resets never overwrite scalar bases/keys or Opacity; Reset keys never erases advanced settings. Keep existing LUT/buffer/decoder/native budgets and strict gates. See [the advanced colour contract](../docs/design/HSL_AND_CURVES.md).
-- Owner-approved #70: required row `colour` contains all seven SDR channels,
+- Strict schema 12 requires complete row Colour with nine scalar fields plus
+  `colour.hsl` (eight complete named bands) and `colour.curves` (master/red/green/blue
+  2–16-point arrays). HSL/curves remain static, not animation channels. All Colour
+  is row-owned, keyed or not; clips have no colour/correction. Neutral creators
+  deep-clone nested structures; never repair missing saved fields. Advanced resets
+  never overwrite scalar bases/keys or Opacity; Reset keys never erases advanced
+  settings. Keep existing LUT/buffer/decoder/native budgets and strict gates. See
+  [the advanced colour contract](../docs/design/HSL_AND_CURVES.md).
+- Approved #68: required row `temperature` and `tint` colour fields use normalized
+  −1…1, neutral 0; positive Temperature warms, positive Tint adds magenta.
+  For Temperature $T$, Tint $I$, raw gains are
+  $q=(2^{T/2+I/4},2^{-I/4},2^{-T/2+I/4})$, normalized as
+  $g=q/(0.2126q_R+0.7152q_G+0.0722q_B)$. Apply to decoded linear RGB before
+  Exposure, then the remaining scalar SDR stages → encoded HSL → master → RGB
+  curves → fades/coverage. CPU/reference/native/GPU use the same math and order.
+  Nonzero settings intentionally colour greys; normalization preserves neutral-white
+  linear luminance before clipping only, not arbitrary pixels or final output.
+  No Kelvin/HDR/AWB. Main/stored slider/exact-field/reset/diamond/navigation retain
+  explicit capture, row ownership, empty-row editing and one-step gestures.
+  Compare bypasses all Colour, including Temperature/Tint, never coverage or geometry.
+  See [Temperature and Tint](../docs/design/TEMPERATURE_AND_TINT.md).
+- Owner-approved #70: required row `colour` contains all nine scalar SDR channels,
   neutral on new rows, with sole row `opacity` initially 1. Reject saved
   `clip.colour`, `clip.correction` and missing row colour. Static and keyed Colour
   have identical row ownership; different treatments require different rows.
@@ -76,7 +96,7 @@ PasCap is a solo, pre-release project: optimize for fast iteration. Details are 
   reused buffers and unchanged bounds. Controls/keys work on empty rows. Moves/new
   clips adopt destination bases/keys/Opacity; trim/split/cut/duplicate preserve
   row bases and absolute points, without per-clip colour copies. HSL and curves
-  retain that ownership; temperature (#68) remains separate row-owned work.
+  retain that ownership, as do Temperature and Tint.
   See [row appearance](../docs/design/ROW_APPEARANCE.md).
 - Every clip requires strict `spatial: { base, keyframes }`: eight complete pose
   values and 0–256 ascending original-source full-pose keys with required easing.
@@ -100,8 +120,9 @@ PasCap is a solo, pre-release project: optimize for fast iteration. Details are 
 - Final approved [#67](https://github.com/Plonk42/PasCap/issues/67): **Opacity** is
   one row-owned setting, not a clip setting. `VideoLayer.opacity` is a required
   number in 0–1; new tracks start at 1 (100%). No saved `clip.opacity` field.
-  The sole row key channel is `opacity`; points require all nine nullable channels:
-  `opacity`, `speed` and the seven colour settings. Reject missing row opacity,
+  The sole row Opacity key channel is `opacity`; points require all eleven nullable
+  channels: `opacity`, `speed`, `temperature`, `tint`, `exposure`, `brightness`,
+  `contrast`, `hue`, `saturation`, `highlights`, `shadows`. Reject missing row opacity,
   saved `clip.opacity` and old `clipOpacity`/`layerOpacity` channels; do not supply
   compatibility defaults. `layer.opacity` is the valid sole stored row value.
   Put the single **Opacity** slider/diamond/navigation in **Clip → Colour** beside
@@ -116,10 +137,10 @@ PasCap is a solo, pre-release project: optimize for fast iteration. Details are 
   $\mathrm{result} = C + \mathrm{lower}(1 - A)$, evaluating row Opacity for each
   source with no additional layer multiplier; $m_i$ is spatial source coverage,
   including opaque neutral letterboxing. Black fades never reduce that coverage.
-  Version-1 export receipts require strict v11 snapshots and captured audio-source/
+  Version-1 export receipts require strict v12 snapshots and captured audio-source/
   instance-plan arrays; receipt, registry/proxy/PCM and benchmark format versions
   remain independent and unchanged.
-  Preserve incompatible v1–v10 projects/receipt snapshots; require recreation,
+  Reject and preserve incompatible v1–v11 projects/receipt snapshots; require recreation,
   without migrations, compatibility defaults or automatic deletion.
 - Music is a required 0–8 array of independently identified instances, never null
   or singular. Duration is the maximum of all video and music OUTs. After the last
@@ -132,6 +153,7 @@ PasCap is a solo, pre-release project: optimize for fast iteration. Details are 
   [timeline](../docs/TIMELINE_EDITING.md),
   [layers/keyframes/resources](../docs/LAYERS_AND_KEYFRAMES.md),
   [speed/audio](../docs/SPEED_AND_AUDIO.md),
+  [Temperature and Tint](../docs/design/TEMPERATURE_AND_TINT.md),
   [spatial transforms](../docs/design/SPATIAL_TRANSFORMS.md),
   [workspace/recovery](../docs/WORKSPACE_AND_RECOVERY.md) and
   [development](../docs/DEVELOPMENT.md). Guides describe current behaviour only;

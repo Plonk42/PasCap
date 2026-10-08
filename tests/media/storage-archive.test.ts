@@ -14,34 +14,43 @@ import { unsupportedProject } from '../unit/project-fixtures.js';
 const enabled = process.env['PASCAP_MEDIA_TESTS'] === '1';
 const roots: string[] = [];
 async function temp(): Promise<string> {
-  const root = await mkdtemp(path.join(os.tmpdir(), 'pascap-schema10-storage-media-'));
+  const root = await mkdtemp(path.join(os.tmpdir(), 'pascap-schema12-storage-media-'));
   roots.push(root);
   return root;
 }
 
-describe.skipIf(!enabled)('schema-11 storage/archive integration · generated files only, no migrations', () => {
+describe.skipIf(!enabled)('schema-12 storage/archive integration · generated files only, no migrations', () => {
   afterEach(async () => {
     await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
   });
 
-  it('loads strict v11 points/bins and lists/rejects unsupported versions through v10 without rewriting them', async () => {
+  it('loads strict v12 row gains/eleven-channel points and preserves unsupported v1–v11', async () => {
     const root = await temp();
     const store = new ProjectStore(root);
-    const project = createProject('strict-v10', 'Strict current document');
+    const project = createProject('strict-v12', 'Strict current document');
     project.media = { videoIds: ['generated-original', 'unplaced-original'], audioIds: ['unplaced-music'] };
     project.clips = [createClip('current-clip', 'generated-original', 0, 4)];
+    project.layers[0]!.colour.temperature = 0.75;
+    project.layers[0]!.colour.tint = -0.65;
     project.layers[0]!.keyframes = [
-      { frame: 0, interpolation: 'linear', values: { ...EMPTY_KEY_VALUES, speed: 0.5, opacity: 0.8 } },
-      { frame: 5000, interpolation: 'ease-out', values: { ...EMPTY_KEY_VALUES, exposure: 0.25 } },
+      { frame: 0, interpolation: 'linear', values: { ...EMPTY_KEY_VALUES, speed: 0.5, opacity: 0.8, temperature: -1 } },
+      { frame: 5000, interpolation: 'ease-out', values: { ...EMPTY_KEY_VALUES, exposure: 0.25, tint: 1 } },
     ];
     const saved = await store.save(project, 0);
-    expect(saved.schemaVersion).toBe(11);
+    expect(saved.schemaVersion).toBe(12);
     expect(saved.media).toEqual(project.media);
+    expect(saved.layers[0]!.colour).toMatchObject({ temperature: 0.75, tint: -0.65 });
+    expect(saved.layers[0]!.keyframes).toEqual(project.layers[0]!.keyframes);
+    for (const keyframe of saved.layers[0]!.keyframes) {
+      expect(Object.keys(keyframe.values)).toHaveLength(11);
+      expect(keyframe.values).toHaveProperty('temperature');
+      expect(keyframe.values).toHaveProperty('tint');
+    }
     expect(await store.load(saved.id)).toEqual(saved);
     const currentPath = path.join(root, 'projects', `${saved.id}.json`);
     const currentBytes = await readFile(currentPath);
     const old = [];
-    for (const version of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]) {
+    for (const version of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]) {
       const id = `original-v${version}`;
       const title = `Preserved original version ${version}`;
       const document = unsupportedProject(version, id, title);
@@ -49,7 +58,7 @@ describe.skipIf(!enabled)('schema-11 storage/archive integration · generated fi
       const filename = path.join(root, 'projects', `${id}.json`);
       await writeFile(filename, bytes);
       old.push({ id, title, version, filename, bytes });
-      await expect(store.load(id)).rejects.toThrow(`schema version ${version}; this build requires version 11`);
+      await expect(store.load(id)).rejects.toThrow(`schema version ${version}; this build requires version 12`);
       await expect(store.rename(id, 'Must not rewrite an older file', 0)).rejects.toThrow(
         'existing file was not changed',
       );
@@ -71,7 +80,7 @@ describe.skipIf(!enabled)('schema-11 storage/archive integration · generated fi
         revision: 0,
         clipCount: 0,
         duration: 0,
-        error: expect.stringContaining(`requires version 11`),
+        error: expect.stringContaining(`requires version 12`),
       });
       expect(await readFile(entry.filename)).toEqual(entry.bytes);
     }
@@ -124,12 +133,12 @@ describe.skipIf(!enabled)('schema-11 storage/archive integration · generated fi
     expect(await readFile(filename)).toEqual(bytes);
   });
 
-  it('rejects malformed v9 and removed opacity fields without synthesizing missing current fields', async () => {
+  it('rejects missing/out-of-range v12 gains and removed appearance fields without defaults', async () => {
     const root = await temp();
     const store = new ProjectStore(root);
     const directory = path.join(root, 'projects');
     await mkdir(directory);
-    const valid = createProject('malformed-v9', 'Must remain strict');
+    const valid = createProject('malformed-v12', 'Must remain strict');
     valid.clips = [createClip('current', 'generated-original', 0, 4)];
     const missingMedia: Record<string, unknown> = { ...valid };
     delete missingMedia['media'];
@@ -166,6 +175,37 @@ describe.skipIf(!enabled)('schema-11 storage/archive integration · generated fi
       { ...valid, clips: [missingSpatial] },
       { ...valid, clips: [{ ...valid.clips[0]!, spatial: { ...valid.clips[0]!.spatial, unknown: true } }] },
       { ...valid, unexpected: true },
+      ...(['temperature', 'tint'] as const).flatMap((setting) => {
+        const colour: Record<string, unknown> = { ...valid.layers[0]!.colour };
+        delete colour[setting];
+        const values: Record<string, unknown> = { ...EMPTY_KEY_VALUES, exposure: 0.25 };
+        delete values[setting];
+        return [
+          { ...valid, layers: [{ ...valid.layers[0]!, colour }] },
+          { ...valid, clips: [{ ...valid.clips[0]!, [setting]: 0 }] },
+          { ...valid, clips: [{ ...valid.clips[0]!, colour: { ...valid.layers[0]!.colour, [setting]: 0.5 } }] },
+          { ...valid, layers: [{ ...valid.layers[0]!, keyframes: [{ frame: 0, interpolation: 'linear', values }] }] },
+          ...[null, -1.001, 1.001, '0'].map((value) => ({
+            ...valid,
+            layers: [{ ...valid.layers[0]!, colour: { ...valid.layers[0]!.colour, [setting]: value } }],
+          })),
+          ...[-1.001, 1.001, '0'].map((value) => ({
+            ...valid,
+            layers: [
+              {
+                ...valid.layers[0]!,
+                keyframes: [
+                  {
+                    frame: 0,
+                    interpolation: 'linear',
+                    values: { ...EMPTY_KEY_VALUES, [setting]: value },
+                  },
+                ],
+              },
+            ],
+          })),
+        ];
+      }),
       {
         ...valid,
         layers: [{ ...valid.layers[0]!, keyframes: [{ frame: 100, interpolation: 'linear', values: missingValues }] }],
@@ -208,14 +248,16 @@ describe.skipIf(!enabled)('schema-11 storage/archive integration · generated fi
     expect((await store.list()).every((summary) => !summary.compatible)).toBe(true);
   });
 
-  it('restores only strict v11 snapshots in version-1 receipts and preserves earlier outputs/receipts byte-for-byte', async () => {
+  it('restores only strict v12 snapshots in version-1 receipts and preserves earlier outputs/receipts byte-for-byte', async () => {
     const root = await temp();
     const config = createConfig({ dataDir: root });
     const jobs = new JobQueue();
     const snapshot = createProject('current-export', 'Current verified export');
     snapshot.clips = [createClip('one', 'generated-original', 0, 2)];
+    snapshot.layers[0]!.colour.temperature = -0.85;
+    snapshot.layers[0]!.colour.tint = 0.9;
     snapshot.layers[0]!.keyframes = [
-      { frame: 50, interpolation: 'smooth', values: { ...EMPTY_KEY_VALUES, exposure: 0.1 } },
+      { frame: 50, interpolation: 'smooth', values: { ...EMPTY_KEY_VALUES, exposure: 0.1, temperature: 1, tint: -1 } },
     ];
     async function archive(document: unknown, label: string) {
       const id = randomUUID();
@@ -240,20 +282,41 @@ describe.skipIf(!enabled)('schema-11 storage/archive integration · generated fi
       return { id, folder, receipt, output };
     }
     try {
-      const current = await archive(snapshot, 'v9');
+      const current = await archive(snapshot, 'v12');
       const older = [];
-      for (const version of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]) {
+      for (const version of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]) {
         const document = unsupportedProject(version, `old-${version}`, `Original ${version}`);
         older.push({ ...(await archive(document, `v${version}`)), version });
       }
       const missingRow: Record<string, unknown> = { ...snapshot.layers[0]! };
       delete missingRow['keyframes'];
-      const malformed = await archive({ ...snapshot, layers: [missingRow] }, 'Malformed v9');
+      const malformed = await archive({ ...snapshot, layers: [missingRow] }, 'Malformed v12');
       const missingTiming = [];
       for (const field of ['opacity', 'ripple', 'transitions', 'openingFade', 'closingFade']) {
         const row: Record<string, unknown> = { ...snapshot.layers[0]! };
         delete row[field];
         missingTiming.push({ ...(await archive({ ...snapshot, layers: [row] }, `Missing ${field}`)), field });
+      }
+      const missingGains = [];
+      for (const setting of ['temperature', 'tint'] as const) {
+        const colour: Record<string, unknown> = { ...snapshot.layers[0]!.colour };
+        delete colour[setting];
+        missingGains.push({
+          ...(await archive({ ...snapshot, layers: [{ ...snapshot.layers[0]!, colour }] }, `Missing row ${setting}`)),
+          setting,
+        });
+        const values: Record<string, unknown> = { ...snapshot.layers[0]!.keyframes[0]!.values };
+        delete values[setting];
+        missingGains.push({
+          ...(await archive(
+            {
+              ...snapshot,
+              layers: [{ ...snapshot.layers[0]!, keyframes: [{ ...snapshot.layers[0]!.keyframes[0]!, values }] }],
+            },
+            `Missing nullable ${setting}`,
+          )),
+          setting,
+        });
       }
       const removedAppearance = [
         await archive({ ...snapshot, clips: [{ ...snapshot.clips[0]!, opacity: 1 }] }, 'Removed clip opacity'),
@@ -280,7 +343,7 @@ describe.skipIf(!enabled)('schema-11 storage/archive integration · generated fi
           ),
         );
       const warnings = await restoreExports(config, jobs);
-      expect(warnings).toHaveLength(19);
+      expect(warnings).toHaveLength(24);
       expect(jobs.list().map((job) => job.id)).toEqual([current.id]);
       expect(jobs.get(current.id)).toMatchObject({
         kind: 'export',
@@ -291,7 +354,7 @@ describe.skipIf(!enabled)('schema-11 storage/archive integration · generated fi
       });
       for (const entry of older) {
         expect(warnings.find((warning) => warning.startsWith(`${entry.id}:`))).toContain(
-          `Unsupported export snapshot schema version ${entry.version}; this build requires version 11`,
+          `Unsupported export snapshot schema version ${entry.version}; this build requires version 12`,
         );
         expect(warnings.find((warning) => warning.startsWith(`${entry.id}:`))).toContain(
           'successful output were not changed',
@@ -300,15 +363,20 @@ describe.skipIf(!enabled)('schema-11 storage/archive integration · generated fi
       expect(warnings.find((warning) => warning.startsWith(`${malformed.id}:`))).toContain('keyframes');
       for (const entry of missingTiming)
         expect(warnings.find((warning) => warning.startsWith(`${entry.id}:`))).toContain(entry.field);
+      for (const entry of missingGains) {
+        const warning = warnings.find((warning) => warning.startsWith(`${entry.id}:`));
+        expect(warning).toContain(entry.setting);
+        expect(warning).toContain('successful output were not changed');
+      }
       for (const entry of removedAppearance)
         expect(warnings.find((warning) => warning.startsWith(`${entry.id}:`))).toContain(
           'successful output were not changed',
         );
-      for (const entry of [current, ...older, malformed, ...missingTiming, ...removedAppearance]) {
+      for (const entry of [current, ...older, malformed, ...missingTiming, ...missingGains, ...removedAppearance]) {
         expect(await readFile(path.join(entry.folder, 'receipt.json'))).toEqual(entry.receipt);
         expect(await readFile(path.join(entry.folder, 'export.mp4'))).toEqual(entry.output);
       }
-      expect(await restoreExports(config, jobs)).toHaveLength(19);
+      expect(await restoreExports(config, jobs)).toHaveLength(24);
       expect(jobs.list()).toHaveLength(1);
     } finally {
       await jobs.close();

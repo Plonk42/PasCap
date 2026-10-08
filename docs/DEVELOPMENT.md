@@ -1,6 +1,24 @@
 # Development
 
-Current strict schema **11** requires all eight HSL bands and all four colour curves in each row's `colour`, alongside the existing seven scalar bases. No load defaults/migrations are permitted. The nine nullable key channels are unchanged. Synthetic tests cover grayscale, circular boundaries, neutral identity, GPU uniform capacity, exact native byte/fractional sharp knees and combined grades with unchanged pixel/frame/resource gates. Nonneutral HSL/curves use exact complete CPU grading through layered export; neutral advanced settings retain scalar LUT paths. At most two native 65³ Float32 buffers (6,591,000 bytes) remain available; no extra decoder, texture, full-frame buffer or child process is introduced. Exact advanced grading can substantially slow UHD exports. See [HSL_AND_CURVES.md](design/HSL_AND_CURVES.md). Current reference/measurement metadata identifies strict 11; historical reports remain unchanged.
+Current strict schema **12** requires nine scalar bases in each row's `colour`,
+including Temperature/Tint (−1…1, neutral 0), all eight HSL bands and all four
+colour curves. Shared points require eleven nullable fields, in control order:
+`opacity`, `speed`, `temperature`, `tint`, `exposure`, `brightness`, `contrast`,
+`hue`, `saturation`, `highlights`, `shadows`. HSL/curves remain static.
+Reject/preserve v1–v11 documents and receipt snapshots; no load defaults,
+migrations, legacy acceptance or automatic deletion. CPU/reference/native/GPU
+must use the same [Temperature/Tint gain math](design/TEMPERATURE_AND_TINT.md)
+before Exposure, including intentionally coloured greys and pre-clipping
+neutral-white linear luminance normalization only. Required synthetic validation
+retains neutral identity, axis signs/combined grades, grayscale/HSL boundaries,
+GPU uniform capacity, exact native sharp knees and unchanged pixel/frame/resource
+gates; this update claims no new test results. Nonneutral HSL/curves use exact
+complete CPU grading through layered export; neutral advanced settings retain
+scalar LUT paths. At most two native 65³ Float32 buffers (6,591,000 bytes) remain
+available, without an extra decoder, texture, full-frame buffer or child process.
+Exact advanced grading can substantially slow UHD exports. See
+[HSL_AND_CURVES.md](design/HSL_AND_CURVES.md). New reference/measurement metadata
+identifies strict schema 12; historical reports remain unchanged.
 
 Local Linux setup and contributing. Editing: [USER_GUIDE.md](USER_GUIDE.md). Service
 paths and **future, not implemented** containers: [DEPLOYMENT.md](DEPLOYMENT.md).
@@ -239,7 +257,8 @@ originals in `.pascap/browser-footage/synthetic-sources/` are outside that cache
 `browse-camera-*` means generated patterns, not real recordings. The
 [fixture factory](../scripts/fixtures.ts) uses `preview-lab-v6` outside the browser
 cache and `preview-lab` inside it. These are project identifiers, not schema
-versions; newly generated documents must satisfy strict v11, including row colour and clip spatial
+versions; newly generated documents must satisfy strict v12, including complete row
+colour with Temperature/Tint, all eleven nullable channels and clip spatial
 base/full-pose keys. Bin resets never imply
 a global-library fallback.
 Neither suite invokes real-source sample preparation or needs private footage/music.
@@ -333,14 +352,15 @@ the independent one-frame A/V, single-epoch and completion assertions.
 **Do not run these in CI or without the owner's explicit approval for real jobs.**
 The [sample helper](../scripts/prepare-samples.ts) targets **DJI_0468.MP4 and DJI_0469.MP4
 only**: pass an **explicit folder after `--`**, never rely on a personal-path default.
-It reuses ready proxies but may prepare missing ones; creates only an absent v11
+It reuses ready proxies but may prepare missing ones; creates only an absent v12
 sample, never overwrites or migrates existing edits.
 
 The [measurement helper](../scripts/measure-preview.ts) accepts exactly **two
 1× excerpts on one enabled, zero-origin contiguous track with row Opacity 1**, no music,
 extra layers, spatial edits/keys or shared row points
 (even neutral/Speed-only points). `PASCAP_MEASURE_URL` selects that project.
-Measurement uses static row Colour and metadata must identify the strict v11 snapshot independently of the
+Measurement uses static scalar row Colour (including Temperature/Tint), neutral
+HSL and identity curves; metadata must identify the strict v12 snapshot independently of the
 report format/identifier; historical reports and receipt snapshots stay untouched.
 `npm run measure -- --skip-playback --reference` skips playback benchmarking but
 **renders a native reference**; `--headed --reference` adds repeated playback. The edit
@@ -385,7 +405,7 @@ of Ripple or track ID.
 Processing: [row points](LAYERS_AND_KEYFRAMES.md), [retiming/audio](SPEED_AND_AUDIO.md)
 and [grading equations](COLOUR_AND_TIMING.md#colour).
 
-Strict schema 11 requires `clip.spatial: { base, keyframes }`: eight complete pose
+Strict schema 12 requires `clip.spatial: { base, keyframes }`: eight complete pose
 values and 0–256 full-pose original-source keys with required easing. Shared
 [spatial mapping](../src/shared/spatial.ts) uses unrounded original-aspect contain
 fit, original-centre pivot and half-open crop bounds; crop does not refit.
@@ -434,20 +454,23 @@ Layer options contains rename, Ripple, ordering and deletion, with visibility se
 - Never modify/copy/delete owner's originals or commit private paths/device IDs,
   saved project IDs, real media/cache or reports. Preserve fingerprints, symlink
   rejection, cache exclusion and HTTP guards.
-- Keep **strict schema 11**: required row `colour`; reject saved `clip.colour`
+- Keep **strict schema 12**: complete required row `colour`, including
+  Temperature/Tint and static HSL/curves; reject saved `clip.colour`
   and `clip.correction`. Grade sources once with evaluated row Colour, retaining
   two LUT buffers and existing raw/process budgets. Main Colour controls and keys
   have identical row scope and work empty. See [row appearance](design/ROW_APPEARANCE.md). Required clip spatial base/full-pose source-frame keys,
-  required unique video/audio membership, all nine nullable
+  required unique video/audio membership, all eleven nullable
   channels and per-layer `ripple`, `transitions`, `openingFade`, `closingFade` and
   numeric `opacity` in 0–1. A new track starts at 1; a missing saved field is invalid.
-  The channels are `opacity` (sole UI **Opacity**), `speed` and seven colour
-  settings. Row `opacity` is the sole valid stored value; reject saved `clip.opacity`
+  The channels are `opacity` (sole UI **Opacity**), `speed`, `temperature`, `tint`,
+  `exposure`, `brightness`, `contrast`, `hue`, `saturation`, `highlights`, `shadows`.
+  Missing bases/channels are invalid; neutral values are creation values only.
+  Row `opacity` is the sole valid stored value; reject saved `clip.opacity`
   and old `clipOpacity`/`layerOpacity` channels. No project-level
   transitions/fades, compatibility fields/defaults/migration or mandatory first-track
   ID. Require a 0–8 `music` array with unique instance IDs and complete independent
   settings, plus captured audio-source/instance-plan arrays in current receipts.
-  Preserve incompatible v1–v10 projects/receipt snapshots and finished videos,
+  Reject and preserve incompatible v1–v11 projects/receipt snapshots and finished videos,
   without automatic deletion; recreate projects deliberately. Registry/proxy formats,
   source protections and native resource budgets remain unchanged.
 - Reuse `JobQueue`, library and backpressured raw/retime helpers: one heavy job,

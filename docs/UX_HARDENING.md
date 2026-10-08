@@ -18,7 +18,7 @@ This guide is not a delivery ledger or a fresh validation result.
   dashed between keys and filled at a participating playhead point. **Animation
   help** explains the states once. Titles and screen-reader descriptions retain
   each setting's scope and capture instructions.
-- All **nine diamonds have adjacent Previous/Next SVG buttons**, followed by
+- All **eleven row-channel diamonds have adjacent Previous/Next SVG buttons**, followed by
   any reset. Explicit capture, real-playhead values, shared point movement,
   off-duration inspection, every participant and one-step Undo remain unchanged.
 - **Clip → Colour** contains the single **Opacity** slider/diamond/navigation
@@ -30,6 +30,13 @@ This guide is not a delivery ledger or a fresh validation result.
   controls composition coverage, not SDR RGB grading. **Placement** contains
   placement only. There is no sidebar duplicate; Layer options contains only
   rename, Ripple, ordering and deletion, with visibility separate in the sidebar.
+- **Temperature / Tint** are row-owned normalized −1…1 scalar Colour controls,
+  neutral/reset 0, with the same exact field, release-only slider, explicit capture
+  and channel-navigation pattern, including on empty rows. Positive Temperature
+  warms; positive Tint adds magenta. Nonzero values intentionally colour greys;
+  normalized linear gains precede Exposure, preserving neutral-white luminance
+  before clipping only. Static HSL/curves add no channels. See
+  [Temperature and Tint](design/TEMPERATURE_AND_TINT.md).
 - Timeline tools form **edit** and **marked-range removal** groups. Temporary
   IN/OUT state appears on the buttons and timeline selection rather than adding
   another toolbar row. Compact windows use labelled, focusable icon controls;
@@ -41,11 +48,12 @@ This guide is not a delivery ledger or a fresh validation result.
   uncertainty, errors/recheck and disclosed location/assumptions. Snapshot and
   native processing details remain available in **Rendering details**.
 
-Schema 9 requires clip spatial base/full-pose source-frame keys and uses a
+Schema 12 requires complete row Colour with Temperature/Tint and static HSL/curves,
+clip spatial base/full-pose source-frame keys and uses a
 required 0–8 `music` array with unique required instance IDs and
 uniform video tracks with required Ripple/transitions/fades and
-numeric `VideoLayer.opacity` in 0–1 (1 on new tracks), plus nine nullable point
-channels: `opacity`, `speed` and seven colour settings. Rows
+numeric `VideoLayer.opacity` in 0–1 (1 on new tracks), plus eleven nullable point
+channels: `opacity`, `speed` and nine scalar colour settings. Rows
 follow saved bottom-to-top composition order. Layer options exposes default-on
 Ripple: enabling closes gaps from the first current start in one Undo; while on,
 later clips continuously sequence there. Turning it off keeps actual placements.
@@ -62,12 +70,12 @@ $w_i$ dissolve weight and $m_i$ spatial pixel coverage. Exact neutral poses
 preserve opaque black letterboxing after grading; nonneutral uncovered pixels
 reveal lower footage. Each source uses the same evaluated row Opacity at that
 project frame, from the row value or its overriding curve.
-v1–v8 project/receipt snapshots remain unchanged/incompatible
+v1–v11 project/receipt snapshots remain unchanged/incompatible
 and require recreation, without migration, defaults or automatic deletion.
 Row `opacity` is the required sole stored value, not obsolete; saved `clip.opacity`
 and old `clipOpacity`/`layerOpacity` point channels are invalid.
 Registry/proxy/current PCM formats do not change. Version-1 export receipts require
-strict v11 snapshots and captured audio-source/instance-plan arrays, rejecting
+strict v12 snapshots and captured audio-source/instance-plan arrays, rejecting
 invalid arrays/older snapshots without rewriting successful exports. No null
 fallback or old-format reader is permitted. Source-copy prohibition,
 row points, source choices, media preparation, Activity and both export

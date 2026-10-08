@@ -1,6 +1,15 @@
-# Speed and audio contract · project v11
+# Speed and audio contract · project v12
 
-Static row HSL and master/RGB colour curves run after the seven evaluated colour controls and before black fades/coverage. They remain active with scalar row keys, add no animation channels, and are unrelated to speed curves. Compare/Ungraded bypasses all colour stages without changing retiming, geometry, Opacity or music. Required data and resource budgets: [HSL_AND_CURVES.md](design/HSL_AND_CURVES.md).
+Nine row-owned scalar Colour controls include Temperature/Tint (−1…1, neutral 0),
+whose normalized linear gains precede Exposure. Positive Temperature warms;
+positive Tint adds magenta; nonzero settings intentionally colour greys. They
+participate independently in row animation without changing Speed semantics.
+See [Temperature and Tint](design/TEMPERATURE_AND_TINT.md).
+Static row HSL and master/RGB colour curves follow scalar grading and precede
+black fades/coverage. They remain active with scalar keys, add no animation
+channels and are unrelated to speed curves. Compare/Ungraded bypasses all Colour
+without changing retiming, geometry, Opacity or music. Required data/resources:
+[HSL_AND_CURVES.md](design/HSL_AND_CURVES.md).
 
 ## Two distinct retiming contracts
 
@@ -54,7 +63,7 @@ selected original frame, even when output sampling skips it.
 Clip curves belong to **one excerpt instance**. Trims, moves, splits and marked
 cuts retain original-source anchors; split/cut/duplicate copies are independent.
 Every retained piece recompiles/rounds its duration once. Curves are carried in
-the required `speed` field of strict schema 11, without an optional fallback,
+the required `speed` field of strict schema 12, without an optional fallback,
 data migration or project-wide speed field. A mode/preset change
 is a deliberate editing command, not a conversion on load.
 
@@ -68,8 +77,10 @@ base without deleting any clip points.
 
 ### Shared row Speed: absolute project-time rate
 
-Schema-10 layer points require nine nullable channels: Opacity (`opacity`),
-Speed (`speed`) and seven colour settings.
+Schema-12 layer points require eleven nullable channels: Opacity (`opacity`),
+Speed (`speed`) and nine scalar colour settings. In control order: `opacity`,
+`speed`, `temperature`, `tint`, `exposure`, `brightness`, `contrast`, `hue`,
+`saturation`, `highlights`, `shadows`; static HSL/curves add no channels.
 Once any point on the row participates in Speed, the row's rate curve **overrides
 every clip's entire constant/ramp/custom-curve base**, not just an interval between keys. Only
 Speed participants define its intervals; unrelated colour/opacity-only points are
@@ -134,7 +145,7 @@ requires the layered export path; any nonneutral spatial base or spatial key
 (even neutral keys) does too. Exact neutral poses retain opaque black letterboxing
 after grading; nonneutral uncovered pixels reveal lower footage. The static chunk
 plan cannot silently omit these edits.
-Opacity is composition coverage, not part of the unchanged SDR RGB grade.
+Opacity is composition coverage, not part of the SDR RGB grade.
 Its single native slider/exact `NumberField`/diamond/navigation is in **Clip → Colour**
 alongside the colour controls. Numeric entry is **0–1**, initially **1**; the main
 label may show **100%**. Without Opacity keys it edits row `opacity`, even on
@@ -284,7 +295,7 @@ separate; an explicit override notice appears when row Speed suppresses clip spe
 
 ## Music
 
-Strict schema 11 requires `music: MusicTrack[]`, with **0–8 independent instances**
+Strict schema 12 requires `music: MusicTrack[]`, with **0–8 independent instances**
 and unique required instance `id` values; `[]` means no music. Each instance
 requires `mediaId`, `sourceIn`, `sourceOut`, `start`, `duration`, `gainDb`, `fadeIn`,
 `fadeOut` and `loop`. Several instances can use the same registered recording
@@ -407,7 +418,7 @@ preview caches remain unchanged but are not current playback input. Missing curr
 PCM caches appear as an explicit **Retry** preparation action in Audio → Music;
 startup/library reads never prepare, rewrite or delete them. Prepare deliberately
 to create the current cache, retaining originals and older generated files. Project
-schema is 9; registry, video-proxy and PCM cache formats are unchanged. Native export
+schema is 12; registry, video-proxy and PCM cache formats are unchanged. Native export
 still reads original audio, not the preview transport.
 
 Native mixing decodes **one original at a time** to exact selected **48 kHz stereo
@@ -429,11 +440,12 @@ cancellation cleans only owned scratch/partials and preserves completed outputs.
 
 ## Versioning
 
-Project schema **v11** requires explicit `media.videoIds` and `media.audioIds` arrays,
-unique and limited to 10,000 IDs each, plus complete row colour, clip constant/ramp/custom-curve
+Project schema **v12** requires explicit `media.videoIds` and `media.audioIds` arrays,
+unique and limited to 10,000 IDs each, plus complete row colour with Temperature/Tint
+and static HSL/curves, clip constant/ramp/custom-curve
 speed, required clip `spatial: { base, keyframes }` with eight-value base and
 0–256 full-pose source-frame keys with required easing, layer point arrays with
-all nine nullable value fields, placement and music
+all eleven nullable value fields, placement and music
 source OUT. `music` is a required 0–8 array with unique required instance IDs and
 all per-instance fields above; `[]` is the sole no-music representation, not null
 or a compatibility default. Every layer also requires `ripple`, `transitions`, `openingFade` and
@@ -442,13 +454,14 @@ not a default for missing saved fields. Transitions/fades are track-local, with
 no special first-track identity. Layers display and composite in their saved bottom-to-top array order.
 The sole row `opacity` channel overrides the row's saved `opacity` on every clip,
 including both dissolve sources; otherwise all use the saved row value.
-Required nullable channels are `opacity`, `speed` and the seven colour settings.
+Required nullable channels are `opacity`, `speed` and the nine scalar colour settings,
+including `temperature` and `tint`. Missing saved bases/channels are invalid, not defaulted.
 Row `opacity` is valid and required; saved `clip.opacity` and old
 `clipOpacity`/`layerOpacity` channels are rejected, not defaulted.
 New projects have empty video/music bins. Standalone audio imports belong
 to the open project's bin; every music instance's references also count as membership.
 Global registered music/proxies are reusable on deliberate import, never automatically
-inherited by a new project. Earlier v1–v10 projects and export receipt snapshots remain unchanged
+inherited by a new project. Earlier v1–v11 projects and export receipt snapshots remain unchanged
 and incompatible. There is no migration, compatibility reader, null fallback, default-field
 injection or automatic deletion; recreate projects and import their media to reuse
 registered assets/verified ready proxies. Confirmed project deletion affects only
@@ -458,7 +471,7 @@ Registry/video-proxy/current PCM formats, source guards and native video budgets
 native composition uses the sole Opacity contract without a layer multiplier.
 Preview uses the current explicitly prepared PCM cache described above.
 
-Export receipts remain **version 1** with a strict **v11** snapshot, required
+Export receipts remain **version 1** with a strict **v12** snapshot, required
 `musicSources` captured unique-original array and `settings.audio` identified
 instance-plan array (`[]` for each without music). Plans preserve independent
 timing/gain/fades/loop; several may refer to the same captured original. The plan

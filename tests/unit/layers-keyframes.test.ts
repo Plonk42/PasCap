@@ -227,12 +227,14 @@ describe('project-frame shared row settings', () => {
     };
     expect(colourAt(layer, 40)).toEqual(NEUTRAL_COLOUR);
   });
-  it('keeps all seven static grade controls and unkeyed channels independent of participating parameters', () => {
+  it('keeps all nine static grade controls and unkeyed channels independent of participating parameters', () => {
     const clip = createClip('one', 'source', 300, 400);
     clip.speed = { mode: 'constant', rate: 0.5 };
     const layer = { ...createProject('p', 'P').layers[0]!, opacity: 0.7 };
     layer.colour = {
       ...NEUTRAL_COLOUR,
+      temperature: 0.2,
+      tint: -0.3,
       exposure: 0.7,
       brightness: 0.09,
       contrast: 0.8,

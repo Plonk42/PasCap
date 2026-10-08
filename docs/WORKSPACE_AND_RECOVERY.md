@@ -1,6 +1,6 @@
 # Desktop workspace and recovery
 
-The workspace uses **strict schema 11 with required row colour, independent clip spatial settings, uniform video tracks, required per-track
+The workspace uses **strict schema 12 with complete required row colour, independent clip spatial settings, uniform video tracks, required per-track
 Ripple/transitions/fades, 0–8 independently identified music instances, project-specific
 video/music bins and draggable shared project-time row points**, with per-setting channel navigation. Layout preferences,
 stored-point inspection and recovery feedback remain editor-only. Source protection,
@@ -14,11 +14,18 @@ The intended discrete-GPU and long real-flight checks remain deferred.
 
 ## Layout and navigation
 
-Main **Clip → Colour** edits seven row colour values and sole Opacity, including
+Main **Clip → Colour** edits nine scalar row colour values and sole Opacity, including
 on empty rows. Static and keyed Colour share this row ownership on every clip.
 Different treatments require different rows; there is no per-clip grade or scope
 toggle. Sources are graded once; Ungraded neutralizes row Colour only.
 See [row appearance](design/ROW_APPEARANCE.md) for reset, context and storage details.
+**Temperature / Tint** precede Exposure, use normalized −1…1 values and Reset to
+0, and retain native slider/exact-field/diamond/channel-navigation controls in
+main and stored editors. Positive Temperature warms; positive Tint adds magenta.
+Nonzero settings intentionally colour greys; shared normalized linear gains run
+before Exposure, preserving neutral-white linear luminance before clipping only.
+They are not Kelvin/HDR/automatic white balance. HSL/curves remain static. See
+[Temperature and Tint](design/TEMPERATURE_AND_TINT.md).
 
 - Header: project picker/title, Undo/Redo, save state, direct **Media / Inspector**
   toggles and keyboard help, **Workspace options** and Export. Workspace options
@@ -50,6 +57,8 @@ See [row appearance](design/ROW_APPEARANCE.md) for reset, context and storage de
 Viewer and Inspector tabs use native buttons with consistent padding, borders and
 selected appearance, retaining arrow/Home/End navigation. Keyframes keeps its
 accessible name without repeating its visible tab title in the toolbar.
+The Inspector tab row stays pinned while its content scrolls; keyboard focus and
+scroll-into-view reveal controls below that row rather than beneath it.
 Control vocabulary and button/icon conventions follow the
 [editor control catalogue](design/EDITOR_CONTROLS.md). Trash deletes; × closes or
 dismisses. Icon-only actions retain accessible names and tooltips.
@@ -288,7 +297,7 @@ point list directly, count, whole-row Previous/Next navigation and participant c
 Its question-mark **Animation help** button uses the common hover/pin/dismiss
 contract above; explanatory text does not replace the shared point editor.
 **Clip** keeps source/clip settings, row Opacity and playhead value/diamond controls.
-All nine settings (Opacity, Speed and seven colour parameters)
+All eleven settings (Opacity, Speed and nine scalar colour parameters)
 always expose a diamond beside their control: **◇ hollow/inactive** versus **◆
 filled/active**, with `aria-pressed`. A hollow diamond remains clickable; inactivity
 does not set HTML `disabled`. Actual invalid/draft states can disable actions.
@@ -311,8 +320,10 @@ channels. Click its hollow diamond to capture the displayed value first; there a
 implicit keys. Without Opacity keys, the slider edits the row's saved `opacity`,
 including on an empty row. Its `opacity` curve overrides that value across every
 clip on the row, including both dissolve participants; removing the final Opacity
-participant reveals the unchanged row value. Unkeyed colour/speed edits require
-a selected clip and affect only that clip. Clip Speed modes include Constant/Ramp up/Ramp down and
+participant reveals the unchanged row value. Unkeyed colour edits the row base,
+including on empty rows; unkeyed speed requires a selected clip and edits only
+that clip. Removing the final colour participant reveals its unchanged row base.
+Clip Speed modes include Constant/Ramp up/Ramp down and
 the explicitly approved Custom curve with source-frame keys. Its presets, precise
 fields and reversible graph gestures do not create row Speed participation.
 
@@ -414,7 +425,7 @@ uncertain write keeps selection and the actual error visible, with guidance to c
 Activity/project state before repeating the import; there is no automatic write retry.
 Late folder reads are aborted on navigation/dismissal. Manual music paths remain
 deliberate imports outside browser roots and never expand configured roots. No original is
-copied: strict schema 11 references registered originals in place, with only
+copied: strict schema 12 references registered originals in place, with only
 generated proxies/thumbnails, metadata, exports/receipts and scratch written locally.
 
 There is no upload endpoint, browser file picker, optional copy flow or true
@@ -553,7 +564,9 @@ saved document. It never deletes original recordings, shared registry entries,
 proxies/cache files, successful MP4s or receipts. This is not cache garbage
 collection; another project's membership and immutable export snapshots are unaffected.
 
-Only strict v11 projects and v11 project snapshots in version-1 export receipts are interpreted.
+Only strict v12 projects and v12 project snapshots in version-1 export receipts are interpreted.
+Every row requires complete Colour, including `temperature` and `tint` bases
+and static HSL/curves; missing fields and clip colour/correction are invalid.
 Every clip requires complete spatial base/full-pose source-frame keys with easing;
 missing spatial data is invalid, not default-filled. Original-source keys remain
 stored outside trims and at original exclusive OUT, without extending duration.
@@ -569,10 +582,12 @@ Every layer requires `ripple`, `transitions`, `openingFade` and `closingFade`;
 project-level transitions/fades and a mandatory first-track identity are absent.
 Every layer also requires numeric `opacity` in 0–1. A new layer starts at 1 (100%);
 a missing saved value is invalid, not default-filled. Every point requires exactly
-nine nullable fields: `opacity`, `speed` and the seven colour channels. Row
+eleven nullable fields, in control order: `opacity`, `speed`, `temperature`,
+`tint`, `exposure`, `brightness`, `contrast`, `hue`, `saturation`, `highlights`,
+`shadows`. HSL/curves remain static. Row
 `opacity` is the sole valid stored value; saved `clip.opacity` and old
 `clipOpacity`/`layerOpacity` channels are invalid, not ignored or defaulted.
-Earlier v1–v10 projects/receipt snapshots are preserved, incompatible
+Earlier v1–v11 projects/receipt snapshots are preserved, incompatible
 and never migrated or rewritten with fallback/default local fields or old-format
 readers. **Create a new
 project** and import its media deliberately; there is no automatic deletion of
@@ -669,7 +684,7 @@ invalid release leaves the saved document and history unchanged.
 For an HTTP 409 or incompatible save response, **Review latest save** explains:
 
 1. **Keep editing this draft** — no saved document changes; the save error persists.
-2. **Download unsaved project** — download a strict v11 JSON snapshot with the current
+2. **Download unsaved project** — download a strict v12 JSON snapshot with the current
    local changes/expected revision before replacing them.
 3. **Discard local changes and reload** — explicitly replace local history/document
    with a newly read saved version. It performs no overwrite POST/PUT.

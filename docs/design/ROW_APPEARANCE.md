@@ -1,29 +1,40 @@
-# Owner-approved row-only Colour and Opacity · schema 11
+# Owner-approved row-only Colour and Opacity · schema 12
 
-Required Colour now includes eight static HSL bands and four master/RGB colour curves. They share row ownership with the seven scalar settings, but add no nullable animation channels. Existing scalar keys override their own bases only; advanced colour remains active. The complete SDR order and editing/reset contract is in [HSL_AND_CURVES.md](HSL_AND_CURVES.md).
+Required Colour includes nine scalar settings, including Temperature and Tint,
+eight static HSL bands and four master/RGB colour curves. HSL/curves share row
+ownership but add no nullable animation channels. Scalar keys override their own
+bases only; advanced colour remains active. Exact gain math and complete SDR
+order: [Temperature/Tint](TEMPERATURE_AND_TINT.md) and
+[HSL/curves](HSL_AND_CURVES.md).
 
 ## Ownership and strict storage
 
 Each video row requires complete `VideoLayer.colour`, neutral on creation,
-alongside its sole required `opacity`, initially 1. Colour contains the seven
+alongside its sole required `opacity`, initially 1. Colour contains the nine
 scalar channels plus required HSL and curves. Clips have no colour or correction
 field: both `clip.colour` and `clip.correction` are invalid.
 The owner-approved scope is identical with or without animation: every clip on
 the same row shares all colour treatment. Different treatments require different
-rows, not a per-clip scope toggle or a separate shot feature. Future temperature
-controls must also be row-owned; #68 is not implemented here.
-The scalar bounds and neutral values retain the existing SDR contract.
+rows, not a per-clip scope toggle or a separate shot feature. Temperature and Tint
+are required normalized −1…1 row fields, neutral 0, with independent animation.
+Positive Temperature warms; positive Tint adds magenta. Nonzero settings
+intentionally colour greys; normalized linear gains precede Exposure, preserving
+neutral-white linear luminance before clipping only, not arbitrary/final images.
+Other scalar bounds and neutral values retain the existing SDR contract.
 No optional legacy field, additive parameter merge, migration or default-on-load exists.
-Schema 11 rejects versions 1–10 without rewriting or deleting their documents.
-Receipt format remains 1 with strict schema-11 snapshots; registry, proxies and
+Schema 12 rejects versions 1–11 without rewriting or deleting their documents.
+Receipt format remains 1 with strict schema-12 snapshots; registry, proxies and
 PCM formats are unchanged. Recreate incompatible projects deliberately.
 
-The seven shared colour channels override **row colour**, independently, in
+The nine shared scalar colour channels override **row colour**, independently, in
 absolute project time. Skip unrelated participants, interpolate parameter values
 using the left participant's easing, and hold endpoints. Removing the last key
 reveals the unchanged row base. HSL and curves remain static.
 Row Speed retains its distinct clip-speed override contract. Opacity ownership,
 source-over composition, spatial coverage and black-fade coverage are unchanged.
+Every point requires all eleven nullable fields, in control order: `opacity`,
+`speed`, `temperature`, `tint`, `exposure`, `brightness`, `contrast`, `hue`,
+`saturation`, `highlights`, `shadows`. Missing fields are invalid, never defaulted.
 
 For example, clips A and B on one row both use Exposure 0.5 without keys.
 An Exposure curve applies the same evaluated value to both at any project frame,
@@ -66,7 +77,7 @@ and identity curves, without independent clip grades.
 
 ## Inspector and history
 
-**Clip → Colour** retains eight main widgets: seven row colour controls plus sole
+**Clip → Colour** has ten main widgets: nine scalar row colour controls plus sole
 Opacity. All use existing slider/exact-field/reset/diamond/channel-navigation
 controls and work on an empty row. An animated channel without participation at
 the real playhead remains read-only until explicitly captured. Sliders never key.
@@ -89,6 +100,7 @@ edit, atomic rejection and editor-only navigation retain their existing contract
 
 Ownership/history/schema tests, CPU single grading and bounded LUT tests,
 real GPU comparison, synthetic 720p/UHD native parity and memory-only inspector
-workflows validate this contract. Passing synthetic tests does not qualify
+workflows are required to validate this contract, including Temperature/Tint math
+and editing. This guide claims no new test results. Passing synthetic tests does not qualify
 intended-GPU speed, long-flight throughput, real media or long-run A/V behaviour.
 No release, issue closure or publication is implied by this document.

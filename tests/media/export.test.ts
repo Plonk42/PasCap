@@ -16,7 +16,14 @@ import { audioAssetSchema, musicGainAt, type AudioAsset } from '../../src/shared
 import { gradePixel, NEUTRAL_COLOUR } from '../../src/shared/colour.js';
 import { applyCommand } from '../../src/shared/commands.js';
 import { estimateExportSpace } from '../../src/shared/export-space.js';
-import { EXPORT_PROFILES, exportAudioSample, planExportMusic, type ExportMusicPlan } from '../../src/shared/export.js';
+import {
+  EXPORT_PROFILES,
+  EXPORT_RESOURCES,
+  exportAudioSample,
+  needsLayeredExport,
+  planExportMusic,
+  type ExportMusicPlan,
+} from '../../src/shared/export.js';
 import type { MediaAsset } from '../../src/shared/media.js';
 import { createClip, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
 import { removeMarkedRange } from '../../src/shared/rush-editing.js';
@@ -446,6 +453,59 @@ describe.skipIf(!enabled)('production native export · opt-in disposable media o
     });
     return { job, filename: path.join(renderDirectory, 'export.mp4'), renderDirectory, receipt };
   }
+
+  it.each([
+    { temperature: -1, tint: -1 },
+    { temperature: -1, tint: 1 },
+    { temperature: 1, tint: -1 },
+    { temperature: 1, tint: 1 },
+  ])(
+    'exports static Temperature $temperature / Tint $tint through the native LUT with unchanged frames/fades/resources',
+    async ({ temperature, tint }) => {
+      const project = document(6);
+      project.layers[0]!.colour = {
+        ...NEUTRAL_COLOUR,
+        temperature,
+        tint,
+        exposure: -0.25,
+        brightness: 0.015,
+        contrast: 1.05,
+        saturation: 0.9,
+        hue: 7,
+        highlights: -0.1,
+        shadows: 0.08,
+      };
+      project.layers[0]!.openingFade = 1;
+      project.layers[0]!.closingFade = 1;
+      const captured = structuredClone(project);
+      expect(needsLayeredExport(project)).toBe(false);
+      const result = await completed(project);
+      expect(result.receipt.snapshot).toEqual(captured);
+      expect(result.receipt.snapshot.schemaVersion).toBe(12);
+      expect(result.receipt.settings.pipeline).toBe('static-single-layer');
+      expect(result.receipt.settings.resources).toEqual(EXPORT_RESOURCES);
+      expect(result.receipt.settings.layered).toBeNull();
+      expect(result.receipt.settings.lutInterpolation).toBe('tetrahedral');
+      expect(result.receipt.retiming).toHaveLength(1);
+      expect(result.receipt.retiming[0]).toMatchObject({ decodedFrames: 6, outputFrames: 6, rawFrameBuffers: 1 });
+      expect(result.receipt.retiming[0]!.largestReadChunkBytes).toBeLessThanOrEqual(256 * 1024);
+      expect(result.receipt.verification.hasAudio).toBe(false);
+      const pixels = await rawVideo(config, { ...assets[0]!, sourcePath: result.filename });
+      expect(pixels).toHaveLength(6 * FRAME_BYTES);
+      for (let frame = 0; frame < 6; frame++) {
+        const actual = pixels.subarray(frame * FRAME_BYTES, (frame + 1) * FRAME_BYTES);
+        assertPixels(project, frame, actual, originals);
+        if (frame === 0 || frame === 5)
+          expect(actual.reduce((sum, value) => sum + value, 0) / FRAME_BYTES).toBeLessThan(1);
+      }
+      expect(project).toEqual(captured);
+      expect(await readFile(path.join(directory, 'projects', `${fixture.document.id}.json`))).toEqual(savedDocument);
+      for (const asset of assets) {
+        expect(asset.prepared).toBeNull();
+        expect(await fingerprintFile(asset.sourcePath)).toEqual(asset.fingerprint);
+      }
+    },
+  );
 
   it('exports >2 clips, repeated graded originals, slow/fast and both directions of every ramp with exact numeric pixels', async () => {
     const project = createProject('native-many', 'Many clips and every speed curve');
