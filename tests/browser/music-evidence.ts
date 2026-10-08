@@ -290,6 +290,82 @@ export async function installMusicEvidence(
           evidence.rangeTimings.push({ range, started, completed: performance.now(), status: response.status });
         return response;
       };
+      // PCM range reads and credit/refill traffic run in the reader worker. Its
+      // observer only records them; requests, messages and transfers pass unchanged.
+      const readerEvents = new BroadcastChannel('pascap-test-music-reader');
+      readerEvents.onmessage = ({ data }) => {
+        const now = data.time - performance.timeOrigin;
+        if (data.kind === 'range-start') {
+          evidence.ranges++;
+          evidence.largestRange = Math.max(evidence.largestRange, data.length);
+        } else if (data.kind === 'range' && evidence.rangeTimings.length < 500)
+          evidence.rangeTimings.push({
+            range: data.range,
+            started: data.started - performance.timeOrigin,
+            completed: now,
+            status: data.status,
+          });
+        else if ((data.kind === 'chunk' || data.kind === 'credit') && evidence.queueEvents.length < 500)
+          evidence.queueEvents.push({
+            direction: data.kind === 'chunk' ? 'sent' : 'received',
+            thread: 'reader',
+            kind: data.kind,
+            generation: data.generation,
+            offset: data.offset,
+            count: data.count,
+            now,
+          });
+      };
+      const readerObserver = String.raw`
+        const events = new BroadcastChannel('pascap-test-music-reader');
+        const time = () => performance.timeOrigin + performance.now();
+        const nativeFetch = self.fetch;
+        self.fetch = async (...args) => {
+          const started = time();
+          const range = new Headers(args[1]?.headers).get('Range');
+          const url = args[0] instanceof Request ? args[0].url : String(args[0]);
+          const observed = Boolean(range) && url.includes('/api/audio/');
+          if (observed) {
+            const match = /^bytes=(\d+)-(\d+)$/.exec(range);
+            events.postMessage({ kind: 'range-start', length: match ? Number(match[2]) - Number(match[1]) + 1 : Infinity });
+          }
+          const response = await nativeFetch(...args);
+          if (observed) events.postMessage({ kind: 'range', range, started, time: time(), status: response.status });
+          return response;
+        };
+        const nativePost = MessagePort.prototype.postMessage;
+        MessagePort.prototype.postMessage = function (...args) {
+          const message = args[0];
+          if (message?.kind === 'chunk')
+            events.postMessage({ kind: 'chunk', generation: message.generation, offset: message.chunk?.offset, time: time() });
+          return Reflect.apply(nativePost, this, args);
+        };
+        const handler = Object.getOwnPropertyDescriptor(MessagePort.prototype, 'onmessage');
+        Object.defineProperty(MessagePort.prototype, 'onmessage', {
+          ...handler,
+          set(listener) {
+            handler.set.call(this, typeof listener === 'function' ? function (event) {
+              if (event.data?.kind === 'credit')
+                events.postMessage({ kind: 'credit', generation: event.data.generation, count: event.data.count, time: time() });
+              return Reflect.apply(listener, this, [event]);
+            } : listener);
+          },
+        });
+      `;
+      const NativeWorker = window.Worker;
+      window.Worker = class extends NativeWorker {
+        constructor(url: string | URL, options?: WorkerOptions) {
+          const href = new URL(String(url), location.href).href;
+          if (!href.includes('music-reader')) {
+            super(url, options);
+            return;
+          }
+          // The static import evaluates the actual reader before this observer,
+          // still before any message dispatch; its fetch calls resolve at call time.
+          const source = `import ${JSON.stringify(href)};\n${readerObserver}`;
+          super(URL.createObjectURL(new Blob([source], { type: 'text/javascript' })), { ...options, type: 'module' });
+        }
+      };
     },
     { captureSignal, reference },
   );

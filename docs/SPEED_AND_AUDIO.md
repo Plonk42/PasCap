@@ -361,7 +361,11 @@ The preview streams **PCM16 48 kHz stereo** in exact bounded HTTP byte ranges in
 one mixed stereo queue and **one AudioContext/AudioWorklet**, not per-instance
 queues/worklets, a media-element clock or whole-file buffers. Read and accumulate
 sources serially into one output block, then clamp once and transfer that mixed
-block. The rendering thread owns consecutive mixed samples and their context-frame
+block. One dedicated reader worker performs these range reads, conversion and
+mixing: the worklet returns credits to it and receives refill blocks directly, so
+long preview-rendering tasks on the editor thread cannot delay refills. The editor
+thread keeps epoch start/stop, startup prefill handoff and receipt validation.
+The rendering thread owns consecutive mixed samples and their context-frame
 receipts. Its first real rendered mixed sample supplies the clock origin; video starts
 only once the output device reaches that origin. Project time follows the audio
 output timestamp, not graph processing ahead of the speakers or an approximate

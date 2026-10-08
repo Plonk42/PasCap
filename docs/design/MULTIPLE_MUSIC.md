@@ -144,7 +144,9 @@ independent of instance count and duration, is:
 - Bounded **64 KiB** source-range/short-loop read scratch, shared serially.
 - One shared **128 KiB** conversion workspace and one **128 KiB** mixed-output
   workspace, not per-instance copies.
-- One unacknowledged consumption receipt and serial credit-controlled refill.
+- One unacknowledged consumption receipt and serial credit-controlled refill, run
+  by one dedicated reader worker that exchanges credits/blocks directly with the
+  worklet, independent of editor-thread rendering.
 
 There are no full-file buffers, duration-sized silence buffers or per-instance
 queues. Short-loop scratch may be reused only within the current mixed block;
