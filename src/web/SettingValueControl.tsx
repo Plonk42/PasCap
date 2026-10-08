@@ -1,7 +1,6 @@
 import { useId, type ReactNode } from 'react';
 import { COLOUR_CONTROLS, NEUTRAL_COLOUR } from '../shared/colour.js';
 import { KEYFRAME_SETTINGS, type KeyframeSetting } from '../shared/keyframes.js';
-import { Icon } from './icons.js';
 import type { NumberFieldProps } from './NumberField.js';
 import { ValueControl, type ValueControlProps } from './ValueControl.js';
 
@@ -17,13 +16,29 @@ interface RangeSettingProps {
   hint: string;
   scope?: ReactNode;
   actions?: ReactNode;
-  resetTitle?: string;
   resetKey?: NumberFieldProps['resetKey'];
   validate?: NumberFieldProps['validate'];
   exact?: Pick<NumberFieldProps, 'resetKey' | 'validate'>;
 }
 
-/** The same setting-specific slider, units and reset in either edit context. */
+/**
+ * A setting's visible name; double-clicking it resets that control. It is not a focusing label:
+ * moving focus could scroll the control between the two clicks. The inputs carry their own names.
+ */
+export function ResetLabel({
+  htmlFor,
+  title,
+  onReset,
+  children,
+}: Readonly<{ htmlFor: string; title?: string; onReset: () => void; children: ReactNode }>) {
+  return (
+    <span className="setting-name" id={`${htmlFor}-name`} title={title} onDoubleClick={onReset}>
+      {children}
+    </span>
+  );
+}
+
+/** The same setting-specific slider and units in either edit context; double-click the name to reset. */
 export function RangeSettingControl({
   setting,
   id,
@@ -34,7 +49,6 @@ export function RangeSettingControl({
   hint,
   scope,
   actions,
-  resetTitle,
   resetKey,
   validate,
   exact,
@@ -49,23 +63,17 @@ export function RangeSettingControl({
   return (
     <>
       <span>
-        <label htmlFor={id} title={hint}>
+        <ResetLabel
+          htmlFor={id}
+          title={hint}
+          onReset={() => {
+            if (!disabled && value !== neutral) onCommit(neutral);
+          }}
+        >
           {definition.label}
           {scope}
-        </label>
-        <span className="colour-control-actions">
-          {actions}
-          <button
-            type="button"
-            className="icon-button"
-            aria-label={`Reset ${name}`}
-            title={resetTitle ?? (setting === 'opacity' ? 'Reset only Opacity to 100%' : hint)}
-            disabled={disabled || value === neutral}
-            onClick={() => onCommit(neutral)}
-          >
-            <Icon name="reset" size={13} />
-          </button>
-        </span>
+        </ResetLabel>
+        {actions && <span className="colour-control-actions">{actions}</span>}
       </span>
       <ValueControl
         id={id}

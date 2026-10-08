@@ -28,7 +28,7 @@ animation channels. Speed retains its separate clip-base/row-override semantics.
 
 **Track → Colour** places Temperature and Tint before Exposure. Main and stored
 participants use native sliders (step 0.01), adjacent exact numeric fields,
-individual Reset to 0, explicit diamonds and channel-specific Previous/Next.
+reset to 0 by double-clicking the name, explicit diamonds and channel-specific Previous/Next.
 Sliders never create keys; animated main values without a participant at the real
 playhead are read-only until diamond capture. Pointer movement is a local draft;
 valid release is one Undo step. Escape/cancellation/capture loss/blur restores.

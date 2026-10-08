@@ -7,6 +7,7 @@ import {
   editLayerPoint,
   expandedInspectorPreferences,
   layerKeyframes,
+  resetSetting,
   inspectorTab as openTab,
   sharedPoint,
 } from './editor-helpers.js';
@@ -263,7 +264,9 @@ test('empty-row native controls preserve exact precision, invalid drafts, indivi
     await expect(widget.locator('output')).toHaveCount(0);
     await expect(diamond(page, label)).toBeEnabled();
     await expect(diamond(page, label)).toHaveAttribute('aria-pressed', 'false');
-    await expect(page.getByRole('button', { name: `Reset ${label}`, exact: true })).toBeDisabled();
+    const neutralState = await checkpoint(page);
+    await resetSetting(page, label);
+    await unchanged(page, neutralState);
     for (const direction of ['Previous', 'Next'] as const) {
       await expect(navigation(page, label, direction)).toBeVisible();
       await expect(navigation(page, label, direction)).toBeDisabled();
@@ -300,7 +303,7 @@ test('empty-row native controls preserve exact precision, invalid drafts, indivi
     await exact.press('Enter');
     await exact.press('Tab');
     await unchanged(page, preciseState);
-    await page.getByRole('button', { name: `Reset ${label}`, exact: true }).click();
+    await resetSetting(page, label);
     await expect(exact).toHaveValue('0');
     await editAndUndo(page, preciseState, edited(preciseState.document, setting, 0, 'empty'));
     const keyboardBefore = await checkpoint(page);
@@ -406,7 +409,9 @@ test('animated missing participants stay read-only until explicit capture; remov
   const tint = controls(page, 'Tint');
   await expect(temperature.exact).toHaveValue('0');
   for (const field of [temperature.slider, temperature.exact]) await expect(field).toBeDisabled();
-  await expect(page.getByRole('button', { name: 'Reset Temperature', exact: true })).toBeDisabled();
+  const readOnly = await checkpoint(page);
+  await resetSetting(page, 'Temperature');
+  await unchanged(page, readOnly);
   await expect(diamond(page, 'Temperature')).toBeEnabled();
   await expect(diamond(page, 'Temperature')).toHaveAttribute('aria-pressed', 'false');
   await expect(temperature.slider).toHaveAccessibleDescription(/Read-only animated value at timeline frame 20/);
@@ -428,7 +433,7 @@ test('animated missing participants stay read-only until explicit capture; remov
   const keyed = edited(captured, 'temperature', 0.123456789, 'video-1', 20);
   const keyedBefore = await checkpoint(page);
   expect(keyedBefore.document).toEqual(keyed);
-  await page.getByRole('button', { name: 'Reset Temperature', exact: true }).click();
+  await resetSetting(page, 'Temperature');
   await editAndUndo(page, keyedBefore, captured);
   await diamond(page, 'Tint').click();
   const both = edited(keyed, 'tint', -0.456789123, 'video-1', 20);
@@ -474,9 +479,10 @@ test('main and off-duration stored resets edit only existing participants; exact
   await fixture(page, document);
   await seek(page, 30);
   await expect(controls(page, 'Temperature').exact).toBeDisabled();
-  for (const action of ['Reset Tint', 'Reset colour']) {
+  for (const action of ['Tint', 'Reset colour']) {
     const mainBefore = await checkpoint(page);
-    await page.getByRole('button', { name: action, exact: true }).click();
+    if (action === 'Tint') await resetSetting(page, 'Tint');
+    else await page.getByRole('button', { name: action, exact: true }).click();
     await editAndUndo(page, mainBefore, edited(mainBefore.document, 'tint', 0, 'video-1', 30));
   }
   const row = await editLayerPoint(page, 'Video 1', 180);
@@ -507,7 +513,7 @@ test('main and off-duration stored resets edit only existing participants; exact
       await exact.press('Escape');
       await expect(exact).toHaveValue(initial);
     }
-    await row.getByRole('button', { name: `Reset ${name}`, exact: true }).click();
+    await resetSetting(row, name);
     await expect(exact).toHaveValue('0');
     await editAndUndo(page, restored, edited(restored.document, setting, 0, 'video-1', 180));
   }
@@ -551,7 +557,7 @@ test('channel navigation skips unrelated keys and shares an off-duration cursor 
   await page.keyboard.press('Tab');
   await expect(next).toBeFocused();
   await page.keyboard.press('Tab');
-  await expect(page.getByRole('button', { name: 'Reset Temperature', exact: true })).toBeFocused();
+  await expect(controls(page, 'Temperature').slider).toBeFocused();
   await page.keyboard.press('Shift+Tab');
   const keys = layerKeyframes(page, 'Video 1');
   for (const frame of [130, 180, 240]) {

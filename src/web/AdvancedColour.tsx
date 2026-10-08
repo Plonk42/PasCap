@@ -461,13 +461,13 @@ export function AdvancedColour(props: Readonly<Props>) {
             type="button"
             className="text-button"
             disabled={disabled}
-            aria-label="Reset HSL range"
+            aria-label={`Reset ${band} HSL range`}
             onClick={() =>
               commit({ ...layer.colour, hsl: { ...layer.colour.hsl, [band]: { hue: 0, saturation: 0, lightness: 0 } } })
             }
           >
             <Icon name="reset" size={13} />
-            Range
+            Reset {band}
           </button>
           <button
             type="button"
@@ -476,7 +476,7 @@ export function AdvancedColour(props: Readonly<Props>) {
             aria-label="Reset all HSL ranges"
             onClick={() => commit({ ...layer.colour, hsl: createHslSettings() })}
           >
-            Reset all HSL
+            Reset all
           </button>
         </div>
       </details>
@@ -516,13 +516,13 @@ export function AdvancedColour(props: Readonly<Props>) {
             type="button"
             className="text-button"
             disabled={disabled}
-            aria-label="Reset colour curve channel"
+            aria-label={`Reset ${channel} curve`}
             onClick={() =>
               commit({ ...layer.colour, curves: { ...layer.colour.curves, [channel]: createColourCurves()[channel] } })
             }
           >
             <Icon name="reset" size={13} />
-            Channel
+            Reset {channel}
           </button>
           <button
             type="button"
@@ -531,7 +531,7 @@ export function AdvancedColour(props: Readonly<Props>) {
             aria-label="Reset all colour curves"
             onClick={() => commit({ ...layer.colour, curves: createColourCurves() })}
           >
-            Reset all curves
+            Reset all
           </button>
         </div>
       </details>

@@ -216,7 +216,7 @@ test('setting tooltips and accessible descriptions explain the editable keyframe
       if (frame === 10) await expect(field).toBeEnabled();
       else await expect(field).toBeDisabled();
       if (role === 'slider')
-        await expect(page.locator(`label[for="${await field.getAttribute('id')}"]`)).toHaveAttribute('title', hint);
+        await expect(page.locator(`[id="${await field.getAttribute('id')}-name"]`)).toHaveAttribute('title', hint);
     }
     await expect(page.locator('#inspector-pane .layer-setting-kind').filter({ hasText: scope })).toHaveCount(3);
     await openOptions(page, 'Layer options Video 1');
@@ -360,7 +360,7 @@ test('between points keyed controls are read-only until their own diamond explic
   for (const label of ['Exposure', 'Opacity']) {
     const slider = page.getByRole('slider', { name: label, exact: true });
     await expect(slider).toBeDisabled();
-    await expect(page.locator(`label[for="${await slider.getAttribute('id')}"]`)).toHaveAttribute(
+    await expect(page.locator(`[id="${await slider.getAttribute('id')}-name"]`)).toHaveAttribute(
       'title',
       `Read-only animated value at timeline frame 30. Click the ${label} diamond to add a keyframe here, then edit the value.`,
     );

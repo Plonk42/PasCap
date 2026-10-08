@@ -11,6 +11,7 @@ import {
   expandedInspectorPreferences,
   inspectorTab,
   layerKeyframes,
+  resetSetting,
   sharedPoint,
 } from './editor-helpers.js';
 import { memoryProjects } from './memory-projects.js';
@@ -437,7 +438,7 @@ test('Colour resets target clip colour and row opacity or only participating Col
   await inspectorTab(page, 'Track');
   await page.getByRole('slider', { name: 'Exposure', exact: true }).fill('0.7');
   await page.getByRole('slider', { name: 'Saturation', exact: true }).fill('1.3');
-  await page.getByRole('button', { name: 'Reset Exposure', exact: true }).click();
+  await resetSetting(page, 'Exposure');
   let document = await currentProject(page);
   expect(document.layers[0]?.colour).toMatchObject({ exposure: 0, saturation: 1.3 });
   expect(document.layers[0]?.keyframes).toEqual([]);
@@ -457,7 +458,7 @@ test('Colour resets target clip colour and row opacity or only participating Col
   await editLayerPoint(page, 'Video 1', 5);
   await keys.getByRole('button', { name: 'Go to layer keyframe 5', exact: true }).click();
   await expect(page.getByRole('slider', { name: 'Exposure', exact: true })).toHaveValue('-0.5');
-  await page.getByRole('button', { name: 'Reset Exposure', exact: true }).click();
+  await resetSetting(page, 'Exposure');
   document = await currentProject(page);
   expect(document.layers[0]?.keyframes[0]).toEqual(
     sharedPoint(5, { exposure: 0, saturation: 0.6, opacity: 0.4 }, 'hold'),
@@ -471,7 +472,7 @@ test('Colour resets target clip colour and row opacity or only participating Col
   await expect(keys.locator('[data-keyframe-frame="8"]')).toBeVisible();
   await expect(page.getByRole('slider', { name: 'Exposure', exact: true })).toBeDisabled();
   await keys.getByRole('button', { name: 'Go to layer keyframe 8', exact: true }).click();
-  await page.getByRole('button', { name: 'Reset Saturation', exact: true }).click();
+  await resetSetting(page, 'Saturation');
   await page.getByRole('slider', { name: 'Exposure', exact: true }).fill('0.25');
   document = await currentProject(page);
   expect(document.layers[0]?.colour).toEqual(base);

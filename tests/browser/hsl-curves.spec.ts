@@ -50,7 +50,7 @@ test('static HSL exact entry, invalid drafts, keyboard, range reset and Undo', a
   expect((await current(page)).layers[0]!.colour.hsl.cyan.hue).toBe(12.3456789);
   await field.press('Escape');
   await expect(field).toHaveValue('12.3456789');
-  await page.getByRole('button', { name: 'Reset HSL range', exact: true }).click();
+  await page.getByRole('button', { name: 'Reset cyan HSL range', exact: true }).click();
   await expect.poll(async () => (await current(page)).layers[0]!.colour.hsl.cyan.hue).toBe(0);
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   await expect(field).toHaveValue('12.3456789');
@@ -77,7 +77,7 @@ test('curve endpoints, exact collisions, nonmonotonic values, maximum points and
   for (let i = 3; i < 16; i++) await page.getByRole('button', { name: 'Add colour curve point', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Add colour curve point', exact: true })).toBeDisabled();
   expect((await current(page)).layers[0]!.colour.curves.master).toHaveLength(16);
-  await page.getByRole('button', { name: 'Reset colour curve channel', exact: true }).click();
+  await page.getByRole('button', { name: 'Reset master curve', exact: true }).click();
   await expect
     .poll(async () => (await current(page)).layers[0]!.colour.curves.master)
     .toEqual([

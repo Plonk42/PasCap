@@ -207,7 +207,7 @@ adds green. Nonzero settings intentionally colour greys. The common gain formula
 runs in linear RGB before Exposure; it preserves neutral-white linear luminance
 before clipping only, not final brightness or arbitrary coloured pixels.
 
-Sliders, exact fields, individual Reset to 0, diamonds and Previous/Next use the
+Sliders, exact fields, double-click-the-name reset to 0, diamonds and Previous/Next use the
 same main/stored control rules as other scalar Colour settings. Without keys,
 edit the row base even on an empty row; every clip on that row adopts it. With
 keys, capture explicitly at the real playhead before editing a missing participant.
@@ -368,7 +368,7 @@ reordering and Undo.
 Stored colour/opacity participants use the same sliders and individual colour
 resets as the main controls, with one precise numeric field to the right of each
 slider as the sole numeric value display (Opacity uses 0–1 in both contexts). Stored
-Speed uses the **Layer rate ×** slider/exact field and Reset to 1×, not clip speed modes or a
+Speed uses the **Layer rate ×** slider/exact field (double-click **Speed** to reset to 1×), not clip speed modes or a
 source-frame curve. These controls edit only an existing participant at that
 stored point; they never implicitly join a setting. Each accepted value/reset is
 one Undo step and leaves the point's time, shared easing, other participants and

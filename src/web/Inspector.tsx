@@ -195,7 +195,6 @@ function OpacityControl({
     label: 'Opacity',
     frame,
   });
-  const resetTarget = state.keyed ? `timeline frame ${frame}` : 'the selected row';
   const commit = (opacity: number): void => {
     if (disabled || !state.editable) return;
     if (state.keyed) {
@@ -215,7 +214,6 @@ function OpacityControl({
         onCommit={commit}
         hint={hint}
         scope={<SettingScope keyed={state.keyed} scope={scope} />}
-        resetTitle={`Reset only Opacity at ${resetTarget} to 100%`}
         exact={{ resetKey: `${resetKey}:opacity:${state.keyed ? 'key' : 'layer'}` }}
         actions={
           <KeyframeToggle
@@ -247,7 +245,6 @@ function ColourControl({
 }: Readonly<LayerControlProps & { control: ColourControlDefinition; value: number; id: string }>) {
   const state = settingState(layer, control.key, frame, true);
   const { scope, hint } = settingPresentation({ ...state, baseLabel: 'Layer', label: control.label, frame });
-  const resetTarget = state.keyed ? `timeline frame ${frame}` : 'the selected row';
   const commit = (nextValue: number): void => {
     if (disabled || !state.editable) return;
     if (state.keyed) {
@@ -266,7 +263,6 @@ function ColourControl({
         onCommit={commit}
         hint={hint}
         scope={<SettingScope keyed={state.keyed} scope={scope} />}
-        resetTitle={`Reset only ${control.label} at ${resetTarget}`}
         exact={{ resetKey: `${resetKey}:${control.key}:${state.keyed ? 'key' : 'layer'}` }}
         actions={
           <KeyframeToggle
@@ -325,8 +321,8 @@ function ColourSection({
             overrides the saved row colour on every clip in the row. Row Colour and Opacity have the same scope with or
             without keys, and work even without clips. Different colour treatments require different rows. Between
             points, click the diamond before editing. Reset keys changes only this point's enabled Colour settings,
-            including Opacity; individual resets change only their own setting. Without Colour animation, Reset restores
-            the selected row's Colour and Opacity to neutral in one Undo step.
+            including Opacity; double-click a setting's name to reset only that setting. Without Colour animation, Reset
+            restores the selected row's Colour and Opacity to neutral in one Undo step.
           </p>
           <p>
             Temperature and Tint use −1 to 1, with 0 neutral. Positive Temperature warms; negative cools. Positive Tint

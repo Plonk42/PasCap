@@ -10,7 +10,7 @@ import { Icon } from './icons.js';
 import { keyframeNavigationFrame, keySeekHint, useKeyframeNavigation } from './keyframe-navigation.js';
 import './layer-keyframes.css';
 import { NumberField } from './NumberField.js';
-import { RangeSettingControl, SpeedRateField } from './SettingValueControl.js';
+import { RangeSettingControl, ResetLabel, SpeedRateField } from './SettingValueControl.js';
 
 export interface KeyframeControlsProps {
   project: ProjectDocument;
@@ -242,18 +242,15 @@ function KeyframePointRow({
                   {setting.key === 'speed' ? (
                     <>
                       <div className="layer-setting-heading">
-                        <span>Speed</span>
-                        <button
-                          type="button"
-                          className="text-button"
-                          aria-label={`Reset ${label} to 1×`}
+                        <ResetLabel
+                          htmlFor={id}
                           title={hint}
-                          disabled={disabled || value === 1}
-                          onClick={() => onCommit(1)}
+                          onReset={() => {
+                            if (!disabled && value !== 1) onCommit(1);
+                          }}
                         >
-                          <Icon name="reset" size={12} />
-                          Reset
-                        </button>
+                          Speed
+                        </ResetLabel>
                       </div>
                       <SpeedRateField
                         id={id}
@@ -274,7 +271,6 @@ function KeyframePointRow({
                       value={value}
                       disabled={disabled}
                       hint={hint}
-                      resetTitle={setting.key === 'opacity' ? `${hint} Reset only Opacity to 100%.` : hint}
                       exact={{ resetKey, validate }}
                       onCommit={onCommit}
                     />
