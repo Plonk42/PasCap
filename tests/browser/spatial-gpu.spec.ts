@@ -240,6 +240,8 @@ for (const [width, height, advancedOnly] of [
   test(`${advancedOnly ? 'advanced colour' : 'pure GPU'} spatial numeric parity at ${width}×${height}`, async ({
     page,
   }, testInfo) => {
+    // Hosted runners measured 28–30 s for UHD software-WebGL parity; keep ~3× headroom.
+    if (width === 3840) test.setTimeout(90_000);
     await page.route('**/*', (route) =>
       route.fulfill({ contentType: 'text/html', body: '<!doctype html><title>Synthetic GPU only</title>' }),
     );
