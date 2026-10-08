@@ -5,6 +5,7 @@ import { generateCube } from '../shared/colour.js';
 import type { ExportPreflight } from '../shared/export-space.js';
 import {
   EXPORT_PROFILES,
+  defaultExportName,
   EXPORT_RESOURCES,
   exportDocumentSchema,
   exportRequestSchema,
@@ -41,6 +42,7 @@ export type AudioResolver = (id: string) => AudioAsset | Promise<AudioAsset>;
 interface ExportInputs {
   snapshot: ProjectDocument;
   profile: ExportProfile;
+  outputName: string;
   plan: ExportPlan | LayeredExportPlan;
   assets: MediaAsset[];
 }
@@ -73,6 +75,7 @@ export interface ExportReceipt {
   createdAt: string;
   snapshot: ProjectDocument;
   profile: ExportProfile;
+  outputName: string;
   sources: { id: string; sourcePath: string; fingerprint: MediaAsset['fingerprint']; metadata: VideoMetadata }[];
   /** Unique registered originals; instance identities/placements are in settings.audio. */
   musicSources: AudioAsset[];
@@ -130,8 +133,13 @@ function validateVideo(clipId: string, sourceOut: number, asset: MediaAsset): vo
     throw new ServiceError(`Clip ${clipId} must be explicitly tagged 8-bit BT.709 SDR.`, 422);
   }
 }
-function captureInputs(document: ProjectDocument, profile: ExportProfile, library: MediaLibrary): ExportInputs {
-  const request = exportRequestSchema.parse({ document, profile });
+function captureInputs(
+  document: ProjectDocument,
+  profile: ExportProfile,
+  library: MediaLibrary,
+  outputName?: string,
+): ExportInputs {
+  const request = exportRequestSchema.parse({ document, profile, ...(outputName === undefined ? {} : { outputName }) });
   const assets = request.document.clips.map((clip) => {
     const asset = mediaAssetSchema.parse(library.get(clip.mediaId));
     if (asset.id !== clip.mediaId)
@@ -147,7 +155,13 @@ function captureInputs(document: ProjectDocument, profile: ExportProfile, librar
   } catch (error) {
     throw new ServiceError(error instanceof Error ? error.message : 'Invalid source range.', 422);
   }
-  return { snapshot: freezeSnapshot(request.document), profile: request.profile, plan, assets };
+  return {
+    snapshot: freezeSnapshot(request.document),
+    profile: request.profile,
+    outputName: request.outputName ?? defaultExportName(request.document.title, request.profile),
+    plan,
+    assets,
+  };
 }
 
 /** Read-only validation; no proxy preparation or document persistence is implicit. */
@@ -188,18 +202,15 @@ export function startExport(
   profile: ExportProfile,
   library: MediaLibrary,
   resolveAudio?: AudioResolver,
+  outputName?: string,
 ): MediaJob {
-  const inputs = captureInputs(document, profile, library);
+  const inputs = captureInputs(document, profile, library, outputName);
   if (inputs.snapshot.music.length > 0 && !resolveAudio)
     throw new ServiceError('A music source resolver is required for this export.', 422);
-  return library.jobs.submit(
-    'export',
-    `${inputs.snapshot.title} · ${profile === 'draft720' ? '720p' : '4K'}`,
-    async (context) => {
-      await renderCapturedExport(inputs, library, context, resolveAudio);
-      library.jobs.setOutput(context.id, `/api/jobs/${context.id}/export`, `/api/jobs/${context.id}/receipt`);
-    },
-  );
+  return library.jobs.submit('export', inputs.outputName, async (context) => {
+    await renderCapturedExport(inputs, library, context, resolveAudio);
+    library.jobs.setOutput(context.id, `/api/jobs/${context.id}/export`, `/api/jobs/${context.id}/receipt`);
+  });
 }
 
 /** Also useful for controlled integration tests; context.id must be a unique UUID. */
@@ -1040,6 +1051,7 @@ async function renderCapturedExport(
       createdAt: new Date().toISOString(),
       snapshot: inputs.snapshot,
       profile: inputs.profile,
+      outputName: inputs.outputName,
       sources: uniqueAssets.map((asset) => ({
         id: asset.id,
         sourcePath: asset.sourcePath,

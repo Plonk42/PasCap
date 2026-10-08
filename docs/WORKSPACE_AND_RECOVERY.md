@@ -734,7 +734,9 @@ failures and cancellations. Progress is numeric/bar-based; settled outcomes are
 announced without reading every progress poll aloud. Escape closes a focused drawer
 and returns focus to Activity, without pausing the editor or native job.
 
-Export shows the project title, contextual duration and quality up front; its
+Export shows the project title, contextual duration and quality up front, then an
+**Output name** field (default project title + quality, validated as 1–100
+characters without slashes/control characters; Enter starts the export). Its
 Rendering details hold the fixed snapshot with counts of clips/layers (enabled),
 track keyframes and animated settings, and all independent music instances. A point
 with several channels counts once, not as separate clip/channel keys. Both 720p/4K

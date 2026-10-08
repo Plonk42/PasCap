@@ -1,7 +1,9 @@
 import { useId, useRef, useState, type RefObject } from 'react';
 import {
+  defaultExportName,
   EXPORT_PROFILES,
   EXPORT_RESOURCES,
+  exportOutputNameSchema,
   LAYERED_EXPORT_RESOURCES,
   needsLayeredExport,
   type ExportProfile,
@@ -22,7 +24,7 @@ export interface ExportDialogProps {
   jobs: readonly MediaJob[];
   busy: boolean;
   error: string;
-  onExport: (profile: ExportProfile) => Promise<boolean>;
+  onExport: (profile: ExportProfile, outputName: string) => Promise<boolean>;
   onClose: () => void;
   restoreFocusTo?: RefObject<HTMLElement | null>;
 }
@@ -66,6 +68,8 @@ export function ExportDialog({
 }: Readonly<ExportDialogProps>) {
   const id = useId();
   const [profile, setProfile] = useState<ExportProfile>('draft720');
+  // Null follows the default (title + quality) until the user types a name.
+  const [customName, setCustomName] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const submission = useRef(false);
   const [localError, setLocalError] = useState('');
@@ -74,15 +78,19 @@ export function ExportDialog({
   const space = useExportSpace(project, profile);
   const storageReady = space.phase === 'ready' && space.data !== null && space.data.status !== 'blocked';
   const settings = EXPORT_PROFILES[profile];
+  const nameDraft = customName ?? defaultExportName(project.title, profile);
+  const name = exportOutputNameSchema.safeParse(nameDraft);
+  const nameError = name.success ? '' : (name.error.issues[0]?.message ?? 'Enter a valid output name.');
+  const ready = storageReady && name.success && summary.duration > 0 && summary.clips > 0;
   const history = orderActivityJobs(jobs).filter((job) => job.kind === 'export' && job.state === 'completed');
 
   const startExport = async (): Promise<void> => {
-    if (busy || submission.current || !storageReady || !summary.duration || !summary.clips) return;
+    if (busy || submission.current || !ready || !name.success) return;
     submission.current = true;
     setPending(true);
     setLocalError('');
     try {
-      if (await onExport(profile)) onClose();
+      if (await onExport(profile, name.data)) onClose();
       else setLocalError('The export could not be submitted. Check the error and try again.');
     } catch (cause) {
       setLocalError(cause instanceof Error ? cause.message : 'The export could not be submitted.');
@@ -108,7 +116,7 @@ export function ExportDialog({
           </button>
           <button
             className="primary-button"
-            disabled={submitting || !storageReady || !summary.duration || !summary.clips}
+            disabled={submitting || !ready}
             onClick={() => {
               void startExport();
             }}
@@ -168,6 +176,33 @@ export function ExportDialog({
         <Icon name="video" size={15} />
         Renders from originals · H.264 · SDR BT.709
       </p>
+      <div className="export-name-field">
+        <label htmlFor={`${id}-name`}>Output name</label>
+        <div className="export-name-input">
+          <input
+            id={`${id}-name`}
+            type="text"
+            autoComplete="off"
+            spellCheck={false}
+            value={nameDraft}
+            disabled={submitting}
+            aria-invalid={nameError !== ''}
+            aria-describedby={nameError ? `${id}-name-error` : undefined}
+            onChange={(event) => setCustomName(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key !== 'Enter' || event.nativeEvent.isComposing) return;
+              event.preventDefault();
+              void startExport();
+            }}
+          />
+          <span aria-hidden="true">.mp4</span>
+        </div>
+        {nameError && (
+          <span className="export-name-error" id={`${id}-name-error`} role="alert">
+            {nameError}
+          </span>
+        )}
+      </div>
       <ExportSpace state={space} />
       <details className="export-render-details">
         <summary>Rendering details</summary>

@@ -453,7 +453,11 @@ check** after freeing space, or **Retry storage check** after a mount/check erro
 A tight-space warning is advisory; below the minimum start reserve, export is
 disabled. Low-space failure preserves originals, edits and completed exports.
 Submission captures an immutable
-snapshot: later edits cannot change that render. Activity exposes progress,
+snapshot: later edits cannot change that render. The **Output name** field defaults
+to the project title plus quality (for example `Flight · 720p`) until edited; it
+labels the job and names the downloaded `.mp4` (1–100 characters, no slashes or
+control characters). It never chooses a folder or overwrites a file: each export
+keeps its own output directory. Activity exposes progress,
 cancellation and verified MP4/receipt links. **Cancelling…** is pending until
 confirmed; a failed status read keeps known jobs and never resubmits the export.
 Successful outputs survive later failures/restarts; interrupted exports are not

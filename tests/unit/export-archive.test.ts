@@ -3,6 +3,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
+import { createApp } from '../../src/server/app.js';
 import { createConfig } from '../../src/server/config.js';
 import { restoreExports } from '../../src/server/export-archive.js';
 import { JobQueue } from '../../src/server/jobs.js';
@@ -83,6 +84,52 @@ afterEach(async () => {
   for (const folder of temporary.splice(0)) await rm(folder, { recursive: true, force: true });
 });
 describe('durable export receipts', () => {
+  it('labels restored exports and names their downloads from the receipt output name', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'pascap-archive-'));
+    temporary.push(root);
+    const named = randomUUID();
+    const unnamed = randomUUID();
+    const snapshot = createProject('flight', 'Flight');
+    snapshot.clips.push(createClip('one', 'source', 0, 10));
+    await Promise.all(
+      [
+        [named, { outputName: 'Mont Blanc été "final" (v2).mp4' }],
+        [unnamed, {}],
+      ].map(async ([id, extra]) => {
+        const folder = path.join(root, 'renders', id as string);
+        await mkdir(folder, { recursive: true });
+        await writeFile(
+          path.join(folder, 'receipt.json'),
+          JSON.stringify({ ...receiptFixture(snapshot, id as string), ...(extra as object) }),
+        );
+        await writeFile(path.join(folder, 'export.mp4'), 'output');
+      }),
+    );
+    const service = await createApp(
+      createConfig({
+        dataDir: root,
+        webDir: path.join(root, 'absent-web'),
+        ffmpeg: '/unit-tests-do-not-run-ffmpeg',
+        ffprobe: '/unit-tests-do-not-run-ffprobe',
+      }),
+    );
+    try {
+      expect(service.jobs.get(named).label).toBe('Mont Blanc été "final" (v2).mp4');
+      expect(service.jobs.get(unnamed).label).toBe('Flight · 720p');
+      const headers = { host: '127.0.0.1:4318' };
+      const download = await service.app.inject({ url: `/api/jobs/${named}/export`, headers });
+      expect(download.statusCode).toBe(200);
+      expect(download.headers['content-disposition']).toBe(
+        'inline; filename="Mont Blanc _t_ _final_ (v2).mp4"; filename*=UTF-8\'\'Mont%20Blanc%20%C3%A9t%C3%A9%20%22final%22%20%28v2%29.mp4',
+      );
+      const fallback = await service.app.inject({ url: `/api/jobs/${unnamed}/export`, headers });
+      expect(fallback.headers['content-disposition']).toContain('filename="Flight _ 720p.mp4"');
+      const receipt = await service.app.inject({ url: `/api/jobs/${named}/receipt`, headers });
+      expect(receipt.headers['content-disposition']).toBeUndefined();
+    } finally {
+      await service.app.close();
+    }
+  });
   it('restores verified completed outputs without touching their receipt or source edit', async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), 'pascap-archive-'));
     temporary.push(root);
