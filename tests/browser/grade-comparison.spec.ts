@@ -569,6 +569,8 @@ test('bypasses row colour across dissolves, retaining coverage, black fades and 
   page,
   comparison,
 }) => {
+  // Sixteen full software-rendered readbacks; hosted runner speed is not a correctness bound.
+  test.setTimeout(60_000);
   const { layered, neutral } = comparison;
   expect(nonColourContract(neutral)).toEqual(nonColourContract(layered));
   expect(neutral.clips).toEqual(layered.clips);
