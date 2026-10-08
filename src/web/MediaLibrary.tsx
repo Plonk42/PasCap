@@ -476,7 +476,7 @@ export function MediaLibrary({
           </button>
         )}
       </div>
-      <div className="library-summary">
+      <div className="library-summary" data-selected={selectedAssets.length}>
         <label>
           <input
             ref={selectAll}
@@ -496,7 +496,7 @@ export function MediaLibrary({
               });
             }}
           />
-          Select all
+          <span>{selectedAssets.length ? `${selectedAssets.length} selected` : 'Select all'}</span>
         </label>
         {visible.length !== assets.length && (
           <span className="library-visible-count" title="Matching recordings">
@@ -514,7 +514,46 @@ export function MediaLibrary({
             <Icon name="x" size={12} />
           </button>
         )}
+        {selectedAssets.length > 0 && (
+          <span className="library-selection-actions">
+            {prepareIds.length > 0 && (
+              <button
+                className="secondary-button small"
+                aria-label="Prepare selected"
+                title="Prepare editing proxies for the selected recordings"
+                disabled={busy || confirmPrepare}
+                onClick={prepareSelected}
+              >
+                <Icon name="download" size={13} />
+                Prepare
+              </button>
+            )}
+            <button className="icon-button" aria-label="Clear selected" title="Clear selection" onClick={clearSelected}>
+              <Icon name="x" size={14} />
+            </button>
+          </span>
+        )}
       </div>
+      {confirmPrepare && prepareIds.length > 1 && (
+        <fieldset className="prepare-confirm">
+          <legend>Prepare {prepareIds.length} editing proxies?</legend>
+          <div>
+            <button
+              className="primary-button small"
+              disabled={busy}
+              onClick={() => {
+                setConfirmPrepare(false);
+                void onPrepare(prepareIds);
+              }}
+            >
+              Prepare {prepareIds.length}
+            </button>
+            <button className="secondary-button small" onClick={() => setConfirmPrepare(false)}>
+              Cancel
+            </button>
+          </div>
+        </fieldset>
+      )}
       {dropError && (
         <div className="media-file-error" role="alert">
           <span>{dropError}</span>
@@ -684,62 +723,6 @@ export function MediaLibrary({
           </div>
         )}
       </div>
-      {selectedAssets.length > 0 && (
-        <div className="library-bulk">
-          <div className="library-bulk-header">
-            <span>{selectedAssets.length} selected</span>
-            <button className="text-button" onClick={clearSelected}>
-              Clear selected
-            </button>
-          </div>
-          {confirmPrepare && prepareIds.length > 1 ? (
-            <div className="prepare-confirm">
-              <p>Prepare {prepareIds.length} editing proxies?</p>
-              <div>
-                <button
-                  className="primary-button small"
-                  disabled={busy}
-                  onClick={() => {
-                    setConfirmPrepare(false);
-                    void onPrepare(prepareIds);
-                  }}
-                >
-                  Prepare {prepareIds.length}
-                </button>
-                <button className="secondary-button small" onClick={() => setConfirmPrepare(false)}>
-                  Cancel
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="library-bulk-actions">
-              {prepareIds.length > 0 && (
-                <button className="secondary-button small" disabled={busy} onClick={prepareSelected}>
-                  Prepare selected
-                </button>
-              )}
-              <button
-                className="primary-button small"
-                disabled={!project || busy || selectedAssets.some((asset) => !mediaReady(asset))}
-                onClick={() =>
-                  onInsert(
-                    visible
-                      .filter((asset) => selected.has(asset.id))
-                      .concat(selectedAssets.filter((asset) => !visible.some((item) => item.id === asset.id)))
-                      .map((asset) => asset.id),
-                  )
-                }
-              >
-                <Icon name="plus" size={14} />
-                Add selected
-              </button>
-            </div>
-          )}
-          <div className="library-target" title="Plus, double-click and batch insertion use this selected video layer">
-            Insert into <strong>{targetLayer}</strong>
-          </div>
-        </div>
-      )}
       {showImport && (
         <Modal
           className="import-dialog"

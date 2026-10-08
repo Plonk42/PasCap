@@ -373,33 +373,6 @@
   grid-row: 2;
 }
 
-.declutter-media .library-bulk {
-  display: grid;
-  gap: 8px;
-}
-
-.declutter-media .library-bulk-header,
-.declutter-media .library-bulk-actions {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 6px;
-  font-size: 12px;
-}
-
-.declutter-media .library-bulk-actions {
-  flex-wrap: wrap;
-}
-
-.declutter-media .library-bulk-actions > button {
-  flex: 1;
-}
-
-.declutter-media .library-bulk .library-target {
-  padding: 0;
-  border: 0;
-}
-
 .declutter-import-copy,
 .declutter-import-report .control-hint {
   font-size: 12px;

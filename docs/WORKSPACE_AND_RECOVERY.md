@@ -31,8 +31,9 @@ They are not Kelvin/HDR/automatic white balance. HSL/curves remain static. See
   toggles and keyboard help, **Workspace options** and Export. Workspace options
   keeps layout reset and Diagnostics.
 - Left: independently scrolling Media list/grid with search, import and compact
-  status. **Media options** holds filter/sort/view controls; batch actions and the
-  insertion target appear when recordings are selected.
+  status. **Media options** holds filter/sort/view controls. With recordings
+  selected, the **Select all** row shows their count with Prepare/Clear; dragging
+  a selected recording inserts the whole selection.
 - Centre: docked **Timeline preview** / **Source preview** tabs, never an overlay
   covering other editor controls. Tab arrows and Home/End switch viewer contexts.
 - Right: scrollable **Clip / Keyframes / Sequence / Audio** inspector tabs

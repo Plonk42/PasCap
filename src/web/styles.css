@@ -380,6 +380,7 @@ svg {
   display: flex;
   align-items: center;
   gap: 8px;
+  margin-right: auto;
 }
 
 .media-items {
@@ -572,25 +573,21 @@ svg {
   font-size: 7px;
 }
 
-.library-bulk {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  padding: 10px 11px;
-  border-top: 1px solid var(--line);
+.prepare-confirm {
+  margin: 0;
+  padding: 8px 13px;
+  border: 0;
+  border-bottom: 1px solid #2a372e;
   background: #141e17;
-  flex-shrink: 0;
 }
 
-.library-bulk > button {
-  flex: 1;
-  font-size: 9px;
-}
-
-.prepare-confirm p {
-  font-size: 10px;
+.prepare-confirm legend {
+  float: left;
+  width: 100%;
+  padding: 0;
+  font-size: 11px;
   color: #bacfbe;
-  margin-bottom: 9px;
+  margin-bottom: 7px;
 }
 
 .prepare-confirm > div {
