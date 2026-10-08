@@ -179,7 +179,7 @@ test('docked source pinning preserves list geometry, preview position and non-de
   await expect(page.locator('.source-preview')).toHaveAttribute('data-source-frame', '60');
   await expect(page.locator('.source-range-editor')).toHaveCount(1);
   await expect(page.locator('video[data-source-decoder]')).toHaveCount(1);
-  await page.getByRole('button', { name: 'Mark source IN' }).click();
+  await page.getByRole('button', { name: 'Review source frame of pattern-b.mp4', exact: true }).press('i');
   expect(await page.evaluate(() => window.pascapLab!.project()!.clips[1]!.sourceIn)).toBe(15);
   await page.getByRole('tab', { name: 'Source preview', exact: true }).focus();
   await page.keyboard.press('ArrowLeft');

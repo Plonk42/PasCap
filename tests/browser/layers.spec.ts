@@ -327,7 +327,7 @@ test('pre-trims media and carries the recoverable range into plus, reload and dr
 
 test('source handle drafts cancel cleanly and I/O marks remain independent of timeline edits', async ({ page }) => {
   await sourceAtPointer(page, 'pattern-a.mp4', 0.2);
-  await page.getByRole('button', { name: 'Mark source IN' }).click();
+  await page.getByRole('button', { name: 'Review source frame of pattern-a.mp4', exact: true }).press('i');
   const marked = Number(await page.getByRole('spinbutton', { name: 'Source IN', exact: true }).inputValue());
   expect(marked).toBe(24);
   const handle = page.getByRole('slider', { name: 'Trim source start', exact: true });
@@ -340,7 +340,7 @@ test('source handle drafts cancel cleanly and I/O marks remain independent of ti
   await page.mouse.up();
   await expect(page.getByRole('spinbutton', { name: 'Source IN', exact: true })).toHaveValue(String(marked));
   expect(await page.evaluate(() => window.pascapLab!.project()!.clips[0]!.sourceIn)).toBe(0);
-  await page.getByRole('button', { name: 'Reset source range' }).click();
+  await handle.press('Home');
   await expect(page.getByRole('spinbutton', { name: 'Source IN', exact: true })).toHaveValue('0');
 });
 

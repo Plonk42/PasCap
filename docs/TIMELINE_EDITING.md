@@ -481,8 +481,10 @@ before starting multiple jobs. Startup and hover never queue old recordings.
 Prepared recording buttons hover-scrub across the complete source range and show
 a mouse-following marker. The source viewer is separate from the project playhead
 and stays out of list flow so rows never move under an active hover/drag. Review
-IN/OUT handles, numeric Apply, I/O marks and Reset are non-destructive. OUT is
+IN/OUT handles, numeric Apply and I/O marks are non-destructive. OUT is
 exclusive; handle drafts cancel/release independently of timeline history/autosave.
+There are no separate Mark IN/OUT or Reset buttons: Home/End on a handle restores
+that edge. Invalid numeric drafts keep an inline error until Apply or Cancel.
 Visible **IN / OUT** handles have 30 × 28 px targets, separate from the source
 scrubber; hatching identifies omitted footage. Drag feedback previews IN or the
 last included frame (OUT − 1); Escape, pointer cancellation, capture loss or window
@@ -491,7 +493,7 @@ blur restores the applied range and prior source frame.
 from the current observed frame if it precedes the last included frame, otherwise
 from IN. It stops and seeks exactly OUT − 1, without looping or audio. A one-frame
 range simply displays that frame. Numeric drafts do not change the played range.
-Scrubbing, trimming, marking, Apply and Reset pause first; closing, hiding, switching
+Scrubbing, trimming, marking and Apply pause first; closing, hiding, switching
 recordings/projects or leaving Source preview cancels pending playback and releases
 its sole decoder. Loading/playback failures remain explicit with Retry. Source
 playback never moves the timeline/music, changes excerpts/row points or saves/history.

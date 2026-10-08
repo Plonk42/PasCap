@@ -310,28 +310,6 @@
   font-size: 9px;
 }
 
-.source-range-actions {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 4px;
-}
-
-.source-range-actions .small {
-  padding: 4px 7px;
-  font-size: 9px;
-}
-
-.source-range-actions .icon-button {
-  width: 23px;
-  height: 23px;
-}
-
-.source-range-actions .text-button {
-  margin-left: auto;
-  font-size: 9px;
-}
-
 .source-range-description {
   margin-top: 2px;
   font-size: 8px;
