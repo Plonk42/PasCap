@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useId, useRef, useState, type ReactNode } fr
 import type { AudioAsset } from '../shared/audio.js';
 import { applyCommand, type EditCommand } from '../shared/commands.js';
 import { MAX_MUSIC_TRACKS, type MusicTrack, type ProjectDocument } from '../shared/model.js';
+import { mediaRemovalUsage } from '../shared/projects.js';
 import './declutter.css';
 import { Disclosure } from './Disclosure.js';
 import { durationLabel, sourceSeconds } from './display.js';
@@ -11,6 +12,7 @@ import './media-import.css';
 import { Modal } from './Modal.js';
 import { createMusicInstance, musicInstanceEdit, videoTimelineDuration } from './music-ui.js';
 import { NumberField } from './NumberField.js';
+import { RemoveMediaDialog } from './RemoveMediaDialog.js';
 import { ValueControl } from './ValueControl.js';
 
 interface Props {
@@ -26,6 +28,7 @@ interface Props {
   onBrowseVisibility: (open: boolean) => void;
   onPrepare: (id: string) => Promise<void>;
   onEdit: (command: EditCommand) => void;
+  onRemoveRecording: (id: string) => boolean;
 }
 
 const MusicBrowser = lazy(() => import('./MusicBrowser.js').then((module) => ({ default: module.MusicBrowser })));
@@ -69,6 +72,7 @@ export function MusicControls({
   onBrowseVisibility,
   onPrepare,
   onEdit,
+  onRemoveRecording,
 }: Readonly<Props>) {
   const helpId = useId();
   const [filename, setFilename] = useState('');
@@ -76,6 +80,8 @@ export function MusicControls({
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState('');
   const [chosenRecordingId, setChosenRecordingId] = useState('');
+  const [removingRecording, setRemovingRecording] = useState<string | null>(null);
+  const recordingSelect = useRef<HTMLSelectElement>(null);
   const browseTrigger = useRef<HTMLButtonElement>(null);
   const pending = useRef(false);
   const mounted = useRef(false);
@@ -132,6 +138,18 @@ export function MusicControls({
   };
   const removeMusic = (): void => {
     if (music && !blocked) onEdit({ type: 'music', music: project.music.filter((track) => track.id !== music.id) });
+  };
+  const removeRecording = (id: string): void => {
+    setRemovingRecording(null);
+    if (blocked || !onRemoveRecording(id)) return;
+    setChosenRecordingId('');
+    requestAnimationFrame(() => recordingSelect.current?.focus());
+  };
+  const requestRemoveRecording = (): void => {
+    if (blocked || !recordingId) return;
+    if (mediaRemovalUsage(project, { videoIds: [], audioIds: [recordingId] }).music > 0)
+      setRemovingRecording(recordingId);
+    else removeRecording(recordingId);
   };
   return (
     <section className="music-controls declutter-music" aria-label="Music settings">
@@ -259,37 +277,60 @@ export function MusicControls({
           </p>
         )}
       </div>
-      <label className="speed-field">
-        <span>Recording</span>
-        <select
-          aria-label="Music recording"
-          disabled={blocked}
-          title="Choose this track’s recording deliberately. Use Add music track first to create another independent instance."
-          value={recordingId}
-          onChange={(event) => {
-            const asset = assets.find((item) => item.id === event.target.value);
-            if (!asset) {
-              setChosenRecordingId('');
-              removeMusic();
-              return;
-            }
-            if (asset.status !== 'ready') return;
-            setChosenRecordingId(asset.id);
-            if (music)
-              onEdit(musicInstanceEdit(project, music.id, createMusicInstance(music.id, asset, videoDuration)));
-            else addMusic(asset);
-          }}
+      <div className="music-recording-row">
+        <label className="speed-field">
+          <span>Recording</span>
+          <select
+            ref={recordingSelect}
+            aria-label="Music recording"
+            disabled={blocked}
+            title="Choose this track’s recording deliberately. Use Add music track first to create another independent instance."
+            value={recordingId}
+            onChange={(event) => {
+              const asset = assets.find((item) => item.id === event.target.value);
+              if (!asset) {
+                setChosenRecordingId('');
+                removeMusic();
+                return;
+              }
+              if (asset.status !== 'ready') return;
+              setChosenRecordingId(asset.id);
+              if (music)
+                onEdit(musicInstanceEdit(project, music.id, createMusicInstance(music.id, asset, videoDuration)));
+              else addMusic(asset);
+            }}
+          >
+            <option value="">{music ? 'No music · remove this track' : 'No music'}</option>
+            {recordingId && !recording && <option value={recordingId}>Unavailable recording</option>}
+            {assets.map((asset) => (
+              <option key={asset.id} disabled={asset.status !== 'ready'} value={asset.id}>
+                {asset.name} · {durationLabel(asset.metadata.durationSeconds)}
+                {asset.status !== 'ready' ? ` (${asset.status})` : ''}
+              </option>
+            ))}
+          </select>
+        </label>
+        <button
+          type="button"
+          className="icon-button"
+          aria-label={recording ? `Remove ${recording.name} from project` : 'Remove recording from project'}
+          title="Remove this recording and its music tracks from this project; the original file is kept"
+          disabled={blocked || !recording}
+          onClick={requestRemoveRecording}
         >
-          <option value="">{music ? 'No music · remove this track' : 'No music'}</option>
-          {recordingId && !recording && <option value={recordingId}>Unavailable recording</option>}
-          {assets.map((asset) => (
-            <option key={asset.id} disabled={asset.status !== 'ready'} value={asset.id}>
-              {asset.name} · {durationLabel(asset.metadata.durationSeconds)}
-              {asset.status !== 'ready' ? ` (${asset.status})` : ''}
-            </option>
-          ))}
-        </select>
-      </label>
+          <Icon name="trash" size={15} />
+        </button>
+      </div>
+      {removingRecording && (
+        <RemoveMediaDialog
+          names={[assets.find((asset) => asset.id === removingRecording)?.name ?? removingRecording]}
+          clips={0}
+          music={mediaRemovalUsage(project, { videoIds: [], audioIds: [removingRecording] }).music}
+          busy={blocked}
+          onCancel={() => setRemovingRecording(null)}
+          onConfirm={() => removeRecording(removingRecording)}
+        />
+      )}
       {assets
         .filter((asset) => asset.status === 'error')
         .map((asset) => (

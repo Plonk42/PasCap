@@ -1723,6 +1723,127 @@ test('Media thumbnails dim the omitted head/tail of the applied source range, no
   expect(await page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(0);
 });
 
+test('removing recordings from the project bin confirms used footage and Undo restores everything', async ({
+  page,
+}) => {
+  const document = sequence();
+  document.clips = document.clips.filter((item) => item.mediaId === assets[0]!.id);
+  document.layers[0]!.transitions = [{ leftId: 'a', rightId: 'c', type: 'cut', duration: 0 }];
+  await fixture(page, document);
+  const edited = async () => {
+    const { revision: _revision, ...rest } = await current(page);
+    return rest;
+  };
+  const before = await edited();
+  const card = (index: number) => page.locator(`.media-item[data-media-id="${assets[index]!.id}"]`);
+  const heading = page.getByRole('heading', { name: /^Media \d+$/ });
+  const undo = page.getByRole('button', { name: 'Undo', exact: true });
+
+  // An unused recording leaves immediately, with focus kept in the list.
+  await page.getByRole('button', { name: 'Remove pattern-b.mp4 from project', exact: true }).click();
+  await expect(card(1)).toHaveCount(0);
+  await expect(heading).toHaveText('Media 1');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(card(0).locator('.media-checkbox')).toBeFocused();
+  expect((await current(page)).media.videoIds).toEqual([assets[0]!.id]);
+  expect((await current(page)).clips).toEqual(before.clips);
+  await undo.click();
+  await expect(heading).toHaveText('Media 2');
+  expect(await edited()).toEqual(before);
+
+  // A used recording asks first; cancelling changes nothing and returns focus.
+  await page.getByRole('button', { name: 'Review pattern-a.mp4', exact: true }).click();
+  await expect(page.locator('video[data-source-decoder]')).toHaveCount(1);
+  const trash = page.getByRole('button', { name: 'Remove pattern-a.mp4 from project', exact: true });
+  await trash.click();
+  const dialog = page.getByRole('dialog', { name: 'Remove pattern-a.mp4 from this project?', exact: true });
+  await expect(dialog).toContainText('2 timeline excerpts using it will be removed too.');
+  await expect(dialog).toContainText('Original files, prepared media and exported videos are kept.');
+  await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(trash).toBeFocused();
+  expect(await edited()).toEqual(before);
+
+  await trash.click();
+  await dialog.getByRole('button', { name: 'Remove from project', exact: true }).click();
+  await expect(card(0)).toHaveCount(0);
+  await expect(page.locator('.timeline-clip')).toHaveCount(0);
+  await expect(page.locator('video[data-source-decoder]')).toHaveCount(0);
+  await expect(page.getByRole('tab', { name: 'Timeline preview', exact: true })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
+  let removed = await current(page);
+  expect(removed.clips).toEqual([]);
+  expect(removed.media.videoIds).toEqual([assets[1]!.id]);
+  await undo.click();
+  await expect(page.locator('.timeline-clip')).toHaveCount(2);
+  expect(await edited()).toEqual(before);
+
+  // A selection is removed in one step from the selection header.
+  await page.getByRole('checkbox', { name: 'Select visible recordings', exact: true }).check();
+  await page.getByRole('button', { name: 'Remove selected from project', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: 'Remove 2 recordings from this project?', exact: true })).toContainText(
+    '2 timeline excerpts using them will be removed too.',
+  );
+  await page.getByRole('button', { name: 'Remove from project', exact: true }).click();
+  await expect(heading).toHaveText('Media 0');
+  await expect(page.locator('.library-summary')).toContainText('Select all');
+  removed = await current(page);
+  expect(removed.media.videoIds).toEqual([]);
+  expect(removed.clips).toEqual([]);
+  await flush(page);
+  expect(memory.snapshot().media.videoIds).toEqual([]);
+  await undo.click();
+  await expect(heading).toHaveText('Media 2');
+  expect(await edited()).toEqual(before);
+});
+
+test('removing a music recording removes its tracks after confirmation and keeps other media', async ({
+  page,
+  request,
+}) => {
+  const music = await fixtureMusic(request);
+  const document = sequence();
+  document.music = [
+    {
+      id: 'bin-music',
+      mediaId: music.id,
+      sourceIn: 0,
+      sourceOut: 60,
+      start: 10,
+      duration: 60,
+      gainDb: 0,
+      fadeIn: 0,
+      fadeOut: 0,
+      loop: false,
+    },
+  ];
+  document.media.audioIds = [music.id];
+  await fixture(page, document);
+  const before = await current(page);
+  await page.getByRole('tab', { name: 'Audio', exact: true }).click();
+  await expect(page.getByRole('combobox', { name: 'Music recording', exact: true })).toHaveValue(music.id);
+  await page.getByRole('button', { name: `Remove ${music.name} from project`, exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: `Remove ${music.name} from this project?`, exact: true });
+  await expect(dialog).toContainText('1 music track using it will be removed too.');
+  await dialog.getByRole('button', { name: 'Remove from project', exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(page.getByRole('combobox', { name: 'Music recording', exact: true })).toBeFocused();
+  await expect(page.getByRole('combobox', { name: 'Music recording', exact: true })).toHaveValue('');
+  await expect(
+    page.getByRole('combobox', { name: 'Music recording', exact: true }).locator(`option[value="${music.id}"]`),
+  ).toHaveCount(0);
+  const removed = await current(page);
+  expect(removed.music).toEqual([]);
+  expect(removed.media).toEqual({ videoIds: before.media.videoIds, audioIds: [] });
+  expect(removed.clips).toEqual(before.clips);
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  const { revision: _restored, ...restored } = await current(page);
+  const { revision: _before, ...original } = before;
+  expect(restored).toEqual(original);
+});
+
 test('an invalid exact source range keeps its draft, an actionable error and no dangling description', async ({
   page,
 }) => {

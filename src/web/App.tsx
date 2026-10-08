@@ -24,7 +24,13 @@ import {
 } from '../shared/media-selection.js';
 import type { MediaAsset, MediaJob } from '../shared/media.js';
 import { createClip, createProject, projectSchema, type ProjectDocument } from '../shared/model.js';
-import { projectAudioIds, projectVideoIds, type ProjectSummary } from '../shared/projects.js';
+import {
+  projectAudioIds,
+  projectVideoIds,
+  removeProjectMedia,
+  type MediaRemoval,
+  type ProjectSummary,
+} from '../shared/projects.js';
 import { removeMarkedRange, trimAtPlayhead, type ClipCutRange } from '../shared/rush-editing.js';
 import { forEachSerial } from '../shared/serial.js';
 import { validateSourceRanges } from '../shared/source-range.js';
@@ -368,14 +374,17 @@ export function App() {
     [select],
   );
   const commit = useCallback(
-    (next: ProjectDocument) => {
+    (next: ProjectDocument, removed?: MediaRemoval) => {
       const previous = current.current;
-      // Keep imported and previously used sources in the bin even after removing their last excerpt.
+      // Keep imported and previously used sources in the bin even after removing their last excerpt,
+      // unless the user explicitly removed them from the project.
+      const bin = (ids: Iterable<string>, gone: readonly string[] = []) =>
+        [...new Set(ids)].filter((id) => !gone.includes(id));
       const document = {
         ...next,
         media: {
-          videoIds: [...new Set([...projectVideoIds(next), ...(previous ? projectVideoIds(previous) : [])])],
-          audioIds: [...new Set([...projectAudioIds(next), ...(previous ? projectAudioIds(previous) : [])])],
+          videoIds: bin([...projectVideoIds(next), ...(previous ? projectVideoIds(previous) : [])], removed?.videoIds),
+          audioIds: bin([...projectAudioIds(next), ...(previous ? projectAudioIds(previous) : [])], removed?.audioIds),
         },
       };
       validate(document);
@@ -1323,6 +1332,25 @@ export function App() {
     setViewerMode('timeline');
     timelineTab.current?.focus({ preventScroll: true });
   };
+  const removeMedia = (removal: MediaRemoval): boolean => {
+    if (!current.current || drafting.current) return false;
+    try {
+      commit(removeProjectMedia(current.current, removal), removal);
+    } catch (cause) {
+      setError(message(cause, 'Cannot remove the recording from this project.'));
+      return false;
+    }
+    setError('');
+    setCutRange(null);
+    if (review && removal.videoIds.includes(review.mediaId)) {
+      // Release the removed recording's review decoder without moving keyboard focus.
+      pinned.current = false;
+      setReviewPinned(false);
+      setReview(null);
+      setViewerMode('timeline');
+    }
+    return true;
+  };
   const refreshActivity = async (): Promise<boolean> => (await act(() => refresh(), 'activity')).ok;
   const downloadDraft = (): void => {
     if (!current.current) return;
@@ -1591,6 +1619,7 @@ export function App() {
               onInsert={insert}
               onDragMedia={setDraggedMediaIds}
               onPrepare={prepare}
+              onRemove={(videoIds) => removeMedia({ videoIds, audioIds: [] })}
               onImport={importFolder}
               onRegisterPaths={registerPaths}
               review={review}
@@ -1818,6 +1847,7 @@ export function App() {
                     error={actionError}
                     onBrowseVisibility={musicImportVisibility}
                     onEdit={edit}
+                    onRemoveRecording={(id) => removeMedia({ videoIds: [], audioIds: [id] })}
                     onImport={importAudio}
                     onBrowseImport={importSelectedAudio}
                     onPrepare={async (id) => {
