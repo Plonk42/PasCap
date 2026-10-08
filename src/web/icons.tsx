@@ -39,7 +39,8 @@ export type IconName =
   | 'magnet'
   | 'cut'
   | 'warning'
-  | 'disk';
+  | 'disk'
+  | 'wand';
 const paths: Record<IconName, string> = {
   mountain: 'M3 19 9 6l5 9 3-6 4 10H3Zm6-13 2 4-2 2-2-2',
   folder: 'M3 7V5a1 1 0 0 1 1-1h5l2 3h9a1 1 0 0 1 1 1v11H3V7Zm0 3h18',
@@ -82,6 +83,7 @@ const paths: Record<IconName, string> = {
   cut: 'm7 7 10 10M7 17 17 7M6 3a3 3 0 1 1 0 6 3 3 0 0 1 0-6Zm0 12a3 3 0 1 1 0 6 3 3 0 0 1 0-6Zm11-8 4-4m-4 14 4 4',
   warning: 'm12 3 10 18H2L12 3Zm0 6v5m0 3h.1',
   disk: 'M4 4h14l3 3v14H3V4h1Zm3 0v7h10V4M7 21v-7h10v7M14 7h.1',
+  wand: 'm3 21 12-12 2 2L5 23M15 9l2 2M17 2v4m-2-2h4M21 8v3m-1.5-1.5h3M10 3v2M9 4h2',
 };
 export function Icon({ name, size = 18 }: Readonly<{ name: IconName; size?: number }>) {
   return (

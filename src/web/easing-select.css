@@ -1,14 +1,14 @@
 .easing-choice {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
   width: 100%;
   min-width: 0;
 }
 
 .easing-choice > select {
-  flex: 1;
-  width: 0;
+  align-self: stretch;
   min-width: 0;
 }
 

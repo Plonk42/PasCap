@@ -148,6 +148,7 @@
 .layer-keyframe-point-values {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: start;
   gap: 8px;
   margin-top: 8px;
 }

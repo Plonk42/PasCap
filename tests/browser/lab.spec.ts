@@ -702,7 +702,12 @@ test('the selection header keeps Prepare and Clear keyboard reachable without st
   const summary = page.locator('.library-summary');
   await expect(summary.getByRole('button', { name: 'Prepare selected' })).toHaveCount(0);
   // Both are deliberately unprepared fixtures, so Prepare must confirm before any job.
+  await page.getByRole('button', { name: 'Review recording-05.mp4', exact: true }).click();
+  await expect(page.getByRole('checkbox', { name: 'Select recording-05.mp4', exact: true })).not.toBeChecked();
+  await expect(page.locator('.media-item[data-media-id] .media-status-text').first()).toHaveText('Not prepared');
   await page.getByRole('checkbox', { name: 'Select recording-05.mp4', exact: true }).check();
+  await expect(summary).toContainText('1 selected');
+  await expect(summary.getByRole('button', { name: 'Clear selected' })).toHaveCount(0);
   await page.getByRole('checkbox', { name: 'Select recording-06.mp4', exact: true }).check();
   await expect(summary).toContainText('2 selected');
   await page.getByRole('checkbox', { name: 'Select visible recordings', exact: true }).focus();

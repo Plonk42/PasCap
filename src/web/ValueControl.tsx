@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type PointerEvent } from 'react';
+import { useEffect, useId, useRef, useState, type CSSProperties, type PointerEvent } from 'react';
 import { NumberField, validateNumberDraft, type NumberFieldProps, type NumberValidation } from './NumberField.js';
 import './value-control.css';
 
@@ -262,6 +262,7 @@ export function ValueControl(props: Readonly<ValueControlProps>) {
       data-dirty={state.pointer?.cancelled === false || state.draft !== props.value}
       data-pointer-draft={state.pointer !== null && !state.pointer.cancelled}
       data-unit={Boolean(props.unit)}
+      style={props.unit ? ({ '--value-unit-space': `${props.unit.length + 0.5}ch` } as CSSProperties) : undefined}
       onKeyDownCapture={(event) => {
         if (event.key === 'Escape' && !event.nativeEvent.isComposing && state.error) dispatch({ type: 'restore' });
       }}
