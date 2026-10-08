@@ -62,7 +62,7 @@ directory, and do not expose the unauthenticated service to a network.
 1. Create a project from **Projects**.
 2. Use **Import → Browse footage**, select originals and register them. Browsing alone starts no media work. Alternatively, explicitly register a whole folder by path.
 3. Wait for proxy preparation in **Activity**. Review a recording, mark source IN/OUT, and add excerpts or drag prepared media onto a video row.
-4. Trim, reorder, grade and animate the edit; import standalone music in **Audio**, then use **Recording / Add music track** and **Music track** to place/select independent instances.
+4. Trim, reorder, grade and animate the edit; import standalone music in **Audio**, then use **Add music track** (or drag it from Media → Music onto the music lane) and **Music track** to place/select independent instances.
 5. Choose **Export** and a draft/final preset, review its storage check, then start. Export reads the original recordings, not the proxies.
 
 Rows follow composition order: row 1 is below row 2 in the image, row 3 is above

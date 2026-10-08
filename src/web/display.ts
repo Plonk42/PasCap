@@ -19,4 +19,5 @@ export function milliseconds(value: number | null | undefined): string {
 }
 
 export const MEDIA_DRAG_TYPE = 'application/x-pascap-media';
+export const MUSIC_DRAG_TYPE = 'application/x-pascap-music';
 export const CLIP_DRAG_TYPE = 'application/x-pascap-clip';

@@ -20,13 +20,21 @@ import { snapFrame, snapPoints } from '../shared/snap.js';
 import { trimOnTimeline, type TrimEdge } from '../shared/source-range.js';
 import { calculateLayout } from '../shared/timeline.js';
 import { formatTimecode, framesToSeconds, secondsToFrames } from '../shared/timing.js';
-import { CLIP_DRAG_TYPE, durationLabel, MEDIA_DRAG_TYPE, shortName, sourceSeconds } from './display.js';
+import {
+  CLIP_DRAG_TYPE,
+  durationLabel,
+  MEDIA_DRAG_TYPE,
+  MUSIC_DRAG_TYPE,
+  shortName,
+  sourceSeconds,
+} from './display.js';
 import { Icon } from './icons.js';
 import { keyframeNavigationFrame, useKeyframeNavigation } from './keyframe-navigation.js';
 import { clipStartRestriction } from './layer-actions.js';
 import './layers.css';
 import { Layers } from './Layers.js';
 import { MusicTimeline, type MusicTimelineGesture } from './MusicTimeline.js';
+import { createMusicInstance, videoTimelineDuration } from './music-ui.js';
 import { Popover } from './Popover.js';
 import { RushEditBar, TimelineCutMarks } from './RushEditBar.js';
 import { useTimelineKeyframes, type TimelineKeyframeDraft } from './timeline-keyframes.js';
@@ -205,6 +213,33 @@ function timelineMusicHeight(project: ProjectDocument): number {
   return project.music.length ? project.music.length * 70 : 55;
 }
 
+/** A ready music file dropped from Media becomes a new music track starting at the drop frame. */
+function musicDrop(
+  props: Readonly<
+    Pick<Props, 'project' | 'audioAssets' | 'onEdit'> & { leading: number; scale: number; disabled: boolean }
+  >,
+) {
+  const accepts = (event: DragEvent<HTMLDivElement>): boolean =>
+    !props.disabled && Array.from(event.dataTransfer.types).includes(MUSIC_DRAG_TYPE);
+  return {
+    onDragOver: (event: DragEvent<HTMLDivElement>): void => {
+      if (!accepts(event)) return;
+      event.preventDefault();
+      event.dataTransfer.dropEffect = 'copy';
+    },
+    onDrop: (event: DragEvent<HTMLDivElement>): void => {
+      if (!accepts(event)) return;
+      event.preventDefault();
+      const asset = props.audioAssets.find((item) => item.id === event.dataTransfer.getData(MUSIC_DRAG_TYPE));
+      if (asset?.status !== 'ready') return;
+      const bounds = event.currentTarget.getBoundingClientRect();
+      const start = Math.max(0, Math.round((event.clientX - bounds.left - props.leading) / props.scale));
+      const music = { ...createMusicInstance(crypto.randomUUID(), asset, videoTimelineDuration(props.project)), start };
+      props.onEdit({ type: 'music', music: [...props.project.music, music] });
+    },
+  };
+}
+
 function TimelineMusicLanes(
   props: Readonly<
     Pick<
@@ -232,8 +267,8 @@ function TimelineMusicLanes(
 ) {
   if (!props.project.music.length)
     return (
-      <div className="music-lane-wrapper" style={{ top: props.top }}>
-        <div className="music-track-empty">Music · choose a Recording in Audio to add a track</div>
+      <div className="music-lane-wrapper" style={{ top: props.top }} {...musicDrop(props)}>
+        <div className="music-track-empty">Drop music here or use Audio → Add music track</div>
       </div>
     );
   return props.project.music.map((music, index) => (
@@ -242,6 +277,7 @@ function TimelineMusicLanes(
       className={`music-lane-wrapper music-instance-lane ${music.id === props.selectedMusicId ? 'selected' : ''}`}
       data-music-lane={music.id}
       style={{ top: props.top + index * 70 }}
+      {...musicDrop(props)}
     >
       <MusicTimeline
         project={props.project}

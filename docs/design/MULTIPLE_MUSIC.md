@@ -72,12 +72,14 @@ permitted.
 
 ## Selected-instance editing
 
-**Audio → Music** uses a native **Music track** selector, **Recording** selector,
-**Add music track** action and trash action **Delete selected music track**.
-Recordings must be ready/prepared. Add creates a fresh independent ID from the
+**Audio → Music** uses a native **Music track** selector with its trash action
+**Delete selected music track**, a **Recording** selector that only changes the
+selected instance, and **Add music track**, the single creation path listing ready
+files (dragging a ready file from Media → Music onto the music lane is equivalent).
+Add creates a fresh independent ID from the
 chosen ready recording, including another instance of the same recording, up to
 the eight-instance limit. Imports only populate the bin and prepare media;
-placement is deliberate and separate.
+placement is deliberate and separate. Project-level removal lives in Media.
 
 Selection is editor-only, with no save or Undo entry. Selecting, editing or
 removing an instance never edits the other instances, video clips, row points or

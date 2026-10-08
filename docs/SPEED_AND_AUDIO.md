@@ -320,8 +320,8 @@ Reimporting an unchanged source at the same absolute path reuses its music entry
 Importing a different location creates a **new music entry**, even when a move or
 hard link retains the original filesystem identity. The selected file is verified
 at its own path; an older entry's missing path does not block that new import.
-Existing entries and project references are not reassociated or removed. Select
-the new entry in **Recording** for deliberate placement. Verified fingerprint-matching PCM can
+Existing entries and project references are not reassociated or removed. Add the
+new entry with **Add music track** for deliberate placement. Verified fingerprint-matching PCM can
 be reused through the serial worker; originals and old caches remain untouched.
 
 Standalone music import requires exactly one audio stream and no video footage.
@@ -329,9 +329,12 @@ Embedded cover artwork explicitly marked as an attached picture is accepted and
 ignored during audio-only playback preparation; video soundtracks remain rejected.
 Original files are referenced in place and are never stripped or rewritten.
 
-**Music track** selects an instance. **Add music track** creates an independent
-instance of the chosen ready/prepared **Recording**, up to eight; the trash action
-**Delete selected music track** removes only that instance. Import never implicitly
+**Music track** selects an instance. **Add music track** is the single creation
+path: it lists this project's ready music files and creates an independent
+instance of the chosen one, up to eight. Dragging a ready file from Media's
+**Music** list onto the music lane does the same at the drop frame. **Recording**
+only changes the selected instance's source. The trash beside **Music track**
+(**Delete selected music track**) removes only that instance. Import never implicitly
 places music. Selection is editor-only; edits, recording changes and removal leave
 other instances, videos, row points and bin membership untouched. Each instance
 retains independent drafts; selection never applies one instance's text to another.
@@ -415,7 +418,7 @@ output acknowledgement or failed range cannot remain busy indefinitely.
 Preparation uses the existing one-heavy-job worker and writes only the versioned
 `pcm16-48k-stereo-mono-unity-v3` cache (about 11.52 MB per minute). Earlier AAC
 preview caches remain unchanged but are not current playback input. Missing current
-PCM caches appear as an explicit **Retry** preparation action in Audio → Music;
+PCM caches appear as an explicit **Prepare** action on the file in Media → Music;
 startup/library reads never prepare, rewrite or delete them. Prepare deliberately
 to create the current cache, retaining originals and older generated files. Project
 schema is 12; registry, video-proxy and PCM cache formats are unchanged. Native export

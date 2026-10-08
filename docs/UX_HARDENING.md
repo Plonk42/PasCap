@@ -92,8 +92,8 @@ original exclusive-OUT anchors. This is clip-local, not another row channel.
 See [the spatial contract](design/SPATIAL_TRANSFORMS.md); no fresh UI acceptance
 or throughput result is implied.
 
-**Audio → Music** uses native **Music track / Recording** selectors, **Add music
-track** and selected-instance trash deletion. Ready/prepared recordings can be
+**Audio → Music** uses native **Music track / Recording** selectors, an **Add music
+track** list of ready files and selected-instance trash deletion. Ready recordings can be
 reused by independent instances; import never implicitly places one. Selection
 is editor-only; edits/removal leave other instances and bin membership intact.
 Independent drafts never apply to another selection. Each valid commit/completed

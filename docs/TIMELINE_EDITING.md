@@ -18,8 +18,8 @@ bin, not every globally registered source. Strict schema 12 requires unique
 `media.videoIds` and `media.audioIds` arrays (10,000 IDs maximum each). Imports add
 membership even without timeline placement; clip/music references also remain
 visible. New projects start with both arrays empty. **Remove from project** (the
-trash on a Media card, on the selection header for a selection, or beside
-**Audio → Music → Recording**) removes only that bin membership in one Undo step.
+trash on a Media card or music file, or on the selection header for a selection)
+removes only that bin membership in one Undo step.
 A recording still used by excerpts or music instances first asks for confirmation
 with their counts, then removes those placements in the same step; Ripple rows
 close the gaps as ordinary deletions do. Originals, registry entries, proxies,
@@ -462,8 +462,9 @@ audio-source/instance-plan arrays; older snapshots/invalid arrays are rejected
 while the receipt and finished output remain preserved. Current PCM format is unchanged.
 
 Each music instance has its own backend-prepared waveform and timeline lane.
-**Audio → Music → Music track** selects the instance; **Add music track** uses a
-ready/prepared Recording and the selected-track trash action removes only that
+**Audio → Music → Music track** selects the instance; **Add music track** lists
+ready music files and creates an instance (dragging one from Media → Music onto
+the music lane does the same), and the selected-track trash action removes only that
 placement. Import never implicitly places music. Selection creates no save/history
 entry, and editing/removing one instance leaves all others and imported media intact.
 Independent drafts cannot apply to another instance. Placement/trim gestures are
