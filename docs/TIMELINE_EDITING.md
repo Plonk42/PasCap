@@ -17,7 +17,14 @@ The media library describes complete recordings belonging to the open project's
 bin, not every globally registered source. Strict schema 12 requires unique
 `media.videoIds` and `media.audioIds` arrays (10,000 IDs maximum each). Imports add
 membership even without timeline placement; clip/music references also remain
-visible. New projects start with both arrays empty. Importing an existing source
+visible. New projects start with both arrays empty. **Remove from project** (the
+trash on a Media card, on the selection header for a selection, or beside
+**Audio → Music → Recording**) removes only that bin membership in one Undo step.
+A recording still used by excerpts or music instances first asks for confirmation
+with their counts, then removes those placements in the same step; Ripple rows
+close the gaps as ordinary deletions do. Originals, registry entries, proxies,
+thumbnails, PCM caches, other projects and exports are untouched; a deliberate
+re-import makes it available again. Importing an existing source
 deliberately reuses the global content-deduplicated registry/proxy cache; switching
 projects never automatically adopts that global library. An insertion creates
 a unique clip-instance ID and copies the latest media-review IN/OUT, or
@@ -442,7 +449,8 @@ Row Colour requires both bases and static HSL/curves; missing fields are invalid
 Recreate projects and deliberately import recordings/music
 to reuse registered sources/verified ready proxies. Confirmed project deletion removes only its saved
 document, never originals, the shared registry/proxy cache or successful exports/
-receipts. Removing an excerpt is not removing that recording from the import bin. The
+receipts. Removing an excerpt is not removing that recording from the import bin;
+use **Remove from project** for that. The
 existing live v3 sample appearing incompatible is expected. Registry/proxy formats
 are unchanged.
 

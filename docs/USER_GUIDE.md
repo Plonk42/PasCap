@@ -53,6 +53,9 @@ footage, and back up originals and saved project/export data separately.
    rejected or queue admission fails. Check Media/Activity before repeating an
    uncertain request. Failed, cancelled or interrupted preparation needs explicit
    **Prepare**; **Prepare selected** confirms a manual multi-recording batch.
+5. To take a recording out of this project, use its trash button (or the trash on
+   the selection header). If excerpts use it, PasCap asks first and removes them
+   too; Undo restores everything. The original file and prepared media are kept.
 
 The separate **absolute-folder-path form** recursively imports the whole chosen
 folder and can queue substantial work. Use it deliberately, with a narrow folder.
@@ -399,7 +402,9 @@ Retiming: [SPEED_AND_AUDIO.md](SPEED_AND_AUDIO.md).
 Source-video audio is not used. In **Audio → Music**, enter your own standalone
 local file in **Music file path**, choose **Import audio**, wait for preparation,
 then choose a ready **Recording** from this project's music bin and deliberately
-place it with **Add music track**. Importing alone never places music. No soundtrack is
+place it with **Add music track**. Importing alone never places music. The trash
+beside **Recording** removes that recording (and, after confirmation, its music
+tracks) from this project. No soundtrack is
 supplied; use music you own or have permission to use and keep private paths private.
 
 If music was moved, import its new location normally and choose the new **Recording**
