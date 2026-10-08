@@ -476,7 +476,8 @@ Audio, nested disclosures and help remain unchanged.
 The header directly exposes **Media / Inspector toggles and keyboard help**.
 **Workspace options** keeps Reset layout and Diagnostics.
 Drag panel dividers or use focused arrows; double-click/Home resets a divider and
-Escape cancels its drag. Compact desktop windows use one side drawer at a time.
+Escape cancels its drag. PasCap is designed for browser windows of at least
+1280 × 720; narrower windows use one side drawer at a time.
 Layout/section preferences do not change rendering. Numbers/titles apply on
 Enter/blur, Escape restores, and invalid text remains editable. Numeric values retain
 full entered precision, independent of slider steps, without clamping or rounding.
