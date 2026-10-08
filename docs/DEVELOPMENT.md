@@ -78,6 +78,11 @@ npm run test:browser
   upstream notice texts in a served notice artifact; `npm run licenses:check`
   verifies the inventory without building/writing. See [licensing](LICENSING.md).
   `npm test` runs Vitest; native tests require `test:media`.
+- Check **SonarQube for IDE** diagnostics on affected code files while editing and
+  before delivery. Fix relevant new quality/security findings rather than adding
+  `NOSONAR`, suppressing warnings or excluding files; report justified exceptions
+  or unavailable analysis. It is not part of `npm run check` or CI, and docs-only
+  changes do not need it.
 - `test:media` uses disposable temporary **synthetic** sources/projects/outputs only.
 - `test:browser` builds/creates synthetic fixtures, then runs serial Chrome workflows
   on its own service at **4320**, without reusing a running service.
@@ -207,7 +212,8 @@ identity, retry loop, skipped assertion, privacy change or larger bound.
 
 The commands above are complete entry points, not a chain to run after every edit.
 Full Chrome, Firefox and native suites run in CI; run them locally only when
-changing playback, decoding, native export or test infrastructure.
+changing playback, decoding, native export or test infrastructure. UI changes still
+need the [live inspection](#live-ui-inspection) below.
 
 - While editing: `npm test -- tests/unit/<file>.test.ts` (or `npm run test:watch`)
   and the dev server.
@@ -245,6 +251,27 @@ original path is inside the excluded cache), then removes only that owned subfol
 Normal navigation/confirmation exercise the guarded audio routes; unavailable locations,
 access/probe/write failures and stale reads use disposable route responses. No fixture
 generator/reset, private audio, music placement or export is needed.
+
+### Live UI inspection
+
+**Required for UI/layout/control/interaction changes**, alongside the affected
+automated specs, not a full browser-suite run:
+
+1. Open or reuse a tab in the **VS Code integrated browser** before changing the
+   UI, and inspect it again after the final edit. Use a memory-only project or the
+   isolated synthetic browser-test service, never saved projects or real media.
+2. Use **Playwright browser controls** to exercise the changed workflow, including
+   relevant normal, error/disabled, expanded, popover, pointer and keyboard states.
+3. Capture and inspect **rendered screenshots** for alignment, spacing, clipping,
+   readable values, reachable controls and scrolling, at a desktop and a compact
+   viewport (plus short/narrow cases when affected; see the
+   [responsive matrix](WORKSPACE_AND_RECOVERY.md#layout-and-navigation)).
+   DOM snapshots and passing tests do not establish visual correctness.
+4. Fix issues and repeat the live checks after the last edit. Run the focused
+   specs separately. Never build or reset fixtures while a tab or test run serves
+   the same output/cache.
+5. Summarise the states and viewports actually checked and any gaps. If browser
+   access is unavailable, report that blocker instead of claiming visual validation.
 
 ### GitHub CI
 
