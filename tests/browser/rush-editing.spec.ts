@@ -1422,9 +1422,9 @@ for (const action of ['scrub', 'mark', 'apply', 'reset', 'trim'] as const) {
     await page.getByRole('button', { name: 'Play source preview', exact: true }).click();
     await expect(page.locator('.source-preview')).toHaveAttribute('data-source-status', 'playing');
     if (action === 'scrub') await sourceFrame(page, 60);
-    if (action === 'mark') await page.getByRole('button', { name: 'Mark source OUT', exact: true }).click();
+    if (action === 'mark') await page.getByRole('button', { name: 'Review source frame of pattern-a.mp4' }).press('o');
     if (action === 'apply') await sourceRange(page, 30, 100);
-    if (action === 'reset') await page.getByRole('button', { name: 'Reset source range', exact: true }).click();
+    if (action === 'reset') await page.getByRole('slider', { name: 'Trim source start', exact: true }).press('Home');
     if (action === 'trim')
       await page.getByRole('slider', { name: 'Trim source start', exact: true }).press('ArrowRight');
     await expect(page.locator('.source-preview')).toHaveAttribute('data-source-status', 'paused');
@@ -1570,7 +1570,7 @@ test('source IN/OUT targets, omitted footage and reversible drafts remain reacha
     { width: 30, height: 28, text: 'IN' },
     { width: 30, height: 28, text: 'OUT' },
   ]);
-  await expect(page.locator('.source-range-description')).toContainText('25 before / 30 after');
+  await expect(page.locator('.source-range-description')).toHaveCount(0);
   for (const edge of ['before', 'after'])
     expect(
       await page.locator(`.source-range-omitted.${edge}`).evaluate((element) => element.getBoundingClientRect().width),
@@ -1591,10 +1591,12 @@ test('source IN/OUT targets, omitted footage and reversible drafts remain reacha
   await page.mouse.down();
   await page.mouse.move(box.x + box.width / 2 + 30, box.y + box.height / 2);
   await expect(page.locator('.source-range-strip')).toHaveAttribute('data-range-draft', 'true');
+  await expect(page.locator('.source-range-description')).toHaveText('Release to apply · Esc to cancel');
   await expect(page.getByRole('button', { name: 'Play source preview', exact: true })).toBeDisabled();
   await page.keyboard.press('Escape');
   await page.mouse.up();
   await expect(page.locator('.source-range-strip')).toHaveAttribute('data-source-in', '25');
+  await expect(page.locator('.source-range-description')).toHaveCount(0);
   await expect(page.locator('.source-preview')).toHaveAttribute('data-source-frame', '50');
   await handle.press('Home');
   await expect(page.locator('.source-range-strip')).toHaveAttribute('data-source-in', '0');
@@ -1602,6 +1604,35 @@ test('source IN/OUT targets, omitted footage and reversible drafts remain reacha
   await page.getByRole('slider', { name: 'Trim source end', exact: true }).press('End');
   await expect(page.locator('.source-range-strip')).toHaveAttribute('data-source-out', '120');
   await expect(page.locator('.source-preview')).toHaveAttribute('data-source-frame', '119');
+  await flush(page);
+  expect(memory.saves).toBe(0);
+});
+
+test('an invalid exact source range keeps its draft, an actionable error and no dangling description', async ({
+  page,
+}) => {
+  await page.getByRole('button', { name: 'Review pattern-a.mp4', exact: true }).click();
+  await sourceRange(page, 10, 40);
+  const sourceIn = page.getByRole('spinbutton', { name: 'Source IN', exact: true });
+  const sourceOut = page.getByRole('spinbutton', { name: 'Source OUT', exact: true });
+  for (const field of [sourceIn, sourceOut]) await expect(field).not.toHaveAttribute('aria-describedby');
+  await sourceIn.fill('50');
+  await page.getByRole('button', { name: 'Apply source range', exact: true }).click();
+  const error = 'Use whole source frames: 0 ≤ IN < OUT ≤ 120. OUT is exclusive.';
+  await expect(page.locator('.source-range-description[role="alert"]')).toHaveText(error);
+  for (const field of [sourceIn, sourceOut]) {
+    await expect(field).toHaveAttribute('aria-invalid', 'true');
+    await expect(field).toHaveAccessibleDescription(error);
+  }
+  await expect(sourceIn).toHaveValue('50');
+  await expect(page.locator('.source-range-strip')).toHaveAttribute('data-source-in', '10');
+  await page.getByRole('button', { name: 'Cancel source range', exact: true }).click();
+  await expect(sourceIn).toHaveValue('10');
+  await expect(page.locator('.source-range-description')).toHaveCount(0);
+  for (const field of [sourceIn, sourceOut]) {
+    await expect(field).toHaveAttribute('aria-invalid', 'false');
+    await expect(field).not.toHaveAttribute('aria-describedby');
+  }
   await flush(page);
   expect(memory.saves).toBe(0);
 });

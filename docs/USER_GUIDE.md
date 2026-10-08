@@ -79,10 +79,11 @@ scrubs its full source range without moving the timeline playhead. **Pin** keeps
 that source selected while you hover other rows. Review opens paused and muted and
 uses a separate decoder; it never plays or prepares an original implicitly.
 
-Set source **IN/OUT** using handles, **Mark IN/OUT**, focused source **I/O**, or the
-paired numeric fields followed by **Apply**. OUT is exclusive; Mark OUT includes
-the displayed frame. **Reset** restores the full recording. These choices are
-per-project, browser-local state, not portable project-document fields.
+Set source **IN/OUT** by dragging the handles, with focused source **I/O**, or with
+the paired numeric fields followed by **Apply**. OUT is exclusive; **O** includes
+the displayed frame. Drag a handle back to an edge (or press **Home**/**End** on it)
+to restore the full recording. These choices are per-project, browser-local state,
+not portable project-document fields.
 
 The labelled **IN / OUT** handles restore omitted footage as well as trim; hatched
 parts are outside the selected range. Dragging previews the boundary frame; release

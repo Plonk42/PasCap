@@ -446,7 +446,7 @@ Its sticky header keeps native **Play / Pause** alongside **Add excerpt**, even
 when short-height source controls scroll. Play uses the applied IN/OUT, not numeric
 drafts, starting at the observed frame if inside and before OUT − 1, otherwise IN.
 It stops and exact-seeks OUT − 1, without looping or audio; a one-frame range only
-displays that frame. Scrub/trim/mark/Apply/Reset pause first. Pending play cannot
+displays that frame. Scrub/trim/mark/Apply pause first. Pending play cannot
 restart after cancellation, a source/project switch, close, hidden viewer or tab
 switch; start/stall failures are explicit after five seconds with Retry.
 Labelled 30 × 28 px IN/OUT handles, omitted-footage hatching and boundary-frame
@@ -456,7 +456,10 @@ This source-only playback adds no timeline/music seek, history/save, decoder,
 original access or implicit preparation.
 
 Pin holds that source while hovering other rows. Explicit click/focus can select
-another prepared source. IN/OUT handles/Apply/I/O marks/Reset stay recoverable.
+another prepared source. IN/OUT handles/Apply/I/O marks stay recoverable; Home/End
+on a handle restores that edge. There are no Mark IN/OUT or Reset buttons and no
+static selected/omitted-frame summary: the strip and exact fields show the range,
+while inline text appears only for drag hints and invalid numeric drafts.
 Applied choices are per-project browser-local state; unavailable storage leaves
 valid choices usable for the current session with a warning. All insertion paths
 copy the latest applied range and create independent clip instances. Changing a

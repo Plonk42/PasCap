@@ -12,7 +12,6 @@ import {
 } from 'react';
 import { VideoDecoderSlot } from '../preview/decoder.js';
 import {
-  fullMediaSelection,
   markMediaSelection,
   moveMediaSelectionEdge,
   validateMediaSelection,
@@ -394,7 +393,6 @@ export function SourceReview({
         data-added-clip-id={lastAddedExcerpt?.id}
       >
         {lastAddedExcerpt && 'Excerpt added · mark another range'}
-        {!lastAddedExcerpt && excerpts.length === 0 && 'Mark IN and OUT, add, then choose another range'}
       </output>
     </section>
   );
@@ -493,7 +491,7 @@ function SourceRangeEditor({
   const [draft, setDraft] = useState<MediaSelection | null>(null);
   const [numbers, setNumbers] = useState({ sourceIn: String(range.sourceIn), sourceOut: String(range.sourceOut) });
   const [error, setError] = useState('');
-  const descriptionId = useId();
+  const errorId = useId();
   const selected = draft ?? range;
   const numbersDirty = numbers.sourceIn !== String(range.sourceIn) || numbers.sourceOut !== String(range.sourceOut);
 
@@ -740,7 +738,7 @@ function SourceRangeEditor({
           <span>IN</span>
           <input
             aria-label="Source IN"
-            aria-describedby={descriptionId}
+            aria-describedby={error ? errorId : undefined}
             aria-invalid={!!error}
             type="number"
             min={0}
@@ -756,7 +754,7 @@ function SourceRangeEditor({
           <span>OUT</span>
           <input
             aria-label="Source OUT"
-            aria-describedby={descriptionId}
+            aria-describedby={error ? errorId : undefined}
             aria-invalid={!!error}
             type="number"
             min={1}
@@ -777,54 +775,24 @@ function SourceRangeEditor({
         >
           Apply
         </button>
-      </form>
-      <div className="source-range-actions">
-        <button
-          className="secondary-button small"
-          aria-label="Mark source IN"
-          title="Mark displayed source frame as IN (I)"
-          disabled={disabled || observedFrame === null || draft !== null}
-          onKeyDown={onKeyDown}
-          onClick={() => mark('in')}
-        >
-          Mark IN
-        </button>
-        <button
-          className="secondary-button small"
-          aria-label="Mark source OUT"
-          title="Mark after displayed source frame as exclusive OUT (O)"
-          disabled={disabled || observedFrame === null || draft !== null}
-          onKeyDown={onKeyDown}
-          onClick={() => mark('out')}
-        >
-          Mark OUT
-        </button>
-        <button
-          className="icon-button"
-          aria-label="Reset source range"
-          title="Restore the full original source range"
-          disabled={disabled || draft !== null || (range.sourceIn === 0 && range.sourceOut === count && !numbersDirty)}
-          onKeyDown={onKeyDown}
-          onClick={() => commit(fullMediaSelection(asset.id, count))}
-        >
-          <Icon name="reset" size={13} />
-        </button>
         {(draft || numbersDirty) && (
-          <button className="text-button" aria-label="Cancel source range" onKeyDown={onKeyDown} onClick={cancel}>
+          <button
+            className="text-button"
+            type="button"
+            aria-label="Cancel source range"
+            onKeyDown={onKeyDown}
+            onClick={cancel}
+          >
             Cancel
           </button>
         )}
-      </div>
-      <div
-        className={`source-range-description ${error ? 'source-range-error' : ''}`}
-        id={descriptionId}
-        role={error ? 'alert' : undefined}
-      >
-        {error ||
-          (draft
-            ? 'Release to apply · Esc to cancel'
-            : `${selected.sourceOut - selected.sourceIn} selected · ${selected.sourceIn} before / ${count - selected.sourceOut} after · OUT exclusive`)}
-      </div>
+      </form>
+      {error && (
+        <div className="source-range-description source-range-error" id={errorId} role="alert">
+          {error}
+        </div>
+      )}
+      {!error && draft && <div className="source-range-description">Release to apply · Esc to cancel</div>}
     </div>
   );
 }
