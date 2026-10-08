@@ -1,0 +1,89 @@
+# Row Temperature and Tint · strict project schema 12
+
+Approved contract for [#68](https://github.com/Plonk42/PasCap/issues/68).
+These are normalized **SDR colour controls**, not Kelvin, HDR, illuminant
+estimation, automatic white balance or highlight recovery. This guide specifies
+behaviour and required validation, not completed tests or hardware qualification.
+
+## Ownership, data and controls
+
+Every row requires finite `colour.temperature` and `colour.tint` in **−1…1**;
+new rows start at **0**, neutral. Positive Temperature warms (red relative to
+blue), negative cools; positive Tint adds magenta (red/blue relative to green),
+negative adds green. Nonzero settings intentionally colour greys.
+
+All static and animated Colour is row-owned. Existing, new and moved clips use
+their row's complete grade, including both dissolve sources. Empty rows remain
+editable; different treatments require different rows. No clip Colour/correction
+base, ownership toggle or copy to clips is introduced.
+
+Shared row points require exactly **eleven nullable channels**, in control order:
+`opacity`, `speed`, `temperature`, `tint`, `exposure`, `brightness`, `contrast`,
+`hue`, `saturation`, `highlights`, `shadows`. Temperature and Tint participate
+independently at absolute project frames, interpolate parameter values using the
+left participant's shared easing and hold endpoints. Unrelated participants are
+skipped. No keys means the saved row base; removing the final participant reveals
+that unchanged base. HSL bands and master/RGB curves remain **static**, not new
+animation channels. Speed retains its separate clip-base/row-override semantics.
+
+**Clip → Colour** places Temperature and Tint before Exposure. Main and stored
+participants use native sliders (step 0.01), adjacent exact numeric fields,
+individual Reset to 0, explicit diamonds and channel-specific Previous/Next.
+Sliders never create keys; animated main values without a participant at the real
+playhead are read-only until diamond capture. Pointer movement is a local draft;
+valid release is one Undo step. Escape/cancellation/capture loss/blur restores.
+Numeric Enter/blur preserves entered precision; invalid drafts stay editable,
+never clamp or default. Resets affect only the targeted base or existing key;
+Reset keys preserves row bases and static HSL/curves.
+
+## One grading formula
+
+Let $T$ be Temperature and $I$ Tint. Define positive linear-RGB raw gains:
+
+$$
+q = \left(2^{T/2+I/4},\;2^{-I/4},\;2^{-T/2+I/4}\right),\qquad
+N=0.2126q_R+0.7152q_G+0.0722q_B,\qquad g=q/N.
+$$
+
+After inverse BT.709 decoding, apply $L'=L\odot g$ component-wise, **before**
+Exposure's $2^{\mathrm{exposure}}$ multiplier. Do not clip the gains or intermediate
+linear RGB. The complete order is inverse BT.709 → Temperature/Tint gains →
+Exposure → Contrast → Brightness → Shadows/Highlights → Hue/Saturation → final
+linear clipping and BT.709 encoding → static encoded HSL → master curve → RGB
+curves → black-fade brightness → Opacity/spatial coverage and grouped source-over.
+See [the grading equations](../COLOUR_AND_TIMING.md) for the remaining stages.
+
+At $T=I=0$, all gains equal 1. Normalization preserves **neutral-white linear
+BT.709 luminance before clipping only**: $0.2126g_R+0.7152g_G+0.0722g_B=1$.
+It is not luminance preservation for arbitrary coloured pixels or the final
+clipped/encoded image, and does not keep greys neutral. HSL's grey protection
+applies to its incoming RGB, which Temperature/Tint may already have coloured.
+
+CPU reference, compiled CPU grade, native LUT generation/exact grading,
+diagnostic reference and GPU shaders must use **this same math and stage order**,
+not separate gain approximations. Existing native LUT interpolation, RGBA16 and
+H.264/YUV quantisation remain measured approximations, not different transforms.
+Neutral HSL/identity curves retain scalar LUT paths; nonneutral advanced settings
+require exact complete grading through layered export. Compare/Ungraded bypasses
+Temperature/Tint and every other colour stage, never Opacity, geometry or fades.
+These appearance-only controls add no decoder, full-frame buffer, LUT array or
+native process; existing frame/pixel/resource and A/V gates remain unchanged.
+
+## Strict preservation and validation
+
+Only **schema 12** projects and schema-12 snapshots in version-1 export receipts
+are accepted. Missing Temperature/Tint bases or either nullable point field,
+unknown fields and saved clip Colour/correction are invalid. Reject **v1–v11**
+documents and receipt snapshots clearly; preserve their bytes and successful
+outputs. Recreate projects deliberately: no migrations, v11 acceptance,
+compatibility readers, injected defaults, fallback or automatic deletion.
+Receipt/report/registry/proxy/PCM format versions remain independent and unchanged;
+new reference/measurement metadata identifies schema 12, historical evidence does
+not change.
+
+Required disposable checks cover strict bounds/rejection/preservation, neutral
+identity, both axis signs and combined gains, pre-clipping neutral-white
+luminance, intentionally coloured greys, stage order and unchanged CPU/reference/
+native/GPU error gates. Editing checks cover empty rows, independent capture,
+read-only gaps, final-key removal, resets, invalid/cancelled drafts, Undo/Redo and
+live desktop/compact screenshots. No real-media jobs or new performance claims.

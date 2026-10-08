@@ -264,7 +264,7 @@ describe('one editor-only stored-point cursor', () => {
     expect(history.canUndo).toBe(false);
     expect(history.canRedo).toBe(false);
     expect(projectSchema.parse(history.current)).toEqual(document);
-    expect(history.current.schemaVersion).toBe(11);
+    expect(history.current.schemaVersion).toBe(12);
   });
 
   it.each([-1, NaN, Infinity, 0.5, 2_147_483_648])(
@@ -357,7 +357,7 @@ describe('native diamond, previous, next DOM and all control placements', () => 
     expect(controls[1]).toContain('nearest available frame 19');
   });
 
-  it('places both buttons at each of the nine inspector diamonds without duplicate sidebar opacity controls', () => {
+  it('places both buttons at each of the eleven inspector diamonds without duplicate sidebar opacity controls', () => {
     const document = project(interleaved);
     const inspector = renderToStaticMarkup(
       createElement(
@@ -403,7 +403,7 @@ describe('native diamond, previous, next DOM and all control placements', () => 
       ),
     );
     expect(sidebar).toContain('Layer options Video 1');
-    expect(KEYFRAME_SETTINGS).toHaveLength(9);
+    expect(KEYFRAME_SETTINGS).toHaveLength(11);
     expect(inspector).toContain('aria-label="Keyframe Opacity"');
     expect(inspector).not.toContain('Keyframe Layer opacity');
     expect(inspector).not.toContain('Keyframe Clip opacity');

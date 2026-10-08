@@ -1,10 +1,13 @@
-# Row HSL ranges and colour curves · strict project 11
+# Row HSL ranges and colour curves · strict project 12
 
 All colour belongs to the video row, keyed or unkeyed. Clips have no colour or
-correction fields. The seven existing scalar controls and their animation remain
-unchanged. HSL ranges and colour curves are **static row settings**, including on
-empty rows; the nine nullable point channels remain Opacity, Speed and those seven
-scalars. Animation does not suppress or replace the advanced static settings.
+correction fields. Nine scalar colour controls, including Temperature and Tint,
+participate independently in row animation. HSL ranges and colour curves are
+**static row settings**, including on empty rows; the eleven nullable point
+channels are Opacity, Speed and those nine scalars. Animation does not suppress
+or replace advanced static settings. Temperature/Tint use normalized −1…1,
+neutral 0, and linear gains before Exposure; see
+[their exact contract](TEMPERATURE_AND_TINT.md).
 
 ## Required data and SDR order
 
@@ -16,14 +19,16 @@ green and blue arrays, each 2…16 strict `{ x, y }` points with finite coordina
 in 0…1. Inputs strictly ascend, with first x=0 and last x=1. Endpoint outputs are
 editable; nonmonotonic outputs are valid. No point IDs or preset fields are saved.
 Neutral factories create independent nested objects/arrays. They are only creators,
-never repairs for missing saved fields. Projects 1…10 and their receipt snapshots
+never repairs for missing saved fields. Projects 1…11 and their receipt snapshots
 are incompatible and preserved; recreate deliberately. Receipt format remains 1;
 registry, proxy and PCM formats are unchanged. No migration or automatic deletion.
 
-The exact order is existing seven-control SDR grading → encoded BT.709 HSL →
-master curve → separate RGB curves → black-fade brightness → grouped coverage and
-source-over. This is not HDR, scene-linear HSL, white balance, a speed curve or a
-per-clip correction. Compare/Ungraded bypasses **all** colour stages, retaining
+The exact order is inverse BT.709 → normalized Temperature/Tint linear gains →
+Exposure → Contrast → Brightness → Shadows/Highlights → Hue/Saturation → final
+linear clipping/BT.709 encoding → encoded HSL → master curve → separate RGB curves →
+black-fade brightness → grouped coverage and source-over. This is not HDR,
+scene-linear HSL, automatic white balance, a speed curve or a per-clip correction.
+Compare/Ungraded bypasses **all** colour stages, retaining
 geometry, timing, visibility, Opacity, black fades and music.
 
 ## HSL mathematics
@@ -33,7 +38,9 @@ neighbouring circular band centres participate. For interval progress u, right
 weight is `u*u*(3-2*u)`, left weight its complement; the magenta→red interval
 wraps through 360 degrees. Never reclassify a pixel after applying one band.
 Multiply weighted offsets by `smoothstep(0, 0.1, max(R,G,B)-min(R,G,B))`.
-Exact greys, black and white therefore remain unchanged by HSL. Wrap hue after
+Exact incoming greys, black and white therefore remain unchanged by HSL.
+Temperature/Tint precede HSL and intentionally colour greys; HSL grey protection
+does not undo those gains or promise a neutral final image. Wrap hue after
 adding its weighted degree offset; multiply saturation by one plus its weighted
 offset and add the lightness offset. Clamp resulting saturation/lightness to gamut,
 not editor input. Convert the resulting HSL back to encoded RGB. All-neutral HSL
@@ -43,7 +50,7 @@ Curves use piecewise-linear interpolation, first master on each encoded componen
 then that component's channel curve. Outputs need not ascend. Arbitrarily narrow
 valid knees are evaluated analytically in native export, not approximated by a
 65³ advanced-colour LUT. Nonneutral HSL or curves route even otherwise static
-projects through layered export. Each such source evaluates the complete seven
+projects through layered export. Each such source evaluates the complete nine
 scalar controls → HSL → master/RGB curves directly on the sampled fractional RGB,
 before black fades and group composition. A scalar-only LUT followed by exact
 curves is insufficient: a sharp curve can amplify that LUT's scalar error.
@@ -53,7 +60,8 @@ quantisation remain measured approximations under the unchanged error gates.
 
 ## Editing, resets and resource ownership
 
-Clip → Colour retains the original seven sliders and sole Opacity control. Nested
+Clip → Colour contains nine scalar sliders (Temperature/Tint before Exposure)
+and sole Opacity control. Nested
 HSL ranges and Colour curves contain native band/channel/point selectors, exact
 numeric fields and a compact SVG curve graph. HSL uses native sliders and exact
 fields, with no diamonds. Curve endpoint inputs are locked; outputs remain editable.

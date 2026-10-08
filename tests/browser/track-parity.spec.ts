@@ -178,7 +178,7 @@ async function captureAt(page: Page, frame: number) {
   return captured;
 }
 
-test('the initial track and every newly added track default to Ripple on with independent strict schema-10 fields', async ({
+test('the initial track and every newly added track default to Ripple on with independent strict schema-12 fields', async ({
   page,
 }) => {
   const before = await current(page);
@@ -194,7 +194,7 @@ test('the initial track and every newly added track default to Ripple on with in
   await page.getByRole('button', { name: 'Add video layer', exact: true }).click();
   const added = await current(page);
   await ready(page, added);
-  expect(added.schemaVersion).toBe(11);
+  expect(added.schemaVersion).toBe(12);
   for (const field of ['transitions', 'openingFade', 'closingFade']) expect(added).not.toHaveProperty(field);
   expect(added.layers.slice(0, 2)).toEqual(before.layers);
   expect(added.clips).toEqual(before.clips);

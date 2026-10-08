@@ -1,5 +1,5 @@
 import { setImmediate as yieldToEvents } from 'node:timers/promises';
-import { colourSchema, gradePixel, type ColourSettings } from '../shared/colour.js';
+import { colourSchema, compilePixelGrade, type ColourSettings } from '../shared/colour.js';
 import { LAYERED_EXPORT_RESOURCES } from '../shared/export.js';
 import { ServiceError } from './errors.js';
 
@@ -64,12 +64,13 @@ export class ColourLutCache {
     }
     this.#building = true;
     const started = performance.now();
+    const grade = compilePixelGrade(value);
     try {
       let offset = 0;
       for (let blue = 0; blue < SIZE; blue++) {
         for (let green = 0; green < SIZE; green++) {
           for (let red = 0; red < SIZE; red++) {
-            const rgb = gradePixel([red / (SIZE - 1), green / (SIZE - 1), blue / (SIZE - 1)], value);
+            const rgb = grade([red / (SIZE - 1), green / (SIZE - 1), blue / (SIZE - 1)]);
             buffer[offset++] = rgb[0];
             buffer[offset++] = rgb[1];
             buffer[offset++] = rgb[2];

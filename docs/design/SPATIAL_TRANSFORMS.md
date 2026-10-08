@@ -1,4 +1,4 @@
-# Clip spatial transforms · strict project schema 11
+# Clip spatial transforms · strict project schema 12
 
 Current contract for [#20](https://github.com/Plonk42/PasCap/issues/20): static and
 keyframed crop, uniform scale, translation and rotation on each excerpt instance.
@@ -17,7 +17,7 @@ Implementation authorities: [pose/schema/mapping](../../src/shared/spatial.ts),
 
 ## Required data and ownership
 
-Every schema-11 clip requires `spatial: { base, keyframes }`. Both objects and all
+Every schema-12 clip requires `spatial: { base, keyframes }`. Both objects and all
 keys are strict: no unknown fields, optional legacy values, coercion, persisted
 defaults or load-time repair. `base` is one complete eight-value pose;
 `keyframes` is a required array of **0–256** complete poses. Each key requires
@@ -37,7 +37,8 @@ the original's exclusive OUT (`frameCount`), including keys outside the trim.
 
 Neutral creation values are not defaults for missing saved data. Spatial keys
 belong only to `clip.spatial`; they add no row channels or timeline row markers.
-The nine nullable shared row channels, clip colour/speed ownership and final
+The eleven nullable shared row channels (Opacity, Speed and nine scalar colour
+fields), row-only Colour ownership, clip-owned speed and final
 [#67](https://github.com/Plonk42/PasCap/issues/67) sole row **Opacity** remain
 unchanged. No saved `clip.opacity` or second opacity multiplier is introduced.
 
@@ -191,11 +192,17 @@ is no Transform graph-point drag, canvas gizmo or per-property diamond workflow.
 
 ## Preservation
 
-Projects and version-1 export receipt snapshots must satisfy strict **schema 11**,
+Projects and version-1 export receipt snapshots must satisfy strict **schema 12**,
 including required clip spatial data and the unchanged identified music arrays.
-Incompatible v1–v10 projects/receipt snapshots and completed videos remain untouched.
+Required row Colour includes Temperature/Tint and static HSL/curves, with eleven
+required nullable row point fields. Incompatible v1–v11 projects/receipt snapshots
+and completed videos remain untouched.
 Recreate projects deliberately; do not migrate, default-fill, rewrite or delete old
 data automatically. Registry/proxy/PCM and receipt/report format versions do not
 change. Historical measurements/planning retain their original schema references.
 
-Advanced row HSL and master/RGB curves grade spatially sampled RGB before black fades and coverage, with no extra spatial field or key. Compare bypasses all colour but preserves spatial mapping. [Advanced colour contract](HSL_AND_CURVES.md).
+Row Temperature/Tint gains precede Exposure in the common grade of spatially
+sampled RGB; static HSL and master/RGB curves follow scalar grading, before black
+fades and coverage. No extra spatial field or key is added. Compare bypasses all
+Colour but preserves spatial mapping. See [Temperature/Tint](TEMPERATURE_AND_TINT.md)
+and [advanced colour](HSL_AND_CURVES.md).

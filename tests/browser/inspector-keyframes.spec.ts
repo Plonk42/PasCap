@@ -36,6 +36,8 @@ test.beforeEach(async ({ page, request }) => {
       {
         opacity: 0.4,
         speed: 1,
+        temperature: 0.3,
+        tint: -0.2,
         exposure: 0.5,
         brightness: 0.1,
         contrast: 1.2,
@@ -140,8 +142,8 @@ test('all participants reuse their main control bounds and resets with one exact
     );
   }
   const row = await editLayerPoint(page, 'Video 1', 10);
-  expect(KEYFRAME_SETTINGS).toHaveLength(9);
-  await expect(row.locator('.layer-keyframe-point-values').getByRole('spinbutton')).toHaveCount(9);
+  expect(KEYFRAME_SETTINGS).toHaveLength(11);
+  await expect(row.locator('.layer-keyframe-point-values').getByRole('spinbutton')).toHaveCount(11);
   for (const setting of KEYFRAME_SETTINGS) {
     const name = `${setting.label} keyframe value 10`;
     await expect(row.getByRole('spinbutton', { name, exact: true })).toBeEnabled();

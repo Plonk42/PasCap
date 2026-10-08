@@ -1,4 +1,4 @@
-# PasCap colour and timing contract · project v11
+# PasCap colour and timing contract · project v12
 
 This specification is shared by the CPU reference, WebGL2 shader and native
 scalar LUT or exact advanced-colour export. It is elementary SDR grading, not
@@ -24,6 +24,15 @@ See [row appearance](design/ROW_APPEARANCE.md) for ownership, UI and strict stor
 - Inverse BT.709: `L = V / 4.5` below `4.5 β`, otherwise
   `L = ((V + α − 1) / α)^(1 / 0.45)`, where
   `α = 1.09929682680944`, `β = 0.018053968510807` (continuous join).
+- Temperature $T$ and Tint $I$: normalized −1…1, neutral 0. Raw linear gains are
+  $q=(2^{T/2+I/4},2^{-I/4},2^{-T/2+I/4})$; normalize with
+  $N=0.2126q_R+0.7152q_G+0.0722q_B$ and apply $L'=L\odot(q/N)$ before Exposure,
+  without clipping intermediate gains/RGB. Positive Temperature warms; positive
+  Tint adds magenta. Nonzero settings intentionally colour greys. Normalization
+  preserves neutral-white linear BT.709 luminance before clipping only, not
+  arbitrary coloured pixels or final output. CPU/reference/native/GPU use this
+  same math, not Kelvin/HDR/automatic white balance. See
+  [Temperature and Tint](design/TEMPERATURE_AND_TINT.md).
 - Exposure: multiply linear RGB by `2^exposure`.
 - Contrast: `(RGB − 0.18) × contrast + 0.18` (linear middle-grey pivot).
 - Brightness: add its linear offset equally to all channels.
@@ -64,12 +73,12 @@ uses `layer.colour`. Clip speed and spatial settings remain per clip. **Opacity*
 setting: `VideoLayer.opacity` is a required number in 0–1, initially 1 on a new
 track. Without Opacity participants, every source uses that row value; otherwise
 the row's sole `opacity` channel overrides it, including both dissolve sources.
-There is no saved `clip.opacity` or second opacity channel. The nine required
-nullable point fields are `opacity`, `speed`, `exposure`, `brightness`, `contrast`,
+There is no saved `clip.opacity` or second opacity channel. The eleven required
+nullable point fields are `opacity`, `speed`, `temperature`, `tint`, `exposure`, `brightness`, `contrast`,
 `hue`, `saturation`, `highlights` and `shadows`.
 Hold/linear/ease-in/ease-out/smooth interpolation belongs to the left participating
 point; endpoints hold outside the
-keyed interval. Colour evaluates all seven parameter values before applying the
+keyed interval. Colour evaluates all nine scalar parameter values before applying the
 equations above. Trim/split never copy or shift row points; they retain clip-speed
 and spatial anchors, including those outside the excerpt and at the registered
 original's exclusive OUT. Spatial poses evaluate continuously through the placed
@@ -81,7 +90,7 @@ and starts at **100%**. It edits row `opacity` without keys and works on an empt
 row. With keys, only a participant at the real playhead is editable; the hollow
 diamond explicitly captures a missing participant. Sliders never create keys.
 This shared UI placement does not make Opacity an RGB grading parameter: it
-controls coverage during composition after the unchanged SDR colour math above.
+controls coverage during composition after the SDR colour math above.
 
 For each enabled layer, source-over uses premultiplied encoded RGB/coverage.
 Let $w_i$ be dissolve weight, $o_i$ evaluated Opacity, $b_i$ black-fade brightness
@@ -173,7 +182,7 @@ resets to normal graded preview. Export continues to use the saved grading contr
 
 ## Music sampling and mixing
 
-Strict schema 11 requires a 0–8 `music` array of independent uniquely identified
+Strict schema 12 requires a 0–8 `music` array of independent uniquely identified
 instances, `[]` without music. Each has source IN/OUT, start/duration, gain, fades
 and loop; source-video audio remains disabled. At 48 kHz, source/placement/duration/
 fade positions round independently to integer samples using the rational frame
@@ -218,22 +227,31 @@ neutral HSL and identity curves, exactly neutral spatial
 bases without spatial keys, without music, extra tracks or row points,
 and is limited to 3,600 project frames. It refuses unsupported
 documents regardless of Ripple or track ID.
-It requires a strict schema-11 project snapshot, including explicit project media
+It requires a strict schema-12 project snapshot, including explicit project media
 membership; its reference receipt format remains independently version 1. New
-measurement reports must identify their v11 project snapshot without overwriting
+measurement reports must identify their v12 project snapshot without overwriting
 historical reports; the report identifier is separate from the project schema.
 Project identifiers such as `preview-lab`/`preview-lab-v6` are not schema versions
 and are not renamed by this contract.
-v1–v10 project documents and receipt snapshots are incompatible and preserved;
+v1–v11 project documents and receipt snapshots are incompatible and preserved;
 recreate projects deliberately, with no migration, compatibility defaults or
-old-format/null fallback readers or automatic deletion. Strict v11 requires
-row `colour`, clip `spatial` base/full-pose keys and row `opacity`; saved `clip.colour`, `clip.correction`, `clip.opacity` and
+old-format/null fallback readers or automatic deletion. Strict v12 requires
+complete row `colour`, including Temperature/Tint bases and static HSL/curves,
+all eleven nullable point fields, clip `spatial` base/full-pose keys and row `opacity`; saved `clip.colour`, `clip.correction`, `clip.opacity` and
 old `clipOpacity`/`layerOpacity` point fields are rejected, not defaulted.
-Production export receipts also remain version 1, with strict v11 snapshots and
+Production export receipts also remain version 1, with strict v12 snapshots and
 required `musicSources` captured-original/`settings.audio` identified-plan arrays;
 older snapshots or invalid arrays are rejected without rewriting receipts/MP4s.
 Registry/proxy/current PCM formats and source guards are unchanged.
 Source ranges and every retained clip key position are validated against registered
 original frame counts, including hidden layer references.
 
-Row colour also requires static eight-band HSL and master/red/green/blue curves. The processing order is the unchanged seven-control SDR transform, encoded BT.709 HSL, master curve, individual RGB curves, black-fade brightness and group coverage/source-over. The nine nullable animation channels remain unchanged. Compare/Ungraded bypasses the entire colour transform, not geometry or coverage. The precise bounds, circular smoothstep weighting, grey protection, piecewise-linear curves and resource budgets are in [HSL_AND_CURVES.md](design/HSL_AND_CURVES.md).
+Row colour also requires static eight-band HSL and master/red/green/blue curves.
+The order is decoded linear Temperature/Tint gains before Exposure and the
+remaining scalar SDR stages, encoded BT.709 HSL, master curve, individual RGB
+curves, black-fade brightness and group coverage/source-over. HSL/curves add no
+channels to the eleven nullable row fields. HSL protects greys in its incoming
+RGB, not greys already coloured by Temperature/Tint. Compare/Ungraded bypasses
+the entire colour transform, not geometry or coverage. Precise advanced bounds,
+circular weighting, piecewise-linear curves and resource budgets are in
+[HSL_AND_CURVES.md](design/HSL_AND_CURVES.md).

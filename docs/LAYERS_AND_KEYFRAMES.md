@@ -1,6 +1,15 @@
-# Layers, shared row points and source review · project v11
+# Layers, shared row points and source review · project v12
 
-Required row Colour includes static **HSL ranges** and **Colour curves**, even when the seven scalar channels are animated. Eight named HSL bands and four encoded input/output curves are edited in nested Clip → Colour controls, including on empty rows. They do not add key channels or clip fields. Band/all-HSL and channel/all-curves resets preserve the seven scalar bases, row points and Opacity; Reset keys preserves all advanced settings. Unanimated Reset restores the complete row Colour and Opacity. See [the complete advanced-colour contract](design/HSL_AND_CURVES.md).
+Required row Colour includes nine scalar fields, including **Temperature** and
+**Tint**, plus static **HSL ranges** and **Colour curves**. Temperature/Tint use
+−1…1, neutral 0; positive values warm/add magenta respectively and intentionally
+colour greys. Their normalized linear gains run before Exposure. See
+[Temperature and Tint](design/TEMPERATURE_AND_TINT.md).
+Eight named HSL bands and four encoded curves stay active when scalar channels
+are animated, without adding key channels or clip fields. Band/all-HSL and
+channel/all-curves resets preserve the nine scalar bases, row points and Opacity;
+Reset keys preserves advanced settings. Unanimated Reset restores complete row
+Colour and Opacity. See [the advanced-colour contract](design/HSL_AND_CURVES.md).
 
 ## Video layers
 
@@ -96,41 +105,43 @@ original-source keys. All shared row points use absolute integer
 clip on that row, including clips from different recordings and both participants
 in that track's dissolve. They do not restart at a clip's IN, start or boundary.
 
-Schema 10 requires `layers[].keyframes` as ordered `{ frame, interpolation, values }`
+Schema 12 requires `layers[].keyframes` as ordered `{ frame, interpolation, values }`
 points, with **at most 256 points per row**. Frames are unique, strictly ascending,
 non-negative and at most 2,147,483,647. Every point's `values` object (`LayerKeyValues`)
-requires **all nine nullable fields** below: a number participates; `null` does not. Omitted/unknown
+requires **all eleven nullable fields** below: a number participates; `null` does not. Omitted/unknown
 fields and all-null points are invalid, not repaired with defaults.
 
-| Channel                   | Value          | Value when this channel has no row keys                 |
-| ------------------------- | -------------- | ------------------------------------------------------- |
-| Opacity (`opacity`)       | 0–1            | The row's required `opacity`, initially 1 on new tracks |
-| Speed (`speed`)           | 0.1×–8×        | Each clip's constant/ramp/custom-keyframed speed        |
-| Exposure (`exposure`)     | −3 to +3 stops | The row's saved colour value                            |
-| Brightness (`brightness`) | −0.5 to +0.5   | The row's saved colour value                            |
-| Contrast (`contrast`)     | 0–2            | The row's saved colour value                            |
-| Hue (`hue`)               | −180° to +180° | The row's saved colour value                            |
-| Saturation (`saturation`) | 0–2            | The row's saved colour value                            |
-| Highlights (`highlights`) | −1 to +1       | The row's saved colour value                            |
-| Shadows (`shadows`)       | −1 to +1       | The row's saved colour value                            |
+| Channel                     | Value          | Value when this channel has no row keys                 |
+| --------------------------- | -------------- | ------------------------------------------------------- |
+| Opacity (`opacity`)         | 0–1            | The row's required `opacity`, initially 1 on new tracks |
+| Speed (`speed`)             | 0.1×–8×        | Each clip's constant/ramp/custom-keyframed speed        |
+| Temperature (`temperature`) | −1 to +1       | The row's saved colour value, initially 0               |
+| Tint (`tint`)               | −1 to +1       | The row's saved colour value, initially 0               |
+| Exposure (`exposure`)       | −3 to +3 stops | The row's saved colour value                            |
+| Brightness (`brightness`)   | −0.5 to +0.5   | The row's saved colour value                            |
+| Contrast (`contrast`)       | 0–2            | The row's saved colour value                            |
+| Hue (`hue`)                 | −180° to +180° | The row's saved colour value                            |
+| Saturation (`saturation`)   | 0–2            | The row's saved colour value                            |
+| Highlights (`highlights`)   | −1 to +1       | The row's saved colour value                            |
+| Shadows (`shadows`)         | −1 to +1       | The row's saved colour value                            |
 
-The exact nine required value fields are `opacity`, `speed`, `exposure`,
+The exact eleven required value fields are `opacity`, `speed`, `temperature`, `tint`, `exposure`,
 `brightness`, `contrast`, `hue`, `saturation`, `highlights` and `shadows`.
 Clip documents contain independent **constant, ramp or custom-keyframed**
-speed and required `spatial: { base, keyframes }`, with no `opacity` field.
+speed and required `spatial: { base, keyframes }`, with no colour/correction or `opacity` field.
 Shared row animation has no per-property row key arrays. Clip speed and spatial
 keys use original-source frames in their separate clip-owned settings; neither
 changes row-channel ownership or precedence. Spatial keys capture complete
 eight-value poses, not nullable per-setting participation.
 Trimming, restoring, moving, splitting and duplicating footage **never copy or
-shift row points or change row Opacity**. Split/duplicate create independent source
-ranges, colour, speed and deep-copied spatial settings, retaining original-source
+shift row points or change row Colour/Opacity**. Split/duplicate create independent source
+ranges, speed and deep-copied spatial settings, retaining original-source
 ramp/clip-speed/spatial anchors, including off-trim and original exclusive-OUT keys.
 A moved clip uses its destination row's saved Opacity or overriding curve and
 animation; both rows' values and points stay where they were. Track Ripple also
 leaves points anchored in project time. Removing the last participant of a channel
 reveals its existing unkeyed value: row `opacity` for Opacity, row `colour` for colour,
-and clip speed for Speed. Correction is never overridden by row keys.
+and clip speed for Speed. There is no separate clip correction.
 
 Points beyond the current project duration remain stored and list-editable. They
 are not constrained by any recording's length and are not discarded when footage
@@ -141,7 +152,7 @@ it; Speed participation can naturally change actual clip durations through retim
 
 ## Independent channel interpolation
 
-Participation is independent, including between the seven colour parameters.
+Participation is independent, including between the nine scalar colour parameters.
 Each point's easing is shared by its participants, but **each channel interpolates
 to its own next participating point**, skipping points where that channel is null.
 For example, Exposure at frames 10 and 30 interpolates across a Contrast-only point
@@ -200,7 +211,7 @@ followed by native SVG Previous/Next buttons:
 The setting's Previous/Next buttons visit **strictly earlier/later** points where
 `values[setting] !== null`; zero is a participant, and points belonging only to
 other channels are skipped. There is no wrap or revisit of the current point.
-All nine settings keep both buttons visible, disabled when the relevant neighbour
+All eleven settings keep both buttons visible, disabled when the relevant neighbour
 is absent, no project is open, or any document-preview draft is active. Native Tab order is
 diamond → Previous → Next → any existing reset control. Navigation preserves the
 chosen Inspector tab and activated button's focus instead of forcing Clip, and
@@ -493,7 +504,7 @@ uses the layout's captured `PlacedClip.retiming`; grade/opacity sampling uses
 absolute project time, including repeated source images. Spatial geometry uses
 continuous original-source position from that same map. Inverse mapping and
 bilinear RGB resampling precede grading. Nonneutral HSL/curves use exact complete
-CPU grading (seven scalar controls, HSL, master/RGB curves), not a LUT; neutral
+CPU grading (nine scalar controls, HSL, master/RGB curves), not a LUT; neutral
 advanced settings retain scalar LUT grading. Exact grading uses tiny RGB triples
 and can substantially slow UHD export; no transformed image/mask buffer or
 per-frame native process is added. The 22 bytes/pixel, two-LUT and process bounds
@@ -526,18 +537,18 @@ not all sources or loop repetitions. It grows with duration and is additional to
 the unchanged video raw-buffer/child/LUT bounds above. Cancellation/failure removes
 only owned scratch, never originals, saved projects or successful outputs.
 
-Schema **v11 is strict**, including required row `colour`, no clip colour/correction fields, and clip `spatial` base/eight-value full-pose
+Schema **v12 is strict**, including complete required row `colour` with Temperature/Tint and static HSL/curves, no clip colour/correction fields, and clip `spatial` base/eight-value full-pose
 source-frame keys and required unique `media.videoIds` / `media.audioIds`
 arrays, at most 10,000 IDs each, and all required per-track settings. Project-level
 transitions/fades, saved `clip.opacity` and old `clipOpacity`/`layerOpacity` point
 channels are not accepted. `VideoLayer.opacity` is the required sole stored row
 value, a number in 0–1; 1 is a new-track initial value, not a missing-field default.
-Points require exactly the nine nullable fields listed above, including `opacity`.
+Points require exactly the eleven nullable fields listed above, including `opacity`, `temperature` and `tint`.
 The required `music` array contains 0–8 independent instances with unique required
 IDs and complete source IN/OUT/start/duration/gain/fades/loop fields; `[]` without
 music, never a null/singular value or default. Version-1 export receipts require
-a strict v11 snapshot plus captured audio-source/instance-plan arrays.
-Older v1–v10 project documents and export receipt snapshots remain unchanged/incompatible;
+a strict v12 snapshot plus captured audio-source/instance-plan arrays.
+Older v1–v11 project documents and export receipt snapshots remain unchanged/incompatible;
 there are no migrations, compatibility fallback/default fields or automatic deletion
 of projects, receipts or successful videos. Create a new project and deliberately
 import its media; registered media and currently verified ready proxies remain reusable.

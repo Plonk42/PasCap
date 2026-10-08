@@ -6,7 +6,7 @@ export const interpolationSchema = z.enum(['hold', 'linear', 'ease-in', 'ease-ou
 export type Interpolation = z.infer<typeof interpolationSchema>;
 export type KeyframeSetting = 'opacity' | 'speed' | ScalarColourSetting;
 
-/** One ordered control catalogue for the nine independently participating row channels. */
+/** One ordered control catalogue for the eleven independently participating row channels. */
 export const KEYFRAME_SETTINGS = Object.freeze(
   (
     [
@@ -21,6 +21,8 @@ const layerKeyValuesSchema = z
   .object({
     opacity: z.number().min(0).max(1).nullable(),
     speed: z.number().min(0.1).max(8).nullable(),
+    temperature: colourSchema.shape.temperature.nullable(),
+    tint: colourSchema.shape.tint.nullable(),
     exposure: colourSchema.shape.exposure.nullable(),
     brightness: colourSchema.shape.brightness.nullable(),
     contrast: colourSchema.shape.contrast.nullable(),
@@ -34,6 +36,8 @@ export type LayerKeyValues = z.infer<typeof layerKeyValuesSchema>;
 export const EMPTY_KEY_VALUES: Readonly<LayerKeyValues> = Object.freeze({
   opacity: null,
   speed: null,
+  temperature: null,
+  tint: null,
   exposure: null,
   brightness: null,
   contrast: null,
