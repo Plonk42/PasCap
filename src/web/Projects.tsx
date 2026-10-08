@@ -139,8 +139,7 @@ export function Projects({
       footer={
         <>
           <span className="activity-hint">
-            Version 11 · row-owned Colour, HSL, curves and Opacity, independent track settings and project-specific
-            media. Older projects remain unchanged unless explicitly deleted; no migration.
+            Projects saved by an older PasCap version cannot be opened. They are kept unchanged.
           </span>
           <button className="secondary-button" onClick={onClose} disabled={submitting}>
             Close
@@ -151,7 +150,7 @@ export function Projects({
       <div className="activity-dialog-heading">
         <h2 id={`${id}-title`}>Projects</h2>
         <span className="activity-hint">
-          {compatibleCount} compatible · {projects.length - compatibleCount} unavailable
+          {compatibleCount} can open · {projects.length - compatibleCount} cannot open
         </span>
       </div>
       <div className="activity-project-tools">
@@ -169,8 +168,8 @@ export function Projects({
           <span>Project filter</span>
           <select value={filter} onChange={(event) => setFilter(event.target.value as ProjectFilter)}>
             <option value="all">All projects</option>
-            <option value="compatible">Compatible (version 11)</option>
-            <option value="unsupported">Unavailable / unsupported</option>
+            <option value="compatible">Can open</option>
+            <option value="unsupported">Cannot open (older version)</option>
           </select>
         </label>
       </div>
@@ -190,7 +189,7 @@ export function Projects({
             <div className="activity-project-heading">
               <strong>{project.title}</strong>
               {project.id === currentId && <span className="activity-badge current">Current</span>}
-              {!project.compatible && <span className="activity-badge failed">Unavailable</span>}
+              {!project.compatible && <span className="activity-badge failed">Cannot open</span>}
             </div>
             <div className="activity-project-meta">
               {project.compatible && (
@@ -212,8 +211,7 @@ export function Projects({
             </div>
             {!project.compatible && (
               <p className="activity-project-reason">
-                {project.error ||
-                  'This project is unsupported or invalid. Version 11 is required; the original is preserved without migration.'}
+                {project.error || 'Saved by an older PasCap version or invalid. It is kept unchanged.'}
               </p>
             )}
             <div className="activity-project-actions">
@@ -249,7 +247,7 @@ export function Projects({
           <p>
             {!projects.length
               ? 'Create an empty project below, then add prepared recordings from the media library.'
-              : 'Try another title or include unavailable projects in the filter.'}
+              : 'Try another title or show all projects in the filter.'}
           </p>
           {projects.length > 0 && (
             <button
