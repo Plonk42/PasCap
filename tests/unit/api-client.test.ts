@@ -305,10 +305,10 @@ describe('registered API methods', () => {
     },
     {
       name: 'export',
-      call: () => api.export(project, 'draft720'),
+      call: () => api.export(project, 'draft720', 'Holiday cut'),
       url: '/api/exports',
       method: 'POST',
-      body: { document: project, profile: 'draft720' },
+      body: { document: project, profile: 'draft720', outputName: 'Holiday cut' },
       response: { job: { ...job, kind: 'export' } },
       expected: { job: { ...job, kind: 'export' } },
       status: 202,

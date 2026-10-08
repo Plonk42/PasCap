@@ -21,6 +21,7 @@ let freeBytes: number;
 let storageError: string;
 let checks: ExportProfile[];
 let submissions: ExportProfile[];
+let submittedNames: (string | undefined)[];
 let jobs: MediaJob[];
 
 function spaceFor(document: ProjectDocument, profile: ExportProfile): ExportPreflight {
@@ -41,6 +42,7 @@ test.beforeEach(async ({ page, request }) => {
   unexpected = [];
   checks = [];
   submissions = [];
+  submittedNames = [];
   jobs = [];
   storageError = '';
   freeBytes = 64 * 1024 ** 3;
@@ -80,8 +82,9 @@ test.beforeEach(async ({ page, request }) => {
       return;
     }
     if (method === 'POST' && pathname === '/api/exports') {
-      const body = route.request().postDataJSON() as { profile: ExportProfile };
+      const body = route.request().postDataJSON() as { profile: ExportProfile; outputName?: string };
       submissions.push(body.profile);
+      submittedNames.push(body.outputName);
       const job: MediaJob = {
         id: 'memory-export-job',
         kind: 'export',
@@ -362,6 +365,29 @@ test('quality choices and storage meter are keyboard usable, with no render on d
   await expect(page.locator('.export-storage-path')).toHaveText('/disposable/editor-cache/renders');
   await page.keyboard.press('Escape');
   await expect(page.getByRole('button', { name: 'Export video', exact: true })).toBeFocused();
+});
+
+test('the output name follows project title and quality until edited, and must be a valid name', async ({ page }) => {
+  const title = (await current(page)).title;
+  await page.getByRole('button', { name: 'Export video', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Export video' });
+  const name = dialog.getByRole('textbox', { name: 'Output name' });
+  await expect(name).toHaveValue(`${title} · 720p`);
+  await dialog.getByRole('radio', { name: '4K final', exact: true }).check();
+  await expect(name).toHaveValue(`${title} · 4K`);
+  await name.fill('a/b');
+  await expect(dialog.getByRole('alert')).toContainText('slashes');
+  await expect(name).toHaveAttribute('aria-invalid', 'true');
+  await expect(dialog.getByRole('button', { name: 'Start export', exact: true })).toBeDisabled();
+  await name.fill('   ');
+  await expect(dialog.getByRole('alert')).toContainText('Enter an output name');
+  await name.fill('  Alpine flight  ');
+  await dialog.getByRole('radio', { name: '720p draft', exact: true }).check();
+  await expect(name).toHaveValue('  Alpine flight  ');
+  await name.press('Enter');
+  await expect(page.getByRole('dialog', { name: 'Export video' })).toHaveCount(0);
+  expect(submissions).toEqual(['draft720']);
+  expect(submittedNames).toEqual(['Alpine flight']);
 });
 
 test('storage failure disables submission until an explicit read-only retry succeeds', async ({ page }) => {

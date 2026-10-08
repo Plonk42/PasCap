@@ -2,7 +2,7 @@ import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { z } from 'zod';
 import { audioAssetSchema } from '../shared/audio.js';
-import { exportProfileSchema, planExportMusic } from '../shared/export.js';
+import { defaultExportName, exportOutputNameSchema, exportProfileSchema, planExportMusic } from '../shared/export.js';
 import { idSchema, MAX_MUSIC_TRACKS, projectSchema } from '../shared/model.js';
 import { forEachSerial } from '../shared/serial.js';
 import { calculateLayout } from '../shared/timeline.js';
@@ -38,6 +38,8 @@ const receiptSchema = z
     createdAt: z.iso.datetime(),
     snapshot: projectSchema,
     profile: exportProfileSchema,
+    // Receipts written before output names existed have none; they keep the default label.
+    outputName: exportOutputNameSchema.optional(),
     musicSources: z.array(audioAssetSchema).max(MAX_MUSIC_TRACKS),
     settings: z.looseObject({
       audio: z.array(exportMusicPlanSchema).max(MAX_MUSIC_TRACKS),
@@ -164,7 +166,7 @@ export async function restoreExports(config: ServiceConfig, jobs: JobQueue): Pro
     jobs.restoreCompleted({
       id: receipt.jobId,
       kind: 'export',
-      label: `${receipt.snapshot.title} · ${receipt.profile === 'draft720' ? '720p' : '4K'}`,
+      label: receipt.outputName ?? defaultExportName(receipt.snapshot.title, receipt.profile),
       state: 'completed',
       progress: 1,
       message: 'Verified export restored from receipt',

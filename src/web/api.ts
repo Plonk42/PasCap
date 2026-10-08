@@ -257,8 +257,8 @@ export const api = {
       { document, profile },
       { ...options, readOnly: true },
     ),
-  export: (document: ProjectDocument, profile: ExportProfile) =>
-    request('/api/exports', z.object({ job: jobSchema }), 'POST', { document, profile }),
+  export: (document: ProjectDocument, profile: ExportProfile, outputName: string) =>
+    request('/api/exports', z.object({ job: jobSchema }), 'POST', { document, profile, outputName }),
   reference: (document: ProjectDocument) =>
     request('/api/reference', z.object({ job: jobSchema }), 'POST', { document }),
 };

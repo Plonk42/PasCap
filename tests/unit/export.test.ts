@@ -151,6 +151,29 @@ describe('strict production export request and immutable validation', () => {
     ])
       expect(exportRequestSchema.safeParse(request).success).toBe(false);
   });
+  it('accepts a trimmed output name and rejects empty, oversized, slashed or control-character names', () => {
+    const document = documentWithClips();
+    expect(exportRequestSchema.parse({ document, profile: 'draft720', outputName: '  My cut  ' }).outputName).toBe(
+      'My cut',
+    );
+    for (const outputName of ['', '   ', 'a'.repeat(101), 'a/b', String.raw`a\b`, 'a\nb', 'a\u0000b'])
+      expect(exportRequestSchema.safeParse({ document, profile: 'draft720', outputName }).success).toBe(false);
+  });
+  it('labels a queued export with its output name, or the project title and quality by default', async () => {
+    const library = fakeLibrary();
+    const document = documentWithClips();
+    const defaults = startExport(document, 'final4k', library);
+    const named = startExport(document, 'draft720', library, undefined, ' Holiday cut ');
+    try {
+      expect(defaults.label).toBe(`${document.title} · 4K`);
+      expect(named.label).toBe('Holiday cut');
+      expect(() => startExport(document, 'draft720', library, undefined, 'a/b')).toThrow();
+    } finally {
+      library.jobs.cancel(defaults.id);
+      library.jobs.cancel(named.id);
+      await library.jobs.close();
+    }
+  });
   it('validates original bounds, rate and SDR without requiring proxies or source-video audio', () => {
     const document = documentWithClips();
     expect(validateExport(document, fakeLibrary()).clips).toHaveLength(1);

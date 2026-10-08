@@ -76,6 +76,50 @@
   font-size: 12px;
 }
 
+.export-name-field {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.export-name-field > label {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.export-name-input {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.export-name-input > input {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 9px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--surface);
+  color: inherit;
+  font-size: 13px;
+}
+
+.export-name-input > input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.export-name-input > input[aria-invalid='true'] {
+  border-color: var(--error);
+}
+
+.export-name-error {
+  color: var(--error);
+  font-size: 12px;
+}
+
 .export-space-pending,
 .export-storage-error {
   display: flex;
