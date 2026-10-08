@@ -439,7 +439,7 @@ test('each row has its own boundary button and Sequence edits target only the se
         }),
       ).toBe(true);
     }
-    await expect(page.getByRole('tab', { name: 'Sequence', exact: true })).toHaveAttribute('aria-selected', 'true');
+    await expect(page.getByRole('tab', { name: 'Track', exact: true })).toHaveAttribute('aria-selected', 'true');
     await expect(page.locator('.layer-control.selected')).toHaveAttribute('data-layer-id', layer.id);
     await expect(page.getByRole('spinbutton', { name: 'Opening fade', exact: true })).toHaveValue(
       String(layer.openingFade),
@@ -506,6 +506,39 @@ test('each row has its own boundary button and Sequence edits target only the se
   }
 });
 
+test('Track transitions list every boundary and follow the selection instead of a sticky earlier boundary', async ({
+  page,
+}) => {
+  const document = boundaries();
+  const layer = document.layers[0]!;
+  document.clips.push({ ...createClip('third-0', assets[0]!.id, 0, 60, layer.id), start: 120 });
+  layer.transitions.push({ leftId: 'right-0', rightId: 'third-0', type: 'cut', duration: 0 });
+  await fixture(page, projectSchema.parse(document));
+  const before = await current(page);
+  const list = page.getByRole('list', { name: `Transitions on ${layer.name}`, exact: true });
+  const choices = list.getByRole('button');
+  await page.locator(`.boundary-button[data-transition-layer="${layer.id}"]`).first().click();
+  await expect(choices).toHaveCount(2);
+  await expect(choices.nth(0)).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('combobox', { name: 'Transition type', exact: true })).toHaveCount(1);
+  await page.locator('[data-clip-id="third-0"] .timeline-clip-body').click();
+  await expect(choices.nth(0)).toHaveAttribute('aria-pressed', 'false');
+  await expect(choices.nth(1)).toHaveAttribute('aria-pressed', 'true');
+  await page.locator('[data-clip-id="left-0"] .timeline-clip-body').click();
+  await expect(choices.nth(0)).toHaveAttribute('aria-pressed', 'true');
+  await choices.nth(1).click();
+  await expect(choices.nth(1)).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('combobox', { name: 'Transition type', exact: true }).selectOption('fade-through-black');
+  const edited = await current(page);
+  expect(edited.layers[0]!.transitions).toEqual([
+    before.layers[0]!.transitions[0],
+    { leftId: 'right-0', rightId: 'third-0', type: 'fade-through-black', duration: 30 },
+  ]);
+  await expect(choices.nth(1)).toHaveAttribute('aria-pressed', 'true');
+  await expect(choices.nth(1)).toContainText('Fade through black');
+  await undoOnce(page, before);
+});
+
 test('a positioned gap disables non-cut boundary choices until explicit Ripple packing closes that track only', async ({
   page,
 }) => {
@@ -520,7 +553,7 @@ test('a positioned gap disables non-cut boundary choices until explicit Ripple p
     await expect(type.locator(`option[value="${value}"]`)).toHaveJSProperty('disabled', true);
   await expect(
     page.getByText(
-      'These clips have a gap. Close it explicitly, or enable this track’s Ripple in Layer options, before adding a fade or dissolve.',
+      'These clips have a gap. Close it, or turn on Ripple for this track, before adding a fade or dissolve.',
       { exact: true },
     ),
   ).toBeVisible();

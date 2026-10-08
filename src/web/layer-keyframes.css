@@ -91,6 +91,11 @@
   gap: 5px;
 }
 
+.layer-keyframe-caption {
+  color: var(--muted);
+  font-size: 11px;
+}
+
 .layer-keyframe-inspected {
   margin-top: 9px;
   padding: 8px;
@@ -271,4 +276,24 @@
   border-color: var(--error);
   color: var(--error);
   outline-color: var(--error);
+}
+
+.timeline-layer-key-time {
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 50%;
+  padding: 1px 5px;
+  transform: translateX(-50%);
+  color: #fff1d5;
+  background: #1b231d;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.timeline-layer-key.invalid .timeline-layer-key-time {
+  color: var(--error);
 }

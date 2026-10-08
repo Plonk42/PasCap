@@ -5,7 +5,7 @@ import { COLOUR_CONTROLS, createColourSettings, NEUTRAL_COLOUR } from '../../src
 import type { MediaAsset } from '../../src/shared/media.js';
 import { createClip, createLayer, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
 import { calculateLayout, sampleTimeline } from '../../src/shared/timeline.js';
-import { expandedInspectorPreferences, sharedPoint } from './editor-helpers.js';
+import { expandedInspectorPreferences, inspectorTab, sharedPoint } from './editor-helpers.js';
 import { memoryProjects, type MemoryProjects } from './memory-projects.js';
 import { installMusicEvidence, observeMusicPlayback, observeRealtimeHeadroom } from './music-evidence.js';
 
@@ -698,6 +698,7 @@ test('a colour edit while bypassed saves once, returns the new grade and has a s
   await watchNativeSeeks(page);
   const identity = await pausedIdentity(page);
   comparison.guard.permittedSaves = 1;
+  await inspectorTab(page, 'Track');
   await page.getByRole('slider', { name: 'Exposure', exact: true }).fill('1.2');
   await page.evaluate(() => window.pascapLab!.flush());
   await expect(page.getByRole('status', { name: 'Saved on this device', exact: true })).toContainText('Saved locally');

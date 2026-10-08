@@ -63,7 +63,7 @@ preview is black; export still requires at least one retained video clip.
 **+ Layer** creates/selects a track. Sidebar controls select and hide/show;
 **Layer options** contains only rename, Ripple, raise/lower and delete. Layer
 names apply on Enter/blur, Escape restores, and a rename is one Undo step. Selecting
-an empty row retains both its **Layer keyframes** context and the target for Media
+an empty row retains both its **Track** context (Colour, Opacity, keyframes) and the target for Media
 **+**/double-click insertion. A populated layer selects its first excerpt and
 reveals its row without changing placement. Selecting a clip or populated/empty
 row preserves the chosen Inspector tab and safely refreshes its editing context.
@@ -187,13 +187,13 @@ repeat/drop sampling without optical flow.
 
 ## Editing keys
 
-The dedicated **Keyframes** tab (accessible name **Layer keyframes**) contains
+The **Track → Keyframes** section (list accessible name **Layer keyframes** plus
+the track name) contains
 **one directly visible whole-row point list** for the selected layer, including an
 empty row without a selected clip. It shows point
 count, whole-row Previous/Next navigation, **Animation help** and participant chips
 for the current or inspected stored point. The toolbar's Animation help includes
 point-timing guidance, with no separate Keyframe timing help button.
-The toolbar does not repeat the visible Keyframes tab title.
 **Clip** keeps source/clip settings, row Opacity and the setting controls/diamonds
 evaluated at the real playhead. Every animatable
 setting always has its own diamond beside its main control, immediately
@@ -217,7 +217,7 @@ diamond → Previous → Next → any existing reset control. Navigation preserv
 chosen Inspector tab and activated button's focus instead of forcing Clip, and
 changes no document, history or autosave state.
 
-**Clip → Colour** contains the single **Opacity** native slider/exact
+**Track → Colour** contains the single **Opacity** native slider/exact
 `NumberField`/diamond/Previous/Next controls alongside the colour controls.
 Its numeric value is **0–1**, initially **1**; the main label may show **100%**.
 Without Opacity keys, either value control edits the selected row's `opacity`,
@@ -236,16 +236,19 @@ read-only at frames where that channel does not participate, including at points
 belonging only to other settings. **Click its hollow diamond to capture a value before editing**.
 Setting tooltips and screen-reader context say **Keyframe at playhead** for an
 editable participant, or **Animated · add a keyframe to edit** for a read-only
-animated value. Clip's Opacity, colour and Row speed animation use the same
+animated value. Track's Opacity and colour and Clip's Row speed animation use the same
 terms and explain which diamond adds a keyframe at the current timeline frame.
 Sliders/numbers never implicitly create keys. Unanimated Opacity edits the row's
 saved `opacity`; unanimated colour edits row `colour`, and speed edits the selected clip.
-On an empty row, Opacity and colour remain editable without keys and diamonds can create
-animation for any channel; unkeyed speed requires a selected clip.
+On an empty row, Opacity and colour remain editable without keys and their diamonds
+can create animation; Clip settings, including Speed, need a selected clip.
 
 In **Keyframes**, the shared list has no outer disclosure or per-row list expansion
-preference. Each shared row lists its participating setting dependencies and has
-an inner **Time, easing & values** disclosure.
+preference. Its toolbar reads "N keyframes" and the section badge repeats the count;
+the chips of a point at the playhead follow an **At playhead:** caption. Each shared
+row lists its participating setting dependencies and has an inner **Edit**
+disclosure, open initially when the list has three or fewer points. Its trash
+deletes that point; the toolbar has no second delete action.
 Its Timeline frame field moves
 **every participant and the point's existing easing together in one Undo step**;
 Shared easing affects all of them, each toward its own next participating point.
@@ -329,7 +332,8 @@ The shared Timeline frame field remains available.
   position, horizontal scroll and stationary playhead. Movement uses that original
   geometry plus scroll travel, rounds the frame delta once and clamps the result
   to **0–2,147,483,647**; live retiming never becomes a new gesture origin.
-- Each destination is validated against the captured project. A valid draft updates
+- Each destination is validated against the captured project. The dragged marker
+  shows its timecode above it (red when invalid). A valid draft updates
   geometry and paused preview, but does not alter the committed document, history
   or autosave. Release moves **all participants with their values and easing intact**
   in one Undo step; an unchanged point creates no history entry.
@@ -358,7 +362,7 @@ natural timing exception. There is no cross-row point move.
 
 The thin strip above video rows is the **time ruler**: separators/ticks denote
 TIME, and click/drag seeks the playhead. The separate **Cut / Fade / Dissolve**
-buttons explicitly open Sequence for their own track's boundary transition controls.
+buttons explicitly open Track → Transitions for their own track's boundary.
 Neither ruler ticks nor those transition buttons are keyframe markers.
 
 ## Group composition
@@ -449,19 +453,20 @@ offscreen/unmount/project-switch releases the review decoder.
 
 ## Inspector and resource limits
 
-The inspector uses **Clip / Keyframes / Sequence / Audio** tabs; Keyframes retains
-the accessible name **Layer keyframes**. Source range,
-Placement (placement only), Speed, Transform, Colour (including the sole row Opacity control)
-and playhead diamonds belong to Clip. The shared point list is directly visible in Keyframes,
-with Animation help, participant chips
-and whole-row point navigation. Keyframes and Sequence have no redundant
-selected-track banner. The selected track's Transition/Sequence fades belong to
-Sequence; Music belongs to Audio, with detailed **Placement & fades**.
+The inspector uses **Clip / Track / Audio** tabs, split by ownership. **Clip**
+holds the selected clip's Source range, Placement (placement only), Speed and
+Transform under a "Clip N of M · track" header; on an empty row it shows only
+"Select a clip on … to edit it." **Track** holds everything the whole row owns
+under an "Applies to all N clips on this track" header: Colour (including the sole
+row Opacity control, HSL and curves), Keyframes (the shared point list with
+Animation help, participant chips and whole-row navigation), Transitions (every
+boundary of the track, left to right, with the selected one expanded) and Fades.
+Music belongs to Audio, with detailed **Placement & fades**.
 Sections retain their expansion in local browser storage.
-New defaults collapse detailed source, placement, speed and Transform controls, while Colour stays
-open. Existing section preferences are not reset. **Expand all / Collapse all**
-appears only in Clip and affects its five top-level sections: Source range,
-Placement, Speed, Transform and Colour. Sequence, Audio, nested point disclosures and
+New defaults collapse detailed source, placement, speed and Transform controls, while Track
+sections stay open. Existing section preferences are not reset. **Expand all / Collapse all**
+appears only in Clip and affects its four sections: Source range,
+Placement, Speed and Transform. Track, Audio, nested point disclosures and
 help remain unchanged; the shared list has no expansion preference.
 Hidden tab/section content stays mounted, retaining valid/invalid drafts within
 the same editing context. Row/clip changes refresh that context safely rather than

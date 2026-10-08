@@ -167,6 +167,60 @@
   padding: 0 14px 13px;
 }
 
+.boundary-list {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 4px 14px 13px;
+  list-style: none;
+}
+
+.boundary-list > li[data-selected='true'] {
+  border: 1px solid #4f755a;
+  border-radius: 5px;
+  background: #213027;
+}
+
+.boundary-choice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  min-height: 32px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.boundary-choice > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.boundary-choice > small {
+  flex-shrink: 0;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.boundary-choice:hover {
+  background: #243029;
+}
+
+.boundary-list .boundary-inspector {
+  padding: 4px 8px 10px;
+  border-top: 0;
+}
+
 .layer-inspector .colour-control {
   display: block;
   margin-top: 11px;

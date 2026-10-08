@@ -77,7 +77,7 @@ and identity curves, without independent clip grades.
 
 ## Inspector and history
 
-**Clip → Colour** has ten main widgets: nine scalar row colour controls plus sole
+**Track → Colour** has ten main widgets: nine scalar row colour controls plus sole
 Opacity. All use existing slider/exact-field/reset/diamond/channel-navigation
 controls and work on an empty row. An animated channel without participation at
 the real playhead remains read-only until explicitly captured. Sliders never key.

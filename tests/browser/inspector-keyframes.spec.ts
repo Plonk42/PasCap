@@ -66,13 +66,13 @@ async function selectClip(page: Page, id: string): Promise<void> {
   await page.locator(`[data-clip-id="${id}"] .timeline-clip-body`).click();
 }
 
-test('four accessible tabs preserve selection across clips, populated/empty tracks and projects without writes', async ({
+test('three accessible tabs preserve selection across clips, populated/empty tracks and projects without writes', async ({
   page,
 }) => {
   const tabs = page.getByRole('tablist', { name: 'Inspector sections', exact: true });
-  await expect(tabs.getByRole('tab')).toHaveText(['Clip', 'Keyframes', 'Sequence', 'Audio']);
+  await expect(tabs.getByRole('tab')).toHaveText(['Clip', 'Track', 'Audio']);
   await tabs.getByRole('tab', { name: 'Clip', exact: true }).focus();
-  for (const label of ['Layer keyframes', 'Sequence', 'Audio']) {
+  for (const label of ['Track', 'Audio']) {
     await page.keyboard.press('ArrowRight');
     const tab = tabs.getByRole('tab', { name: label, exact: true });
     await expect(tab).toBeFocused();
@@ -103,10 +103,7 @@ test('four accessible tabs preserve selection across clips, populated/empty trac
   await expect(layerKeyframes(page, 'Video 2')).toBeVisible();
   await page.getByRole('button', { name: 'Select layer Empty row', exact: true }).click();
   await expect(layerKeyframes(page, 'Empty row')).toBeVisible();
-  await expect(page.getByRole('tab', { name: 'Layer keyframes', exact: true })).toHaveAttribute(
-    'aria-selected',
-    'true',
-  );
+  await expect(page.getByRole('tab', { name: 'Track', exact: true })).toHaveAttribute('aria-selected', 'true');
   await expect(
     layerKeyframes(page, 'Empty row').getByRole('button', { name: 'Next layer keyframe', exact: true }),
   ).toBeEnabled();
@@ -116,10 +113,7 @@ test('four accessible tabs preserve selection across clips, populated/empty trac
   await page.getByRole('button', { name: 'Open projects', exact: true }).click();
   await page.getByRole('button', { name: 'Open Other context', exact: true }).click();
   await expect(layerKeyframes(page, 'Other row')).toBeVisible();
-  await expect(page.getByRole('tab', { name: 'Layer keyframes', exact: true })).toHaveAttribute(
-    'aria-selected',
-    'true',
-  );
+  await expect(page.getByRole('tab', { name: 'Track', exact: true })).toHaveAttribute('aria-selected', 'true');
   await expect(layerKeyframes(page, 'Empty row')).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
   expect(memory.saves).toBe(0);
@@ -130,6 +124,7 @@ test('all participants reuse their main control bounds and resets with one exact
   page,
 }) => {
   const main = new Map<string, { min: string | null; max: string | null; step: string | null }>();
+  await inspectorTab(page, 'Track');
   for (const setting of KEYFRAME_SETTINGS.filter((item) => item.key !== 'speed')) {
     const slider = page.getByRole('slider', { name: setting.label, exact: true });
     main.set(

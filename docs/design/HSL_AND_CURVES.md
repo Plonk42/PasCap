@@ -60,7 +60,7 @@ quantisation remain measured approximations under the unchanged error gates.
 
 ## Editing, resets and resource ownership
 
-Clip → Colour contains nine scalar sliders (Temperature/Tint before Exposure)
+Track → Colour contains nine scalar sliders (Temperature/Tint before Exposure)
 and sole Opacity control. Nested
 HSL ranges and Colour curves contain native band/channel/point selectors, exact
 numeric fields and a compact SVG curve graph. HSL uses native sliders and exact

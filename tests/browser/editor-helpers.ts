@@ -18,9 +18,26 @@ export async function closeOptions(page: Page): Promise<void> {
   await forEachSerial(await opened.all(), (trigger) => trigger.click());
 }
 
-export async function inspectorTab(page: Page, name: 'Clip' | 'Layer keyframes' | 'Sequence' | 'Audio'): Promise<void> {
-  const tab = page.getByRole('tab', { name, exact: true });
+type InspectorTab = 'Clip' | 'Track' | 'Audio';
+// Keyframes and Sequence are sections of the Track tab; specs name the content they need.
+const TAB_FOR: Record<InspectorTab | 'Layer keyframes' | 'Sequence', InspectorTab> = {
+  Clip: 'Clip',
+  Track: 'Track',
+  Audio: 'Audio',
+  'Layer keyframes': 'Track',
+  Sequence: 'Track',
+};
+
+export async function inspectorTab(page: Page, name: keyof typeof TAB_FOR): Promise<void> {
+  const tab = page.getByRole('tab', { name: TAB_FOR[name], exact: true });
   if ((await tab.getAttribute('aria-selected')) !== 'true') await tab.click();
+}
+
+/** Speed is clip-owned (Clip tab); Opacity and Colour are track-owned (Track tab). */
+export async function settingTab(page: Page, label: string): Promise<void> {
+  const tab = page.getByRole('tab', { name: label === 'Speed' ? 'Clip' : 'Track', exact: true });
+  // A synthetic click never moves the mouse, so it cannot end an active pointer draft.
+  if ((await tab.getAttribute('aria-selected')) !== 'true') await tab.dispatchEvent('click');
 }
 
 /** Audio → Add music track is the single creation path; it lists ready music files. */

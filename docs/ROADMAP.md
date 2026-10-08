@@ -20,7 +20,7 @@ The final approved [#67](https://github.com/Plonk42/PasCap/issues/67) contract h
 one row-owned **Opacity** setting: required numeric `VideoLayer.opacity` in 0–1,
 initially 1 (100%) on new tracks. Its sole row channel, `opacity`, overrides that
 value on every clip, including both dissolve sources, without an additional layer
-multiplier. The single slider/diamond/navigation lives in **Clip → Colour** and
+multiplier. The single slider/diamond/navigation lives in **Track → Colour** and
 works on empty rows; **Placement** contains placement only. Without Opacity keys,
 the slider edits the row value; with keys, a missing participant at the real
 playhead is read-only until explicitly captured. Sliders never create keys, and
@@ -50,18 +50,18 @@ Enabling Ripple packs from the current first start; while on, clips continuously
 sequence there, and turning it off retains actual placements. Rows display stored
 bottom-to-top composition order without primary/overlay roles. The UI provides a
 pinned ruler, synchronized native row access, accessible action bounds and contextual
-heading help. Inspector tabs are **Clip / Keyframes / Sequence / Audio**: the
-[dedicated Keyframes tab](https://github.com/Plonk42/PasCap/issues/26), with accessible
-name **Layer keyframes**, directly shows the whole-row point list and combines
+heading help. Inspector tabs are **Clip / Track / Audio**, split by ownership: the
+[whole-row keyframe list](https://github.com/Plonk42/PasCap/issues/26) is the
+**Track → Keyframes** section, directly shows the whole-row point list and combines
 animation/timing help in its toolbar. Nested point details retain drafts and input
 identity; there is no outer list disclosure or per-row list expansion preference.
-Keyframes and Sequence omit redundant selected-track banners. Clip keeps
-source/clip settings, row Opacity and playhead controls; its Expand all/Collapse all affects only the
-five Clip top-level sections (Source range, Placement, Speed, Transform and Colour),
-leaving Sequence, Audio, nested disclosures and help
+Track also holds Colour, Transitions and Fades. Clip keeps
+source/clip settings and playhead Speed/Transform controls; its Expand all/Collapse all
+affects only the four Clip sections (Source range, Placement, Speed and Transform),
+leaving Track, Audio, nested disclosures and help
 unchanged. Stored participants reuse the main value
 controls with precise numeric editing. Clip/row selection and point navigation
-preserve the chosen tab; explicit boundary buttons open Sequence. Current usage
+preserve the chosen tab; explicit boundary buttons open Track. Current usage
 and limits are documented in [the user guide](USER_GUIDE.md),
 [layer/resource contracts](LAYERS_AND_KEYFRAMES.md) and
 [development/validation guide](DEVELOPMENT.md).

@@ -5,7 +5,7 @@ import { Icon, type IconName } from './icons.js';
 import './input-controls.css';
 import { readPreference, writePreference } from './preferences.js';
 
-export type InspectorMode = 'clip' | 'keyframes' | 'sequence' | 'audio';
+export type InspectorMode = 'clip' | 'track' | 'audio';
 
 const SECTION_DEFAULTS = {
   source: false,
@@ -14,12 +14,13 @@ const SECTION_DEFAULTS = {
   speed: false,
   transform: false,
   colour: true,
+  keyframes: true,
   transition: true,
   fades: true,
   music: true,
 };
 type SectionId = keyof typeof SECTION_DEFAULTS;
-const CLIP_SECTIONS: readonly SectionId[] = ['source', 'layer-opacity', 'speed', 'transform', 'colour'];
+const CLIP_SECTIONS: readonly SectionId[] = ['source', 'layer-opacity', 'speed', 'transform'];
 type Expansion = Record<SectionId, boolean>;
 interface InspectorExpansion {
   sections: Expansion;
@@ -65,7 +66,7 @@ export function InspectorExpansionControls({
           type="button"
           className="text-button"
           aria-label={expansion.allOpen ? 'Collapse all Inspector settings' : 'Expand all Inspector settings'}
-          title="All top-level Clip settings; Sequence, Audio, nested details and help stay unchanged."
+          title="All Clip sections; Track, Audio, nested details and help stay unchanged."
           onClick={expansion.toggleAll}
         >
           {expansion.allOpen ? 'Collapse all' : 'Expand all'}

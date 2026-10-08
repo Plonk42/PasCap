@@ -26,7 +26,7 @@ skipped. No keys means the saved row base; removing the final participant reveal
 that unchanged base. HSL bands and master/RGB curves remain **static**, not new
 animation channels. Speed retains its separate clip-base/row-override semantics.
 
-**Clip → Colour** places Temperature and Tint before Exposure. Main and stored
+**Track → Colour** places Temperature and Tint before Exposure. Main and stored
 participants use native sliders (step 0.01), adjacent exact numeric fields,
 individual Reset to 0, explicit diamonds and channel-specific Previous/Next.
 Sliders never create keys; animated main values without a participant at the real

@@ -373,6 +373,7 @@ describe('native diamond, previous, next DOM and all control placements', () => 
           drafting: false,
           section: 'clip',
           onSection: vi.fn(),
+          onSelectBoundary: vi.fn(),
           onEdit: vi.fn(),
           onPreview: vi.fn(),
           onSeek: vi.fn(),

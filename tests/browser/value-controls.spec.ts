@@ -124,6 +124,18 @@ function controls(scope: Page | Locator, name: string) {
   return { slider, exact: scope.getByRole('spinbutton', { name, exact: true }), widget: slider.locator('..') };
 }
 
+/** Track owns Colour, Opacity and stored keyframe values; Audio owns gain; Clip owns clip speed. */
+async function showControl(page: Page, name: string): Promise<void> {
+  if (name === 'Music gain') await inspectorTab(page, 'Audio');
+  else if (
+    /keyframe value|^(Opacity|Temperature|Tint|Exposure|Brightness|Contrast|Hue|Saturation|Highlights|Shadows)$/.test(
+      name,
+    )
+  )
+    await inspectorTab(page, 'Track');
+  else if (/speed rate|rate$/i.test(name)) await inspectorTab(page, 'Clip');
+}
+
 async function checkpoint(page: Page) {
   await page.evaluate(() => window.pascapLab!.flush());
   return {
@@ -212,6 +224,7 @@ async function moveDrag(page: Page, drag: Awaited<ReturnType<typeof beginDrag>>,
 }
 
 async function pointerEdit(page: Page, name: string, edit: ValueEdit, scope: Page | Locator = page): Promise<void> {
+  await showControl(page, name);
   const { slider, exact, widget } = controls(scope, name);
   const before = await checkpoint(page);
   const initial = await slider.inputValue();
@@ -241,6 +254,7 @@ async function preciseEdit(
   edit: ValueEdit,
   scope: Page | Locator = page,
 ): Promise<void> {
+  await showControl(page, name);
   const { exact } = controls(scope, name);
   const before = await checkpoint(page);
   const id = await exact.getAttribute('id');
@@ -340,6 +354,7 @@ for (const cancellation of ['Escape', 'pointercancel', 'lostcapture', 'windowblu
   test(`${cancellation} restores the thumb, exact readout and document; the next real gesture still works`, async ({
     page,
   }) => {
+    await showControl(page, 'Exposure');
     const { slider, exact, widget } = controls(page, 'Exposure');
     const before = await checkpoint(page);
     const drag = await beginDrag(page, slider);
@@ -374,6 +389,7 @@ for (const cancellation of ['Escape', 'pointercancel', 'lostcapture', 'windowblu
 }
 
 test('precise entry remains usable after window blur without the lost native release', async ({ page }) => {
+  await showControl(page, 'Exposure');
   const { slider, exact } = controls(page, 'Exposure');
   const before = await checkpoint(page);
   const drag = await beginDrag(page, slider);
@@ -393,6 +409,7 @@ test('precise entry remains usable after window blur without the lost native rel
 test('main exact Opacity, exposure and Gain preserve full precision; Enter then blur saves only once', async ({
   page,
 }) => {
+  await showControl(page, 'Opacity');
   const { exact, widget } = controls(page, 'Opacity');
   await expect(exact).toHaveValue('1');
   await expect(exact).toHaveAttribute('min', '0');
@@ -555,6 +572,7 @@ test('identical-valued clip and row context replacements preserve input identity
   document.layers[0]!.transitions = [{ leftId: 'one', rightId: 'two', type: 'cut', duration: 0 }];
   document.layers.push(createLayer('empty', 'Empty row'));
   await fixture(page, document);
+  await showControl(page, 'Exposure');
   for (const [name, target, value] of [
     ['Exposure', '[data-clip-id="two"] .timeline-clip-body', '0'],
     ['Opacity', '[aria-label="Select layer Empty row"]', '1'],
@@ -598,6 +616,7 @@ test('identical-valued clip and row context replacements preserve input identity
 test('keyboard focus and native reveal clear the sticky inspector tabs at the default and minimum viewports', async ({
   page,
 }) => {
+  await showControl(page, 'Opacity');
   const before = await checkpoint(page);
   const { slider } = controls(page, 'Opacity');
   const diamond = page.getByRole('button', { name: 'Keyframe Opacity', exact: true });
@@ -639,6 +658,7 @@ test('animated channels without a playhead participant disable both inputs, not 
   await fixture(page, document);
   const before = await checkpoint(page);
   for (const name of ['Opacity', 'Exposure', 'Layer speed rate']) {
+    await showControl(page, name);
     const { slider, exact } = controls(page, name);
     await expect(slider).toBeVisible();
     await expect(exact).toBeVisible();
@@ -654,6 +674,7 @@ test('animated channels without a playhead participant disable both inputs, not 
   await unchanged(page, before);
   await page.evaluate(() => window.pascapLab!.engine.seek(10));
   await ready(page, document);
+  await showControl(page, 'Opacity');
   const { exact } = controls(page, 'Opacity');
   await expect(exact).toBeEnabled();
   await exact.fill('0.456789123');
@@ -689,16 +710,17 @@ test('common widgets fit 270px inspectors at the default and minimum viewports w
     await page.setViewportSize({ width, height });
     await expect(inspector).toBeVisible();
     expect((await inspector.boundingBox())!.width).toBe(270);
-    for (const tab of ['Clip', 'Layer keyframes', 'Audio'] as const) {
+    for (const tab of ['Clip', 'Track', 'Audio'] as const) {
       await inspectorTab(page, tab);
-      if (tab === 'Clip')
+      if (tab === 'Track') {
         await inspector
           .locator('.advanced-colour details')
           .first()
           .evaluate((element) => {
             (element as HTMLDetailsElement).open = true;
           });
-      if (tab === 'Layer keyframes') await editLayerPoint(page, 'Video 1', 0);
+        await editLayerPoint(page, 'Video 1', 0);
+      }
       const widgets = await inspector.locator('.value-control').evaluateAll((elements) =>
         elements
           .filter((element) => element.getBoundingClientRect().height > 0)
@@ -727,7 +749,8 @@ test('common widgets fit 270px inspectors at the default and minimum viewports w
             };
           }),
       );
-      expect(widgets.length, `${width}px ${tab}`).toBe(tab === 'Clip' ? 22 : tab === 'Layer keyframes' ? 3 : 1);
+      // Clip: speed rate + eight Transform values; Track: ten Colour/Opacity, three HSL and three stored values.
+      expect(widgets.length, `${width}px ${tab}`).toBe(tab === 'Clip' ? 9 : tab === 'Track' ? 16 : 1);
       for (const widget of widgets) {
         expect(widget.inputs, `${width}px ${widget.name}`).toBe(2);
         expect(widget.outputs).toBe(0);
@@ -742,7 +765,8 @@ test('common widgets fit 270px inspectors at the default and minimum viewports w
         expect(widget.contained).toBe(true);
         expect(widget.overflow).toBe(false);
       }
-      const name = tab === 'Clip' ? 'Opacity' : tab === 'Layer keyframes' ? 'Speed keyframe value 0' : 'Music gain';
+      // The row Speed keyframe overrides clip speed, so Clip shows the row rate.
+      const name = tab === 'Clip' ? 'Layer speed rate' : tab === 'Track' ? 'Speed keyframe value 0' : 'Music gain';
       const { exact } = controls(inspector, name);
       await exact.scrollIntoViewIfNeeded();
       await expect(exact).toBeInViewport();

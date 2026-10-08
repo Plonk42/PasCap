@@ -149,11 +149,11 @@ two decoder/texture slots per row (16 for eight), plus one source-review decoder
 
 ## Clip → Transform controls
 
-**Transform** adds a fifth top-level Clip section (after Speed, before Colour),
-collapsed for new preferences. **Expand all / Collapse all** includes Source range,
-Placement, Speed, Transform and Colour. Existing expansion preferences remain
+**Transform** is the fourth and last Clip section (after Speed), collapsed for
+new preferences. **Expand all / Collapse all** includes Source range, Placement,
+Speed and Transform. Existing expansion preferences remain
 respected; **Transform animation** heading help is reachable while collapsed.
-An empty row shows **Select an excerpt to edit its Transform.**
+An empty row shows no Clip sections, only **Select a clip on … to edit it.**
 
 The eight **Crop left / Crop right / Crop top / Crop bottom / Scale / Translate X /
 Translate Y / Rotation °** controls each pair a native slider with an exact field.

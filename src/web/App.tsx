@@ -53,7 +53,7 @@ import { clipStartRestriction } from './layer-actions.js';
 import { MediaLibrary, type ImportResult, type ReviewTarget } from './MediaLibrary.js';
 import { MusicControls } from './MusicControls.js';
 import { Popover } from './Popover.js';
-import { writePreference } from './preferences.js';
+import { readPreference, writePreference } from './preferences.js';
 import { PreviewPanel } from './PreviewPanel.js';
 import { ProjectTitle } from './ProjectTitle.js';
 import { editorShortcut } from './shortcuts.js';
@@ -216,7 +216,13 @@ export function App() {
   const [fitRequest, setFitRequest] = useState(0);
   const [revealRequest, setRevealRequest] = useState(0);
   const [cutRange, setCutRange] = useState<ClipCutRange | null>(null);
-  const [inspectorMode, setInspectorMode] = useState<InspectorMode>('clip');
+  const [inspectorMode, setInspectorMode] = useState<InspectorMode>(() => {
+    const saved = readPreference('pascap-inspector-tab');
+    return saved === 'track' || saved === 'audio' ? saved : 'clip';
+  });
+  useEffect(() => {
+    writePreference('pascap-inspector-tab', inspectorMode);
+  }, [inspectorMode]);
   const [draggedMediaIds, setDraggedMediaIds] = useState<string[] | null>(null);
   const [viewerMode, setViewerMode] = useState<'timeline' | 'source'>('timeline');
   const [review, setReview] = useState<ReviewTarget | null>(null);
@@ -287,8 +293,9 @@ export function App() {
       setSelectedLayerId(layerId);
     }
     const transitions = document?.layers.find((item) => item.id === layerId)?.transitions;
+    // Follow the selection: the clip's incoming boundary, else its outgoing one.
     const boundary =
-      transitions?.find((item) => item.leftId === id) ?? transitions?.find((item) => item.rightId === id);
+      transitions?.find((item) => item.rightId === id) ?? transitions?.find((item) => item.leftId === id);
     setBoundaryId(boundary?.leftId ?? null);
   }, []);
   const selectMusic = useCallback((id: string): void => {
@@ -878,15 +885,6 @@ export function App() {
       }
     }
   }, [project, draft, previewReady]);
-  useEffect(() => {
-    if (!project) return;
-    const transitions = project.layers.find((layer) => layer.id === selectedLayerId)?.transitions;
-    if (boundaryId !== null && transitions?.some((item) => item.leftId === boundaryId)) return;
-    const boundary =
-      transitions?.find((item) => item.leftId === selectedId) ??
-      transitions?.find((item) => item.rightId === selectedId);
-    setBoundaryId(boundary?.leftId ?? null);
-  }, [project, selectedId, selectedLayerId, boundaryId]);
   const trackingJobs = jobs.some((job) => ['queued', 'running'].includes(job.state));
   useEffect(() => {
     if ((!trackingJobs && !showActivity) || connection.state !== 'ready') return;
@@ -1841,6 +1839,7 @@ export function App() {
                   drafting={draft !== null || !project}
                   section={inspectorMode}
                   onSection={setInspectorMode}
+                  onSelectBoundary={setBoundaryId}
                   onEdit={edit}
                   onPreview={previewDraft}
                   onSeek={seek}
@@ -1892,7 +1891,7 @@ export function App() {
             onBoundary={(id) => {
               select(id);
               setBoundaryId(id);
-              setInspectorMode('sequence');
+              setInspectorMode('track');
               workspace.update({
                 inspectorOpen: true,
                 ...(workspace.viewport.width < 980 ? { mediaOpen: false } : {}),

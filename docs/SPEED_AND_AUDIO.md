@@ -146,7 +146,7 @@ requires the layered export path; any nonneutral spatial base or spatial key
 after grading; nonneutral uncovered pixels reveal lower footage. The static chunk
 plan cannot silently omit these edits.
 Opacity is composition coverage, not part of the SDR RGB grade.
-Its single native slider/exact `NumberField`/diamond/navigation is in **Clip → Colour**
+Its single native slider/exact `NumberField`/diamond/navigation is in **Track → Colour**
 alongside the colour controls. Numeric entry is **0–1**, initially **1**; the main
 label may show **100%**. Without Opacity keys it edits row `opacity`, even on
 an empty row. With keys, a missing participant at the real playhead is read-only
@@ -205,12 +205,12 @@ its hollow diamond is clicked. Unanimated Speed uses **Constant speed / Ramp up 
 or **Custom curve** clip controls. Reset to 1× affects only the active row Speed
 participant at the playhead when keyed, otherwise the selected clip's base.
 
-The dedicated **Keyframes** tab (accessible name **Layer keyframes**) contains the
+The **Track → Keyframes** section contains the
 directly visible whole-row point list and point navigation. Its toolbar's
 **Animation help** includes point-timing guidance, with no separate Keyframe timing
 help button. There is no outer list disclosure or per-row list expansion preference;
-nested **Time, easing & values** details remain collapsible and preserve drafts
-and input identity through reordering and Undo. **Keyframes → Time, easing & values**
+nested **Edit** details remain collapsible and preserve drafts
+and input identity through reordering and Undo. **Keyframes → Edit**
 edits stored point times, easing and existing participants, including beyond current duration
 or on an empty row. A stored Speed participant reuses the **Layer rate ×** slider/exact
 `NumberField` and Reset to 1×, not clip mode/preset/source-curve controls. Enter/blur applies

@@ -72,7 +72,7 @@ while on, later clips remain continuously sequenced, retaining dissolve overlaps
 Turning it off keeps actual placements for independent edits. Music, other tracks
 and absolute row points do not move with it.
 
-**Clip → Colour** contains the single **Opacity** slider alongside the colour
+**Track → Colour** contains the single **Opacity** slider alongside the colour
 sliders, initially **100%**. Without Opacity keys it edits the selected row's
 `opacity` value, including on an empty row; the row's `opacity` curve overrides
 that value on every clip when animated, including both dissolve sources.

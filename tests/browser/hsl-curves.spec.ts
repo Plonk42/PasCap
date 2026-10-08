@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import path from 'node:path';
 import type { MediaAsset } from '../../src/shared/media.js';
 import { createClip, createLayer, createProject, type ProjectDocument } from '../../src/shared/model.js';
-import { expandedInspectorPreferences, sharedPoint } from './editor-helpers.js';
+import { expandedInspectorPreferences, inspectorTab, sharedPoint } from './editor-helpers.js';
 import { memoryProjects, type MemoryProjects } from './memory-projects.js';
 
 let memory: MemoryProjects;
@@ -27,6 +27,7 @@ test.beforeEach(async ({ page, request }) => {
   memory = await memoryProjects(page, document);
   await expandedInspectorPreferences(page);
   await page.goto(`/?project=${document.id}`);
+  await inspectorTab(page, 'Track');
   await expect(page.getByRole('slider', { name: 'Exposure', exact: true })).toBeEnabled();
 });
 test.afterEach(() => expect(unexpected).toEqual([]));

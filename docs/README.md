@@ -34,7 +34,7 @@ and priorities.
 Use the final approved [#67](https://github.com/Plonk42/PasCap/issues/67) contract:
 one required numeric row `opacity`, initially 1 (100%) on new tracks, with the sole
 row key channel `opacity` overriding that value on every clip. Its single slider
-is in **Clip → Colour**, works on empty rows and never creates implicit keys;
+is in **Track → Colour**, works on empty rows and never creates implicit keys;
 **Placement** contains placement only. Opacity is composition coverage, not SDR
 RGB grading; unkeyed colour settings are row-owned. Eleven nullable point fields
 are required, in control order: `opacity`, `speed`, `temperature`, `tint`,

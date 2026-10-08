@@ -85,7 +85,7 @@ original's exclusive OUT. Spatial poses evaluate continuously through the placed
 retiming map, not at the floored recorded-image frame; see
 [spatial transforms](design/SPATIAL_TRANSFORMS.md).
 
-The single **Opacity** slider is in **Clip → Colour**, beside the colour sliders,
+The single **Opacity** slider is in **Track → Colour**, beside the colour sliders,
 and starts at **100%**. It edits row `opacity` without keys and works on an empty
 row. With keys, only a participant at the real playhead is editable; the hollow
 diamond explicitly captures a missing participant. Sliders never create keys.

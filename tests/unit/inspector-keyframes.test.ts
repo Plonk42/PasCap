@@ -17,7 +17,7 @@ const navigation = {
 };
 
 describe('dedicated Inspector keyframe controls', () => {
-  it('labels four mounted tab panels and keeps empty-row points in their own panel', () => {
+  it('labels Clip, Track and Audio panels; an empty track keeps Colour, Opacity and keyframes in Track', () => {
     const project = createProject('tabs', 'Tabs');
     const markup = renderToStaticMarkup(
       createElement(
@@ -31,8 +31,9 @@ describe('dedicated Inspector keyframe controls', () => {
           boundaryId: null,
           frame: 0,
           drafting: false,
-          section: 'keyframes',
+          section: 'track',
           onSection: vi.fn(),
+          onSelectBoundary: vi.fn(),
           onEdit: vi.fn(),
           onPreview: vi.fn(),
           onSeek: vi.fn(),
@@ -41,35 +42,35 @@ describe('dedicated Inspector keyframe controls', () => {
       ),
     );
     const tabs = [...markup.matchAll(/<button[^>]*role="tab"[^>]*>(.*?)<\/button>/g)].map((match) => match[1]);
-    expect(tabs).toEqual(['Clip', 'Keyframes', 'Sequence', 'Audio']);
-    expect(markup).toContain('aria-label="Layer keyframes"');
-    expect(markup).not.toContain('inspector-track-selection');
-    expect(markup).not.toContain('Whole-row animation');
-    expect(markup).not.toContain('Track transitions &amp; fades');
+    expect(tabs).toEqual(['Clip', 'Track', 'Audio']);
+    expect(markup).not.toContain('Whole video row');
+    expect(markup).not.toContain('Row colour');
     const panels = [...markup.matchAll(/<div role="tabpanel"[^>]*>/g)].map((match) => match[0]);
-    expect(panels).toHaveLength(4);
+    expect(panels).toHaveLength(3);
     expect(panels[1]).not.toContain('hidden');
-    expect(panels.filter((panel) => panel.includes('hidden'))).toHaveLength(3);
+    expect(panels.filter((panel) => panel.includes('hidden'))).toHaveLength(2);
     const clipPanel = markup.slice(markup.indexOf(panels[0]!), markup.indexOf(panels[1]!));
-    const keysPanel = markup.slice(markup.indexOf(panels[1]!), markup.indexOf(panels[2]!));
-    expect(clipPanel).not.toContain('aria-label="Layer keyframes Video 1"');
-    expect(keysPanel).toContain('aria-label="Layer keyframes Video 1"');
-    expect(clipPanel).toContain('aria-label="Placement section"');
-    expect(clipPanel).not.toContain('Layer &amp; opacity');
-    const opacity = [...clipPanel.matchAll(/<input[^>]*aria-label="Opacity"[^>]*>/g)].map((match) => match[0]);
+    const trackPanel = markup.slice(markup.indexOf(panels[1]!), markup.indexOf(panels[2]!));
+    expect(clipPanel).toContain('Select a clip on Video 1 to edit it.');
+    expect(clipPanel).not.toContain('aria-label="Placement section"');
+    expect(clipPanel).not.toContain('aria-label="Opacity"');
+    expect(trackPanel).toContain('aria-label="Layer keyframes Video 1"');
+    expect(trackPanel).toContain('aria-label="Keyframes section"');
+    expect(trackPanel).toContain('aria-label="Fades section"');
+    const opacity = [...trackPanel.matchAll(/<input[^>]*aria-label="Opacity"[^>]*>/g)].map((match) => match[0]);
     expect(opacity).toHaveLength(2);
     expect(opacity[0]).toContain('type="range"');
     expect(opacity[0]).toContain('value="1"');
     expect(opacity[1]).toContain('type="number"');
     expect(opacity[1]).toContain('value="1"');
     expect(opacity[0]).not.toContain('disabled');
-    expect(clipPanel).toContain('100%');
-    expect(clipPanel).toContain('Not animated');
-    const colour = clipPanel.slice(clipPanel.indexOf('aria-label="Colour section"'));
+    expect(trackPanel).toContain('100%');
+    expect(trackPanel).toContain('Not animated');
+    const colour = trackPanel.slice(trackPanel.indexOf('aria-label="Colour section"'));
     expect(colour).toContain('aria-label="Opacity"');
-    expect(clipPanel.split('aria-label="Keyframe Opacity"')).toHaveLength(2);
-    expect(clipPanel).not.toContain('Keyframe Layer opacity');
-    expect(clipPanel).not.toContain('Keyframe Clip opacity');
+    expect(trackPanel.split('aria-label="Keyframe Opacity"')).toHaveLength(2);
+    expect(trackPanel).not.toContain('Keyframe Layer opacity');
+    expect(trackPanel).not.toContain('Keyframe Clip opacity');
   });
 
   it.each(KEYFRAME_SETTINGS)('$label shares its setting-specific bounds and accessible controls', (setting) => {

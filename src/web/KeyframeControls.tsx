@@ -101,6 +101,7 @@ interface PointRowProps {
   helpId: string;
   duration: number;
   current: boolean;
+  initiallyOpen: boolean;
   disabled: boolean;
   onEdit: (command: EditCommand) => void;
   onSeek: (point: LayerKeyframe) => void;
@@ -117,11 +118,14 @@ function KeyframePointRow({
   helpId,
   duration,
   current,
+  initiallyOpen,
   disabled,
   onEdit,
   onSeek,
 }: Readonly<PointRowProps>) {
   const settings = participatingSettings(point);
+  // Short lists start expanded; afterwards the user's toggle owns the disclosure.
+  const [open] = useState(initiallyOpen);
   return (
     <li
       className={`keyframe-row${current ? ' current' : ''}`}
@@ -164,8 +168,8 @@ function KeyframePointRow({
       >
         {settings.map((setting) => setting.label).join(' · ')}
       </p>
-      <details className="layer-keyframe-point-details">
-        <summary aria-label={`Edit layer keyframe ${point.frame}`}>Time, easing & values</summary>
+      <details className="layer-keyframe-point-details" open={open}>
+        <summary aria-label={`Edit layer keyframe ${point.frame}`}>Edit</summary>
         <div className="layer-keyframe-point-fields">
           <label htmlFor={`${listId}-${row.id}-frame`}>
             Timeline frame
@@ -328,12 +332,8 @@ export function KeyframeControls({
       <legend className="declutter-sr-only">Layer keyframes</legend>
       <div className="keyframe-toolbar">
         <strong className="keyframe-panel-title declutter-sr-only">Layer keyframes</strong>
-        <span
-          className="keyframe-count"
-          title={`${keys.length} shared ${keys.length === 1 ? 'point' : 'points'} on ${layer.name}`}
-        >
-          {keys.length}
-          <span className="declutter-sr-only"> {keys.length === 1 ? 'point' : 'points'}</span>
+        <span className="keyframe-count">
+          {keys.length} {keys.length === 1 ? 'keyframe' : 'keyframes'}
         </span>
         <div className="keyframe-navigation">
           <button
@@ -361,18 +361,6 @@ export function KeyframeControls({
             <Icon name="forward" size={14} />
           </button>
         </div>
-        {atHead && (
-          <button
-            type="button"
-            className="icon-button"
-            disabled={unavailable}
-            aria-label="Remove layer keyframe at playhead"
-            title="Remove this whole shared point and all its participating settings"
-            onClick={() => onEdit({ type: 'layer-key-remove', layerId: layer.id, frame: atHead.frame })}
-          >
-            <Icon name="trash" size={14} />
-          </button>
-        )}
         <HelpPopover label="Animation" className="animation-help">
           <p>
             Each setting's diamond animates this whole video row, not just the selected clip. All participating settings
@@ -408,7 +396,12 @@ export function KeyframeControls({
         <span className="layer-keyframe-position declutter-sr-only">
           {playheadLabel(frame, duration, atHead !== undefined)}
         </span>
-        {atHead && <ParticipantChips point={atHead} />}
+        {atHead && (
+          <>
+            <span className="layer-keyframe-caption">At playhead:</span>
+            <ParticipantChips point={atHead} />
+          </>
+        )}
       </div>
       {inspectedAway && (
         <div className="layer-keyframe-inspected">
@@ -445,6 +438,7 @@ export function KeyframeControls({
               helpId={helpId}
               duration={duration}
               current={(inspection !== null || previewAvailable) && key.frame === navigationFrame}
+              initiallyOpen={keys.length <= 3}
               disabled={unavailable}
               onEdit={onEdit}
               onSeek={seekPoint}

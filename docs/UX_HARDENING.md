@@ -21,7 +21,7 @@ This guide is not a delivery ledger or a fresh validation result.
 - All **eleven row-channel diamonds have adjacent Previous/Next SVG buttons**, followed by
   any reset. Explicit capture, real-playhead values, shared point movement,
   off-duration inspection, every participant and one-step Undo remain unchanged.
-- **Clip → Colour** contains the single **Opacity** slider/diamond/navigation
+- **Track → Colour** contains the single **Opacity** slider/diamond/navigation
   alongside the colour sliders, initially **100%**. Without Opacity keys it edits
   row `opacity`, including on an empty row; keyed `opacity` overrides that value
   on every clip and both dissolve sources. Sliders never create keys; animated
@@ -82,7 +82,7 @@ row points, source choices, media preparation, Activity and both export
 profiles retain their contracts. The editor targets desktop Linux; the 640 px
 width floor is not a mobile-support claim.
 
-**Clip → Transform** is the fifth top-level section, collapsed for new
+**Clip → Transform** is the fourth Clip section, collapsed for new
 preferences and included in Clip's bulk expansion. Native sliders/exact fields
 and one full-pose source-frame diamond retain explicit capture, read-only keyed
 main values without a key at the real displayed source frame, release-only

@@ -190,8 +190,11 @@ test('partial media selection is mixed and active search/filter states can be cl
 test('selected context precedes compact animation controls and adjusted sections are visibly marked', async ({
   page,
 }) => {
-  const selection = page.locator('.inspector-selection');
+  const selection = page.locator('#inspector-pane [role="tabpanel"]:not([hidden]) .inspector-selection');
   await expect(selection).toContainText('pattern-a');
+  await expect(selection).toContainText('Clip 1 of 1');
+  await inspectorTab(page, 'Track');
+  await expect(selection).toContainText('Applies to the clip on this track');
   expect(
     await selection.evaluate((element) =>
       Boolean(
@@ -221,6 +224,7 @@ test('animated visual feedback retains explicit capture, native navigation order
   await page.reload();
   await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
   await seek(page, 30);
+  await inspectorTab(page, 'Track');
   const diamond = page.getByRole('button', { name: 'Keyframe Exposure', exact: true });
   await expect(diamond).toHaveAttribute('aria-pressed', 'false');
   await expect(diamond).toHaveCSS('border-style', 'dashed');
@@ -236,7 +240,6 @@ test('animated visual feedback retains explicit capture, native navigation order
   await expect(page.locator('.animation-legend')).toBeVisible();
   await page.keyboard.press('Escape');
   expect(await current(page)).toEqual(document);
-  await inspectorTab(page, 'Clip');
   await diamond.click();
   await expect(page.getByRole('slider', { name: 'Exposure', exact: true })).toBeEnabled();
   expect((await current(page)).layers[0]!.keyframes).toEqual([
@@ -423,6 +426,7 @@ test('a failed deferred preview keeps the editor usable and saves pending edits 
   await page.reload();
   await expect(page.getByRole('button', { name: 'Reload editor', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Play preview', exact: true })).toBeDisabled();
+  await inspectorTab(page, 'Track');
   await expect(page.getByRole('button', { name: 'Keyframe Exposure', exact: true })).toBeDisabled();
   await expect(page.getByRole('textbox', { name: 'Project title', exact: true })).toHaveValue(before.title);
   expect(memory.snapshot()).toEqual(before);
@@ -451,7 +455,7 @@ test('a failed deferred inspector is contained and never discards the rest of th
   expect(await current(page)).toEqual(before);
   await page.unroute('**/assets/Inspector-*.js');
   await page.getByRole('button', { name: 'Reload editor', exact: true }).click();
-  await expect(page.getByRole('slider', { name: 'Exposure', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Placement section', exact: true })).toBeVisible();
   await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
   expect(await current(page)).toEqual(before);
   expect(memory.saves).toBe(0);

@@ -8,7 +8,7 @@ or opacity contract. [#67](https://github.com/Plonk42/PasCap/issues/67) supersed
 two-opacity descriptions with the sole row contract retained in schema 8: required numeric `VideoLayer.opacity`
 (1 on new tracks), no saved `clip.opacity`, and the sole row key channel `opacity`
 overriding the row value on every source, without an additional group multiplier.
-The single **Opacity** control is in **Clip → Colour**; **Placement** contains
+The single **Opacity** control is in **Track → Colour**; **Placement** contains
 placement only. The accepted schema-6 body below remains historical. Track visibility,
 Ripple, transitions/fades, grouped dissolves and resource bounds retain their
 semantics. [#35's current schema-8 contract](MULTIPLE_MUSIC.md) supersedes the
@@ -60,7 +60,7 @@ the design rationale, not a second mutable implementation checklist.
 | Setting / capability                 | New-track default / bound                                                                                         | Location and effect                                                                                                         |
 | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
 | Ripple                               | Required boolean; **on**, including the initial track                                                             | Native Layer options checkbox and visible row state; enable packs immediately, then continuously sequences                  |
-| Opening/closing fade                 | Required integer output-frame lengths; **0/0**                                                                    | Selected track in Sequence inspector, at actual first/last placements; dormant on empty tracks                              |
+| Opening/closing fade                 | Required integer output-frame lengths; **0/0**                                                                    | Selected track in Track → Fades, at actual first/last placements; dormant on empty tracks                                   |
 | Boundary transition                  | Required track-owned adjacent-pair records; Cut 0, Fade-through-black at least 2, Cross-dissolve at least 1 frame | Boundary button on its own row and the existing transition editor; no role-based enable flag                                |
 | Enabled / layer opacity / row points | Existing strict values; enabled, opacity 1, empty points                                                          | Existing controls on every track; unchanged curve ownership and group composition                                           |
 | Absolute clip start / nudge          | Required integer start on every clip                                                                              | Positioned clips or first Ripple anchor only; later Ripple clips explain how to reorder or turn Ripple off                  |
