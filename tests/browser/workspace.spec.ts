@@ -279,6 +279,32 @@ test('failed project opens stay in the dialog and do not discard the current edi
   await expect(page.getByRole('button', { name: 'Open projects' })).toBeFocused();
 });
 
+test('Escape closes the Projects, Export and shortcut dialogs and restores focus to their triggers', async ({
+  page,
+}) => {
+  for (const [trigger, dialog] of [
+    ['Open projects', 'Projects'],
+    ['Export video', 'Export video'],
+    ['Keyboard shortcuts', 'Keyboard shortcuts'],
+  ] as const) {
+    await page.getByRole('button', { name: trigger, exact: true }).click();
+    await expect(page.getByRole('dialog', { name: dialog, exact: true })).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: trigger, exact: true })).toBeFocused();
+  }
+  await page.getByRole('button', { name: 'Open projects' }).click();
+  await expect(page.getByRole('dialog', { name: 'Projects' })).toContainText(
+    'Projects saved by an older PasCap version cannot be opened. They are kept unchanged.',
+  );
+  await expect(page.getByRole('combobox', { name: 'Project filter' }).locator('option')).toHaveText([
+    'All projects',
+    'Can open',
+    'Cannot open (older version)',
+  ]);
+  expect(writes).toBe(0);
+});
+
 test('no-project startup performs no hidden create and unavailable service has a read-only retry path', async ({
   page,
 }) => {
