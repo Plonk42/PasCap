@@ -718,9 +718,7 @@ export function Inspector({
                 resetKey={project.id}
                 helpId={`${colourControlId}-speed-help`}
                 clip={clip ?? null}
-                layer={layer}
                 frame={frame}
-                projectDuration={layout.duration}
                 placedDuration={placed?.duration ?? null}
                 disabled={drafting}
                 sourceFrame={sourceFrame}

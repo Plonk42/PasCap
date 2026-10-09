@@ -1,37 +1,52 @@
+import { updateClipSpeedKey } from '../shared/clip-speed.js';
 import { applyCommand, type EditCommand } from '../shared/commands.js';
-import type { ProjectDocument } from '../shared/model.js';
+import type { ProjectDocument, VideoClip } from '../shared/model.js';
 import { calculateLayout, type PlacedClip } from '../shared/timeline.js';
 import { clipKeyframeMarkers, type ClipKeyframeMarker } from './clip-keyframe-markers.js';
 import type { KeyframeSlideKind, KeyframeSlideTarget } from './keyframe-slide.js';
 import { replaceSpatialKey } from './spatial-editor.js';
 
-type SpatialCommand = Extract<EditCommand, { type: 'spatial' }>;
+type ClipKeyCommand = Extract<EditCommand, { type: 'spatial' | 'speed' }>;
+export type ClipKeyframeType = ClipKeyframeMarker['type'];
 export interface ClipKeyframeDragPlan {
   frame: number;
   document: ProjectDocument;
-  command: SpatialCommand | null;
+  command: ClipKeyCommand | null;
   error: string;
 }
 
-/** Moves one Transform key to another original source frame, keeping its easing and enabled settings. */
+const LABELS: Record<ClipKeyframeType, string> = { transform: 'Transform', speed: 'Speed' };
+
+function moveCommand(clip: VideoClip, type: ClipKeyframeType, origin: number, frame: number): ClipKeyCommand {
+  if (type === 'transform')
+    return { type: 'spatial', clipId: clip.id, spatial: replaceSpatialKey(clip.spatial, origin, { frame }) };
+  if (clip.speed.mode !== 'curve') throw new Error('This clip has no speed keyframes.');
+  return { type: 'speed', clipId: clip.id, speed: updateClipSpeedKey(clip.speed, origin, { frame }) };
+}
+
+/** Moves one clip key to another original source frame, keeping its value(s) and easing. */
 export function planClipKeyframeMove(
   project: ProjectDocument,
   clipId: string,
   origin: number,
   nextFrame: number,
   frameCount: number,
+  type: ClipKeyframeType = 'transform',
 ): ClipKeyframeDragPlan {
   const fail = (error: string): ClipKeyframeDragPlan => ({ frame: nextFrame, document: project, command: null, error });
   const clip = project.clips.find((item) => item.id === clipId);
   if (!clip) return fail('This clip no longer exists.');
   if (nextFrame < 0 || nextFrame > frameCount)
-    return fail(`A Transform keyframe must stay within source frames 0–${frameCount}.`);
+    return fail(`A ${LABELS[type]} keyframe must stay within source frames 0–${frameCount}.`);
+  if (
+    type === 'speed' &&
+    nextFrame !== origin &&
+    clip.speed.mode === 'curve' &&
+    clip.speed.keyframes.some((key) => key.frame === nextFrame)
+  )
+    return fail('A clip speed keyframe already exists at this source frame. Choose another frame.');
   try {
-    const command: SpatialCommand = {
-      type: 'spatial',
-      clipId,
-      spatial: replaceSpatialKey(clip.spatial, origin, { frame: nextFrame }),
-    };
+    const command = moveCommand(clip, type, origin, nextFrame);
     return {
       frame: nextFrame,
       document: applyCommand(project, command),
@@ -39,7 +54,7 @@ export function planClipKeyframeMove(
       error: '',
     };
   } catch (cause) {
-    return fail(cause instanceof Error ? cause.message : 'Cannot move this Transform keyframe.');
+    return fail(cause instanceof Error ? cause.message : `Cannot move this ${LABELS[type]} keyframe.`);
   }
 }
 
@@ -53,34 +68,45 @@ export function clipKeyframeTarget(
   return placed.retiming.sourceAt(Math.max(0, Math.min(placed.duration - 1, marker.outputFrame + delta)));
 }
 
-function seekFrameFor(document: ProjectDocument, clipId: string, sourceFrame: number): number | null {
+function seekFrameFor(
+  document: ProjectDocument,
+  clipId: string,
+  type: ClipKeyframeType,
+  sourceFrame: number,
+): number | null {
   const placed = calculateLayout(document).clips.find((item) => item.clip.id === clipId);
-  const layer = document.layers.find((item) => item.id === placed?.clip.layerId);
-  if (!placed || !layer) return null;
-  return (
-    clipKeyframeMarkers(placed, layer).find((m) => m.type === 'transform' && m.sourceFrame === sourceFrame)
-      ?.seekFrame ?? null
-  );
+  if (!placed) return null;
+  return clipKeyframeMarkers(placed).find((m) => m.type === type && m.sourceFrame === sourceFrame)?.seekFrame ?? null;
 }
 
-export interface TransformKeyframeTarget extends KeyframeSlideTarget {
+export interface ClipKeyframeTarget extends KeyframeSlideTarget {
   placed: PlacedClip;
   marker: ClipKeyframeMarker;
 }
 
-export function transformKeyframeTarget(placed: PlacedClip, marker: ClipKeyframeMarker): TransformKeyframeTarget {
+export function clipKeyframeSlideTarget(placed: PlacedClip, marker: ClipKeyframeMarker): ClipKeyframeTarget {
   return { scope: placed.clip.id, origin: marker.sourceFrame, placed, marker };
 }
 
-/** Clip Transform keys move in original source frames, following pointer travel through the placed retiming. */
-export function transformKeyframeKind(options: {
-  frameCountOf: (mediaId: string) => number;
-  onSelect: (clipId: string) => void;
-  onSeek: (frame: number) => void;
-  onOpenTransform: () => void;
-}): KeyframeSlideKind<TransformKeyframeTarget> {
-  const move = (project: ProjectDocument, target: TransformKeyframeTarget, frame: number): ClipKeyframeDragPlan =>
-    planClipKeyframeMove(project, target.scope, target.origin, frame, options.frameCountOf(target.placed.clip.mediaId));
+/** Clip keys move in original source frames, following pointer travel through the placed retiming. */
+export function clipKeyframeKind(
+  type: ClipKeyframeType,
+  options: {
+    frameCountOf: (mediaId: string) => number;
+    onSelect: (clipId: string) => void;
+    onSeek: (frame: number) => void;
+    onOpen: () => void;
+  },
+): KeyframeSlideKind<ClipKeyframeTarget> {
+  const move = (project: ProjectDocument, target: ClipKeyframeTarget, frame: number): ClipKeyframeDragPlan =>
+    planClipKeyframeMove(
+      project,
+      target.scope,
+      target.origin,
+      frame,
+      options.frameCountOf(target.placed.clip.mediaId),
+      type,
+    );
   return {
     at: ({ placed, marker }, travel) =>
       travel === 0
@@ -94,14 +120,14 @@ export function transformKeyframeKind(options: {
       return move(project, target, frame);
     },
     step: (project, target, delta) => move(project, target, target.origin + delta),
-    seekFrame: (document, target, frame) => seekFrameFor(document, target.scope, frame),
+    seekFrame: (document, target, frame) => seekFrameFor(document, target.scope, type, frame),
     select: ({ scope }) => options.onSelect(scope),
     reveal: (document, target, frame, open) => {
-      const seek = seekFrameFor(document, target.scope, frame);
+      const seek = seekFrameFor(document, target.scope, type, frame);
       if (seek !== null) options.onSeek(seek);
-      if (open) options.onOpenTransform();
+      if (open) options.onOpen();
     },
     selector: ({ scope }, frame) =>
-      `[data-clip-id="${CSS.escape(scope)}"] [data-clip-keyframe="transform"][data-source-frame="${frame}"]`,
+      `[data-clip-id="${CSS.escape(scope)}"] [data-clip-keyframe="${type}"][data-source-frame="${frame}"]`,
   };
 }

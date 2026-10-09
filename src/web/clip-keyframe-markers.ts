@@ -1,4 +1,3 @@
-import type { VideoLayer } from '../shared/model.js';
 import type { PlacedClip } from '../shared/timeline.js';
 
 export interface ClipKeyframeMarker {
@@ -7,7 +6,6 @@ export interface ClipKeyframeMarker {
   outputFrame: number;
   timelineFrame: number;
   seekFrame: number;
-  speedOverridden: boolean;
 }
 
 /** Match inspector source preview without recompiling the placed map for every key. */
@@ -26,8 +24,7 @@ function markerSeekFrame(placed: PlacedClip, sourceFrame: number): number {
  * the right boundary, while its preview must stay on the final available output.
  * Work/storage is bounded by the two existing 256-key lists, never clip duration.
  */
-export function clipKeyframeMarkers(placed: PlacedClip, layer: VideoLayer): ClipKeyframeMarker[] {
-  const speedOverridden = layer.keyframes.some((point) => point.values.speed !== null);
+export function clipKeyframeMarkers(placed: PlacedClip): ClipKeyframeMarker[] {
   const markers = (type: ClipKeyframeMarker['type'], keys: readonly { frame: number }[]): ClipKeyframeMarker[] =>
     keys
       .filter((point) => point.frame >= placed.clip.sourceIn && point.frame <= placed.clip.sourceOut)
@@ -40,7 +37,6 @@ export function clipKeyframeMarkers(placed: PlacedClip, layer: VideoLayer): Clip
           outputFrame,
           timelineFrame: placed.start + outputFrame,
           seekFrame: markerSeekFrame(placed, point.frame),
-          speedOverridden: type === 'speed' && speedOverridden,
         };
       });
   return [

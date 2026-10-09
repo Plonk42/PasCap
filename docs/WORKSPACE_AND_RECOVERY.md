@@ -1,6 +1,6 @@
 # Desktop workspace and recovery
 
-The workspace uses **strict schema 12 with complete required video track colour, independent clip spatial settings, uniform video tracks, required per-track
+The workspace uses **strict schema 13 with complete required video track colour, independent clip spatial settings and clip-only speed, uniform video tracks, required per-track
 Ripple/transitions/fades, 0–8 independently identified music tracks, project-specific
 video/music bins and draggable shared project-time track keyframes**, with per-setting channel navigation. Layout preferences,
 stored-keyframe inspection and recovery feedback remain editor-only. Source protection,
@@ -122,7 +122,7 @@ raise/lower and delete; visibility remains a separate sidebar control.
 **Track → Colour** contains the single **Opacity** native slider/exact
 `NumberField` alongside the colour controls, with its diamond.
 The Colour keyframe line's Previous/Next pair visits the union of Opacity and
-nine scalar keyframes, skipping speed-only keyframes. Per-channel Opacity
+nine scalar keyframes. Per-channel Opacity
 Previous/Next buttons remain beside the main diamond, alongside
 the existing arrows on enabled setting chips in stored Keyframes rows.
 Main and stored sliders/exact fields use **0–100%**, neutral **100%**.
@@ -161,7 +161,7 @@ On a focused track keyframe marker, Left/Right moves that keyframe one project f
 moves ten. Marker keyboard events remain in that context, retaining keyframe/Timeline
 focus while navigating to the moved keyframe, without also firing ordinary playhead-step,
 clip-nudge or other editor shortcuts.
-Click or Enter on a marker selects its track, seeks and opens Track → Colour (Clip → Speed for a Speed-only keyframe), without editing; whole-track keyframe navigation preserves the chosen Inspector tab.
+Click or Enter on a marker selects its track, seeks and opens Track → Colour, without editing; whole-track keyframe navigation preserves the chosen Inspector tab.
 
 Options are nonmodal disclosures with normal Tab navigation, not custom ARIA menus.
 They use the browser top layer to avoid clipping inside panels. Escape closes and
@@ -293,24 +293,34 @@ animated channels without an enabled setting at the playhead are read-only until
 
 ### Section keyframe controls
 
-Colour, Speed and Transform always show their capture diamonds and adjacent per-setting **Previous/Next** buttons while the section is expanded; there is no Animate toggle and no stored preference. Each expanded section has one keyframe line with the **number of keyframes**, one **Previous/Next** pair over the same set and **Reset**. The line is hidden while the section is collapsed; the title row and its help stay reachable. Rendering, retained keyframes and read-only constraints never depend on what is shown.
+Colour, Speed and Transform always show their capture diamonds while the section is expanded, Colour and Transform with adjacent per-setting **Previous/Next** buttons; there is no Animate toggle and no stored preference. Each expanded section has one keyframe line with the **number of keyframes**, one **Previous/Next** pair over the same set and **Reset**. The line is hidden while the section is collapsed; the title row and its help stay reachable. Rendering, retained keyframes and read-only constraints never depend on what is shown.
 
-Main scalar Colour/Opacity and track Speed diamonds retain adjacent per-setting
+Main scalar Colour/Opacity diamonds retain adjacent per-setting
 **Previous/Next** buttons because not every setting is enabled at every shared
-keyframe. The keyframe line holds one Previous/Next pair: Colour visits the Opacity/nine-scalar union, skipping speed-only
-keyframes; Speed visits track Speed keyframes plus all retained custom speed source
-keyframes of the selected clip, including off-trim keyframes and original exclusive
-OUT, previewing the nearest mapped image through authoritative retiming. Track
-Speed overrides but retains clip keyframes and their navigation. Transform likewise
+keyframe. The keyframe line holds one Previous/Next pair: Colour visits the Opacity/nine-scalar union;
+Speed visits all retained custom speed source keyframes of the selected clip,
+including off-trim keyframes and original exclusive OUT, previewing the nearest
+mapped image through authoritative retiming. Speed has a single setting, so its
+diamond has no second per-setting arrows. Transform likewise
 visits all retained source keyframes, including off-trim/original OUT.
 Speed and Transform each keep a clip-local stored-source cursor independent of
 track inspection, allowing successive keyframes to be visited even when their
 nearest first/last preview image is the same. Main capture always uses the real
 displayed project/source frame, never an inspected stored time.
 
-All track, Transform, custom clip-speed and ramp selectors visibly read
-**Easing**, retaining contextual accessible names such as **Track keyframe easing N**
-and **Ramp easing**, and unchanged interpolation.
+All track, Transform and custom clip-speed selectors visibly read
+**Easing**, retaining contextual accessible names such as **Track keyframe easing N**,
+and unchanged interpolation.
+
+### Clip speed
+
+**Clip → Speed** is clip-owned: **Speed mode** (**Constant speed / Custom curve**),
+constant 0.25×–4× presets and the **Speed ×** row. Its **Keyframe Speed** diamond
+captures or removes a Linear keyframe at the actually displayed source frame,
+then preview follows the retimed keyframe; the rate is read-only in curve mode
+without a keyframe there. Reset returns the clip to constant 1×. Curve presets
+(including Ramp up/Ramp down) replace its keyframes. Details:
+[speed and audio](SPEED_AND_AUDIO.md#editing-speed).
 
 ### Clip Transform animation
 
@@ -351,7 +361,7 @@ Its question-mark **Animation help** button uses the common hover/pin/dismiss
 contract above; explanatory text does not replace the shared keyframe editor.
 **Clip** keeps source/clip settings and Speed/Transform controls; **Track → Colour**
 keeps track Colour/Opacity playhead value/diamond controls.
-All eleven settings (Opacity, Speed and nine scalar colour parameters)
+All ten settings (Opacity and nine scalar colour parameters)
 expose a main diamond with adjacent per-setting **Previous/Next** buttons: **◇ hollow/inactive**
 versus **◆ filled/active**, with `aria-pressed`. A hollow diamond remains clickable; inactivity
 does not set HTML `disabled`. Actual invalid/draft states can disable actions.
@@ -376,11 +386,8 @@ implicit keyframes. Without Opacity keyframes, the slider edits the track's save
 including on an empty track. Its `opacity` curve overrides that value across every
 clip on the track, including both dissolve sources; removing the final keyed Opacity
 setting reveals the unchanged track value. Unkeyed colour edits the track base,
-including on empty tracks; unkeyed speed requires a selected clip and edits only
-that clip. Removing the final keyed colour setting reveals its unchanged track base.
-Clip Speed modes include Constant/Ramp up/Ramp down and
-the explicitly approved Custom curve with source-frame keyframes. Its presets, precise
-fields and reversible graph gestures do not enable track Speed settings.
+including on empty tracks. Removing the final keyed colour setting reveals its unchanged
+track base. Speed is clip-only and never a track setting.
 
 **Keyframes** exposes one shared list without an outer disclosure or per-track list
 expansion preference. Each entry names the enabled settings;
@@ -388,25 +395,24 @@ its inner **Edit** disclosure (open initially for three or fewer keyframes) prov
 **Timeline frame**, **Easing** and values for the enabled settings.
 A time edit moves all enabled settings
 and their existing easing together in **one Undo step**; colliding times/invalid
-values/contextual timing are rejected without changing the committed document,
+values are rejected without changing the committed document,
 never merged or overwritten. One easing is shared at a keyframe,
 but each channel interpolates toward its own **next keyframe with that setting enabled**, with
 endpoint holds and unkeyed values only for entirely unanimated channels: track
-`opacity` for Opacity, track `colour` for colour, clip speed otherwise. Keyframe
+`opacity` for Opacity, track `colour` for colour. Keyframe
 input identity/focus and drafts survive time reordering and Undo;
 no persisted keyframe IDs are added.
 
 Stored keyed colour/opacity settings reuse the main sliders and double-click-the-name
 resets, with one exact `NumberField` to the right of each slider; Opacity uses
 **0–100%**, neutral **100%**, while stored values remain **0–1**.
-Speed reuses the **Track rate ×** slider/exact field (double-click **Speed** resets to 1×), not clip
-mode/preset/source-curve controls. The local-draft/release-only slider contract above
+The local-draft/release-only slider contract above
 applies to all stored keyed settings too. Each accepted value or reset targets only
 that existing stored keyed setting in one Undo step;
 keyframe time, shared easing, other enabled settings, track `opacity` and clip settings stay unchanged.
 There is no implicit joining. Numeric drafts retain entered precision and apply
-on Enter/blur; Escape restores. Empty, nonfinite, out-of-range or timing-conflicting
-values retain inline errors without clamping or shortening transitions.
+on Enter/blur; Escape restores. Empty, nonfinite or out-of-range
+values retain inline errors without clamping.
 
 Keyframes outside current duration remain stored/list-editable. A central editor-only
 inspection cursor is shared by main per-setting arrows, stored-setting chip arrows,
@@ -415,7 +421,7 @@ off-duration keyframes even when their previews clamp to the same last
 available frame. Labels identify stored time separately from actual preview; a
 timeline without video or music duration has no preview frame; music-only regions
 preview black at their real project frame. List controls edit their stored keyframe,
-but Clip's setting values, diamond state and capture **still use the real playhead**.
+but the main setting values, diamond state and capture **still use the real playhead**.
 Manual seek (including the same clamped frame), playback, track/project changes and
 deletion of the inspected keyframe clear inspection. A valid single-keyframe move/Undo
 preserves the cursor and input identity; **Follow playhead** ends inspection explicitly.
@@ -430,18 +436,16 @@ captured clip/music/transition boundaries and playhead within eight pixels; Alt
 bypasses it. Horizontal autoscroll retains the captured geometry, with no track move
 or automatic track reveal.
 
-An occupied time or Speed-related overlap/fade/transition conflict shows a red
-invalid ghost. Release reports the error without merging, overwriting, shortening
-transitions or committing an earlier valid draft. Escape, pointer cancellation,
+An occupied time shows a red
+invalid ghost. Release reports the error without merging, overwriting
+or committing an earlier valid draft. Escape, pointer cancellation,
 unexpected capture loss or window blur restores preview/document/scroll without a
 draft save. A keyframe may move beyond duration without extending the sequence merely
-to display it; Speed can naturally recompile clip durations. Other keyframes, source/
-static clip bases and music are not copied or shifted. The shared time field remains
+to display it; moving it never retimes a clip. Other keyframes, source ranges,
+clip settings and music are not copied or shifted. The shared time field remains
 an exact alternative, with the same atomic move validation.
 
-In Clip, Reset speed to 1× changes only an active keyed Speed setting when animated;
-without Speed keyframes it resets the selected clip's constant/ramp/custom base.
-It never clears the track curve or unrelated enabled settings. Colour **Reset** on an animated track
+Colour **Reset** on an animated track
 changes only enabled colour values at the current keyframe; double-clicking a setting's
 name resets only that setting, including unanimated track colour bases. Stored-keyframe resets in Keyframes target that
 keyframe's existing enabled setting, not a different value at the playhead.
@@ -452,10 +456,9 @@ Trim/move/split/duplicate do not copy or shift track keyframes. The contract is 
 
 Inside each timeline clip rectangle, boxed blue **▼** Transform and salmon/dashed
 **◆** custom-speed lanes show source keyframes at authoritative retimed output
-positions, including a track Speed override. Off-trim keyframes are omitted; exclusive
-OUT has a boundary marker that seeks the final available frame. Speed override
-is indicated without deleting clip keyframes. Click, Enter or Space selects the clip,
-seeks its nearest mapped image and opens Clip → Transform (Clip → Speed for the ◆ lane); a click edits nothing. Transform keys also slide by drag or ←/→ (one original source frame, Shift ten), keeping easing and enabled settings: drafts preview only, a valid release is one Undo step, and Escape, cancellation, blur or an occupied frame restores.
+positions. Off-trim keyframes are omitted; exclusive
+OUT has a boundary marker that seeks the final available frame. Click, Enter or Space selects the clip,
+seeks its nearest mapped image and opens Clip → Transform (Clip → Speed for the ◆ lane); a click edits nothing. Both kinds also slide by drag or ←/→ (one original source frame, Shift ten), keeping easing (and Transform enabled settings): drafts preview only, a valid release is one Undo step, and Escape, cancellation, blur or an occupied frame restores. Moving a speed keyframe retimes its clip, so its duration and Ripple suffix can change; timing conflicts reject the release.
 Marker keyboard events are isolated from timeline shortcuts. These differ from
 draggable shared project-time track markers. Speed and Transform stored-source
 inspection remains separate, reaches all retained off-trim/original-OUT keyframes
@@ -495,7 +498,7 @@ uncertain write keeps selection and the actual error visible, with guidance to c
 Activity/project state before repeating the import; there is no automatic write retry.
 Late folder reads are aborted on navigation/dismissal. Manual music paths remain
 deliberate imports outside browser roots and never expand configured roots. No original is
-copied: strict schema 12 references registered originals in place, with only
+copied: strict schema 13 references registered originals in place, with only
 generated proxies/thumbnails, metadata, exports/receipts and scratch written locally.
 
 There is no upload endpoint, browser file picker, optional copy flow or true
@@ -654,10 +657,11 @@ saved document. It never deletes original recordings, shared registry entries,
 proxies/cache files, successful MP4s or receipts. This is not cache garbage
 collection; another project's membership and immutable export snapshots are unaffected.
 
-Only strict v12 projects and v12 project snapshots in version-1 export receipts are interpreted.
+Only strict v13 projects and v13 project snapshots in version-1 export receipts are interpreted.
 Every video track requires complete Colour, including `temperature` and `tint` bases
 and static HSL/curves; missing fields and clip colour/correction are invalid.
-Every clip requires complete spatial base/per-setting source-frame keyframes with easing;
+Every clip requires constant or 1–256-keyframe custom-curve speed and complete spatial
+base/per-setting source-frame keyframes with easing;
 missing spatial data is invalid, not default-filled. Original-source keyframes remain
 stored outside trims and at original exclusive OUT, without extending duration.
 The required `music` array holds 0–8 music tracks with unique required `id` values and
@@ -672,12 +676,12 @@ Every video track requires `ripple`, `transitions`, `openingFade` and `closingFa
 project-level transitions/fades and a mandatory first-track identity are absent.
 Every video track also requires numeric `opacity` in 0–1. A new track starts at 1 (100%);
 a missing saved value is invalid, not default-filled. Every keyframe requires exactly
-eleven nullable fields, in control order: `opacity`, `speed`, `temperature`,
+ten nullable fields, in control order: `opacity`, `temperature`,
 `tint`, `exposure`, `brightness`, `contrast`, `hue`, `saturation`, `highlights`,
 `shadows`. HSL/curves remain static. Track
 `opacity` is the sole valid stored value; saved `clip.opacity` and old
 `clipOpacity`/`layerOpacity` channels are invalid, not ignored or defaulted.
-Earlier v1–v11 projects/receipt snapshots are preserved, incompatible
+Earlier v1–v12 projects/receipt snapshots are preserved, incompatible
 and never migrated or rewritten with fallback/default local fields or old-format
 readers. **Create a new
 project** and import its media deliberately; there is no automatic deletion of
@@ -774,7 +778,7 @@ invalid release leaves the saved document and history unchanged.
 For an HTTP 409 or incompatible save response, **Review latest save** explains:
 
 1. **Keep editing this draft** — no saved document changes; the save error persists.
-2. **Download unsaved project** — download a strict v12 JSON snapshot with the current
+2. **Download unsaved project** — download a strict v13 JSON snapshot with the current
    local changes/expected revision before replacing them.
 3. **Discard local changes and reload** — explicitly replace local history/document
    with a newly read saved version. It performs no overwrite POST/PUT.

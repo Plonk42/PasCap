@@ -1,4 +1,4 @@
-# Video track Temperature and Tint · strict project schema 12
+# Video track Temperature and Tint · strict project schema 13
 
 Approved contract for [#68](https://github.com/Plonk42/PasCap/issues/68).
 These are normalized **SDR colour controls**, not Kelvin, HDR, illuminant
@@ -17,19 +17,19 @@ their track's complete grade, including both dissolve sources. Empty tracks rema
 editable; different treatments require different tracks. No clip Colour/correction
 base, ownership toggle or copy to clips is introduced.
 
-Shared video track keyframes require exactly **eleven nullable channels**, in control order:
-`opacity`, `speed`, `temperature`, `tint`, `exposure`, `brightness`, `contrast`,
+Shared video track keyframes require exactly **ten nullable channels**, in control order:
+`opacity`, `temperature`, `tint`, `exposure`, `brightness`, `contrast`,
 `hue`, `saturation`, `highlights`, `shadows`. Temperature and Tint are keyed
 independently at absolute project frames, interpolate parameter values using the
 left keyframe's shared easing for that setting and hold endpoints. Keyframes without that enabled setting are
 skipped. No keyframes for a setting means the saved track base; removing its final keyframe reveals
 that unchanged base. HSL bands and master/RGB curves remain **static**, not new
-animation channels. Speed retains its separate clip-base/track-override semantics.
+animation channels. Speed is clip-only, never a track channel.
 
 **Track → Colour** places Temperature and Tint before Exposure. Main and stored
 keyed settings use native sliders (step 0.01), adjacent exact numeric fields,
-and reset to 0 by double-clicking the name. Main capture diamonds are always visible, with adjacent per-setting **Previous/Next** buttons because not every setting is enabled at every shared keyframe. Its single keyframe-line Previous/Next pair (with the keyframe count) visits the union of Opacity and all nine scalar colour keys,
-skipping speed-only keys. Enabled setting chips in stored Keyframes rows retain
+and reset to 0 by double-clicking the name. Main capture diamonds are always visible, with adjacent per-setting **Previous/Next** buttons because not every setting is enabled at every shared keyframe. Its single keyframe-line Previous/Next pair (with the keyframe count) visits the union of Opacity and all nine scalar colour keys.
+Enabled setting chips in stored Keyframes rows retain
 their per-channel arrows. All main and stored per-channel arrows visit strictly
 earlier/later keyframes where that channel is nonnull (zero is enabled), sharing
 the central off-duration inspection cursor.
@@ -79,14 +79,14 @@ native process; existing frame/pixel/resource and A/V gates remain unchanged.
 
 ## Strict preservation and validation
 
-Only **schema 12** projects and schema-12 snapshots in version-1 export receipts
+Only **schema 13** projects and schema-13 snapshots in version-1 export receipts
 are accepted. Missing Temperature/Tint bases or either nullable keyframe field,
-unknown fields and saved clip Colour/correction are invalid. Reject **v1–v11**
+unknown fields and saved clip Colour/correction are invalid. Reject **v1–v12**
 documents and receipt snapshots clearly; preserve their bytes and successful
-outputs. Recreate projects deliberately: no migrations, v11 acceptance,
+outputs. Recreate projects deliberately: no migrations, v12 acceptance,
 compatibility readers, injected defaults, fallback or automatic deletion.
 Receipt/report/registry/proxy/PCM format versions remain independent and unchanged;
-new reference/measurement metadata identifies schema 12, historical evidence does
+new reference/measurement metadata identifies schema 13, historical evidence does
 not change.
 
 Required disposable checks cover strict bounds/rejection/preservation, neutral

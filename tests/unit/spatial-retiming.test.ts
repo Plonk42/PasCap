@@ -1,11 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { EMPTY_KEY_VALUES, type Interpolation } from '../../src/shared/keyframes.js';
-import { compileLayerRetiming } from '../../src/shared/layer-retiming.js';
-import { createClip, createLayer } from '../../src/shared/model.js';
+import type { Interpolation } from '../../src/shared/keyframes.js';
+import { createClip } from '../../src/shared/model.js';
 import { evaluateSpatial, NEUTRAL_SPATIAL_POSE } from '../../src/shared/spatial.js';
 import { compileRetiming, type Retiming, type SpeedSettings } from '../../src/shared/speed.js';
 
-const easings: Interpolation[] = ['hold', 'linear', 'ease-in', 'ease-out', 'smooth'];
 const progress: Record<Interpolation, (u: number) => number> = {
   hold: () => 0,
   linear: (u) => u,
@@ -13,25 +11,8 @@ const progress: Record<Interpolation, (u: number) => number> = {
   'ease-out': (u) => 2 * u - u * u,
   smooth: (u) => 3 * u * u - 2 * u * u * u,
 };
-const primitive: Record<Interpolation, (u: number) => number> = {
-  hold: () => 0,
-  linear: (u) => (u * u) / 2,
-  'ease-in': (u) => (u * u * u) / 3,
-  'ease-out': (u) => u * u - (u * u * u) / 3,
-  smooth: (u) => u * u * u - (u * u * u * u) / 2,
-};
-
 function base(speed: SpeedSettings, sourceIn = 7, sourceOut = 37) {
   return { ...createClip('spatial-retiming', 'synthetic', sourceIn, sourceOut), speed };
-}
-
-function keyedRow(interpolation: Interpolation, left = 0.5, right = 2) {
-  const layer = createLayer('spatial-row', 'Spatial row');
-  layer.keyframes = [
-    { frame: 0, interpolation, values: { ...EMPTY_KEY_VALUES, speed: left } },
-    { frame: 100, interpolation: 'hold', values: { ...EMPTY_KEY_VALUES, speed: right } },
-  ];
-  return layer;
 }
 
 function expectContinuousBounds(map: Retiming, sourceIn: number, sourceOut: number): void {
@@ -65,37 +46,6 @@ describe('continuous original-source retiming for spatial animation', () => {
       }
       for (const source of [7, 8, 21, 36, 37])
         expect(map.outputAt(source)).toBe(Math.min(duration - 1, Math.floor((source - 7) / (30 / duration) + 1e-8)));
-      expectContinuousBounds(map, 7, 37);
-    },
-  );
-
-  it.each(['linear', 'ease-in', 'ease-out', 'smooth'] as const)(
-    'exposes the existing midpoint-integrated %s ramp clock before flooring',
-    (curve) => {
-      const map = compileRetiming(
-        base({ mode: 'ramp', startRate: 0.5, endRate: 2, curve, anchorIn: 0, anchorOut: 50 }),
-      );
-      // Independently reconstruct the specified midpoint clock, including off-trim anchors.
-      const step = 30 / 256;
-      const times = [0];
-      const rate = (source: number) => 0.5 + 1.5 * progress[curve](source / 50);
-      for (let index = 0; index < 256; index++) times.push(times[index]! + step / rate(7 + (index + 0.5) * step));
-      const total = times[256]!;
-      expect(map.duration).toBe(Math.round(total));
-      for (const frame of [0.25, 1, map.duration / 2, map.duration - 0.25]) {
-        const time = (frame * total) / map.duration;
-        const index = times.findIndex((value) => value > time) - 1;
-        const source = 7 + (index + (time - times[index]!) / (times[index + 1]! - times[index]!)) * step;
-        expect(map.sourcePositionAt(frame)).toBeCloseTo(source, 12);
-        expect(map.sourceAt(frame)).toBe(Math.min(36, Math.floor(source + 1e-8)));
-        expect(map.rateAt(frame)).toBeCloseTo((rate(source) * total) / map.duration, 12);
-      }
-      for (const source of [7, 8, 20, 36]) {
-        const position = (source - 7) / step;
-        const index = Math.floor(position);
-        const time = times[index]! + (times[index + 1]! - times[index]!) * (position - index);
-        expect(map.outputAt(source)).toBe(Math.min(map.duration - 1, Math.floor((time * map.duration) / total + 1e-8)));
-      }
       expectContinuousBounds(map, 7, 37);
     },
   );
@@ -187,87 +137,8 @@ describe('continuous original-source retiming for spatial animation', () => {
     expectContinuousBounds(map, 0, 1000);
   });
 
-  it.each(easings)('uses the unnormalised absolute row %s integral at the actual placement', (interpolation) => {
-    const layer = keyedRow(interpolation);
-    const clip = base({ mode: 'constant', rate: 8 });
-    const start = 20;
-    const map = compileLayerRetiming(clip, layer, start);
-    const consumed = (elapsed: number) =>
-      0.5 * elapsed + 150 * (primitive[interpolation]((start + elapsed) / 100) - primitive[interpolation](start / 100));
-    let low = 0;
-    let high = 80;
-    for (let iteration = 0; iteration < 60; iteration++) {
-      const middle = (low + high) / 2;
-      if (consumed(middle) < 30) low = middle;
-      else high = middle;
-    }
-    expect(map.duration).toBe(Math.round((low + high) / 2));
-    for (const frame of [0.25, 1, map.duration / 2, map.duration - 0.25]) {
-      const source = 7 + consumed(frame);
-      expect(map.sourcePositionAt(frame)).toBeCloseTo(Math.min(37, source), 11);
-      expect(map.sourceAt(frame)).toBe(Math.min(36, Math.floor(source + 1e-8)));
-      expect(map.rateAt(frame)).toBeCloseTo(0.5 + 1.5 * progress[interpolation]((start + frame) / 100), 12);
-    }
-    for (const source of [7, 8, 20, 36]) {
-      let begin = 0;
-      let end = 80;
-      for (let iteration = 0; iteration < 60; iteration++) {
-        const middle = (begin + end) / 2;
-        if (consumed(middle) < source - 7) begin = middle;
-        else end = middle;
-      }
-      expect(map.outputAt(source)).toBe(Math.min(map.duration - 1, Math.floor(end + 1e-8)));
-    }
-    expectContinuousBounds(map, 7, 37);
-    if (interpolation !== 'hold') {
-      const moved = compileLayerRetiming(clip, layer, 30);
-      expect(moved.sourcePositionAt(1)).toBeGreaterThan(map.sourcePositionAt(1));
-    }
-  });
-
-  it('crosses row intervals in project time and skips unrelated participants', () => {
-    const layer = createLayer('compound-row', 'Compound row');
-    layer.keyframes = [
-      { frame: 0, interpolation: 'hold', values: { ...EMPTY_KEY_VALUES, speed: 0.25 } },
-      { frame: 10, interpolation: 'linear', values: { ...EMPTY_KEY_VALUES, opacity: 0.5 } },
-      { frame: 12, interpolation: 'hold', values: { ...EMPTY_KEY_VALUES, speed: 2 } },
-      { frame: 20, interpolation: 'hold', values: { ...EMPTY_KEY_VALUES, speed: 0.5 } },
-    ];
-    const map = compileLayerRetiming(base({ mode: 'constant', rate: 8 }), layer, 8);
-    expect(map.duration).toBe(38);
-    for (const [output, source, rate] of [
-      [0.5, 7.125, 0.25],
-      [2.5, 7.625, 0.25],
-      [4, 8, 2],
-      [4.5, 9, 2],
-      [12, 24, 0.5],
-      [12.5, 24.25, 0.5],
-      [37.5, 36.75, 0.5],
-    ] as const) {
-      expect(map.sourcePositionAt(output)).toBe(source);
-      expect(map.sourceAt(output)).toBe(Math.floor(source));
-      expect(map.rateAt(output)).toBe(rate);
-    }
-    expectContinuousBounds(map, 7, 37);
-  });
-
-  it('does not normalise a rounded constant row clock and still includes the exact exclusive OUT', () => {
-    const layer = keyedRow('hold', 8, 8);
-    const clip = base({ mode: 'constant', rate: 8 }, 7, 10);
-    const row = compileLayerRetiming(clip, layer, 0);
-    const staticMap = compileRetiming(clip);
-    expect(row.duration).toBe(1);
-    expect(staticMap.duration).toBe(1);
-    expect(row.sourcePositionAt(0.25)).toBe(9);
-    expect(staticMap.sourcePositionAt(0.25)).toBe(7.75);
-    expect(row.sourcePositionAt(0.75)).toBe(10);
-    expect(row.sourceAt(0.75)).toBe(9);
-    expectContinuousBounds(row, 7, 10);
-  });
-
   it('evaluates distinct smooth spatial poses on held decoded images for every speed compiler', () => {
     const constant = base({ mode: 'constant', rate: 0.25 });
-    const ramp = base({ mode: 'ramp', startRate: 0.2, endRate: 0.5, curve: 'smooth', anchorIn: 7, anchorOut: 37 });
     const custom = base({
       mode: 'curve',
       keyframes: [
@@ -283,13 +154,7 @@ describe('continuous original-source retiming for spatial animation', () => {
       ],
     };
     const before = structuredClone(spatial);
-    const maps = [
-      compileRetiming(constant),
-      compileRetiming(ramp),
-      compileRetiming(custom),
-      compileLayerRetiming(constant, keyedRow('smooth', 0.2, 0.5), 20),
-      compileLayerRetiming(constant, createLayer('unkeyed', 'Unkeyed'), 20),
-    ];
+    const maps = [compileRetiming(constant), compileRetiming(custom)];
     for (const map of maps) {
       expect(map.sourceAt(1)).toBe(7);
       expect(map.sourceAt(2)).toBe(7);

@@ -23,12 +23,10 @@ export function easingGraphPoints(curve: Interpolation): string {
 interface Props extends Omit<SelectHTMLAttributes<HTMLSelectElement>, 'value' | 'onChange' | 'children' | 'multiple'> {
   value: Interpolation;
   onChange: (value: Interpolation) => void;
-  allowHold?: boolean;
-  ramp?: boolean;
 }
 
 /** A native selector with supplementary feedback, not a custom option menu. */
-export function EasingSelect({ value, onChange, allowHold = true, ramp = false, ...props }: Readonly<Props>) {
+export function EasingSelect({ value, onChange, ...props }: Readonly<Props>) {
   const descriptionId = useId();
   const shape = SHAPES.find((item) => item.value === value)!;
   const description = `${shape.label}: ${shape.description} Graph: time runs left to right; value progress runs bottom to top.`;
@@ -40,9 +38,9 @@ export function EasingSelect({ value, onChange, allowHold = true, ramp = false, 
         aria-describedby={[props['aria-describedby'], descriptionId].filter(Boolean).join(' ')}
         onChange={(event) => onChange(event.currentTarget.value as Interpolation)}
       >
-        {SHAPES.filter((item) => allowHold || item.value !== 'hold').map((item) => (
+        {SHAPES.map((item) => (
           <option key={item.value} value={item.value}>
-            {ramp && item.value === 'smooth' ? 'Smooth (S curve)' : item.label}
+            {item.label}
           </option>
         ))}
       </select>

@@ -368,8 +368,8 @@ describe('registered API methods', () => {
     await expect(api.save(project, 0)).rejects.toMatchObject({ status: 200, kind: 'response' });
   });
 
-  it('uses complete schema-12 project mocks and rejects a version-8 response without changing it', async () => {
-    expect(project.schemaVersion).toBe(12);
+  it('uses complete schema-13 project mocks and rejects a version-8 response without changing it', async () => {
+    expect(project.schemaVersion).toBe(13);
     expect(project.layers[0]!.keyframes).toEqual([]);
     const unsupported = unsupportedProject(8, project.id, project.title);
     const before = JSON.stringify(unsupported);
@@ -379,7 +379,7 @@ describe('registered API methods', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
-  it('validates all eleven required nullable members in a shared row point, including zero participation', async () => {
+  it('validates all ten required nullable members in a shared row point, including zero participation', async () => {
     const point = {
       frame: 100,
       interpolation: 'linear' as const,
@@ -399,8 +399,8 @@ describe('registered API methods', () => {
     expect(vi.getTimerCount()).toBe(0);
   });
 
-  it.each(['clip opacity', 'layerOpacity', 'clipOpacity'])(
-    'rejects a removed %s in a v12 response without dropping it or retrying',
+  it.each(['clip opacity', 'layerOpacity', 'clipOpacity', 'speed'])(
+    'rejects a removed %s in a v13 response without dropping it or retrying',
     async (removed) => {
       const layer = project.layers[0]!;
       const legacyLayer =

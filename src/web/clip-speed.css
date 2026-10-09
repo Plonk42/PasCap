@@ -48,24 +48,6 @@
   color: #efce8d;
 }
 
-.clip-speed-key-tools {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  color: var(--muted);
-  font-size: 11px;
-}
-
-.clip-speed-key-tools > span {
-  margin-right: auto;
-}
-
-.product-workspace .clip-speed-key-tools > .secondary-button {
-  min-height: 30px;
-  padding: 4px 7px;
-  font-size: 11px;
-}
-
 .clip-speed-chart {
   display: grid;
   grid-template-columns: 26px minmax(0, 1fr);
@@ -277,23 +259,4 @@
   align-items: center;
   gap: 5px;
   font-variant-numeric: tabular-nums;
-}
-
-.clip-speed-row-heading {
-  padding-top: 12px;
-  margin-top: 12px;
-  border-top: 1px solid var(--line);
-}
-
-.clip-speed-override {
-  display: flex;
-  align-items: flex-start;
-  gap: 6px;
-  padding: 8px;
-  border: 1px solid #947c4b;
-  border-radius: 5px;
-  color: #edcf92;
-  background: #312c20;
-  font-size: 11px;
-  line-height: 1.5;
 }

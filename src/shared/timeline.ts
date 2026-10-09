@@ -1,9 +1,8 @@
 import type { ColourSettings } from './colour.js';
 import { colourAt, opacityAt } from './composition.js';
-import { compileLayerRetiming } from './layer-retiming.js';
 import type { ProjectDocument, Transition, VideoClip, VideoLayer } from './model.js';
 import { evaluateSpatial, type SpatialPose } from './spatial.js';
-import type { Retiming } from './speed.js';
+import { compileRetiming, type Retiming } from './speed.js';
 
 export interface PlacedClip {
   clip: VideoClip;
@@ -150,8 +149,9 @@ function placeLayer(
     const closing = index === ordered.length - 1 ? layer.closingFade : 0;
     const previous = clips[index - 1];
     const start = placementStart(clip, layer, previous, incoming);
-    const retiming = compileLayerRetiming(clip, layer, start);
+    const retiming = compileRetiming(clip);
     const duration = retiming.duration;
+    if (start + duration > 2_147_483_647) throw new RangeError('Track duration exceeds supported project frames.');
     validateClipRegions(clip, duration, incoming, outgoing, opening, closing);
     const placed = { clip, start, end: start + duration, duration, retiming };
     validatePlacement(placed, previous, clips[index - 2], incoming);

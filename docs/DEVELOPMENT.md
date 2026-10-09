@@ -1,11 +1,12 @@
 # Development
 
-Current strict schema **12** requires nine scalar bases in each video track's `colour`,
+Current strict schema **13** requires nine scalar bases in each video track's `colour`,
 including Temperature/Tint (−1…1, neutral 0), all eight HSL bands and all four
-colour curves. Shared keyframes require eleven nullable fields, in control order:
-`opacity`, `speed`, `temperature`, `tint`, `exposure`, `brightness`, `contrast`,
-`hue`, `saturation`, `highlights`, `shadows`. HSL/curves remain static.
-Reject/preserve v1–v11 documents and receipt snapshots; no load defaults,
+colour curves. Shared keyframes require ten nullable fields, in control order:
+`opacity`, `temperature`, `tint`, `exposure`, `brightness`, `contrast`,
+`hue`, `saturation`, `highlights`, `shadows`. HSL/curves remain static; speed is
+clip-only (constant or 1–256 source-frame keyframes).
+Reject/preserve v1–v12 documents and receipt snapshots; no load defaults,
 migrations, legacy acceptance or automatic deletion. CPU/reference/native/GPU
 must use the same [Temperature/Tint gain math](design/TEMPERATURE_AND_TINT.md)
 before Exposure, including intentionally coloured greys and pre-clipping
@@ -18,7 +19,7 @@ scalar LUT paths. At most two native 65³ Float32 buffers (6,591,000 bytes) rema
 available, without an extra decoder, texture, full-frame buffer or child process.
 Exact advanced grading remains the costliest export path, especially at UHD. See
 [HSL_AND_CURVES.md](design/HSL_AND_CURVES.md). New reference/measurement metadata
-identifies strict schema 12; historical reports remain unchanged.
+identifies strict schema 13; historical reports remain unchanged.
 
 Local Linux setup and contributing. Editing: [USER_GUIDE.md](USER_GUIDE.md). Service
 paths and **future, not implemented** containers: [DEPLOYMENT.md](DEPLOYMENT.md).
@@ -312,8 +313,8 @@ originals in `.pascap/browser-footage/synthetic-sources/` are outside that cache
 `browse-camera-*` means generated patterns, not real recordings. The
 [fixture factory](../scripts/fixtures.ts) uses `preview-lab-v6` outside the browser
 cache and `preview-lab` inside it. These are project identifiers, not schema
-versions; newly generated documents must satisfy strict v12, including complete video track
-colour with Temperature/Tint, all eleven nullable channels and clip spatial
+versions; newly generated documents must satisfy strict v13, including complete video track
+colour with Temperature/Tint, all ten nullable channels and clip spatial
 base/per-setting keyframes. Bin resets never imply
 a global-library fallback.
 Neither suite invokes real-source sample preparation or needs private footage/music.
@@ -410,15 +411,15 @@ the independent one-frame A/V, single-epoch and completion assertions.
 **Do not run these in CI or without the owner's explicit approval for real jobs.**
 The [sample helper](../scripts/prepare-samples.ts) targets **DJI_0468.MP4 and DJI_0469.MP4
 only**: pass an **explicit folder after `--`**, never rely on a personal-path default.
-It reuses ready proxies but may prepare missing ones; creates only an absent v12
+It reuses ready proxies but may prepare missing ones; creates only an absent v13
 sample, never overwrites or migrates existing edits.
 
 The [measurement helper](../scripts/measure-preview.ts) accepts exactly **two
 1× clips on one enabled, zero-origin contiguous video track with Opacity 1**, no music,
 extra tracks, spatial edits/keyframes or shared track keyframes
-(even neutral/Speed-only keyframes). `PASCAP_MEASURE_URL` selects that project.
+(even neutral keyframes). `PASCAP_MEASURE_URL` selects that project.
 Measurement uses static scalar track Colour (including Temperature/Tint), neutral
-HSL and identity curves; metadata must identify the strict v12 snapshot independently of the
+HSL and identity curves; metadata must identify the strict v13 snapshot independently of the
 report format/identifier; historical reports and receipt snapshots stay untouched.
 `npm run measure -- --skip-playback --reference` skips playback benchmarking but
 **renders a native reference**; `--headed --reference` adds repeated playback. The edit
@@ -429,12 +430,12 @@ total-process memory; reports expose private paths/snapshots, so review before s
 
 ## Architecture
 
-| Boundary | Entry points                                                                                                                                                   | Responsibility                                                                                |
-| -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| Shared   | [Model](../src/shared/model.ts), [commands](../src/shared/commands.ts), [layout](../src/shared/timeline.ts), [track retiming](../src/shared/layer-retiming.ts) | Strict data, integer-frame timing, atomic edits; no React/browser/FFmpeg dependencies         |
-| Preview  | [Engine](../src/preview/engine.ts), [decoder](../src/preview/decoder.ts), [compositor](../src/preview/compositor.ts), [music](../src/preview/music.ts)         | Observed frames, decoder reuse, WebGL2/Web Audio; independent of React                        |
-| Web      | [App](../src/web/App.tsx), [autosave](../src/web/autosave.ts)                                                                                                  | Panels, contextual controls, transient pointer/input drafts, session history and serial saves |
-| Service  | [HTTP app](../src/server/app.ts), [library](../src/server/library.ts), [jobs](../src/server/jobs.ts), [composited export](../src/server/layered-export.ts)     | Guarded registered-source access, bounded native work and verified immutable exports          |
+| Boundary | Entry points                                                                                                                                               | Responsibility                                                                                |
+| -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| Shared   | [Model](../src/shared/model.ts), [commands](../src/shared/commands.ts), [layout](../src/shared/timeline.ts), [clip speed](../src/shared/speed.ts)          | Strict data, integer-frame timing, atomic edits; no React/browser/FFmpeg dependencies         |
+| Preview  | [Engine](../src/preview/engine.ts), [decoder](../src/preview/decoder.ts), [compositor](../src/preview/compositor.ts), [music](../src/preview/music.ts)     | Observed frames, decoder reuse, WebGL2/Web Audio; independent of React                        |
+| Web      | [App](../src/web/App.tsx), [autosave](../src/web/autosave.ts)                                                                                              | Panels, contextual controls, transient pointer/input drafts, session history and serial saves |
+| Service  | [HTTP app](../src/server/app.ts), [library](../src/server/library.ts), [jobs](../src/server/jobs.ts), [composited export](../src/server/layered-export.ts) | Guarded registered-source access, bounded native work and verified immutable exports          |
 
 Preview reuses **two decoder/texture slots per track, up to 16 for eight**, plus one
 source reviewer, not one per clip. Each track can dissolve independently. Generalized
@@ -464,7 +465,7 @@ of Ripple or track ID.
 Processing: [track keyframes](LAYERS_AND_KEYFRAMES.md), [retiming/audio](SPEED_AND_AUDIO.md)
 and [grading equations](COLOUR_AND_TIMING.md#colour).
 
-Strict schema 12 requires `clip.spatial: { base, keyframes }`: eight complete pose
+Strict schema 13 requires `clip.spatial: { base, keyframes }`: eight complete pose
 values and 0–256 per-setting original-source keyframes with required easing. Shared
 [spatial mapping](../src/shared/spatial.ts) uses unrounded original-aspect contain
 fit, original-centre pivot and half-open crop bounds; crop does not refit.
@@ -501,13 +502,12 @@ real playhead permits editing, with the diamond explicitly capturing a missing
 setting. Sliders never create keyframes. **Placement** contains placement only;
 Track options contains rename, Ripple, ordering and deletion, with visibility separate.
 
-Colour, Speed and Transform always show their capture diamonds and adjacent per-setting **Previous/Next** buttons while the section is expanded; there is no Animate toggle and no stored preference. Each expanded section has one keyframe line with the **number of keyframes**, one **Previous/Next** pair over the same set and **Reset**. The line is hidden while the section is collapsed; the title row and its help stay reachable. Rendering, retained keyframes and read-only constraints never depend on what is shown. The per-setting buttons remain alongside the stored enabled-setting chip arrows because not every setting is enabled at every shared keyframe.
+Colour, Speed and Transform always show their capture diamonds while the section is expanded, Colour and Transform with adjacent per-setting **Previous/Next** buttons; there is no Animate toggle and no stored preference. Each expanded section has one keyframe line with the **number of keyframes**, one **Previous/Next** pair over the same set and **Reset**. The line is hidden while the section is collapsed; the title row and its help stay reachable. Rendering, retained keyframes and read-only constraints never depend on what is shown. The per-setting buttons remain alongside the stored enabled-setting chip arrows because not every setting is enabled at every shared keyframe.
 Each keyframe line has one Previous/Next pair: Colour visits the union of
-Opacity and nine scalar keyframes, skipping speed-only keyframes; Speed visits track
-Speed keyframes plus all retained custom speed source keyframes of the selected
-clip, including off-trim keyframes and original exclusive OUT, previewing the
-nearest mapped image through authoritative retiming. Track Speed overrides but
-retains clip keyframes and their navigation. Transform likewise visits all retained
+Opacity and nine scalar keyframes; Speed visits all retained custom speed source
+keyframes of the selected clip, including off-trim keyframes and original exclusive
+OUT, previewing the nearest mapped image through authoritative retiming. Transform
+likewise visits all retained
 source keyframes, including off-trim/original OUT. Speed and Transform
 each use a clip-local stored-source cursor independent of central track inspection,
 so successive stored keyframes remain reachable even when their nearest first/last
@@ -518,15 +518,14 @@ where that channel is nonnull (zero is enabled), sharing the central off-duratio
 inspection cursor with section navigation to track keyframes and track/list
 navigation. Main capture always uses the real displayed project/source frame,
 never an inspected stored time. All visible
-track/Transform/clip-speed/ramp easing labels read **Easing**, retaining contextual
-accessible names such as **Track keyframe easing N** and **Ramp easing**.
+track/Transform/clip-speed easing labels read **Easing**, retaining contextual
+accessible names such as **Track keyframe easing N**.
 
 Inside timeline clip rectangles, boxed blue **▼** Transform and salmon/dashed **◆**
-custom-speed lanes place source keyframes at authoritative retimed output positions,
-including track Speed overrides, indicated without deleting clip keyframes.
+custom-speed lanes place source keyframes at authoritative retimed output positions.
 Off-trim keyframes are omitted; exclusive OUT has a boundary marker seeking the final
 available frame. Click, Enter or Space selects the clip, seeks its nearest
-mapped image and opens its Inspector section (Transform, or Speed for ◆); a click edits nothing. Transform keys slide by drag or ←/→ (one source frame, Shift ten), one Undo step per valid release; marker keyboard events
+mapped image and opens its Inspector section (Transform, or Speed for ◆); a click edits nothing. Transform and speed keys slide by drag or ←/→ (one source frame, Shift ten), one Undo step per valid release; moving a speed key retimes its clip. Marker keyboard events
 are isolated from timeline shortcuts. Shared track markers retain their separate
 project-time editing behavior. These presentation changes leave math, storage,
 retiming algorithms and resource bounds unchanged.
@@ -567,15 +566,15 @@ independent numeric IN/OUT pair (Enter/blur applies, Escape restores) is unchang
 - Never modify/copy/delete owner's originals or commit private paths/device IDs,
   saved project IDs, real media/cache or reports. Preserve fingerprints, symlink
   rejection, cache exclusion and HTTP guards.
-- Keep **strict schema 12**: complete required video track `colour`, including
+- Keep **strict schema 13**: complete required video track `colour`, including
   Temperature/Tint and static HSL/curves; reject saved `clip.colour`
   and `clip.correction`. Grade sources once with evaluated track Colour, retaining
   two LUT buffers and existing raw/process budgets. Main Colour controls and keyframes
   have identical track scope and work empty. See [track appearance](design/ROW_APPEARANCE.md). Required clip spatial base/per-setting source-frame keyframes,
-  required unique video/audio membership, all eleven nullable
+  required unique video/audio membership, all ten nullable
   channels and per-track `ripple`, `transitions`, `openingFade`, `closingFade` and
   numeric `opacity` in 0–1. A new track starts at 1; a missing saved field is invalid.
-  The channels are `opacity` (sole UI **Opacity**), `speed`, `temperature`, `tint`,
+  The channels are `opacity` (sole UI **Opacity**), `temperature`, `tint`,
   `exposure`, `brightness`, `contrast`, `hue`, `saturation`, `highlights`, `shadows`.
   Missing bases/channels are invalid; neutral values are creation values only.
   Track `opacity` is the sole valid stored value; reject saved `clip.opacity`
@@ -583,7 +582,7 @@ independent numeric IN/OUT pair (Enter/blur applies, Escape restores) is unchang
   transitions/fades, compatibility fields/defaults/migration or mandatory first-track
   ID. Require a 0–8 `music` array with unique instance IDs and complete independent
   settings, plus captured audio-source/instance-plan arrays in current receipts.
-  Reject and preserve incompatible v1–v11 projects/receipt snapshots and finished videos,
+  Reject and preserve incompatible v1–v12 projects/receipt snapshots and finished videos,
   without automatic deletion; recreate projects deliberately. Registry/proxy formats,
   source protections and native resource budgets remain unchanged.
 - Reuse `JobQueue`, library and backpressured raw/retime helpers: one heavy job,

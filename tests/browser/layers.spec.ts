@@ -185,7 +185,7 @@ test('shares row opacity and individual colour channels at project points and ke
   expect(project.layers[0]?.keyframes).toEqual([]);
 });
 
-test('shared rate points support easing, participant removal and contextual row duration without source endpoints', async ({
+test('clip speed keys support easing, removal and their own duration while shared points stay put', async ({
   page,
 }) => {
   await expect(
@@ -193,12 +193,16 @@ test('shared rate points support easing, participant removal and contextual row 
   ).toHaveCount(0);
   const inspector = page.getByRole('complementary', { name: 'Clip inspector' });
   const diamond = inspector.getByRole('button', { name: 'Keyframe Speed', exact: true });
+  const speedOf = async () =>
+    projectSchema.parse(await page.evaluate(() => window.pascapLab!.project())).clips[0]!.speed;
+  const duration = async () =>
+    calculateLayout(projectSchema.parse(await page.evaluate(() => window.pascapLab!.project()))).duration;
   await seek(page, 0);
   await inspectorTab(page, 'Track');
   await inspector.getByRole('button', { name: 'Keyframe Exposure', exact: true }).click();
   await inspectorTab(page, 'Clip');
   await diamond.click();
-  const rate = page.getByRole('spinbutton', { name: 'Track speed rate', exact: true });
+  const rate = page.getByRole('spinbutton', { name: 'Clip speed rate', exact: true });
   await rate.fill('0.5');
   await rate.press('Enter');
   await seek(page, 30);
@@ -207,30 +211,30 @@ test('shared rate points support easing, participant removal and contextual row 
   await rate.fill('2');
   await rate.press('Enter');
   let project = projectSchema.parse(await page.evaluate(() => window.pascapLab!.project()));
-  expect(project.layers[0]?.keyframes).toEqual([
-    sharedPoint(0, { speed: 0.5, exposure: 0 }),
-    sharedPoint(30, { speed: 2 }),
-  ]);
-  expect(project.clips[0]?.speed).toEqual({ mode: 'constant', rate: 1 });
-  // Both linear and smooth integrate to 30 × (0.5 + 2) / 2 = 37.5
-  // source frames before frame 30; the remaining 22.5 consume 11.25 at 2×.
-  expect(calculateLayout(project).duration).toBe(41);
-  const first = await editLayerPoint(page, 'Video track 1', 0);
-  await first.getByRole('combobox', { name: 'Track keyframe easing 0', exact: true }).selectOption('smooth');
-  project = projectSchema.parse(await page.evaluate(() => window.pascapLab!.project()));
-  expect(calculateLayout(project).duration).toBe(41);
-  await inspectorTab(page, 'Clip');
+  expect(project.layers[0]?.keyframes).toEqual([sharedPoint(0, { exposure: 0 })]);
+  expect(project.clips[0]?.speed).toEqual({
+    mode: 'curve',
+    keyframes: [
+      { frame: 0, rate: 0.5, interpolation: 'linear' },
+      { frame: 15, rate: 2, interpolation: 'linear' },
+    ],
+  });
+  // 15 × ln(4) / 1.5 ≈ 13.86 output frames to source 15, then 45 source frames at 2×.
+  expect(calculateLayout(project).duration).toBe(36);
+  await page
+    .getByRole('combobox', { name: 'Selected clip speed keyframe', exact: true })
+    .selectOption({ label: 'Keyframe 1 · source 0' });
+  await page.getByRole('combobox', { name: 'Clip speed keyframe easing', exact: true }).selectOption('smooth');
+  const smooth = await speedOf();
+  expect(smooth.mode === 'curve' && smooth.keyframes[0]!.interpolation).toBe('smooth');
+  expect(await duration()).toBe(37);
   await seek(page, 0);
+  await expect(diamond).toHaveAttribute('aria-pressed', 'true');
   await diamond.click();
-  expect(projectSchema.parse(await page.evaluate(() => window.pascapLab!.project())).layers[0]?.keyframes[0]).toEqual(
-    sharedPoint(0, { exposure: 0 }, 'smooth'),
-  );
-  await diamond.click();
-  await rate.fill('0.5');
-  await rate.press('Enter');
-  expect(
-    projectSchema.parse(await page.evaluate(() => window.pascapLab!.project())).layers[0]?.keyframes[0]?.interpolation,
-  ).toBe('smooth');
+  expect(await speedOf()).toEqual({ mode: 'curve', keyframes: [{ frame: 15, rate: 2, interpolation: 'linear' }] });
+  expect(await duration()).toBe(30);
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  expect(await speedOf()).toEqual(smooth);
   await seek(page, 20);
   await inspectorTab(page, 'Track');
   await inspector.getByRole('button', { name: 'Keyframe Opacity', exact: true }).click();
@@ -239,15 +243,17 @@ test('shared rate points support easing, participant removal and contextual row 
     return window.pascapLab!.engine.diagnostics();
   });
   expect(state.status, state.message).toBe('paused');
-  await inspectorTab(page, 'Track keyframes');
-  await layerKeyframes(page, 'Video track 1')
-    .getByRole('button', { name: 'Delete track keyframe 30', exact: true })
-    .click();
+  await inspectorTab(page, 'Clip');
+  await page
+    .getByRole('combobox', { name: 'Selected clip speed keyframe', exact: true })
+    .selectOption({ label: 'Keyframe 2 · source 15' });
+  await page.getByRole('button', { name: 'Delete clip speed keyframe', exact: true }).click();
   project = projectSchema.parse(await page.evaluate(() => window.pascapLab!.project()));
-  expect(project.layers[0]?.keyframes).toEqual([
-    sharedPoint(0, { speed: 0.5, exposure: 0 }, 'smooth'),
-    sharedPoint(20, { opacity: 1 }),
-  ]);
+  expect(project.layers[0]?.keyframes).toEqual([sharedPoint(0, { exposure: 0 }), sharedPoint(20, { opacity: 1 })]);
+  expect(project.clips[0]?.speed).toEqual({
+    mode: 'curve',
+    keyframes: [{ frame: 0, rate: 0.5, interpolation: 'smooth' }],
+  });
   expect(calculateLayout(project).duration).toBe(120);
   expect(calculateLayout(project).clips[0]?.retiming.sourceAt(40)).toBe(20);
 });
@@ -381,7 +387,7 @@ test('layered native UI export includes keyed opacity and colour in an immutable
   const { receiptUrl } = await freshExportLinks(page, request, accepted, 90_000);
   const receipt = (await (await request.get(receiptUrl)).json()) as ExportReceipt;
   const snapshot = projectSchema.parse(receipt.snapshot);
-  expect(snapshot.schemaVersion).toBe(12);
+  expect(snapshot.schemaVersion).toBe(13);
   expect(snapshot.layers).toHaveLength(2);
   expect(snapshot.layers[1]?.keyframes).toEqual(document.layers[1]?.keyframes);
   expect(snapshot.clips[1]).not.toHaveProperty('animation');
@@ -423,8 +429,8 @@ test('plays three simultaneous sources through row-wide rate/grade curves, a tra
     layer: {
       ...project.layers[0]!,
       keyframes: [
-        sharedPoint(0, { speed: 0.5, exposure: -0.4, opacity: 0.6 }),
-        sharedPoint(24, { speed: 2, exposure: 0.4, opacity: 1 }, 'smooth'),
+        sharedPoint(0, { exposure: -0.4, opacity: 0.6 }),
+        sharedPoint(24, { exposure: 0.4, opacity: 1 }, 'smooth'),
       ],
     },
   });
@@ -440,18 +446,36 @@ test('plays three simultaneous sources through row-wide rate/grade curves, a tra
     layer: {
       ...project.layers[1]!,
       keyframes: [
-        sharedPoint(0, { speed: 0.7, opacity: 0, exposure: -0.4, saturation: 1 }, 'smooth'),
-        sharedPoint(79, { speed: 1.4, opacity: 1, exposure: 0.4, saturation: 0.6 }),
+        sharedPoint(0, { opacity: 0, exposure: -0.4, saturation: 1 }, 'smooth'),
+        sharedPoint(79, { opacity: 1, exposure: 0.4, saturation: 0.6 }),
       ],
     },
   });
+  // Each clip's own speed curve varies its decoder playback rate.
+  const curves: Record<string, [number, number, 'linear' | 'smooth', number]> = {
+    first: [0.5, 2, 'linear', 45],
+    second: [2, 0.5, 'smooth', 45],
+    'upper-clip': [0.7, 1.4, 'smooth', 80],
+  };
+  for (const [clipId, [from, to, interpolation, last]] of Object.entries(curves))
+    project = applyCommand(project, {
+      type: 'speed',
+      clipId,
+      speed: {
+        mode: 'curve',
+        keyframes: [
+          { frame: 0, rate: from, interpolation },
+          { frame: last, rate: to, interpolation },
+        ],
+      },
+    });
   const layout = calculateLayout(project);
   const dissolve = layout.transitions[0]!;
   const during = sampleTimeline(project, dissolve.start + 7).filter((layer) => layer.layerId === 'video-1');
   expect(during).toHaveLength(2);
   expect(during[0]?.colour).toEqual(during[1]?.colour);
   expect(during[0]?.opacity).toBe(during[1]?.opacity);
-  expect(layout.clips[1]!.retiming.rateAt(7)).toBeCloseTo(layout.clips[0]!.retiming.rateAt(dissolve.start + 7));
+  expect(layout.clips[1]!.retiming.rateAt(7)).not.toBeCloseTo(layout.clips[0]!.retiming.rateAt(dissolve.start + 7));
   const duration = calculateLayout(project).duration;
   project = applyCommand(project, {
     type: 'music',
@@ -558,10 +582,7 @@ test('edits shared values outside the source excerpt and duration without moving
     type: 'layer-update',
     layer: {
       ...project.layers[0]!,
-      keyframes: [
-        sharedPoint(5, { opacity: 0.2, exposure: -0.5, speed: 0.5 }, 'smooth'),
-        sharedPoint(110, { speed: 2 }),
-      ],
+      keyframes: [sharedPoint(5, { opacity: 0.2, exposure: -0.5 }, 'smooth'), sharedPoint(110, { exposure: 2 })],
     },
   });
   project = applyCommand(project, { type: 'trim', clipId: original.id, sourceIn: 30, sourceOut: 90 });
@@ -575,15 +596,15 @@ test('edits shared values outside the source excerpt and duration without moving
   await opacityFrame.press('Enter');
   const outside = await editLayerPoint(page, 'Video track 1', 110);
   await expect(outside.locator('.keyframe-row-skipped')).toHaveText('Outside duration');
-  await outside.getByRole('spinbutton', { name: 'Speed keyframe value 110', exact: true }).fill('3');
+  await outside.getByRole('spinbutton', { name: 'Exposure keyframe value 110', exact: true }).fill('3');
   await layerKeyframes(page, 'Video track 1')
     .getByRole('button', { name: 'Go to track keyframe 8', exact: true })
     .click();
   await page.getByRole('slider', { name: 'Exposure', exact: true }).fill('0.7');
   const edited = projectSchema.parse(await page.evaluate(() => window.pascapLab!.project()));
   expect(edited.layers[0]?.keyframes).toEqual([
-    sharedPoint(8, { opacity: 0.8, exposure: 0.7, speed: 0.5 }, 'smooth'),
-    sharedPoint(110, { speed: 3 }),
+    sharedPoint(8, { opacity: 0.8, exposure: 0.7 }, 'smooth'),
+    sharedPoint(110, { exposure: 3 }),
   ]);
   expect(edited.clips[0]).toEqual({ ...original, sourceIn: 30, sourceOut: 90 });
 });

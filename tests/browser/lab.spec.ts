@@ -388,10 +388,11 @@ test('constant speed retimes only the selected clip and split respects mapped so
   );
 });
 
-test('each ramp curve saves and restores along with shared row Colour', async ({ page }) => {
-  await page.getByRole('combobox', { name: 'Speed mode' }).selectOption('ramp-up');
+test('each Ramp up preset easing saves and restores along with shared row Colour', async ({ page }) => {
+  await page.getByRole('combobox', { name: 'Speed mode' }).selectOption('curve');
+  await page.getByRole('button', { name: 'Clip speed preset Ramp up', exact: true }).click();
   for (const curve of ['linear', 'ease-in', 'ease-out', 'smooth']) {
-    await page.getByRole('combobox', { name: 'Ramp easing' }).selectOption(curve);
+    await page.getByRole('combobox', { name: 'Clip speed keyframe easing' }).selectOption(curve);
     await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
     const state = await page.evaluate(async () => {
       const engine = window.pascapLab!.engine;
@@ -400,7 +401,7 @@ test('each ramp curve saves and restores along with shared row Colour', async ({
       return engine.diagnostics();
     });
     expect(state.status, state.message).toBe('paused');
-    expect(await page.evaluate(() => window.pascapLab!.project()!.clips[0]!.speed.mode)).toBe('ramp');
+    expect(await page.evaluate(() => window.pascapLab!.project()!.clips[0]!.speed.mode)).toBe('curve');
   }
   await inspectorTab(page, 'Track');
   await page.getByRole('slider', { name: 'Exposure', exact: true }).fill('0.6');
@@ -409,7 +410,7 @@ test('each ramp curve saves and restores along with shared row Colour', async ({
   await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
   await expect(page.getByRole('slider', { name: 'Exposure', exact: true })).toHaveValue('0.6');
   await inspectorTab(page, 'Clip');
-  await expect(page.getByRole('combobox', { name: 'Ramp easing' })).toHaveValue('smooth');
+  await expect(page.getByRole('combobox', { name: 'Clip speed keyframe easing' })).toHaveValue('smooth');
   expect(await page.evaluate(() => window.pascapLab!.project()!.layers[0]!.colour.exposure)).toBe(0.6);
 });
 
@@ -487,12 +488,15 @@ test('plays both ramp directions across dissolves and music source wraps on repe
       type: 'speed',
       clipId: clip.id,
       speed: {
-        mode: 'ramp',
-        startRate: index === 1 ? 2 : 0.5,
-        endRate: index === 1 ? 0.5 : 2,
-        curve: index === 0 ? 'linear' : index === 1 ? 'smooth' : 'ease-out',
-        anchorIn: 15,
-        anchorOut: 75,
+        mode: 'curve',
+        keyframes: [
+          {
+            frame: 15,
+            rate: index === 1 ? 2 : 0.5,
+            interpolation: index === 0 ? 'linear' : index === 1 ? 'smooth' : 'ease-out',
+          },
+          { frame: 75, rate: index === 1 ? 0.5 : 2, interpolation: 'linear' },
+        ],
       },
     });
   }

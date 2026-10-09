@@ -4,13 +4,13 @@ import {
   CLIP_SPEED_PRESETS,
   clipSpeedPreset,
   editableClipSpeed,
+  editClipSpeedRate,
   removeClipSpeedKey,
   updateClipSpeedKey,
 } from '../../src/shared/clip-speed.js';
 import { applyCommand, EditHistory } from '../../src/shared/commands.js';
 import { needsLayeredExport, planExport } from '../../src/shared/export.js';
-import { EMPTY_KEY_VALUES, interpolatedProgress, type Interpolation } from '../../src/shared/keyframes.js';
-import { compileLayerRetiming } from '../../src/shared/layer-retiming.js';
+import { interpolatedProgress, type Interpolation } from '../../src/shared/keyframes.js';
 import { createClip, createProject, projectSchema } from '../../src/shared/model.js';
 import { trimByOutputFrames, validateSourceRanges } from '../../src/shared/source-range.js';
 import {
@@ -38,13 +38,13 @@ describe('strict clip-instance speed curves', () => {
     const document = createProject('curve', 'Curve');
     document.clips = [clip(curve(key(0, 1), key(120, 2)))];
     expect(projectSchema.parse(document)).toEqual(document);
-    expect(document.schemaVersion).toBe(12);
+    expect(document.schemaVersion).toBe(13);
     expect(speedSchema.parse({ mode: 'constant', rate: 1 })).toEqual({ mode: 'constant', rate: 1 });
     expect(() => speedSchema.parse({ mode: 'curve' })).toThrow();
   });
   it.each([
     { mode: 'curve', keyframes: [] },
-    { mode: 'curve', keyframes: [key(0, 1)] },
+    { mode: 'ramp', startRate: 1, endRate: 2, anchorIn: 0, anchorOut: 120, curve: 'linear' },
     curve(key(2, 1), key(2, 2)),
     curve(key(10, 1), key(0, 2)),
     curve(key(-1, 1), key(120, 1)),
@@ -61,9 +61,10 @@ describe('strict clip-instance speed curves', () => {
   ])('rejects malformed curve %# rather than silently repairing it', (invalid) => {
     expect(speedSchema.safeParse(invalid).success).toBe(false);
   });
-  it('retains equal adjacent rates and accepts the exact 256-point bound', () => {
+  it('retains equal adjacent rates and accepts a single key and the exact 256-point bound', () => {
     const speed = curve(...Array.from({ length: 256 }, (_, index) => key(index, 1)));
     expect(speedSchema.parse(speed)).toEqual(speed);
+    expect(speedSchema.parse(curve(key(40, 1.5)))).toEqual(curve(key(40, 1.5)));
   });
   it.each(['hold', 'linear', 'ease-in', 'ease-out', 'smooth'] as const)(
     'samples %s between exact source anchors with endpoint holds',
@@ -171,6 +172,26 @@ describe('precise bounded curve integration and immutable shared maps', () => {
 });
 
 describe('presets, exact key edits and existing timeline operations', () => {
+  it('offers Ramp up/down as two-key smooth presets at the excerpt edges, in catalogue order', () => {
+    expect(CLIP_SPEED_PRESETS.map(({ id }) => id)).toEqual([
+      'flat',
+      'ramp-up',
+      'ramp-down',
+      'accelerate',
+      'decelerate',
+      'slow-centre',
+      'fast-centre',
+    ]);
+    expect(clipSpeedPreset({ sourceIn: 30, sourceOut: 90 }, 'ramp-up')).toEqual(
+      curve(key(30, 0.5, 'smooth'), key(90, 2, 'smooth')),
+    );
+    expect(clipSpeedPreset({ sourceIn: 30, sourceOut: 90 }, 'ramp-down')).toEqual(
+      curve(key(30, 2, 'smooth'), key(90, 0.5, 'smooth')),
+    );
+    expect(clipSpeedPreset({ sourceIn: 10, sourceOut: 17 }, 'slow-centre').keyframes.map(({ frame }) => frame)).toEqual(
+      [10, 12, 14, 15, 17],
+    );
+  });
   it.each(CLIP_SPEED_PRESETS)(
     'creates the $label curve across this excerpt only, including one-frame excerpts',
     ({ id }) => {
@@ -183,38 +204,31 @@ describe('presets, exact key edits and existing timeline operations', () => {
       }
     },
   );
-  it('deliberate Custom conversion preserves constant values and exact existing ramp anchors/easing', () => {
+  it('deliberate Custom conversion preserves constant values and an existing curve', () => {
     const base = { ...createClip('base', 'source', 30, 90), speed: { mode: 'constant' as const, rate: 1.125 } };
     expect(editableClipSpeed(base).keyframes.every((point) => point.rate === 1.125)).toBe(true);
-    base.speed = { mode: 'constant', rate: 2 };
-    const ramp = {
-      ...base,
-      speed: {
-        mode: 'ramp' as const,
-        startRate: 0.5,
-        endRate: 2,
-        anchorIn: 0,
-        anchorOut: 120,
-        curve: 'ease-out' as const,
-      },
-    };
-    const converted = editableClipSpeed(ramp);
-    for (const frame of [0, 30, 60, 90, 120])
-      expect(sourceRateAt(converted, frame)).toBe(sourceRateAt(ramp.speed, frame));
-    expect(editableClipSpeed({ ...ramp, speed: converted })).toEqual(converted);
+    const existing = curve(key(0, 0.5, 'ease-out'), key(120, 2));
+    expect(editableClipSpeed({ ...base, speed: existing })).toEqual(existing);
   });
-  it('adds a captured point, rejects collisions/missing keys, and retains the two-point minimum', () => {
+  it('adds a captured point, rejects collisions/missing keys, and keeps the last rate as constant speed', () => {
     const speed = curve(key(0, 0.5), key(120, 2));
     const before = structuredClone(speed);
     const added = addClipSpeedKey(speed, 60);
-    expect(added.keyframes[1]).toEqual(key(60, 1.25, 'smooth'));
+    expect(added.keyframes[1]).toEqual(key(60, 1.25, 'linear'));
     const moved = updateClipSpeedKey(added, 60, { frame: 80, rate: 1.125, interpolation: 'hold' });
     expect(moved.keyframes[1]).toEqual(key(80, 1.125, 'hold'));
     expect(() => updateClipSpeedKey(moved, 80, { frame: 120 })).toThrow();
     expect(() => addClipSpeedKey(speed, 120)).toThrow('already exists');
     expect(() => updateClipSpeedKey(speed, 50, { rate: 1 })).toThrow('no longer exists');
     expect(removeClipSpeedKey(moved, 80)).toEqual(speed);
-    expect(() => removeClipSpeedKey(speed, 0)).toThrow();
+    expect(() => removeClipSpeedKey(speed, 50)).toThrow('no longer exists');
+    expect(removeClipSpeedKey(speed, 0)).toEqual(curve(key(120, 2)));
+    expect(removeClipSpeedKey(curve(key(120, 2)), 120)).toEqual({ mode: 'constant', rate: 2 });
+    expect(addClipSpeedKey({ mode: 'constant', rate: 1.5 }, 40)).toEqual(curve(key(40, 1.5)));
+    expect(editClipSpeedRate({ mode: 'constant', rate: 1.5 }, null, 3)).toEqual({ mode: 'constant', rate: 3 });
+    expect(editClipSpeedRate(speed, 120, 4)).toEqual(curve(key(0, 0.5), key(120, 4)));
+    for (const frame of [null, 60])
+      expect(() => editClipSpeedRate(speed, frame, 4)).toThrow('Add a speed keyframe at this source frame');
     expect(speed).toEqual(before);
   });
   it('trim/split/duplicate retain source anchors, independent instances and exact one-step history', () => {
@@ -234,27 +248,6 @@ describe('presets, exact key edits and existing timeline operations', () => {
     expect(history.redo()).toEqual(updated);
     expect(compileRetiming(trimmed.clips[0]!).duration).toBeLessThan(compileRetiming(document.clips[0]!).duration);
     expect(trimByOutputFrames(trimmed.clips[0]!, 'out', -10, 120).sourceOut).toBeLessThan(100);
-  });
-  it('row Speed still overrides the clip curve, and removing only row Speed restores its independent base', () => {
-    const document = createProject('row-override', 'Row override');
-    document.clips = [clip(curve(key(0, 0.25), key(120, 0.25)))];
-    document.layers[0]!.keyframes = [
-      { frame: 0, interpolation: 'hold', values: { ...EMPTY_KEY_VALUES, speed: 2, exposure: 0.3 } },
-    ];
-    const placed = calculateLayout(document).clips[0]!;
-    expect(placed.duration).toBe(60);
-    expect(placed.retiming.sourceAt(10)).toBe(20);
-    const restored = applyCommand(document, {
-      type: 'layer-key-toggle',
-      layerId: 'video-1',
-      frame: 0,
-      setting: 'speed',
-      value: 2,
-    });
-    expect(calculateLayout(restored).duration).toBe(480);
-    expect(restored.layers[0]!.keyframes[0]!.values.exposure).toBe(0.3);
-    expect(restored.clips[0]!.speed).toEqual(document.clips[0]!.speed);
-    expect(compileLayerRetiming(restored.clips[0]!, restored.layers[0]!, 0)).toBe(compileRetiming(restored.clips[0]!));
   });
   it('static export uses the same custom map, and invalid speed changes never shorten existing dissolves', () => {
     const document = createProject('native-curve', 'Native curve');

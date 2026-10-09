@@ -6,15 +6,8 @@ import { createConfig, type ServiceConfig } from '../../src/server/config.js';
 import { fingerprintFile } from '../../src/server/files.js';
 import { runProcess } from '../../src/server/process.js';
 import { retimeRawVideo, type RawRetimingOptions } from '../../src/server/retime-process.js';
-import {
-  EMPTY_KEY_VALUES,
-  evaluateLayerSetting,
-  type Interpolation,
-  type LayerKeyframe,
-  type LayerKeyValues,
-} from '../../src/shared/keyframes.js';
 import { createClip, createLayer, createProject, projectSchema, type VideoClip } from '../../src/shared/model.js';
-import { compileRetiming, type Retiming } from '../../src/shared/speed.js';
+import { compileRetiming, sourceRateAt, type Retiming, type SpeedCurve } from '../../src/shared/speed.js';
 import { calculateLayout, sampleTimeline } from '../../src/shared/timeline.js';
 
 const enabled = process.env['PASCAP_MEDIA_TESTS'] === '1';
@@ -23,11 +16,8 @@ const HEIGHT = 8;
 const FRAME_BYTES = WIDTH * HEIGHT * 3;
 const RGB_FILTER = 'scale=in_color_matrix=bt709:out_color_matrix=bt709:in_range=tv:out_range=pc,format=rgb24';
 const BASE = ['-hide_banner', '-loglevel', 'error', '-nostdin', '-n'];
-function point(frame: number, values: Partial<LayerKeyValues>, interpolation: Interpolation = 'linear'): LayerKeyframe {
-  return { frame, interpolation, values: { ...EMPTY_KEY_VALUES, ...values } };
-}
 
-describe.skipIf(!enabled)('schema-7 supplied row maps · native pipes and disposable frame-coded originals', () => {
+describe.skipIf(!enabled)('supplied clip retiming maps · native pipes and disposable frame-coded originals', () => {
   let root: string;
   let config: ServiceConfig;
   let sourcePath: string;
@@ -189,27 +179,27 @@ describe.skipIf(!enabled)('schema-7 supplied row maps · native pipes and dispos
   }
 
   it.each(['hold', 'linear', 'ease-in', 'ease-out', 'smooth'] as const)(
-    'streams every exact contextual source frame for %s and owns the captured map',
+    'streams every exact clip-curve source frame for %s and owns the captured map',
     async (interpolation) => {
       const work = await mkdtemp(path.join(root, 'mapped-'));
       try {
-        const project = createProject(`native-row-${interpolation}`, 'No UI state is involved');
-        const row = {
-          ...createLayer('video-2', 'Contextual row', false),
+        const project = createProject(`native-curve-${interpolation}`, 'No UI state is involved');
+        const row = createLayer('video-2', 'Placed row', false);
+        project.layers.push(row);
+        const speed: SpeedCurve = {
+          mode: 'curve',
           keyframes: [
-            point(4, { speed: 0.35 }, interpolation),
-            point(11, { hue: 75 }, 'hold'),
-            point(26, { speed: 3 }, 'ease-out'),
-            point(35, { speed: 0.7 }, 'smooth'),
-            point(50, { speed: 2 }, 'hold'),
+            { frame: 4, rate: 0.35, interpolation },
+            { frame: 11, rate: 3, interpolation: 'ease-out' },
+            { frame: 14, rate: 0.7, interpolation: 'smooth' },
+            { frame: 17, rate: 2, interpolation: 'hold' },
           ],
         };
-        project.layers.push(row);
-        const clip = {
-          ...createClip('placed-row-clip', 'generated-original', 7, 19),
+        const clip: VideoClip = {
+          ...createClip('placed-curve-clip', 'generated-original', 7, 19),
           layerId: row.id,
           start: 9,
-          speed: { mode: 'constant' as const, rate: 4 },
+          speed,
         };
         project.clips = [clip];
         const captured = projectSchema.parse(project);
@@ -217,7 +207,7 @@ describe.skipIf(!enabled)('schema-7 supplied row maps · native pipes and dispos
         const placed = layout.clips[0]!;
         const map = placed.retiming;
         const expected = Array.from({ length: map.duration }, (_, output) => map.sourceAt(output));
-        expect(map.duration).not.toBe(compileRetiming(clip).duration);
+        expect(map.duration).toBe(compileRetiming(clip).duration);
         expect(Object.isFrozen(map)).toBe(true);
         const frameBuffer = Buffer.alloc(FRAME_BYTES);
         let mutated = false;
@@ -230,9 +220,9 @@ describe.skipIf(!enabled)('schema-7 supplied row maps · native pipes and dispos
             if (mutated) return;
             mutated = true;
             clip.sourceIn = 8;
+            speed.keyframes[0]!.rate = 8;
+            speed.keyframes[1]!.frame = 12;
             clip.speed = { mode: 'constant', rate: 8 };
-            row.keyframes[0]!.values.speed = 8;
-            row.keyframes[1]!.frame = 12;
           },
         });
         expect(mutated).toBe(true);
@@ -246,6 +236,10 @@ describe.skipIf(!enabled)('schema-7 supplied row maps · native pipes and dispos
         });
         expect(report.largestReadChunkBytes).toBeLessThanOrEqual(12 * FRAME_BYTES);
         expect(frameBuffer).toHaveLength(FRAME_BYTES);
+        const capturedSpeed = captured.clips[0]!.speed;
+        // Curve maps normalise their clock once to the rounded duration: one constant factor.
+        const normalisation = map.rateAt(0) / sourceRateAt(capturedSpeed, map.sourcePositionAt(0));
+        expect(Math.abs(normalisation - 1)).toBeLessThanOrEqual(0.5 / map.duration);
         for (const [output, source] of expected.entries()) {
           expect(Number.isSafeInteger(source)).toBe(true);
           expect(source).toBeGreaterThanOrEqual(7);
@@ -257,7 +251,7 @@ describe.skipIf(!enabled)('schema-7 supplied row maps · native pipes and dispos
           const sample = sampleTimeline(captured, placed.start + output, layout)[0]!;
           expect(sample.sourceFrame).toBe(source);
           expect(map.rateAt(output)).toBeCloseTo(
-            evaluateLayerSetting(captured.layers[1]!, 'speed', placed.start + output, 1),
+            sourceRateAt(capturedSpeed, map.sourcePositionAt(output)) * normalisation,
           );
         }
         await unchanged();
@@ -332,13 +326,14 @@ describe.skipIf(!enabled)('schema-7 supplied row maps · native pipes and dispos
     await unchanged();
   });
 
-  it('cancels a supplied row map during backpressured native writes without changing the original', async () => {
+  it('cancels a supplied clip map during backpressured native writes without changing the original', async () => {
     const work = await mkdtemp(path.join(root, 'cancelled-'));
     const controller = new AbortController();
     try {
-      const project = createProject('cancelled-row', 'Disposable contextual cancellation');
-      project.layers[0]!.keyframes = [point(0, { speed: 0.1 })];
-      project.clips = [createClip('slow-row', 'generated-original', 7, 19)];
+      const project = createProject('cancelled-clip', 'Disposable clip-map cancellation');
+      project.clips = [
+        { ...createClip('slow-clip', 'generated-original', 7, 19), speed: { mode: 'constant', rate: 0.1 } },
+      ];
       const placed = calculateLayout(project).clips[0]!;
       let progress = false;
       expect(placed.duration).toBe(120);

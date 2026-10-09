@@ -122,7 +122,6 @@ function layeredProject(videos: readonly MediaAsset[]): ProjectDocument {
       sharedPoint(
         0,
         {
-          speed: rate,
           opacity: 0.8 - index * 0.1,
           temperature: 0.2 - index * 0.1,
           tint: -0.15 + index * 0.1,
@@ -137,7 +136,7 @@ function layeredProject(videos: readonly MediaAsset[]): ProjectDocument {
         'smooth',
       ),
       // A colour-only point must disappear from the neutral reference, not
-      // acquire fabricated speed/opacity participation to satisfy the schema.
+      // acquire fabricated opacity participation to satisfy the schema.
       sharedPoint(40, { exposure: -0.4, hue: -25, saturation: 1.4 }),
       sharedPoint(143, {
         opacity: 0.65 + index * 0.05,
@@ -168,8 +167,8 @@ function layeredProject(videos: readonly MediaAsset[]): ProjectDocument {
         layer.id,
       );
       clip.start = member ? duration - (index === 1 ? 0 : 16) : 0;
-      // The retained row Speed must override this deliberately different base.
-      clip.speed = { mode: 'constant', rate: 1.6 };
+      // Each row's clips share one constant rate, so every dissolve keeps its timing.
+      clip.speed = { mode: 'constant', rate };
       return clip;
     });
     document.clips.push(...clips);
@@ -590,7 +589,9 @@ test('bypasses row colour across dissolves, retaining coverage, black fades and 
     [0, 143],
     [0, 143],
   ]);
-  expect(neutral.layers.map((layer) => layer.keyframes[0]!.values.speed)).toEqual([0.8, 1, 1.25]);
+  expect(neutral.clips.map((clip) => clip.speed)).toEqual(
+    [0.8, 0.8, 1, 1, 1.25, 1.25].map((rate) => ({ mode: 'constant', rate })),
+  );
   const layout = calculateLayout(layered);
   const referenceLayout = calculateLayout(neutral);
   expect(layout.duration).toBe(144);
