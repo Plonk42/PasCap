@@ -132,7 +132,10 @@ PasCap is a solo, pre-release project: optimize for fast iteration. Details are 
   saved `clip.opacity` and old `clipOpacity`/`layerOpacity` channels; do not supply
   compatibility defaults. `layer.opacity` is the valid sole stored row value.
   Put the single **Opacity** slider/diamond/navigation in **Track → Colour** beside
-  the colour sliders, usable on empty rows too. Without Opacity keys, the slider
+  the colour sliders, usable on empty rows too. Main and stored sliders/exact
+  fields use 0–100%, neutral 100%; convert only at the UI boundary, keeping
+  `VideoLayer.opacity` and `opacity` key values in 0–1 with no schema change.
+  Without Opacity keys, the slider
   edits `row.opacity`; keys override that value on every clip, including both
   dissolve sources. Sliders never create keys; an animated channel without a
   participant at the real playhead is read-only until its diamond captures it.

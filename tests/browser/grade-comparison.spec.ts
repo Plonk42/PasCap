@@ -756,7 +756,7 @@ test('comparison survives seek and timing reload, but clears on project switches
   await seek(page, comparison.single, 30);
   await expectMode(page, true);
   comparison.guard.permittedSaves = 1;
-  const out = page.getByRole('spinbutton', { name: 'Source OUT frame', exact: true });
+  const out = page.getByRole('textbox', { name: 'Source OUT frame', exact: true });
   await out.fill('96');
   await out.press('Enter');
   await page.waitForFunction(() => {

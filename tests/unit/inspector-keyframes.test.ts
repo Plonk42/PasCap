@@ -60,9 +60,9 @@ describe('dedicated Inspector keyframe controls', () => {
     const opacity = [...trackPanel.matchAll(/<input[^>]*aria-label="Opacity"[^>]*>/g)].map((match) => match[0]);
     expect(opacity).toHaveLength(2);
     expect(opacity[0]).toContain('type="range"');
-    expect(opacity[0]).toContain('value="1"');
+    expect(opacity[0]).toContain('value="100"');
     expect(opacity[1]).toContain('type="number"');
-    expect(opacity[1]).toContain('value="1"');
+    expect(opacity[1]).toContain('value="100"');
     expect(opacity[0]).not.toContain('disabled');
     expect(trackPanel).toContain('100%');
     expect(trackPanel).toContain('Not animated');
@@ -98,9 +98,10 @@ describe('dedicated Inspector keyframe controls', () => {
               onCommit: vi.fn(),
             }),
           );
-    expect(markup).toContain(`min="${setting.min}"`);
-    expect(markup).toContain(`max="${setting.max}"`);
-    expect(markup).toContain(`step="${setting.step}"`);
+    const scale = setting.key === 'opacity' ? 100 : 1;
+    expect(markup).toContain(`min="${setting.min * scale}"`);
+    expect(markup).toContain(`max="${setting.max * scale}"`);
+    expect(markup).toContain(`step="${setting.step * scale}"`);
     expect(markup).toContain(`aria-label="${name}"`);
     expect(markup).toContain('type="number"');
     expect(markup).toMatch(/class="value-control"[^>]*><input[^>]*type="range"[^>]*\/><span class="number-field"/);

@@ -479,12 +479,25 @@ Video closing fades remain inside their last clips. The static export path must
 cover the full project; music tails use layered export. Export still requires video.
 See [the multiple-music contract](design/MULTIPLE_MUSIC.md).
 
-The single **Opacity** slider/diamond/navigation belongs in **Track → Colour**
-alongside the colour sliders, initially **100%**, and works on an empty row.
+The single **Opacity** slider/exact-field/diamond/navigation belongs in **Track → Colour**
+alongside the colour sliders and works on an empty row. Main and stored sliders/
+exact fields use **0–100%**, neutral **100%**; convert only at the UI boundary,
+keeping required `VideoLayer.opacity` and `opacity` keys **0–1** with no schema change.
 Without Opacity keys, it edits row `opacity`; with keys, only participation at the
 real playhead permits editing, with the diamond explicitly capturing a missing
 participant. Sliders never create keys. **Placement** contains placement only;
 Layer options contains rename, Ripple, ordering and deletion, with visibility separate.
+
+Clip Source range uses one full-original hatched bar with IN/OUT handles and exact
+text fields below its ends, displaying 30 fps NDF **HH:MM:SS:FF** and accepting
+whole original frames or timecode on Enter/blur. Invalid drafts remain editable;
+Escape restores. No duplicate duration/original/source-frame/head-tail labels.
+Fields/bar use ordinary source-range trim with fixed placement and normal Ripple
+suffix sequencing, not the timeline left handle's retained-OUT rule. Drag previews
+the complete validated document; final valid release is one Undo, invalid final/
+cancel/lost capture/blur restores. Arrows move one original frame (Shift ten),
+Home/End restore IN/OUT endpoints; Restore full recording stays. Source review's
+independent paired Apply workflow is unchanged. See [Source range](TIMELINE_EDITING.md#clip-inspector-source-range).
 
 ## Contributor safety
 

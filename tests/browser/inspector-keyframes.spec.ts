@@ -153,7 +153,8 @@ test('all participants reuse their main control bounds and resets with one exact
         })),
       ).toEqual(main.get(setting.key));
       const field = row.getByRole('spinbutton', { name, exact: true });
-      await expect(field).toHaveValue(String(initial.layers[0]!.keyframes[0]!.values[setting.key]));
+      const scale = setting.key === 'opacity' ? 100 : 1;
+      await expect(field).toHaveValue(String(initial.layers[0]!.keyframes[0]!.values[setting.key]! * scale));
       await field.scrollIntoViewIfNeeded();
       const sliderBox = (await slider.boundingBox())!;
       const fieldBox = (await field.boundingBox())!;

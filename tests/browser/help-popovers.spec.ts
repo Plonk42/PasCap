@@ -177,7 +177,7 @@ test('bulk collapse retains invalid drafts, nested disclosure state and reachabl
   page,
 }) => {
   const before = await current(page);
-  const input = page.getByRole('spinbutton', { name: 'Source IN frame', exact: true, includeHidden: true });
+  const input = page.getByRole('textbox', { name: 'Source IN frame', exact: true, includeHidden: true });
   await input.fill('0.5');
   await input.press('Enter');
   await inspectorTab(page, 'Layer keyframes');
@@ -309,7 +309,7 @@ test('keyboard focus previews, Enter and Space pin, and help keys never fire tim
 
 test('Escape closes a hover preview before cancelling an underlying invalid numeric draft', async ({ page }) => {
   const before = await current(page);
-  const input = page.getByRole('spinbutton', { name: 'Source IN frame', exact: true });
+  const input = page.getByRole('textbox', { name: 'Source IN frame', exact: true });
   await input.fill('0.5');
   await input.press('Enter');
   await expect(input).toHaveAttribute('aria-invalid', 'true');
@@ -323,7 +323,7 @@ test('Escape closes a hover preview before cancelling an underlying invalid nume
   await expect(input).toBeFocused();
   await expect(input).toHaveValue('0.5');
   await input.press('Escape');
-  await expect(input).toHaveValue('0');
+  await expect(input).toHaveValue('00:00:00:00');
   expect(await current(page)).toEqual(before);
   expect(memory.saves).toBe(0);
 });
@@ -387,7 +387,11 @@ test('an outside pointer gesture dismisses pinned help before capture so Escape 
 });
 
 const HELP_CONTEXTS = [
-  { label: 'Source timing', tab: 'Clip', text: 'Original recording frames; OUT is exclusive.' },
+  {
+    label: 'Source timing',
+    tab: 'Clip',
+    text: 'The bar spans the original recording; hatching shows omitted footage.',
+  },
   { label: 'Placement timing', tab: 'Clip', text: 'Opacity is in Colour and affects the whole row.' },
   { label: 'Colour animation', tab: 'Track', text: 'Each diamond keys only its own setting' },
   { label: 'Speed timing', tab: 'Clip', text: 'Row keys override, rather than multiply' },
@@ -459,7 +463,11 @@ test('native heading Tab order is section then help then its controls, and remem
   await page.keyboard.press('Tab');
   await expect(help).toBeFocused();
   await page.keyboard.press('Tab');
-  await expect(page.getByRole('spinbutton', { name: 'Source IN frame', exact: true })).toBeFocused();
+  await expect(page.getByRole('slider', { name: 'Trim clip source start', exact: true })).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(page.getByRole('slider', { name: 'Trim clip source end', exact: true })).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(page.getByRole('textbox', { name: 'Source IN frame', exact: true })).toBeFocused();
   await section.click();
   await expect(section).toHaveAttribute('aria-expanded', 'false');
   await page.reload();
@@ -476,7 +484,7 @@ test('collapsing and restoring a section keeps the same invalid field draft and 
   page,
 }) => {
   const before = await current(page);
-  const input = page.getByRole('spinbutton', { name: 'Source IN frame', exact: true });
+  const input = page.getByRole('textbox', { name: 'Source IN frame', exact: true });
   await input.fill('0.5');
   await input.press('Enter');
   const element = await input.elementHandle();
@@ -493,7 +501,7 @@ test('collapsing and restoring a section keeps the same invalid field draft and 
   await expect(input).toHaveAttribute('aria-invalid', 'true');
   expect(await input.evaluate((node, previous) => node === previous, element)).toBe(true);
   await input.press('Escape');
-  await expect(input).toHaveValue('0');
+  await expect(input).toHaveValue('00:00:00:00');
   expect(await current(page)).toEqual(before);
   expect(memory.saves).toBe(0);
 });
@@ -533,8 +541,8 @@ for (const context of HELP_CONTEXTS) {
 }
 
 test('numeric fields retain their descriptions even while the linked help popover is hidden', async ({ page }) => {
-  await expect(page.getByRole('spinbutton', { name: 'Source IN frame', exact: true })).toHaveAccessibleDescription(
-    /Original recording frames; OUT is exclusive/,
+  await expect(page.getByRole('textbox', { name: 'Source IN frame', exact: true })).toHaveAccessibleDescription(
+    /Fields accept whole source frames[\s\S]*OUT is exclusive/,
   );
   await expect(page.getByRole('spinbutton', { name: 'Clip speed rate', exact: true })).toHaveAccessibleDescription(
     /Custom curve points belong to one clip/,
@@ -566,22 +574,24 @@ test('only the small question-mark target opens help, not the empty space across
 });
 
 test('a pinned help ignores another hover but an explicit second help click replaces it', async ({ page }) => {
-  const source = page.getByRole('button', { name: 'Source timing help', exact: true });
-  const opacity = page.getByRole('button', { name: 'Placement timing help', exact: true });
-  const sourcePanel = await panelFor(page, source);
-  const opacityPanel = await panelFor(page, opacity);
-  await source.click();
-  await expect(sourcePanel).toBeVisible();
-  await opacity.hover();
-  await expect(opacityPanel).toBeHidden();
-  await expect(sourcePanel).toBeVisible();
-  await expect(source).toHaveAttribute('aria-pressed', 'true');
-  await opacity.click();
-  await expect(opacityPanel).toBeVisible();
-  await expect(sourcePanel).toBeHidden();
+  // Pin the lower heading: its panel leaves the other heading exposed above it.
+  // Hovering a control obscured by the larger source explanation would scroll its owner away.
+  const pinned = page.getByRole('button', { name: 'Placement timing help', exact: true });
+  const other = page.getByRole('button', { name: 'Source timing help', exact: true });
+  const pinnedPanel = await panelFor(page, pinned);
+  const otherPanel = await panelFor(page, other);
+  await pinned.click();
+  await expect(pinnedPanel).toBeVisible();
+  await other.hover();
+  await expect(otherPanel).toBeHidden();
+  await expect(pinnedPanel).toBeVisible();
+  await expect(pinned).toHaveAttribute('aria-pressed', 'true');
+  await other.click();
+  await expect(otherPanel).toBeVisible();
+  await expect(pinnedPanel).toBeHidden();
   await expect(page.locator('.editor-help-content:popover-open')).toHaveCount(1);
-  await opacity.click();
-  await expect(opacityPanel).toBeHidden();
+  await other.click();
+  await expect(otherPanel).toBeHidden();
   expect(memory.saves).toBe(0);
 });
 
@@ -606,7 +616,7 @@ test('hover keeps a valid numeric draft unapplied; clicking help keeps the ordin
   page,
 }) => {
   const before = await current(page);
-  const input = page.getByRole('spinbutton', { name: 'Source IN frame', exact: true });
+  const input = page.getByRole('textbox', { name: 'Source IN frame', exact: true });
   await input.fill('5');
   const trigger = page.getByRole('button', { name: 'Source timing help', exact: true });
   const panel = await panelFor(page, trigger);
@@ -617,7 +627,7 @@ test('hover keeps a valid numeric draft unapplied; clicking help keeps the ordin
   expect(memory.saves).toBe(0);
   await trigger.click();
   await expect(trigger).toHaveAttribute('aria-pressed', 'true');
-  await expect(input).toHaveValue('5');
+  await expect(input).toHaveValue('00:00:00:05');
   expect((await current(page)).clips[0]!.sourceIn).toBe(5);
   await page.evaluate(() => window.pascapLab!.flush());
   expect(memory.saves).toBe(1);
@@ -814,7 +824,7 @@ test('startup-error help retains diagnostics and dismissal never reloads or edit
 test('functional music, source and export detail sections remain ordinary editable/informational disclosures', async ({
   page,
 }) => {
-  await expect(page.getByRole('spinbutton', { name: 'Source OUT frame', exact: true })).toBeVisible();
+  await expect(page.getByRole('textbox', { name: 'Source OUT frame', exact: true })).toBeVisible();
   await inspectorTab(page, 'Audio');
   await page.getByText('Placement & fades', { exact: true }).click();
   await expect(page.getByRole('spinbutton', { name: 'Music fade in', exact: true })).toBeVisible();

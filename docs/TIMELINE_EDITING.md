@@ -116,6 +116,9 @@ registered paths and bytes. This is data safety, not compatibility code.
 
 ## Non-destructive trim gestures
 
+These timeline-edge gestures use output-frame geometry; the Clip inspector's
+original-source range controls have the separate contract below.
+
 - Pointer down captures the handle, pauses preview and snapshots the committed
   document and frame/pixel scale.
 - Pointer movement computes output-frame delta from the original pointer position,
@@ -136,9 +139,9 @@ registered paths and bytes. This is data safety, not compatibility code.
   handle/keyboard trim solves the new start and source IN together so the timeline
   OUT holds, including under a row rate curve. If integer-frame quantisation cannot
   represent that retained OUT, the trim is explicitly rejected rather than moving
-  it silently. Right trims leave the start fixed. Numeric source edits keep placement.
+  it silently. Right trims leave the start fixed. Inspector source edits keep placement.
   The selected original's dashed extent appears during trim hover/focus/drafts,
-  and Source range exposes the recoverable head/tail amounts.
+  independently of the Clip inspector's full-original Source range bar.
 - The timeline origin stays fixed rather than shifting when a clip is selected.
   On a left-handle gesture only, recoverable headspace is reserved and scroll is
   compensated before paint: pointer/frame-zero positions do not jump at gesture start.
@@ -146,8 +149,8 @@ registered paths and bytes. This is data safety, not compatibility code.
   even when a long beginning was omitted from the first excerpt. Release
   removes the temporary gutter; cancellation restores its initial scroll and document.
   No negative project start is stored. Right-edge autoscroll likewise exposes tails.
-  Home/End and numeric source fields remain available for exact restoration.
-- Numeric IN/OUT and **Restore full recording** share the same source and
+  Home/End and exact source fields remain available for exact restoration.
+- Inspector IN/OUT and **Restore full recording** share the same source and
   transition validation as handles.
 - Trim/restoration never copies or shifts row points. Original-source static ramp
   anchors are retained; the row animation override continues across the new range.
@@ -160,6 +163,32 @@ move by one original source frame; Shift moves by ten. Home at the left edge req
 IN=0; End at the right edge requests the original OUT. A Ripple-off left restoration
 cannot extend before project frame zero or silently change its retained timeline
 OUT; source/placement quantisation and normal overlap/fade validation still apply.
+
+### Clip inspector Source range
+
+One full-original range bar hatches omitted footage and has draggable **IN / OUT**
+handles. Exact **Source IN / OUT** text fields sit below the respective ends,
+displaying **HH:MM:SS:FF** (30 fps NDF). They accept whole original-frame numbers
+or timecode on Enter/blur; OUT remains exclusive. Empty, malformed, fractional,
+out-of-original or conflicting ranges retain editable inline errors, never clamp
+or silently round; Escape restores. There are no duplicate section duration,
+original-length, source-frame or recoverable head/tail labels. **Restore full
+recording** remains available.
+
+Both fields and bar handles use ordinary source-range trim: the selected clip's
+placement stays fixed in either Ripple mode; Ripple re-sequences its suffix
+normally. They do not use the timeline left handle's retained-OUT rule above.
+Source bounds, at least one retained frame, retiming and transition/fade validation
+remain authoritative; original speed/spatial anchors and row points stay unchanged.
+
+Dragging previews the complete validated document, including contextual layout
+and paused preview, without history/autosave. A final valid release commits one
+Undo step; an unchanged range adds none. Invalid final release, Escape, pointer
+cancellation, lost capture or window blur restores the starting document/preview,
+never commits an earlier valid draft. Focused handle arrows move one original
+frame (Shift ten); Home on IN restores zero and End on OUT restores the original
+exclusive OUT. Source review remains independent, with its current paired numeric
+**Apply** workflow.
 
 ## Cutting an unwanted part
 
@@ -346,7 +375,8 @@ relevant neighbour, an opened project, or during any document-preview draft. The
 strictly earlier/later points where that channel is not `null` (zero included),
 skipping unrelated participation. **Track → Colour** contains the single **Opacity**
 slider/exact `NumberField`/diamond/navigation alongside the colour controls.
-The numeric value uses **0–1**, initially **1**; the main label may show **100%**.
+Main and stored sliders/exact fields use **0–100%**, neutral **100%**.
+Required row `opacity` and key values remain **0–1**; UI conversion changes no schema.
 Its buttons visit `opacity` participants, with no sidebar duplicate.
 Without Opacity keys, either value control edits row `opacity` and works on an empty row.
 With keys, a missing participant at the real playhead stays read-only until its
@@ -538,8 +568,9 @@ document edit and updates the image. Escape, pointer cancellation, lost capture 
 window blur restores the starting value without save/history. Each keyboard slider
 adjustment is an individual validated edit. Numeric fields retain full entered
 precision, commit on Enter/blur, keep invalid drafts editable and restore on Escape.
-Integer source/placement frames, durations and fades retain exact native numeric
-steppers and existing timecode feedback, without arbitrary timing sliders.
+Clip Source range uses the full-original bar and exact timecode text fields above.
+Other integer source/placement frames, durations and fades retain exact native
+numeric steppers and existing timecode feedback, without arbitrary timing sliders.
 Source-review paired IN/OUT retains its explicit Apply workflow.
 **Clip / Track / Audio** separates clip-owned source/placement/speed/Transform,
 track-owned Colour/keyframes/transitions/fades, and music. The header directly exposes

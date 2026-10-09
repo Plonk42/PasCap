@@ -79,7 +79,7 @@ test('adds layered clips, adjusts row opacity, hides/shows and releases unused d
   await expect(page.getByRole('slider', { name: 'Opacity of layer Video 2', exact: true })).toHaveCount(0);
   await closeOptions(page);
   await inspectorTab(page, 'Track');
-  await page.getByRole('slider', { name: 'Opacity', exact: true }).fill('0.5');
+  await page.getByRole('slider', { name: 'Opacity', exact: true }).fill('50');
   await seek(page, 30);
   const half = await page.evaluate(() => Array.from(window.pascapLab!.engine.capturePixels().slice(100_000, 100_012)));
   project = projectSchema.parse(await page.evaluate(() => window.pascapLab!.project()));
@@ -152,7 +152,7 @@ test('shares row opacity and individual colour channels at project points and ke
   await seek(page, 60);
   await expect(page.getByRole('slider', { name: 'Opacity', exact: true })).toBeDisabled();
   await inspector.getByRole('button', { name: 'Keyframe Opacity', exact: true }).click();
-  await page.getByRole('slider', { name: 'Opacity', exact: true }).fill('1');
+  await page.getByRole('slider', { name: 'Opacity', exact: true }).fill('100');
   await inspector.getByRole('button', { name: 'Keyframe Exposure', exact: true }).click();
   await page.getByRole('slider', { name: 'Exposure', exact: true }).fill('1');
   await seek(page, 0);
@@ -172,8 +172,8 @@ test('shares row opacity and individual colour channels at project points and ke
   expect(project.layers[1]!.opacity).toBe(0);
   await expect(page.getByRole('checkbox', { name: 'Animate colour adjustments', exact: true })).toHaveCount(0);
   await inspectorTab(page, 'Clip');
-  await page.getByRole('spinbutton', { name: 'Source IN frame', exact: true }).fill('15');
-  await page.getByRole('spinbutton', { name: 'Source IN frame', exact: true }).press('Enter');
+  await page.getByRole('textbox', { name: 'Source IN frame', exact: true }).fill('15');
+  await page.getByRole('textbox', { name: 'Source IN frame', exact: true }).press('Enter');
   project = projectSchema.parse(await page.evaluate(() => window.pascapLab!.project()));
   expect(project.layers[1]?.keyframes).toEqual(points);
   expect(project.clips.find((clip) => clip.id === id)).not.toHaveProperty('animation');
@@ -566,7 +566,7 @@ test('edits shared values outside the source excerpt and duration without moving
   await page.evaluate((document) => window.pascapLab!.setDocument(document), project);
   await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
   const row = await editLayerPoint(page, 'Video 1', 5);
-  await row.getByRole('spinbutton', { name: 'Opacity keyframe value 5', exact: true }).fill('0.8');
+  await row.getByRole('spinbutton', { name: 'Opacity keyframe value 5', exact: true }).fill('80');
   const opacityFrame = row.getByRole('spinbutton', { name: 'Layer keyframe frame 5', exact: true });
   await opacityFrame.fill('8');
   expect(await page.evaluate(() => window.pascapLab!.project()!.layers[0]!.keyframes[0]!.frame)).toBe(5);
