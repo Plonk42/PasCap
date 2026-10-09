@@ -12,6 +12,7 @@ import {
 } from 'react';
 import type { EditCommand } from '../shared/commands.js';
 import type { ProjectDocument } from '../shared/model.js';
+import { snapFrame, snapPoints } from '../shared/snap.js';
 import type { DraftPreview } from './Timeline.js';
 import { editorShortcut } from './shortcuts.js';
 
@@ -37,15 +38,12 @@ export interface KeyframeSlideDraft<T extends KeyframeSlideTarget> extends Keyfr
   width: number;
 }
 
-/** What differs between keyframe types; everything else is shared by `useKeyframeSlide`. */
+/** What differs between keyframe types; everything else, including snapping, is shared by `useKeyframeSlide`. */
 export interface KeyframeSlideKind<T extends KeyframeSlideTarget> {
-  /** Pointer travel is in timeline frames, relative to the captured marker; `scale` is pixels per frame. */
-  plan(
-    project: ProjectDocument,
-    target: T,
-    travel: number,
-    gesture: { playhead: number; alt: boolean; scale: number },
-  ): KeyframeSlidePlan;
+  /** Timeline frame of the dragged marker after `travel` timeline frames of pointer movement. */
+  at(target: T, travel: number): number;
+  /** Moves the key to the stored frame drawn at timeline frame `at`. */
+  planAt(project: ProjectDocument, target: T, at: number): KeyframeMove;
   /** Arrow keys move the stored frame by `delta`. */
   step(project: ProjectDocument, target: T, delta: number): KeyframeMove;
   /** Timeline frame previewing the key stored at `frame`, or null when it has none. */
@@ -63,6 +61,7 @@ interface Options<T extends KeyframeSlideTarget> {
   scale: number;
   width: number;
   disabled: boolean;
+  snapping: boolean;
   viewport: RefObject<HTMLDivElement | null>;
   onPause: () => void;
   onPreview: (draft: DraftPreview | null, restoreFrame?: number) => void;
@@ -82,6 +81,7 @@ interface Session<T extends KeyframeSlideTarget> {
   moved: boolean;
   pointerX: number;
   alt: boolean;
+  targets: number[];
   plan: KeyframeSlidePlan;
 }
 
@@ -164,18 +164,21 @@ export function useKeyframeSlide<T extends KeyframeSlideTarget>(options: Options
   };
   const update = (): void => {
     const active = session.current;
-    const { viewport, kind, onPreview } = latest.current;
+    const { viewport, kind, snapping, onPreview } = latest.current;
     if (!active || !viewport.current) return;
     const scrollLeft = viewport.current.scrollLeft;
     if (!active.moved && Math.abs(active.pointerX - active.startX + scrollLeft - active.startScroll) < 3) return;
     active.moved = true;
     const travel = slideTravel(active.startX, active.pointerX, active.startScroll, scrollLeft, active.scale);
-    const plan = kind.plan(active.project, active.target, travel, {
-      playhead: active.playhead,
-      alt: active.alt,
-      scale: active.scale,
-    });
-    if (plan.frame === active.plan.frame && plan.error === active.plan.error && plan.guide === active.plan.guide)
+    const free = kind.at(active.target, travel);
+    const at = snapping && !active.alt ? snapFrame(free, active.targets, 8 / active.scale) : free;
+    const plan = { ...kind.planAt(active.project, active.target, at), at, guide: at === free ? null : at };
+    if (
+      plan.frame === active.plan.frame &&
+      plan.at === active.plan.at &&
+      plan.error === active.plan.error &&
+      plan.guide === active.plan.guide
+    )
       return;
     active.plan = plan;
     setDraft({ ...plan, target: active.target, width: active.width });
@@ -209,7 +212,7 @@ export function useKeyframeSlide<T extends KeyframeSlideTarget>(options: Options
     event.currentTarget.focus({ preventScroll: true });
     const plan: KeyframeSlidePlan = {
       frame: target.origin,
-      at: kind.seekFrame(project, target, target.origin) ?? frame,
+      at: kind.at(target, 0),
       document: project,
       command: null,
       guide: null,
@@ -228,6 +231,7 @@ export function useKeyframeSlide<T extends KeyframeSlideTarget>(options: Options
       playhead: frame,
       moved: false,
       alt: event.altKey,
+      targets: [...new Set([...snapPoints(project), frame])],
       plan,
     };
     event.currentTarget.setPointerCapture(event.pointerId);

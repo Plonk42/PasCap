@@ -360,6 +360,30 @@ test('a fast Transform marker slide that leaves the marker keeps its pointer cap
   expect((await current(page)).clips[0]!.spatial.keyframes.map((item) => item.frame)).toEqual([80, 90]);
 });
 
+test('a Transform marker snaps to the playhead like a track keyframe, and Alt bypasses it', async ({ page }) => {
+  await seedScaleKeys(page, [40, 80]);
+  await seek(page, 63);
+  const scale = Number(await page.locator('.timeline-surface').getAttribute('data-pixels-per-frame'));
+  const box = (await transformMarker(page, 40).boundingBox())!;
+  const x = box.x + box.width / 2;
+  const y = box.y + box.height / 2;
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  await page.mouse.move(x + 21 * scale, y, { steps: 4 });
+  await expect(page.locator('.timeline-clip-key.transform.moving')).toHaveAttribute('data-source-frame', '63');
+  await expect(page.locator('.snap-guide')).toHaveCount(1);
+  await page.keyboard.down('Alt');
+  await page.mouse.move(x + 21 * scale + 1, y);
+  await page.mouse.move(x + 21 * scale, y);
+  await expect(page.locator('.timeline-clip-key.transform.moving')).toHaveAttribute('data-source-frame', '61');
+  await expect(page.locator('.snap-guide')).toHaveCount(0);
+  await page.keyboard.up('Alt');
+  await page.mouse.move(x + 21 * scale + 1, y);
+  await page.mouse.move(x + 21 * scale, y);
+  await page.mouse.up();
+  expect((await current(page)).clips[0]!.spatial.keyframes.map((item) => item.frame)).toEqual([63, 80]);
+});
+
 test('Escape cancels a Transform marker slide and the arrow keys move it one source frame', async ({ page }) => {
   const before = await seedScaleKeys(page, [40, 80]);
   const scale = Number(await page.locator('.timeline-surface').getAttribute('data-pixels-per-frame'));
@@ -491,7 +515,7 @@ test('bulk expansion includes Transform while heading help and tab navigation re
   page,
 }) => {
   const before = await current(page);
-  await page.getByRole('button', { name: 'Collapse all Clip sections', exact: true }).click();
+  await page.getByRole('button', { name: 'Collapse all Inspector settings', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Transform section', exact: true })).toHaveAttribute(
     'aria-expanded',
     'false',
@@ -504,7 +528,7 @@ test('bulk expansion includes Transform while heading help and tab navigation re
     'aria-expanded',
     'false',
   );
-  await page.getByRole('button', { name: 'Expand all Clip sections', exact: true }).click();
+  await page.getByRole('button', { name: 'Expand all Inspector settings', exact: true }).click();
   await expect(exact(page, 'Scale')).toBeVisible();
   await page.getByRole('tab', { name: 'Clip', exact: true }).focus();
   await page.keyboard.press('ArrowRight');

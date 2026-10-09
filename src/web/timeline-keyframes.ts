@@ -1,6 +1,6 @@
 import { applyCommand, type EditCommand } from '../shared/commands.js';
 import type { ProjectDocument } from '../shared/model.js';
-import { snapFrame, snapPoints } from '../shared/snap.js';
+import { snapFrame } from '../shared/snap.js';
 import { calculateLayout } from '../shared/timeline.js';
 import { previewFrameFor } from './keyframe-navigation.js';
 import type { KeyframeSlideKind, KeyframeSlideTarget } from './keyframe-slide.js';
@@ -55,32 +55,15 @@ export function planKeyframeDrag(
   }
 }
 
-const snapCache = new WeakMap<ProjectDocument, readonly number[]>();
-function snapTargets(project: ProjectDocument, playhead: number): number[] {
-  const points = snapCache.get(project) ?? snapPoints(project);
-  snapCache.set(project, points);
-  return [...new Set([...points, playhead])];
-}
-
-/** Shared track keyframes move in timeline frames, snapping to captured boundaries and the playhead. */
+/** Shared track keyframes move in timeline frames. */
 export function trackKeyframeKind(options: {
-  snapping: boolean;
   onSelectLayer: (id: string) => void;
   onSeekKeyframe: (layerId: string, frame: number) => void;
   onOpenSection: (section: InspectorSectionTarget) => void;
 }): KeyframeSlideKind<KeyframeSlideTarget> {
   return {
-    plan: (project, { scope, origin }, travel, { playhead, alt, scale }) => {
-      const plan = planKeyframeDrag(
-        project,
-        scope,
-        origin,
-        trackKeyframeFrame(origin, travel),
-        options.snapping && !alt ? snapTargets(project, playhead) : [],
-        8 / scale,
-      );
-      return { ...plan, at: plan.frame };
-    },
+    at: ({ origin }, travel) => trackKeyframeFrame(origin, travel),
+    planAt: (project, { scope, origin }, at) => planKeyframeDrag(project, scope, origin, at, [], 0),
     step: (project, { scope, origin }, delta) =>
       planKeyframeDrag(project, scope, origin, trackKeyframeFrame(origin, delta), [], 0),
     seekFrame: (document, _target, frame) => previewFrameFor(frame, calculateLayout(document).duration),

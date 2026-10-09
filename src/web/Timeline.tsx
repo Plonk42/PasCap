@@ -348,7 +348,8 @@ function clipMarkerView(props: ClipMarkerProps, marker: ClipKeyframeMarker, sour
   const nameSuffix = settings ? ` (${settings})` : '';
   const titleSuffix = settings ? ` · ${settings}` : '';
   const slideHint = marker.type === 'transform' ? ' · Drag to move; Arrow keys: 1 source frame, Shift: 10' : '';
-  const output = at === null ? marker.outputFrame : at - props.placed.start;
+  const output =
+    at === null ? marker.outputFrame : Math.max(0, Math.min(props.placed.duration, at - props.placed.start));
   return {
     className: `timeline-clip-key ${marker.type}`,
     'data-clip-keyframe': marker.type,
@@ -469,7 +470,6 @@ export function Timeline(props: Readonly<Props>) {
   const baselineWidth = Math.max(viewportWidth, 32 + calculateLayout(project).duration * scale + 96);
   const keyframes = useKeyframeSlide({
     kind: trackKeyframeKind({
-      snapping,
       onSelectLayer,
       onSeekKeyframe: keyframeNavigation.onSeekKeyframe,
       onOpenSection: props.onOpenSection,
@@ -479,6 +479,7 @@ export function Timeline(props: Readonly<Props>) {
     scale,
     width: baselineWidth,
     disabled: keyframeNavigation.disabled || musicGesture !== null,
+    snapping,
     viewport: scroll,
     onPause,
     onPreview,
@@ -497,6 +498,7 @@ export function Timeline(props: Readonly<Props>) {
     scale,
     width: baselineWidth,
     disabled: keyframeNavigation.disabled || musicGesture !== null || keyframes.active,
+    snapping,
     viewport: scroll,
     onPause,
     onPreview,
@@ -1433,8 +1435,16 @@ export function Timeline(props: Readonly<Props>) {
             {snapGuide !== null && draft && (
               <div className="snap-guide" style={{ left: leading + snapGuide * scale }} />
             )}
-            {keyframes.draft?.guide !== null && keyframes.draft?.guide !== undefined && (
-              <div className="snap-guide" style={{ left: leading + keyframes.draft.guide * scale }} />
+            {[keyframes.draft?.guide, clipKeys.draft?.guide].map(
+              (guide) =>
+                guide !== null &&
+                guide !== undefined && (
+                  <div
+                    key={`keyframe-guide-${guide}`}
+                    className="snap-guide"
+                    style={{ left: leading + guide * scale }}
+                  />
+                ),
             )}
             {musicGesture?.guide !== null && musicGesture?.guide !== undefined && (
               <div className="snap-guide" style={{ left: leading + musicGesture.guide * scale }} />
@@ -1465,7 +1475,9 @@ export function Timeline(props: Readonly<Props>) {
         <div className="timeline-bottom">
           <span
             className={
-              dragError || dropPlan?.error || keyframes.draft?.error || musicGesture?.error ? 'trim-error' : ''
+              dragError || dropPlan?.error || keyframes.draft?.error || clipKeys.draft?.error || musicGesture?.error
+                ? 'trim-error'
+                : ''
             }
           >
             {interactionStatus}
