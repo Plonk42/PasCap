@@ -40,7 +40,7 @@ export function editableClipSpeed(clip: RetimedClip): SpeedCurve {
 }
 
 export function updateClipSpeedKey(speed: SpeedCurve, frame: number, changes: Partial<SpeedCurveKeyframe>): SpeedCurve {
-  if (!speed.keyframes.some((key) => key.frame === frame)) throw new Error('The clip speed key no longer exists.');
+  if (!speed.keyframes.some((key) => key.frame === frame)) throw new Error('The clip speed keyframe no longer exists.');
   const keyframes = speed.keyframes
     .map((key) => (key.frame === frame ? { ...key, ...changes } : { ...key }))
     .sort((left, right) => left.frame - right.frame);
@@ -49,7 +49,7 @@ export function updateClipSpeedKey(speed: SpeedCurve, frame: number, changes: Pa
 
 export function addClipSpeedKey(speed: SpeedCurve, frame: number): SpeedCurve {
   if (speed.keyframes.some((key) => key.frame === frame))
-    throw new Error('A clip speed key already exists at this source frame.');
+    throw new Error('A clip speed keyframe already exists at this source frame.');
   const key = { frame, rate: sourceRateAt(speed, frame), interpolation: 'smooth' as const };
   return speedCurveSchema.parse({
     mode: 'curve',
@@ -58,6 +58,6 @@ export function addClipSpeedKey(speed: SpeedCurve, frame: number): SpeedCurve {
 }
 
 export function removeClipSpeedKey(speed: SpeedCurve, frame: number): SpeedCurve {
-  if (!speed.keyframes.some((key) => key.frame === frame)) throw new Error('The clip speed key no longer exists.');
+  if (!speed.keyframes.some((key) => key.frame === frame)) throw new Error('The clip speed keyframe no longer exists.');
   return speedCurveSchema.parse({ mode: 'curve', keyframes: speed.keyframes.filter((key) => key.frame !== frame) });
 }

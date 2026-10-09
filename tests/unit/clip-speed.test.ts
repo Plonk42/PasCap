@@ -81,7 +81,7 @@ describe('strict clip-instance speed curves', () => {
     document.clips = [clip(curve(key(0, 1), key(120, 2)), 30, 90)];
     expect(() => validateSourceRanges(document, new Map([['source', 120]]))).not.toThrow();
     document.clips[0]!.speed = curve(key(0, 1), key(121, 2));
-    expect(() => validateSourceRanges(document, new Map([['source', 120]]))).toThrow('speed keys exceed');
+    expect(() => validateSourceRanges(document, new Map([['source', 120]]))).toThrow('speed keyframes exceed');
   });
 });
 

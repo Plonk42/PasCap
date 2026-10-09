@@ -102,7 +102,7 @@ export function planClipSpeedDrag(
   if (clip?.speed.mode !== 'curve') throw new Error('The selected clip curve no longer exists.');
   try {
     if (clip.speed.keyframes.some((key) => key.frame !== origin && key.frame === nextFrame))
-      throw new Error('A clip speed key already exists at this source frame. Choose another frame.');
+      throw new Error('A clip speed keyframe already exists at this source frame. Choose another frame.');
     const speed = updateClipSpeedKey(clip.speed, origin, { frame: nextFrame, rate });
     const command: Extract<EditCommand, { type: 'speed' }> = { type: 'speed', clipId, speed };
     const document = applyCommand(project, command);

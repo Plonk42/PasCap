@@ -42,7 +42,7 @@ export function spatialPlayhead(project: ProjectDocument, clipId: string, frame:
 
 export function captureSpatialKey(settings: SpatialSettings, frame: number, position: number): SpatialSettings {
   if (settings.keyframes.some((key) => key.frame === frame))
-    throw new Error('A Transform key already exists at this source frame.');
+    throw new Error('A Transform keyframe already exists at this source frame.');
   return validatedSpatial({
     base: settings.base,
     keyframes: [
@@ -57,12 +57,13 @@ export function replaceSpatialKey(
   frame: number,
   changes: Partial<SpatialKeyframe>,
 ): SpatialSettings {
-  if (!settings.keyframes.some((key) => key.frame === frame)) throw new Error('This Transform key no longer exists.');
+  if (!settings.keyframes.some((key) => key.frame === frame))
+    throw new Error('This Transform keyframe no longer exists.');
   if (
     changes.frame !== undefined &&
     settings.keyframes.some((key) => key.frame !== frame && key.frame === changes.frame)
   )
-    throw new Error('A Transform key already exists at this source frame. Choose another frame.');
+    throw new Error('A Transform keyframe already exists at this source frame. Choose another frame.');
   return validatedSpatial({
     base: settings.base,
     keyframes: settings.keyframes

@@ -177,7 +177,7 @@ function OpacityControl({
   const value = evaluateLayerSetting(layer, 'opacity', frame, layer.opacity);
   const { scope, hint } = settingPresentation({
     ...state,
-    baseLabel: 'Layer',
+    baseLabel: 'Track',
     label: 'Opacity',
     frame,
   });
@@ -230,7 +230,7 @@ function ColourControl({
   id,
 }: Readonly<LayerControlProps & { control: ColourControlDefinition; value: number; id: string }>) {
   const state = settingState(layer, control.key, frame, true);
-  const { scope, hint } = settingPresentation({ ...state, baseLabel: 'Layer', label: control.label, frame });
+  const { scope, hint } = settingPresentation({ ...state, baseLabel: 'Track', label: control.label, frame });
   const commit = (nextValue: number): void => {
     if (disabled || !state.editable) return;
     if (state.keyed) {
@@ -288,7 +288,7 @@ function ColourSection({
     ).length + Number(opacity !== 1 || hasLayerKeys(layer, 'opacity'));
   const canReset = resetCommands.length > 0;
   const resetTitle = animated
-    ? 'Reset only the enabled Colour settings, including Opacity, at this shared point. Other settings and points stay unchanged.'
+    ? 'Reset only the enabled Colour settings, including Opacity, at this shared keyframe. Other settings and keyframes stay unchanged.'
     : 'Reset this track’s Colour and Opacity. Keyframes stay unchanged.';
   const reset = (): void => {
     if (disabled || !canReset) return;
@@ -303,12 +303,13 @@ function ColourSection({
       help={
         <HelpPopover label="Colour animation">
           <p>
-            Each diamond keys only its own setting for this whole layer, in project timeline time. A keyed channel
-            overrides the saved row colour on every clip in the row. Row Colour and Opacity have the same scope with or
-            without keys, and work even without clips. Different colour treatments require different rows. Between
-            points, click the diamond before editing. Reset keys changes only this point's enabled Colour settings,
-            including Opacity; double-click a setting's name to reset only that setting. Without Colour animation, Reset
-            restores the selected row's Colour and Opacity to neutral in one Undo step.
+            Each diamond captures only its own setting for this whole track, in project timeline time. An animated
+            channel overrides the saved track colour on every clip in the track. Track Colour and Opacity have the same
+            scope with or without keyframes, and work even without clips. Different colour treatments require different
+            tracks. Between keyframes, click the diamond before editing. Reset keyframes changes only this keyframe's
+            enabled Colour settings, including Opacity; double-click a setting's name to reset only that setting.
+            Without Colour animation, Reset restores the selected track's Colour and Opacity to neutral in one Undo
+            step.
           </p>
           <p>
             Temperature and Tint use −1 to 1, with 0 neutral. Positive Temperature warms; negative cools. Positive Tint
@@ -328,7 +329,7 @@ function ColourSection({
           onClick={reset}
         >
           <Icon name="reset" size={13} />
-          {animated ? 'Reset keys' : 'Reset'}
+          {animated ? 'Reset keyframes' : 'Reset'}
         </button>
       </div>
       <div className="colour-controls">
@@ -408,7 +409,7 @@ function SequenceControls({
           help={
             <HelpPopover label="Transition timing">
               <p id={`${id}-transition-help`}>
-                Timeline frames after retiming, on this track only. Fade-through-black darkens this row without
+                Timeline frames after retiming, on this track only. Fade-through-black darkens this track without
                 revealing lower footage. Non-cut transitions need touching clips or an existing dissolve; close a gap
                 explicitly first. A positioned dissolve moves only its right clip to the exact overlap. Conflicts reject
                 the complete edit, never shorten another fade or transition.
@@ -507,7 +508,7 @@ function SequenceControls({
           <HelpPopover label="Fade timing">
             <p id={`${id}-fades-help`}>
               Timeline frames on this track’s first and last clips, at their actual placements. 0 disables a fade. These
-              fades darken this row toward black without changing its coverage or fading another track. Empty tracks
+              fades darken this track toward black without changing its coverage or fading another track. Empty tracks
               retain their stored fades.
             </p>
           </HelpPopover>
@@ -593,7 +594,7 @@ function SourceRangeSection({
   return (
     <InspectorSection
       id="source"
-      title="Source range"
+      title="Range"
       icon="start"
       modified={clip.sourceIn !== 0 || clip.sourceOut !== frameCount}
       help={
@@ -602,7 +603,7 @@ function SourceRangeSection({
             The bar spans the original recording; hatching shows omitted footage. Drag IN/OUT to trim or restore. Arrows
             move one source frame, Shift ten; Home/End reach source limits. Fields accept whole source frames or
             HH:MM:SS:FF (30 fps NDF). Enter or blur applies; Escape restores. OUT is exclusive. Placement stays fixed;
-            Ripple sequences later clips. Layer keyframes keep their project times.
+            Ripple sequences later clips. Track keyframes keep their project times.
           </p>
         </HelpPopover>
       }
@@ -710,9 +711,9 @@ export function Inspector({
                 help={
                   <HelpPopover label="Placement timing">
                     <p>
-                      Move the selected excerpt to a video layer or edit its timeline start. With Ripple on, only the
-                      first clip's anchor can be edited here; drag later clips to reorder. Other tracks, music and row
-                      keyframes stay at their project times. Opacity is in Colour and affects the whole row.
+                      Move the selected clip to a video track or edit its timeline start. With Ripple on, only the first
+                      clip's anchor can be edited here; drag later clips to reorder. Other tracks, music and track
+                      keyframes stay at their project times. Opacity is in Colour and affects the whole track.
                     </p>
                   </HelpPopover>
                 }
@@ -721,9 +722,9 @@ export function Inspector({
                   {clip && placed && (
                     <>
                       <label className="speed-field">
-                        <span>Video layer</span>
+                        <span>Video track</span>
                         <select
-                          aria-label="Clip video layer"
+                          aria-label="Clip video track"
                           disabled={drafting}
                           value={clip.layerId}
                           onChange={(event) => {

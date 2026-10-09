@@ -3,27 +3,27 @@
 ## Scope and decisions
 
 Controls use native elements, the existing editor layout and strict project
-schema 12, including complete row Colour, clip spatial settings and 0–8 independent music instances. No UI framework or icon dependency is introduced. Exact
-timing entry is retained: Clip Source range uses timecode text fields and a
+schema 12, including complete track Colour, clip spatial settings and 0–8 independent music tracks. No UI framework or icon dependency is introduced. Exact
+timing entry is retained: Clip Range uses timecode text fields and a
 full-original range bar; other frame/duration/fade fields retain numeric steppers.
 
 ### Current control inventory
 
-| Area                          | Control                                                                                            | Contract                                                                                     |
-| ----------------------------- | -------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| Colour / Opacity              | Native slider and exact field in main/stored editors                                               | Opacity UI 0–100%, neutral 100%; stored row/key values remain 0–1                            |
-| Speed                         | Constant, ramp, custom-point and layer rates                                                       | Bounded slider/exact-value pattern; retain presets and curve graph                           |
-| Transform                     | Eight clip pose sliders/exact fields, one full-pose diamond, stored source-key selector/navigation | Explicit source-frame capture; retain off-trim keys and distinguish stored time from preview |
-| Audio                         | Music track / Recording selects, Add music track, selected-instance trash and gain slider          | Independent identified instances; exact gain draft; import never implicitly places           |
-| Clip Source range             | One full-original hatched range bar with draggable IN/OUT; exact text fields below its ends        | Display 30 fps NDF timecode; accept whole original frames or timecode                        |
-| Other frames, duration, fades | Integer timing needs exact entry and contextual validation                                         | Retain native numeric steppers and timecode feedback, not arbitrary slider limits            |
-| Slider gestures               | Transient local pointer draft                                                                      | One validated edit on release; cancellation restores; keyboard edits stay individual         |
-| Keyframe / music deletion     | Trash action with accessible name                                                                  | Delete the identified point/instance; × only closes/dismisses                                |
-| Inspector / viewer tabs       | Consistent native-button appearance                                                                | Retain existing keyboard navigation and mounted drafts                                       |
-| Keyframes                     | Tab owns its title; toolbar owns navigation/help                                                   | Keep its accessible name; no repeated visible toolbar title                                  |
-| Import actions                | Folder/plus icons with explanatory text                                                            | Deliberate import; no implicit music placement                                               |
-| Layer options / Timeline      | Visibility, Ripple, stacking and frequent clip actions already have native controls/icons          | Keep their locations; no invented lock action                                                |
-| Help / disclosures / options  | Question-mark help and top-layer options are already consistent                                    | Keep those components and browser preferences                                                |
+| Area                          | Control                                                                                                 | Contract                                                                                          |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| Colour / Opacity              | Native slider and exact field in main/stored editors                                                    | Opacity UI 0–100%, neutral 100%; stored track/keyframe values remain 0–1                          |
+| Speed                         | Constant, ramp, custom-keyframe and track rates                                                         | Bounded slider/exact-value pattern; retain presets and curve graph                                |
+| Transform                     | Eight clip pose sliders/exact fields, one full-pose diamond, stored source-keyframe selector/navigation | Explicit source-frame capture; retain off-trim keyframes and distinguish stored time from preview |
+| Audio                         | Music track / Recording selects, Add music track, selected-track trash and gain slider                  | Independent identified tracks; exact gain draft; import never implicitly places                   |
+| Clip Range                    | One full-original hatched range bar with draggable IN/OUT; exact text fields below its ends             | Display 30 fps NDF timecode; accept whole original frames or timecode                             |
+| Other frames, duration, fades | Integer timing needs exact entry and contextual validation                                              | Retain native numeric steppers and timecode feedback, not arbitrary slider limits                 |
+| Slider gestures               | Transient local pointer draft                                                                           | One validated edit on release; cancellation restores; keyboard edits stay individual              |
+| Keyframe / music deletion     | Trash action with accessible name                                                                       | Delete the identified keyframe/track; × only closes/dismisses                                     |
+| Inspector / viewer tabs       | Consistent native-button appearance                                                                     | Retain existing keyboard navigation and mounted drafts                                            |
+| Keyframes                     | Tab owns its title; toolbar owns navigation/help                                                        | Keep its accessible name; no repeated visible toolbar title                                       |
+| Import actions                | Folder/plus icons with explanatory text                                                                 | Deliberate import; no implicit music placement                                                    |
+| Track options / Timeline      | Visibility, Ripple, stacking and frequent clip actions already have native controls/icons               | Keep their locations; no invented lock action                                                     |
+| Help / disclosures / options  | Question-mark help and top-layer options are already consistent                                         | Keep those components and browser preferences                                                     |
 
 The icon module already supplies a broad SVG set; it does not need replacing.
 The browser preference identifier for Placement remains unchanged deliberately.
@@ -32,29 +32,37 @@ neither needs replacing merely to make their implementation identical.
 
 ## Vocabulary
 
-- **Layer**: a video composition/editing container. **Row** describes its timeline
-  position, not another object or ownership mode. **Track** remains the ordinary
-  audio term; guides may explain the equivalence for video.
-- **Music track**: an independently identified music instance, not a recording or
-  another audio clock. **Recording** identifies its registered source; several
-  instances may reuse it. **Add music track** lists ready music files and creates
-  a fresh instance; **Recording** only changes the selected instance; the trash
-  action **Delete selected music track** removes only that placement.
-- **Clip**: the timeline instance and its Inspector tab. **Excerpt**: a selected
-  original-source range being reviewed/added. A recording is the complete original.
-- **Keyframe**: a stored animation point. **Participant**: one setting enabled at
-  that point. **Keys** is concise help prose, not a different editor/control.
+This is the source of terminology for visible UI text, help, accessible names,
+test selectors and current-behaviour guides. Internal identifiers, persisted fields
+and technical paths stay unchanged; this glossary does not change schema 12.
+
+- **Recording**: the complete original file, video or music. Use **video recording**
+  or **music recording** when the distinction matters; never bare “video” for a file.
+- **Clip**: an independently editable instance of a video recording on the timeline,
+  and its Inspector tab. Several clips can use the same recording.
+- **Track**: a horizontal timeline container. Use **video track** or **music track**
+  to distinguish them; **Track options** and **+ Track** use the same noun.
+  A music track is an independently identified placement of a music recording,
+  not another audio clock. **Add music track** creates a placement; **Recording**
+  changes its recording; **Delete selected music track** deletes only that placement.
+- **Keyframe**: a stored animation value at a frame. Shared track keyframes contain
+  **enabled settings**; clip speed and Transform keyframes use original-source frames.
+  Use the full word in labels and help. Static colour curves instead have **control nodes**,
+  not animation keyframes.
+- **Range**: the selected IN/OUT portion of a recording, whether reviewed or used by
+  a clip. Qualify its context when necessary, without introducing another object name.
+  Do not use rush, excerpt, row, layer, point or participant as object synonyms.
 - **Source IN / OUT**: original-frame boundaries; OUT is exclusive. **Timeline
   frame**: absolute project position. **Duration** and **fades** use output frames.
 - **Opacity**, **Speed**, **Colour** and **Ripple** retain their established names.
-  Opacity is row-owned coverage, not an additional grading operation. Main and
-  stored sliders/exact fields use 0–100%, neutral 100%; row/key storage stays 0–1.
-- **Temperature / Tint** are row-owned normalized −1…1 scalar Colour controls,
+  Opacity is track-owned coverage, not an additional grading operation. Main and
+  stored sliders/exact fields use 0–100%, neutral 100%; track/keyframe storage stays 0–1.
+- **Temperature / Tint** are track-owned normalized −1…1 scalar Colour controls,
   neutral 0: positive Temperature warms, positive Tint adds magenta. They precede
-  Exposure, are independently keyable and work on empty rows, with the standard
+  Exposure, are independently animatable and work on empty tracks, with the standard
   slider/exact-field/reset/diamond/navigation pattern. No Kelvin or AWB label.
 - **Transform** is clip-owned crop, Scale, Translate X/Y and Rotation; its single
-  diamond captures the full eight-value source-frame pose, not a row participant.
+  diamond captures the full eight-value source-frame pose, not an enabled track setting.
 
 ## Control patterns
 
@@ -62,7 +70,7 @@ neither needs replacing merely to make their implementation identical.
   numeric draft. A pointer gesture is one edit; Escape, cancellation and lost
   capture restore it. Keyboard range adjustments remain native and precise entry
   applies on Enter/blur. Invalid numeric drafts remain editable with inline errors.
-- Clip Source range: exact **Source IN / OUT** text fields display **HH:MM:SS:FF**
+- Clip Range: exact **Source IN / OUT** text fields display **HH:MM:SS:FF**
   (30 fps NDF) and accept whole original frames or timecode on Enter/blur.
   Invalid drafts retain editable errors; Escape restores. One full-original bar
   hatches omitted footage, with fields below its ends and no duplicate duration,
@@ -78,7 +86,7 @@ neither needs replacing merely to make their implementation identical.
 - Other frames/durations/fades: native numeric stepper, explicit frame units and existing
   timecode feedback. No clamping, rounding or hidden timing repair.
 - Easing/modes/recordings: native select; selected easing has its existing graph.
-- Boolean settings: native checkbox. Shared row keyframe participation: diamond with
+- Boolean settings: native checkbox. Enabling a shared track keyframe setting: diamond with
   `aria-pressed`, followed by Previous/Next. Double-clicking a setting's name resets
   only that setting; sections keep one Reset in their header (Colour, Speed,
   Transform) and HSL/curves name theirs **Reset red** / **Reset all**.
@@ -94,7 +102,7 @@ neither needs replacing merely to make their implementation identical.
 
 Keep Media for recording discovery/import; the centre's Timeline/Source preview
 tabs for viewing; Clip for source/placement/speed/Transform; Track for Colour,
-Opacity, shared Keyframes, transitions and fades; Audio for music. Layer options owns
+Opacity, shared Keyframes, transitions and fades; Audio for music. Track options owns
 rename, Ripple, stacking and deletion. No tab relocation is justified by the audit.
 Keep frequent split/trim/delete/cut actions directly in Timeline, not in another
 toolbar. Detailed controls and diagnostics remain contextual/collapsible.
@@ -102,23 +110,23 @@ toolbar. Detailed controls and diagnostics remain contextual/collapsible.
 Transform is Clip's fourth section, collapsed by default and included
 in Expand all/Collapse all. **Transform animation** heading help remains reachable
 while collapsed. **Crop left/right/top/bottom / Scale / Translate X/Y / Rotation °**
-pair native sliders with exact fields. Main values edit the base without keys,
-or an existing full-pose key at the real displayed source frame; animated values
-without that key stay read-only until diamond capture. Stored **Source frame /
-To next point** and pose fields target the selected key; **Previous/Next**, the
-selector and **Preview stored key** seek the closest mapped image, with separate
-stored/actual source labels. Trash removes one full-pose key, revealing the saved
-base after the last deletion; **Reset transform** clears all keys and restores
+pair native sliders with exact fields. Main values edit the base without keyframes,
+or an existing full-pose keyframe at the real displayed source frame; animated values
+without that keyframe stay read-only until diamond capture. Stored **Source frame /
+To next keyframe** and pose fields target the selected keyframe; **Previous/Next**, the
+selector and **Preview stored keyframe** seek the closest mapped image, with separate
+stored/actual source labels. Trash removes one full-pose keyframe, revealing the saved
+base after the last deletion; **Reset transform** clears all keyframes and restores
 the neutral base. There is no graph/canvas gizmo or per-property diamond. Exact
 invalid drafts and release-only sliders follow the common validation/cancellation
 pattern. See [SPATIAL_TRANSFORMS.md](SPATIAL_TRANSFORMS.md).
 
 Audio keeps **Music track / Recording / Add music track / Delete selected music
 track** with native selects/buttons, contextual disabled reasons (no ready source,
-eight-instance limit or active draft) and existing **Placement & fades** fields.
+eight-track limit or active draft) and existing **Placement & fades** fields.
 Imports populate the bin/prepare media without implicit placement. Selection is
-editor-only; selected-instance edits/removal leave the others unchanged. Each
-instance retains independent drafts; hiding/selecting cannot apply one to another.
+editor-only; selected-track edits/removal leave the others unchanged. Each
+track retains independent drafts; hiding/selecting cannot apply one to another.
 One Undo step per accepted commit/gesture, atomic invalid/cancelled operations and
 the common gain-slider/exact-number contract remain authoritative.
 

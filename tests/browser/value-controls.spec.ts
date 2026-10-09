@@ -452,7 +452,7 @@ test('main and stored Opacity percentages reject invalid entries, cancel drafts 
       ? [sharedPoint(0, { opacity: 0.8, exposure: 0.2 }), sharedPoint(180, { opacity: 0.4 })]
       : [];
     await fixture(page, document);
-    const scope = stored ? await editLayerPoint(page, 'Video 1', 0) : page;
+    const scope = stored ? await editLayerPoint(page, 'Video track 1', 0) : page;
     const name = stored ? 'Opacity keyframe value 0' : 'Opacity';
     await showControl(page, name);
     const { slider, exact, widget } = controls(scope, name);
@@ -548,7 +548,7 @@ test('stored participants share the widgets, retain precise Speed and never join
     sharedPoint(180, { speed: 1, exposure: 0.5 }, 'hold'),
   ];
   await fixture(page, document);
-  const row = await editLayerPoint(page, 'Video 1', 0);
+  const row = await editLayerPoint(page, 'Video track 1', 0);
   for (const [setting, label, value] of [
     ['opacity', 'Opacity', 23.4567891],
     ['exposure', 'Exposure', 0.345678912],
@@ -567,7 +567,7 @@ test('stored participants share the widgets, retain precise Speed and never join
   await expect(row.locator('.layer-keyframe-point-values').getByRole('slider')).toHaveCount(3);
   await expect(row.locator('.layer-keyframe-point-values').getByRole('spinbutton')).toHaveCount(3);
   await expect(row.getByRole('slider', { name: 'Saturation keyframe value 0', exact: true })).toHaveCount(0);
-  const outside = await editLayerPoint(page, 'Video 1', 180);
+  const outside = await editLayerPoint(page, 'Video track 1', 180);
   await preciseEdit(
     page,
     'Speed keyframe value 180',
@@ -588,7 +588,7 @@ test('closing-fade Speed conflicts retain the final invalid draft, never an earl
     document.layers[0]!.closingFade = 90;
     document.layers[0]!.keyframes = stored ? [sharedPoint(0, { speed: 1, exposure: 0.25 }, 'smooth')] : [];
     await fixture(page, document);
-    const scope = stored ? await editLayerPoint(page, 'Video 1', 0) : page;
+    const scope = stored ? await editLayerPoint(page, 'Video track 1', 0) : page;
     const name = stored ? 'Speed keyframe value 0' : 'Clip speed rate';
     const { slider, exact, widget } = controls(scope, name);
     const before = await checkpoint(page);
@@ -641,7 +641,7 @@ test('identical-valued clip and row context replacements preserve input identity
   await showControl(page, 'Exposure');
   for (const [name, target, value] of [
     ['Exposure', '[data-clip-id="two"] .timeline-clip-body', '0'],
-    ['Opacity', '[aria-label="Select layer Empty row"]', '100'],
+    ['Opacity', '[aria-label="Select track Empty row"]', '100'],
   ] as const) {
     const { exact } = controls(page, name);
     const id = await exact.getAttribute('id');
@@ -665,7 +665,7 @@ test('identical-valued clip and row context replacements preserve input identity
   await moveDrag(page, drag, 0.35);
   await expect(exact).toBeDisabled();
   await page
-    .getByRole('button', { name: 'Select layer Video 1', exact: true })
+    .getByRole('button', { name: 'Select track Video track 1', exact: true })
     .evaluate((button: HTMLButtonElement) => button.click());
   await expect(widget).toHaveAttribute('data-pointer-draft', 'false');
   await expect(slider).toBeFocused();
@@ -723,14 +723,14 @@ test('animated channels without a playhead participant disable both inputs, not 
   document.layers[0]!.keyframes = [sharedPoint(10, { opacity: 1, exposure: 0, speed: 1 })];
   await fixture(page, document);
   const before = await checkpoint(page);
-  for (const name of ['Opacity', 'Exposure', 'Layer speed rate']) {
+  for (const name of ['Opacity', 'Exposure', 'Track speed rate']) {
     await showControl(page, name);
     const { slider, exact } = controls(page, name);
     await expect(slider).toBeVisible();
     await expect(exact).toBeVisible();
     await expect(slider).toBeDisabled();
     await expect(exact).toBeDisabled();
-    const label = name === 'Layer speed rate' ? 'Speed' : name;
+    const label = name === 'Track speed rate' ? 'Speed' : name;
     await expect(page.getByRole('button', { name: `Keyframe ${label}`, exact: true })).toBeEnabled();
     await expect(page.getByRole('button', { name: `Keyframe ${label}`, exact: true })).toHaveAttribute(
       'aria-pressed',
@@ -785,7 +785,7 @@ test('common widgets fit 270px inspectors at the default and minimum viewports w
           .evaluate((element) => {
             (element as HTMLDetailsElement).open = true;
           });
-        await editLayerPoint(page, 'Video 1', 0);
+        await editLayerPoint(page, 'Video track 1', 0);
       }
       const widgets = await inspector.locator('.value-control').evaluateAll((elements) =>
         elements
@@ -832,7 +832,7 @@ test('common widgets fit 270px inspectors at the default and minimum viewports w
         expect(widget.overflow).toBe(false);
       }
       // The row Speed keyframe overrides clip speed, so Clip shows the row rate.
-      const name = tab === 'Clip' ? 'Layer speed rate' : tab === 'Track' ? 'Speed keyframe value 0' : 'Music gain';
+      const name = tab === 'Clip' ? 'Track speed rate' : tab === 'Track' ? 'Speed keyframe value 0' : 'Music gain';
       const { exact } = controls(inspector, name);
       await exact.scrollIntoViewIfNeeded();
       await expect(exact).toBeInViewport();

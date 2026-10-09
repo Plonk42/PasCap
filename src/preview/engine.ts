@@ -572,7 +572,7 @@ export class PreviewEngine {
   updateColour(layerId: string, settings: ColourSettings): void {
     if (!this.#document) return;
     const layer = this.#document.layers.find((item) => item.id === layerId);
-    if (!layer) throw new Error('The graded row does not exist.');
+    if (!layer) throw new Error('The graded track does not exist.');
     layer.colour = colourSchema.parse(settings);
     this.#dirty = true;
     this.#colourRequested = performance.now();

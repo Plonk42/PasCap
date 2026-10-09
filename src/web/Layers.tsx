@@ -9,7 +9,7 @@ import { timelineRows } from './timeline-rows.js';
 
 function layerNameError(draft: string): string | null {
   const name = draft.trim();
-  if (!name) return 'Enter a layer name (1–100 characters).';
+  if (!name) return 'Enter a track name (1–100 characters).';
   return name.length > 100 ? 'Use at most 100 characters.' : null;
 }
 
@@ -57,10 +57,10 @@ function LayerName({
   return (
     <div className="layer-name-field" data-dirty={dirty}>
       <label htmlFor={fieldId}>
-        Layer name
+        Track name{' '}
         <input
           id={fieldId}
-          aria-label={`Rename layer ${layer.name}`}
+          aria-label={`Rename track ${layer.name}`}
           value={state.draft}
           maxLength={100}
           disabled={disabled}
@@ -150,7 +150,7 @@ export function Layers({
     <aside
       ref={viewport}
       className="layer-sidebar declutter-layers"
-      aria-label="Video layers"
+      aria-label="Video tracks"
       style={{ height: viewportHeight ?? undefined }}
       onScroll={(event) => {
         const top = event.currentTarget.scrollTop;
@@ -163,9 +163,9 @@ export function Layers({
       <div className="layer-sidebar-surface" style={{ height: surfaceHeight }}>
         <div
           className="layer-sidebar-heading"
-          title="Row 1 renders below row 2, then row 3 above row 2. Every track has independent Ripple, transitions and fades."
+          title="Video track 1 renders below video track 2, then video track 3 above video track 2. Every track has independent Ripple, transitions and fades."
         >
-          Video layers · {project.layers.length} / 8
+          Video tracks · {project.layers.length} / 8
         </div>
         {timelineRows(project.layers).map(({ layer, index, top }) => {
           const restrictions = layerActionRestrictions(index, project.layers.length, disabled);
@@ -180,8 +180,8 @@ export function Layers({
               <div className="layer-control-main">
                 <button
                   className="icon-button"
-                  aria-label={`${layer.enabled ? 'Hide' : 'Show'} layer ${layer.name}`}
-                  title={layer.enabled ? 'Hide layer in preview and export' : 'Show layer in preview and export'}
+                  aria-label={`${layer.enabled ? 'Hide' : 'Show'} track ${layer.name}`}
+                  title={layer.enabled ? 'Hide track in preview and export' : 'Show track in preview and export'}
                   disabled={disabled}
                   onClick={() => onEdit({ type: 'layer-update', layer: { ...layer, enabled: !layer.enabled } })}
                 >
@@ -189,7 +189,7 @@ export function Layers({
                 </button>
                 <button
                   className="text-button layer-select"
-                  aria-label={`Select layer ${layer.name}`}
+                  aria-label={`Select track ${layer.name}`}
                   aria-pressed={layer.id === selectedId}
                   disabled={disabled}
                   title="Select this track"
@@ -211,7 +211,7 @@ export function Layers({
                 >
                   <Icon name="ripple" size={15} />
                 </button>
-                <Popover label={`Layer options ${layer.name}`} className="layer-options">
+                <Popover label={`Track options ${layer.name}`} className="layer-options">
                   {(close) => (
                     <>
                       <LayerName
@@ -225,14 +225,14 @@ export function Layers({
                         <label title="Enabling Ripple packs this track in one Undo step, preserving its first clip’s current start and existing dissolves. Turning it off preserves current placements.">
                           <input
                             type="checkbox"
-                            aria-label={`Ripple on layer ${layer.name}`}
+                            aria-label={`Ripple on track ${layer.name}`}
                             aria-describedby={`${description}-ripple`}
                             checked={layer.ripple}
                             disabled={disabled}
                             onChange={(event) =>
                               onEdit({ type: 'layer-update', layer: { ...layer, ripple: event.currentTarget.checked } })
                             }
-                          />
+                          />{' '}
                           Ripple
                         </label>
                         <HelpPopover label={`Ripple on ${layer.name}`}>
@@ -240,16 +240,16 @@ export function Layers({
                             On: clips pack continuously from the first clip’s current project-frame start, retaining
                             existing dissolves. Enabling closes gaps in one Undo step; it does not move the first
                             anchor. Off: current placements are kept and each start is independent. Other tracks, music
-                            and row points never move with this switch. New tracks start with Ripple on.
+                            and track keyframes never move with this switch. New tracks start with Ripple on.
                           </p>
                         </HelpPopover>
                       </div>
                       <div className="layer-options-actions">
                         <button
                           className="secondary-button small"
-                          aria-label={`Raise layer ${layer.name}`}
+                          aria-label={`Raise track ${layer.name}`}
                           aria-describedby={restrictions.raise ? `${description}-raise` : undefined}
-                          title={restrictions.raise ?? 'Composite this track above the next layer'}
+                          title={restrictions.raise ?? 'Composite this track above the next track'}
                           disabled={restrictions.raise !== null}
                           onClick={() => move(index, 1)}
                         >
@@ -258,9 +258,9 @@ export function Layers({
                         </button>
                         <button
                           className="secondary-button small"
-                          aria-label={`Lower layer ${layer.name}`}
+                          aria-label={`Lower track ${layer.name}`}
                           aria-describedby={restrictions.lower ? `${description}-lower` : undefined}
-                          title={restrictions.lower ?? 'Composite this track below the previous layer'}
+                          title={restrictions.lower ?? 'Composite this track below the previous track'}
                           disabled={restrictions.lower !== null}
                           onClick={() => move(index, -1)}
                         >
@@ -269,7 +269,7 @@ export function Layers({
                         </button>
                         <button
                           className="secondary-button small layer-delete"
-                          aria-label={`Delete layer ${layer.name}`}
+                          aria-label={`Delete track ${layer.name}`}
                           aria-describedby={restrictions.remove ? `${description}-remove` : undefined}
                           title={restrictions.remove ?? 'Remove this track and its clips · Undo restores them'}
                           disabled={restrictions.remove !== null}
@@ -279,7 +279,7 @@ export function Layers({
                           }}
                         >
                           <Icon name="trash" size={14} />
-                          Delete layer
+                          Delete track
                         </button>
                       </div>
                       {restrictions.raise && (

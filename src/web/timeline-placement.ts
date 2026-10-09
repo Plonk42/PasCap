@@ -213,7 +213,7 @@ export function planTimelineDrop(
   playhead: number,
 ): DropPlan {
   const layer = project.layers.find((item) => item.id === layerId);
-  if (!layer) throw new Error('Choose a video row before dropping.');
+  if (!layer) throw new Error('Choose a video track before dropping.');
   const clips = draggedClips(project, payload);
   const first = clips[0]!;
   const requested = Math.max(0, Math.round(pointerFrame - (payload.kind === 'clip' ? payload.grabFrame : 0)));

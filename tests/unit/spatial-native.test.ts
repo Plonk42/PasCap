@@ -334,7 +334,7 @@ describe('native spatial sampling without transformed frame storage', () => {
         cache,
         signal(),
       ),
-    ).rejects.toThrow('authoritative layer group');
+    ).rejects.toThrow('authoritative track group');
     await expect(
       composeLayerFrame(
         buffer,
@@ -343,7 +343,7 @@ describe('native spatial sampling without transformed frame storage', () => {
         cache,
         signal(),
       ),
-    ).rejects.toThrow('authoritative layer group');
+    ).rejects.toThrow('authoritative track group');
     await expect(
       composeLayerFrame(
         buffer,

@@ -73,11 +73,11 @@ for (const context of ['shared', 'ramp', 'clip'] as const) {
     await page.setViewportSize({ width: 1280, height: 720 });
     await page.goto(`/?project=${document.id}`);
     await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
-    if (context === 'shared') await editLayerPoint(page, 'Video 1', 10);
+    if (context === 'shared') await editLayerPoint(page, 'Video track 1', 10);
     else await inspectorTab(page, 'Clip');
     const label =
       context === 'shared'
-        ? 'Layer keyframe interpolation 10'
+        ? 'Track keyframe interpolation 10'
         : context === 'ramp'
           ? 'Ramp curve'
           : 'Clip speed keyframe easing';

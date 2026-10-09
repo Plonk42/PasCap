@@ -156,7 +156,7 @@ function CurveEditor({
     const result = colourCurveSchema.safeParse(next);
     return result.success
       ? null
-      : 'Curve inputs must be unique and ascending from 0 to 1, with 2–16 points and outputs in 0–1.';
+      : 'Curve inputs must be unique and ascending from 0 to 1, with 2–16 control nodes and outputs in 0–1.';
   };
   const replace = (at: number, changes: Partial<ColourCurvePoint>): ColourCurvePoint[] =>
     points.map((point, position) => (position === at ? { ...point, ...changes } : point));
@@ -291,7 +291,7 @@ function CurveEditor({
             type="button"
             className="colour-curve-point"
             style={{ left: `${point.x * 100}%`, top: `${(1 - point.y) * 100}%` }}
-            aria-label={`Colour curve point ${at + 1}`}
+            aria-label={`Colour curve control node ${at + 1}`}
             aria-pressed={index === at}
             aria-disabled={disabled && !capture.current}
             title={`Input ${point.x}, output ${point.y}. Arrows edit; Shift moves 0.1; Enter selects.`}
@@ -309,21 +309,21 @@ function CurveEditor({
       </div>
       <div className="advanced-colour-tools">
         <select
-          aria-label="Selected colour curve point"
+          aria-label="Selected colour curve control node"
           value={index}
           disabled={unavailable}
           onChange={(event) => selection.select(points[Number(event.currentTarget.value)]!.x)}
         >
           {points.map((point, at) => (
             <option key={selection.ids[at]} value={at}>
-              Point {at + 1} · {point.x}
+              Control node {at + 1} · {point.x}
             </option>
           ))}
         </select>
         <button
           type="button"
           className="icon-button"
-          aria-label="Add colour curve point"
+          aria-label="Add colour curve control node"
           disabled={unavailable || points.length >= 16}
           onClick={add}
         >
@@ -332,7 +332,7 @@ function CurveEditor({
         <button
           type="button"
           className="icon-button"
-          aria-label="Delete colour curve point"
+          aria-label="Delete colour curve control node"
           disabled={unavailable || endpoint}
           onClick={() => change(points.filter((_, at) => at !== index))}
         >
@@ -349,7 +349,7 @@ function CurveEditor({
             max={1}
             resetKey={context}
             disabled={unavailable || endpoint}
-            {...(endpoint ? { hint: 'Endpoint input is fixed.' } : {})}
+            {...(endpoint ? { hint: 'End control node input is fixed.' } : {})}
             validate={(x) => validate(replace(index, { x }))}
             onCommit={(x) => change(replace(index, { x }))}
           />
@@ -372,7 +372,7 @@ function CurveEditor({
           type="button"
           className="text-button"
           disabled={unavailable || index === 0}
-          aria-label="Previous colour curve point"
+          aria-label="Previous colour curve control node"
           onClick={() => selection.select(points[index - 1]!.x)}
         >
           <Icon name="back" size={14} />
@@ -382,7 +382,7 @@ function CurveEditor({
           type="button"
           className="text-button"
           disabled={unavailable || index === points.length - 1}
-          aria-label="Next colour curve point"
+          aria-label="Next colour curve control node"
           onClick={() => selection.select(points[index + 1]!.x)}
         >
           Next
@@ -410,7 +410,7 @@ export function AdvancedColour(props: Readonly<Props>) {
     <div className="advanced-colour">
       <details>
         <summary>
-          HSL ranges <small>Static row</small>
+          HSL ranges <small>Static track</small>
         </summary>
         <div className="advanced-colour-tools">
           <label>
@@ -430,7 +430,7 @@ export function AdvancedColour(props: Readonly<Props>) {
           </label>
           <HelpPopover label="HSL ranges">
             <p>
-              Static colour for every clip on this row, including when scalar colour is animated. Hue is degrees;
+              Static colour for every clip on this track, including when scalar colour is animated. Hue is degrees;
               saturation is a multiplier offset; lightness is an encoded offset. Circular neighbouring ranges blend
               smoothly. Greys are protected. This is SDR, not white balance.
             </p>
@@ -482,7 +482,7 @@ export function AdvancedColour(props: Readonly<Props>) {
       </details>
       <details>
         <summary>
-          Colour curves <small>Static row</small>
+          Colour curves <small>Static track</small>
         </summary>
         <div className="advanced-colour-tools">
           <label>
@@ -502,11 +502,11 @@ export function AdvancedColour(props: Readonly<Props>) {
           </label>
           <HelpPopover label="Colour curves">
             <p>
-              Encoded input/output 0–1, after scalar grading and HSL. Master runs before the RGB channels. Endpoints
-              lock input only. Up to sixteen points; outputs may rise or fall. Drag edits both coordinates, committing
-              only on release; Escape cancels. Arrows edit by 0.01, Shift by 0.1. Exact fields retain precision. Native
-              export evaluates advanced colour directly, including sharp knees. Final video encoding still quantises the
-              result.
+              Encoded input/output 0–1, after scalar grading and HSL. Master runs before the RGB channels. End control
+              nodes lock input only. Up to sixteen control nodes; outputs may rise or fall. Drag edits both coordinates,
+              committing only on release; Escape cancels. Arrows edit by 0.01, Shift by 0.1. Exact fields retain
+              precision. Native export evaluates advanced colour directly, including sharp knees. Final video encoding
+              still quantises the result.
             </p>
           </HelpPopover>
         </div>

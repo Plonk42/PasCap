@@ -114,7 +114,7 @@ describe('strict schema-12 independent music instances', () => {
     expect(invalid).toEqual(before);
     document.clips = [{ ...createClip('too-long', 'video', 0, maximum), start: 1 }];
     expect(projectSchema.safeParse(document).success).toBe(false);
-    expect(() => calculateLayout(document)).toThrow('Layer duration exceeds supported project frames.');
+    expect(() => calculateLayout(document)).toThrow('Track duration exceeds supported project frames.');
   });
 });
 

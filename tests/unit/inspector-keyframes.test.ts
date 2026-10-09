@@ -51,10 +51,10 @@ describe('dedicated Inspector keyframe controls', () => {
     expect(panels.filter((panel) => panel.includes('hidden'))).toHaveLength(2);
     const clipPanel = markup.slice(markup.indexOf(panels[0]!), markup.indexOf(panels[1]!));
     const trackPanel = markup.slice(markup.indexOf(panels[1]!), markup.indexOf(panels[2]!));
-    expect(clipPanel).toContain('Select a clip on Video 1 to edit it.');
+    expect(clipPanel).toContain('Select a clip on Video track 1 to edit it.');
     expect(clipPanel).not.toContain('aria-label="Placement section"');
     expect(clipPanel).not.toContain('aria-label="Opacity"');
-    expect(trackPanel).toContain('aria-label="Layer keyframes Video 1"');
+    expect(trackPanel).toContain('aria-label="Track keyframes Video track 1"');
     expect(trackPanel).toContain('aria-label="Keyframes section"');
     expect(trackPanel).toContain('aria-label="Fades section"');
     const opacity = [...trackPanel.matchAll(/<input[^>]*aria-label="Opacity"[^>]*>/g)].map((match) => match[0]);
@@ -133,7 +133,7 @@ describe('dedicated Inspector keyframe controls', () => {
     expect(markup).not.toContain('aria-label="Keyframe Exposure"');
     expect(markup).not.toContain('Speed mode');
     expect(markup).toContain('Outside duration');
-    expect(markup).toContain('<ol class="keyframe-list keyframe-entries" aria-label="Edit layer keys">');
+    expect(markup).toContain('<ol class="keyframe-list keyframe-entries" aria-label="Edit track keyframes">');
     expect(markup).not.toContain('Edit points');
     expect(markup).not.toContain('pascap-layer-key-list');
   });

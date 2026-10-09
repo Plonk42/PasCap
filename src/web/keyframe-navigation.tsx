@@ -19,7 +19,7 @@ export function previewFrameFor(time: number, duration: number): number {
 export function keySeekHint(time: number, duration: number): string {
   if (duration === 0) return `Stored timeline frame ${time}; the timeline is empty, so there is no frame to preview.`;
   if (time >= duration)
-    return `Stored timeline frame ${time}; preview the nearest available frame ${previewFrameFor(time, duration)}. The point stays in place.`;
+    return `Stored timeline frame ${time}; preview the nearest available frame ${previewFrameFor(time, duration)}. The keyframe stays in place.`;
   return `Go to timeline frame ${time}.`;
 }
 

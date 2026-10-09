@@ -27,7 +27,7 @@ function layered() {
   });
   project = applyCommand(project, {
     type: 'layer-add',
-    layer: { ...createLayer('upper', 'Video 2', false), opacity: 0.5 },
+    layer: { ...createLayer('upper', 'Video track 2', false), opacity: 0.5 },
   });
   return applyCommand(project, {
     type: 'insert',
@@ -81,7 +81,7 @@ describe('layer layout, compositing and edit commands', () => {
     expect(history.canUndo).toBe(false);
     expect(history.canRedo).toBe(true);
     expect(() => history.commit({ type: 'opacity', layerId: 'missing', opacity: 0.5 })).toThrow(
-      'Layer no longer exists',
+      'Track no longer exists',
     );
     expect(history.current).toEqual(document);
     expect(history.redo()).toEqual(changed);
@@ -198,7 +198,7 @@ describe('layer layout, compositing and edit commands', () => {
   it('rejects deleting an unknown layer without touching existing layers or clips', () => {
     const project = layered();
     const before = JSON.stringify(project);
-    expect(() => applyCommand(project, { type: 'layer-remove', layerId: 'missing' })).toThrow('Layer no longer exists');
+    expect(() => applyCommand(project, { type: 'layer-remove', layerId: 'missing' })).toThrow('Track no longer exists');
     expect(JSON.stringify(project)).toBe(before);
   });
 });

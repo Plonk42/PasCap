@@ -118,7 +118,7 @@ export function MusicControls({
   const videoDuration = videoTimelineDuration(project);
   const available = assets.some((asset) => asset.id === music?.mediaId);
   const ready = assets.filter((asset) => asset.status === 'ready');
-  let addReason = ready.length ? '' : 'Import a music file first; it can be added once it is ready.';
+  let addReason = ready.length ? '' : 'Import a music recording first; it can be added once it is ready.';
   if (project.music.length >= MAX_MUSIC_TRACKS)
     addReason = `A project can contain at most ${MAX_MUSIC_TRACKS} music tracks. Remove a track before adding another.`;
   const addMusic = (asset: AudioAsset): void => {
@@ -144,7 +144,7 @@ export function MusicControls({
         }}
       >
         <Icon name="folder" size={14} />
-        Browse music files
+        Browse music recordings
       </button>
       <form
         className="music-import"
@@ -154,8 +154,8 @@ export function MusicControls({
         }}
       >
         <input
-          aria-label="Music file path"
-          placeholder="Local audio file path"
+          aria-label="Music recording path"
+          placeholder="Local audio recording path"
           value={filename}
           disabled={blocked}
           onChange={(event) => setFilename(event.target.value)}
@@ -195,11 +195,11 @@ export function MusicControls({
           }
         >
           <div className="activity-dialog-heading">
-            <h2 id={`${helpId}-browse-title`}>Browse music files</h2>
+            <h2 id={`${helpId}-browse-title`}>Browse music recordings</h2>
           </div>
           <p className="control-hint" id={`${helpId}-browse-description`}>
-            Choose one original audio file accessible to the PasCap service. Browsing and selection do not import, copy
-            or prepare it.
+            Choose one original music recording accessible to the PasCap service. Browsing and selection do not import,
+            copy or prepare it.
           </p>
           <Suspense fallback={<output className="footage-loading">Opening music browser…</output>}>
             <MusicBrowser busy={blocked} onImport={(path) => importMusic(path, true)} />
@@ -289,7 +289,7 @@ export function MusicControls({
           }
         >
           {(close) => (
-            <ul className="music-add-list" aria-label="Ready music files">
+            <ul className="music-add-list" aria-label="Ready music recordings">
               {ready.map((asset) => (
                 <li key={asset.id}>
                   <button
@@ -372,7 +372,7 @@ function MusicInstanceControls({
           disabled={drafting || !videoDuration}
           title={
             videoDuration
-              ? 'Start this track at frame 0 and fit to the last video OUT, limited by the source range unless Loop is enabled. Other music tracks stay unchanged.'
+              ? 'Start this track at frame 0 and fit to the last video clip OUT, limited by the range unless Loop is enabled. Other music tracks stay unchanged.'
               : 'Add a video clip before fitting music to video duration.'
           }
           onClick={() =>
@@ -409,7 +409,7 @@ function MusicInstanceControls({
           disabled={drafting}
           onChange={(event) => update({ loop: event.target.checked })}
         />
-        <span>Loop selected source range</span>
+        <span>Loop selected range</span>
       </label>
       <MusicTiming helpId={helpId}>
         <div className="range-fields">

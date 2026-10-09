@@ -22,7 +22,7 @@ migration, source copying, native jobs or a release.
 - [Registry v1 and MediaAsset](../../src/shared/media.ts) are strict. The video
   registry and [audio registry](../../src/server/audio.ts) are distinct files.
   [Project v8](../../src/shared/model.ts) clips/bins reference asset IDs, not paths;
-  row points, source-frame curves and music timing are independent of location.
+  video track keyframes, source-frame curves and music timing are independent of location.
 - [Export admission](../../src/server/export.ts) captures/freeze-copies source
   assets before queuing native work. Version-1 receipts contain their captured
   project snapshot **and original source paths/fingerprints/metadata**. They are
@@ -56,7 +56,7 @@ video asset. Keep the existing required fields, plus:
 | `sourcePath` / `fingerprint` | Current explicitly confirmed service-side absolute path and its filesystem/sampled evidence; replace together, never use their new digest as the cache key                 |
 
 Reject omitted/unknown fields, unsupported algorithms, invalid digests, duplicate
-IDs, mismatched content/cache keys and invalid revisions. No optional/null legacy
+IDs, mismatched content/cache identifiers and invalid revisions. No optional/null legacy
 evidence, fallback baseline or "verified" flag without its checksum is proposed.
 Content identity and accepted timing/colour metadata cannot be changed by relinking.
 
@@ -165,7 +165,7 @@ yield before registering the reservation. Release only owned reservations/handle
 Write a clone of the current complete registry: change only `sourcePath`, its
 current `fingerprint` and `locationRevision`. Preserve `id`, `cacheKey`, `content`,
 metadata and prepared assets; do not replace the live in-memory asset before
-persistence commits. No clip/base/point/music/bin/history/autosave/receipt rewrite.
+persistence commits. No clip/base/keyframe/music/bin/history/autosave/receipt rewrite.
 Tabs refresh asset availability and use ordinary preview recovery at the retained
 project frame, without a fictional Undo step for registry maintenance.
 
@@ -206,7 +206,7 @@ These are required future checks, **not results claimed by this design record**:
   post-rename acknowledgement and verify honest readback/restart recovery, not
   an invented rollback. No automatic retry or interrupted-job resume.
 - Save/reopen/restart, existing proxy reuse, preview source mapping and short native
-  export preserve the same media ID, clip ranges/bases, shared points, speed curves,
+  export preserve the same media ID, clip ranges/bases, shared keyframes, speed curves,
   bins, music, frame/pixel/resource gates and prior successful outputs.
 - Strict v1/invalid-v2 refusal preserves files and caches. No default-field injection,
   automatic migration, cache moves or ID remapping. Audio remains unchanged.

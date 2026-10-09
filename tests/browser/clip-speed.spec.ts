@@ -370,7 +370,7 @@ test('duplicate/trim/split preserve independent clip curves and keep outside-tri
   await expect(page.locator('.clip-speed-point')).toHaveCount(3);
   await page
     .getByRole('combobox', { name: 'Selected clip speed keyframe' })
-    .selectOption({ label: 'Point 1 · source 0 · outside clip' });
+    .selectOption({ label: 'Keyframe 1 · source 0 · outside clip' });
   await expect(page.locator('.clip-speed-outside')).toBeVisible();
   await page.getByRole('button', { name: 'Restore full recording' }).click();
   await seek(page, 60);

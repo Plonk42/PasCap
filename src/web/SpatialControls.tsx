@@ -118,16 +118,17 @@ export function TransformHelp() {
   return (
     <HelpPopover label="Transform animation">
       <p>
-        Transform belongs only to this excerpt. Crop fractions remove original source edges without refitting; opposite
+        Transform belongs only to this clip. Crop fractions remove original source edges without refitting; opposite
         crops must sum to less than 1. Scale preserves aspect. Rotation uses the original centre pivot, clockwise;
-        translation is a fraction of the output width or height. Uncovered pixels reveal lower layers.
+        translation is a fraction of the output width or height. Uncovered pixels reveal lower tracks.
       </p>
       <p>
         The single diamond captures the complete evaluated pose at the actually displayed integer source frame. With
-        animation, capture a key before editing at a new source frame; sliders never add keys. All eight values share
-        the key's easing. Stored keys, including outside the trim and at exclusive OUT, stay editable; navigation
-        previews the closest actually mapped image. Trimming, splitting and moving retain original-source anchors. Reset
-        transform deliberately restores the neutral base and deletes all Transform keys, in one Undo.
+        animation, capture a keyframe before editing at a new source frame; sliders never add keyframes. All eight
+        values share the keyframe's easing. Stored keyframes, including outside the trim and at exclusive OUT, stay
+        editable; navigation previews the closest actually mapped image. Trimming, splitting and moving retain
+        original-source anchors. Reset transform deliberately restores the neutral base and deletes all Transform
+        keyframes, in one Undo.
       </p>
     </HelpPopover>
   );
@@ -182,7 +183,7 @@ export function SpatialControls({ project, clip, sourceFrameCount, frame, disabl
           aria-pressed={active !== undefined}
           title={
             active
-              ? `Remove the full Transform key at source frame ${active.frame}`
+              ? `Remove the full Transform keyframe at source frame ${active.frame}`
               : 'Capture the full evaluated pose at the displayed source frame'
           }
           disabled={unavailable || playhead === null || (!active && settings.keyframes.length >= 256)}
@@ -197,7 +198,7 @@ export function SpatialControls({ project, clip, sourceFrameCount, frame, disabl
         >
           <span aria-hidden="true">{active ? '◆' : '◇'}</span>
         </button>
-        <span>{settings.keyframes.length} Transform keys</span>
+        <span>{settings.keyframes.length} Transform keyframes</span>
         <button
           type="button"
           className="text-button"
@@ -223,7 +224,7 @@ export function SpatialControls({ project, clip, sourceFrameCount, frame, disabl
         onCommit={(key, value) => change(() => editSpatialPose(settings, playhead?.frame ?? null, key, value))}
       />
       {selected && (
-        <section className="spatial-stored" aria-label="Stored Transform key">
+        <section className="spatial-stored" aria-label="Stored Transform keyframe">
           <div className="spatial-selection">
             <button
               type="button"
@@ -244,7 +245,7 @@ export function SpatialControls({ project, clip, sourceFrameCount, frame, disabl
             >
               {settings.keyframes.map((key, at) => (
                 <option key={key.frame} value={key.frame}>
-                  Key {at + 1} · source {key.frame}
+                  Keyframe {at + 1} · source {key.frame}
                   {key.frame < clip.sourceIn || key.frame >= clip.sourceOut ? ' · outside clip' : ''}
                 </option>
               ))}
@@ -272,7 +273,7 @@ export function SpatialControls({ project, clip, sourceFrameCount, frame, disabl
             Stored source frame {selected.frame} ·{' '}
             {playhead ? `actual displayed source frame ${playhead.frame}` : 'no displayed source frame'}
             {selected.frame < clip.sourceIn || selected.frame >= clip.sourceOut
-              ? ' · outside excerpt; preview uses the nearest available image'
+              ? ' · outside clip; preview uses the nearest available image'
               : ''}
           </p>
           <button
@@ -282,7 +283,7 @@ export function SpatialControls({ project, clip, sourceFrameCount, frame, disabl
             disabled={unavailable}
             onClick={() => seek(index)}
           >
-            Preview stored key
+            Preview stored keyframe
           </button>
           <label className="speed-field">
             Source frame
@@ -300,7 +301,7 @@ export function SpatialControls({ project, clip, sourceFrameCount, frame, disabl
             />
           </label>
           <label className="speed-field">
-            To next point
+            To next keyframe
             <EasingSelect
               aria-label="Transform keyframe easing"
               value={selected.interpolation}
@@ -347,7 +348,7 @@ export function TransformSection(props: Readonly<Omit<Props, 'clip'> & { clip: V
       {props.clip ? (
         <SpatialControls {...props} clip={props.clip} key={`${props.project.id}:${props.clip.id}`} />
       ) : (
-        <p className="control-hint">Select an excerpt to edit its Transform.</p>
+        <p className="control-hint">Select a clip to edit its Transform.</p>
       )}
     </InspectorSection>
   );

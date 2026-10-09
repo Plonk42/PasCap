@@ -45,8 +45,8 @@ export function KeyframeToggle({
     setting,
   );
   const title = active
-    ? `Remove ${label} from the shared point at timeline frame ${frame}. Other settings at this point stay unchanged.`
-    : `Keyframe ${label} at timeline frame ${frame}. Capture the displayed value for the whole video row ${layer.name}.`;
+    ? `Remove ${label} from the shared keyframe at timeline frame ${frame}. Other settings at this keyframe stay unchanged.`
+    : `Keyframe ${label} at timeline frame ${frame}. Capture the displayed value for the whole video track ${layer.name}.`;
   const toggle = (): void => {
     if (unavailable || !valid) return;
     onEdit({ type: 'layer-key-toggle', layerId: layer.id, frame, setting, value });
@@ -60,15 +60,15 @@ export function KeyframeToggle({
         aria-label={`Keyframe ${label}`}
         aria-pressed={active}
         aria-describedby={descriptionId}
-        title={valid ? title : 'A valid timeline frame and value are required to key this setting.'}
+        title={valid ? title : 'A valid timeline frame and value are required to capture a keyframe for this setting.'}
         disabled={unavailable || !valid}
         onClick={toggle}
       >
         <span aria-hidden="true">{active ? '◆' : '◇'}</span>
         <span id={descriptionId} className="declutter-sr-only">
           {animated
-            ? 'This setting follows the whole row’s animation curve. Capture a key at the playhead before editing between points.'
-            : 'Not animated. The diamond captures the displayed value to animate this setting on the whole video row.'}
+            ? 'This setting follows the whole track’s animation curve. Capture a keyframe at the playhead before editing between keyframes.'
+            : 'Not animated. The diamond captures the displayed value to animate this setting on the whole video track.'}
         </span>
       </button>
       <button

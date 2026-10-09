@@ -2,7 +2,7 @@ interface SettingContext {
   keyed: boolean;
   active: boolean;
   baseAvailable: boolean;
-  baseLabel: 'Clip' | 'Layer';
+  baseLabel: 'Clip' | 'Track';
   label: string;
   frame: number;
 }
@@ -12,7 +12,7 @@ export function settingPresentation({ keyed, active, baseAvailable, label, frame
   if (keyed && active)
     return {
       scope: 'Keyframe at playhead',
-      hint: `Editable keyframe at timeline frame ${frame}. Edits change only ${label} at this shared layer point.`,
+      hint: `Editable keyframe at timeline frame ${frame}. Edits change only ${label} at this shared track keyframe.`,
     };
   if (keyed)
     return {
@@ -22,10 +22,10 @@ export function settingPresentation({ keyed, active, baseAvailable, label, frame
   if (!baseAvailable)
     return {
       scope: 'No clip selected',
-      hint: `Select a clip to edit ${label}, or click the ${label} diamond to animate this setting on the row.`,
+      hint: `Select a clip to edit ${label}, or click the ${label} diamond to animate this setting on the track.`,
     };
   return {
     scope: 'Not animated',
-    hint: `Editing ${label}. Add keyframes to animate this setting on the row.`,
+    hint: `Editing ${label}. Add keyframes to animate this setting on the track.`,
   };
 }

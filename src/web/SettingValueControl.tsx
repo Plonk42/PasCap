@@ -108,7 +108,7 @@ export function SpeedRateField(props: Readonly<Omit<NumberFieldProps, 'min' | 'm
   const id = props.id ?? generatedId;
   return (
     <div className="speed-field">
-      <label htmlFor={id}>Layer rate ×</label>
+      <label htmlFor={id}>Track rate ×</label>
       <RateValueControl {...props} id={id} />
     </div>
   );

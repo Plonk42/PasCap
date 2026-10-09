@@ -113,7 +113,7 @@ describe('strict uniform schema-12 tracks', () => {
   it('uses Ripple ON for the initial track and every newly created track', () => {
     const initial = createProject('new', 'New');
     expect(initial.schemaVersion).toBe(12);
-    expect(initial.layers).toEqual([createLayer(BASE_LAYER_ID, 'Video 1')]);
+    expect(initial.layers).toEqual([createLayer(BASE_LAYER_ID, 'Video track 1')]);
     for (const id of [BASE_LAYER_ID, ...Array.from({ length: 8 }, (_, index) => `arbitrary-${index}`)]) {
       expect(createLayer(id, 'Track')).toEqual({
         id,
@@ -195,11 +195,11 @@ describe('strict uniform schema-12 tracks', () => {
     rejected(last, { type: 'layer-remove', layerId: 'sky' }, 'last video track');
     expect(layerActionRestrictions(0, 3, false)).toEqual({
       raise: null,
-      lower: 'This track is already the bottom composition layer.',
+      lower: 'This track is already the bottom video track.',
       remove: null,
     });
     expect(layerActionRestrictions(2, 3, false)).toEqual({
-      raise: 'This track is already the top composition layer.',
+      raise: 'This track is already the top video track.',
       lower: null,
       remove: null,
     });

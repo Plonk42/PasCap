@@ -35,7 +35,7 @@ export const colourCurveSchema = z
       points[0]?.x === 0 &&
       points.at(-1)?.x === 1 &&
       points.every((point, index) => index === 0 || point.x > points[index - 1]!.x),
-    { message: 'Curve inputs must strictly ascend from 0 to 1.' },
+    { message: 'Colour curve control node inputs must strictly ascend from 0 to 1.' },
   );
 export const curvesSchema = z
   .object({ master: colourCurveSchema, red: colourCurveSchema, green: colourCurveSchema, blue: colourCurveSchema })

@@ -79,7 +79,7 @@ test('browse and register original paths, prepare verified proxies, persist proj
       });
   });
   await openImport(page);
-  const checkbox = page.getByRole('checkbox', { name: 'Select original browse-camera-1.mp4', exact: true });
+  const checkbox = page.getByRole('checkbox', { name: 'Select recording browse-camera-1.mp4', exact: true });
   await expect(checkbox).toBeVisible();
   expect(writes).toEqual([]);
   await expect(page.locator('input[type="file"]')).toHaveCount(0);
@@ -154,21 +154,21 @@ test('navigation, natural names, filtering and selection send paths only and nev
     });
   });
   await openImport(page);
-  await expect(page.getByRole('button', { name: 'Up one footage folder' })).toBeDisabled();
-  await expect(page.getByRole('list', { name: 'Footage entries' }).locator('li')).toHaveText([
+  await expect(page.getByRole('button', { name: 'Up one recording folder' })).toBeDisabled();
+  await expect(page.getByRole('list', { name: 'Recording entries' }).locator('li')).toHaveText([
     'Flight 2›',
     'Clip 2.mp4250 MiB',
     'Clip 10.MOV600 MiB',
   ]);
-  await page.getByRole('searchbox', { name: 'Search footage' }).fill('Clip 2');
+  await page.getByRole('searchbox', { name: 'Search recordings' }).fill('Clip 2');
   await page.getByRole('checkbox', { name: 'Select visible original recordings' }).check();
-  await page.getByRole('searchbox', { name: 'Search footage' }).fill('');
-  await page.getByRole('button', { name: 'Open footage folder Flight 2' }).click();
-  await page.getByRole('checkbox', { name: 'Select original Other.MP4' }).check();
+  await page.getByRole('searchbox', { name: 'Search recordings' }).fill('');
+  await page.getByRole('button', { name: 'Open recording folder Flight 2' }).click();
+  await page.getByRole('checkbox', { name: 'Select recording Other.MP4' }).check();
   await expect(page.locator('.footage-registration')).toContainText('2 selected');
   expect(posts).toBe(0);
-  await page.getByRole('button', { name: 'Up one footage folder' }).click();
-  await expect(page.getByRole('checkbox', { name: 'Select original Clip 2.mp4' })).toBeChecked();
+  await page.getByRole('button', { name: 'Up one recording folder' }).click();
+  await expect(page.getByRole('checkbox', { name: 'Select recording Clip 2.mp4' })).toBeChecked();
   await page.getByRole('button', { name: 'Register selected recordings' }).click();
   await expect(page.getByRole('region', { name: 'Import results' })).toBeVisible();
   expect(sent).toEqual({ paths: ['/approved/Clip 2.mp4', '/approved/Flight 2/Other.MP4'] });
@@ -236,11 +236,11 @@ test('failed registration keeps selections and the current project without retry
     });
   });
   await openImport(page);
-  await page.getByRole('checkbox', { name: 'Select original Original.mp4' }).check();
+  await page.getByRole('checkbox', { name: 'Select recording Original.mp4' }).check();
   await page.getByRole('button', { name: 'Register selected recordings' }).click();
   const modal = page.getByRole('dialog', { name: 'Import recordings' });
   await expect(modal.getByRole('alert')).toContainText('Mount the drive');
-  await expect(page.getByRole('checkbox', { name: 'Select original Original.mp4' })).toBeChecked();
+  await expect(page.getByRole('checkbox', { name: 'Select recording Original.mp4' })).toBeChecked();
   expect(posts).toBe(1);
   expect(memory.snapshot().media.videoIds).toEqual([]);
   await modal.getByRole('button', { name: 'Cancel', exact: true }).click();
@@ -253,7 +253,7 @@ test('empty and unavailable approved roots explain configuration and retain the 
   const unavailable = { ...root, available: false, error: 'Drive disconnected.' };
   await mockDirectory(page, directory([]), [unavailable]);
   await openImport(page);
-  await expect(page.getByText('No readable footage locations', { exact: true })).toBeVisible();
+  await expect(page.getByText('No readable recording locations', { exact: true })).toBeVisible();
   await expect(page.getByRole('region', { name: 'Browse original recordings' })).toContainText('PASCAP_MEDIA_ROOTS');
   await expect(page.getByRole('region', { name: 'Browse original recordings' })).toContainText('Drive disconnected');
   await expect(page.getByRole('button', { name: 'Register selected recordings' })).toBeDisabled();
@@ -281,8 +281,8 @@ test('read failures refresh only metadata and can recover without starting an im
   );
   await openImport(page);
   await expect(page.getByRole('alert')).toContainText('temporarily unavailable');
-  await page.getByRole('button', { name: 'Refresh footage locations' }).click();
-  await expect(page.getByRole('checkbox', { name: 'Select original Recovered.mp4' })).toBeVisible();
+  await page.getByRole('button', { name: 'Refresh recording locations' }).click();
+  await expect(page.getByRole('checkbox', { name: 'Select recording Recovered.mp4' })).toBeVisible();
   expect(reads).toBe(2);
   expect(posts).toBe(0);
   expect(memory.saves).toBe(0);
@@ -318,13 +318,13 @@ test('changing roots discards stale reads and clears selections from the previou
   });
   await openImport(page);
   await loading;
-  await page.getByRole('combobox', { name: 'Footage location' }).selectOption('root-1');
-  await expect(page.getByRole('checkbox', { name: 'Select original Current.mp4' })).toBeVisible();
+  await page.getByRole('combobox', { name: 'Recording location' }).selectOption('root-1');
+  await expect(page.getByRole('checkbox', { name: 'Select recording Current.mp4' })).toBeVisible();
   release();
-  await expect(page.getByRole('checkbox', { name: 'Select original Stale.mp4' })).toHaveCount(0);
-  await page.getByRole('checkbox', { name: 'Select original Current.mp4' }).check();
-  await page.getByRole('combobox', { name: 'Footage location' }).selectOption('root-0');
-  await expect(page.getByRole('checkbox', { name: 'Select original Stale.mp4' })).toBeVisible();
+  await expect(page.getByRole('checkbox', { name: 'Select recording Stale.mp4' })).toHaveCount(0);
+  await page.getByRole('checkbox', { name: 'Select recording Current.mp4' }).check();
+  await page.getByRole('combobox', { name: 'Recording location' }).selectOption('root-0');
+  await expect(page.getByRole('checkbox', { name: 'Select recording Stale.mp4' })).toBeVisible();
   await expect(page.locator('.footage-registration')).toContainText('0 selected');
 });
 
@@ -386,7 +386,7 @@ test('the no-copy browser and explicit path form fit the minimum viewport withou
   await page.setViewportSize({ width: 1280, height: 720 });
   await openImport(page);
   await expect(
-    page.getByRole('checkbox', { name: 'Select original A very long footage filename with spaces.mp4' }),
+    page.getByRole('checkbox', { name: 'Select recording A very long footage filename with spaces.mp4' }),
   ).toBeVisible();
   await page.getByText('Import a whole folder by path', { exact: true }).click();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);

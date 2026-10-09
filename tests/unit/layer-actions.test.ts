@@ -17,9 +17,9 @@ describe('existing layer stack actions and explicit disabled reasons', () => {
   it('explains only the actual composition ends and last-track removal guard', () => {
     const bottom = layerActionRestrictions(0, 8, false);
     expect(bottom.raise).toBeNull();
-    expect(bottom.lower).toContain('already the bottom composition layer');
+    expect(bottom.lower).toContain('already the bottom video track');
     expect(bottom.remove).toBeNull();
-    expect(layerActionRestrictions(7, 8, false).raise).toContain('already the top composition layer');
+    expect(layerActionRestrictions(7, 8, false).raise).toContain('already the top video track');
     expect(layerActionRestrictions(1, 8, false).lower).toBeNull();
     expect(layerActionRestrictions(0, 1, false).remove).toContain('Keep at least one video track');
   });

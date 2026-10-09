@@ -122,7 +122,7 @@ test('dragging a marker moves all participants/easing with preview-only drafts, 
   await expect(marker(page, 50)).toHaveClass(/moving/);
   await expect(marker(page, 50)).toHaveAttribute('data-keyframe-origin', '20');
   await expect(marker(page, 50).locator('.timeline-layer-key-time')).toHaveText('00:00:01:20');
-  await expect(page.locator('.timeline-bottom')).toContainText('all participants move together');
+  await expect(page.locator('.timeline-bottom')).toContainText('all animated settings move together');
   expect(await current(page)).toEqual(before);
   await page.evaluate(() => window.pascapLab!.flush());
   expect(memory.saves).toBe(0);
@@ -331,15 +331,15 @@ test('a keyboard Speed-point move can extend beyond the old preview duration wit
   project.layers[0]!.keyframes = [sharedPoint(0, { speed: 0.5 }, 'hold'), sharedPoint(110, { speed: 8 }, 'hold')];
   await fixture(page, project);
   expect(calculateLayout(project).duration).toBe(111);
-  await inspectorTab(page, 'Layer keyframes');
+  await inspectorTab(page, 'Track keyframes');
   await marker(page, 110).focus();
   await marker(page, 110).press('Shift+ArrowRight');
   const expected = applyCommand(project, { type: 'layer-key-move', layerId: 'video-1', frame: 110, nextFrame: 120 });
   expect(await current(page)).toEqual(expected);
   await ready(page, expected);
   await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(119);
-  await expect(layerKeyframes(page, 'Video 1').locator('.layer-keyframe-inspected')).toContainText(
-    'Stored point · timeline frame 120',
+  await expect(layerKeyframes(page, 'Video track 1').locator('.layer-keyframe-inspected')).toContainText(
+    'Stored keyframe · timeline frame 120',
   );
   await expect(page.locator('.error-banner')).toHaveCount(0);
   expect(errors).toEqual([]);
@@ -350,14 +350,14 @@ test('an empty positioned row has independently movable points and marker select
 }) => {
   const project = sequence();
   project.layers.push({
-    ...createLayer('empty-overlay', 'Video 2', false),
+    ...createLayer('empty-overlay', 'Video track 2', false),
     keyframes: [sharedPoint(20, { opacity: 0.5, hue: 30 }, 'hold')],
   });
   await fixture(page, project);
-  await inspectorTab(page, 'Layer keyframes');
+  await inspectorTab(page, 'Track keyframes');
   const start = await begin(page, 20, 'empty-overlay');
   await move(page, start, 35, true);
-  await expect(layerKeyframes(page, 'Video 2')).toBeVisible();
+  await expect(layerKeyframes(page, 'Video track 2')).toBeVisible();
   await page.mouse.up();
   await page.keyboard.up('Alt');
   const next = await current(page);
@@ -367,7 +367,7 @@ test('an empty positioned row has independently movable points and marker select
   await expect(marker(page, 35, 'empty-overlay')).toBeFocused();
   await inspectorTab(page, 'Clip');
   await expect(page.getByRole('tabpanel', { name: 'Clip', exact: true })).toContainText(
-    'Select a clip on Video 2 to edit it.',
+    'Select a clip on Video track 2 to edit it.',
   );
 });
 
@@ -407,7 +407,7 @@ test('horizontal autoscroll uses captured zoom/scroll coordinates and Escape res
 test('moving a point outside duration stores its time without extending footage, and setting navigation can find it', async ({
   page,
 }) => {
-  await inspectorTab(page, 'Layer keyframes');
+  await inspectorTab(page, 'Track keyframes');
   const before = await current(page);
   const start = await begin(page);
   await move(page, start, 160, true);
@@ -419,16 +419,16 @@ test('moving a point outside duration stores its time without extending footage,
   expect(next.clips).toEqual(before.clips);
   expect(next.layers[0]!.keyframes.map((point) => point.frame)).toEqual([80, 160]);
   await expect(marker(page, 160)).toBeFocused();
-  await expect(layerKeyframes(page, 'Video 1').locator('.layer-keyframe-inspected')).toContainText(
-    'Stored point · timeline frame 160',
+  await expect(layerKeyframes(page, 'Video track 1').locator('.layer-keyframe-inspected')).toContainText(
+    'Stored keyframe · timeline frame 160',
   );
   await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(119);
   await page.getByRole('button', { name: 'Previous Exposure keyframe', exact: true }).click();
   await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(80);
   await page.getByRole('button', { name: 'Next Exposure keyframe', exact: true }).click();
-  await inspectorTab(page, 'Layer keyframes');
-  await expect(layerKeyframes(page, 'Video 1').locator('.layer-keyframe-inspected')).toContainText(
-    'Stored point · timeline frame 160',
+  await inspectorTab(page, 'Track keyframes');
+  await expect(layerKeyframes(page, 'Video track 1').locator('.layer-keyframe-inspected')).toContainText(
+    'Stored keyframe · timeline frame 160',
   );
 });
 
@@ -463,9 +463,9 @@ test('stored points after the last clip keep their own markers without extending
   await marker(page, 200).press('Enter');
   await expect(marker(page, 200)).toHaveAttribute('aria-pressed', 'true');
   await expect(marker(page, 160)).toHaveAttribute('aria-pressed', 'false');
-  await inspectorTab(page, 'Layer keyframes');
-  await expect(layerKeyframes(page, 'Video 1').locator('.layer-keyframe-inspected')).toContainText(
-    'Stored point · timeline frame 200 · outside current duration',
+  await inspectorTab(page, 'Track keyframes');
+  await expect(layerKeyframes(page, 'Video track 1').locator('.layer-keyframe-inspected')).toContainText(
+    'Stored keyframe · timeline frame 200 · outside current duration',
   );
   expect(await current(page)).toEqual(project);
   await page.evaluate(() => window.pascapLab!.flush());
@@ -479,8 +479,8 @@ test('stored points after the last clip keep their own markers without extending
     .poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics()))
     .toMatchObject({ frame: 119, duration: 120 });
   await expect(marker(page, 200)).toHaveAttribute('aria-pressed', 'false');
-  const row = await editLayerPoint(page, 'Video 1', 160);
-  await row.getByRole('button', { name: 'Delete layer keyframe 160', exact: true }).click();
+  const row = await editLayerPoint(page, 'Video track 1', 160);
+  await row.getByRole('button', { name: 'Delete track keyframe 160', exact: true }).click();
   expect((await current(page)).layers[0]!.keyframes.map((point) => point.frame)).toEqual([20, 80, 200]);
   await expect(marker(page, 160)).toHaveCount(0);
   await expect(marker(page, 200)).toBeVisible();

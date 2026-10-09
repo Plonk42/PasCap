@@ -52,7 +52,7 @@ export const layerKeyframeSchema = z
   .object({ frame, interpolation: interpolationSchema, values: layerKeyValuesSchema })
   .strict()
   .refine((key) => Object.values(key.values).some((value) => value !== null), {
-    message: 'A shared layer point must have at least one participating setting.',
+    message: 'A shared track keyframe must have at least one enabled setting.',
   });
 export type LayerKeyframe = z.infer<typeof layerKeyframeSchema>;
 

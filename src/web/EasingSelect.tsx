@@ -3,7 +3,7 @@ import { interpolatedProgress, type Interpolation } from '../shared/keyframes.js
 import './easing-select.css';
 
 const SHAPES = [
-  { value: 'hold', label: 'Hold', description: 'Keep the starting value, then jump at the next point.' },
+  { value: 'hold', label: 'Hold', description: 'Keep the starting value, then jump at the next keyframe.' },
   { value: 'linear', label: 'Linear', description: 'Change at a steady rate.' },
   { value: 'ease-in', label: 'Ease in', description: 'Start slowly, then change faster.' },
   { value: 'ease-out', label: 'Ease out', description: 'Start quickly, then change more slowly.' },

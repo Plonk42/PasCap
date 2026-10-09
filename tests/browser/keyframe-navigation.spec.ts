@@ -22,7 +22,7 @@ let unexpectedApi: string[];
 
 // These cases navigate Colour/Opacity, which share the Track tab with the keyframe list;
 // "Clip" here means the playhead setting controls. Real Clip-tab checks use openTab.
-async function inspectorTab(page: Page, name: 'Clip' | 'Layer keyframes' | 'Sequence' | 'Track'): Promise<void> {
+async function inspectorTab(page: Page, name: 'Clip' | 'Track keyframes' | 'Sequence' | 'Track'): Promise<void> {
   await openTab(page, name === 'Clip' ? 'Track' : name);
 }
 
@@ -97,8 +97,8 @@ async function ready(page: Page, document: ProjectDocument): Promise<void> {
     },
     { id: document.id, duration: calculateLayout(document).duration },
   );
-  await inspectorTab(page, 'Layer keyframes');
-  await expect(layerKeyframes(page, 'Video 1')).toBeVisible();
+  await inspectorTab(page, 'Track keyframes');
+  await expect(layerKeyframes(page, 'Video track 1')).toBeVisible();
 }
 
 async function fixture(page: Page, document: ProjectDocument): Promise<void> {
@@ -191,7 +191,7 @@ for (const [index, { key, label }] of KEYFRAME_SETTINGS.entries()) {
     await expect(diamond(page, label)).toBeEnabled();
     await expect(diamond(page, label)).toHaveAttribute('aria-pressed', 'false');
     if (key === 'speed')
-      await expect(page.getByRole('spinbutton', { name: 'Layer speed rate', exact: true })).toBeDisabled();
+      await expect(page.getByRole('spinbutton', { name: 'Track speed rate', exact: true })).toBeDisabled();
     else await expect(inspector(page).getByRole('slider', { name: label, exact: true })).toBeDisabled();
     await expect(previous).toBeDisabled();
     await expect(next).toBeEnabled();
@@ -273,7 +273,7 @@ test('all eleven setting buttons remain present and disabled throughout a native
   const document = sequence(interleaved());
   await fixture(page, document);
   await seek(page, 45);
-  const handle = page.getByRole('slider', { name: 'Trim end of pattern-a.mp4, excerpt 1', exact: true });
+  const handle = page.getByRole('slider', { name: 'Trim end of pattern-a.mp4, clip 1', exact: true });
   const box = (await handle.boundingBox())!;
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await page.mouse.down();
@@ -326,7 +326,7 @@ test('single opacity navigation on a selected empty row preserves Inspector cont
   document = applyCommand(document, {
     type: 'layer-add',
     layer: {
-      ...createLayer('upper', 'Video 2', false),
+      ...createLayer('upper', 'Video track 2', false),
       keyframes: [
         sharedPoint(20, { opacity: 0 }),
         sharedPoint(130, { opacity: 0.5 }),
@@ -341,15 +341,15 @@ test('single opacity navigation on a selected empty row preserves Inspector cont
   await page.getByRole('button', { name: 'Toggle Clip panel', exact: true }).click();
   await closeOptions(page);
   await expect(inspector(page)).toBeHidden();
-  await openOptions(page, 'Layer options Video 2');
-  const options = page.getByRole('group', { name: 'Layer options Video 2', exact: true });
+  await openOptions(page, 'Track options Video track 2');
+  const options = page.getByRole('group', { name: 'Track options Video track 2', exact: true });
   await expect(options.getByRole('slider')).toHaveCount(0);
   await expect(options.getByRole('button', { name: /Opacity keyframe/ })).toHaveCount(0);
   await closeOptions(page);
   await openOptions(page, 'Workspace options');
   await page.getByRole('button', { name: 'Toggle Clip panel', exact: true }).click();
   await closeOptions(page);
-  await page.getByRole('button', { name: 'Select layer Video 2', exact: true }).click();
+  await page.getByRole('button', { name: 'Select track Video track 2', exact: true }).click();
   await expect(page.getByRole('tab', { name: 'Track', exact: true })).toHaveAttribute('aria-selected', 'true');
   const next = step(page, 'Opacity', 'Next');
   await next.focus();
@@ -361,39 +361,39 @@ test('single opacity navigation on a selected empty row preserves Inspector cont
   await closeOptions(page);
   await openTab(page, 'Clip');
   await expect(inspector(page).locator('[role="tabpanel"]:not([hidden])')).toContainText(
-    'Select a clip on Video 2 to edit it.',
+    'Select a clip on Video track 2 to edit it.',
   );
-  await inspectorTab(page, 'Layer keyframes');
-  await expect(layerKeyframes(page, 'Video 2')).toBeVisible();
+  await inspectorTab(page, 'Track keyframes');
+  await expect(layerKeyframes(page, 'Video track 2')).toBeVisible();
   await expect(page.locator('.layer-control.selected')).toHaveAttribute('data-layer-id', 'upper');
   await inspectorTab(page, 'Clip');
   await next.press('Space');
   await previewAt(page, 119);
   await expect(next).toBeFocused();
-  await inspectorTab(page, 'Layer keyframes');
-  await expect(layerKeyframes(page, 'Video 2').locator('.layer-keyframe-inspected')).toContainText(
-    'Stored point · timeline frame 130',
+  await inspectorTab(page, 'Track keyframes');
+  await expect(layerKeyframes(page, 'Video track 2').locator('.layer-keyframe-inspected')).toContainText(
+    'Stored keyframe · timeline frame 130',
   );
   await closeOptions(page);
   await inspectorTab(page, 'Clip');
   await expect(step(page, 'Opacity', 'Next')).toHaveAttribute('title', /Stored timeline frame 160;/);
-  await inspectorTab(page, 'Layer keyframes');
-  await layerKeyframes(page, 'Video 2').getByRole('button', { name: 'Next layer keyframe', exact: true }).click();
-  await expect(layerKeyframes(page, 'Video 2').locator('.layer-keyframe-inspected')).toContainText(
-    'Stored point · timeline frame 140',
+  await inspectorTab(page, 'Track keyframes');
+  await layerKeyframes(page, 'Video track 2').getByRole('button', { name: 'Next track keyframe', exact: true }).click();
+  await expect(layerKeyframes(page, 'Video track 2').locator('.layer-keyframe-inspected')).toContainText(
+    'Stored keyframe · timeline frame 140',
   );
   await inspectorTab(page, 'Clip');
   await step(page, 'Opacity', 'Next').click();
-  await inspectorTab(page, 'Layer keyframes');
-  await expect(layerKeyframes(page, 'Video 2').locator('.layer-keyframe-inspected')).toContainText(
-    'Stored point · timeline frame 160',
+  await inspectorTab(page, 'Track keyframes');
+  await expect(layerKeyframes(page, 'Video track 2').locator('.layer-keyframe-inspected')).toContainText(
+    'Stored keyframe · timeline frame 160',
   );
   await inspectorTab(page, 'Clip');
   await expect(step(page, 'Opacity', 'Next')).toBeDisabled();
   await step(page, 'Opacity', 'Previous').click();
-  await inspectorTab(page, 'Layer keyframes');
-  await expect(layerKeyframes(page, 'Video 2').locator('.layer-keyframe-inspected')).toContainText(
-    'Stored point · timeline frame 130',
+  await inspectorTab(page, 'Track keyframes');
+  await expect(layerKeyframes(page, 'Video track 2').locator('.layer-keyframe-inspected')).toContainText(
+    'Stored keyframe · timeline frame 130',
   );
   await readOnly(page, document);
 });
@@ -414,18 +414,18 @@ test('successive outside-duration setting, row and list navigation keeps one tru
     .locator('[data-clip-id="second"] .timeline-clip-body')
     .evaluate((button) => (button as HTMLButtonElement).click());
   await previewAt(page, 60);
-  const keys = layerKeyframes(page, 'Video 1');
-  await editLayerPoint(page, 'Video 1', 120);
+  const keys = layerKeyframes(page, 'Video track 1');
+  await editLayerPoint(page, 'Video track 1', 120);
   for (const frame of [120, 180, 240]) {
     await inspectorTab(page, 'Clip');
     await step(page, 'Exposure', 'Next').click();
     await previewAt(page, 119);
-    await inspectorTab(page, 'Layer keyframes');
+    await inspectorTab(page, 'Track keyframes');
     await expect(keys.locator('.layer-keyframe-inspected')).toContainText(
-      `Stored point · timeline frame ${frame} · outside current duration`,
+      `Stored keyframe · timeline frame ${frame} · outside current duration`,
     );
     await expect(keys.locator('.layer-keyframe-inspected')).toContainText(
-      'Preview is at frame 119, not at this stored point.',
+      'Preview is at frame 119, not at this stored keyframe.',
     );
     await expect(keys.locator('.layer-keyframe-current')).toContainText('Timeline frame 119');
     await expect(keys.locator('.keyframe-row[aria-current="true"]')).toHaveAttribute(
@@ -437,26 +437,32 @@ test('successive outside-duration setting, row and list navigation keeps one tru
     await expect(diamond(page, 'Exposure')).toHaveAttribute('title', /timeline frame 119\./);
     await expect(page.getByRole('slider', { name: 'Exposure', exact: true })).toBeDisabled();
     await openTab(page, 'Clip');
-    await expect(
-      page.getByRole('region', { name: 'Source range', exact: true }).locator('.section-label'),
-    ).toContainText('Source frame 89');
+    await expect
+      .poll(() =>
+        page.evaluate(() => {
+          const state = window.pascapLab!.engine.diagnostics();
+          const index = state.assignedClipIds.indexOf('second');
+          return { ready: state.decoderReady[index], sourceFrame: state.decodedSourceFrames[index] };
+        }),
+      )
+      .toEqual({ ready: true, sourceFrame: 89 });
   }
   await inspectorTab(page, 'Clip');
   await expect(step(page, 'Exposure', 'Next')).toBeDisabled();
-  await inspectorTab(page, 'Layer keyframes');
-  await keys.getByRole('button', { name: 'Previous layer keyframe', exact: true }).click();
-  await expect(keys.locator('.layer-keyframe-inspected')).toContainText('Stored point · timeline frame 180');
-  await keys.getByRole('button', { name: 'Go to layer keyframe 120', exact: true }).click();
-  await keys.getByRole('button', { name: 'Next layer keyframe', exact: true }).click();
-  await expect(keys.locator('.layer-keyframe-inspected')).toContainText('Stored point · timeline frame 130');
+  await inspectorTab(page, 'Track keyframes');
+  await keys.getByRole('button', { name: 'Previous track keyframe', exact: true }).click();
+  await expect(keys.locator('.layer-keyframe-inspected')).toContainText('Stored keyframe · timeline frame 180');
+  await keys.getByRole('button', { name: 'Go to track keyframe 120', exact: true }).click();
+  await keys.getByRole('button', { name: 'Next track keyframe', exact: true }).click();
+  await expect(keys.locator('.layer-keyframe-inspected')).toContainText('Stored keyframe · timeline frame 130');
   await inspectorTab(page, 'Clip');
   await step(page, 'Exposure', 'Next').click();
-  await inspectorTab(page, 'Layer keyframes');
-  await expect(keys.locator('.layer-keyframe-inspected')).toContainText('Stored point · timeline frame 180');
+  await inspectorTab(page, 'Track keyframes');
+  await expect(keys.locator('.layer-keyframe-inspected')).toContainText('Stored keyframe · timeline frame 180');
   await inspectorTab(page, 'Clip');
   await step(page, 'Exposure', 'Previous').click();
-  await inspectorTab(page, 'Layer keyframes');
-  await expect(keys.locator('.layer-keyframe-inspected')).toContainText('Stored point · timeline frame 120');
+  await inspectorTab(page, 'Track keyframes');
+  await expect(keys.locator('.layer-keyframe-inspected')).toContainText('Stored keyframe · timeline frame 120');
   await keys.getByRole('button', { name: 'Follow playhead', exact: true }).click();
   await expect(keys.locator('.layer-keyframe-inspected')).toHaveCount(0);
   await inspectorTab(page, 'Clip');
@@ -477,13 +483,13 @@ test('an empty timeline can inspect successive stored keys, without pretending t
     sharedPoint(90, { exposure: 2 }),
   ];
   await fixture(page, document);
-  const keys = layerKeyframes(page, 'Video 1');
-  await editLayerPoint(page, 'Video 1', 30);
+  const keys = layerKeyframes(page, 'Video track 1');
+  await editLayerPoint(page, 'Video track 1', 30);
   for (const frame of [30, 60, 90]) {
     await inspectorTab(page, 'Clip');
     await step(page, 'Exposure', 'Next').click();
-    await inspectorTab(page, 'Layer keyframes');
-    await expect(keys.locator('.layer-keyframe-inspected')).toContainText(`Stored point · timeline frame ${frame}`);
+    await inspectorTab(page, 'Track keyframes');
+    await expect(keys.locator('.layer-keyframe-inspected')).toContainText(`Stored keyframe · timeline frame ${frame}`);
     await expect(keys.locator('.layer-keyframe-inspected')).toContainText('No preview frame is available.');
     await expect(keys.locator('.layer-keyframe-current')).toHaveText('Empty timeline · no preview frame');
     await expect(keys.locator('.keyframe-row[aria-current="true"]')).toHaveAttribute(
@@ -502,13 +508,13 @@ test('an empty timeline can inspect successive stored keys, without pretending t
   }
   await expect(step(page, 'Exposure', 'Next')).toBeDisabled();
   await step(page, 'Exposure', 'Previous').click();
-  await inspectorTab(page, 'Layer keyframes');
-  await keys.getByRole('button', { name: 'Previous layer keyframe', exact: true }).click();
-  await expect(keys.locator('.layer-keyframe-inspected')).toContainText('Stored point · timeline frame 45');
+  await inspectorTab(page, 'Track keyframes');
+  await keys.getByRole('button', { name: 'Previous track keyframe', exact: true }).click();
+  await expect(keys.locator('.layer-keyframe-inspected')).toContainText('Stored keyframe · timeline frame 45');
   await inspectorTab(page, 'Clip');
   await step(page, 'Exposure', 'Next').click();
-  await inspectorTab(page, 'Layer keyframes');
-  await expect(keys.locator('.layer-keyframe-inspected')).toContainText('Stored point · timeline frame 60');
+  await inspectorTab(page, 'Track keyframes');
+  await expect(keys.locator('.layer-keyframe-inspected')).toContainText('Stored keyframe · timeline frame 60');
   await inspectorTab(page, 'Clip');
   await expect(step(page, 'Exposure', 'Next')).toHaveAttribute(
     'title',
@@ -526,7 +532,7 @@ test('row and project switches discard the old stored cursor even when layer IDs
   document = applyCommand(document, {
     type: 'layer-add',
     layer: {
-      ...createLayer('upper', 'Video 2', false),
+      ...createLayer('upper', 'Video track 2', false),
       keyframes: [sharedPoint(30, { opacity: 0 }), sharedPoint(130, { opacity: 1 })],
     },
   });
@@ -534,16 +540,16 @@ test('row and project switches discard the old stored cursor even when layer IDs
   await seek(page, 100);
   await step(page, 'Exposure', 'Next').click();
   await previewAt(page, 119);
-  await page.getByRole('button', { name: 'Select layer Video 2', exact: true }).click();
-  await inspectorTab(page, 'Layer keyframes');
-  await expect(layerKeyframes(page, 'Video 2').locator('.layer-keyframe-inspected')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Select track Video track 2', exact: true }).click();
+  await inspectorTab(page, 'Track keyframes');
+  await expect(layerKeyframes(page, 'Video track 2').locator('.layer-keyframe-inspected')).toHaveCount(0);
   await inspectorTab(page, 'Clip');
   await expect(step(page, 'Opacity', 'Next')).toHaveAttribute('title', /Stored timeline frame 130;/);
   await expect(step(page, 'Exposure', 'Next')).toBeDisabled();
   await step(page, 'Opacity', 'Next').click();
-  await page.getByRole('button', { name: 'Select layer Video 1', exact: true }).click();
-  await inspectorTab(page, 'Layer keyframes');
-  await expect(layerKeyframes(page, 'Video 1').locator('.layer-keyframe-inspected')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Select track Video track 1', exact: true }).click();
+  await inspectorTab(page, 'Track keyframes');
+  await expect(layerKeyframes(page, 'Video track 1').locator('.layer-keyframe-inspected')).toHaveCount(0);
   await inspectorTab(page, 'Clip');
   await expect(step(page, 'Exposure', 'Next')).toHaveAttribute('title', /Stored timeline frame 150;/);
   await step(page, 'Exposure', 'Next').click();
@@ -560,8 +566,8 @@ test('row and project switches discard the old stored cursor even when layer IDs
     .click();
   await ready(page, other);
   await previewAt(page, 0);
-  await inspectorTab(page, 'Layer keyframes');
-  await expect(layerKeyframes(page, 'Video 1').locator('.layer-keyframe-inspected')).toHaveCount(0);
+  await inspectorTab(page, 'Track keyframes');
+  await expect(layerKeyframes(page, 'Video track 1').locator('.layer-keyframe-inspected')).toHaveCount(0);
   await inspectorTab(page, 'Clip');
   await expect(step(page, 'Exposure', 'Previous')).toBeDisabled();
   await expect(step(page, 'Exposure', 'Next')).toHaveAttribute('title', 'Go to timeline frame 20.');
@@ -580,14 +586,14 @@ test('manual seeking to the same clamped last frame, direct seeks and playback r
     sharedPoint(160, { exposure: 2 }),
   ]);
   await fixture(page, document);
-  const keys = layerKeyframes(page, 'Video 1');
+  const keys = layerKeyframes(page, 'Video track 1');
   await step(page, 'Exposure', 'Next').click();
   await previewAt(page, 10);
   await step(page, 'Exposure', 'Next').click();
   await previewAt(page, 119);
   await step(page, 'Exposure', 'Next').click();
-  await inspectorTab(page, 'Layer keyframes');
-  await expect(keys.locator('.layer-keyframe-inspected')).toContainText('Stored point · timeline frame 160');
+  await inspectorTab(page, 'Track keyframes');
+  await expect(keys.locator('.layer-keyframe-inspected')).toContainText('Stored keyframe · timeline frame 160');
   await page.getByRole('button', { name: 'Go to timeline end', exact: true }).click();
   await previewAt(page, 119);
   await expect(keys.locator('.layer-keyframe-inspected')).toHaveCount(0);
@@ -595,14 +601,14 @@ test('manual seeking to the same clamped last frame, direct seeks and playback r
   await expect(step(page, 'Exposure', 'Next')).toHaveAttribute('title', /Stored timeline frame 130;/);
   await step(page, 'Exposure', 'Next').click();
   await seek(page, 25);
-  await inspectorTab(page, 'Layer keyframes');
+  await inspectorTab(page, 'Track keyframes');
   await expect(keys.locator('.layer-keyframe-inspected')).toHaveCount(0);
   await inspectorTab(page, 'Clip');
   await step(page, 'Exposure', 'Next').click();
   await previewAt(page, 119);
   await step(page, 'Exposure', 'Next').click();
   await page.getByRole('button', { name: 'Play preview', exact: true }).click();
-  await inspectorTab(page, 'Layer keyframes');
+  await inspectorTab(page, 'Track keyframes');
   await expect(keys.locator('.layer-keyframe-inspected')).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Pause preview', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Pause preview', exact: true }).click();
@@ -613,7 +619,7 @@ test('manual seeking to the same clamped last frame, direct seeks and playback r
     'title',
     frame < 10
       ? 'Go to timeline frame 10.'
-      : 'Stored timeline frame 130; preview the nearest available frame 119. The point stays in place.',
+      : 'Stored timeline frame 130; preview the nearest available frame 119. The keyframe stays in place.',
   );
   await readOnly(page, document);
 });
@@ -631,33 +637,33 @@ test('point moves and history retain input identity and the shared cursor, while
   await seek(page, 10);
   await step(page, 'Exposure', 'Next').click();
   await previewAt(page, 119);
-  const keys = layerKeyframes(page, 'Video 1');
-  const row = await editLayerPoint(page, 'Video 1', 150);
-  const time = row.getByRole('spinbutton', { name: 'Layer keyframe frame 150', exact: true });
+  const keys = layerKeyframes(page, 'Video track 1');
+  const row = await editLayerPoint(page, 'Video track 1', 150);
+  const time = row.getByRole('spinbutton', { name: 'Track keyframe frame 150', exact: true });
   const id = await time.getAttribute('id');
   await time.fill('175');
   await time.press('Enter');
-  const moved = keys.getByRole('spinbutton', { name: 'Layer keyframe frame 175', exact: true });
+  const moved = keys.getByRole('spinbutton', { name: 'Track keyframe frame 175', exact: true });
   await expect(moved).toBeFocused();
   await expect(moved).toHaveAttribute('id', id!);
-  await expect(keys.locator('.layer-keyframe-inspected')).toContainText('Stored point · timeline frame 175');
+  await expect(keys.locator('.layer-keyframe-inspected')).toContainText('Stored keyframe · timeline frame 175');
   await page
     .getByRole('button', { name: 'Undo', exact: true })
     .evaluate((button) => (button as HTMLButtonElement).click());
   await expect(time).toBeFocused();
   await expect(time).toHaveAttribute('id', id!);
-  await expect(keys.locator('.layer-keyframe-inspected')).toContainText('Stored point · timeline frame 150');
+  await expect(keys.locator('.layer-keyframe-inspected')).toContainText('Stored keyframe · timeline frame 150');
   expect(await current(page)).toEqual(document);
   await page
     .getByRole('button', { name: 'Redo', exact: true })
     .evaluate((button) => (button as HTMLButtonElement).click());
   await expect(moved).toBeFocused();
-  await keys.getByRole('button', { name: 'Delete layer keyframe 175', exact: true }).click();
+  await keys.getByRole('button', { name: 'Delete track keyframe 175', exact: true }).click();
   await expect(keys.locator('.layer-keyframe-inspected')).toHaveCount(0);
   await inspectorTab(page, 'Clip');
   await expect(step(page, 'Exposure', 'Next')).toHaveAttribute('title', /Stored timeline frame 180;/);
-  await inspectorTab(page, 'Layer keyframes');
-  await expect(keys.getByRole('button', { name: 'Next layer keyframe', exact: true })).toHaveAttribute(
+  await inspectorTab(page, 'Track keyframes');
+  await expect(keys.getByRole('button', { name: 'Next track keyframe', exact: true })).toHaveAttribute(
     'title',
     /Stored timeline frame 160;/,
   );

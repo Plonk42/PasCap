@@ -70,7 +70,7 @@ test('compact library handles 12 recordings and the editor fits the desktop view
   await expect(page.getByLabel('Placement section', { exact: true })).toBeEnabled();
   await expect(page.getByRole('region', { name: 'Video timeline' })).toBeInViewport();
   const recordings = page.locator('article.media-item');
-  const music = page.getByRole('region', { name: 'Music files', exact: true }).getByRole('article');
+  const music = page.getByRole('region', { name: 'Music recordings', exact: true }).getByRole('article');
   await expect(recordings).toHaveCount(12);
   await expect(music).toHaveCount(audio.length);
   await page.getByRole('textbox', { name: 'Search media' }).fill('pattern-a');
@@ -821,7 +821,9 @@ test('changing a later boundary preserves independent excerpts while Colour appl
   await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
   await inspectorTab(page, 'Track');
   await page.getByRole('slider', { name: 'Exposure', exact: true }).fill('0.8');
-  await page.getByRole('button', { name: 'Transition after pattern-b.mp4, excerpt 2 on Video 1', exact: true }).click();
+  await page
+    .getByRole('button', { name: 'Transition after pattern-b.mp4, clip 2 on Video track 1', exact: true })
+    .click();
   await page.getByRole('combobox', { name: 'Transition type' }).selectOption('cross-dissolve');
   const project = projectSchema.parse(await page.evaluate(() => window.pascapLab!.project()));
   expect(project.layers[0]?.colour.exposure).toBe(0.8);

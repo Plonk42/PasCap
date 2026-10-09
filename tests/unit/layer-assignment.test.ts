@@ -240,7 +240,7 @@ function makeProject(layerCount = 1, dissolve = false): ProjectDocument {
   }
   for (let index = 1; index < layerCount; index++) {
     const id = `video-${index + 1}`;
-    project.layers.push(createLayer(id, `Video ${index + 1}`, false));
+    project.layers.push(createLayer(id, `Video track ${index + 1}`, false));
     project.clips.push({
       ...createClip(`overlay-${index}`, `overlay-media-${index}`, 200 + index * 100, 200 + index * 100 + duration),
       layerId: id,
@@ -376,9 +376,9 @@ describe('bounded layer decoder assignment', () => {
     expect(decoderPoolSize(0)).toBe(0);
     expect(decoderPoolSize(1)).toBe(2);
     expect(decoderPoolSize(2)).toBe(4);
-    expect(decoderPoolSize(8)).toBe(16);
-    expect(() => decoderPoolSize(9)).toThrow();
-    expect(() => decoderPoolSize(1.5)).toThrow();
+    expect(() => decoderPoolSize(9)).toThrow('Unsupported video track count.');
+    expect(() => decoderPoolSize(1.5)).toThrow('Unsupported video track count.');
+    expect(() => decoderPoolSize(-1)).toThrow('Unsupported video track count.');
     expect(() => decoderPoolSize(-1)).toThrow();
     expect(MAX_DECODER_SLOTS).toBe(16);
   });
@@ -710,6 +710,7 @@ describe('live appearance updates and lifecycle', () => {
     await engine.loadProject(project, resolver, originalDimensions, 10);
     const before = calls();
     const uploads = compositor().uploads.length;
+    expect(() => engine.updateColour('missing-track', NEUTRAL_COLOUR)).toThrow('The graded track does not exist.');
     engine.updateColour(project.layers[0]!.id, { ...NEUTRAL_COLOUR, saturation: 0.4 });
     expect(compositor().groups[0]!.clips[0]!.settings.saturation).toBe(0.4);
     project.layers[0]!.opacity = 0.25;

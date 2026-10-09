@@ -24,7 +24,7 @@ test.beforeEach(async ({ page, request }) => {
   initial = createProject('inspector-keyframes', 'Inspector points · memory-only');
   initial.media.videoIds = [asset.id];
   initial = applyCommand(initial, { type: 'insert', clip: createClip('bottom', asset.id, 0, 90), index: 0 });
-  initial = applyCommand(initial, { type: 'layer-add', layer: createLayer('upper', 'Video 2', false) });
+  initial = applyCommand(initial, { type: 'layer-add', layer: createLayer('upper', 'Video track 2', false) });
   initial = applyCommand(initial, {
     type: 'insert',
     clip: { ...createClip('upper-clip', asset.id, 0, 90), layerId: 'upper' },
@@ -95,18 +95,18 @@ test('three accessible tabs preserve selection across clips, populated/empty tra
   await expect(tabs.getByRole('tab', { name: 'Audio', exact: true })).toBeFocused();
   await page.keyboard.press('ArrowRight');
   await expect(tabs.getByRole('tab', { name: 'Clip', exact: true })).toBeFocused();
-  await inspectorTab(page, 'Layer keyframes');
+  await inspectorTab(page, 'Track keyframes');
   await expect(
-    layerKeyframes(page, 'Video 1').getByRole('list', { name: 'Edit layer keys', exact: true }),
+    layerKeyframes(page, 'Video track 1').getByRole('list', { name: 'Edit track keyframes', exact: true }),
   ).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Edit layer keys', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Edit track keyframes', exact: true })).toHaveCount(0);
   await selectClip(page, 'upper-clip');
-  await expect(layerKeyframes(page, 'Video 2')).toBeVisible();
-  await page.getByRole('button', { name: 'Select layer Empty row', exact: true }).click();
+  await expect(layerKeyframes(page, 'Video track 2')).toBeVisible();
+  await page.getByRole('button', { name: 'Select track Empty row', exact: true }).click();
   await expect(layerKeyframes(page, 'Empty row')).toBeVisible();
   await expect(page.getByRole('tab', { name: 'Track', exact: true })).toHaveAttribute('aria-selected', 'true');
   await expect(
-    layerKeyframes(page, 'Empty row').getByRole('button', { name: 'Next layer keyframe', exact: true }),
+    layerKeyframes(page, 'Empty row').getByRole('button', { name: 'Next track keyframe', exact: true }),
   ).toBeEnabled();
   const other = createProject('other-inspector', 'Other context');
   other.layers[0]!.name = 'Other row';
@@ -137,7 +137,7 @@ test('all participants reuse their main control bounds and resets with one exact
       })),
     );
   }
-  const row = await editLayerPoint(page, 'Video 1', 10);
+  const row = await editLayerPoint(page, 'Video track 1', 10);
   expect(KEYFRAME_SETTINGS).toHaveLength(11);
   await expect(row.locator('.layer-keyframe-point-values').getByRole('spinbutton')).toHaveCount(11);
   for (const setting of KEYFRAME_SETTINGS) {
@@ -201,7 +201,7 @@ test('all participants reuse their main control bounds and resets with one exact
 test('invalid stored drafts survive tab changes and cancel, without stale row context or implicit participation', async ({
   page,
 }) => {
-  const row = await editLayerPoint(page, 'Video 1', 200);
+  const row = await editLayerPoint(page, 'Video track 1', 200);
   await expect(row.getByRole('slider')).toHaveCount(1);
   await expect(row.getByRole('spinbutton')).toHaveCount(2);
   const field = row.getByRole('spinbutton', { name: 'Exposure keyframe value 200', exact: true });
@@ -209,7 +209,7 @@ test('invalid stored drafts survive tab changes and cancel, without stale row co
   await field.press('Enter');
   await expect(field).toHaveAttribute('aria-invalid', 'true');
   await inspectorTab(page, 'Clip');
-  await inspectorTab(page, 'Layer keyframes');
+  await inspectorTab(page, 'Track keyframes');
   await expect(field).toHaveValue('99');
   await expect(field).toHaveAttribute('aria-invalid', 'true');
   await field.press('Escape');
@@ -230,11 +230,11 @@ test('invalid stored drafts survive tab changes and cancel, without stale row co
   await page.getByRole('button', { name: 'Redo', exact: true }).click();
   await expect(field).toHaveValue('0.123456789');
   await selectClip(page, 'upper-clip');
-  await expect(layerKeyframes(page, 'Video 2')).toBeVisible();
-  const other = await editLayerPoint(page, 'Video 2', 10);
+  await expect(layerKeyframes(page, 'Video track 2')).toBeVisible();
+  const other = await editLayerPoint(page, 'Video track 2', 10);
   await expect(other.getByRole('slider', { name: 'Exposure keyframe value 10', exact: true })).toHaveValue('0.5');
   await expect(other.getByRole('spinbutton', { name: 'Exposure keyframe value 10', exact: true })).toHaveValue('0.5');
-  await page.getByRole('button', { name: 'Select layer Empty row', exact: true }).click();
+  await page.getByRole('button', { name: 'Select track Empty row', exact: true }).click();
   const empty = await editLayerPoint(page, 'Empty row', 200);
   await empty.getByRole('spinbutton', { name: 'Speed keyframe value 200', exact: true }).fill('3');
   await empty.getByRole('spinbutton', { name: 'Speed keyframe value 200', exact: true }).press('Enter');
@@ -264,8 +264,8 @@ test('four tabs and participant controls fit the minimum Inspector at the defaul
     { width: 1280, height: 720 },
   ]) {
     await page.setViewportSize({ width, height });
-    await inspectorTab(page, 'Layer keyframes');
-    const row = await editLayerPoint(page, 'Video 1', 10);
+    await inspectorTab(page, 'Track keyframes');
+    const row = await editLayerPoint(page, 'Video track 1', 10);
     const divider = page.getByRole('slider', { name: 'Resize Clip panel', exact: true });
     await expect(divider).toHaveAttribute('aria-valuenow', '270');
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);

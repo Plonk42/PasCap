@@ -24,7 +24,7 @@ export function RemoveMediaDialog({
   const id = useId();
   const subject = names.length === 1 ? names[0]! : count(names.length, 'recording', 'recordings');
   const usage = [
-    clips > 0 && count(clips, 'timeline excerpt', 'timeline excerpts'),
+    clips > 0 && count(clips, 'timeline clip', 'timeline clips'),
     music > 0 && count(music, 'music track', 'music tracks'),
   ]
     .filter(Boolean)
@@ -50,7 +50,7 @@ export function RemoveMediaDialog({
       <h2 id={`${id}-title`}>Remove {subject} from this project?</h2>
       <p id={`${id}-help`}>
         {usage} using {names.length === 1 ? 'it' : 'them'} will be removed too. Undo restores everything. Original
-        files, prepared media and exported videos are kept.
+        recordings, prepared media and exported videos are kept.
       </p>
     </Modal>
   );

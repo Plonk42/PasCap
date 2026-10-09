@@ -448,7 +448,7 @@ export function App() {
         let next = current.current;
         const targetLayer = layerId ?? selectedLayer.current;
         const layer = next.layers.find((layer) => layer.id === targetLayer);
-        if (!layer) throw new Error('Choose a video layer before inserting.');
+        if (!layer) throw new Error('Choose a video track before inserting.');
         const instances = mediaIds.map((id) => {
           const asset = latestAssets.current.find((item) => item.id === id);
           if (!asset || !mediaReady(asset)) throw new Error('Prepare the recording before adding it to the timeline.');
@@ -552,7 +552,7 @@ export function App() {
       select(newClipId);
       setError('');
     } catch (cause) {
-      setError(message(cause, 'Cannot split this excerpt.'));
+      setError(message(cause, 'Cannot split this clip.'));
     }
   }, [commit, select]);
   const quickTrim = useCallback(
@@ -561,7 +561,7 @@ export function App() {
       try {
         edit(trimAtPlayhead(current.current, selection.current, engine.current?.diagnostics().frame ?? 0, edge));
       } catch (cause) {
-        setError(message(cause, 'Place the playhead inside the selected excerpt to trim it.'));
+        setError(message(cause, 'Place the playhead inside the selected clip to trim it.'));
       }
     },
     [edit],
@@ -571,7 +571,7 @@ export function App() {
     const placed = calculateLayout(current.current).clips.find((item) => item.clip.id === selection.current);
     const frame = engine.current?.diagnostics().frame ?? 0;
     if (!placed || frame < placed.start || frame >= placed.end) {
-      setError('Place the playhead inside the selected excerpt to mark a cut.');
+      setError('Place the playhead inside the selected clip to mark a cut.');
       return;
     }
     engine.current?.pause();
@@ -602,7 +602,7 @@ export function App() {
       setError('');
       setViewerMode('timeline');
     } catch (cause) {
-      setError(message(cause, 'Set valid cut marks inside the selected excerpt.'));
+      setError(message(cause, 'Set valid cut marks inside the selected clip.'));
     }
   }, [commit, cutRange, select]);
   const remove = useCallback(() => {
@@ -618,7 +618,7 @@ export function App() {
       select(newClipId);
       setError('');
     } catch (cause) {
-      setError(message(cause, 'The duplicate cannot fit here. Make room or use another layer.'));
+      setError(message(cause, 'The duplicate cannot fit here. Make room or use another track.'));
     }
   }, [commit, select]);
   const nudge = useCallback(
@@ -674,7 +674,7 @@ export function App() {
       try {
         const stored: unknown = JSON.parse(localStorage.getItem(`pascap-media-ranges-${loaded.id}`) ?? '{}');
         if (typeof stored !== 'object' || stored === null || Array.isArray(stored))
-          throw new Error('Invalid source range choices.');
+          throw new Error('Invalid range choices.');
         for (const [id, value] of Object.entries(stored)) {
           const asset = latestAssets.current.find((item) => item.id === id);
           if (!asset) continue;
@@ -685,17 +685,17 @@ export function App() {
             !('sourceIn' in value) ||
             !('sourceOut' in value)
           )
-            throw new Error('Invalid stored source range.');
+            throw new Error('Invalid stored range.');
           const candidate = value as MediaSelection;
           validateMediaSelection(candidate, asset.metadata.frameCount);
-          if (candidate.mediaId !== id) throw new Error('Source range refers to a different recording.');
+          if (candidate.mediaId !== id) throw new Error('Range refers to a different recording.');
           choices = { ...choices, [id]: candidate };
         }
       } catch (cause) {
         setError(
           cause instanceof Error
-            ? `${cause.message} Source range choices were not loaded; originals remain intact.`
-            : 'Cannot read source range choices.',
+            ? `${cause.message} Range choices were not loaded; originals remain intact.`
+            : 'Cannot read range choices.',
         );
       }
       sourceRanges.current = choices;
@@ -1039,17 +1039,17 @@ export function App() {
     try {
       const asset = latestAssets.current.find((item) => item.id === range.mediaId);
       if (!asset || !current.current)
-        throw new Error('Load a project and register this recording before selecting a source range.');
+        throw new Error('Load a project and register this recording before selecting a range.');
       validateMediaSelection(range, asset.metadata.frameCount);
       const next = { ...sourceRanges.current, [range.mediaId]: { ...range } };
       sourceRanges.current = next;
       setRanges(next);
       if (!writePreference(`pascap-media-ranges-${current.current.id}`, JSON.stringify(next)))
         setError(
-          'This source range is available for this session, but browser storage could not remember it. Existing clips and originals are unchanged.',
+          'This range is available for this session, but browser storage could not remember it. Existing clips and originals are unchanged.',
         );
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Cannot save source range choices.');
+      setError(cause instanceof Error ? cause.message : 'Cannot save range choices.');
     }
   };
   const selectLayer = useCallback(

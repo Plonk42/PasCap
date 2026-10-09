@@ -58,7 +58,7 @@ export const layerSchema = z
     keyframes: z
       .array(layerKeyframeSchema)
       .max(256)
-      .refine(orderedKeys, { message: 'Layer points must have unique ascending project frames.' }),
+      .refine(orderedKeys, { message: 'Track keyframes must have unique ascending project frames.' }),
     ripple: z.boolean(),
     transitions: z.array(transitionSchema).max(999),
     openingFade: frameSchema,
@@ -159,7 +159,7 @@ export function createProject(id: string, title: string): ProjectDocument {
     media: { videoIds: [], audioIds: [] },
     frameRate: { ...PROJECT_FPS },
     colourProfile: 'bt709-sdr',
-    layers: [createLayer(BASE_LAYER_ID, 'Video 1')],
+    layers: [createLayer(BASE_LAYER_ID, 'Video track 1')],
     clips: [],
     music: [],
     revision: 0,

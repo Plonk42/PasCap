@@ -194,14 +194,14 @@ export function SpeedHelp({
   return (
     <HelpPopover label="Speed timing">
       <p id={helpId}>
-        1× is recorded speed. Custom curve points belong to one clip and use original source frames; drag a point or
-        enter its exact frame/rate. Their positions stay anchored when trimming or splitting. The logarithmic graph
+        1× is recorded speed. Custom curve keyframes belong to one clip and use original source frames; drag a keyframe
+        or enter its exact frame/rate. Their positions stay anchored when trimming or splitting. The logarithmic graph
         spans 0.1×–8×. Slow motion repeats recorded frames, without generated optical-flow images.
       </p>
       <p>
-        The Row speed animation diamond keys the whole layer in project timeline time. Row keys override, rather than
-        multiply, each clip's constant/ramp/custom speed. Between row points, capture with the diamond before changing
-        its rate.
+        The Track speed animation diamond captures a keyframe for the whole track in project timeline time. Track
+        keyframes override, rather than multiply, each clip's constant/ramp/custom speed. Between track keyframes,
+        capture with the diamond before changing its rate.
       </p>
       {!keyed && clip?.speed.mode === 'ramp' && (
         <p>
@@ -212,8 +212,8 @@ export function SpeedHelp({
       {!keyed && clip?.speed.mode === 'constant' && clip.speed.rate < 1 && <p>Slow motion repeats recorded frames.</p>}
       {keyed && (
         <p>
-          Reset to 1× changes only an enabled Speed value at this frame; it never clears the row curve. Use the diamonds
-          or the shared point list to remove keys explicitly.
+          Reset to 1× changes only an enabled Speed value at this frame; it never clears the track curve. Use the
+          diamonds or the shared keyframe list to remove keyframes explicitly.
         </p>
       )}
     </HelpPopover>
@@ -249,8 +249,8 @@ export function SpeedControls({
     ? !active || rate === 1
     : !clip || (clip.speed.mode === 'constant' && clip.speed.rate === 1);
   const resetTitle = keyed
-    ? `Set only Speed at timeline frame ${frame} to 1×. Keep the other points, participants and clip bases.`
-    : "Reset only the selected clip's speed to constant 1×. Its curve is removed; row points stay unchanged.";
+    ? `Set only Speed at timeline frame ${frame} to 1×. Keep the other keyframes, settings and clip bases.`
+    : "Reset only the selected clip's speed to constant 1×. Its curve is removed; track keyframes stay unchanged.";
   const updateBase = (speed: SpeedSettings): void => {
     if (clip && !disabled && !keyed) onEdit({ type: 'speed', clipId: clip.id, speed });
   };
@@ -285,7 +285,7 @@ export function SpeedControls({
   const customCurve = !keyed && clip?.speed.mode === 'curve';
 
   return (
-    <section className="speed-settings declutter-speed" aria-label="Layer and clip speed">
+    <section className="speed-settings declutter-speed" aria-label="Track and clip speed">
       <div className="speed-overview">
         <span>
           {clip && placedDuration !== null && placedDuration !== clip.sourceOut - clip.sourceIn && (
@@ -341,7 +341,7 @@ export function SpeedControls({
       )}
       <div className={`layer-setting-heading${clip && !keyed ? ' clip-speed-row-heading' : ''}`}>
         <span title={hint}>
-          <span>Row speed animation</span>
+          <span>Track speed animation</span>
           <small className="layer-setting-kind" title={scope}>
             {keyed && <Icon name="curve" size={12} />}
             <span className="declutter-sr-only">{scope}</span>
@@ -349,7 +349,7 @@ export function SpeedControls({
         </span>
         <span className="layer-setting-actions">
           {!keyed && clip && (
-            <output title="Capture the selected clip's current rate as a row-wide key">{rate}×</output>
+            <output title="Capture the selected clip's current rate as a track-wide keyframe">{rate}×</output>
           )}
           <KeyframeToggle
             layer={layer}
@@ -365,7 +365,7 @@ export function SpeedControls({
       {(keyed || !clip) && (
         <SpeedRateField
           id={rateId}
-          aria-label="Layer speed rate"
+          aria-label="Track speed rate"
           aria-describedby={helpId}
           disabled={disabled || !validFrame || !active}
           value={rate}
@@ -383,7 +383,7 @@ export function SpeedControls({
             className="speed-graph"
             viewBox="0 0 220 55"
             role="img"
-            aria-label={`${keyed ? 'Layer' : 'Clip'} speed curve · ${graphRange}`}
+            aria-label={`${keyed ? 'Track' : 'Clip'} speed curve · ${graphRange}`}
           >
             <path d="M0 48H220" stroke="var(--line)" />
             <polyline

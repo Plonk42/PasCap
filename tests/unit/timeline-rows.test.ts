@@ -4,7 +4,7 @@ import { TIMELINE_RULER_HEIGHT, timelineLayerAt, timelineRows } from '../../src/
 
 function layers(count: number) {
   const project = createProject('row-geometry', 'Row geometry');
-  for (let index = 2; index <= count; index++) project.layers.push(createLayer(`row-${index}`, `Video ${index}`));
+  for (let index = 2; index <= count; index++) project.layers.push(createLayer(`row-${index}`, `Video track ${index}`));
   return project.layers;
 }
 

@@ -37,13 +37,13 @@ export function validateReference(project: ProjectDocument, library: MediaLibrar
     snapshot.layers.some((layer) => !layer.enabled || layer.opacity !== 1 || layer.keyframes.length > 0)
   ) {
     throw new ServiceError(
-      'The diagnostic reference does not support video layers, opacity or shared project-frame layer points (including speed). Use Export.',
+      'The diagnostic reference does not support video tracks, opacity or shared project-frame track keyframes (including speed). Use Export.',
     );
   }
   if (snapshot.clips.some((clip) => clip.speed.mode !== 'constant' || clip.speed.rate !== 1))
     throw new ServiceError('The diagnostic reference only supports normal speed. Use Export for retimed clips.');
   if (snapshot.clips.some((clip) => hasSpatialEdits(clip.spatial)))
-    throw new ServiceError('The diagnostic reference does not support spatial edits or spatial keys. Use Export.');
+    throw new ServiceError('The diagnostic reference does not support spatial edits or spatial keyframes. Use Export.');
   const layout = calculateLayout(snapshot);
   const [left, right] = layout.clips;
   const transition = snapshot.layers[0]!.transitions[0]!;

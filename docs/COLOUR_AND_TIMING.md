@@ -6,12 +6,12 @@ highlight recovery. Originals remain untouched.
 
 ## Colour
 
-The row's required `colour` (or evaluated colour keys) grades sampled RGB once.
-Every clip on that row shares this treatment, whether keys are used or not.
+The video track's required `colour` (or evaluated colour keyframes) grades sampled RGB once.
+Every clip on that track shares this treatment, whether keyframes are used or not.
 Clips have no colour/correction field. Exactly neutral Colour short-circuits.
 Grading precedes black fades and coverage/group composition. Native scalar paths
-use row-only LUTs and retain at most two reused LUT arrays; advanced grades are exact.
-See [row appearance](design/ROW_APPEARANCE.md) for ownership, UI and strict storage.
+use track-only LUTs and retain at most two reused LUT arrays; advanced grades are exact.
+See [track appearance](design/ROW_APPEARANCE.md) for ownership, UI and strict storage.
 
 - Input/output: full-range normalised nonlinear R′G′B′, BT.709 primaries and transfer.
   Limited-range BT.709 Y′CbCr footage is converted with the BT.709 matrix first.
@@ -49,10 +49,10 @@ See [row appearance](design/ROW_APPEARANCE.md) for ownership, UI and strict stor
 - Grade each decoder independently, then blend **encoded** RGB for dissolves.
   Black fades multiply already-graded encoded RGB. Thus tinted/lifted black cannot
   contaminate fade-to-black. No hidden sharpening, tone mapping or loudness change.
-- With neutral HSL/identity curves, static single-layer export generates a 65³
-  scalar cube for FFmpeg `lut3d` tetrahedral interpolation. Layered/animated export
+- With neutral HSL/identity curves, static single-track export generates a 65³
+  scalar cube for FFmpeg `lut3d` tetrahedral interpolation. Composited/animated export
   reuses at most two scalar-only in-memory 65³ Float32 LUTs from **evaluated parameters**.
-  Nonneutral HSL/curves instead require layered export and exact complete CPU
+  Nonneutral HSL/curves instead require composited export and exact complete CPU
   grading on fractional sampled RGB before premultiplied RGBA16 and final H.264;
   narrow valid knees never pass through a LUT, including the preceding scalar stage.
   No endpoint-LUT/image crossfade substitutes for parameter animation. Scaling to
@@ -66,56 +66,56 @@ See [row appearance](design/ROW_APPEARANCE.md) for ownership, UI and strict stor
 
 ## Opacity and animation
 
-Shared row opacity, colour and Speed points use integer **project frames** and
-override each participating channel across every clip on that row. Clip-instance
-custom speed and spatial keys instead use integer **original-source frames**; unkeyed row colour
-uses `layer.colour`. Clip speed and spatial settings remain per clip. **Opacity** is one row-owned
+Shared video track opacity, colour and Speed keyframes use integer **project frames** and
+override each keyed channel across every clip on that track. Clip-instance
+custom speed and spatial keyframes instead use integer **original-source frames**; unkeyed track colour
+uses `layer.colour`. Clip speed and spatial settings remain per clip. **Opacity** is one track-owned
 setting: `VideoLayer.opacity` is a required number in 0–1, initially 1 on a new
-track. Without Opacity participants, every source uses that row value; otherwise
-the row's sole `opacity` channel overrides it, including both dissolve sources.
+track. Without keyed Opacity settings, every source uses that track value; otherwise
+the track's sole `opacity` channel overrides it, including both dissolve sources.
 There is no saved `clip.opacity` or second opacity channel. The eleven required
-nullable point fields are `opacity`, `speed`, `temperature`, `tint`, `exposure`, `brightness`, `contrast`,
+nullable keyframe fields are `opacity`, `speed`, `temperature`, `tint`, `exposure`, `brightness`, `contrast`,
 `hue`, `saturation`, `highlights` and `shadows`.
-Hold/linear/ease-in/ease-out/smooth interpolation belongs to the left participating
-point; endpoints hold outside the
+Hold/linear/ease-in/ease-out/smooth interpolation belongs to the left keyframe
+with that setting enabled; endpoints hold outside the
 keyed interval. Colour evaluates all nine scalar parameter values before applying the
-equations above. Trim/split never copy or shift row points; they retain clip-speed
-and spatial anchors, including those outside the excerpt and at the registered
+equations above. Trim/split never copy or shift track keyframes; they retain clip-speed
+and spatial anchors, including those outside the clip range and at the registered
 original's exclusive OUT. Spatial poses evaluate continuously through the placed
 retiming map, not at the floored recorded-image frame; see
 [spatial transforms](design/SPATIAL_TRANSFORMS.md).
 
 The single **Opacity** slider is in **Track → Colour**, beside the colour sliders,
-and starts at **100%**. It edits row `opacity` without keys and works on an empty
-row. With keys, only a participant at the real playhead is editable; the hollow
-diamond explicitly captures a missing participant. Sliders never create keys.
+and starts at **100%**. It edits track `opacity` without keyframes and works on an empty
+track. With keyframes, only an enabled setting at the real playhead is editable; the hollow
+diamond explicitly captures a setting that is not enabled there. Sliders never create keyframes.
 This shared UI placement does not make Opacity an RGB grading parameter: it
 controls coverage during composition after the SDR colour math above.
 
-For each enabled layer, source-over uses premultiplied encoded RGB/coverage.
+For each enabled video track, source-over uses premultiplied encoded RGB/coverage.
 Let $w_i$ be dissolve weight, $o_i$ evaluated Opacity, $b_i$ black-fade brightness
 and $G_i$ graded RGB, with $m_i$ spatial coverage at the output pixel. Evaluate the
-row's Opacity for each source at the same project frame. Group RGB and coverage are
+track's Opacity for each source at the same project frame. Group RGB and coverage are
 $C = \sum_i G_i b_i o_i w_i m_i$ and $A = \sum_i o_i w_i m_i$.
-Source-over is $\mathrm{result} = C + \mathrm{lower}(1 - A)$, with no additional layer multiplier.
+Source-over is $\mathrm{result} = C + \mathrm{lower}(1 - A)$, with no additional track multiplier.
 Every track's dissolve is one group, preventing unintended double attenuation;
 independent pairs may dissolve simultaneously on several tracks. Black fades affect
 that track's RGB, **not alpha**, preserving its available coverage of lower footage.
 Nonneutral poses use $m_i=0$ outside the transformed/cropped source. Exact neutral
 poses preserve $m_i=1$ over the canvas and ungraded black letterbox RGB.
-Enabled layer groups blend bottom-to-top over opaque black, with no implicit linear-
+Enabled video track groups blend bottom-to-top over opaque black, with no implicit linear-
 light blend or extra tone map. See [LAYERS_AND_KEYFRAMES.md](LAYERS_AND_KEYFRAMES.md).
 
 ### Editor-only ungraded comparison
 
 Timeline preview comparison replaces **all evaluated colour settings** with the
-shared `NEUTRAL_COLOUR` value for every enabled row and both participants in each
-dissolve, bypassing row colour bases and evaluated row colour keys alike. Future
+shared `NEUTRAL_COLOUR` value for every enabled video track and both sources in each
+dissolve, bypassing track colour bases and evaluated track colour keyframes alike. Future
 colour controls added to `NEUTRAL_COLOUR` are automatically bypassed, without a
-separate per-control comparison list. Stored grades and keys are unchanged.
+separate per-control comparison list. Stored grades and keyframes are unchanged.
 
 Only grading is neutralized: exact observed source frames and `PlacedClip.retiming`,
-spatial geometry/coverage, row Opacity, visibility, dissolve weights, black fades, stacking
+spatial geometry/coverage, track Opacity, visibility, dissolve weights, black fades, stacking
 and music retain their normal contract. Ungraded is still the composed preview,
 not an original-resolution or isolated-selected-clip view; Source preview is unchanged.
 
@@ -129,7 +129,7 @@ resets to normal graded preview. Export continues to use the saved grading contr
 
 ## Timing
 
-- Project placements, row points and output durations use integer **project frames**;
+- Project placements, track keyframes and output durations use integer **project frames**;
   source bounds and clip-speed/spatial anchors use integer **original-source frames**.
   Rate: exactly `30000/1001`.
   Seconds exist only at media API / FFmpeg boundaries. Source OUT is exclusive.
@@ -159,7 +159,7 @@ resets to normal graded preview. Export continues to use the saved grading contr
 - Incoming/outgoing transition and opening/closing regions must not overlap
   within a clip. Invalid durations/edits are rejected, never silently clamped.
 - Splits deep-copy static settings/clip-speed/spatial anchors, preserve exterior boundaries
-  and add a cut; shared row points stay at their project frames. Pieces recompile
+  and add a cut; shared track keyframes stay at their project frames. Pieces recompile
   and round independently. Ripple-on tracks re-sequence; off tracks retain
   unrelated placements. Reordering tracks changes composition, not clip timing.
   Reordering preserves only unchanged adjacent ID pairs; new pairs become cuts.
@@ -169,12 +169,12 @@ resets to normal graded preview. Export continues to use the saved grading contr
   A completed drag is one undoable command; pointer drafts are not saved.
 - Constant/ramp/keyframed speed changes output duration/source mapping using the shared
   contract in [SPEED_AND_AUDIO.md](SPEED_AND_AUDIO.md). Transitions/fades stay in
-  output frames. Shared row Colour grades each source once before blending.
+  output frames. Shared video track Colour grades each source once before blending.
 - Ripple-off starts are independent absolute project frames; gaps reveal lower
   footage/black. Exact adjacent Cross-dissolve overlap is the only allowed
   same-track overlap; triple overlap is invalid. Total duration is the maximum
-  retimed clip end across all tracks (including hidden-layer tails) and every
-  music instance's start + duration, bounded to 2,147,483,647 frames without clamping.
+  retimed clip end across all tracks (including hidden-track tails) and every
+  music track's start + duration, bounded to 2,147,483,647 frames without clamping.
   Music can extend the project. Empty/entirely hidden video regions and music-only
   tails are opaque black, never a frozen last image; music fades at its own end.
 - UI timecode is 30 fps non-drop-frame, labelled NDF. Duration in seconds uses the
@@ -183,15 +183,15 @@ resets to normal graded preview. Export continues to use the saved grading contr
 ## Music sampling and mixing
 
 Strict schema 12 requires a 0–8 `music` array of independent uniquely identified
-instances, `[]` without music. Each has source IN/OUT, start/duration, gain, fades
+music tracks, `[]` without music. Each has source IN/OUT, start/duration, gain, fades
 and loop; source-video audio remains disabled. At 48 kHz, source/placement/duration/
 fade positions round independently to integer samples using the rational frame
-rate. Each instance's selected source repeats only with explicit Loop, contributes
+rate. Each music track's selected source repeats only with explicit Loop, contributes
 silence outside placement, and receives its own `10^(gainDb/20)` linear fade
-envelope before mixing. Sum all instances linearly and **hard-clamp [−1, 1] once
+envelope before mixing. Sum all music tracks linearly and **hard-clamp [−1, 1] once
 after all sources**, never per-source or during native pairwise accumulation.
 No normalisation, ducking, effects or hidden gain compensation. Music is not
-retimed/rippled with video; clip speed and row Colour/Opacity are unchanged.
+retimed/rippled with video tracks; clip speed and track Colour/Opacity are unchanged.
 
 One AudioContext/worklet and output-timestamp epoch retain the exact one-frame
 A/V bound through music-only black regions. Native audio uses serial selected
@@ -203,28 +203,28 @@ pending acceptance, not completed-test claims.
 
 ## Preview and reference scope
 
-The editor supports up to eight layers and arbitrary clip instances within schema
+The editor supports up to eight video tracks and arbitrary clips within schema
 limits. Display and composition follow the same saved bottom-to-top track array;
-no ID or first row has special editing privileges. Preview reuses two decoder/texture
+no ID or first track has special editing privileges. Preview reuses two decoder/texture
 slots per track in a nonempty project, up to **16 for eight**, plus at most one
 separate source-review decoder. Resources
 are not allocated per stored clip; missing observed frames buffer explicitly.
 
 Production export reads originals and uses exact shared retiming. The static fast
-path requires neutral HSL/identity curves, one enabled track with row Opacity 1, no row points, exactly neutral
-spatial bases without spatial keys, zero origin
+path requires neutral HSL/identity curves, one enabled video track with Opacity 1, no track keyframes, exactly neutral
+spatial bases without spatial keyframes, zero origin
 and no internal gaps, covering full project duration; supported track fades/dissolves retain bounded chunks.
 Other valid timelines use generalized sequential RGBA16 group and source-over
 passes without regrading, then one final H.264 encode,
 with optional mixed 48 kHz AAC music in both paths. Music beyond video OUT requires
-layered export to render black through project OUT. Music-only preview is black;
+composited export to render black through project OUT. Music-only preview is black;
 export requires at least one retained video clip. Resource and numeric limits are in
 [Inspector and resource limits](LAYERS_AND_KEYFRAMES.md#inspector-and-resource-limits).
 
 The diagnostic reference accepts **exactly two normal-speed clips on one
-enabled, zero-origin contiguous track with row Opacity 1 and static scalar row Colour**,
+enabled, zero-origin contiguous video track with Opacity 1 and static scalar track Colour**,
 neutral HSL and identity curves, exactly neutral spatial
-bases without spatial keys, without music, extra tracks or row points,
+bases without spatial keyframes, without music, extra tracks or track keyframes,
 and is limited to 3,600 project frames. It refuses unsupported
 documents regardless of Ripple or track ID.
 It requires a strict schema-12 project snapshot, including explicit project media
@@ -236,21 +236,21 @@ and are not renamed by this contract.
 v1–v11 project documents and receipt snapshots are incompatible and preserved;
 recreate projects deliberately, with no migration, compatibility defaults or
 old-format/null fallback readers or automatic deletion. Strict v12 requires
-complete row `colour`, including Temperature/Tint bases and static HSL/curves,
-all eleven nullable point fields, clip `spatial` base/full-pose keys and row `opacity`; saved `clip.colour`, `clip.correction`, `clip.opacity` and
-old `clipOpacity`/`layerOpacity` point fields are rejected, not defaulted.
+complete video track `colour`, including Temperature/Tint bases and static HSL/curves,
+all eleven nullable keyframe fields, clip `spatial` base/full-pose keyframes and track `opacity`; saved `clip.colour`, `clip.correction`, `clip.opacity` and
+old `clipOpacity`/`layerOpacity` keyframe fields are rejected, not defaulted.
 Production export receipts also remain version 1, with strict v12 snapshots and
 required `musicSources` captured-original/`settings.audio` identified-plan arrays;
 older snapshots or invalid arrays are rejected without rewriting receipts/MP4s.
 Registry/proxy/current PCM formats and source guards are unchanged.
-Source ranges and every retained clip key position are validated against registered
-original frame counts, including hidden layer references.
+Source ranges and every retained clip keyframe position are validated against registered
+original frame counts, including hidden track references.
 
-Row colour also requires static eight-band HSL and master/red/green/blue curves.
+Video track colour also requires static eight-band HSL and master/red/green/blue curves.
 The order is decoded linear Temperature/Tint gains before Exposure and the
 remaining scalar SDR stages, encoded BT.709 HSL, master curve, individual RGB
 curves, black-fade brightness and group coverage/source-over. HSL/curves add no
-channels to the eleven nullable row fields. HSL protects greys in its incoming
+channels to the eleven nullable track fields. HSL protects greys in its incoming
 RGB, not greys already coloured by Temperature/Tint. Compare/Ungraded bypasses
 the entire colour transform, not geometry or coverage. Precise advanced bounds,
 circular weighting, piecewise-linear curves and resource budgets are in

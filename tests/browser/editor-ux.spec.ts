@@ -231,14 +231,14 @@ test('animated visual feedback retains explicit capture, native navigation order
   const diamond = page.getByRole('button', { name: 'Keyframe Exposure', exact: true });
   await expect(diamond).toHaveAttribute('aria-pressed', 'false');
   await expect(diamond).toHaveCSS('border-style', 'dashed');
-  await expect(diamond).toHaveAccessibleDescription(/whole row/);
+  await expect(diamond).toHaveAccessibleDescription(/whole track/);
   await expect(page.getByRole('slider', { name: 'Exposure', exact: true })).toBeDisabled();
   await diamond.focus();
   await page.keyboard.press('Tab');
   await expect(page.getByRole('button', { name: 'Previous Exposure keyframe', exact: true })).toBeFocused();
   await page.keyboard.press('Tab');
   await expect(page.getByRole('button', { name: 'Next Exposure keyframe', exact: true })).toBeFocused();
-  await inspectorTab(page, 'Layer keyframes');
+  await inspectorTab(page, 'Track keyframes');
   await page.getByRole('button', { name: 'Animation help', exact: true }).click();
   await expect(page.locator('.animation-legend')).toBeVisible();
   await page.keyboard.press('Escape');
@@ -256,7 +256,7 @@ test('animated visual feedback retains explicit capture, native navigation order
 
 test('hiding the deferred inspector applies a blur draft once and retains its section state', async ({ page }) => {
   const before = await current(page);
-  await page.getByRole('button', { name: 'Source range section', exact: true }).click();
+  await page.getByRole('button', { name: 'Range section', exact: true }).click();
   const input = page.getByRole('textbox', { name: 'Source IN frame', exact: true });
   await input.fill('5');
   const toggle = await panelToggle(page, 'Clip');
@@ -318,7 +318,7 @@ for (const { width, height } of [
       'Cut marked range',
       'Clear cut marks',
       'Toggle snapping',
-      'Add video layer',
+      'Add video track',
     ]) {
       const button = page.getByRole('button', { name, exact: true });
       await expect(button).toBeInViewport();

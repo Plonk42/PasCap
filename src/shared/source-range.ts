@@ -46,10 +46,10 @@ export function validateSourceRanges(project: ProjectDocument, frameCounts: Read
     // Keys at the exclusive recording OUT are valid boundary anchors; keys
     // outside the current trim remain recoverable, but never outside the original.
     if (clip.speed.mode === 'curve' && clip.speed.keyframes.some((key) => key.frame > count)) {
-      throw new Error('Clip speed keys exceed the registered recording. The edit was not committed.');
+      throw new Error('Clip speed keyframes exceed the registered recording. The edit was not committed.');
     }
     if (clip.spatial.keyframes.some((key) => key.frame > count)) {
-      throw new Error('Clip spatial keys exceed the registered recording. The edit was not committed.');
+      throw new Error('Clip spatial keyframes exceed the registered recording. The edit was not committed.');
     }
   }
 }

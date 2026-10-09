@@ -19,7 +19,7 @@ function point(frame: number, values: Partial<LayerKeyValues>, interpolation: In
   return { frame, interpolation, values: { ...EMPTY_KEY_VALUES, ...values } };
 }
 function row(keyframes: LayerKeyframe[]): VideoLayer {
-  return { ...createLayer('video-1', 'Video 1'), keyframes };
+  return { ...createLayer('video-1', 'Video track 1'), keyframes };
 }
 
 describe('shared retiming and recoverable speed edits', () => {

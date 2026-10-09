@@ -6,7 +6,7 @@ describe('setting scope wording', () => {
     const context = { keyed: true, baseAvailable: true, baseLabel: 'Clip' as const, label, frame: 30 };
     expect(settingPresentation({ ...context, active: true })).toEqual({
       scope: 'Keyframe at playhead',
-      hint: `Editable keyframe at timeline frame 30. Edits change only ${label} at this shared layer point.`,
+      hint: `Editable keyframe at timeline frame 30. Edits change only ${label} at this shared track keyframe.`,
     });
     expect(settingPresentation({ ...context, active: false })).toEqual({
       scope: 'Animated · add a keyframe to edit',
@@ -19,7 +19,7 @@ describe('setting scope wording', () => {
       settingPresentation({ keyed: false, active: false, baseAvailable: true, baseLabel: 'Clip', label, frame: 0 }),
     ).toEqual({
       scope: 'Not animated',
-      hint: `Editing ${label}. Add keyframes to animate this setting on the row.`,
+      hint: `Editing ${label}. Add keyframes to animate this setting on the track.`,
     });
   });
 
@@ -35,7 +35,7 @@ describe('setting scope wording', () => {
       }),
     ).toEqual({
       scope: 'No clip selected',
-      hint: `Select a clip to edit ${label}, or click the ${label} diamond to animate this setting on the row.`,
+      hint: `Select a clip to edit ${label}, or click the ${label} diamond to animate this setting on the track.`,
     });
   });
   it('keeps unkeyed Opacity available on an empty row', () => {
@@ -44,13 +44,13 @@ describe('setting scope wording', () => {
         keyed: false,
         active: false,
         baseAvailable: true,
-        baseLabel: 'Layer',
+        baseLabel: 'Track',
         label: 'Opacity',
         frame: 0,
       }),
     ).toEqual({
       scope: 'Not animated',
-      hint: 'Editing Opacity. Add keyframes to animate this setting on the row.',
+      hint: 'Editing Opacity. Add keyframes to animate this setting on the track.',
     });
   });
 });

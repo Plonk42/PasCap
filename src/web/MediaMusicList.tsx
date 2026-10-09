@@ -63,7 +63,7 @@ export function MediaMusicList({
     else remove(id);
   };
   return (
-    <section className="media-music" aria-label="Music files">
+    <section className="media-music" aria-label="Music recordings">
       <h3>
         Music <span className="count">{music.length}</span>
       </h3>
@@ -91,7 +91,7 @@ export function MediaMusicList({
                 <span className="media-recording-duration">{durationLabel(asset.metadata.durationSeconds)}</span>
                 {used > 0 && (
                   <span className="media-usage-badge">
-                    {used} {used === 1 ? 'track' : 'tracks'}
+                    {used} {used === 1 ? 'music track' : 'music tracks'}
                   </span>
                 )}
                 {asset.status !== 'ready' && <span className="media-status-text">{STATUS[asset.status]}</span>}
@@ -113,7 +113,7 @@ export function MediaMusicList({
             <button
               className="icon-button media-remove"
               aria-label={`Remove ${asset.name} from project`}
-              title="Remove from this project; the original file is kept"
+              title="Remove from this project; the original recording is kept"
               disabled={!project || busy}
               onClick={() => requestRemove(asset.id)}
             >

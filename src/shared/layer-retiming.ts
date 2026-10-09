@@ -8,7 +8,7 @@ const frameSchema = z.number().int().nonnegative().max(MAX_PROJECT_FRAME);
 const pointsSchema = z
   .array(layerKeyframeSchema)
   .max(256)
-  .refine(orderedKeys, { message: 'Layer points must have unique ascending project frames.' });
+  .refine(orderedKeys, { message: 'Track keyframes must have unique ascending project frames.' });
 const cache = new Map<string, Retiming>();
 
 interface RateSegment {
@@ -89,7 +89,7 @@ export function compileLayerRetiming(clip: VideoClip, layer: VideoLayer, start: 
   if (!keys.length) {
     const retiming = compileRetiming({ sourceIn, sourceOut, speed });
     if (start + retiming.duration > MAX_PROJECT_FRAME)
-      throw new RangeError('Layer duration exceeds supported project frames.');
+      throw new RangeError('Track duration exceeds supported project frames.');
     return retiming;
   }
   const cacheKey = JSON.stringify([sourceIn, sourceOut, start, keys]);
@@ -133,7 +133,7 @@ export function compileLayerRetiming(clip: VideoClip, layer: VideoLayer, start: 
   }
   const last = keys.at(-1)!;
   add(Math.max(start, last.frame), MAX_PROJECT_FRAME, last.value, last.value, 'hold', last.frame, MAX_PROJECT_FRAME);
-  if (consumed < length) throw new RangeError('Layer duration exceeds supported project frames.');
+  if (consumed < length) throw new RangeError('Track duration exceeds supported project frames.');
   Object.freeze(segments);
 
   const elapsedAt = (amount: number): number => {
@@ -149,7 +149,7 @@ export function compileLayerRetiming(clip: VideoClip, layer: VideoLayer, start: 
     return segment.begin - start + inverseSegment(segment, amount - segment.sourceBegin);
   };
   const duration = Math.max(1, Math.round(elapsedAt(length)));
-  if (start + duration > MAX_PROJECT_FRAME) throw new RangeError('Layer duration exceeds supported project frames.');
+  if (start + duration > MAX_PROJECT_FRAME) throw new RangeError('Track duration exceeds supported project frames.');
   const sourceAtTime = (outputFrame: number): number => {
     const frame = start + outputFrame;
     let low = 0;

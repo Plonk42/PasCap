@@ -56,7 +56,7 @@ function validateFrames(accumulator: Buffer, pixels: number, sources: readonly L
   if (accumulator.length !== pixels * 8 || accumulator.byteOffset % 2 !== 0)
     throw new Error('Invalid RGBA16 accumulator.');
   if (sources.length > 2 || sources.some((source) => source.rgb.length !== pixels * 3))
-    throw new Error('A layer group requires at most two correctly sized RGB frames.');
+    throw new Error('A track group requires at most two correctly sized RGB frames.');
 }
 
 function validateBounds(bounds: ContentBounds, target: { width: number; height: number }): void {
@@ -149,9 +149,9 @@ function gradeSampledRgb(source: PreparedSource, rgb: Float64Array, out: Float64
 function groupCoverage(sources: readonly LayerFrameSource[]): number {
   const { layerId, opacity } = sources[0]!.sample;
   if (sources.some((source) => source.sample.layerId !== layerId || source.sample.opacity !== opacity))
-    throw new Error('Compose one authoritative layer group at a time.');
+    throw new Error('Compose one authoritative track group at a time.');
   const coverage = sources.reduce((sum, source) => sum + source.sample.opacity * source.sample.blendWeight, 0);
-  if (coverage < 0 || coverage > 1 + 1e-10) throw new Error('Layer coverage must remain in [0, 1].');
+  if (coverage < 0 || coverage > 1 + 1e-10) throw new Error('Track coverage must remain in [0, 1].');
   return coverage;
 }
 

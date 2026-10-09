@@ -13,7 +13,7 @@ interface Props {
 function message(error: unknown): string {
   return error instanceof Error
     ? error.message
-    : 'Cannot read this footage location. Check its mount and permissions, then refresh.';
+    : 'Cannot read this recording location. Check its mount and permissions, then refresh.';
 }
 
 export function FootageBrowser({ busy, onRegister, onResult }: Readonly<Props>) {
@@ -102,7 +102,7 @@ export function FootageBrowser({ busy, onRegister, onResult }: Readonly<Props>) 
       else next.add(filename);
     });
     if (next.size > MAX_FOOTAGE_FILES) {
-      setDirectoryError(`Select at most ${MAX_FOOTAGE_FILES} originals per import.`);
+      setDirectoryError(`Select at most ${MAX_FOOTAGE_FILES} recordings per import.`);
       return;
     }
     setSelected(next);
@@ -127,15 +127,15 @@ export function FootageBrowser({ busy, onRegister, onResult }: Readonly<Props>) 
 
   return (
     <section className="footage-browser" aria-label="Browse original recordings" aria-busy={loading || registering}>
-      <h3>Browse footage</h3>
+      <h3>Browse recordings</h3>
       <p className="control-hint">
-        Select originals accessible to the PasCap service. No video bytes are uploaded or copied.
+        Select original recordings accessible to the PasCap service. No recording bytes are uploaded or copied.
       </p>
       <div className="footage-location-tools">
         <label className="activity-field">
-          <span>Footage location</span>
+          <span>Recording location</span>
           <select
-            aria-label="Footage location"
+            aria-label="Recording location"
             value={rootId}
             disabled={blocked || loadingRoots}
             onChange={(event) => {
@@ -155,7 +155,7 @@ export function FootageBrowser({ busy, onRegister, onResult }: Readonly<Props>) 
         </label>
         <button
           className="secondary-button small"
-          aria-label="Refresh footage locations"
+          aria-label="Refresh recording locations"
           disabled={blocked || loading}
           onClick={() => setRefresh((value) => value + 1)}
         >
@@ -170,7 +170,7 @@ export function FootageBrowser({ busy, onRegister, onResult }: Readonly<Props>) 
       )}
       {!loadingRoots && !rootsError && !roots.some((item) => item.available) && (
         <div className="footage-empty">
-          <strong>No readable footage locations</strong>
+          <strong>No readable recording locations</strong>
           <p>
             Configure PASCAP_MEDIA_ROOTS for the service, or use the explicit folder-path import below. Container
             locations must be mounted read-only.
@@ -187,7 +187,7 @@ export function FootageBrowser({ busy, onRegister, onResult }: Readonly<Props>) 
           <div className="footage-navigation">
             <button
               className="secondary-button small"
-              aria-label="Up one footage folder"
+              aria-label="Up one recording folder"
               disabled={blocked || loading || !listing?.parent}
               onClick={() => navigate(listing!.parent!)}
             >
@@ -195,7 +195,7 @@ export function FootageBrowser({ busy, onRegister, onResult }: Readonly<Props>) 
             </button>
             <button
               className="secondary-button small"
-              aria-label="Footage root folder"
+              aria-label="Recording root folder"
               disabled={blocked || loading || !directory}
               onClick={() => navigate(undefined)}
             >
@@ -205,7 +205,7 @@ export function FootageBrowser({ busy, onRegister, onResult }: Readonly<Props>) 
           </div>
           <input
             type="search"
-            aria-label="Search footage"
+            aria-label="Search recordings"
             placeholder="Filter this folder"
             value={query}
             disabled={blocked || loading}
@@ -234,13 +234,13 @@ export function FootageBrowser({ busy, onRegister, onResult }: Readonly<Props>) 
                 />
                 Select visible recordings
               </label>
-              <ul className="footage-entry-list" aria-label="Footage entries">
+              <ul className="footage-entry-list" aria-label="Recording entries">
                 {visible.map((item) => (
                   <li key={item.path}>
                     {item.kind === 'directory' ? (
                       <button
                         className="footage-directory"
-                        aria-label={`Open footage folder ${item.name}`}
+                        aria-label={`Open recording folder ${item.name}`}
                         disabled={blocked}
                         onClick={() => navigate(item.path)}
                       >
@@ -252,7 +252,7 @@ export function FootageBrowser({ busy, onRegister, onResult }: Readonly<Props>) 
                       <label className="footage-recording">
                         <input
                           type="checkbox"
-                          aria-label={`Select original ${item.name}`}
+                          aria-label={`Select recording ${item.name}`}
                           checked={selected.has(item.path)}
                           disabled={blocked}
                           onChange={() => toggle([item.path], selected.has(item.path))}
