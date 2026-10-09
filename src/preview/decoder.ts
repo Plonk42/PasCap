@@ -147,6 +147,8 @@ export class VideoDecoderSlot {
   }
   async play(): Promise<void> {
     if (this.#disposed) return;
+    // play() on an ended element rewinds to the start; keep presenting the last frame.
+    if (this.video.ended) return;
     this.#played = true;
     await this.video.play();
   }
