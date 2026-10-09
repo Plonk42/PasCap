@@ -266,6 +266,93 @@ test('per-setting Previous/Next visit only that setting\u2019s keys; the timelin
   expect(memory.saves).toBe(0);
 });
 
+const transformMarker = (page: Page, source: number) =>
+  page.locator(`[data-clip-id="one"] [data-clip-keyframe="transform"][data-source-frame="${source}"]`);
+
+async function seedScaleKeys(page: Page, frames: readonly number[]): Promise<ProjectDocument> {
+  return seed(page, (document) => {
+    const none = { cropLeft: null, cropRight: null, cropTop: null, cropBottom: null, translateX: null };
+    document.clips[0]!.spatial.keyframes = frames.map((frame, index) => ({
+      frame,
+      interpolation: index ? 'ease-in' : 'linear',
+      values: { ...none, translateY: null, rotation: null, scale: 1 + index },
+    }));
+  });
+}
+
+test('a Transform marker click opens Clip → Transform, even from the Track tab with the section collapsed', async ({
+  page,
+}) => {
+  const before = await seedScaleKeys(page, [40, 80]);
+  const section = page.getByRole('button', { name: 'Transform section', exact: true });
+  await section.click();
+  await expect(section).toHaveAttribute('aria-expanded', 'false');
+  await page.getByRole('tab', { name: 'Track', exact: true }).click();
+  await transformMarker(page, 40).click();
+  await expect(page.getByRole('tab', { name: 'Clip', exact: true })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('button', { name: 'Transform section', exact: true })).toHaveAttribute(
+    'aria-expanded',
+    'true',
+  );
+  expect(await current(page)).toEqual(before);
+});
+
+test('sliding a Transform marker previews without saving, commits one Undo and rejects collisions', async ({
+  page,
+}) => {
+  const before = await seedScaleKeys(page, [40, 80]);
+  const scale = Number(await page.locator('.timeline-surface').getAttribute('data-pixels-per-frame'));
+  const key = transformMarker(page, 40);
+  const box = (await key.boundingBox())!;
+  const x = box.x + box.width / 2;
+  const y = box.y + box.height / 2;
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  await page.mouse.move(x + 10 * scale, y, { steps: 6 });
+  await expect(page.locator('.timeline-clip-key.transform.moving')).toHaveAttribute('data-source-frame', '50');
+  await expect(page.locator('.timeline-bottom')).toContainText('Transform keyframe · source frame 50');
+  expect(await current(page)).toEqual(before);
+  expect(memory.saves).toBe(0);
+  await page.mouse.up();
+  const moved = await current(page);
+  expect(moved.clips[0]!.spatial.keyframes.map((item) => [item.frame, item.interpolation, item.values.scale])).toEqual([
+    [50, 'linear', 1],
+    [80, 'ease-in', 2],
+  ]);
+  await expect(transformMarker(page, 50)).toBeFocused();
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  expect(await current(page)).toEqual(before);
+  await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
+
+  const start = (await transformMarker(page, 40).boundingBox())!;
+  await page.mouse.move(start.x + start.width / 2, start.y + start.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(start.x + start.width / 2 + 40 * scale, start.y + start.height / 2, { steps: 6 });
+  await expect(page.locator('.timeline-clip-key.transform.moving')).toHaveClass(/invalid/);
+  await page.mouse.up();
+  expect(await current(page)).toEqual(before);
+});
+
+test('Escape cancels a Transform marker slide and the arrow keys move it one source frame', async ({ page }) => {
+  const before = await seedScaleKeys(page, [40, 80]);
+  const scale = Number(await page.locator('.timeline-surface').getAttribute('data-pixels-per-frame'));
+  const box = (await transformMarker(page, 40).boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width / 2 + 12 * scale, box.y + box.height / 2, { steps: 6 });
+  await expect(page.locator('.timeline-clip-key.transform.moving')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await page.mouse.up();
+  expect(await current(page)).toEqual(before);
+  expect(memory.saves).toBe(0);
+  await transformMarker(page, 40).focus();
+  await transformMarker(page, 40).press('ArrowRight');
+  await expect(transformMarker(page, 41)).toBeFocused();
+  await transformMarker(page, 41).press('Shift+ArrowRight');
+  await expect(transformMarker(page, 51)).toBeFocused();
+  expect((await current(page)).clips[0]!.spatial.keyframes.map((item) => item.frame)).toEqual([51, 80]);
+});
+
 test('stored full poses preserve base, frame input focus through move/Undo, reject collisions and edit easing', async ({
   page,
 }) => {

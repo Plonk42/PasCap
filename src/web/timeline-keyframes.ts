@@ -4,7 +4,13 @@ import type { ProjectDocument } from '../shared/model.js';
 import { snapFrame, snapPoints } from '../shared/snap.js';
 import { calculateLayout } from '../shared/timeline.js';
 import { previewFrameFor } from './keyframe-navigation.js';
+import type { InspectorSectionTarget } from './InspectorSection.js';
 import type { DraftPreview } from './Timeline.js';
+
+/** A shared keyframe opens Colour when it enables any colour or Opacity setting, otherwise Speed. */
+export function keyframeSection(values: Readonly<Record<string, number | null>>): InspectorSectionTarget {
+  return Object.entries(values).some(([setting, value]) => setting !== 'speed' && value !== null) ? 'colour' : 'speed';
+}
 
 type MoveKey = Extract<EditCommand, { type: 'layer-key-move' }>;
 export interface KeyframeDragPlan {
@@ -75,6 +81,7 @@ interface Options {
   onPreview: (draft: DraftPreview | null, restoreFrame?: number) => void;
   onEdit: (command: EditCommand) => void;
   onSeekKeyframe: (layerId: string, frame: number) => void;
+  onOpenSection: (section: InspectorSectionTarget) => void;
   onError: (error: string) => void;
 }
 interface Session {
@@ -264,6 +271,10 @@ export function useTimelineKeyframes(options: Options) {
     }
     if (active.plan.command) latest.current.onEdit(active.plan.command);
     latest.current.onSeekKeyframe(active.layerId, active.plan.frame);
+    const moved = active.plan.document.layers
+      .find((layer) => layer.id === active.layerId)
+      ?.keyframes.find((point) => point.frame === active.plan.frame);
+    if (moved) latest.current.onOpenSection(keyframeSection(moved.values));
     focusMarker(active.layerId, active.plan.frame);
   };
   const keyboard = (event: KeyboardEvent<HTMLButtonElement>, layerId: string, frame: number): void => {

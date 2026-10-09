@@ -7,6 +7,7 @@ import {
   type CSSProperties,
   type DragEvent,
   type KeyboardEvent,
+  type MouseEvent,
   type PointerEvent,
 } from 'react';
 import type { AudioAsset } from '../shared/audio.js';
@@ -29,7 +30,9 @@ import { trimOnTimeline, type TrimEdge } from '../shared/source-range.js';
 import { spatialKeyChannels } from '../shared/spatial.js';
 import { calculateLayout, type PlacedClip } from '../shared/timeline.js';
 import { formatTimecode, framesToSeconds, secondsToFrames } from '../shared/timing.js';
-import { clipKeyframeMarkers } from './clip-keyframe-markers.js';
+import { clipKeyframeMarkers, type ClipKeyframeMarker } from './clip-keyframe-markers.js';
+import { useClipKeyframeDrag, type ClipKeyframeDraft } from './clip-keyframe-drag.js';
+import type { InspectorSectionTarget } from './InspectorSection.js';
 import { SPATIAL_CONTROLS } from './spatial-editor.js';
 import './clip-keyframe-markers.css';
 import {
@@ -50,7 +53,7 @@ import { Layers } from './Layers.js';
 import { createMusicInstance, videoTimelineDuration } from './music-ui.js';
 import { MusicTimeline, type MusicTimelineGesture } from './MusicTimeline.js';
 import { RushEditBar, TimelineCutMarks } from './RushEditBar.js';
-import { useTimelineKeyframes, type TimelineKeyframeDraft } from './timeline-keyframes.js';
+import { keyframeSection, useTimelineKeyframes, type TimelineKeyframeDraft } from './timeline-keyframes.js';
 import { planTimelineDrop, type DropPlan, type TimelinePayload } from './timeline-placement.js';
 import { TIMELINE_RULER_HEIGHT, timelineLayerAt, timelineRows } from './timeline-rows.js';
 
@@ -75,6 +78,7 @@ interface Props {
   onSelect: (id: string) => void;
   onBoundary: (leftId: string) => void;
   onSeek: (frame: number) => void;
+  onOpenSection: (section: InspectorSectionTarget) => void;
   onPause: () => void;
   onEdit: (command: EditCommand | readonly EditCommand[]) => void;
   onInsert: (mediaIds: string[], index: number, layerId: string, start: number) => void;
@@ -143,11 +147,16 @@ function interactionMessage(
 
 function timelineInteractionMessage(
   keyframe: TimelineKeyframeDraft | null,
+  clipKeyframe: ClipKeyframeDraft | null,
   error: string,
   plan: DropPlan | null,
   draft: ProjectDocument | null,
   selected: VideoClip | undefined,
 ): string {
+  if (clipKeyframe)
+    return (
+      clipKeyframe.error || `Transform keyframe · source frame ${clipKeyframe.frame} · release to apply · Esc cancels`
+    );
   if (keyframe)
     return (
       keyframe.error ||
@@ -306,23 +315,87 @@ function TimelineMusicLanes(
   ));
 }
 
-function ClipKeyframeMarkers(
-  props: Readonly<{
-    placed: PlacedClip;
-    layer: VideoLayer;
-    name: string;
-    disabled: boolean;
-    blocked: () => boolean;
-    onSelect: Props['onSelect'];
-    onSeek: Props['onSeek'];
-  }>,
-) {
+type ClipKeyDrag = ReturnType<typeof useClipKeyframeDrag>;
+type ClipMarkerProps = Readonly<{
+  placed: PlacedClip;
+  layer: VideoLayer;
+  name: string;
+  disabled: boolean;
+  blocked: () => boolean;
+  onSelect: Props['onSelect'];
+  onSeek: Props['onSeek'];
+  onOpenSection: Props['onOpenSection'];
+  drag: ClipKeyDrag;
+}>;
+
+const swallow = (event: { preventDefault: () => void; stopPropagation: () => void }): void => {
+  event.preventDefault();
+  event.stopPropagation();
+};
+const contain = (event: { stopPropagation: () => void }): void => event.stopPropagation();
+
+const markerGuards = {
+  onMouseDown: swallow,
+  onMouseMove: contain,
+  onMouseUp: contain,
+  onDoubleClick: swallow,
+  onDragStart: swallow,
+  onKeyUp: contain,
+};
+
+/** Transform keys slide like shared track keys; custom-speed keys only select and seek. */
+function clipMarkerEvents(props: ClipMarkerProps, marker: ClipKeyframeMarker) {
+  const { drag, placed } = props;
+  if (marker.type === 'transform')
+    return {
+      ...markerGuards,
+      onPointerDown: (event: PointerEvent<HTMLButtonElement>) => drag.begin(event, placed, marker),
+      onPointerMove: drag.move,
+      onPointerUp: drag.finish,
+      onPointerCancel: drag.cancel,
+      onLostPointerCapture: drag.cancel,
+      onKeyDown: (event: KeyboardEvent<HTMLButtonElement>) => drag.keyboard(event, placed, marker),
+      onClick: clipMarkerClick(props, marker),
+    };
+  return {
+    ...markerGuards,
+    onPointerDown: (event: PointerEvent<HTMLButtonElement>) => {
+      swallow(event);
+      if (event.button === 0 && !props.blocked()) event.currentTarget.focus({ preventScroll: true });
+    },
+    onPointerMove: contain,
+    onPointerUp: contain,
+    onPointerCancel: contain,
+    onKeyDown: contain,
+    onClick: clipMarkerClick(props, marker),
+  };
+}
+
+function clipMarkerClick(props: ClipMarkerProps, marker: ClipKeyframeMarker) {
+  const slides = marker.type === 'transform';
+  return (event: MouseEvent<HTMLButtonElement>): void => {
+    event.stopPropagation();
+    // A pointer release on a Transform key was already handled by its drag session.
+    if ((slides && event.detail !== 0) || props.blocked()) return;
+    props.onSelect(props.placed.clip.id);
+    props.onSeek(marker.seekFrame);
+    props.onOpenSection(slides ? 'transform' : 'speed');
+  };
+}
+
+function ClipKeyframeMarkers(props: ClipMarkerProps) {
   const markers = clipKeyframeMarkers(props.placed, props.layer);
   if (!markers.length) return null;
+  const dragged = props.drag.draft?.clipId === props.placed.clip.id ? props.drag.draft : null;
   return (
     <div className="clip-keyframe-markers">
       {markers.map((marker) => {
         const type = marker.type === 'transform' ? 'Transform' : 'Speed';
+        // The dragged key keeps one element, so pointer capture survives its frame changing.
+        const moving =
+          marker.type === 'transform' &&
+          dragged !== null &&
+          marker.sourceFrame === (dragged.error ? dragged.origin : dragged.frame);
         const displayedSource = props.placed.retiming.sourceAt(marker.seekFrame - props.placed.start);
         const transformKey =
           marker.type === 'transform'
@@ -335,54 +408,26 @@ function ClipKeyframeMarkers(
           : '';
         const nameSuffix = settings ? ` (${settings})` : '';
         const titleSuffix = settings ? ` · ${settings}` : '';
+        const slideHint = marker.type === 'transform' ? ' · Drag to move; Arrow keys: 1 source frame, Shift: 10' : '';
         return (
           <button
             type="button"
-            key={`${marker.type}-${marker.sourceFrame}`}
-            className={`timeline-clip-key ${marker.type}`}
+            key={moving ? 'transform-moving' : `${marker.type}-${marker.sourceFrame}`}
+            className={`timeline-clip-key ${marker.type}${moving ? ' moving' : ''}${moving && dragged?.error ? ' invalid' : ''}`}
             data-clip-keyframe={marker.type}
             data-source-frame={marker.sourceFrame}
             data-timeline-frame={marker.timelineFrame}
             data-seek-frame={marker.seekFrame}
             aria-label={`${type} keyframe source ${marker.sourceFrame} on clip ${props.placed.clip.id}, ${props.name}${nameSuffix}`}
-            title={`${type} · source frame ${marker.sourceFrame}${titleSuffix} · timeline frame ${marker.timelineFrame} (${formatTimecode(marker.timelineFrame)}) · Preview source ${displayedSource} at timeline frame ${marker.seekFrame}${marker.speedOverridden ? ' · Clip Speed overridden by video track Speed' : ''}`}
+            title={`${type} · source frame ${marker.sourceFrame}${titleSuffix} · timeline frame ${marker.timelineFrame} (${formatTimecode(marker.timelineFrame)}) · Preview source ${displayedSource} at timeline frame ${marker.seekFrame}${marker.speedOverridden ? ' · Clip Speed overridden by video track Speed' : ''}${slideHint}`}
             style={
               {
                 '--clip-keyframe-position': `${(marker.outputFrame / props.placed.duration) * 100}%`,
               } as CSSProperties
             }
-            disabled={props.disabled}
+            disabled={props.disabled && !moving}
             draggable={false}
-            onPointerDown={(event) => {
-              event.preventDefault();
-              event.stopPropagation();
-              if (event.button === 0 && !props.blocked()) event.currentTarget.focus({ preventScroll: true });
-            }}
-            onPointerMove={(event) => event.stopPropagation()}
-            onPointerUp={(event) => event.stopPropagation()}
-            onPointerCancel={(event) => event.stopPropagation()}
-            onMouseDown={(event) => {
-              event.preventDefault();
-              event.stopPropagation();
-            }}
-            onMouseMove={(event) => event.stopPropagation()}
-            onMouseUp={(event) => event.stopPropagation()}
-            onDoubleClick={(event) => {
-              event.preventDefault();
-              event.stopPropagation();
-            }}
-            onDragStart={(event) => {
-              event.preventDefault();
-              event.stopPropagation();
-            }}
-            onKeyDown={(event) => event.stopPropagation()}
-            onKeyUp={(event) => event.stopPropagation()}
-            onClick={(event) => {
-              event.stopPropagation();
-              if (props.blocked()) return;
-              props.onSelect(props.placed.clip.id);
-              props.onSeek(marker.seekFrame);
-            }}
+            {...clipMarkerEvents(props, marker)}
           >
             <span aria-hidden="true">{marker.type === 'transform' ? '▼' : '◆'}</span>
           </button>
@@ -465,8 +510,25 @@ export function Timeline(props: Readonly<Props>) {
     onPreview,
     onEdit,
     onSeekKeyframe: keyframeNavigation.onSeekKeyframe,
+    onOpenSection: props.onOpenSection,
     onError,
   });
+  const clipKeys = useClipKeyframeDrag({
+    project,
+    frame,
+    scale,
+    disabled: keyframeNavigation.disabled || musicGesture !== null || keyframes.active,
+    viewport: scroll,
+    frameCountOf: (mediaId) => assets.find((asset) => asset.id === mediaId)?.metadata.frameCount ?? 0,
+    onPause,
+    onSelect,
+    onSeek,
+    onPreview,
+    onEdit,
+    onOpenTransform: () => props.onOpenSection('transform'),
+    onError,
+  });
+  const gestureActive = keyframes.active || clipKeys.active;
 
   // Extra recoverable head space exists only during a trim. Shift the scroll by
   // the identical amount before paint, so neither selection nor gesture start
@@ -522,7 +584,7 @@ export function Timeline(props: Readonly<Props>) {
     return () => window.removeEventListener('keydown', escape, true);
   });
 
-  const visible = keyframes.draft?.document ?? draft ?? musicGesture?.document ?? project;
+  const visible = keyframes.draft?.document ?? clipKeys.draft?.document ?? draft ?? musicGesture?.document ?? project;
   const layout = calculateLayout(visible);
   const baseLayout = calculateLayout(project);
   const selected = layout.clips.find((placed) => placed.clip.id === selectedClipId);
@@ -567,7 +629,7 @@ export function Timeline(props: Readonly<Props>) {
     musicGesture?.width ?? 0,
   );
   const interactionBlocked =
-    musicGesture !== null || timelineInteractionBlocked(draft, keyframes.active, keyframeNavigation.disabled);
+    musicGesture !== null || timelineInteractionBlocked(draft, gestureActive, keyframeNavigation.disabled);
   const clipMarkerBlocked = (): boolean =>
     interactionBlocked ||
     drag.current !== null ||
@@ -587,7 +649,7 @@ export function Timeline(props: Readonly<Props>) {
   if (pixelsPerSecond >= 60) tickStep = 1;
   const ticks = Array.from({ length: Math.ceil(seconds / tickStep) + 1 }, (_, index) => index * tickStep);
   const fitTimeline = (): void => {
-    if (layout.duration && !drag.current && !keyframes.active && !musicGesture)
+    if (layout.duration && !drag.current && !gestureActive && !musicGesture)
       setPixelsPerSecond(
         Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, (viewportWidth - leading - 64) / framesToSeconds(layout.duration))),
       );
@@ -615,7 +677,7 @@ export function Timeline(props: Readonly<Props>) {
       selectedRowTop === undefined ||
       drag.current ||
       movingClip.current ||
-      keyframes.active ||
+      gestureActive ||
       musicGesture
     )
       return;
@@ -625,7 +687,7 @@ export function Timeline(props: Readonly<Props>) {
   }, [selectedLayerId, selectedClipId, props.revealRequest, selectedRowTop, viewportHeight]);
   useEffect(() => {
     const element = scroll.current;
-    if (!element || drag.current || movingClip.current || movement.current || keyframes.active || musicGesture) return;
+    if (!element || drag.current || movingClip.current || movement.current || gestureActive || musicGesture) return;
     const placed = calculateLayout(project).clips.find((item) => item.clip.id === selectedClipId);
     if (!placed) return;
     const left = 32 + placed.start * scale;
@@ -644,7 +706,7 @@ export function Timeline(props: Readonly<Props>) {
       musicGesture ||
       drag.current ||
       movingClip.current ||
-      keyframes.active
+      gestureActive
     )
       return;
     const top = musicTop + index * 70;
@@ -962,7 +1024,7 @@ export function Timeline(props: Readonly<Props>) {
 
   const interactionStatus = musicGesture
     ? musicGesture.error || `Music track · ${formatTimecode(musicGesture.start)} · release to apply · Esc cancels`
-    : timelineInteractionMessage(keyframes.draft, dragError, dropPlan, draft, selected?.clip);
+    : timelineInteractionMessage(keyframes.draft, clipKeys.draft, dragError, dropPlan, draft, selected?.clip);
   return (
     <section className="timeline-panel panel" id="timeline-pane" tabIndex={-1} aria-label="Video timeline">
       <div className="timeline-toolbar">
@@ -1076,7 +1138,7 @@ export function Timeline(props: Readonly<Props>) {
         >
           <div
             ref={surface}
-            className={`${timelineSurfaceClassName(dragError, draft, keyframes.active)} ${musicGesture ? 'music-drafting' : ''}`}
+            className={`${timelineSurfaceClassName(dragError, draft, gestureActive)} ${musicGesture ? 'music-drafting' : ''}`}
             style={{ width, height: surfaceHeight }}
             data-pixels-per-frame={scale}
             data-leading={leading}
@@ -1100,7 +1162,7 @@ export function Timeline(props: Readonly<Props>) {
               {layout.duration > 0 && (
                 <div className="timeline-ruler-playhead" style={{ left: leading + frame * scale }}>
                   <button aria-label="Drag playhead" onPointerDown={beginSeek} onPointerMove={moveSeek} />
-                  {(draft || keyframes.active) && (
+                  {(draft || gestureActive) && (
                     <span className="playhead-readout">{formatTimecode(frame)} · draft</span>
                   )}
                 </div>
@@ -1255,6 +1317,8 @@ export function Timeline(props: Readonly<Props>) {
                     blocked={clipMarkerBlocked}
                     onSelect={onSelect}
                     onSeek={onSeek}
+                    onOpenSection={props.onOpenSection}
+                    drag={clipKeys}
                   />
                   {(['in', 'out'] as const).map((edge) => (
                     <button
@@ -1326,7 +1390,10 @@ export function Timeline(props: Readonly<Props>) {
                     onKeyDown={(event) => keyframes.keyboard(event, layer.id, point.frame)}
                     onClick={(event) => {
                       event.stopPropagation();
-                      if (event.detail === 0) keyframeNavigation.onSeekKeyframe(layer.id, point.frame);
+                      if (event.detail === 0) {
+                        keyframeNavigation.onSeekKeyframe(layer.id, point.frame);
+                        props.onOpenSection(keyframeSection(point.values));
+                      }
                     }}
                   >
                     ◆

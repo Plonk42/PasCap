@@ -42,6 +42,11 @@
   color: #c4e9ff;
 }
 
+.keyframe-setting-navigation[data-animated='true'] > .keyframe-toggle.transform-keyframe-toggle:not(.active) {
+  border-color: #5d93b8;
+  color: #c4e9ff;
+}
+
 .keyframe-toggle.transform-keyframe-toggle.active {
   border-color: #5d93b8;
   background: #1b3446;

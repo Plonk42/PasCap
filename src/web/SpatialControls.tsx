@@ -202,7 +202,7 @@ function PoseFields({
                 {control.label}
                 {unit}
               </ResetLabel>
-              {readOnly?.(control.key) && <LockedCue glyph="▽" />}
+              {readOnly?.(control.key) && <LockedCue glyph="▽" className="transform" />}
               {keys && (
                 <span className="colour-control-actions">
                   <SpatialChannelKeys label={control.label} keys={keys} disabled={disabled} />
@@ -262,7 +262,6 @@ export function SpatialControls({
   const channelActive = (channel: SpatialChannel): boolean => atDisplayed?.values[channel] != null;
   const readOnly = (channel: SpatialChannel): boolean =>
     hasSpatialChannelKeys(settings, channel) && !channelActive(channel);
-  const anyReadOnly = SPATIAL_CONTROLS.some(({ key }) => readOnly(key));
   const selection = useSpatialSelection(settings);
   const [lastInspected, setLastInspected] = useState(selectedFrame);
   if (lastInspected !== selectedFrame) {
@@ -341,12 +340,6 @@ export function SpatialControls({
           Reset
         </button>
       </div>
-      {anyReadOnly && (
-        <p className="control-hint">
-          {playhead ? `Source frame ${playhead.frame}` : 'Playhead outside clip'} · Animated · add a keyframe to edit a
-          setting here.
-        </p>
-      )}
       <PoseFields
         values={pose}
         prefix="Transform"

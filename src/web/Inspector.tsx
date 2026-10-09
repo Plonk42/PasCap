@@ -19,6 +19,7 @@ import {
   InspectorSection,
   useInspectorExpansion,
   type InspectorMode,
+  type InspectorSectionRequest,
 } from './InspectorSection.js';
 import { KeyframeControls } from './KeyframeControls.js';
 import { KeyframeToggle } from './KeyframeToggle.js';
@@ -45,6 +46,7 @@ interface Props {
   drafting: boolean;
   section: InspectorMode;
   onSection: (section: InspectorMode) => void;
+  sectionRequest?: InspectorSectionRequest | null;
   onSelectBoundary: (leftId: string) => void;
   onEdit: (command: EditCommand | readonly EditCommand[]) => void;
   children?: ReactNode;
@@ -632,6 +634,7 @@ export function Inspector({
   drafting,
   section,
   onSection,
+  sectionRequest,
   onSelectBoundary,
   onEdit,
   onPreview,
@@ -655,6 +658,19 @@ export function Inspector({
     // A timeline boundary click must reveal its transition even if the section was collapsed.
     if (boundaryId !== null && section === 'track') setOpen('transition', true);
   }, [boundaryId, section]);
+  useEffect(() => {
+    // A timeline keyframe marker opens the section that edits it, even if it was collapsed.
+    if (!sectionRequest) return;
+    const { section: target } = sectionRequest;
+    setOpen(target, true);
+    const title = target.charAt(0).toUpperCase() + target.slice(1);
+    const frameId = requestAnimationFrame(() =>
+      globalThis.document
+        .querySelector<HTMLElement>(`.inspector-panel [aria-label="${title} section"]`)
+        ?.scrollIntoView({ block: 'nearest' }),
+    );
+    return () => cancelAnimationFrame(frameId);
+  }, [sectionRequest]);
   const sourceFrame =
     placed && frame >= placed.start && frame < placed.end ? placed.retiming.sourceAt(frame - placed.start) : null;
   const inputContext = `${project.id}:${layer?.id}:${clip?.id ?? 'row'}`;

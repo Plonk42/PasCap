@@ -325,8 +325,8 @@ Inside each clip rectangle, custom-speed source keyframes appear in a salmon/das
 authoritative retiming, including a track Speed override; retained overridden
 keyframes are indicated, not deleted. Off-trim keyframes are omitted. Exclusive OUT has a
 boundary marker that seeks the final available frame. Click, Enter or Space
-selects the clip and seeks its nearest mapped image without editing, history,
-save or dragging. Keyboard handling is isolated from timeline shortcuts. These
+selects the clip, seeks its nearest mapped image and opens Clip → Speed without
+editing; Transform keys, unlike these, slide on the timeline. Keyboard handling is isolated from timeline shortcuts. These
 markers are distinct from draggable shared project-time track markers and from
 the editable source-speed graph. Unlike these markers, Speed and Transform stored
 navigation reaches all retained off-trim/original-OUT keyframes; neither navigation

@@ -117,6 +117,10 @@
   margin-top: 8px;
 }
 
+.setting-locked-cue.transform {
+  color: #c4e9ff;
+}
+
 .value-rate-fields,
 .clip-speed-rate-field {
   display: grid;

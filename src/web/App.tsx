@@ -41,7 +41,7 @@ import { waitForService } from './connection.js';
 import { DeferredPanel } from './DeferredPanel.js';
 import { mediaReady } from './display.js';
 import { Icon } from './icons.js';
-import type { InspectorMode } from './InspectorSection.js';
+import type { InspectorMode, InspectorSectionRequest, InspectorSectionTarget } from './InspectorSection.js';
 import { Jobs } from './Jobs.js';
 import {
   inspectKeyframe,
@@ -226,6 +226,7 @@ export function App() {
   useEffect(() => {
     writePreference('pascap-inspector-tab', inspectorMode);
   }, [inspectorMode]);
+  const [sectionRequest, setSectionRequest] = useState<InspectorSectionRequest | null>(null);
   const [draggedMediaIds, setDraggedMediaIds] = useState<string[] | null>(null);
   const [viewerMode, setViewerMode] = useState<'timeline' | 'source'>('timeline');
   const [review, setReview] = useState<ReviewTarget | null>(null);
@@ -1128,6 +1129,13 @@ export function App() {
     [selectLayer],
   );
   const followPlayhead = useCallback((): void => setKeyframeInspection(null), []);
+  const openInspectorSection = useCallback((section: InspectorSectionTarget): void => {
+    setInspectorMode(section === 'colour' ? 'track' : 'clip');
+    const workspace = latestWorkspace.current;
+    if (!workspace.layout.inspectorOpen)
+      workspace.update({ inspectorOpen: true, ...(workspace.viewport.width < 980 ? { mediaOpen: false } : {}) }, false);
+    setSectionRequest((previous) => ({ section, nonce: (previous?.nonce ?? 0) + 1 }));
+  }, []);
   const seekSourceKeyframe = useCallback((frame: number): void => seek(frame, true), [seek]);
   const navigationDisabled = !project || draft !== null || !previewReady;
   const keyframeNavigation = useMemo(
@@ -1881,6 +1889,7 @@ export function App() {
                   drafting={draft !== null || !project}
                   section={inspectorMode}
                   onSection={setInspectorMode}
+                  sectionRequest={sectionRequest}
                   onSelectBoundary={setBoundaryId}
                   onEdit={edit}
                   onPreview={previewDraft}
@@ -1940,6 +1949,7 @@ export function App() {
               });
             }}
             onSeek={seek}
+            onOpenSection={openInspectorSection}
             onPause={() => engine.current?.pause()}
             onEdit={edit}
             onInsert={insert}

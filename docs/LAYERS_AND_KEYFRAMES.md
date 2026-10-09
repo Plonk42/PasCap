@@ -336,8 +336,8 @@ targets its existing stored keyed setting, even when that keyframe is outside du
 There is **one marker per stored track keyframe**, even across multiple clips or a
 dissolve, not one marker per channel/clip. Its title names the video track, project time
 and enabled settings; the panel exposes chips/dependencies. **Click or Enter** selects
-the track and seeks without editing or changing the Inspector tab. Whole-track keyframe
-navigation also retains that tab. Keyframes after the last clip keep their marker at
+the track, seeks and opens Track → Colour (Clip → Speed for a Speed-only keyframe), without editing. Whole-track keyframe
+navigation retains the chosen Inspector tab. Keyframes after the last clip keep their marker at
 their own project time, like keyframes before the first clip. The scrollable timeline
 widens to reach the last stored keyframe, but duration, playback and seeking still end
 at the last project frame, determined by the maximum video/music OUT, not keyframes.
@@ -387,8 +387,8 @@ authoritative clip retiming, including the track Speed override; off-trim
 keyframes are omitted. An exclusive-OUT keyframe has a boundary marker that seeks
 the final available frame.
 Speed markers indicate when track Speed overrides the retained clip curve.
-Click, Enter or Space selects the clip and seeks the nearest mapped image, without
-editing, history, save or dragging. Marker keyboard events are isolated from
+Click, Enter or Space selects the clip, seeks the nearest mapped image and opens Clip → Transform (Clip → Speed for the ◆ lane); a click edits nothing. Transform keys also slide: drag one
+horizontally, or press ←/→ (one original source frame, Shift ten), keeping its easing and enabled settings. A drag previews without history/save; a valid release is one Undo step, while Escape, cancellation, blur or an occupied/invalid frame restores. Marker keyboard events are isolated from
 timeline shortcuts. These source-keyframe markers are not the draggable shared
 project-time track markers above. Speed and Transform stored navigation still
 reaches all retained off-trim/original-OUT keyframes through independent clip-local

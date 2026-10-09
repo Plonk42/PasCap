@@ -6,6 +6,12 @@ import './input-controls.css';
 import { readPreference, writePreference } from './preferences.js';
 
 export type InspectorMode = 'clip' | 'track' | 'audio';
+/** A timeline keyframe marker asks the Inspector to show the section that edits it. */
+export type InspectorSectionTarget = 'colour' | 'speed' | 'transform';
+export interface InspectorSectionRequest {
+  section: InspectorSectionTarget;
+  nonce: number;
+}
 
 const SECTION_DEFAULTS = {
   source: false,

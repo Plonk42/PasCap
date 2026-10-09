@@ -210,7 +210,7 @@ Slider movement drafts only the local control, not preview/document/history/save
 valid release commits once and updates the image. Escape, pointer cancellation,
 lost capture or window blur restores the starting value; invalid release commits
 nothing. Each keyboard slider adjustment is an individual validated edit. There
-is no Transform graph-keyframe drag or canvas gizmo.
+is no Transform canvas gizmo; timeline markers slide as described below.
 
 ### Timeline source-keyframe markers
 
@@ -219,8 +219,8 @@ list the enabled settings) distinguish it without relying on colour. One marker
 represents one key, however many settings it enables.
 Source keyframes use the clip's authoritative retiming to locate output positions;
 off-trim keyframes are omitted. A keyframe at exclusive OUT is a boundary marker and seeks
-the final available frame. Click, Enter or Space selects the clip and seeks the
-nearest mapped image without editing, history, save or dragging. Marker keyboard
+the final available frame. Click, Enter or Space selects the clip, seeks the
+nearest mapped image and opens Clip → Transform; a click edits nothing. A key slides to another original source frame by dragging (pointer travel in output frames mapped through the placed retiming; zero travel keeps its frame) or ←/→ (one source frame, Shift ten), keeping its easing and enabled settings. Drafts preview without history/save; a valid release is one `spatial` command and one Undo step, while Escape, cancellation, lost capture, blur, an occupied frame or an out-of-original frame restores. Marker keyboard
 events do not also invoke timeline shortcuts. Speed markers indicate a track
 Speed override, which retains the clip's source keyframes. Speed and Transform
 stored navigation still reaches all retained off-trim/original-OUT keyframes
