@@ -4,7 +4,17 @@ import { EditHistory } from '../../src/shared/commands.js';
 import { EMPTY_KEY_VALUES, type LayerKeyframe } from '../../src/shared/keyframes.js';
 import { createClip, createProject } from '../../src/shared/model.js';
 import { calculateLayout } from '../../src/shared/timeline.js';
-import { keyframeFrameAtPointer, planKeyframeDrag } from '../../src/web/timeline-keyframes.js';
+import { slideTravel } from '../../src/web/keyframe-slide.js';
+import { planKeyframeDrag, trackKeyframeFrame } from '../../src/web/timeline-keyframes.js';
+
+const keyframeFrameAtPointer = (
+  frame: number,
+  startX: number,
+  clientX: number,
+  startScroll: number,
+  scrollLeft: number,
+  scale: number,
+): number => trackKeyframeFrame(frame, slideTravel(startX, clientX, startScroll, scrollLeft, scale));
 
 function fixture() {
   const project = createProject('keyframe-drag', 'Shared points');

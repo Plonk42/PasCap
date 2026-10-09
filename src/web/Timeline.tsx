@@ -7,7 +7,6 @@ import {
   type CSSProperties,
   type DragEvent,
   type KeyboardEvent,
-  type MouseEvent,
   type PointerEvent,
 } from 'react';
 import type { AudioAsset } from '../shared/audio.js';
@@ -31,7 +30,7 @@ import { spatialKeyChannels } from '../shared/spatial.js';
 import { calculateLayout, type PlacedClip } from '../shared/timeline.js';
 import { formatTimecode, framesToSeconds, secondsToFrames } from '../shared/timing.js';
 import { clipKeyframeMarkers, type ClipKeyframeMarker } from './clip-keyframe-markers.js';
-import { useClipKeyframeDrag, type ClipKeyframeDraft } from './clip-keyframe-drag.js';
+import { transformKeyframeKind, transformKeyframeTarget, type TransformKeyframeTarget } from './clip-keyframe-drag.js';
 import type { InspectorSectionTarget } from './InspectorSection.js';
 import { SPATIAL_CONTROLS } from './spatial-editor.js';
 import './clip-keyframe-markers.css';
@@ -45,6 +44,14 @@ import {
 } from './display.js';
 import { Icon } from './icons.js';
 import { keyframeNavigationFrame, useKeyframeNavigation } from './keyframe-navigation.js';
+import {
+  KeyframeMarkers,
+  keyframeMarkerGuards,
+  useKeyframeSlide,
+  type KeyframeSlide,
+  type KeyframeSlideDraft,
+  type KeyframeSlideTarget,
+} from './keyframe-slide.js';
 import { ClipContextMenu, type ClipMenuAnchor } from './ClipContextMenu.js';
 import { nextLayerName } from './move-to-track.js';
 import './declutter.css';
@@ -53,7 +60,7 @@ import { Layers } from './Layers.js';
 import { createMusicInstance, videoTimelineDuration } from './music-ui.js';
 import { MusicTimeline, type MusicTimelineGesture } from './MusicTimeline.js';
 import { RushEditBar, TimelineCutMarks } from './RushEditBar.js';
-import { keyframeSection, useTimelineKeyframes, type TimelineKeyframeDraft } from './timeline-keyframes.js';
+import { trackKeyframeKind } from './timeline-keyframes.js';
 import { planTimelineDrop, type DropPlan, type TimelinePayload } from './timeline-placement.js';
 import { TIMELINE_RULER_HEIGHT, timelineLayerAt, timelineRows } from './timeline-rows.js';
 
@@ -146,8 +153,8 @@ function interactionMessage(
 }
 
 function timelineInteractionMessage(
-  keyframe: TimelineKeyframeDraft | null,
-  clipKeyframe: ClipKeyframeDraft | null,
+  keyframe: KeyframeSlideDraft<KeyframeSlideTarget> | null,
+  clipKeyframe: KeyframeSlideDraft<TransformKeyframeTarget> | null,
   error: string,
   plan: DropPlan | null,
   draft: ProjectDocument | null,
@@ -315,124 +322,87 @@ function TimelineMusicLanes(
   ));
 }
 
-type ClipKeyDrag = ReturnType<typeof useClipKeyframeDrag>;
 type ClipMarkerProps = Readonly<{
   placed: PlacedClip;
   layer: VideoLayer;
   name: string;
-  disabled: boolean;
   blocked: () => boolean;
   onSelect: Props['onSelect'];
   onSeek: Props['onSeek'];
   onOpenSection: Props['onOpenSection'];
-  drag: ClipKeyDrag;
+  slide: KeyframeSlide<TransformKeyframeTarget>;
 }>;
 
-const swallow = (event: { preventDefault: () => void; stopPropagation: () => void }): void => {
-  event.preventDefault();
-  event.stopPropagation();
-};
-const contain = (event: { stopPropagation: () => void }): void => event.stopPropagation();
-
-const markerGuards = {
-  onMouseDown: swallow,
-  onMouseMove: contain,
-  onMouseUp: contain,
-  onDoubleClick: swallow,
-  onDragStart: swallow,
-  onKeyUp: contain,
-};
+function clipMarkerView(props: ClipMarkerProps, marker: ClipKeyframeMarker, sourceFrame: number, at: number | null) {
+  const type = marker.type === 'transform' ? 'Transform' : 'Speed';
+  const displayedSource = props.placed.retiming.sourceAt(marker.seekFrame - props.placed.start);
+  const transformKey =
+    marker.type === 'transform'
+      ? props.placed.clip.spatial.keyframes.find((key) => key.frame === marker.sourceFrame)
+      : undefined;
+  const settings = transformKey
+    ? spatialKeyChannels(transformKey)
+        .map((channel) => SPATIAL_CONTROLS.find((control) => control.key === channel)!.label)
+        .join(', ')
+    : '';
+  const nameSuffix = settings ? ` (${settings})` : '';
+  const titleSuffix = settings ? ` · ${settings}` : '';
+  const slideHint = marker.type === 'transform' ? ' · Drag to move; Arrow keys: 1 source frame, Shift: 10' : '';
+  const output = at === null ? marker.outputFrame : at - props.placed.start;
+  return {
+    className: `timeline-clip-key ${marker.type}`,
+    'data-clip-keyframe': marker.type,
+    'data-source-frame': sourceFrame,
+    'data-timeline-frame': marker.timelineFrame,
+    'data-seek-frame': marker.seekFrame,
+    'aria-label': `${type} keyframe source ${sourceFrame} on clip ${props.placed.clip.id}, ${props.name}${nameSuffix}`,
+    title: `${type} · source frame ${sourceFrame}${titleSuffix} · timeline frame ${marker.timelineFrame} (${formatTimecode(marker.timelineFrame)}) · Preview source ${displayedSource} at timeline frame ${marker.seekFrame}${marker.speedOverridden ? ' · Clip Speed overridden by video track Speed' : ''}${slideHint}`,
+    style: { '--clip-keyframe-position': `${(output / props.placed.duration) * 100}%` } as CSSProperties,
+    children: <span aria-hidden="true">{marker.type === 'transform' ? '▼' : '◆'}</span>,
+  };
+}
 
 /** Transform keys slide like shared track keys; custom-speed keys only select and seek. */
-function clipMarkerEvents(props: ClipMarkerProps, marker: ClipKeyframeMarker) {
-  const { drag, placed } = props;
-  if (marker.type === 'transform')
-    return {
-      ...markerGuards,
-      onPointerDown: (event: PointerEvent<HTMLButtonElement>) => drag.begin(event, placed, marker),
-      onPointerMove: drag.move,
-      onPointerUp: drag.finish,
-      onPointerCancel: drag.cancel,
-      onLostPointerCapture: drag.cancel,
-      onKeyDown: (event: KeyboardEvent<HTMLButtonElement>) => drag.keyboard(event, placed, marker),
-      onClick: clipMarkerClick(props, marker),
-    };
-  return {
-    ...markerGuards,
-    onPointerDown: (event: PointerEvent<HTMLButtonElement>) => {
-      swallow(event);
-      if (event.button === 0 && !props.blocked()) event.currentTarget.focus({ preventScroll: true });
-    },
-    onPointerMove: contain,
-    onPointerUp: contain,
-    onPointerCancel: contain,
-    onKeyDown: contain,
-    onClick: clipMarkerClick(props, marker),
-  };
-}
-
-function clipMarkerClick(props: ClipMarkerProps, marker: ClipKeyframeMarker) {
-  const slides = marker.type === 'transform';
-  return (event: MouseEvent<HTMLButtonElement>): void => {
-    event.stopPropagation();
-    // A pointer release on a Transform key was already handled by its drag session.
-    if ((slides && event.detail !== 0) || props.blocked()) return;
-    props.onSelect(props.placed.clip.id);
-    props.onSeek(marker.seekFrame);
-    props.onOpenSection(slides ? 'transform' : 'speed');
-  };
-}
-
 function ClipKeyframeMarkers(props: ClipMarkerProps) {
   const markers = clipKeyframeMarkers(props.placed, props.layer);
   if (!markers.length) return null;
-  const dragged = props.drag.draft?.clipId === props.placed.clip.id ? props.drag.draft : null;
+  const transforms = markers.filter((marker) => marker.type === 'transform');
   return (
     <div className="clip-keyframe-markers">
-      {markers.map((marker) => {
-        const type = marker.type === 'transform' ? 'Transform' : 'Speed';
-        // The dragged key keeps its original React key, so pointer capture survives its frame changing.
-        const moving =
-          marker.type === 'transform' &&
-          dragged !== null &&
-          marker.sourceFrame === (dragged.error ? dragged.origin : dragged.frame);
-        const displayedSource = props.placed.retiming.sourceAt(marker.seekFrame - props.placed.start);
-        const transformKey =
-          marker.type === 'transform'
-            ? props.placed.clip.spatial.keyframes.find((key) => key.frame === marker.sourceFrame)
-            : undefined;
-        const settings = transformKey
-          ? spatialKeyChannels(transformKey)
-              .map((channel) => SPATIAL_CONTROLS.find((control) => control.key === channel)!.label)
-              .join(', ')
-          : '';
-        const nameSuffix = settings ? ` (${settings})` : '';
-        const titleSuffix = settings ? ` · ${settings}` : '';
-        const slideHint = marker.type === 'transform' ? ' · Drag to move; Arrow keys: 1 source frame, Shift: 10' : '';
-        return (
+      <KeyframeMarkers
+        slide={props.slide}
+        targets={transforms.map((marker) => transformKeyframeTarget(props.placed, marker))}
+        blocked={props.blocked}
+        view={({ marker }, state) => clipMarkerView(props, marker, state.frame, state.at)}
+      />
+      {markers
+        .filter((marker) => marker.type === 'speed')
+        .map((marker) => (
           <button
             type="button"
-            key={`${marker.type}-${moving && dragged ? dragged.origin : marker.sourceFrame}`}
-            className={`timeline-clip-key ${marker.type}${moving ? ' moving' : ''}${moving && dragged?.error ? ' invalid' : ''}`}
-            data-clip-keyframe={marker.type}
-            data-source-frame={marker.sourceFrame}
-            data-timeline-frame={marker.timelineFrame}
-            data-seek-frame={marker.seekFrame}
-            aria-label={`${type} keyframe source ${marker.sourceFrame} on clip ${props.placed.clip.id}, ${props.name}${nameSuffix}`}
-            title={`${type} · source frame ${marker.sourceFrame}${titleSuffix} · timeline frame ${marker.timelineFrame} (${formatTimecode(marker.timelineFrame)}) · Preview source ${displayedSource} at timeline frame ${marker.seekFrame}${marker.speedOverridden ? ' · Clip Speed overridden by video track Speed' : ''}${slideHint}`}
-            style={
-              {
-                '--clip-keyframe-position': `${(marker.outputFrame / props.placed.duration) * 100}%`,
-              } as CSSProperties
-            }
-            disabled={props.disabled && !moving}
+            key={`speed-${marker.sourceFrame}`}
+            {...clipMarkerView(props, marker, marker.sourceFrame, null)}
+            disabled={props.blocked()}
             draggable={false}
-            {...clipMarkerEvents(props, marker)}
-          >
-            <span aria-hidden="true">{marker.type === 'transform' ? '▼' : '◆'}</span>
-          </button>
-        );
-      })}
+            {...keyframeMarkerGuards}
+            onPointerDown={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              if (event.button === 0 && !props.blocked()) event.currentTarget.focus({ preventScroll: true });
+            }}
+            onPointerMove={(event) => event.stopPropagation()}
+            onPointerUp={(event) => event.stopPropagation()}
+            onPointerCancel={(event) => event.stopPropagation()}
+            onKeyDown={(event) => event.stopPropagation()}
+            onClick={(event) => {
+              event.stopPropagation();
+              if (props.blocked()) return;
+              props.onSelect(props.placed.clip.id);
+              props.onSeek(marker.seekFrame);
+              props.onOpenSection('speed');
+            }}
+          />
+        ))}
     </div>
   );
 }
@@ -497,35 +467,40 @@ export function Timeline(props: Readonly<Props>) {
   const keyframeNavigation = useKeyframeNavigation();
   const scale = framesToSeconds(1, project.frameRate) * pixelsPerSecond;
   const baselineWidth = Math.max(viewportWidth, 32 + calculateLayout(project).duration * scale + 96);
-  const keyframes = useTimelineKeyframes({
+  const keyframes = useKeyframeSlide({
+    kind: trackKeyframeKind({
+      snapping,
+      onSelectLayer,
+      onSeekKeyframe: keyframeNavigation.onSeekKeyframe,
+      onOpenSection: props.onOpenSection,
+    }),
     project,
     frame,
     scale,
     width: baselineWidth,
     disabled: keyframeNavigation.disabled || musicGesture !== null,
-    snapping,
     viewport: scroll,
     onPause,
-    onSelectLayer,
     onPreview,
     onEdit,
-    onSeekKeyframe: keyframeNavigation.onSeekKeyframe,
-    onOpenSection: props.onOpenSection,
     onError,
   });
-  const clipKeys = useClipKeyframeDrag({
+  const clipKeys = useKeyframeSlide({
+    kind: transformKeyframeKind({
+      frameCountOf: (mediaId) => assets.find((asset) => asset.id === mediaId)?.metadata.frameCount ?? 0,
+      onSelect,
+      onSeek,
+      onOpenTransform: () => props.onOpenSection('transform'),
+    }),
     project,
     frame,
     scale,
+    width: baselineWidth,
     disabled: keyframeNavigation.disabled || musicGesture !== null || keyframes.active,
     viewport: scroll,
-    frameCountOf: (mediaId) => assets.find((asset) => asset.id === mediaId)?.metadata.frameCount ?? 0,
     onPause,
-    onSelect,
-    onSeek,
     onPreview,
     onEdit,
-    onOpenTransform: () => props.onOpenSection('transform'),
     onError,
   });
   const gestureActive = keyframes.active || clipKeys.active;
@@ -1313,12 +1288,11 @@ export function Timeline(props: Readonly<Props>) {
                     placed={currentPlaced}
                     layer={visible.layers.find((layer) => layer.id === clip.layerId)!}
                     name={name}
-                    disabled={clipMarkerBlocked()}
                     blocked={clipMarkerBlocked}
                     onSelect={onSelect}
                     onSeek={onSeek}
                     onOpenSection={props.onOpenSection}
-                    drag={clipKeys}
+                    slide={clipKeys}
                   />
                   {(['in', 'out'] as const).map((edge) => (
                     <button
@@ -1358,54 +1332,42 @@ export function Timeline(props: Readonly<Props>) {
               leading={leading}
               scale={scale}
             />
-            {project.layers.flatMap((layer) =>
-              layer.keyframes.map((point) => {
-                const settings = keySettings(point)
-                  .map((setting) => KEYFRAME_SETTINGS.find((definition) => definition.key === setting)!.label)
-                  .join(' · ');
-                const active = keyframes.draft?.layerId === layer.id && keyframes.draft.origin === point.frame;
-                const displayedFrame = active ? keyframes.draft!.frame : point.frame;
-                const current =
-                  layer.id === selectedLayerId &&
-                  displayedFrame === keyframeNavigationFrame(keyframeNavigation.inspection, layer.id, frame);
-                return (
-                  <button
-                    type="button"
-                    key={`${layer.id}-${point.frame}`}
-                    className={`timeline-layer-key ${current ? 'active' : ''} ${active ? 'moving' : ''} ${active && keyframes.draft!.error ? 'invalid' : ''}`}
-                    data-layer-keyframe={displayedFrame}
-                    data-keyframe-origin={point.frame}
-                    data-keyframe-layer={layer.id}
-                    aria-label={`Track keyframe ${displayedFrame} on ${layer.name}`}
-                    aria-pressed={current}
-                    title={`${layer.name} · ${formatTimecode(displayedFrame)} · ${settings} · Drag to move all animated settings; Arrow keys: 1 frame, Shift: 10. Alt bypasses snapping.`}
-                    style={{ top: rowTop(layer.id) + 48, left: leading + displayedFrame * scale }}
-                    draggable={false}
-                    disabled={interactionBlocked && !active}
-                    onPointerDown={(event) => keyframes.begin(event, layer.id, point.frame)}
-                    onPointerMove={keyframes.move}
-                    onPointerUp={keyframes.finish}
-                    onPointerCancel={keyframes.cancel}
-                    onLostPointerCapture={keyframes.cancel}
-                    onKeyDown={(event) => keyframes.keyboard(event, layer.id, point.frame)}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      if (event.detail === 0) {
-                        keyframeNavigation.onSeekKeyframe(layer.id, point.frame);
-                        props.onOpenSection(keyframeSection(point.values));
-                      }
-                    }}
-                  >
-                    ◆
-                    {active && (
-                      <span className="timeline-layer-key-time" aria-hidden="true">
-                        {formatTimecode(displayedFrame)}
-                      </span>
-                    )}
-                  </button>
-                );
-              }),
-            )}
+            {visible.layers.map((layer) => (
+              <KeyframeMarkers
+                key={layer.id}
+                slide={keyframes}
+                targets={layer.keyframes.map((point) => ({ scope: layer.id, origin: point.frame }))}
+                blocked={() => interactionBlocked}
+                view={({ origin }, state) => {
+                  const point = layer.keyframes.find((item) => item.frame === origin)!;
+                  const settings = keySettings(point)
+                    .map((setting) => KEYFRAME_SETTINGS.find((definition) => definition.key === setting)!.label)
+                    .join(' · ');
+                  const current =
+                    layer.id === selectedLayerId &&
+                    state.frame === keyframeNavigationFrame(keyframeNavigation.inspection, layer.id, frame);
+                  return {
+                    className: `timeline-layer-key${current ? ' active' : ''}`,
+                    'data-layer-keyframe': state.frame,
+                    'data-keyframe-layer': layer.id,
+                    'aria-label': `Track keyframe ${state.frame} on ${layer.name}`,
+                    'aria-pressed': current,
+                    title: `${layer.name} · ${formatTimecode(state.frame)} · ${settings} · Drag to move all animated settings; Arrow keys: 1 frame, Shift: 10. Alt bypasses snapping.`,
+                    style: { top: rowTop(layer.id) + 48, left: leading + (state.at ?? origin) * scale },
+                    children: (
+                      <>
+                        ◆
+                        {state.moving && (
+                          <span className="timeline-layer-key-time" aria-hidden="true">
+                            {formatTimecode(state.frame)}
+                          </span>
+                        )}
+                      </>
+                    ),
+                  };
+                }}
+              />
+            ))}
             {geometry.transitions.map((region, index) => {
               const left =
                 assets.find(

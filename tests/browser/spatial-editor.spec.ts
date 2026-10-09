@@ -347,6 +347,17 @@ test('a fast Transform marker slide that leaves the marker keeps its pointer cap
   await page.mouse.up();
   expect((await current(page)).clips[0]!.spatial.keyframes.map((item) => item.frame)).toEqual([50, 80]);
   await expect(transformMarker(page, 50)).toBeFocused();
+  await page.keyboard.press('Control+z');
+  expect((await current(page)).clips[0]!.spatial.keyframes.map((item) => item.frame)).toEqual([40, 80]);
+
+  // Passing a neighbour keeps the same element, so the slide survives it.
+  const again = (await transformMarker(page, 40).boundingBox())!;
+  await page.mouse.move(again.x + again.width / 2, again.y + again.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(again.x + again.width / 2 + 50 * scale, again.y + again.height / 2, { steps: 5 });
+  await expect(page.locator('.timeline-clip-key.transform.moving')).toHaveAttribute('data-source-frame', '90');
+  await page.mouse.up();
+  expect((await current(page)).clips[0]!.spatial.keyframes.map((item) => item.frame)).toEqual([80, 90]);
 });
 
 test('Escape cancels a Transform marker slide and the arrow keys move it one source frame', async ({ page }) => {
