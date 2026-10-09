@@ -293,6 +293,8 @@ test('Snap uses stationary boundaries/playhead, Alt bypasses it, and timeline fr
   await move(page, start, 58);
   await expect(marker(page, 60)).toHaveClass(/moving/);
   await expect(page.locator('.snap-guide')).toHaveCount(1);
+  // The track keyframe icon colour (#edc886).
+  await expect(page.locator('.snap-guide')).toHaveCSS('background-color', 'rgb(237, 200, 134)');
   await page.mouse.up();
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   start = await begin(page);

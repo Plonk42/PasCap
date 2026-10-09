@@ -372,6 +372,8 @@ test('a Transform marker snaps to the playhead like a track keyframe, and Alt by
   await page.mouse.move(x + 21 * scale, y, { steps: 4 });
   await expect(page.locator('.timeline-clip-key.transform.moving')).toHaveAttribute('data-source-frame', '63');
   await expect(page.locator('.snap-guide')).toHaveCount(1);
+  // The Transform keyframe icon colour (#c4e9ff).
+  await expect(page.locator('.snap-guide')).toHaveCSS('background-color', 'rgb(196, 233, 255)');
   await page.keyboard.down('Alt');
   await page.mouse.move(x + 21 * scale + 1, y);
   await page.mouse.move(x + 21 * scale, y);
