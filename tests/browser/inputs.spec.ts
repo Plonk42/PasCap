@@ -242,7 +242,7 @@ test('the shared list labels time/value/easing, retains reordered input focus, a
   ).toBeVisible();
 });
 
-test('row-speed navigation reaches project points and previews outside-duration points at the nearest frame', async ({
+test('track keyframe navigation reaches project points and previews outside-duration points at the nearest frame', async ({
   page,
 }) => {
   let document = await currentProject(page);
@@ -251,16 +251,20 @@ test('row-speed navigation reaches project points and previews outside-duration 
     layer: {
       ...document.layers[0]!,
       keyframes: [
-        sharedPoint(5, { speed: 2 }, 'hold'),
-        sharedPoint(35, { speed: 2 }, 'smooth'),
-        sharedPoint(40, { speed: 2 }),
-        sharedPoint(110, { speed: 2 }, 'hold'),
+        sharedPoint(5, { exposure: 0.2 }, 'hold'),
+        sharedPoint(35, { exposure: 0.2 }, 'smooth'),
+        sharedPoint(40, { exposure: 0.2 }),
+        sharedPoint(110, { exposure: 0.2 }, 'hold'),
       ],
     },
   });
   document = applyCommand(document, { type: 'trim', clipId: 'clip-a', sourceIn: 30, sourceOut: 90 });
+  // Both clips' own 2× speed keep the last point outside the timeline.
+  for (const clipId of ['clip-a', 'clip-b'])
+    document = applyCommand(document, { type: 'speed', clipId, speed: { mode: 'constant', rate: 2 } });
   await setProject(page, document);
   expect(document.layers[0]?.keyframes.map((point) => point.frame)).toEqual([5, 35, 40, 110]);
+  expect(calculateLayout(document).duration).toBeLessThan(110);
   await inspectorTab(page, 'Track keyframes');
   const keys = layerKeyframes(page, 'Video track 1');
   for (const frame of [5, 35, 40, calculateLayout(document).duration - 1]) {
@@ -281,13 +285,13 @@ test('row-speed navigation reaches project points and previews outside-duration 
   await expect(keys.locator('.keyframe-row-skipped')).toHaveCount(1);
   await keys.getByRole('button', { name: 'Previous track keyframe', exact: true }).click();
   await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(40);
-  await inspectorTab(page, 'Clip');
+  await inspectorTab(page, 'Track');
   const main = page.locator('.keyframe-setting-navigation').filter({
-    has: page.getByRole('button', { name: 'Keyframe Speed', exact: true }),
+    has: page.getByRole('button', { name: 'Keyframe Exposure', exact: true }),
   });
   await expect(main.getByRole('button')).toHaveCount(3);
-  const previous = main.getByRole('button', { name: 'Previous Speed keyframe', exact: true });
-  const next = main.getByRole('button', { name: 'Next Speed keyframe', exact: true });
+  const previous = main.getByRole('button', { name: 'Previous Exposure keyframe', exact: true });
+  const next = main.getByRole('button', { name: 'Next Exposure keyframe', exact: true });
   await expect(previous).toHaveAttribute('title', 'Go to timeline frame 35.');
   await expect(next).toHaveAttribute(
     'title',
@@ -307,55 +311,61 @@ test('row-speed navigation reaches project points and previews outside-duration 
   await expect(previous).toBeFocused();
   expect(await currentProject(page)).toEqual(document);
   const row = await editLayerPoint(page, 'Video track 1', 35);
-  const value = row.getByRole('spinbutton', { name: 'Speed keyframe value 35', exact: true });
-  await value.fill('3');
+  const value = row.getByRole('spinbutton', { name: 'Exposure keyframe value 35', exact: true });
+  await value.fill('0.3');
   expect((await currentProject(page)).layers[0]?.keyframes).toEqual(document.layers[0]?.keyframes);
   await value.press('Enter');
   await page.evaluate(() => window.pascapLab!.engine.seek(0));
-  await inspectorTab(page, 'Clip');
-  const rate = page.getByRole('spinbutton', { name: 'Track speed rate', exact: true });
-  await expect(rate).toBeDisabled();
+  await inspectorTab(page, 'Track');
+  const exposure = page.getByRole('spinbutton', { name: 'Exposure', exact: true });
+  await expect(exposure).toBeDisabled();
   const diamond = page
     .getByRole('complementary', { name: 'Clip inspector' })
-    .getByRole('button', { name: 'Keyframe Speed', exact: true });
+    .getByRole('button', { name: 'Keyframe Exposure', exact: true });
   await expect(diamond).toBeEnabled();
   await expect(diamond).toHaveAttribute('aria-pressed', 'false');
   await diamond.click();
-  await commitNumber(page, 'Track speed rate', '1.5');
+  await commitNumber(page, 'Exposure', '1.5');
   const points = (await currentProject(page)).layers[0]!.keyframes;
   expect(points.map((point) => point.frame)).toEqual([0, 5, 35, 40, 110]);
-  expect(points.find((point) => point.frame === 35)).toEqual(sharedPoint(35, { speed: 3 }, 'smooth'));
-  expect(points.find((point) => point.frame === 0)).toEqual(sharedPoint(0, { speed: 1.5 }));
+  expect(points.find((point) => point.frame === 35)).toEqual(sharedPoint(35, { exposure: 0.3 }, 'smooth'));
+  expect(points.find((point) => point.frame === 0)).toEqual(sharedPoint(0, { exposure: 1.5 }));
   expect((await currentProject(page)).clips.map((clip) => clip.speed)).toEqual(
     document.clips.map((clip) => clip.speed),
   );
-  await page.getByRole('button', { name: 'Reset speed to 1×', exact: true }).click();
-  expect((await currentProject(page)).layers[0]?.keyframes[0]).toEqual(sharedPoint(0, { speed: 1 }));
+  await page.getByRole('button', { name: 'Reset colour', exact: true }).click();
+  expect((await currentProject(page)).layers[0]?.keyframes[0]).toEqual(sharedPoint(0, { exposure: 0 }));
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   expect((await currentProject(page)).layers[0]?.keyframes).toEqual(points);
   await inspectorTab(page, 'Track keyframes');
   await expect(keys.getByRole('list', { name: 'Edit track keyframes', exact: true })).toBeVisible();
 });
 
-test('speed/ramp numbers commit explicitly and reset to 1× changes only speed in one undo step', async ({ page }) => {
+test('speed numbers commit explicitly and reset to 1× changes only speed in one undo step', async ({ page }) => {
   const before = await currentProject(page);
   const rate = page.getByRole('spinbutton', { name: 'Clip speed rate', exact: true });
   await rate.fill('0.5');
   expect((await currentProject(page)).clips[0]?.speed).toEqual({ mode: 'constant', rate: 1 });
   await rate.press('Tab');
   expect((await currentProject(page)).clips[0]?.speed).toEqual({ mode: 'constant', rate: 0.5 });
-  await page.getByRole('combobox', { name: 'Speed mode', exact: true }).selectOption('ramp-up');
-  await commitNumber(page, 'Ramp start rate', '0.7');
-  await commitNumber(page, 'Ramp end rate', '1.6');
-  await page.getByRole('combobox', { name: 'Ramp easing', exact: true }).selectOption('ease-out');
-  const ramp = (await currentProject(page)).clips[0]!.speed;
-  expect(ramp).toEqual({ mode: 'ramp', startRate: 0.7, endRate: 1.6, curve: 'ease-out', anchorIn: 15, anchorOut: 105 });
+  await page.getByRole('combobox', { name: 'Speed mode', exact: true }).selectOption('curve');
+  const keyRate = page.getByRole('spinbutton', { name: 'Clip speed keyframe rate', exact: true });
+  await keyRate.fill('1.6');
+  const flat = (await currentProject(page)).clips[0]!.speed;
+  expect(flat.mode === 'curve' && flat.keyframes[0]).toEqual({ frame: 15, rate: 0.5, interpolation: 'smooth' });
+  await keyRate.press('Enter');
+  await page.getByRole('combobox', { name: 'Clip speed keyframe easing', exact: true }).selectOption('ease-out');
+  const curve = (await currentProject(page)).clips[0]!.speed;
+  expect(curve.mode).toBe('curve');
+  if (curve.mode !== 'curve') throw new Error('Curve expected');
+  expect(curve.keyframes[0]).toEqual({ frame: 15, rate: 1.6, interpolation: 'ease-out' });
+  expect(curve.keyframes.slice(1).every((key) => key.rate === 0.5)).toBe(true);
   await page.getByRole('button', { name: 'Reset speed to 1×', exact: true }).click();
   const reset = await currentProject(page);
   expect(reset.clips[0]).toEqual({ ...before.clips[0]!, speed: { mode: 'constant', rate: 1 } });
   expect(reset.clips[1]).toEqual(before.clips[1]);
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
-  expect((await currentProject(page)).clips[0]?.speed).toEqual(ramp);
+  expect((await currentProject(page)).clips[0]?.speed).toEqual(curve);
 });
 
 test('music commits preserve source/timeline units and validate range, duration, gain and combined fades', async ({

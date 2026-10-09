@@ -1,6 +1,5 @@
 import type { ProjectDocument, VideoClip } from '../shared/model.js';
 import { previewClipSource } from './clip-speed-geometry.js';
-import type { KeyframeInspection } from './keyframe-navigation.js';
 
 /** Clip-local stored source time, never a replacement for the actual playhead. */
 export interface SpatialInspection {
@@ -11,9 +10,15 @@ export interface SpatialInspection {
   expectedFrame: number;
 }
 
-function spatialFrames(project: ProjectDocument, clip: VideoClip | null): number[] {
+/** Which clip-owned keyframes a section navigates. */
+export type ClipKeyFrames = (clip: VideoClip) => readonly number[];
+const transformFrames: ClipKeyFrames = (clip) => clip.spatial.keyframes.map((key) => key.frame);
+export const speedFrames: ClipKeyFrames = (clip) =>
+  clip.speed.mode === 'curve' ? clip.speed.keyframes.map((key) => key.frame) : [];
+
+function spatialFrames(project: ProjectDocument, clip: VideoClip | null, framesOf: ClipKeyFrames): number[] {
   if (!clip || !project.clips.some((item) => item.id === clip.id && item.layerId === clip.layerId)) return [];
-  return clip.spatial.keyframes.map((key) => key.frame);
+  return [...framesOf(clip)];
 }
 
 /** Selection alone does not seek; callers can publish expectedFrame through the source-only route. */
@@ -23,8 +28,9 @@ export function inspectSpatialKeyframe(
   clip: VideoClip | null,
   frame: number,
   observedFrame: number,
+  framesOf: ClipKeyFrames = transformFrames,
 ): SpatialInspection | null {
-  const frames = spatialFrames(project, clip);
+  const frames = spatialFrames(project, clip, framesOf);
   if (!clip || !frames.includes(frame)) return null;
   return {
     context,
@@ -57,18 +63,18 @@ function acceptsObservation(inspection: SpatialInspection, observedFrame: number
   );
 }
 
-/** Follow one moved source key/Undo, but clear on deletion, playback, track inspection or a foreign context. */
+/** Follow one moved source key/Undo, but clear on deletion, playback or track inspection (`interrupted`) or a foreign context. */
 export function reconcileSpatialInspection(
   inspection: SpatialInspection | null,
   context: string,
   project: ProjectDocument,
   clip: VideoClip | null,
   observedFrame: number,
-  playing: boolean,
-  centralInspection: KeyframeInspection | null,
+  interrupted: boolean,
+  framesOf: ClipKeyFrames = transformFrames,
 ): SpatialInspection | null {
-  if (inspection?.context !== context || playing || centralInspection) return null;
-  const frames = spatialFrames(project, clip);
+  if (inspection?.context !== context || interrupted) return null;
+  const frames = spatialFrames(project, clip, framesOf);
   const frame = retainedSpatialFrame(inspection, frames);
   if (frame === null || !clip) return null;
   const expectedFrame = previewClipSource(project, clip.id, frame);

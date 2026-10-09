@@ -406,6 +406,117 @@ test('Escape cancels a Transform marker slide and the arrow keys move it one sou
   expect((await current(page)).clips[0]!.spatial.keyframes.map((item) => item.frame)).toEqual([51, 80]);
 });
 
+const speedMarker = (page: Page, source: number) =>
+  page.locator(`[data-clip-id="one"] [data-clip-keyframe="speed"][data-source-frame="${source}"]`);
+
+/** Rate 1 up to source 80, then 2×: output frames equal source frames before key 80. */
+async function seedSpeedKeys(page: Page): Promise<ProjectDocument> {
+  return seed(page, (document) => {
+    document.clips[0]!.speed = {
+      mode: 'curve',
+      keyframes: [
+        { frame: 40, rate: 1, interpolation: 'hold' },
+        { frame: 80, rate: 2, interpolation: 'hold' },
+      ],
+    };
+  });
+}
+
+test('sliding a Speed marker previews without saving, retimes the clip in one Undo and rejects collisions', async ({
+  page,
+}) => {
+  const before = await seedSpeedKeys(page);
+  expect(calculateLayout(before).duration).toBe(100);
+  await expect(speedMarker(page, 80)).toHaveAttribute(
+    'title',
+    /^Speed · source frame 80 · 2× · .* · Drag to move; Arrow keys: 1 source frame, Shift: 10$/,
+  );
+  const scale = Number(await page.locator('.timeline-surface').getAttribute('data-pixels-per-frame'));
+  const box = (await speedMarker(page, 80).boundingBox())!;
+  const x = box.x + box.width / 2;
+  const y = box.y + box.height / 2;
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  await page.mouse.move(x - 10 * scale, y, { steps: 6 });
+  await expect(page.locator('.timeline-clip-key.speed.moving')).toHaveAttribute('data-source-frame', '70');
+  await expect(page.locator('.timeline-bottom')).toContainText('Speed keyframe · source frame 70');
+  expect(await current(page)).toEqual(before);
+  expect(memory.saves).toBe(0);
+  await page.mouse.up();
+  const moved = await current(page);
+  expect(moved.clips[0]!.speed).toEqual({
+    mode: 'curve',
+    keyframes: [
+      { frame: 40, rate: 1, interpolation: 'hold' },
+      { frame: 70, rate: 2, interpolation: 'hold' },
+    ],
+  });
+  // 70 source frames at 1× then 50 at 2×.
+  expect(calculateLayout(moved).duration).toBe(95);
+  await ready(page, moved);
+  await expect(speedMarker(page, 70)).toBeFocused();
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  expect(await current(page)).toEqual(before);
+  await ready(page, before);
+  await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
+
+  const start = (await speedMarker(page, 80).boundingBox())!;
+  await page.mouse.move(start.x + start.width / 2, start.y + start.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(start.x + start.width / 2 - 40 * scale, start.y + start.height / 2, { steps: 6 });
+  await expect(page.locator('.timeline-clip-key.speed.moving')).toHaveClass(/invalid/);
+  await page.mouse.up();
+  expect(await current(page)).toEqual(before);
+  await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
+});
+
+test('a Speed marker click opens Clip → Speed; Escape cancels its slide and arrow keys move it one source frame', async ({
+  page,
+}) => {
+  const before = await seedSpeedKeys(page);
+  const section = page.getByRole('button', { name: 'Speed section', exact: true });
+  await section.click();
+  await expect(section).toHaveAttribute('aria-expanded', 'false');
+  await page.getByRole('tab', { name: 'Track', exact: true }).click();
+  await speedMarker(page, 40).click();
+  await expect(page.getByRole('tab', { name: 'Clip', exact: true })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('button', { name: 'Speed section', exact: true })).toHaveAttribute(
+    'aria-expanded',
+    'true',
+  );
+  await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(40);
+  expect(await current(page)).toEqual(before);
+
+  const scale = Number(await page.locator('.timeline-surface').getAttribute('data-pixels-per-frame'));
+  const box = (await speedMarker(page, 40).boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width / 2 + 12 * scale, box.y + box.height / 2, { steps: 6 });
+  await expect(page.locator('.timeline-clip-key.speed.moving')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await page.mouse.up();
+  expect(await current(page)).toEqual(before);
+  expect(memory.saves).toBe(0);
+
+  await speedMarker(page, 40).focus();
+  await speedMarker(page, 40).press('ArrowRight');
+  await expect(speedMarker(page, 41)).toBeFocused();
+  await speedMarker(page, 41).press('Shift+ArrowRight');
+  await expect(speedMarker(page, 51)).toBeFocused();
+  const stepped = await current(page);
+  expect(stepped.clips[0]!.speed).toEqual({
+    mode: 'curve',
+    keyframes: [
+      { frame: 51, rate: 1, interpolation: 'hold' },
+      { frame: 80, rate: 2, interpolation: 'hold' },
+    ],
+  });
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  expect(await current(page)).toEqual(before);
+  await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
+});
+
 test('stored full poses preserve base, frame input focus through move/Undo, reject collisions and edit easing', async ({
   page,
 }) => {
@@ -517,7 +628,7 @@ test('bulk expansion includes Transform while heading help and tab navigation re
   page,
 }) => {
   const before = await current(page);
-  await page.getByRole('button', { name: 'Collapse all Inspector settings', exact: true }).click();
+  await page.getByRole('button', { name: 'Collapse all Clip sections', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Transform section', exact: true })).toHaveAttribute(
     'aria-expanded',
     'false',
@@ -530,7 +641,7 @@ test('bulk expansion includes Transform while heading help and tab navigation re
     'aria-expanded',
     'false',
   );
-  await page.getByRole('button', { name: 'Expand all Inspector settings', exact: true }).click();
+  await page.getByRole('button', { name: 'Expand all Clip sections', exact: true }).click();
   await expect(exact(page, 'Scale')).toBeVisible();
   await page.getByRole('tab', { name: 'Clip', exact: true }).focus();
   await page.keyboard.press('ArrowRight');

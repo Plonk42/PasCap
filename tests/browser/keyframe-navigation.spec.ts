@@ -215,7 +215,7 @@ async function readOnly(page: Page, document: ProjectDocument): Promise<void> {
 
 function interleaved(): LayerKeyframe[] {
   return [3, 50, 89].flatMap((start) =>
-    KEYFRAME_SETTINGS.map(({ key }, index) => sharedPoint(start + index * 3, { [key]: key === 'speed' ? 1 : 0 })),
+    KEYFRAME_SETTINGS.map(({ key }, index) => sharedPoint(start + index * 3, { [key]: 0 })),
   );
 }
 
@@ -223,7 +223,7 @@ test('unkeyed settings keep diamonds with visible guarded per-setting arrows and
   page,
 }) => {
   const document = await current(page);
-  expect(KEYFRAME_SETTINGS).toHaveLength(11);
+  expect(KEYFRAME_SETTINGS).toHaveLength(10);
   await expect(inspector(page).getByRole('button', { name: /^Keyframe / })).toHaveCount(10);
   for (const { label } of KEYFRAME_SETTINGS) {
     await settingTab(page, label);
@@ -254,22 +254,22 @@ test('unkeyed settings keep diamonds with visible guarded per-setting arrows and
     }
   }
   await inspectorTab(page, 'Track');
-  for (const { label } of KEYFRAME_SETTINGS.filter((setting) => setting.key !== 'speed'))
+  for (const { label } of KEYFRAME_SETTINGS)
     await expect(inspector(page).getByRole('slider', { name: label, exact: true })).toBeEnabled();
   await openTab(page, 'Clip');
   await expect(page.getByRole('spinbutton', { name: 'Clip speed rate', exact: true })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Keyframe Speed', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'false',
+  );
   await readOnly(page, document);
 });
 
-test('Colour section arrows visit the Opacity/scalar union, skip Speed-only points and share chip inspection', async ({
-  page,
-}) => {
+test('Colour section arrows visit the Opacity/scalar union and share chip inspection', async ({ page }) => {
   const document = sequence([
     sharedPoint(10, { exposure: 0 }),
-    sharedPoint(20, { speed: 1 }),
     sharedPoint(30, { opacity: 0 }),
     sharedPoint(50, { temperature: 0, tint: 0 }),
-    sharedPoint(70, { speed: 1 }),
     sharedPoint(100, { shadows: 0 }),
     sharedPoint(130, { highlights: 0 }),
     sharedPoint(160, { brightness: 0 }),
@@ -304,8 +304,8 @@ test('Colour section arrows visit the Opacity/scalar union, skip Speed-only poin
     );
   }
   await expect(previous).toBeDisabled();
-  // Inspection on a Speed-only point is central too; Colour advances from that stored time.
-  await goToPoint(page, 70);
+  // Inspection from a stored chip seek is central too; Colour advances from that stored time.
+  await goToPoint(page, 50);
   await next.scrollIntoViewIfNeeded();
   await next.click();
   await previewAt(page, 100);
@@ -315,79 +315,60 @@ test('Colour section arrows visit the Opacity/scalar union, skip Speed-only poin
   await next.scrollIntoViewIfNeeded();
   await next.click();
   await previewAt(page, 100);
-  await expect(layerKeyframes(page, 'Video track 1').locator('.layer-keyframe-chip')).toHaveCount(9);
+  await expect(layerKeyframes(page, 'Video track 1').locator('.layer-keyframe-chip')).toHaveCount(7);
   await expect(diamond(page, 'Shadows')).toHaveAttribute('aria-pressed', 'true');
   await readOnly(page, document);
 });
 
-test('Speed section union includes clip-source and track Speed keys, excluding Colour-only points', async ({
+test('Speed section navigation visits only the clip speed keys, including off-trim and exclusive-OUT keys', async ({
   page,
 }) => {
-  const document = sequence([
-    sharedPoint(10, { speed: 1 }),
-    sharedPoint(20, { exposure: 0 }),
-    sharedPoint(40, { speed: 1 }),
-    sharedPoint(130, { speed: 1 }),
-    sharedPoint(160, { speed: 1 }),
-  ]);
+  const document = sequence([sharedPoint(20, { exposure: 0 }), sharedPoint(40, { opacity: 0.5 })]);
   document.clips[0]!.speed = {
     mode: 'curve',
-    keyframes: [0, 30, 60].map((frame) => ({ frame, rate: 1, interpolation: 'linear' })),
+    keyframes: [0, 30, 60, 90].map((frame) => ({ frame, rate: 1, interpolation: 'linear' })),
   };
   await fixture(page, document);
   const placed = calculateLayout(document).clips.find((item) => item.clip.id === 'first')!;
-  const targets = [
-    ...document.layers[0]!.keyframes.filter((key) => key.values.speed !== null).map((key) => key.frame),
-    ...clipKeyframeMarkers(placed, document.layers[0]!)
+  expect(
+    clipKeyframeMarkers(placed)
       .filter((key) => key.type === 'speed')
       .map((key) => key.seekFrame),
-  ].sort((left, right) => left - right);
-  expect(targets).toEqual([0, 10, 30, 40, 59, 130, 160]);
+  ).toEqual([0, 30, 59]);
   await settingTab(page, 'Speed');
   const next = sectionStep(page, 'Speed', 'Next');
   const previous = sectionStep(page, 'Speed', 'Previous');
   await expect(previous).toBeDisabled();
+  await expect(inspector(page).locator('.speed-settings .section-keyframe-count')).toHaveText('4 keyframes');
   await expect(
     inspector(page)
       .locator('.speed-settings')
       .locator('.keyframe-setting-navigation')
       .getByRole('button', { name: /^(Previous|Next) Speed keyframe$/ }),
-  ).toHaveCount(2);
-  for (const frame of targets.slice(1)) {
+  ).toHaveCount(0);
+  const stored = inspector(page).getByRole('spinbutton', { name: 'Clip speed keyframe source frame', exact: true });
+  for (const [frame, preview] of [
+    [30, 30],
+    [60, 59],
+    [90, 59],
+  ] as const) {
     await next.scrollIntoViewIfNeeded();
     await next.click();
-    await previewAt(page, Math.min(frame, 119));
-    if (frame >= 120) {
-      await settingTab(page, 'Exposure');
-      await expect(layerKeyframes(page, 'Video track 1').locator('.layer-keyframe-inspected')).toContainText(
-        `Stored keyframe · timeline frame ${frame}`,
-      );
-      await settingTab(page, 'Speed');
-    }
+    await previewAt(page, preview);
+    await expect(stored).toHaveValue(String(frame));
   }
   await expect(next).toBeDisabled();
-  for (const frame of targets.slice(0, -1).reverse()) {
+  for (const [frame, preview] of [
+    [60, 59],
+    [30, 30],
+    [0, 0],
+  ] as const) {
     await previous.scrollIntoViewIfNeeded();
     await previous.click();
-    await previewAt(page, Math.min(frame, 119));
+    await previewAt(page, preview);
+    await expect(stored).toHaveValue(String(frame));
   }
   await expect(previous).toBeDisabled();
-  // A stored-chip seek must also reset/advance section navigation's shared cursor.
-  await goToPoint(page, 130);
-  await navigate(page, 'Speed', 'Next', 130);
-  await previewAt(page, 119);
-  await expect(layerKeyframes(page, 'Video track 1').locator('.layer-keyframe-inspected')).toContainText(
-    'Stored keyframe · timeline frame 160',
-  );
-  await settingTab(page, 'Speed');
-  await expect(next).toBeDisabled();
-  await previous.scrollIntoViewIfNeeded();
-  await previous.click();
-  await previewAt(page, 119);
-  await settingTab(page, 'Exposure');
-  await expect(layerKeyframes(page, 'Video track 1').locator('.layer-keyframe-inspected')).toContainText(
-    'Stored keyframe · timeline frame 130',
-  );
   await readOnly(page, document);
 });
 
@@ -450,9 +431,7 @@ for (const [index, { key, label }] of KEYFRAME_SETTINGS.entries()) {
     await settingTab(page, label);
     await expect(diamond(page, label)).toBeEnabled();
     await expect(diamond(page, label)).toHaveAttribute('aria-pressed', 'false');
-    if (key === 'speed')
-      await expect(page.getByRole('spinbutton', { name: 'Track speed rate', exact: true })).toBeDisabled();
-    else await expect(inspector(page).getByRole('slider', { name: label, exact: true })).toBeDisabled();
+    await expect(inspector(page).getByRole('slider', { name: label, exact: true })).toBeDisabled();
     const mainPrevious = mainStep(page, label, 'Previous');
     const mainNext = mainStep(page, label, 'Next');
     await guardedUnavailable(mainPrevious);
@@ -520,9 +499,7 @@ for (const [index, { key, label }] of KEYFRAME_SETTINGS.entries()) {
     await expect(await step(page, label, 'Previous')).toHaveAttribute('title', `Go to timeline frame ${middle}.`);
     await navigate(page, label, 'Previous');
     await previewAt(page, middle);
-    expect(document.layers[0]!.keyframes.find((point) => point.frame === first)!.values[key]).toBe(
-      key === 'speed' ? 1 : 0,
-    );
+    expect(document.layers[0]!.keyframes.find((point) => point.frame === first)!.values[key]).toBe(0);
     await readOnly(page, document);
   });
 }
@@ -694,7 +671,7 @@ test('main diamond tabs through Previous/Next before its value controls and stor
   await readOnly(page, document);
 });
 
-test('all eleven setting buttons remain present and disabled throughout a native trim draft', async ({ page }) => {
+test('all ten setting buttons remain present and disabled throughout a native trim draft', async ({ page }) => {
   const document = sequence(interleaved());
   await fixture(page, document);
   await seek(page, 45);
@@ -722,6 +699,7 @@ test('all eleven setting buttons remain present and disabled throughout a native
     for (const direction of ['Previous', 'Next'] as const)
       await expect(sectionStep(page, label, direction)).toBeDisabled();
   }
+  await expect(page.getByRole('button', { name: 'Keyframe Speed', exact: true })).toBeDisabled();
   await page.keyboard.press('Escape');
   await page.mouse.up();
   await previewAt(page, 45);
@@ -745,7 +723,7 @@ test('no opened project keeps main diamonds and Colour section navigation disabl
   await dialog.getByRole('button', { name: 'Close', exact: true }).click();
   await inspectorTab(page, 'Track');
   // Speed is clip-owned, so without a project only the ten Track settings exist.
-  for (const { label } of KEYFRAME_SETTINGS.filter((setting) => setting.key !== 'speed')) {
+  for (const { label } of KEYFRAME_SETTINGS) {
     await expect(diamond(page, label)).toBeDisabled();
     await expect(diamond(page, label).locator('..').getByRole('button')).toHaveCount(3);
     for (const direction of ['Previous', 'Next'] as const) {

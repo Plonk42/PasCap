@@ -30,12 +30,10 @@ import {
 } from '../../src/shared/export.js';
 import {
   EMPTY_KEY_VALUES,
-  evaluateLayerSetting,
   type Interpolation,
   type LayerKeyframe,
   type LayerKeyValues,
 } from '../../src/shared/keyframes.js';
-import { compileLayerRetiming } from '../../src/shared/layer-retiming.js';
 import { mediaAssetSchema, type MediaAsset } from '../../src/shared/media.js';
 import {
   createClip,
@@ -110,33 +108,36 @@ function fakeLibrary(): MediaLibrary {
   return library;
 }
 
-describe('schema-12 production dispatch and read-only validation', () => {
-  it('keeps static constant/ramp speed on the cheap path and dispatches shared speed points with their placed map', () => {
+describe('schema-13 production dispatch and read-only validation', () => {
+  it('keeps static constant/curve speed on the cheap path and dispatches shared track points with their placed map', () => {
     const project = document();
     expect(needsLayeredExport(project)).toBe(false);
     expect(planExport(project).duration).toBe(compileRetiming(project.clips[0]!).duration);
     for (const speed of [
       { mode: 'constant' as const, rate: 2 },
-      { mode: 'ramp' as const, startRate: 0.5, endRate: 2, anchorIn: 0, anchorOut: 40, curve: 'smooth' as const },
+      {
+        mode: 'curve' as const,
+        keyframes: [
+          { frame: 0, rate: 0.5, interpolation: 'smooth' as const },
+          { frame: 40, rate: 2, interpolation: 'smooth' as const },
+        ],
+      },
     ]) {
       project.clips[0]!.speed = speed;
       expect(needsLayeredExport(project)).toBe(false);
       expect(planExport(project).duration).toBe(compileRetiming(project.clips[0]!).duration);
     }
-    project.clips[0]!.speed = { mode: 'constant', rate: 1 };
-    project.layers[0]!.keyframes = [point(0, { speed: 0.5 }, 'smooth'), point(40, { speed: 2 }, 'hold')];
+    project.layers[0]!.keyframes = [point(0, { exposure: 0.5 }, 'smooth'), point(40, { exposure: 2 }, 'hold')];
     expect(needsLayeredExport(project)).toBe(true);
     expect(() => planExport(project)).toThrow('layered exporter');
     const placed = calculateLayout(project).clips[0]!;
-    expect(planLayeredExport(project).duration).toBe(
-      compileLayerRetiming(project.clips[0]!, project.layers[0]!, placed.start).duration,
-    );
+    expect(planLayeredExport(project).duration).toBe(compileRetiming(project.clips[0]!).duration);
     expect(placed.retiming.duration).toBe(planLayeredExport(project).duration);
-    expect(exportRequestSchema.parse({ document: project, profile: 'draft720' }).document.schemaVersion).toBe(12);
+    expect(exportRequestSchema.parse({ document: project, profile: 'draft720' }).document.schemaVersion).toBe(13);
     expect(
       exportRequestSchema.safeParse({ document: { ...project, schemaVersion: 2 }, profile: 'draft720' }).success,
     ).toBe(false);
-    for (const version of [1, 3, 4, 5, 6, 7, 8, 9, 10, 11])
+    for (const version of [1, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])
       expect(
         exportRequestSchema.safeParse({
           document: unsupportedProject(version, 'old', 'Unsupported export'),
@@ -216,7 +217,7 @@ describe('schema-12 production dispatch and read-only validation', () => {
       expect(project).toEqual(before);
     },
   );
-  it('requires explicit v12 media/row/static clip fields, permits eight rows and refuses a ninth or same-row overlap', () => {
+  it('requires explicit v13 media/row/static clip fields, permits eight rows and refuses a ninth or same-row overlap', () => {
     const project = document();
     for (let index = 2; index <= 8; index++) project.layers.push(layer(`video-${index}`));
     expect(projectSchema.safeParse(project).success).toBe(true);
@@ -288,12 +289,12 @@ describe('schema-12 production dispatch and read-only validation', () => {
     expect(Object.isFrozen(snapshot.layers[0]!.keyframes[0]!.values)).toBe(true);
     expect(Object.isFrozen(snapshot.layers[0]!.colour)).toBe(true);
   });
-  it('strictly loads v12 but lists/rejects unsupported versions unchanged, including overwrite attempts', async () => {
+  it('strictly loads v13 but lists/rejects unsupported versions unchanged, including overwrite attempts', async () => {
     const directory = await temp();
     const store = new ProjectStore(directory);
     const saved = await store.save(document(), 0);
     expect(await store.load(saved.id)).toEqual(saved);
-    for (const version of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]) {
+    for (const version of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]) {
       const id = `old-v${version}`;
       const title = `Original v${version} document`;
       const unsupported = unsupportedProject(version, id, title);
@@ -306,7 +307,7 @@ describe('schema-12 production dispatch and read-only validation', () => {
         title,
         error: expect.stringContaining(`schema version ${version}`),
       });
-      await expect(store.load(id)).rejects.toThrow('requires version 12');
+      await expect(store.load(id)).rejects.toThrow('requires version 13');
       await expect(store.rename(id, 'No migration', 0)).rejects.toThrow('existing file was not changed');
       await expect(store.save(createProject(id, 'No migration'), 0)).rejects.toThrow('existing file was not changed');
       expect(await readFile(filename, 'utf8')).toBe(bytes);
@@ -350,7 +351,7 @@ describe('schema-12 production dispatch and read-only validation', () => {
     },
   );
 
-  it('rejects layered/animated/speed-key diagnostic references, even on direct render calls', async () => {
+  it('rejects layered/animated diagnostic references, even on direct render calls', async () => {
     const plain = document();
     plain.clips.push(createClip('right', 'video', 20, 32));
     plain.layers[0]!.transitions = [{ leftId: 'left', rightId: 'right', type: 'cut', duration: 0 }];
@@ -372,9 +373,6 @@ describe('schema-12 production dispatch and read-only validation', () => {
       (project: ProjectDocument) => {
         project.layers[0]!.keyframes.push(point(7, { opacity: 0.5 }, 'smooth'));
       },
-      (project: ProjectDocument) => {
-        project.layers[0]!.keyframes.push(point(7, { speed: 1 }, 'hold'));
-      },
     ]) {
       const project = structuredClone(plain);
       change(project);
@@ -386,7 +384,7 @@ describe('schema-12 production dispatch and read-only validation', () => {
   });
 });
 
-describe('bounded project-frame row speed and native pipe ownership without FFmpeg', () => {
+describe('bounded retiming maps and native pipe ownership without FFmpeg', () => {
   it('rejects supplied partial continuous-query maps and bad endpoints before starting children', async () => {
     const directory = await temp();
     const clip = createClip('invalid-map', 'video', 7, 19);
@@ -529,22 +527,19 @@ describe('bounded project-frame row speed and native pipe ownership without FFmp
   });
 
   for (const interpolation of ['hold', 'linear', 'ease-in', 'ease-out', 'smooth'] as const) {
-    it(`uses the exact shared compound speed-key map (${interpolation}) and owns the captured keys`, async () => {
+    it(`uses the exact compound clip speed-curve map (${interpolation}) and owns the captured keys`, async () => {
       const directory = await temp();
       const clip = createClip('keyed', 'video', 7, 19);
-      const rateLayer = layer();
-      clip.layerId = rateLayer.id;
       clip.start = 9;
-      rateLayer.keyframes = [
-        point(2, { speed: 0.35 }, interpolation),
-        point(11, { speed: 3 }, 'ease-out'),
-        point(14, { exposure: 0.5, opacity: 0.3 }, 'hold'),
-        point(16, { speed: 0.7 }, 'smooth'),
-        point(25, { speed: 2 }, 'hold'),
+      const keyframes = [
+        { frame: 2, rate: 0.35, interpolation },
+        { frame: 11, rate: 3, interpolation: 'ease-out' as const },
+        { frame: 16, rate: 0.7, interpolation: 'smooth' as const },
+        { frame: 25, rate: 2, interpolation: 'hold' as const },
       ];
-      const map = compileLayerRetiming(clip, rateLayer, clip.start);
-      const startingRate = evaluateLayerSetting(rateLayer, 'speed', 9, 1);
-      expect(map.rateAt(0)).toBeCloseTo(startingRate);
+      clip.speed = { mode: 'curve', keyframes };
+      const map = compileRetiming(clip);
+      const startingRate = map.rateAt(0);
       const expected = Array.from({ length: map.duration }, (_, output) => map.sourceAt(output));
       const destination = path.join(directory, 'mapped.rgb');
       const decode =
@@ -565,8 +560,8 @@ describe('bounded project-frame row speed and native pipe ownership without FFmp
         onProgress: () => {
           if (mutated) return;
           mutated = true;
-          rateLayer.keyframes[0]!.values.speed = 8;
-          rateLayer.keyframes.at(-1)!.frame = 125;
+          keyframes[0]!.rate = 8;
+          keyframes.at(-1)!.frame = 125;
           clip.sourceIn = 8;
           clip.start = 500;
         },
@@ -696,7 +691,7 @@ describe('bounded CPU-reference animated LUTs and premultiplied groups', () => {
     clip.layerId = row.id;
     clip.start = 20;
     row.keyframes = [point(10, { exposure: -2 }), point(40, { exposure: 2 }, 'hold')];
-    expect(compileLayerRetiming(clip, row, clip.start).sourceAt(5)).toBe(205);
+    expect(compileRetiming(clip).sourceAt(5)).toBe(205);
     const settings = colourAt(row, 25);
     expect(settings.exposure).toBe(0);
     const cache = new ColourLutCache();

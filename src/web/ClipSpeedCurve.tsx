@@ -1,15 +1,9 @@
 import { useId, useState, type KeyboardEvent } from 'react';
-import {
-  addClipSpeedKey,
-  CLIP_SPEED_PRESETS,
-  clipSpeedPreset,
-  removeClipSpeedKey,
-  updateClipSpeedKey,
-} from '../shared/clip-speed.js';
+import { CLIP_SPEED_PRESETS, clipSpeedPreset, removeClipSpeedKey, updateClipSpeedKey } from '../shared/clip-speed.js';
 import { applyCommand, type EditCommand } from '../shared/commands.js';
 import type { Interpolation } from '../shared/keyframes.js';
 import type { ProjectDocument, VideoClip } from '../shared/model.js';
-import { MAX_CLIP_SPEED_KEYS, type SpeedCurve } from '../shared/speed.js';
+import type { SpeedCurve, SpeedSettings } from '../shared/speed.js';
 import { formatTimecode } from '../shared/timing.js';
 import { clipCurvePoints, previewClipSource, speedRatePosition, stepClipSpeedRate } from './clip-speed-geometry.js';
 import './clip-speed.css';
@@ -163,7 +157,7 @@ export function ClipSpeedCurve({
   const selectedRow = identity.rows[selectedIndex]!;
   const unavailable = disabled || navigation.disabled || drag.active;
   const [error, setError] = useState('');
-  const change = (next: SpeedCurve): void => {
+  const change = (next: SpeedSettings): void => {
     if (unavailable) return;
     try {
       applyCommand(project, { type: 'speed', clipId: clip.id, speed: next });
@@ -214,7 +208,7 @@ export function ClipSpeedCurve({
       case 'Backspace':
         event.preventDefault();
         event.stopPropagation();
-        if (current.keyframes.length > 2) change(removeClipSpeedKey(current, point.frame));
+        change(removeClipSpeedKey(current, point.frame));
         return;
       default:
         return;
@@ -237,10 +231,6 @@ export function ClipSpeedCurve({
           ?.focus({ preventScroll: true });
     });
   };
-  const canAdd =
-    sourceFrame !== null &&
-    current.keyframes.length < MAX_CLIP_SPEED_KEYS &&
-    !current.keyframes.some((point) => point.frame === sourceFrame);
   const outside = selected.frame < clip.sourceIn || selected.frame >= clip.sourceOut;
   const status = error || drag.error || drag.draft?.plan.error;
 
@@ -252,36 +242,6 @@ export function ClipSpeedCurve({
       data-drafting={drag.active}
     >
       <CurvePresets clip={clip} speed={current} disabled={unavailable} onChange={change} />
-      <div className="clip-speed-key-tools">
-        <span>{current.keyframes.length} keyframes</span>
-        <button
-          type="button"
-          className="secondary-button small"
-          aria-label="Add clip speed keyframe"
-          title={
-            canAdd
-              ? `Capture this clip's speed at original source frame ${sourceFrame}`
-              : 'Seek to a source frame without a keyframe inside this clip; at most 256 keyframes'
-          }
-          disabled={unavailable || !canAdd}
-          onClick={() => {
-            if (sourceFrame !== null) change(addClipSpeedKey(current, sourceFrame));
-          }}
-        >
-          <Icon name="plus" size={14} />
-          Add keyframe
-        </button>
-        <button
-          type="button"
-          className="icon-button"
-          aria-label="Delete clip speed keyframe"
-          title="Delete the selected keyframe; at least two remain"
-          disabled={unavailable || current.keyframes.length <= 2}
-          onClick={() => change(removeClipSpeedKey(current, selected.frame))}
-        >
-          <Icon name="trash" size={14} />
-        </button>
-      </div>
       <div className="clip-speed-chart">
         <div className="clip-speed-axis" aria-hidden="true">
           <span>8×</span>
@@ -313,7 +273,7 @@ export function ClipSpeedCurve({
             className="clip-speed-seek"
             aria-label="Seek within clip speed curve"
             aria-describedby={helpId}
-            title="Click the curve background to seek, then Add keyframe"
+            title="Click the curve background to seek, then keyframe Speed ◇"
             disabled={unavailable}
             onClick={(event) => {
               const box = event.currentTarget.getBoundingClientRect();
@@ -394,6 +354,16 @@ export function ClipSpeedCurve({
             </option>
           ))}
         </select>
+        <button
+          type="button"
+          className="icon-button"
+          aria-label="Delete clip speed keyframe"
+          title="Delete the selected keyframe; deleting the last one keeps its rate as constant speed"
+          disabled={unavailable}
+          onClick={() => change(removeClipSpeedKey(current, selected.frame))}
+        >
+          <Icon name="trash" size={14} />
+        </button>
       </div>
       <div className="clip-speed-point-fields">
         <label>
@@ -452,8 +422,8 @@ export function ClipSpeedCurve({
       <span id={helpId} className="declutter-sr-only">
         Keyframes belong only to this clip. Horizontal dragging changes the original source frame; vertical dragging
         changes speed on a logarithmic axis. Arrows move one source frame or 0.01×; Shift uses ten frames or 0.1×. Enter
-        seeks, Delete removes a keyframe; two must remain. Escape cancels a drag. Trims and splits keep original source
-        anchors.
+        seeks, Delete removes a keyframe; removing the last one keeps its rate as constant speed. Escape cancels a drag.
+        Trims and splits keep original source anchors.
       </span>
     </section>
   );

@@ -360,9 +360,7 @@ describe('shared exact values and contextual validation', () => {
     const project = createProject('row', 'Row');
     const layer = project.layers[0]!;
     layer.opacity = 0.75;
-    layer.keyframes = [
-      { frame: 10, interpolation: 'smooth', values: { ...EMPTY_KEY_VALUES, opacity: 0.25, speed: 1 } },
-    ];
+    layer.keyframes = [{ frame: 10, interpolation: 'smooth', values: { ...EMPTY_KEY_VALUES, opacity: 0.25 } }];
     const captured = begin(createValueControlState(context({ value: 0.25, min: 0, max: 1, step: 0.01 })));
     const moved = change(captured.state, 0.137123456789);
     expect(moved.commit).toBeNull();

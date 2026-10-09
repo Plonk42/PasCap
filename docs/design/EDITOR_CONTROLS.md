@@ -3,7 +3,7 @@
 ## Scope and decisions
 
 Controls use native elements, the existing editor layout and strict project
-schema 12, including complete track Colour, clip spatial settings and 0–8 independent music tracks. No UI framework or icon dependency is introduced. Exact
+schema 13, including complete track Colour, clip-only speed, clip spatial settings and 0–8 independent music tracks. No UI framework or icon dependency is introduced. Exact
 timing entry is retained: Clip Range uses timecode text fields and a
 full-original range bar; other frame/duration/fade fields retain numeric steppers.
 
@@ -12,7 +12,7 @@ full-original range bar; other frame/duration/fade fields retain numeric stepper
 | Area                          | Control                                                                                                                             | Contract                                                                                                                             |
 | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
 | Colour / Opacity              | Native slider and exact field in main/stored editors                                                                                | Opacity UI 0–100%, neutral 100%; stored track/keyframe values remain 0–1                                                             |
-| Speed                         | Constant, ramp, custom-keyframe and track rates                                                                                     | Bounded slider/exact-value pattern; retain presets and curve graph                                                                   |
+| Speed                         | Clip constant rate or 1–256 source-frame keyframes; Keyframe Speed diamond                                                          | Bounded slider/exact-value pattern; retain presets and curve graph                                                                   |
 | Transform                     | Eight clip pose sliders/exact fields, each with its own blue triangle and Previous/Next, stored source-keyframe selector/navigation | Explicit per-setting source-frame capture; retain off-trim keyframes and distinguish stored time from preview                        |
 | Audio                         | Music track / Recording selects, Add music track, selected-track trash and gain slider                                              | Independent identified tracks; exact gain draft; import never implicitly places                                                      |
 | Clip Range                    | One full-original hatched range bar with draggable IN/OUT; exact text fields below its ends                                         | Display 30 fps NDF timecode; accept whole original frames or timecode                                                                |
@@ -34,7 +34,7 @@ neither needs replacing merely to make their implementation identical.
 
 This is the source of terminology for visible UI text, help, accessible names,
 test selectors and current-behaviour guides. Internal identifiers, persisted fields
-and technical paths stay unchanged; this glossary does not change schema 12.
+and technical paths stay unchanged; this glossary does not change schema 13.
 
 - **Recording**: the complete original file, video or music. Use **video recording**
   or **music recording** when the distinction matters; never bare “video” for a file.
@@ -69,10 +69,11 @@ and technical paths stay unchanged; this glossary does not change schema 12.
   diamond captures the full eight-value source-frame pose, not an enabled track setting.
 - **Keyframe line**: the first row of an expanded Colour, Speed or Transform section: **N keyframes**, one
   **Previous/Next** pair over the same set and **Reset**. It is hidden while the section is collapsed.
-  There is no Animate toggle or stored preference; capture diamonds and per-setting arrows are always visible.
-- **Easing**: the visible label for track-keyframe, Transform, custom clip-speed
-  and ramp selectors. Contextual accessible names remain, including
-  **Track keyframe easing N** and **Ramp easing**; interpolation is unchanged.
+  There is no Animate toggle or stored preference; capture diamonds and per-setting arrows are always visible
+  (Speed, a single setting, relies on its keyframe-line pair).
+- **Easing**: the visible label for track-keyframe, Transform and custom clip-speed
+  selectors. Contextual accessible names remain, including
+  **Track keyframe easing N**; interpolation is unchanged.
 
 ## Control patterns
 
@@ -97,13 +98,15 @@ and technical paths stay unchanged; this glossary does not change schema 12.
 - Other frames/durations/fades: native numeric stepper, explicit frame units and existing
   timecode feedback. No clamping, rounding or hidden timing repair.
 - Easing/modes/recordings: native select; selected easing has its existing graph.
-- Boolean settings: native checkbox. Main scalar Colour/Opacity and track Speed controls expose a capture diamond with
+- Boolean settings: native checkbox. Main scalar Colour/Opacity controls expose a capture diamond with
   `aria-pressed` and adjacent per-setting **Previous/Next** buttons, since a shared
-  keyframe need not enable every setting. Colour's keyframe-line Previous/Next pair visits the union of Opacity and nine scalar keyframes, skipping
-  speed-only keyframes. Speed's pair visits track Speed keyframes plus all retained
+  keyframe need not enable every setting. Colour's keyframe-line Previous/Next pair visits the union of Opacity and nine scalar keyframes.
+  Clip **Speed ×** has one **Keyframe Speed** diamond capturing or removing a keyframe at the
+  actually displayed source frame, without extra per-setting arrows; in curve mode its rate is
+  read-only without a keyframe there. Speed's pair visits all retained
   custom speed source keyframes of the selected clip, including off-trim keyframes
   and original exclusive OUT, previewing the nearest mapped image through
-  authoritative retiming even under the indicated track Speed override.
+  authoritative retiming.
   Transform's pair likewise visits all retained source keyframes,
   including off-trim/original OUT. Speed and Transform each keep a clip-local
   stored-source cursor independent of central track inspection; successive stored
@@ -153,8 +156,8 @@ Inside each timeline clip rectangle, Transform keys are boxed blue **▼** butto
 **◆** custom-speed lanes show source keyframes at authoritative retimed output positions.
 Off-trim keyframes are omitted; exclusive OUT has a boundary marker that seeks the
 final available frame. Click, Enter or Space selects the clip, seeks its nearest
-mapped image and opens Clip → Transform (Clip → Speed for ◆); a click edits nothing. Transform keys also slide by drag or ←/→ (one source frame, Shift ten): previewed, one Undo step on a valid release, restored by Escape or an occupied frame. Speed override is indicated;
-marker keyboard handling is isolated from timeline shortcuts. These are distinct
+mapped image and opens Clip → Transform (Clip → Speed for ◆); a click edits nothing. Transform and speed keys also slide by drag or ←/→ (one source frame, Shift ten): previewed, one Undo step on a valid release, restored by Escape or an occupied frame; moving a speed key retimes its clip.
+Marker keyboard handling is isolated from timeline shortcuts. These are distinct
 from draggable shared project-time track markers.
 
 Audio keeps **Music track / Recording / Add music track / Delete selected music

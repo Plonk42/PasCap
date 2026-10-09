@@ -15,7 +15,6 @@ import {
   type LayerKeyframe,
   type LayerKeyValues,
 } from '../../src/shared/keyframes.js';
-import { compileLayerRetiming } from '../../src/shared/layer-retiming.js';
 import {
   BASE_LAYER_ID,
   clipSchema,
@@ -26,8 +25,8 @@ import {
   type ProjectDocument,
   type VideoLayer,
 } from '../../src/shared/model.js';
-import { trimByOutputFrames, trimOnTimeline, validateSourceRanges } from '../../src/shared/source-range.js';
-import { clipDuration, compileRetiming, speedSchema } from '../../src/shared/speed.js';
+import { trimOnTimeline, validateSourceRanges } from '../../src/shared/source-range.js';
+import { speedSchema } from '../../src/shared/speed.js';
 import { calculateLayout, sampleTimeline } from '../../src/shared/timeline.js';
 import { unsupportedProject } from './project-fixtures.js';
 
@@ -50,10 +49,11 @@ function sequence(keyframes: LayerKeyframe[] = [], lengths = [120, 100]): Projec
   return project;
 }
 function overlay(
-  keyframes = [point(0, { speed: 1 }), point(100, { speed: 3 })],
+  keyframes = [point(0, { exposure: 0.5 }), point(100, { hue: 30 })],
   start = 50,
   sourceIn = 10,
   sourceOut = 85,
+  rate = 4,
 ): ProjectDocument {
   const project = applyCommand(createProject('overlay', 'Overlay row'), {
     type: 'layer-add',
@@ -65,25 +65,16 @@ function overlay(
       ...createClip('top', 'source', sourceIn, sourceOut),
       layerId: 'upper',
       start,
-      speed: { mode: 'constant', rate: 4 },
+      speed: { mode: 'constant', rate },
     },
     index: 0,
   });
 }
-const changingRate = (): LayerKeyframe[] => [point(0, { speed: 1 }, 'hold'), point(100, { speed: 2 })];
-const primitive: Record<Interpolation, (u: number) => number> = {
-  hold: () => 0,
-  linear: (u) => (u * u) / 2,
-  'ease-in': (u) => (u * u * u) / 3,
-  'ease-out': (u) => u * u - (u * u * u) / 3,
-  smooth: (u) => u * u * u - (u * u * u * u) / 2,
-};
-
-describe('strict schema-12 row points and independently participating settings', () => {
-  it('exports an ordered immutable eleven-setting catalogue and explicit all-null template', () => {
+const colourKeys = (): LayerKeyframe[] => [point(0, { exposure: 1 }, 'hold'), point(100, { hue: 20 })];
+describe('strict schema-13 row points and independently participating settings', () => {
+  it('exports an ordered immutable ten-setting catalogue and explicit all-null template', () => {
     const settings = [
       'opacity',
-      'speed',
       'temperature',
       'tint',
       'exposure',
@@ -96,16 +87,16 @@ describe('strict schema-12 row points and independently participating settings',
     ];
     expect(KEYFRAME_SETTINGS.map((setting) => setting.key)).toEqual(settings);
     expect(Object.keys(EMPTY_KEY_VALUES)).toEqual(settings);
-    expect(Object.values(EMPTY_KEY_VALUES)).toEqual(Array(11).fill(null));
+    expect(Object.values(EMPTY_KEY_VALUES)).toEqual(Array(10).fill(null));
     expect(Object.isFrozen(EMPTY_KEY_VALUES)).toBe(true);
     expect(Object.isFrozen(KEYFRAME_SETTINGS)).toBe(true);
     expect(KEYFRAME_SETTINGS.every(Object.isFrozen)).toBe(true);
   });
 
-  it('requires version 12, explicit media membership, row opacity and clip settings without legacy fields', () => {
+  it('requires version 13, explicit media membership, row opacity and clip settings without legacy fields', () => {
     const project = createProject('strict', 'Strict');
     const clip = createClip('one', 'source', 0, 20);
-    expect(project.schemaVersion).toBe(12);
+    expect(project.schemaVersion).toBe(13);
     expect(project.media).toEqual({ videoIds: [], audioIds: [] });
     expect(project.layers[0]).toEqual(row());
     expect(Object.keys(clip)).toEqual([
@@ -142,7 +133,7 @@ describe('strict schema-12 row points and independently participating settings',
 
   it('rejects empty points, missing/extra values, noninteger times and unknown easing', () => {
     expect(layerKeyframeSchema.safeParse(point(0, {})).success).toBe(false);
-    for (const removed of ['layerOpacity', 'clipOpacity'])
+    for (const removed of ['layerOpacity', 'clipOpacity', 'speed'])
       for (const value of [null, 0, 1]) {
         const current = point(0, { opacity: 0 });
         expect(
@@ -153,7 +144,7 @@ describe('strict schema-12 row points and independently participating settings',
           layerKeyframeSchema.safeParse({ ...current, values: { ...otherValues, [removed]: value } }).success,
         ).toBe(false);
       }
-    const { speed: _speed, ...incomplete } = point(0, { exposure: 0 }).values;
+    const { temperature: _temperature, ...incomplete } = point(0, { exposure: 0 }).values;
     expect(layerKeyframeSchema.safeParse({ ...point(0, { exposure: 0 }), values: incomplete }).success).toBe(false);
     expect(
       layerKeyframeSchema.safeParse({
@@ -248,8 +239,8 @@ describe('strict schema-12 row points and independently participating settings',
     expect(project.layers[0]!.keyframes).toEqual([]);
   });
 
-  it('can independently toggle all eleven participants at one frame', () => {
-    let project = createProject('eleven', 'Eleven');
+  it('can independently toggle all ten participants at one frame', () => {
+    let project = createProject('ten', 'Ten');
     for (const setting of KEYFRAME_SETTINGS)
       project = applyCommand(project, {
         type: 'layer-key-toggle',
@@ -343,9 +334,7 @@ describe('strict schema-12 row points and independently participating settings',
   it('moves all values/easing atomically and rejects collisions without changing undo/redo', () => {
     const document = {
       ...createProject('move', 'Move'),
-      layers: [
-        row([point(10, { opacity: 0.7, speed: 2, exposure: 1, hue: 90 }, 'ease-in'), point(20, { shadows: 0.5 })]),
-      ],
+      layers: [row([point(10, { opacity: 0.7, exposure: 1, hue: 90 }, 'ease-in'), point(20, { shadows: 0.5 })])],
     };
     const history = new EditHistory(document);
     history.commit({ type: 'layer-key-move', layerId: BASE_LAYER_ID, frame: 10, nextFrame: 30 });
@@ -369,7 +358,7 @@ describe('strict schema-12 row points and independently participating settings',
     expect(document.layers[0]!.keyframes[0]!.frame).toBe(10);
   });
 
-  it('rejects timing-invalid speed edits atomically and leaves no history entry', () => {
+  it('rejects timing-invalid clip speed edits atomically and leaves no history entry', () => {
     const document = applyCommand(sequence([], [100]), {
       type: 'fades',
       layerId: BASE_LAYER_ID,
@@ -377,16 +366,16 @@ describe('strict schema-12 row points and independently participating settings',
       closing: 0,
     });
     const history = new EditHistory(document);
-    expect(() =>
-      history.commit({ type: 'layer-key-toggle', layerId: BASE_LAYER_ID, frame: 0, setting: 'speed', value: 8 }),
-    ).toThrow('regions overlap');
+    expect(() => history.commit({ type: 'speed', clipId: 'clip-0', speed: { mode: 'constant', rate: 8 } })).toThrow(
+      'regions overlap',
+    );
     expect(history.current).toEqual(document);
     expect(history.canUndo).toBe(false);
     expect(() => history.commit({ type: 'layer-key-remove', layerId: BASE_LAYER_ID, frame: 100 })).toThrow(
       'no longer exists',
     );
     expect(() =>
-      history.commit({ type: 'layer-key-toggle', layerId: 'missing', frame: 0, setting: 'speed', value: 1 }),
+      history.commit({ type: 'layer-key-toggle', layerId: 'missing', frame: 0, setting: 'exposure', value: 1 }),
     ).toThrow('Track no longer exists');
   });
 });
@@ -476,231 +465,27 @@ describe('independent row interpolation and unchanged CPU composition', () => {
   });
 });
 
-describe('analytic project-frame row rate maps', () => {
-  it.each(curves)('integrates the %s polynomial analytically with one duration rounding', (interpolation) => {
-    const length = Math.round(100 + 200 * primitive[interpolation](1));
-    const clip = createClip('curve', 'source', 10, 10 + length);
-    const layer = row([
-      point(0, { speed: 1 }, interpolation),
-      point(25, { exposure: 1 }, 'hold'),
-      point(100, { speed: 3 }),
-    ]);
-    const map = compileLayerRetiming(clip, layer, 0);
-    expect(map.duration).toBe(100);
-    for (const frame of [0, 1, 25, 50, 75, 99]) {
-      const source = 10 + Math.floor(frame + 200 * primitive[interpolation](frame / 100) + 1e-8);
-      expect(map.sourceAt(frame)).toBe(source);
-      expect(Number.isInteger(map.sourceAt(frame))).toBe(true);
-    }
-    expect(map.rateAt(50)).toBe({ hold: 1, linear: 2, 'ease-in': 1.5, 'ease-out': 2.5, smooth: 2 }[interpolation]);
-    expect(map.rateAt(100)).toBe(3);
-    expect(map.outputAt(clip.sourceIn - 10)).toBe(0);
-    expect(map.outputAt(clip.sourceOut)).toBe(map.duration - 1);
-  });
-
-  it.each(curves)('integrates partial %s intervals at an offset absolute start', (interpolation) => {
-    const initialProgress = 0.15;
-    const length = Math.round(
-      0.5 * 85 + 250 * (primitive[interpolation](1) - primitive[interpolation](initialProgress)),
-    );
-    const clip = createClip('partial', 'source', 17, 17 + length);
-    const map = compileLayerRetiming(
-      clip,
-      row([point(20, { speed: 0.5 }, interpolation), point(120, { speed: 3 })]),
-      35,
-    );
-    expect(map.duration).toBe(85);
-    for (const output of [0, 1, 5, 25, 50, 84]) {
-      const consumed =
-        0.5 * output +
-        250 * (primitive[interpolation]((15 + output) / 100) - primitive[interpolation](initialProgress));
-      expect(map.sourceAt(output)).toBe(17 + Math.floor(consumed + 1e-8));
-      expect(map.outputAt(map.sourceAt(output))).toBeLessThanOrEqual(output);
-    }
-    expect(map.rateAt(85)).toBe(3);
-  });
-
-  it('does not rescale key times/rates when consuming source from another absolute start', () => {
-    const clip = createClip('offset', 'source', 7, 82);
-    const layer = row([point(0, { speed: 1 }), point(100, { speed: 3 })]);
-    const map = compileLayerRetiming(clip, layer, 50);
-    expect(map.duration).toBe(Math.round((-2 + Math.sqrt(7)) / 0.02));
-    expect(map.duration).toBe(32);
-    expect(map.rateAt(0)).toBe(2);
-    expect(map.rateAt(25)).toBe(2.5);
-    expect(map.sourceAt(25)).toBe(63);
-    expect(map.outputAt(28)).toBe(10);
-    expect(map.sourceAt(-100)).toBe(7);
-    expect(map.sourceAt(map.duration)).toBe(81);
-    expect(map.sourceAt(1_000)).toBe(81);
-    const another = {
-      ...clip,
-      speed: {
-        mode: 'ramp' as const,
-        startRate: 0.1,
-        endRate: 8,
-        curve: 'smooth' as const,
-        anchorIn: 0,
-        anchorOut: 100,
-      },
-    };
-    expect(compileLayerRetiming(another, layer, 50)).toBe(map);
-  });
-
-  it('keeps first/last participating rates and exact discontinuities in hold curves', () => {
-    const layer = row([point(0, { hue: 20 }), point(20, { speed: 0.5 }), point(80, { speed: 2 })]);
-    const first = compileLayerRetiming(createClip('first', 'source', 0, 50), layer, 0);
-    expect(first.duration).toBe(60);
-    expect(first.rateAt(10)).toBe(0.5);
-    expect(first.rateAt(20)).toBe(0.5);
-    expect(first.rateAt(60)).toBe(1.5);
-    expect(compileLayerRetiming(createClip('last', 'source', 0, 50), layer, 100).duration).toBe(25);
-    const holdLayer = row([point(0, { speed: 0.5 }, 'hold'), point(40, { speed: 2 }, 'hold'), point(90, { speed: 1 })]);
-    const map = compileLayerRetiming(createClip('hold', 'source', 0, 100), holdLayer, 0);
-    expect(map.duration).toBe(80);
-    expect([39, 40, 50].map(map.sourceAt)).toEqual([19, 20, 40]);
-    expect(map.rateAt(40)).toBe(2);
-    const shifted = compileLayerRetiming(createClip('hold', 'source', 0, 100), holdLayer, 60);
-    expect(shifted.duration).toBe(70);
-    expect(shifted.rateAt(30)).toBe(1);
-  });
-
-  it('repeats/drops discrete original frames without rounding the authored row rate', () => {
-    const clip = createClip('discrete', 'source', 10, 22);
-    const slow = compileLayerRetiming(clip, row([point(0, { speed: 0.5 })]), 0);
-    const fast = compileLayerRetiming(clip, row([point(0, { speed: 2 })]), 0);
-    expect(slow.duration).toBe(24);
-    expect([0, 1, 2, 23].map(slow.sourceAt)).toEqual([10, 10, 11, 21]);
-    expect(fast.duration).toBe(6);
-    expect([0, 1, 5].map(fast.sourceAt)).toEqual([10, 12, 20]);
-    const short = compileLayerRetiming(createClip('short', 'source', 0, 15), row([point(0, { speed: 8 })]), 0);
-    expect(short.duration).toBe(2);
-    expect(short.sourceAt(1)).toBe(8);
-    expect(short.rateAt(1)).toBe(8);
-    expect(short.outputAt(8)).toBe(1);
-  });
-
-  it('uses the existing static constant/ramp compiler when no row speed participates', () => {
-    const clip = {
-      ...createClip('base', 'source', 10, 100),
-      speed: {
-        mode: 'ramp' as const,
-        startRate: 0.5,
-        endRate: 2,
-        curve: 'smooth' as const,
-        anchorIn: 0,
-        anchorOut: 120,
-      },
-    };
-    const layer = row([point(50, { exposure: 1 })]);
-    expect(compileLayerRetiming(clip, layer, 25)).toBe(compileRetiming(clip));
-    expect(compileLayerRetiming(clip, layer, 100).duration).toBe(clipDuration(clip));
-    const fast = { ...createClip('static', 'source', 10, 610), speed: { mode: 'constant' as const, rate: 2 } };
-    expect(trimByOutputFrames(fast, 'out', -30, 700).sourceOut).toBe(550);
-    for (const candidate of [clip, fast]) {
-      const map = compileLayerRetiming(candidate, layer, 25);
-      expect(() => map.sourceAt(NaN)).toThrow('finite');
-      expect(() => map.outputAt(Infinity)).toThrow('finite');
-      expect(() => map.rateAt(NaN)).toThrow('finite');
-    }
-  });
-
-  it('subtracts incoming dissolve before compiling, with one row rate at the same project frame', () => {
-    const project = applyCommand(sequence(changingRate()), {
-      type: 'transition',
-      transition: { leftId: 'clip-0', rightId: 'clip-1', type: 'cross-dissolve', duration: 20 },
-    });
-    const layout = calculateLayout(project);
-    expect(layout.clips.map((clip) => [clip.start, clip.duration, clip.end])).toEqual([
-      [0, 110, 110],
-      [90, 55, 145],
-    ]);
-    expect(layout.duration).toBe(145);
-    expect(sampleTimeline(project, 100, layout).map((sample) => sample.sourceFrame)).toEqual([100, 10]);
-    expect(layout.clips.map((clip) => clip.retiming.rateAt(100 - clip.start))).toEqual([2, 2]);
-    expect(layout.clips[1]!.retiming.sourceAt(11)).toBe(12);
-    project.layers[0]!.enabled = false;
-    expect(calculateLayout(project).duration).toBe(145);
-    expect(sampleTimeline(project, 100)).toEqual([]);
-  });
-
-  it('copies/freezes maps and rate settings and evicts entries beyond 128', () => {
-    const layer = row([point(0, { speed: 1 }), point(100, { speed: 3 })]);
-    const clip = createClip('snapshot', 'source', 0, 150);
-    const map = compileLayerRetiming(clip, layer, 0);
-    const before = [map.duration, map.sourceAt(30), map.rateAt(30)];
-    layer.keyframes[0]!.values.speed = 7;
-    layer.keyframes[1]!.frame = 200;
-    clip.sourceOut = 180;
-    expect([map.duration, map.sourceAt(30), map.rateAt(30)]).toEqual(before);
-    expect(Object.isFrozen(map)).toBe(true);
-    const cacheClip = createClip('cache', 'source', 1_000_000, 1_000_010);
-    const cacheLayer = row([point(0, { speed: 1.25 })]);
-    const first = compileLayerRetiming(cacheClip, cacheLayer, 5_000);
-    expect(compileLayerRetiming(cacheClip, cacheLayer, 5_000)).toBe(first);
-    for (let index = 1; index <= 128; index++) compileLayerRetiming(cacheClip, cacheLayer, 5_000 + index);
-    expect(compileLayerRetiming(cacheClip, cacheLayer, 5_000)).not.toBe(first);
-    expect(first.sourceAt(0)).toBe(1_000_000);
-  });
-
-  it('handles a two-billion-frame duration without output-frame arrays and bounds the project', () => {
-    const layer = row([point(0, { speed: 0.1 })]);
-    const map = compileLayerRetiming(createClip('large', 'source', 0, 200_000_000), layer, 0);
-    expect(map.duration).toBe(2_000_000_000);
-    expect(map.sourceAt(1_999_999_999)).toBe(199_999_999);
-    expect(map.outputAt(100_000_000)).toBe(1_000_000_000);
-    expect(() => compileLayerRetiming(createClip('too-long', 'source', 0, 300_000_000), layer, 0)).toThrow(
-      'supported project frames',
-    );
-    expect(() => compileLayerRetiming(createClip('too-late', 'source', 0, 10), layer, 2_147_483_640)).toThrow(
-      'supported project frames',
-    );
-    expect(() => compileLayerRetiming(createClip('base-long', 'source', 0, 300_000_000), row(), 0)).not.toThrow();
-    const staticSlow = {
-      ...createClip('base-long', 'source', 0, 300_000_000),
-      speed: { mode: 'constant' as const, rate: 0.1 },
-    };
-    expect(() => compileLayerRetiming(staticSlow, row(), 0)).toThrow('supported project frames');
-  });
-
-  it('rejects invalid starts, rates, points, static settings and nonfinite row-map queries', () => {
-    const clip = createClip('invalid', 'source', 0, 20);
-    const layer = row([point(0, { speed: 1 })]);
-    for (const start of [-1, 0.5, NaN, Infinity, 2_147_483_648])
-      expect(() => compileLayerRetiming(clip, layer, start)).toThrow();
-    for (const speed of [0, 0.09, 8.01, NaN, Infinity])
-      expect(() => compileLayerRetiming(clip, row([point(0, { speed })]), 0)).toThrow();
-    expect(() => compileLayerRetiming(clip, row([point(0, {})]), 0)).toThrow();
-    expect(() => compileLayerRetiming(clip, row([point(5, { exposure: 1 }), point(0, { speed: 1 })]), 0)).toThrow();
-    expect(() =>
-      compileLayerRetiming(clip, row(Array.from({ length: 257 }, (_, frame) => point(frame, { speed: 1 }))), 0),
-    ).toThrow();
-    expect(() => compileLayerRetiming({ ...clip, speed: { mode: 'constant', rate: 0 } }, layer, 0)).toThrow();
-    expect(() => compileLayerRetiming({ ...clip, sourceIn: -1 }, layer, 0)).toThrow();
-    const map = compileLayerRetiming(clip, layer, 0);
-    expect(() => map.sourceAt(NaN)).toThrow('finite');
-    expect(() => map.outputAt(Infinity)).toThrow('finite');
-    expect(() => map.rateAt(-Infinity)).toThrow('finite');
-  });
-});
-
-describe('contextual trims, splits, duplicates and fixed row key times', () => {
-  it('keeps primary IN start fixed while rippling downstream contextual durations', () => {
-    const original = sequence(changingRate());
+describe('fixed clip durations through trims, splits, duplicates and fixed row key times', () => {
+  it('keeps primary IN start fixed while rippling downstream clips', () => {
+    const original = sequence(colourKeys());
     const keys = original.layers[0]!.keyframes;
     const command = trimOnTimeline(original, 'clip-0', 'in', 20, 200, 'output');
-    expect(command).toEqual({ type: 'trim', clipId: 'clip-0', sourceIn: 30, sourceOut: 120 });
+    expect(command).toEqual({ type: 'trim', clipId: 'clip-0', sourceIn: 20, sourceOut: 120 });
     const project = applyCommand(original, command);
     expect(calculateLayout(project).clips.map((clip) => [clip.start, clip.duration])).toEqual([
-      [0, 90],
-      [90, 55],
+      [0, 100],
+      [100, 100],
     ]);
     expect(project.layers[0]!.keyframes).toEqual(keys);
     expect(original.clips[0]!.sourceIn).toBe(0);
   });
 
   it('uses the nearest original endpoint across an entire rounded-duration plateau', () => {
-    const original = sequence([point(0, { speed: 8 })], [100]);
+    const original = applyCommand(sequence([], [100]), {
+      type: 'speed',
+      clipId: 'clip-0',
+      speed: { mode: 'constant', rate: 8 },
+    });
     const project = applyCommand(original, { type: 'trim', clipId: 'clip-0', sourceIn: 80, sourceOut: 100 });
     const restored = trimOnTimeline(project, 'clip-0', 'in', -1, 200, 'output');
     expect(restored).toEqual({ type: 'trim', clipId: 'clip-0', sourceIn: 72, sourceOut: 100 });
@@ -708,28 +493,12 @@ describe('contextual trims, splits, duplicates and fixed row key times', () => {
     expect(extended).toEqual({ type: 'trim', clipId: 'clip-0', sourceIn: 80, sourceOut: 108 });
     const placed = calculateLayout(applyCommand(project, restored)).clips[0]!;
     expect(placed.duration).toBe(4);
-    expect(placed.retiming.sourceAt(1)).toBe(80);
+    // 28 source frames over 4 output frames: 7 per output frame.
+    expect(placed.retiming.sourceAt(1)).toBe(79);
   });
 
-  it('solves a changing-rate overlay left trim jointly, retaining the exact old right edge', () => {
-    const original = overlay();
-    const keys = original.layers[1]!.keyframes;
-    const command = trimOnTimeline(original, 'top', 'in', 10, 200, 'output');
-    // Several source endpoints round to the same duration; retain more footage.
-    expect(command).toEqual({ type: 'trim-place', clipId: 'top', sourceIn: 31, sourceOut: 85, start: 60 });
-    const project = applyCommand(original, command);
-    const placed = calculateLayout(project).clips[0]!;
-    expect([placed.start, placed.duration, placed.end]).toEqual([60, 22, 82]);
-    expect(project.layers[1]!.keyframes).toEqual(keys);
-    expect(trimOnTimeline(original, 'top', 'in', 21, 200, 'source')).toEqual(command);
-    const numeric = applyCommand(original, { type: 'trim', clipId: 'top', sourceIn: 32, sourceOut: 85 });
-    expect(numeric.clips[0]!.start).toBe(50);
-    expect(calculateLayout(numeric).clips[0]!.end).not.toBe(82);
-    expect(numeric.layers[1]!.keyframes).toEqual(keys);
-  });
-
-  it.each(curves)('keeps overlay OUT fixed through %s rates and source bounds', (interpolation) => {
-    const original = overlay([point(0, { speed: 1 }, interpolation), point(100, { speed: 3 })]);
+  it.each([0.5, 1, 4])('keeps overlay OUT fixed for a %sx clip and source bounds', (rate) => {
+    const original = overlay(undefined, 50, 10, 85, rate);
     const right = calculateLayout(original).clips[0]!.end;
     for (const delta of [-20, -5, 5, 20]) {
       const command = trimOnTimeline(original, 'top', 'in', delta, 200, 'output');
@@ -742,23 +511,24 @@ describe('contextual trims, splits, duplicates and fixed row key times', () => {
   });
 
   it('clamps overlay restoration at frame zero and right trims at the original recording', () => {
-    const original = overlay([point(0, { speed: 0.5 })], 10, 100, 150);
+    const original = overlay([point(0, { exposure: 0.5 })], 10, 100, 150, 0.5);
     for (const unit of ['output', 'source'] as const) {
       const command = trimOnTimeline(original, 'top', 'in', -10_000, 200, unit);
       expect(command).toEqual({ type: 'trim-place', clipId: 'top', sourceIn: 95, sourceOut: 150, start: 0 });
       expect(calculateLayout(applyCommand(original, command)).clips[0]!.end).toBe(110);
     }
-    const changing = overlay();
-    expect(trimOnTimeline(changing, 'top', 'out', 10, 200, 'output')).toEqual({
+    const fast = overlay();
+    // 19 + 10 output frames at 4x need 114–117 source frames; keep the nearest OUT.
+    expect(trimOnTimeline(fast, 'top', 'out', 10, 200, 'output')).toEqual({
       type: 'trim',
       clipId: 'top',
       sourceIn: 10,
-      sourceOut: 111,
+      sourceOut: 124,
     });
-    const restored = applyCommand(changing, trimOnTimeline(changing, 'top', 'out', 10_000, 200, 'output'));
+    const restored = applyCommand(fast, trimOnTimeline(fast, 'top', 'out', 10_000, 200, 'output'));
     expect(restored.clips[0]!.sourceOut).toBe(200);
     expect(restored.clips[0]!.start).toBe(50);
-    expect(trimOnTimeline(changing, 'top', 'out', 5, 200, 'source')).toEqual({
+    expect(trimOnTimeline(fast, 'top', 'out', 5, 200, 'source')).toEqual({
       type: 'trim',
       clipId: 'top',
       sourceIn: 10,
@@ -767,7 +537,12 @@ describe('contextual trims, splits, duplicates and fixed row key times', () => {
   });
 
   it('leaves fade/overlay conflict validation to atomic command application', () => {
-    const original = applyCommand(sequence([point(0, { speed: 2 })], [100, 100]), {
+    const fastFirst = applyCommand(sequence([], [100, 100]), {
+      type: 'speed',
+      clipId: 'clip-0',
+      speed: { mode: 'constant', rate: 2 },
+    });
+    const original = applyCommand(fastFirst, {
       type: 'transition',
       transition: { leftId: 'clip-0', rightId: 'clip-1', type: 'cross-dissolve', duration: 20 },
     });
@@ -776,7 +551,7 @@ describe('contextual trims, splits, duplicates and fixed row key times', () => {
     expect(() => history.commit(command)).toThrow('regions overlap');
     expect(history.current).toEqual(original);
     expect(history.canUndo).toBe(false);
-    const first = overlay([point(0, { speed: 2 })], 0, 0, 100);
+    const first = overlay([], 0, 0, 100, 2);
     const layered = applyCommand(first, {
       type: 'insert',
       clip: { ...createClip('next', 'source', 0, 100), layerId: 'upper', start: 60 },
@@ -787,26 +562,15 @@ describe('contextual trims, splits, duplicates and fixed row key times', () => {
     expect(layered.clips[0]!.sourceOut).toBe(100);
   });
 
-  it('rejects unrepresentable source trims rather than moving the retained overlay OUT', () => {
-    const original = overlay([point(0, { speed: 8 }, 'hold'), point(40, { speed: 0.1 })], 30, 0, 90);
-    expect(calculateLayout(original).clips[0]!.end).toBe(140);
-    expect(() => trimOnTimeline(original, 'top', 'in', 1, 100, 'source')).toThrow(
-      'cannot keep the positioned clip OUT',
-    );
-    expect(original.clips[0]).toMatchObject({ start: 30, sourceIn: 0, sourceOut: 90 });
-    const byOutput = trimOnTimeline(original, 'top', 'in', 1, 100, 'output');
-    expect(byOutput).toEqual({ type: 'trim-place', clipId: 'top', sourceIn: 8, sourceOut: 90, start: 31 });
-    expect(calculateLayout(applyCommand(original, byOutput)).clips[0]!.end).toBe(140);
-  });
-
-  it('splits at contextual left duration, keeps points on the row, and preserves static settings', () => {
+  it('splits at the left piece duration, keeps points on the row, and preserves static settings', () => {
     const original = overlay();
     const keys = original.layers[1]!.keyframes;
     const split = applyCommand(original, { type: 'split', clipId: 'top', sourceFrame: 40, newClipId: 'right' });
     const layout = calculateLayout(split);
+    // 30 and 45 source frames at 4x round independently to 8 and 11 output frames.
     expect(layout.clips.map((clip) => [clip.start, clip.duration, clip.end])).toEqual([
-      [50, 14, 64],
-      [64, 18, 82],
+      [50, 8, 58],
+      [58, 11, 69],
     ]);
     expect(split.clips.map((clip) => [clip.sourceIn, clip.sourceOut])).toEqual([
       [10, 40],
@@ -816,8 +580,8 @@ describe('contextual trims, splits, duplicates and fixed row key times', () => {
     expect(split.layers[0]!.colour).toEqual(original.layers[0]!.colour);
     expect(split.clips[1]).not.toHaveProperty('animation');
     expect(split.layers[1]!.keyframes).toEqual(keys);
-    expect(layout.clips[1]!.retiming.rateAt(0)).toBeCloseTo(2.28);
-    const sequenceProject = applyCommand(sequence(changingRate()), {
+    expect(layout.clips[1]!.retiming.rateAt(0)).toBeCloseTo(45 / 11);
+    const sequenceProject = applyCommand(sequence(colourKeys()), {
       type: 'transition',
       transition: { leftId: 'clip-0', rightId: 'clip-1', type: 'cross-dissolve', duration: 10 },
     });
@@ -833,7 +597,7 @@ describe('contextual trims, splits, duplicates and fixed row key times', () => {
         .map((clip) => [clip.start, clip.duration]),
     ).toEqual([
       [0, 90],
-      [90, 20],
+      [90, 30],
     ]);
     expect(
       divided.layers[0]!.transitions.map((transition) => [transition.leftId, transition.rightId, transition.type]),
@@ -845,46 +609,51 @@ describe('contextual trims, splits, duplicates and fixed row key times', () => {
   });
 
   it('rounds split-piece durations independently without silently sliding row points', () => {
-    const original = sequence(changingRate(), [120]);
-    const split = applyCommand(original, { type: 'split', clipId: 'clip-0', sourceFrame: 115, newClipId: 'part' });
-    expect(calculateLayout(original).duration).toBe(110);
-    expect(calculateLayout(split).clips.map((clip) => clip.duration)).toEqual([108, 3]);
-    expect(calculateLayout(split).duration).toBe(111);
+    const original = applyCommand(sequence(colourKeys(), [120]), {
+      type: 'speed',
+      clipId: 'clip-0',
+      speed: { mode: 'constant', rate: 8 },
+    });
+    const split = applyCommand(original, { type: 'split', clipId: 'clip-0', sourceFrame: 4, newClipId: 'part' });
+    // 120 / 8 = 15, but 4 / 8 and 116 / 8 round up independently.
+    expect(calculateLayout(original).duration).toBe(15);
+    expect(calculateLayout(split).clips.map((clip) => clip.duration)).toEqual([1, 15]);
+    expect(calculateLayout(split).duration).toBe(16);
     expect(split.layers[0]!.keyframes).toEqual(original.layers[0]!.keyframes);
   });
 
-  it('duplicates after the contextual end and retimes the copy at its own absolute start', () => {
+  it('duplicates after the clip end with the same fixed duration', () => {
     const original = overlay();
     const history = new EditHistory(original);
     history.commit({ type: 'duplicate', clipId: 'top', newClipId: 'copy' });
     const layout = calculateLayout(history.current);
     expect(layout.clips.map((clip) => [clip.start, clip.duration, clip.end])).toEqual([
-      [50, 32, 82],
-      [82, 26, 108],
+      [50, 19, 69],
+      [69, 19, 88],
     ]);
-    expect(history.current.clips[1]).toEqual({ ...original.clips[0]!, id: 'copy', start: 82 });
+    expect(history.current.clips[1]).toEqual({ ...original.clips[0]!, id: 'copy', start: 69 });
     expect(history.current.layers[1]!.keyframes).toEqual(original.layers[1]!.keyframes);
     expect(history.undo()).toEqual(original);
-    const primary = applyCommand(sequence(changingRate(), [120]), {
+    const primary = applyCommand(sequence(colourKeys(), [120]), {
       type: 'duplicate',
       clipId: 'clip-0',
       newClipId: 'copy',
     });
     expect(calculateLayout(primary).clips.map((clip) => [clip.start, clip.duration])).toEqual([
-      [0, 110],
-      [110, 60],
+      [0, 120],
+      [120, 120],
     ]);
-    expect(primary.layers[0]!.keyframes).toEqual(changingRate());
+    expect(primary.layers[0]!.keyframes).toEqual(colourKeys());
   });
 
-  it('uses contextual duration for placement and hidden layers, leaving row keys at fixed frames', () => {
+  it('keeps the clip duration through placement and hidden layers, leaving row keys at fixed frames', () => {
     const original = overlay();
     const keys = original.layers[1]!.keyframes;
     const moved = applyCommand(original, { type: 'place', clipId: 'top', layerId: 'upper', start: 100, index: 0 });
-    expect(calculateLayout(moved).clips[0]).toMatchObject({ start: 100, duration: 25, end: 125 });
+    expect(calculateLayout(moved).clips[0]).toMatchObject({ start: 100, duration: 19, end: 119 });
     expect(moved.layers[1]!.keyframes).toEqual(keys);
     moved.layers[1]!.enabled = false;
-    expect(calculateLayout(moved).duration).toBe(125);
+    expect(calculateLayout(moved).duration).toBe(119);
     expect(sampleTimeline(moved, 110)).toEqual([]);
   });
 

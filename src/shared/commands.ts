@@ -10,7 +10,6 @@ import {
   type KeyframeSetting,
   type LayerKeyframe,
 } from './keyframes.js';
-import { compileLayerRetiming } from './layer-retiming.js';
 import {
   clipSchema,
   frameSchema,
@@ -25,7 +24,7 @@ import {
   type VideoLayer,
 } from './model.js';
 import { spatialSettingsSchema, type SpatialSettings } from './spatial.js';
-import type { SpeedSettings } from './speed.js';
+import { clipDuration, type SpeedSettings } from './speed.js';
 import { calculateLayout, layerClips, type TimelineLayout } from './timeline.js';
 
 export type EditCommand =
@@ -125,11 +124,7 @@ function splitClip(next: ProjectDocument, index: number, command: Extract<EditCo
     throw new Error('Split must be strictly inside a clip.');
   const placed = calculateLayout(next).clips.find((item) => item.clip.id === original.id)!;
   const layer = next.layers.find((item) => item.id === original.layerId)!;
-  const leftDuration = compileLayerRetiming(
-    { ...original, sourceOut: command.sourceFrame },
-    layer,
-    placed.start,
-  ).duration;
+  const leftDuration = clipDuration({ ...original, sourceOut: command.sourceFrame });
   const right = {
     ...original,
     id: command.newClipId,

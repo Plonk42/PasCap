@@ -609,9 +609,15 @@ describe('layered observed-frame preview', () => {
     expect(() => engine.capturePixels()).toThrow(/required decoded frames/);
     expect(compositor().uploads).toHaveLength(uploads);
   });
-  it('uses keyframed speed for decoder rates and keeps frame-zero rAF clamping', async () => {
+  it('uses keyframed clip speed for decoder rates and keeps frame-zero rAF clamping', async () => {
     const project = makeProject();
-    project.layers[0]!.keyframes = [point(0, { speed: 0.5 }, 'smooth'), point(59, { speed: 2 }, 'hold')];
+    project.clips[0]!.speed = {
+      mode: 'curve',
+      keyframes: [
+        { frame: 40, rate: 0.5, interpolation: 'smooth' },
+        { frame: 99, rate: 2, interpolation: 'hold' },
+      ],
+    };
     const engine = makeEngine();
     await engine.loadProject(project, resolver, originalDimensions);
     await engine.play();
@@ -734,9 +740,6 @@ describe('live appearance updates and lifecycle', () => {
         document.clips[0]!.speed = { mode: 'constant', rate: 2 };
       },
       (document) => {
-        document.layers[0]!.keyframes = [point(0, { speed: 2 })];
-      },
-      (document) => {
         document.layers[1]!.ripple = true;
       },
       (document) => {
@@ -797,9 +800,9 @@ describe('live appearance updates and lifecycle', () => {
     expect(compositor().uploads).toHaveLength(uploads);
     expect(engine.diagnostics()).toMatchObject({ status: 'paused', frame: 10, duration: 120 });
   });
-  it('rejects participating speed-point edits but permits unrelated colour points without rebuilding the captured map', async () => {
+  it('treats shared track point edits as appearance updates without rebuilding the captured map', async () => {
     const project = makeProject(2);
-    project.layers[0]!.keyframes = [point(0, { speed: 0.5 }, 'smooth'), point(59, { speed: 2 }, 'hold')];
+    project.layers[0]!.keyframes = [point(0, { opacity: 0.5 }, 'smooth'), point(59, { opacity: 1 }, 'hold')];
     const engine = makeEngine();
     await engine.loadProject(project, resolver, originalDimensions, 15);
     const before = calls();
@@ -810,9 +813,6 @@ describe('live appearance updates and lifecycle', () => {
     expect(calls()).toEqual(before);
     expect(compositor().groups[0]!.clips[0]!.settings.exposure).toBe(0.7);
     for (const change of [
-      (document: ProjectDocument) => {
-        document.layers[0]!.keyframes[0]!.values.speed = 1;
-      },
       (document: ProjectDocument) => {
         document.layers[0]!.keyframes[0]!.frame = 1;
       },
@@ -825,7 +825,7 @@ describe('live appearance updates and lifecycle', () => {
     ]) {
       const next = structuredClone(appearance);
       change(next);
-      expect(() => engine.updateProjectAppearance(next)).toThrow(/preserve project timing/);
+      expect(() => engine.updateProjectAppearance(next)).not.toThrow();
     }
     expect(calls()).toEqual(before);
     expect(engine.diagnostics()).toMatchObject({ status: 'paused', frame: 15, duration });
