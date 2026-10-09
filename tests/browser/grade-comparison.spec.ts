@@ -247,9 +247,8 @@ const test = browserTest.extend<{ comparison: ComparisonFixture }>({
     playback.clips = [
       {
         ...createClip('music-comparison-clip', videos[0]!.id, 0, 120, playback.layers[0]!.id),
-        // Sixteen seconds leaves time for four real native activations under
-        // software rendering without guessing a particular callback schedule.
-        speed: { mode: 'constant', rate: 0.25 },
+        // Forty seconds: four native activations took ~17 s on hosted software rendering (#126).
+        speed: { mode: 'constant', rate: 0.1 },
       },
     ];
     playback.music = [
@@ -259,7 +258,7 @@ const test = browserTest.extend<{ comparison: ComparisonFixture }>({
         sourceIn: 0,
         sourceOut: 120,
         start: 0,
-        duration: 480,
+        duration: 1200,
         gainDb: -12,
         fadeIn: 0,
         fadeOut: 0,
@@ -868,8 +867,8 @@ test('comparison during music playback preserves the real worklet epoch and stri
   page,
   comparison,
 }) => {
-  // About 18-19 s locally and under CI-like constraints; keep 3x for uncontrolled hosted runners.
-  test.setTimeout(60_000);
+  // Forty seconds of real-time playback plus setup; keep ~3x for uncontrolled hosted runners.
+  test.setTimeout(150_000);
   comparison.guard.allowPCM = true;
   await installMusicEvidence(page);
   await observeRealtimeHeadroom(page, test.info());
@@ -1082,7 +1081,7 @@ test('comparison during music playback preserves the real worklet epoch and stri
         );
       },
       duration,
-      { timeout: 35_000 },
+      { timeout: 90_000 },
     );
     const result = await page.evaluate(() => ({
       state: window.pascapLab!.engine.diagnostics(),
