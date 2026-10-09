@@ -1,6 +1,7 @@
 import { useId, type ReactNode } from 'react';
 import { COLOUR_CONTROLS, NEUTRAL_COLOUR } from '../shared/colour.js';
 import { KEYFRAME_SETTINGS, type KeyframeSetting } from '../shared/keyframes.js';
+import { Icon } from './icons.js';
 import type { NumberFieldProps } from './NumberField.js';
 import { ValueControl, type ValueControlProps } from './ValueControl.js';
 
@@ -15,6 +16,7 @@ interface RangeSettingProps {
   label?: string;
   hint: string;
   scope?: ReactNode;
+  locked?: ReactNode;
   actions?: ReactNode;
   resetKey?: NumberFieldProps['resetKey'];
   validate?: NumberFieldProps['validate'];
@@ -38,6 +40,16 @@ export function ResetLabel({
   );
 }
 
+/** Visible without hover: an animated value without a keyframe here is read-only until its diamond captures one. */
+export function LockedCue({ animate }: Readonly<{ animate: boolean }>) {
+  return (
+    <small className="setting-locked-cue" aria-hidden="true">
+      <Icon name="lock" size={11} />
+      {animate ? 'Add a keyframe ◇ to edit' : 'Turn Animate on to edit'}
+    </small>
+  );
+}
+
 /** The same setting-specific slider and units in either edit context; double-click the name to reset. */
 export function RangeSettingControl({
   setting,
@@ -48,6 +60,7 @@ export function RangeSettingControl({
   label,
   hint,
   scope,
+  locked,
   actions,
   resetKey,
   validate,
@@ -74,6 +87,7 @@ export function RangeSettingControl({
           {definition.label}
           {scope}
         </ResetLabel>
+        {locked}
         {actions && <span className="colour-control-actions">{actions}</span>}
       </span>
       <ValueControl

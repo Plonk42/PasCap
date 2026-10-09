@@ -176,10 +176,16 @@ test('each setting has its own diamond capturing only that setting at the displa
   // Scale is animated without a key here, so it is read-only; Rotation is unkeyed and still edits its base.
   await expect(exact(page, 'Scale')).toBeDisabled();
   await expect(exact(page, 'Rotation')).toBeEnabled();
+  const poseFields = page.locator('.spatial-editor > .spatial-pose-fields .spatial-pose-field');
+  await expect(poseFields.filter({ hasText: 'Scale' }).locator('.setting-locked-cue')).toHaveText(
+    'Add a keyframe ◇ to edit',
+  );
+  await expect(poseFields.filter({ hasText: 'Rotation' }).locator('.setting-locked-cue')).toHaveCount(0);
   await expect(capture(page, 'Scale')).toHaveAttribute('aria-pressed', 'false');
   await capture(page, 'Scale').focus();
   await capture(page, 'Scale').press('Enter');
   await expect(capture(page, 'Scale')).toHaveAttribute('aria-pressed', 'true');
+  await expect(poseFields.filter({ hasText: 'Scale' }).locator('.setting-locked-cue')).toHaveCount(0);
   await expect(capture(page, 'Rotation')).toHaveAttribute('aria-pressed', 'false');
   const captured = await current(page);
   expect(captured.clips[0]!.spatial.keyframes.find((key) => key.frame === source)).toEqual({

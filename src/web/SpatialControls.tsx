@@ -32,7 +32,7 @@ import {
   toggleSpatialChannel,
 } from './spatial-editor.js';
 import { inspectSpatialKeyframe, reconcileSpatialInspection, type SpatialInspection } from './spatial-navigation.js';
-import { ResetLabel } from './SettingValueControl.js';
+import { LockedCue, ResetLabel } from './SettingValueControl.js';
 import { ValueControl } from './ValueControl.js';
 
 interface Props {
@@ -202,6 +202,7 @@ function PoseFields({
                 {control.label}
                 {unit}
               </ResetLabel>
+              {readOnly?.(control.key) && <LockedCue animate={keys !== undefined} />}
               {keys && (
                 <span className="colour-control-actions">
                   <SpatialChannelKeys label={control.label} keys={keys} disabled={disabled} />

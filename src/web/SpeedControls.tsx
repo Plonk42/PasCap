@@ -14,7 +14,7 @@ import { KeyframeToggle } from './KeyframeToggle.js';
 import { InspectorSection } from './InspectorSection.js';
 import { useSpeedNavigation } from './speed-navigation.js';
 import { settingPresentation } from './setting-scope.js';
-import { RateValueControl, SpeedRateField } from './SettingValueControl.js';
+import { LockedCue, RateValueControl, SpeedRateField } from './SettingValueControl.js';
 import type { DraftPreview } from './Timeline.js';
 
 export interface SpeedControlsProps {
@@ -391,6 +391,7 @@ export function SpeedControls({
             />
           </span>
         </div>
+        {keyed && !active && <LockedCue animate={tools.enabled} />}
         {(keyed || !clip) && (
           <SpeedRateField
             id={rateId}

@@ -210,7 +210,8 @@ All clips on that track share the treatment; different looks require different t
 UI treatment, but controls composition coverage, not the SDR RGB grade.
 **Clip → Placement** contains placement only. Sliders never create implicit keyframes;
 an animated setting that is not enabled at the real playhead is read-only until
-its hollow diamond captures a keyframe there.
+its hollow diamond captures a keyframe there. It is shown dimmed with a lock cue
+(**Add a keyframe ◇ to edit**), and dragging or typing in it changes nothing.
 Speed accepts **0.1×–8×**. Constant, ramp endpoint, custom-keyframe and main/stored track
 rates pair a native slider with an exact numeric field, retaining modes, presets
 and the curve graph. Slow motion repeats frames and acceleration drops them;
