@@ -1925,7 +1925,6 @@ export function App() {
             onSplit={split}
             onDelete={remove}
             onDuplicate={duplicate}
-            onNudge={nudge}
             onQuickTrim={quickTrim}
             cutRange={cutRange}
             onMarkCut={markCut}

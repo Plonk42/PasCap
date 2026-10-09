@@ -676,6 +676,12 @@ export function Inspector({
   const inputContext = `${project.id}:${layer?.id}:${clip?.id ?? 'row'}`;
   const startRestriction = clip ? clipStartRestriction(project, clip) : null;
   const startHint = startRestriction ?? undefined;
+  const earlierTitle =
+    placed?.start === 0 ? 'Already at timeline frame 0' : 'Move this start or first Ripple anchor · Alt+Left';
+  const nudgeClip = (delta: number): void => {
+    if (clip && placed)
+      onEdit({ type: 'place', clipId: clip.id, layerId: clip.layerId, start: placed.start + delta, index: position });
+  };
 
   return (
     <InspectorExpansionContext value={expansion}>
@@ -782,6 +788,28 @@ export function Inspector({
                           }
                         />
                       </label>
+                      <div className="clip-nudge-controls">
+                        <button
+                          type="button"
+                          className="secondary-button small"
+                          aria-label="Move clip one frame earlier"
+                          title={startRestriction ?? earlierTitle}
+                          disabled={drafting || startRestriction !== null || placed.start === 0}
+                          onClick={() => nudgeClip(-1)}
+                        >
+                          ← 1 frame
+                        </button>
+                        <button
+                          type="button"
+                          className="secondary-button small"
+                          aria-label="Move clip one frame later"
+                          title={startRestriction ?? 'Move this start or first Ripple anchor · Alt+Right'}
+                          disabled={drafting || startRestriction !== null}
+                          onClick={() => nudgeClip(1)}
+                        >
+                          1 frame →
+                        </button>
+                      </div>
                     </>
                   )}
                 </section>

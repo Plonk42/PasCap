@@ -16,6 +16,7 @@ export type IconName =
   | 'grid'
   | 'list'
   | 'plus'
+  | 'minus'
   | 'video'
   | 'undo'
   | 'redo'
@@ -62,6 +63,7 @@ const paths: Record<IconName, string> = {
   grid: 'M3 3h7v7H3V3Zm11 0h7v7h-7V3ZM3 14h7v7H3v-7Zm11 0h7v7h-7v-7Z',
   list: 'M8 5h13M8 12h13M8 19h13M3 5h.1M3 12h.1M3 19h.1',
   plus: 'M12 5v14M5 12h14',
+  minus: 'M5 12h14',
   video: 'M3 4h18v16H3V4Zm0 4h18M7 4v4m10-4v4m-7 3 5 3-5 3v-6Z',
   undo: 'M3 9h10a7 7 0 0 1 0 14M3 9l5-5M3 9l5 5',
   redo: 'M21 9H11a7 7 0 0 0 0 14M21 9l-5-5m5 5-5 5',

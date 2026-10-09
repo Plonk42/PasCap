@@ -70,9 +70,11 @@ export async function expandedInspectorPreferences(page: Page): Promise<void> {
   });
 }
 
+/** Split and Delete sit in the toolbar; Duplicate lives in the selected clip's context menu. */
 export async function clipAction(page: Page, name: string): Promise<void> {
   const action = page.getByRole('button', { name, exact: true });
-  if (!(await action.isVisible())) await openOptions(page, 'Clip actions');
+  if (!(await action.isVisible()))
+    await page.locator('.timeline-clip.selected .timeline-clip-body').click({ button: 'right' });
   await action.click();
 }
 

@@ -53,7 +53,9 @@ They are not Kelvin/HDR/automatic white balance. HSL/curves remain static. See
 - Bottom: frame-scaled multi-track timeline, playhead timecode, highlighted active
   insertion track, one marker per stored track keyframe, dimmed hidden clips and Activity.
   The responsive toolbar keeps Split, Trim start/end, Delete and IN/OUT/Cut range
-  directly visible; duplication/start nudging remain in Clip actions.
+  directly visible; Duplicate is in the clip's right-click menu (Ctrl+D), and start
+  nudging beside Clip → Placement's start field. Zoom keeps its slider and Fit,
+  with Zoom out / Zoom in buttons beside them.
   Video tracks display the saved bottom-to-top composition array: track 1 renders below track 2,
   track 3 above track 2, and so on, with no primary/overlay role. The thin ruler remains
   pinned above scrolling video tracks with TIME ticks/separators, playhead handle and click/drag seeking;

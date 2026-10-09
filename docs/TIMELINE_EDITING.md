@@ -285,7 +285,7 @@ and undoable, and never move music, other tracks or absolute track keyframes.
   unchanged and apply to both pieces. It creates a cut between the pieces on
   that track. Each piece retimes/rounds independently,
   so total duration can change. Invalid edits never enter history.
-- **Clip actions → Duplicate** / **Ctrl+D** copies the complete clip range,
+- **Duplicate** (right-click the clip, or its Menu key) / **Ctrl+D** copies the complete clip range,
   constant/ramp/custom speed and deep-copied spatial base/keyframes into
   an independent ID; it does not
   copy or change track Colour/Opacity. Ripple-on duplicates insert after the original with
@@ -299,8 +299,8 @@ and undoable, and never move music, other tracks or absolute track keyframes.
   Splits/cuts/duplicates copy complete spatial poses and keyframe arrays independently;
   trims/moves/Ripple never shift, rescale or discard their original-source anchors.
 - **Alt+Left/Right** nudges a positioned clip or the first Ripple anchor one frame;
-  adding Shift nudges ten. Clip actions also exposes frame-nudge buttons, and
-  Clip → Placement has **Timeline start frame** on every track. Later Ripple
+  adding Shift nudges ten. Clip → Placement has one-frame nudge buttons beside
+  **Timeline start frame**, which is available on every track. Later Ripple
   starts are derived and disabled with an accessible reason: drag to reorder or
   turn Ripple off for independent placement. Moving the first anchor while it
   remains first re-sequences its track. Starts remain nonnegative, conflicts reject
@@ -618,8 +618,9 @@ Source-review IN/OUT fields apply as a pair on Enter or when focus leaves both; 
 track-owned Colour/keyframes/transitions/fades, and music. The header directly exposes
 help; **Workspace options**
 holds the Media/Clip panel toggles, layout reset and Diagnostics. **Track options**
-holds only rename/Ripple/stacking/deletion; **Clip actions** holds duplication/nudging,
-while the frequent split/trim/delete/cut actions stay directly visible.
+holds only rename/Ripple/stacking/deletion; a clip's right-click menu holds Duplicate,
+while the frequent split/trim/delete/cut actions stay directly visible. The timeline
+zoom keeps its slider and **Fit**, with **Zoom out / Zoom in** buttons beside it.
 Diagnostic counters, shader tests and the two-clip native comparison tool remain
 hidden behind Diagnostics. **Export** uses the bounded native multi-clip
 renderer, with profiles for 720p drafts and 4K finals. The diagnostic two-clip

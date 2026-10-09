@@ -510,6 +510,48 @@ test('rush excerpt popup leaves review geometry and Add reachable on a short lap
   await expect(page.locator('.source-review')).toHaveAttribute('data-source-excerpt-count', '3');
 });
 
+test('Duplicate is a clip context-menu action and zoom buttons step the retained slider', async ({ page }) => {
+  const before = await current(page);
+  await expect(page.locator('summary[aria-label="Clip actions"]')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Duplicate selected clip', exact: true })).toHaveCount(0);
+
+  const body = clip(page, 'b').locator('.timeline-clip-body');
+  await body.click({ button: 'right' });
+  await expect(body).toHaveAttribute('aria-pressed', 'true');
+  const duplicate = page.getByRole('button', { name: 'Duplicate selected clip', exact: true });
+  await expect(duplicate).toBeVisible();
+  await expect(duplicate).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(duplicate).toHaveCount(0);
+  await expect(body).toBeFocused();
+  expect(await current(page)).toEqual(before);
+
+  await body.click({ button: 'right' });
+  await duplicate.click();
+  await expect(duplicate).toHaveCount(0);
+  const after = await current(page);
+  expect(after.clips).toHaveLength(before.clips.length + 1);
+  const copy = after.clips.find((item) => !before.clips.some((original) => original.id === item.id))!;
+  expect(copy).toMatchObject({ mediaId: assets[1]!.id, sourceIn: 30, sourceOut: 90 });
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  expect(await current(page)).toEqual(before);
+
+  const slider = page.getByRole('slider', { name: 'Timeline zoom', exact: true });
+  const zoomIn = page.getByRole('button', { name: 'Zoom in', exact: true });
+  const zoomOut = page.getByRole('button', { name: 'Zoom out', exact: true });
+  await slider.fill('48');
+  await zoomIn.click();
+  await expect(slider).toHaveValue('60');
+  await zoomOut.click();
+  await zoomOut.click();
+  await expect(slider).toHaveValue('38');
+  await slider.fill('180');
+  await expect(zoomIn).toBeDisabled();
+  await slider.fill('12');
+  await expect(zoomOut).toBeDisabled();
+  await expect(zoomIn).toBeEnabled();
+});
+
 test('visible split then S selects each right piece, preserves boundaries and deletes without another selection', async ({
   page,
 }) => {
@@ -526,7 +568,6 @@ test('visible split then S selects each right piece, preserves boundaries and de
   await expect(page.locator('[aria-label="Clip editing actions"]')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Split at playhead', exact: true })).toBeVisible();
   await clipAction(page, 'Split at playhead');
-  await expect(page.locator('summary[aria-label="Clip actions"]')).toHaveAttribute('aria-expanded', 'false');
   const first = await current(page);
   const rightId = first.clips[1]!.id;
   expect(first.clips[0]).toEqual({ ...before.clips[0]!, sourceOut: 45 });
