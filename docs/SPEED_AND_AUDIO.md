@@ -495,7 +495,7 @@ Project schema **v12** requires explicit `media.videoIds` and `media.audioIds` a
 unique and limited to 10,000 IDs each, plus complete video track colour with Temperature/Tint
 and static HSL/curves, clip constant/ramp/custom-curve
 speed, required clip `spatial: { base, keyframes }` with eight-value base and
-0–256 full-pose source-frame keyframes with required easing, track keyframe arrays with
+0–256 source-frame keyframes with required easing, track keyframe arrays with
 all eleven nullable value fields, placement and music
 source OUT. `music` is a required 0–8 array with unique required music track IDs and
 all per-track fields above; `[]` is the sole no-music representation, not null

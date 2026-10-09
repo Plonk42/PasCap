@@ -35,24 +35,31 @@ function pose(changes: Partial<SpatialPose> = {}): SpatialPose {
 // Deliberately do not call evaluateSpatial, compileSpatialMapping, fittedContent,
 // composeLayerFrame or compositePixel in the oracle. These tests exercise them.
 function referencePose(settings: SpatialSettings, position: number): SpatialPose {
-  const keys = settings.keyframes;
-  if (!keys.length) return { ...settings.base };
-  if (position <= keys[0]!.frame) return { ...keys[0]!.values };
-  const rightIndex = keys.findIndex((key) => key.frame > position);
-  if (rightIndex < 0) return { ...keys.at(-1)!.values };
-  const left = keys[rightIndex - 1]!;
-  const right = keys[rightIndex]!;
-  const t = (position - left.frame) / (right.frame - left.frame);
-  const progress = {
-    hold: 0,
-    linear: t,
-    'ease-in': t * t,
-    'ease-out': 2 * t - t * t,
-    smooth: 3 * t * t - 2 * t * t * t,
-  }[left.interpolation];
-  const result = { ...left.values };
-  for (const channel of Object.keys(result) as (keyof SpatialPose)[])
-    result[channel] = left.values[channel] * (1 - progress) + right.values[channel] * progress;
+  const result = { ...settings.base };
+  for (const channel of Object.keys(result) as (keyof SpatialPose)[]) {
+    const keys = settings.keyframes.filter((key) => key.values[channel] !== null);
+    if (!keys.length) continue;
+    if (position <= keys[0]!.frame) {
+      result[channel] = keys[0]!.values[channel]!;
+      continue;
+    }
+    const rightIndex = keys.findIndex((key) => key.frame > position);
+    if (rightIndex < 0) {
+      result[channel] = keys.at(-1)!.values[channel]!;
+      continue;
+    }
+    const left = keys[rightIndex - 1]!;
+    const right = keys[rightIndex]!;
+    const t = (position - left.frame) / (right.frame - left.frame);
+    const progress = {
+      hold: 0,
+      linear: t,
+      'ease-in': t * t,
+      'ease-out': 2 * t - t * t,
+      smooth: 3 * t * t - 2 * t * t * t,
+    }[left.interpolation];
+    result[channel] = left.values[channel]! * (1 - progress) + right.values[channel]! * progress;
+  }
   return result;
 }
 

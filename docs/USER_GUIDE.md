@@ -13,7 +13,7 @@ inherit the shared media registry. Importing the same original into another proj
 deliberately adds it to that project's bin and reuses eligible verified proxies.
 Removing a clip or music track does not remove the imported recording.
 
-Projects use **strict format v12**, with complete required video track colour and clip spatial base/full-pose
+Projects use **strict format v12**, with complete required video track colour and clip spatial base/per-setting
 source-frame keyframes and a required `music` array of 0–8 independent
 music tracks and unique required IDs (`[]` without music), every video track's Ripple, transitions and
 opening/closing fades and required numeric `opacity` in 0–1 (1 on new tracks),
@@ -236,7 +236,7 @@ speed-only keyframes. Speed visits track Speed keyframes plus **all retained cus
 speed source keyframes of the selected clip**, including off-trim keyframes and the
 original exclusive OUT, previewing the nearest mapped image. Track Speed overrides
 but retains clip keyframes and their navigation, with that override indicated.
-Transform likewise visits all retained full-pose source keyframes. Speed and
+Transform likewise visits all retained source keyframes. Speed and
 Transform each keep a clip-local stored-source selection separate from track
 inspection, so several stored keyframes can be visited even when they preview
 the same first/last image. Enabled setting chips in stored Keyframes rows retain
@@ -336,18 +336,21 @@ Translate Y / Rotation °**, each with a native slider and exact number field.
 Scale preserves aspect and accepts **0.1–8**. Translation accepts **−2–2** as
 fractions of the whole output width/height, not source pixels. Rotation is
 clockwise, **−180°–180°**, around the original image centre. Crop fractions each
-stay below 1 and opposite crops must sum to less than 1; cropping never refits or
+stay below 1; opposite crops that meet or cross simply display nothing. Cropping never refits or
 recentres the retained image. Uncovered pixels from nonneutral transforms reveal
 lower tracks; exact neutral poses retain the old opaque black letterbox.
 
 - Without keyframes, values edit this clip's saved base. Turn Animate Transform on
-  and click the single **Transform keyframe at displayed source frame** diamond
-  to capture all eight evaluated
-  values at the real displayed integer source frame. With animation, main values
-  are read-only at a source frame without a keyframe until explicitly captured; sliders
-  never add keyframes. Capture requires the real playhead inside the selected clip.
-- All eight values use **Easing** together; one keyframe overrides the
-  entire base, holding before the first/after the last keyframe. Rotation interpolates
+  and click a setting's own diamond (for example **Keyframe Scale**) to capture that
+  setting's evaluated value at the real displayed integer source frame; other settings
+  stay unkeyed, or join the same keyframe with their own diamond. A keyed setting
+  is read-only at a source frame without its keyframe until captured; sliders
+  never add keyframes, and unkeyed settings stay editable. Capture requires the real
+  playhead inside the selected clip. Each setting also has **Previous/Next** buttons
+  that visit only its own keyframes.
+- Each setting interpolates between its own keyframes, using the **Easing** of the
+  keyframe on its left; a keyed setting overrides its base, holding before the first/after
+  the last keyframe. Rotation interpolates
   numerically, not by shortest arc: +170° to −170° passes through 0°.
 - **Selected Transform keyframe**, the header's **Previous/Next** pair and
   **Preview stored keyframe** reach all retained keyframes, including outside the
@@ -355,19 +358,19 @@ lower tracks; exact neutral poses retain the old opaque black letterbox.
   is separate from track inspection and can advance even when previews coincide. The stored
   source time is shown separately from the actual preview's source frame; preview
   uses the closest mapped image rather than an unavailable or invented frame.
-  Stored **Source frame**, **Easing** and pose fields edit that selected keyframe; time and
-  value edits do not seek automatically. Easing is disabled on the last keyframe.
-- Numeric Enter/blur applies exact values; Escape restores. Invalid crop sums,
-  collisions, fractional/out-of-original frames and out-of-bounds values stay
+  Stored **Source frame**, **Easing** and the fields of its enabled settings edit that selected keyframe; time and
+  value edits do not seek automatically. Easing is disabled when no enabled setting continues to a later keyframe.
+- Numeric Enter/blur applies exact values; Escape restores. Collisions,
+  fractional/out-of-original frames and out-of-bounds values stay
   editable with errors, never silently clamp or overwrite. Slider movement is
   local only; valid release changes the image in one Undo. Escape, cancellation,
   capture loss or window blur cancels it without saving; keyboard adjustments
   are individual validated edits.
-- The trash action removes only the selected full-pose keyframe. Removing the last
-  keyframe reveals the unchanged base. **Reset transform** deliberately restores the
+- The trash action removes only the selected keyframe. Removing a setting's last
+  keyframe reveals its unchanged base. **Reset transform** deliberately restores the
   neutral base and clears all spatial keyframes in one Undo.
 
-Up to **256** full-pose keyframes belong to each clip, separately from the video
+Up to **256** keyframes belong to each clip, separately from the video
 track's keyframes. Trims/restoration, moves and Ripple retain original-source anchors;
 splits, cuts and duplicates retain independent deep copies, including off-trim
 keyframes. Retiming drives geometry continuously even while a recorded image is held;

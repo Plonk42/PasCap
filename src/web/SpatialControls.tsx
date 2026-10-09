@@ -4,8 +4,12 @@ import type { ProjectDocument, VideoClip } from '../shared/model.js';
 import {
   createSpatialSettings,
   evaluateSpatial,
+  hasSpatialChannelKeys,
   hasSpatialEdits,
-  type SpatialPose,
+  NEUTRAL_SPATIAL_POSE,
+  spatialKeyChannels,
+  type SpatialChannel,
+  type SpatialKeyframe,
   type SpatialSettings,
 } from '../shared/spatial.js';
 import { previewClipSource } from './clip-speed-geometry.js';
@@ -15,17 +19,20 @@ import { HelpPopover } from './HelpPopover.js';
 import { Icon } from './icons.js';
 import { InspectorSection } from './InspectorSection.js';
 import { useKeyframeNavigation } from './keyframe-navigation.js';
+import './keyframe-navigation.css';
+import './layer-keyframes.css';
 import { NumberField } from './NumberField.js';
 import './spatial-editor.css';
 import {
-  captureSpatialKey,
   editSpatialPose,
   removeSpatialKey,
   replaceSpatialKey,
   SPATIAL_CONTROLS,
   spatialPlayhead,
+  toggleSpatialChannel,
 } from './spatial-editor.js';
 import { inspectSpatialKeyframe, reconcileSpatialInspection, type SpatialInspection } from './spatial-navigation.js';
+import { ResetLabel } from './SettingValueControl.js';
 import { ValueControl } from './ValueControl.js';
 
 interface Props {
@@ -77,44 +84,145 @@ function useSpatialSelection(settings: SpatialSettings) {
   };
 }
 
+interface ChannelKeys {
+  keyed: boolean;
+  active: boolean;
+  previous: SpatialKeyframe | undefined;
+  next: SpatialKeyframe | undefined;
+  captureDisabled: boolean;
+  onToggle: () => void;
+  onSeek: (key: SpatialKeyframe) => void;
+}
+
+/** One channel's diamond and Previous/Next, matching the Colour setting controls. */
+function SpatialChannelKeys({
+  label,
+  keys,
+  disabled,
+}: Readonly<{ label: string; keys: ChannelKeys; disabled: boolean }>) {
+  const { keyed, active, previous, next } = keys;
+  return (
+    <span className="keyframe-setting-navigation" data-animated={keyed}>
+      <button
+        type="button"
+        className={`keyframe-toggle${active ? ' active' : ''}`}
+        aria-label={`Keyframe ${label}`}
+        aria-pressed={active}
+        title={
+          active
+            ? `Remove ${label} from the Transform keyframe at the displayed source frame. Other settings at this keyframe stay unchanged.`
+            : `Keyframe ${label} at the displayed source frame. Capture the displayed value for this clip.`
+        }
+        disabled={disabled || keys.captureDisabled}
+        onClick={keys.onToggle}
+      >
+        <span aria-hidden="true">{active ? '◆' : '◇'}</span>
+      </button>
+      <span className="channel-keyframe-navigation">
+        <button
+          type="button"
+          className="icon-button"
+          aria-label={`Previous ${label} keyframe`}
+          title={previous ? `Go to source frame ${previous.frame}.` : `No previous ${label} keyframe`}
+          aria-disabled={disabled || !previous}
+          tabIndex={disabled || !previous ? -1 : 0}
+          onClick={() => {
+            if (previous && !disabled) keys.onSeek(previous);
+          }}
+        >
+          <Icon name="back" size={12} />
+        </button>
+        <button
+          type="button"
+          className="icon-button"
+          aria-label={`Next ${label} keyframe`}
+          title={next ? `Go to source frame ${next.frame}.` : `No next ${label} keyframe`}
+          aria-disabled={disabled || !next}
+          tabIndex={disabled || !next ? -1 : 0}
+          onClick={() => {
+            if (next && !disabled) keys.onSeek(next);
+          }}
+        >
+          <Icon name="forward" size={12} />
+        </button>
+      </span>
+    </span>
+  );
+}
+
+/** Eight settings with the Colour pattern: a diamond and arrows each, read-only until captured. */
 function PoseFields({
-  pose,
+  values,
   prefix,
   context,
   disabled,
+  readOnly,
+  channels,
+  keysFor,
   validate,
   onCommit,
+  onReset,
 }: Readonly<{
-  pose: SpatialPose;
+  values: Readonly<Record<SpatialChannel, number>>;
   prefix: string;
   context: string;
   disabled: boolean;
-  validate: (key: keyof SpatialPose, value: number) => string | null;
-  onCommit: (key: keyof SpatialPose, value: number) => void;
+  /** Channels that cannot be edited here (animated without a key at this frame). */
+  readOnly?: (channel: SpatialChannel) => boolean;
+  channels?: readonly SpatialChannel[];
+  keysFor?: ((channel: SpatialChannel) => ChannelKeys) | undefined;
+  validate: (key: SpatialChannel, value: number) => string | null;
+  onCommit: (key: SpatialChannel, value: number) => void;
+  onReset?: (key: SpatialChannel) => void;
 }>) {
   const id = useId();
   return (
     <div className="spatial-pose-fields">
-      {SPATIAL_CONTROLS.map((control) => (
-        <div className="spatial-pose-field" key={control.key}>
-          <label htmlFor={`${id}-${control.key}`}>
-            {control.label}
-            {control.key === 'rotation' ? ' °' : ''}
-          </label>
-          <ValueControl
-            id={`${id}-${control.key}`}
-            aria-label={`${prefix} ${control.label}`}
-            value={pose[control.key]}
-            min={control.min}
-            max={control.max}
-            step={control.step}
-            disabled={disabled}
-            resetKey={`${context}:${control.key}`}
-            validate={(value) => validate(control.key, value)}
-            onCommit={(value) => onCommit(control.key, value)}
-          />
-        </div>
-      ))}
+      {SPATIAL_CONTROLS.filter((control) => !channels || channels.includes(control.key)).map((control) => {
+        const fieldId = `${id}-${control.key}`;
+        const keys = keysFor?.(control.key);
+        const locked = disabled || (readOnly?.(control.key) ?? false);
+        const unit = control.key === 'rotation' ? ' °' : '';
+        return (
+          <div
+            className="colour-control layer-keyed-control spatial-pose-field"
+            key={control.key}
+            data-animated={keys?.keyed ?? false}
+            data-key-at-playhead={keys?.active ?? false}
+          >
+            <span>
+              <ResetLabel
+                htmlFor={fieldId}
+                title={`Double-click to reset ${control.label}`}
+                onReset={() => {
+                  if (!locked && onReset && values[control.key] !== NEUTRAL_SPATIAL_POSE[control.key])
+                    onReset(control.key);
+                }}
+              >
+                {control.label}
+                {unit}
+              </ResetLabel>
+              {keys && (
+                <span className="colour-control-actions">
+                  <SpatialChannelKeys label={control.label} keys={keys} disabled={disabled} />
+                </span>
+              )}
+            </span>
+            <ValueControl
+              id={fieldId}
+              aria-label={`${prefix} ${control.label}`}
+              value={values[control.key]}
+              min={control.min}
+              max={control.max}
+              step={control.step}
+              disabled={locked}
+              resetKey={`${context}:${control.key}`}
+              validate={(value) => validate(control.key, value)}
+              onCommit={(value) => onCommit(control.key, value)}
+            />
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -122,7 +230,7 @@ function PoseFields({
 export function TransformHelp() {
   return (
     <HelpPopover label="Transform animation" guide="crop-scale-translate-and-rotate-a-clip">
-      <p>Crop, scale, move and rotate this clip. Values animate only if you add a keyframe first (◇).</p>
+      <p>Crop, scale, move and rotate this clip. A setting animates once you add a keyframe for it (◇).</p>
       <p className="editor-help-tip">Tip: Reset transform restores the original framing.</p>
     </HelpPopover>
   );
@@ -145,10 +253,15 @@ export function SpatialControls({
   const context = `${project.id}:${clip.id}`;
   const settings = clip.spatial;
   const playhead = spatialPlayhead(project, clip.id, frame);
-  const active = settings.keyframes.find((key) => key.frame === playhead?.frame);
-  const pose = active?.values ?? evaluateSpatial(settings, playhead?.position ?? clip.sourceIn);
-  const editable = !settings.keyframes.length || active !== undefined;
-  const scope = active ? 'Keyframe at displayed source frame' : 'Animated · add a Transform keyframe to edit';
+  const atDisplayed = settings.keyframes.find((key) => key.frame === playhead?.frame);
+  const evaluated = evaluateSpatial(settings, playhead?.position ?? clip.sourceIn);
+  const pose = Object.fromEntries(
+    SPATIAL_CONTROLS.map(({ key }) => [key, atDisplayed?.values[key] ?? evaluated[key]]),
+  ) as Record<SpatialChannel, number>;
+  const channelActive = (channel: SpatialChannel): boolean => atDisplayed?.values[channel] != null;
+  const readOnly = (channel: SpatialChannel): boolean =>
+    hasSpatialChannelKeys(settings, channel) && !channelActive(channel);
+  const anyReadOnly = SPATIAL_CONTROLS.some(({ key }) => readOnly(key));
   const selection = useSpatialSelection(settings);
   const [lastInspected, setLastInspected] = useState(selectedFrame);
   if (lastInspected !== selectedFrame) {
@@ -162,6 +275,12 @@ export function SpatialControls({
   }
   const index = settings.keyframes.findIndex((key) => key.frame === selection.selected);
   const selected = settings.keyframes[index];
+  // Easing only matters where an enabled setting continues to a later key.
+  const laterKeyExists =
+    selected !== undefined &&
+    spatialKeyChannels(selected).some((channel) =>
+      settings.keyframes.some((key) => key.frame > selected.frame && key.values[channel] !== null),
+    );
   const [error, setError] = useState('');
   const validate = (produce: () => SpatialSettings): string | null => {
     try {
@@ -189,33 +308,25 @@ export function SpatialControls({
     onSelectStored?.(point.frame);
     (navigation.onSeekSourceKeyframe ?? onSeek)(previewClipSource(project, clip.id, point.frame));
   };
+  // Per-channel arrows step from the inspected stored frame, else the displayed source frame.
+  const cursor = selectedFrame ?? playhead?.frame ?? clip.sourceIn;
+  const keysFor = (channel: SpatialChannel): ChannelKeys => {
+    const keyed = settings.keyframes.filter((key) => key.values[channel] !== null);
+    return {
+      keyed: keyed.length > 0,
+      active: channelActive(channel),
+      previous: [...keyed].reverse().find((key) => key.frame < cursor),
+      next: keyed.find((key) => key.frame > cursor),
+      captureDisabled: unavailable || playhead === null || (!atDisplayed && settings.keyframes.length >= 256),
+      onToggle: () => {
+        if (playhead) change(() => toggleSpatialChannel(settings, channel, playhead.frame, playhead.position));
+      },
+      onSeek: (key) => seek(settings.keyframes.indexOf(key)),
+    };
+  };
   return (
     <section className="spatial-editor" aria-label="Clip Transform editor">
       <div className="spatial-tools">
-        {animate && (
-          <button
-            type="button"
-            className="keyframe-toggle icon-button"
-            aria-label="Transform keyframe at displayed source frame"
-            aria-pressed={active !== undefined}
-            title={
-              active
-                ? `Remove the full Transform keyframe at source frame ${active.frame}`
-                : 'Capture the full evaluated pose at the displayed source frame'
-            }
-            disabled={unavailable || playhead === null || (!active && settings.keyframes.length >= 256)}
-            onClick={() => {
-              if (!playhead) return;
-              change(() =>
-                active
-                  ? removeSpatialKey(settings, active.frame)
-                  : captureSpatialKey(settings, playhead.frame, playhead.position),
-              );
-            }}
-          >
-            <span aria-hidden="true">{active ? '◆' : '◇'}</span>
-          </button>
-        )}
         <span>{settings.keyframes.length} Transform keyframes</span>
         <button
           type="button"
@@ -228,18 +339,24 @@ export function SpatialControls({
           Reset
         </button>
       </div>
-      {settings.keyframes.length > 0 && (
+      {anyReadOnly && (
         <p className="control-hint">
-          {playhead ? `Source frame ${playhead.frame}` : 'Playhead outside clip'} · {scope}
+          {playhead ? `Source frame ${playhead.frame}` : 'Playhead outside clip'} · Animated · add a keyframe to edit a
+          setting here.
         </p>
       )}
       <PoseFields
-        pose={pose}
+        values={pose}
         prefix="Transform"
         context={`${context}:main:${settings.keyframes.length ? playhead?.frame : 'base'}`}
-        disabled={unavailable || !editable}
+        disabled={unavailable}
+        readOnly={readOnly}
+        keysFor={animate ? keysFor : undefined}
         validate={(key, value) => validate(() => editSpatialPose(settings, playhead?.frame ?? null, key, value))}
         onCommit={(key, value) => change(() => editSpatialPose(settings, playhead?.frame ?? null, key, value))}
+        onReset={(key) =>
+          change(() => editSpatialPose(settings, playhead?.frame ?? null, key, NEUTRAL_SPATIAL_POSE[key]))
+        }
       />
       {selected && (
         <section hidden={!animate} className="spatial-stored" aria-label="Stored Transform keyframe">
@@ -305,12 +422,13 @@ export function SpatialControls({
             <EasingSelect
               aria-label="Transform keyframe easing"
               value={selected.interpolation}
-              disabled={unavailable || index === settings.keyframes.length - 1}
+              disabled={unavailable || !laterKeyExists}
               onChange={(interpolation) => change(() => replaceSpatialKey(settings, selected.frame, { interpolation }))}
             />
           </label>
           <PoseFields
-            pose={selected.values}
+            values={selected.values as Record<SpatialChannel, number>}
+            channels={spatialKeyChannels(selected)}
             prefix="Stored Transform"
             context={`${context}:stored:${selection.identity}`}
             disabled={unavailable}

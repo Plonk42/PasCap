@@ -132,8 +132,7 @@ Clip documents contain independent **constant, ramp or custom-keyframed**
 speed and required `spatial: { base, keyframes }`, with no colour/correction or `opacity` field.
 Shared track animation has no per-property track keyframe arrays. Clip speed and spatial
 keyframes use original-source frames in their separate clip-owned settings; neither
-changes track-channel ownership or precedence. Spatial keyframes capture complete
-eight-value poses, not nullable enabled settings.
+changes track-channel ownership or precedence. Spatial keyframes enable each of the eight settings independently (nullable per setting), like track keyframes.
 Trimming, restoring, moving, splitting and duplicating footage **never copy or
 shift track keyframes or change track Colour/Opacity**. Split/duplicate create independent source
 ranges, speed and deep-copied spatial settings, retaining original-source
@@ -225,7 +224,7 @@ speed source keyframes of the selected clip, including off-trim keyframes and th
 original exclusive OUT, previewing the nearest mapped image through authoritative
 `PlacedClip.retiming`. Track Speed overrides but retains clip keyframes and their
 navigation, with that override indicated. Transform likewise visits all retained
-full-pose source keyframes, including off-trim/original OUT. Speed and Transform
+source keyframes, including off-trim/original OUT. Speed and Transform
 each use an independent clip-local stored-source cursor rather than the central
 track cursor, advancing through successive stored keyframes even when their
 nearest first/last preview image is the same. Stored source time remains distinct
@@ -609,7 +608,7 @@ not all sources or loop repetitions. It grows with duration and is additional to
 the unchanged video raw-buffer/child/LUT bounds above. Cancellation/failure removes
 only owned scratch, never originals, saved projects or successful outputs.
 
-Schema **v12 is strict**, including complete required video track `colour` with Temperature/Tint and static HSL/curves, no clip colour/correction fields, and clip `spatial` base/eight-value full-pose
+Schema **v12 is strict**, including complete required video track `colour` with Temperature/Tint and static HSL/curves, no clip colour/correction fields, and clip `spatial` base/eight-value
 source-frame keyframes and required unique `media.videoIds` / `media.audioIds`
 arrays, at most 10,000 IDs each, and all required per-track settings. Project-level
 transitions/fades, saved `clip.opacity` and old `clipOpacity`/`layerOpacity` keyframe

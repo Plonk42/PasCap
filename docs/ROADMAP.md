@@ -13,7 +13,7 @@ deadline; hardware/real-media work requires explicit owner consent.
 The local schema-12 contract covers no-copy footage import, projects, source
 clips, multi-track timelines, colour/speed/opacity track keyframes, music and verified
 720p/4K export, with precise clip-only speed curves as well as overriding video track Speed.
-Clip-owned crop/scale/translation/rotation and full-pose source-frame animation
+Clip-owned crop/scale/translation/rotation and per-setting source-frame animation
 are specified by [#20's current contract](design/SPATIAL_TRANSFORMS.md), without
 claiming qualification or changing milestone status.
 The final approved [#67](https://github.com/Plonk42/PasCap/issues/67) contract has

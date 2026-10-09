@@ -34,7 +34,7 @@ Usage belongs in [the user guide](../USER_GUIDE.md) and
   HSL/curves remain static. There is no clip colour/correction, clip opacity or
   second opacity channel. Clip constant/ramp/custom source-frame speed retains
   its ownership and retiming. Schema 12 also requires clip-owned spatial
-  base/full-pose source-frame keyframes;
+  base/per-setting source-frame keyframes;
   [spatial transforms](SPATIAL_TRANSFORMS.md) do not change music or video track Opacity.
 
 v1–v11 projects and receipt snapshots are incompatible and preserved byte-for-byte,

@@ -314,7 +314,7 @@ keyframes; Speed visits track Speed keyframes plus all retained custom speed sou
 keyframes of the selected clip, including off-trim keyframes and original exclusive
 OUT, previewing the nearest mapped image through authoritative retiming. Track
 Speed overrides but retains clip keyframes and their navigation. Transform likewise
-visits all retained full-pose source keyframes, including off-trim/original OUT.
+visits all retained source keyframes, including off-trim/original OUT.
 Speed and Transform each keep a clip-local stored-source cursor independent of
 track inspection, allowing successive keyframes to be visited even when their
 nearest first/last preview image is the same. Main capture always uses the real
@@ -329,10 +329,10 @@ and **Ramp easing**, and unchanged interpolation.
 **Clip → Transform** is clip-owned, not another shared track channel or shared marker.
 Its **Crop left / Crop right / Crop top / Crop bottom / Scale / Translate X /
 Translate Y / Rotation °** sliders and exact fields edit the saved base without
-keyframes. With keyframes, main values require a full-pose keyframe at the actually displayed
-integer source frame at the real playhead; otherwise they are read-only. The
-single Animate-on **Transform keyframe at displayed source frame** diamond explicitly
-captures the complete continuously evaluated pose; sliders never create keyframes.
+keyframes. With keyframes, a keyed setting's main value requires that setting's keyframe at the actually displayed
+integer source frame at the real playhead; otherwise it is read-only, while unkeyed settings still edit their base. Each
+Animate-on setting has its own diamond (**Keyframe Scale**, etc.) and Previous/Next; a diamond explicitly
+captures that setting's continuously evaluated value; sliders never create keyframes.
 Capture is unavailable outside the selected clip or during blocked/draft states.
 
 **Selected Transform keyframe**, the section header's **Previous/Next** pair and
@@ -673,7 +673,7 @@ collection; another project's membership and immutable export snapshots are unaf
 Only strict v12 projects and v12 project snapshots in version-1 export receipts are interpreted.
 Every video track requires complete Colour, including `temperature` and `tint` bases
 and static HSL/curves; missing fields and clip colour/correction are invalid.
-Every clip requires complete spatial base/full-pose source-frame keyframes with easing;
+Every clip requires complete spatial base/per-setting source-frame keyframes with easing;
 missing spatial data is invalid, not default-filled. Original-source keyframes remain
 stored outside trims and at original exclusive OUT, without extending duration.
 The required `music` array holds 0–8 music tracks with unique required `id` values and

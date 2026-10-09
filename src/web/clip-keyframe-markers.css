@@ -40,6 +40,13 @@
   color: #ffc7bb;
 }
 
+/* Transform keys hang from the clip's top edge as ▼ tabs, apart from the bottom Colour/Speed markers. */
+.timeline-clip-key.transform {
+  top: 0;
+  height: 8px;
+  font-size: 8px;
+}
+
 .timeline-clip-key > span {
   position: relative;
   z-index: 6;

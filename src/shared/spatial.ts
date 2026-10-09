@@ -4,7 +4,10 @@ import { interpolationSchema, keyInterval, orderedKeys } from './keyframes.js';
 // Zod numbers already reject NaN and infinities; no coercion or persisted defaults.
 const cropFraction = z.number().min(0).lt(1);
 
-/** Crop removes source coverage; it never refits or moves the original-centre pivot. */
+/**
+ * Crop removes source coverage; it never refits or moves the original-centre pivot.
+ * Opposite edges summing to 1 or more simply cover nothing, so no pairwise refinement.
+ */
 export const spatialPoseSchema = z
   .object({
     cropLeft: cropFraction,
@@ -16,18 +19,40 @@ export const spatialPoseSchema = z
     translateY: z.number().min(-2).max(2),
     rotation: z.number().min(-180).max(180),
   })
-  .strict()
-  .refine((pose) => pose.cropLeft + pose.cropRight < 1 && pose.cropTop + pose.cropBottom < 1, {
-    message: 'Crop must retain a positive source width and height.',
-  });
+  .strict();
 
 export type SpatialPose = z.infer<typeof spatialPoseSchema>;
+export type SpatialChannel = keyof SpatialPose;
+
+/** Ordered control catalogue; every channel animates independently. */
+export const SPATIAL_CHANNELS = Object.freeze(Object.keys(spatialPoseSchema.shape) as SpatialChannel[]);
+
+const poseShape = spatialPoseSchema.shape;
+
+/** Each channel is a number (enabled at this key) or null (not keyed here). */
+export const spatialKeyValuesSchema = z
+  .object({
+    cropLeft: poseShape.cropLeft.nullable(),
+    cropRight: poseShape.cropRight.nullable(),
+    cropTop: poseShape.cropTop.nullable(),
+    cropBottom: poseShape.cropBottom.nullable(),
+    scale: poseShape.scale.nullable(),
+    translateX: poseShape.translateX.nullable(),
+    translateY: poseShape.translateY.nullable(),
+    rotation: poseShape.rotation.nullable(),
+  })
+  .strict()
+  .refine((values) => Object.values(values).some((value) => value !== null), {
+    message: 'A Transform keyframe must enable at least one setting.',
+  });
+
+export type SpatialKeyValues = z.infer<typeof spatialKeyValuesSchema>;
 
 export const spatialKeyframeSchema = z
   .object({
     frame: z.number().int().nonnegative().max(2_147_483_647),
     interpolation: interpolationSchema,
-    values: spatialPoseSchema,
+    values: spatialKeyValuesSchema,
   })
   .strict();
 
@@ -65,28 +90,47 @@ function requireFinite(value: number, label: string): void {
   if (!Number.isFinite(value)) throw new Error(`${label} must be finite.`);
 }
 
+function evaluateChannel(
+  keys: readonly SpatialKeyframe[],
+  channel: SpatialChannel,
+  sourcePosition: number,
+  base: number,
+): number {
+  // Each channel interpolates between its own enabled keys, using the left key's easing.
+  const interval = keyInterval(
+    keys.filter((key) => key.values[channel] !== null),
+    sourcePosition,
+  );
+  if (!interval) return base;
+  const { left, right, progress } = interval;
+  const from = left.values[channel]!;
+  // Exact endpoints also preserve values at Hold boundaries and avoid round-off there.
+  if (left === right || progress === 0) return from;
+  const to = right.values[channel]!;
+  if (progress === 1) return to;
+  // Numeric interpolation deliberately travels through zero from +170 to -170.
+  return from * (1 - progress) + to * progress;
+}
+
 /** Continuous original-source position, not a rounded frame or trim-relative time. */
 export function evaluateSpatial(settings: SpatialSettings, sourcePosition: number): SpatialPose {
   requireFinite(sourcePosition, 'Spatial source position');
   const validated = spatialSettingsSchema.parse(settings);
-  const interval = keyInterval(validated.keyframes, sourcePosition);
-  if (!interval) return { ...validated.base };
-  const { left, right, progress } = interval;
-  // Exact endpoints also preserve values at Hold boundaries and avoid round-off there.
-  if (left === right || progress === 0) return { ...left.values };
-  if (progress === 1) return { ...right.values };
-  const mix = (from: number, to: number): number => from * (1 - progress) + to * progress;
-  return {
-    cropLeft: mix(left.values.cropLeft, right.values.cropLeft),
-    cropRight: mix(left.values.cropRight, right.values.cropRight),
-    cropTop: mix(left.values.cropTop, right.values.cropTop),
-    cropBottom: mix(left.values.cropBottom, right.values.cropBottom),
-    scale: mix(left.values.scale, right.values.scale),
-    translateX: mix(left.values.translateX, right.values.translateX),
-    translateY: mix(left.values.translateY, right.values.translateY),
-    // Numeric interpolation deliberately travels through zero from +170 to -170.
-    rotation: mix(left.values.rotation, right.values.rotation),
-  };
+  const pose = { ...validated.base };
+  if (!validated.keyframes.length) return pose;
+  for (const channel of SPATIAL_CHANNELS)
+    pose[channel] = evaluateChannel(validated.keyframes, channel, sourcePosition, validated.base[channel]);
+  return pose;
+}
+
+/** True when this channel has at least one stored key, so its base is overridden. */
+export function hasSpatialChannelKeys(settings: SpatialSettings, channel: SpatialChannel): boolean {
+  return settings.keyframes.some((key) => key.values[channel] !== null);
+}
+
+/** Channels enabled at one stored key, in control order. */
+export function spatialKeyChannels(key: SpatialKeyframe): SpatialChannel[] {
+  return SPATIAL_CHANNELS.filter((channel) => key.values[channel] !== null);
 }
 
 /** Exact identity only; tiny edits must not enter the legacy opaque-letterbox path. */

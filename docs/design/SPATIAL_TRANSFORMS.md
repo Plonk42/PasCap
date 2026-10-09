@@ -1,7 +1,8 @@
 # Clip spatial transforms · strict project schema 12
 
-Current contract for [#20](https://github.com/Plonk42/PasCap/issues/20): static and
-keyframed crop, uniform scale, translation and rotation on each clip.
+Current contract for [#20](https://github.com/Plonk42/PasCap/issues/20) and
+[#90](https://github.com/Plonk42/PasCap/issues/90): static and keyframed crop, uniform
+scale, translation and rotation on each clip, each setting animating independently.
 This describes the implementation contract, not test results, hardware/long-run
 qualification, release approval or milestone closure. Usage is in
 [the user guide](../USER_GUIDE.md); timing and resources are in
@@ -20,20 +21,24 @@ Implementation authorities: [pose/schema/mapping](../../src/shared/spatial.ts),
 Every schema-12 clip requires `spatial: { base, keyframes }`. Both objects and all
 keyframes are strict: no unknown fields, optional legacy values, coercion, persisted
 defaults or load-time repair. `base` is one complete eight-value pose;
-`keyframes` is a required array of **0–256** complete poses. Each keyframe requires
-`{ frame, interpolation, values }`, with all eight numeric fields in `values`.
+`keyframes` is a required array of **0–256** keys. Each key requires
+`{ frame, interpolation, values }`: all eight fields are required in `values`, each a
+number (the setting is keyed here) or `null` (it is not), with at least one number.
 Frames are unique ascending integers in **0–2,147,483,647**, measured from the
 original recording's frame zero, never the clip IN or its project start.
 Registered-source validation additionally requires every keyframe to be at or before
 the original's exclusive OUT (`frameCount`), including keyframes outside the trim.
 
-| Field                       | Bounds and meaning                                    | New-clip neutral value |
-| --------------------------- | ----------------------------------------------------- | ---------------------- |
-| `cropLeft` / `cropRight`    | Each in [0, 1), fractions of original width; sum < 1  | 0 / 0                  |
-| `cropTop` / `cropBottom`    | Each in [0, 1), fractions of original height; sum < 1 | 0 / 0                  |
-| `scale`                     | Uniform, aspect-preserving 0.1–8                      | 1                      |
-| `translateX` / `translateY` | −2–2, fractions of full output width/height           | 0 / 0                  |
-| `rotation`                  | −180°–180°, clockwise                                 | 0                      |
+| Field                       | Bounds and meaning                           | New-clip neutral value |
+| --------------------------- | -------------------------------------------- | ---------------------- |
+| `cropLeft` / `cropRight`    | Each in [0, 1), fractions of original width  | 0 / 0                  |
+| `cropTop` / `cropBottom`    | Each in [0, 1), fractions of original height | 0 / 0                  |
+| `scale`                     | Uniform, aspect-preserving 0.1–8             | 1                      |
+| `translateX` / `translateY` | −2–2, fractions of full output width/height  | 0 / 0                  |
+| `rotation`                  | −180°–180°, clockwise                        | 0                      |
+
+Opposite crops may meet or cross (left + right ≥ 1, or top + bottom ≥ 1): that
+covers nothing and the clip displays nothing there. It is never rejected or repaired.
 
 Neutral creation values are not defaults for missing saved data. Spatial keyframes
 belong only to `clip.spatial`; they add no video track channels or shared track markers.
@@ -43,15 +48,18 @@ fields), track-only Colour ownership, clip-owned speed and final
 [#67](https://github.com/Plonk42/PasCap/issues/67) sole video track **Opacity** remain
 unchanged. No saved `clip.opacity` or second opacity multiplier is introduced.
 
-With no keyframes, `base` holds for the whole clip. With any keyframes, the full-pose
-curve overrides all eight base values everywhere, including endpoint holds
-before the first and after the last keyframe. A single keyframe therefore holds its whole
-pose throughout. The left keyframe's required `interpolation` is `hold`, `linear`,
-`ease-in`, `ease-out` or `smooth`, shared by all eight values toward the next keyframe.
-Interpolation is numeric component-by-component, not an affine-matrix or image
+With no keys for a setting, its `base` value holds for the whole clip. Once any key
+enables a setting, that setting's curve overrides its base everywhere, including
+endpoint holds before its first and after its last key; a single key holds its value
+throughout. Each setting interpolates between its own enabled keys, skipping keys that
+leave it `null`, so a key for Scale never interrupts Rotation. The left key's required
+`interpolation` (`hold`, `linear`, `ease-in`, `ease-out` or `smooth`) applies to each
+of its enabled settings toward that setting's next key. Interpolation is numeric
+setting-by-setting, not an affine-matrix or image
 crossfade. Rotation does **not** take a shortest arc: +170° to −170° travels
-through 0°. Removing all keyframes reveals the unchanged saved base. **Reset transform**
-is different: it deliberately clears all keyframes and restores the neutral base.
+through 0°. Removing a setting's last key reveals its unchanged saved base. **Reset
+transform** is different: it deliberately clears all keyframes and restores the
+neutral base.
 
 ## Timing and retained anchors
 
@@ -160,21 +168,25 @@ The native **Animate Transform** toggle is a presentation-only browser-local
 section preference. With no stored choice, unanimated Transform starts off and
 existing spatial keyframes start on. Turning it off retains all keyframes, rendering,
 read-only constraints and history without a project save or Undo step; it changes
-no schema or stored data. When on, it exposes the full-pose capture diamond and
-one Previous/Next pair in the section header.
+no schema or stored data. When on, each setting exposes its own capture diamond and
+Previous/Next buttons, and the section header has one Previous/Next pair.
 
 The eight **Crop left / Crop right / Crop top / Crop bottom / Scale / Translate X /
-Translate Y / Rotation °** controls each pair a native slider with an exact field.
-Without keyframes they edit the clip base. With keyframes, main fields are read-only unless
-a keyframe exists at the **actually displayed integer source frame** at the real
-project playhead, even with Animate off. The single
-**Transform keyframe at displayed source frame** diamond captures the complete
-continuously evaluated pose there, with Linear
-easing for a new keyframe; a filled diamond removes that whole keyframe. Sliders/numbers
-never create keyframes. Capture is unavailable outside the clip, during blocked/draft
-states or at the 256-keyframe limit (existing-keyframe removal remains possible).
+Translate Y / Rotation °** controls each pair a native slider with an exact field,
+following the Colour pattern. A setting with no keys edits the clip base. Once a setting
+has keys, its main field is read-only unless that setting is keyed at the **actually
+displayed integer source frame** at the real project playhead, even with Animate off;
+other settings stay editable. Each setting's diamond (**Keyframe Scale**, etc.) captures
+that setting's continuously evaluated value at the displayed source frame, creating a
+Linear-eased key or joining the existing key there; a filled diamond removes only that
+setting (and the key once no setting remains). Sliders/numbers never create keyframes.
+Capture is unavailable outside the clip, during blocked/draft states or at the
+256-key limit (removal and joining an existing key remain possible). Double-clicking a
+setting's name resets only that setting.
 
-**Selected Transform keyframe**, the header's **Previous/Next Transform keyframe** and
+**Previous/Next** per setting (**Previous Scale keyframe**, etc.) visit strictly earlier/
+later keys that enable that setting. **Selected Transform keyframe**, the header's
+**Previous/Next Transform keyframe** and
 **Preview stored keyframe** navigate all retained source keyframes, including off-trim
 keyframes and original exclusive OUT. Preview uses the closest actually mapped image
 (first/last available output at trim boundaries), not a fictional source frame.
@@ -184,15 +196,15 @@ keyframes even when their nearest preview image is the same. This selection is
 separate from track off-duration inspection and Speed's clip-local cursor;
 main fields and capture never use the stored selection as a fake playhead.
 
-Stored **Source frame**, **Easing** and all eight pose fields target that
-selected keyframe. Contextual accessible easing names remain unchanged. Easing is
-disabled on the last keyframe, which has no next interval.
-The trash action **Delete selected Transform keyframe** removes only it; deleting
-the last keyframe restores the saved base. **Reset transform** clears the whole spatial
+The stored section edits only the selected key: **Source frame**, **Easing** and the
+fields of its enabled settings. Contextual accessible easing names remain unchanged.
+Easing is disabled when none of its enabled settings continues to a later key.
+The trash action **Delete selected Transform keyframe** removes the whole key; deleting
+a setting's last key restores its saved base. **Reset transform** clears the whole spatial
 animation and restores the neutral base in one Undo step.
 
 Numeric drafts retain full entered precision, apply on Enter/blur and restore on
-Escape. Empty/nonfinite/out-of-bounds values, crop sums ≥1, fractional/out-of-original
+Escape. Empty/nonfinite/out-of-bounds values, fractional/out-of-original
 frames and occupied keyframe times retain editable inline errors; they never clamp,
 merge or overwrite. Value/time/easing edits do not automatically seek. Valid
 edits are one Undo step; keyframe movement and Undo preserve selected field identity.
@@ -200,12 +212,15 @@ Slider movement drafts only the local control, not preview/document/history/save
 valid release commits once and updates the image. Escape, pointer cancellation,
 lost capture or window blur restores the starting value; invalid release commits
 nothing. Each keyboard slider adjustment is an individual validated edit. There
-is no Transform graph-keyframe drag, canvas gizmo or per-property diamond workflow.
+is no Transform graph-keyframe drag or canvas gizmo.
 
 ### Timeline source-keyframe markers
 
-Each clip rectangle has a pale-blue **◆** Transform lane, distinct from the
-salmon/dashed **◆** custom-speed lane and shared project-time track markers.
+Each clip rectangle hangs Transform keys from its top edge as pale-blue **▼** tabs,
+clear of the bottom shared project-time track markers and the salmon/dashed **◆**
+custom-speed lane; the tab shape and the marker's accessible name and tooltip (which
+list the enabled settings) distinguish it without relying on colour. One marker
+represents one key, however many settings it enables.
 Source keyframes use the clip's authoritative retiming to locate output positions;
 off-trim keyframes are omitted. A keyframe at exclusive OUT is a boundary marker and seeks
 the final available frame. Click, Enter or Space selects the clip and seeks the

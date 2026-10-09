@@ -115,17 +115,22 @@ describe('strict schema-12 spatial persistence', () => {
       },
     },
     {
-      name: 'zero remaining crop',
+      name: 'null base setting',
       change: (value) => {
-        value.base.cropLeft = 0.5;
-        value.base.cropRight = 0.5;
+        Object.assign(value.base, { scale: null });
       },
     },
     {
-      name: 'invalid key crop',
+      name: 'key without an enabled setting',
       change: (value) => {
-        value.keyframes[0]!.values.cropTop = 0.8;
-        value.keyframes[0]!.values.cropBottom = 0.3;
+        for (const channel of Object.keys(value.keyframes[0]!.values))
+          Object.assign(value.keyframes[0]!.values, { [channel]: null });
+      },
+    },
+    {
+      name: 'key missing a nullable setting',
+      change: (value) => {
+        Reflect.deleteProperty(value.keyframes[0]!.values, 'cropLeft');
       },
     },
     {

@@ -6,11 +6,13 @@ import {
   compileSpatialMapping,
   createSpatialSettings,
   evaluateSpatial,
+  hasSpatialChannelKeys,
   hasSpatialEdits,
   isNeutralSpatial,
   mapSpatialPoint,
   NEUTRAL_SPATIAL_POSE,
   spatialCoverage,
+  spatialKeyChannels,
   spatialKeyframeSchema,
   spatialPoseSchema,
   spatialSettingsSchema,
@@ -92,7 +94,7 @@ describe('strict spatial settings', () => {
     }
   });
 
-  it('accepts closed transform bounds and strictly positive remaining crop dimensions', () => {
+  it('accepts closed transform bounds and opposite crops that cover nothing', () => {
     for (const scale of [0.1, 8]) {
       for (const translation of [-2, 2]) {
         for (const rotation of [-180, 180]) {
@@ -105,16 +107,17 @@ describe('strict spatial settings', () => {
     }
     expect(spatialPoseSchema.safeParse(pose({ cropLeft: 1 - Number.EPSILON })).success).toBe(true);
     expect(spatialPoseSchema.safeParse(pose({ cropTop: 0.4, cropBottom: 0.599 })).success).toBe(true);
+    // Opposite edges meeting or crossing are valid: nothing is covered, with no repair.
+    expect(spatialPoseSchema.safeParse(pose({ cropLeft: 0.4, cropRight: 0.6 })).success).toBe(true);
+    expect(spatialPoseSchema.safeParse(pose({ cropTop: 0.8, cropBottom: 0.3 })).success).toBe(true);
   });
 
-  it('rejects individual bounds and zero/negative remaining crop dimensions without clamping', () => {
+  it('rejects individual bounds without clamping', () => {
     const invalid: Partial<SpatialPose>[] = [
       { cropLeft: -0.001 },
       { cropRight: 1 },
       { cropTop: 1 },
       { cropBottom: -0.001 },
-      { cropLeft: 0.4, cropRight: 0.6 },
-      { cropTop: 0.8, cropBottom: 0.3 },
       { scale: 0.099 },
       { scale: 8.001 },
       { translateX: -2.001 },
@@ -236,6 +239,81 @@ describe('full-pose source-time spatial animation', () => {
     expect(isNeutralSpatial(evaluateSpatial(animatedNeutral, 5))).toBe(true);
     expect(hasSpatialEdits(animatedNeutral)).toBe(true);
     expect(hasSpatialEdits(settings([], pose({ scale: 2 })))).toBe(true);
+  });
+});
+
+describe('independent per-setting spatial keyframes', () => {
+  const none = Object.fromEntries(channels.map((channel) => [channel, null])) as Record<
+    keyof SpatialPose,
+    number | null
+  >;
+  const sparse = (frame: number, values: Partial<Record<keyof SpatialPose, number>>, curve: Interpolation = 'linear') =>
+    ({ frame, interpolation: curve, values: { ...none, ...values } }) as SpatialKeyframe;
+
+  it('requires every field and at least one enabled setting, allowing null elsewhere', () => {
+    expect(spatialKeyframeSchema.safeParse(sparse(0, { scale: 2 })).success).toBe(true);
+    expect(spatialKeyframeSchema.safeParse(sparse(0, {})).success).toBe(false);
+    const missing: Partial<typeof none> = { ...none, scale: 2 };
+    delete missing.rotation;
+    expect(spatialKeyframeSchema.safeParse({ frame: 0, interpolation: 'linear', values: missing }).success).toBe(false);
+    expect(spatialKeyframeSchema.safeParse(sparse(0, { scale: 9 })).success).toBe(false);
+    expect(spatialPoseSchema.safeParse({ ...pose(), scale: null }).success).toBe(false);
+  });
+
+  it('interpolates each setting between its own keys, skipping keys that leave it out', () => {
+    const value = settings(
+      [
+        sparse(0, { scale: 1 }, 'linear'),
+        sparse(10, { rotation: 100 }, 'hold'),
+        sparse(20, { scale: 3 }, 'linear'),
+        sparse(30, { rotation: -100 }, 'hold'),
+      ],
+      pose({ translateX: 0.5 }),
+    );
+    // A key for another setting neither interrupts nor shortens this setting's interval.
+    expect(evaluateSpatial(value, 10).scale).toBe(2);
+    expect(evaluateSpatial(value, 5).scale).toBe(1.5);
+    expect(evaluateSpatial(value, 25).scale).toBe(3);
+    // Rotation holds its first key before it, ramps with its own left easing and holds the last.
+    expect(evaluateSpatial(value, 0).rotation).toBe(100);
+    expect(evaluateSpatial(value, 20).rotation).toBe(100);
+    expect(evaluateSpatial(value, 30).rotation).toBe(-100);
+    // A setting without keys keeps the saved base.
+    for (const position of [0, 15, 99]) expect(evaluateSpatial(value, position).translateX).toBe(0.5);
+  });
+
+  it('applies the left key\u2019s easing to each of its enabled settings', () => {
+    const value = settings([
+      sparse(0, { scale: 1, rotation: 0 }, 'hold'),
+      sparse(10, { scale: 3, rotation: 90 }, 'linear'),
+    ]);
+    expect(evaluateSpatial(value, 5)).toMatchObject({ scale: 1, rotation: 0 });
+    expect(evaluateSpatial(value, 10)).toMatchObject({ scale: 3, rotation: 90 });
+  });
+
+  it('reports animation by setting, including all-null base-only settings', () => {
+    expect(hasSpatialEdits(settings([sparse(0, { scale: 1 })]))).toBe(true);
+    expect(spatialKeyChannels(sparse(3, { scale: 1, rotation: 0 }))).toEqual(['scale', 'rotation']);
+    const value = settings([sparse(3, { rotation: 0 })]);
+    expect(hasSpatialChannelKeys(value, 'rotation')).toBe(true);
+    expect(hasSpatialChannelKeys(value, 'scale')).toBe(false);
+  });
+
+  it('covers nothing when opposite crops meet or cross, without repairing them', () => {
+    for (const crops of [
+      { cropLeft: 0.5, cropRight: 0.5 },
+      { cropTop: 0.7, cropBottom: 0.6 },
+    ]) {
+      const mapping = compileSpatialMapping(pose(crops), 1920, 1080, 1280, 720);
+      for (const [u, v] of [
+        [0, 0],
+        [0.25, 0.25],
+        [0.5, 0.5],
+        [0.75, 0.75],
+        [0.999, 0.999],
+      ])
+        expect(spatialCoverage(mapping, u!, v!)).toBe(0);
+    }
   });
 });
 

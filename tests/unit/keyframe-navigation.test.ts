@@ -31,6 +31,7 @@ import {
 } from '../../src/web/keyframe-navigation.js';
 import { KeyframeToggle, type KeyframeToggleProps } from '../../src/web/KeyframeToggle.js';
 import { Layers } from '../../src/web/Layers.js';
+import { SPATIAL_CONTROLS } from '../../src/web/spatial-editor.js';
 
 function point(frame: number, values: Partial<LayerKeyValues>): LayerKeyframe {
   return { frame, interpolation: 'linear', values: { ...EMPTY_KEY_VALUES, ...values } };
@@ -482,7 +483,14 @@ describe('main diamonds with per-setting arrows and stored-channel navigation', 
     const diamonds = [
       ...inspector.matchAll(/<span class="keyframe-setting-navigation"[\s\S]*?<\/button><\/span><\/span>/g),
     ];
-    expect(diamonds).toHaveLength(11);
+    expect(diamonds).toHaveLength(11 + SPATIAL_CONTROLS.length);
+    for (const { label } of SPATIAL_CONTROLS) {
+      // Each Transform setting has one diamond with one Previous/Next pair, like Colour.
+      expect(inspector.split(`aria-label="Keyframe ${label}"`)).toHaveLength(2);
+      for (const direction of ['Previous', 'Next'])
+        expect(inspector.split(`aria-label="${direction} ${label} keyframe"`)).toHaveLength(2);
+    }
+    expect(inspector).not.toContain('Transform keyframe at displayed source frame');
     for (const [markup] of diamonds) {
       const controls = buttons(markup);
       expect(controls).toHaveLength(3);

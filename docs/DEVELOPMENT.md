@@ -314,7 +314,7 @@ originals in `.pascap/browser-footage/synthetic-sources/` are outside that cache
 cache and `preview-lab` inside it. These are project identifiers, not schema
 versions; newly generated documents must satisfy strict v12, including complete video track
 colour with Temperature/Tint, all eleven nullable channels and clip spatial
-base/full-pose keyframes. Bin resets never imply
+base/per-setting keyframes. Bin resets never imply
 a global-library fallback.
 Neither suite invokes real-source sample preparation or needs private footage/music.
 
@@ -465,7 +465,7 @@ Processing: [track keyframes](LAYERS_AND_KEYFRAMES.md), [retiming/audio](SPEED_A
 and [grading equations](COLOUR_AND_TIMING.md#colour).
 
 Strict schema 12 requires `clip.spatial: { base, keyframes }`: eight complete pose
-values and 0–256 full-pose original-source keyframes with required easing. Shared
+values and 0–256 per-setting original-source keyframes with required easing. Shared
 [spatial mapping](../src/shared/spatial.ts) uses unrounded original-aspect contain
 fit, original-centre pivot and half-open crop bounds; crop does not refit.
 `PlacedClip.retiming.sourcePositionAt` supplies continuous geometry while
@@ -475,7 +475,7 @@ after grading; nonneutral uncovered pixels have zero coverage. Native inverse
 RGB resampling precedes grading, reusing the same four raw buffers/two LUTs and
 serial process limits. Source keyframes remain at their original anchors through
 trim/cut/split/duplicate/move; new pieces have independent deep copies. The fourth
-Clip section **Transform** is collapsed by default and uses explicit full-pose
+Clip section **Transform** is collapsed by default and uses explicit per-setting
 source-frame capture, stored-keyframe navigation and release-only sliders. See
 [the spatial contract](design/SPATIAL_TRANSFORMS.md), not historical benchmark
 reports, for current geometry/schema/UI facts.
@@ -516,7 +516,7 @@ Speed keyframes plus all retained custom speed source keyframes of the selected
 clip, including off-trim keyframes and original exclusive OUT, previewing the
 nearest mapped image through authoritative retiming. Track Speed overrides but
 retains clip keyframes and their navigation. Transform likewise visits all retained
-full-pose source keyframes, including off-trim/original OUT. Speed and Transform
+source keyframes, including off-trim/original OUT. Speed and Transform
 each use a clip-local stored-source cursor independent of central track inspection,
 so successive stored keyframes remain reachable even when their nearest first/last
 preview image is the same. Stored source time stays distinct from actual preview.
@@ -569,7 +569,7 @@ independent paired **Apply range / Cancel range** workflow is unchanged. See [Ra
   Temperature/Tint and static HSL/curves; reject saved `clip.colour`
   and `clip.correction`. Grade sources once with evaluated track Colour, retaining
   two LUT buffers and existing raw/process budgets. Main Colour controls and keyframes
-  have identical track scope and work empty. See [track appearance](design/ROW_APPEARANCE.md). Required clip spatial base/full-pose source-frame keyframes,
+  have identical track scope and work empty. See [track appearance](design/ROW_APPEARANCE.md). Required clip spatial base/per-setting source-frame keyframes,
   required unique video/audio membership, all eleven nullable
   channels and per-track `ripple`, `transitions`, `openingFade`, `closingFade` and
   numeric `opacity` in 0–1. A new track starts at 1; a missing saved field is invalid.

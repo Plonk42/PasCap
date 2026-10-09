@@ -93,7 +93,7 @@ PasCap is a solo, pre-release project: optimize for fast iteration. Details are 
   original exclusive OUT, even under a track Speed override. Clip source navigation
   previews the nearest image mapped by authoritative retiming, using an independent
   clip-local stored-source cursor, not central track inspection or a clamped
-  playhead as stored time. Transform likewise visits all retained full-pose source
+  playhead as stored time. Transform likewise visits all retained source
   keyframes with its own clip-local cursor. Successive stored keyframes remain
   reachable when previews coincide; main values/capture always use the real
   displayed project/source frame. Timeline source markers still omit off-trim
@@ -134,21 +134,22 @@ PasCap is a solo, pre-release project: optimize for fast iteration. Details are 
   retain that ownership, as do Temperature and Tint.
   See [row appearance](../docs/design/ROW_APPEARANCE.md).
 - Every clip requires strict `spatial: { base, keyframes }`: eight complete pose
-  values and 0–256 ascending original-source full-pose keys with required easing.
-  Without keys, the base holds; keys override the full pose with endpoint holds.
-  Deleting all keys reveals the unchanged base; Reset transform clears keys and
-  restores the neutral base deliberately. No nullable spatial participants.
+  values and 0–256 ascending original-source keys with required easing; each key
+  enables any of the eight settings (others null, at least one number) and each
+  setting interpolates between its own keys with endpoint holds. A setting without
+  keys holds its base; deleting its last key reveals that base; Reset transform
+  clears keys and restores the neutral base deliberately.
   Retain/deep-copy original anchors through trims, cuts, splits and duplication,
   including off-trim keys and original exclusive OUT. Evaluate geometry with
   `PlacedClip.retiming.sourcePositionAt`; `sourceAt` remains recorded-image identity.
   Scale is 0.1–8, translation −2–2 output-width/height fractions, rotation
   −180°–180° clockwise with numeric, not shortest-arc interpolation. Crop fractions
-  retain positive width/height, without refit or moving the original-centre pivot;
+  are each below 1 (opposite crops summing to 1 or more cover nothing), without refit or moving the original-centre pivot;
   use unrounded original-aspect contain fit and top-left half-open crop bounds.
   Exact neutral rendering preserves opaque black letterboxing after grading;
   nonneutral uncovered pixels are transparent. Clip → Transform is the fourth
-  section, collapsed by default, with one full-pose source-frame capture diamond,
-  read-only animated main values without a key at the real displayed source frame,
+  section, collapsed by default, with a source-frame capture diamond and Previous/Next per setting,
+  read-only animated main values without that setting's key at the real displayed source frame,
   stored-key navigation/exact fields and release-only value sliders. Any spatial
   edit/key requires layered export; native 22 bytes/pixel, two LUTs and process
   bounds remain unchanged. See [spatial transforms](../docs/design/SPATIAL_TRANSFORMS.md).
