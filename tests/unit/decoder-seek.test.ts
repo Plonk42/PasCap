@@ -16,6 +16,8 @@ class NativeVideo extends EventTarget {
   readyState = 0;
   seeking = false;
   paused = true;
+  ended = false;
+  plays = 0;
   playbackRate = 1;
   readonly seeks: number[] = [];
   #time = 0;
@@ -59,6 +61,7 @@ class NativeVideo extends EventTarget {
   }
   remove(): void {}
   async play(): Promise<void> {
+    this.plays++;
     this.paused = false;
   }
   pause(): void {
@@ -182,6 +185,19 @@ describe('paused seek presentation', () => {
     expect(video.seeks).toEqual([target(2), target(4)]);
     await vi.advanceTimersByTimeAsync(5_000);
     await failure;
+  });
+
+  it('keeps an ended recording on its last frame instead of letting play() rewind it', async () => {
+    const slot = await playedSlot();
+    video.present(119);
+    video.ended = true;
+    const plays = video.plays;
+    await slot.seek(119, new AbortController().signal);
+    await slot.play();
+    expect(video.plays).toBe(plays);
+    expect(video.paused).toBe(true);
+    expect(video.seeks).toEqual([]);
+    expect(slot.decodedFrame).toBe(119);
   });
 
   it('cancels the pending re-presentation with the seek', async () => {
