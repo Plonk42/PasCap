@@ -525,8 +525,8 @@ Inside timeline clip rectangles, boxed blue **▼** Transform and salmon/dashed 
 custom-speed lanes place source keyframes at authoritative retimed output positions,
 including track Speed overrides, indicated without deleting clip keyframes.
 Off-trim keyframes are omitted; exclusive OUT has a boundary marker seeking the final
-available frame. Click, Enter or Space selects the clip and seeks its nearest
-mapped image without editing, history, save or dragging; marker keyboard events
+available frame. Click, Enter or Space selects the clip, seeks its nearest
+mapped image and opens its Inspector section (Transform, or Speed for ◆); a click edits nothing. Transform keys slide by drag or ←/→ (one source frame, Shift ten), one Undo step per valid release; marker keyboard events
 are isolated from timeline shortcuts. Shared track markers retain their separate
 project-time editing behavior. These presentation changes leave math, storage,
 retiming algorithms and resource bounds unchanged.

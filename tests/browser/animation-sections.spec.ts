@@ -723,8 +723,8 @@ for (const viewport of [
       await key.focus();
       await key.press('Enter');
       await previewAt(page, document, 50);
-      for (const shortcut of ['ArrowRight', 'Shift+ArrowLeft', 's', 'q', 'w', 'i', 'o', 'Control+d', 'Delete'])
-        await key.press(shortcut);
+      // Arrow keys move a Transform key (spatial-editor spec); every other shortcut must stay isolated.
+      for (const shortcut of ['s', 'q', 'w', 'i', 'o', 'Control+d', 'Delete']) await key.press(shortcut);
       await previewAt(page, document, 50);
       await expect(key).toBeFocused();
       await key.press('Space');

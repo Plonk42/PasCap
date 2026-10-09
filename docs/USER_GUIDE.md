@@ -377,8 +377,8 @@ custom-speed lanes distinguish source keyframes from shared project-time track m
 Positions follow authoritative retiming, including track Speed overrides, which
 are indicated without deleting clip keyframes. Off-trim keyframes are omitted. An
 exclusive-OUT boundary marker seeks the final available frame. Click or focus a
-marker and press Enter/Space to select its clip and seek the nearest mapped image.
-These markers do not edit, drag, save or enter Undo history, and their keyboard
+marker and press Enter/Space to select its clip, seek the nearest mapped image and open Clip → Transform (Clip → Speed for a ◆ key).
+Drag a Transform marker, or press ←/→ on it (Shift for ten), to move that key to another original source frame; its easing and enabled settings stay, a valid release is one Undo step, and Escape or an occupied frame restores it. Clicking edits nothing, and keyboard
 events do not also run timeline shortcuts. Unlike the markers, stored Speed and
 Transform navigation reaches all retained off-trim/original-OUT keyframes,
 separately from the real frame used for capture.
@@ -423,8 +423,8 @@ shared keyframes are allowed per video track.
 ### Move and inspect shared keyframes
 
 The timeline shows **one marker per stored shared keyframe**, not per clip/channel.
-Click or Enter selects its video track and seeks without editing or changing the chosen
-Inspector tab. Whole-track keyframe navigation also keeps that tab. Drag horizontally to
+Click or Enter selects its video track, seeks and opens Track → Colour (Clip → Speed for a Speed-only keyframe), without editing.
+Whole-track keyframe navigation keeps the chosen Inspector tab. Drag horizontally to
 move **all enabled settings, values and easing together**; valid release is one Undo
 step. With Snap on, pointer movement snaps within eight pixels at the captured zoom
 to captured clip/music/transition boundaries and playhead; **Alt** bypasses it.

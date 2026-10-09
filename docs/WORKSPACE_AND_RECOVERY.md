@@ -161,8 +161,7 @@ On a focused track keyframe marker, Left/Right moves that keyframe one project f
 moves ten. Marker keyboard events remain in that context, retaining keyframe/Timeline
 focus while navigating to the moved keyframe, without also firing ordinary playhead-step,
 clip-nudge or other editor shortcuts.
-Click or Enter on a marker selects its track and seeks without editing; marker and
-whole-track keyframe navigation preserve the chosen Inspector tab.
+Click or Enter on a marker selects its track, seeks and opens Track → Colour (Clip → Speed for a Speed-only keyframe), without editing; whole-track keyframe navigation preserves the chosen Inspector tab.
 
 Options are nonmodal disclosures with normal Tab navigation, not custom ARIA menus.
 They use the browser top layer to avoid clipping inside panels. Escape closes and
@@ -454,8 +453,8 @@ Inside each timeline clip rectangle, boxed blue **▼** Transform and salmon/das
 **◆** custom-speed lanes show source keyframes at authoritative retimed output
 positions, including a track Speed override. Off-trim keyframes are omitted; exclusive
 OUT has a boundary marker that seeks the final available frame. Speed override
-is indicated without deleting clip keyframes. Click, Enter or Space selects the clip
-and seeks its nearest mapped image without editing, history, save or dragging.
+is indicated without deleting clip keyframes. Click, Enter or Space selects the clip,
+seeks its nearest mapped image and opens Clip → Transform (Clip → Speed for the ◆ lane); a click edits nothing. Transform keys also slide by drag or ←/→ (one original source frame, Shift ten), keeping easing and enabled settings: drafts preview only, a valid release is one Undo step, and Escape, cancellation, blur or an occupied frame restores.
 Marker keyboard events are isolated from timeline shortcuts. These differ from
 draggable shared project-time track markers. Speed and Transform stored-source
 inspection remains separate, reaches all retained off-trim/original-OUT keyframes

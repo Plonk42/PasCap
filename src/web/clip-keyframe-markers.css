@@ -53,10 +53,23 @@
   border-radius: 4px;
   color: #c4e9ff;
   font-size: 13px;
+  cursor: ew-resize;
 }
 
 .timeline-clip-key.transform > span {
   line-height: 20px;
+}
+
+.timeline-clip-key.transform.moving {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+  cursor: grabbing;
+}
+
+.timeline-clip-key.transform.invalid {
+  border-color: var(--error);
+  color: var(--error);
+  outline-color: var(--error);
 }
 
 .timeline-clip-key.transform:is(:hover, :focus-visible):not(:disabled) {

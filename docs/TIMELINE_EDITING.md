@@ -346,7 +346,7 @@ identity/focus and expansion survive a single-keyframe move and Undo.
 Each video track draws **one marker per stored keyframe**, with enabled settings in its title,
 never per-clip duplicates; keyframes after the last clip keep their markers there
 without extending playback. **Click or Enter** selects the marker's track
-and seeks without editing. **Drag horizontally** to move the shared keyframe:
+and seeks, opening Track → Colour (Clip → Speed for a Speed-only keyframe), without editing. **Drag horizontally** to move the shared keyframe:
 
 - Capture the committed project, track/keyframe, zoom, grabbed pointer position,
   horizontal scroll and stationary playhead. Compute from that captured base plus
@@ -381,8 +381,7 @@ and custom-speed keyframes a separate salmon/dashed **◆** lane. Marker output 
 come from authoritative `PlacedClip.retiming`, including track Speed overrides.
 Off-trim keyframes are omitted; exclusive OUT has a boundary marker that seeks the
 final available frame. Speed override is indicated and retains the clip keyframes.
-Click, Enter or Space selects the clip and seeks the nearest mapped image without
-editing, history, save or dragging; keyboard handling is isolated from timeline
+Click, Enter or Space selects the clip, seeks the nearest mapped image and opens Clip → Transform (Clip → Speed for the ◆ lane); a click edits nothing. Transform keys also slide: drag one horizontally, or press ←/→ (one original source frame, Shift ten), keeping its easing and enabled settings. A drag previews without history/save; a valid release is one Undo step, while Escape, cancellation, blur or an occupied/invalid frame restores. Keyboard handling is isolated from timeline
 shortcuts. These are not the draggable shared project-time track markers above.
 
 ### Channel navigation and off-duration inspection
