@@ -80,6 +80,9 @@ PasCap is a solo, pre-release project: optimize for fast iteration. Details are 
 
 - Shared integer-frame layout/retiming (`PlacedClip.retiming`) is authoritative for
   UI, preview and native export. Per-frame rendering stays outside React.
+- Sliding timeline keyframe markers (track, Transform and any new type) must use
+  `useKeyframeSlide`/`KeyframeMarkers` in `src/web/keyframe-slide.tsx`; a type
+  only supplies its `KeyframeSlideKind`, never its own drag/keyboard handling.
 - Section keyframe controls have no Animate toggle or stored preference: main capture diamonds and adjacent
   per-setting Previous/Next buttons are always visible while a section is expanded. Keep these main buttons
   because not every setting is enabled at every shared keyframe, alongside the existing stored
