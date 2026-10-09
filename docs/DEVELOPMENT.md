@@ -158,8 +158,10 @@ legitimate completion later; they do not replace that retained checkpoint with a
 later diagnostics read. All four activations must happen while Playing, render
 their requested mode before the end, and retain one music epoch, exact source
 readiness and the independent one-frame output-clock bound through full completion.
-The memory-only fixture remains 480 project frames; no clock forgery, throughput
-threshold or enlarged playback timeout is used.
+The memory-only fixture is one 0.1× clip, 1,200 project frames (40 s): hosted
+software rendering needed about 17 s for the four activations, which no longer
+fit in the former 16 s window ([#126](https://github.com/Plonk42/PasCap/issues/126)).
+No clock forgery or throughput threshold is used.
 
 On a rejected graphics result, the prerequisite also runs the installed Firefox
 bundle's native `gfxtest glx` once in the same display/Mesa environment, with a
