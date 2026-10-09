@@ -1406,8 +1406,8 @@ describe.skipIf(!enabled)('schema-12 layered native export · disposable synthet
     );
   }, 120_000);
 
-  it('exports all eight video layers without multiplying decoder or raw-buffer peaks', async () => {
-    const project = createProject('native-eight-layers', 'Eight synthetic video layers');
+  it('exports all eight video tracks without multiplying decoder or raw-buffer peaks', async () => {
+    const project = createProject('native-eight-layers', 'Eight synthetic video tracks');
     for (let index = 1; index < 8; index++) project.layers.push(layer(`video-${index + 1}`));
     project.layers.forEach((row, index) => {
       row.opacity = 0.4 + index * 0.06;
@@ -1432,7 +1432,7 @@ describe.skipIf(!enabled)('schema-12 layered native export · disposable synthet
     expect(result.receipt.settings.layered!.peakLosslessTimelineRepresentations).toBe(3);
     expect(result.receipt.settings.layered!.rawBufferBytes).toBe(1280 * 720 * 22);
     console.log(
-      `Eight-layer maximum RGB MAE: ${maximumMae.toFixed(4)} / 255; decoder peaks remain 1 original / 2 intermediate`,
+      `Eight-track maximum RGB MAE: ${maximumMae.toFixed(4)} / 255; decoder peaks remain 1 original / 2 intermediate`,
     );
   });
 

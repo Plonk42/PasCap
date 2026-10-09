@@ -91,6 +91,11 @@ npm run test:browser
 
 - `npm run format` applies Prettier ([configuration](../.prettierrc.json)) to the
   repository; `check` first verifies that formatting with `format:check`.
+  [Workspace editor settings](../.vscode/settings.json) use the same Prettier
+  formatter and disable inherited **Organize Imports on save**: Prettier does not
+  sort imports, so a second save-time organizer would create changes after the
+  command-line gate and commit. Manual **Organize Imports** remains available;
+  apply deliberate import cleanup before validation and commit.
 - `check` runs strict frontend typechecking, unit/service tests and the production
   build/server typecheck and locked production-license inventory. Builds retain the
   upstream notice texts in a served notice artifact; `npm run licenses:check`
