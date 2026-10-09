@@ -164,18 +164,15 @@ new preferences. **Expand all / Collapse all** includes **Range**, **Placement**
 respected; **Transform animation** heading help is reachable while collapsed.
 An empty video track shows no Clip sections, only **Select a clip on … to edit it.**
 
-The native **Animate Transform** toggle is a presentation-only browser-local
-section preference. With no stored choice, unanimated Transform starts off and
-existing spatial keyframes start on. Turning it off retains all keyframes, rendering,
-read-only constraints and history without a project save or Undo step; it changes
-no schema or stored data. When on, each setting exposes its own capture diamond and
-Previous/Next buttons, and the section header has one Previous/Next pair.
+There is no Animate toggle or stored preference. Each setting always exposes its own capture diamond and
+Previous/Next buttons, and the expanded section's keyframe line shows the keyframe count, one Previous/Next
+pair and Reset; it is hidden while the section is collapsed.
 
 The eight **Crop left / Crop right / Crop top / Crop bottom / Scale / Translate X /
 Translate Y / Rotation °** controls each pair a native slider with an exact field,
 following the Colour pattern. A setting with no keys edits the clip base. Once a setting
 has keys, its main field is read-only unless that setting is keyed at the **actually
-displayed integer source frame** at the real project playhead, even with Animate off;
+displayed integer source frame** at the real project playhead;
 other settings stay editable. Each setting's diamond (**Keyframe Scale**, etc.) captures
 that setting's continuously evaluated value at the displayed source frame, creating a
 Linear-eased key or joining the existing key there; a filled diamond removes only that
@@ -216,9 +213,7 @@ is no Transform graph-keyframe drag or canvas gizmo.
 
 ### Timeline source-keyframe markers
 
-Each clip rectangle hangs Transform keys from its top edge as pale-blue **▼** tabs,
-clear of the bottom shared project-time track markers and the salmon/dashed **◆**
-custom-speed lane; the tab shape and the marker's accessible name and tooltip (which
+Each clip rectangle shows Transform keys as boxed blue **▼** buttons at its top edge, as visible as the amber Colour markers, clear of the bottom shared project-time track markers and the salmon/dashed **◆** custom-speed lane (the clip label sits below them); the tab shape and the marker's accessible name and tooltip (which
 list the enabled settings) distinguish it without relying on colour. One marker
 represents one key, however many settings it enables.
 Source keyframes use the clip's authoritative retiming to locate output positions;

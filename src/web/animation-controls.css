@@ -1,13 +1,20 @@
-.section-animation-controls {
+.section-keyframe-line {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  gap: 3px;
-  padding: 0 10px 6px;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+  padding: 0 0 6px;
 }
-.section-animate[aria-pressed='true'] {
-  color: var(--accent);
-  background: var(--panel-raised);
+.section-keyframe-count {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+.section-keyframe-steps {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
 }
 .channel-keyframe-navigation {
   display: inline-flex;
@@ -37,4 +44,10 @@
 
 .declutter-inspector .colour-control-actions .channel-keyframe-navigation .icon-button[aria-disabled='true'] {
   opacity: 0.4;
+}
+
+/* Colour's line and hint sit directly in the section content, which has no padding of its own. */
+.inspector-section-content > .section-keyframe-line,
+.inspector-section-content > .colour-scope-hint {
+  padding-inline: 14px;
 }

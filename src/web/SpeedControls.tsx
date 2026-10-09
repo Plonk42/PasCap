@@ -4,7 +4,7 @@ import { activeLayerSetting, evaluateLayerSetting, hasLayerKeys } from '../share
 import type { ProjectDocument, VideoClip, VideoLayer } from '../shared/model.js';
 import { sourceRateAt, type SpeedSettings } from '../shared/speed.js';
 import { ClipSpeedCurve } from './ClipSpeedCurve.js';
-import { AnimationControls, useAnimationTools } from './AnimationControls.js';
+import { KeyframeLine } from './AnimationControls.js';
 import './declutter.css';
 import { sourceSeconds } from './display.js';
 import { EasingSelect } from './EasingSelect.js';
@@ -226,12 +226,7 @@ export function SpeedControls({
   const layerContext = `${resetKey ?? layer.id}:${layer.id}`;
   const inputContext = `${layerContext}:${clip?.id ?? 'row'}`;
   const keyed = hasLayerKeys(layer, 'speed');
-  const tools = useAnimationTools(
-    'speed',
-    `${project.id}:${layer.id}:${clip?.id}`,
-    keyed || clip?.speed.mode === 'curve',
-  );
-  const { navigation, inspectedFrame, onSelectStored, previous, next, seekTarget } = useSpeedNavigation({
+  const { navigation, targets, inspectedFrame, onSelectStored, previous, next, seekTarget } = useSpeedNavigation({
     project,
     clip,
     layer,
@@ -252,7 +247,6 @@ export function SpeedControls({
     : "Reset only the selected clip's speed to constant 1×. Its curve is removed; track keyframes stay unchanged.";
   const updateBase = (speed: SpeedSettings): void => {
     if (clip && !disabled && !keyed) {
-      if (speed.mode === 'curve' && !tools.enabled) tools.toggle();
       onEdit({ type: 'speed', clipId: clip.id, speed });
     }
   };
@@ -294,29 +288,17 @@ export function SpeedControls({
       badge={`${rate.toFixed(2)}×`}
       modified={rate !== 1 || keyed || (!!clip && clip.speed.mode !== 'constant')}
       help={<SpeedHelp keyed={keyed} helpId={helpId} />}
-      actions={
-        <AnimationControls
+    >
+      <section className="speed-settings declutter-speed" aria-label="Track and clip speed">
+        <KeyframeLine
           label="Speed"
-          enabled={tools.enabled}
+          count={targets.length}
           disabled={disabled || navigation.disabled}
-          onToggle={tools.toggle}
           previous={!!previous}
           next={!!next}
           onPrevious={() => seekTarget(previous)}
           onNext={() => seekTarget(next)}
-        />
-      }
-    >
-      <section className="speed-settings declutter-speed" aria-label="Track and clip speed">
-        <div className="speed-overview">
-          <span>
-            {clip && placedDuration !== null && placedDuration !== clip.sourceOut - clip.sourceIn && (
-              <>
-                {sourceSeconds(clip.sourceOut - clip.sourceIn)} <Icon name="arrow" size={12} />{' '}
-                {sourceSeconds(placedDuration)}
-              </>
-            )}
-          </span>
+        >
           <button
             type="button"
             className="text-button"
@@ -328,7 +310,15 @@ export function SpeedControls({
             <Icon name="reset" size={12} />
             Reset
           </button>
-        </div>
+        </KeyframeLine>
+        {clip && placedDuration !== null && placedDuration !== clip.sourceOut - clip.sourceIn && (
+          <div className="speed-overview">
+            <span>
+              {sourceSeconds(clip.sourceOut - clip.sourceIn)} <Icon name="arrow" size={12} />{' '}
+              {sourceSeconds(placedDuration)}
+            </span>
+          </div>
+        )}
         {clip && keyed && (
           <p className="clip-speed-override">
             <Icon name="curve" size={15} />
@@ -346,7 +336,7 @@ export function SpeedControls({
           />
         )}
         {!keyed && clip?.speed.mode === 'curve' && sourceFrameCount !== null && (
-          <div hidden={!tools.enabled}>
+          <div>
             <ClipSpeedCurve
               key={`${project.id}:${clip.id}`}
               project={project}
@@ -365,10 +355,7 @@ export function SpeedControls({
             />
           </div>
         )}
-        <div
-          hidden={!tools.enabled}
-          className={`layer-setting-heading${clip && !keyed ? ' clip-speed-row-heading' : ''}`}
-        >
+        <div className={`layer-setting-heading${clip && !keyed ? ' clip-speed-row-heading' : ''}`}>
           <span title={hint}>
             <span>Track speed animation</span>
             <small className="layer-setting-kind" title={scope}>
@@ -391,7 +378,7 @@ export function SpeedControls({
             />
           </span>
         </div>
-        {keyed && !active && <LockedCue animate={tools.enabled} />}
+        {keyed && !active && <LockedCue />}
         {(keyed || !clip) && (
           <SpeedRateField
             id={rateId}

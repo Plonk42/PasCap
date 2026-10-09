@@ -43,6 +43,7 @@ import {
 import { Icon } from './icons.js';
 import { keyframeNavigationFrame, useKeyframeNavigation } from './keyframe-navigation.js';
 import { ClipContextMenu, type ClipMenuAnchor } from './ClipContextMenu.js';
+import { nextLayerName } from './move-to-track.js';
 import './declutter.css';
 import './layers.css';
 import { Layers } from './Layers.js';
@@ -75,7 +76,7 @@ interface Props {
   onBoundary: (leftId: string) => void;
   onSeek: (frame: number) => void;
   onPause: () => void;
-  onEdit: (command: EditCommand) => void;
+  onEdit: (command: EditCommand | readonly EditCommand[]) => void;
   onInsert: (mediaIds: string[], index: number, layerId: string, start: number) => void;
   onPreview: (draft: DraftPreview | null, restoreFrame?: number) => void;
   onError: (message: string) => void;
@@ -179,12 +180,6 @@ function speedLabel(clip: VideoClip): string {
     case 'curve':
       return ' · curve';
   }
-}
-
-function nextLayerName(project: ProjectDocument): string {
-  let number = 2;
-  while (project.layers.some((layer) => layer.name === `Video track ${number}`)) number++;
-  return `Video track ${number}`;
 }
 
 function timelineEmptyMessage(project: ProjectDocument): string {
@@ -1456,6 +1451,8 @@ export function Timeline(props: Readonly<Props>) {
             setClipMenu(null);
             onDuplicate();
           }}
+          project={project}
+          onEdit={onEdit}
         />
       )}
     </section>

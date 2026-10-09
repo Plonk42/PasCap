@@ -28,25 +28,18 @@ animation channels. Speed retains its separate clip-base/track-override semantic
 
 **Track → Colour** places Temperature and Tint before Exposure. Main and stored
 keyed settings use native sliders (step 0.01), adjacent exact numeric fields,
-and reset to 0 by double-clicking the name. Main capture diamonds appear only with
-**Animate Colour** on, with adjacent per-setting **Previous/Next** buttons because
-not every setting is enabled at every shared keyframe. Its single section-header
-Previous/Next pair visits the union of Opacity and all nine scalar colour keys,
+and reset to 0 by double-clicking the name. Main capture diamonds are always visible, with adjacent per-setting **Previous/Next** buttons because not every setting is enabled at every shared keyframe. Its single keyframe-line Previous/Next pair (with the keyframe count) visits the union of Opacity and all nine scalar colour keys,
 skipping speed-only keys. Enabled setting chips in stored Keyframes rows retain
 their per-channel arrows. All main and stored per-channel arrows visit strictly
 earlier/later keyframes where that channel is nonnull (zero is enabled), sharing
 the central off-duration inspection cursor.
-Animate is a presentation-only browser-local section preference: without a stored
-choice, unanimated Colour starts off and existing colour/Opacity keys start on.
-Turning it off hides main diamonds and adjacent arrows while retaining keyframes,
-rendering, read-only constraints and history, without a project save or Undo step.
+There is no Animate toggle or stored preference.
 Main capture uses the real project playhead, never
 an inspected stored time. Visible easing selectors read **Easing**, with contextual
 accessible names and interpolation unchanged. No schema or data changes result.
 Sliders never create keyframes; animated main values without an enabled setting at the real
-playhead are read-only until diamond capture, including with Animate off.
-Pointer movement is a local draft;
-valid release is one Undo step. Escape/cancellation/capture loss/blur restores.
+playhead are read-only until diamond capture.
+Pointer movement previews the draft in the image without a document change; valid release is one Undo step. Escape/cancellation/capture loss/blur restores control and preview.
 Numeric Enter/blur preserves entered precision; invalid drafts stay editable,
 never clamp or default. Resets affect only the targeted base or existing keyframe;
 Reset keyframes preserves track bases and static HSL/curves.

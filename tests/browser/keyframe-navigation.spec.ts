@@ -143,7 +143,7 @@ async function guardedUnavailable(button: Locator): Promise<void> {
 
 function sectionStep(page: Page, label: 'Colour' | 'Speed' | 'Transform', direction: 'Previous' | 'Next'): Locator {
   return inspector(page)
-    .locator('.section-animation-controls')
+    .locator('.section-keyframe-line')
     .getByRole('button', { name: `${direction} ${label} keyframe`, exact: true });
 }
 
@@ -245,10 +245,6 @@ test('unkeyed settings keep diamonds with visible guarded per-setting arrows and
   await expect(inspector(page).locator('.layer-keyframe-chip')).toHaveCount(0);
   for (const label of ['Colour', 'Speed', 'Transform'] as const) {
     await settingTab(page, label === 'Colour' ? 'Exposure' : 'Speed');
-    await expect(inspector(page).getByRole('button', { name: `Animate ${label}`, exact: true })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    );
     for (const direction of ['Previous', 'Next'] as const) {
       const button = sectionStep(page, label, direction);
       await expect(button).toBeVisible();
@@ -319,14 +315,7 @@ test('Colour section arrows visit the Opacity/scalar union, skip Speed-only poin
   await next.scrollIntoViewIfNeeded();
   await next.click();
   await previewAt(page, 100);
-  const animate = inspector(page).getByRole('button', { name: 'Animate Colour', exact: true });
-  await animate.click();
-  await expect(animate).toHaveAttribute('aria-pressed', 'false');
-  await expect(next).toHaveCount(0);
-  await expect(inspector(page).locator('.colour-controls .keyframe-setting-navigation')).toHaveCount(0);
   await expect(layerKeyframes(page, 'Video track 1').locator('.layer-keyframe-chip')).toHaveCount(9);
-  await animate.click();
-  await expect(animate).toHaveAttribute('aria-pressed', 'true');
   await expect(diamond(page, 'Shadows')).toHaveAttribute('aria-pressed', 'true');
   await readOnly(page, document);
 });
@@ -730,7 +719,6 @@ test('all eleven setting buttons remain present and disabled throughout a native
   }
   for (const label of ['Colour', 'Speed', 'Transform'] as const) {
     await settingTab(page, label === 'Colour' ? 'Exposure' : 'Speed');
-    await expect(inspector(page).getByRole('button', { name: `Animate ${label}`, exact: true })).toBeDisabled();
     for (const direction of ['Previous', 'Next'] as const)
       await expect(sectionStep(page, label, direction)).toBeDisabled();
   }
@@ -768,7 +756,6 @@ test('no opened project keeps main diamonds and Colour section navigation disabl
     }
   }
   await expect(inspector(page).locator('.layer-keyframe-chip')).toHaveCount(0);
-  await expect(inspector(page).getByRole('button', { name: 'Animate Colour', exact: true })).toBeDisabled();
   for (const direction of ['Previous', 'Next'] as const) {
     await expect(sectionStep(page, 'Colour', direction)).toBeVisible();
     await expect(sectionStep(page, 'Colour', direction)).toBeDisabled();

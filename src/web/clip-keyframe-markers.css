@@ -40,11 +40,32 @@
   color: #ffc7bb;
 }
 
-/* Transform keys hang from the clip's top edge as ▼ tabs, apart from the bottom Colour/Speed markers. */
+/* Transform keys are boxed blue buttons, as visible as the amber Colour markers, at the clip's top edge.
+ * The clip label moves below them so neither hides the other.
+ */
 .timeline-clip-key.transform {
-  top: 0;
-  height: 8px;
-  font-size: 8px;
+  top: 2px;
+  left: clamp(0px, calc(var(--clip-keyframe-position) - 8px), max(0px, calc(100% - 16px)));
+  width: min(16px, 100%);
+  height: 16px;
+  background: #1b3446ee;
+  border: 1px solid #5d93b8;
+  border-radius: 4px;
+  color: #c4e9ff;
+  font-size: 10px;
+}
+
+.timeline-clip-key.transform > span {
+  line-height: 14px;
+}
+
+.timeline-clip-key.transform:is(:hover, :focus-visible):not(:disabled) {
+  background: #264b66;
+  border-color: #9fd2f2;
+}
+
+.product-workspace .timeline-clip:has(.timeline-clip-key.transform) .timeline-clip-label {
+  top: 19px;
 }
 
 .timeline-clip-key > span {
@@ -78,7 +99,7 @@
   opacity: 0.6;
 }
 
-.timeline-clip-key:is(:hover, :focus-visible):not(:disabled) > span {
+.timeline-clip-key:not(.transform):is(:hover, :focus-visible):not(:disabled) > span {
   background: #14251e;
   box-shadow: inset 0 0 0 1px currentColor;
   border-radius: 2px;

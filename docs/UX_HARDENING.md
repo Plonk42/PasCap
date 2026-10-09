@@ -14,15 +14,12 @@ This guide is not a delivery ledger or a fresh validation result.
   Collapsed sections have relevant icons, compact duration/rate readouts and an
   adjusted-state dot; expanding preserves every control and existing preferences.
 - Animation uses contextual help rather than a paragraph below every control. Static values use
-  the normal treatment; main capture diamonds appear only with the section's
-  **Animate** on: hollow when the setting is not enabled at the real playhead,
+  the normal treatment; main capture diamonds are always visible: hollow when the setting is not enabled at the real playhead,
   filled when enabled. **Animation help** explains the states once. Titles and screen-reader descriptions retain
   each setting's scope and capture instructions.
-- With Animate on, each main scalar Colour/Opacity and track Speed diamond retains
-  adjacent per-setting **Previous/Next** buttons because not every setting is enabled
-  at every shared keyframe. Animate off hides main arrows and diamonds while
-  retaining all keyframes, rendering and read-only constraints.
-- Each Animate-on section header retains one **Previous/Next** pair.
+- Each main scalar Colour/Opacity and track Speed diamond retains adjacent per-setting **Previous/Next** buttons
+  because not every setting is enabled at every shared keyframe.
+- Each expanded section's keyframe line shows the keyframe count, one **Previous/Next** pair and Reset keyframes.
   Colour visits Opacity/scalar colour keyframes; Speed visits
   track Speed keyframes and all retained custom speed source keyframes of the
   selected clip, even under a track Speed override. Speed and Transform stored

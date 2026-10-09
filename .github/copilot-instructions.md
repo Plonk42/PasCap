@@ -80,14 +80,13 @@ PasCap is a solo, pre-release project: optimize for fast iteration. Details are 
 
 - Shared integer-frame layout/retiming (`PlacedClip.retiming`) is authoritative for
   UI, preview and native export. Per-frame rendering stays outside React.
-- Section Animate is presentation-only and browser-local. Main capture diamonds
-  and adjacent per-setting Previous/Next buttons appear only with Animate on;
-  turning it off hides both while retaining keyframes, rendering and constraints.
-  Keep these main buttons because not every setting is enabled at every shared
-  keyframe, alongside the existing stored enabled-setting chip arrows. All
-  per-channel arrows visit strictly earlier/later keyframes where that channel is
-  nonnull (zero is enabled), sharing the central off-duration inspection cursor.
-  Each Animate-on header retains one Previous/Next pair: Colour visits Opacity/nine scalar
+- Section keyframe controls have no Animate toggle or stored preference: main capture diamonds and adjacent
+  per-setting Previous/Next buttons are always visible while a section is expanded. Keep these main buttons
+  because not every setting is enabled at every shared keyframe, alongside the existing stored
+  enabled-setting chip arrows. All per-channel arrows visit strictly earlier/later keyframes where that
+  channel is nonnull (zero is enabled), sharing the central off-duration inspection cursor. Each expanded
+  section has one keyframe line (count, one Previous/Next pair over the same set, Reset keyframes), hidden
+  while collapsed. The pair: Colour visits Opacity/nine scalar
   colour keyframes; Speed visits track Speed keyframes and **all retained custom
   speed source keyframes of the selected clip**, including off-trim keyframes and
   original exclusive OUT, even under a track Speed override. Clip source navigation

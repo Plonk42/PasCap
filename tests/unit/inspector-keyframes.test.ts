@@ -68,8 +68,8 @@ describe('dedicated Inspector keyframe controls', () => {
     expect(trackPanel).toContain('Not animated');
     const colour = trackPanel.slice(trackPanel.indexOf('aria-label="Colour section"'));
     expect(colour).toContain('aria-label="Opacity"');
-    expect(trackPanel).toMatch(/aria-label="Animate Colour" aria-pressed="false"/);
-    expect(trackPanel).not.toContain('aria-label="Keyframe Opacity"');
+    expect(trackPanel).not.toContain('Animate Colour');
+    expect(trackPanel).toContain('aria-label="Keyframe Opacity"');
     expect(trackPanel).not.toContain('Keyframe Layer opacity');
     expect(trackPanel).not.toContain('Keyframe Clip opacity');
   });

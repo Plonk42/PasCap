@@ -16,6 +16,7 @@ import type { ProjectDocument, VideoLayer } from '../shared/model.js';
 import './advanced-colour.css';
 import { HelpPopover } from './HelpPopover.js';
 import { Icon } from './icons.js';
+import { livePreview } from './live-preview.js';
 import { NumberField } from './NumberField.js';
 import type { DraftPreview } from './Timeline.js';
 import { ValueControl } from './ValueControl.js';
@@ -436,26 +437,30 @@ export function AdvancedColour(props: Readonly<Props>) {
             <p className="editor-help-tip">Tip: Reset all returns every range to neutral.</p>
           </HelpPopover>
         </div>
-        {HSL_CONTROLS.map((control) => (
-          <div className="advanced-hsl-control" key={control.key}>
-            <span>{control.label}</span>
-            <ValueControl
-              aria-label={`HSL ${control.key}`}
-              value={layer.colour.hsl[band][control.key]}
-              min={control.min}
-              max={control.max}
-              step={control.step}
-              resetKey={context}
-              disabled={disabled}
-              onCommit={(value) =>
-                commit({
-                  ...layer.colour,
-                  hsl: { ...layer.colour.hsl, [band]: { ...layer.colour.hsl[band], [control.key]: value } },
-                })
-              }
-            />
-          </div>
-        ))}
+        {HSL_CONTROLS.map((control) => {
+          const withValue = (value: number): ColourSettings => ({
+            ...layer.colour,
+            hsl: { ...layer.colour.hsl, [band]: { ...layer.colour.hsl[band], [control.key]: value } },
+          });
+          return (
+            <div className="advanced-hsl-control" key={control.key}>
+              <span>{control.label}</span>
+              <ValueControl
+                aria-label={`HSL ${control.key}`}
+                value={layer.colour.hsl[band][control.key]}
+                min={control.min}
+                max={control.max}
+                step={control.step}
+                resetKey={context}
+                disabled={disabled}
+                onCommit={(value) => commit(withValue(value))}
+                onDraft={(value) =>
+                  livePreview(value === null ? null : { type: 'colour', layerId: layer.id, colour: withValue(value) })
+                }
+              />
+            </div>
+          );
+        })}
         <div className="advanced-colour-tools">
           <button
             type="button"

@@ -157,7 +157,7 @@ test('dragging a marker moves all participants/easing with preview-only drafts, 
     }
   }
   await expect(
-    page.locator('.section-animation-controls').getByRole('button', { name: 'Next Colour keyframe', exact: true }),
+    page.locator('.section-keyframe-line').getByRole('button', { name: 'Next Colour keyframe', exact: true }),
   ).toBeDisabled();
   await page.mouse.up();
   const expected = applyCommand(before, { type: 'layer-key-move', layerId: 'video-1', frame: 20, nextFrame: 30 });

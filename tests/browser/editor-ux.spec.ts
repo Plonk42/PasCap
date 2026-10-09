@@ -208,14 +208,7 @@ test('selected context precedes compact animation controls and adjusted sections
   ).toBe(true);
   await expect(page.locator('.layer-keyframe-scope')).toHaveCount(0);
   await expect(page.locator('.layer-keyed-control>.layer-setting-hint')).toHaveCount(0);
-  const animate = page.getByRole('button', { name: 'Animate Colour', exact: true });
-  await expect(animate).toHaveAttribute('aria-pressed', 'false');
-  await expect(page.getByRole('button', { name: 'Keyframe Exposure', exact: true })).toHaveCount(0);
-  await expect(page.locator('.colour-controls .keyframe-setting-navigation')).toHaveCount(0);
-  const before = await current(page);
-  await animate.click();
-  await expect(animate).toHaveAttribute('aria-pressed', 'true');
-  expect(await current(page)).toEqual(before);
+  await expect(page.getByRole('button', { name: /^Animate / })).toHaveCount(0);
   expect(memory.saves).toBe(0);
   await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
   const control = page.getByRole('button', { name: 'Keyframe Exposure', exact: true });
@@ -232,9 +225,7 @@ test('selected context precedes compact animation controls and adjusted sections
     await expect(button).toHaveJSProperty('disabled', false);
     await expect(button).toHaveAttribute('title', `No ${direction.toLowerCase()} Exposure keyframe`);
     await expect(
-      page
-        .locator('.section-animation-controls')
-        .getByRole('button', { name: `${direction} Colour keyframe`, exact: true }),
+      page.locator('.section-keyframe-line').getByRole('button', { name: `${direction} Colour keyframe`, exact: true }),
     ).toBeDisabled();
   }
   await page.getByRole('slider', { name: 'Exposure', exact: true }).fill('0.4');
@@ -525,13 +516,11 @@ test('a failed deferred preview keeps the editor usable and saves pending edits 
 }) => {
   const before = await current(page);
   await inspectorTab(page, 'Track');
-  await page.getByRole('button', { name: 'Animate Colour', exact: true }).click();
   await page.route('**/assets/bootstrap-*.js', (route) => route.abort('failed'));
   await page.reload();
   await expect(page.getByRole('button', { name: 'Reload editor', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Play preview', exact: true })).toBeDisabled();
   await inspectorTab(page, 'Track');
-  await expect(page.getByRole('button', { name: 'Animate Colour', exact: true })).toBeDisabled();
   await expect(page.getByRole('button', { name: 'Keyframe Exposure', exact: true })).toBeDisabled();
   const main = page.locator('.keyframe-setting-navigation').filter({
     has: page.getByRole('button', { name: 'Keyframe Exposure', exact: true }),

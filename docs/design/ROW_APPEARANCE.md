@@ -84,21 +84,16 @@ Opacity. All use existing slider/exact-field/reset controls and work on an empty
 track. Main and stored Opacity sliders/exact fields use **0–100%**, neutral **100%**;
 convert only at the UI boundary. Required
 `VideoLayer.opacity` and `opacity` keyframe values remain **0–1**, without a schema change.
-Main capture diamonds appear only with the native **Animate Colour** toggle on;
-each retains adjacent per-setting **Previous/Next** buttons because not every
-setting is enabled at every shared keyframe. One section-header Previous/Next pair visits
+Main capture diamonds are always visible; each retains adjacent per-setting **Previous/Next** buttons because not every
+setting is enabled at every shared keyframe. One keyframe-line Previous/Next pair (with the keyframe count) visits
 the union of Opacity and nine scalar colour keys, skipping speed-only keys.
 Enabled setting chips in stored Keyframes rows retain their per-channel arrows.
 All main and stored per-channel arrows visit strictly earlier/later keyframes
 where that channel is nonnull (zero is enabled), using the shared central
 stored-keyframe cursor, including off-duration inspection.
-Animate is a presentation-only browser-local preference per section. Without a
-stored choice, unanimated Colour starts off and existing colour/Opacity keys start
-on. Turning it off hides main diamonds and adjacent arrows while retaining all
-keyframes, rendering, read-only constraints and history, without a project save or
-Undo step; schema and stored data are unchanged.
+There is no Animate toggle or stored preference.
 An animated channel without an enabled setting at the real playhead remains
-read-only until explicitly captured, even with Animate off. Capture never uses
+read-only until explicitly captured. Capture never uses
 an inspected stored time. Sliders never create keyframes. Track-keyframe selectors
 visibly read **Easing**, retaining contextual accessible names and shared interpolation.
 The nested static HSL and curve editors share video track ownership, with no new diamonds.
