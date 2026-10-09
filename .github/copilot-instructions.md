@@ -43,6 +43,9 @@ PasCap is a solo, pre-release project: optimize for fast iteration. Details are 
   inspected; if browser access is unavailable, name the blocker and missing check.
 - Before pushing: `npm run format`, then `npm run check` (formatting, unit/service
   tests, types, build, licenses) plus the affected Playwright specs for UI changes.
+  Find affected specs by searching `tests/browser` for every accessible name,
+  selector and visible/help text the change renamed, removed or newly hides, after
+  `git pull`; run each match, not only specs you edited.
   Docs-only changes need only `npm run format`.
 - Full Chrome, Firefox and native suites run in CI. Run them locally only for
   playback, decoding, native export or test-infrastructure changes.
