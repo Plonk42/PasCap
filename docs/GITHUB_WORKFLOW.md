@@ -24,8 +24,8 @@ fix relevant new findings without suppressing them
 2. Edit, running the affected unit tests and the dev server while working. UI
    changes also need [live visual inspection](DEVELOPMENT.md#live-ui-inspection).
 3. Run the fast gate: `npm run format`, then `npm run check` plus the affected
-   Playwright specs for UI changes ([commands](DEVELOPMENT.md#fast-local-validation)).
-   Docs-only changes need only `npm run format`.
+   Playwright specs for UI changes ([commands](DEVELOPMENT.md#fast-local-validation)),
+   found by search rather than memory. Docs-only changes need only `npm run format`.
 4. Commit each coherent step with its tests and doc updates, then
    `git push origin main`. GitHub reports the push as bypassing the PR rule; that
    is expected for routine changes.

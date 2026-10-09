@@ -264,6 +264,11 @@ need the [live inspection](#live-ui-inspection) below.
 
   Install Chrome once with `npx playwright install --with-deps chrome`.
 
+- Choose affected specs by search, not memory: after `git pull`, search
+  `tests/browser` for every accessible name, selector and visible/help text the
+  change renames, removes or newly hides (for example behind a toggle), and run
+  every matching spec, not only the ones you edited.
+
 - Reuse fixtures across focused runs while tests leave their baseline intact;
   reseed after state-changing runs. Never build or reset fixtures while a browser
   run serves that output.
