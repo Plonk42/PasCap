@@ -116,7 +116,7 @@ test('adds layered clips, adjusts row opacity, hides/shows and releases unused d
   expect(await page.evaluate(() => window.pascapLab!.project()!.layers.length)).toBe(2);
 });
 
-test('reorders independently positioned video layers without altering source ranges', async ({ page }) => {
+test('reorders independently positioned video tracks without altering source ranges', async ({ page }) => {
   await addOverlay(page);
   await page.getByRole('button', { name: 'Add video track', exact: true }).click();
   await openOptions(page, 'Track options Video track 3');
