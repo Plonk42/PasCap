@@ -293,7 +293,7 @@ async function sourceFrame(page: Page, frame: number): Promise<void> {
 async function sourceRange(page: Page, sourceIn: number, sourceOut: number): Promise<void> {
   await page.getByRole('spinbutton', { name: 'Source IN', exact: true }).fill(String(sourceIn));
   await page.getByRole('spinbutton', { name: 'Source OUT', exact: true }).fill(String(sourceOut));
-  await page.getByRole('button', { name: 'Apply range', exact: true }).click();
+  await page.getByRole('spinbutton', { name: 'Source OUT', exact: true }).press('Enter');
   await expect(page.locator('.source-range-strip')).toHaveAttribute('data-source-in', String(sourceIn));
   await expect(page.locator('.source-range-strip')).toHaveAttribute('data-source-out', String(sourceOut));
 }
@@ -1456,7 +1456,7 @@ for (const action of ['scrub', 'mark', 'apply', 'reset', 'trim'] as const) {
   });
 }
 
-test('a one-frame source range remains exact; unapplied numeric drafts are not played or inserted', async ({
+test('a one-frame source range remains exact; an Escape-cancelled numeric draft is not played or inserted', async ({
   page,
 }) => {
   await page.getByRole('button', { name: 'Review pattern-a.mp4', exact: true }).click();
@@ -1464,10 +1464,11 @@ test('a one-frame source range remains exact; unapplied numeric drafts are not p
   await sourceFrame(page, 0);
   await page.getByRole('spinbutton', { name: 'Source IN', exact: true }).fill('10');
   await page.getByRole('spinbutton', { name: 'Source OUT', exact: true }).fill('100');
+  await page.getByRole('spinbutton', { name: 'Source OUT', exact: true }).press('Escape');
   await page.getByRole('button', { name: 'Play source preview', exact: true }).click();
   await expect(page.locator('.source-preview')).toHaveAttribute('data-source-frame', '50');
   await expect(page.locator('.source-preview')).toHaveAttribute('data-source-status', 'paused');
-  await expect(page.getByRole('spinbutton', { name: 'Source IN', exact: true })).toHaveValue('10');
+  await expect(page.getByRole('spinbutton', { name: 'Source IN', exact: true })).toHaveValue('50');
   const id = await addExcerpt(page);
   expect((await current(page)).clips.find((clip) => clip.id === id)).toMatchObject({ sourceIn: 50, sourceOut: 51 });
 });
@@ -1869,7 +1870,7 @@ test('an invalid exact source range keeps its draft, an actionable error and no 
   const sourceOut = page.getByRole('spinbutton', { name: 'Source OUT', exact: true });
   for (const field of [sourceIn, sourceOut]) await expect(field).not.toHaveAttribute('aria-describedby');
   await sourceIn.fill('50');
-  await page.getByRole('button', { name: 'Apply range', exact: true }).click();
+  await sourceIn.press('Enter');
   const error = 'Use whole source frames: 0 ≤ IN < OUT ≤ 120. OUT is exclusive.';
   await expect(page.locator('.source-range-description[role="alert"]')).toHaveText(error);
   for (const field of [sourceIn, sourceOut]) {
@@ -1878,7 +1879,7 @@ test('an invalid exact source range keeps its draft, an actionable error and no 
   }
   await expect(sourceIn).toHaveValue('50');
   await expect(page.locator('.source-range-strip')).toHaveAttribute('data-source-in', '10');
-  await page.getByRole('button', { name: 'Cancel range', exact: true }).click();
+  await sourceIn.press('Escape');
   await expect(sourceIn).toHaveValue('10');
   await expect(page.locator('.source-range-description')).toHaveCount(0);
   for (const field of [sourceIn, sourceOut]) {
@@ -1887,4 +1888,21 @@ test('an invalid exact source range keeps its draft, an actionable error and no 
   }
   await flush(page);
   expect(memory.saves).toBe(0);
+});
+
+test('numeric source IN and OUT apply as a pair when focus leaves them, not between the two fields', async ({
+  page,
+}) => {
+  await page.getByRole('button', { name: 'Review pattern-a.mp4', exact: true }).click();
+  await sourceRange(page, 10, 40);
+  const strip = page.locator('.source-range-strip');
+  const sourceIn = page.getByRole('spinbutton', { name: 'Source IN', exact: true });
+  await sourceIn.fill('60');
+  await sourceIn.press('Tab');
+  await page.getByRole('spinbutton', { name: 'Source OUT', exact: true }).fill('90');
+  await expect(page.locator('.source-range-description')).toHaveCount(0);
+  await expect(strip).toHaveAttribute('data-source-in', '10');
+  await page.getByRole('button', { name: 'Play source preview', exact: true }).focus();
+  await expect(strip).toHaveAttribute('data-source-in', '60');
+  await expect(strip).toHaveAttribute('data-source-out', '90');
 });

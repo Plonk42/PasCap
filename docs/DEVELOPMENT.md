@@ -548,7 +548,7 @@ suffix sequencing, not the timeline left handle's retained-OUT rule. Drag previe
 the complete validated document; final valid release is one Undo, invalid final/
 cancel/lost capture/blur restores. Arrows move one original frame (Shift ten),
 Home/End restore IN/OUT endpoints; Restore full recording stays. Source review's
-independent paired **Apply range / Cancel range** workflow is unchanged. See [Range](TIMELINE_EDITING.md#clip-inspector-range).
+independent numeric IN/OUT pair (Enter/blur applies, Escape restores) is unchanged. See [Range](TIMELINE_EDITING.md#clip-inspector-range).
 
 ## Contributor safety
 

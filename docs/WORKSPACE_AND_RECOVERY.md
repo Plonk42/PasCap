@@ -288,7 +288,7 @@ restores the original exclusive OUT. Details: [Range](TIMELINE_EDITING.md#clip-i
 
 Other integer source/timeline frames, durations and fades retain exact native
 `NumberField` steppers and timecode feedback, not arbitrary sliders. Source review
-is independent and keeps its paired **Apply range / Cancel range** workflow to validate both endpoints atomically.
+is independent: its numeric IN/OUT apply as one validated pair on Enter or when focus leaves both fields; Escape restores.
 
 Project titles and track names follow the same draft/apply/cancel pattern; empty
 names are invalid. Track rename lives in **Track options**, accepts 1–100 trimmed
@@ -530,7 +530,7 @@ A round native **Play / Pause** button sits at the left of the source range stri
 the image, the same transport bar as the range. Play uses the applied IN/OUT, not numeric
 drafts, starting at the observed frame if inside and before OUT − 1, otherwise IN.
 It stops and exact-seeks OUT − 1, without looping or audio; a one-frame range only
-displays that frame. Scrub/trim/mark/**Apply range** pause first. Pending play cannot
+displays that frame. Scrub/trim/mark/numeric range edits pause first. Pending play cannot
 restart after cancellation, a source/project switch, close, hidden viewer or tab
 switch; start/stall failures are explicit after five seconds with Retry.
 The track shows the five prepared snapshots across the whole original (or an
@@ -542,10 +542,10 @@ This source-only playback adds no timeline/music seek, history/save, decoder,
 original access or implicit preparation.
 
 Pin holds that source while hovering other recording cards. Explicit click/focus can select
-another prepared source. IN/OUT handles/**Apply range**/I/O marks stay recoverable; Home/End
+another prepared source. IN/OUT handles/numeric fields/I/O marks stay recoverable; Home/End
 on a handle restores that edge. There are no Mark IN/OUT or Reset buttons and no
 static selected/omitted-frame summary: the strip and exact fields show the range,
-while inline text appears only for drag hints and invalid numeric drafts; **Cancel range**
+while inline text appears only for drag hints and invalid numeric drafts; Escape
 restores unapplied numeric drafts.
 Applied choices are per-project browser-local state; unavailable storage leaves
 valid choices usable for the current session with a warning. All insertion paths

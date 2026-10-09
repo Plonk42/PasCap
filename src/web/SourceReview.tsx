@@ -588,6 +588,15 @@ function SourceRangeEditor({
   };
   useImperativeHandle(ref, () => ({ mark, cancel }));
 
+  const commitNumbers = (): void => {
+    if (!numbersDirty || draft !== null) return;
+    if (!numbers.sourceIn.trim() || !numbers.sourceOut.trim()) {
+      setError('Enter whole source frames for IN and OUT.');
+      return;
+    }
+    commit({ mediaId: asset.id, sourceIn: Number(numbers.sourceIn), sourceOut: Number(numbers.sourceOut) });
+  };
+
   const moveAt = (clientX: number): void => {
     const active = drag.current;
     if (!active) return;
@@ -764,13 +773,10 @@ function SourceRangeEditor({
         {readout}
         <form
           className="source-range-numbers"
-          onSubmit={(event) => {
-            event.preventDefault();
-            if (!numbers.sourceIn.trim() || !numbers.sourceOut.trim()) {
-              setError('Enter whole source frames for IN and OUT.');
-              return;
-            }
-            commit({ mediaId: asset.id, sourceIn: Number(numbers.sourceIn), sourceOut: Number(numbers.sourceOut) });
+          onSubmit={(event) => event.preventDefault()}
+          onBlur={(event) => {
+            // Tabbing from IN to OUT must not validate the pair against a stale OUT.
+            if (!event.currentTarget.contains(event.relatedTarget)) commitNumbers();
           }}
         >
           <label>
@@ -785,7 +791,11 @@ function SourceRangeEditor({
               step={1}
               value={draft ? selected.sourceIn : numbers.sourceIn}
               disabled={disabled || draft !== null}
-              onKeyDown={onKeyDown}
+              title="Enter or leave the pair to apply. Escape restores."
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' && !event.nativeEvent.isComposing) commitNumbers();
+                onKeyDown(event);
+              }}
               onChange={(event) => setNumbers({ ...numbers, sourceIn: event.target.value })}
             />
           </label>
@@ -801,30 +811,14 @@ function SourceRangeEditor({
               step={1}
               value={draft ? selected.sourceOut : numbers.sourceOut}
               disabled={disabled || draft !== null}
-              onKeyDown={onKeyDown}
+              title="Enter or leave the pair to apply. Escape restores."
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' && !event.nativeEvent.isComposing) commitNumbers();
+                onKeyDown(event);
+              }}
               onChange={(event) => setNumbers({ ...numbers, sourceOut: event.target.value })}
             />
           </label>
-          <button
-            className="secondary-button small"
-            type="submit"
-            aria-label="Apply range"
-            disabled={disabled || !numbersDirty || draft !== null}
-            onKeyDown={onKeyDown}
-          >
-            Apply
-          </button>
-          {(draft || numbersDirty) && (
-            <button
-              className="text-button"
-              type="button"
-              aria-label="Cancel range"
-              onKeyDown={onKeyDown}
-              onClick={cancel}
-            >
-              Cancel
-            </button>
-          )}
         </form>
       </div>
       {error && (

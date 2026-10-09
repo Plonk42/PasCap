@@ -463,9 +463,10 @@ User library imports/additions automatically queue eligible proxies; ready/activ
 work is reused. Startup and hovering unprepared sources do not launch hidden
 preparation jobs or play originals. Cancelled/failed preparation requires an explicit retry.
 
-Set source IN/OUT with review handles, numeric **Apply range**, or **I/O** while the
+Set source IN/OUT with review handles, the numeric fields, or **I/O** while the
 review controls are focused. OUT is exclusive: **O** selects through the visible
-frame (`OUT = frame + 1`). **Cancel range** restores unapplied numeric drafts.
+frame (`OUT = frame + 1`). The numeric pair applies on Enter or when focus leaves
+both fields; Escape restores an unapplied draft.
 At least one original frame is retained. Home/End on
 a handle restores 0 or the full frame count; there are no separate Mark or Reset
 buttons. Handle drafts commit only on release; Escape,
@@ -481,7 +482,7 @@ The round source **Play / Pause** button sits at the left of that strip. It
 stays muted and uses the applied IN/OUT, not numeric drafts.
 It starts at the current observed frame when inside the range and before its last
 frame, otherwise IN; it stops and exact-seeks OUT − 1, without looping. A one-frame
-range displays that frame without playing. Scrub/trim/mark/**Apply range** pause first.
+range displays that frame without playing. Scrub/trim/mark/numeric range edits pause first.
 Pending play and observed callbacks cannot restart after close, hidden viewer,
 recording/project change or tab switch. Playback uses this same sole verified proxy
 decoder, with explicit start/stall failures after five seconds and Retry; no source

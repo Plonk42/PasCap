@@ -89,10 +89,10 @@ for (const viewport of [
     await page.getByRole('button', { name: 'Review pattern-a.mp4', exact: true }).click();
     await expect(page.getByRole('button', { name: /^Add clip \d+\.\d{2} s to timeline$/ })).toBeVisible();
     await expect(page.locator('summary[aria-label="Show 1 clip from this recording"]')).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Apply range', exact: true })).toBeAttached();
+    await expect(page.getByRole('button', { name: 'Apply range', exact: true })).toHaveCount(0);
     await page.getByRole('spinbutton', { name: 'Source IN', exact: true }).fill('1');
-    await expect(page.getByRole('button', { name: 'Cancel range', exact: true })).toBeAttached();
-    await page.getByRole('button', { name: 'Cancel range', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Cancel range', exact: true })).toHaveCount(0);
+    await page.getByRole('spinbutton', { name: 'Source IN', exact: true }).press('Escape');
     await page.getByRole('button', { name: 'Close source review', exact: true }).click();
     await inspectorTab(page, 'Audio');
     await expect(page.getByRole('button', { name: 'Browse music recordings', exact: true })).toBeVisible();

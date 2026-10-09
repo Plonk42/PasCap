@@ -202,7 +202,7 @@ test('media overlay drop uses the same snapped ghost and copies the applied sour
   await page.getByRole('button', { name: 'Review pattern-b.mp4', exact: true }).click();
   await page.getByRole('spinbutton', { name: 'Source IN', exact: true }).fill('15');
   await page.getByRole('spinbutton', { name: 'Source OUT', exact: true }).fill('45');
-  await page.getByRole('button', { name: 'Apply range' }).click();
+  await page.getByRole('spinbutton', { name: 'Source OUT', exact: true }).press('Enter');
   const button = page.getByRole('button', { name: 'Review pattern-b.mp4', exact: true });
   const box = (await button.boundingBox())!;
   const surface = page.locator('.timeline-surface');
