@@ -391,7 +391,7 @@ function ClipKeyframeMarkers(props: ClipMarkerProps) {
     <div className="clip-keyframe-markers">
       {markers.map((marker) => {
         const type = marker.type === 'transform' ? 'Transform' : 'Speed';
-        // The dragged key keeps one element, so pointer capture survives its frame changing.
+        // The dragged key keeps its original React key, so pointer capture survives its frame changing.
         const moving =
           marker.type === 'transform' &&
           dragged !== null &&
@@ -412,7 +412,7 @@ function ClipKeyframeMarkers(props: ClipMarkerProps) {
         return (
           <button
             type="button"
-            key={moving ? 'transform-moving' : `${marker.type}-${marker.sourceFrame}`}
+            key={`${marker.type}-${moving && dragged ? dragged.origin : marker.sourceFrame}`}
             className={`timeline-clip-key ${marker.type}${moving ? ' moving' : ''}${moving && dragged?.error ? ' invalid' : ''}`}
             data-clip-keyframe={marker.type}
             data-source-frame={marker.sourceFrame}
