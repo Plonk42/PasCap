@@ -299,6 +299,10 @@
   outline-color: var(--error);
 }
 
+.snap-guide.track-keyframe-guide {
+  background: #edc886;
+}
+
 .timeline-layer-key-time {
   position: absolute;
   bottom: calc(100% + 4px);

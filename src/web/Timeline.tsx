@@ -1435,13 +1435,18 @@ export function Timeline(props: Readonly<Props>) {
             {snapGuide !== null && draft && (
               <div className="snap-guide" style={{ left: leading + snapGuide * scale }} />
             )}
-            {[keyframes.draft?.guide, clipKeys.draft?.guide].map(
-              (guide) =>
+            {(
+              [
+                ['track', keyframes.draft?.guide],
+                ['transform', clipKeys.draft?.guide],
+              ] as const
+            ).map(
+              ([type, guide]) =>
                 guide !== null &&
                 guide !== undefined && (
                   <div
-                    key={`keyframe-guide-${guide}`}
-                    className="snap-guide"
+                    key={`${type}-keyframe-guide`}
+                    className={`snap-guide ${type}-keyframe-guide`}
                     style={{ left: leading + guide * scale }}
                   />
                 ),
