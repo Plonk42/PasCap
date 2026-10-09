@@ -14,13 +14,28 @@ This guide is not a delivery ledger or a fresh validation result.
   Collapsed sections have relevant icons, compact duration/rate readouts and an
   adjusted-state dot; expanding preserves every control and existing preferences.
 - Animation uses contextual help rather than a paragraph below every control. Static values use
-  the normal treatment; animated values have a **curve icon and amber diamond**,
-  dashed between keyframes and filled when the setting is enabled at the playhead. **Animation
-  help** explains the states once. Titles and screen-reader descriptions retain
+  the normal treatment; main capture diamonds appear only with the section's
+  **Animate** on: hollow when the setting is not enabled at the real playhead,
+  filled when enabled. **Animation help** explains the states once. Titles and screen-reader descriptions retain
   each setting's scope and capture instructions.
-- All **eleven track-channel diamonds have adjacent Previous/Next SVG buttons**, followed by
-  any reset. Explicit capture, real-playhead values, shared keyframe movement,
-  off-duration inspection, every enabled setting and one-step Undo remain unchanged.
+- With Animate on, each main scalar Colour/Opacity and track Speed diamond retains
+  adjacent per-setting **Previous/Next** buttons because not every setting is enabled
+  at every shared keyframe. Animate off hides main arrows and diamonds while
+  retaining all keyframes, rendering and read-only constraints.
+- Each Animate-on section header retains one **Previous/Next** pair.
+  Colour visits Opacity/scalar colour keyframes; Speed visits
+  track Speed keyframes and all retained custom speed source keyframes of the
+  selected clip, even under a track Speed override. Speed and Transform stored
+  navigation includes off-trim/original-exclusive-OUT keyframes, previewing the
+  nearest mapped image with independent clip-local stored-source cursors, separate
+  from central track inspection. Successive stored keyframes stay reachable even
+  when they preview the same first/last image. Enabled setting chips in stored
+  Keyframes rows retain their per-channel arrows. All main and stored per-channel
+  arrows visit strictly earlier/later keyframes where that channel is nonnull
+  (zero is enabled), sharing the central off-duration inspection cursor.
+  Main capture uses the real displayed frame; navigation never edits or saves.
+  Timeline source markers still
+  omit off-trim keyframes, with exclusive OUT represented by a boundary marker.
 - **Track → Colour** contains the single **Opacity** slider/diamond/navigation
   alongside the colour sliders, initially **100%**. Without Opacity keyframes it edits
   track `opacity`, including on an empty track; keyed `opacity` overrides that value
@@ -88,7 +103,7 @@ and one full-pose source-frame diamond retain explicit capture, read-only keyed
 main values without a keyframe at the real displayed source frame, release-only
 drafts and editable invalid numbers. Stored-keyframe navigation distinguishes stored
 source time from the closest actually mapped preview, including off-trim and
-original exclusive-OUT anchors. This is clip-local, not another track channel.
+original exclusive-OUT keyframes. This is clip-local, not another track channel.
 See [the spatial contract](design/SPATIAL_TRANSFORMS.md); no fresh UI acceptance
 or throughput result is implied.
 

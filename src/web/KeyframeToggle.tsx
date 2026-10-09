@@ -1,17 +1,11 @@
 import { useId } from 'react';
 import type { EditCommand } from '../shared/commands.js';
-import {
-  activeLayerSetting,
-  hasLayerKeys,
-  isKeyframeFrame,
-  keyframeNeighbors,
-  type KeyframeSetting,
-} from '../shared/keyframes.js';
+import { activeLayerSetting, hasLayerKeys, isKeyframeFrame, type KeyframeSetting } from '../shared/keyframes.js';
 import type { VideoLayer } from '../shared/model.js';
+import { ChannelKeyframeNavigation } from './AnimationControls.js';
 import './layer-keyframes.css';
 import './keyframe-navigation.css';
-import { Icon } from './icons.js';
-import { keyframeNavigationFrame, keySeekHint, useKeyframeNavigation } from './keyframe-navigation.js';
+import { useKeyframeNavigation } from './keyframe-navigation.js';
 
 export interface KeyframeToggleProps {
   layer: VideoLayer;
@@ -39,11 +33,6 @@ export function KeyframeToggle({
   const active = activeLayerSetting(layer, setting, frame);
   const animated = hasLayerKeys(layer, setting);
   const valid = isKeyframeFrame(frame) && Number.isFinite(value);
-  const { previous, next } = keyframeNeighbors(
-    layer.keyframes,
-    keyframeNavigationFrame(navigation.inspection, layer.id, frame),
-    setting,
-  );
   const title = active
     ? `Remove ${label} from the shared keyframe at timeline frame ${frame}. Other settings at this keyframe stay unchanged.`
     : `Keyframe ${label} at timeline frame ${frame}. Capture the displayed value for the whole video track ${layer.name}.`;
@@ -71,34 +60,7 @@ export function KeyframeToggle({
             : 'Not animated. The diamond captures the displayed value to animate this setting on the whole video track.'}
         </span>
       </button>
-      <button
-        type="button"
-        className="icon-button keyframe-setting-step"
-        aria-label={`Previous ${label} keyframe`}
-        title={
-          previous
-            ? keySeekHint(previous.frame, navigation.duration)
-            : `No previous ${label} keyframe on ${layer.name}.`
-        }
-        disabled={unavailable || !previous}
-        onClick={() => {
-          if (!unavailable && previous) navigation.onSeekKeyframe(layer.id, previous.frame);
-        }}
-      >
-        <Icon name="back" size={14} />
-      </button>
-      <button
-        type="button"
-        className="icon-button keyframe-setting-step"
-        aria-label={`Next ${label} keyframe`}
-        title={next ? keySeekHint(next.frame, navigation.duration) : `No next ${label} keyframe on ${layer.name}.`}
-        disabled={unavailable || !next}
-        onClick={() => {
-          if (!unavailable && next) navigation.onSeekKeyframe(layer.id, next.frame);
-        }}
-      >
-        <Icon name="forward" size={14} />
-      </button>
+      <ChannelKeyframeNavigation layer={layer} setting={setting} label={label} frame={frame} disabled={disabled} />
     </span>
   );
 }

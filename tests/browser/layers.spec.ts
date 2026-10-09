@@ -216,7 +216,7 @@ test('shared rate points support easing, participant removal and contextual row 
   // source frames before frame 30; the remaining 22.5 consume 11.25 at 2×.
   expect(calculateLayout(project).duration).toBe(41);
   const first = await editLayerPoint(page, 'Video track 1', 0);
-  await first.getByRole('combobox', { name: 'Track keyframe interpolation 0', exact: true }).selectOption('smooth');
+  await first.getByRole('combobox', { name: 'Track keyframe easing 0', exact: true }).selectOption('smooth');
   project = projectSchema.parse(await page.evaluate(() => window.pascapLab!.project()));
   expect(calculateLayout(project).duration).toBe(41);
   await inspectorTab(page, 'Clip');

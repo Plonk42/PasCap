@@ -118,22 +118,52 @@ test('dragging a marker moves all participants/easing with preview-only drafts, 
   await seek(page, 5);
   await inspectorTab(page, 'Track');
   const start = await begin(page);
-  await move(page, start, 50, true);
-  await expect(marker(page, 50)).toHaveClass(/moving/);
-  await expect(marker(page, 50)).toHaveAttribute('data-keyframe-origin', '20');
-  await expect(marker(page, 50).locator('.timeline-layer-key-time')).toHaveText('00:00:01:20');
+  await move(page, start, 30, true);
+  await page.keyboard.up('Alt');
+  await expect(marker(page, 30)).toHaveClass(/moving/);
+  await expect(marker(page, 30)).toHaveAttribute('data-keyframe-origin', '20');
+  await expect(marker(page, 30).locator('.timeline-layer-key-time')).toHaveText('00:00:01:00');
   await expect(page.locator('.timeline-bottom')).toContainText('all animated settings move together');
   expect(await current(page)).toEqual(before);
   await page.evaluate(() => window.pascapLab!.flush());
   expect(memory.saves).toBe(0);
   await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
-  await expect(page.getByRole('button', { name: 'Next Exposure keyframe', exact: true })).toBeDisabled();
+  const keys = layerKeyframes(page, 'Video track 1');
+  await expect(keys.locator('[data-keyframe-frame="20"]')).toHaveCount(0);
+  const chipNext = keys
+    .locator('[data-keyframe-frame="30"] .layer-keyframe-chip')
+    .getByRole('button', { name: 'Next Exposure keyframe', exact: true });
+  const diamond = page.getByRole('button', { name: 'Keyframe Exposure', exact: true });
+  const main = diamond.locator('..');
+  await expect(main).toHaveClass(/\bkeyframe-setting-navigation\b/);
+  await expect(main.getByRole('button')).toHaveCount(3);
+  await expect(diamond).toBeDisabled();
+  for (const arrow of [
+    chipNext,
+    main.getByRole('button', { name: 'Previous Exposure keyframe', exact: true }),
+    main.getByRole('button', { name: 'Next Exposure keyframe', exact: true }),
+  ]) {
+    await expect(arrow).toHaveJSProperty('tagName', 'BUTTON');
+    await expect(arrow).toHaveAttribute('aria-disabled', 'true');
+    await expect(arrow).toHaveJSProperty('disabled', false);
+    await expect(arrow).toHaveAttribute('tabindex', '-1');
+    await arrow.focus();
+    for (const activation of ['Enter', 'Space']) {
+      await arrow.press(activation);
+      await expect(arrow).toBeFocused();
+      await expect(marker(page, 30)).toHaveClass(/moving/);
+      expect(await current(page)).toEqual(before);
+      await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(30);
+    }
+  }
+  await expect(
+    page.locator('.section-animation-controls').getByRole('button', { name: 'Next Colour keyframe', exact: true }),
+  ).toBeDisabled();
   await page.mouse.up();
-  await page.keyboard.up('Alt');
-  const expected = applyCommand(before, { type: 'layer-key-move', layerId: 'video-1', frame: 20, nextFrame: 50 });
+  const expected = applyCommand(before, { type: 'layer-key-move', layerId: 'video-1', frame: 20, nextFrame: 30 });
   expect(await current(page)).toEqual(expected);
-  await expect(marker(page, 50)).toBeFocused();
-  await expect(marker(page, 50)).not.toHaveClass(/moving/);
+  await expect(marker(page, 30)).toBeFocused();
+  await expect(marker(page, 30)).not.toHaveClass(/moving/);
   await expect
     .poll(() =>
       page.evaluate(() => ({
@@ -141,7 +171,7 @@ test('dragging a marker moves all participants/easing with preview-only drafts, 
         status: window.pascapLab!.engine.diagnostics().status,
       })),
     )
-    .toEqual({ frame: 50, status: 'paused' });
+    .toEqual({ frame: 30, status: 'paused' });
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   expect(await current(page)).toEqual(before);
   await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
@@ -151,7 +181,7 @@ test('dragging a marker moves all participants/easing with preview-only drafts, 
   expect(memory.snapshot().layers[0]!.keyframes).toEqual(expected.layers[0]!.keyframes);
   await page.reload();
   await ready(page, expected);
-  await expect(marker(page, 50)).toBeVisible();
+  await expect(marker(page, 30)).toBeVisible();
 });
 
 for (const cancellation of ['Escape', 'pointercancel', 'lostcapture', 'blur'] as const) {
@@ -423,9 +453,18 @@ test('moving a point outside duration stores its time without extending footage,
     'Stored keyframe · timeline frame 160',
   );
   await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(119);
-  await page.getByRole('button', { name: 'Previous Exposure keyframe', exact: true }).click();
+  const keys = layerKeyframes(page, 'Video track 1');
+  const previous = keys
+    .locator('[data-keyframe-frame="160"] .layer-keyframe-chip')
+    .getByRole('button', { name: 'Previous Exposure keyframe', exact: true });
+  await previous.scrollIntoViewIfNeeded();
+  await previous.click();
   await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(80);
-  await page.getByRole('button', { name: 'Next Exposure keyframe', exact: true }).click();
+  const following = keys
+    .locator('[data-keyframe-frame="80"] .layer-keyframe-chip')
+    .getByRole('button', { name: 'Next Exposure keyframe', exact: true });
+  await following.scrollIntoViewIfNeeded();
+  await following.click();
   await inspectorTab(page, 'Track keyframes');
   await expect(layerKeyframes(page, 'Video track 1').locator('.layer-keyframe-inspected')).toContainText(
     'Stored keyframe · timeline frame 160',

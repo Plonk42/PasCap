@@ -4,6 +4,7 @@ import {
   useLayoutEffect,
   useRef,
   useState,
+  type CSSProperties,
   type DragEvent,
   type KeyboardEvent,
   type PointerEvent,
@@ -14,12 +15,21 @@ import { KEYFRAME_SETTINGS, keySettings } from '../shared/keyframes.js';
 import { compileLayerRetiming } from '../shared/layer-retiming.js';
 import { resolveMediaSelection, type MediaSelections } from '../shared/media-selection.js';
 import type { MediaAsset } from '../shared/media.js';
-import { createClip, createLayer, MAX_VIDEO_LAYERS, type ProjectDocument, type VideoClip } from '../shared/model.js';
+import {
+  createClip,
+  createLayer,
+  MAX_VIDEO_LAYERS,
+  type ProjectDocument,
+  type VideoClip,
+  type VideoLayer,
+} from '../shared/model.js';
 import type { ClipCutRange } from '../shared/rush-editing.js';
 import { snapFrame, snapPoints } from '../shared/snap.js';
 import { trimOnTimeline, type TrimEdge } from '../shared/source-range.js';
-import { calculateLayout } from '../shared/timeline.js';
+import { calculateLayout, type PlacedClip } from '../shared/timeline.js';
 import { formatTimecode, framesToSeconds, secondsToFrames } from '../shared/timing.js';
+import { clipKeyframeMarkers } from './clip-keyframe-markers.js';
+import './clip-keyframe-markers.css';
 import {
   CLIP_DRAG_TYPE,
   durationLabel,
@@ -298,6 +308,81 @@ function TimelineMusicLanes(
   ));
 }
 
+function ClipKeyframeMarkers(
+  props: Readonly<{
+    placed: PlacedClip;
+    layer: VideoLayer;
+    name: string;
+    disabled: boolean;
+    blocked: () => boolean;
+    onSelect: Props['onSelect'];
+    onSeek: Props['onSeek'];
+  }>,
+) {
+  const markers = clipKeyframeMarkers(props.placed, props.layer);
+  if (!markers.length) return null;
+  return (
+    <div className="clip-keyframe-markers">
+      {markers.map((marker) => {
+        const type = marker.type === 'transform' ? 'Transform' : 'Speed';
+        const displayedSource = props.placed.retiming.sourceAt(marker.seekFrame - props.placed.start);
+        return (
+          <button
+            type="button"
+            key={`${marker.type}-${marker.sourceFrame}`}
+            className={`timeline-clip-key ${marker.type}`}
+            data-clip-keyframe={marker.type}
+            data-source-frame={marker.sourceFrame}
+            data-timeline-frame={marker.timelineFrame}
+            data-seek-frame={marker.seekFrame}
+            aria-label={`${type} keyframe source ${marker.sourceFrame} on clip ${props.placed.clip.id}, ${props.name}`}
+            title={`${type} · source frame ${marker.sourceFrame} · timeline frame ${marker.timelineFrame} (${formatTimecode(marker.timelineFrame)}) · Preview source ${displayedSource} at timeline frame ${marker.seekFrame}${marker.speedOverridden ? ' · Clip Speed overridden by video track Speed' : ''}`}
+            style={
+              {
+                '--clip-keyframe-position': `${(marker.outputFrame / props.placed.duration) * 100}%`,
+              } as CSSProperties
+            }
+            disabled={props.disabled}
+            draggable={false}
+            onPointerDown={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              if (event.button === 0 && !props.blocked()) event.currentTarget.focus({ preventScroll: true });
+            }}
+            onPointerMove={(event) => event.stopPropagation()}
+            onPointerUp={(event) => event.stopPropagation()}
+            onPointerCancel={(event) => event.stopPropagation()}
+            onMouseDown={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+            }}
+            onMouseMove={(event) => event.stopPropagation()}
+            onMouseUp={(event) => event.stopPropagation()}
+            onDoubleClick={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+            }}
+            onDragStart={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+            }}
+            onKeyDown={(event) => event.stopPropagation()}
+            onKeyUp={(event) => event.stopPropagation()}
+            onClick={(event) => {
+              event.stopPropagation();
+              if (props.blocked()) return;
+              props.onSelect(props.placed.clip.id);
+              props.onSeek(marker.seekFrame);
+            }}
+          >
+            <span aria-hidden="true">◆</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 export function Timeline(props: Readonly<Props>) {
   const {
     project,
@@ -472,6 +557,13 @@ export function Timeline(props: Readonly<Props>) {
   );
   const interactionBlocked =
     musicGesture !== null || timelineInteractionBlocked(draft, keyframes.active, keyframeNavigation.disabled);
+  const clipMarkerBlocked = (): boolean =>
+    interactionBlocked ||
+    drag.current !== null ||
+    movingClip.current ||
+    movement.current !== null ||
+    draggedMediaIds !== null ||
+    dropPlan !== null;
   const geometry = drag.current?.edge === 'in' ? calculateLayout(drag.current.base) : layout;
   const rows = timelineRows(project.layers);
   const rowTop = (layerId: string): number => rows.find((row) => row.layer.id === layerId)!.top;
@@ -1095,7 +1187,8 @@ export function Timeline(props: Readonly<Props>) {
                     if (
                       interactionBlocked ||
                       drag.current ||
-                      (event.target instanceof HTMLElement && event.target.closest('[data-trim-handle]'))
+                      (event.target instanceof HTMLElement &&
+                        event.target.closest('[data-trim-handle], [data-clip-keyframe]'))
                     ) {
                       event.preventDefault();
                       return;
@@ -1160,6 +1253,15 @@ export function Timeline(props: Readonly<Props>) {
                       </small>
                     </span>
                   </button>
+                  <ClipKeyframeMarkers
+                    placed={currentPlaced}
+                    layer={visible.layers.find((layer) => layer.id === clip.layerId)!}
+                    name={name}
+                    disabled={clipMarkerBlocked()}
+                    blocked={clipMarkerBlocked}
+                    onSelect={onSelect}
+                    onSeek={onSeek}
+                  />
                   {(['in', 'out'] as const).map((edge) => (
                     <button
                       key={edge}

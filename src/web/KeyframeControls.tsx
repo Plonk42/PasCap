@@ -3,6 +3,7 @@ import { applyCommand, type EditCommand } from '../shared/commands.js';
 import { KEYFRAME_SETTINGS, keyframeNeighbors, keySettings, type LayerKeyframe } from '../shared/keyframes.js';
 import type { ProjectDocument, VideoLayer } from '../shared/model.js';
 import { formatTimecode } from '../shared/timing.js';
+import { ChannelKeyframeNavigation } from './AnimationControls.js';
 import './declutter.css';
 import { EasingSelect } from './EasingSelect.js';
 import { HelpPopover } from './HelpPopover.js';
@@ -36,12 +37,24 @@ function participatingSettings(key: LayerKeyframe) {
   return KEYFRAME_SETTINGS.filter((definition) => settings.includes(definition.key));
 }
 
-function ParticipantChips({ point }: Readonly<{ point: LayerKeyframe }>) {
+function ParticipantChips({
+  point,
+  layer,
+  frame,
+  disabled,
+}: Readonly<{ point: LayerKeyframe; layer: VideoLayer; frame: number; disabled: boolean }>) {
   return (
     <div className="layer-keyframe-chips" aria-label="Animated settings">
       {participatingSettings(point).map((setting) => (
         <span className="layer-keyframe-chip" key={setting.key}>
           {setting.label}
+          <ChannelKeyframeNavigation
+            layer={layer}
+            frame={frame}
+            setting={setting.key}
+            label={setting.label}
+            disabled={disabled}
+          />
         </span>
       ))}
     </div>
@@ -162,12 +175,17 @@ function KeyframePointRow({
           <Icon name="trash" size={14} />
         </button>
       </div>
-      <p
+      <div
         className="layer-keyframe-dependencies"
         title="Moving this keyframe moves all these settings together; they also share its easing."
       >
-        {settings.map((setting) => setting.label).join(' · ')}
-      </p>
+        <ParticipantChips
+          point={point}
+          layer={project.layers.find((layer) => layer.id === layerId)!}
+          frame={point.frame}
+          disabled={disabled}
+        />
+      </div>
       <details className="layer-keyframe-point-details" open={open}>
         <summary aria-label={`Edit track keyframe ${point.frame}`}>Edit</summary>
         <div className="layer-keyframe-point-fields">
@@ -193,10 +211,10 @@ function KeyframePointRow({
             />
           </label>
           <label className="keyframe-easing" htmlFor={`${listId}-${row.id}-easing`}>
-            Shared easing
+            Easing
             <EasingSelect
               id={`${listId}-${row.id}-easing`}
-              aria-label={`Track keyframe interpolation ${point.frame}`}
+              aria-label={`Track keyframe easing ${point.frame}`}
               aria-describedby={helpId}
               title="Shared by these settings, to each setting's next keyframe"
               disabled={disabled}
@@ -375,8 +393,7 @@ export function KeyframeControls({
             </span>
           </div>
           <p className="editor-help-tip">
-            Tip: use the arrows beside a diamond to visit that setting's keyframes, or drag a timeline keyframe to move
-            all its settings.
+            Tip: Animate reveals diamonds. Section arrows visit any keyframe; chip arrows visit one setting's keyframes.
           </p>
         </HelpPopover>
       </div>
@@ -388,7 +405,11 @@ export function KeyframeControls({
         {atHead && (
           <>
             <span className="layer-keyframe-caption">At playhead:</span>
-            <ParticipantChips point={atHead} />
+            <span>
+              {participatingSettings(atHead)
+                .map((setting) => setting.label)
+                .join(' · ')}
+            </span>
           </>
         )}
       </div>
@@ -398,7 +419,11 @@ export function KeyframeControls({
             Stored keyframe · timeline frame {inspectedAway.frame}
             {inspectedAway.frame >= duration ? ' · outside current duration' : ''}
           </span>
-          <ParticipantChips point={inspectedAway} />
+          <span>
+            {participatingSettings(inspectedAway)
+              .map((setting) => setting.label)
+              .join(' · ')}
+          </span>
           <span className="layer-setting-hint">
             {duration === 0
               ? 'No preview frame is available. This keyframe remains editable below.'

@@ -5,9 +5,9 @@ import { colourAt } from '../shared/composition.js';
 import { activeLayerSetting, evaluateLayerSetting, hasLayerKeys, type KeyframeSetting } from '../shared/keyframes.js';
 import type { MediaAsset } from '../shared/media.js';
 import type { ProjectDocument, Transition, VideoClip, VideoLayer } from '../shared/model.js';
-import { sourceRateAt } from '../shared/speed.js';
 import { calculateLayout, type TimelineLayout } from '../shared/timeline.js';
 import { AdvancedColour } from './AdvancedColour.js';
+import { TrackAnimationControls, useAnimationTools } from './AnimationControls.js';
 import { ClipSourceRange } from './ClipSourceRange.js';
 import { colourResetCommands } from './colour-reset.js';
 import { shortName, sourceSeconds } from './display.js';
@@ -27,7 +27,7 @@ import { NumberField } from './NumberField.js';
 import { settingPresentation } from './setting-scope.js';
 import { RangeSettingControl } from './SettingValueControl.js';
 import { TransformSection } from './SpatialControls.js';
-import { SpeedControls, SpeedHelp } from './SpeedControls.js';
+import { SpeedControls } from './SpeedControls.js';
 import { planTimelineDrop } from './timeline-placement.js';
 import type { DraftPreview } from './Timeline.js';
 import './ui-controls.css';
@@ -147,6 +147,7 @@ interface LayerControlProps {
   resetKey: string;
   disabled: boolean;
   onEdit: Props['onEdit'];
+  animate?: boolean;
 }
 
 function settingState(layer: VideoLayer, setting: KeyframeSetting, frame: number, baseAvailable: boolean) {
@@ -172,6 +173,7 @@ function OpacityControl({
   disabled,
   onEdit,
   id,
+  animate,
 }: Readonly<LayerControlProps & { id: string }>) {
   const state = settingState(layer, 'opacity', frame, true);
   const value = evaluateLayerSetting(layer, 'opacity', frame, layer.opacity);
@@ -202,15 +204,17 @@ function OpacityControl({
         scope={<SettingScope keyed={state.keyed} scope={scope} />}
         exact={{ resetKey: `${resetKey}:opacity:${state.keyed ? 'key' : 'layer'}` }}
         actions={
-          <KeyframeToggle
-            layer={layer}
-            setting="opacity"
-            label="Opacity"
-            frame={frame}
-            value={value}
-            disabled={disabled}
-            onEdit={onEdit}
-          />
+          animate && (
+            <KeyframeToggle
+              layer={layer}
+              setting="opacity"
+              label="Opacity"
+              frame={frame}
+              value={value}
+              disabled={disabled}
+              onEdit={onEdit}
+            />
+          )
         }
       />
     </div>
@@ -228,6 +232,7 @@ function ColourControl({
   control,
   value,
   id,
+  animate,
 }: Readonly<LayerControlProps & { control: ColourControlDefinition; value: number; id: string }>) {
   const state = settingState(layer, control.key, frame, true);
   const { scope, hint } = settingPresentation({ ...state, baseLabel: 'Track', label: control.label, frame });
@@ -251,15 +256,17 @@ function ColourControl({
         scope={<SettingScope keyed={state.keyed} scope={scope} />}
         exact={{ resetKey: `${resetKey}:${control.key}:${state.keyed ? 'key' : 'layer'}` }}
         actions={
-          <KeyframeToggle
-            layer={layer}
-            setting={control.key}
-            label={control.label}
-            frame={frame}
-            value={value}
-            disabled={disabled}
-            onEdit={onEdit}
-          />
+          animate && (
+            <KeyframeToggle
+              layer={layer}
+              setting={control.key}
+              label={control.label}
+              frame={frame}
+              value={value}
+              disabled={disabled}
+              onEdit={onEdit}
+            />
+          )
         }
       />
     </div>
@@ -281,6 +288,7 @@ function ColourSection({
   const opacity = evaluateLayerSetting(layer, 'opacity', frame, layer.opacity);
   const animated =
     hasLayerKeys(layer, 'opacity') || COLOUR_CONTROLS.some((control) => hasLayerKeys(layer, control.key));
+  const tools = useAnimationTools('colour', `${project.id}:${layer.id}`, animated);
   const resetCommands = colourResetCommands(layer, frame);
   const adjusted =
     COLOUR_CONTROLS.filter(
@@ -300,6 +308,16 @@ function ColourSection({
       title="Colour"
       icon="colour"
       modified={adjusted > 0 || !isNeutralColour(layer.colour)}
+      actions={
+        <TrackAnimationControls
+          label="Colour"
+          layer={layer}
+          frame={frame}
+          settings={['opacity', ...COLOUR_CONTROLS.map((control) => control.key)]}
+          tools={tools}
+          disabled={disabled}
+        />
+      }
       help={
         <HelpPopover label="Colour animation" guide="colour-speed-and-shared-video-track-keyframes">
           <p>These settings grade every clip on this track. To grade one clip differently, put it on its own track.</p>
@@ -320,8 +338,14 @@ function ColourSection({
           {animated ? 'Reset keyframes' : 'Reset'}
         </button>
       </div>
+      {tools.warning && (
+        <p className="control-hint">
+          Animation tools cannot be saved in this browser; the choice remains available for this session.
+        </p>
+      )}
       <div className="colour-controls">
         <OpacityControl
+          animate={tools.enabled}
           layer={layer}
           frame={frame}
           resetKey={resetKey}
@@ -331,6 +355,7 @@ function ColourSection({
         />
         {COLOUR_CONTROLS.map((control) => (
           <ColourControl
+            animate={tools.enabled}
             key={control.key}
             layer={layer}
             frame={frame}
@@ -648,8 +673,6 @@ export function Inspector({
   }, [boundaryId, section]);
   const sourceFrame =
     placed && frame >= placed.start && frame < placed.end ? placed.retiming.sourceAt(frame - placed.start) : null;
-  const clipRate = clip ? sourceRateAt(clip.speed, sourceFrame ?? clip.sourceIn) : 1;
-  const speedRate = layer ? evaluateLayerSetting(layer, 'speed', frame, clipRate) : 1;
   const inputContext = `${project.id}:${layer?.id}:${clip?.id ?? 'row'}`;
   const startRestriction = clip ? clipStartRestriction(project, clip) : null;
   const startHint = startRestriction ?? undefined;
@@ -763,36 +786,23 @@ export function Inspector({
                   )}
                 </section>
               </InspectorSection>
-              <InspectorSection
-                id="speed"
-                title="Speed"
-                icon="speed"
-                badge={`${speedRate.toFixed(2)}×`}
-                modified={
-                  speedRate !== 1 ||
-                  hasLayerKeys(layer, 'speed') ||
-                  (clip !== undefined && clip.speed.mode !== 'constant')
-                }
-                help={<SpeedHelp keyed={hasLayerKeys(layer, 'speed')} helpId={`${colourControlId}-speed-help`} />}
-              >
-                <SpeedControls
-                  project={project}
-                  resetKey={project.id}
-                  helpId={`${colourControlId}-speed-help`}
-                  clip={clip ?? null}
-                  layer={layer}
-                  frame={frame}
-                  projectDuration={layout.duration}
-                  placedDuration={placed?.duration ?? null}
-                  disabled={drafting}
-                  sourceFrame={sourceFrame}
-                  sourceFrameCount={asset?.metadata.frameCount ?? null}
-                  onEdit={onEdit}
-                  onPreview={onPreview}
-                  onSeek={onSeek}
-                  onPause={onPause}
-                />
-              </InspectorSection>
+              <SpeedControls
+                project={project}
+                resetKey={project.id}
+                helpId={`${colourControlId}-speed-help`}
+                clip={clip ?? null}
+                layer={layer}
+                frame={frame}
+                projectDuration={layout.duration}
+                placedDuration={placed?.duration ?? null}
+                disabled={drafting}
+                sourceFrame={sourceFrame}
+                sourceFrameCount={asset?.metadata.frameCount ?? null}
+                onEdit={onEdit}
+                onPreview={onPreview}
+                onSeek={onSeek}
+                onPause={onPause}
+              />
               <TransformSection
                 project={project}
                 clip={clip ?? null}

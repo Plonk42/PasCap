@@ -33,6 +33,8 @@ interface Props {
   onPause: () => void;
   onSeek: (frame: number) => void;
   onPreview: (draft: DraftPreview | null, restoreFrame?: number) => void;
+  inspectedFrame?: number | null;
+  onSelectStored?: (frame: number) => void;
 }
 interface PointIdentity {
   frame: number;
@@ -131,6 +133,8 @@ export function ClipSpeedCurve({
   onPause,
   onSeek,
   onPreview,
+  inspectedFrame,
+  onSelectStored,
 }: Readonly<Props>) {
   const helpId = useId();
   const context = `${project.id}:${clip.id}`;
@@ -148,6 +152,12 @@ export function ClipSpeedCurve({
   });
   const current = drag.draft?.plan.speed ?? speed;
   const identity = usePointIdentity(current);
+  const [lastInspected, setLastInspected] = useState<number | null | undefined>(inspectedFrame);
+  if (lastInspected !== inspectedFrame) {
+    setLastInspected(inspectedFrame);
+    const row = identity.rows.find((row) => row.frame === inspectedFrame);
+    if (row) identity.select(row.id);
+  }
   const selectedIndex = identity.rows.findIndex((row) => row.id === identity.selected);
   const selected = current.keyframes[selectedIndex]!;
   const selectedRow = identity.rows[selectedIndex]!;
@@ -180,6 +190,7 @@ export function ClipSpeedCurve({
   };
   const seekPoint = (index: number): void => {
     identity.select(identity.rows[index]!.id);
+    onSelectStored?.(current.keyframes[index]!.frame);
     onSeek(previewClipSource(project, clip.id, current.keyframes[index]!.frame));
   };
   const keyboard = (event: KeyboardEvent<HTMLButtonElement>, index: number): void => {
@@ -368,15 +379,6 @@ export function ClipSpeedCurve({
         <span>{formatTimecode(clip.sourceOut)}</span>
       </div>
       <div className="clip-speed-selection">
-        <button
-          type="button"
-          className="icon-button"
-          aria-label="Previous clip speed keyframe"
-          disabled={unavailable || selectedIndex === 0}
-          onClick={() => seekPoint(selectedIndex - 1)}
-        >
-          <Icon name="back" size={14} />
-        </button>
         <select
           aria-label="Selected clip speed keyframe"
           value={identity.selected}
@@ -392,15 +394,6 @@ export function ClipSpeedCurve({
             </option>
           ))}
         </select>
-        <button
-          type="button"
-          className="icon-button"
-          aria-label="Next clip speed keyframe"
-          disabled={unavailable || selectedIndex === current.keyframes.length - 1}
-          onClick={() => seekPoint(selectedIndex + 1)}
-        >
-          <Icon name="forward" size={14} />
-        </button>
       </div>
       <div className="clip-speed-point-fields">
         <label>
@@ -431,7 +424,7 @@ export function ClipSpeedCurve({
           />
         </div>
         <label className="clip-speed-easing">
-          To next keyframe
+          Easing
           <EasingSelect
             aria-label="Clip speed keyframe easing"
             disabled={unavailable || selectedIndex === current.keyframes.length - 1}

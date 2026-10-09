@@ -1,4 +1,4 @@
-import { createElement } from 'react';
+import { createElement, type ComponentProps } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import { applyCommand, EditHistory } from '../../src/shared/commands.js';
@@ -19,6 +19,7 @@ import {
   type VideoLayer,
 } from '../../src/shared/model.js';
 import { Inspector } from '../../src/web/Inspector.js';
+import { ChannelKeyframeNavigation, TrackAnimationControls } from '../../src/web/AnimationControls.js';
 import {
   inspectKeyframe,
   KeyframeNavigationContext,
@@ -91,6 +92,30 @@ function toggleMarkup(changes: Partial<KeyframeToggleProps> = {}, context = navi
 
 function buttons(markup: string): string[] {
   return [...markup.matchAll(/<button\b[^>]*>[\s\S]*?<\/button>/g)].map((match) => match[0]);
+}
+
+function channelMarkup(
+  changes: Partial<ComponentProps<typeof ChannelKeyframeNavigation>> = {},
+  context = navigation(),
+): string {
+  const layer = {
+    ...createProject('markup', 'Markup').layers[0]!,
+    keyframes: [point(10, { exposure: 0 }), point(15, { brightness: 0 }), point(20, { exposure: 0.4 })],
+  };
+  return renderToStaticMarkup(
+    createElement(
+      KeyframeNavigationContext.Provider,
+      { value: context },
+      createElement(ChannelKeyframeNavigation, {
+        layer,
+        setting: 'exposure',
+        label: 'Exposure',
+        frame: 15,
+        disabled: false,
+        ...changes,
+      }),
+    ),
+  );
 }
 
 describe('ordered per-setting keyframe neighbours', () => {
@@ -293,8 +318,8 @@ describe('one editor-only stored-point cursor', () => {
   });
 });
 
-describe('native diamond, previous, next DOM and all control placements', () => {
-  it('renders exactly three sibling native buttons, in diamond/previous/next order, with SVG navigation', () => {
+describe('main diamonds with per-setting arrows and stored-channel navigation', () => {
+  it('renders the native diamond before its pair of SVG channel buttons with the same stored-chip names', () => {
     const markup = toggleMarkup();
     const controls = buttons(markup);
     expect(markup.startsWith('<span class="keyframe-setting-navigation" data-animated="true">')).toBe(true);
@@ -304,20 +329,34 @@ describe('native diamond, previous, next DOM and all control placements', () => 
     expect(controls[0]).toContain('aria-label="Keyframe Exposure"');
     expect(controls[0]).toContain('aria-pressed="false"');
     expect(controls[0]).toContain('◇');
+    expect(markup).toContain('<span class="channel-keyframe-navigation">');
     expect(controls[1]).toContain('aria-label="Previous Exposure keyframe"');
     expect(controls[2]).toContain('aria-label="Next Exposure keyframe"');
-    for (const control of controls) expect(control).toContain('type="button"');
-    for (const control of controls.slice(1)) {
+    expect(controls[1]).toContain('title="Go to timeline frame 10."');
+    expect(controls[2]).toContain('title="Go to timeline frame 20."');
+    const channel = buttons(channelMarkup());
+    expect(channel).toHaveLength(2);
+    expect(channel[0]).toContain('aria-label="Previous Exposure keyframe"');
+    expect(channel[1]).toContain('aria-label="Next Exposure keyframe"');
+    for (const control of [...controls, ...channel]) expect(control).toContain('type="button"');
+    expect(controls.slice(1)).toEqual(channel);
+    for (const control of [...controls.slice(1), ...channel]) {
       expect(control).toContain('<svg');
       expect(control).not.toContain('disabled=""');
+      expect(control).toContain('aria-disabled="false"');
+      expect(control).toContain('tabindex="0"');
     }
   });
 
   it('only the diamond requires a finite capture value, not read-only navigation', () => {
     const controls = buttons(toggleMarkup({ value: NaN }));
+    expect(controls).toHaveLength(3);
     expect(controls[0]).toContain('disabled=""');
-    expect(controls[1]).not.toContain('disabled=""');
-    expect(controls[2]).not.toContain('disabled=""');
+    for (const control of [...controls.slice(1), ...buttons(channelMarkup())]) {
+      expect(control).not.toContain('disabled=""');
+      expect(control).toContain('aria-disabled="false"');
+      expect(control).toContain('tabindex="0"');
+    }
   });
 
   it.each(['disabled prop', 'no project / draft context', 'no keys', 'unkeyed channel', 'invalid frame'] as const)(
@@ -327,19 +366,23 @@ describe('native diamond, previous, next DOM and all control placements', () => 
         ...createProject('empty', 'Empty').layers[0]!,
         keyframes: reason === 'no keys' ? [] : [point(10, { exposure: 0 }), point(20, { exposure: 1 })],
       };
-      const controls = buttons(
-        toggleMarkup(
-          {
-            layer,
-            disabled: reason === 'disabled prop',
-            setting: reason === 'unkeyed channel' ? 'brightness' : 'exposure',
-            frame: reason === 'invalid frame' ? NaN : 15,
-          },
-          navigation({ disabled: reason === 'no project / draft context' }),
-        ),
-      );
-      expect(controls).toHaveLength(3);
-      for (const control of controls.slice(1)) expect(control).toContain('disabled=""');
+      const props = {
+        layer,
+        disabled: reason === 'disabled prop',
+        setting: reason === 'unkeyed channel' ? ('brightness' as const) : ('exposure' as const),
+        frame: reason === 'invalid frame' ? NaN : 15,
+      };
+      const context = navigation({ disabled: reason === 'no project / draft context' });
+      const controls = buttons(channelMarkup(props, context));
+      expect(controls).toHaveLength(2);
+      const main = buttons(toggleMarkup(props, context));
+      expect(main).toHaveLength(3);
+      expect(main.slice(1)).toEqual(controls);
+      for (const control of [...controls, ...main.slice(1)]) {
+        expect(control).toContain('aria-disabled="true"');
+        expect(control).toContain('tabindex="-1"');
+        expect(control).not.toContain('disabled=""');
+      }
     },
   );
 
@@ -349,16 +392,64 @@ describe('native diamond, previous, next DOM and all control placements', () => 
       keyframes: [point(60, { exposure: 0 }), point(80, { exposure: 1 }), point(100, { exposure: 2 })],
     };
     const inspection = inspectKeyframe('outside', layer, 80, 19, 20)!;
-    const controls = buttons(toggleMarkup({ layer, frame: 19 }, navigation({ inspection, duration: 20 })));
-    expect(controls[0]).toContain('aria-pressed="false"');
-    expect(controls[0]).toContain('timeline frame 19');
-    expect(controls[1]).toContain('Stored timeline frame 60');
-    expect(controls[2]).toContain('Stored timeline frame 100');
-    expect(controls[1]).toContain('nearest available frame 19');
+    const context = navigation({ inspection, duration: 20 });
+    const main = buttons(toggleMarkup({ layer, frame: 19 }, context));
+    expect(main).toHaveLength(3);
+    expect(main[0]).toContain('aria-pressed="false"');
+    expect(main[0]).toContain('timeline frame 19');
+    const controls = buttons(channelMarkup({ layer, frame: 60 }, context));
+    expect(main.slice(1)).toEqual(controls);
+    expect(controls[0]).toContain('Stored timeline frame 60');
+    expect(controls[1]).toContain('Stored timeline frame 100');
+    expect(controls[0]).toContain('nearest available frame 19');
   });
 
-  it('places both buttons at each of the eleven inspector diamonds without duplicate sidebar opacity controls', () => {
+  it('uses the stored row frame without inspection, with strict bounds and zero-valued participants', () => {
+    const layer = {
+      ...createProject('stored', 'Stored').layers[0]!,
+      keyframes: [point(0, { exposure: 0 }), point(10, { brightness: 0 }), point(2_147_483_647, { exposure: 1 })],
+    };
+    const first = buttons(channelMarkup({ layer, frame: 0 }));
+    expect(first[0]).toContain('aria-disabled="true"');
+    expect(first[0]).toContain('tabindex="-1"');
+    expect(first[1]).toContain('Stored timeline frame 2147483647;');
+    const last = buttons(channelMarkup({ layer, frame: 2_147_483_647 }));
+    expect(last[0]).toContain('Go to timeline frame 0.');
+    expect(last[0]).not.toContain('disabled=""');
+    expect(last[0]).toContain('aria-disabled="false"');
+    expect(last[0]).toContain('tabindex="0"');
+    expect(last[1]).toContain('aria-disabled="true"');
+    expect(last[1]).toContain('tabindex="-1"');
+    const foreign = inspectKeyframe('other', { ...layer, id: 'other' }, 0, 0, 250)!;
+    expect(channelMarkup({ layer, frame: 2_147_483_647 }, navigation({ inspection: foreign }))).toBe(
+      channelMarkup({ layer, frame: 2_147_483_647 }),
+    );
+  });
+
+  it('retains both channel arrows and endpoint disabling on an empty timeline while inspecting stored points', () => {
+    const layer = {
+      ...createProject('empty', 'Empty').layers[0]!,
+      keyframes: [point(30, { exposure: 0 }), point(45, { brightness: 0 }), point(60, { exposure: 1 })],
+    };
+    const first = buttons(channelMarkup({ layer, frame: 30 }, navigation({ duration: 0 })));
+    expect(first[0]).toContain('aria-disabled="true"');
+    expect(first[0]).toContain('tabindex="-1"');
+    expect(first[1]).toContain('Stored timeline frame 60; the timeline is empty');
+    const inspection = inspectKeyframe('empty', layer, 60, 0, 0)!;
+    const last = buttons(channelMarkup({ layer, frame: 30 }, navigation({ inspection, duration: 0 })));
+    expect(last[0]).toContain('Stored timeline frame 30; the timeline is empty');
+    expect(last[1]).toContain('aria-disabled="true"');
+    expect(last[1]).toContain('tabindex="-1"');
+    expect(buttons(toggleMarkup({ layer, frame: 0 }, navigation({ inspection, duration: 0 }))).slice(1)).toEqual(last);
+  });
+
+  it('retains per-setting arrows beside main diamonds and on chips, with one section union and no sidebar duplicates', () => {
     const document = project(interleaved);
+    document.clips[0]!.spatial.keyframes = [0, 20].map((frame) => ({
+      frame,
+      interpolation: 'linear',
+      values: { ...document.clips[0]!.spatial.base },
+    }));
     const inspector = renderToStaticMarkup(
       createElement(
         KeyframeNavigationContext.Provider,
@@ -382,9 +473,36 @@ describe('native diamond, previous, next DOM and all control placements', () => 
       ),
     );
     for (const { label } of KEYFRAME_SETTINGS) {
-      for (const name of [`Keyframe ${label}`, `Previous ${label} keyframe`, `Next ${label} keyframe`]) {
-        expect(inspector.split(`aria-label="${name}"`)).toHaveLength(2);
-      }
+      expect(inspector.split(`aria-label="Keyframe ${label}"`)).toHaveLength(2);
+      // One main pair and three stored participants; Speed additionally has its section union.
+      const count = label === 'Speed' ? 5 : 4;
+      for (const direction of ['Previous', 'Next'])
+        expect(inspector.split(`aria-label="${direction} ${label} keyframe"`)).toHaveLength(count + 1);
+    }
+    const diamonds = [
+      ...inspector.matchAll(/<span class="keyframe-setting-navigation"[\s\S]*?<\/button><\/span><\/span>/g),
+    ];
+    expect(diamonds).toHaveLength(11);
+    for (const [markup] of diamonds) {
+      const controls = buttons(markup);
+      expect(controls).toHaveLength(3);
+      const label = /aria-label="Keyframe ([^"]+)"/.exec(controls[0]!)![1];
+      expect(markup).toContain('<span class="channel-keyframe-navigation">');
+      expect(controls[1]).toContain(`aria-label="Previous ${label} keyframe"`);
+      expect(controls[2]).toContain(`aria-label="Next ${label} keyframe"`);
+    }
+    const chips = [...inspector.matchAll(/<span class="layer-keyframe-chip"[\s\S]*?<\/button><\/span><\/span>/g)];
+    expect(chips).toHaveLength(interleaved.length);
+    for (const [markup] of chips) expect(buttons(markup)).toHaveLength(2);
+    const sections = [...inspector.matchAll(/<div class="section-animation-controls">[\s\S]*?<\/div>/g)];
+    expect(sections).toHaveLength(3);
+    for (const label of ['Colour', 'Speed', 'Transform']) {
+      expect(inspector.split(`aria-label="Animate ${label}"`)).toHaveLength(2);
+      const section = sections.find(([markup]) => markup.includes(`aria-label="Animate ${label}"`))![0];
+      expect(buttons(section)).toHaveLength(3);
+      expect(section).toContain('aria-pressed="true"');
+      for (const direction of ['Previous', 'Next'])
+        expect(section.split(`aria-label="${direction} ${label} keyframe"`)).toHaveLength(2);
     }
     const sidebar = renderToStaticMarkup(
       createElement(
@@ -411,5 +529,48 @@ describe('native diamond, previous, next DOM and all control placements', () => 
     expect(sidebar).not.toContain('Track opacity');
     expect(buttons(sidebar).join('')).not.toContain('keyframe');
     expect(sidebar).not.toContain('Previous Exposure keyframe');
+  });
+});
+
+describe('Colour section union navigation', () => {
+  it.each([0, 10, 20, 30, 40, 2_147_483_647])('visits Opacity and scalar Colour only from frame %s', (frame) => {
+    const layer = {
+      ...createProject('union', 'Union').layers[0]!,
+      keyframes: [
+        point(0, { opacity: 0 }),
+        point(10, { speed: 1 }),
+        point(20, { temperature: 0, tint: 0 }),
+        point(30, { speed: 2 }),
+        point(40, { shadows: 0 }),
+      ],
+    };
+    const settings = KEYFRAME_SETTINGS.filter(({ key }) => key !== 'speed').map(({ key }) => key);
+    const expected = keyframeNeighbors(
+      layer.keyframes.filter((key) => key.values.speed === null),
+      frame,
+    );
+    const context = navigation();
+    const markup = renderToStaticMarkup(
+      createElement(
+        KeyframeNavigationContext.Provider,
+        { value: context },
+        createElement(TrackAnimationControls, {
+          label: 'Colour',
+          layer,
+          frame,
+          settings,
+          disabled: false,
+          tools: { context: 'union', enabled: true, warning: false, toggle: vi.fn() },
+        }),
+      ),
+    );
+    const controls = buttons(markup);
+    expect(controls).toHaveLength(3);
+    expect(controls[0]).toContain('aria-label="Animate Colour"');
+    expect(controls[0]).toContain('aria-pressed="true"');
+    expect(controls[1]).toContain('aria-label="Previous Colour keyframe"');
+    expect(controls[2]).toContain('aria-label="Next Colour keyframe"');
+    expect(controls[1]!.includes('disabled=""')).toBe(expected.previous === null);
+    expect(controls[2]!.includes('disabled=""')).toBe(expected.next === null);
   });
 });

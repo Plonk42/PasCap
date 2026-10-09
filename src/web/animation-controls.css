@@ -1,0 +1,40 @@
+.section-animation-controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 3px;
+  padding: 0 10px 6px;
+}
+.section-animate[aria-pressed='true'] {
+  color: var(--accent);
+  background: var(--panel-raised);
+}
+.channel-keyframe-navigation {
+  display: inline-flex;
+  align-items: center;
+}
+
+/* Retain the activated arrow's focus when navigation reaches an endpoint. */
+.channel-keyframe-navigation button[aria-disabled='true'] {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.layer-keyframe-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.channel-keyframe-navigation .icon-button {
+  min-width: 22px;
+  min-height: 24px;
+  padding: 2px;
+}
+
+/* Per-setting navigation is not an optional hover-only reset action. */
+.declutter-inspector .colour-control-actions .channel-keyframe-navigation .icon-button {
+  opacity: 1;
+}
+
+.declutter-inspector .colour-control-actions .channel-keyframe-navigation .icon-button[aria-disabled='true'] {
+  opacity: 0.4;
+}

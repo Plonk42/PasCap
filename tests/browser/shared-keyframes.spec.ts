@@ -215,6 +215,26 @@ test('setting tooltips and accessible descriptions explain the editable keyframe
       }
       if (frame === 10) await expect(field).toBeEnabled();
       else await expect(field).toBeDisabled();
+      const main = diamond(page, label).locator('..');
+      await expect(main).toHaveClass('keyframe-setting-navigation');
+      await expect(main.getByRole('button')).toHaveCount(3);
+      for (const direction of ['Previous', 'Next'] as const) {
+        const arrow = main.getByRole('button', { name: `${direction} ${label} keyframe`, exact: true });
+        const available = frame === 0 && direction === 'Next';
+        await expect(arrow).toBeVisible();
+        await expect(arrow).toHaveAttribute('aria-disabled', String(!available));
+        await expect(arrow).toHaveAttribute('tabindex', available ? '0' : '-1');
+        await expect(arrow).toHaveJSProperty('disabled', false);
+        await expect(arrow).toHaveAttribute(
+          'title',
+          available ? 'Go to timeline frame 10.' : `No ${direction.toLowerCase()} ${label} keyframe`,
+        );
+        if (available) await expect(arrow).toBeEnabled();
+        else {
+          await expect(arrow).toBeDisabled();
+          await arrow.evaluate((element) => (element as HTMLButtonElement).click());
+        }
+      }
       if (role === 'slider')
         await expect(page.locator(`[id="${await field.getAttribute('id')}-name"]`)).toHaveAttribute('title', hint);
     }
@@ -310,7 +330,12 @@ test('the first hollow diamond creates one point; same-frame channels merge inde
   await expect(page.locator('.layer-keyframe-controls')).toHaveCount(1);
   await expect(page.getByRole('checkbox', { name: 'Animate colour adjustments', exact: true })).toHaveCount(0);
   const row = await editLayerPoint(page, 'Video track 1', 20);
-  await expect(row.locator('.layer-keyframe-dependencies')).toHaveText('Opacity · Speed · Exposure · Saturation');
+  await expect(row.locator('.layer-keyframe-dependencies .layer-keyframe-chip')).toHaveText([
+    'Opacity',
+    'Speed',
+    'Exposure',
+    'Saturation',
+  ]);
   await expect(row.locator('.layer-keyframe-point-values').getByRole('spinbutton')).toHaveCount(4);
   const marker = page.getByRole('button', { name: 'Track keyframe 20 on Video track 1', exact: true });
   for (const label of ['Opacity', 'Speed', 'Exposure', 'Saturation'])
@@ -434,7 +459,12 @@ test('moving a shared point moves every participant with one Undo and preserves 
   await fixture(page, document);
   const row = await editLayerPoint(page, 'Video track 1', 10);
   await expect(row.getByLabel('Edit track keyframe 10', { exact: true })).toHaveText('Edit');
-  await expect(row.locator('.layer-keyframe-dependencies')).toHaveText('Opacity · Speed · Exposure · Saturation');
+  await expect(row.locator('.layer-keyframe-dependencies .layer-keyframe-chip')).toHaveText([
+    'Opacity',
+    'Speed',
+    'Exposure',
+    'Saturation',
+  ]);
   const time = row.getByRole('spinbutton', { name: 'Track keyframe frame 10', exact: true });
   const id = await time.getAttribute('id');
   await time.fill('50');
@@ -445,9 +475,7 @@ test('moving a shared point moves every participant with one Undo and preserves 
   await expect(moved).toBeFocused();
   await expect(moved).toHaveAttribute('id', id!);
   expect((await current(page)).layers[0]?.keyframes).toEqual([second, { ...first, frame: 50 }]);
-  await expect(keys.getByRole('combobox', { name: 'Track keyframe interpolation 50', exact: true })).toHaveValue(
-    'ease-in',
-  );
+  await expect(keys.getByRole('combobox', { name: 'Track keyframe easing 50', exact: true })).toHaveValue('ease-in');
   await moved.press('Enter');
   await page
     .getByRole('button', { name: 'Undo', exact: true })

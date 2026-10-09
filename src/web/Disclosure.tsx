@@ -14,6 +14,7 @@ interface Props {
   beforeTitle?: ReactNode;
   afterTitle?: ReactNode;
   help?: ReactNode;
+  actions?: ReactNode;
   children: ReactNode;
 }
 
@@ -30,6 +31,7 @@ export function Disclosure({
   beforeTitle,
   afterTitle,
   help,
+  actions,
   children,
 }: Readonly<Props>) {
   return (
@@ -53,6 +55,7 @@ export function Disclosure({
         </h3>
         {help}
       </div>
+      {actions}
       <div
         className={`disclosure-content ${contentClassName}`}
         id={contentId}

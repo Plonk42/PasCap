@@ -146,8 +146,11 @@ requires the composited export path; any nonneutral spatial base or spatial keyf
 after grading; nonneutral uncovered pixels reveal lower footage. The static chunk
 plan cannot silently omit these edits.
 Opacity is composition coverage, not part of the SDR RGB grade.
-Its single native slider/exact `NumberField`/diamond/navigation is in **Track → Colour**
-alongside the colour controls. Main and stored sliders/exact fields use **0–100%**,
+Its single native slider/exact `NumberField` is in **Track → Colour** alongside
+the colour controls. Its capture diamond appears only when Animate Colour is on;
+adjacent per-setting Previous/Next buttons appear with it, and stored
+enabled-setting chips retain their per-channel arrows.
+Main and stored sliders/exact fields use **0–100%**,
 neutral **100%**; track `opacity` and keyframe values stay **0–1**, without a schema change.
 Without Opacity keyframes it edits track `opacity`, even on
 an empty track. With keyframes, a setting not enabled at the real playhead is read-only
@@ -194,17 +197,38 @@ save/history. Each keyboard slider adjustment is an individual validated edit.
 Numeric entry retains full precision, applies on Enter/blur and restores on Escape;
 invalid drafts remain editable without clamping or rounding.
 
-In **Clip → Speed**, the diamond explicitly joins/leaves Speed at the current
-project frame. It captures the displayed rate; changing a control never creates
-implicit endpoint keyframes.
-Immediately after it, native SVG **Previous/Next** buttons visit strictly earlier/
-later keyframes with a non-null Speed value, skipping colour/opacity-only keyframes. They
-stay visible but disabled without a neighbour, an opened project, or during any
-document-preview draft. Navigation preserves the chosen Inspector tab and activated
-button's focus; it is editor-only, not a rate/base change or an Undo/autosave operation.
+In **Clip → Speed**, the native **Animate Speed** toggle is a presentation-only
+browser-local section preference. Without a stored choice, unanimated Speed
+starts off and existing Speed keyframes start on. Turning it off retains all keyframes,
+retiming/rendering, read-only constraints and history; it creates no project save
+or Undo step and changes no schema or stored data. Main arrows and diamonds are hidden.
 
-The main animated rate controls are read-only where Speed is not enabled until
-its hollow diamond is clicked. Unanimated Speed uses **Constant speed / Ramp up / Ramp down**
+When Animate is on, the track Speed diamond explicitly joins/leaves Speed at the
+real project frame, capturing the displayed rate, never an inspected stored time.
+Changing a value never creates implicit endpoint keyframes. Per-setting
+**Previous/Next** buttons remain beside the main diamond because not every setting
+is enabled at every shared keyframe. One native **Previous/Next** pair in the
+section header visits the union of track Speed keyframes and **all retained custom speed source
+keyframes of the selected clip**, including off-trim keyframes and the original
+exclusive OUT. Clip keyframes preview the nearest mapped image through authoritative
+`PlacedClip.retiming`: off-trim keyframes use the first/last available output image,
+and original OUT never requests an out-of-range image. A clip-local stored-source
+cursor, independent of the central track inspection cursor, advances through
+successive clip keyframes even when several preview the same image. Stored source
+time stays distinct from the actual displayed source frame. Track Speed overrides
+retained clip keyframes without deleting them or removing them from navigation,
+and the override is indicated. Colour/Opacity-only track keyframes are skipped.
+Navigation is editor-only, preserving
+the Inspector tab/focus without a rate/base edit, history or save. Enabled Speed
+chips in stored Keyframes rows retain their per-channel arrows too. Main and
+stored Speed arrows visit only strictly earlier/later track keyframes where
+Speed is nonnull. All main and stored per-channel arrows use that same nonnull
+rule (zero is enabled for channels that allow it) and the shared central
+off-duration inspection cursor, skipping unrelated enabled settings.
+
+The main animated rate controls are read-only where Speed is not enabled, even
+with Animate off, until Animate is on and its hollow diamond is clicked.
+Unanimated Speed uses **Constant speed / Ramp up / Ramp down**
 or **Custom curve** clip controls. Reset to 1× affects only the active keyed track Speed
 setting at the playhead, otherwise the selected clip's base.
 
@@ -238,8 +262,9 @@ cancellation, lost capture or window blur restores preview/document/scroll.
 Source ranges, static clip bases, other track keyframes and music are not copied/shifted;
 Speed can naturally recompile clip durations and Ripple-derived track starts.
 
-Setting/track/list navigation shares a stored-keyframe inspection cursor, so several
-off-duration Speed keyframes remain reachable even when preview clamps to the same
+Main per-setting arrows, stored-setting chip arrows, section navigation to track
+keyframes and track/list navigation share a stored-keyframe inspection cursor,
+so several off-duration Speed keyframes remain reachable even when preview clamps to the same
 last frame. Marker and whole-track keyframe navigation keep the chosen Inspector tab.
 Labels distinguish stored time from actual preview. The main Clip rate field and
 diamond capture still use the **real playhead**, not the inspected off-duration
@@ -250,29 +275,35 @@ retiming or a music track's OUT can change project duration. Details:
 
 ### Precise clip-curve editor
 
-With a clip selected and no overriding track Speed keyframes, choose **Clip → Speed →
-Custom curve**. A constant rate becomes a flat editable curve; converting an old
+With a clip selected and no overriding track Speed keyframes, open **Clip → Speed**,
+turn Animate on and choose **Custom curve**. A constant rate becomes a flat
+editable curve; converting an old
 ramp retains its original anchors and easing. Flat, Accelerate, Decelerate, Slow
 centre and Fast centre buttons deliberately replace only this clip's speed keyframes.
 
 The graph uses source time horizontally and a logarithmic **0.1×–8×** speed axis
 vertically. A vertical line identifies the actually displayed source frame. Click
 the background or a keyframe to preview, then **Add keyframe** captures speed at an
-unkeyed displayed source frame. The exclusive OUT anchor previews the last
+unkeyed displayed source frame. The original exclusive-OUT keyframe previews the last
 output frame, never an invented source frame. Source navigation compares the
 two adjacent mapped outputs, showing the exact source image when available or
 the closest rendered image when fast playback skips it; the stored keyframe stays
-at its requested source frame. Keyframe arrows and the native
-keyframe selector also reach retained off-trim keyframes.
+at its requested source frame. The Speed header's Animate-on navigation visits
+all retained clip source keyframes alongside track Speed keyframes, including
+off-trim and original-OUT keyframes. The native keyframe selector also retains
+access to them; clip selection uses the independent stored-source cursor above,
+not the clamped preview frame as a substitute for stored source time.
 
-**Source frame / Speed × / To next keyframe** provide exact editing: source frame
+**Source frame / Speed × / Easing** provide exact editing: source frame
 uses a native integer `NumberField`; Speed × pairs a slider with an exact field.
 Numeric fields retain full entered decimal precision and commit on Enter/blur; invalid collisions,
 out-of-original positions and timing conflicts retain the draft with inline
 errors. They do not automatically seek. Escape restores the field. Easing belongs
 to the left keyframe; the last rate holds without a next interval.
-Custom **To next keyframe**, ramp **Curve** and shared **Shared easing** selectors
-use the same compact selected-shape graph and accessible description. It illustrates
+Custom clip-speed, ramp, Transform and track-keyframe selectors all visibly read
+**Easing**, retaining contextual accessible names such as **Ramp easing** and
+**Track keyframe easing N**. Clip-speed, ramp and track-keyframe selectors retain
+the same compact selected-shape graph and accessible description. It illustrates
 the existing progress function, not a new rate or interpolation rule; ramp curves
 still exclude Hold. Selection remains native and commits once, with one Undo step.
 
@@ -295,6 +326,20 @@ remains reachable if a keyframe moves outside the visible trim. New keyframes se
 themselves. Reset removes this clip curve in favour of constant 1× without
 changing track keyframes or other clips. The **Video track speed animation** controls remain
 separate; an explicit override notice appears when track Speed suppresses clip speed.
+
+### Timeline clip-speed markers
+
+Inside each clip rectangle, custom-speed source keyframes appear in a salmon/dashed
+**◆** lane, distinct from the pale-blue **◆** Transform lane. Positions follow
+authoritative retiming, including a track Speed override; retained overridden
+keyframes are indicated, not deleted. Off-trim keyframes are omitted. Exclusive OUT has a
+boundary marker that seeks the final available frame. Click, Enter or Space
+selects the clip and seeks its nearest mapped image without editing, history,
+save or dragging. Keyboard handling is isolated from timeline shortcuts. These
+markers are distinct from draggable shared project-time track markers and from
+the editable source-speed graph. Unlike these markers, Speed and Transform stored
+navigation reaches all retained off-trim/original-OUT keyframes; neither navigation
+nor inspection supplies a fake frame for main capture.
 
 ## Music
 
