@@ -180,9 +180,13 @@ All inline help uses a small **question-mark button**, including animation, sour
 opacity, speed, Transform, colour, keyframe/transition/fade/audio timing and startup details.
 Inspector **Range**, **Placement**, **Speed**, **Transform**, **Colour**, Transition and Sequence
 fades put help beside their titles, reachable even when collapsed. Expansion and
-help are independent native buttons in normal section → help → fields Tab order;
+help are independent native buttons in normal section → help → fields Tab order
+(an open help's **Learn more** link comes right after its button);
 help never opens or closes the settings. Hidden content remains mounted, retaining
 its valid/invalid drafts and section preferences.
+Each help body is at most two short sentences plus one tip, written as user guidance;
+exact behaviour stays in [the user guide](USER_GUIDE.md), reached from a **Learn more**
+link (opening in a new tab) on every help except startup details.
 Shared-keyframe timing guidance is combined with **Animation help** in the Keyframes
 toolbar; there is no separate Keyframe timing help button. Audio timing sits beside
 **Placement & fades**, and startup details beside **Preview needs attention**.

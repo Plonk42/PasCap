@@ -209,7 +209,7 @@ test('setting tooltips and accessible descriptions explain the editable keyframe
         await expect(field).toHaveAccessibleDescription(`${hint}${opacityHint} ${sliderInstructions}`);
       } else {
         await expect(field).toHaveAccessibleDescription(
-          '1× is recorded speed. Custom curve keyframes belong to one clip and use original source frames; drag a keyframe or enter its exact frame/rate. Their positions stay anchored when trimming or splitting. The logarithmic graph spans 0.1×–8×. Slow motion repeats recorded frames, without generated optical-flow images. ' +
+          '1× is recorded speed: below 1× is slow motion, above is faster. Custom curve changes the speed over the length of this clip. ' +
             `Enter or leave the field to apply. Escape restores the current value. ${hint}`,
         );
       }

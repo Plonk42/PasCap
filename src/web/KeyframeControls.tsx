@@ -357,9 +357,9 @@ export function KeyframeControls({
             <Icon name="forward" size={14} />
           </button>
         </div>
-        <HelpPopover label="Animation" className="animation-help">
-          <p>
-            Each setting's diamond animates this whole video track, not just the selected clip. All animated settings
+        <HelpPopover label="Animation" className="animation-help" guide="opt-in-to-shared-video-track-animation">
+          <p id={helpId}>
+            Each diamond adds a keyframe for that setting on the whole track, at the playhead. Settings keyed together
             share one keyframe and its easing.
           </p>
           <div className="animation-legend">
@@ -374,16 +374,9 @@ export function KeyframeControls({
               <span aria-hidden="true">◆</span>Keyframe at playhead · editable
             </span>
           </div>
-          <p>
-            Use the arrows beside a diamond to visit that setting's keyframes. Drag a timeline keyframe to move all its
-            settings; Escape cancels.
-          </p>
-          <p id={helpId}>
-            Absolute project timeline frames, independent of clip trims. Moving a keyframe moves every animated setting.
-            Its easing runs to each setting's next keyframe; the first and last channel values hold. Opacity affects the
-            whole track, with or without keyframes. Unanimated Colour edits the track; unanimated Speed edits the
-            selected clip. Keyframes outside the current duration stay editable; navigation previews the nearest
-            available frame without moving them.
+          <p className="editor-help-tip">
+            Tip: use the arrows beside a diamond to visit that setting's keyframes, or drag a timeline keyframe to move
+            all its settings.
           </p>
         </HelpPopover>
       </div>

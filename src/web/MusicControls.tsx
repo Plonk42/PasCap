@@ -42,12 +42,12 @@ function MusicTiming({ helpId, children }: Readonly<{ helpId: string; children: 
       open={open}
       onToggle={setOpen}
       help={
-        <HelpPopover label="Audio timing">
+        <HelpPopover label="Audio timing" guide="add-music-and-export">
           <p id={helpId}>
-            IN / OUT use original audio frames; OUT is exclusive. Start, duration and fades use timeline frames. Both
-            fades must fit within Duration. Music can extend the project beyond the last video clip, continuing over
-            black. Video closing fades stay on their last clips; changing video length never shortens music.
+            IN and OUT pick the part of the recording; Start and Duration place it on the timeline. Both fades must fit
+            within Duration.
           </p>
+          <p className="editor-help-tip">Tip: Loop repeats the chosen part, and music can play on over black.</p>
         </HelpPopover>
       }
     >

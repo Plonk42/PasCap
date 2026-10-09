@@ -311,9 +311,7 @@ test('bulk expansion includes Transform while heading help and tab navigation re
   );
   const help = page.getByRole('button', { name: 'Transform animation help', exact: true });
   await help.click();
-  await expect(
-    page.getByText('Crop fractions remove original source edges without refitting;', { exact: false }),
-  ).toBeVisible();
+  await expect(page.getByText('Crop, scale, move and rotate this clip.', { exact: false })).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(page.getByRole('button', { name: 'Transform section', exact: true })).toHaveAttribute(
     'aria-expanded',

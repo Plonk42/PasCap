@@ -247,7 +247,7 @@ test('hover help preserves focus, stays readable across the gap, and leaves with
   const box = (await panel.boundingBox())!;
   await page.mouse.move(box.x + box.width / 2, box.y + 20);
   await expect(panel).toBeVisible();
-  await expect(panel).toContainText('All animated settings share one keyframe');
+  await expect(panel).toContainText('Settings keyed together share one keyframe');
   await page.mouse.move(600, 20);
   await expect(panel).toBeHidden();
   await expect(trigger).toHaveAttribute('aria-expanded', 'false');
@@ -390,16 +390,20 @@ const HELP_CONTEXTS = [
   {
     label: 'Source timing',
     tab: 'Clip',
-    text: 'The bar spans the original recording; hatching shows omitted footage.',
+    text: 'The bar shows the whole recording; drag IN and OUT to keep only the part you want.',
   },
-  { label: 'Placement timing', tab: 'Clip', text: 'Opacity is in Colour and affects the whole track.' },
-  { label: 'Colour animation', tab: 'Track', text: 'Each diamond captures only its own setting' },
-  { label: 'Speed timing', tab: 'Clip', text: 'Track keyframes override, rather than multiply' },
-  { label: 'Animation', tab: 'Track keyframes', text: 'Moving a keyframe moves every animated setting.' },
+  { label: 'Placement timing', tab: 'Clip', text: 'Tip: Opacity is in Track → Colour.' },
+  { label: 'Colour animation', tab: 'Track', text: 'These settings grade every clip on this track.' },
+  { label: 'Speed timing', tab: 'Clip', text: 'Custom curve changes the speed over the length of this clip.' },
+  {
+    label: 'Animation',
+    tab: 'Track keyframes',
+    text: 'Each diamond adds a keyframe for that setting on the whole track',
+  },
   {
     label: 'Transition timing',
     tab: 'Sequence',
-    text: 'Conflicts reject the complete edit, never shorten another fade or transition.',
+    text: 'Fades and dissolves need the two clips to touch',
   },
   { label: 'Fade timing', tab: 'Sequence', text: '0 disables a fade.' },
   { label: 'Audio timing', tab: 'Audio', text: 'Both fades must fit within Duration.' },
@@ -462,6 +466,9 @@ test('native heading Tab order is section then help then its controls, and remem
   await section.focus();
   await page.keyboard.press('Tab');
   await expect(help).toBeFocused();
+  // Focus previews the help, so its Learn more link is next in Tab order before the section controls.
+  await page.keyboard.press('Tab');
+  await expect(page.getByRole('link', { name: 'Learn more', exact: true })).toBeFocused();
   await page.keyboard.press('Tab');
   await expect(page.getByRole('slider', { name: 'Trim clip source start', exact: true })).toBeFocused();
   await page.keyboard.press('Tab');
@@ -525,6 +532,10 @@ for (const context of HELP_CONTEXTS) {
     await trigger.hover();
     await expect(panel).toBeVisible();
     await expect(panel).toContainText(context.text);
+    await expect(panel.getByRole('link', { name: 'Learn more', exact: true })).toHaveAttribute(
+      'href',
+      /\/docs\/USER_GUIDE\.md#[a-z-]+$/,
+    );
     await trigger.click();
     await expect(trigger).toHaveAttribute('aria-pressed', 'true');
     await page.mouse.move(600, 20);
@@ -542,10 +553,10 @@ for (const context of HELP_CONTEXTS) {
 
 test('numeric fields retain their descriptions even while the linked help popover is hidden', async ({ page }) => {
   await expect(page.getByRole('textbox', { name: 'Source IN frame', exact: true })).toHaveAccessibleDescription(
-    /Fields accept whole source frames[\s\S]*OUT is exclusive/,
+    /Type a frame number or HH:MM:SS:FF in the fields/,
   );
   await expect(page.getByRole('spinbutton', { name: 'Clip speed rate', exact: true })).toHaveAccessibleDescription(
-    /Custom curve keyframes belong to one clip/,
+    /Custom curve changes the speed over the length of this clip/,
   );
   await inspectorTab(page, 'Sequence');
   await expect(page.getByRole('spinbutton', { name: 'Opening fade', exact: true })).toHaveAccessibleDescription(
@@ -653,7 +664,7 @@ test('direct point list keeps timing help available and nested drafts mounted ac
   const panel = await panelFor(page, trigger);
   await trigger.click();
   await expect(panel).toBeVisible();
-  await expect(panel).toContainText('Absolute project timeline frames');
+  await expect(panel).toContainText('drag a timeline keyframe to move all its settings');
   await inspectorTab(page, 'Audio');
   await expect(panel).toBeHidden();
   await expect(field).toBeAttached();

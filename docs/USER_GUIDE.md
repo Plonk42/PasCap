@@ -546,6 +546,10 @@ or **Placement & fades**—even when that section is collapsed. Help and expansi
 are separate buttons; no scrolling to the end of a section is needed. Startup
 details are next to **Preview needs attention**.
 
+Each help is two short sentences plus a tip: what the setting does and what to try.
+Exact behaviour lives in this guide, reached from the **Learn more** link that ends
+every help except startup details.
+
 Hover or focus to preview it; click, Enter or Space to keep it open while moving away.
 You can move the pointer into the help to read it, or press Down arrow to focus
 and scroll its text. Escape or a click elsewhere closes it; Escape closes help

@@ -4,9 +4,13 @@ import { popoverPosition, type PopoverPosition } from './popover-position.js';
 import { HELP_INSTRUCTIONS_ID } from './SharedInstructions.js';
 import './help-popover.css';
 
+const USER_GUIDE_URL = 'https://github.com/Plonk42/PasCap/blob/main/docs/USER_GUIDE.md';
+
 interface Props {
   label: string;
   className?: string;
+  /** Heading anchor in docs/USER_GUIDE.md holding the exact behaviour. */
+  guide?: string;
   children: ReactNode;
 }
 type HelpMode = 'closed' | 'preview' | 'pinned';
@@ -17,7 +21,7 @@ interface HelpRequest {
 const OPEN_HELP = 'pascap-open-help';
 
 /** Hover/focus previews never take focus; explicit activation keeps the help open. */
-export function HelpPopover({ label, className = '', children }: Readonly<Props>) {
+export function HelpPopover({ label, className = '', guide, children }: Readonly<Props>) {
   const id = useId();
   const root = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
@@ -227,6 +231,13 @@ export function HelpPopover({ label, className = '', children }: Readonly<Props>
       >
         <h4 id={`${id}-title`}>{label}</h4>
         {children}
+        {guide && (
+          <p className="editor-help-more">
+            <a href={`${USER_GUIDE_URL}#${guide}`} target="_blank" rel="noreferrer">
+              Learn more
+            </a>
+          </p>
+        )}
       </section>
     </div>
   );

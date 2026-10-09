@@ -428,12 +428,12 @@ export function AdvancedColour(props: Readonly<Props>) {
               ))}
             </select>
           </label>
-          <HelpPopover label="HSL ranges">
+          <HelpPopover label="HSL ranges" guide="colour-speed-and-shared-video-track-keyframes">
             <p>
-              Static colour for every clip on this track, including when scalar colour is animated. Hue is degrees;
-              saturation is a multiplier offset; lightness is an encoded offset. Circular neighbouring ranges blend
-              smoothly. Greys are protected. This is SDR, not white balance.
+              Shift the hue, saturation or lightness of one colour range, such as the blues, on every clip on this
+              track. Neighbouring ranges blend smoothly and greys stay untouched.
             </p>
+            <p className="editor-help-tip">Tip: Reset all returns every range to neutral.</p>
           </HelpPopover>
         </div>
         {HSL_CONTROLS.map((control) => (
@@ -500,13 +500,13 @@ export function AdvancedColour(props: Readonly<Props>) {
               ))}
             </select>
           </label>
-          <HelpPopover label="Colour curves">
+          <HelpPopover label="Colour curves" guide="colour-speed-and-shared-video-track-keyframes">
             <p>
-              Encoded input/output 0–1, after scalar grading and HSL. Master runs before the RGB channels. End control
-              nodes lock input only. Up to sixteen control nodes; outputs may rise or fall. Drag edits both coordinates,
-              committing only on release; Escape cancels. Arrows edit by 0.01, Shift by 0.1. Exact fields retain
-              precision. Native export evaluates advanced colour directly, including sharp knees. Final video encoding
-              still quantises the result.
+              Drag control nodes to reshape brightness or colour: Master changes everything, Red, Green and Blue one
+              channel each. Add a node to bend another part of the curve.
+            </p>
+            <p className="editor-help-tip">
+              Tip: select a node and use the arrow keys for fine steps; Escape cancels a drag.
             </p>
           </HelpPopover>
         </div>
