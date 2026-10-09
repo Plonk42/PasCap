@@ -110,7 +110,7 @@ test('default editor keeps rare options, speed/layer details, track settings and
   await inspectorTab(page, 'Track');
   await expect(page.getByRole('slider', { name: 'Exposure', exact: true })).toBeVisible();
   await expect(page.getByRole('slider', { name: 'Opacity', exact: true })).toBeVisible();
-  await expect(page.getByRole('slider', { name: 'Opacity', exact: true })).toHaveValue('1');
+  await expect(page.getByRole('slider', { name: 'Opacity', exact: true })).toHaveValue('100');
   await expect(page.getByRole('spinbutton', { name: 'Opening fade' })).toBeVisible();
   await expect(page.getByLabel('Placement section', { exact: true })).toBeHidden();
   await inspectorTab(page, 'Audio');

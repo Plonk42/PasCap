@@ -42,8 +42,10 @@ With Ripple off, gaps reveal lower footage/black. Edits do not move unrelated
 clips; invalid overlap is rejected atomically. Left-edge handle/keyboard trims
 solve the new start to retain timeline OUT, rejecting unrepresentable integer-frame
 results. With Ripple on, these trims keep the sequence start and recompile the
-suffix. Right trims and numeric source IN/OUT/reset keep the selected start in
-either mode. Source-frame speed anchors remain independent.
+suffix. Right timeline trims and Clip Source range fields/bar/Restore full recording
+keep the selected start in either mode; the inspector uses ordinary source-range
+trim, not the timeline left handle's retained-OUT rule. Source-frame speed anchors
+remain independent. See [the Source range controls](TIMELINE_EDITING.md#clip-inspector-source-range).
 
 Each track has one transition per adjacent pair: Cut, Fade-through-black or
 Cross-dissolve. Gapped pairs are Cut only. Non-cut edits require touching clips or
@@ -195,8 +197,8 @@ empty row without a selected clip. It shows point
 count, whole-row Previous/Next navigation, **Animation help** and participant chips
 for the current or inspected stored point. The toolbar's Animation help includes
 point-timing guidance, with no separate Keyframe timing help button.
-**Clip** keeps source/clip settings, row Opacity and the setting controls/diamonds
-evaluated at the real playhead. Every animatable
+**Clip** keeps source/clip settings and Speed/Transform controls; **Track → Colour**
+keeps row Colour/Opacity controls evaluated at the real playhead. Every animatable
 setting always has its own diamond beside its main control, immediately
 followed by native SVG Previous/Next buttons:
 
@@ -220,7 +222,8 @@ changes no document, history or autosave state.
 
 **Track → Colour** contains the single **Opacity** native slider/exact
 `NumberField`/diamond/Previous/Next controls alongside the colour controls.
-Its numeric value is **0–1**, initially **1**; the main label may show **100%**.
+Main and stored sliders/exact fields use **0–100%**, neutral **100%**.
+Required row `opacity` and key values stay **0–1**, with UI-only conversion and no schema change.
 Without Opacity keys, either value control edits the selected row's `opacity`,
 including on an empty row with no selected clip. Opacity navigation visits only
 `opacity` participants.
@@ -267,7 +270,8 @@ This remains one list, not a new list per channel or marker.
 Main and stored colour/Opacity controls share a native slider with one adjacent
 exact `NumberField` as the value display, not a read-only output. Stored participants
 reuse the same bounds and double-click-the-name resets; Opacity numeric entry
-uses **0–1** in both contexts. The channel table's bounds apply to both controls.
+uses **0–100%**, neutral **100%**, in both contexts. The channel table gives stored
+bounds; only Opacity scales those values by 100 for the UI.
 Stored Speed uses the same **Layer rate ×** slider/exact field and resets to 1× by
 double-clicking **Speed**, never a clip mode, preset or source-frame curve editor.
 

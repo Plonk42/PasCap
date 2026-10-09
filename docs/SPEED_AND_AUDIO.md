@@ -147,8 +147,9 @@ after grading; nonneutral uncovered pixels reveal lower footage. The static chun
 plan cannot silently omit these edits.
 Opacity is composition coverage, not part of the SDR RGB grade.
 Its single native slider/exact `NumberField`/diamond/navigation is in **Track → Colour**
-alongside the colour controls. Numeric entry is **0–1**, initially **1**; the main
-label may show **100%**. Without Opacity keys it edits row `opacity`, even on
+alongside the colour controls. Main and stored sliders/exact fields use **0–100%**,
+neutral **100%**; row `opacity` and key values stay **0–1**, without a schema change.
+Without Opacity keys it edits row `opacity`, even on
 an empty row. With keys, a missing participant at the real playhead is read-only
 until captured with the diamond; sliders never create keys. Unkeyed colour
 settings edit the row base. **Placement** contains placement only; Layer options
@@ -171,8 +172,10 @@ shortens transitions to make the destination fit.
 Moving ghosts and commits use the same contextual duration calculation. A
 trailing-edge magnet solves the new start/end against the row curve rather than
 using the old width. Left handle/keyboard trims with Ripple off retain timeline OUT; an
-unrepresentable integer-frame result is explicitly rejected. Numeric source fields
-retain the start in either mode; Ripple-on left trims also keep their sequence
+unrepresentable integer-frame result is explicitly rejected. Clip Source range
+text fields, bar handles and Restore full recording use ordinary source-range trim:
+retain the start in either mode and re-sequence the Ripple suffix normally, not
+the timeline left handle's retained-OUT rule. Ripple-on timeline left trims keep their sequence
 start and recompile the suffix. Only the first anchor supports numeric start/nudge
 while on; later clips expose the reason to turn Ripple off or drag to reorder.
 Trim/move/split/duplicate never copy or shift row points; each
@@ -224,7 +227,7 @@ clip bases stay unchanged; it never implicitly joins Speed or requests a seek.
 Stored colour/opacity participants likewise reuse the main sliders and individual
 colour resets, with one exact `NumberField` beside each slider as the sole numeric
 value display, targeting only that stored participant. Opacity numeric entry uses
-**0–1** in both main and stored controls.
+**0–100%**, neutral **100%**, in both main and stored controls; stored values remain **0–1**.
 
 Drag a row marker horizontally or use its one-/ten-frame keyboard moves to move
 all participants and their existing easing in **one Undo step**, using the same

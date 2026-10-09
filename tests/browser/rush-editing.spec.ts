@@ -343,7 +343,7 @@ async function beginHeadTrim(page: Page): Promise<{ origin: number; scrollLeft: 
     .toBe(scrollLeft + shift);
   await expect(page.locator('.timeline-surface')).toHaveAttribute('data-leading', String(32 + shift));
   await expect.poll(() => frameOrigin(page)).toBe(origin);
-  await expect(page.getByRole('spinbutton', { name: 'Source IN frame', exact: true })).toHaveValue('90');
+  await expect(page.getByRole('textbox', { name: 'Source IN frame', exact: true })).toHaveValue('00:00:03:00');
   return { origin, scrollLeft, edgeX: viewport.x + 2, y };
 }
 
@@ -445,7 +445,7 @@ test('three ranges from one rush keep the source pinned, independent, reloadable
 
   await page.setViewportSize({ width: 1440, height: 900 });
   await selectClip(page, ids[2]!);
-  const input = page.getByRole('spinbutton', { name: 'Source IN frame', exact: true });
+  const input = page.getByRole('textbox', { name: 'Source IN frame', exact: true });
   await input.fill('50');
   await input.press('Enter');
   await inspectorTab(page, 'Track');
@@ -812,7 +812,7 @@ test('I/O middle removal is transient then one edit, preserving absolute eleven-
   await page.getByRole('button', { name: 'Redo', exact: true }).click();
   expect(await current(page)).toEqual(next);
   await selectClip(page, right.id);
-  const out = page.getByRole('spinbutton', { name: 'Source OUT frame', exact: true });
+  const out = page.getByRole('textbox', { name: 'Source OUT frame', exact: true });
   await out.fill('100');
   await out.press('Enter');
   const independent = await current(page);
@@ -1047,10 +1047,14 @@ test('partial, reversed and outside marks are rejected; input and source shortcu
   await markRange(page, 20, 31);
   await expectCutOverlay(page, 20, 31);
   const keys = ['i', 'o', 'q', 'w', 's', 'Shift+Delete'];
-  const input = page.getByRole('spinbutton', { name: 'Source IN frame', exact: true });
-  await input.focus();
+  const input = page.getByRole('textbox', { name: 'Source IN frame', exact: true });
+  await input.fill('00:00:00:15');
+  await input.press('End');
   for (const key of keys) await input.press(key);
-  await expect(input).toHaveValue('15');
+  await expect(input).toHaveValue('00:00:00:15ioqws');
+  expect(await current(page)).toEqual(before);
+  await input.press('Escape');
+  await expect(input).toHaveValue('00:00:00:15');
   await expectCutOverlay(page, 20, 31);
   expect(await current(page)).toEqual(before);
   const search = page.getByRole('textbox', { name: 'Search media', exact: true });
@@ -1100,7 +1104,7 @@ test('selection, clear, Escape, timing, Undo and project switching invalidate on
   await shortcut(page, 'Escape');
   await expect(page.locator('.timeline-cut-mark')).toHaveCount(0);
   await markRange(page, 10, 20);
-  const input = page.getByRole('spinbutton', { name: 'Source IN frame', exact: true });
+  const input = page.getByRole('textbox', { name: 'Source IN frame', exact: true });
   await input.fill('20');
   await input.press('Enter');
   await expect(page.locator('.timeline-cut-mark')).toHaveCount(0);
@@ -1155,8 +1159,8 @@ test('native first-clip edge autoscroll restores a head longer than 32px without
   expect(memory.saves).toBe(saves);
   await page.mouse.move(drag.edgeX, drag.y, { steps: 4 });
   await expect
-    .poll(() => page.getByRole('spinbutton', { name: 'Source IN frame', exact: true }).inputValue())
-    .toBe('0');
+    .poll(() => page.getByRole('textbox', { name: 'Source IN frame', exact: true }).inputValue())
+    .toBe('00:00:00:00');
   await expect(clip(page, 'a').locator('[data-trim-handle="in"]')).toHaveAttribute('aria-valuenow', '0');
   expect(await current(page)).toEqual(before); // Inspector shows a draft; committed sourceIn is still 90.
   await flush(page);
@@ -1196,8 +1200,8 @@ test('Escape and pointercancel discard native autoscrolled head drafts and resto
     const drag = await beginHeadTrim(page);
     await page.mouse.move(drag.edgeX, drag.y, { steps: 4 });
     await expect
-      .poll(() => page.getByRole('spinbutton', { name: 'Source IN frame', exact: true }).inputValue())
-      .toBe('0');
+      .poll(() => page.getByRole('textbox', { name: 'Source IN frame', exact: true }).inputValue())
+      .toBe('00:00:00:00');
     expect(await current(page)).toEqual(before);
     if (cancellation === 'Escape') await page.keyboard.press('Escape');
     else
@@ -1207,7 +1211,7 @@ test('Escape and pointercancel discard native autoscrolled head drafts and resto
     await page.mouse.up();
     await expect(page.locator('.timeline-surface')).not.toHaveClass(/trim-drafting/);
     await expect(page.locator('.timeline-surface')).toHaveAttribute('data-leading', '32');
-    await expect(page.getByRole('spinbutton', { name: 'Source IN frame', exact: true })).toHaveValue('90');
+    await expect(page.getByRole('textbox', { name: 'Source IN frame', exact: true })).toHaveValue('00:00:03:00');
     await expect
       .poll(() => page.locator('.timeline-scroll').evaluate((element) => element.scrollLeft))
       .toBe(drag.scrollLeft);

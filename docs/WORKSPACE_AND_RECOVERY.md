@@ -118,7 +118,8 @@ Layer options contains only rename, Ripple,
 raise/lower and delete; visibility remains a separate sidebar control.
 **Track → Colour** contains the single **Opacity** native slider/exact
 `NumberField`/diamond/Previous/Next controls alongside the colour controls.
-Numeric entry uses **0–1**, initially **1**; the main label may show **100%**.
+Main and stored sliders/exact fields use **0–100%**, neutral **100%**.
+Required row `opacity` and key values remain **0–1**; UI conversion changes no schema.
 Without Opacity keys, either value control edits row `opacity`, including on an empty
 row with no selected clip.
 With keys, that channel overrides the row value on every clip and both dissolve
@@ -240,8 +241,8 @@ or reloading the editor with a fresh engine restores normal graded preview.
 Colour/Opacity/Transform values, playback rates and music gain share a bounded native slider
 with an adjacent exact `NumberField` in main controls and stored-participant editors.
 The field is the sole numeric value display, not a read-only output or number-only
-layout. Opacity numeric entry always uses **0–1**, initially **1**; the main label may
-show **100%**.
+layout. Opacity sliders/exact fields always use **0–100%**, neutral **100%**;
+only UI values are scaled, with row `opacity` and key storage unchanged at **0–1**.
 
 Pointer sliding keeps only a transient local control-value draft. Movement updates
 the thumb and numeric value, not the document or preview. Release applies the final
@@ -261,10 +262,23 @@ timing inputs stay editable with inline errors.
 Numbers are not coerced to zero/clamped/rounded to conceal an invalid edit. An
 unchanged draft creates no undo step, and Enter then blur cannot submit it twice.
 
-Integer source/timeline frames, durations and fades remain exact native `NumberField`
-steppers with explicit frame units and existing timecode feedback, not sliders with
-arbitrary limits. Source-review paired IN/OUT keeps its explicit **Apply** workflow
-to validate both endpoints atomically.
+**Clip → Source range** uses one full-original bar with hatched omitted footage
+and draggable IN/OUT handles. Exact **Source IN / OUT** text fields below its ends
+display **HH:MM:SS:FF** (30 fps NDF) and accept whole original frames or timecode
+on Enter/blur; invalid drafts remain editable with errors and Escape restores.
+No duplicate section duration, original-length, source-frame or recoverable
+head/tail labels accompany it; **Restore full recording** remains.
+Fields and handles keep placement fixed and use ordinary source-range trim with
+normal Ripple suffix sequencing, not the timeline left handle's retained-OUT rule.
+Dragging previews the complete validated document without history/save; final
+valid release is one Undo step. Invalid final release, Escape, cancellation, lost
+capture or window blur restores, never commits an earlier valid draft. Handle
+arrows move one original frame (Shift ten); Home on IN restores zero, End on OUT
+restores the original exclusive OUT. Details: [Source range](TIMELINE_EDITING.md#clip-inspector-source-range).
+
+Other integer source/timeline frames, durations and fades retain exact native
+`NumberField` steppers and timecode feedback, not arbitrary sliders. Source review
+is independent and keeps its paired **Apply** workflow to validate both endpoints atomically.
 
 Project titles and layer names follow the same draft/apply/cancel pattern; empty
 names are invalid. Layer rename lives in **Layer options**, accepts 1–100 trimmed
@@ -308,7 +322,8 @@ an empty row and contains the shared
 point list directly, count, whole-row Previous/Next navigation and participant chips.
 Its question-mark **Animation help** button uses the common hover/pin/dismiss
 contract above; explanatory text does not replace the shared point editor.
-**Clip** keeps source/clip settings, row Opacity and playhead value/diamond controls.
+**Clip** keeps source/clip settings and Speed/Transform controls; **Track → Colour**
+keeps row Colour/Opacity playhead value/diamond controls.
 All eleven settings (Opacity, Speed and nine scalar colour parameters)
 always expose a diamond beside their control: **◇ hollow/inactive** versus **◆
 filled/active**, with `aria-pressed`. A hollow diamond remains clickable; inactivity
@@ -354,7 +369,8 @@ input identity/focus and drafts survive time reordering and Undo;
 no persisted point IDs are added.
 
 Stored colour/opacity participants reuse the main sliders and double-click-the-name
-resets, with one exact `NumberField` to the right of each slider; Opacity uses **0–1**.
+resets, with one exact `NumberField` to the right of each slider; Opacity uses
+**0–100%**, neutral **100%**, while stored values remain **0–1**.
 Speed reuses the **Layer rate ×** slider/exact field (double-click **Speed** resets to 1×), not clip
 mode/preset/source-curve controls. The local-draft/release-only slider contract above
 applies to all stored participants too. Each accepted value or reset targets only
@@ -495,8 +511,9 @@ cleared by selection/timing/history/project changes, never project/autosave fiel
 Ripple-on edits close gaps/re-sequence later excerpts on that track from its first
 anchor; off keeps other clips at independent starts. Left handle/keyboard trims
 keep the sequence start while on, retain timeline OUT while off, and reject an
-unrepresentable integer-frame OUT. Numeric source edits keep the start in either
-mode. Music, other tracks and shared row points keep their absolute project times. Invalid
+unrepresentable integer-frame OUT. Clip Source range fields/bar/Restore full
+recording instead keep the start in either mode with ordinary source-range trim
+and normal Ripple suffix sequencing. Music, other tracks and shared row points keep their absolute project times. Invalid
 fade/overlap/quantisation edits remain atomic. Full details are in
 [TIMELINE_EDITING.md](TIMELINE_EDITING.md).
 

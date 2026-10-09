@@ -268,7 +268,11 @@ async function preciseEdit(
   await committed(page, before, applyCommand(before.document, edit(before.document, value)));
 }
 
-const opacityEdit: ValueEdit = (_document, opacity) => ({ type: 'opacity', layerId: 'video-1', opacity });
+const opacityEdit: ValueEdit = (_document, percent) => ({
+  type: 'opacity',
+  layerId: 'video-1',
+  opacity: percent / 100,
+});
 const exposureEdit: ValueEdit = (document, exposure) => ({
   type: 'colour',
   layerId: document.layers[0]!.id,
@@ -410,28 +414,90 @@ test('main exact Opacity, exposure and Gain preserve full precision; Enter then 
   page,
 }) => {
   await showControl(page, 'Opacity');
-  const { exact, widget } = controls(page, 'Opacity');
-  await expect(exact).toHaveValue('1');
+  const { slider, exact, widget } = controls(page, 'Opacity');
+  await expect(slider).toHaveValue('100');
+  await expect(slider).toHaveAttribute('min', '0');
+  await expect(slider).toHaveAttribute('max', '100');
+  await expect(slider).toHaveAttribute('step', '1');
+  await expect(exact).toHaveValue('100');
   await expect(exact).toHaveAttribute('min', '0');
-  await expect(exact).toHaveAttribute('max', '1');
-  await expect(widget.getByText('0–1', { exact: true })).toBeVisible();
+  await expect(exact).toHaveAttribute('max', '100');
+  await expect(widget.getByText('%', { exact: true })).toBeVisible();
   const before = await checkpoint(page);
-  for (const invalid of ['', '-0.1', '1.1']) {
+  for (const invalid of ['', '-0.1', '100.1']) {
     await exact.fill(invalid);
     await exact.press('Enter');
     await expect(exact).toHaveValue(invalid);
     await expect(exact).toHaveAttribute('aria-invalid', 'true');
     await expect(exact.locator('..').getByRole('alert')).toContainText(
-      invalid === '' ? 'Enter a number' : invalid === '-0.1' ? 'Enter 0 or greater.' : 'Enter 1 or less.',
+      invalid === '' ? 'Enter a number' : invalid === '-0.1' ? 'Enter 0 or greater.' : 'Enter 100 or less.',
     );
     await unchanged(page, before);
     await exact.press('Escape');
-    await expect(exact).toHaveValue('1');
+    await expect(exact).toHaveValue('100');
   }
-  await preciseEdit(page, 'Opacity', 0.123456789, opacityEdit);
+  await preciseEdit(page, 'Opacity', 12.3456789, opacityEdit);
   await preciseEdit(page, 'Exposure', 1.23456789, exposureEdit);
   await inspectorTab(page, 'Audio');
   await preciseEdit(page, 'Music gain', -7.123456789, gainEdit);
+});
+
+test('main and stored Opacity percentages reject invalid entries, cancel drafts and reset without changing fractional bases or other keys', async ({
+  page,
+}) => {
+  for (const stored of [false, true]) {
+    const document = await current(page);
+    document.layers[0]!.opacity = 0.75;
+    document.layers[0]!.keyframes = stored
+      ? [sharedPoint(0, { opacity: 0.8, exposure: 0.2 }), sharedPoint(180, { opacity: 0.4 })]
+      : [];
+    await fixture(page, document);
+    const scope = stored ? await editLayerPoint(page, 'Video 1', 0) : page;
+    const name = stored ? 'Opacity keyframe value 0' : 'Opacity';
+    await showControl(page, name);
+    const { slider, exact, widget } = controls(scope, name);
+    const before = await checkpoint(page);
+    const initial = stored ? '80' : '75';
+    await expect(slider).toHaveValue(initial);
+    await expect(exact).toHaveValue(initial);
+    await expect(widget.getByText('%', { exact: true })).toBeVisible();
+    for (const invalid of ['', '-1', '100.000000001']) {
+      await exact.fill(invalid);
+      await exact.press('Enter');
+      await expect(exact).toHaveValue(invalid);
+      await expect(exact).toHaveAttribute('aria-invalid', 'true');
+      await exact.press('Tab');
+      await unchanged(page, before);
+      await exact.press('Escape');
+      await expect(exact).toHaveValue(initial);
+    }
+    const drag = await beginDrag(page, slider);
+    await moveDrag(page, drag, 0.35);
+    await expect(slider).toHaveValue('35');
+    await expect(exact).toHaveValue('35');
+    await unchanged(page, before);
+    await page.keyboard.press('Escape');
+    await page.mouse.up();
+    await expect(slider).toHaveValue(initial);
+    await expect(exact).toHaveValue(initial);
+    await unchanged(page, before);
+    const edit: ValueEdit = stored
+      ? (_document, percent) => ({
+          type: 'layer-key-value',
+          layerId: 'video-1',
+          frame: 0,
+          setting: 'opacity',
+          value: percent / 100,
+        })
+      : opacityEdit;
+    await preciseEdit(page, name, 12.3456789, edit, scope);
+    const beforeReset = await checkpoint(page);
+    await scope.locator(`[id="${await slider.getAttribute('id')}-name"]`).dblclick();
+    await expect(slider).toHaveValue('100');
+    await expect(exact).toHaveValue('100');
+    await committed(page, beforeReset, applyCommand(beforeReset.document, edit(beforeReset.document, 100)));
+    await expect(exact).toHaveValue(initial);
+  }
 });
 
 test('constant, ramp endpoints and custom-point rates use the same pointer and precise-number contract', async ({
@@ -484,7 +550,7 @@ test('stored participants share the widgets, retain precise Speed and never join
   await fixture(page, document);
   const row = await editLayerPoint(page, 'Video 1', 0);
   for (const [setting, label, value] of [
-    ['opacity', 'Opacity', 0.234567891],
+    ['opacity', 'Opacity', 23.4567891],
     ['exposure', 'Exposure', 0.345678912],
     ['speed', 'Speed', 1.234567891],
   ] as const) {
@@ -493,7 +559,7 @@ test('stored participants share the widgets, retain precise Speed and never join
       layerId: 'video-1',
       frame: 0,
       setting,
-      value: nextValue,
+      value: setting === 'opacity' ? nextValue / 100 : nextValue,
     });
     await pointerEdit(page, `${label} keyframe value 0`, edit, row);
     await preciseEdit(page, `${label} keyframe value 0`, value, edit, row);
@@ -575,7 +641,7 @@ test('identical-valued clip and row context replacements preserve input identity
   await showControl(page, 'Exposure');
   for (const [name, target, value] of [
     ['Exposure', '[data-clip-id="two"] .timeline-clip-body', '0'],
-    ['Opacity', '[aria-label="Select layer Empty row"]', '1'],
+    ['Opacity', '[aria-label="Select layer Empty row"]', '100'],
   ] as const) {
     const { exact } = controls(page, name);
     const id = await exact.getAttribute('id');
@@ -603,9 +669,9 @@ test('identical-valued clip and row context replacements preserve input identity
     .evaluate((button: HTMLButtonElement) => button.click());
   await expect(widget).toHaveAttribute('data-pointer-draft', 'false');
   await expect(slider).toBeFocused();
-  await expect(slider).toHaveValue('1');
+  await expect(slider).toHaveValue('100');
   await expect(exact).toHaveAttribute('id', id!);
-  await expect(exact).toHaveValue('1');
+  await expect(exact).toHaveValue('100');
   await moveDrag(page, drag, 0.65);
   await page.mouse.up();
   await expect(exact).toBeEnabled();
@@ -677,13 +743,13 @@ test('animated channels without a playhead participant disable both inputs, not 
   await showControl(page, 'Opacity');
   const { exact } = controls(page, 'Opacity');
   await expect(exact).toBeEnabled();
-  await exact.fill('0.456789123');
+  await exact.fill('45.6789123');
   await page.evaluate(() => window.pascapLab!.engine.seek(0));
   await expect(exact).toBeDisabled();
-  await expect(exact).toHaveValue('1');
+  await expect(exact).toHaveValue('100');
   await page.evaluate(() => window.pascapLab!.engine.seek(10));
   await expect(exact).toBeEnabled();
-  await expect(exact).toHaveValue('1');
+  await expect(exact).toHaveValue('100');
   await exact.press('Enter');
   await exact.press('Tab');
   expect(await current(page)).toEqual(document);

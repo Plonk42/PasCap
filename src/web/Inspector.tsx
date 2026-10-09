@@ -7,8 +7,8 @@ import type { MediaAsset } from '../shared/media.js';
 import type { ProjectDocument, Transition, VideoClip, VideoLayer } from '../shared/model.js';
 import { sourceRateAt } from '../shared/speed.js';
 import { calculateLayout, type TimelineLayout } from '../shared/timeline.js';
-import { formatTimecode } from '../shared/timing.js';
 import { AdvancedColour } from './AdvancedColour.js';
+import { ClipSourceRange } from './ClipSourceRange.js';
 import { colourResetCommands } from './colour-reset.js';
 import { shortName, sourceSeconds } from './display.js';
 import { HelpPopover } from './HelpPopover.js';
@@ -83,24 +83,6 @@ function transitionHasGap(boundary: Transition | undefined, layout: TimelineLayo
   const left = layout.clips.find((item) => item.clip.id === boundary.leftId);
   const right = layout.clips.find((item) => item.clip.id === boundary.rightId);
   return !!left && !!right && left.end !== right.start;
-}
-
-function clipRangeError(
-  project: ProjectDocument,
-  clip: VideoClip | undefined,
-  changes: Partial<Pick<VideoClip, 'sourceIn' | 'sourceOut'>>,
-): string | null {
-  if (!clip) return null;
-  return commandNumberError(
-    project,
-    {
-      type: 'trim',
-      clipId: clip.id,
-      sourceIn: changes.sourceIn ?? clip.sourceIn,
-      sourceOut: changes.sourceOut ?? clip.sourceOut,
-    },
-    'Adjust this range or the conflicting fades and clips.',
-  );
 }
 
 function InspectorTabs({
@@ -592,93 +574,52 @@ function SourceRangeSection({
   project,
   clip,
   asset,
-  sourceFrame,
+  frame,
   drafting,
   resetKey,
   id,
   onEdit,
+  onPreview,
+  onPause,
 }: Readonly<
-  Pick<Props, 'project' | 'drafting' | 'onEdit'> & {
+  Pick<Props, 'project' | 'drafting' | 'onEdit' | 'onPreview' | 'onPause' | 'frame'> & {
     clip: VideoClip;
     asset: MediaAsset;
-    sourceFrame: number | null;
     resetKey: string;
     id: string;
   }
 >) {
   const frameCount = asset.metadata.frameCount;
-  const timingError = (changes: Partial<Pick<VideoClip, 'sourceIn' | 'sourceOut'>>): string | null =>
-    clipRangeError(project, clip, changes);
   return (
     <InspectorSection
       id="source"
       title="Source range"
       icon="start"
-      badge={sourceSeconds(clip.sourceOut - clip.sourceIn)}
       modified={clip.sourceIn !== 0 || clip.sourceOut !== frameCount}
       help={
         <HelpPopover label="Source timing">
           <p id={`${id}-source-help`}>
-            Original recording frames; OUT is exclusive. Layer keyframes stay in project timeline time when this source
-            range changes.
+            The bar spans the original recording; hatching shows omitted footage. Drag IN/OUT to trim or restore. Arrows
+            move one source frame, Shift ten; Home/End reach source limits. Fields accept whole source frames or
+            HH:MM:SS:FF (30 fps NDF). Enter or blur applies; Escape restores. OUT is exclusive. Placement stays fixed;
+            Ripple sequences later clips. Layer keyframes keep their project times.
           </p>
         </HelpPopover>
       }
     >
-      <section className="source-range" aria-label="Source range">
-        <div className="section-label">
-          <span>{sourceSeconds(frameCount)} original</span>
-          <span>{sourceFrame === null ? 'Playhead outside clip' : `Source frame ${sourceFrame}`}</span>
-        </div>
-        <div className="range-fields">
-          <label htmlFor={`${id}-in`}>
-            IN <output>{formatTimecode(clip.sourceIn)}</output>
-            <NumberField
-              id={`${id}-in`}
-              aria-label="Source IN frame"
-              aria-describedby={`${id}-source-help`}
-              min={0}
-              max={clip.sourceOut - 1}
-              integer
-              step={1}
-              value={clip.sourceIn}
-              disabled={drafting}
-              resetKey={resetKey}
-              validate={(sourceIn) => timingError({ sourceIn })}
-              onCommit={(sourceIn) => onEdit({ type: 'trim', clipId: clip.id, sourceIn, sourceOut: clip.sourceOut })}
-            />
-          </label>
-          <label htmlFor={`${id}-out`}>
-            OUT <output>{formatTimecode(clip.sourceOut)}</output>
-            <NumberField
-              id={`${id}-out`}
-              aria-label="Source OUT frame"
-              aria-describedby={`${id}-source-help`}
-              min={clip.sourceIn + 1}
-              max={Math.min(frameCount, 2_147_483_647)}
-              integer
-              step={1}
-              value={clip.sourceOut}
-              disabled={drafting}
-              resetKey={resetKey}
-              validate={(sourceOut) => timingError({ sourceOut })}
-              onCommit={(sourceOut) => onEdit({ type: 'trim', clipId: clip.id, sourceIn: clip.sourceIn, sourceOut })}
-            />
-          </label>
-        </div>
-        <div className="range-availability" aria-label="Recoverable source footage">
-          <span>{sourceSeconds(clip.sourceIn)} before</span>
-          <span>{sourceSeconds(frameCount - clip.sourceOut)} after</span>
-        </div>
-        <button
-          className="text-button restore-range"
-          disabled={drafting || (clip.sourceIn === 0 && clip.sourceOut === frameCount)}
-          onClick={() => onEdit({ type: 'trim', clipId: clip.id, sourceIn: 0, sourceOut: frameCount })}
-        >
-          <Icon name="reset" size={13} />
-          Restore full recording
-        </button>
-      </section>
+      <ClipSourceRange
+        key={resetKey}
+        project={project}
+        clip={clip}
+        count={frameCount}
+        frame={frame}
+        disabled={drafting}
+        resetKey={resetKey}
+        id={id}
+        onEdit={onEdit}
+        onPreview={onPreview}
+        onPause={onPause}
+      />
     </InspectorSection>
   );
 }
@@ -753,11 +694,13 @@ export function Inspector({
                   project={project}
                   clip={clip}
                   asset={asset}
-                  sourceFrame={sourceFrame}
+                  frame={frame}
                   drafting={drafting}
                   resetKey={inputContext}
                   id={colourControlId}
                   onEdit={onEdit}
+                  onPreview={onPreview}
+                  onPause={onPause}
                 />
               )}
               <InspectorSection

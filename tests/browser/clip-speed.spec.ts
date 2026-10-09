@@ -360,10 +360,10 @@ test('duplicate/trim/split preserve independent clip curves and keep outside-tri
   expect((await current(page)).clips[0]!).toEqual(duplicated.clips[0]!);
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
-  const sourceIn = page.getByRole('spinbutton', { name: 'Source IN frame', exact: true });
+  const sourceIn = page.getByRole('textbox', { name: 'Source IN frame', exact: true });
   await sourceIn.fill('30');
   await sourceIn.press('Enter');
-  const sourceOut = page.getByRole('spinbutton', { name: 'Source OUT frame', exact: true });
+  const sourceOut = page.getByRole('textbox', { name: 'Source OUT frame', exact: true });
   await sourceOut.fill('90');
   await sourceOut.press('Enter');
   expect((await current(page)).clips[0]!.speed).toEqual(before.clips[0]!.speed);

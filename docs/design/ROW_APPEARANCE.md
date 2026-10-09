@@ -79,7 +79,10 @@ and identity curves, without independent clip grades.
 
 **Track → Colour** has ten main widgets: nine scalar row colour controls plus sole
 Opacity. All use existing slider/exact-field/reset/diamond/channel-navigation
-controls and work on an empty row. An animated channel without participation at
+controls and work on an empty row. Main and stored Opacity sliders/exact fields
+use **0–100%**, neutral **100%**; convert only at the UI boundary. Required
+`VideoLayer.opacity` and `opacity` key values remain **0–1**, without a schema change.
+An animated channel without participation at
 the real playhead remains read-only until explicitly captured. Sliders never key.
 The nested static HSL and curve editors share row ownership, with no new diamonds.
 Individual scalar resets target only the row base or current existing participant;

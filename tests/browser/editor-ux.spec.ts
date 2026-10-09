@@ -257,7 +257,7 @@ test('animated visual feedback retains explicit capture, native navigation order
 test('hiding the deferred inspector applies a blur draft once and retains its section state', async ({ page }) => {
   const before = await current(page);
   await page.getByRole('button', { name: 'Source range section', exact: true }).click();
-  const input = page.getByRole('spinbutton', { name: 'Source IN frame', exact: true });
+  const input = page.getByRole('textbox', { name: 'Source IN frame', exact: true });
   await input.fill('5');
   const toggle = await panelToggle(page, 'Clip');
   // Hiding a focused native input itself blurs it; the existing Enter/blur contract must still apply once.
@@ -266,7 +266,7 @@ test('hiding the deferred inspector applies a blur draft once and retains its se
   expect((await current(page)).clips[0]!.sourceIn).toBe(5);
   await toggle.evaluate((button) => (button as HTMLButtonElement).click());
   await expect(input).toBeVisible();
-  await expect(input).toHaveValue('5');
+  await expect(input).toHaveValue('00:00:00:05');
   await input.press('Enter');
   expect((await current(page)).clips[0]!.sourceIn).toBe(5);
   await page.getByRole('button', { name: 'Undo', exact: true }).click();

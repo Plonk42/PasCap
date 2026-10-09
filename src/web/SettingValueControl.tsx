@@ -57,7 +57,8 @@ export function RangeSettingControl({
   const colour = COLOUR_CONTROLS.find((item) => item.key === setting);
   const name = label ?? definition.label;
   const neutral = colour ? NEUTRAL_COLOUR[colour.key] : 1;
-  const exactHint = setting === 'opacity' ? `${hint} Exact Opacity uses 0–1; 1 is 100%.` : hint;
+  const scale = setting === 'opacity' ? 100 : 1;
+  const exactHint = setting === 'opacity' ? `${hint} Opacity uses 0–100%.` : hint;
   const fieldContext = exact?.resetKey ?? resetKey ?? `${id}:${hint}`;
   const fieldValidation = exact?.validate ?? validate;
   return (
@@ -79,15 +80,15 @@ export function RangeSettingControl({
         id={id}
         aria-label={name}
         aria-describedby={`${id}-hint`}
-        min={definition.min}
-        max={definition.max}
-        step={definition.step}
-        value={value}
+        min={definition.min * scale}
+        max={definition.max * scale}
+        step={definition.step * scale}
+        value={value * scale}
         disabled={disabled}
         resetKey={fieldContext}
-        {...(fieldValidation === undefined ? {} : { validate: fieldValidation })}
-        unit={setting === 'opacity' ? '0–1' : (colour?.unit ?? '')}
-        onCommit={onCommit}
+        {...(fieldValidation === undefined ? {} : { validate: (next: number) => fieldValidation(next / scale) })}
+        unit={setting === 'opacity' ? '%' : (colour?.unit ?? '')}
+        onCommit={(next) => onCommit(next / scale)}
       />
       <span id={`${id}-hint`} className="declutter-sr-only">
         {exactHint}

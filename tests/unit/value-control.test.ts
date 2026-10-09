@@ -1,15 +1,19 @@
+import { Children, isValidElement, type ReactElement } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { COLOUR_CONTROLS } from '../../src/shared/colour.js';
 import { applyCommand, EditHistory } from '../../src/shared/commands.js';
 import { EMPTY_KEY_VALUES, KEYFRAME_SETTINGS } from '../../src/shared/keyframes.js';
 import { createClip, createProject } from '../../src/shared/model.js';
 import { validateNumberDraft } from '../../src/web/NumberField.js';
+import { RangeSettingControl } from '../../src/web/SettingValueControl.js';
 import {
   createValueControlState,
   syncValueControlState,
   transitionValueControl,
   validateValueControlValue,
+  ValueControl,
   type ValueControlContext,
+  type ValueControlProps,
   type ValueControlState,
 } from '../../src/web/ValueControl.js';
 
@@ -206,12 +210,77 @@ describe('shared exact values and contextual validation', () => {
     },
   );
 
-  it('uses stored 0–1 Opacity, not a percentage-valued edit', () => {
-    const initial = createValueControlState(context({ value: 1, min: 0, max: 1, step: 0.01 }));
-    expect(change(initial, 0).commit).toBe(0);
-    expect(change(initial, 0.137123456789).commit).toBe(0.137123456789);
-    expect(change(initial, 50).commit).toBeNull();
+  const opacityProps = (overrides: Partial<Parameters<typeof RangeSettingControl>[0]> = {}) => {
+    const control = RangeSettingControl({
+      setting: 'opacity',
+      id: 'opacity',
+      value: 0.75,
+      disabled: false,
+      hint: 'Editing Opacity.',
+      onCommit: vi.fn(),
+      ...overrides,
+    });
+    const widget = Children.toArray(control.props.children).find(
+      (child) => isValidElement(child) && child.type === ValueControl,
+    );
+    expect(widget).toBeDefined();
+    return (widget as ReactElement<ValueControlProps>).props;
+  };
+
+  it.each([false, true])('converts main/stored Opacity percentages without step rounding (stored=%s)', (stored) => {
+    const onCommit = vi.fn();
+    const validate = vi.fn(() => null);
+    const props = opacityProps({
+      onCommit,
+      ...(stored ? { exact: { resetKey: 'stored-key', validate } } : { validate }),
+    });
+    expect(props).toMatchObject({ value: 75, min: 0, max: 100, step: 1, unit: '%' });
+    for (const percent of [0, 12.3456789, 100]) {
+      const result = validateNumberDraft(String(percent), props);
+      expect(result).toEqual({ valid: true, value: percent });
+      expect(validate).toHaveBeenLastCalledWith(percent / 100);
+      if (result.valid) props.onCommit(result.value);
+      expect(onCommit).toHaveBeenLastCalledWith(percent / 100);
+    }
+    const calls = validate.mock.calls.length;
+    for (const invalid of ['', '-0.1', '100.1', 'NaN', 'Infinity'])
+      expect(validateNumberDraft(invalid, props).valid).toBe(false);
+    expect(validate).toHaveBeenCalledTimes(calls);
+    expect(onCommit).toHaveBeenCalledTimes(3);
+    expect(opacityProps({ value: 12.3456789 / 100 }).value).toBe(12.3456789);
   });
+
+  it('delegates Opacity contextual validation in fractions and preserves exact-validator precedence', () => {
+    const validate = vi.fn(() => 'Wrong validator');
+    const exactValidate = vi.fn((value: number) => (value > 0.5 ? 'Context rejects this opacity.' : null));
+    const props = opacityProps({ validate, exact: { validate: exactValidate } });
+    expect(validateValueControlValue(25, props)).toEqual({ valid: true, value: 25 });
+    expect(validateValueControlValue(75, props)).toEqual({ valid: false, error: 'Context rejects this opacity.' });
+    expect(exactValidate.mock.calls).toEqual([[0.25], [0.75]]);
+    expect(validate).not.toHaveBeenCalled();
+  });
+
+  it.each(['Escape', 'pointercancel', 'lostpointercapture', 'window blur'])(
+    'keeps percentage Opacity drafts local and restores on %s without a fractional commit',
+    () => {
+      const onCommit = vi.fn();
+      const props = opacityProps({ onCommit });
+      const initial = createValueControlState(context(props));
+      const moved = change(begin(initial).state, 35, props.validate);
+      expect(moved.commit).toBeNull();
+      expect(moved.state.draft).toBe(35);
+      const cancelled = transitionValueControl(moved.state, { type: 'cancel' });
+      expect(cancelled.state.draft).toBe(75);
+      expect(finish(cancelled.state, props.validate).commit).toBeNull();
+      expect(onCommit).not.toHaveBeenCalled();
+      const released = finish(change(begin(initial).state, 35, props.validate).state, props.validate);
+      expect(released.commit).toBe(35);
+      props.onCommit(released.commit!);
+      expect(onCommit).toHaveBeenCalledExactlyOnceWith(0.35);
+      expect(change(released.state, 35, props.validate).commit).toBeNull();
+      expect(change(createValueControlState(context({ ...props, disabled: true })), 35).commit).toBeNull();
+    },
+  );
 
   it('uses all nine colour bounds and gains from −60 to 12 dB', () => {
     for (const setting of COLOUR_CONTROLS)

@@ -130,7 +130,7 @@ for (const target of ['video-1', 'empty'] as const) {
     await expect(opacity).toHaveCount(1);
     await expect(opacity).toBeVisible();
     await expect(opacity).toBeEnabled();
-    await expect(opacity).toHaveValue('1');
+    await expect(opacity).toHaveValue('100');
     if (target === 'video-1')
       await expect(
         page.getByRole('button', { name: 'Placement section', exact: true, includeHidden: true }),
@@ -144,18 +144,18 @@ for (const target of ['video-1', 'empty'] as const) {
     await expect(placement.locator('input[aria-label="Opacity"]')).toHaveCount(0);
     await expect(page.locator('.layer-control input[aria-label="Opacity"]')).toHaveCount(0);
     await expect(colourSection.locator('input[aria-label="Opacity"]')).toHaveCount(2);
-    await expect(opacity.locator('..').getByRole('spinbutton', { name: 'Opacity', exact: true })).toHaveValue('1');
-    await expect(opacity.locator('..').getByText('0–1', { exact: true })).toBeVisible();
+    await expect(opacity.locator('..').getByRole('spinbutton', { name: 'Opacity', exact: true })).toHaveValue('100');
+    await expect(opacity.locator('..').getByText('%', { exact: true })).toBeVisible();
     await expect(
       colourSection.locator('.colour-control').filter({ has: opacity }).getByText('Not animated', { exact: true }),
     ).toHaveCount(1);
     await expect(opacity).toHaveAccessibleDescription(
-      `Editing Opacity. Add keyframes to animate this setting on the row. Exact Opacity uses 0–1; 1 is 100%. ${sliderInstructions}`,
+      `Editing Opacity. Add keyframes to animate this setting on the row. Opacity uses 0–100%. ${sliderInstructions}`,
     );
     await expect(diamond(page, 'Opacity')).toHaveAttribute('aria-pressed', 'false');
     const before = await current(page);
     const layout = calculateLayout(before);
-    await opacity.fill('0.35');
+    await opacity.fill('35');
     const changed = await current(page);
     expect(changed.clips).toEqual(before.clips);
     expect(changed.layers).toEqual(
@@ -177,7 +177,7 @@ for (const target of ['video-1', 'empty'] as const) {
     }
     await page.getByRole('button', { name: 'Undo', exact: true }).click();
     expect(await current(page)).toEqual(before);
-    await expect(opacity).toHaveValue('1');
+    await expect(opacity).toHaveValue('100');
     await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
     await page.getByRole('button', { name: 'Redo', exact: true }).click();
     expect(await current(page)).toEqual(changed);
@@ -205,7 +205,7 @@ test('setting tooltips and accessible descriptions explain the editable keyframe
           : `Read-only animated value at timeline frame 0. Click the ${label} diamond to add a keyframe here, then edit the value.`;
       const field = page.getByRole(role, { name, exact: true });
       if (role === 'slider') {
-        const opacityHint = label === 'Opacity' ? ' Exact Opacity uses 0–1; 1 is 100%.' : '';
+        const opacityHint = label === 'Opacity' ? ' Opacity uses 0–100%.' : '';
         await expect(field).toHaveAccessibleDescription(`${hint}${opacityHint} ${sliderInstructions}`);
       } else {
         await expect(field).toHaveAccessibleDescription(
@@ -256,7 +256,7 @@ test('the first hollow diamond creates one point; same-frame channels merge inde
   await seek(page, 20);
   await inspectorTab(page, 'Track');
   await page.getByRole('slider', { name: 'Exposure', exact: true }).fill('0.4');
-  await page.getByRole('slider', { name: 'Opacity', exact: true }).fill('0.7');
+  await page.getByRole('slider', { name: 'Opacity', exact: true }).fill('70');
   await expect(page.getByRole('slider', { name: 'Layer opacity', exact: true })).toHaveCount(0);
   await expect(page.getByRole('slider', { name: 'Clip opacity', exact: true })).toHaveCount(0);
   await inspectorTab(page, 'Clip');
@@ -661,7 +661,7 @@ test('a row marker opens the selected empty row independently of clips, and keyb
   await expect(page.locator('#inspector-pane [role="tabpanel"]:not([hidden])')).toContainText(
     'Select a clip on Video 2 to edit it.',
   );
-  await expect(page.getByRole('spinbutton', { name: 'Source IN frame', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('textbox', { name: 'Source IN frame', exact: true })).toHaveCount(0);
   await expect(page.locator('.layer-control.selected .layer-select')).toHaveAttribute(
     'aria-label',
     'Select layer Video 2',
@@ -801,7 +801,7 @@ test('numeric trim, mapped split, duplicate and overlay moves keep absolute row 
   });
   await fixture(page, document);
   await inspectorTab(page, 'Clip');
-  const sourceIn = page.getByRole('spinbutton', { name: 'Source IN frame', exact: true });
+  const sourceIn = page.getByRole('textbox', { name: 'Source IN frame', exact: true });
   await sourceIn.fill('10');
   await sourceIn.press('Enter');
   const trimmed = await current(page);
@@ -873,7 +873,7 @@ test('numeric trim, mapped split, duplicate and overlay moves keep absolute row 
     .locator('[data-clip-id="overlay"] .timeline-clip-body')
     .evaluate((button) => (button as HTMLButtonElement).click());
   await inspectorTab(page, 'Clip');
-  await expect(sourceIn).toHaveValue('10');
+  await expect(sourceIn).toHaveValue('00:00:00:10');
   await expect(start).toHaveValue('80');
   await expect(page.getByRole('button', { name: 'Layer keyframe 5 on Video 2', exact: true })).toHaveCount(1);
 });

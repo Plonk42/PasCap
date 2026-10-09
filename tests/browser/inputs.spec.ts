@@ -72,7 +72,7 @@ async function commitNumber(page: Page, name: string, value: string): Promise<vo
 test('Enter and blur each commit once, while Escape and unchanged drafts do not create undo steps', async ({
   page,
 }) => {
-  const field = page.getByRole('spinbutton', { name: 'Source IN frame', exact: true });
+  const field = page.getByRole('textbox', { name: 'Source IN frame', exact: true });
   const undo = page.getByRole('button', { name: 'Undo', exact: true });
   await field.fill('25');
   expect((await currentProject(page)).clips[0]?.sourceIn).toBe(15);
@@ -82,17 +82,17 @@ test('Enter and blur each commit once, while Escape and unchanged drafts do not 
   await field.press('Enter');
   await field.press('Tab');
   await undo.click();
-  await expect(field).toHaveValue('15');
+  await expect(field).toHaveValue('00:00:00:15');
   await expect(undo).toBeDisabled();
 
-  await field.fill('30');
+  await field.fill('00:00:01:00');
   await field.press('Tab');
   expect((await currentProject(page)).clips[0]?.sourceIn).toBe(30);
   await undo.click();
   await expect(undo).toBeDisabled();
   await field.fill('42');
   await field.press('Escape');
-  await expect(field).toHaveValue('15');
+  await expect(field).toHaveValue('00:00:00:15');
   await expect(field).toBeFocused();
   await field.fill('15.0');
   await field.press('Enter');
@@ -104,21 +104,21 @@ test('Enter and blur each commit once, while Escape and unchanged drafts do not 
 test('empty, fractional, out-of-bounds and conflicting timing drafts stay editable with inline errors', async ({
   page,
 }) => {
-  const field = page.getByRole('spinbutton', { name: 'Source IN frame', exact: true });
-  for (const draft of ['', '15.5', '-1', '999']) {
+  const field = page.getByRole('textbox', { name: 'Source IN frame', exact: true });
+  for (const draft of ['', '15.5', '-1', '999', '00:00:00:30', '00:60:00:00', 'not a frame']) {
     await field.fill(draft);
     await field.press('Enter');
     await expect(field).toHaveAttribute('aria-invalid', 'true');
     await expect(field).toHaveValue(draft);
     const error = field.locator('..').getByRole('alert');
-    await expect(error).toContainText('Escape to restore 15');
+    await expect(error).toContainText('Escape to restore 00:00:00:15');
     expect(await field.getAttribute('aria-errormessage')).toBe(await error.getAttribute('id'));
     expect((await currentProject(page)).clips[0]?.sourceIn).toBe(15);
     await field.press('Escape');
     await expect(field).toHaveAttribute('aria-invalid', 'false');
-    await expect(field).toHaveValue('15');
+    await expect(field).toHaveValue('00:00:00:15');
   }
-  const out = page.getByRole('spinbutton', { name: 'Source OUT frame', exact: true });
+  const out = page.getByRole('textbox', { name: 'Source OUT frame', exact: true });
   await out.fill('999');
   await out.press('Enter');
   await expect(out.locator('..').getByRole('alert')).toContainText('Enter 120 or less');
@@ -194,7 +194,7 @@ test('the shared list labels time/value/easing, retains reordered input focus, a
   await expect(keys.getByRole('list')).toHaveAccessibleName('Edit layer keys');
   await expect(row.locator('.layer-keyframe-dependencies')).toHaveText('Opacity · Exposure');
   const draft = row.getByRole('spinbutton', { name: 'Opacity keyframe value 20', exact: true });
-  await draft.fill('0.4');
+  await draft.fill('40');
   expect((await currentProject(page)).layers[0]?.keyframes[0]?.values.opacity).toBe(0.2);
   await draft.press('Enter');
   const time = row.getByRole('spinbutton', { name: 'Layer keyframe frame 20', exact: true });
@@ -222,14 +222,14 @@ test('the shared list labels time/value/easing, retains reordered input focus, a
     sharedPoint(80, { opacity: 0.4, exposure: -0.5 }, 'hold'),
   ]);
   const value = keys.getByRole('spinbutton', { name: 'Opacity keyframe value 80', exact: true });
-  await value.fill('0.9');
+  await value.fill('90');
   await page
     .locator('[data-clip-id="other-row"] .timeline-clip-body')
     .evaluate((button) => (button as HTMLButtonElement).click());
   const otherKeys = layerKeyframes(page, 'Video 2');
   const otherValue = otherKeys.getByRole('spinbutton', { name: 'Opacity keyframe value 80', exact: true });
   await expect(otherKeys.getByRole('list', { name: 'Edit layer keys', exact: true })).toBeVisible();
-  await expect(otherValue).toHaveValue('0.4');
+  await expect(otherValue).toHaveValue('40');
   await expect(otherValue).toBeFocused();
   expect((await currentProject(page)).layers[0]?.keyframes[0]?.values.opacity).toBe(0.4);
   expect((await currentProject(page)).layers[1]?.keyframes[0]?.values.opacity).toBe(0.4);
@@ -419,7 +419,7 @@ test('per-track fade/transition timing and positioned track key numbers use the 
   expect((await currentProject(page)).clips[2]?.start).toBe(5);
   await start.press('Enter');
   await editLayerPoint(page, 'Video 2', 10);
-  await commitNumber(page, 'Opacity keyframe value 10', '0.6');
+  await commitNumber(page, 'Opacity keyframe value 10', '60');
   await commitNumber(page, 'Layer keyframe frame 10', '25');
   const edited = await currentProject(page);
   expect(edited.clips[2]).toMatchObject({ start: 80, sourceIn: 0, sourceOut: 30 });
