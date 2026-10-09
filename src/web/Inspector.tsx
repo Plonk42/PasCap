@@ -301,21 +301,9 @@ function ColourSection({
       icon="colour"
       modified={adjusted > 0 || !isNeutralColour(layer.colour)}
       help={
-        <HelpPopover label="Colour animation">
-          <p>
-            Each diamond captures only its own setting for this whole track, in project timeline time. An animated
-            channel overrides the saved track colour on every clip in the track. Track Colour and Opacity have the same
-            scope with or without keyframes, and work even without clips. Different colour treatments require different
-            tracks. Between keyframes, click the diamond before editing. Reset keyframes changes only this keyframe's
-            enabled Colour settings, including Opacity; double-click a setting's name to reset only that setting.
-            Without Colour animation, Reset restores the selected track's Colour and Opacity to neutral in one Undo
-            step.
-          </p>
-          <p>
-            Temperature and Tint use −1 to 1, with 0 neutral. Positive Temperature warms; negative cools. Positive Tint
-            adds magenta; negative adds green. They apply linear-RGB gains before Exposure and intentionally colour
-            greys. These are normalized SDR adjustments, not Kelvin estimates, automatic white balance or HDR recovery.
-          </p>
+        <HelpPopover label="Colour animation" guide="colour-speed-and-shared-video-track-keyframes">
+          <p>These settings grade every clip on this track. To grade one clip differently, put it on its own track.</p>
+          <p className="editor-help-tip">Tip: Compare shows the ungraded image.</p>
         </HelpPopover>
       }
     >
@@ -407,12 +395,13 @@ function SequenceControls({
           badge={layer.transitions.length}
           modified={layer.transitions.some((item) => item.type !== 'cut')}
           help={
-            <HelpPopover label="Transition timing">
+            <HelpPopover label="Transition timing" guide="assemble-trim-and-cut">
               <p id={`${id}-transition-help`}>
-                Timeline frames after retiming, on this track only. Fade-through-black darkens this track without
-                revealing lower footage. Non-cut transitions need touching clips or an existing dissolve; close a gap
-                explicitly first. A positioned dissolve moves only its right clip to the exact overlap. Conflicts reject
-                the complete edit, never shorten another fade or transition.
+                A transition blends one clip into the next on this track. Fades and dissolves need the two clips to
+                touch, so close any gap or turn Ripple on first.
+              </p>
+              <p className="editor-help-tip">
+                Tip: if a change is refused, check the neighbouring fades and transitions.
               </p>
             </HelpPopover>
           }
@@ -505,12 +494,12 @@ function SequenceControls({
         icon="start"
         modified={layer.openingFade > 0 || layer.closingFade > 0}
         help={
-          <HelpPopover label="Fade timing">
+          <HelpPopover label="Fade timing" guide="assemble-trim-and-cut">
             <p id={`${id}-fades-help`}>
-              Timeline frames on this track’s first and last clips, at their actual placements. 0 disables a fade. These
-              fades darken this track toward black without changing its coverage or fading another track. Empty tracks
-              retain their stored fades.
+              The opening fade darkens the start of this track’s first clip and the closing fade its last clip’s end, in
+              timeline frames. 0 disables a fade.
             </p>
+            <p className="editor-help-tip">Tip: fades darken this track only, so other tracks stay visible.</p>
           </HelpPopover>
         }
       >
@@ -598,13 +587,12 @@ function SourceRangeSection({
       icon="start"
       modified={clip.sourceIn !== 0 || clip.sourceOut !== frameCount}
       help={
-        <HelpPopover label="Source timing">
+        <HelpPopover label="Source timing" guide="assemble-trim-and-cut">
           <p id={`${id}-source-help`}>
-            The bar spans the original recording; hatching shows omitted footage. Drag IN/OUT to trim or restore. Arrows
-            move one source frame, Shift ten; Home/End reach source limits. Fields accept whole source frames or
-            HH:MM:SS:FF (30 fps NDF). Enter or blur applies; Escape restores. OUT is exclusive. Placement stays fixed;
-            Ripple sequences later clips. Track keyframes keep their project times.
+            The bar shows the whole recording; drag IN and OUT to keep only the part you want. Type a frame number or
+            HH:MM:SS:FF in the fields.
           </p>
+          <p className="editor-help-tip">Tip: Restore full recording undoes a trim.</p>
         </HelpPopover>
       }
     >
@@ -709,12 +697,12 @@ export function Inspector({
                 title="Placement"
                 icon="layers"
                 help={
-                  <HelpPopover label="Placement timing">
+                  <HelpPopover label="Placement timing" guide="assemble-trim-and-cut">
                     <p>
-                      Move the selected clip to a video track or edit its timeline start. With Ripple on, only the first
-                      clip's anchor can be edited here; drag later clips to reorder. Other tracks, music and track
-                      keyframes stay at their project times. Opacity is in Colour and affects the whole track.
+                      Choose the track and timeline start for this clip. With Ripple on, only the first clip's start can
+                      be typed; drag the others to reorder.
                     </p>
+                    <p className="editor-help-tip">Tip: Opacity is in Track → Colour.</p>
                   </HelpPopover>
                 }
               >
@@ -785,13 +773,7 @@ export function Inspector({
                   hasLayerKeys(layer, 'speed') ||
                   (clip !== undefined && clip.speed.mode !== 'constant')
                 }
-                help={
-                  <SpeedHelp
-                    clip={clip ?? null}
-                    keyed={hasLayerKeys(layer, 'speed')}
-                    helpId={`${colourControlId}-speed-help`}
-                  />
-                }
+                help={<SpeedHelp keyed={hasLayerKeys(layer, 'speed')} helpId={`${colourControlId}-speed-help`} />}
               >
                 <SpeedControls
                   project={project}

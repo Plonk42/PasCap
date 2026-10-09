@@ -235,13 +235,11 @@ export function Layers({
                           />{' '}
                           Ripple
                         </label>
-                        <HelpPopover label={`Ripple on ${layer.name}`}>
+                        <HelpPopover label={`Ripple on ${layer.name}`} guide="assemble-trim-and-cut">
                           <p id={`${description}-ripple`}>
-                            On: clips pack continuously from the first clip’s current project-frame start, retaining
-                            existing dissolves. Enabling closes gaps in one Undo step; it does not move the first
-                            anchor. Off: current placements are kept and each start is independent. Other tracks, music
-                            and track keyframes never move with this switch. New tracks start with Ripple on.
+                            On: clips stay packed; trimming or deleting closes gaps. Off: clips keep their positions.
                           </p>
+                          <p className="editor-help-tip">Tip: other tracks and music never move with this switch.</p>
                         </HelpPopover>
                       </div>
                       <div className="layer-options-actions">

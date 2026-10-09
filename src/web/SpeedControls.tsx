@@ -186,36 +186,18 @@ function speedGraphPoints(clip: VideoClip | null, layer: VideoLayer, projectDura
   }).join(' ');
 }
 
-export function SpeedHelp({
-  clip,
-  keyed,
-  helpId,
-}: Readonly<{ clip: VideoClip | null; keyed: boolean; helpId: string }>) {
+export function SpeedHelp({ keyed, helpId }: Readonly<{ keyed: boolean; helpId: string }>) {
   return (
-    <HelpPopover label="Speed timing">
+    <HelpPopover label="Speed timing" guide="precise-clip-speed-curves">
       <p id={helpId}>
-        1× is recorded speed. Custom curve keyframes belong to one clip and use original source frames; drag a keyframe
-        or enter its exact frame/rate. Their positions stay anchored when trimming or splitting. The logarithmic graph
-        spans 0.1×–8×. Slow motion repeats recorded frames, without generated optical-flow images.
+        1× is recorded speed: below 1× is slow motion, above is faster. Custom curve changes the speed over the length
+        of this clip.
       </p>
-      <p>
-        The Track speed animation diamond captures a keyframe for the whole track in project timeline time. Track
-        keyframes override, rather than multiply, each clip's constant/ramp/custom speed. Between track keyframes,
-        capture with the diamond before changing its rate.
+      <p className="editor-help-tip">
+        {keyed
+          ? 'Tip: track speed keyframes override each clip’s own speed; Reset to 1× changes only the keyframe at this frame.'
+          : 'Tip: the Track speed animation diamond changes speed for the whole track instead, overriding each clip’s own speed.'}
       </p>
-      {!keyed && clip?.speed.mode === 'ramp' && (
-        <p>
-          Selected clip ramp anchors: IN {clip.speed.anchorIn}, OUT {clip.speed.anchorOut} (exclusive). Trims do not
-          move them.
-        </p>
-      )}
-      {!keyed && clip?.speed.mode === 'constant' && clip.speed.rate < 1 && <p>Slow motion repeats recorded frames.</p>}
-      {keyed && (
-        <p>
-          Reset to 1× changes only an enabled Speed value at this frame; it never clears the track curve. Use the
-          diamonds or the shared keyframe list to remove keyframes explicitly.
-        </p>
-      )}
     </HelpPopover>
   );
 }

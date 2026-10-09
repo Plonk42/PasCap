@@ -116,20 +116,9 @@ function PoseFields({
 
 export function TransformHelp() {
   return (
-    <HelpPopover label="Transform animation">
-      <p>
-        Transform belongs only to this clip. Crop fractions remove original source edges without refitting; opposite
-        crops must sum to less than 1. Scale preserves aspect. Rotation uses the original centre pivot, clockwise;
-        translation is a fraction of the output width or height. Uncovered pixels reveal lower tracks.
-      </p>
-      <p>
-        The single diamond captures the complete evaluated pose at the actually displayed integer source frame. With
-        animation, capture a keyframe before editing at a new source frame; sliders never add keyframes. All eight
-        values share the keyframe's easing. Stored keyframes, including outside the trim and at exclusive OUT, stay
-        editable; navigation previews the closest actually mapped image. Trimming, splitting and moving retain
-        original-source anchors. Reset transform deliberately restores the neutral base and deletes all Transform
-        keyframes, in one Undo.
-      </p>
+    <HelpPopover label="Transform animation" guide="crop-scale-translate-and-rotate-a-clip">
+      <p>Crop, scale, move and rotate this clip. Values animate only if you add a keyframe first (◇).</p>
+      <p className="editor-help-tip">Tip: Reset transform restores the original framing.</p>
     </HelpPopover>
   );
 }

@@ -72,3 +72,11 @@
   font-size: 12px;
   font-weight: 600;
 }
+
+.editor-help-content > .editor-help-tip {
+  color: #eef4ef;
+}
+
+.editor-help-content a {
+  color: var(--accent);
+}
