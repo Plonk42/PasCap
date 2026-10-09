@@ -393,7 +393,7 @@ export function KeyframeControls({
             </span>
           </div>
           <p className="editor-help-tip">
-            Tip: Animate reveals diamonds. Section arrows visit any keyframe; chip arrows visit one setting's keyframes.
+            Tip: Animate reveals diamonds and arrows; drag a timeline keyframe to move all its settings.
           </p>
         </HelpPopover>
       </div>
