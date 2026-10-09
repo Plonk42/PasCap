@@ -1,6 +1,9 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import './declutter.css';
+import type { EditCommand } from '../shared/commands.js';
+import type { ProjectDocument } from '../shared/model.js';
 import { Icon } from './icons.js';
+import { moveToNewTrack } from './move-to-track.js';
 
 export interface ClipMenuAnchor {
   clipId: string;
@@ -11,11 +14,15 @@ export interface ClipMenuAnchor {
 interface Props {
   anchor: ClipMenuAnchor;
   onDuplicate: () => void;
+  project: ProjectDocument;
+  onEdit: (commands: readonly EditCommand[]) => void;
   onClose: (restoreFocus: boolean) => void;
 }
 
 /** Right-click (or Menu key) actions for one clip; Ctrl+D remains the keyboard shortcut. */
-export function ClipContextMenu({ anchor, onDuplicate, onClose }: Readonly<Props>) {
+export function ClipContextMenu({ anchor, onDuplicate, project, onEdit, onClose }: Readonly<Props>) {
+  const moved = moveToNewTrack(project, anchor.clipId);
+  const moveBlocked = 'reason' in moved ? moved.reason : null;
   const panel = useRef<HTMLFieldSetElement>(null);
   const [position, setPosition] = useState<{ left: number; top: number } | null>(null);
 
@@ -68,6 +75,21 @@ export function ClipContextMenu({ anchor, onDuplicate, onClose }: Readonly<Props
       <button className="secondary-button small" aria-label="Duplicate selected clip" onClick={onDuplicate}>
         <Icon name="plus" size={15} />
         Duplicate <kbd>Ctrl+D</kbd>
+      </button>
+      <button
+        className="secondary-button small"
+        aria-label="Move selected clip to a new track"
+        title={moveBlocked ?? 'Move this clip to a new track, so it can have its own Colour and keyframes'}
+        aria-disabled={moveBlocked !== null}
+        onClick={() => {
+          if ('commands' in moved) {
+            onClose(false);
+            onEdit(moved.commands);
+          }
+        }}
+      >
+        <Icon name="layers" size={15} />
+        Move to new track
       </button>
     </fieldset>
   );

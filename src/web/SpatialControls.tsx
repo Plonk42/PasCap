@@ -1,4 +1,4 @@
-import { useId, useState } from 'react';
+import { useId, useState, type ReactNode } from 'react';
 import { applyCommand, type EditCommand } from '../shared/commands.js';
 import type { ProjectDocument, VideoClip } from '../shared/model.js';
 import {
@@ -13,7 +13,7 @@ import {
   type SpatialSettings,
 } from '../shared/spatial.js';
 import { previewClipSource } from './clip-speed-geometry.js';
-import { AnimationControls, useAnimationTools } from './AnimationControls.js';
+import { KeyframeSteps, keyframeCount } from './AnimationControls.js';
 import { EasingSelect } from './EasingSelect.js';
 import { HelpPopover } from './HelpPopover.js';
 import { Icon } from './icons.js';
@@ -43,9 +43,9 @@ interface Props {
   disabled: boolean;
   onEdit: (command: EditCommand) => void;
   onSeek: (frame: number) => void;
-  animate?: boolean;
   selectedFrame?: number | null;
   onSelectStored?: (frame: number) => void;
+  steps?: ReactNode;
 }
 
 /** Reconcile one moved key (and Undo) without remounting its exact fields. */
@@ -202,7 +202,7 @@ function PoseFields({
                 {control.label}
                 {unit}
               </ResetLabel>
-              {readOnly?.(control.key) && <LockedCue animate={keys !== undefined} />}
+              {readOnly?.(control.key) && <LockedCue />}
               {keys && (
                 <span className="colour-control-actions">
                   <SpatialChannelKeys label={control.label} keys={keys} disabled={disabled} />
@@ -245,9 +245,9 @@ export function SpatialControls({
   disabled,
   onEdit,
   onSeek,
-  animate = true,
   selectedFrame,
   onSelectStored,
+  steps,
 }: Readonly<Props>) {
   const navigation = useKeyframeNavigation();
   const unavailable = disabled || navigation.disabled;
@@ -327,8 +327,9 @@ export function SpatialControls({
   };
   return (
     <section className="spatial-editor" aria-label="Clip Transform editor">
-      <div className="spatial-tools">
-        <span>{settings.keyframes.length} Transform keyframes</span>
+      <div className="spatial-tools section-keyframe-line">
+        <span className="section-keyframe-count">{keyframeCount(settings.keyframes.length)}</span>
+        {steps}
         <button
           type="button"
           className="text-button"
@@ -352,7 +353,7 @@ export function SpatialControls({
         context={`${context}:main:${settings.keyframes.length ? playhead?.frame : 'base'}`}
         disabled={unavailable}
         readOnly={readOnly}
-        keysFor={animate ? keysFor : undefined}
+        keysFor={keysFor}
         validate={(key, value) => validate(() => editSpatialPose(settings, playhead?.frame ?? null, key, value))}
         onCommit={(key, value) => change(() => editSpatialPose(settings, playhead?.frame ?? null, key, value))}
         onReset={(key) =>
@@ -360,7 +361,7 @@ export function SpatialControls({
         }
       />
       {selected && (
-        <section hidden={!animate} className="spatial-stored" aria-label="Stored Transform keyframe">
+        <section className="spatial-stored" aria-label="Stored Transform keyframe">
           <div className="spatial-selection">
             <select
               aria-label="Selected Transform keyframe"
@@ -456,11 +457,6 @@ export function SpatialControls({
 }
 
 export function TransformSection(props: Readonly<Omit<Props, 'clip'> & { clip: VideoClip | null }>) {
-  const tools = useAnimationTools(
-    'transform',
-    `${props.project.id}:${props.clip?.id}`,
-    !!props.clip?.spatial.keyframes.length,
-  );
   const navigation = useKeyframeNavigation();
   const [selection, setSelection] = useState<SpatialInspection | null>(null);
   const context = `${props.project.id}:${props.clip?.id}:${navigation.sourceEpoch ?? 0}`;
@@ -500,29 +496,21 @@ export function TransformSection(props: Readonly<Omit<Props, 'clip'> & { clip: V
       icon="layers"
       modified={props.clip !== null && hasSpatialEdits(props.clip.spatial)}
       help={<TransformHelp />}
-      actions={
-        <AnimationControls
-          label="Transform"
-          enabled={tools.enabled}
-          disabled={props.disabled || navigation.disabled || !props.clip}
-          onToggle={tools.toggle}
-          previous={!!previous}
-          next={!!next}
-          onPrevious={() => seek(previous)}
-          onNext={() => seek(next)}
-        />
-      }
     >
-      {tools.warning && (
-        <p className="control-hint">
-          Animation tools cannot be saved in this browser; the choice remains available for this session.
-        </p>
-      )}
       {props.clip ? (
         <SpatialControls
           {...props}
-          animate={tools.enabled}
           selectedFrame={inspected}
+          steps={
+            <KeyframeSteps
+              label="Transform"
+              disabled={props.disabled || navigation.disabled}
+              previous={!!previous}
+              next={!!next}
+              onPrevious={() => seek(previous)}
+              onNext={() => seek(next)}
+            />
+          }
           onSelectStored={selectStored}
           clip={props.clip}
           key={`${props.project.id}:${props.clip.id}`}

@@ -492,8 +492,7 @@ cover the full project; music tails use composited export. Export still requires
 See [the multiple-music contract](design/MULTIPLE_MUSIC.md).
 
 The single **Opacity** slider/exact field belongs in **Track → Colour** alongside
-the colour sliders and works on an empty track. Its diamond appears when Animate
-is on, with adjacent per-setting Previous/Next buttons; stored enabled-setting
+the colour sliders and works on an empty track. Its diamond is always visible, with adjacent per-setting Previous/Next buttons; stored enabled-setting
 chip arrows remain available too. Main and stored sliders/
 exact fields use **0–100%**, neutral **100%**; convert only at the UI boundary,
 keeping required `VideoLayer.opacity` and `opacity` keyframes **0–1** with no schema change.
@@ -502,15 +501,8 @@ real playhead permits editing, with the diamond explicitly capturing a missing
 setting. Sliders never create keyframes. **Placement** contains placement only;
 Track options contains rename, Ripple, ordering and deletion, with visibility separate.
 
-Colour, Speed and Transform each have a native **Animate** section toggle, stored
-only as a separate browser-local preference. With no stored choice, unanimated
-sections start off and existing keyframes start on. Turning it off retains all keyframes,
-rendering, read-only constraints and history without a project save or Undo step;
-there is no schema or data change. Main scalar Colour/Opacity and track Speed
-diamonds and adjacent per-setting Previous/Next buttons are visible only with
-Animate on. These buttons remain alongside the stored enabled-setting chip arrows
-because not every setting is enabled at every shared keyframe.
-Each Animate-on header has one Previous/Next pair: Colour visits the union of
+Colour, Speed and Transform always show their capture diamonds and adjacent per-setting **Previous/Next** buttons while the section is expanded; there is no Animate toggle and no stored preference. Each expanded section has one keyframe line with the **number of keyframes**, one **Previous/Next** pair over the same set and **Reset keyframes**. The line is hidden while the section is collapsed; the title row and its help stay reachable. Rendering, retained keyframes and read-only constraints never depend on what is shown. The per-setting buttons remain alongside the stored enabled-setting chip arrows because not every setting is enabled at every shared keyframe.
+Each keyframe line has one Previous/Next pair: Colour visits the union of
 Opacity and nine scalar keyframes, skipping speed-only keyframes; Speed visits track
 Speed keyframes plus all retained custom speed source keyframes of the selected
 clip, including off-trim keyframes and original exclusive OUT, previewing the
@@ -529,7 +521,7 @@ never an inspected stored time. All visible
 track/Transform/clip-speed/ramp easing labels read **Easing**, retaining contextual
 accessible names such as **Track keyframe easing N** and **Ramp easing**.
 
-Inside timeline clip rectangles, pale-blue **◆** Transform and salmon/dashed **◆**
+Inside timeline clip rectangles, boxed blue **▼** Transform and salmon/dashed **◆**
 custom-speed lanes place source keyframes at authoritative retimed output positions,
 including track Speed overrides, indicated without deleting clip keyframes.
 Off-trim keyframes are omitted; exclusive OUT has a boundary marker seeking the final

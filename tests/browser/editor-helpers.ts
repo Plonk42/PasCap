@@ -62,7 +62,6 @@ export async function addMusicTrack(page: Page, name?: string): Promise<void> {
 /** Legacy functional tests choose expansion; default compact presentation is tested separately. */
 export async function expandedInspectorPreferences(page: Page): Promise<void> {
   await page.addInitScript(() => {
-    for (const section of ['colour', 'speed', 'transform']) localStorage.setItem(`pascap-animate-${section}`, 'on');
     for (const id of ['source', 'layer-opacity', 'speed', 'transform', 'colour', 'transition', 'fades', 'music']) {
       const key = `pascap-section-${id}`;
       if (localStorage.getItem(key) === null) localStorage.setItem(key, 'open');

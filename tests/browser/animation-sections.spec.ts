@@ -17,14 +17,15 @@ function inspector(page: Page): Locator {
   return page.getByRole('complementary', { name: 'Clip inspector', exact: true });
 }
 
-function animate(page: Page, section: Section): Locator {
-  return inspector(page).getByRole('button', { name: `Animate ${section}`, exact: true });
+/** The expanded section's keyframe line: count, Previous/Next and the section reset. */
+function line(page: Page, section: Section): Locator {
+  return inspector(page)
+    .locator('.section-keyframe-line')
+    .filter({ has: page.getByRole('button', { name: `Next ${section} keyframe`, exact: true }) });
 }
 
 function navigation(page: Page, section: Section, direction: 'Previous' | 'Next'): Locator {
-  return inspector(page)
-    .locator('.section-animation-controls')
-    .getByRole('button', { name: `${direction} ${section} keyframe`, exact: true });
+  return line(page, section).getByRole('button', { name: `${direction} ${section} keyframe`, exact: true });
 }
 
 function diamond(page: Page, label: string): Locator {
@@ -106,10 +107,9 @@ function nearestOutput(placed: PlacedClip, source: number): number {
   );
 }
 
-async function preferences(page: Page): Promise<(string | null)[]> {
-  return page.evaluate(() =>
-    ['colour', 'speed', 'transform'].map((section) => localStorage.getItem(`pascap-animate-${section}`)),
-  );
+/** The removed Animate preference must never be written. */
+async function animatePreferences(page: Page): Promise<string[]> {
+  return page.evaluate(() => Object.keys(localStorage).filter((key) => key.startsWith('pascap-animate')));
 }
 
 async function pixels(page: Page, ungraded = false) {
@@ -207,8 +207,6 @@ for (const viewport of [
       }));
       document.clips = [clip];
       memory = await memoryProjects(page, document);
-      // Do NOT use expandedInspectorPreferences: it explicitly forces Animate on.
-      // Expand only disclosures; leave all three animation preferences absent.
       await page.addInitScript(() => {
         for (const section of ['source', 'layer-opacity', 'speed', 'transform', 'colour', 'keyframes']) {
           const key = `pascap-section-${section}`;
@@ -253,7 +251,7 @@ for (const viewport of [
       await expect(page.getByRole('button', { name: 'Redo', exact: true })).toBeDisabled();
     }
 
-    test('unanimated defaults hide tools, keep native values editable and expose keyboard section toggles', async ({
+    test('keyframe controls are always visible without a toggle, native values stay editable and no preference is stored', async ({
       page,
     }, testInfo) => {
       const document = await fixture(page, (document) => {
@@ -262,71 +260,48 @@ for (const viewport of [
         document.clips[0]!.spatial = createSpatialSettings();
       });
       expect(document.schemaVersion).toBe(12);
-      expect(await preferences(page)).toEqual([null, null, null]);
       await inspectorTab(page, 'Track');
-      await expect(animate(page, 'Colour')).toHaveAttribute('aria-pressed', 'false');
-      await expect(inspector(page).locator('.colour-controls .keyframe-toggle')).toHaveCount(0);
-      await expect(inspector(page).locator('.colour-controls span.keyframe-setting-navigation')).toHaveCount(0);
-      await expect(navigation(page, 'Colour', 'Next')).toHaveCount(0);
+      await expect(inspector(page).getByRole('button', { name: /^Animate / })).toHaveCount(0);
+      await expect(line(page, 'Colour')).toContainText('0 keyframes');
+      await expect(line(page, 'Colour').getByRole('button', { name: 'Reset colour', exact: true })).toBeVisible();
+      for (const direction of ['Previous', 'Next'] as const)
+        await expect(navigation(page, 'Colour', direction)).toBeDisabled();
       for (const { label } of colourSettings) {
         await expect(page.getByRole('slider', { name: label, exact: true })).toBeEnabled();
         await expect(page.getByRole('spinbutton', { name: label, exact: true })).toBeEnabled();
+        const main = diamond(page, label).locator('..');
+        await expect(diamond(page, label)).toBeVisible();
+        await expect(main).toHaveClass(/\bkeyframe-setting-navigation\b/);
+        await expect(main).toHaveJSProperty('tagName', 'SPAN');
+        await expect(main.getByRole('button')).toHaveCount(3);
+        for (const button of await main.getByRole('button').all())
+          await expect(button).toHaveJSProperty('tagName', 'BUTTON');
+        for (const direction of ['Previous', 'Next'] as const) {
+          const arrow = channelNavigation(page, label, direction);
+          await expect(arrow).toBeVisible();
+          await expect(arrow).toHaveAttribute('aria-disabled', 'true');
+          await expect(arrow).toHaveJSProperty('disabled', false);
+          await expect(arrow).toHaveAttribute('tabindex', '-1');
+        }
       }
       await testInfo.attach('unanimated-colour', { body: await page.screenshot(), contentType: 'image/png' });
       await inspectorTab(page, 'Clip');
+      await expect(inspector(page).getByRole('button', { name: /^Animate / })).toHaveCount(0);
       for (const section of ['Speed', 'Transform'] as const) {
-        await expect(animate(page, section)).toHaveAttribute('aria-pressed', 'false');
-        await expect(navigation(page, section, 'Next')).toHaveCount(0);
+        await expect(line(page, section)).toContainText('0 keyframes');
+        for (const direction of ['Previous', 'Next'] as const)
+          await expect(navigation(page, section, direction)).toBeDisabled();
       }
-      await expect(diamond(page, 'Speed')).toBeHidden();
-      await expect(transformDiamonds(page)).toHaveCount(0);
+      await expect(diamond(page, 'Speed')).toBeVisible();
+      await expect(transformDiamonds(page)).toHaveCount(8);
       await expect(page.getByRole('spinbutton', { name: 'Clip speed rate', exact: true })).toBeEnabled();
       await expect(page.getByRole('spinbutton', { name: 'Transform Scale', exact: true })).toBeEnabled();
-      for (const section of ['Speed', 'Transform', 'Colour'] as const) {
-        await settingTab(page, section === 'Colour' ? 'Exposure' : 'Speed');
-        const toggle = animate(page, section);
-        await expect(toggle).toHaveJSProperty('tagName', 'BUTTON');
-        await toggle.focus();
-        await toggle.press('Space');
-        await expect(toggle).toHaveAttribute('aria-pressed', 'true');
-        await expect(toggle).toBeFocused();
-        for (const direction of ['Previous', 'Next'] as const) {
-          await expect(navigation(page, section, direction)).toBeVisible();
-          await expect(navigation(page, section, direction)).toBeDisabled();
-        }
-        if (section !== 'Transform') {
-          for (const label of section === 'Colour' ? colourSettings.map(({ label }) => label) : ['Speed']) {
-            const main = diamond(page, label).locator('..');
-            await expect(main).toHaveClass(/\bkeyframe-setting-navigation\b/);
-            await expect(main).toHaveJSProperty('tagName', 'SPAN');
-            await expect(main.getByRole('button')).toHaveCount(3);
-            for (const button of await main.getByRole('button').all())
-              await expect(button).toHaveJSProperty('tagName', 'BUTTON');
-            for (const direction of ['Previous', 'Next'] as const) {
-              const arrow = channelNavigation(page, label, direction);
-              await expect(arrow).toBeVisible();
-              await expect(arrow).toHaveAttribute('aria-disabled', 'true');
-              await expect(arrow).toHaveJSProperty('disabled', false);
-              await expect(arrow).toHaveAttribute('tabindex', '-1');
-            }
-          }
-        }
-        await toggle.press('Enter');
-        await expect(toggle).toHaveAttribute('aria-pressed', 'false');
-        if (section === 'Colour')
-          await expect(inspector(page).locator('.colour-controls span.keyframe-setting-navigation')).toHaveCount(0);
-        else if (section === 'Speed') {
-          await expect(diamond(page, 'Speed')).toBeHidden();
-          for (const direction of ['Previous', 'Next'] as const)
-            await expect(channelNavigation(page, 'Speed', direction)).toBeHidden();
-        }
-      }
-      expect(await preferences(page)).toEqual(['off', 'off', 'off']);
+      expect(await animatePreferences(page)).toEqual([]);
       expect(await page.evaluate(() => globalThis.document.documentElement.scrollWidth <= innerWidth)).toBe(true);
       await unchanged(page, document);
     });
 
-    test('existing keys default on without preferences; Animate off retains rendered keys and read-only gaps', async ({
+    test('existing keys keep read-only gaps, count what each header visits and hide the line when collapsed', async ({
       page,
     }, testInfo) => {
       const document = await current(page);
@@ -335,41 +310,30 @@ for (const viewport of [
       expect(graded).toHaveLength(1280 * 720 * 4);
       expect(graded.rgbSum).toBeGreaterThan(0);
       expect(await pixels(page, true)).not.toEqual(graded);
-      expect(await preferences(page)).toEqual([null, null, null]);
       await inspectorTab(page, 'Track');
-      await expect(animate(page, 'Colour')).toHaveAttribute('aria-pressed', 'true');
+      await expect(line(page, 'Colour')).toContainText('2 keyframes');
       await expect(diamond(page, 'Exposure')).toHaveAttribute('aria-pressed', 'false');
       await expect(page.getByRole('spinbutton', { name: 'Exposure', exact: true })).toHaveValue('0.6');
       await expect(page.getByRole('spinbutton', { name: 'Opacity', exact: true })).toHaveValue('65');
-      await animate(page, 'Colour').click();
-      await expect(diamond(page, 'Exposure')).toHaveCount(0);
-      await expect(inspector(page).locator('.colour-controls span.keyframe-setting-navigation')).toHaveCount(0);
       await expect(page.getByRole('spinbutton', { name: 'Exposure', exact: true })).toBeDisabled();
       await expect(page.getByRole('slider', { name: 'Opacity', exact: true })).toBeDisabled();
       await expect(layerKeyframes(page, TRACK).locator('.keyframe-row')).toHaveCount(3);
       await inspectorTab(page, 'Clip');
-      for (const section of ['Speed', 'Transform'] as const) {
-        await expect(animate(page, section)).toHaveAttribute('aria-pressed', 'true');
-        await animate(page, section).click();
-        await expect(animate(page, section)).toHaveAttribute('aria-pressed', 'false');
-        await expect(navigation(page, section, 'Next')).toHaveCount(0);
-      }
-      await expect(diamond(page, 'Speed')).toBeHidden();
-      for (const direction of ['Previous', 'Next'] as const)
-        await expect(channelNavigation(page, 'Speed', direction)).toBeHidden();
+      // Track Speed (1) plus every retained custom clip key (4); Transform keeps all 5, off-trim included.
+      await expect(line(page, 'Speed')).toContainText('5 keyframes');
+      await expect(line(page, 'Transform')).toContainText('5 keyframes');
       await expect(page.getByRole('spinbutton', { name: 'Track speed rate', exact: true })).toBeDisabled();
       await expect(page.getByRole('spinbutton', { name: 'Track speed rate', exact: true })).toHaveValue('1');
-      await expect(transformDiamonds(page)).toHaveCount(0);
+      await expect(transformDiamonds(page)).toHaveCount(8);
       const pose = evaluateSpatial(document.clips[0]!.spatial, 25);
       await expect(page.getByRole('spinbutton', { name: 'Transform Scale', exact: true })).toHaveValue(
         String(pose.scale),
       );
       await expect(page.getByRole('spinbutton', { name: 'Transform Scale', exact: true })).toBeDisabled();
-      await expect(page.getByRole('combobox', { name: 'Selected Transform keyframe', exact: true })).toBeHidden();
       expect(await pixels(page)).toEqual(graded);
       await previewAt(page, document, 15);
-      await testInfo.attach('animated-tools-hidden', { body: await page.screenshot(), contentType: 'image/png' });
-      // Hiding tools does not disable a stored setting that exists at the real playhead.
+      await testInfo.attach('locked-with-keys', { body: await page.screenshot(), contentType: 'image/png' });
+      // A stored setting at the real playhead stays editable.
       await seek(page, document, 50);
       await expect(page.getByRole('spinbutton', { name: 'Track speed rate', exact: true })).toBeEnabled();
       await seek(page, document, 10);
@@ -379,46 +343,23 @@ for (const viewport of [
       await expect(page.getByRole('spinbutton', { name: 'Exposure', exact: true })).toBeEnabled();
       await seek(page, document, 0);
       await expect(page.getByRole('spinbutton', { name: 'Opacity', exact: true })).toBeEnabled();
+      // Collapsing a section hides its keyframe line; the title row stays.
+      const colour = page.getByRole('button', { name: 'Colour section', exact: true });
+      await colour.click();
+      await expect(line(page, 'Colour')).toBeHidden();
+      await expect(colour).toBeVisible();
+      await colour.click();
+      await expect(line(page, 'Colour')).toBeVisible();
+      await inspectorTab(page, 'Clip');
+      for (const section of ['Speed', 'Transform'] as const) {
+        const toggle = page.getByRole('button', { name: `${section} section`, exact: true });
+        await toggle.click();
+        await expect(line(page, section)).toBeHidden();
+        await toggle.click();
+        await expect(line(page, section)).toBeVisible();
+      }
+      expect(await animatePreferences(page)).toEqual([]);
       await unchanged(page, document);
-    });
-
-    test('section preferences persist independently across reload and another project without saves or history', async ({
-      page,
-    }) => {
-      const document = await current(page);
-      await inspectorTab(page, 'Track');
-      await animate(page, 'Colour').focus();
-      await animate(page, 'Colour').press('Space');
-      expect(await preferences(page)).toEqual(['off', null, null]);
-      await inspectorTab(page, 'Clip');
-      await expect(animate(page, 'Speed')).toHaveAttribute('aria-pressed', 'true');
-      await expect(animate(page, 'Transform')).toHaveAttribute('aria-pressed', 'true');
-      await animate(page, 'Speed').focus();
-      await animate(page, 'Speed').press('Enter');
-      expect(await preferences(page)).toEqual(['off', 'off', null]);
-      await unchanged(page, document);
-      await page.reload();
-      await ready(page, document);
-      await inspectorTab(page, 'Clip');
-      await expect(animate(page, 'Speed')).toHaveAttribute('aria-pressed', 'false');
-      await expect(animate(page, 'Transform')).toHaveAttribute('aria-pressed', 'true');
-      await inspectorTab(page, 'Track');
-      await expect(animate(page, 'Colour')).toHaveAttribute('aria-pressed', 'false');
-      const other = projectSchema.parse({
-        ...document,
-        id: 'animation-sections-other',
-        title: 'Another memory project',
-      });
-      memory.seed(other);
-      await page.goto(`/?project=${other.id}`);
-      await ready(page, other);
-      await inspectorTab(page, 'Track');
-      await expect(animate(page, 'Colour')).toHaveAttribute('aria-pressed', 'false');
-      await inspectorTab(page, 'Clip');
-      await expect(animate(page, 'Speed')).toHaveAttribute('aria-pressed', 'false');
-      await expect(animate(page, 'Transform')).toHaveAttribute('aria-pressed', 'true');
-      await unchanged(page, other);
-      expect(memory.snapshot(document.id)).toEqual(document);
     });
 
     test('Colour header visits Opacity and all nine scalar settings, skips Speed-only keys and retains main arrows', async ({
@@ -560,14 +501,7 @@ for (const viewport of [
       await page.evaluate(() => window.pascapLab!.flush());
       expect(memory.saves).toBe(1);
       await expect(diamond(page, 'Exposure')).toHaveAttribute('aria-pressed', 'true');
-      await animate(page, 'Colour').focus();
-      await animate(page, 'Colour').press('Space');
-      await expect(animate(page, 'Colour')).toHaveAttribute('aria-pressed', 'false');
-      await animate(page, 'Colour').press('Enter');
-      expect(await current(page)).toEqual(expected);
-      await page.evaluate(() => window.pascapLab!.flush());
-      expect(memory.saves).toBe(1);
-      // The existing capture remains exactly one history step despite toggling tools.
+      // The capture is exactly one history step.
       await page.getByRole('button', { name: 'Undo', exact: true }).click();
       expect(await current(page)).toEqual(document);
       await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
@@ -741,7 +675,7 @@ for (const viewport of [
           });
           const expectedX = Math.max(
             0,
-            Math.min(bounds.clipWidth - bounds.width, (output / placed.duration) * bounds.clipWidth - 6),
+            Math.min(bounds.clipWidth - bounds.width, (output / placed.duration) * bounds.clipWidth - bounds.width / 2),
           );
           expect(bounds.x).toBeCloseTo(expectedX, 1);
         }
@@ -837,7 +771,7 @@ for (const viewport of [
       await unchanged(page, ramp);
     });
 
-    test('a real custom-speed pointer draft disables section tools, chips and source markers; Escape restores without a save', async ({
+    test('a real custom-speed pointer draft disables section navigation, chips and source markers; Escape restores without a save', async ({
       page,
     }) => {
       const document = await fixture(page, (document) => {
@@ -856,10 +790,8 @@ for (const viewport of [
         'data-drafting',
         'true',
       );
-      for (const section of ['Speed', 'Transform'] as const) {
-        await expect(animate(page, section)).toBeDisabled();
+      for (const section of ['Speed', 'Transform'] as const)
         await expect(navigation(page, section, 'Next')).toBeDisabled();
-      }
       await expect(diamond(page, 'Speed')).toBeDisabled();
       for (const direction of ['Previous', 'Next'] as const)
         await expect(channelNavigation(page, 'Speed', direction)).toHaveAttribute('aria-disabled', 'true');
@@ -867,7 +799,6 @@ for (const viewport of [
       await expect(marker(page, 'transform', 60)).toBeDisabled();
       // A synthetic tab click cannot end or move the captured real pointer gesture.
       await settingTab(page, 'Exposure');
-      await expect(animate(page, 'Colour')).toBeDisabled();
       await expect(navigation(page, 'Colour', 'Next')).toBeDisabled();
       await expect(diamond(page, 'Exposure')).toBeDisabled();
       for (const direction of ['Previous', 'Next'] as const)
@@ -883,9 +814,9 @@ for (const viewport of [
       await expect(
         page.getByRole('region', { name: 'Clip speed curve editor', exact: true, includeHidden: true }),
       ).toHaveAttribute('data-drafting', 'false');
-      await expect(animate(page, 'Colour')).toBeEnabled();
+      await expect(navigation(page, 'Colour', 'Previous')).toBeEnabled();
       await previewAt(page, document, 15);
-      expect(await preferences(page)).toEqual([null, null, null]);
+      expect(await animatePreferences(page)).toEqual([]);
       await unchanged(page, document);
     });
   });

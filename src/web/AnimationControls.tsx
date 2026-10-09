@@ -1,90 +1,65 @@
-import { useState } from 'react';
+import type { ReactNode } from 'react';
 import { keyframeNeighbors, type KeyframeSetting } from '../shared/keyframes.js';
 import type { VideoLayer } from '../shared/model.js';
 import { Icon } from './icons.js';
 import { keyframeNavigationFrame, keySeekHint, useKeyframeNavigation } from './keyframe-navigation.js';
-import { readPreference, writePreference } from './preferences.js';
 import './animation-controls.css';
 
-export type AnimationSection = 'colour' | 'speed' | 'transform';
-
-/** Presentation only: hiding animation tools never changes bases or stored keys. */
-export function useAnimationTools(section: AnimationSection, context: string, animated: boolean) {
-  const initial = () => {
-    const saved = readPreference(`pascap-animate-${section}`);
-    return saved === null ? animated : saved === 'on';
-  };
-  const [state, setState] = useState(() => ({ context, enabled: initial(), warning: false }));
-  let current = state;
-  if (state.context !== context) {
-    current = { context, enabled: initial(), warning: false };
-    setState(current);
-  }
-  return {
-    ...current,
-    toggle: () => {
-      const enabled = !current.enabled;
-      const warning = !writePreference(`pascap-animate-${section}`, enabled ? 'on' : 'off');
-      setState({ context, enabled, warning });
-    },
-  };
-}
-
-export function AnimationControls({
+/** Previous/Next over the keyframes a section header counts. */
+export function KeyframeSteps({
   label,
-  enabled,
   disabled,
-  onToggle,
   previous,
   next,
   onPrevious,
   onNext,
 }: Readonly<{
   label: string;
-  enabled: boolean;
   disabled: boolean;
-  onToggle: () => void;
   previous: boolean;
   next: boolean;
   onPrevious: () => void;
   onNext: () => void;
 }>) {
   return (
-    <div className="section-animation-controls">
+    <span className="section-keyframe-steps">
       <button
         type="button"
-        className="text-button section-animate"
-        aria-label={`Animate ${label}`}
-        aria-pressed={enabled}
-        disabled={disabled}
-        onClick={onToggle}
-        title="Show or hide animation tools; existing keyframes keep applying"
+        className="icon-button"
+        aria-label={`Previous ${label} keyframe`}
+        disabled={disabled || !previous}
+        onClick={onPrevious}
       >
-        <Icon name="curve" size={13} />
-        Animate
+        <Icon name="back" size={14} />
       </button>
-      {enabled && (
-        <>
-          <button
-            type="button"
-            className="icon-button"
-            aria-label={`Previous ${label} keyframe`}
-            disabled={disabled || !previous}
-            onClick={onPrevious}
-          >
-            <Icon name="back" size={14} />
-          </button>
-          <button
-            type="button"
-            className="icon-button"
-            aria-label={`Next ${label} keyframe`}
-            disabled={disabled || !next}
-            onClick={onNext}
-          >
-            <Icon name="forward" size={14} />
-          </button>
-        </>
-      )}
+      <button
+        type="button"
+        className="icon-button"
+        aria-label={`Next ${label} keyframe`}
+        disabled={disabled || !next}
+        onClick={onNext}
+      >
+        <Icon name="forward" size={14} />
+      </button>
+    </span>
+  );
+}
+
+export function keyframeCount(count: number): string {
+  return `${count} ${count === 1 ? 'keyframe' : 'keyframes'}`;
+}
+
+/** The expanded section's keyframe line: count, Previous/Next and the section's keyframe reset. */
+export function KeyframeLine({
+  count,
+  children,
+  ...steps
+}: Readonly<Parameters<typeof KeyframeSteps>[0] & { count: number; children?: ReactNode }>) {
+  return (
+    <div className="section-keyframe-line">
+      <span className="section-keyframe-count">{keyframeCount(count)}</span>
+      <KeyframeSteps {...steps} />
+      {children}
     </div>
   );
 }
@@ -94,25 +69,24 @@ export function TrackAnimationControls({
   layer,
   frame,
   settings,
-  tools,
   disabled,
+  children,
 }: Readonly<{
   label: string;
   layer: VideoLayer;
   frame: number;
   settings: readonly KeyframeSetting[];
-  tools: ReturnType<typeof useAnimationTools>;
   disabled: boolean;
+  children?: ReactNode;
 }>) {
   const navigation = useKeyframeNavigation();
   const keys = layer.keyframes.filter((key) => settings.some((setting) => key.values[setting] !== null));
   const { previous, next } = keyframeNeighbors(keys, keyframeNavigationFrame(navigation.inspection, layer.id, frame));
   return (
-    <AnimationControls
+    <KeyframeLine
       label={label}
-      enabled={tools.enabled}
+      count={keys.length}
       disabled={disabled || navigation.disabled}
-      onToggle={tools.toggle}
       previous={!!previous}
       next={!!next}
       onPrevious={() => {
@@ -121,7 +95,9 @@ export function TrackAnimationControls({
       onNext={() => {
         if (next) navigation.onSeekKeyframe(layer.id, next.frame);
       }}
-    />
+    >
+      {children}
+    </KeyframeLine>
   );
 }
 

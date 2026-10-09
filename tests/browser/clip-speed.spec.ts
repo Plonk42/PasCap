@@ -202,9 +202,7 @@ test('point click, source-boundary navigation and Add/Delete are explicit and re
     await arrow.evaluate((element) => (element as HTMLButtonElement).click());
   }
   await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(60);
-  const next = page
-    .locator('.section-animation-controls')
-    .getByRole('button', { name: 'Next Speed keyframe', exact: true });
+  const next = page.locator('.section-keyframe-line').getByRole('button', { name: 'Next Speed keyframe', exact: true });
   await next.click();
   await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(90);
   await next.click();

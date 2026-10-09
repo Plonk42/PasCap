@@ -15,7 +15,7 @@
 .inspector-section-content > .spatial-editor {
   padding: 0 14px 13px;
 }
-.spatial-tools > span {
+.spatial-tools > .section-keyframe-count {
   flex: 1;
   font-size: 12px;
 }

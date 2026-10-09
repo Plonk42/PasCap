@@ -194,8 +194,7 @@ Each clip has independent constant/ramp/custom speed and spatial settings.
 All static and keyed Colour belongs to its video track, not the clip.
 **Opacity** is one setting for the selected **whole video track**, not a clip.
 Find its single native slider/exact numeric field in **Track → Colour**, with its
-capture diamond and adjacent per-setting Previous/Next buttons when Animate Colour
-is on, alongside Temperature, Tint, Exposure,
+capture diamond and adjacent per-setting Previous/Next buttons, alongside Temperature, Tint, Exposure,
 Brightness, Contrast, Hue, Saturation,
 Highlights and Shadows.
 Main and stored sliders/exact fields use **0–100%**, neutral **100%**.
@@ -206,7 +205,7 @@ clip, including both sources in a dissolve. Removing its final keyed setting rev
 the unchanged saved track value. There is no saved clip opacity, additional track
 multiplier or duplicate sidebar control/navigation.
 Static and keyed colour controls edit the same video track, including on empty tracks.
-All clips on that track share the treatment; different looks require different tracks. Opacity shares their
+All clips on that track share the treatment; different looks require different tracks. With several clips on the track, Colour shows **Grades all N clips on …** with **Move clip to its own track**; the clip's right-click menu offers **Move to new track**. Both are one Undo step and keep the clip's start. Opacity shares their
 UI treatment, but controls composition coverage, not the SDR RGB grade.
 **Clip → Placement** contains placement only. Sliders never create implicit keyframes;
 an animated setting that is not enabled at the real playhead is read-only until
@@ -219,19 +218,12 @@ there is no optical-flow synthesis.
 Speed changes output duration: Ripple-on tracks re-sequence, off keeps independent starts,
 and incompatible fades/transitions/overlaps reject the edit rather than being shrunk.
 
-### Show animation controls
+### Animation controls
 
-Colour, Speed and Transform each have a native **Animate** toggle. It is a
-presentation-only browser-local preference per section, not an animation bypass.
-Without a stored choice, unanimated sections start off and sections with existing
-keyframes start on. Turning it off retains all keyframes, rendering, read-only constraints
-and Undo history, without a project save or Undo step. Main arrows and diamonds
-are hidden; schema and stored data do not change.
+Colour, Speed and Transform always show their capture diamonds and adjacent per-setting **Previous/Next** buttons while the section is expanded; there is no Animate toggle and no stored preference. Each expanded section has one keyframe line with the **number of keyframes**, one **Previous/Next** pair over the same set and **Reset keyframes**. The line is hidden while the section is collapsed; the title row and its help stay reachable. Rendering, retained keyframes and read-only constraints never depend on what is shown.
 
-Turn Animate on to see main Colour/Opacity or track Speed capture diamonds with
-adjacent per-setting **Previous/Next** buttons to find keyframes for that setting:
-not every setting is enabled at every shared keyframe. Each section header also
-retains its single **Previous/Next** pair. Colour visits any Opacity or scalar
+The capture diamonds and their adjacent per-setting **Previous/Next** buttons find keyframes for that setting:
+not every setting is enabled at every shared keyframe. Each section's keyframe line counts the keyframes its single **Previous/Next** pair visits. Colour visits any Opacity or scalar
 colour keyframe, skipping
 speed-only keyframes. Speed visits track Speed keyframes plus **all retained custom
 speed source keyframes of the selected clip**, including off-trim keyframes and the
@@ -260,8 +252,7 @@ runs in linear RGB before Exposure; it preserves neutral-white linear luminance
 before clipping only, not final brightness or arbitrary coloured pixels.
 
 Sliders, exact fields and double-click-the-name reset to 0 use the same main/stored
-control rules as other scalar Colour settings. Main diamonds need Animate Colour
-on, with adjacent per-setting Previous/Next buttons; its header visits the
+control rules as other scalar Colour settings. Main diamonds come with adjacent per-setting Previous/Next buttons; its header visits the
 colour/Opacity union, while main and stored-setting chip arrows visit individual
 channels. Without keyframes, edit the track base even on an empty
 track; every clip on that track adopts it. With
@@ -297,7 +288,7 @@ the editor with a fresh preview engine resets to normal graded preview.
 
 ### Precise clip speed curves
 
-Select the clip, open **Clip → Speed**, turn Animate on and choose **Custom curve**.
+Select the clip, open **Clip → Speed** and choose **Custom curve**.
 Start from **Flat / Accelerate / Decelerate / Slow centre / Fast centre**, then edit any keyframe.
 These keyframes belong only to the selected clip, not to every clip in its video track.
 
@@ -308,7 +299,7 @@ These keyframes belong only to the selected clip, not to every clip in its video
   a slider with a field retaining the decimal precision you enter. Enter/blur applies,
   Escape restores.
 - Click the graph background or a keyframe to seek, then **Add keyframe** at an unkeyed
-  displayed source frame. The Animate-on Speed header's Previous/Next pair visits
+  displayed source frame. The Speed Previous/Next pair visits
   all retained clip source keyframes alongside track Speed keyframes; the selector
   also reaches off-trim and original-exclusive-OUT keyframes. Each previews the
   nearest mapped image, with a separate stored-source selection that can advance
@@ -341,8 +332,7 @@ stay below 1; opposite crops that meet or cross simply display nothing. Cropping
 recentres the retained image. Uncovered pixels from nonneutral transforms reveal
 lower tracks; exact neutral poses retain the old opaque black letterbox.
 
-- Without keyframes, values edit this clip's saved base. Turn Animate Transform on
-  and click a setting's own diamond (for example **Keyframe Scale**) to capture that
+- Without keyframes, values edit this clip's saved base. Click's own diamond (for example **Keyframe Scale**) to capture that
   setting's evaluated value at the real displayed integer source frame; other settings
   stay unkeyed, or join the same keyframe with their own diamond. A keyed setting
   is read-only at a source frame without its keyframe until captured; sliders
@@ -382,7 +372,7 @@ Details: [spatial transforms](design/SPATIAL_TRANSFORMS.md).
 
 ### Seek clip source keyframes from the timeline
 
-Inside each clip rectangle, pale-blue **◆** Transform and salmon/dashed **◆**
+Inside each clip rectangle, boxed blue **▼** Transform and salmon/dashed **◆**
 custom-speed lanes distinguish source keyframes from shared project-time track markers.
 Positions follow authoritative retiming, including track Speed overrides, which
 are indicated without deleting clip keyframes. Off-trim keyframes are omitted. An
@@ -407,7 +397,7 @@ Opacity (`opacity`), Speed and the nine scalar colour controls, including
 Temperature and Tint. HSL/curves remain static. At most 256
 shared keyframes are allowed per video track.
 
-- With its section's Animate on, each main setting has a **hollow ◇ / filled ◆ diamond**
+- Each main setting has a **hollow ◇ / filled ◆ diamond**
   with adjacent per-setting **Previous/Next** buttons.
   Hollow means inactive but
   clickable. Click at the **real playhead** to capture/join that setting; click filled
@@ -417,15 +407,13 @@ shared keyframes are allowed per video track.
   unkeyed speed edits the selected clip. There is no per-clip colour setting.
   Moving clips uses destination track bases/keyframes/Opacity without changing either track.
   Once a channel is animated, its value is
-  read-only where it is not enabled, even with Animate off: turn Animate on and
-  click the hollow diamond first.
+  read-only where it is not enabled, shown dimmed with a lock cue: click the hollow diamond first.
   Removing its final keyed setting reveals its existing unkeyed value, not a
   new default or the removed keyframe's value.
 - Each keyframe shares an easing, but every channel interpolates to its **own next
   keyframe with that setting enabled**, skipping unrelated settings; its endpoints hold outside
   that interval. A single keyframe therefore overrides that channel across the track.
-- The per-channel native **Previous/Next** arrows beside main diamonds when Animate
-  is on and on enabled setting chips in stored Keyframes rows visit only that
+- The per-channel native **Previous/Next** arrows beside main diamonds and on enabled setting chips in stored Keyframes rows visit only that
   channel's strictly earlier/later keyframes where it is nonnull, including zero-valued
   ones. They are disabled without a neighbour/project or during a document draft.
   Section-header arrows retain their unions above.
@@ -589,9 +577,7 @@ Enter/blur, Escape restores, and invalid text remains editable. Numeric values r
 full entered precision, independent of slider steps, without clamping or rounding.
 Colour/Opacity/Transform, playback rates and gain use a native slider with one adjacent exact
 numeric field in both main and stored controls, not read-only outputs or number-only
-layouts. Pointer sliding updates only the local control value; the image updates
-on release after one validated edit. Escape, pointer cancellation, lost capture or
-window blur restores the starting value without save/history. Each keyboard slider
+layouts. Dragging a Colour, Opacity or HSL slider (main or stored) previews the draft value in the image, coalesced to the display rate, without any document, history, autosave or Inspector change, and without restarting music. Release commits one validated edit and one Undo step. Escape, pointer cancellation, lost capture, window blur or an invalid value restores the control and the preview. Other sliders (Transform, speed, gain) keep their release-only image update. Each keyboard slider
 adjustment is an individual validated edit. **Clip → Range** uses the full-original
 bar and exact timecode text fields described above. Other integer source/timeline
 frames, durations and fades retain exact native numeric steppers and timecode

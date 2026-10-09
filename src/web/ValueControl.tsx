@@ -8,6 +8,8 @@ export interface ValueControlProps extends Omit<NumberFieldProps, 'min' | 'max' 
   max: number;
   step: number;
   unit?: string;
+  /** The valid value being dragged, or null when no pointer gesture is previewing. Never a commit. */
+  onDraft?: (value: number | null) => void;
 }
 
 export interface ValueControlContext {
@@ -251,6 +253,21 @@ export function ValueControl(props: Readonly<ValueControlProps>) {
       capture.current = null;
       active?.dispose();
       if (active?.element.hasPointerCapture(active.id)) active.element.releasePointerCapture(active.id);
+    },
+    [],
+  );
+
+  const previewing = state.pointer !== null && !state.pointer.cancelled && state.error === null;
+  const draftValue = previewing && state.draft !== props.value ? state.draft : null;
+  const previewed = useRef(false);
+  useEffect(() => {
+    if (draftValue === null && !previewed.current) return;
+    previewed.current = draftValue !== null;
+    latest.current.props.onDraft?.(draftValue);
+  }, [draftValue]);
+  useEffect(
+    () => () => {
+      if (previewed.current) latest.current.props.onDraft?.(null);
     },
     [],
   );

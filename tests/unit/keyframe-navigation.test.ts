@@ -502,13 +502,12 @@ describe('main diamonds with per-setting arrows and stored-channel navigation', 
     const chips = [...inspector.matchAll(/<span class="layer-keyframe-chip"[\s\S]*?<\/button><\/span><\/span>/g)];
     expect(chips).toHaveLength(interleaved.length);
     for (const [markup] of chips) expect(buttons(markup)).toHaveLength(2);
-    const sections = [...inspector.matchAll(/<div class="section-animation-controls">[\s\S]*?<\/div>/g)];
+    const sections = [...inspector.matchAll(/<div class="[^"]*section-keyframe-line">[\s\S]*?<\/div>/g)];
     expect(sections).toHaveLength(3);
+    expect(inspector).not.toContain('Animate ');
     for (const label of ['Colour', 'Speed', 'Transform']) {
-      expect(inspector.split(`aria-label="Animate ${label}"`)).toHaveLength(2);
-      const section = sections.find(([markup]) => markup.includes(`aria-label="Animate ${label}"`))![0];
-      expect(buttons(section)).toHaveLength(3);
-      expect(section).toContain('aria-pressed="true"');
+      const section = sections.find(([markup]) => markup.includes(`aria-label="Next ${label} keyframe"`))![0];
+      expect(section).toMatch(/\d+ keyframes?/);
       for (const direction of ['Previous', 'Next'])
         expect(section.split(`aria-label="${direction} ${label} keyframe"`)).toHaveLength(2);
     }
@@ -568,17 +567,15 @@ describe('Colour section union navigation', () => {
           frame,
           settings,
           disabled: false,
-          tools: { context: 'union', enabled: true, warning: false, toggle: vi.fn() },
         }),
       ),
     );
     const controls = buttons(markup);
-    expect(controls).toHaveLength(3);
-    expect(controls[0]).toContain('aria-label="Animate Colour"');
-    expect(controls[0]).toContain('aria-pressed="true"');
-    expect(controls[1]).toContain('aria-label="Previous Colour keyframe"');
-    expect(controls[2]).toContain('aria-label="Next Colour keyframe"');
-    expect(controls[1]!.includes('disabled=""')).toBe(expected.previous === null);
-    expect(controls[2]!.includes('disabled=""')).toBe(expected.next === null);
+    expect(controls).toHaveLength(2);
+    expect(markup).toContain('3 keyframes');
+    expect(controls[0]).toContain('aria-label="Previous Colour keyframe"');
+    expect(controls[1]).toContain('aria-label="Next Colour keyframe"');
+    expect(controls[0]!.includes('disabled=""')).toBe(expected.previous === null);
+    expect(controls[1]!.includes('disabled=""')).toBe(expected.next === null);
   });
 });

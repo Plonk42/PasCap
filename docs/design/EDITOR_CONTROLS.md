@@ -9,21 +9,21 @@ full-original range bar; other frame/duration/fade fields retain numeric stepper
 
 ### Current control inventory
 
-| Area                          | Control                                                                                                                       | Contract                                                                                                      |
-| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| Colour / Opacity              | Native slider and exact field in main/stored editors                                                                          | Opacity UI 0–100%, neutral 100%; stored track/keyframe values remain 0–1                                      |
-| Speed                         | Constant, ramp, custom-keyframe and track rates                                                                               | Bounded slider/exact-value pattern; retain presets and curve graph                                            |
-| Transform                     | Eight clip pose sliders/exact fields, each with its own diamond and Previous/Next, stored source-keyframe selector/navigation | Explicit per-setting source-frame capture; retain off-trim keyframes and distinguish stored time from preview |
-| Audio                         | Music track / Recording selects, Add music track, selected-track trash and gain slider                                        | Independent identified tracks; exact gain draft; import never implicitly places                               |
-| Clip Range                    | One full-original hatched range bar with draggable IN/OUT; exact text fields below its ends                                   | Display 30 fps NDF timecode; accept whole original frames or timecode                                         |
-| Other frames, duration, fades | Integer timing needs exact entry and contextual validation                                                                    | Retain native numeric steppers and timecode feedback, not arbitrary slider limits                             |
-| Slider gestures               | Transient local pointer draft                                                                                                 | One validated edit on release; cancellation restores; keyboard edits stay individual                          |
-| Keyframe / music deletion     | Trash action with accessible name                                                                                             | Delete the identified keyframe/track; × only closes/dismisses                                                 |
-| Inspector / viewer tabs       | Consistent native-button appearance                                                                                           | Retain existing keyboard navigation and mounted drafts                                                        |
-| Keyframes                     | Tab owns its title; toolbar owns navigation/help                                                                              | Keep its accessible name; no repeated visible toolbar title                                                   |
-| Import actions                | Folder/plus icons with explanatory text                                                                                       | Deliberate import; no implicit music placement                                                                |
-| Track options / Timeline      | Visibility, Ripple, stacking and frequent clip actions already have native controls/icons                                     | Keep their locations; Duplicate is in the clip context menu; zoom has slider, Fit and Zoom out/in buttons     |
-| Help / disclosures / options  | Question-mark help and top-layer options are already consistent                                                               | Keep those components and browser preferences                                                                 |
+| Area                          | Control                                                                                                                       | Contract                                                                                                                             |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| Colour / Opacity              | Native slider and exact field in main/stored editors                                                                          | Opacity UI 0–100%, neutral 100%; stored track/keyframe values remain 0–1                                                             |
+| Speed                         | Constant, ramp, custom-keyframe and track rates                                                                               | Bounded slider/exact-value pattern; retain presets and curve graph                                                                   |
+| Transform                     | Eight clip pose sliders/exact fields, each with its own diamond and Previous/Next, stored source-keyframe selector/navigation | Explicit per-setting source-frame capture; retain off-trim keyframes and distinguish stored time from preview                        |
+| Audio                         | Music track / Recording selects, Add music track, selected-track trash and gain slider                                        | Independent identified tracks; exact gain draft; import never implicitly places                                                      |
+| Clip Range                    | One full-original hatched range bar with draggable IN/OUT; exact text fields below its ends                                   | Display 30 fps NDF timecode; accept whole original frames or timecode                                                                |
+| Other frames, duration, fades | Integer timing needs exact entry and contextual validation                                                                    | Retain native numeric steppers and timecode feedback, not arbitrary slider limits                                                    |
+| Slider gestures               | Transient local pointer draft; Colour/Opacity/HSL also preview it in the image                                                | One validated edit on release; cancellation restores control and preview; keyboard edits stay individual                             |
+| Keyframe / music deletion     | Trash action with accessible name                                                                                             | Delete the identified keyframe/track; × only closes/dismisses                                                                        |
+| Inspector / viewer tabs       | Consistent native-button appearance                                                                                           | Retain existing keyboard navigation and mounted drafts                                                                               |
+| Keyframes                     | Tab owns its title; toolbar owns navigation/help                                                                              | Keep its accessible name; no repeated visible toolbar title                                                                          |
+| Import actions                | Folder/plus icons with explanatory text                                                                                       | Deliberate import; no implicit music placement                                                                                       |
+| Track options / Timeline      | Visibility, Ripple, stacking and frequent clip actions already have native controls/icons                                     | Keep their locations; Duplicate and **Move to new track** are in the clip context menu; zoom has slider, Fit and Zoom out/in buttons |
+| Help / disclosures / options  | Question-mark help and top-layer options are already consistent                                                               | Keep those components and browser preferences                                                                                        |
 
 The icon module already supplies a broad SVG set; it does not need replacing.
 The browser preference identifier for Placement remains unchanged deliberately.
@@ -62,18 +62,14 @@ and technical paths stay unchanged; this glossary does not change schema 12.
 - **Temperature / Tint** are track-owned normalized −1…1 scalar Colour controls,
   neutral 0: positive Temperature warms, positive Tint adds magenta. They precede
   Exposure, are independently animatable and work on empty tracks, with the standard
-  slider/exact-field/reset pattern, capture diamonds when Colour Animate is on,
+  slider/exact-field/reset pattern, capture diamonds,
   adjacent per-setting Previous/Next buttons, section navigation and stored-setting
   chip arrows. No Kelvin or AWB label.
 - **Transform** is clip-owned crop, Scale, Translate X/Y and Rotation; its single
   diamond captures the full eight-value source-frame pose, not an enabled track setting.
-- **Animate**: a native presentation toggle in Colour, Speed and Transform,
-  accessible as **Animate Colour**, **Animate Speed** and **Animate Transform**.
-  Each section has its own browser-local preference. With no stored choice, an
-  unanimated section starts off and a section with existing keyframes starts on.
-  Turning it off hides main diamonds and their adjacent per-setting arrows while
-  retaining all keyframes, rendering, read-only constraints and history;
-  it creates no project save or Undo step and changes no schema or stored data.
+- **Keyframe line**: the first row of an expanded Colour, Speed or Transform section: **N keyframes**, one
+  **Previous/Next** pair over the same set and **Reset keyframes**. It is hidden while the section is collapsed.
+  There is no Animate toggle or stored preference; capture diamonds and per-setting arrows are always visible.
 - **Easing**: the visible label for track-keyframe, Transform, custom clip-speed
   and ramp selectors. Contextual accessible names remain, including
   **Track keyframe easing N** and **Ramp easing**; interpolation is unchanged.
@@ -101,12 +97,9 @@ and technical paths stay unchanged; this glossary does not change schema 12.
 - Other frames/durations/fades: native numeric stepper, explicit frame units and existing
   timecode feedback. No clamping, rounding or hidden timing repair.
 - Easing/modes/recordings: native select; selected easing has its existing graph.
-- Boolean settings: native checkbox. Animate uses a native toggle button with
-  `aria-pressed`. When Animate is on, main scalar
-  Colour/Opacity and track Speed controls expose a capture diamond with
+- Boolean settings: native checkbox. Main scalar Colour/Opacity and track Speed controls expose a capture diamond with
   `aria-pressed` and adjacent per-setting **Previous/Next** buttons, since a shared
-  keyframe need not enable every setting. Colour's single header
-  Previous/Next pair visits the union of Opacity and nine scalar keyframes, skipping
+  keyframe need not enable every setting. Colour's keyframe-line Previous/Next pair visits the union of Opacity and nine scalar keyframes, skipping
   speed-only keyframes. Speed's pair visits track Speed keyframes plus all retained
   custom speed source keyframes of the selected clip, including off-trim keyframes
   and original exclusive OUT, previewing the nearest mapped image through
@@ -120,13 +113,9 @@ and technical paths stay unchanged; this glossary does not change schema 12.
   retain their per-channel native arrows. All main and stored per-channel arrows
   visit strictly earlier/later keyframes where that channel is nonnull (zero is
   enabled), sharing the central off-duration inspection cursor with section
-  navigation to track keyframes and track/list navigation. Main arrows and
-  diamonds are hidden with Animate off; rendering and read-only constraints remain.
-  A read-only animated main value is visibly locked without hover: dimmed slider and
-  field plus a lock cue (**Add a keyframe ◇ to edit**, or **Turn Animate on to edit**
-  with Animate off). Interacting with it never creates a keyframe or edit.
-  Double-clicking a setting's name resets only that setting; sections keep one
-  Reset in their header (Colour, Speed, Transform) and HSL/curves name theirs
+  navigation to track keyframes and track/list navigation. A read-only animated main value is visibly locked without hover: dimmed slider and
+  field plus a lock cue (**Add a keyframe ◇ to edit**). Interacting with it never creates a keyframe or edit.
+  Double-clicking a setting's name resets only that setting; sections keep one Reset in their keyframe line (Colour, Speed, Transform) and HSL/curves name theirs
   **Reset red** / **Reset all**.
 - Tabs: native buttons with one selected appearance and existing arrow/Home/End
   behavior. Disclosures keep mounted drafts; options use the existing Popover.
@@ -150,9 +139,8 @@ in Expand all/Collapse all. **Transform animation** heading help remains reachab
 while collapsed. **Crop left/right/top/bottom / Scale / Translate X/Y / Rotation °**
 pair native sliders with exact fields. Main values edit the base for an unkeyed setting,
 or that setting's key at the real displayed source frame; a keyed setting without a key
-there stays read-only until its own diamond captures it, even with Animate off.
-With Animate on, every setting has its own diamond and **Previous/Next** buttons like
-Colour, plus the single header **Previous/Next** pair. Stored **Source frame / Easing**
+there stays read-only until its own diamond captures it.
+Every setting has its own diamond and **Previous/Next** buttons like Colour, plus the single **Previous/Next** pair in the keyframe line. Stored **Source frame / Easing**
 and the selected key's enabled-setting fields target the selected
 keyframe; the selector and **Preview stored keyframe** seek the closest mapped image, with separate
 stored/actual source labels. Trash removes one keyframe, revealing the saved
@@ -161,7 +149,7 @@ the neutral base. There is no graph/canvas gizmo. Exact
 invalid drafts and release-only sliders follow the common validation/cancellation
 pattern. See [SPATIAL_TRANSFORMS.md](SPATIAL_TRANSFORMS.md).
 
-Inside each timeline clip rectangle, pale-blue **▼** Transform tabs hang from the top edge and salmon/dashed
+Inside each timeline clip rectangle, Transform keys are boxed blue **▼** buttons at the clip's top edge, as visible as the amber Colour markers; the clip label sits below them and salmon/dashed
 **◆** custom-speed lanes show source keyframes at authoritative retimed output positions.
 Off-trim keyframes are omitted; exclusive OUT has a boundary marker that seeks the
 final available frame. Click, Enter or Space selects the clip and seeks its nearest

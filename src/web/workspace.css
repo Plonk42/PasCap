@@ -790,6 +790,11 @@ body {
   justify-content: flex-start;
 }
 
+.clip-context-menu > button[aria-disabled='true'] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .clip-context-menu {
   position: fixed;
   inset: auto;

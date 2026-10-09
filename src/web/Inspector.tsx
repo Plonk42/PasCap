@@ -7,7 +7,7 @@ import type { MediaAsset } from '../shared/media.js';
 import type { ProjectDocument, Transition, VideoClip, VideoLayer } from '../shared/model.js';
 import { calculateLayout, type TimelineLayout } from '../shared/timeline.js';
 import { AdvancedColour } from './AdvancedColour.js';
-import { TrackAnimationControls, useAnimationTools } from './AnimationControls.js';
+import { TrackAnimationControls } from './AnimationControls.js';
 import { ClipSourceRange } from './ClipSourceRange.js';
 import { colourResetCommands } from './colour-reset.js';
 import { shortName, sourceSeconds } from './display.js';
@@ -25,6 +25,8 @@ import { KeyframeToggle } from './KeyframeToggle.js';
 import { clipStartRestriction } from './layer-actions.js';
 import { NumberField } from './NumberField.js';
 import { settingPresentation } from './setting-scope.js';
+import { livePreview } from './live-preview.js';
+import { moveToNewTrack } from './move-to-track.js';
 import { LockedCue, RangeSettingControl } from './SettingValueControl.js';
 import { TransformSection } from './SpatialControls.js';
 import { SpeedControls } from './SpeedControls.js';
@@ -147,7 +149,6 @@ interface LayerControlProps {
   resetKey: string;
   disabled: boolean;
   onEdit: Props['onEdit'];
-  animate?: boolean;
 }
 
 function settingState(layer: VideoLayer, setting: KeyframeSetting, frame: number, baseAvailable: boolean) {
@@ -173,7 +174,6 @@ function OpacityControl({
   disabled,
   onEdit,
   id,
-  animate,
 }: Readonly<LayerControlProps & { id: string }>) {
   const state = settingState(layer, 'opacity', frame, true);
   const value = evaluateLayerSetting(layer, 'opacity', frame, layer.opacity);
@@ -183,13 +183,12 @@ function OpacityControl({
     label: 'Opacity',
     frame,
   });
+  const command = (opacity: number): EditCommand =>
+    state.keyed
+      ? { type: 'layer-key-value', layerId: layer.id, frame, setting: 'opacity', value: opacity }
+      : { type: 'opacity', layerId: layer.id, opacity };
   const commit = (opacity: number): void => {
-    if (disabled || !state.editable) return;
-    if (state.keyed) {
-      onEdit({ type: 'layer-key-value', layerId: layer.id, frame, setting: 'opacity', value: opacity });
-      return;
-    }
-    onEdit({ type: 'opacity', layerId: layer.id, opacity });
+    if (!disabled && state.editable) onEdit(command(opacity));
   };
   return (
     <div className="colour-control layer-keyed-control" data-animated={state.keyed} data-key-at-playhead={state.active}>
@@ -200,22 +199,21 @@ function OpacityControl({
         value={value}
         disabled={disabled || !state.editable}
         onCommit={commit}
+        onDraft={(value) => livePreview(value === null ? null : command(value))}
         hint={hint}
         scope={<SettingScope keyed={state.keyed} scope={scope} />}
-        locked={state.keyed && !state.active && <LockedCue animate={Boolean(animate)} />}
+        locked={state.keyed && !state.active && <LockedCue />}
         exact={{ resetKey: `${resetKey}:opacity:${state.keyed ? 'key' : 'layer'}` }}
         actions={
-          animate && (
-            <KeyframeToggle
-              layer={layer}
-              setting="opacity"
-              label="Opacity"
-              frame={frame}
-              value={value}
-              disabled={disabled}
-              onEdit={onEdit}
-            />
-          )
+          <KeyframeToggle
+            layer={layer}
+            setting="opacity"
+            label="Opacity"
+            frame={frame}
+            value={value}
+            disabled={disabled}
+            onEdit={onEdit}
+          />
         }
       />
     </div>
@@ -233,17 +231,15 @@ function ColourControl({
   control,
   value,
   id,
-  animate,
 }: Readonly<LayerControlProps & { control: ColourControlDefinition; value: number; id: string }>) {
   const state = settingState(layer, control.key, frame, true);
   const { scope, hint } = settingPresentation({ ...state, baseLabel: 'Track', label: control.label, frame });
+  const command = (nextValue: number): EditCommand =>
+    state.keyed
+      ? { type: 'layer-key-value', layerId: layer.id, frame, setting: control.key, value: nextValue }
+      : { type: 'colour', layerId: layer.id, colour: { ...layer.colour, [control.key]: nextValue } };
   const commit = (nextValue: number): void => {
-    if (disabled || !state.editable) return;
-    if (state.keyed) {
-      onEdit({ type: 'layer-key-value', layerId: layer.id, frame, setting: control.key, value: nextValue });
-      return;
-    }
-    onEdit({ type: 'colour', layerId: layer.id, colour: { ...layer.colour, [control.key]: nextValue } });
+    if (!disabled && state.editable) onEdit(command(nextValue));
   };
   return (
     <div className="colour-control layer-keyed-control" data-animated={state.keyed} data-key-at-playhead={state.active}>
@@ -253,22 +249,21 @@ function ColourControl({
         value={value}
         disabled={disabled || !state.editable}
         onCommit={commit}
+        onDraft={(value) => livePreview(value === null ? null : command(value))}
         hint={hint}
         scope={<SettingScope keyed={state.keyed} scope={scope} />}
-        locked={state.keyed && !state.active && <LockedCue animate={Boolean(animate)} />}
+        locked={state.keyed && !state.active && <LockedCue />}
         exact={{ resetKey: `${resetKey}:${control.key}:${state.keyed ? 'key' : 'layer'}` }}
         actions={
-          animate && (
-            <KeyframeToggle
-              layer={layer}
-              setting={control.key}
-              label={control.label}
-              frame={frame}
-              value={value}
-              disabled={disabled}
-              onEdit={onEdit}
-            />
-          )
+          <KeyframeToggle
+            layer={layer}
+            setting={control.key}
+            label={control.label}
+            frame={frame}
+            value={value}
+            disabled={disabled}
+            onEdit={onEdit}
+          />
         }
       />
     </div>
@@ -285,12 +280,19 @@ function ColourSection({
   project,
   onPause,
   onPreview,
-}: Readonly<LayerControlProps & { id: string } & Pick<Props, 'project' | 'onPause' | 'onPreview'>>) {
+  trackClips,
+  clipId,
+}: Readonly<
+  LayerControlProps & { id: string; trackClips: number; clipId: string | null } & Pick<
+      Props,
+      'project' | 'onPause' | 'onPreview'
+    >
+>) {
   const colour = colourAt(layer, frame);
+  const move = clipId ? moveToNewTrack(project, clipId) : null;
   const opacity = evaluateLayerSetting(layer, 'opacity', frame, layer.opacity);
   const animated =
     hasLayerKeys(layer, 'opacity') || COLOUR_CONTROLS.some((control) => hasLayerKeys(layer, control.key));
-  const tools = useAnimationTools('colour', `${project.id}:${layer.id}`, animated);
   const resetCommands = colourResetCommands(layer, frame);
   const adjusted =
     COLOUR_CONTROLS.filter(
@@ -310,16 +312,6 @@ function ColourSection({
       title="Colour"
       icon="colour"
       modified={adjusted > 0 || !isNeutralColour(layer.colour)}
-      actions={
-        <TrackAnimationControls
-          label="Colour"
-          layer={layer}
-          frame={frame}
-          settings={['opacity', ...COLOUR_CONTROLS.map((control) => control.key)]}
-          tools={tools}
-          disabled={disabled}
-        />
-      }
       help={
         <HelpPopover label="Colour animation" guide="colour-speed-and-shared-video-track-keyframes">
           <p>These settings grade every clip on this track. To grade one clip differently, put it on its own track.</p>
@@ -327,7 +319,32 @@ function ColourSection({
         </HelpPopover>
       }
     >
-      <div className="grade-heading">
+      {trackClips > 1 && (
+        <p className="control-hint colour-scope-hint">
+          Grades all {trackClips} clips on {layer.name}
+          {move && 'commands' in move && (
+            <>
+              {' · '}
+              <button
+                type="button"
+                className="text-button"
+                disabled={disabled}
+                title="Colour belongs to the track: move the selected clip to a new track to grade it differently"
+                onClick={() => onEdit(move.commands)}
+              >
+                Move clip to its own track
+              </button>
+            </>
+          )}
+        </p>
+      )}
+      <TrackAnimationControls
+        label="Colour"
+        layer={layer}
+        frame={frame}
+        settings={['opacity', ...COLOUR_CONTROLS.map((control) => control.key)]}
+        disabled={disabled}
+      >
         <button
           type="button"
           className="text-button"
@@ -339,15 +356,9 @@ function ColourSection({
           <Icon name="reset" size={13} />
           {animated ? 'Reset keyframes' : 'Reset'}
         </button>
-      </div>
-      {tools.warning && (
-        <p className="control-hint">
-          Animation tools cannot be saved in this browser; the choice remains available for this session.
-        </p>
-      )}
+      </TrackAnimationControls>
       <div className="colour-controls">
         <OpacityControl
-          animate={tools.enabled}
           layer={layer}
           frame={frame}
           resetKey={resetKey}
@@ -357,7 +368,6 @@ function ColourSection({
         />
         {COLOUR_CONTROLS.map((control) => (
           <ColourControl
-            animate={tools.enabled}
             key={control.key}
             layer={layer}
             frame={frame}
@@ -872,6 +882,8 @@ export function Inspector({
                 disabled={drafting}
                 onEdit={onEdit}
                 id={colourControlId}
+                trackClips={trackClips.length}
+                clipId={clip?.id ?? null}
               />
               <InspectorSection
                 id="keyframes"

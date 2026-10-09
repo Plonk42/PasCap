@@ -20,6 +20,7 @@ interface RangeSettingProps {
   actions?: ReactNode;
   resetKey?: NumberFieldProps['resetKey'];
   validate?: NumberFieldProps['validate'];
+  onDraft?: ValueControlProps['onDraft'];
   exact?: Pick<NumberFieldProps, 'resetKey' | 'validate'>;
 }
 
@@ -41,11 +42,11 @@ export function ResetLabel({
 }
 
 /** Visible without hover: an animated value without a keyframe here is read-only until its diamond captures one. */
-export function LockedCue({ animate }: Readonly<{ animate: boolean }>) {
+export function LockedCue() {
   return (
     <small className="setting-locked-cue" aria-hidden="true">
       <Icon name="lock" size={11} />
-      {animate ? 'Add a keyframe ◇ to edit' : 'Turn Animate on to edit'}
+      Add a keyframe ◇ to edit
     </small>
   );
 }
@@ -64,6 +65,7 @@ export function RangeSettingControl({
   actions,
   resetKey,
   validate,
+  onDraft,
   exact,
 }: Readonly<RangeSettingProps>) {
   const definition = KEYFRAME_SETTINGS.find((item) => item.key === setting)!;
@@ -103,6 +105,7 @@ export function RangeSettingControl({
         {...(fieldValidation === undefined ? {} : { validate: (next: number) => fieldValidation(next / scale) })}
         unit={setting === 'opacity' ? '%' : (colour?.unit ?? '')}
         onCommit={(next) => onCommit(next / scale)}
+        {...(onDraft === undefined ? {} : { onDraft: (next) => onDraft(next === null ? null : next / scale) })}
       />
       <span id={`${id}-hint`} className="declutter-sr-only">
         {exactHint}

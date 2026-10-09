@@ -50,6 +50,7 @@ import {
   type KeyframeInspection,
 } from './keyframe-navigation.js';
 import { clipStartRestriction } from './layer-actions.js';
+import { registerLivePreview } from './live-preview.js';
 import { MediaLibrary, type ImportResult, type ReviewTarget } from './MediaLibrary.js';
 import { MusicControls } from './MusicControls.js';
 import { Popover } from './Popover.js';
@@ -640,6 +641,28 @@ export function App() {
     },
     [edit],
   );
+  // Slider drags show their value in the preview only: no document, history, autosave or Inspector change.
+  const livePending = useRef<{ command: EditCommand | null } | null>(null);
+  const liveFrame = useRef<number | null>(null);
+  const previewLive = useCallback((command: EditCommand | null): void => {
+    livePending.current = { command };
+    if (liveFrame.current !== null) return;
+    liveFrame.current = requestAnimationFrame(() => {
+      liveFrame.current = null;
+      const request = livePending.current;
+      livePending.current = null;
+      const document = current.current;
+      const preview = engine.current;
+      if (!request || !document || !preview || drafting.current) return;
+      try {
+        preview.updateProjectAppearance(request.command ? applyCommand(document, request.command) : document);
+      } catch {
+        // An invalid or timing-changing value is not previewed; the committed project stays shown.
+        preview.updateProjectAppearance(document);
+      }
+    });
+  }, []);
+  useEffect(() => registerLivePreview(previewLive), [previewLive]);
   const previewDraft = useCallback((next: DraftPreview | null, frame?: number): void => {
     if (next) setKeyframeInspection(null);
     if (next && !drafting.current) restoreFrame.current = engine.current?.diagnostics().frame ?? 0;

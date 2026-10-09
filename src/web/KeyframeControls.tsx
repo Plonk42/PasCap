@@ -10,6 +10,7 @@ import { HelpPopover } from './HelpPopover.js';
 import { Icon } from './icons.js';
 import { keyframeNavigationFrame, keySeekHint, useKeyframeNavigation } from './keyframe-navigation.js';
 import './layer-keyframes.css';
+import { livePreview } from './live-preview.js';
 import { NumberField } from './NumberField.js';
 import { RangeSettingControl, ResetLabel, SpeedRateField } from './SettingValueControl.js';
 
@@ -291,6 +292,7 @@ function KeyframePointRow({
                       hint={hint}
                       exact={{ resetKey, validate }}
                       onCommit={onCommit}
+                      onDraft={(next) => livePreview(next === null ? null : command(next))}
                     />
                   )}
                 </div>
@@ -392,9 +394,7 @@ export function KeyframeControls({
               <span aria-hidden="true">◆</span>Keyframe at playhead · editable
             </span>
           </div>
-          <p className="editor-help-tip">
-            Tip: Animate reveals diamonds and arrows; drag a timeline keyframe to move all its settings.
-          </p>
+          <p className="editor-help-tip">Tip: drag a timeline keyframe to move all its settings.</p>
         </HelpPopover>
       </div>
 

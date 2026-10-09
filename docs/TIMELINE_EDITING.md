@@ -292,6 +292,9 @@ and undoable, and never move music, other tracks or absolute track keyframes.
   new cut boundaries. Ripple-off duplicates start immediately
   after the original's contextual end and acquire their own contextual duration;
   occupied placement is rejected atomically.
+- **Move to new track** (the same menu) creates a video track and moves the clip there in one Undo step,
+  keeping its start and order; the new track has neutral Colour and Opacity 1, since Colour is track-owned. It is
+  unavailable when the clip is alone on its track or eight tracks exist.
 - **Trim/cut/move/split/duplicate never copy or shift track keyframes.** Track Ripple
   leaves their project times fixed. Moving between tracks leaves both tracks' keyframes
   and saved Opacity values intact, using the destination track value or curve;
@@ -329,14 +332,7 @@ value for Opacity, track colour for colour, and individual clip speed for Speed.
 The selected video track, including an empty one, has one **Track → Keyframes** section
 (list accessible name **Track keyframes**) with its directly visible shared keyframe list. Clip keeps
 the playhead Speed and Transform controls; Track keeps Colour and Opacity.
-Colour, Speed and Transform each have a native **Animate** toggle, a separate
-presentation-only browser-local preference. Without a stored choice, unanimated
-sections start off and existing keyframes start on. Turning it off retains all keyframes,
-rendering, read-only constraints and history without a project save or Undo step;
-no schema or data changes result. Main scalar Colour/Opacity and track Speed
-diamonds and adjacent per-setting **Previous/Next** buttons appear only when their
-section's Animate is on; Animate off hides both while retaining rendering and
-read-only constraints. Each diamond is clickable hollow/inactive or filled/active with
+Colour, Speed and Transform always show their capture diamonds and adjacent per-setting **Previous/Next** buttons while the section is expanded; there is no Animate toggle and no stored preference. Each expanded section has one keyframe line with the **number of keyframes**, one **Previous/Next** pair over the same set and **Reset keyframes**. The line is hidden while the section is collapsed; the title row and its help stay reachable. Rendering, retained keyframes and read-only constraints never depend on what is shown. Each diamond is clickable hollow/inactive or filled/active with
 `aria-pressed`; inactive is not HTML-disabled. Toggling affects only that channel;
 the first enabled setting creates/last removes the keyframe. Animated values are read-only
 between keyframes with that setting enabled until explicitly captured with the diamond; no slider
@@ -380,7 +376,7 @@ keyed Speed settings may naturally recompile contextual clip durations.
 
 ### Clip source-keyframe markers
 
-Inside each timeline clip rectangle, Transform keyframes use a pale-blue **◆** lane
+Inside each timeline clip rectangle, Transform keyframes use a boxed blue **▼** button lane
 and custom-speed keyframes a separate salmon/dashed **◆** lane. Marker output positions
 come from authoritative `PlacedClip.retiming`, including track Speed overrides.
 Off-trim keyframes are omitted; exclusive OUT has a boundary marker that seeks the
@@ -391,7 +387,7 @@ shortcuts. These are not the draggable shared project-time track markers above.
 
 ### Channel navigation and off-duration inspection
 
-With Animate on, each section header has one native **Previous/Next** pair.
+Each section's keyframe line has one native **Previous/Next** pair, beside the keyframe count it visits.
 Colour visits the union of Opacity and nine scalar keyframes, skipping speed-only
 keyframes. Speed visits track Speed keyframes plus all retained custom speed source
 keyframes of the selected clip, including off-trim keyframes and original exclusive
@@ -404,15 +400,13 @@ several preview the same first/last image. Stored time never replaces the real
 displayed project/source frame for main values or capture. Timeline source markers
 still omit off-trim keyframes and retain the exclusive-OUT boundary marker.
 
-Per-channel native **Previous/Next** arrows remain beside each main diamond when
-Animate is on, because not every setting is enabled at every shared keyframe.
+Per-channel native **Previous/Next** arrows remain beside each main diamond, because not every setting is enabled at every shared keyframe.
 Enabled setting chips in stored Keyframes rows retain their arrows too.
 All these per-channel arrows are disabled without the relevant neighbour, an opened
 project, or during any document-preview draft. They seek
 strictly earlier/later keyframes where that channel is not `null` (zero included),
 skipping unrelated enabled settings. **Track → Colour** contains the single **Opacity**
-slider/exact `NumberField` alongside the colour controls, its Animate-on diamond
-and adjacent per-setting arrows.
+slider/exact `NumberField` alongside the colour controls, its diamond and adjacent per-setting arrows.
 Main and stored sliders/exact fields use **0–100%**, neutral **100%**.
 Required track `opacity` and keyframe values remain **0–1**; UI conversion changes no schema.
 Its main and stored-chip arrows visit keyframes with `opacity` enabled; the Colour header
@@ -605,9 +599,7 @@ Panels are resizable/collapsible with browser-local layout persistence; source
 review occupies a docked viewer tab rather than covering the workspace. Main and
 stored Colour/Opacity/Transform values, playback rates and gain share native sliders with
 adjacent exact `NumberField` controls, not read-only outputs or number-only layouts.
-Pointer sliding changes only a local control draft; release applies one validated
-document edit and updates the image. Escape, pointer cancellation, lost capture or
-window blur restores the starting value without save/history. Each keyboard slider
+Dragging a Colour, Opacity or HSL slider (main or stored) previews the draft value in the image, coalesced to the display rate, without any document, history, autosave or Inspector change, and without restarting music. Release commits one validated edit and one Undo step. Escape, pointer cancellation, lost capture, window blur or an invalid value restores the control and the preview. Other sliders (Transform, speed, gain) keep their release-only image update. Each keyboard slider
 adjustment is an individual validated edit. Numeric fields retain full entered
 precision, commit on Enter/blur, keep invalid drafts editable and restore on Escape.
 **Clip → Range** uses the full-original bar and exact timecode text fields above.

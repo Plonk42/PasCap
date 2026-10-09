@@ -116,12 +116,6 @@ function navigation(page: Page, label: string, direction: 'Previous' | 'Next'): 
     .getByRole('button', { name: `${direction} ${label} keyframe`, exact: true });
 }
 
-async function enableColourAnimation(page: Page): Promise<void> {
-  const toggle = page.getByRole('button', { name: 'Animate Colour', exact: true });
-  if ((await toggle.getAttribute('aria-pressed')) === 'false') await toggle.click();
-  await expect(toggle).toHaveAttribute('aria-pressed', 'true');
-}
-
 async function previewAt(page: Page, frame: number): Promise<void> {
   await expect
     .poll(() =>
@@ -258,7 +252,6 @@ test('empty-row native controls preserve exact precision, invalid drafts, indivi
   await expect(page.locator('[role="tabpanel"]:not([hidden]) .selected-clip-name')).toContainText(
     'Applies to every clip added to this track',
   );
-  await enableColourAnimation(page);
   for (const { setting, label, precise } of channels) {
     const { slider, exact, widget } = controls(page, label);
     await expect(slider).toBeEnabled();
@@ -419,7 +412,6 @@ test('animated missing participants stay read-only until explicit capture; remov
     sharedPoint(30, { temperature: 0.5 }),
   ];
   await fixture(page, document);
-  await enableColourAnimation(page);
   expect(document.schemaVersion).toBe(12);
   expect(Object.keys(document.layers[0]!.keyframes[0]!.values)).toHaveLength(11);
   await seek(page, 20);
@@ -559,7 +551,6 @@ test('channel navigation skips unrelated keys and shares an off-duration cursor 
     sharedPoint(260, { temperature: 0.9 }),
   ];
   await fixture(page, document);
-  await enableColourAnimation(page);
   const before = await checkpoint(page);
   const next = navigation(page, 'Temperature', 'Next');
   const previous = navigation(page, 'Temperature', 'Previous');
