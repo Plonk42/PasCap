@@ -26,7 +26,12 @@ const SECTION_DEFAULTS = {
   music: true,
 };
 type SectionId = keyof typeof SECTION_DEFAULTS;
-const CLIP_SECTIONS: readonly SectionId[] = ['speed', 'transform', 'source', 'layer-opacity'];
+const TAB_SECTIONS: Record<InspectorMode, readonly SectionId[]> = {
+  clip: ['speed', 'transform', 'source', 'layer-opacity'],
+  track: ['colour', 'keyframes', 'transition', 'fades'],
+  audio: ['music'],
+};
+const TAB_TITLES: Record<InspectorMode, string> = { clip: 'Clip', track: 'Track', audio: 'Audio' };
 type Expansion = Record<SectionId, boolean>;
 interface InspectorExpansion {
   sections: Expansion;
@@ -34,7 +39,7 @@ interface InspectorExpansion {
 }
 export const InspectorExpansionContext = createContext<InspectorExpansion | null>(null);
 
-/** Include temporarily absent Clip sections, so selecting a clip respects bulk choices. */
+/** Include temporarily absent sections, so selecting a clip or track respects bulk choices. */
 export function useInspectorExpansion() {
   const [sections, setSections] = useState<Expansion>(
     () =>
@@ -53,31 +58,33 @@ export function useInspectorExpansion() {
     setSections((previous) => ({ ...previous, [id]: open }));
     persist(id, open);
   };
-  const allOpen = CLIP_SECTIONS.every((id) => sections[id]);
-  const toggleAll = (): void => {
-    const open = !allOpen;
-    setSections((previous) => ({ ...previous, ...Object.fromEntries(CLIP_SECTIONS.map((id) => [id, open])) }));
-    CLIP_SECTIONS.forEach((id) => persist(id, open));
+  const allOpen = (tab: InspectorMode): boolean => TAB_SECTIONS[tab].every((id) => sections[id]);
+  const toggleAll = (tab: InspectorMode): void => {
+    const open = !allOpen(tab);
+    setSections((previous) => ({ ...previous, ...Object.fromEntries(TAB_SECTIONS[tab].map((id) => [id, open])) }));
+    TAB_SECTIONS[tab].forEach((id) => persist(id, open));
   };
   return { sections, setOpen, allOpen, toggleAll, storageWarning };
 }
 
 export function InspectorExpansionControls({
   expansion,
+  tab,
   hidden,
-}: Readonly<{ expansion: ReturnType<typeof useInspectorExpansion>; hidden: boolean }>) {
+}: Readonly<{ expansion: ReturnType<typeof useInspectorExpansion>; tab: InspectorMode; hidden: boolean }>) {
   if (hidden) return null;
-  const label = expansion.allOpen ? 'Collapse all Inspector settings' : 'Expand all Inspector settings';
+  const allOpen = expansion.allOpen(tab);
+  const label = `${allOpen ? 'Collapse' : 'Expand'} all ${TAB_TITLES[tab]} sections`;
   return (
     <>
       <button
         type="button"
         className="icon-button inspector-expansion"
         aria-label={label}
-        title={`${expansion.allOpen ? 'Collapse' : 'Expand'} all Clip sections`}
-        onClick={expansion.toggleAll}
+        title={label}
+        onClick={() => expansion.toggleAll(tab)}
       >
-        <Icon name={expansion.allOpen ? 'collapse-all' : 'expand-all'} size={16} />
+        <Icon name={allOpen ? 'collapse-all' : 'expand-all'} size={16} />
       </button>
       {expansion.storageWarning && (
         <output className="control-hint">

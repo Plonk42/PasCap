@@ -80,7 +80,10 @@ test('three accessible tabs preserve selection across clips, populated/empty tra
     await expect(tab).toHaveAttribute('aria-selected', 'true');
     const panel = page.getByRole('tabpanel', { name: label, exact: true });
     await expect(panel).toBeVisible();
-    await expect(page.getByRole('button', { name: /^(Expand|Collapse) all Inspector settings$/ })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /^(Expand|Collapse) all \w+ sections$/ })).toHaveCount(1);
+    await expect(
+      page.getByRole('button', { name: new RegExp(`^(Expand|Collapse) all ${label} sections$`) }),
+    ).toHaveCount(1);
     await expect(panel.locator('.inspector-track-selection')).toHaveCount(0);
     expect(await tab.getAttribute('aria-controls')).toBe(await panel.getAttribute('id'));
     await selectClip(page, 'upper-clip');

@@ -170,11 +170,12 @@ the clicked control. Inspector tab arrows/Home/End switch contexts without disca
 mounted content or its valid/invalid drafts within the same editing context.
 Selecting a clip or track keeps the chosen tab; explicit Cut/Fade/Dissolve boundary
 buttons open Track with that boundary expanded.
-**Expand all / Collapse all** is an icon button on the Inspector tab bar, shown only
-in Clip; it changes its four
-sections: **Speed**, **Transform**, **Range** and **Placement**, including
-temporarily absent Clip sections. A mixed state offers Expand all. Individual toggles
-and the existing section preferences remain authoritative. Track and Audio
+**Expand all / Collapse all** is an icon button on the Inspector tab bar that changes
+only the visible tab's sections, including temporarily absent ones: Clip's **Speed**,
+**Transform**, **Range** and **Placement**; Track's **Colour**, **Keyframes**,
+**Transitions** and **Fades**; Audio's **Music**. It is hidden while Clip has no
+selected clip or Track no selected track. A mixed state offers Expand all. Individual toggles
+and the existing section preferences remain authoritative. Other tabs'
 sections, each keyframe's nested **Edit**, other nested details and help are unchanged.
 Bulk expansion is presentation-only and leaves mounted drafts, processing, history
 and saves unchanged. If preference storage fails, choices still work for the session.
