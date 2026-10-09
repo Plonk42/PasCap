@@ -82,15 +82,16 @@ export function transformKeyframeKind(options: {
   const move = (project: ProjectDocument, target: TransformKeyframeTarget, frame: number): ClipKeyframeDragPlan =>
     planClipKeyframeMove(project, target.scope, target.origin, frame, options.frameCountOf(target.placed.clip.mediaId));
   return {
-    plan: (project, target, travel) => {
+    at: ({ placed, marker }, travel) =>
+      travel === 0
+        ? marker.timelineFrame
+        : placed.start + Math.max(0, Math.min(placed.duration - 1, marker.outputFrame + travel)),
+    planAt: (project, target, at) => {
       const { placed, marker } = target;
-      const output =
-        travel === 0 ? marker.outputFrame : Math.max(0, Math.min(placed.duration - 1, marker.outputFrame + travel));
-      return {
-        ...move(project, target, clipKeyframeTarget(placed, marker, travel)),
-        at: placed.start + output,
-        guide: null,
-      };
+      // A snap to the clip's end lands on its exclusive OUT boundary.
+      const frame =
+        at >= placed.end ? placed.clip.sourceOut : clipKeyframeTarget(placed, marker, at - marker.timelineFrame);
+      return move(project, target, frame);
     },
     step: (project, target, delta) => move(project, target, target.origin + delta),
     seekFrame: (document, target, frame) => seekFrameFor(document, target.scope, frame),

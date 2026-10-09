@@ -490,9 +490,10 @@ dissolves use the source-over contract above. See
 
 **Snap** uses an eight-pixel tolerance converted to project frames at the current
 zoom. Ruler/playhead scrubbing snaps to video/music boundaries; trim handles also
-snap to the original, stationary playhead. Shared-keyframe drags use boundaries and
+snap to the original, stationary playhead. Shared-keyframe and Transform-keyframe
+drags use boundaries and
 the stationary playhead captured at pointer down, with their captured zoom throughout
-autoscroll. Ripple-off moves match either leading or trailing edge to other clip/music/
+autoscroll; a Transform key snapped to its clip's end lands on its exclusive OUT. Ripple-off moves match either leading or trailing edge to other clip/music/
 transition boundaries, frame zero or the captured
 stationary playhead; their own old edges/transition regions are excluded. Holding
 Alt bypasses these magnets. A trailing-edge snap solves a representable contextual

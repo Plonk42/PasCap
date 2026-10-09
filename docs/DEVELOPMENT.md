@@ -533,11 +533,12 @@ retiming algorithms and resource bounds unchanged.
 
 Every sliding timeline keyframe marker (shared track and Transform, and any future
 type) uses one implementation, [keyframe-slide.tsx](../src/web/keyframe-slide.tsx):
-`useKeyframeSlide` owns pointer capture, the 3-pixel threshold, edge autoscroll,
+`useKeyframeSlide` owns pointer capture, the 3-pixel threshold, snapping (8 px to
+captured boundaries and playhead; Alt bypasses), edge autoscroll,
 preview following the dragged key, the red ghost at an invalid target, Escape/blur
 cancellation, one Undo step per valid release, ←/→ moves and focus; `KeyframeMarkers`
 renders one element per stored key whose React key survives the drag. A keyframe
-type supplies only a `KeyframeSlideKind`: frame mapping/snapping, validation, seek
+type supplies only a `KeyframeSlideKind`: frame mapping, validation, seek
 and Inspector section. Plain keys stay with a focused marker; Undo/Redo still apply.
 
 **Clip → Range** uses one full-original hatched bar with IN/OUT handles and exact
