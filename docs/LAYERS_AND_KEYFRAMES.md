@@ -490,8 +490,7 @@ offscreen/unmount/project-switch releases the review decoder.
 ## Inspector and resource limits
 
 The inspector uses **Clip / Track / Audio** tabs, split by ownership. **Clip**
-holds the selected clip's **Range**, **Placement** (placement only), **Speed** and
-**Transform** under a "Clip N of M · track" header; on an empty video track it shows only
+holds the selected clip's **Speed**, **Transform**, **Range** and **Placement** (placement only) under a "Clip N of M · track" header; on an empty video track it shows only
 "Select a clip on … to edit it." **Track** holds everything the whole video track owns
 under an "Applies to all N clips on this track" header: Colour (including the sole
 track Opacity control, HSL and curves), Keyframes (the shared keyframe list with
@@ -499,10 +498,10 @@ Animation help, enabled-setting chips and whole-track navigation), Transitions (
 boundary of the track, left to right, with the selected one expanded) and Fades.
 Music belongs to Audio, with detailed **Placement & fades**.
 Sections retain their expansion in local browser storage.
-New defaults collapse **Range**, **Placement**, **Speed** and **Transform** controls, while Track
+New defaults collapse **Speed**, **Transform**, **Range** and **Placement** controls, while Track
 sections stay open. Existing section preferences are not reset. **Expand all / Collapse all**
-appears only in Clip and affects its four sections: **Range**,
-**Placement**, **Speed** and **Transform**. Track, Audio, nested keyframe disclosures and
+appears only in Clip and affects its four sections: **Speed**,
+**Transform**, **Range** and **Placement**. Track, Audio, nested keyframe disclosures and
 help remain unchanged; the shared list has no expansion preference.
 Hidden tab/section content stays mounted, retaining valid/invalid drafts within
 the same editing context. Track/clip changes refresh that context safely rather than

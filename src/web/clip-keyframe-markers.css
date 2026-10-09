@@ -7,7 +7,7 @@
   /* Include the clip's existing 1px borders: even a 2px minimum-width clip
    * has visible glyph space, and percentages follow its rendered outer width.
    */
-  inset: 0 -1px;
+  inset: -3px -1px 0;
   overflow: hidden;
   pointer-events: none;
 }
@@ -18,7 +18,7 @@
 
 .timeline-clip-key {
   position: absolute;
-  top: 25px;
+  top: 28px;
   left: clamp(0px, calc(var(--clip-keyframe-position) - 6px), max(0px, calc(100% - 12px)));
   width: min(12px, 100%);
   height: 10px;
@@ -36,27 +36,27 @@
 }
 
 .timeline-clip-key.speed {
-  top: 37px;
+  top: 40px;
   color: #ffc7bb;
 }
 
-/* Transform keys are boxed blue buttons, as visible as the amber Colour markers, at the clip's top edge.
- * The clip label moves below them so neither hides the other.
+/* Transform keys are boxed blue buttons the size of the Colour track markers: that box overlaps the clip's
+ * bottom edge by 19px (3px beyond it), this one overlaps the top edge by 19px. The clip label sits below.
  */
 .timeline-clip-key.transform {
-  top: 2px;
-  left: clamp(0px, calc(var(--clip-keyframe-position) - 8px), max(0px, calc(100% - 16px)));
-  width: min(16px, 100%);
-  height: 16px;
+  top: 0;
+  left: clamp(0px, calc(var(--clip-keyframe-position) - 10px), max(0px, calc(100% - 20px)));
+  width: min(20px, 100%);
+  height: 22px;
   background: #1b3446ee;
   border: 1px solid #5d93b8;
   border-radius: 4px;
   color: #c4e9ff;
-  font-size: 10px;
+  font-size: 13px;
 }
 
 .timeline-clip-key.transform > span {
-  line-height: 14px;
+  line-height: 20px;
 }
 
 .timeline-clip-key.transform:is(:hover, :focus-visible):not(:disabled) {

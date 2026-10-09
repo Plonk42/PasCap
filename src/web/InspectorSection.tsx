@@ -20,7 +20,7 @@ const SECTION_DEFAULTS = {
   music: true,
 };
 type SectionId = keyof typeof SECTION_DEFAULTS;
-const CLIP_SECTIONS: readonly SectionId[] = ['source', 'layer-opacity', 'speed', 'transform'];
+const CLIP_SECTIONS: readonly SectionId[] = ['speed', 'transform', 'source', 'layer-opacity'];
 type Expansion = Record<SectionId, boolean>;
 interface InspectorExpansion {
   sections: Expansion;

@@ -474,7 +474,7 @@ without optical flow. Exact neutral poses preserve old opaque black letterboxing
 after grading; nonneutral uncovered pixels have zero coverage. Native inverse
 RGB resampling precedes grading, reusing the same four raw buffers/two LUTs and
 serial process limits. Source keyframes remain at their original anchors through
-trim/cut/split/duplicate/move; new pieces have independent deep copies. The fourth
+trim/cut/split/duplicate/move; new pieces have independent deep copies. The second
 Clip section **Transform** is collapsed by default and uses explicit per-setting
 source-frame capture, stored-keyframe navigation and release-only sliders. See
 [the spatial contract](design/SPATIAL_TRANSFORMS.md), not historical benchmark

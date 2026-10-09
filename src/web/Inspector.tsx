@@ -26,7 +26,6 @@ import { clipStartRestriction } from './layer-actions.js';
 import { NumberField } from './NumberField.js';
 import { settingPresentation } from './setting-scope.js';
 import { livePreview } from './live-preview.js';
-import { moveToNewTrack } from './move-to-track.js';
 import { LockedCue, RangeSettingControl } from './SettingValueControl.js';
 import { TransformSection } from './SpatialControls.js';
 import { SpeedControls } from './SpeedControls.js';
@@ -280,16 +279,8 @@ function ColourSection({
   project,
   onPause,
   onPreview,
-  trackClips,
-  clipId,
-}: Readonly<
-  LayerControlProps & { id: string; trackClips: number; clipId: string | null } & Pick<
-      Props,
-      'project' | 'onPause' | 'onPreview'
-    >
->) {
+}: Readonly<LayerControlProps & { id: string } & Pick<Props, 'project' | 'onPause' | 'onPreview'>>) {
   const colour = colourAt(layer, frame);
-  const move = clipId ? moveToNewTrack(project, clipId) : null;
   const opacity = evaluateLayerSetting(layer, 'opacity', frame, layer.opacity);
   const animated =
     hasLayerKeys(layer, 'opacity') || COLOUR_CONTROLS.some((control) => hasLayerKeys(layer, control.key));
@@ -319,25 +310,6 @@ function ColourSection({
         </HelpPopover>
       }
     >
-      {trackClips > 1 && (
-        <p className="control-hint colour-scope-hint">
-          Grades all {trackClips} clips on {layer.name}
-          {move && 'commands' in move && (
-            <>
-              {' · '}
-              <button
-                type="button"
-                className="text-button"
-                disabled={disabled}
-                title="Colour belongs to the track: move the selected clip to a new track to grade it differently"
-                onClick={() => onEdit(move.commands)}
-              >
-                Move clip to its own track
-              </button>
-            </>
-          )}
-        </p>
-      )}
       <TrackAnimationControls
         label="Colour"
         layer={layer}
@@ -719,6 +691,32 @@ export function Inspector({
                   Clip {trackPosition + 1} of {trackClips.length} · {layer.name}
                 </span>
               </div>
+              <SpeedControls
+                project={project}
+                resetKey={project.id}
+                helpId={`${colourControlId}-speed-help`}
+                clip={clip ?? null}
+                layer={layer}
+                frame={frame}
+                projectDuration={layout.duration}
+                placedDuration={placed?.duration ?? null}
+                disabled={drafting}
+                sourceFrame={sourceFrame}
+                sourceFrameCount={asset?.metadata.frameCount ?? null}
+                onEdit={onEdit}
+                onPreview={onPreview}
+                onSeek={onSeek}
+                onPause={onPause}
+              />
+              <TransformSection
+                project={project}
+                clip={clip ?? null}
+                sourceFrameCount={asset?.metadata.frameCount ?? 0}
+                frame={frame}
+                disabled={drafting}
+                onEdit={onEdit}
+                onSeek={onSeek}
+              />
               {asset && (
                 <SourceRangeSection
                   project={project}
@@ -826,32 +824,6 @@ export function Inspector({
                   )}
                 </section>
               </InspectorSection>
-              <SpeedControls
-                project={project}
-                resetKey={project.id}
-                helpId={`${colourControlId}-speed-help`}
-                clip={clip ?? null}
-                layer={layer}
-                frame={frame}
-                projectDuration={layout.duration}
-                placedDuration={placed?.duration ?? null}
-                disabled={drafting}
-                sourceFrame={sourceFrame}
-                sourceFrameCount={asset?.metadata.frameCount ?? null}
-                onEdit={onEdit}
-                onPreview={onPreview}
-                onSeek={onSeek}
-                onPause={onPause}
-              />
-              <TransformSection
-                project={project}
-                clip={clip ?? null}
-                sourceFrameCount={asset?.metadata.frameCount ?? 0}
-                frame={frame}
-                disabled={drafting}
-                onEdit={onEdit}
-                onSeek={onSeek}
-              />
             </>
           ) : (
             <div className="inspector-empty">
@@ -882,8 +854,6 @@ export function Inspector({
                 disabled={drafting}
                 onEdit={onEdit}
                 id={colourControlId}
-                trackClips={trackClips.length}
-                clipId={clip?.id ?? null}
               />
               <InspectorSection
                 id="keyframes"

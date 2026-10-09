@@ -125,18 +125,20 @@ test('a locked animated slider neither previews nor creates a keyframe', async (
   expect(memory.saves).toBe(0);
 });
 
-test('Colour offers to move a clip to its own track, once, from the hint and the clip menu', async ({ page }) => {
+test('Colour has no scope hint; the clip menu moves a clip to its own track in one Undo step', async ({ page }) => {
   await inspectorTab(page, 'Track');
   const before = await current(page);
-  await expect(page.locator('.colour-scope-hint')).toContainText('Grades all 2 clips on Video track 1');
-  await page.getByRole('button', { name: 'Move clip to its own track', exact: true }).click();
+  await expect(page.getByText('Grades all', { exact: false })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Move clip to its own track', exact: true })).toHaveCount(0);
+
+  await page.locator('[data-clip-id="first"]').click({ button: 'right' });
+  await page.getByRole('button', { name: 'Move selected clip to a new track', exact: true }).click();
   const moved = await current(page);
   expect(moved.layers).toHaveLength(2);
   const layout = calculateLayout(moved);
   const first = layout.clips.find((item) => item.clip.id === 'first')!;
   expect(first.clip.layerId).toBe(moved.layers[1]!.id);
   expect(first.start).toBe(0);
-  await expect(page.locator('.colour-scope-hint')).toHaveCount(0);
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   expect(await current(page)).toEqual(before);
   await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();

@@ -178,7 +178,7 @@ test('each setting has its own diamond capturing only that setting at the displa
   await expect(exact(page, 'Rotation')).toBeEnabled();
   const poseFields = page.locator('.spatial-editor > .spatial-pose-fields .spatial-pose-field');
   await expect(poseFields.filter({ hasText: 'Scale' }).locator('.setting-locked-cue')).toHaveText(
-    'Add a keyframe ◇ to edit',
+    'Add a keyframe ▽ to edit',
   );
   await expect(poseFields.filter({ hasText: 'Rotation' }).locator('.setting-locked-cue')).toHaveCount(0);
   await expect(capture(page, 'Scale')).toHaveAttribute('aria-pressed', 'false');

@@ -105,7 +105,7 @@ function SpatialChannelKeys({
     <span className="keyframe-setting-navigation" data-animated={keyed}>
       <button
         type="button"
-        className={`keyframe-toggle${active ? ' active' : ''}`}
+        className={`keyframe-toggle transform-keyframe-toggle${active ? ' active' : ''}`}
         aria-label={`Keyframe ${label}`}
         aria-pressed={active}
         title={
@@ -116,7 +116,7 @@ function SpatialChannelKeys({
         disabled={disabled || keys.captureDisabled}
         onClick={keys.onToggle}
       >
-        <span aria-hidden="true">{active ? '◆' : '◇'}</span>
+        <span aria-hidden="true">{active ? '▼' : '▽'}</span>
       </button>
       <span className="channel-keyframe-navigation">
         <button
@@ -202,7 +202,7 @@ function PoseFields({
                 {control.label}
                 {unit}
               </ResetLabel>
-              {readOnly?.(control.key) && <LockedCue />}
+              {readOnly?.(control.key) && <LockedCue glyph="▽" />}
               {keys && (
                 <span className="colour-control-actions">
                   <SpatialChannelKeys label={control.label} keys={keys} disabled={disabled} />
@@ -231,7 +231,7 @@ function PoseFields({
 export function TransformHelp() {
   return (
     <HelpPopover label="Transform animation" guide="crop-scale-translate-and-rotate-a-clip">
-      <p>Crop, scale, move and rotate this clip. A setting animates once you add a keyframe for it (◇).</p>
+      <p>Crop, scale, move and rotate this clip. A setting animates once you add a keyframe for it (▽).</p>
       <p className="editor-help-tip">Tip: Reset transform restores the original framing.</p>
     </HelpPopover>
   );

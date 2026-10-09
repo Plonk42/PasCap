@@ -205,7 +205,7 @@ clip, including both sources in a dissolve. Removing its final keyed setting rev
 the unchanged saved track value. There is no saved clip opacity, additional track
 multiplier or duplicate sidebar control/navigation.
 Static and keyed colour controls edit the same video track, including on empty tracks.
-All clips on that track share the treatment; different looks require different tracks. With several clips on the track, Colour shows **Grades all N clips on …** with **Move clip to its own track**; the clip's right-click menu offers **Move to new track**. Both are one Undo step and keep the clip's start. Opacity shares their
+All clips on that track share the treatment; different looks require different tracks. The clip's right-click menu offers **Move to new track** (one Undo step, keeping the clip's start). Opacity shares their
 UI treatment, but controls composition coverage, not the SDR RGB grade.
 **Clip → Placement** contains placement only. Sliders never create implicit keyframes;
 an animated setting that is not enabled at the real playhead is read-only until
@@ -332,9 +332,9 @@ stay below 1; opposite crops that meet or cross simply display nothing. Cropping
 recentres the retained image. Uncovered pixels from nonneutral transforms reveal
 lower tracks; exact neutral poses retain the old opaque black letterbox.
 
-- Without keyframes, values edit this clip's saved base. Click's own diamond (for example **Keyframe Scale**) to capture that
+- Without keyframes, values edit this clip's saved base. Click's own blue triangle (for example **Keyframe Scale**) to capture that
   setting's evaluated value at the real displayed integer source frame; other settings
-  stay unkeyed, or join the same keyframe with their own diamond. A keyed setting
+  stay unkeyed, or join the same keyframe with their own triangle. A keyed setting
   is read-only at a source frame without its keyframe until captured; sliders
   never add keyframes, and unkeyed settings stay editable. Capture requires the real
   playhead inside the selected clip. Each setting also has **Previous/Next** buttons
@@ -547,7 +547,7 @@ resources and pending acceptance; this guide does not claim those tests passed.
 
 ## Workspace and keyboard
 
-Use **Clip** for the selected clip's **Range**, **Placement**, **Speed** and **Transform**;
+Use **Clip** for the selected clip's **Speed**, **Transform**, **Range** and **Placement**;
 **Track** for everything the whole video track owns (Colour and Opacity, keyframes,
 transitions and fades); and **Audio** for music. Each tab names its scope at the top.
 Selecting a clip or a populated/empty video track preserves the chosen tab and updates
@@ -564,7 +564,7 @@ control conventions and vocabulary.
 
 **Expand all / Collapse all** is an icon button on the Inspector tab bar, shown only
 in Clip; it controls its four
-sections: **Range**, **Placement**, **Speed** and **Transform**. Track,
+sections: **Speed**, **Transform**, **Range** and **Placement**. Track,
 Audio, nested disclosures and help remain unchanged.
 
 The header directly exposes keyboard help. **Workspace options** holds the
@@ -594,8 +594,8 @@ Search/filter clear actions,
 mixed select-all and always-visible media Add simplify the library.
 
 Inline help is a small **? button**, not an expandable text section. Find it
-beside the relevant title—**Range**, **Placement**,
-**Speed**, **Colour**, **Transitions**, **Fades**
+beside the relevant title—**Speed**, **Range**, **Placement**,
+**Colour**, **Transitions**, **Fades**
 or **Placement & fades**—even when that section is collapsed. Help and expansion
 are separate buttons; no scrolling to the end of a section is needed. Startup
 details are next to **Preview needs attention**.
