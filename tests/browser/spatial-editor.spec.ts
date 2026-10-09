@@ -333,6 +333,22 @@ test('sliding a Transform marker previews without saving, commits one Undo and r
   expect(await current(page)).toEqual(before);
 });
 
+test('a fast Transform marker slide that leaves the marker keeps its pointer capture', async ({ page }) => {
+  await seedScaleKeys(page, [40, 80]);
+  const scale = Number(await page.locator('.timeline-surface').getAttribute('data-pixels-per-frame'));
+  const box = (await transformMarker(page, 40).boundingBox())!;
+  const x = box.x + box.width / 2;
+  const y = box.y + box.height / 2;
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  // One jump far off the small marker, as a quick flick does.
+  await page.mouse.move(x + 10 * scale, y + 40);
+  await expect(page.locator('.timeline-clip-key.transform.moving')).toHaveAttribute('data-source-frame', '50');
+  await page.mouse.up();
+  expect((await current(page)).clips[0]!.spatial.keyframes.map((item) => item.frame)).toEqual([50, 80]);
+  await expect(transformMarker(page, 50)).toBeFocused();
+});
+
 test('Escape cancels a Transform marker slide and the arrow keys move it one source frame', async ({ page }) => {
   const before = await seedScaleKeys(page, [40, 80]);
   const scale = Number(await page.locator('.timeline-surface').getAttribute('data-pixels-per-frame'));
