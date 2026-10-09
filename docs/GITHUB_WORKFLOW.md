@@ -135,6 +135,11 @@ through the [issue skill](../.github/skills/github-issue/SKILL.md), or the
 [feature](../.github/ISSUE_TEMPLATE/feature_request.yml) and
 [task](../.github/ISSUE_TEMPLATE/work_item.yml) forms.
 
+Use `/work-on-issue <X>` to pick the X most relevant open issues and deliver them
+one by one with the routing above, through the
+[work prompt](../.github/prompts/work-on-issue.prompt.md). Invoking it approves
+implementing the selected issues, not owner decisions they leave open.
+
 ## Compatibility before the first release candidate
 
 Until RC1, fast iteration takes precedence over backward compatibility. Approved
