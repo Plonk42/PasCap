@@ -85,7 +85,7 @@ PasCap is a solo, pre-release project: optimize for fast iteration. Details are 
   because not every setting is enabled at every shared keyframe, alongside the existing stored
   enabled-setting chip arrows. All per-channel arrows visit strictly earlier/later keyframes where that
   channel is nonnull (zero is enabled), sharing the central off-duration inspection cursor. Each expanded
-  section has one keyframe line (count, one Previous/Next pair over the same set, Reset keyframes), hidden
+  section has one keyframe line (count, one Previous/Next pair over the same set, Reset), hidden
   while collapsed. The pair: Colour visits Opacity/nine scalar
   colour keyframes; Speed visits track Speed keyframes and **all retained custom
   speed source keyframes of the selected clip**, including off-trim keyframes and
@@ -105,7 +105,7 @@ PasCap is a solo, pre-release project: optimize for fast iteration. Details are 
   2–16-point arrays). HSL/curves remain static, not animation channels. All Colour
   is row-owned, keyed or not; clips have no colour/correction. Neutral creators
   deep-clone nested structures; never repair missing saved fields. Advanced resets
-  never overwrite scalar bases/keys or Opacity; Reset keyframes never erases advanced
+  never overwrite scalar bases/keys or Opacity; Reset on an animated section never erases advanced
   settings. Keep existing LUT/buffer/decoder/native budgets and strict gates. See
   [the advanced colour contract](../docs/design/HSL_AND_CURVES.md).
 - Approved #68: required row `temperature` and `tint` colour fields use normalized

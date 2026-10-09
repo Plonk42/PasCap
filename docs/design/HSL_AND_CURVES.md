@@ -72,7 +72,7 @@ positions reject, never commit an earlier valid draft. Escape, cancellation, los
 capture and window blur restore. Keyboard/exact fields remain usable at 270 px.
 
 Band/all-HSL and channel/all-curves resets affect only their respective static
-settings in one Undo step. Reset keyframes changes only current keyed
+settings in one Undo step. Colour Reset on an animated track changes only current keyed
 scalar/Opacity settings, never advanced settings or saved video track bases. Unanimated Reset
 colour resets the entire video track colour and Opacity. Selection/collapse/tab changes
 never apply a former track's draft to another track. Same-track clip selection retains

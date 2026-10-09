@@ -19,7 +19,7 @@ This guide is not a delivery ledger or a fresh validation result.
   each setting's scope and capture instructions.
 - Each main scalar Colour/Opacity and track Speed diamond retains adjacent per-setting **Previous/Next** buttons
   because not every setting is enabled at every shared keyframe.
-- Each expanded section's keyframe line shows the keyframe count, one **Previous/Next** pair and Reset keyframes.
+- Each expanded section's keyframe line shows the keyframe count, one **Previous/Next** pair and Reset.
   Colour visits Opacity/scalar colour keyframes; Speed visits
   track Speed keyframes and all retained custom speed source keyframes of the
   selected clip, even under a track Speed override. Speed and Transform stored

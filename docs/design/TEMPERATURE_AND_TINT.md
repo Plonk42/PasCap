@@ -42,7 +42,7 @@ playhead are read-only until diamond capture.
 Pointer movement previews the draft in the image without a document change; valid release is one Undo step. Escape/cancellation/capture loss/blur restores control and preview.
 Numeric Enter/blur preserves entered precision; invalid drafts stay editable,
 never clamp or default. Resets affect only the targeted base or existing keyframe;
-Reset keyframes preserves track bases and static HSL/curves.
+Colour Reset on an animated track preserves track bases and static HSL/curves.
 
 ## One grading formula
 

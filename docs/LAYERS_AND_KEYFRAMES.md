@@ -8,7 +8,7 @@ colour greys. Their normalized linear gains run before Exposure. See
 Eight named HSL bands and four encoded curves stay active when scalar channels
 are animated, without adding keyframe channels or clip fields. Band/all-HSL and
 channel/all-curves resets preserve the nine scalar bases, track keyframes and Opacity;
-Reset keyframes preserves advanced settings. Unanimated Reset restores complete track
+Reset on an animated track preserves advanced settings. Unanimated Reset restores complete track
 Colour and Opacity. See [the advanced-colour contract](design/HSL_AND_CURVES.md).
 
 ## Video tracks
@@ -199,7 +199,7 @@ keyframe-timing guidance, with no separate Keyframe timing help button.
 **Clip** keeps source/clip settings and Speed/Transform controls; **Track → Colour**
 keeps track Colour/Opacity controls evaluated at the real playhead.
 
-Colour, Speed and Transform always show their capture diamonds and adjacent per-setting **Previous/Next** buttons while the section is expanded; there is no Animate toggle and no stored preference. Each expanded section has one keyframe line with the **number of keyframes**, one **Previous/Next** pair over the same set and **Reset keyframes**. The line is hidden while the section is collapsed; the title row and its help stay reachable. Rendering, retained keyframes and read-only constraints never depend on what is shown. Diamond states remain:
+Colour, Speed and Transform always show their capture diamonds and adjacent per-setting **Previous/Next** buttons while the section is expanded; there is no Animate toggle and no stored preference. Each expanded section has one keyframe line with the **number of keyframes**, one **Previous/Next** pair over the same set and **Reset**. The line is hidden while the section is collapsed; the title row and its help stay reachable. Rendering, retained keyframes and read-only constraints never depend on what is shown. Diamond states remain:
 
 - **◇ Hollow**, `aria-pressed=false`: setting not enabled at this project frame.
   It is still clickable, **not HTML-disabled merely because it is inactive**.

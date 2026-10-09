@@ -328,7 +328,7 @@ function ColourSection({
           onClick={reset}
         >
           <Icon name="reset" size={13} />
-          {animated ? 'Reset keyframes' : 'Reset'}
+          Reset
         </button>
       </TrackAnimationControls>
       <div className="colour-controls">

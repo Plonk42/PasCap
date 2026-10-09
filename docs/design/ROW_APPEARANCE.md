@@ -98,7 +98,7 @@ an inspected stored time. Sliders never create keyframes. Track-keyframe selecto
 visibly read **Easing**, retaining contextual accessible names and shared interpolation.
 The nested static HSL and curve editors share video track ownership, with no new diamonds.
 Individual scalar resets target only the track base or current existing keyed setting;
-Reset keyframes targets only existing keyed colour/Opacity settings, preserving HSL/curves.
+Colour Reset on an animated track targets only existing keyed colour/Opacity settings, preserving HSL/curves.
 No reset overwrites another keyframe or the saved base beneath a keyed channel.
 
 There is no Clip correction disclosure, control, command or stored field. Collapse

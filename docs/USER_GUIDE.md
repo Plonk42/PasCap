@@ -220,7 +220,7 @@ and incompatible fades/transitions/overlaps reject the edit rather than being sh
 
 ### Animation controls
 
-Colour, Speed and Transform always show their capture diamonds and adjacent per-setting **Previous/Next** buttons while the section is expanded; there is no Animate toggle and no stored preference. Each expanded section has one keyframe line with the **number of keyframes**, one **Previous/Next** pair over the same set and **Reset keyframes**. The line is hidden while the section is collapsed; the title row and its help stay reachable. Rendering, retained keyframes and read-only constraints never depend on what is shown.
+Colour, Speed and Transform always show their capture diamonds and adjacent per-setting **Previous/Next** buttons while the section is expanded; there is no Animate toggle and no stored preference. Each expanded section has one keyframe line with the **number of keyframes**, one **Previous/Next** pair over the same set and **Reset**. The line is hidden while the section is collapsed; the title row and its help stay reachable. Rendering, retained keyframes and read-only constraints never depend on what is shown.
 
 The capture diamonds and their adjacent per-setting **Previous/Next** buttons find keyframes for that setting:
 not every setting is enabled at every shared keyframe. Each section's keyframe line counts the keyframes its single **Previous/Next** pair visits. Colour visits any Opacity or scalar
