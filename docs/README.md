@@ -35,7 +35,7 @@ fields, filenames and URLs retain their technical spelling.
 | [design/ROW_APPEARANCE.md](design/ROW_APPEARANCE.md)             | Required video track-only static/keyed Colour and Opacity, shared ownership, resets and destination-track adoption                                            |
 | [design/TEMPERATURE_AND_TINT.md](design/TEMPERATURE_AND_TINT.md) | Required normalized track Temperature/Tint, exact pre-exposure linear gains, independent capture and strict schema-12 preservation                            |
 | [design/HSL_AND_CURVES.md](design/HSL_AND_CURVES.md)             | Required static track HSL bands and master/RGB curves, SDR order, bounded GPU/native evaluation and exact editor gestures                                     |
-| [design/SPATIAL_TRANSFORMS.md](design/SPATIAL_TRANSFORMS.md)     | Required clip base/full-pose source-frame keyframes, crop/affine geometry, neutral letterboxing, per-pixel coverage and Transform controls                    |
+| [design/SPATIAL_TRANSFORMS.md](design/SPATIAL_TRANSFORMS.md)     | Required clip base/per-setting source-frame keyframes, crop/affine geometry, neutral letterboxing, per-pixel coverage and Transform controls                  |
 
 Use the final approved [#67](https://github.com/Plonk42/PasCap/issues/67) contract:
 one required numeric video track `opacity`, initially 1 (100%) on new tracks, with the sole
@@ -51,7 +51,7 @@ Colour animation remains track-wide, while the separately approved clip-only spe
 curves use source frames.
 Schema 12 requires complete video track-owned Colour and Opacity with identical static/keyed scope,
 and rejects saved `clip.colour` and `clip.correction`. It also requires clip `spatial: { base, keyframes }`: a complete
-eight-value pose and 0–256 full-pose original-source keyframes with required easing.
+eight-value pose and 0–256 per-setting original-source keyframes with required easing.
 Clip transforms preserve off-trim/exclusive-OUT anchors through edits and use
 continuous placed retiming for geometry, without optical flow. They are separate
 from track animation; the sole track Opacity contract is unchanged.

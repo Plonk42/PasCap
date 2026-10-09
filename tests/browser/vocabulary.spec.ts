@@ -78,7 +78,7 @@ for (const viewport of [
 
     await inspectorTab(page, 'Clip');
     await expect(page.getByRole('button', { name: 'Range section', exact: true })).toBeVisible();
-    await page.getByRole('button', { name: 'Transform keyframe at displayed source frame', exact: true }).click();
+    await page.getByRole('button', { name: 'Keyframe Scale', exact: true }).click();
     await expect(page.getByRole('combobox', { name: 'Selected Transform keyframe', exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Preview selected Transform keyframe', exact: true })).toHaveText(
       'Preview stored keyframe',

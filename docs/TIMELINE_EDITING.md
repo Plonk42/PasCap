@@ -216,7 +216,7 @@ toolbar covering the lanes. Each track header has one **Ripple** toggle icon
   a fresh ID. Prefix/suffix removal keeps only the retained clip; a whole-range
   removal deletes it. Retained pieces share the original media but have independent
   ranges/settings, including original-source ramp anchors and deep-copied spatial
-  base/full-pose keyframes. Off-trim and original exclusive-OUT anchors remain stored.
+  base/per-setting keyframes. Off-trim and original exclusive-OUT anchors remain stored.
   No proxy is cut.
 - With Ripple on, the track closes the removed gap and recalculates later starts/durations
   without changing their order, original-source ranges or static settings. The new
@@ -397,7 +397,7 @@ keyframes. Speed visits track Speed keyframes plus all retained custom speed sou
 keyframes of the selected clip, including off-trim keyframes and original exclusive
 OUT, previewing the nearest mapped image through authoritative retiming. Track
 Speed overrides but retains clip keyframes and their navigation. Transform likewise
-visits all retained full-pose source keyframes, including off-trim/original OUT.
+visits all retained source keyframes, including off-trim/original OUT.
 Speed and Transform each keep an independent clip-local stored-source cursor,
 separate from track inspection, so successive keyframes remain reachable when
 several preview the same first/last image. Stored time never replaces the real
@@ -509,7 +509,7 @@ move of its retained first clip changes the anchor. The
 toggle persists for the current timeline session, not the renderable document.
 
 Projects are named separate **version-12** documents with complete required video track colour, clip spatial
-base/full-pose source-frame keyframes and per-track Ripple,
+base/per-setting source-frame keyframes and per-track Ripple,
 transitions, opening/closing fades and numeric `opacity` in 0–1. New tracks start
 at 1 (100%); a missing saved field is invalid. Switching flushes autosave first,
 blocks on failed saves, and resets session selection/history; successful export

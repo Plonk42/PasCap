@@ -72,7 +72,7 @@ dragging remains supported. Imports reference originals; generated proxies/
 thumbnails, project/registry metadata, exports/receipts and scratch are the only
 new local data, not duplicate original footage. Projects use strict schema 12 with
 complete required video track Colour, including Temperature/Tint and static HSL/curves,
-no clip colour/correction fields, required clip `spatial` base/full-pose original-source keyframes and
+no clip colour/correction fields, required clip `spatial` base/per-setting original-source keyframes and
 required `music` array (0–8 independent music tracks, unique required IDs; `[]` without
 music), and
 required per-track Ripple, transitions, opening/closing fades and numeric

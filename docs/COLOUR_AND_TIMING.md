@@ -237,7 +237,7 @@ v1–v11 project documents and receipt snapshots are incompatible and preserved;
 recreate projects deliberately, with no migration, compatibility defaults or
 old-format/null fallback readers or automatic deletion. Strict v12 requires
 complete video track `colour`, including Temperature/Tint bases and static HSL/curves,
-all eleven nullable keyframe fields, clip `spatial` base/full-pose keyframes and track `opacity`; saved `clip.colour`, `clip.correction`, `clip.opacity` and
+all eleven nullable keyframe fields, clip `spatial` base/per-setting keyframes and track `opacity`; saved `clip.colour`, `clip.correction`, `clip.opacity` and
 old `clipOpacity`/`layerOpacity` keyframe fields are rejected, not defaulted.
 Production export receipts also remain version 1, with strict v12 snapshots and
 required `musicSources` captured-original/`settings.audio` identified-plan arrays;

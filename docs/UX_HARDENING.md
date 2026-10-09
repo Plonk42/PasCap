@@ -64,7 +64,7 @@ This guide is not a delivery ledger or a fresh validation result.
   native processing details remain available in **Rendering details**.
 
 Schema 12 requires complete video track Colour with Temperature/Tint and static HSL/curves,
-clip spatial base/full-pose source-frame keyframes and uses a
+clip spatial base/per-setting source-frame keyframes and uses a
 required 0–8 `music` array with unique required music track IDs and
 uniform video tracks with required Ripple/transitions/fades and
 numeric `VideoLayer.opacity` in 0–1 (1 on new tracks), plus eleven nullable keyframe
@@ -99,7 +99,7 @@ width floor is not a mobile-support claim.
 
 **Clip → Transform** is the fourth Clip section, collapsed for new
 preferences and included in Clip's bulk expansion. Native sliders/exact fields
-and one full-pose source-frame diamond retain explicit capture, read-only keyed
+and per-setting source-frame diamonds retain explicit capture, read-only keyed
 main values without a keyframe at the real displayed source frame, release-only
 drafts and editable invalid numbers. Stored-keyframe navigation distinguishes stored
 source time from the closest actually mapped preview, including off-trim and
