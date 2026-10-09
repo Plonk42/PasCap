@@ -716,10 +716,8 @@ test('a row marker opens the selected empty row independently of clips, and keyb
   expect(await page.evaluate(() => window.pascapLab!.engine.diagnostics().playing)).toBe(false);
   await field.press('Escape');
   await expect(field).toHaveValue('2');
-  await openOptions(page, 'Clip actions');
-  for (const name of ['Split at playhead', 'Duplicate selected clip', 'Delete selected clip'])
+  for (const name of ['Split at playhead', 'Delete selected clip'])
     await expect(page.getByRole('button', { name, exact: true })).toBeDisabled();
-  await page.keyboard.press('Escape');
   await page.getByRole('region', { name: 'Video timeline' }).focus();
   for (const key of ['s', 'Control+d', 'Delete']) await page.keyboard.press(key);
   expect(await current(page)).toEqual(edited);

@@ -166,7 +166,7 @@ original exclusive OUT. Source review keeps its independent numeric IN/OUT pair 
   mark timeline **IN / I**, then the last unwanted frame and **OUT / O**.
   The hatched range is removed by **Cut range / Shift+Delete**, in **one Undo step**.
   Ripple-on cuts close the gap on that track; off keeps the removed gap and fixed neighbours.
-- **Clip actions → Duplicate / Ctrl+D** makes an independent clip. Timeline
+- **Duplicate** (right-click the clip) or **Ctrl+D** makes an independent clip. Timeline
   Delete removes a clip, not its original or project-bin membership.
 
 Placement ghosts show the actual video track/start, including destination speed timing.
@@ -630,7 +630,7 @@ storage/render breakdowns remain their existing expandable controls, not help bu
 | Timeline play/seek                          | Space; ←/→ one frame; Shift+←/→ ten; Home/End; F to fit                      |
 | Split / quick trim                          | S / Q / W                                                                    |
 | Unwanted timeline range                     | I / O; Shift+Delete cuts; Escape clears marks                                |
-| Clip actions                                | Ctrl+D duplicate; Delete/Backspace remove                                    |
+| Clip actions                                | Ctrl+D duplicate (or right-click the clip); Delete/Backspace remove          |
 | Session history                             | Ctrl+Z; Ctrl+Shift+Z or Ctrl+Y redo                                          |
 | Positioned clip / first Ripple anchor nudge | Alt+←/→ one frame; Alt+Shift+←/→ ten; later Ripple starts require Ripple off |
 | Focused trim handle                         | Arrows one source frame; Shift ten; left Home/right End restore              |

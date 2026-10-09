@@ -786,12 +786,30 @@ body {
 }
 
 .workspace-options .editor-popover-content > button,
-.timeline-clip-actions .editor-popover-content > button {
+.clip-context-menu > button {
   justify-content: flex-start;
 }
 
-.timeline-clip-actions kbd {
-  margin-left: auto;
+.clip-context-menu {
+  position: fixed;
+  inset: auto;
+  z-index: 60;
+  display: grid;
+  margin: 0;
+  padding: 6px;
+  border: 1px solid #58725f;
+  border-radius: 7px;
+  background: #1c2820;
+  box-shadow: 0 8px 24px #0008;
+}
+
+.clip-context-menu::backdrop {
+  background: transparent;
+  pointer-events: none;
+}
+
+.clip-context-menu kbd {
+  margin-left: 12px;
   font-size: 10px;
 }
 

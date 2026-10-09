@@ -1,6 +1,6 @@
 import {
+  useCallback,
   useEffect,
-  useId,
   useLayoutEffect,
   useRef,
   useState,
@@ -42,13 +42,12 @@ import {
 } from './display.js';
 import { Icon } from './icons.js';
 import { keyframeNavigationFrame, useKeyframeNavigation } from './keyframe-navigation.js';
-import { clipStartRestriction } from './layer-actions.js';
+import { ClipContextMenu, type ClipMenuAnchor } from './ClipContextMenu.js';
 import './declutter.css';
 import './layers.css';
 import { Layers } from './Layers.js';
 import { createMusicInstance, videoTimelineDuration } from './music-ui.js';
 import { MusicTimeline, type MusicTimelineGesture } from './MusicTimeline.js';
-import { Popover } from './Popover.js';
 import { RushEditBar, TimelineCutMarks } from './RushEditBar.js';
 import { useTimelineKeyframes, type TimelineKeyframeDraft } from './timeline-keyframes.js';
 import { planTimelineDrop, type DropPlan, type TimelinePayload } from './timeline-placement.js';
@@ -58,6 +57,9 @@ export interface DraftPreview {
   document: ProjectDocument;
   frame: number;
 }
+const ZOOM_MIN = 12;
+const ZOOM_MAX = 180;
+const ZOOM_FACTOR = 1.25;
 interface Props {
   project: ProjectDocument;
   assets: MediaAsset[];
@@ -83,7 +85,6 @@ interface Props {
   draggedMediaIds: readonly string[] | null;
   ranges: MediaSelections;
   onDuplicate: () => void;
-  onNudge: (delta: number) => void;
   onQuickTrim: (edge: TrimEdge) => void;
   cutRange: ClipCutRange | null;
   onMarkCut: (edge: TrimEdge) => void;
@@ -422,10 +423,13 @@ export function Timeline(props: Readonly<Props>) {
     draggedMediaIds,
     ranges,
     onDuplicate,
-    onNudge,
   } = props;
   const [snapping, setSnapping] = useState(true);
-  const nudgeReasonId = useId();
+  const [clipMenu, setClipMenu] = useState<ClipMenuAnchor | null>(null);
+  const closeClipMenu = useCallback((restoreFocus: boolean): void => {
+    setClipMenu(null);
+    if (restoreFocus) document.querySelector<HTMLElement>('.timeline-clip.selected .timeline-clip-body')?.focus();
+  }, []);
   const [snapGuide, setSnapGuide] = useState<number | null>(null);
   const bypassSnap = useRef(false);
   const [pixelsPerSecond, setPixelsPerSecond] = useState(48);
@@ -529,7 +533,6 @@ export function Timeline(props: Readonly<Props>) {
   const selected = layout.clips.find((placed) => placed.clip.id === selectedClipId);
   const source = assets.find((asset) => asset.id === selected?.clip.mediaId);
   const selectedLayer = project.layers.find((layer) => layer.id === selected?.clip.layerId);
-  const nudgeRestriction = selected ? clipStartRestriction(project, selected.clip) : null;
   // Reserve access to omitted head/tail footage, including the first/last clip.
   // Outward trimming must not require dragging beyond the edge of the browser.
   const availableHead =
@@ -591,9 +594,11 @@ export function Timeline(props: Readonly<Props>) {
   const fitTimeline = (): void => {
     if (layout.duration && !drag.current && !keyframes.active && !musicGesture)
       setPixelsPerSecond(
-        Math.max(12, Math.min(180, (viewportWidth - leading - 64) / framesToSeconds(layout.duration))),
+        Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, (viewportWidth - leading - 64) / framesToSeconds(layout.duration))),
       );
   };
+  const zoomBy = (factor: number): void =>
+    setPixelsPerSecond(Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, pixelsPerSecond * factor)));
   const latestFit = useRef(fitTimeline);
   latestFit.current = fitTimeline;
   useEffect(() => {
@@ -967,56 +972,6 @@ export function Timeline(props: Readonly<Props>) {
     <section className="timeline-panel panel" id="timeline-pane" tabIndex={-1} aria-label="Video timeline">
       <div className="timeline-toolbar">
         <h2 className="declutter-sr-only">Timeline</h2>
-        <Popover label="Clip actions" className="timeline-clip-actions">
-          {(close) => (
-            <>
-              <button
-                className="secondary-button small"
-                aria-label="Duplicate selected clip"
-                disabled={!selectedClipId || interactionBlocked}
-                onClick={() => {
-                  close();
-                  onDuplicate();
-                }}
-              >
-                <Icon name="plus" size={15} />
-                Duplicate <kbd>Ctrl+D</kbd>
-              </button>
-              <div className="clip-nudge-controls">
-                <button
-                  className="secondary-button small"
-                  aria-label="Move clip one frame earlier"
-                  aria-describedby={nudgeRestriction ? nudgeReasonId : undefined}
-                  title={
-                    nudgeRestriction ??
-                    (selected?.start === 0
-                      ? 'Already at timeline frame 0'
-                      : 'Move this start or first Ripple anchor · Alt+Left')
-                  }
-                  disabled={!selected || selected.start === 0 || nudgeRestriction !== null || interactionBlocked}
-                  onClick={() => onNudge(-1)}
-                >
-                  ← 1 frame
-                </button>
-                <button
-                  className="secondary-button small"
-                  aria-label="Move clip one frame later"
-                  aria-describedby={nudgeRestriction ? nudgeReasonId : undefined}
-                  title={nudgeRestriction ?? 'Move this start or first Ripple anchor · Alt+Right'}
-                  disabled={!selected || nudgeRestriction !== null || interactionBlocked}
-                  onClick={() => onNudge(1)}
-                >
-                  1 frame →
-                </button>
-              </div>
-              {nudgeRestriction && (
-                <p className="control-hint" id={nudgeReasonId}>
-                  {nudgeRestriction}
-                </p>
-              )}
-            </>
-          )}
-        </Popover>
         <RushEditBar
           project={project}
           selected={selected}
@@ -1057,17 +1012,35 @@ export function Timeline(props: Readonly<Props>) {
         </button>
         <div className="timeline-zoom">
           <label htmlFor="timeline-zoom">Zoom</label>
+          <button
+            className="icon-button"
+            aria-label="Zoom out"
+            title="Zoom out"
+            disabled={interactionBlocked || pixelsPerSecond <= ZOOM_MIN}
+            onClick={() => zoomBy(1 / ZOOM_FACTOR)}
+          >
+            <Icon name="minus" size={15} />
+          </button>
           <input
             id="timeline-zoom"
             type="range"
             aria-label="Timeline zoom"
-            min={12}
-            max={180}
+            min={ZOOM_MIN}
+            max={ZOOM_MAX}
             step={1}
             value={pixelsPerSecond}
             disabled={interactionBlocked}
             onChange={(event) => setPixelsPerSecond(Number(event.target.value))}
           />
+          <button
+            className="icon-button"
+            aria-label="Zoom in"
+            title="Zoom in"
+            disabled={interactionBlocked || pixelsPerSecond >= ZOOM_MAX}
+            onClick={() => zoomBy(ZOOM_FACTOR)}
+          >
+            <Icon name="plus" size={15} />
+          </button>
           <button
             className="text-button"
             title="Fit timeline (F)"
@@ -1230,6 +1203,19 @@ export function Timeline(props: Readonly<Props>) {
                     event.dataTransfer.effectAllowed = 'move';
                   }}
                   onDragEnd={clearMove}
+                  onContextMenu={(event) => {
+                    event.preventDefault();
+                    if (interactionBlocked) return;
+                    onSelect(clip.id);
+                    // The Menu key reports no pointer position; anchor to the clip instead.
+                    const box = event.currentTarget.getBoundingClientRect();
+                    const keyboard = event.clientX === 0 && event.clientY === 0;
+                    setClipMenu({
+                      clipId: clip.id,
+                      x: keyboard ? box.left : event.clientX,
+                      y: keyboard ? box.bottom : event.clientY,
+                    });
+                  }}
                 >
                   <button
                     className="timeline-clip-body"
@@ -1461,6 +1447,16 @@ export function Timeline(props: Readonly<Props>) {
             {interactionStatus}
           </span>
         </div>
+      )}
+      {clipMenu && (
+        <ClipContextMenu
+          anchor={clipMenu}
+          onClose={closeClipMenu}
+          onDuplicate={() => {
+            setClipMenu(null);
+            onDuplicate();
+          }}
+        />
       )}
     </section>
   );
