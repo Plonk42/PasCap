@@ -38,7 +38,12 @@ function channelNavigation(page: Page, label: string, direction: 'Previous' | 'N
 }
 
 function transformDiamond(page: Page): Locator {
-  return inspector(page).getByRole('button', { name: 'Transform keyframe at displayed source frame', exact: true });
+  return inspector(page).getByRole('button', { name: 'Keyframe Scale', exact: true });
+}
+
+/** Every main Transform setting has its own diamond, like Colour; stored fields have none. */
+function transformDiamonds(page: Page): Locator {
+  return inspector(page).locator('.spatial-pose-fields .keyframe-toggle');
 }
 
 function marker(page: Page, type: 'transform' | 'speed', source: number): Locator {
@@ -274,7 +279,7 @@ for (const viewport of [
         await expect(navigation(page, section, 'Next')).toHaveCount(0);
       }
       await expect(diamond(page, 'Speed')).toBeHidden();
-      await expect(transformDiamond(page)).toHaveCount(0);
+      await expect(transformDiamonds(page)).toHaveCount(0);
       await expect(page.getByRole('spinbutton', { name: 'Clip speed rate', exact: true })).toBeEnabled();
       await expect(page.getByRole('spinbutton', { name: 'Transform Scale', exact: true })).toBeEnabled();
       for (const section of ['Speed', 'Transform', 'Colour'] as const) {
@@ -354,7 +359,7 @@ for (const viewport of [
         await expect(channelNavigation(page, 'Speed', direction)).toBeHidden();
       await expect(page.getByRole('spinbutton', { name: 'Track speed rate', exact: true })).toBeDisabled();
       await expect(page.getByRole('spinbutton', { name: 'Track speed rate', exact: true })).toHaveValue('1');
-      await expect(transformDiamond(page)).toHaveCount(0);
+      await expect(transformDiamonds(page)).toHaveCount(0);
       const pose = evaluateSpatial(document.clips[0]!.spatial, 25);
       await expect(page.getByRole('spinbutton', { name: 'Transform Scale', exact: true })).toHaveValue(
         String(pose.scale),
@@ -641,7 +646,7 @@ for (const viewport of [
       await unchanged(page, document);
     });
 
-    test('Transform header and selector reach off-trim/original OUT keys; one diamond captures the actual full pose', async ({
+    test('Transform header and selector reach off-trim/original OUT keys; each setting diamond captures only that actual setting', async ({
       page,
     }) => {
       const document = await current(page);
@@ -651,8 +656,8 @@ for (const viewport of [
       await expect(select.locator('option')).toHaveCount(5);
       await expect(select.locator('option[value="0"]')).toContainText('outside clip');
       await expect(select.locator('option[value="120"]')).toContainText('outside clip');
+      await expect(transformDiamonds(page)).toHaveCount(8);
       await expect(transformDiamond(page)).toHaveCount(1);
-      await expect(page.locator('.spatial-pose-fields .keyframe-toggle')).toHaveCount(0);
       for (const source of [20, 60, 100, 120]) {
         await navigation(page, 'Transform', 'Next').click();
         await previewAt(page, document, nearestOutput(placed, source));
@@ -680,7 +685,16 @@ for (const viewport of [
       expected.clips[0]!.spatial.keyframes.splice(3, 0, {
         frame: placed.retiming.sourceAt(89),
         interpolation: 'linear',
-        values: evaluateSpatial(document.clips[0]!.spatial, placed.retiming.sourcePositionAt(89)),
+        values: {
+          cropLeft: null,
+          cropRight: null,
+          cropTop: null,
+          cropBottom: null,
+          scale: evaluateSpatial(document.clips[0]!.spatial, placed.retiming.sourcePositionAt(89)).scale,
+          translateX: null,
+          translateY: null,
+          rotation: null,
+        },
       });
       expect(await current(page)).toEqual(expected);
       await expect(transformDiamond(page)).toHaveAttribute('aria-pressed', 'true');

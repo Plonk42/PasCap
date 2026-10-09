@@ -83,8 +83,7 @@ async function seek(page: Page, frame: number): Promise<void> {
   await page.evaluate((position) => window.pascapLab!.engine.seek(position), frame);
   await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(frame);
 }
-const capture = (page: Page) =>
-  page.getByRole('button', { name: 'Transform keyframe at displayed source frame', exact: true });
+const capture = (page: Page, label: string) => page.getByRole('button', { name: `Keyframe ${label}`, exact: true });
 const exact = (page: Page, label: string, stored = false) =>
   page.getByRole('spinbutton', { name: `${stored ? 'Stored Transform' : 'Transform'} ${label}`, exact: true });
 
@@ -111,23 +110,25 @@ test('all eight exact fields edit only the base with full precision and no impli
   expect((await current(page)).clips[0]!.spatial.base.rotation).toBe(0);
 });
 
-test('invalid crop drafts remain editable without clamping and Escape restores', async ({ page }) => {
+test('invalid crop drafts remain editable without clamping and Escape restores; crossing crops are accepted', async ({
+  page,
+}) => {
   await exact(page, 'Crop right').fill('0.6');
   await exact(page, 'Crop right').press('Enter');
   const before = await current(page);
   const left = exact(page, 'Crop left');
-  await left.fill('0.456789');
-  await left.press('Enter');
-  await expect(left).toHaveAttribute('aria-invalid', 'true');
-  await expect(left).toHaveValue('0.456789');
-  expect(await current(page)).toEqual(before);
-  await left.press('Escape');
-  await expect(left).toHaveValue('0');
   await left.fill('1');
   await left.press('Enter');
   await expect(left).toHaveAttribute('aria-invalid', 'true');
   await expect(left).toHaveValue('1');
   expect(await current(page)).toEqual(before);
+  await left.press('Escape');
+  await expect(left).toHaveValue('0');
+  // Opposite edges that meet or cross simply cover nothing; they are never repaired.
+  await left.fill('0.456789');
+  await left.press('Enter');
+  await expect(left).toHaveAttribute('aria-invalid', 'false');
+  expect((await current(page)).clips[0]!.spatial.base).toMatchObject({ cropLeft: 0.456789, cropRight: 0.6 });
 });
 
 test('real native slider drafts commit on release once, cancel on Escape and Undo restores', async ({ page }) => {
@@ -154,32 +155,46 @@ test('real native slider drafts commit on release once, cancel on Escape and Und
   await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
 });
 
-test('one full-pose diamond captures continuous evaluation at the actual displayed integer source frame', async ({
+test('each setting has its own diamond capturing only that setting at the displayed integer source frame', async ({
   page,
 }) => {
   const before = await seed(page, (document) => {
     const clip = document.clips[0]!;
     clip.speed = { mode: 'constant', rate: 0.75 };
     clip.spatial.base.scale = 1.5;
+    clip.spatial.base.rotation = 20;
+    const none = { cropLeft: null, cropRight: null, cropTop: null, cropBottom: null, translateX: null };
     clip.spatial.keyframes = [
-      { frame: 0, interpolation: 'linear', values: { ...NEUTRAL_SPATIAL_POSE, scale: 1 } },
-      { frame: 100, interpolation: 'smooth', values: { ...NEUTRAL_SPATIAL_POSE, scale: 3, rotation: 90 } },
+      { frame: 0, interpolation: 'linear', values: { ...none, translateY: null, rotation: null, scale: 1 } },
+      { frame: 100, interpolation: 'smooth', values: { ...none, translateY: null, rotation: null, scale: 3 } },
     ];
   });
   await seek(page, 5);
   const placed = calculateLayout(before).clips[0]!;
   const source = placed.retiming.sourceAt(5);
   const evaluated = evaluateSpatial(before.clips[0]!.spatial, placed.retiming.sourcePositionAt(5));
+  // Scale is animated without a key here, so it is read-only; Rotation is unkeyed and still edits its base.
   await expect(exact(page, 'Scale')).toBeDisabled();
-  await expect(capture(page)).toHaveAttribute('aria-pressed', 'false');
-  await capture(page).focus();
-  await capture(page).press('Enter');
-  await expect(capture(page)).toHaveAttribute('aria-pressed', 'true');
+  await expect(exact(page, 'Rotation')).toBeEnabled();
+  await expect(capture(page, 'Scale')).toHaveAttribute('aria-pressed', 'false');
+  await capture(page, 'Scale').focus();
+  await capture(page, 'Scale').press('Enter');
+  await expect(capture(page, 'Scale')).toHaveAttribute('aria-pressed', 'true');
+  await expect(capture(page, 'Rotation')).toHaveAttribute('aria-pressed', 'false');
   const captured = await current(page);
   expect(captured.clips[0]!.spatial.keyframes.find((key) => key.frame === source)).toEqual({
     frame: source,
     interpolation: 'linear',
-    values: evaluated,
+    values: {
+      cropLeft: null,
+      cropRight: null,
+      cropTop: null,
+      cropBottom: null,
+      scale: evaluated.scale,
+      translateX: null,
+      translateY: null,
+      rotation: null,
+    },
   });
   expect(captured.clips[0]!.spatial.base).toEqual(before.clips[0]!.spatial.base);
   expect(captured.layers).toEqual(before.layers);
@@ -188,9 +203,61 @@ test('one full-pose diamond captures continuous evaluation at the actual display
   expect((await current(page)).clips[0]!.spatial.keyframes.find((key) => key.frame === source)!.values.scale).toBe(
     2.3456789,
   );
+  // Rotation joins the same key without touching Scale, then leaves it again.
+  await capture(page, 'Rotation').click();
+  const joined = (await current(page)).clips[0]!.spatial.keyframes.find((key) => key.frame === source)!;
+  expect(joined.values).toMatchObject({ scale: 2.3456789, rotation: 20, translateX: null });
+  await capture(page, 'Rotation').click();
+  expect(
+    (await current(page)).clips[0]!.spatial.keyframes.find((key) => key.frame === source)!.values.rotation,
+  ).toBeNull();
   await seek(page, 20);
   await expect(exact(page, 'Scale')).toBeDisabled();
+  await expect(exact(page, 'Rotation')).toBeEnabled();
   expect((await current(page)).clips[0]!.spatial.keyframes).toHaveLength(3);
+});
+
+test('per-setting Previous/Next visit only that setting\u2019s keys; the timeline marks Transform keys at the top', async ({
+  page,
+}) => {
+  const before = await seed(page, (document) => {
+    const clip = document.clips[0]!;
+    const none = {
+      cropLeft: null,
+      cropRight: null,
+      cropTop: null,
+      cropBottom: null,
+      translateX: null,
+      translateY: null,
+    };
+    clip.spatial.keyframes = [
+      { frame: 10, interpolation: 'linear', values: { ...none, scale: 1, rotation: null } },
+      { frame: 40, interpolation: 'linear', values: { ...none, scale: null, rotation: 45 } },
+      { frame: 70, interpolation: 'linear', values: { ...none, scale: 2, rotation: null } },
+    ];
+  });
+  await seek(page, 0);
+  const marker = page.locator('[data-clip-id="one"] [data-clip-keyframe="transform"]');
+  await expect(marker).toHaveCount(3);
+  await expect(marker.nth(1)).toHaveAccessibleName(/Rotation/);
+  await expect(marker.nth(0)).toHaveAccessibleName(/\(Scale\)/);
+  await expect(marker.first()).toHaveText('\u25bc');
+  const clipBox = (await page.locator('[data-clip-id="one"]').boundingBox())!;
+  const markerBox = (await marker.first().boundingBox())!;
+  expect(markerBox.y - clipBox.y).toBeLessThan(10);
+  await page.getByRole('button', { name: 'Next Scale keyframe', exact: true }).click();
+  await expect(page.getByRole('combobox', { name: 'Selected Transform keyframe', exact: true })).toHaveValue('10');
+  await page.getByRole('button', { name: 'Next Scale keyframe', exact: true }).click();
+  // Frame 40 enables only Rotation, so Scale skips straight to its next key.
+  await expect(page.getByRole('combobox', { name: 'Selected Transform keyframe', exact: true })).toHaveValue('70');
+  await page.getByRole('button', { name: 'Previous Rotation keyframe', exact: true }).click();
+  await expect(page.getByRole('combobox', { name: 'Selected Transform keyframe', exact: true })).toHaveValue('40');
+  await expect(page.getByRole('button', { name: 'Next Rotation keyframe', exact: true })).toHaveAttribute(
+    'aria-disabled',
+    'true',
+  );
+  expect(await current(page)).toEqual(before);
+  expect(memory.saves).toBe(0);
 });
 
 test('stored full poses preserve base, frame input focus through move/Undo, reject collisions and edit easing', async ({

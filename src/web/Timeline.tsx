@@ -26,9 +26,11 @@ import {
 import type { ClipCutRange } from '../shared/rush-editing.js';
 import { snapFrame, snapPoints } from '../shared/snap.js';
 import { trimOnTimeline, type TrimEdge } from '../shared/source-range.js';
+import { spatialKeyChannels } from '../shared/spatial.js';
 import { calculateLayout, type PlacedClip } from '../shared/timeline.js';
 import { formatTimecode, framesToSeconds, secondsToFrames } from '../shared/timing.js';
 import { clipKeyframeMarkers } from './clip-keyframe-markers.js';
+import { SPATIAL_CONTROLS } from './spatial-editor.js';
 import './clip-keyframe-markers.css';
 import {
   CLIP_DRAG_TYPE,
@@ -326,6 +328,17 @@ function ClipKeyframeMarkers(
       {markers.map((marker) => {
         const type = marker.type === 'transform' ? 'Transform' : 'Speed';
         const displayedSource = props.placed.retiming.sourceAt(marker.seekFrame - props.placed.start);
+        const transformKey =
+          marker.type === 'transform'
+            ? props.placed.clip.spatial.keyframes.find((key) => key.frame === marker.sourceFrame)
+            : undefined;
+        const settings = transformKey
+          ? spatialKeyChannels(transformKey)
+              .map((channel) => SPATIAL_CONTROLS.find((control) => control.key === channel)!.label)
+              .join(', ')
+          : '';
+        const nameSuffix = settings ? ` (${settings})` : '';
+        const titleSuffix = settings ? ` · ${settings}` : '';
         return (
           <button
             type="button"
@@ -335,8 +348,8 @@ function ClipKeyframeMarkers(
             data-source-frame={marker.sourceFrame}
             data-timeline-frame={marker.timelineFrame}
             data-seek-frame={marker.seekFrame}
-            aria-label={`${type} keyframe source ${marker.sourceFrame} on clip ${props.placed.clip.id}, ${props.name}`}
-            title={`${type} · source frame ${marker.sourceFrame} · timeline frame ${marker.timelineFrame} (${formatTimecode(marker.timelineFrame)}) · Preview source ${displayedSource} at timeline frame ${marker.seekFrame}${marker.speedOverridden ? ' · Clip Speed overridden by video track Speed' : ''}`}
+            aria-label={`${type} keyframe source ${marker.sourceFrame} on clip ${props.placed.clip.id}, ${props.name}${nameSuffix}`}
+            title={`${type} · source frame ${marker.sourceFrame}${titleSuffix} · timeline frame ${marker.timelineFrame} (${formatTimecode(marker.timelineFrame)}) · Preview source ${displayedSource} at timeline frame ${marker.seekFrame}${marker.speedOverridden ? ' · Clip Speed overridden by video track Speed' : ''}`}
             style={
               {
                 '--clip-keyframe-position': `${(marker.outputFrame / props.placed.duration) * 100}%`,
@@ -375,7 +388,7 @@ function ClipKeyframeMarkers(
               props.onSeek(marker.seekFrame);
             }}
           >
-            <span aria-hidden="true">◆</span>
+            <span aria-hidden="true">{marker.type === 'transform' ? '▼' : '◆'}</span>
           </button>
         );
       })}
