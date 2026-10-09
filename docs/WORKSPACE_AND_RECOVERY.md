@@ -292,7 +292,7 @@ animated channels without an enabled setting at the playhead are read-only until
 
 ### Section keyframe controls
 
-Colour, Speed and Transform always show their capture diamonds and adjacent per-setting **Previous/Next** buttons while the section is expanded; there is no Animate toggle and no stored preference. Each expanded section has one keyframe line with the **number of keyframes**, one **Previous/Next** pair over the same set and **Reset keyframes**. The line is hidden while the section is collapsed; the title row and its help stay reachable. Rendering, retained keyframes and read-only constraints never depend on what is shown.
+Colour, Speed and Transform always show their capture diamonds and adjacent per-setting **Previous/Next** buttons while the section is expanded; there is no Animate toggle and no stored preference. Each expanded section has one keyframe line with the **number of keyframes**, one **Previous/Next** pair over the same set and **Reset**. The line is hidden while the section is collapsed; the title row and its help stay reachable. Rendering, retained keyframes and read-only constraints never depend on what is shown.
 
 Main scalar Colour/Opacity and track Speed diamonds retain adjacent per-setting
 **Previous/Next** buttons because not every setting is enabled at every shared
@@ -440,7 +440,7 @@ an exact alternative, with the same atomic move validation.
 
 In Clip, Reset speed to 1× changes only an active keyed Speed setting when animated;
 without Speed keyframes it resets the selected clip's constant/ramp/custom base.
-It never clears the track curve or unrelated enabled settings. Colour **Reset keyframes**
+It never clears the track curve or unrelated enabled settings. Colour **Reset** on an animated track
 changes only enabled colour values at the current keyframe; double-clicking a setting's
 name resets only that setting, including unanimated track colour bases. Stored-keyframe resets in Keyframes target that
 keyframe's existing enabled setting, not a different value at the playhead.

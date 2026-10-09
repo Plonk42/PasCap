@@ -68,7 +68,7 @@ and technical paths stay unchanged; this glossary does not change schema 12.
 - **Transform** is clip-owned crop, Scale, Translate X/Y and Rotation; its single
   diamond captures the full eight-value source-frame pose, not an enabled track setting.
 - **Keyframe line**: the first row of an expanded Colour, Speed or Transform section: **N keyframes**, one
-  **Previous/Next** pair over the same set and **Reset keyframes**. It is hidden while the section is collapsed.
+  **Previous/Next** pair over the same set and **Reset**. It is hidden while the section is collapsed.
   There is no Animate toggle or stored preference; capture diamonds and per-setting arrows are always visible.
 - **Easing**: the visible label for track-keyframe, Transform, custom clip-speed
   and ramp selectors. Contextual accessible names remain, including
