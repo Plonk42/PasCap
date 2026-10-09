@@ -95,8 +95,9 @@ and technical paths stay unchanged; this glossary does not change schema 12.
   final valid release commits one Undo step. Invalid final release, Escape,
   cancellation, lost capture or blur restores; never commit an earlier valid draft.
   Handle arrows move one original frame (Shift ten); Home restores IN=0 and End
-  restores OUT=original frame count. Source review keeps its independent paired
-  Apply workflow. See [TIMELINE_EDITING.md](../TIMELINE_EDITING.md).
+  restores OUT=original frame count. Source review's numeric IN/OUT apply as one
+  validated pair on Enter or when focus leaves both fields (not between them);
+  Escape restores. See [TIMELINE_EDITING.md](../TIMELINE_EDITING.md).
 - Other frames/durations/fades: native numeric stepper, explicit frame units and existing
   timecode feedback. No clamping, rounding or hidden timing repair.
 - Easing/modes/recordings: native select; selected easing has its existing graph.

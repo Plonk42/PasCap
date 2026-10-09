@@ -298,7 +298,7 @@ test('pre-trims media and carries the recoverable range into plus, reload and dr
   await sourceAtPointer(page, 'pattern-b.mp4', 0.4);
   await page.getByRole('spinbutton', { name: 'Source IN', exact: true }).fill('20');
   await page.getByRole('spinbutton', { name: 'Source OUT', exact: true }).fill('95');
-  await page.getByRole('button', { name: 'Apply range' }).click();
+  await page.getByRole('spinbutton', { name: 'Source OUT', exact: true }).press('Enter');
   expect(await page.evaluate(() => window.pascapLab!.project()!.clips.length)).toBe(1);
   expect(projectSchema.parse(await page.evaluate(() => window.pascapLab!.project())).layers[0]?.keyframes).toEqual(
     anchors,
@@ -596,7 +596,7 @@ test('source-range choices are per project and do not alter already inserted exc
   await sourceAtPointer(page, 'pattern-a.mp4', 0.25);
   await page.getByRole('spinbutton', { name: 'Source IN', exact: true }).fill('30');
   await page.getByRole('spinbutton', { name: 'Source OUT', exact: true }).fill('80');
-  await page.getByRole('button', { name: 'Apply range' }).click();
+  await page.getByRole('spinbutton', { name: 'Source OUT', exact: true }).press('Enter');
   expect(await page.evaluate(() => window.pascapLab!.project()!.clips[0]!.sourceIn)).toBe(0);
   expect(projectSchema.parse(await page.evaluate(() => window.pascapLab!.project())).layers[0]?.keyframes).toEqual(
     anchors,

@@ -188,8 +188,8 @@ Undo step; an unchanged range adds none. Invalid final release, Escape, pointer
 cancellation, lost capture or window blur restores the starting document/preview,
 never commits an earlier valid draft. Focused handle arrows move one original
 frame (Shift ten); Home on IN restores zero and End on OUT restores the original
-exclusive OUT. Source review remains independent, with its current paired numeric
-**Apply range / Cancel range** workflow.
+exclusive OUT. Source review remains independent: its numeric IN/OUT pair applies on
+Enter or when focus leaves both fields; Escape restores.
 
 ## Cutting an unwanted part
 
@@ -572,10 +572,11 @@ before starting multiple jobs. Startup and hover never queue old recordings.
 Prepared recording buttons hover-scrub across the complete source range and show
 a mouse-following marker. The source viewer is separate from the project playhead
 and stays out of list flow so recording cards never move under an active hover/drag. Review
-IN/OUT handles, numeric **Apply range** and I/O marks are non-destructive. OUT is
+IN/OUT handles, numeric fields and I/O marks are non-destructive. OUT is
 exclusive; handle drafts cancel/release independently of timeline history/autosave.
 There are no separate Mark IN/OUT or Reset buttons: Home/End on a handle restores
-that edge. Invalid numeric drafts keep an inline error until **Apply range** or **Cancel range**.
+that edge. The numeric pair applies on Enter or when focus leaves both fields, validating IN and OUT
+together; invalid drafts keep an inline error until corrected or restored with Escape.
 The source range strip below the image spans the whole original with its five prepared
 snapshots; hatching identifies omitted footage and timeline-style **IN / OUT**
 handles (24 px pointer targets) trim, while the rest of the track scrubs. Drag
@@ -588,7 +589,7 @@ verified muted proxy within the applied range,
 from the current observed frame if it precedes the last included frame, otherwise
 from IN. It stops and seeks exactly OUT − 1, without looping or audio. A one-frame
 range simply displays that frame. Numeric drafts do not change the played range.
-Scrubbing, trimming, marking and **Apply range** pause first; closing, hiding, switching
+Scrubbing, trimming, marking and numeric range edits pause first; closing, hiding, switching
 recordings/projects or leaving Source preview cancels pending playback and releases
 its sole decoder. Loading/playback failures remain explicit with Retry. Source
 playback never moves the timeline/music, changes clips/track keyframes or saves/history.
@@ -612,7 +613,7 @@ precision, commit on Enter/blur, keep invalid drafts editable and restore on Esc
 **Clip → Range** uses the full-original bar and exact timecode text fields above.
 Other integer source/placement frames, durations and fades retain exact native
 numeric steppers and existing timecode feedback, without arbitrary timing sliders.
-Source-review paired IN/OUT retains its explicit **Apply range / Cancel range** workflow.
+Source-review IN/OUT fields apply as a pair on Enter or when focus leaves both; Escape restores.
 **Clip / Track / Audio** separates clip-owned source/placement/speed/Transform,
 track-owned Colour/keyframes/transitions/fades, and music. The header directly exposes
 help; **Workspace options**

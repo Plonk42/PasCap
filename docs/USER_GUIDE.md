@@ -83,8 +83,8 @@ that recording selected while you hover other recordings. Review opens paused an
 uses a separate decoder; it never plays or prepares an original implicitly.
 
 Set source **IN/OUT** by dragging the handles, with focused source **I/O**, or with
-the paired numeric fields followed by **Apply range**; **Cancel range** restores
-unapplied drafts. OUT is exclusive; **O** includes
+the paired numeric fields, which apply together on Enter or when you leave both;
+Escape restores an unapplied draft. OUT is exclusive; **O** includes
 the displayed frame. Drag a handle back to an edge (or press **Home**/**End** on it)
 to restore the full recording. These choices are per-project, browser-local state,
 not portable project-document fields.
@@ -96,7 +96,7 @@ scrubs. Dragging previews the boundary frame; release applies, while Escape/capt
 loss/cancellation/window blur restores the prior choice. The round **Play / Pause**
 button left of the strip reviews the applied range, muted, from the current frame or IN.
 It stops at the last included frame (OUT − 1), without looping; a one-frame range
-just displays that frame. Numeric drafts are not played or inserted before **Apply range**.
+just displays that frame. Unapplied numeric drafts are not played or inserted.
 Scrubbing or changing the range pauses first. Closing, switching sources/projects
 or leaving the Source tab cancels playback. Source playback does not move the
 timeline or music and does not create Undo steps or saves. Failures expose Retry.
@@ -157,7 +157,7 @@ Dragging previews the complete validated document; final valid release is one
 Undo step. An invalid final release, Escape, cancellation, lost capture or blur
 restores without applying an earlier valid draft. Focused handle arrows move one
 original frame (Shift ten); Home on IN restores zero and End on OUT restores the
-original exclusive OUT. Source review keeps its independent paired **Apply range / Cancel range** workflow.
+original exclusive OUT. Source review keeps its independent numeric IN/OUT pair (Enter/blur applies, Escape restores).
 
 - **Split / S** splits at the playhead and selects the new right piece.
 - **Trim start / Q** removes the head before the displayed frame; **Trim end / W**
@@ -594,8 +594,8 @@ window blur restores the starting value without save/history. Each keyboard slid
 adjustment is an individual validated edit. **Clip → Range** uses the full-original
 bar and exact timecode text fields described above. Other integer source/timeline
 frames, durations and fades retain exact native numeric steppers and timecode
-feedback, not arbitrary timing sliders. Source-review paired IN/OUT deliberately
-requires **Apply range**; **Cancel range** restores unapplied drafts.
+feedback, not arbitrary timing sliders. Source-review paired IN/OUT applies as
+a pair on Enter or when focus leaves both fields; Escape restores unapplied drafts.
 
 Clip shows the selected clip/video track first; section readouts and dots
 indicate adjusted settings without expanding everything. Animated channels use
