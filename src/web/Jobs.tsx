@@ -15,8 +15,8 @@ export interface JobsProps {
 }
 
 const KIND_LABELS: Readonly<Record<MediaJob['kind'], string>> = {
-  prepare: 'Video preparation',
-  audio: 'Audio preparation',
+  prepare: 'Video recording preparation',
+  audio: 'Music recording preparation',
   reference: 'Reference render',
   export: 'Export',
 };
@@ -294,7 +294,7 @@ export function Jobs({ jobs, onCancel, open, onOpen, onClose, busy, error, onRef
             {!jobs.length ? (
               <div className="activity-empty">
                 <strong>No jobs yet</strong>
-                <p>Video and audio preparation, reference renders and exports appear here.</p>
+                <p>Video and music recording preparation, reference renders and exports appear here.</p>
               </div>
             ) : (
               <>

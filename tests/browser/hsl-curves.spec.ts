@@ -65,7 +65,7 @@ test('curve endpoints, exact collisions, nonmonotonic values, maximum points and
   await expect(input).toBeDisabled();
   await output.fill('0.8');
   await output.press('Enter');
-  await page.getByRole('button', { name: 'Add colour curve point', exact: true }).click();
+  await page.getByRole('button', { name: 'Add colour curve control node', exact: true }).click();
   await expect(input).toHaveValue('0.5');
   await output.fill('0.123456789');
   await output.press('Enter');
@@ -74,8 +74,9 @@ test('curve endpoints, exact collisions, nonmonotonic values, maximum points and
   await expect(input).toHaveValue('1');
   expect((await current(page)).layers[0]!.colour.curves.master[1]!.x).toBe(0.5);
   await input.press('Escape');
-  for (let i = 3; i < 16; i++) await page.getByRole('button', { name: 'Add colour curve point', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Add colour curve point', exact: true })).toBeDisabled();
+  for (let i = 3; i < 16; i++)
+    await page.getByRole('button', { name: 'Add colour curve control node', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Add colour curve control node', exact: true })).toBeDisabled();
   expect((await current(page)).layers[0]!.colour.curves.master).toHaveLength(16);
   await page.getByRole('button', { name: 'Reset master curve', exact: true }).click();
   await expect
@@ -90,10 +91,10 @@ test('captured curve drafts cancel, reject the final invalid destination and com
   page,
 }) => {
   await page.locator('.advanced-colour details').nth(1).locator('summary').click();
-  await page.getByRole('button', { name: 'Add colour curve point', exact: true }).click();
+  await page.getByRole('button', { name: 'Add colour curve control node', exact: true }).click();
   await expect.poll(() => memory.saves).toBe(1);
   const original = (await current(page)).layers[0]!.colour.curves.master;
-  const point = page.getByRole('button', { name: 'Colour curve point 2', exact: true });
+  const point = page.getByRole('button', { name: 'Colour curve control node 2', exact: true });
   const box = await point.boundingBox();
   if (!box) throw new Error('Curve point not visible.');
   const x = box.x + box.width / 2,
@@ -143,10 +144,10 @@ test('scalar keys do not disable static HSL or curves and Reset keys preserves t
 for (const cancellation of ['pointercancel', 'lostcapture', 'windowblur'] as const) {
   test(`curve ${cancellation} restores captured points without a draft save`, async ({ page }) => {
     await page.locator('.advanced-colour details').nth(1).locator('summary').click();
-    await page.getByRole('button', { name: 'Add colour curve point', exact: true }).click();
+    await page.getByRole('button', { name: 'Add colour curve control node', exact: true }).click();
     await expect.poll(() => memory.saves).toBe(1);
     const original = (await current(page)).layers[0]!.colour.curves.master;
-    const point = page.getByRole('button', { name: 'Colour curve point 2', exact: true });
+    const point = page.getByRole('button', { name: 'Colour curve control node 2', exact: true });
     const box = await point.boundingBox();
     if (!box) throw new Error('Visible point required.');
     await point.evaluate((element) =>
@@ -170,7 +171,7 @@ for (const cancellation of ['pointercancel', 'lostcapture', 'windowblur'] as con
     await page.mouse.up();
     expect((await current(page)).layers[0]!.colour.curves.master).toEqual(original);
     expect(memory.saves).toBe(1);
-    await expect(page.getByRole('button', { name: 'Add colour curve point', exact: true })).toBeEnabled();
+    await expect(page.getByRole('button', { name: 'Add colour curve control node', exact: true })).toBeEnabled();
   });
 }
 
@@ -192,7 +193,7 @@ test('advanced row settings survive same-row clip selection; empty-row selection
   await expect(field).toHaveValue('7.123456789');
   await field.fill('31');
   await field.press('Enter');
-  await page.getByRole('button', { name: 'Select layer Empty advanced row', exact: true }).click();
+  await page.getByRole('button', { name: 'Select track Empty advanced row', exact: true }).click();
   await page.locator('.advanced-colour details').first().locator('summary').click();
   await expect(field).toHaveValue('0');
   await expect(field).toBeEnabled();

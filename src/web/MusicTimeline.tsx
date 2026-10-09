@@ -279,7 +279,7 @@ export function MusicTimeline(props: Readonly<Props>) {
         onClick={() => props.onSelect(music.id)}
         onKeyDown={(event) => event.stopPropagation()}
       >
-        Music {index + 1} · {asset?.name ?? 'Unavailable recording'}
+        Music track {index + 1} · {asset?.name ?? 'Unavailable recording'}
       </button>
       <div
         className={`music-timeline-clip ${selected ? 'selected' : ''} ${candidate?.error ? 'invalid' : ''}`}

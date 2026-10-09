@@ -20,7 +20,7 @@ is tracked in [#9 — networking](https://github.com/Plonk42/PasCap/issues/9),
 
 ## No-copy source access today
 
-**Import** defaults to the service-side footage browser. Choose an approved root,
+**Import → Browse recordings** opens the default service-side recording browser. Choose an approved root,
 open a folder, select MP4/MOV/M4V recordings and explicitly confirm registration.
 Browsing and selection alone do not import or queue preparation. Paths belong to
 the service's filesystem, not a browser file picker or a desktop drop payload.
@@ -56,8 +56,8 @@ folder import, including folders outside browser roots. It can register/autoqueu
 the whole folder and therefore start substantial work; submit it only explicitly.
 It does **not** silently add a root. Approved roots constrain browsing and the
 selected-path route, not every existing deliberate manual import action. Standalone
-music uses **Audio → Music → Browse music files**, a native single-selection modal
-beside the manual path form. Music browsing/selection/Cancel never POST; only explicit
+music uses **Audio → Music → Browse music recordings**, a native single-selection modal
+beside the manual **Music recording path** form. Music browsing/selection/Cancel never POST; only explicit
 confirmation registers/prepares and adds the importing project's audio membership.
 Failed/uncertain writes retain the selection and error without automatic retry.
 WAV/MP3/M4A/AAC/FLAC/OGG/OPUS/AIFF/AIF/WMA extensions are discovery candidates;
@@ -71,17 +71,17 @@ navigation and show Import guidance without a POST. Internal ready-Media-to-Time
 dragging remains supported. Imports reference originals; generated proxies/
 thumbnails, project/registry metadata, exports/receipts and scratch are the only
 new local data, not duplicate original footage. Projects use strict schema 12 with
-complete required row Colour, including Temperature/Tint and static HSL/curves,
-no clip colour/correction fields, required clip `spatial` base/full-pose original-source keys and
-required `music` array (0–8 independent instances, unique required IDs; `[]` without
+complete required video track Colour, including Temperature/Tint and static HSL/curves,
+no clip colour/correction fields, required clip `spatial` base/full-pose original-source keyframes and
+required `music` array (0–8 independent music tracks, unique required IDs; `[]` without
 music), and
 required per-track Ripple, transitions, opening/closing fades and numeric
-`VideoLayer.opacity` in 0–1 (1 on new tracks), plus eleven nullable point channels:
+`VideoLayer.opacity` in 0–1 (1 on new tracks), plus eleven nullable keyframe channels:
 `opacity`, `speed` and nine scalar colour settings, including `temperature` and
-`tint`. HSL/curves remain static. Row `opacity` is the sole saved
+`tint`. HSL/curves remain static. Track `opacity` is the sole saved
 Opacity value; saved `clip.opacity` and old `clipOpacity`/`layerOpacity` channels
-are rejected. The row value or its overriding keys supply Opacity to each source
-in a dissolve group, without an additional layer multiplier. v1–v11 projects
+are rejected. The track value or its overriding keyframes supply Opacity to each source
+in a dissolve group, without an additional track multiplier. v1–v11 projects
 and receipt snapshots remain unchanged/incompatible and require project recreation,
 without migration, compatibility defaults, null/old-format readers or automatic deletion.
 Export receipts remain version 1 with strict v12 snapshots and required captured
@@ -89,11 +89,11 @@ audio-source/instance-plan arrays; invalid arrays/older snapshots remain preserv
 and rejected. Registry/proxy/current PCM formats and source identity checks are unchanged.
 
 Music import populates the project bin/preparation queue, never implicit placement.
-Up to eight independent instances can reference the same or different originals
+Up to eight independent music tracks can reference the same or different originals
 without copying them. Project duration is the maximum video clip OUT or music
 start + duration; music can extend it. Video closing fades end at their clip OUT,
 then the picture is black while music continues/fades at its own end. Music-only
-preview is black; native export still requires a video clip and uses layered
+preview is black; native export still requires a video clip and uses composited
 export for music tails. [MULTIPLE_MUSIC.md](design/MULTIPLE_MUSIC.md) specifies
 the current contract and pending validation, not container/release acceptance.
 
@@ -202,7 +202,7 @@ its Node and FFmpeg/ffprobe toolchain, including the required `libx264`, FFV1,
 `lut3d`/`xfade`, raw/lossless pixel formats and colour/timing behaviour. A distribution
 package or a different FFmpeg build cannot be declared equivalent merely because
 it starts: container parity tests are required for proxy correspondence, retiming,
-layer composition, BT.709 tags, exact frame counts and music/export verification.
+track composition, BT.709 tags, exact frame counts and music/export verification.
 
 ## Future container acceptance — not completed
 
@@ -230,7 +230,7 @@ synthetic media and explicit read-only source bind mounts:
 5. Stop during native work with SIGTERM, verify child reaping/owned-scratch cleanup,
    recreate with the same paths/data and retain projects, registry/proxy reuse,
    existing registered source bytes and accessible successful exports/receipts.
-6. Run native proxy and short 720p/4K timing/colour/layer/music parity tests in both
+6. Run native proxy and short 720p/4K timing/colour/track/music parity tests in both
    runtimes. Report actual results separately from historical native evidence;
    make no GPU or long-render performance claim from a container build or short test.
 

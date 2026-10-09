@@ -1,8 +1,8 @@
 # Development
 
-Current strict schema **12** requires nine scalar bases in each row's `colour`,
+Current strict schema **12** requires nine scalar bases in each video track's `colour`,
 including Temperature/Tint (−1…1, neutral 0), all eight HSL bands and all four
-colour curves. Shared points require eleven nullable fields, in control order:
+colour curves. Shared keyframes require eleven nullable fields, in control order:
 `opacity`, `speed`, `temperature`, `tint`, `exposure`, `brightness`, `contrast`,
 `hue`, `saturation`, `highlights`, `shadows`. HSL/curves remain static.
 Reject/preserve v1–v11 documents and receipt snapshots; no load defaults,
@@ -13,7 +13,7 @@ neutral-white linear luminance normalization only. Required synthetic validation
 retains neutral identity, axis signs/combined grades, grayscale/HSL boundaries,
 GPU uniform capacity, exact native sharp knees and unchanged pixel/frame/resource
 gates; this update claims no new test results. Nonneutral HSL/curves use exact
-complete CPU grading through layered export; neutral advanced settings retain
+complete CPU grading through composited export; neutral advanced settings retain
 scalar LUT paths. At most two native 65³ Float32 buffers (6,591,000 bytes) remain
 available, without an extra decoder, texture, full-frame buffer or child process.
 Exact advanced grading remains the costliest export path, especially at UHD. See
@@ -300,9 +300,9 @@ originals in `.pascap/browser-footage/synthetic-sources/` are outside that cache
 `browse-camera-*` means generated patterns, not real recordings. The
 [fixture factory](../scripts/fixtures.ts) uses `preview-lab-v6` outside the browser
 cache and `preview-lab` inside it. These are project identifiers, not schema
-versions; newly generated documents must satisfy strict v12, including complete row
+versions; newly generated documents must satisfy strict v12, including complete video track
 colour with Temperature/Tint, all eleven nullable channels and clip spatial
-base/full-pose keys. Bin resets never imply
+base/full-pose keyframes. Bin resets never imply
 a global-library fallback.
 Neither suite invokes real-source sample preparation or needs private footage/music.
 
@@ -402,10 +402,10 @@ It reuses ready proxies but may prepare missing ones; creates only an absent v12
 sample, never overwrites or migrates existing edits.
 
 The [measurement helper](../scripts/measure-preview.ts) accepts exactly **two
-1× excerpts on one enabled, zero-origin contiguous track with row Opacity 1**, no music,
-extra layers, spatial edits/keys or shared row points
-(even neutral/Speed-only points). `PASCAP_MEASURE_URL` selects that project.
-Measurement uses static scalar row Colour (including Temperature/Tint), neutral
+1× clips on one enabled, zero-origin contiguous video track with Opacity 1**, no music,
+extra tracks, spatial edits/keyframes or shared track keyframes
+(even neutral/Speed-only keyframes). `PASCAP_MEASURE_URL` selects that project.
+Measurement uses static scalar track Colour (including Temperature/Tint), neutral
 HSL and identity curves; metadata must identify the strict v12 snapshot independently of the
 report format/identifier; historical reports and receipt snapshots stay untouched.
 `npm run measure -- --skip-playback --reference` skips playback benchmarking but
@@ -417,18 +417,18 @@ total-process memory; reports expose private paths/snapshots, so review before s
 
 ## Architecture
 
-| Boundary | Entry points                                                                                                                                                 | Responsibility                                                                                |
-| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------- |
-| Shared   | [Model](../src/shared/model.ts), [commands](../src/shared/commands.ts), [layout](../src/shared/timeline.ts), [row retiming](../src/shared/layer-retiming.ts) | Strict data, integer-frame timing, atomic edits; no React/browser/FFmpeg dependencies         |
-| Preview  | [Engine](../src/preview/engine.ts), [decoder](../src/preview/decoder.ts), [compositor](../src/preview/compositor.ts), [music](../src/preview/music.ts)       | Observed frames, decoder reuse, WebGL2/Web Audio; independent of React                        |
-| Web      | [App](../src/web/App.tsx), [autosave](../src/web/autosave.ts)                                                                                                | Panels, contextual controls, transient pointer/input drafts, session history and serial saves |
-| Service  | [HTTP app](../src/server/app.ts), [library](../src/server/library.ts), [jobs](../src/server/jobs.ts), [layered export](../src/server/layered-export.ts)      | Guarded registered-source access, bounded native work and verified immutable exports          |
+| Boundary | Entry points                                                                                                                                                   | Responsibility                                                                                |
+| -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| Shared   | [Model](../src/shared/model.ts), [commands](../src/shared/commands.ts), [layout](../src/shared/timeline.ts), [track retiming](../src/shared/layer-retiming.ts) | Strict data, integer-frame timing, atomic edits; no React/browser/FFmpeg dependencies         |
+| Preview  | [Engine](../src/preview/engine.ts), [decoder](../src/preview/decoder.ts), [compositor](../src/preview/compositor.ts), [music](../src/preview/music.ts)         | Observed frames, decoder reuse, WebGL2/Web Audio; independent of React                        |
+| Web      | [App](../src/web/App.tsx), [autosave](../src/web/autosave.ts)                                                                                                  | Panels, contextual controls, transient pointer/input drafts, session history and serial saves |
+| Service  | [HTTP app](../src/server/app.ts), [library](../src/server/library.ts), [jobs](../src/server/jobs.ts), [composited export](../src/server/layered-export.ts)     | Guarded registered-source access, bounded native work and verified immutable exports          |
 
 Preview reuses **two decoder/texture slots per track, up to 16 for eight**, plus one
 source reviewer, not one per clip. Each track can dissolve independently. Generalized
-layered export renders premultiplied RGBA16 track groups. Every `VideoLayer`
+composited export renders premultiplied RGBA16 track groups. Every `VideoLayer`
 requires numeric `opacity` in 0–1, initially 1 (100%) on new tracks. Evaluate that
-row value or its sole overriding `opacity` key channel for each source, including
+track value or its sole overriding `opacity` keyframe channel for each source, including
 both dissolve sources; there is no saved `clip.opacity` or second opacity channel.
 With graded RGB $G_i$,
 black-fade brightness $b_i$, Opacity $o_i$, dissolve weight $w_i$ and per-pixel
@@ -436,7 +436,7 @@ spatial coverage $m_i$, group RGB is $C = \sum_i G_i b_i o_i w_i m_i$ and
 coverage is $A = \sum_i o_i w_i m_i$.
 Groups merge bottom-to-top as $\mathrm{result} = C + \mathrm{lower}(1 - A)$,
 without regrading or another opacity multiplier. Opacity is composition coverage,
-not SDR RGB grading; unkeyed colour settings are row-owned. Black fades preserve coverage;
+not SDR RGB grading; unkeyed colour settings are track-owned. Black fades preserve coverage;
 each dissolve remains one group. Serial limits: one original decoder, two intermediate readers,
 one encoder and three native video children per pass. Four raw buffers (two RGB8,
 two RGBA16) use **22 bytes/pixel = 182,476,800 bytes at UHD**; two 65³ Float32 LUTs
@@ -445,15 +445,15 @@ run on at most eight worker threads sharing those buffers, without copies. Two r
 three timeline representations bound concurrency, **not disk GB**;
 scratch grows with duration ([resource contract](LAYERS_AND_KEYFRAMES.md#inspector-and-resource-limits)).
 The static fast path requires one enabled, unanimated, zero-origin contiguous
-track with row Opacity 1, neutral HSL/identity colour curves and exactly neutral spatial bases without spatial keys;
-any spatial edit/key (even neutral keys) or unsupported placement/coverage uses
-generalized layered export, regardless
+video track with Opacity 1, neutral HSL/identity colour curves and exactly neutral spatial bases without spatial keyframes;
+any spatial edit/keyframe (even neutral keyframes) or unsupported placement/coverage uses
+generalized composited export, regardless
 of Ripple or track ID.
-Processing: [row points](LAYERS_AND_KEYFRAMES.md), [retiming/audio](SPEED_AND_AUDIO.md)
+Processing: [track keyframes](LAYERS_AND_KEYFRAMES.md), [retiming/audio](SPEED_AND_AUDIO.md)
 and [grading equations](COLOUR_AND_TIMING.md#colour).
 
 Strict schema 12 requires `clip.spatial: { base, keyframes }`: eight complete pose
-values and 0–256 full-pose original-source keys with required easing. Shared
+values and 0–256 full-pose original-source keyframes with required easing. Shared
 [spatial mapping](../src/shared/spatial.ts) uses unrounded original-aspect contain
 fit, original-centre pivot and half-open crop bounds; crop does not refit.
 `PlacedClip.retiming.sourcePositionAt` supplies continuous geometry while
@@ -461,14 +461,14 @@ fit, original-centre pivot and half-open crop bounds; crop does not refit.
 without optical flow. Exact neutral poses preserve old opaque black letterboxing
 after grading; nonneutral uncovered pixels have zero coverage. Native inverse
 RGB resampling precedes grading, reusing the same four raw buffers/two LUTs and
-serial process limits. Source keys remain at their original anchors through
+serial process limits. Source keyframes remain at their original anchors through
 trim/cut/split/duplicate/move; new pieces have independent deep copies. The fourth
 Clip section **Transform** is collapsed by default and uses explicit full-pose
-source-frame capture, stored-key navigation and release-only sliders. See
+source-frame capture, stored-keyframe navigation and release-only sliders. See
 [the spatial contract](design/SPATIAL_TRANSFORMS.md), not historical benchmark
 reports, for current geometry/schema/UI facts.
 
-Up to eight independently identified music instances share one bounded mixed queue,
+Up to eight independently identified music tracks share one bounded mixed queue,
 AudioContext/worklet and output clock. Apply each source's gain/fades, sum linearly,
 then clamp once after the full mix. Native audio stays serial: one original decoder,
 at most two intermediate inputs and three scratch files (selected PCM plus old/new
@@ -476,19 +476,19 @@ Float64 accumulators). Audio storage planning is maximum selected PCM plus two f
 project accumulators. Project duration includes every music OUT; absent active video
 is opaque black, not a held last image, while music continues/fades at its own OUT.
 Video closing fades remain inside their last clips. The static export path must
-cover the full project; music tails use layered export. Export still requires video.
+cover the full project; music tails use composited export. Export still requires a video clip.
 See [the multiple-music contract](design/MULTIPLE_MUSIC.md).
 
 The single **Opacity** slider/exact-field/diamond/navigation belongs in **Track → Colour**
-alongside the colour sliders and works on an empty row. Main and stored sliders/
+alongside the colour sliders and works on an empty track. Main and stored sliders/
 exact fields use **0–100%**, neutral **100%**; convert only at the UI boundary,
-keeping required `VideoLayer.opacity` and `opacity` keys **0–1** with no schema change.
-Without Opacity keys, it edits row `opacity`; with keys, only participation at the
+keeping required `VideoLayer.opacity` and `opacity` keyframes **0–1** with no schema change.
+Without Opacity keyframes, it edits track `opacity`; with keyframes, only an enabled setting at the
 real playhead permits editing, with the diamond explicitly capturing a missing
-participant. Sliders never create keys. **Placement** contains placement only;
-Layer options contains rename, Ripple, ordering and deletion, with visibility separate.
+setting. Sliders never create keyframes. **Placement** contains placement only;
+Track options contains rename, Ripple, ordering and deletion, with visibility separate.
 
-Clip Source range uses one full-original hatched bar with IN/OUT handles and exact
+**Clip → Range** uses one full-original hatched bar with IN/OUT handles and exact
 text fields below its ends, displaying 30 fps NDF **HH:MM:SS:FF** and accepting
 whole original frames or timecode on Enter/blur. Invalid drafts remain editable;
 Escape restores. No duplicate duration/original/source-frame/head-tail labels.
@@ -497,7 +497,7 @@ suffix sequencing, not the timeline left handle's retained-OUT rule. Drag previe
 the complete validated document; final valid release is one Undo, invalid final/
 cancel/lost capture/blur restores. Arrows move one original frame (Shift ten),
 Home/End restore IN/OUT endpoints; Restore full recording stays. Source review's
-independent paired Apply workflow is unchanged. See [Source range](TIMELINE_EDITING.md#clip-inspector-source-range).
+independent paired **Apply range / Cancel range** workflow is unchanged. See [Range](TIMELINE_EDITING.md#clip-inspector-range).
 
 ## Contributor safety
 
@@ -514,18 +514,18 @@ independent paired Apply workflow is unchanged. See [Source range](TIMELINE_EDIT
 - Never modify/copy/delete owner's originals or commit private paths/device IDs,
   saved project IDs, real media/cache or reports. Preserve fingerprints, symlink
   rejection, cache exclusion and HTTP guards.
-- Keep **strict schema 12**: complete required row `colour`, including
+- Keep **strict schema 12**: complete required video track `colour`, including
   Temperature/Tint and static HSL/curves; reject saved `clip.colour`
-  and `clip.correction`. Grade sources once with evaluated row Colour, retaining
-  two LUT buffers and existing raw/process budgets. Main Colour controls and keys
-  have identical row scope and work empty. See [row appearance](design/ROW_APPEARANCE.md). Required clip spatial base/full-pose source-frame keys,
+  and `clip.correction`. Grade sources once with evaluated track Colour, retaining
+  two LUT buffers and existing raw/process budgets. Main Colour controls and keyframes
+  have identical track scope and work empty. See [track appearance](design/ROW_APPEARANCE.md). Required clip spatial base/full-pose source-frame keyframes,
   required unique video/audio membership, all eleven nullable
-  channels and per-layer `ripple`, `transitions`, `openingFade`, `closingFade` and
+  channels and per-track `ripple`, `transitions`, `openingFade`, `closingFade` and
   numeric `opacity` in 0–1. A new track starts at 1; a missing saved field is invalid.
   The channels are `opacity` (sole UI **Opacity**), `speed`, `temperature`, `tint`,
   `exposure`, `brightness`, `contrast`, `hue`, `saturation`, `highlights`, `shadows`.
   Missing bases/channels are invalid; neutral values are creation values only.
-  Row `opacity` is the sole valid stored value; reject saved `clip.opacity`
+  Track `opacity` is the sole valid stored value; reject saved `clip.opacity`
   and old `clipOpacity`/`layerOpacity` channels. No project-level
   transitions/fades, compatibility fields/defaults/migration or mandatory first-track
   ID. Require a 0–8 `music` array with unique instance IDs and complete independent

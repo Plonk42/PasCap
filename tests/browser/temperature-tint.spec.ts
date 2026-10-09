@@ -14,7 +14,7 @@ import {
 import { memoryProjects, type MemoryProjects } from './memory-projects.js';
 
 // Temperature/Tint are Track settings beside the keyframe list; "Clip" here means those playhead controls.
-async function inspectorTab(page: Page, name: 'Clip' | 'Layer keyframes'): Promise<void> {
+async function inspectorTab(page: Page, name: 'Clip' | 'Track keyframes'): Promise<void> {
   await openTab(page, name === 'Clip' ? 'Track' : name);
 }
 
@@ -246,7 +246,7 @@ test('empty-row native controls preserve exact precision, invalid drafts, indivi
   document.layers[0]!.colour.temperature = 0.4;
   document.layers[0]!.colour.tint = -0.6;
   await fixture(page, document);
-  await page.getByRole('button', { name: 'Select layer Empty row', exact: true }).click();
+  await page.getByRole('button', { name: 'Select track Empty row', exact: true }).click();
   await expect(page.locator('[role="tabpanel"]:not([hidden]) .selected-clip-name')).toContainText(
     'Applies to every clip added to this track',
   );
@@ -342,7 +342,7 @@ test('main and stored native pointer drafts cancel safely, then release as one s
       document.layers[0]!.keyframes = [sharedPoint(30, { temperature: 0.25, tint: -0.3, exposure: 0.2 }, 'smooth')];
       await fixture(page, document);
     }
-    const scope = stored ? await editLayerPoint(page, 'Video 1', 30) : page;
+    const scope = stored ? await editLayerPoint(page, 'Video track 1', 30) : page;
     for (const { setting, label } of channels) {
       const name = stored ? `${label} keyframe value 30` : label;
       const { slider, exact, widget } = controls(scope, name);
@@ -485,7 +485,7 @@ test('main and off-duration stored resets edit only existing participants; exact
     else await page.getByRole('button', { name: action, exact: true }).click();
     await editAndUndo(page, mainBefore, edited(mainBefore.document, 'tint', 0, 'video-1', 30));
   }
-  const row = await editLayerPoint(page, 'Video 1', 180);
+  const row = await editLayerPoint(page, 'Video track 1', 180);
   await expect(row.locator('.layer-keyframe-point-values').getByRole('slider')).toHaveCount(3);
   await expect(row.getByRole('slider', { name: 'Exposure keyframe value 180', exact: true })).toHaveCount(0);
   for (const { setting, label, precise } of channels) {
@@ -559,7 +559,7 @@ test('channel navigation skips unrelated keys and shares an off-duration cursor 
   await page.keyboard.press('Tab');
   await expect(controls(page, 'Temperature').slider).toBeFocused();
   await page.keyboard.press('Shift+Tab');
-  const keys = layerKeyframes(page, 'Video 1');
+  const keys = layerKeyframes(page, 'Video track 1');
   for (const frame of [130, 180, 240]) {
     await next.press('Enter');
     await previewAt(page, 119);
@@ -568,12 +568,12 @@ test('channel navigation skips unrelated keys and shares an off-duration cursor 
     await expect(diamond(page, 'Temperature')).toHaveAttribute('aria-pressed', 'false');
     await expect(diamond(page, 'Temperature')).toHaveAttribute('title', /timeline frame 119\./);
     await expect(controls(page, 'Temperature').exact).toBeDisabled();
-    await inspectorTab(page, 'Layer keyframes');
+    await inspectorTab(page, 'Track keyframes');
     await expect(keys.locator('.layer-keyframe-inspected')).toContainText(
-      `Stored point · timeline frame ${frame} · outside current duration`,
+      `Stored keyframe · timeline frame ${frame} · outside current duration`,
     );
     await expect(keys.locator('.layer-keyframe-inspected')).toContainText(
-      'Preview is at frame 119, not at this stored point.',
+      'Preview is at frame 119, not at this stored keyframe.',
     );
     await expect(keys.locator('.keyframe-row[aria-current="true"]')).toHaveAttribute(
       'data-keyframe-frame',
@@ -587,19 +587,19 @@ test('channel navigation skips unrelated keys and shares an off-duration cursor 
   await previewAt(page, 119);
   await expect(next).toBeDisabled();
   await previous.press('Space');
-  await inspectorTab(page, 'Layer keyframes');
-  await expect(keys.locator('.layer-keyframe-inspected')).toContainText('Stored point · timeline frame 240');
+  await inspectorTab(page, 'Track keyframes');
+  await expect(keys.locator('.layer-keyframe-inspected')).toContainText('Stored keyframe · timeline frame 240');
   await inspectorTab(page, 'Clip');
   await previous.press('Space');
-  await inspectorTab(page, 'Layer keyframes');
-  await expect(keys.locator('.layer-keyframe-inspected')).toContainText('Stored point · timeline frame 180');
+  await inspectorTab(page, 'Track keyframes');
+  await expect(keys.locator('.layer-keyframe-inspected')).toContainText('Stored keyframe · timeline frame 180');
   await inspectorTab(page, 'Clip');
   const tintNext = navigation(page, 'Tint', 'Next');
   for (const frame of [190, 250]) {
     await tintNext.press('Space');
     await previewAt(page, 119);
-    await inspectorTab(page, 'Layer keyframes');
-    await expect(keys.locator('.layer-keyframe-inspected')).toContainText(`Stored point · timeline frame ${frame}`);
+    await inspectorTab(page, 'Track keyframes');
+    await expect(keys.locator('.layer-keyframe-inspected')).toContainText(`Stored keyframe · timeline frame ${frame}`);
     await inspectorTab(page, 'Clip');
   }
   await expect(tintNext).toBeDisabled();

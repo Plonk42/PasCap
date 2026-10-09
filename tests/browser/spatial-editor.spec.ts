@@ -252,7 +252,7 @@ test('off-trim and exclusive OUT stored navigation uses the closest real mapped 
     const output = previewClipSource(before, 'one', frame);
     const source = calculateLayout(before).clips[0]!.retiming.sourceAt(output);
     await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(output);
-    await expect(page.getByRole('region', { name: 'Stored Transform key', exact: true })).toContainText(
+    await expect(page.getByRole('region', { name: 'Stored Transform keyframe', exact: true })).toContainText(
       `Stored source frame ${frame} · actual displayed source frame ${source}`,
     );
     await expect(exact(page, 'Scale')).toBeDisabled();

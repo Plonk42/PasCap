@@ -104,7 +104,7 @@ test.afterEach(() =>
 function twoTracks(): ProjectDocument {
   const document = createProject(PROJECT_ID, 'Uniform video tracks · memory-only');
   document.media.videoIds = assets.map((asset) => asset.id);
-  document.layers.push(createLayer('upper', 'Video 2'));
+  document.layers.push(createLayer('upper', 'Video track 2'));
   document.clips = [
     createClip('bottom', assets[0]!.id, 0, 120),
     createClip('upper-clip', assets[1]!.id, 0, 120, 'upper'),
@@ -184,23 +184,23 @@ test('the initial track and every newly added track default to Ripple on with in
   const before = await current(page);
   for (const layer of before.layers) {
     expect(layer).toMatchObject({ opacity: 1, ripple: true, transitions: [], openingFade: 0, closingFade: 0 });
-    await openOptions(page, `Layer options ${layer.name}`);
-    await expect(page.getByRole('checkbox', { name: `Ripple on layer ${layer.name}`, exact: true })).toBeChecked();
-    await expect(page.getByRole('textbox', { name: `Rename layer ${layer.name}`, exact: true })).toBeEnabled();
-    await expect(page.getByRole('slider', { name: `Opacity of layer ${layer.name}`, exact: true })).toHaveCount(0);
+    await openOptions(page, `Track options ${layer.name}`);
+    await expect(page.getByRole('checkbox', { name: `Ripple on track ${layer.name}`, exact: true })).toBeChecked();
+    await expect(page.getByRole('textbox', { name: `Rename track ${layer.name}`, exact: true })).toBeEnabled();
+    await expect(page.getByRole('slider', { name: `Opacity of track ${layer.name}`, exact: true })).toHaveCount(0);
     expect(before.clips.filter((clip) => clip.layerId === layer.id).every((clip) => !('opacity' in clip))).toBe(true);
     await closeOptions(page);
   }
-  await page.getByRole('button', { name: 'Add video layer', exact: true }).click();
+  await page.getByRole('button', { name: 'Add video track', exact: true }).click();
   const added = await current(page);
   await ready(page, added);
   expect(added.schemaVersion).toBe(12);
   for (const field of ['transitions', 'openingFade', 'closingFade']) expect(added).not.toHaveProperty(field);
   expect(added.layers.slice(0, 2)).toEqual(before.layers);
   expect(added.clips).toEqual(before.clips);
-  expect(added.layers[2]).toEqual(createLayer(added.layers[2]!.id, 'Video 3'));
-  await openOptions(page, 'Layer options Video 3');
-  await expect(page.getByRole('checkbox', { name: 'Ripple on layer Video 3', exact: true })).toBeChecked();
+  expect(added.layers[2]).toEqual(createLayer(added.layers[2]!.id, 'Video track 3'));
+  await openOptions(page, 'Track options Video track 3');
+  await expect(page.getByRole('checkbox', { name: 'Ripple on track Video track 3', exact: true })).toBeChecked();
   await expect(page.locator('.layer-control.selected')).toHaveAttribute('data-layer-id', added.layers[2]!.id);
   await undoOnce(page, before);
 });
@@ -247,8 +247,8 @@ for (const row of [0, 1]) {
     const saves = memory.saves;
     const layer = before.layers[row]!;
     const anchor = row === 0 ? 40 : 200;
-    await openOptions(page, `Layer options ${layer.name}`);
-    await page.getByRole('checkbox', { name: `Ripple on layer ${layer.name}`, exact: true }).check();
+    await openOptions(page, `Track options ${layer.name}`);
+    await page.getByRole('checkbox', { name: `Ripple on track ${layer.name}`, exact: true }).check();
     const packed = await current(page);
     await ready(page, packed);
     expect(trackGeometry(packed, layer.id)).toEqual([
@@ -332,8 +332,8 @@ for (const row of [0, 1]) {
       await expect(page.getByRole('button', { name, exact: true })).toHaveAccessibleDescription(/Ripple is on/);
     }
     await closeOptions(page);
-    await openOptions(page, `Layer options ${layer.name}`);
-    await page.getByRole('checkbox', { name: `Ripple on layer ${layer.name}`, exact: true }).uncheck();
+    await openOptions(page, `Track options ${layer.name}`);
+    await page.getByRole('checkbox', { name: `Ripple on track ${layer.name}`, exact: true }).uncheck();
     const positioned = await current(page);
     expect(positioned.clips).toEqual(before.clips);
     expect(positioned.layers).toEqual(
@@ -375,8 +375,8 @@ test('a contextually invalid Ripple enable is rejected as a whole without changi
   await fixture(page, document);
   const before = await current(page);
   const saves = memory.saves;
-  await openOptions(page, 'Layer options Video 2');
-  const ripple = page.getByRole('checkbox', { name: 'Ripple on layer Video 2', exact: true });
+  await openOptions(page, 'Track options Video track 2');
+  const ripple = page.getByRole('checkbox', { name: 'Ripple on track Video track 2', exact: true });
   await ripple.click();
   await expect(ripple).not.toBeChecked();
   await expect(page.locator('.error-banner')).toContainText('Fade/transition regions overlap or exceed clip slow.');
@@ -559,8 +559,8 @@ test('a positioned gap disables non-cut boundary choices until explicit Ripple p
   ).toBeVisible();
   expect(await current(page)).toEqual(before);
   expect(memory.saves).toBe(0);
-  await openOptions(page, 'Layer options Video 2');
-  await page.getByRole('checkbox', { name: 'Ripple on layer Video 2', exact: true }).check();
+  await openOptions(page, 'Track options Video track 2');
+  await page.getByRole('checkbox', { name: 'Ripple on track Video track 2', exact: true }).check();
   await closeOptions(page);
   await boundary.click();
   for (const value of ['fade-through-black', 'cross-dissolve'])
@@ -591,7 +591,7 @@ test('a top-track opening black fade keeps opaque coverage instead of fading or 
     ['upper', 0, 1],
   ]);
   expect((await captureAt(page, 20)).sum).toBe(0);
-  await page.getByRole('button', { name: 'Hide layer Video 2', exact: true }).click();
+  await page.getByRole('button', { name: 'Hide track Video track 2', exact: true }).click();
   expect((await captureAt(page, 20)).sum).toBeGreaterThan(0);
   const hidden = await current(page);
   expect(hidden.layers).toEqual(
@@ -608,11 +608,11 @@ test('Raise and Lower cross the old initial-layer boundary and display the new b
   const before = await current(page);
   const originalPixels = (await captureAt(page, 20)).sample;
   for (const [action, name] of [
-    ['Lower', 'Video 2'],
-    ['Raise', 'Video 1'],
+    ['Lower', 'Video track 2'],
+    ['Raise', 'Video track 1'],
   ] as const) {
-    await openOptions(page, `Layer options ${name}`);
-    await page.getByRole('button', { name: `${action} layer ${name}`, exact: true }).click();
+    await openOptions(page, `Track options ${name}`);
+    await page.getByRole('button', { name: `${action} track ${name}`, exact: true }).click();
     const after = await current(page);
     await ready(page, after);
     expect(after.layers).toEqual([before.layers[1], before.layers[0]]);
@@ -634,8 +634,8 @@ test('the ordinary initial track can be removed; only deleting the last remainin
   page,
 }) => {
   const before = await current(page);
-  await openOptions(page, 'Layer options Video 1');
-  await page.getByRole('button', { name: 'Delete layer Video 1', exact: true }).click();
+  await openOptions(page, 'Track options Video track 1');
+  await page.getByRole('button', { name: 'Delete track Video track 1', exact: true }).click();
   const after = await current(page);
   await ready(page, after);
   expect(after.layers).toEqual([before.layers[1]]);
@@ -644,11 +644,11 @@ test('the ordinary initial track can be removed; only deleting the last remainin
   expect(after.music).toEqual(before.music);
   await expect(page.locator('[data-layer-id]')).toHaveCount(1);
   await expect(page.locator('[data-layer-lane="video-1"]')).toHaveCount(0);
-  await openOptions(page, 'Layer options Video 2');
-  const remove = page.getByRole('button', { name: 'Delete layer Video 2', exact: true });
+  await openOptions(page, 'Track options Video track 2');
+  const remove = page.getByRole('button', { name: 'Delete track Video track 2', exact: true });
   await expect(remove).toBeDisabled();
-  await expect(remove).toHaveAccessibleDescription('Keep at least one video track. Delete its excerpts instead.');
-  await expect(page.getByRole('checkbox', { name: 'Ripple on layer Video 2', exact: true })).toBeEnabled();
+  await expect(remove).toHaveAccessibleDescription('Keep at least one video track. Delete its clips instead.');
+  await expect(page.getByRole('checkbox', { name: 'Ripple on track Video track 2', exact: true })).toBeEnabled();
   await undoOnce(page, before);
 });
 
@@ -656,10 +656,10 @@ test('eight concurrent track dissolves use exactly sixteen reusable decoder slot
   page,
 }) => {
   const document = twoTracks();
-  document.layers = [createLayer('video-1', 'Video 1')];
+  document.layers = [createLayer('video-1', 'Video track 1')];
   document.clips = [];
   for (let index = 0; index < 8; index++) {
-    const layer = index === 0 ? document.layers[0]! : createLayer(`row-${index + 1}`, `Video ${index + 1}`);
+    const layer = index === 0 ? document.layers[0]! : createLayer(`row-${index + 1}`, `Video track ${index + 1}`);
     if (index > 0) document.layers.push(layer);
     document.clips.push(createClip(`left-${index}`, assets[0]!.id, 0, 60, layer.id), {
       ...createClip(`right-${index}`, assets[1]!.id, 0, 60, layer.id),
@@ -696,8 +696,8 @@ test('eight concurrent track dissolves use exactly sixteen reusable decoder slot
     expect(captured.videos[slot]).toMatchObject({ seeking: false, frame: source.sourceFrame });
     expect(captured.videos[slot]!.readyState).toBeGreaterThanOrEqual(2);
   }
-  await openOptions(page, 'Layer options Video 8');
-  await page.getByRole('button', { name: 'Delete layer Video 8', exact: true }).click();
+  await openOptions(page, 'Track options Video track 8');
+  await page.getByRole('button', { name: 'Delete track Video track 8', exact: true }).click();
   const after = await current(page);
   await ready(page, after);
   expect(after.layers).toEqual(before.layers.slice(0, 7));
@@ -725,7 +725,7 @@ test('export discloses three timeline representations and four 22-byte-per-pixel
   await dialog.getByRole('radio', { name: '4K final', exact: true }).check();
   await expect(resources).toContainText('4 reusable raw buffers use 182.5 MB at 3840 × 2160; up to 2 LUTs add 6.6 MB.');
   await expect(dialog.locator('.activity-export-snapshot')).toContainText(
-    'each track’s Ripple, transitions and fades, enabled layers, bottom-to-top composition order',
+    'each video track’s Colour, Ripple, transitions and fades, enabled video tracks, bottom-to-top composition order',
   );
   await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
   expect(await current(page)).toEqual(before);

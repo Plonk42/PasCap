@@ -276,7 +276,7 @@ export function MediaLibrary({
       event.dataTransfer.dropEffect = 'none';
       // A refused desktop drop may never dispatch "drop"; explain it during dragover too.
       setDropError(
-        'Filesystem drops are disabled. Use Import → Browse footage to reference originals without copying.',
+        'Filesystem drops are disabled. Use Import → Browse recordings to reference originals without copying.',
       );
     };
     window.addEventListener('dragover', preventNavigation);
@@ -439,7 +439,7 @@ export function MediaLibrary({
           <button
             className="secondary-button small"
             aria-label="Import folder"
-            title="Browse original recordings or register a folder in place; no footage is copied"
+            title="Browse original recordings or register a folder in place; no recordings are copied"
             disabled={busy}
             onClick={openImport}
           >
@@ -568,7 +568,7 @@ export function MediaLibrary({
             <button
               className="icon-button"
               aria-label="Remove selected from project"
-              title="Remove the selected recordings from this project; original files are kept"
+              title="Remove the selected recordings from this project; original recordings are kept"
               disabled={!project || busy}
               onClick={() => requestRemove(selectedAssets.map((asset) => asset.id))}
             >
@@ -615,7 +615,7 @@ export function MediaLibrary({
           const trimmed = range.sourceIn !== 0 || range.sourceOut !== count;
           const rangeId = `${rangeIdPrefix}-${asset.id}`;
           const excerptCount = usage.get(asset.id) ?? 0;
-          const excerptLabel = `${excerptCount} ${excerptCount === 1 ? 'excerpt' : 'excerpts'}`;
+          const excerptLabel = `${excerptCount} ${excerptCount === 1 ? 'clip' : 'clips'}`;
           const usageDescription = excerptCount > 0 ? `, ${excerptLabel} in timeline` : '';
           let statusLabel = STATUS_LABEL[asset.status];
           if (asset.status === 'ready') statusLabel = excerptCount > 0 ? `${excerptLabel} in timeline` : 'Ready';
@@ -660,7 +660,7 @@ export function MediaLibrary({
                 }}
                 title={
                   excerptCount > 0
-                    ? `Choose another excerpt from the original recording · ${asset.sourcePath}`
+                    ? `Choose another range from the original recording · ${asset.sourcePath}`
                     : asset.sourcePath
                 }
               >
@@ -711,7 +711,7 @@ export function MediaLibrary({
                   </span>
                   {trimmed && (
                     <span className="declutter-sr-only" id={rangeId}>
-                      Selected source range: frames {range.sourceIn} to {range.sourceOut} of {count}, OUT exclusive
+                      Selected range: frames {range.sourceIn} to {range.sourceOut} of {count}, OUT exclusive
                     </span>
                   )}
                 </span>
@@ -742,7 +742,7 @@ export function MediaLibrary({
               <button
                 className="icon-button media-remove"
                 aria-label={`Remove ${asset.name} from project`}
-                title="Remove from this project; the original file is kept"
+                title="Remove from this project; the original recording is kept"
                 disabled={!project || busy}
                 onClick={() => requestRemove([asset.id])}
               >
@@ -758,7 +758,7 @@ export function MediaLibrary({
             <p>
               {assets.length || music.length
                 ? 'Try another search or filter.'
-                : 'Browse footage or import a folder. Originals stay in place; only editing proxies are generated.'}
+                : 'Browse recordings or import a folder. Originals stay in place; only editing proxies are generated.'}
             </p>
             {assets.length ? (
               <button
@@ -815,7 +815,7 @@ export function MediaLibrary({
           <p className="control-hint declutter-import-copy">
             Originals stay local and unchanged. Only selected paths are registered; proxies are queued automatically.
           </p>
-          <Suspense fallback={<output>Opening footage browser…</output>}>
+          <Suspense fallback={<output>Opening recording browser…</output>}>
             <FootageBrowser
               busy={busy}
               onRegister={onRegisterPaths}

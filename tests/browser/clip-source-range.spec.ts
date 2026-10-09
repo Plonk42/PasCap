@@ -388,7 +388,7 @@ test('collapse/tabs retain draft identity; clip selection replaces context witho
   await input.press('Enter');
   const node = await input.elementHandle();
   if (!node) throw new Error('Source field must be mounted.');
-  const section = page.getByRole('button', { name: 'Source range section', exact: true });
+  const section = page.getByRole('button', { name: 'Range section', exact: true });
   await section.click();
   await expect(input).toBeHidden();
   expect(await node.evaluate((element) => element.isConnected)).toBe(true);

@@ -550,7 +550,7 @@ class SequentialLayeredRenderer {
   private async join(chunks: LosslessChunk[], output: string): Promise<string> {
     const { directory, ffmpeg, context, plan } = this.options;
     if (chunks.reduce((sum, chunk) => sum + chunk.duration, 0) !== plan.duration)
-      throw new Error('Layer chunks must cover every authoritative project frame exactly once.');
+      throw new Error('Track chunks must cover every authoritative project frame exactly once.');
     if (!chunks.length) throw new Error('A lossless timeline requires at least one chunk.');
     if (chunks.length === 1) {
       await rename(path.join(directory, chunks[0]!.filename), path.join(directory, output));

@@ -96,7 +96,7 @@ function CurvePresets({
               type="button"
               key={preset.id}
               aria-label={`Clip speed preset ${preset.label}`}
-              title={`Replace this clip's speed keys with ${preset.label.toLowerCase()}; every point stays editable`}
+              title={`Replace this clip's speed keyframes with ${preset.label.toLowerCase()}; every keyframe stays editable`}
               aria-pressed={active}
               disabled={disabled}
               onClick={() => onChange(template)}
@@ -166,7 +166,7 @@ export function ClipSpeedCurve({
   };
   const validation = (nextFrame: number, rate: number, interpolation: Interpolation): string | null => {
     if (current.keyframes.some((point) => point.frame !== selected.frame && point.frame === nextFrame))
-      return 'A clip speed key already exists at this source frame. Choose another frame.';
+      return 'A clip speed keyframe already exists at this source frame. Choose another frame.';
     try {
       applyCommand(project, {
         type: 'speed',
@@ -242,7 +242,7 @@ export function ClipSpeedCurve({
     >
       <CurvePresets clip={clip} speed={current} disabled={unavailable} onChange={change} />
       <div className="clip-speed-key-tools">
-        <span>{current.keyframes.length} points</span>
+        <span>{current.keyframes.length} keyframes</span>
         <button
           type="button"
           className="secondary-button small"
@@ -250,7 +250,7 @@ export function ClipSpeedCurve({
           title={
             canAdd
               ? `Capture this clip's speed at original source frame ${sourceFrame}`
-              : 'Seek to an unkeyed source frame inside this clip; at most 256 points'
+              : 'Seek to a source frame without a keyframe inside this clip; at most 256 keyframes'
           }
           disabled={unavailable || !canAdd}
           onClick={() => {
@@ -258,13 +258,13 @@ export function ClipSpeedCurve({
           }}
         >
           <Icon name="plus" size={14} />
-          Add point
+          Add keyframe
         </button>
         <button
           type="button"
           className="icon-button"
           aria-label="Delete clip speed keyframe"
-          title="Delete the selected point; at least two remain"
+          title="Delete the selected keyframe; at least two remain"
           disabled={unavailable || current.keyframes.length <= 2}
           onClick={() => change(removeClipSpeedKey(current, selected.frame))}
         >
@@ -302,7 +302,7 @@ export function ClipSpeedCurve({
             className="clip-speed-seek"
             aria-label="Seek within clip speed curve"
             aria-describedby={helpId}
-            title="Click the curve background to seek, then Add point"
+            title="Click the curve background to seek, then Add keyframe"
             disabled={unavailable}
             onClick={(event) => {
               const box = event.currentTarget.getBoundingClientRect();
@@ -387,7 +387,7 @@ export function ClipSpeedCurve({
         >
           {current.keyframes.map((point, index) => (
             <option key={identity.rows[index]!.id} value={identity.rows[index]!.id}>
-              Point {index + 1} · source {point.frame}
+              Keyframe {index + 1} · source {point.frame}
               {point.frame < clip.sourceIn || point.frame >= clip.sourceOut ? ' · outside clip' : ''}
             </option>
           ))}
@@ -431,7 +431,7 @@ export function ClipSpeedCurve({
           />
         </div>
         <label className="clip-speed-easing">
-          To next point
+          To next keyframe
           <EasingSelect
             aria-label="Clip speed keyframe easing"
             disabled={unavailable || selectedIndex === current.keyframes.length - 1}
@@ -448,7 +448,7 @@ export function ClipSpeedCurve({
       </div>
       {outside && (
         <p className="clip-speed-outside">
-          Stored source point outside this excerpt; preview uses its nearest available frame.
+          Stored source keyframe outside this clip; preview uses its nearest available frame.
         </p>
       )}
       {status && (
@@ -457,9 +457,9 @@ export function ClipSpeedCurve({
         </p>
       )}
       <span id={helpId} className="declutter-sr-only">
-        Points belong only to this clip. Horizontal dragging changes the original source frame; vertical dragging
+        Keyframes belong only to this clip. Horizontal dragging changes the original source frame; vertical dragging
         changes speed on a logarithmic axis. Arrows move one source frame or 0.01×; Shift uses ten frames or 0.1×. Enter
-        seeks, Delete removes a point; two must remain. Escape cancels a drag. Trims and splits keep original source
+        seeks, Delete removes a keyframe; two must remain. Escape cancels a drag. Trims and splits keep original source
         anchors.
       </span>
     </section>

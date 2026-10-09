@@ -20,7 +20,7 @@ interface Props {
 }
 
 function markedCutError(project: ProjectDocument, marks: ClipCutRange | null): string {
-  if (!marks) return 'Mark IN and OUT within one excerpt to remove an unwanted part.';
+  if (!marks) return 'Mark IN and OUT within one clip to remove an unwanted part.';
   try {
     sourceRangeForCut(project, marks);
     return '';
@@ -96,14 +96,14 @@ export function RushEditBar({
   const error = markedCutError(project, marks);
 
   return (
-    <div className="rush-edit-bar" aria-label="Rush editing actions">
+    <div className="rush-edit-bar" aria-label="Clip editing actions">
       <fieldset className="rush-quick-actions">
-        <legend className="declutter-sr-only">Edit selected excerpt</legend>
+        <legend className="declutter-sr-only">Edit selected clip</legend>
         <button
           type="button"
           className="secondary-button small"
           aria-label="Split at playhead"
-          title="Split into independent excerpts; select the right piece · S"
+          title="Split into independent clips; select the right clip · S"
           disabled={disabled || !canSplit}
           onClick={onSplit}
         >
@@ -136,7 +136,7 @@ export function RushEditBar({
           type="button"
           className="icon-button"
           aria-label="Delete selected clip"
-          title="Remove this excerpt only; originals remain recoverable · Delete"
+          title="Remove this clip only; originals remain recoverable · Delete"
           disabled={disabled || !selected}
           onClick={onDelete}
         >

@@ -157,7 +157,7 @@ export function ClipSourceRange(props: Readonly<Props>) {
   const status = draft?.error || error;
   const errorId = `${props.id}-source-error`;
   return (
-    <section className="source-range clip-source-range" aria-label="Source range" data-dirty={draft !== null}>
+    <section className="source-range clip-source-range" aria-label="Range" data-dirty={draft !== null}>
       <div
         ref={bar}
         className="clip-source-bar"

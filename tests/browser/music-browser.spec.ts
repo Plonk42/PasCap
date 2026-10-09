@@ -69,17 +69,17 @@ async function audioControls(page: Page): Promise<void> {
   await inspectorTab(page, 'Audio');
   const section = page.getByRole('button', { name: 'Music section', exact: true });
   if ((await section.getAttribute('aria-expanded')) === 'false') await section.click();
-  await expect(page.getByRole('button', { name: 'Browse music files', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Browse music recordings', exact: true })).toBeVisible();
 }
 
 async function openBrowser(page: Page, enterFixture = true): Promise<Locator> {
   await audioControls(page);
-  await page.getByRole('button', { name: 'Browse music files', exact: true }).click();
-  const modal = page.getByRole('dialog', { name: 'Browse music files', exact: true });
+  await page.getByRole('button', { name: 'Browse music recordings', exact: true }).click();
+  const modal = page.getByRole('dialog', { name: 'Browse music recordings', exact: true });
   await expect(modal).toBeVisible();
   if (enterFixture) {
     await modal.getByRole('button', { name: `Open music folder ${path.basename(testDirectory)}`, exact: true }).click();
-    await expect(modal.getByRole('radio', { name: `Select music ${sourceName}`, exact: true })).toBeVisible();
+    await expect(modal.getByRole('radio', { name: `Select music recording ${sourceName}`, exact: true })).toBeVisible();
   }
   return modal;
 }
@@ -122,20 +122,20 @@ test('browse, select, Cancel and Escape never POST or edit, and return focus wit
 }) => {
   const writes = posts(page);
   await audioControls(page);
-  const manual = page.getByRole('textbox', { name: 'Music file path', exact: true });
+  const manual = page.getByRole('textbox', { name: 'Music recording path', exact: true });
   await manual.fill('/disposable/manual-music.wav');
   const before = memory.snapshot();
   const modal = await openBrowser(page);
   expect(await modal.evaluate((element: HTMLDialogElement) => element.open && element.matches(':modal'))).toBe(true);
   await expect(modal.getByRole('button', { name: 'Import selected music', exact: true })).toBeDisabled();
-  await modal.getByRole('radio', { name: `Select music ${sourceName}`, exact: true }).check();
+  await modal.getByRole('radio', { name: `Select music recording ${sourceName}`, exact: true }).check();
   await modal.getByRole('button', { name: 'Cancel', exact: true }).click();
-  const trigger = page.getByRole('button', { name: 'Browse music files', exact: true });
+  const trigger = page.getByRole('button', { name: 'Browse music recordings', exact: true });
   await expect(trigger).toBeFocused();
   await expect(manual).toHaveValue('/disposable/manual-music.wav');
   await trigger.press('Enter');
   await expect(modal).toBeVisible();
-  await expect(modal.locator('.footage-registration')).toContainText('No music file selected');
+  await expect(modal.locator('.footage-registration')).toContainText('No music recording selected');
   await page.keyboard.press('Escape');
   await expect(modal).toHaveCount(0);
   await expect(trigger).toBeFocused();
@@ -156,23 +156,26 @@ test('real guarded navigation, root/up, filtering and native radios keep exactly
   await expect(modal.getByRole('button', { name: 'Music root folder', exact: true })).toBeDisabled();
   await expect(modal.getByRole('radio', { name: /browse-camera/ })).toHaveCount(0);
   await modal.getByRole('button', { name: `Open music folder ${path.basename(testDirectory)}`, exact: true }).click();
-  const first = modal.getByRole('radio', { name: `Select music ${sourceName}`, exact: true });
-  const other = modal.getByRole('radio', { name: `Select music ${otherName}`, exact: true });
-  await expect(modal.getByRole('list', { name: 'Music entries' }).locator('li')).toHaveCount(3);
+  const first = modal.getByRole('radio', { name: `Select music recording ${sourceName}`, exact: true });
+  const other = modal.getByRole('radio', { name: `Select music recording ${otherName}`, exact: true });
+  await expect(modal.getByRole('list', { name: 'Music recording entries' }).locator('li')).toHaveCount(3);
   expect(
-    await modal.getByRole('list', { name: 'Music entries' }).locator('.footage-recording span').allTextContents(),
+    await modal
+      .getByRole('list', { name: 'Music recording entries' })
+      .locator('.footage-recording span')
+      .allTextContents(),
   ).toEqual([sourceName, otherName]);
   await first.check();
   await other.check();
   await expect(first).not.toBeChecked();
   await expect(modal.locator('input[type="radio"]:checked')).toHaveCount(1);
-  await modal.getByRole('searchbox', { name: 'Search music files', exact: true }).fill('music 2');
+  await modal.getByRole('searchbox', { name: 'Search music recordings', exact: true }).fill('music 2');
   await expect(first).toBeVisible();
   await expect(other).toHaveCount(0);
   await expect(modal.locator('.footage-registration')).toContainText(`Selected: ${otherName}`);
-  await modal.getByRole('searchbox', { name: 'Search music files', exact: true }).fill('');
+  await modal.getByRole('searchbox', { name: 'Search music recordings', exact: true }).fill('');
   await modal.getByRole('button', { name: 'Open music folder Nested', exact: true }).click();
-  await modal.getByRole('radio', { name: `Select music ${nestedName}`, exact: true }).check();
+  await modal.getByRole('radio', { name: `Select music recording ${nestedName}`, exact: true }).check();
   await modal.getByRole('button', { name: 'Up one music folder', exact: true }).click();
   await expect(modal.locator('.footage-registration')).toContainText(`Selected: ${nestedName}`);
   await expect(modal.locator('input[type="radio"]:checked')).toHaveCount(0);
@@ -201,7 +204,7 @@ test('real explicit confirmation persists only importing-project audio membershi
   const otherProject = { ...createProject('music-browser-other', 'Other memory project'), revision: 1 };
   memory.seed(otherProject);
   const modal = await openBrowser(page);
-  await modal.getByRole('radio', { name: `Select music ${sourceName}`, exact: true }).check();
+  await modal.getByRole('radio', { name: `Select music recording ${sourceName}`, exact: true }).check();
   expect(writes).toEqual([]);
   const confirmed = page.waitForResponse(
     (response) =>
@@ -218,7 +221,7 @@ test('real explicit confirmation persists only importing-project audio membershi
   const importedId = result.asset.id;
   expect(result.job.kind).toBe('audio');
   await expect(modal).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Browse music files', exact: true })).toBeFocused();
+  await expect(page.getByRole('button', { name: 'Browse music recordings', exact: true })).toBeFocused();
   await page.evaluate(() => window.pascapLab!.flush());
   expect(memory.snapshot().media).toEqual({ videoIds: [], audioIds: [importedId] });
   expect(memory.snapshot().music).toEqual([]);
@@ -297,7 +300,7 @@ test('importing moved music creates a new bin entry without relinking the old so
   await page.reload();
   const writes = posts(page);
   const modal = await openBrowser(page);
-  await modal.getByRole('radio', { name: 'Select music After move.wav', exact: true }).check();
+  await modal.getByRole('radio', { name: 'Select music recording After move.wav', exact: true }).check();
   const confirmed = page.waitForResponse(
     (response) =>
       new URL(response.url()).pathname === '/api/audio/register-selected' && response.request().method() === 'POST',
@@ -368,14 +371,14 @@ test('the retained manual path uses its separate unrestricted endpoint and adds 
   );
   await audioControls(page);
   const manualPath = '/disposable-outside-browser-roots/manual.wav';
-  await page.getByRole('textbox', { name: 'Music file path', exact: true }).fill(manualPath);
+  await page.getByRole('textbox', { name: 'Music recording path', exact: true }).fill(manualPath);
   await page.getByRole('button', { name: 'Import audio', exact: true }).click();
   await expect(page.locator('[data-music-media-id]')).toHaveCount(1);
   await page.evaluate(() => window.pascapLab!.flush());
   expect(writes).toEqual([{ pathname: '/api/audio/register', body: { path: manualPath } }]);
   expect(memory.snapshot().media.audioIds).toEqual([music.id]);
   expect(memory.snapshot().music).toEqual([]);
-  await expect(page.getByRole('textbox', { name: 'Music file path', exact: true })).toHaveValue(manualPath);
+  await expect(page.getByRole('textbox', { name: 'Music recording path', exact: true })).toHaveValue(manualPath);
 });
 
 for (const unavailable of [false, true]) {
@@ -395,7 +398,7 @@ for (const unavailable of [false, true]) {
       await expect(modal).toContainText('Synthetic drive disconnected');
     }
     await modal.getByRole('button', { name: 'Cancel', exact: true }).click();
-    await expect(page.getByRole('textbox', { name: 'Music file path', exact: true })).toBeVisible();
+    await expect(page.getByRole('textbox', { name: 'Music recording path', exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Import audio', exact: true })).toBeVisible();
     expect(writes).toEqual([]);
     expect(memory.saves).toBe(0);
@@ -427,7 +430,7 @@ test('access errors and Refresh are read-only; recovered truncation and access w
   await expect(modal.getByRole('alert')).toContainText('Check permissions');
   await expect(modal.getByRole('button', { name: 'Import selected music', exact: true })).toBeDisabled();
   await modal.getByRole('button', { name: 'Refresh music locations', exact: true }).click();
-  await expect(modal.getByRole('radio', { name: `Select music ${sourceName}`, exact: true })).toBeVisible();
+  await expect(modal.getByRole('radio', { name: `Select music recording ${sourceName}`, exact: true })).toBeVisible();
   await expect(modal).toContainText('entry listing limit');
   await expect(modal).toContainText('smaller subfolder');
   await modal.getByText('Folder access warnings', { exact: true }).click();
@@ -482,17 +485,17 @@ test('changing roots aborts stale listings and clears selection instead of showi
   try {
     await loading;
     await modal.getByRole('combobox', { name: 'Music location', exact: true }).selectOption(second.id);
-    const current = modal.getByRole('radio', { name: `Select music ${nestedName}`, exact: true });
+    const current = modal.getByRole('radio', { name: `Select music recording ${nestedName}`, exact: true });
     await expect(current).toBeVisible();
     await current.check();
     release();
     await modal.getByRole('combobox', { name: 'Music location', exact: true }).selectOption(approved.id);
-    await expect(modal.getByRole('radio', { name: 'Select music Stale.wav', exact: true })).toBeVisible();
-    await expect(modal.locator('.footage-registration')).toContainText('No music file selected');
+    await expect(modal.getByRole('radio', { name: 'Select music recording Stale.wav', exact: true })).toBeVisible();
+    await expect(modal.locator('.footage-registration')).toContainText('No music recording selected');
     await modal.getByRole('combobox', { name: 'Music location', exact: true }).selectOption(second.id);
     await expect(current).toBeVisible();
     await expect(current).not.toBeChecked();
-    await expect(modal.getByRole('radio', { name: 'Select music Stale.wav', exact: true })).toHaveCount(0);
+    await expect(modal.getByRole('radio', { name: 'Select music recording Stale.wav', exact: true })).toHaveCount(0);
     expect(writes).toEqual([]);
     expect(memory.saves).toBe(0);
   } finally {
@@ -527,10 +530,10 @@ test('Cancel aborts an outstanding roots read and reopening starts clean, with n
     await modal.getByRole('button', { name: 'Cancel', exact: true }).click();
     await expect(modal).toHaveCount(0);
     release();
-    await expect(page.getByRole('button', { name: 'Browse music files', exact: true })).toBeFocused();
+    await expect(page.getByRole('button', { name: 'Browse music recordings', exact: true })).toBeFocused();
     await openBrowser(page);
     await expect(modal.getByRole('alert')).toHaveCount(0);
-    await expect(modal.locator('.footage-registration')).toContainText('No music file selected');
+    await expect(modal.locator('.footage-registration')).toContainText('No music recording selected');
     expect(reads).toBe(2);
     expect(writes).toEqual([]);
     expect(memory.saves).toBe(0);
@@ -557,7 +560,7 @@ for (const failure of [
       route.fulfill({ status: failure.status, json: { error: failure.message } }),
     );
     const modal = await openBrowser(page);
-    const selected = modal.getByRole('radio', { name: `Select music ${sourceName}`, exact: true });
+    const selected = modal.getByRole('radio', { name: `Select music recording ${sourceName}`, exact: true });
     await selected.check();
     await modal.getByRole('button', { name: 'Import selected music', exact: true }).click();
     await expect(modal.getByRole('alert')).toContainText(failure.message);
@@ -571,7 +574,7 @@ for (const failure of [
     expect(memory.saves).toBe(0);
     expect(memory.snapshot().media.audioIds).toEqual([]);
     await modal.getByRole('button', { name: 'Cancel', exact: true }).click();
-    await expect(page.getByRole('button', { name: 'Browse music files', exact: true })).toBeFocused();
+    await expect(page.getByRole('button', { name: 'Browse music recordings', exact: true })).toBeFocused();
   });
 }
 
@@ -581,7 +584,7 @@ test('an uncertain write retains selection, shows the actual transport uncertain
   const writes = posts(page);
   await page.route('**/api/audio/register-selected', (route) => route.abort('connectionreset'));
   const modal = await openBrowser(page);
-  const selected = modal.getByRole('radio', { name: `Select music ${sourceName}`, exact: true });
+  const selected = modal.getByRole('radio', { name: `Select music recording ${sourceName}`, exact: true });
   await selected.check();
   await modal.getByRole('button', { name: 'Import selected music', exact: true }).click();
   await expect(modal.getByRole('alert')).toContainText('operation may still have completed');
@@ -621,7 +624,7 @@ test('pending registration blocks Escape, Cancel and duplicate submit; accepted 
       : route.fulfill({ json: { assets: [music] } }),
   );
   const modal = await openBrowser(page);
-  await modal.getByRole('radio', { name: `Select music ${sourceName}`, exact: true }).check();
+  await modal.getByRole('radio', { name: `Select music recording ${sourceName}`, exact: true }).check();
   try {
     // Same-event submissions exercise the ref, before React's disabled render.
     await modal
@@ -634,7 +637,9 @@ test('pending registration blocks Escape, Cancel and duplicate submit; accepted 
     await expect(modal.getByRole('button', { name: 'Cancel', exact: true })).toBeDisabled();
     await expect(modal.getByRole('button', { name: 'Import selected music', exact: true })).toBeDisabled();
     await expect(modal.getByRole('combobox', { name: 'Music location', exact: true })).toBeDisabled();
-    await expect(modal.getByRole('radio', { name: `Select music ${sourceName}`, exact: true })).toBeDisabled();
+    await expect(
+      modal.getByRole('radio', { name: `Select music recording ${sourceName}`, exact: true }),
+    ).toBeDisabled();
     await page.keyboard.press('Escape');
     await expect(modal).toBeVisible();
     expect(writes).toHaveLength(1);
@@ -665,12 +670,12 @@ test('native keyboard navigation and focus trapping stay reachable at the minimu
   await location.focus();
   await page.keyboard.press('Tab');
   await expect(modal.getByRole('button', { name: 'Refresh music locations', exact: true })).toBeFocused();
-  const first = modal.getByRole('radio', { name: `Select music ${sourceName}`, exact: true });
+  const first = modal.getByRole('radio', { name: `Select music recording ${sourceName}`, exact: true });
   await first.focus();
   await first.press('Space');
   await expect(first).toBeChecked();
   await first.press('ArrowDown');
-  await expect(modal.getByRole('radio', { name: `Select music ${otherName}`, exact: true })).toBeChecked();
+  await expect(modal.getByRole('radio', { name: `Select music recording ${otherName}`, exact: true })).toBeChecked();
   await expect(modal.locator('input[type="radio"]:checked')).toHaveCount(1);
   const cancel = modal.getByRole('button', { name: 'Cancel', exact: true });
   await cancel.focus();
@@ -696,7 +701,7 @@ test('native keyboard navigation and focus trapping stay reachable at the minimu
   expect((await confirm.boundingBox())!.height).toBeGreaterThanOrEqual(28);
   await page.keyboard.press('Escape');
   await expect(modal).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Browse music files', exact: true })).toBeFocused();
+  await expect(page.getByRole('button', { name: 'Browse music recordings', exact: true })).toBeFocused();
   expect(await page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(frame);
   expect(writes).toEqual([]);
   expect(memory.saves).toBe(0);

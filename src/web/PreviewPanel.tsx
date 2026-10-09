@@ -36,7 +36,7 @@ function previewCaption(loading: boolean, diagnostics: PreviewDiagnostics | null
   if (diagnostics?.status === 'error') return { heading: 'Preview needs attention', message: diagnostics.message };
   return {
     heading: 'Start your edit',
-    message: 'Import a folder, wait for editing proxies, then add an excerpt from Media.',
+    message: 'Import a folder, wait for editing proxies, then add a clip from Media.',
   };
 }
 
@@ -125,7 +125,7 @@ export function PreviewPanel({
             className="preview-comparison-toggle"
             aria-label="Show ungraded preview"
             aria-pressed={diagnostics?.ungraded ?? false}
-            title="Preview only: bypass all colour adjustments on every layer, keeping opacity, fades and transitions. Saved grades and exports are unchanged."
+            title="Preview only: bypass all colour adjustments on every video track, keeping opacity, fades and transitions. Saved grades and exports are unchanged."
             disabled={controlsUnavailable || failed || !diagnostics || status === 'disposed'}
             onClick={onToggleUngraded}
           >

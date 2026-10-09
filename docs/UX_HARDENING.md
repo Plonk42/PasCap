@@ -10,36 +10,36 @@ This guide is not a delivery ledger or a fresh validation result.
 
 - **Keyboard help** is directly in the header. Workspace options holds the
   Media/Clip panel toggles, layout reset and Diagnostics.
-- The **selected excerpt or whole-row context comes first** in Inspector.
+- The **selected clip or whole-track context comes first** in Inspector.
   Collapsed sections have relevant icons, compact duration/rate readouts and an
   adjusted-state dot; expanding preserves every control and existing preferences.
 - Animation uses contextual help rather than a paragraph below every control. Static values use
   the normal treatment; animated values have a **curve icon and amber diamond**,
-  dashed between keys and filled at a participating playhead point. **Animation
+  dashed between keyframes and filled when the setting is enabled at the playhead. **Animation
   help** explains the states once. Titles and screen-reader descriptions retain
   each setting's scope and capture instructions.
-- All **eleven row-channel diamonds have adjacent Previous/Next SVG buttons**, followed by
-  any reset. Explicit capture, real-playhead values, shared point movement,
-  off-duration inspection, every participant and one-step Undo remain unchanged.
+- All **eleven track-channel diamonds have adjacent Previous/Next SVG buttons**, followed by
+  any reset. Explicit capture, real-playhead values, shared keyframe movement,
+  off-duration inspection, every enabled setting and one-step Undo remain unchanged.
 - **Track → Colour** contains the single **Opacity** slider/diamond/navigation
-  alongside the colour sliders, initially **100%**. Without Opacity keys it edits
-  row `opacity`, including on an empty row; keyed `opacity` overrides that value
-  on every clip and both dissolve sources. Sliders never create keys; animated
-  values without a participant at the real playhead are read-only until explicitly
-  captured with the diamond. Unkeyed colour settings are row-owned; Opacity
+  alongside the colour sliders, initially **100%**. Without Opacity keyframes it edits
+  track `opacity`, including on an empty track; keyed `opacity` overrides that value
+  on every clip and both dissolve sources. Sliders never create keyframes; animated
+  values without an enabled setting at the real playhead are read-only until explicitly
+  captured with the diamond. Unkeyed colour settings are track-owned; Opacity
   controls composition coverage, not SDR RGB grading. **Placement** contains
-  placement only. There is no sidebar duplicate; Layer options contains only
+  placement only. There is no sidebar duplicate; Track options contains only
   rename, Ripple, ordering and deletion, with visibility separate in the sidebar.
-- **Temperature / Tint** are row-owned normalized −1…1 scalar Colour controls,
+- **Temperature / Tint** are video track-owned normalized −1…1 scalar Colour controls,
   neutral/reset 0, with the same exact field, release-only slider, explicit capture
-  and channel-navigation pattern, including on empty rows. Positive Temperature
+  and channel-navigation pattern, including on empty tracks. Positive Temperature
   warms; positive Tint adds magenta. Nonzero values intentionally colour greys;
   normalized linear gains precede Exposure, preserving neutral-white luminance
   before clipping only. Static HSL/curves add no channels. See
   [Temperature and Tint](design/TEMPERATURE_AND_TINT.md).
 - Timeline tools form **edit** and **marked-range removal** groups. Temporary
   IN/OUT state appears on the buttons and timeline selection rather than adding
-  another toolbar row. Compact windows use labelled, focusable icon controls;
+  another toolbar. Compact windows use labelled, focusable icon controls;
   shortcuts, accessible names and explanatory titles remain available.
 - Media **Add** stays visible. Search and active filters have direct clear
   actions; partial selection uses the native mixed checkbox state. Readiness has
@@ -48,54 +48,54 @@ This guide is not a delivery ledger or a fresh validation result.
   uncertainty, errors/recheck and disclosed location/assumptions. Snapshot and
   native processing details remain available in **Rendering details**.
 
-Schema 12 requires complete row Colour with Temperature/Tint and static HSL/curves,
-clip spatial base/full-pose source-frame keys and uses a
-required 0–8 `music` array with unique required instance IDs and
+Schema 12 requires complete video track Colour with Temperature/Tint and static HSL/curves,
+clip spatial base/full-pose source-frame keyframes and uses a
+required 0–8 `music` array with unique required music track IDs and
 uniform video tracks with required Ripple/transitions/fades and
-numeric `VideoLayer.opacity` in 0–1 (1 on new tracks), plus eleven nullable point
-channels: `opacity`, `speed` and nine scalar colour settings. Rows
-follow saved bottom-to-top composition order. Layer options exposes default-on
+numeric `VideoLayer.opacity` in 0–1 (1 on new tracks), plus eleven nullable keyframe
+channels: `opacity`, `speed` and nine scalar colour settings. Video tracks
+follow saved bottom-to-top composition order. Track options exposes default-on
 Ripple: enabling closes gaps from the first current start in one Undo; while on,
 later clips continuously sequence there. Turning it off keeps actual placements.
 Later Ripple starts/nudges explain how to reorder or turn Ripple off; only the
-first anchor can move while on. Other tracks, music and absolute row points stay
+first anchor can move while on. Other tracks, music and absolute track keyframes stay
 put. Every track can be reordered/deleted except the last remaining track; stack
 endpoint restrictions have accessible reasons.
 
 Track-local black fades preserve coverage; simultaneous track dissolves use the
 premultiplied group math $C = \sum_i G_i b_i o_i w_i m_i$, $A = \sum_i o_i w_i m_i$ and
-$\mathrm{result} = C + \mathrm{lower}(1 - A)$, without a layer multiplier.
+$\mathrm{result} = C + \mathrm{lower}(1 - A)$, without a track multiplier.
 Here $G_i$ is graded RGB, $b_i$ black-fade brightness, $o_i$ evaluated Opacity and
 $w_i$ dissolve weight and $m_i$ spatial pixel coverage. Exact neutral poses
 preserve opaque black letterboxing after grading; nonneutral uncovered pixels
-reveal lower footage. Each source uses the same evaluated row Opacity at that
-project frame, from the row value or its overriding curve.
+reveal lower footage. Each source uses the same evaluated track Opacity at that
+project frame, from the track value or its overriding curve.
 v1–v11 project/receipt snapshots remain unchanged/incompatible
 and require recreation, without migration, defaults or automatic deletion.
-Row `opacity` is the required sole stored value, not obsolete; saved `clip.opacity`
-and old `clipOpacity`/`layerOpacity` point channels are invalid.
+Track `opacity` is the required sole stored value, not obsolete; saved `clip.opacity`
+and old `clipOpacity`/`layerOpacity` keyframe channels are invalid.
 Registry/proxy/current PCM formats do not change. Version-1 export receipts require
 strict v12 snapshots and captured audio-source/instance-plan arrays, rejecting
 invalid arrays/older snapshots without rewriting successful exports. No null
 fallback or old-format reader is permitted. Source-copy prohibition,
-row points, source choices, media preparation, Activity and both export
+track keyframes, source choices, media preparation, Activity and both export
 profiles retain their contracts. The editor targets desktop Linux; the 640 px
 width floor is not a mobile-support claim.
 
 **Clip → Transform** is the fourth Clip section, collapsed for new
 preferences and included in Clip's bulk expansion. Native sliders/exact fields
 and one full-pose source-frame diamond retain explicit capture, read-only keyed
-main values without a key at the real displayed source frame, release-only
-drafts and editable invalid numbers. Stored-key navigation distinguishes stored
+main values without a keyframe at the real displayed source frame, release-only
+drafts and editable invalid numbers. Stored-keyframe navigation distinguishes stored
 source time from the closest actually mapped preview, including off-trim and
-original exclusive-OUT anchors. This is clip-local, not another row channel.
+original exclusive-OUT anchors. This is clip-local, not another track channel.
 See [the spatial contract](design/SPATIAL_TRANSFORMS.md); no fresh UI acceptance
 or throughput result is implied.
 
 **Audio → Music** uses native **Music track / Recording** selectors, an **Add music
-track** list of ready files and selected-instance trash deletion. Ready recordings can be
-reused by independent instances; import never implicitly places one. Selection
-is editor-only; edits/removal leave other instances and bin membership intact.
+track** list of ready files and selected-track trash deletion. Ready recordings can be
+reused by independent music tracks; import never implicitly places one. Selection
+is editor-only; edits/removal leave other music tracks and bin membership intact.
 Independent drafts never apply to another selection. Each valid commit/completed
 gesture is one Undo step; invalid/cancelled operations remain atomic.
 Project duration is maximum video OUT or music start + duration. Music can extend
@@ -191,8 +191,8 @@ project-title-plus-quality label.
 The displayed allowance is duration/profile dependent:
 
 - Up to the two largest enabled retimed clips at **4 uncompressed bytes/pixel**.
-- For generalized layered export, up to **three** timeline representations at
-  **8 uncompressed bytes/pixel**; disabled-layer tails and music OUTs count in full
+- For generalized composited export, up to **three** timeline representations at
+  **8 uncompressed bytes/pixel**; disabled-track tails and music OUTs count in full
   project duration. Music beyond video OUT requires this path's black tail.
 - Encoded chunks plus final MP4, each budgeted at **1 byte/pixel/frame**.
 - **Maximum selected music PCM size**, **48 kHz stereo s16**, plus **two full-project
@@ -216,7 +216,7 @@ stale or cancelled profile reads cannot replace the current result.
 
 ### Disk-full recovery and applicable validation
 
-Generalized layered export renders each track's premultiplied RGBA16 group, then
+Generalized composited export renders each track's premultiplied RGBA16 group, then
 merges it over the lower accumulator without regrading. It retains up to two clip
 files and three timeline representations, including a span collection as one.
 Four reusable raw buffers use **22 bytes/pixel = 182,476,800 bytes at UHD**; the
@@ -224,22 +224,22 @@ two 65³ Float32 LUTs add **6,591,000 bytes**, excluding native/audio memory.
 One original decoder, two intermediate readers, one encoder and three video children
 per serial pass bound concurrency, not duration-dependent disk use. The static
 fast path requires one enabled, unanimated, zero-origin contiguous track
-with row Opacity 1, exactly neutral spatial bases and no spatial keys; spatial
-edits/keys (even neutral keys) or unsupported placement/coverage use generalized
-layered export, with unchanged raw-buffer/LUT/process budgets.
+with track Opacity 1, exactly neutral spatial bases and no spatial keyframes; spatial
+edits/keyframes (even neutral keyframes) or unsupported placement/coverage use generalized
+composited export, with unchanged raw-buffer/LUT/process budgets.
 
 That static track must cover full project duration; music-only tails require
-layered black, without stretching video closing fades or holding a last image.
+composited black, without stretching video closing fades or holding a last image.
 Audio processes **one original at a time** into selected s16 PCM and serially
 pairwise-sums with a **Float64 stereo accumulator**. At most **two intermediate
 audio inputs**, **one native audio child per pass** and **three audio scratch files**
 (selected PCM + old/new accumulators) coexist, deleting consumed inputs before the
-next instance. Apply per-instance gain/fades, sum without normalisation or
+next music track. Apply per-track gain/fades, sum without normalisation or
 intermediate clipping, then hard-clamp once before final AAC. There is no ducking,
 effect or video audio. These audio allocations are additional to the unchanged
 video bounds above and remain duration-dependent on disk.
 
-Preview instances share one AudioContext/worklet/output clock and **four × 128 KiB**
+Preview music tracks share one AudioContext/worklet/output clock and **four × 128 KiB**
 mixed queue blocks total, serial source reads with **64 KiB** range scratch, one
 **128 KiB conversion workspace** and one **128 KiB mixed-output workspace**. No
 per-track queues/full-file buffers; exact one-frame A/V, source failure/underrun and

@@ -42,7 +42,7 @@ export interface PreviewLayer {
  * stored pair order disambiguates a legal equal-start full-overlap dissolve. */
 export function layerClips(project: ProjectDocument, layerId: string): VideoClip[] {
   const layer = project.layers.find((item) => item.id === layerId);
-  if (!layer) throw new Error('Clip references an unknown video layer.');
+  if (!layer) throw new Error('Clip references an unknown video track.');
   const clips = project.clips.filter((clip) => clip.layerId === layerId);
   if (layer.ripple) return clips;
   const pairOrder = new Map<string, number>();
@@ -68,9 +68,9 @@ function regionConsumption(transition: Transition | undefined, side: 'in' | 'out
 
 function validateTopology(project: ProjectDocument): void {
   if (new Set(project.layers.map((layer) => layer.id)).size !== project.layers.length)
-    throw new Error('Layer IDs must be unique.');
+    throw new Error('Track IDs must be unique.');
   if (project.clips.some((clip) => !project.layers.some((layer) => layer.id === clip.layerId)))
-    throw new Error('Clip references an unknown video layer.');
+    throw new Error('Clip references an unknown video track.');
   if (new Set(project.clips.map((clip) => clip.id)).size !== project.clips.length)
     throw new Error('Clip-instance IDs must be unique.');
   for (const layer of project.layers) {

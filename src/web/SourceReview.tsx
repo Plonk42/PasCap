@@ -86,7 +86,7 @@ interface RangeDrag {
 }
 
 function message(cause: unknown): string {
-  return cause instanceof Error ? cause.message : 'Cannot review this source.';
+  return cause instanceof Error ? cause.message : 'Cannot review this recording.';
 }
 
 /** One muted proxy decoder, independent of the project preview and transport. */
@@ -170,7 +170,7 @@ export function SourceReview({
     decoder.video.disableRemotePlayback = true;
     setDecoderError('');
     if (!mediaReady(asset) || asset.prepared?.verification.frameCount !== asset.metadata.frameCount) {
-      setDecoderError('Prepare a complete, verified source proxy before reviewing it.');
+      setDecoderError('Prepare a complete, verified recording proxy before reviewing it.');
       return () => decoder.dispose();
     }
     owner = new SourceTransport(
@@ -278,7 +278,7 @@ export function SourceReview({
           className={`secondary-button small ${pinned ? 'active' : ''}`}
           aria-label="Pin source review"
           aria-pressed={pinned}
-          title="Keep this source selected while moving over other recordings"
+          title="Keep this recording selected while moving over other recordings"
           onKeyDown={keyboard}
           onClick={onPin}
         >
@@ -288,14 +288,14 @@ export function SourceReview({
         <button
           className="primary-button small"
           type="button"
-          aria-label={`Add ${sourceSeconds(range.sourceOut - range.sourceIn)} source excerpt to timeline`}
-          title={`Append this range to ${targetLayer} as a new, independent excerpt; omitted source frames remain available`}
+          aria-label={`Add clip ${sourceSeconds(range.sourceOut - range.sourceIn)} to timeline`}
+          title={`Append this range to ${targetLayer} as a new, independent clip; omitted source frames remain available`}
           disabled={insertDisabled}
           onKeyDown={keyboard}
           onClick={insertExcerpt}
         >
           <Icon name="plus" size={15} />
-          Add {sourceSeconds(range.sourceOut - range.sourceIn)}
+          Add clip {sourceSeconds(range.sourceOut - range.sourceIn)}
         </button>
         <button
           className="icon-button"
@@ -398,7 +398,7 @@ export function SourceReview({
         aria-atomic="true"
         data-added-clip-id={lastAddedExcerpt?.id}
       >
-        {lastAddedExcerpt && 'Excerpt added · mark another range'}
+        {lastAddedExcerpt && 'Clip added · mark another range'}
       </output>
     </section>
   );
@@ -420,7 +420,7 @@ function SourceExcerpts({
   onKeyDown: (event: KeyboardEvent<HTMLElement>) => void;
 }>) {
   const count = `${excerpts.length} ${excerpts.length === 1 ? 'clip' : 'clips'}`;
-  const label = `Show ${count} from this rush`;
+  const label = `Show ${count} from this recording`;
   return (
     <Popover
       className="source-excerpts"
@@ -434,7 +434,7 @@ function SourceExcerpts({
       {(close) => (
         <>
           <p className="source-excerpts-description">Source IN → OUT · OUT exclusive</p>
-          <ol className="source-excerpt-list" aria-label="Timeline excerpts from this rush">
+          <ol className="source-excerpt-list" aria-label="Timeline clips from this recording">
             {excerpts.map((excerpt) => (
               <li
                 className="source-excerpt-row"
@@ -444,7 +444,7 @@ function SourceExcerpts({
               >
                 <div className="source-excerpt-info">
                   <span className="source-excerpt-heading">
-                    <strong>Excerpt {excerpt.index}</strong>
+                    <strong>Clip {excerpt.index}</strong>
                     <span className="source-excerpt-layer" title={excerpt.layerName}>
                       {excerpt.layerName}
                     </span>
@@ -459,8 +459,8 @@ function SourceExcerpts({
                 <button
                   className="secondary-button small source-excerpt-reveal"
                   type="button"
-                  aria-label={`Show excerpt ${excerpt.index} on timeline`}
-                  title={`Show excerpt ${excerpt.index} on ${excerpt.layerName}`}
+                  aria-label={`Show clip ${excerpt.index} on timeline`}
+                  title={`Show clip ${excerpt.index} on ${excerpt.layerName}`}
                   disabled={disabled}
                   onKeyDown={(event) => {
                     if (event.key === 'Escape') {
@@ -574,7 +574,7 @@ function SourceRangeEditor({
     onPause();
     try {
       validateMediaSelection(next, count);
-      if (next.mediaId !== asset.id) throw new Error('Source range belongs to a different recording.');
+      if (next.mediaId !== asset.id) throw new Error('Range belongs to a different recording.');
       if (next.sourceIn !== range.sourceIn || next.sourceOut !== range.sourceOut) onRange({ ...next });
       setNumbers({ sourceIn: String(next.sourceIn), sourceOut: String(next.sourceOut) });
       setError('');
@@ -665,7 +665,7 @@ function SourceRangeEditor({
         <div
           className="source-range-strip"
           ref={strip}
-          aria-label="Source range"
+          aria-label="Range"
           data-source-in={selected.sourceIn}
           data-source-out={selected.sourceOut}
           data-range-draft={draft ? 'true' : 'false'}
@@ -808,7 +808,7 @@ function SourceRangeEditor({
           <button
             className="secondary-button small"
             type="submit"
-            aria-label="Apply source range"
+            aria-label="Apply range"
             disabled={disabled || !numbersDirty || draft !== null}
             onKeyDown={onKeyDown}
           >
@@ -818,7 +818,7 @@ function SourceRangeEditor({
             <button
               className="text-button"
               type="button"
-              aria-label="Cancel source range"
+              aria-label="Cancel range"
               onKeyDown={onKeyDown}
               onClick={cancel}
             >

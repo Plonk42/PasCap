@@ -288,7 +288,7 @@ describe('one editor-only stored-point cursor', () => {
     expect(previewFrameFor(80, 20)).toBe(19);
     expect(keySeekHint(10, 20)).toBe('Go to timeline frame 10.');
     expect(keySeekHint(20, 20)).toBe(
-      'Stored timeline frame 20; preview the nearest available frame 19. The point stays in place.',
+      'Stored timeline frame 20; preview the nearest available frame 19. The keyframe stays in place.',
     );
   });
 });
@@ -299,7 +299,7 @@ describe('native diamond, previous, next DOM and all control placements', () => 
     const controls = buttons(markup);
     expect(markup.startsWith('<span class="keyframe-setting-navigation" data-animated="true">')).toBe(true);
     expect(markup).toContain('aria-describedby=');
-    expect(markup).toContain('Capture a key at the playhead');
+    expect(markup).toContain('Capture a keyframe at the playhead');
     expect(controls).toHaveLength(3);
     expect(controls[0]).toContain('aria-label="Keyframe Exposure"');
     expect(controls[0]).toContain('aria-pressed="false"');
@@ -403,13 +403,13 @@ describe('native diamond, previous, next DOM and all control placements', () => 
         }),
       ),
     );
-    expect(sidebar).toContain('Layer options Video 1');
+    expect(sidebar).toContain('Track options Video track 1');
     expect(KEYFRAME_SETTINGS).toHaveLength(11);
     expect(inspector).toContain('aria-label="Keyframe Opacity"');
-    expect(inspector).not.toContain('Keyframe Layer opacity');
+    expect(inspector).not.toContain('Keyframe Track opacity');
     expect(inspector).not.toContain('Keyframe Clip opacity');
-    expect(sidebar).not.toContain('Layer opacity');
-    expect(sidebar).not.toContain('keyframe');
+    expect(sidebar).not.toContain('Track opacity');
+    expect(buttons(sidebar).join('')).not.toContain('keyframe');
     expect(sidebar).not.toContain('Previous Exposure keyframe');
   });
 });

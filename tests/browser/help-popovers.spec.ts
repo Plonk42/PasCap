@@ -156,11 +156,11 @@ test('bulk Clip expansion preserves other tabs, mixed state and preferences with
       ),
     ),
   ).toEqual(['open', 'open', 'open', 'open', 'open', 'open', 'closed', 'closed']);
-  await page.getByRole('button', { name: 'Source range section', exact: true }).click();
+  await page.getByRole('button', { name: 'Range section', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Expand all Inspector settings', exact: true })).toBeVisible();
   await page.reload();
   await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
-  await expect(page.getByRole('button', { name: 'Source range section', exact: true })).toHaveAttribute(
+  await expect(page.getByRole('button', { name: 'Range section', exact: true })).toHaveAttribute(
     'aria-expanded',
     'false',
   );
@@ -180,10 +180,10 @@ test('bulk collapse retains invalid drafts, nested disclosure state and reachabl
   const input = page.getByRole('textbox', { name: 'Source IN frame', exact: true, includeHidden: true });
   await input.fill('0.5');
   await input.press('Enter');
-  await inspectorTab(page, 'Layer keyframes');
-  const list = page.getByRole('list', { name: 'Edit layer keys', exact: true, includeHidden: true });
+  await inspectorTab(page, 'Track keyframes');
+  const list = page.getByRole('list', { name: 'Edit track keyframes', exact: true, includeHidden: true });
   await expect(list).toBeVisible();
-  const point = page.getByLabel('Edit layer keyframe 10', { exact: true });
+  const point = page.getByLabel('Edit track keyframe 10', { exact: true });
   // Lists of three or fewer points open their Edit details initially.
   await expect(point.locator('..')).toHaveAttribute('open', '');
   await inspectorTab(page, 'Clip');
@@ -193,7 +193,7 @@ test('bulk collapse retains invalid drafts, nested disclosure state and reachabl
   await expect(list).toBeAttached();
   await expect(point.locator('..')).toHaveAttribute('open', '');
   await page.getByRole('button', { name: 'Source timing help', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Source range section', exact: true })).toHaveAttribute(
+  await expect(page.getByRole('button', { name: 'Range section', exact: true })).toHaveAttribute(
     'aria-expanded',
     'false',
   );
@@ -222,7 +222,7 @@ test('bulk Inspector choices still work when preference writes are denied', asyn
   await page.getByRole('button', { name: 'Collapse all Inspector settings', exact: true }).click();
   await expect(page.getByText('Section preferences cannot be saved in this browser.', { exact: false })).toBeVisible();
   await page.getByRole('button', { name: 'Expand all Inspector settings', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Source range section', exact: true })).toHaveAttribute(
+  await expect(page.getByRole('button', { name: 'Range section', exact: true })).toHaveAttribute(
     'aria-expanded',
     'true',
   );
@@ -234,7 +234,7 @@ test('hover help preserves focus, stays readable across the gap, and leaves with
   page,
 }) => {
   const before = await current(page);
-  await inspectorTab(page, 'Layer keyframes');
+  await inspectorTab(page, 'Track keyframes');
   const title = page.getByRole('textbox', { name: 'Project title', exact: true });
   await title.focus();
   const trigger = page.getByRole('button', { name: 'Animation help', exact: true });
@@ -247,7 +247,7 @@ test('hover help preserves focus, stays readable across the gap, and leaves with
   const box = (await panel.boundingBox())!;
   await page.mouse.move(box.x + box.width / 2, box.y + 20);
   await expect(panel).toBeVisible();
-  await expect(panel).toContainText('All participating settings share one point');
+  await expect(panel).toContainText('All animated settings share one keyframe');
   await page.mouse.move(600, 20);
   await expect(panel).toBeHidden();
   await expect(trigger).toHaveAttribute('aria-expanded', 'false');
@@ -261,7 +261,7 @@ test('click pins an already-hovered panel until an outside click, without steali
   page,
 }) => {
   const before = await current(page);
-  await inspectorTab(page, 'Layer keyframes');
+  await inspectorTab(page, 'Track keyframes');
   const trigger = page.getByRole('button', { name: 'Animation help', exact: true });
   const panel = await panelFor(page, trigger);
   await trigger.hover();
@@ -280,7 +280,7 @@ test('click pins an already-hovered panel until an outside click, without steali
 
 test('keyboard focus previews, Enter and Space pin, and help keys never fire timeline shortcuts', async ({ page }) => {
   const before = await current(page);
-  await inspectorTab(page, 'Layer keyframes');
+  await inspectorTab(page, 'Track keyframes');
   const trigger = page.getByRole('button', { name: 'Animation help', exact: true });
   const panel = await panelFor(page, trigger);
   await trigger.focus();
@@ -364,7 +364,7 @@ test('an outside pointer gesture dismisses pinned help before capture so Escape 
   page,
 }) => {
   const before = await current(page);
-  await inspectorTab(page, 'Layer keyframes');
+  await inspectorTab(page, 'Track keyframes');
   const trigger = page.getByRole('button', { name: 'Animation help', exact: true });
   const panel = await panelFor(page, trigger);
   await trigger.click();
@@ -392,10 +392,10 @@ const HELP_CONTEXTS = [
     tab: 'Clip',
     text: 'The bar spans the original recording; hatching shows omitted footage.',
   },
-  { label: 'Placement timing', tab: 'Clip', text: 'Opacity is in Colour and affects the whole row.' },
-  { label: 'Colour animation', tab: 'Track', text: 'Each diamond keys only its own setting' },
-  { label: 'Speed timing', tab: 'Clip', text: 'Row keys override, rather than multiply' },
-  { label: 'Animation', tab: 'Layer keyframes', text: 'Moving a point moves every participating setting.' },
+  { label: 'Placement timing', tab: 'Clip', text: 'Opacity is in Colour and affects the whole track.' },
+  { label: 'Colour animation', tab: 'Track', text: 'Each diamond captures only its own setting' },
+  { label: 'Speed timing', tab: 'Clip', text: 'Track keyframes override, rather than multiply' },
+  { label: 'Animation', tab: 'Track keyframes', text: 'Moving a keyframe moves every animated setting.' },
   {
     label: 'Transition timing',
     tab: 'Sequence',
@@ -406,7 +406,7 @@ const HELP_CONTEXTS = [
 ] as const;
 
 const INSPECTOR_HELP_HEADINGS = [
-  { title: 'Source range', help: 'Source timing', tab: 'Clip' },
+  { title: 'Range', help: 'Source timing', tab: 'Clip' },
   { title: 'Placement', help: 'Placement timing', tab: 'Clip' },
   { title: 'Speed', help: 'Speed timing', tab: 'Clip' },
   { title: 'Colour', help: 'Colour animation', tab: 'Track' },
@@ -457,7 +457,7 @@ test('native heading Tab order is section then help then its controls, and remem
   page,
 }) => {
   const before = await current(page);
-  const section = page.getByRole('button', { name: 'Source range section', exact: true });
+  const section = page.getByRole('button', { name: 'Range section', exact: true });
   const help = page.getByRole('button', { name: 'Source timing help', exact: true });
   await section.focus();
   await page.keyboard.press('Tab');
@@ -489,7 +489,7 @@ test('collapsing and restoring a section keeps the same invalid field draft and 
   await input.press('Enter');
   const element = await input.elementHandle();
   if (!element) throw new Error('The field must remain mounted across collapse.');
-  const section = page.getByRole('button', { name: 'Source range section', exact: true });
+  const section = page.getByRole('button', { name: 'Range section', exact: true });
   await section.click();
   await expect(input).toBeHidden();
   expect(await element.evaluate((node) => node.isConnected)).toBe(true);
@@ -545,7 +545,7 @@ test('numeric fields retain their descriptions even while the linked help popove
     /Fields accept whole source frames[\s\S]*OUT is exclusive/,
   );
   await expect(page.getByRole('spinbutton', { name: 'Clip speed rate', exact: true })).toHaveAccessibleDescription(
-    /Custom curve points belong to one clip/,
+    /Custom curve keyframes belong to one clip/,
   );
   await inspectorTab(page, 'Sequence');
   await expect(page.getByRole('spinbutton', { name: 'Opening fade', exact: true })).toHaveAccessibleDescription(
@@ -642,11 +642,11 @@ test('hover keeps a valid numeric draft unapplied; clicking help keeps the ordin
 });
 
 test('direct point list keeps timing help available and nested drafts mounted across tabs', async ({ page }) => {
-  await inspectorTab(page, 'Layer keyframes');
-  const list = page.getByRole('list', { name: 'Edit layer keys', exact: true });
+  await inspectorTab(page, 'Track keyframes');
+  const list = page.getByRole('list', { name: 'Edit track keyframes', exact: true });
   await expect(list).toBeVisible();
-  await expect(page.getByLabel('Edit layer keyframe 10', { exact: true }).locator('..')).toHaveAttribute('open', '');
-  const field = page.getByRole('spinbutton', { name: 'Layer keyframe frame 10', exact: true, includeHidden: true });
+  await expect(page.getByLabel('Edit track keyframe 10', { exact: true }).locator('..')).toHaveAttribute('open', '');
+  const field = page.getByRole('spinbutton', { name: 'Track keyframe frame 10', exact: true, includeHidden: true });
   await field.fill('0.5');
   await field.press('Enter');
   const trigger = page.getByRole('button', { name: 'Animation help', exact: true });
@@ -658,7 +658,7 @@ test('direct point list keeps timing help available and nested drafts mounted ac
   await expect(panel).toBeHidden();
   await expect(field).toBeAttached();
   await expect(field).toBeHidden();
-  await inspectorTab(page, 'Layer keyframes');
+  await inspectorTab(page, 'Track keyframes');
   await expect(field).toHaveValue('0.5');
   await expect(field).toHaveAttribute('aria-invalid', 'true');
   await trigger.click();
@@ -843,7 +843,7 @@ test.describe('touch help', () => {
   test.use({ hasTouch: true });
   test('a tap pins help and an outside tap dismisses it without an unavailable hover step', async ({ page }) => {
     const before = await current(page);
-    await inspectorTab(page, 'Layer keyframes');
+    await inspectorTab(page, 'Track keyframes');
     const trigger = page.getByRole('button', { name: 'Animation help', exact: true });
     const panel = await panelFor(page, trigger);
     await trigger.tap();

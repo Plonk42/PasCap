@@ -57,7 +57,7 @@ export function planKeyframeDrag(
       document: project,
       command: null,
       guide: null,
-      error: cause instanceof Error ? cause.message : 'Cannot move this shared point.',
+      error: cause instanceof Error ? cause.message : 'Cannot move this track keyframe.',
     };
   }
 }

@@ -26,11 +26,11 @@ export async function closeOptions(page: Page): Promise<void> {
 
 type InspectorTab = 'Clip' | 'Track' | 'Audio';
 // Keyframes and Sequence are sections of the Track tab; specs name the content they need.
-const TAB_FOR: Record<InspectorTab | 'Layer keyframes' | 'Sequence', InspectorTab> = {
+const TAB_FOR: Record<InspectorTab | 'Track keyframes' | 'Sequence', InspectorTab> = {
   Clip: 'Clip',
   Track: 'Track',
   Audio: 'Audio',
-  'Layer keyframes': 'Track',
+  'Track keyframes': 'Track',
   Sequence: 'Track',
 };
 
@@ -52,10 +52,10 @@ export async function resetSetting(scope: Page | Locator, name: string): Promise
   await scope.locator(`[id="${id}-name"]`).dblclick();
 }
 
-/** Audio → Add music track is the single creation path; it lists ready music files. */
+/** Audio → Add music track is the single creation path; it lists ready music recordings. */
 export async function addMusicTrack(page: Page, name?: string): Promise<void> {
   await openOptions(page, 'Add music track');
-  const choices = page.getByRole('list', { name: 'Ready music files' }).getByRole('button');
+  const choices = page.getByRole('list', { name: 'Ready music recordings' }).getByRole('button');
   await (name ? choices.filter({ hasText: name }).first() : choices.first()).click();
 }
 
@@ -85,16 +85,16 @@ export function sharedPoint(
 }
 
 export function layerKeyframes(page: Page, name: string): Locator {
-  return page.getByRole('group', { name: `Layer keyframes ${name}`, exact: true });
+  return page.getByRole('group', { name: `Track keyframes ${name}`, exact: true });
 }
 
 /** Shared points are directly visible; open only the selected point's nested details. */
 export async function editLayerPoint(page: Page, name: string, frame: number): Promise<Locator> {
-  await inspectorTab(page, 'Layer keyframes');
+  await inspectorTab(page, 'Track keyframes');
   const keys = layerKeyframes(page, name);
   const row = keys.locator(`[data-keyframe-frame="${frame}"]`);
   if ((await row.locator('.layer-keyframe-point-details').getAttribute('open')) === null)
-    await row.getByLabel(`Edit layer keyframe ${frame}`, { exact: true }).click();
+    await row.getByLabel(`Edit track keyframe ${frame}`, { exact: true }).click();
   return row;
 }
 

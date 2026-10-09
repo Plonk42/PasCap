@@ -39,7 +39,7 @@ export const spatialSettingsSchema = z
     keyframes: z
       .array(spatialKeyframeSchema)
       .max(256)
-      .refine(orderedKeys, { message: 'Spatial keys must have unique ascending original-source frames.' }),
+      .refine(orderedKeys, { message: 'Spatial keyframes must have unique ascending original-source frames.' }),
   })
   .strict();
 

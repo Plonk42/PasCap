@@ -6,7 +6,7 @@ export const MAX_DECODER_SLOTS = 2 * MAX_VIDEO_LAYERS;
 /** Two simultaneous dissolve sources per track; never one decoder per stored clip. */
 export function decoderPoolSize(layerCount: number): number {
   if (!Number.isInteger(layerCount) || layerCount < 0 || layerCount > MAX_VIDEO_LAYERS)
-    throw new Error('Unsupported video layer count.');
+    throw new Error('Unsupported video track count.');
   return 2 * layerCount;
 }
 

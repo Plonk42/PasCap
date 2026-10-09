@@ -111,7 +111,7 @@ describe('shared-point drag planning', () => {
   );
   it('rejects a deleted point or row instead of creating a replacement', () => {
     const { project } = fixture();
-    expect(planKeyframeDrag(project, 'missing-row', 20, 30, [], 0).error).toContain('Layer no longer exists');
-    expect(planKeyframeDrag(project, 'video-1', 21, 30, [], 0).error).toContain('point no longer exists');
+    expect(planKeyframeDrag(project, 'missing-row', 20, 30, [], 0).error).toContain('Track no longer exists');
+    expect(planKeyframeDrag(project, 'video-1', 21, 30, [], 0).error).toContain('Track keyframe no longer exists');
   });
 });

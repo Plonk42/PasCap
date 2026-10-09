@@ -293,19 +293,19 @@ async function sourceFrame(page: Page, frame: number): Promise<void> {
 async function sourceRange(page: Page, sourceIn: number, sourceOut: number): Promise<void> {
   await page.getByRole('spinbutton', { name: 'Source IN', exact: true }).fill(String(sourceIn));
   await page.getByRole('spinbutton', { name: 'Source OUT', exact: true }).fill(String(sourceOut));
-  await page.getByRole('button', { name: 'Apply source range', exact: true }).click();
+  await page.getByRole('button', { name: 'Apply range', exact: true }).click();
   await expect(page.locator('.source-range-strip')).toHaveAttribute('data-source-in', String(sourceIn));
   await expect(page.locator('.source-range-strip')).toHaveAttribute('data-source-out', String(sourceOut));
 }
 
-/** The Add button names the applied range length it will insert, for example "Add 3.00 s". */
-const ADD_EXCERPT = /^Add \d+\.\d{2} s source excerpt to timeline$/;
+/** The Add button names the applied range length it will insert, for example "Add clip 3.00 s to timeline". */
+const ADD_EXCERPT = /^Add clip \d+\.\d{2} s to timeline$/;
 
 async function addExcerpt(page: Page): Promise<string> {
   await page.getByRole('button', { name: ADD_EXCERPT }).click();
   const feedback = page.locator('.source-add-feedback');
   await expect(feedback).toHaveAttribute('data-added-clip-id', /^[a-zA-Z0-9_-]+$/);
-  await expect(feedback).toHaveText('Excerpt added · mark another range');
+  await expect(feedback).toHaveText('Clip added · mark another range');
   const id = await feedback.getAttribute('data-added-clip-id');
   if (!id) throw new Error('Successful source insertion must identify its new clip instance.');
   return id;
@@ -410,7 +410,7 @@ test('three ranges from one rush keep the source pinned, independent, reloadable
   expect(calculateLayout(added).duration).toBe(240);
   const badge = page.locator(`.media-item[data-media-id="${assets[0]!.id}"] .media-usage-badge`);
   await expect(badge).toBeVisible();
-  await expect(badge).toHaveText('3 excerpts');
+  await expect(badge).toHaveText('3 clips');
   await sourceRange(page, 5, 35);
   expect((await current(page)).clips).toEqual(added.clips);
 
@@ -422,8 +422,8 @@ test('three ranges from one rush keep the source pinned, independent, reloadable
       'title',
       `Original source frames ${excerpt.sourceIn} → ${excerpt.sourceOut}, OUT exclusive`,
     );
-    await expect(row.locator('.source-excerpt-layer')).toHaveText('Video 1');
-    await expect(row.getByRole('button', { name: `Show excerpt ${index + 1} on timeline`, exact: true })).toBeVisible();
+    await expect(row.locator('.source-excerpt-layer')).toHaveText('Video track 1');
+    await expect(row.getByRole('button', { name: `Show clip ${index + 1} on timeline`, exact: true })).toBeVisible();
   }
   await page.setViewportSize({ width: 1280, height: 720 });
   await page.getByRole('slider', { name: 'Timeline zoom', exact: true }).fill('180');
@@ -436,7 +436,7 @@ test('three ranges from one rush keep the source pinned, independent, reloadable
   const viewport = (await page.locator('.timeline-scroll').boundingBox())!;
   const offscreen = (await clip(page, ids[0]!).boundingBox())!;
   expect(offscreen.x + offscreen.width).toBeLessThan(viewport.x);
-  await page.getByRole('button', { name: 'Show excerpt 1 on timeline', exact: true }).click();
+  await page.getByRole('button', { name: 'Show clip 1 on timeline', exact: true }).click();
   await expect(clip(page, ids[0]!).locator('.timeline-clip-body')).toHaveAttribute('aria-pressed', 'true');
   await expect.poll(() => page.locator('.timeline-scroll').evaluate((element) => element.scrollLeft)).toBe(0);
   await expect(clip(page, ids[0]!)).toBeInViewport();
@@ -467,7 +467,7 @@ test('three ranges from one rush keep the source pinned, independent, reloadable
   await expect(page.locator('.source-range-strip')).toHaveAttribute('data-source-in', '5');
   await expect(page.locator('.source-range-strip')).toHaveAttribute('data-source-out', '35');
   await expect(page.locator('.source-review')).toHaveAttribute('data-source-excerpt-count', '3');
-  await expect(badge).toHaveText('3 excerpts');
+  await expect(badge).toHaveText('3 clips');
   await expect(page.locator('video[data-source-decoder]')).toHaveCount(1);
   await expect(page.locator('video[data-pascap-decoder]')).toHaveCount(2);
   expect(await page.evaluate(() => window.pascapLab!.engine.diagnostics().decoderCount)).toBe(2);
@@ -487,10 +487,10 @@ test('rush excerpt popup leaves review geometry and Add reachable on a short lap
   await trigger.click();
   await expect(trigger).toHaveAttribute('aria-expanded', 'true');
   await expect(page.locator('.source-excerpt-row')).toHaveCount(2);
-  await expect(page.getByRole('button', { name: 'Show excerpt 2 on timeline', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Show clip 2 on timeline', exact: true })).toBeVisible();
   expect(await page.locator('.source-preview').boundingBox()).toEqual(sourceBox);
   await expect(add).toBeInViewport();
-  await page.getByRole('button', { name: 'Show excerpt 1 on timeline', exact: true }).focus();
+  await page.getByRole('button', { name: 'Show clip 1 on timeline', exact: true }).focus();
   await page.keyboard.press('Escape');
   await expect(trigger).toHaveAttribute('aria-expanded', 'false');
   await expect(trigger).toBeFocused();
@@ -523,7 +523,7 @@ test('visible split then S selects each right piece, preserves boundaries and de
   await fixture(page, document);
   const before = await current(page);
   await seek(page, 30);
-  await expect(page.locator('[aria-label="Rush editing actions"]')).toBeVisible();
+  await expect(page.locator('[aria-label="Clip editing actions"]')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Split at playhead', exact: true })).toBeVisible();
   await clipAction(page, 'Split at playhead');
   await expect(page.locator('summary[aria-label="Clip actions"]')).toHaveAttribute('aria-expanded', 'false');
@@ -722,7 +722,7 @@ test('I/O middle removal is transient then one edit, preserving absolute eleven-
     sharedPoint(1_000, { speed: 1, exposure: 0.6 }, 'smooth'),
   ];
   document.layers.push({
-    ...createLayer('upper', 'Video 2', false),
+    ...createLayer('upper', 'Video track 2', false),
     opacity: 0.75,
     keyframes: [sharedPoint(200, { opacity: 0.6, hue: 35 }, 'ease-in')],
   });
@@ -828,7 +828,7 @@ test('overlay middle cuts keep their gap and neighbours fixed; visible quick tri
 }) => {
   const document = sequence();
   document.layers.push({
-    ...createLayer('upper', 'Video 2', false),
+    ...createLayer('upper', 'Video track 2', false),
     opacity: 0.8,
     keyframes: [sharedPoint(10, { speed: 1, exposure: 0.2 }), sharedPoint(500, { speed: 1, hue: 25 }, 'hold')],
     transitions: [
@@ -844,7 +844,7 @@ test('overlay middle cuts keep their gap and neighbours fixed; visible quick tri
   await fixture(page, document);
   await selectClip(page, 'top');
   const before = await current(page);
-  await expect(page.getByRole('button', { name: 'Toggle Ripple on Video 2', exact: true })).toHaveAttribute(
+  await expect(page.getByRole('button', { name: 'Toggle Ripple on Video track 2', exact: true })).toHaveAttribute(
     'aria-pressed',
     'false',
   );
@@ -1039,7 +1039,7 @@ test('partial, reversed and outside marks are rejected; input and source shortcu
   }
   await shortcut(page, 'i');
   await expect(page.locator('.error-banner')).toContainText(
-    'Place the playhead inside the selected excerpt to mark a cut.',
+    'Place the playhead inside the selected clip to mark a cut.',
   );
   expect(await current(page)).toEqual(before);
   await page.getByRole('button', { name: 'Clear cut marks', exact: true }).click();
@@ -1325,7 +1325,7 @@ test('an overlapping source Add clears stale success feedback but keeps the sour
 }) => {
   const document = sequence();
   document.layers.push({
-    ...createLayer('upper', 'Video 2', false),
+    ...createLayer('upper', 'Video track 2', false),
     keyframes: [sharedPoint(10, { exposure: 0.25 }), sharedPoint(500, { hue: 20 }, 'hold')],
     transitions: [{ leftId: 'top', rightId: 'occupied', type: 'cut', duration: 0 }],
   });
@@ -1691,7 +1691,7 @@ test('Media thumbnails dim the omitted head/tail of the applied source range, no
   };
   await review.click();
   await expectZones(0, 120);
-  await expect(review).not.toHaveAccessibleDescription(/Selected source range/);
+  await expect(review).not.toHaveAccessibleDescription(/Selected range/);
   for (const [sourceIn, sourceOut] of [
     [30, 90],
     [30, 120],
@@ -1703,7 +1703,7 @@ test('Media thumbnails dim the omitted head/tail of the applied source range, no
     await expect(item.locator('.media-thumb')).toHaveAttribute('data-source-out', String(sourceOut));
     await expectZones(sourceIn, sourceOut);
     await expect(review).toHaveAccessibleDescription(
-      `Selected source range: frames ${sourceIn} to ${sourceOut} of 120, OUT exclusive`,
+      `Selected range: frames ${sourceIn} to ${sourceOut} of 120, OUT exclusive`,
     );
   }
   await expect(item.getByText(/IN \d+ · OUT \d+/)).toHaveCount(0);
@@ -1728,7 +1728,7 @@ test('Media thumbnails dim the omitted head/tail of the applied source range, no
   await expect(item.locator('.media-thumb')).toHaveAttribute('data-source-in', '0');
   await expect(item.locator('.media-thumb')).toHaveAttribute('data-source-out', '120');
   await expectZones(0, 120);
-  await expect(review).not.toHaveAccessibleDescription(/Selected source range/);
+  await expect(review).not.toHaveAccessibleDescription(/Selected range/);
 
   await sourceRange(page, 20, 100);
   await openOptions(page, 'Media options');
@@ -1775,8 +1775,8 @@ test('removing recordings from the project bin confirms used footage and Undo re
   const trash = page.getByRole('button', { name: 'Remove pattern-a.mp4 from project', exact: true });
   await trash.click();
   const dialog = page.getByRole('dialog', { name: 'Remove pattern-a.mp4 from this project?', exact: true });
-  await expect(dialog).toContainText('2 timeline excerpts using it will be removed too.');
-  await expect(dialog).toContainText('Original files, prepared media and exported videos are kept.');
+  await expect(dialog).toContainText('2 timeline clips using it will be removed too.');
+  await expect(dialog).toContainText('Original recordings, prepared media and exported videos are kept.');
   await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
   await expect(dialog).toHaveCount(0);
   await expect(trash).toBeFocused();
@@ -1802,7 +1802,7 @@ test('removing recordings from the project bin confirms used footage and Undo re
   await page.getByRole('checkbox', { name: 'Select visible recordings', exact: true }).check();
   await page.getByRole('button', { name: 'Remove selected from project', exact: true }).click();
   await expect(page.getByRole('dialog', { name: 'Remove 2 recordings from this project?', exact: true })).toContainText(
-    '2 timeline excerpts using them will be removed too.',
+    '2 timeline clips using them will be removed too.',
   );
   await page.getByRole('button', { name: 'Remove from project', exact: true }).click();
   await expect(heading).toHaveText('Media 0');
@@ -1841,7 +1841,7 @@ test('removing a music recording removes its tracks after confirmation and keeps
   await fixture(page, document);
   const before = await current(page);
   const row = page.locator(`[data-music-media-id="${music.id}"]`);
-  await expect(row).toContainText('1 track');
+  await expect(row).toContainText('1 music track');
   await row.getByRole('button', { name: `Remove ${music.name} from project`, exact: true }).click();
   const dialog = page.getByRole('dialog', { name: `Remove ${music.name} from this project?`, exact: true });
   await expect(dialog).toContainText('1 music track using it will be removed too.');
@@ -1869,7 +1869,7 @@ test('an invalid exact source range keeps its draft, an actionable error and no 
   const sourceOut = page.getByRole('spinbutton', { name: 'Source OUT', exact: true });
   for (const field of [sourceIn, sourceOut]) await expect(field).not.toHaveAttribute('aria-describedby');
   await sourceIn.fill('50');
-  await page.getByRole('button', { name: 'Apply source range', exact: true }).click();
+  await page.getByRole('button', { name: 'Apply range', exact: true }).click();
   const error = 'Use whole source frames: 0 ≤ IN < OUT ≤ 120. OUT is exclusive.';
   await expect(page.locator('.source-range-description[role="alert"]')).toHaveText(error);
   for (const field of [sourceIn, sourceOut]) {
@@ -1878,7 +1878,7 @@ test('an invalid exact source range keeps its draft, an actionable error and no 
   }
   await expect(sourceIn).toHaveValue('50');
   await expect(page.locator('.source-range-strip')).toHaveAttribute('data-source-in', '10');
-  await page.getByRole('button', { name: 'Cancel source range', exact: true }).click();
+  await page.getByRole('button', { name: 'Cancel range', exact: true }).click();
   await expect(sourceIn).toHaveValue('10');
   await expect(page.locator('.source-range-description')).toHaveCount(0);
   for (const field of [sourceIn, sourceOut]) {

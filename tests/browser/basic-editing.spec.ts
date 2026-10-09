@@ -56,7 +56,7 @@ async function current(page: Page): Promise<ProjectDocument> {
 }
 async function installOverlay(page: Page, start = 20): Promise<void> {
   let document = await current(page);
-  document = applyCommand(document, { type: 'layer-add', layer: createLayer('upper', 'Video 2', false) });
+  document = applyCommand(document, { type: 'layer-add', layer: createLayer('upper', 'Video track 2', false) });
   document = applyCommand(document, {
     type: 'insert',
     clip: {
@@ -98,7 +98,7 @@ test('default editor keeps rare options, speed/layer details, track settings and
   await expect(page.getByRole('combobox', { name: 'Speed mode', exact: true })).toBeHidden();
   await expect(page.getByLabel('Placement section', { exact: true })).toBeVisible();
   await expect(page.getByRole('spinbutton', { name: 'Clip timeline start', exact: true })).toBeHidden();
-  await expect(page.getByRole('slider', { name: 'Layer opacity', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('slider', { name: 'Track opacity', exact: true })).toHaveCount(0);
   await expect(page.getByRole('spinbutton', { name: 'Opening fade', exact: true })).toBeHidden();
   await expect(page.getByRole('combobox', { name: 'Music track', exact: true })).toBeHidden();
   await expect(page.getByRole('combobox', { name: 'Filter media' })).toBeHidden();
@@ -202,7 +202,7 @@ test('media overlay drop uses the same snapped ghost and copies the applied sour
   await page.getByRole('button', { name: 'Review pattern-b.mp4', exact: true }).click();
   await page.getByRole('spinbutton', { name: 'Source IN', exact: true }).fill('15');
   await page.getByRole('spinbutton', { name: 'Source OUT', exact: true }).fill('45');
-  await page.getByRole('button', { name: 'Apply source range' }).click();
+  await page.getByRole('button', { name: 'Apply range' }).click();
   const button = page.getByRole('button', { name: 'Review pattern-b.mp4', exact: true });
   const box = (await button.boundingBox())!;
   const surface = page.locator('.timeline-surface');
@@ -269,19 +269,19 @@ test('duplicate preserves static settings without copying row points, and overla
 test('layer rename drafts cancel or commit without affecting ranges/order, and restore with Undo', async ({ page }) => {
   await installOverlay(page);
   const before = await current(page);
-  await openOptions(page, 'Layer options Video 2');
-  const name = page.getByRole('textbox', { name: 'Rename layer Video 2', exact: true });
+  await openOptions(page, 'Track options Video track 2');
+  const name = page.getByRole('textbox', { name: 'Rename track Video track 2', exact: true });
   await name.fill('Scenic overlay');
   await name.press('Escape');
-  expect((await current(page)).layers[1]?.name).toBe('Video 2');
-  await openOptions(page, 'Layer options Video 2');
+  expect((await current(page)).layers[1]?.name).toBe('Video track 2');
+  await openOptions(page, 'Track options Video track 2');
   await name.fill('Scenic overlay');
   await name.press('Enter');
   expect((await current(page)).layers[1]?.name).toBe('Scenic overlay');
   expect((await current(page)).clips).toEqual(before.clips);
   await closeOptions(page);
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
-  expect((await current(page)).layers[1]?.name).toBe('Video 2');
+  expect((await current(page)).layers[1]?.name).toBe('Video track 2');
 });
 
 test('partial proxy admission errors preserve import success and accepted jobs without repeating the request', async ({

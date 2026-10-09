@@ -107,7 +107,11 @@ export function MusicBrowser({ busy, onImport }: Readonly<Props>) {
   };
 
   return (
-    <section className="footage-browser music-browser" aria-label="Browse original music" aria-busy={loading || busy}>
+    <section
+      className="footage-browser music-browser"
+      aria-label="Browse original music recordings"
+      aria-busy={loading || busy}
+    >
       <div className="footage-location-tools">
         <label className="activity-field">
           <span>Music location</span>
@@ -151,7 +155,7 @@ export function MusicBrowser({ busy, onImport }: Readonly<Props>) {
         <div className="footage-empty">
           <strong>No readable music locations</strong>
           <p>
-            Configure PASCAP_MEDIA_ROOTS for the service, or Cancel and use the manual Music file path. Container
+            Configure PASCAP_MEDIA_ROOTS for the service, or Cancel and use the manual Music recording path. Container
             locations must be mounted read-only.
           </p>
         </div>
@@ -193,7 +197,7 @@ export function MusicBrowser({ busy, onImport }: Readonly<Props>) {
           </div>
           <input
             type="search"
-            aria-label="Search music files"
+            aria-label="Search music recordings"
             placeholder="Filter this folder"
             value={query}
             disabled={busy || loading}
@@ -208,8 +212,8 @@ export function MusicBrowser({ busy, onImport }: Readonly<Props>) {
           {!loading && listing && (
             <>
               <fieldset className="music-browser-files" disabled={busy}>
-                <legend className="declutter-sr-only">Choose one music file</legend>
-                <ul className="footage-entry-list" aria-label="Music entries">
+                <legend className="declutter-sr-only">Choose one music recording</legend>
+                <ul className="footage-entry-list" aria-label="Music recording entries">
                   {visible.map((item) => (
                     <li key={item.path}>
                       {item.kind === 'directory' ? (
@@ -229,7 +233,7 @@ export function MusicBrowser({ busy, onImport }: Readonly<Props>) {
                           <input
                             type="radio"
                             name={radioName}
-                            aria-label={`Select music ${item.name}`}
+                            aria-label={`Select music recording ${item.name}`}
                             checked={selection?.path === item.path}
                             onChange={() => setSelected({ rootId: location.rootId, path: item.path, name: item.name })}
                           />
@@ -246,13 +250,13 @@ export function MusicBrowser({ busy, onImport }: Readonly<Props>) {
               </fieldset>
               {!visible.length && (
                 <p className="control-hint">
-                  {query ? 'No matching music files or folders.' : 'No supported audio files in this folder.'}
+                  {query ? 'No matching music recordings or folders.' : 'No supported music recordings in this folder.'}
                 </p>
               )}
               {listing.truncated && (
                 <p className="control-hint">
                   This folder exceeds the {MAX_FOOTAGE_ENTRIES.toLocaleString()}-entry listing limit. Open a smaller
-                  subfolder or Cancel and use the manual Music file path.
+                  subfolder or Cancel and use the manual Music recording path.
                 </p>
               )}
               {listing.warnings.length > 0 && (
@@ -275,7 +279,7 @@ export function MusicBrowser({ busy, onImport }: Readonly<Props>) {
       </p>
       <div className="footage-registration">
         <output title={selection?.path} aria-live="polite">
-          {selection ? `Selected: ${selection.name} · original stays in place` : 'No music file selected'}
+          {selection ? `Selected: ${selection.name} · original stays in place` : 'No music recording selected'}
         </output>
         <button type="button" className="text-button" disabled={busy || !selection} onClick={() => setSelected(null)}>
           Clear selection

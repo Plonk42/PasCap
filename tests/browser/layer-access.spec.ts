@@ -46,7 +46,8 @@ test.beforeEach(async ({ page, request }) => {
   });
   const document = createProject('layer-access-memory', 'Layer access · memory-only');
   document.media.videoIds = assets.map((asset) => asset.id);
-  for (let index = 2; index <= 8; index++) document.layers.push(createLayer(`row-${index}`, `Video ${index}`, false));
+  for (let index = 2; index <= 8; index++)
+    document.layers.push(createLayer(`row-${index}`, `Video track ${index}`, false));
   document.layers[6]!.keyframes = [sharedPoint(10, { exposure: 0.2 })];
   document.clips = [
     createClip('base', assets[0]!.id, 0, 120),
@@ -101,7 +102,7 @@ test('native wheel scrolling over the timeline reaches hidden rows and music wit
   await wheelOver(page, viewport, 400);
   await expect.poll(() => viewport.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
   await wheelOver(page, viewport, 2000);
-  await expect(page.getByRole('button', { name: 'Timeline lane Video 8', exact: true })).toBeInViewport();
+  await expect(page.getByRole('button', { name: 'Timeline lane Video track 8', exact: true })).toBeInViewport();
   await expect(page.locator('.music-track-empty')).toBeInViewport();
   await alignedRows(page);
   expect(await current(page)).toEqual(before);
@@ -113,20 +114,20 @@ test('native wheel scrolling over the timeline reaches hidden rows and music wit
 test('wheel scrolling over layer headers reaches all eight rows and keeps the clips synchronized', async ({ page }) => {
   const before = await current(page);
   const viewport = page.locator('.timeline-scroll');
-  const headers = page.getByRole('complementary', { name: 'Video layers', exact: true });
+  const headers = page.getByRole('complementary', { name: 'Video tracks', exact: true });
   await resetVertical(viewport);
-  await expect(page.getByRole('button', { name: 'Select layer Video 1', exact: true })).toBeInViewport();
+  await expect(page.getByRole('button', { name: 'Select track Video track 1', exact: true })).toBeInViewport();
   await wheelOver(page, headers, 400);
   await expect.poll(() => viewport.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
   await alignedRows(page);
   await wheelOver(page, headers, 2000);
-  await expect(page.getByRole('button', { name: 'Select layer Video 8', exact: true })).toBeInViewport();
+  await expect(page.getByRole('button', { name: 'Select track Video track 8', exact: true })).toBeInViewport();
   await expect
     .poll(() => headers.evaluate((element) => element.scrollTop))
     .toBe(await viewport.evaluate((element) => element.scrollTop));
   await wheelOver(page, headers, -2000);
   await expect.poll(() => viewport.evaluate((element) => element.scrollTop)).toBe(0);
-  await expect(page.getByRole('button', { name: 'Select layer Video 1', exact: true })).toBeInViewport();
+  await expect(page.getByRole('button', { name: 'Select track Video track 1', exact: true })).toBeInViewport();
   expect(await current(page)).toEqual(before);
   expect(memory.saves).toBe(0);
 });
@@ -147,7 +148,7 @@ test('the native vertical scrollbar reveals the last composition row and synchro
   await page.mouse.down();
   await page.mouse.move(bounds.x + bounds.width - size.gutter / 2, bounds.y + size.height - 8, { steps: 5 });
   await page.mouse.up();
-  await expect(page.getByRole('button', { name: 'Select layer Video 8', exact: true })).toBeInViewport();
+  await expect(page.getByRole('button', { name: 'Select track Video track 8', exact: true })).toBeInViewport();
   await expect(page.locator('.music-track-empty')).toBeInViewport();
   await alignedRows(page);
   expect(await current(page)).toEqual(before);
@@ -161,17 +162,17 @@ test('native keyboard focus reveals hidden headers, selects their own row, and s
   const frame = await page.evaluate(() => window.pascapLab!.engine.diagnostics().frame);
   const viewport = page.locator('.timeline-scroll');
   await resetVertical(viewport);
-  const last = page.getByRole('button', { name: 'Select layer Video 8', exact: true });
+  const last = page.getByRole('button', { name: 'Select track Video track 8', exact: true });
   await last.focus();
   await expect(last).toBeFocused();
   await expect(last).toBeInViewport();
   await expect.poll(() => viewport.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
   await alignedRows(page);
   await page.keyboard.press('Tab');
-  await expect(page.getByRole('button', { name: 'Toggle Ripple on Video 8', exact: true })).toBeFocused();
+  await expect(page.getByRole('button', { name: 'Toggle Ripple on Video track 8', exact: true })).toBeFocused();
   await page.keyboard.press('Tab');
-  await expect(page.locator('summary[aria-label="Layer options Video 8"]')).toBeFocused();
-  const top = page.getByRole('button', { name: 'Select layer Video 1', exact: true });
+  await expect(page.locator('summary[aria-label="Track options Video track 8"]')).toBeFocused();
+  const top = page.getByRole('button', { name: 'Select track Video track 1', exact: true });
   await top.focus();
   await top.press('Enter');
   await expect(top).toHaveAttribute('aria-pressed', 'true');
@@ -193,7 +194,7 @@ test('horizontal scrolling remains independent and synchronized vertical extents
   await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
   await page.getByRole('slider', { name: 'Timeline zoom', exact: true }).fill('180');
   const viewport = page.locator('.timeline-scroll');
-  const headers = page.getByRole('complementary', { name: 'Video layers', exact: true });
+  const headers = page.getByRole('complementary', { name: 'Video tracks', exact: true });
   await expect.poll(() => viewport.evaluate((element) => element.scrollWidth - element.clientWidth)).toBeGreaterThan(0);
   const bounds = (await viewport.boundingBox())!;
   await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
@@ -238,18 +239,18 @@ for (const { width, height, timelineHeight } of [
     if (timelineHeight === 200) for (let index = 0; index < 3; index++) await resizer.press('Shift+ArrowDown');
     await expect(resizer).toHaveAttribute('aria-valuenow', String(timelineHeight));
     const viewport = page.locator('.timeline-scroll');
-    const headers = page.getByRole('complementary', { name: 'Video layers', exact: true });
+    const headers = page.getByRole('complementary', { name: 'Video tracks', exact: true });
     const viewportHeight = await viewport.evaluate((element) => element.clientHeight);
     await expect.poll(() => headers.evaluate((element) => element.clientHeight)).toBe(viewportHeight);
     await resetVertical(viewport);
     await wheelOver(page, headers, 2000);
-    await expect(page.getByRole('button', { name: 'Select layer Video 8', exact: true })).toBeInViewport();
+    await expect(page.getByRole('button', { name: 'Select track Video track 8', exact: true })).toBeInViewport();
     await expect(page.locator('.music-track-empty')).toBeInViewport();
     await expect(page.locator('.timeline-ruler')).toBeInViewport({ ratio: 1 });
     await alignedRows(page);
     await wheelOver(page, viewport, -2000);
     await expect.poll(() => viewport.evaluate((element) => element.scrollTop)).toBe(0);
-    await expect(page.getByRole('button', { name: 'Select layer Video 1', exact: true })).toBeInViewport();
+    await expect(page.getByRole('button', { name: 'Select track Video track 1', exact: true })).toBeInViewport();
     await expect(page.locator('.timeline-ruler')).toBeInViewport({ ratio: 1 });
     await alignedRows(page);
     expect(await page.evaluate(() => globalThis.document.documentElement.scrollWidth <= innerWidth)).toBe(true);
@@ -260,30 +261,30 @@ for (const { width, height, timelineHeight } of [
 
 test('only composition ends restrict stacking while every nonfinal track can be deleted', async ({ page }) => {
   const before = await current(page);
-  await openOptions(page, 'Layer options Video 1');
-  await expect(page.getByRole('button', { name: 'Lower layer Video 1', exact: true })).toBeDisabled();
-  await expect(page.getByRole('button', { name: 'Lower layer Video 1', exact: true })).toHaveAccessibleDescription(
-    'This track is already the bottom composition layer.',
-  );
+  await openOptions(page, 'Track options Video track 1');
+  await expect(page.getByRole('button', { name: 'Lower track Video track 1', exact: true })).toBeDisabled();
+  await expect(
+    page.getByRole('button', { name: 'Lower track Video track 1', exact: true }),
+  ).toHaveAccessibleDescription('This track is already the bottom video track.');
   for (const action of ['Raise', 'Delete'])
-    await expect(page.getByRole('button', { name: `${action} layer Video 1`, exact: true })).toBeEnabled();
+    await expect(page.getByRole('button', { name: `${action} track Video track 1`, exact: true })).toBeEnabled();
   await page.keyboard.press('Escape');
-  await openOptions(page, 'Layer options Video 8');
-  await expect(page.getByRole('button', { name: 'Raise layer Video 8', exact: true })).toBeDisabled();
-  await expect(page.getByRole('button', { name: 'Raise layer Video 8', exact: true })).toHaveAccessibleDescription(
-    'This track is already the top composition layer.',
-  );
-  await expect(page.getByRole('button', { name: 'Lower layer Video 8', exact: true })).toBeEnabled();
-  await expect(page.getByRole('button', { name: 'Delete layer Video 8', exact: true })).toBeEnabled();
+  await openOptions(page, 'Track options Video track 8');
+  await expect(page.getByRole('button', { name: 'Raise track Video track 8', exact: true })).toBeDisabled();
+  await expect(
+    page.getByRole('button', { name: 'Raise track Video track 8', exact: true }),
+  ).toHaveAccessibleDescription('This track is already the top video track.');
+  await expect(page.getByRole('button', { name: 'Lower track Video track 8', exact: true })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Delete track Video track 8', exact: true })).toBeEnabled();
   await page.keyboard.press('Escape');
-  await openOptions(page, 'Layer options Video 2');
-  await expect(page.getByRole('button', { name: 'Lower layer Video 2', exact: true })).toBeEnabled();
-  await expect(page.getByRole('button', { name: 'Raise layer Video 2', exact: true })).toBeEnabled();
-  await expect(page.getByRole('button', { name: 'Delete layer Video 2', exact: true })).toBeEnabled();
+  await openOptions(page, 'Track options Video track 2');
+  await expect(page.getByRole('button', { name: 'Lower track Video track 2', exact: true })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Raise track Video track 2', exact: true })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Delete track Video track 2', exact: true })).toBeEnabled();
   await page.keyboard.press('Escape');
-  await openOptions(page, 'Layer options Video 4');
+  await openOptions(page, 'Track options Video track 4');
   for (const action of ['Raise', 'Lower', 'Delete'])
-    await expect(page.getByRole('button', { name: `${action} layer Video 4`, exact: true })).toBeEnabled();
+    await expect(page.getByRole('button', { name: `${action} track Video track 4`, exact: true })).toBeEnabled();
   expect(await current(page)).toEqual(before);
   expect(memory.saves).toBe(0);
 });
@@ -293,11 +294,35 @@ test('overlay raise, lower and delete each keep other data unchanged and require
 }) => {
   const before = await current(page);
   for (const [action, order] of [
-    ['Raise', ['Video 1', 'Video 2', 'Video 3', 'Video 5', 'Video 4', 'Video 6', 'Video 7', 'Video 8']],
-    ['Lower', ['Video 1', 'Video 2', 'Video 4', 'Video 3', 'Video 5', 'Video 6', 'Video 7', 'Video 8']],
+    [
+      'Raise',
+      [
+        'Video track 1',
+        'Video track 2',
+        'Video track 3',
+        'Video track 5',
+        'Video track 4',
+        'Video track 6',
+        'Video track 7',
+        'Video track 8',
+      ],
+    ],
+    [
+      'Lower',
+      [
+        'Video track 1',
+        'Video track 2',
+        'Video track 4',
+        'Video track 3',
+        'Video track 5',
+        'Video track 6',
+        'Video track 7',
+        'Video track 8',
+      ],
+    ],
   ] as const) {
-    await openOptions(page, 'Layer options Video 4');
-    await page.getByRole('button', { name: `${action} layer Video 4`, exact: true }).click();
+    await openOptions(page, 'Track options Video track 4');
+    await page.getByRole('button', { name: `${action} track Video track 4`, exact: true }).click();
     const after = await current(page);
     expect(after.layers.map((layer) => layer.name)).toEqual(order);
     expect(after.clips).toEqual(before.clips);
@@ -311,8 +336,8 @@ test('overlay raise, lower and delete each keep other data unchanged and require
     await alignedRows(page);
   }
   await wheelOver(page, page.locator('.timeline-scroll'), 2000);
-  await openOptions(page, 'Layer options Video 4');
-  await page.getByRole('button', { name: 'Delete layer Video 4', exact: true }).click();
+  await openOptions(page, 'Track options Video track 4');
+  await page.getByRole('button', { name: 'Delete track Video track 4', exact: true }).click();
   const after = await current(page);
   expect(after.layers).toEqual(before.layers.filter((layer) => layer.id !== 'row-4'));
   expect(after.clips).toEqual(before.clips.filter((clip) => clip.layerId !== 'row-4'));
@@ -330,7 +355,7 @@ test('active shared-point capture still blocks layer mutations and Escape restor
   page,
 }) => {
   const before = await current(page);
-  const marker = page.getByRole('button', { name: 'Layer keyframe 10 on Video 7', exact: true });
+  const marker = page.getByRole('button', { name: 'Track keyframe 10 on Video track 7', exact: true });
   await marker.scrollIntoViewIfNeeded();
   const bounds = (await marker.boundingBox())!;
   await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
@@ -338,7 +363,11 @@ test('active shared-point capture still blocks layer mutations and Escape restor
   await page.mouse.move(bounds.x + bounds.width / 2 + 16, bounds.y + bounds.height / 2, { steps: 3 });
   await expect(page.locator('.timeline-surface')).toHaveClass(/keyframe-drafting/);
   for (const action of ['Raise', 'Lower', 'Delete']) {
-    const button = page.getByRole('button', { name: `${action} layer Video 7`, exact: true, includeHidden: true });
+    const button = page.getByRole('button', {
+      name: `${action} track Video track 7`,
+      exact: true,
+      includeHidden: true,
+    });
     await expect(button).toBeDisabled();
     await expect(button).toHaveAccessibleDescription(/Finish or cancel the active edit/);
   }
@@ -363,9 +392,18 @@ test('displayed rows follow stored bottom-to-top composition order without chang
       .sort((a, b) => a.top - b.top)
       .map((row) => row.name),
   );
-  expect(headers).toEqual(['Video 1', 'Video 2', 'Video 3', 'Video 4', 'Video 5', 'Video 6', 'Video 7', 'Video 8']);
-  await expect(page.getByRole('button', { name: 'Select layer Video 1', exact: true })).toBeInViewport();
-  await expect(page.getByRole('button', { name: 'Timeline lane Video 1', exact: true })).toBeInViewport();
+  expect(headers).toEqual([
+    'Video track 1',
+    'Video track 2',
+    'Video track 3',
+    'Video track 4',
+    'Video track 5',
+    'Video track 6',
+    'Video track 7',
+    'Video track 8',
+  ]);
+  await expect(page.getByRole('button', { name: 'Select track Video track 1', exact: true })).toBeInViewport();
+  await expect(page.getByRole('button', { name: 'Timeline lane Video track 1', exact: true })).toBeInViewport();
   await alignedRows(page);
   expect(await current(page)).toEqual(before);
   expect(memory.saves).toBe(0);
@@ -378,7 +416,7 @@ test('the time ruler stays fully visible and above row controls at every vertica
   const before = await current(page);
   const viewport = page.locator('.timeline-scroll');
   const ruler = page.locator('.timeline-ruler');
-  const headers = page.getByRole('complementary', { name: 'Video layers', exact: true });
+  const headers = page.getByRole('complementary', { name: 'Video tracks', exact: true });
   await resetVertical(viewport);
   for (const top of [0, 105, 300, 2000]) {
     await viewport.evaluate((element, position) => {
@@ -446,7 +484,7 @@ test('the visible ruler and playhead retain exact seeking after vertical and hor
   expect(await current(page)).toEqual(document);
   expect(memory.saves).toBe(0);
   await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
-  await expect(page.getByRole('button', { name: 'Select layer Video 1', exact: true })).toHaveAttribute(
+  await expect(page.getByRole('button', { name: 'Select track Video track 1', exact: true })).toHaveAttribute(
     'aria-pressed',
     'true',
   );

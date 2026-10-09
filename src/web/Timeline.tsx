@@ -137,7 +137,7 @@ function timelineInteractionMessage(
   if (keyframe)
     return (
       keyframe.error ||
-      `Shared point · ${formatTimecode(keyframe.frame)} · all participants move together · release to apply · Esc cancels`
+      `Track keyframe · ${formatTimecode(keyframe.frame)} · all animated settings move together · release to apply · Esc cancels`
     );
   return interactionMessage(error, plan, draft, selected);
 }
@@ -170,8 +170,8 @@ function speedLabel(clip: VideoClip): string {
 
 function nextLayerName(project: ProjectDocument): string {
   let number = 2;
-  while (project.layers.some((layer) => layer.name === `Video ${number}`)) number++;
-  return `Video ${number}`;
+  while (project.layers.some((layer) => layer.name === `Video track ${number}`)) number++;
+  return `Video track ${number}`;
 }
 
 function timelineEmptyMessage(project: ProjectDocument): string {
@@ -707,7 +707,7 @@ export function Timeline(props: Readonly<Props>) {
     try {
       onEdit(trimOnTimeline(project, clip.id, edge, delta, count, 'source'));
     } catch (cause) {
-      onError(cause instanceof Error ? cause.message : 'Cannot trim this source range.');
+      onError(cause instanceof Error ? cause.message : 'Cannot trim this range.');
     }
   };
   const frameAt = (clientX: number): number => {
@@ -844,7 +844,7 @@ export function Timeline(props: Readonly<Props>) {
         };
       dropPointer.current = { x: event.clientX, y: event.clientY, alt: event.altKey };
       const candidate = latestDrop.current();
-      if (!candidate) throw new Error('Drop onto a video row.');
+      if (!candidate) throw new Error('Drop onto a video track.');
       if (candidate.error) throw new Error(candidate.error);
       if (candidate.command) onEdit(candidate.command);
       else onInsert(ids, candidate.index, candidate.layerId, candidate.start);
@@ -856,7 +856,7 @@ export function Timeline(props: Readonly<Props>) {
   };
 
   const interactionStatus = musicGesture
-    ? musicGesture.error || `Music · ${formatTimecode(musicGesture.start)} · release to apply · Esc cancels`
+    ? musicGesture.error || `Music track · ${formatTimecode(musicGesture.start)} · release to apply · Esc cancels`
     : timelineInteractionMessage(keyframes.draft, dragError, dropPlan, draft, selected?.clip);
   return (
     <section className="timeline-panel panel" id="timeline-pane" tabIndex={-1} aria-label="Video timeline">
@@ -938,7 +938,7 @@ export function Timeline(props: Readonly<Props>) {
         </button>
         <button
           className="secondary-button small timeline-view-action"
-          aria-label="Add video layer"
+          aria-label="Add video track"
           title="Add a video track with Ripple on, independent transitions and fades"
           disabled={interactionBlocked || project.layers.length >= MAX_VIDEO_LAYERS}
           onClick={() => {
@@ -948,7 +948,7 @@ export function Timeline(props: Readonly<Props>) {
           }}
         >
           <Icon name="plus" size={15} />
-          <span className="timeline-action-label">Layer</span>
+          <span className="timeline-action-label">Track</span>
         </button>
         <div className="timeline-zoom">
           <label htmlFor="timeline-zoom">Zoom</label>
@@ -1051,7 +1051,7 @@ export function Timeline(props: Readonly<Props>) {
             {selected && source && selectedLayer && (
               <div
                 className="available-source"
-                aria-label="Available original footage"
+                aria-label="Available original recording"
                 style={{
                   top: rowTop(selected.clip.layerId) - 5,
                   left: leading + (selected.start - availableHead) * scale,
@@ -1127,7 +1127,7 @@ export function Timeline(props: Readonly<Props>) {
                 >
                   <button
                     className="timeline-clip-body"
-                    aria-label={`Select ${name}, excerpt ${index + 1}`}
+                    aria-label={`Select ${name}, clip ${index + 1}`}
                     aria-pressed={isSelected}
                     disabled={interactionBlocked}
                     title={`${name} · ${project.layers.find((layer) => layer.id === clip.layerId)?.name} · ${placed.duration} timeline frames`}
@@ -1166,7 +1166,7 @@ export function Timeline(props: Readonly<Props>) {
                       className={`trim-handle ${edge}`}
                       data-trim-handle={edge}
                       role="slider"
-                      aria-label={`Trim ${edge === 'in' ? 'start' : 'end'} of ${name}, excerpt ${index + 1}`}
+                      aria-label={`Trim ${edge === 'in' ? 'start' : 'end'} of ${name}, clip ${index + 1}`}
                       disabled={keyframes.active || musicGesture !== null}
                       aria-valuemin={edge === 'in' ? 0 : clip.sourceIn + 1}
                       aria-valuemax={
@@ -1174,7 +1174,7 @@ export function Timeline(props: Readonly<Props>) {
                       }
                       aria-valuenow={edge === 'in' ? clip.sourceIn : clip.sourceOut}
                       aria-valuetext={sourceSeconds(edge === 'in' ? clip.sourceIn : clip.sourceOut)}
-                      title={`Trim ${edge === 'in' ? 'start' : 'end'}; drag outward to restore footage. Arrow keys: one frame; Shift: ten.`}
+                      title={`Trim ${edge === 'in' ? 'start' : 'end'}; drag outward to restore recording frames. Arrow keys: one frame; Shift: ten.`}
                       onPointerDown={(event) => beginTrim(event, placed.clip, edge)}
                       onPointerMove={moveTrim}
                       onPointerUp={finishTrim}
@@ -1216,9 +1216,9 @@ export function Timeline(props: Readonly<Props>) {
                     data-layer-keyframe={displayedFrame}
                     data-keyframe-origin={point.frame}
                     data-keyframe-layer={layer.id}
-                    aria-label={`Layer keyframe ${displayedFrame} on ${layer.name}`}
+                    aria-label={`Track keyframe ${displayedFrame} on ${layer.name}`}
                     aria-pressed={current}
-                    title={`${layer.name} · ${formatTimecode(displayedFrame)} · ${settings} · Drag to move all participants; Arrow keys: 1 frame, Shift: 10. Alt bypasses snapping.`}
+                    title={`${layer.name} · ${formatTimecode(displayedFrame)} · ${settings} · Drag to move all animated settings; Arrow keys: 1 frame, Shift: 10. Alt bypasses snapping.`}
                     style={{ top: rowTop(layer.id) + 48, left: leading + displayedFrame * scale }}
                     draggable={false}
                     disabled={interactionBlocked && !active}
@@ -1247,7 +1247,7 @@ export function Timeline(props: Readonly<Props>) {
               const left =
                 assets.find(
                   (asset) => asset.id === project.clips.find((clip) => clip.id === region.transition.leftId)?.mediaId,
-                )?.name ?? `Excerpt ${index + 1}`;
+                )?.name ?? `Clip ${index + 1}`;
               const position =
                 region.transition.type === 'cross-dissolve' ? (region.start + region.end) / 2 : region.boundary;
               const label = { cut: 'Cut', 'cross-dissolve': 'Dissolve', 'fade-through-black': 'Fade' }[
@@ -1261,7 +1261,7 @@ export function Timeline(props: Readonly<Props>) {
                   data-transition-layer={region.layerId}
                   disabled={interactionBlocked}
                   style={{ top: rowTop(region.layerId) + 4, left: leading + position * scale }}
-                  aria-label={`Transition after ${left}, excerpt ${index + 1} on ${layerName}`}
+                  aria-label={`Transition after ${left}, clip ${index + 1} on ${layerName}`}
                   title={`${label} on ${layerName} · edit this track’s boundary`}
                   onClick={() => onBoundary(region.transition.leftId)}
                 >

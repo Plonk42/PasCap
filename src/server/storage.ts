@@ -80,7 +80,7 @@ export class ProjectStore {
       const version =
         typeof rawVersion === 'string' || typeof rawVersion === 'number' ? String(rawVersion) : 'missing or invalid';
       throw new ServiceError(
-        `Unsupported project schema version ${version}; this build requires version 12 with row-owned Colour, Temperature, Tint, HSL ranges, curves and Opacity, eleven required nullable point channels, explicit clip spatial settings, identified music instances and per-track Ripple, transitions and fades. No migration is performed.`,
+        `Unsupported project schema version ${version}; this build requires version 12 with track-owned Colour, Temperature, Tint, HSL ranges, curves and Opacity, eleven required nullable keyframe channels, explicit clip spatial settings, identified music instances and per-track Ripple, transitions and fades. No migration is performed.`,
         422,
       );
     }

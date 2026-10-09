@@ -71,7 +71,7 @@ function repairBoundaries(clips: VideoClip[], previous: Transition[]): Transitio
 
 function requiredLayer(next: ProjectDocument, layerId: string): VideoLayer {
   const layer = next.layers.find((item) => item.id === layerId);
-  if (!layer) throw new Error('Layer no longer exists.');
+  if (!layer) throw new Error('Track no longer exists.');
   return layer;
 }
 
@@ -181,10 +181,8 @@ function removeSourceRange(
   } else if (command.sourceOut === original.sourceOut) {
     next.clips[index] = { ...original, sourceOut: command.sourceIn };
   } else {
-    if (!idSchema.safeParse(command.newClipId).success)
-      throw new Error('The new excerpt needs a valid clip-instance ID.');
-    if (next.clips.some((clip) => clip.id === command.newClipId))
-      throw new Error('The new excerpt clip ID must be unused.');
+    if (!idSchema.safeParse(command.newClipId).success) throw new Error('The new clip needs a valid clip-instance ID.');
+    if (next.clips.some((clip) => clip.id === command.newClipId)) throw new Error('The new clip ID must be unused.');
     const right = {
       ...original,
       id: command.newClipId,
@@ -220,7 +218,7 @@ function editLayerValue(layer: VideoLayer, point: LayerKeyframe | undefined, com
   const current = point?.values[command.setting];
   if (command.type === 'layer-key-value') {
     if (current === undefined || current === null)
-      throw new Error('The setting does not participate at this layer point.');
+      throw new Error('The setting is not enabled at this track keyframe.');
     point!.values[command.setting] = command.value;
     return;
   }
@@ -237,19 +235,19 @@ function editLayerValue(layer: VideoLayer, point: LayerKeyframe | undefined, com
 
 function editLayerKey(next: ProjectDocument, command: LayerKeyCommand): void {
   const layer = next.layers.find((item) => item.id === command.layerId);
-  if (!layer) throw new Error('Layer no longer exists.');
+  if (!layer) throw new Error('Track no longer exists.');
   frameSchema.parse(command.frame);
   const point = layer.keyframes.find((key) => key.frame === command.frame);
   if (command.type === 'layer-key-toggle' || command.type === 'layer-key-value') {
     editLayerValue(layer, point, command);
     return;
   }
-  if (!point) throw new Error('Layer point no longer exists.');
+  if (!point) throw new Error('Track keyframe no longer exists.');
   switch (command.type) {
     case 'layer-key-move':
       frameSchema.parse(command.nextFrame);
       if (layer.keyframes.some((key) => key !== point && key.frame === command.nextFrame))
-        throw new Error('A shared layer point already exists at the destination frame.');
+        throw new Error('A shared track keyframe already exists at the destination frame.');
       layer.keyframes = upsertKey(
         layer.keyframes.filter((key) => key !== point),
         { ...point, frame: command.nextFrame },
@@ -267,7 +265,7 @@ function editLayerKey(next: ProjectDocument, command: LayerKeyCommand): void {
 type LayerCommand = Extract<EditCommand, { type: 'layer-add' | 'layer-update' | 'layer-remove' | 'layer-order' }>;
 function updateLayer(next: ProjectDocument, updated: VideoLayer, before: TimelineLayout): void {
   const position = next.layers.findIndex((layer) => layer.id === updated.id);
-  if (position < 0) throw new Error('Layer no longer exists.');
+  if (position < 0) throw new Error('Track no longer exists.');
   const previous = next.layers[position]!;
   next.layers[position] = layerSchema.parse(updated);
   if (previous.ripple === updated.ripple) return;
@@ -292,17 +290,17 @@ function editLayer(next: ProjectDocument, command: LayerCommand, before: Timelin
       updateLayer(next, command.layer, before);
       break;
     case 'layer-remove':
-      if (!next.layers.some((layer) => layer.id === command.layerId)) throw new Error('Layer no longer exists.');
+      if (!next.layers.some((layer) => layer.id === command.layerId)) throw new Error('Track no longer exists.');
       if (next.layers.length === 1) throw new Error('The last video track cannot be removed.');
       next.layers = next.layers.filter((layer) => layer.id !== command.layerId);
       next.clips = next.clips.filter((clip) => clip.layerId !== command.layerId);
       break;
     case 'layer-order':
       if (command.layerIds.length !== next.layers.length || new Set(command.layerIds).size !== next.layers.length)
-        throw new Error('Layer order must contain each layer once.');
+        throw new Error('Track order must contain each track once.');
       next.layers = command.layerIds.map((id) => {
         const layer = next.layers.find((item) => item.id === id);
-        if (!layer) throw new Error('Unknown layer.');
+        if (!layer) throw new Error('Unknown track.');
         return layer;
       });
       break;

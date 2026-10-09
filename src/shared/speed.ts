@@ -18,7 +18,7 @@ export const speedCurveSchema = z
       .array(speedCurveKeyframeSchema)
       .min(2)
       .max(MAX_CLIP_SPEED_KEYS)
-      .refine(orderedKeys, { message: 'Clip speed keys must have unique ascending source frames.' }),
+      .refine(orderedKeys, { message: 'Clip speed keyframes must have unique ascending source frames.' }),
   })
   .strict();
 export type SpeedCurveKeyframe = z.infer<typeof speedCurveKeyframeSchema>;
@@ -176,7 +176,7 @@ export function compileRetiming(clip: RetimedClip): Retiming {
         (sourceRateAt(clip.speed, inverse((finiteFrame(frame) * total) / duration)) * total) / duration,
     };
   }
-  if (result.duration > 2_147_483_647) throw new RangeError('Layer duration exceeds supported project frames.');
+  if (result.duration > 2_147_483_647) throw new RangeError('Track duration exceeds supported project frames.');
   Object.freeze(result);
   cache.set(key, result);
   if (cache.size > 128) cache.delete(cache.keys().next().value!);

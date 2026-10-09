@@ -210,7 +210,7 @@ describe('strict schema-12 spatial persistence', () => {
     expect(() => validateSourceRanges(document, new Map([['original', 100]]))).not.toThrow();
     document.clips[0]!.spatial.keyframes[1]!.frame = 101;
     expect(projectSchema.safeParse(document).success).toBe(true);
-    expect(() => validateSourceRanges(document, new Map([['original', 100]]))).toThrow('spatial keys exceed');
+    expect(() => validateSourceRanges(document, new Map([['original', 100]]))).toThrow('spatial keyframes exceed');
     document.clips[0]!.spatial.keyframes = Array.from({ length: 256 }, (_, frame) => ({
       frame,
       interpolation: 'hold',

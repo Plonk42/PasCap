@@ -169,8 +169,10 @@ test('import is bin-only; add, duplicate recording, select, edit and trash retai
   await inspectorTab(page, 'Audio');
   const add = page.locator('[aria-label="Add music track"]');
   await expect(add).toBeDisabled();
-  await expect(add).toHaveAccessibleDescription(/Import a music file first/);
-  await page.getByRole('textbox', { name: 'Music file path', exact: true }).fill('/disposable/synthetic-music.wav');
+  await expect(add).toHaveAccessibleDescription(/Import a music recording first/);
+  await page
+    .getByRole('textbox', { name: 'Music recording path', exact: true })
+    .fill('/disposable/synthetic-music.wav');
   await page.getByRole('button', { name: 'Import audio', exact: true }).click();
   await expect(page.locator(`[data-music-media-id="${song.id}"]`)).toBeVisible();
   await expect(page.getByRole('combobox', { name: 'Music recording', exact: true })).toHaveCount(0);

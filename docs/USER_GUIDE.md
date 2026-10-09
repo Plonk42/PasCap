@@ -11,18 +11,18 @@ Open **Projects**, create a named project, then import its recordings and music.
 A new project has an **empty timeline and empty video/music bins**; it does not
 inherit the shared media registry. Importing the same original into another project
 deliberately adds it to that project's bin and reuses eligible verified proxies.
-Removing an excerpt or music placement does not remove the imported media.
+Removing a clip or music track does not remove the imported recording.
 
-Projects use **strict format v12**, with complete required row colour and clip spatial base/full-pose
-source-frame keys and a required `music` array of 0–8 independent
-instances and unique required instance IDs (`[]` without music), every video track's Ripple, transitions and
+Projects use **strict format v12**, with complete required video track colour and clip spatial base/full-pose
+source-frame keyframes and a required `music` array of 0–8 independent
+music tracks and unique required IDs (`[]` without music), every video track's Ripple, transitions and
 opening/closing fades and required numeric `opacity` in 0–1 (1 on new tracks),
 with eleven nullable animation channels, in control order: `opacity`, `speed`,
 `temperature`, `tint`, `exposure`, `brightness`, `contrast`, `hue`, `saturation`,
-`highlights`, `shadows`. Row Colour requires Temperature/Tint bases and static
+`highlights`, `shadows`. Video track Colour requires Temperature/Tint bases and static
 HSL/curves; missing fields and saved clip colour/correction are invalid.
-Row `opacity` is the sole saved Opacity value; saved `clip.opacity` and old
-`clipOpacity`/`layerOpacity` key channels are invalid, not ignored or defaulted.
+Track `opacity` is the sole saved Opacity value; saved `clip.opacity` and old
+`clipOpacity`/`layerOpacity` keyframe channels are invalid, not ignored or defaulted.
 v1–v11 project documents and receipt snapshots
 stay on disk but are incompatible: there is no migration, compatibility default,
 null fallback, old-format reader, automatic repair or deletion. Export receipts
@@ -39,7 +39,7 @@ footage, and back up originals and saved project/export data separately.
 
 ## Import and prepare recordings
 
-1. Choose **Import**. Its default is a service-side browser of approved roots,
+1. Choose **Import → Browse recordings**. Its default is a service-side browser of approved roots,
    not your browser's operating-system file picker. Open a folder, select recordings
    and explicitly confirm registration into the open project.
 2. Browsing and selection alone start **no preparation**. Each listing reads one
@@ -54,7 +54,7 @@ footage, and back up originals and saved project/export data separately.
    uncertain request. Failed, cancelled or interrupted preparation needs explicit
    **Prepare**; **Prepare selected** confirms a manual multi-recording batch.
 5. To take a recording out of this project, use its trash button (or the trash on
-   the selection header). If excerpts use it, PasCap asks first and removes them
+   the selection header). If clips use it, PasCap asks first and removes them
    too; Undo restores everything. The original file and prepared media are kept.
 
 The separate **absolute-folder-path form** recursively imports the whole chosen
@@ -75,72 +75,75 @@ timestamps/frame counts, 8-bit `yuv420p`, and explicit SDR BT.709 colour/range t
 HDR, untagged colour and ambiguous timing are rejected, not silently normalised.
 See [TIMELINE_EDITING.md](TIMELINE_EDITING.md) and [DEPLOYMENT.md](DEPLOYMENT.md).
 
-## Review a source and add excerpts
+## Review a recording and add clips
 
 Hover a ready recording to open **Source preview**; horizontal mouse position
 scrubs its full source range without moving the timeline playhead. **Pin** keeps
-that source selected while you hover other rows. Review opens paused and muted and
+that recording selected while you hover other recordings. Review opens paused and muted and
 uses a separate decoder; it never plays or prepares an original implicitly.
 
 Set source **IN/OUT** by dragging the handles, with focused source **I/O**, or with
-the paired numeric fields followed by **Apply**. OUT is exclusive; **O** includes
+the paired numeric fields followed by **Apply range**; **Cancel range** restores
+unapplied drafts. OUT is exclusive; **O** includes
 the displayed frame. Drag a handle back to an edge (or press **Home**/**End** on it)
 to restore the full recording. These choices are per-project, browser-local state,
 not portable project-document fields.
 
-The source track under the image shows snapshots across the whole recording, like
+The source range strip under the image shows snapshots across the whole recording, like
 a timeline clip. Its **IN / OUT** handles restore omitted footage as well as trim;
-hatched parts are outside the selected range, and clicking elsewhere on the track
+hatched parts are outside the selected range, and clicking elsewhere on the strip
 scrubs. Dragging previews the boundary frame; release applies, while Escape/capture
 loss/cancellation/window blur restores the prior choice. The round **Play / Pause**
-button left of the track reviews the applied range, muted, from the current frame or IN.
+button left of the strip reviews the applied range, muted, from the current frame or IN.
 It stops at the last included frame (OUT − 1), without looping; a one-frame range
-just displays that frame. Numeric drafts are not played or inserted before Apply.
+just displays that frame. Numeric drafts are not played or inserted before **Apply range**.
 Scrubbing or changing the range pauses first. Closing, switching sources/projects
 or leaving the Source tab cancels playback. Source playback does not move the
 timeline or music and does not create Undo steps or saves. Failures expose Retry.
 
-Choose **Add** (it shows the applied range length, for example **Add 3.00 s**), mark another range, then add again: each addition creates
-an independent instance and keeps the source pinned at the same frame/range.
+Choose **Add clip** (it shows the applied range length, for example **Add clip 3.00 s**),
+mark another range, then add again: each addition creates an independent clip and
+keeps the source pinned at the same frame/range. **Clip added · mark another range**
+confirms a successful addition.
 The sticky **Show N clips** button lists existing ranges; **Show** selects,
-seeks and reveals one on the timeline. Reuse badges count excerpts, not copied files.
+seeks and reveals one on the timeline. Reuse badges count clips, not copied files.
 In Media, a hatched head/tail on a recording's thumbnail shows the omitted part of
 its applied range, like a miniature timeline.
 Media **+**, double-click and drag/drop (dragging a selected recording carries the
 whole selection) also copy the applied range
 (or the full recording without a choice). Later source choices never alter existing
-excerpts. Plus/double-click target the selected layer; a drop targets its row.
+clips. Plus/double-click target the selected video track; a drop targets the track under the pointer.
 
 ## Assemble, trim and cut
 
 Use up to **eight uniform video tracks**. Each starts with **Ripple on**; find the
-checkbox in **Layer options**. Enabling it packs clips and closes gaps in **one
+checkbox in **Track options**. Enabling it packs clips and closes gaps in **one
 Undo step**, preserving the first clip's current start and valid existing dissolves.
 While on, insert/reorder/delete/trim/speed edits continuously sequence that track
 from its first anchor. Turning it off keeps actual placements for independent
-edits; it does not restore old gaps. Other tracks, music and row points stay fixed.
+edits; it does not restore old gaps. Other tracks, music and track keyframes stay fixed.
 With Ripple off, edits never move unrelated clips and conflicts reject the edit.
 Same-track overlap is allowed only for an exact adjacent cross-dissolve; use different
 tracks for independent simultaneous footage.
 
-Rows follow **bottom-to-top composition order**: row 1 renders below row 2, row 3
-above row 2, and so on. There is no primary/overlay role or special first-track ID.
+Video tracks follow **bottom-to-top composition order**: track 1 renders below track 2, track 3
+above track 2, and so on. There is no primary/overlay role or special first-track ID.
 Raise/Lower change composition priority; any track can be reordered or deleted
-except the last remaining track. Scroll over the tracks or layer headers to
-reach all rows and music. The time ruler and its playhead handle remain
+except the last remaining video track. Scroll over the tracks or track headers to
+reach all video and music tracks. The time ruler and its playhead handle remain
 visible while scrolling; its ticks follow horizontal scroll, and clicking/dragging
-it seeks without editing a row. Layer options explains unavailable actions at
+it seeks without editing a track. Track options explains unavailable actions at
 stack endpoints or on the last remaining track. It contains only rename, Ripple,
 Raise/Lower and Delete; visibility stays in the sidebar and Opacity in **Track → Colour**.
 
-Select an excerpt and drag a timeline edge inward to shorten it or outward to restore
+Select a clip and drag a timeline edge inward to shorten it or outward to restore
 omitted footage up to the original bounds. The dashed extent shows available source.
 Left-edge autoscroll can recover a long omitted beginning. With Ripple on, a timeline
 left handle/keyboard trim keeps the sequence start; with it off, it changes the
 start to retain timeline OUT. Invalid overlap, fade or frame-quantisation edits are rejected.
 Originals and full proxies are never cut or regenerated by trimming.
 
-**Clip → Source range** has one full-original bar with hatched omitted footage and
+**Clip → Range** has one full-original bar with hatched omitted footage and
 draggable **IN / OUT** handles. Exact **Source IN / OUT** text fields below its
 ends show **HH:MM:SS:FF** (30 fps NDF); enter a whole original-frame number or
 timecode and press Enter or leave the field to apply. OUT is exclusive. Invalid
@@ -154,59 +157,59 @@ Dragging previews the complete validated document; final valid release is one
 Undo step. An invalid final release, Escape, cancellation, lost capture or blur
 restores without applying an earlier valid draft. Focused handle arrows move one
 original frame (Shift ten); Home on IN restores zero and End on OUT restores the
-original exclusive OUT. Source review keeps its independent paired **Apply** workflow.
+original exclusive OUT. Source review keeps its independent paired **Apply range / Cancel range** workflow.
 
 - **Split / S** splits at the playhead and selects the new right piece.
 - **Trim start / Q** removes the head before the displayed frame; **Trim end / W**
   removes the tail after it. Both keep that frame; handles can recover omitted footage.
-- To remove a middle section, select an excerpt, seek the first unwanted frame and
+- To remove a middle section, select a clip, seek the first unwanted frame and
   mark timeline **IN / I**, then the last unwanted frame and **OUT / O**.
   The hatched range is removed by **Cut range / Shift+Delete**, in **one Undo step**.
   Ripple-on cuts close the gap on that track; off keeps the removed gap and fixed neighbours.
-- **Clip actions → Duplicate / Ctrl+D** makes an independent instance. Timeline
-  Delete removes an instance, not its original or project-bin membership.
+- **Clip actions → Duplicate / Ctrl+D** makes an independent clip. Timeline
+  Delete removes a clip, not its original or project-bin membership.
 
-Placement ghosts show the actual row/start, including destination speed timing.
+Placement ghosts show the actual video track/start, including destination speed timing.
 Red invalid ghosts never commit. **Snap** uses nearby boundaries; **Alt** bypasses
-magnets, but cannot turn a Ripple-on row into free placement. Trim and point drags
+magnets, but cannot turn a Ripple-on track into free placement. Trim and keyframe drags
 preview transiently, commit once on valid release, and cancel with Escape.
 **Timeline start frame** and nudge controls work on independently positioned clips
 or the **first Ripple anchor only**. Later Ripple clips expose an accessible reason:
-drag to reorder, or turn Ripple off in Layer options to set an independent start.
+drag to reorder, or turn Ripple off in Track options to set an independent start.
 
 Boundary **Cut / Fade / Dissolve** and **Fades** belong to the selected
 track in **Track**; clicking a boundary button opens that tab with the boundary expanded.
 Gapped pairs are Cut only: explicitly close the gap or enable Ripple before adding
 a fade/dissolve. A cross-dissolve explicitly adjusts the right clip to its overlap;
 with Ripple off, no other clip moves and conflicts reject it.
-Black fades darken only that row's RGB, preserving coverage rather than revealing
+Black fades darken only that video track's RGB, preserving coverage rather than revealing
 lower footage. Opening/closing fades use actual first/last placements and remain
 stored but dormant on empty tracks. A closing fade ends at its last video clip's
 OUT, not a later music OUT; after all video ends the picture is black, never a
 frozen last image. Details: [TIMELINE_EDITING.md](TIMELINE_EDITING.md).
 
-## Colour, speed and shared row keyframes
+## Colour, speed and shared video track keyframes
 
-Each excerpt has independent constant/ramp/custom speed and spatial settings.
-All static and keyed Colour belongs to its video row, not the excerpt.
-**Opacity** is one setting for the selected **whole video row**, not a clip.
+Each clip has independent constant/ramp/custom speed and spatial settings.
+All static and keyed Colour belongs to its video track, not the clip.
+**Opacity** is one setting for the selected **whole video track**, not a clip.
 Find its single native slider/exact numeric field/diamond/navigation in **Track → Colour**,
 alongside Temperature, Tint, Exposure, Brightness, Contrast, Hue, Saturation,
 Highlights and Shadows.
 Main and stored sliders/exact fields use **0–100%**, neutral **100%**.
-Saved row `opacity` and key values remain **0–1**; this is UI conversion only, not a schema change.
-Without Opacity keys, either value control edits the row's saved `opacity` and works even
-on an empty row. With keys, the row's `opacity` curve overrides that value on every
-clip, including both sources in a dissolve. Removing its final participant reveals
-the unchanged saved row value. There is no saved clip opacity, additional layer
+Saved track `opacity` and keyframe values remain **0–1**; this is UI conversion only, not a schema change.
+Without Opacity keyframes, either value control edits the track's saved `opacity` and works even
+on an empty track. With keyframes, the track's `opacity` curve overrides that value on every
+clip, including both sources in a dissolve. Removing its final keyed setting reveals
+the unchanged saved track value. There is no saved clip opacity, additional track
 multiplier or duplicate sidebar control/navigation.
-Static and keyed colour controls edit the same row, including on empty rows.
-All clips on that row share the treatment; different looks require different rows. Opacity shares their
+Static and keyed colour controls edit the same video track, including on empty tracks.
+All clips on that track share the treatment; different looks require different tracks. Opacity shares their
 UI treatment, but controls composition coverage, not the SDR RGB grade.
-**Clip → Placement** contains placement only. Sliders never create implicit keys;
-an animated setting without participation at the real playhead is read-only until
-its hollow diamond captures a key there.
-Speed accepts **0.1×–8×**. Constant, ramp endpoint, custom-point and main/stored row
+**Clip → Placement** contains placement only. Sliders never create implicit keyframes;
+an animated setting that is not enabled at the real playhead is read-only until
+its hollow diamond captures a keyframe there.
+Speed accepts **0.1×–8×**. Constant, ramp endpoint, custom-keyframe and main/stored track
 rates pair a native slider with an exact numeric field, retaining modes, presets
 and the curve graph. Slow motion repeats frames and acceleration drops them;
 there is no optical-flow synthesis.
@@ -223,14 +226,14 @@ runs in linear RGB before Exposure; it preserves neutral-white linear luminance
 before clipping only, not final brightness or arbitrary coloured pixels.
 
 Sliders, exact fields, double-click-the-name reset to 0, diamonds and Previous/Next use the
-same main/stored control rules as other scalar Colour settings. Without keys,
-edit the row base even on an empty row; every clip on that row adopts it. With
-keys, capture explicitly at the real playhead before editing a missing participant.
-Removing the final participant reveals the unchanged saved row base. Slider
+same main/stored control rules as other scalar Colour settings. Without keyframes,
+edit the track base even on an empty track; every clip on that track adopts it. With
+keyframes, capture explicitly at the real playhead before editing a setting that is not enabled there.
+Removing the final keyed setting reveals the unchanged saved track base. Slider
 movement stays local until release; valid edits make one Undo step, invalid or
 cancelled edits apply nothing. Numeric entry retains its precision.
 
-Nested **HSL ranges** and **Colour curves** also belong to the row, but remain
+Nested **HSL ranges** and **Colour curves** also belong to the video track, but remain
 static, with no animation diamonds. They follow scalar grading, so HSL's grey
 protection does not undo Temperature/Tint colouring. Ungraded comparison bypasses
 all these Colour stages, retaining Opacity and geometry. Exact processing:
@@ -246,8 +249,8 @@ paused or playing; there is no global shortcut. **Source preview** is unchanged.
 
 Ungraded means the **composed timeline preview without grading**, not an
 original-resolution view or an isolated selected clip. It neutralizes all evaluated
-colour settings across enabled rows, including row colour bases/keys and both
-dissolve participants. Exact observed source frames, retiming, row Opacity,
+colour settings across enabled video tracks, including track colour bases/keyframes and both
+dissolve sources. Exact observed source frames, retiming, track Opacity,
 spatial geometry/coverage, visibility, black fades, stacking and music remain unchanged.
 
 Comparison is editor-only: toggling never seeks, saves, enters Undo history, changes
@@ -257,37 +260,37 @@ the editor with a fresh preview engine resets to normal graded preview.
 
 ### Precise clip speed curves
 
-Select the excerpt, open **Clip → Speed**, and choose **Custom curve**. Start from
-**Flat / Accelerate / Decelerate / Slow centre / Fast centre**, then edit any point.
-These points belong only to the selected clip, not to every clip in its video row.
+Select the clip, open **Clip → Speed**, and choose **Custom curve**. Start from
+**Flat / Accelerate / Decelerate / Slow centre / Fast centre**, then edit any keyframe.
+These keyframes belong only to the selected clip, not to every clip in its video track.
 
 - Drag horizontally for original source time and vertically for speed. The graph
   has a logarithmic 0.1×–8× axis; the vertical line is the displayed source frame.
-- For precise edits, select a point and enter **Source frame**, **Speed ×** and
-  **To next point** easing. Source frames use exact integer fields; Speed × pairs
+- For precise edits, select a keyframe and enter **Source frame**, **Speed ×** and
+  **To next keyframe** easing. Source frames use exact integer fields; Speed × pairs
   a slider with a field retaining the decimal precision you enter. Enter/blur applies,
   Escape restores.
-- Click the graph background or a point to seek, then **Add point** at an unkeyed
-  displayed source frame. Point Previous/Next and the selector also reach off-trim
-  keys. The original OUT anchor previews the last available image.
-- Graph-point drag drafts preview live without saving, unlike value sliders.
+- Click the graph background or a keyframe to seek, then **Add keyframe** at an unkeyed
+  displayed source frame. Keyframe Previous/Next and the selector also reach off-trim
+  keyframes. The original OUT anchor previews the last available image.
+- Graph-keyframe drag drafts preview live without saving, unlike value sliders.
   Valid release is one Undo; Escape, pointer cancellation/capture loss or window blur
   restores the prior edit.
   Red collisions or timing conflicts never merge, overwrite or shrink transitions.
-- Focus a point: arrows move one source frame or 0.01×; Shift moves ten frames
-  or 0.1×. Enter seeks; Delete removes it if at least two points remain.
-- Keys retain original source positions through trims, splits and marked cuts;
+- Focus a keyframe: arrows move one source frame or 0.01×; Shift moves ten frames
+  or 0.1×. Enter seeks; Delete removes it if at least two keyframes remain.
+- Keyframes retain original source positions through trims, splits and marked cuts;
   duplicated/split clips have independent curves. **Reset** returns only this clip
   to 1×. No generated slow-motion frames or optical flow are added.
 
-Existing **Row speed animation** stays separate and overrides a clip curve when
-the row has Speed keys. The override notice explains it; removing those Speed
-participants reveals the clip curve unchanged. Row colour/opacity animation is
+Existing **Video track speed animation** stays separate and overrides a clip curve when
+the track has Speed keyframes. The override notice explains it; removing those keyed Speed
+settings reveals the clip curve unchanged. Track colour/opacity animation is
 unaffected. Details: [SPEED_AND_AUDIO.md](SPEED_AND_AUDIO.md#precise-clip-curve-editor).
 
-### Crop, scale, translate and rotate an excerpt
+### Crop, scale, translate and rotate a clip
 
-Select an excerpt and open **Clip → Transform** (collapsed initially). Its eight
+Select a clip and open **Clip → Transform** (collapsed initially). Its eight
 controls are **Crop left / Crop right / Crop top / Crop bottom / Scale / Translate X /
 Translate Y / Rotation °**, each with a native slider and exact number field.
 Scale preserves aspect and accepts **0.1–8**. Translation accepts **−2–2** as
@@ -297,117 +300,118 @@ stay below 1 and opposite crops must sum to less than 1; cropping never refits o
 recentres the retained image. Uncovered pixels from nonneutral transforms reveal
 lower tracks; exact neutral poses retain the old opaque black letterbox.
 
-- Without keys, values edit this clip's saved base. Click the single **Transform
+- Without keyframes, values edit this clip's saved base. Click the single **Transform
   keyframe at displayed source frame** diamond to capture all eight evaluated
   values at the real displayed integer source frame. With animation, main values
-  are read-only at a source frame without a key until explicitly captured; sliders
-  never add keys. Capture requires the real playhead inside the selected excerpt.
-- All eight values use **To next point** easing together; one key overrides the
-  entire base, holding before the first/after the last key. Rotation interpolates
+  are read-only at a source frame without a keyframe until explicitly captured; sliders
+  never add keyframes. Capture requires the real playhead inside the selected clip.
+- All eight values use **To next keyframe** easing together; one keyframe overrides the
+  entire base, holding before the first/after the last keyframe. Rotation interpolates
   numerically, not by shortest arc: +170° to −170° passes through 0°.
-- **Selected Transform keyframe**, **Previous/Next** and **Preview stored key**
-  reach keys outside the trim and at the original exclusive OUT. The stored
+- **Selected Transform keyframe**, **Previous/Next** and **Preview stored keyframe**
+  reach keyframes outside the trim and at the original exclusive OUT. The stored
   source time is shown separately from the actual preview's source frame; preview
   uses the closest mapped image rather than an unavailable or invented frame.
-  Stored **Source frame**, easing and pose fields edit that selected key; time and
-  value edits do not seek automatically. Easing is disabled on the last key.
+  Stored **Source frame**, easing and pose fields edit that selected keyframe; time and
+  value edits do not seek automatically. Easing is disabled on the last keyframe.
 - Numeric Enter/blur applies exact values; Escape restores. Invalid crop sums,
   collisions, fractional/out-of-original frames and out-of-bounds values stay
   editable with errors, never silently clamp or overwrite. Slider movement is
   local only; valid release changes the image in one Undo. Escape, cancellation,
   capture loss or window blur cancels it without saving; keyboard adjustments
   are individual validated edits.
-- The trash action removes only the selected full-pose key. Removing the last
-  key reveals the unchanged base. **Reset transform** deliberately restores the
-  neutral base and clears all spatial keys in one Undo.
+- The trash action removes only the selected full-pose keyframe. Removing the last
+  keyframe reveals the unchanged base. **Reset transform** deliberately restores the
+  neutral base and clears all spatial keyframes in one Undo.
 
-Up to **256** full-pose keys belong to each clip, separately from the row's
-row's keyframes. Trims/restoration, moves and Ripple retain original-source anchors;
+Up to **256** full-pose keyframes belong to each clip, separately from the video
+track's keyframes. Trims/restoration, moves and Ripple retain original-source anchors;
 splits, cuts and duplicates retain independent deep copies, including off-trim
-keys. Retiming drives geometry continuously even while a recorded image is held;
-there is no optical flow. Transform edits do not change timing, row Opacity,
+keyframes. Retiming drives geometry continuously even while a recorded image is held;
+there is no optical flow. Transform edits do not change timing, track Opacity,
 music, originals or proxies. Native Export supports these transforms through the
-layered path; the diagnostic two-clip reference does not.
+composited path; the diagnostic two-clip reference does not.
 Details: [spatial transforms](design/SPATIAL_TRANSFORMS.md).
 
-### Opt in to shared row animation
+### Opt in to shared video track animation
 
 The **Track → Keyframes** section
-belongs to the selected **whole video row**, even an empty one, not to a clip.
-It contains the point count, participant chips, whole-row Previous/Next navigation
-and a directly visible shared point list. The toolbar's **Animation help** combines
-animation and point-timing guidance. **Clip** keeps source/clip settings, row Opacity
-and the diamonds and value controls that use the real playhead. All row points use absolute project
-frames and affect every clip on that row. Eleven settings participate independently:
+belongs to the selected **whole video track**, even an empty one, not to a clip.
+It contains the keyframe count, enabled-setting chips, whole-track Previous/Next navigation
+and a directly visible shared keyframe list. The toolbar's **Animation help** combines
+animation and keyframe-timing guidance. **Clip** keeps source/clip settings and playhead
+Speed/Transform controls; **Track → Colour** keeps Opacity and Colour controls.
+All shared track keyframes use absolute project frames and affect every clip on that track.
+Eleven settings can be keyed independently:
 Opacity (`opacity`), Speed and the nine scalar colour controls, including
 Temperature and Tint. HSL/curves remain static. At most 256
-shared points are allowed per row.
+shared keyframes are allowed per video track.
 
 - Every setting has a **hollow ◇ / filled ◆ diamond**. Hollow means inactive but
   clickable. Click at the **real playhead** to capture/join that setting; click filled
-  to remove only its participation. First participation creates the point; removing
-  the last participant deletes it. Sliders never create implicit keys.
-- With no Opacity or colour keys, edit the row values, even on an empty row;
+  to disable only that keyed setting. Enabling the first setting creates the keyframe; removing
+  the last enabled setting deletes it. Sliders never create implicit keyframes.
+- With no Opacity or colour keyframes, edit the track values, even on an empty track;
   unkeyed speed edits the selected clip. There is no per-clip colour setting.
-  Moving clips uses destination row bases/keys/Opacity without changing either row.
+  Moving clips uses destination track bases/keyframes/Opacity without changing either track.
   Once a channel is animated, its value is
-  read-only where it does not participate: click the hollow diamond first.
-  Removing its final participation reveals its existing unkeyed value, not a
-  new default or the removed key's value.
-- Each point shares an easing, but every channel interpolates to its **own next
-  participating point**, skipping unrelated settings; its endpoints hold outside
-  that interval. A single point therefore overrides that channel across the row.
+  read-only where it is not enabled: click the hollow diamond first.
+  Removing its final keyed setting reveals its existing unkeyed value, not a
+  new default or the removed keyframe's value.
+- Each keyframe shares an easing, but every channel interpolates to its **own next
+  keyframe with that setting enabled**, skipping unrelated settings; its endpoints hold outside
+  that interval. A single keyframe therefore overrides that channel across the track.
 - The **Previous/Next buttons immediately after each diamond** visit only that
-  channel's strictly earlier/later participants, including zero-valued ones. They
+  channel's strictly earlier/later keyframes with that setting enabled, including zero-valued ones. They
   remain visible but disabled without a neighbour/project or during a document draft.
   Navigation keeps the chosen Inspector tab and the activated button's focus; it
   does not save or create Undo history.
 
-### Move and inspect shared points
+### Move and inspect shared keyframes
 
-The timeline shows **one marker per stored shared point**, not per clip/channel.
-Click or Enter selects its row and seeks without editing or changing the chosen
-Inspector tab. Whole-row point navigation also keeps that tab. Drag horizontally to
-move **all participants, values and easing together**; valid release is one Undo
+The timeline shows **one marker per stored shared keyframe**, not per clip/channel.
+Click or Enter selects its video track and seeks without editing or changing the chosen
+Inspector tab. Whole-track keyframe navigation also keeps that tab. Drag horizontally to
+move **all enabled settings, values and easing together**; valid release is one Undo
 step. With Snap on, pointer movement snaps within eight pixels at the captured zoom
 to captured clip/music/transition boundaries and playhead; **Alt** bypasses it.
 Focused marker **←/→** moves one project frame, **Shift+←/→** ten, without snapping
 or also stepping the playhead/nudging a clip. **Keyframes → Edit**
-on each point provides exact time/value editing with Enter/blur to apply
+on each keyframe provides exact time/value editing with Enter/blur to apply
 and Escape to restore.
 
-The shared list has no outer disclosure or per-row list expansion preference.
-Nested point details remain collapsible; drafts and input identity survive point
+The shared list has no outer disclosure or per-track list expansion preference.
+Nested keyframe details remain collapsible; drafts and input identity survive keyframe
 reordering and Undo.
 
-Stored colour/opacity participants use the same sliders and individual colour
+Stored keyed colour/opacity settings use the same sliders and individual colour
 resets as the main controls, with one precise numeric field to the right of each
 slider as the sole numeric value display (Opacity uses 0–100%, neutral 100%, in
 both contexts; saved values remain 0–1). Stored
-Speed uses the **Layer rate ×** slider/exact field (double-click **Speed** to reset to 1×), not clip speed modes or a
-source-frame curve. These controls edit only an existing participant at that
-stored point; they never implicitly join a setting. Each accepted value/reset is
-one Undo step and leaves the point's time, shared easing, other participants and
-saved row/clip settings unchanged. Invalid or out-of-bounds numeric drafts remain editable
+Speed uses the **Track rate ×** slider/exact field (double-click **Speed** to reset to 1×), not clip speed modes or a
+source-frame curve. These controls edit only an existing keyed setting at that
+stored keyframe; they never implicitly enable a setting. Each accepted value/reset is
+one Undo step and leaves the keyframe's time, shared easing, other enabled settings and
+saved track/clip settings unchanged. Invalid or out-of-bounds numeric drafts remain editable
 with errors; timing conflicts reject the edit rather than shortening transitions.
 
-Occupied frames never merge or overwrite points. A red collision or Speed-related
+Occupied frames never merge or overwrite keyframes. A red collision or Speed-related
 timing conflict rejects the entire final move, not just one setting or an earlier
 valid draft. Escape, pointer cancellation, lost capture or window blur restores the
 document/preview/scroll; pointer previews never enter autosave or history.
 
-Points outside duration stay stored and list-editable. Points after the last clip
-keep their timeline markers at their own time, like points before the first clip;
-the timeline scrolls far enough to reach them, but points alone do not extend
-playback beyond project duration (the maximum video/music OUT). Setting/row/list/marker navigation can inspect successive stored
-points while preview clamps to the nearest available
+Keyframes outside duration stay stored and list-editable. Keyframes after the last clip
+keep their timeline markers at their own time, like keyframes before the first clip;
+the timeline scrolls far enough to reach them, but keyframes alone do not extend
+playback beyond project duration (the maximum video/music OUT). Setting/track/list/marker navigation can inspect successive stored
+keyframes while preview clamps to the nearest available
 project frame (black during a music-only region; none without video or music duration). Labels distinguish **stored time from actual
-preview**: list controls edit the stored point, but Clip's setting values,
+preview**: list controls edit the stored keyframe, but main setting values,
 diamonds and capture still use the **real playhead**. Manual seek, playback and
-row/project changes clear inspection; **Follow playhead** ends it explicitly.
-A point alone does not extend the sequence; Speed participation can naturally
+track/project changes clear inspection; **Follow playhead** ends it explicitly.
+A keyframe alone does not extend the sequence; keyed Speed settings can naturally
 recompile clip durations.
-Trim, cut, move, split, duplicate and ripple **never copy or shift row points**.
+Trim, cut, move, split, duplicate and ripple **never copy or shift track keyframes**.
 
 Current animation semantics: [LAYERS_AND_KEYFRAMES.md](LAYERS_AND_KEYFRAMES.md).
 Grading equations: [COLOUR_AND_TIMING.md](COLOUR_AND_TIMING.md#colour).
@@ -415,8 +419,9 @@ Retiming: [SPEED_AND_AUDIO.md](SPEED_AND_AUDIO.md).
 
 ## Add music and export
 
-Source-video audio is not used. In **Audio → Music**, enter your own standalone
-local file in **Music file path**, choose **Import audio**, wait for preparation,
+Source-video audio is not used. In **Audio → Music**, choose **Browse music recordings**
+and confirm with **Import selected music**, or enter your own standalone local file
+in **Music recording path** and choose **Import audio**. Wait for preparation,
 then choose **Add music track** and pick the file, or drag it from **Media → Music**
 onto the music lane. Importing alone never places music. The trash on the file in
 **Media → Music** removes that recording (and, after confirmation, its music
@@ -428,24 +433,24 @@ after preparation. This does not reconnect or replace the old entry; existing
 projects and caches remain untouched. Reimporting the same unchanged path reuses its
 entry, while a missing old location stays visibly unavailable.
 
-Use up to **eight independent music instances**, including several from the same
-recording. **Music track** selects the instance to edit; **Add music track** adds
-another from a ready music file, and **Recording** changes the selected instance's
+Use up to **eight independent music tracks**, including several from the same
+recording. **Music track** selects the track to edit; **Add music track** adds
+another from a ready music file, and **Recording** changes the selected music track's
 file. Its trash action **Delete selected
 music track** removes only that placement; Undo restores it. Selection creates no
-save/history entry, and editing/removing one instance leaves all others unchanged.
-Each instance has its own waveform placement/edge trims, source IN/OUT,
+save/history entry, and editing/removing one music track leaves all others unchanged.
+Each music track has its own waveform placement/edge trims, source IN/OUT,
 start/duration, native **gain dB** slider with an exact numeric field, linear fades
 and **Loop selected source range**. Without looping, duration must fit its source
-range; looping repeats only it. Independent drafts never apply to another instance.
+range; looping repeats only it. Independent drafts never apply to another music track.
 Each accepted edit or completed gesture is one Undo step; invalid/cancelled edits
 are atomic and never silently clamp timing, save a draft or change other tracks.
 
-Overlapping music sums linearly after each instance's gain/fades, with **one hard
+Overlapping music sums linearly after each music track's gain/fades, with **one hard
 clamp to −1–1 after the complete sum**, not per track. There is no loudness
 normalisation, ducking, effect or video-speed retiming of music. Preview uses one
 AudioContext/worklet/output clock and one bounded mixed PCM queue, not full-file
-buffers or per-instance clocks/queues. Selected-range loops continue without a
+buffers or per-track clocks/queues. Selected-range loops continue without a
 music restart; genuine video buffering or audio read/processor failures stay explicit.
 If an older prepared recording lacks the current PCM cache, **Audio → Music →
 Retry recording name** explicitly prepares it. No startup/library read starts that
@@ -455,7 +460,7 @@ per minute; registry/video-proxy/PCM cache formats are unchanged.
 **Music can extend the project.** Duration is the maximum of every retimed video
 clip OUT and every music start + duration. Video closing fades remain at their
 clip OUTs, then the picture is black while music continues and fades at each
-instance's own end. Native export uses the layered path for this black tail and
+music track's own end. Native export uses the composited path for this black tail and
 pads/trims mixed AAC to full project duration, never freezing the last image.
 Music-only preview is black; export requires at least one retained video clip.
 
@@ -477,7 +482,7 @@ keeps its own output directory. Activity exposes progress,
 cancellation and verified MP4/receipt links. **Cancelling…** is pending until
 confirmed; a failed status read keeps known jobs and never resubmits the export.
 Successful outputs survive later failures/restarts; interrupted exports are not
-resumed or published as finished. Long 4K/layered renders can need substantial
+resumed or published as finished. Long 4K/composited renders can need substantial
 scratch disk and CPU time; short tests do not qualify long-flight throughput.
 See [SPEED_AND_AUDIO.md](SPEED_AND_AUDIO.md) and
 [Inspector and resource limits](LAYERS_AND_KEYFRAMES.md#inspector-and-resource-limits).
@@ -486,24 +491,24 @@ resources and pending acceptance; this guide does not claim those tests passed.
 
 ## Workspace and keyboard
 
-Use **Clip** for the selected clip's source range, placement, speed and Transform;
-**Track** for everything the whole row owns (Colour and Opacity, keyframes,
+Use **Clip** for the selected clip's **Range**, **Placement**, **Speed** and **Transform**;
+**Track** for everything the whole video track owns (Colour and Opacity, keyframes,
 transitions and fades); and **Audio** for music. Each tab names its scope at the top.
-Selecting an excerpt or a populated/empty row preserves the chosen tab and updates
-its row context safely. Switching tabs hides rather than unmounts content, retaining
-drafts within the same editing context; changing the edited row/clip refreshes its
+Selecting a clip or a populated/empty video track preserves the chosen tab and updates
+its track context safely. Switching tabs hides rather than unmounts content, retaining
+drafts within the same editing context; changing the edited track/clip refreshes its
 fields rather than applying a previous context's draft to the new selection.
 Explicit boundary buttons open Track with that boundary expanded.
 
 Viewer and Inspector tabs share one native-button appearance and retain their
 arrow/Home/End navigation.
 Trash icons delete; × closes or dismisses. Icon-only actions keep accessible names
-and tooltips. See the [editor control catalogue](design/EDITOR_CONTROLS.md) for
+and tooltips. See the [editor control catalogue](design/EDITOR_CONTROLS.md#vocabulary) for
 control conventions and vocabulary.
 
-**Expand all / Collapse all** is an icon button on the Inspector tab row, shown only
+**Expand all / Collapse all** is an icon button on the Inspector tab bar, shown only
 in Clip; it controls its four
-sections: **Source range**, **Placement**, **Speed** and **Transform**. Track,
+sections: **Range**, **Placement**, **Speed** and **Transform**. Track,
 Audio, nested disclosures and help remain unchanged.
 
 The header directly exposes keyboard help. **Workspace options** holds the
@@ -519,23 +524,23 @@ numeric field in both main and stored controls, not read-only outputs or number-
 layouts. Pointer sliding updates only the local control value; the image updates
 on release after one validated edit. Escape, pointer cancellation, lost capture or
 window blur restores the starting value without save/history. Each keyboard slider
-adjustment is an individual validated edit. Clip Source range uses the full-original
+adjustment is an individual validated edit. **Clip → Range** uses the full-original
 bar and exact timecode text fields described above. Other integer source/timeline
 frames, durations and fades retain exact native numeric steppers and timecode
 feedback, not arbitrary timing sliders. Source-review paired IN/OUT deliberately
-requires **Apply**.
+requires **Apply range**; **Cancel range** restores unapplied drafts.
 
-Clip shows the selected excerpt/row first; section readouts and dots
+Clip shows the selected clip/video track first; section readouts and dots
 indicate adjusted settings without expanding everything. Animated channels use
-an amber curve/diamond: dashed between keys, filled when the setting participates
+an amber curve/diamond: dashed between keyframes, filled when the setting is enabled
 at the playhead. **Animation help** in the Keyframes toolbar explains scope,
-capture and point timing; there is no separate Keyframe timing help button.
-All eleven settings retain their unkeyed values, explicit capture and stored-point editing.
+capture and keyframe timing; there is no separate Keyframe timing help button.
+All eleven settings retain their unkeyed values, explicit capture and stored-keyframe editing.
 Search/filter clear actions,
 mixed select-all and always-visible media Add simplify the library.
 
 Inline help is a small **? button**, not an expandable text section. Find it
-beside the relevant title—**Source range**, **Placement**,
+beside the relevant title—**Range**, **Placement**,
 **Speed**, **Colour**, **Transitions**, **Fades**
 or **Placement & fades**—even when that section is collapsed. Help and expansion
 are separate buttons; no scrolling to the end of a section is needed. Startup
@@ -554,11 +559,11 @@ storage/render breakdowns remain their existing expandable controls, not help bu
 | Timeline play/seek                          | Space; ←/→ one frame; Shift+←/→ ten; Home/End; F to fit                      |
 | Split / quick trim                          | S / Q / W                                                                    |
 | Unwanted timeline range                     | I / O; Shift+Delete cuts; Escape clears marks                                |
-| Instance actions                            | Ctrl+D duplicate; Delete/Backspace remove                                    |
+| Clip actions                                | Ctrl+D duplicate; Delete/Backspace remove                                    |
 | Session history                             | Ctrl+Z; Ctrl+Shift+Z or Ctrl+Y redo                                          |
 | Positioned clip / first Ripple anchor nudge | Alt+←/→ one frame; Alt+Shift+←/→ ten; later Ripple starts require Ripple off |
 | Focused trim handle                         | Arrows one source frame; Shift ten; left Home/right End restore              |
-| Focused row marker                          | Arrows one project frame; Shift ten; Enter selects/seeks                     |
+| Focused track keyframe marker               | Arrows one project frame; Shift ten; Enter selects/seeks                     |
 | Focused source review                       | I/O marks source range, not the timeline's unwanted range                    |
 | Shortcut guide                              | ? outside form/modal/source controls                                         |
 

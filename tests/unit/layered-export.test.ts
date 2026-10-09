@@ -190,7 +190,7 @@ describe('schema-12 production dispatch and read-only validation', () => {
     expect(Object.isFrozen(snapshot.clips[0]!.spatial.keyframes)).toBe(true);
     expect(Object.isFrozen(snapshot.clips[0]!.spatial.keyframes[1]!.values)).toBe(true);
     project.clips[0]!.spatial.keyframes[1]!.frame = 101;
-    expect(() => validateExport(project, library)).toThrow('spatial keys exceed');
+    expect(() => validateExport(project, library)).toThrow('spatial keyframes exceed');
     expect(snapshot.clips[0]!.spatial.keyframes[1]!.frame).toBe(100);
     expect(library.jobs.list()).toEqual([]);
   });

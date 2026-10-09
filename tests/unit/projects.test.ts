@@ -938,7 +938,7 @@ describe('multiple-project HTTP API', () => {
       payload: { document: spatialBeyondOriginal, expectedRevision: 1 },
     });
     expect(rejectedSpatial.statusCode).toBe(422);
-    expect(rejectedSpatial.json().error).toContain('spatial keys exceed');
+    expect(rejectedSpatial.json().error).toContain('spatial keyframes exceed');
     expect(await readFile(confirmedPath)).toEqual(confirmedBytes);
     const videoTooLong = { ...current, clips: [createClip('clip-a', video.id, 0, 121)] };
     const musicTooLong = { ...current, music: [current.music[0]!, { ...current.music[1]!, sourceOut: 60 }] };

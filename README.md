@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/Plonk42/PasCap/actions/workflows/ci.yml/badge.svg)](https://github.com/Plonk42/PasCap/actions/workflows/ci.yml)
 
-**A local, single-user video editor for Linux.** Review rushes, assemble an edit,
+**A local, single-user video editor for Linux.** Review recordings, assemble an edit,
 animate colour, speed and clip transforms, add music, and export a 720p draft or 4K final using
 native FFmpeg. Footage stays on your machine and is **referenced in place, not
 uploaded or copied**.
@@ -16,16 +16,16 @@ deployment targets.
 ## Highlights
 
 - Separate projects with local autosave, conflict recovery and an initially empty media bin.
-- No-copy footage browsing, verified editing proxies, thumbnails and reusable source excerpts.
+- No-copy footage browsing, verified editing proxies, thumbnails and reusable recording ranges.
 - Up to eight uniform video tracks, each with Ripple on by default; turn it off for independent placement.
 - Recoverable trims, split, duplication, marked-range cutting, snapping, Undo/Redo and source review.
-- Independent clip speed/spatial settings, row-owned Colour/Opacity, and **shared row-wide keyframes** for Opacity, Speed and nine scalar colour settings, including Temperature and Tint.
-- Precise clip-only speed curves with editable presets, draggable source-frame points and exact rate/easing inputs.
+- Independent clip speed/spatial settings, video track-owned Colour/Opacity, and **shared track-wide keyframes** for Opacity, Speed and nine scalar colour settings, including Temperature and Tint.
+- Precise clip-only speed curves with editable presets, draggable source-frame keyframes and exact rate/easing inputs.
 - Clip-only crop, uniform scale, translation and rotation, with full-pose original-source keyframes.
 - Draggable timeline keyframes and setting-specific Previous/Next navigation.
 - Direct panel/help controls, compact visual animation states and grouped editing tools.
 - Track-local cuts, fade-through-black, cross-dissolves and opening/closing fades.
-- Up to eight independent music instances with waveforms, gain, fades and explicit range looping; overlapping sources sum linearly with one final hard clamp.
+- Up to eight independent music tracks with waveforms, gain, fades and explicit range looping; overlapping sources sum linearly with one final hard clamp.
 - Native original-based H.264 SDR exports at **1280×720** or **3840×2160**, with progress, cancellation and verification receipts.
 - Export-space preflight, disclosed planning assumptions and safe disk-full recovery.
 
@@ -60,53 +60,56 @@ directory, and do not expose the unauthenticated service to a network.
 ### First edit
 
 1. Create a project from **Projects**.
-2. Use **Import → Browse footage**, select originals and register them. Browsing alone starts no media work. Alternatively, explicitly register a whole folder by path.
-3. Wait for proxy preparation in **Activity**. Review a recording, mark source IN/OUT, and add excerpts or drag prepared media onto a video row.
-4. Trim, reorder, grade and animate the edit; import standalone music in **Audio**, then use **Add music track** (or drag it from Media → Music onto the music lane) and **Music track** to place/select independent instances.
+2. Use **Import → Browse recordings**, select originals and register them. Browsing alone starts no media work. Alternatively, explicitly register a whole folder by path.
+3. Wait for proxy preparation in **Activity**. Review a recording, mark source IN/OUT, and choose **Add clip** or drag prepared media onto a video track.
+4. Trim, reorder, grade and animate the edit; import standalone music in **Audio**, then use **Add music track** (or drag it from Media → Music onto the music lane) and **Music track** to place/select independent tracks.
 5. Choose **Export** and a draft/final preset, review its storage check, then start. Export reads the original recordings, not the proxies.
 
-Rows follow composition order: row 1 is below row 2 in the image, row 3 is above
-row 2, and so on. No row has a special editing role. **Layer options → Ripple**
+Video tracks follow composition order: track 1 is below track 2 in the image, track 3 is above
+track 2, and so on. No track has a special editing role. **Track options → Ripple**
 packs a track from its first clip's current start in one Undo step when enabled;
 while on, later clips remain continuously sequenced, retaining dissolve overlaps.
 Turning it off keeps actual placements for independent edits. Music, other tracks
-and absolute row points do not move with it.
+and absolute track keyframes do not move with it.
 
 **Track → Colour** contains the single **Opacity** slider alongside the colour
-sliders, initially **100%**. Without Opacity keys it edits the selected row's
-`opacity` value, including on an empty row; the row's `opacity` curve overrides
+sliders, initially **100%**. Without Opacity keyframes it edits the selected video track's
+`opacity` value, including on an empty track; the track's `opacity` curve overrides
 that value on every clip when animated, including both dissolve sources.
-Sliders never create keys. An animated setting without participation at the real
-playhead is read-only until its hollow diamond captures a key there.
-Static and keyed Colour have the same row ownership and grade each source once.
-Different colour treatments require different rows. See [row appearance](docs/design/ROW_APPEARANCE.md). Opacity controls composition coverage,
-not the SDR RGB grade, with no additional layer multiplier or sidebar duplicate.
+Sliders never create keyframes. An animated setting that is not enabled at the real
+playhead is read-only until its hollow diamond captures a keyframe there.
+Static and keyed Colour have the same video track ownership and grade each source once.
+Different colour treatments require different tracks. See [track appearance](docs/design/ROW_APPEARANCE.md). Opacity controls composition coverage,
+not the SDR RGB grade, with no additional track multiplier or sidebar duplicate.
 **Temperature / Tint** use normalized **−1…1** values, neutral **0**: positive
-Temperature warms, positive Tint adds magenta. They are row-owned, independently
-keyable and editable on empty rows. Nonzero settings intentionally colour greys;
+Temperature warms, positive Tint adds magenta. They are track-owned, independently
+keyable and editable on empty tracks. Nonzero settings intentionally colour greys;
 the shared linear-gain formula runs before Exposure, not as Kelvin/HDR/automatic
 white balance. Static HSL/curves add no animation channels. See
 [Temperature and Tint](docs/design/TEMPERATURE_AND_TINT.md).
 **Clip → Placement** contains placement only.
-Layer options contains only rename, Ripple, ordering and deletion; visibility
+Track options contains only rename, Ripple, ordering and deletion; visibility
 remains a separate sidebar control.
 
-**Clip → Transform** edits each excerpt's crop, Scale, Translate X/Y and Rotation.
+**Clip → Transform** edits each clip's crop, Scale, Translate X/Y and Rotation.
 Its source-frame diamond captures a complete pose; animated main values require
-a key at the actually displayed source frame. Stored-key navigation reaches
+a keyframe at the actually displayed source frame. Stored-keyframe navigation reaches
 off-trim and exclusive-OUT anchors without inventing preview frames. Cropping does
-not refit the image; nonneutral uncovered pixels reveal lower layers. Exact neutral
+not refit the image; nonneutral uncovered pixels reveal lower video tracks. Exact neutral
 poses retain opaque black letterboxing. See [spatial transforms](docs/design/SPATIAL_TRANSFORMS.md).
 
 Project duration is the maximum of all retimed video clip ends and every music
-instance's start + duration. Music can continue beyond video: the final video
+track's start + duration. Music can continue beyond video: the final video
 closing fade ends at its clip OUT, then the picture is black while music continues
 and fades at its own end. Music-only preview is black; export still requires at
-least one video clip. Imports never implicitly place music, and instance edits
-or removal leave the other instances unchanged. There is no normalisation,
+least one video clip. Imports never implicitly place music, and music track edits
+or removal leave the other music tracks unchanged. There is no normalisation,
 ducking, audio effect or source-video audio.
 
 Read the [user guide](docs/USER_GUIDE.md) for the full workflow and shortcuts.
+The [editor control vocabulary](docs/design/EDITOR_CONTROLS.md#vocabulary) defines
+Recording (file), Clip (video timeline instance), Track (video or music), Keyframe
+(animation), and Range (IN/OUT). Static colour curves use control nodes, not keyframes.
 Filesystem file drops and browser upload pickers are intentionally disabled:
 no import flow duplicates your original footage.
 
@@ -129,13 +132,13 @@ Missing mounts and symlinks fail explicitly. In the eventual container package,
 originals will be read-only bind mounts and application data will be a separate
 persistent writable mount. See [deployment design](docs/DEPLOYMENT.md).
 
-**Project format:** strict schema **v12**, with required complete row `colour`, including `temperature` and `tint`, no clip colour/correction field, clip `spatial` base and
-0–256 full-pose source-frame keys, required `music` array (0–8
-instances, unique required IDs; `[]` without music), per-track Ripple,
+**Project format:** strict schema **v12**, with required complete video track `colour`, including `temperature` and `tint`, no clip colour/correction field, clip `spatial` base and
+0–256 full-pose source-frame keyframes, required `music` array (0–8
+music tracks, unique required IDs; `[]` without music), per-track Ripple,
 transitions, fades and numeric `VideoLayer.opacity` (0–1; new tracks start at 1),
-and exactly eleven nullable point channels: `opacity`, `speed`, `temperature`,
+and exactly eleven nullable keyframe channels: `opacity`, `speed`, `temperature`,
 `tint`, `exposure`, `brightness`, `contrast`, `hue`, `saturation`, `highlights`,
-`shadows`. HSL/curves remain static. Row `opacity` is required and valid; saved `clip.opacity` and old
+`shadows`. HSL/curves remain static. Track `opacity` is required and valid; saved `clip.opacity` and old
 `clipOpacity`/`layerOpacity` channels are rejected, not ignored or defaulted.
 v1–v11 projects and receipt snapshots remain unchanged
 on disk but are incompatible: recreate projects and import media deliberately.
@@ -164,7 +167,7 @@ and 24, plus native-media and browser integration on the checksum-pinned FFmpeg
 Record dated local results and acceptance evidence on the corresponding
 [work issue](https://github.com/Plonk42/PasCap/issues), separately from CI for the
 actual delivery commit. Preview/Inspector/Diagnostics loading is deferred;
-resource limits are documented in the [layer contract](docs/LAYERS_AND_KEYFRAMES.md#inspector-and-resource-limits).
+resource limits are documented in the [track contract](docs/LAYERS_AND_KEYFRAMES.md#inspector-and-resource-limits).
 
 [Development guide](docs/DEVELOPMENT.md) · [CI implementation](.github/workflows/ci.yml)
 
@@ -179,9 +182,9 @@ real-workload qualification, and local Docker/Podman packaging. See
 - [Documentation index](docs/README.md)
 - [UX and local hardening](docs/UX_HARDENING.md)
 - [Timing and colour contract](docs/COLOUR_AND_TIMING.md)
-- [Layers and keyframes](docs/LAYERS_AND_KEYFRAMES.md)
+- [Tracks and keyframes](docs/LAYERS_AND_KEYFRAMES.md)
 - [Speed, audio and export](docs/SPEED_AND_AUDIO.md)
-- [Row appearance/schema-12 contract](docs/design/ROW_APPEARANCE.md)
+- [Video track appearance/schema-12 contract](docs/design/ROW_APPEARANCE.md)
 - [Temperature and Tint/schema-12 contract](docs/design/TEMPERATURE_AND_TINT.md)
 - [Spatial transforms/schema-12 contract](docs/design/SPATIAL_TRANSFORMS.md)
 - [Multiple music/schema-12 contract](docs/design/MULTIPLE_MUSIC.md) — required behaviour; implementation/validation acceptance remains pending, not a test or release claim.

@@ -1,26 +1,26 @@
-# Multiple music instances · strict project schema 12
+# Multiple music tracks · strict project schema 12
 
 Current contract for [#35](https://github.com/Plonk42/PasCap/issues/35). This specifies
 the required behaviour, not completed implementation, test evidence or release
 acceptance. Unit, native and browser validation of this contract is pending.
 Usage belongs in [the user guide](../USER_GUIDE.md) and
 [speed and audio](../SPEED_AND_AUDIO.md); resource/storage limits also belong in
-[layers and keyframes](../LAYERS_AND_KEYFRAMES.md#inspector-and-resource-limits) and
+[tracks and keyframes](../LAYERS_AND_KEYFRAMES.md#inspector-and-resource-limits) and
 [UX hardening](../UX_HARDENING.md#issue-3-export-storage-and-recovery).
 
-## Strict document and instance identity
+## Strict document and track identity
 
 - `schemaVersion` is exactly **12**. Required `music: MusicTrack[]` contains **0–8**
-  independent instances; `[]` means no music. Omitted fields, `null`, a single
-  object, unknown fields and duplicate instance IDs are invalid. There are no
+  independent music tracks; `[]` means no music. Omitted fields, `null`, a single
+  object, unknown fields and duplicate track IDs are invalid. There are no
   migrations, compatibility readers, null fallbacks or injected defaults.
-- Each instance requires `id`, `mediaId`, `sourceIn`, `sourceOut`, `start`,
+- Each music track requires `id`, `mediaId`, `sourceIn`, `sourceOut`, `start`,
   `duration`, `gainDb`, `fadeIn`, `fadeOut` and `loop`. Its unique `id` identifies
-  the placement, not the registered recording; several instances may use the same
+  the placement, not the registered recording; several music tracks may use the same
   `mediaId` without sharing editable timing or gain.
 - Source IN/OUT and placement/fades are integer frames; OUT is exclusive.
   IN/start/fades are nonnegative; OUT/duration are positive. Frames and timeline
-  OUT fit **0–2,147,483,647**. Reject overflow; never shorten or clamp an instance.
+  OUT fit **0–2,147,483,647**. Reject overflow; never shorten or clamp a music track.
   Source OUT must exceed IN and fit the registered recording. Fade IN + OUT must
   fit duration. Without looping, duration cannot exceed the selected source range.
   Looping repeats only that range. Gain is **−60 to +12 dB**.
@@ -28,14 +28,14 @@ Usage belongs in [the user guide](../USER_GUIDE.md) and
   membership, each limited to 10,000 IDs. Every music reference also counts as
   visible membership; importing does not place music implicitly.
 - Video contracts do not change: 1–8 uniform tracks, required Ripple/transitions/
-  opening/closing fades and sole row `opacity` in 0–1. All eleven nullable point
+  opening/closing fades and sole video track `opacity` in 0–1. All eleven nullable keyframe
   channels are `opacity`, `speed` and nine scalar colour fields, including
-  `temperature` and `tint`. Complete static/keyed Colour remains row-owned;
+  `temperature` and `tint`. Complete static/keyed Colour remains video track-owned;
   HSL/curves remain static. There is no clip colour/correction, clip opacity or
   second opacity channel. Clip constant/ramp/custom source-frame speed retains
   its ownership and retiming. Schema 12 also requires clip-owned spatial
-  base/full-pose source-frame keys;
-  [spatial transforms](SPATIAL_TRANSFORMS.md) do not change music or row Opacity.
+  base/full-pose source-frame keyframes;
+  [spatial transforms](SPATIAL_TRANSFORMS.md) do not change music or video track Opacity.
 
 v1–v11 projects and receipt snapshots are incompatible and preserved byte-for-byte,
 along with finished exports. Recreate projects deliberately; do not rewrite,
@@ -44,51 +44,51 @@ repair or delete them automatically. Registry, video-proxy and current
 
 ## Duration, black tails and video fades
 
-For placed video clips $c$ and music instances $m$, the exclusive project OUT is
+For placed video clips $c$ and music tracks $m$, the exclusive project OUT is
 
 $$
 D = \max\left(\{0\} \cup \{c.\mathrm{end}\} \cup
 \{m.\mathrm{start}+m.\mathrm{duration}\}\right).
 $$
 
-Use authoritative retimed clip ends, including hidden video layers, and every
-music instance's OUT. Music **can extend project duration**. Stored row points
+Use authoritative retimed clip ends, including hidden video tracks, and every
+music track's OUT. Music **can extend project duration**. Stored track keyframes
 alone do not extend it. Seek/playback/export use this same duration; independent
 music placement never follows video Ripple or video speed.
 
 Each video track's closing fade stays inside its last clip and ends at that
 clip's timeline OUT. It does not move to project OUT, stretch, or hold the last
-image. Where no enabled video remains, composition is **opaque black** while
-music continues; each music fade still ends at its own instance OUT. Music-only
+image. Where no active video clip remains on an enabled track, composition is **opaque black** while
+music continues; each music fade still ends at its own track OUT. Music-only
 preview is naturally black and uses the same output clock. Export requires at
 least one retained video clip; this is not an audio-only export feature.
 
-A music tail beyond video OUT requires the **layered exporter**, which fills
+A music tail beyond video OUT requires the **composited exporter**, which fills
 trailing black frames through project OUT. The static fast path still requires
 one enabled, opaque, unanimated, zero-origin contiguous video track with exactly
-neutral spatial bases and no spatial keys, covering
+neutral spatial bases and no spatial keyframes, covering
 the entire project duration. No frozen-last-image or shortened-audio shortcut is
 permitted.
 
-## Selected-instance editing
+## Selected music track editing
 
 **Audio → Music** uses a native **Music track** selector with its trash action
 **Delete selected music track**, a **Recording** selector that only changes the
-selected instance, and **Add music track**, the single creation path listing ready
+selected music track, and **Add music track**, the single creation path listing ready
 files (dragging a ready file from Media → Music onto the music lane is equivalent).
 Add creates a fresh independent ID from the
-chosen ready recording, including another instance of the same recording, up to
-the eight-instance limit. Imports only populate the bin and prepare media;
+chosen ready recording, including another music track using the same recording, up to
+the eight-track limit. Imports only populate the bin and prepare media;
 placement is deliberate and separate. Project-level removal lives in Media.
 
 Selection is editor-only, with no save or Undo entry. Selecting, editing or
-removing an instance never edits the other instances, video clips, row points or
-bin membership. Changing Recording targets only the selected instance. Removal
+removing a music track never edits the other music tracks, video clips, track keyframes or
+bin membership. Changing Recording targets only the selected music track. Removal
 leaves the original/cache and other placements intact; Undo restores the removed
-instance. Timeline waveform selection, placement and edge trims target its ID.
+music track. Timeline waveform selection, placement and edge trims target its ID.
 
-Each instance retains independent field drafts. Tab/section hiding preserves
-them; selection must not submit an old draft into a different instance. Numeric
+Each music track retains independent field drafts. Tab/section hiding preserves
+them; selection must not submit an old draft into a different music track. Numeric
 Enter/blur commits once, Escape restores, and invalid drafts stay editable.
 Gain uses a native slider plus an exact field: pointer movement is local, release
 commits once; each keyboard adjustment is one edit. Timing gestures keep their
@@ -101,7 +101,7 @@ cancellation, capture loss and window blur restore a gesture atomically.
 
 Use PCM16 **48 kHz stereo** sources; mono is duplicated without attenuation.
 Convert each source IN/OUT, start, duration and fade boundary independently to
-integer samples at the rational project frame rate. For instance $i$, local
+integer samples at the rational project frame rate. For music track $i$, local
 elapsed samples $u$, duration $d_i$ and fade lengths $f_i^{\mathrm{in/out}}$, its
 amplitude envelope is
 
@@ -111,7 +111,7 @@ a_i(u)=10^{g_i/20}
 \begin{cases}(d_i-u)/f_i^{\mathrm{out}},&d_i-f_i^{\mathrm{out}}\le u<d_i\\1,&\text{otherwise}.\end{cases}
 $$
 
-A zero fade is absent, not division by zero. Outside an instance's placement it
+A zero fade is absent, not division by zero. Outside a music track's placement it
 contributes silence. Within placement, sample its selected source range, wrapping
 only when Loop is enabled. Let $s_i$ be start samples and $x_{i,k}(u)$ the sampled
 selected-range channel, zero outside $0\le u<d_i$. For each stereo channel $k$ and
@@ -132,8 +132,8 @@ equivalence.
 ## Preview: one bounded mixed stream and output clock
 
 One **AudioContext**, one **AudioWorklet** and one mixed stereo stream supply a
-single audio-output timestamp clock/epoch. All instances align to project sample
-positions on that clock; there is no per-instance worklet, clock or restart at
+single audio-output timestamp clock/epoch. All music tracks align to project sample
+positions on that clock; there is no per-track worklet, clock or restart at
 loop/placement boundaries. Video starts after the device reaches the first real
 rendered mixed sample's origin. Receipts independently retain the exact
 **one-project-frame A/V bound**; this change does not relax decoder readiness,
@@ -141,22 +141,22 @@ drift checks, operation deadlines or cancellation.
 
 Read/accumulate sources **serially** into one mixed block, apply their envelopes,
 clamp the completed sum, and transfer it to the worklet. The aggregate bound,
-independent of instance count and duration, is:
+independent of music track count and duration, is:
 
 - **4 × 128 KiB** stereo Float32 queue/transfer blocks, **512 KiB total**, not four
-  blocks per instance.
+  blocks per track.
 - Bounded **64 KiB** source-range/short-loop read scratch, shared serially.
 - One shared **128 KiB** conversion workspace and one **128 KiB** mixed-output
-  workspace, not per-instance copies.
+  workspace, not per-track copies.
 - One unacknowledged consumption receipt and serial credit-controlled refill, run
   by one dedicated reader worker that exchanges credits/blocks directly with the
   worklet, independent of editor-thread rendering.
 
-There are no full-file buffers, duration-sized silence buffers or per-instance
+There are no full-file buffers, duration-sized silence buffers or per-track
 queues. Short-loop scratch may be reused only within the current mixed block;
 each refill still performs fresh identity-guarded range reads. Legitimate
 placement silence is not an underrun. A missing active source/read/processor
-failure is explicit; never silently omit an instance or invent successful
+failure is explicit; never silently omit a music track or invent successful
 silence. Pause, seek, edit, cancellation and disposal invalidate the entire mix
 epoch, reads, queued blocks and late receipts together.
 
@@ -173,7 +173,7 @@ after selected decoding and before publication. Keep one serial heavy worker.
    into the next Float64 accumulator. No normalisation or intermediate clamp;
    values outside −1–1 survive subsequent cancellation.
 3. Verify exact sample counts and delete consumed selected PCM/old accumulator
-   before processing the next instance. At most **two intermediate audio inputs**,
+   before processing the next music track. At most **two intermediate audio inputs**,
    **one native audio child per pass** and **three audio scratch files** coexist:
    selected source, old accumulator, new accumulator.
 4. Feed one final mixed input to AAC, hard-clamping once after all sources.
@@ -209,7 +209,7 @@ OUT. Restore only the current snapshot/array contract; reject incompatible older
 snapshots or invalid arrays clearly and preserve their receipts and finished MP4s.
 
 Pending acceptance includes strict schema/receipt rejection and preservation;
-independent selection/drafts/Undo and cancellation; repeated-source instances;
+independent selection/drafts/Undo and cancellation; repeated-source music tracks;
 overlap/cancellation and final-only clipping; placement silence, loops and sample
 counts; one output epoch and unchanged A/V bound; video closing fade followed by
 black through a music tail; music-only black preview and video-required export;

@@ -214,7 +214,7 @@ export function ExportDialog({
               <dd>{summary.clips}</dd>
             </div>
             <div>
-              <dt>Video layers</dt>
+              <dt>Video tracks</dt>
               <dd>
                 {summary.layers} <small>({summary.enabledLayers} enabled)</small>
               </dd>
@@ -231,14 +231,14 @@ export function ExportDialog({
             </div>
           </dl>
           <p>
-            The submitted edit includes clip grades and speed, each track’s Ripple, transitions and fades, enabled
-            layers, bottom-to-top composition order, row Opacity and keyframes
+            The submitted edit includes clip speed and transforms, each video track’s Colour, Ripple, transitions and
+            fades, enabled video tracks, bottom-to-top composition order, track Opacity and keyframes
             {summary.musicTracks ? `, and all ${summary.musicTracks} music tracks` : '; no music tracks are placed'}.
             Later edits do not change a submitted render.
           </p>
           {summary.musicTracks > 0 && (
             <p>
-              Music instances retain independent ranges, placement, gain, fades and looping. Overlaps sum linearly, then
+              Music tracks retain independent ranges, placement, gain, fades and looping. Overlaps sum linearly, then
               the final mix is hard-clamped to −1…1, without normalization or ducking. Export reaches the last video or
               music OUT. Video closing fades stay on their last clips; any remaining music continues over black.
             </p>

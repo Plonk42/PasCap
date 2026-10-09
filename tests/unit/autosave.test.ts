@@ -121,7 +121,11 @@ describe('serial autosave', () => {
     edited.title = 'Outside mutation';
     edited.layers[0]!.name = 'Outside layer mutation';
     await autosave.flush();
-    expect(save.mock.calls[0]?.[0]).toMatchObject({ title: 'Edited', revision: 4, layers: [{ name: 'Video 1' }] });
+    expect(save.mock.calls[0]?.[0]).toMatchObject({
+      title: 'Edited',
+      revision: 4,
+      layers: [{ name: 'Video track 1' }],
+    });
     expect(save.mock.calls[0]?.[1]).toBe(4);
     expect(autosave.revision).toBe(5);
   });

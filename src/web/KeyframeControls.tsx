@@ -38,7 +38,7 @@ function participatingSettings(key: LayerKeyframe) {
 
 function ParticipantChips({ point }: Readonly<{ point: LayerKeyframe }>) {
   return (
-    <div className="layer-keyframe-chips" aria-label="Participating settings">
+    <div className="layer-keyframe-chips" aria-label="Animated settings">
       {participatingSettings(point).map((setting) => (
         <span className="layer-keyframe-chip" key={setting.key}>
           {setting.label}
@@ -87,7 +87,7 @@ function playheadLabel(frame: number, duration: number, atHead: boolean): string
   if (duration === 0) return 'Empty timeline · no preview frame';
   if (!Number.isInteger(frame) || frame < 0 || frame >= duration)
     return `Frame ${frame} is outside the current timeline`;
-  return `Timeline frame ${frame}${atHead ? ' · shared point at playhead' : ' · no shared point here'}`;
+  return `Timeline frame ${frame}${atHead ? ' · shared keyframe at playhead' : ' · no shared keyframe here'}`;
 }
 
 interface PointRowProps {
@@ -136,7 +136,7 @@ function KeyframePointRow({
         <button
           type="button"
           className="text-button"
-          aria-label={`Go to layer keyframe ${point.frame}`}
+          aria-label={`Go to track keyframe ${point.frame}`}
           title={keySeekHint(point.frame, duration)}
           disabled={disabled}
           onClick={() => onSeek(point)}
@@ -146,7 +146,7 @@ function KeyframePointRow({
         {point.frame >= duration && (
           <span
             className="keyframe-row-skipped"
-            title="Outside the current timeline; this stored point remains editable."
+            title="Outside the current timeline; this stored keyframe remains editable."
           >
             Outside duration
           </span>
@@ -154,8 +154,8 @@ function KeyframePointRow({
         <button
           type="button"
           className="icon-button"
-          aria-label={`Delete layer keyframe ${point.frame}`}
-          title="Remove this whole shared point and all its participating settings"
+          aria-label={`Delete track keyframe ${point.frame}`}
+          title="Remove this whole shared keyframe and all its animated settings"
           disabled={disabled}
           onClick={() => onEdit({ type: 'layer-key-remove', layerId, frame: point.frame })}
         >
@@ -164,18 +164,18 @@ function KeyframePointRow({
       </div>
       <p
         className="layer-keyframe-dependencies"
-        title="Moving this point moves all these settings together; they also share its easing."
+        title="Moving this keyframe moves all these settings together; they also share its easing."
       >
         {settings.map((setting) => setting.label).join(' · ')}
       </p>
       <details className="layer-keyframe-point-details" open={open}>
-        <summary aria-label={`Edit layer keyframe ${point.frame}`}>Edit</summary>
+        <summary aria-label={`Edit track keyframe ${point.frame}`}>Edit</summary>
         <div className="layer-keyframe-point-fields">
           <label htmlFor={`${listId}-${row.id}-frame`}>
             Timeline frame
             <NumberField
               id={`${listId}-${row.id}-frame`}
-              aria-label={`Layer keyframe frame ${point.frame}`}
+              aria-label={`Track keyframe frame ${point.frame}`}
               aria-describedby={helpId}
               min={0}
               max={2_147_483_647}
@@ -186,7 +186,7 @@ function KeyframePointRow({
               resetKey={`${context}:${row.id}:frame`}
               validate={(value) =>
                 keys.some((other) => other.frame !== point.frame && other.frame === value)
-                  ? `Frame ${value} already has a shared point. Choose a different frame.`
+                  ? `Frame ${value} already has a shared keyframe. Choose a different frame.`
                   : null
               }
               onCommit={(nextFrame) => onEdit({ type: 'layer-key-move', layerId, frame: point.frame, nextFrame })}
@@ -196,9 +196,9 @@ function KeyframePointRow({
             Shared easing
             <EasingSelect
               id={`${listId}-${row.id}-easing`}
-              aria-label={`Layer keyframe interpolation ${point.frame}`}
+              aria-label={`Track keyframe interpolation ${point.frame}`}
               aria-describedby={helpId}
-              title="Shared by these settings, to each setting's next participating point"
+              title="Shared by these settings, to each setting's next keyframe"
               disabled={disabled}
               value={point.interpolation}
               onChange={(interpolation) =>
@@ -217,7 +217,7 @@ function KeyframePointRow({
               if (value === null) return null;
               const id = `${listId}-${row.id}-${setting.key}`;
               const label = `${setting.label} keyframe value ${point.frame}`;
-              const hint = `${setting.label} at stored timeline frame ${point.frame} on ${project.layers.find((layer) => layer.id === layerId)?.name}. Edits change only this participant, not the playhead, shared easing or unanimated settings.`;
+              const hint = `${setting.label} at stored timeline frame ${point.frame} on ${project.layers.find((layer) => layer.id === layerId)?.name}. Edits change only this setting's keyframe value, not the playhead, shared easing or unanimated settings.`;
               const command = (nextValue: number): EditCommand => ({
                 type: 'layer-key-value',
                 layerId,
@@ -323,11 +323,11 @@ export function KeyframeControls({
   return (
     <fieldset
       className="keyframe-controls declutter-keyframes layer-keyframe-controls"
-      aria-label={`Layer keyframes ${layer.name}`}
+      aria-label={`Track keyframes ${layer.name}`}
     >
-      <legend className="declutter-sr-only">Layer keyframes</legend>
+      <legend className="declutter-sr-only">Track keyframes</legend>
       <div className="keyframe-toolbar">
-        <strong className="keyframe-panel-title declutter-sr-only">Layer keyframes</strong>
+        <strong className="keyframe-panel-title declutter-sr-only">Track keyframes</strong>
         <span className="keyframe-count">
           {keys.length} {keys.length === 1 ? 'keyframe' : 'keyframes'}
         </span>
@@ -335,8 +335,8 @@ export function KeyframeControls({
           <button
             type="button"
             className="icon-button"
-            aria-label="Previous layer keyframe"
-            title={previous ? keySeekHint(previous.frame, duration) : 'No previous shared point'}
+            aria-label="Previous track keyframe"
+            title={previous ? keySeekHint(previous.frame, duration) : 'No previous shared keyframe'}
             disabled={unavailable || !previous}
             onClick={() => {
               if (previous) seekPoint(previous);
@@ -347,8 +347,8 @@ export function KeyframeControls({
           <button
             type="button"
             className="icon-button"
-            aria-label="Next layer keyframe"
-            title={next ? keySeekHint(next.frame, duration) : 'No next shared point'}
+            aria-label="Next track keyframe"
+            title={next ? keySeekHint(next.frame, duration) : 'No next shared keyframe'}
             disabled={unavailable || !next}
             onClick={() => {
               if (next) seekPoint(next);
@@ -359,8 +359,8 @@ export function KeyframeControls({
         </div>
         <HelpPopover label="Animation" className="animation-help">
           <p>
-            Each setting's diamond animates this whole video row, not just the selected clip. All participating settings
-            share one point and its easing.
+            Each setting's diamond animates this whole video track, not just the selected clip. All animated settings
+            share one keyframe and its easing.
           </p>
           <div className="animation-legend">
             <span>
@@ -368,22 +368,22 @@ export function KeyframeControls({
             </span>
             <span>
               <Icon name="curve" size={14} />
-              Row curve · capture before editing
+              Track curve · capture before editing
             </span>
             <span>
-              <span aria-hidden="true">◆</span>Key at playhead · editable
+              <span aria-hidden="true">◆</span>Keyframe at playhead · editable
             </span>
           </div>
           <p>
-            Use the arrows beside a diamond to visit that setting's keys. Drag a timeline point to move all its
-            participants; Escape cancels.
+            Use the arrows beside a diamond to visit that setting's keyframes. Drag a timeline keyframe to move all its
+            settings; Escape cancels.
           </p>
           <p id={helpId}>
-            Absolute project timeline frames, independent of clip trims. Moving a point moves every participating
-            setting. Its easing runs to each setting's next participating point; the first and last channel values hold.
-            Opacity affects the whole row, with or without keyframes. Other unanimated settings edit the selected clip.
-            Points outside the current duration stay editable; navigation previews the nearest available frame without
-            moving them.
+            Absolute project timeline frames, independent of clip trims. Moving a keyframe moves every animated setting.
+            Its easing runs to each setting's next keyframe; the first and last channel values hold. Opacity affects the
+            whole track, with or without keyframes. Unanimated Colour edits the track; unanimated Speed edits the
+            selected clip. Keyframes outside the current duration stay editable; navigation previews the nearest
+            available frame without moving them.
           </p>
         </HelpPopover>
       </div>
@@ -402,14 +402,14 @@ export function KeyframeControls({
       {inspectedAway && (
         <div className="layer-keyframe-inspected">
           <span className="layer-keyframe-position">
-            Stored point · timeline frame {inspectedAway.frame}
+            Stored keyframe · timeline frame {inspectedAway.frame}
             {inspectedAway.frame >= duration ? ' · outside current duration' : ''}
           </span>
           <ParticipantChips point={inspectedAway} />
           <span className="layer-setting-hint">
             {duration === 0
-              ? 'No preview frame is available. This point remains editable below.'
-              : `Preview is at frame ${frame}, not at this stored point.`}
+              ? 'No preview frame is available. This keyframe remains editable below.'
+              : `Preview is at frame ${frame}, not at this stored keyframe.`}
           </span>
           {inspection && (
             <button type="button" className="text-button" onClick={navigation.onFollowPlayhead}>
@@ -420,7 +420,7 @@ export function KeyframeControls({
       )}
 
       {keys.length > 0 && (
-        <ol className="keyframe-list keyframe-entries" aria-label="Edit layer keys">
+        <ol className="keyframe-list keyframe-entries" aria-label="Edit track keyframes">
           {keys.map((key, index) => (
             <KeyframePointRow
               key={current.rows[index]!.id}

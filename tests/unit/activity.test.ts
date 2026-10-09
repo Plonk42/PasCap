@@ -162,10 +162,10 @@ describe('activity ordering and summaries', () => {
     expect(activityResultSummary(job('clip', { state: 'running', progress: 0.7 }))).toBe('');
     expect(activityResultSummary(job('clip', { state: 'queued' }))).toBe('');
     expect(activityResultSummary(job('clip', { state: 'failed', message: 'Cannot prepare proxy' }))).toBe(
-      'Video preparation failed: clip.mp4. Cannot prepare proxy',
+      'Video recording preparation failed: clip.mp4. Cannot prepare proxy',
     );
     expect(activityResultSummary(job('music', { kind: 'audio', state: 'cancelled', message: 'Job cancelled.' }))).toBe(
-      'Audio preparation cancelled: music.mp4. Job cancelled.',
+      'Music recording preparation cancelled: music.mp4. Job cancelled.',
     );
     const completed = job('render', { kind: 'export', state: 'completed', progress: 1 });
     expect(activityResultSummary(completed)).toBe('Export completed: render.mp4');
