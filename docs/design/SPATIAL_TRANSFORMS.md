@@ -158,13 +158,14 @@ two decoder/texture slots per video track (16 for eight), plus one source-review
 
 ## Clip → Transform controls
 
-**Transform** is the fourth and last Clip section (after Speed), collapsed for
-new preferences. **Expand all / Collapse all** includes **Range**, **Placement**,
-**Speed** and **Transform**. Existing expansion preferences remain
+**Transform** is the second Clip section (after Speed, before Range and Placement), collapsed for
+new preferences. **Expand all / Collapse all** includes **Speed**, **Transform**,
+**Range** and **Placement**. Existing expansion preferences remain
 respected; **Transform animation** heading help is reachable while collapsed.
 An empty video track shows no Clip sections, only **Select a clip on … to edit it.**
 
-There is no Animate toggle or stored preference. Each setting always exposes its own capture diamond and
+There is no Animate toggle or stored preference. Each setting always exposes its own capture button, a blue triangle
+(hollow ▽ inactive, filled ▼ active) like the timeline marker, never the Colour diamond, and
 Previous/Next buttons, and the expanded section's keyframe line shows the keyframe count, one Previous/Next
 pair and Reset; it is hidden while the section is collapsed.
 
@@ -213,7 +214,7 @@ is no Transform graph-keyframe drag or canvas gizmo.
 
 ### Timeline source-keyframe markers
 
-Each clip rectangle shows Transform keys as boxed blue **▼** buttons at its top edge, as visible as the amber Colour markers, clear of the bottom shared project-time track markers and the salmon/dashed **◆** custom-speed lane (the clip label sits below them); the tab shape and the marker's accessible name and tooltip (which
+Each clip rectangle shows Transform keys as boxed blue **▼** buttons overlapping its top edge, the same size as the amber Colour track markers (which overlap the bottom edge by the same amount), clear of the bottom shared project-time track markers and the salmon/dashed **◆** custom-speed lane (the clip label sits below them); the tab shape and the marker's accessible name and tooltip (which
 list the enabled settings) distinguish it without relying on colour. One marker
 represents one key, however many settings it enables.
 Source keyframes use the clip's authoritative retiming to locate output positions;

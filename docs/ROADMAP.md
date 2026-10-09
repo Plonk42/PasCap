@@ -57,7 +57,7 @@ animation/timing help in its toolbar. Nested keyframe details retain drafts and 
 identity; there is no outer list disclosure or per-track list expansion preference.
 Track also holds Colour, Transitions and Fades. Clip keeps
 source/clip settings and playhead Speed/Transform controls; its Expand all/Collapse all
-affects only the four Clip sections (**Range**, **Placement**, **Speed** and **Transform**),
+affects only the four Clip sections (**Speed**, **Transform**, **Range** and **Placement**),
 leaving Track, Audio, nested disclosures and help
 unchanged. Stored keyed settings reuse the main value
 controls with precise numeric editing. Clip/track selection and keyframe navigation

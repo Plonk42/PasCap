@@ -46,8 +46,7 @@
   opacity: 0.4;
 }
 
-/* Colour's line and hint sit directly in the section content, which has no padding of its own. */
-.inspector-section-content > .section-keyframe-line,
-.inspector-section-content > .colour-scope-hint {
+/* Colour's line sits directly in the section content, which has no padding of its own. */
+.inspector-section-content > .section-keyframe-line {
   padding-inline: 14px;
 }

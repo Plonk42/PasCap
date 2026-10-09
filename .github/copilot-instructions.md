@@ -146,7 +146,7 @@ PasCap is a solo, pre-release project: optimize for fast iteration. Details are 
   are each below 1 (opposite crops summing to 1 or more cover nothing), without refit or moving the original-centre pivot;
   use unrounded original-aspect contain fit and top-left half-open crop bounds.
   Exact neutral rendering preserves opaque black letterboxing after grading;
-  nonneutral uncovered pixels are transparent. Clip → Transform is the fourth
+  nonneutral uncovered pixels are transparent. Clip → Transform is the second
   section, collapsed by default, with a source-frame capture diamond and Previous/Next per setting,
   read-only animated main values without that setting's key at the real displayed source frame,
   stored-key navigation/exact fields and release-only value sliders. Any spatial

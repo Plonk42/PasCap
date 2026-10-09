@@ -32,6 +32,22 @@
   opacity: 0.4;
 }
 
+/* Transform keyframes use the timeline marker's blue triangle, not the Colour diamond. */
+.keyframe-toggle.transform-keyframe-toggle {
+  font-size: 15px;
+}
+
+.keyframe-toggle.transform-keyframe-toggle:not(:disabled):is(:hover, :focus-visible) {
+  border-color: #9fd2f2;
+  color: #c4e9ff;
+}
+
+.keyframe-toggle.transform-keyframe-toggle.active {
+  border-color: #5d93b8;
+  background: #1b3446;
+  color: #c4e9ff;
+}
+
 .inspector-panel .layer-keyframe-controls.keyframe-controls {
   padding: 12px 14px;
   border-bottom: 1px solid var(--line);

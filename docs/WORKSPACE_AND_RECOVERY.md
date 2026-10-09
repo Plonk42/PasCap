@@ -40,8 +40,8 @@ They are not Kelvin/HDR/automatic white balance. HSL/curves remain static. See
   covering other editor controls. Tab arrows and Home/End switch viewer contexts.
 - Right: scrollable **Clip / Track / Audio** inspector tabs
   with readable inputs and independent collapsible sections, split by ownership.
-  Clip ("Clip N of M · track") contains the selected clip's **Range**,
-  **Placement**, **Speed** and **Transform**; an empty video track shows one line instead.
+  Clip ("Clip N of M · track") contains the selected clip's **Speed**,
+  **Transform**, **Range** and **Placement**; an empty video track shows one line instead.
   Track ("Applies to all N clips on this track") contains Colour with the single
   track-owned Opacity control, Keyframes (the whole-keyframe list, enabled-setting chips,
   Animation help and keyframe navigation), Transitions and Fades;
@@ -173,19 +173,19 @@ Selecting a clip or track keeps the chosen tab; explicit Cut/Fade/Dissolve bound
 buttons open Track with that boundary expanded.
 **Expand all / Collapse all** is an icon button on the Inspector tab bar, shown only
 in Clip; it changes its four
-sections: **Range**, **Placement**, **Speed** and **Transform**, including
+sections: **Speed**, **Transform**, **Range** and **Placement**, including
 temporarily absent Clip sections. A mixed state offers Expand all. Individual toggles
 and the existing section preferences remain authoritative. Track and Audio
 sections, each keyframe's nested **Edit**, other nested details and help are unchanged.
 Bulk expansion is presentation-only and leaves mounted drafts, processing, history
 and saves unchanged. If preference storage fails, choices still work for the session.
-New preferences keep **Range**, **Placement**, **Speed** and **Transform** collapsed and Track sections open;
+New preferences keep **Speed**, **Transform**, **Range** and **Placement** collapsed and Track sections open;
 existing expansion preferences remain respected. Help/reset details are contextual,
 not repeated across the main workspace. Collapsing never disables processing.
 
 All inline help uses a small **question-mark button**, including animation, source,
 opacity, speed, Transform, colour, keyframe/transition/fade/audio timing and startup details.
-Inspector **Range**, **Placement**, **Speed**, **Transform**, **Colour**, Transition and Sequence
+Inspector **Speed**, **Transform**, **Range**, **Placement**, **Colour**, Transition and Sequence
 fades put help beside their titles, reachable even when collapsed. Expansion and
 help are independent native buttons in normal section → help → fields Tab order
 (an open help's **Learn more** link comes right after its button);
@@ -318,7 +318,7 @@ and **Ramp easing**, and unchanged interpolation.
 Its **Crop left / Crop right / Crop top / Crop bottom / Scale / Translate X /
 Translate Y / Rotation °** sliders and exact fields edit the saved base without
 keyframes. With keyframes, a keyed setting's main value requires that setting's keyframe at the actually displayed
-integer source frame at the real playhead; otherwise it is read-only, while unkeyed settings still edit their base. Each setting has its own diamond (**Keyframe Scale**, etc.) and Previous/Next; a diamond explicitly
+integer source frame at the real playhead; otherwise it is read-only, while unkeyed settings still edit their base. Each setting has its own blue triangle (**Keyframe Scale**, etc.) and Previous/Next; a triangle explicitly
 captures that setting's continuously evaluated value; sliders never create keyframes.
 Capture is unavailable outside the selected clip or during blocked/draft states.
 

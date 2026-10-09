@@ -42,11 +42,11 @@ export function ResetLabel({
 }
 
 /** Visible without hover: an animated value without a keyframe here is read-only until its diamond captures one. */
-export function LockedCue() {
+export function LockedCue({ glyph = '◇' }: Readonly<{ glyph?: string }>) {
   return (
     <small className="setting-locked-cue" aria-hidden="true">
       <Icon name="lock" size={11} />
-      Add a keyframe ◇ to edit
+      Add a keyframe {glyph} to edit
     </small>
   );
 }

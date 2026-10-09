@@ -94,7 +94,7 @@ track keyframes, source choices, media preparation, Activity and both export
 profiles retain their contracts. The editor targets desktop Linux; the 640 px
 width floor is not a mobile-support claim.
 
-**Clip → Transform** is the fourth Clip section, collapsed for new
+**Clip → Transform** is the second Clip section, collapsed for new
 preferences and included in Clip's bulk expansion. Native sliders/exact fields
 and per-setting source-frame diamonds retain explicit capture, read-only keyed
 main values without a keyframe at the real displayed source frame, release-only
