@@ -215,6 +215,13 @@ test('setting tooltips and accessible descriptions explain the editable keyframe
       }
       if (frame === 10) await expect(field).toBeEnabled();
       else await expect(field).toBeDisabled();
+      const cue =
+        role === 'slider'
+          ? page.locator('.colour-control').filter({ has: field }).locator('.setting-locked-cue')
+          : page.locator('.speed-settings > .setting-locked-cue');
+      if (frame === 10) await expect(cue).toHaveCount(0);
+      else await expect(cue).toHaveText('Add a keyframe ◇ to edit');
+      if (frame === 0) await expect(cue).toBeVisible();
       const main = diamond(page, label).locator('..');
       await expect(main).toHaveClass('keyframe-setting-navigation');
       await expect(main.getByRole('button')).toHaveCount(3);

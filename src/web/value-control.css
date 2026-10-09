@@ -93,6 +93,30 @@
   pointer-events: none;
 }
 
+/* A locked control reads as inert at a glance, not only through its tooltip. */
+.value-control:has(> input[type='range']:disabled) {
+  opacity: 0.45;
+}
+
+.value-control > input[type='range']:disabled {
+  cursor: not-allowed;
+}
+
+.setting-locked-cue {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  color: #edc886;
+  font-size: 11px;
+  font-weight: 400;
+  white-space: nowrap;
+}
+
+.speed-settings > .setting-locked-cue {
+  margin-top: 8px;
+}
+
 .value-rate-fields,
 .clip-speed-rate-field {
   display: grid;

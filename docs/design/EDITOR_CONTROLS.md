@@ -122,6 +122,9 @@ and technical paths stay unchanged; this glossary does not change schema 12.
   enabled), sharing the central off-duration inspection cursor with section
   navigation to track keyframes and track/list navigation. Main arrows and
   diamonds are hidden with Animate off; rendering and read-only constraints remain.
+  A read-only animated main value is visibly locked without hover: dimmed slider and
+  field plus a lock cue (**Add a keyframe ◇ to edit**, or **Turn Animate on to edit**
+  with Animate off). Interacting with it never creates a keyframe or edit.
   Double-clicking a setting's name resets only that setting; sections keep one
   Reset in their header (Colour, Speed, Transform) and HSL/curves name theirs
   **Reset red** / **Reset all**.

@@ -25,7 +25,7 @@ import { KeyframeToggle } from './KeyframeToggle.js';
 import { clipStartRestriction } from './layer-actions.js';
 import { NumberField } from './NumberField.js';
 import { settingPresentation } from './setting-scope.js';
-import { RangeSettingControl } from './SettingValueControl.js';
+import { LockedCue, RangeSettingControl } from './SettingValueControl.js';
 import { TransformSection } from './SpatialControls.js';
 import { SpeedControls } from './SpeedControls.js';
 import { planTimelineDrop } from './timeline-placement.js';
@@ -202,6 +202,7 @@ function OpacityControl({
         onCommit={commit}
         hint={hint}
         scope={<SettingScope keyed={state.keyed} scope={scope} />}
+        locked={state.keyed && !state.active && <LockedCue animate={Boolean(animate)} />}
         exact={{ resetKey: `${resetKey}:opacity:${state.keyed ? 'key' : 'layer'}` }}
         actions={
           animate && (
@@ -254,6 +255,7 @@ function ColourControl({
         onCommit={commit}
         hint={hint}
         scope={<SettingScope keyed={state.keyed} scope={scope} />}
+        locked={state.keyed && !state.active && <LockedCue animate={Boolean(animate)} />}
         exact={{ resetKey: `${resetKey}:${control.key}:${state.keyed ? 'key' : 'layer'}` }}
         actions={
           animate && (
