@@ -121,10 +121,10 @@ test('bulk Clip expansion preserves other tabs, mixed state and preferences with
   const headers = page.locator(
     '[id$="-clip-panel"] .inspector-section > .disclosure-heading > h3 > .disclosure-trigger',
   );
-  const collapse = page.getByRole('button', { name: 'Collapse all Inspector settings', exact: true });
+  const collapse = page.getByRole('button', { name: 'Collapse all Clip sections', exact: true });
   await collapse.focus();
   await collapse.press('Enter');
-  await expect(page.getByRole('button', { name: 'Expand all Inspector settings', exact: true })).toBeFocused();
+  await expect(page.getByRole('button', { name: 'Expand all Clip sections', exact: true })).toBeFocused();
   expect(
     await headers.evaluateAll((nodes) => nodes.every((node) => node.getAttribute('aria-expanded') === 'false')),
   ).toBe(true);
@@ -134,17 +134,17 @@ test('bulk Clip expansion preserves other tabs, mixed state and preferences with
     'true',
   );
   await page.getByRole('button', { name: 'Fades section', exact: true }).click();
-  await expect(page.getByRole('button', { name: /^(Expand|Collapse) all Inspector settings$/ })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Expand all Track sections', exact: true })).toBeVisible();
   await inspectorTab(page, 'Audio');
   await expect(page.getByRole('button', { name: 'Music section', exact: true })).toHaveAttribute(
     'aria-expanded',
     'true',
   );
   await page.getByRole('button', { name: 'Music section', exact: true }).click();
-  await expect(page.getByRole('button', { name: /^(Expand|Collapse) all Inspector settings$/ })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Expand all Audio sections', exact: true })).toBeVisible();
   await inspectorTab(page, 'Clip');
-  await expect(page.getByRole('button', { name: 'Expand all Inspector settings', exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Expand all Inspector settings', exact: true }).press('Space');
+  await expect(page.getByRole('button', { name: 'Expand all Clip sections', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Expand all Clip sections', exact: true }).press('Space');
   await expect(collapse).toBeFocused();
   expect(
     await headers.evaluateAll((nodes) => nodes.every((node) => node.getAttribute('aria-expanded') === 'true')),
@@ -157,7 +157,7 @@ test('bulk Clip expansion preserves other tabs, mixed state and preferences with
     ),
   ).toEqual(['open', 'open', 'open', 'open', 'open', 'open', 'closed', 'closed']);
   await page.getByRole('button', { name: 'Range section', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Expand all Inspector settings', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Expand all Clip sections', exact: true })).toBeVisible();
   await page.reload();
   await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
   await expect(page.getByRole('button', { name: 'Range section', exact: true })).toHaveAttribute(
@@ -171,6 +171,42 @@ test('bulk Clip expansion preserves other tabs, mixed state and preferences with
   expect(await current(page)).toEqual(before);
   expect(memory.saves).toBe(0);
   await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
+});
+
+test('Track and Audio bulk expansion change only their own sections', async ({ page }) => {
+  const before = await current(page);
+  const sections = (ids: string[]) =>
+    page.evaluate((list) => list.map((id) => localStorage.getItem(`pascap-section-${id}`)), ids);
+  const trackIds = ['colour', 'keyframes', 'transition', 'fades'];
+  const otherIds = ['speed', 'transform', 'source', 'layer-opacity', 'music'];
+  const others = await sections(otherIds);
+  await inspectorTab(page, 'Track');
+  const collapse = page.getByRole('button', { name: 'Collapse all Track sections', exact: true });
+  await collapse.focus();
+  await collapse.press('Enter');
+  await expect(page.getByRole('button', { name: 'Expand all Track sections', exact: true })).toBeFocused();
+  for (const title of ['Colour', 'Keyframes', 'Transitions', 'Fades'])
+    await expect(page.getByRole('button', { name: `${title} section`, exact: true })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    );
+  expect(await sections(trackIds)).toEqual(['closed', 'closed', 'closed', 'closed']);
+  expect(await sections(otherIds)).toEqual(others);
+  await page.getByRole('button', { name: 'Expand all Track sections', exact: true }).click();
+  expect(await sections(trackIds)).toEqual(['open', 'open', 'open', 'open']);
+  await inspectorTab(page, 'Audio');
+  await page.getByRole('button', { name: 'Collapse all Audio sections', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Music section', exact: true })).toHaveAttribute(
+    'aria-expanded',
+    'false',
+  );
+  await page.getByRole('button', { name: 'Expand all Audio sections', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Music section', exact: true })).toHaveAttribute(
+    'aria-expanded',
+    'true',
+  );
+  expect(await current(page)).toEqual(before);
+  expect(memory.saves).toBe(0);
 });
 
 test('bulk collapse retains invalid drafts, nested disclosure state and reachable heading help at the minimum viewport', async ({
@@ -187,7 +223,7 @@ test('bulk collapse retains invalid drafts, nested disclosure state and reachabl
   // Lists of three or fewer points open their Edit details initially.
   await expect(point.locator('..')).toHaveAttribute('open', '');
   await inspectorTab(page, 'Clip');
-  await page.getByRole('button', { name: 'Collapse all Inspector settings', exact: true }).click();
+  await page.getByRole('button', { name: 'Collapse all Clip sections', exact: true }).click();
   await expect(input).toBeAttached();
   await expect(input).toBeHidden();
   await expect(list).toBeAttached();
@@ -198,12 +234,12 @@ test('bulk collapse retains invalid drafts, nested disclosure state and reachabl
     'false',
   );
   await page.keyboard.press('Escape');
-  await page.getByRole('button', { name: 'Expand all Inspector settings', exact: true }).click();
+  await page.getByRole('button', { name: 'Expand all Clip sections', exact: true }).click();
   await expect(input).toHaveValue('0.5');
   await expect(input).toHaveAttribute('aria-invalid', 'true');
   await page.setViewportSize({ width: 1280, height: 720 });
   await expect(page.getByRole('complementary', { name: 'Clip inspector', exact: true })).toBeVisible();
-  const bulk = page.getByRole('button', { name: 'Collapse all Inspector settings', exact: true });
+  const bulk = page.getByRole('button', { name: 'Collapse all Clip sections', exact: true });
   await expect(bulk).toBeInViewport();
   expect((await bulk.boundingBox())!.height).toBeGreaterThanOrEqual(24);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
@@ -219,9 +255,9 @@ test('bulk Inspector choices still work when preference writes are denied', asyn
       throw new DOMException('Denied', 'SecurityError');
     };
   });
-  await page.getByRole('button', { name: 'Collapse all Inspector settings', exact: true }).click();
+  await page.getByRole('button', { name: 'Collapse all Clip sections', exact: true }).click();
   await expect(page.getByText('Section preferences cannot be saved in this browser.', { exact: false })).toBeVisible();
-  await page.getByRole('button', { name: 'Expand all Inspector settings', exact: true }).click();
+  await page.getByRole('button', { name: 'Expand all Clip sections', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Range section', exact: true })).toHaveAttribute(
     'aria-expanded',
     'true',

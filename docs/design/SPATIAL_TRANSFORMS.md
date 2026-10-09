@@ -159,7 +159,7 @@ two decoder/texture slots per video track (16 for eight), plus one source-review
 ## Clip → Transform controls
 
 **Transform** is the second Clip section (after Speed, before Range and Placement), collapsed for
-new preferences. **Expand all / Collapse all** includes **Speed**, **Transform**,
+new preferences. Clip's **Expand all / Collapse all** includes **Speed**, **Transform**,
 **Range** and **Placement**. Existing expansion preferences remain
 respected; **Transform animation** heading help is reachable while collapsed.
 An empty video track shows no Clip sections, only **Select a clip on … to edit it.**

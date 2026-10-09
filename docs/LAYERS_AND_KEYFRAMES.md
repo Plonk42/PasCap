@@ -500,8 +500,9 @@ Music belongs to Audio, with detailed **Placement & fades**.
 Sections retain their expansion in local browser storage.
 New defaults collapse **Speed**, **Transform**, **Range** and **Placement** controls, while Track
 sections stay open. Existing section preferences are not reset. **Expand all / Collapse all**
-appears only in Clip and affects its four sections: **Speed**,
-**Transform**, **Range** and **Placement**. Track, Audio, nested keyframe disclosures and
+affects only the visible tab's sections: Clip's **Speed**, **Transform**, **Range** and
+**Placement**; Track's **Colour**, **Keyframes**, **Transitions** and **Fades**; Audio's
+**Music**. Other tabs, nested keyframe disclosures and
 help remain unchanged; the shared list has no expansion preference.
 Hidden tab/section content stays mounted, retaining valid/invalid drafts within
 the same editing context. Track/clip changes refresh that context safely rather than

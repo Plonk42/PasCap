@@ -562,10 +562,10 @@ Trash icons delete; × closes or dismisses. Icon-only actions keep accessible na
 and tooltips. See the [editor control catalogue](design/EDITOR_CONTROLS.md#vocabulary) for
 control conventions and vocabulary.
 
-**Expand all / Collapse all** is an icon button on the Inspector tab bar, shown only
-in Clip; it controls its four
-sections: **Speed**, **Transform**, **Range** and **Placement**. Track,
-Audio, nested disclosures and help remain unchanged.
+**Expand all / Collapse all** is an icon button on the Inspector tab bar for the
+visible tab: Clip's **Speed**, **Transform**, **Range** and **Placement**; Track's
+**Colour**, **Keyframes**, **Transitions** and **Fades**; Audio's **Music**. Other
+tabs, nested disclosures and help remain unchanged.
 
 The header directly exposes keyboard help. **Workspace options** holds the
 **Media panel / Clip panel** toggles, Reset layout and Diagnostics.

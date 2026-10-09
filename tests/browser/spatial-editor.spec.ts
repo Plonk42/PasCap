@@ -491,7 +491,7 @@ test('bulk expansion includes Transform while heading help and tab navigation re
   page,
 }) => {
   const before = await current(page);
-  await page.getByRole('button', { name: 'Collapse all Inspector settings', exact: true }).click();
+  await page.getByRole('button', { name: 'Collapse all Clip sections', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Transform section', exact: true })).toHaveAttribute(
     'aria-expanded',
     'false',
@@ -504,7 +504,7 @@ test('bulk expansion includes Transform while heading help and tab navigation re
     'aria-expanded',
     'false',
   );
-  await page.getByRole('button', { name: 'Expand all Inspector settings', exact: true }).click();
+  await page.getByRole('button', { name: 'Expand all Clip sections', exact: true }).click();
   await expect(exact(page, 'Scale')).toBeVisible();
   await page.getByRole('tab', { name: 'Clip', exact: true }).focus();
   await page.keyboard.press('ArrowRight');

@@ -690,7 +690,13 @@ export function Inspector({
           id={inspectorId}
           section={section}
           onSection={onSection}
-          trailing={<InspectorExpansionControls expansion={expansion} hidden={section !== 'clip' || !placed} />}
+          trailing={
+            <InspectorExpansionControls
+              expansion={expansion}
+              tab={section}
+              hidden={(section === 'clip' && !placed) || (section === 'track' && !layer)}
+            />
+          }
         />
         <div
           role="tabpanel"
