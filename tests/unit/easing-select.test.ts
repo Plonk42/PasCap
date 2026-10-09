@@ -30,13 +30,13 @@ describe('easing selection graphs', () => {
       createElement(EasingSelect, {
         value: 'ease-in',
         onChange: vi.fn(),
-        'aria-label': 'Shared easing',
+        'aria-label': 'Track keyframe easing 10',
         'aria-describedby': 'timing-help',
       }),
     );
     expect(markup.match(/<select/g)).toHaveLength(1);
     expect(markup.match(/<option/g)).toHaveLength(5);
-    expect(markup).toContain('aria-label="Shared easing"');
+    expect(markup).toContain('aria-label="Track keyframe easing 10"');
     expect(markup).toMatch(/aria-describedby="timing-help [^"]+"/);
     expect(markup).toContain('aria-hidden="true" focusable="false"');
     expect(markup).toContain('Start slowly, then change faster.');

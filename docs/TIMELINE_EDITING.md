@@ -328,12 +328,22 @@ value for Opacity, track colour for colour, and individual clip speed for Speed.
 
 The selected video track, including an empty one, has one **Track → Keyframes** section
 (list accessible name **Track keyframes**) with its directly visible shared keyframe list. Clip keeps
-the playhead Speed and Transform controls; Track keeps Colour and Opacity. Every setting has a clickable hollow/inactive or filled/active diamond with
+the playhead Speed and Transform controls; Track keeps Colour and Opacity.
+Colour, Speed and Transform each have a native **Animate** toggle, a separate
+presentation-only browser-local preference. Without a stored choice, unanimated
+sections start off and existing keyframes start on. Turning it off retains all keyframes,
+rendering, read-only constraints and history without a project save or Undo step;
+no schema or data changes result. Main scalar Colour/Opacity and track Speed
+diamonds and adjacent per-setting **Previous/Next** buttons appear only when their
+section's Animate is on; Animate off hides both while retaining rendering and
+read-only constraints. Each diamond is clickable hollow/inactive or filled/active with
 `aria-pressed`; inactive is not HTML-disabled. Toggling affects only that channel;
 the first enabled setting creates/last removes the keyframe. Animated values are read-only
 between keyframes with that setting enabled until explicitly captured with the diamond; no slider
 creates implicit keyframes. Keyframes shows dependencies and an inner **Edit**
-disclosure. Moving its Timeline frame moves all enabled settings and the existing easing
+disclosure. All visible easing selectors read **Easing**, including track,
+Transform, clip speed and ramp, retaining contextual accessible names and
+interpolation. Moving its Timeline frame moves all enabled settings and the existing easing
 in one Undo step, with collision and contextual timing validation. List input
 identity/focus and expansion survive a single-keyframe move and Undo.
 
@@ -368,17 +378,45 @@ duration and stays list-editable, but does not extend the sequence merely for th
 keyframe. Moving it copies/shifts no other keyframes, track values, clip settings/source ranges or music;
 keyed Speed settings may naturally recompile contextual clip durations.
 
+### Clip source-keyframe markers
+
+Inside each timeline clip rectangle, Transform keyframes use a pale-blue **◆** lane
+and custom-speed keyframes a separate salmon/dashed **◆** lane. Marker output positions
+come from authoritative `PlacedClip.retiming`, including track Speed overrides.
+Off-trim keyframes are omitted; exclusive OUT has a boundary marker that seeks the
+final available frame. Speed override is indicated and retains the clip keyframes.
+Click, Enter or Space selects the clip and seeks the nearest mapped image without
+editing, history, save or dragging; keyboard handling is isolated from timeline
+shortcuts. These are not the draggable shared project-time track markers above.
+
 ### Channel navigation and off-duration inspection
 
-All eleven setting diamonds are immediately followed by native SVG **Previous/Next**
-buttons, before any existing reset. They remain visible but disabled without the
-relevant neighbour, an opened project, or during any document-preview draft. They seek
+With Animate on, each section header has one native **Previous/Next** pair.
+Colour visits the union of Opacity and nine scalar keyframes, skipping speed-only
+keyframes. Speed visits track Speed keyframes plus all retained custom speed source
+keyframes of the selected clip, including off-trim keyframes and original exclusive
+OUT, previewing the nearest mapped image through authoritative retiming. Track
+Speed overrides but retains clip keyframes and their navigation. Transform likewise
+visits all retained full-pose source keyframes, including off-trim/original OUT.
+Speed and Transform each keep an independent clip-local stored-source cursor,
+separate from track inspection, so successive keyframes remain reachable when
+several preview the same first/last image. Stored time never replaces the real
+displayed project/source frame for main values or capture. Timeline source markers
+still omit off-trim keyframes and retain the exclusive-OUT boundary marker.
+
+Per-channel native **Previous/Next** arrows remain beside each main diamond when
+Animate is on, because not every setting is enabled at every shared keyframe.
+Enabled setting chips in stored Keyframes rows retain their arrows too.
+All these per-channel arrows are disabled without the relevant neighbour, an opened
+project, or during any document-preview draft. They seek
 strictly earlier/later keyframes where that channel is not `null` (zero included),
 skipping unrelated enabled settings. **Track → Colour** contains the single **Opacity**
-slider/exact `NumberField`/diamond/navigation alongside the colour controls.
+slider/exact `NumberField` alongside the colour controls, its Animate-on diamond
+and adjacent per-setting arrows.
 Main and stored sliders/exact fields use **0–100%**, neutral **100%**.
 Required track `opacity` and keyframe values remain **0–1**; UI conversion changes no schema.
-Its buttons visit keyframes with `opacity` enabled, with no sidebar duplicate.
+Its main and stored-chip arrows visit keyframes with `opacity` enabled; the Colour header
+visits the colour/Opacity union, with no sidebar duplicate.
 Without Opacity keyframes, either value control edits track `opacity` and works on an empty track.
 With keyframes, a setting not enabled at the real playhead stays read-only until its
 diamond captures it; sliders never create implicit keyframes. Unkeyed colour remains
@@ -386,8 +424,10 @@ track-owned with or without keyframes. Opacity affects composition coverage, not
 **Clip → Placement** contains placement only. Track options remains limited to
 rename, Ripple, ordering and deletion, with visibility separate.
 
-Setting buttons, track navigation and list time buttons share a central **editor-only
-stored-keyframe inspection cursor**. It advances through several off-duration keyframes
+Main per-setting arrows, stored-setting chip arrows, section navigation to track
+keyframes, track navigation and list time buttons share a central
+**editor-only stored-keyframe inspection cursor**.
+It advances through several off-duration keyframes
 instead of repeatedly choosing the same keyframe from a clamped playhead. Preview
 uses the nearest available project frame, black in a music-only region, or no
 preview without video or music duration; labels

@@ -486,14 +486,53 @@ Video closing fades remain inside their last clips. The static export path must
 cover the full project; music tails use composited export. Export still requires a video clip.
 See [the multiple-music contract](design/MULTIPLE_MUSIC.md).
 
-The single **Opacity** slider/exact-field/diamond/navigation belongs in **Track → Colour**
-alongside the colour sliders and works on an empty track. Main and stored sliders/
+The single **Opacity** slider/exact field belongs in **Track → Colour** alongside
+the colour sliders and works on an empty track. Its diamond appears when Animate
+is on, with adjacent per-setting Previous/Next buttons; stored enabled-setting
+chip arrows remain available too. Main and stored sliders/
 exact fields use **0–100%**, neutral **100%**; convert only at the UI boundary,
 keeping required `VideoLayer.opacity` and `opacity` keyframes **0–1** with no schema change.
 Without Opacity keyframes, it edits track `opacity`; with keyframes, only an enabled setting at the
 real playhead permits editing, with the diamond explicitly capturing a missing
 setting. Sliders never create keyframes. **Placement** contains placement only;
 Track options contains rename, Ripple, ordering and deletion, with visibility separate.
+
+Colour, Speed and Transform each have a native **Animate** section toggle, stored
+only as a separate browser-local preference. With no stored choice, unanimated
+sections start off and existing keyframes start on. Turning it off retains all keyframes,
+rendering, read-only constraints and history without a project save or Undo step;
+there is no schema or data change. Main scalar Colour/Opacity and track Speed
+diamonds and adjacent per-setting Previous/Next buttons are visible only with
+Animate on. These buttons remain alongside the stored enabled-setting chip arrows
+because not every setting is enabled at every shared keyframe.
+Each Animate-on header has one Previous/Next pair: Colour visits the union of
+Opacity and nine scalar keyframes, skipping speed-only keyframes; Speed visits track
+Speed keyframes plus all retained custom speed source keyframes of the selected
+clip, including off-trim keyframes and original exclusive OUT, previewing the
+nearest mapped image through authoritative retiming. Track Speed overrides but
+retains clip keyframes and their navigation. Transform likewise visits all retained
+full-pose source keyframes, including off-trim/original OUT. Speed and Transform
+each use a clip-local stored-source cursor independent of central track inspection,
+so successive stored keyframes remain reachable even when their nearest first/last
+preview image is the same. Stored source time stays distinct from actual preview.
+Enabled setting chips in stored Keyframes rows carry per-channel native arrows
+too. All main and stored per-channel arrows visit strictly earlier/later keyframes
+where that channel is nonnull (zero is enabled), sharing the central off-duration
+inspection cursor with section navigation to track keyframes and track/list
+navigation. Main capture always uses the real displayed project/source frame,
+never an inspected stored time. All visible
+track/Transform/clip-speed/ramp easing labels read **Easing**, retaining contextual
+accessible names such as **Track keyframe easing N** and **Ramp easing**.
+
+Inside timeline clip rectangles, pale-blue **◆** Transform and salmon/dashed **◆**
+custom-speed lanes place source keyframes at authoritative retimed output positions,
+including track Speed overrides, indicated without deleting clip keyframes.
+Off-trim keyframes are omitted; exclusive OUT has a boundary marker seeking the final
+available frame. Click, Enter or Space selects the clip and seeks its nearest
+mapped image without editing, history, save or dragging; marker keyboard events
+are isolated from timeline shortcuts. Shared track markers retain their separate
+project-time editing behavior. These presentation changes leave math, storage,
+retiming algorithms and resource bounds unchanged.
 
 **Clip → Range** uses one full-original hatched bar with IN/OUT handles and exact
 text fields below its ends, displaying 30 fps NDF **HH:MM:SS:FF** and accepting

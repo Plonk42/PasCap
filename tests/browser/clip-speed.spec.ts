@@ -187,9 +187,27 @@ test('point click, source-boundary navigation and Add/Delete are explicit and re
   await seek(page, 10);
   await point(page, 60).click();
   await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(60);
-  await page.getByRole('button', { name: 'Next clip speed keyframe', exact: true }).click();
+  const main = page.locator('.keyframe-setting-navigation').filter({
+    has: page.getByRole('button', { name: 'Keyframe Speed', exact: true }),
+  });
+  await expect(main.getByRole('button')).toHaveCount(3);
+  // Main arrows visit track Speed only; clip-source keys belong to the section union.
+  for (const direction of ['Previous', 'Next'] as const) {
+    const arrow = main.getByRole('button', { name: `${direction} Speed keyframe`, exact: true });
+    await expect(arrow).toBeVisible();
+    await expect(arrow).toBeDisabled();
+    await expect(arrow).toHaveAttribute('aria-disabled', 'true');
+    await expect(arrow).toHaveAttribute('tabindex', '-1');
+    await expect(arrow).toHaveJSProperty('disabled', false);
+    await arrow.evaluate((element) => (element as HTMLButtonElement).click());
+  }
+  await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(60);
+  const next = page
+    .locator('.section-animation-controls')
+    .getByRole('button', { name: 'Next Speed keyframe', exact: true });
+  await next.click();
   await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(90);
-  await page.getByRole('button', { name: 'Next clip speed keyframe', exact: true }).click();
+  await next.click();
   await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(119);
   await expect(page.getByRole('spinbutton', { name: 'Clip speed keyframe source frame' })).toHaveValue('120');
   await expect(page.locator('.clip-speed-outside')).toContainText('nearest available');
@@ -231,6 +249,15 @@ test('native graph dragging previews live but commits only on release as one Und
   expect(memory.saves).toBe(0);
   await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
   await expect(page.getByRole('button', { name: 'Keyframe Speed', exact: true })).toBeDisabled();
+  const main = page.locator('.keyframe-setting-navigation').filter({
+    has: page.getByRole('button', { name: 'Keyframe Speed', exact: true }),
+  });
+  for (const direction of ['Previous', 'Next'] as const) {
+    const arrow = main.getByRole('button', { name: `${direction} Speed keyframe`, exact: true });
+    await expect(arrow).toBeDisabled();
+    await expect(arrow).toHaveAttribute('aria-disabled', 'true');
+    await expect(arrow).toHaveAttribute('tabindex', '-1');
+  }
   await expect(page.getByRole('button', { name: 'Split at playhead', exact: true })).toBeDisabled();
   await page.mouse.up();
   await expect(point(page, 70)).toBeFocused();

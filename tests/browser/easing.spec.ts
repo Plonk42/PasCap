@@ -77,9 +77,9 @@ for (const context of ['shared', 'ramp', 'clip'] as const) {
     else await inspectorTab(page, 'Clip');
     const label =
       context === 'shared'
-        ? 'Track keyframe interpolation 10'
+        ? 'Track keyframe easing 10'
         : context === 'ramp'
-          ? 'Ramp curve'
+          ? 'Ramp easing'
           : 'Clip speed keyframe easing';
     const select = page.getByRole('combobox', { name: label, exact: true });
     const choice = select.locator('..');

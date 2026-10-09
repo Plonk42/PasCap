@@ -48,7 +48,9 @@ and technical paths stay unchanged; this glossary does not change schema 12.
 - **Keyframe**: a stored animation value at a frame. Shared track keyframes contain
   **enabled settings**; clip speed and Transform keyframes use original-source frames.
   Use the full word in labels and help. Static colour curves instead have **control nodes**,
-  not animation keyframes.
+  not animation keyframes. Technical math, internal identifiers and persisted fields
+  may retain precise terms such as anchor, participant and `interpolation`; do not
+  use them as user-facing synonyms for keyframe, enabled setting or Easing.
 - **Range**: the selected IN/OUT portion of a recording, whether reviewed or used by
   a clip. Qualify its context when necessary, without introducing another object name.
   Do not use rush, excerpt, row, layer, point or participant as object synonyms.
@@ -60,9 +62,21 @@ and technical paths stay unchanged; this glossary does not change schema 12.
 - **Temperature / Tint** are track-owned normalized −1…1 scalar Colour controls,
   neutral 0: positive Temperature warms, positive Tint adds magenta. They precede
   Exposure, are independently animatable and work on empty tracks, with the standard
-  slider/exact-field/reset/diamond/navigation pattern. No Kelvin or AWB label.
+  slider/exact-field/reset pattern, capture diamonds when Colour Animate is on,
+  adjacent per-setting Previous/Next buttons, section navigation and stored-setting
+  chip arrows. No Kelvin or AWB label.
 - **Transform** is clip-owned crop, Scale, Translate X/Y and Rotation; its single
   diamond captures the full eight-value source-frame pose, not an enabled track setting.
+- **Animate**: a native presentation toggle in Colour, Speed and Transform,
+  accessible as **Animate Colour**, **Animate Speed** and **Animate Transform**.
+  Each section has its own browser-local preference. With no stored choice, an
+  unanimated section starts off and a section with existing keyframes starts on.
+  Turning it off hides main diamonds and their adjacent per-setting arrows while
+  retaining all keyframes, rendering, read-only constraints and history;
+  it creates no project save or Undo step and changes no schema or stored data.
+- **Easing**: the visible label for track-keyframe, Transform, custom clip-speed
+  and ramp selectors. Contextual accessible names remain, including
+  **Track keyframe easing N** and **Ramp easing**; interpolation is unchanged.
 
 ## Control patterns
 
@@ -86,10 +100,30 @@ and technical paths stay unchanged; this glossary does not change schema 12.
 - Other frames/durations/fades: native numeric stepper, explicit frame units and existing
   timecode feedback. No clamping, rounding or hidden timing repair.
 - Easing/modes/recordings: native select; selected easing has its existing graph.
-- Boolean settings: native checkbox. Enabling a shared track keyframe setting: diamond with
-  `aria-pressed`, followed by Previous/Next. Double-clicking a setting's name resets
-  only that setting; sections keep one Reset in their header (Colour, Speed,
-  Transform) and HSL/curves name theirs **Reset red** / **Reset all**.
+- Boolean settings: native checkbox. Animate uses a native toggle button with
+  `aria-pressed`. When Animate is on, main scalar
+  Colour/Opacity and track Speed controls expose a capture diamond with
+  `aria-pressed` and adjacent per-setting **Previous/Next** buttons, since a shared
+  keyframe need not enable every setting. Colour's single header
+  Previous/Next pair visits the union of Opacity and nine scalar keyframes, skipping
+  speed-only keyframes. Speed's pair visits track Speed keyframes plus all retained
+  custom speed source keyframes of the selected clip, including off-trim keyframes
+  and original exclusive OUT, previewing the nearest mapped image through
+  authoritative retiming even under the indicated track Speed override.
+  Transform's pair likewise visits all retained full-pose source keyframes,
+  including off-trim/original OUT. Speed and Transform each keep a clip-local
+  stored-source cursor independent of central track inspection; successive stored
+  keyframes remain reachable even when their first/last preview image is the same.
+  Main capture always uses the real displayed project/source frame,
+  never the inspected stored time. Enabled setting chips in stored Keyframes rows
+  retain their per-channel native arrows. All main and stored per-channel arrows
+  visit strictly earlier/later keyframes where that channel is nonnull (zero is
+  enabled), sharing the central off-duration inspection cursor with section
+  navigation to track keyframes and track/list navigation. Main arrows and
+  diamonds are hidden with Animate off; rendering and read-only constraints remain.
+  Double-clicking a setting's name resets only that setting; sections keep one
+  Reset in their header (Colour, Speed, Transform) and HSL/curves name theirs
+  **Reset red** / **Reset all**.
 - Tabs: native buttons with one selected appearance and existing arrow/Home/End
   behavior. Disclosures keep mounted drafts; options use the existing Popover.
 - Buttons: primary for the main confirmed action, secondary for supporting actions,
@@ -112,14 +146,23 @@ in Expand all/Collapse all. **Transform animation** heading help remains reachab
 while collapsed. **Crop left/right/top/bottom / Scale / Translate X/Y / Rotation °**
 pair native sliders with exact fields. Main values edit the base without keyframes,
 or an existing full-pose keyframe at the real displayed source frame; animated values
-without that keyframe stay read-only until diamond capture. Stored **Source frame /
-To next keyframe** and pose fields target the selected keyframe; **Previous/Next**, the
-selector and **Preview stored keyframe** seek the closest mapped image, with separate
+without that keyframe stay read-only until diamond capture, even with Animate off.
+With Animate on, the full-pose diamond and single header **Previous/Next** pair are
+available. Stored **Source frame / Easing** and pose fields target the selected
+keyframe; the selector and **Preview stored keyframe** seek the closest mapped image, with separate
 stored/actual source labels. Trash removes one full-pose keyframe, revealing the saved
 base after the last deletion; **Reset transform** clears all keyframes and restores
 the neutral base. There is no graph/canvas gizmo or per-property diamond. Exact
 invalid drafts and release-only sliders follow the common validation/cancellation
 pattern. See [SPATIAL_TRANSFORMS.md](SPATIAL_TRANSFORMS.md).
+
+Inside each timeline clip rectangle, pale-blue **◆** Transform and salmon/dashed
+**◆** custom-speed lanes show source keyframes at authoritative retimed output positions.
+Off-trim keyframes are omitted; exclusive OUT has a boundary marker that seeks the
+final available frame. Click, Enter or Space selects the clip and seeks its nearest
+mapped image without editing, history, save or dragging. Speed override is indicated;
+marker keyboard handling is isolated from timeline shortcuts. These are distinct
+from draggable shared project-time track markers.
 
 Audio keeps **Music track / Recording / Add music track / Delete selected music
 track** with native selects/buttons, contextual disabled reasons (no ready source,

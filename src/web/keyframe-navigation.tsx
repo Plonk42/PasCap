@@ -108,6 +108,9 @@ export interface KeyframeNavigation {
   inspection: KeyframeInspection | null;
   duration: number;
   disabled: boolean;
+  playing?: boolean;
+  sourceEpoch?: number;
+  onSeekSourceKeyframe?: (frame: number) => void;
   onSeekKeyframe: (layerId: string, frame: number) => void;
   onFollowPlayhead: () => void;
 }

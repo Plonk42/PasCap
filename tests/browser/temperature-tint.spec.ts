@@ -111,7 +111,15 @@ function diamond(page: Page, label: string): Locator {
 }
 
 function navigation(page: Page, label: string, direction: 'Previous' | 'Next'): Locator {
-  return page.getByRole('button', { name: `${direction} ${label} keyframe`, exact: true });
+  return diamond(page, label)
+    .locator('..')
+    .getByRole('button', { name: `${direction} ${label} keyframe`, exact: true });
+}
+
+async function enableColourAnimation(page: Page): Promise<void> {
+  const toggle = page.getByRole('button', { name: 'Animate Colour', exact: true });
+  if ((await toggle.getAttribute('aria-pressed')) === 'false') await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-pressed', 'true');
 }
 
 async function previewAt(page: Page, frame: number): Promise<void> {
@@ -250,6 +258,7 @@ test('empty-row native controls preserve exact precision, invalid drafts, indivi
   await expect(page.locator('[role="tabpanel"]:not([hidden]) .selected-clip-name')).toContainText(
     'Applies to every clip added to this track',
   );
+  await enableColourAnimation(page);
   for (const { setting, label, precise } of channels) {
     const { slider, exact, widget } = controls(page, label);
     await expect(slider).toBeEnabled();
@@ -264,12 +273,20 @@ test('empty-row native controls preserve exact precision, invalid drafts, indivi
     await expect(widget.locator('output')).toHaveCount(0);
     await expect(diamond(page, label)).toBeEnabled();
     await expect(diamond(page, label)).toHaveAttribute('aria-pressed', 'false');
+    const main = diamond(page, label).locator('..');
+    await expect(main).toHaveClass(/\bkeyframe-setting-navigation\b/);
+    await expect(main).toHaveJSProperty('tagName', 'SPAN');
+    await expect(main.getByRole('button')).toHaveCount(3);
+    for (const button of await main.getByRole('button').all())
+      await expect(button).toHaveJSProperty('tagName', 'BUTTON');
     const neutralState = await checkpoint(page);
     await resetSetting(page, label);
     await unchanged(page, neutralState);
     for (const direction of ['Previous', 'Next'] as const) {
       await expect(navigation(page, label, direction)).toBeVisible();
-      await expect(navigation(page, label, direction)).toBeDisabled();
+      await expect(navigation(page, label, direction)).toHaveAttribute('aria-disabled', 'true');
+      await expect(navigation(page, label, direction)).toHaveJSProperty('disabled', false);
+      await expect(navigation(page, label, direction)).toHaveAttribute('tabindex', '-1');
     }
     const before = await checkpoint(page);
     await exact.fill(String(precise));
@@ -402,6 +419,7 @@ test('animated missing participants stay read-only until explicit capture; remov
     sharedPoint(30, { temperature: 0.5 }),
   ];
   await fixture(page, document);
+  await enableColourAnimation(page);
   expect(document.schemaVersion).toBe(12);
   expect(Object.keys(document.layers[0]!.keyframes[0]!.values)).toHaveLength(11);
   await seek(page, 20);
@@ -541,6 +559,7 @@ test('channel navigation skips unrelated keys and shares an off-duration cursor 
     sharedPoint(260, { temperature: 0.9 }),
   ];
   await fixture(page, document);
+  await enableColourAnimation(page);
   const before = await checkpoint(page);
   const next = navigation(page, 'Temperature', 'Next');
   const previous = navigation(page, 'Temperature', 'Previous');
@@ -581,11 +600,20 @@ test('channel navigation skips unrelated keys and shares an off-duration cursor 
     );
     await inspectorTab(page, 'Clip');
   }
-  // Keep a later participant while asserting retained native focus. Once the
-  // terminal action becomes HTML-disabled it necessarily leaves the Tab order.
+  // Terminal arrows remain native buttons: aria-disabled guards activation
+  // and removes them from Tab order without discarding the activated focus.
   await next.press('Enter');
   await previewAt(page, 119);
-  await expect(next).toBeDisabled();
+  await expect(next).toBeFocused();
+  await expect(next).toHaveAttribute('aria-disabled', 'true');
+  await expect(next).toHaveJSProperty('disabled', false);
+  await expect(next).toHaveAttribute('tabindex', '-1');
+  for (const activation of ['Enter', 'Space']) {
+    await next.press(activation);
+    await expect(next).toBeFocused();
+    await previewAt(page, 119);
+    await expect(keys.locator('.keyframe-row[aria-current="true"]')).toHaveAttribute('data-keyframe-frame', '260');
+  }
   await previous.press('Space');
   await inspectorTab(page, 'Track keyframes');
   await expect(keys.locator('.layer-keyframe-inspected')).toContainText('Stored keyframe · timeline frame 240');
@@ -598,11 +626,17 @@ test('channel navigation skips unrelated keys and shares an off-duration cursor 
   for (const frame of [190, 250]) {
     await tintNext.press('Space');
     await previewAt(page, 119);
+    await expect(tintNext).toBeFocused();
     await inspectorTab(page, 'Track keyframes');
     await expect(keys.locator('.layer-keyframe-inspected')).toContainText(`Stored keyframe · timeline frame ${frame}`);
     await inspectorTab(page, 'Clip');
   }
-  await expect(tintNext).toBeDisabled();
+  await expect(tintNext).toHaveAttribute('aria-disabled', 'true');
+  await expect(tintNext).toHaveJSProperty('disabled', false);
+  await expect(tintNext).toHaveAttribute('tabindex', '-1');
+  await tintNext.press('Enter');
+  await expect(tintNext).toBeFocused();
+  await expect(keys.locator('.keyframe-row[aria-current="true"]')).toHaveAttribute('data-keyframe-frame', '250');
   for (const frame of [190, 140, 50, 20]) {
     await navigation(page, 'Tint', 'Previous').click();
     await previewAt(page, Math.min(frame, 119));
@@ -611,7 +645,14 @@ test('channel navigation skips unrelated keys and shares an off-duration cursor 
       await expect(diamond(page, 'Tint')).toHaveAttribute('aria-pressed', 'true');
     }
   }
-  await expect(navigation(page, 'Tint', 'Previous')).toBeDisabled();
+  const tintPrevious = navigation(page, 'Tint', 'Previous');
+  await expect(tintPrevious).toBeFocused();
+  await expect(tintPrevious).toHaveAttribute('aria-disabled', 'true');
+  await expect(tintPrevious).toHaveJSProperty('disabled', false);
+  await expect(tintPrevious).toHaveAttribute('tabindex', '-1');
+  await tintPrevious.press('Space');
+  await expect(tintPrevious).toBeFocused();
+  await previewAt(page, 20);
   await page.evaluate(() => window.pascapLab!.flush());
   expect(await current(page)).toEqual(before.document);
   expect(memory.snapshot()).toEqual(before.saved);

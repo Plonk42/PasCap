@@ -192,7 +192,7 @@ test('the shared list labels time/value/easing, retains reordered input focus, a
   await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(20);
   const row = await editLayerPoint(page, 'Video track 1', 20);
   await expect(keys.getByRole('list')).toHaveAccessibleName('Edit track keyframes');
-  await expect(row.locator('.layer-keyframe-dependencies')).toHaveText('Opacity · Exposure');
+  await expect(row.locator('.layer-keyframe-dependencies .layer-keyframe-chip')).toHaveText(['Opacity', 'Exposure']);
   const draft = row.getByRole('spinbutton', { name: 'Opacity keyframe value 20', exact: true });
   await draft.fill('40');
   expect((await currentProject(page)).layers[0]?.keyframes[0]?.values.opacity).toBe(0.2);
@@ -281,6 +281,31 @@ test('row-speed navigation reaches project points and previews outside-duration 
   await expect(keys.locator('.keyframe-row-skipped')).toHaveCount(1);
   await keys.getByRole('button', { name: 'Previous track keyframe', exact: true }).click();
   await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(40);
+  await inspectorTab(page, 'Clip');
+  const main = page.locator('.keyframe-setting-navigation').filter({
+    has: page.getByRole('button', { name: 'Keyframe Speed', exact: true }),
+  });
+  await expect(main.getByRole('button')).toHaveCount(3);
+  const previous = main.getByRole('button', { name: 'Previous Speed keyframe', exact: true });
+  const next = main.getByRole('button', { name: 'Next Speed keyframe', exact: true });
+  await expect(previous).toHaveAttribute('title', 'Go to timeline frame 35.');
+  await expect(next).toHaveAttribute(
+    'title',
+    `Stored timeline frame 110; preview the nearest available frame ${calculateLayout(document).duration - 1}. The keyframe stays in place.`,
+  );
+  await next.focus();
+  await next.press('Enter');
+  await expect
+    .poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame))
+    .toBe(calculateLayout(document).duration - 1);
+  await expect(next).toBeFocused();
+  await expect(next).toHaveAttribute('aria-disabled', 'true');
+  await expect(next).toHaveAttribute('tabindex', '-1');
+  await expect(previous).toHaveAttribute('title', 'Go to timeline frame 40.');
+  await previous.press('Space');
+  await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(40);
+  await expect(previous).toBeFocused();
+  expect(await currentProject(page)).toEqual(document);
   const row = await editLayerPoint(page, 'Video track 1', 35);
   const value = row.getByRole('spinbutton', { name: 'Speed keyframe value 35', exact: true });
   await value.fill('3');
@@ -322,7 +347,7 @@ test('speed/ramp numbers commit explicitly and reset to 1× changes only speed i
   await page.getByRole('combobox', { name: 'Speed mode', exact: true }).selectOption('ramp-up');
   await commitNumber(page, 'Ramp start rate', '0.7');
   await commitNumber(page, 'Ramp end rate', '1.6');
-  await page.getByRole('combobox', { name: 'Ramp curve', exact: true }).selectOption('ease-out');
+  await page.getByRole('combobox', { name: 'Ramp easing', exact: true }).selectOption('ease-out');
   const ramp = (await currentProject(page)).clips[0]!.speed;
   expect(ramp).toEqual({ mode: 'ramp', startRate: 0.7, endRate: 1.6, curve: 'ease-out', anchorIn: 15, anchorOut: 105 });
   await page.getByRole('button', { name: 'Reset speed to 1×', exact: true }).click();

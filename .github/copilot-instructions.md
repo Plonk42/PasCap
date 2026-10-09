@@ -62,6 +62,11 @@ PasCap is a solo, pre-release project: optimize for fast iteration. Details are 
   expected, accessible native controls, visual feedback over explanatory text.
   Preserve keyboard/focus behaviour and one Undo step per completed gesture;
   invalid edits never silently clamp, merge or overwrite.
+- User-facing animation text uses **Keyframe**, **enabled setting** and **Easing**,
+  following [the editor control catalogue](../docs/design/EDITOR_CONTROLS.md).
+  Keep contextual accessible names and technical/internal math terms such as
+  anchor, participant and `interpolation` where needed; do not rename saved fields
+  or internal identifiers merely to match visible labels.
 - Until the first release candidate, approved changes may break saved projects and
   persisted formats. Keep one strict current contract: no migrations, legacy fields,
   compatibility defaults or old-format readers unless requested. Reject
@@ -72,12 +77,33 @@ PasCap is a solo, pre-release project: optimize for fast iteration. Details are 
 
 - Shared integer-frame layout/retiming (`PlacedClip.retiming`) is authoritative for
   UI, preview and native export. Per-frame rendering stays outside React.
+- Section Animate is presentation-only and browser-local. Main capture diamonds
+  and adjacent per-setting Previous/Next buttons appear only with Animate on;
+  turning it off hides both while retaining keyframes, rendering and constraints.
+  Keep these main buttons because not every setting is enabled at every shared
+  keyframe, alongside the existing stored enabled-setting chip arrows. All
+  per-channel arrows visit strictly earlier/later keyframes where that channel is
+  nonnull (zero is enabled), sharing the central off-duration inspection cursor.
+  Each Animate-on header retains one Previous/Next pair: Colour visits Opacity/nine scalar
+  colour keyframes; Speed visits track Speed keyframes and **all retained custom
+  speed source keyframes of the selected clip**, including off-trim keyframes and
+  original exclusive OUT, even under a track Speed override. Clip source navigation
+  previews the nearest image mapped by authoritative retiming, using an independent
+  clip-local stored-source cursor, not central track inspection or a clamped
+  playhead as stored time. Transform likewise visits all retained full-pose source
+  keyframes with its own clip-local cursor. Successive stored keyframes remain
+  reachable when previews coincide; main values/capture always use the real
+  displayed project/source frame. Timeline source markers still omit off-trim
+  keyframes; exclusive OUT has a boundary marker seeking the last available image.
+  Navigation never edits,
+  saves or creates history. See [speed/audio](../docs/SPEED_AND_AUDIO.md) and
+  [spatial transforms](../docs/design/SPATIAL_TRANSFORMS.md).
 - Strict schema 12 requires complete row Colour with nine scalar fields plus
   `colour.hsl` (eight complete named bands) and `colour.curves` (master/red/green/blue
   2–16-point arrays). HSL/curves remain static, not animation channels. All Colour
   is row-owned, keyed or not; clips have no colour/correction. Neutral creators
   deep-clone nested structures; never repair missing saved fields. Advanced resets
-  never overwrite scalar bases/keys or Opacity; Reset keys never erases advanced
+  never overwrite scalar bases/keys or Opacity; Reset keyframes never erases advanced
   settings. Keep existing LUT/buffer/decoder/native budgets and strict gates. See
   [the advanced colour contract](../docs/design/HSL_AND_CURVES.md).
 - Approved #68: required row `temperature` and `tint` colour fields use normalized

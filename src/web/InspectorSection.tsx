@@ -91,6 +91,7 @@ export function InspectorSection({
   badge,
   modified = false,
   help,
+  actions,
 }: Readonly<{
   id: SectionId;
   title: string;
@@ -99,6 +100,7 @@ export function InspectorSection({
   badge?: ReactNode;
   modified?: boolean;
   help?: ReactNode;
+  actions?: ReactNode;
 }>) {
   const headingId = useId();
   const contentId = `${headingId}-content`;
@@ -128,6 +130,7 @@ export function InspectorSection({
         </>
       }
       help={help}
+      actions={actions}
     >
       {children}
     </Disclosure>

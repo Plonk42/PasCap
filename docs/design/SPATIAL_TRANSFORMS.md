@@ -36,7 +36,8 @@ the original's exclusive OUT (`frameCount`), including keyframes outside the tri
 | `rotation`                  | −180°–180°, clockwise                                 | 0                      |
 
 Neutral creation values are not defaults for missing saved data. Spatial keyframes
-belong only to `clip.spatial`; they add no video track channels or timeline track markers.
+belong only to `clip.spatial`; they add no video track channels or shared track markers.
+Their separate source-keyframe lane is inside each timeline clip rectangle.
 The eleven nullable shared video track channels (Opacity, Speed and nine scalar colour
 fields), track-only Colour ownership, clip-owned speed and final
 [#67](https://github.com/Plonk42/PasCap/issues/67) sole video track **Opacity** remain
@@ -155,26 +156,37 @@ new preferences. **Expand all / Collapse all** includes **Range**, **Placement**
 respected; **Transform animation** heading help is reachable while collapsed.
 An empty video track shows no Clip sections, only **Select a clip on … to edit it.**
 
+The native **Animate Transform** toggle is a presentation-only browser-local
+section preference. With no stored choice, unanimated Transform starts off and
+existing spatial keyframes start on. Turning it off retains all keyframes, rendering,
+read-only constraints and history without a project save or Undo step; it changes
+no schema or stored data. When on, it exposes the full-pose capture diamond and
+one Previous/Next pair in the section header.
+
 The eight **Crop left / Crop right / Crop top / Crop bottom / Scale / Translate X /
 Translate Y / Rotation °** controls each pair a native slider with an exact field.
 Without keyframes they edit the clip base. With keyframes, main fields are read-only unless
 a keyframe exists at the **actually displayed integer source frame** at the real
-project playhead. The single **Transform keyframe at displayed source frame**
-diamond captures the complete continuously evaluated pose there, with Linear
+project playhead, even with Animate off. The single
+**Transform keyframe at displayed source frame** diamond captures the complete
+continuously evaluated pose there, with Linear
 easing for a new keyframe; a filled diamond removes that whole keyframe. Sliders/numbers
 never create keyframes. Capture is unavailable outside the clip, during blocked/draft
 states or at the 256-keyframe limit (existing-keyframe removal remains possible).
 
-**Selected Transform keyframe**, **Previous/Next Transform keyframe** and
-**Preview stored keyframe** navigate the stored source-keyframe list, including off-trim
+**Selected Transform keyframe**, the header's **Previous/Next Transform keyframe** and
+**Preview stored keyframe** navigate all retained source keyframes, including off-trim
 keyframes and original exclusive OUT. Preview uses the closest actually mapped image
 (first/last available output at trim boundaries), not a fictional source frame.
 The UI distinguishes **Stored source frame** from **actual displayed source
-frame**. This clip-local selection is separate from track off-duration inspection;
+frame**. Its independent clip-local stored-source cursor advances through successive
+keyframes even when their nearest preview image is the same. This selection is
+separate from track off-duration inspection and Speed's clip-local cursor;
 main fields and capture never use the stored selection as a fake playhead.
 
-Stored **Source frame**, **To next keyframe** and all eight pose fields target that
-selected keyframe. Easing is disabled on the last keyframe, which has no next interval.
+Stored **Source frame**, **Easing** and all eight pose fields target that
+selected keyframe. Contextual accessible easing names remain unchanged. Easing is
+disabled on the last keyframe, which has no next interval.
 The trash action **Delete selected Transform keyframe** removes only it; deleting
 the last keyframe restores the saved base. **Reset transform** clears the whole spatial
 animation and restores the neutral base in one Undo step.
@@ -189,6 +201,20 @@ valid release commits once and updates the image. Escape, pointer cancellation,
 lost capture or window blur restores the starting value; invalid release commits
 nothing. Each keyboard slider adjustment is an individual validated edit. There
 is no Transform graph-keyframe drag, canvas gizmo or per-property diamond workflow.
+
+### Timeline source-keyframe markers
+
+Each clip rectangle has a pale-blue **◆** Transform lane, distinct from the
+salmon/dashed **◆** custom-speed lane and shared project-time track markers.
+Source keyframes use the clip's authoritative retiming to locate output positions;
+off-trim keyframes are omitted. A keyframe at exclusive OUT is a boundary marker and seeks
+the final available frame. Click, Enter or Space selects the clip and seeks the
+nearest mapped image without editing, history, save or dragging. Marker keyboard
+events do not also invoke timeline shortcuts. Speed markers indicate a track
+Speed override, which retains the clip's source keyframes. Speed and Transform
+stored navigation still reaches all retained off-trim/original-OUT keyframes
+through independent clip-local source inspection;
+main capture never substitutes that stored time for the real displayed source frame.
 
 ## Preservation
 

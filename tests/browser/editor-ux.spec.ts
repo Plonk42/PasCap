@@ -10,7 +10,7 @@ import {
 import type { ExportProfile } from '../../src/shared/export.js';
 import type { MediaAsset, MediaJob } from '../../src/shared/media.js';
 import { createClip, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
-import { inspectorTab, openOptions, panelToggle, sharedPoint } from './editor-helpers.js';
+import { inspectorTab, layerKeyframes, openOptions, panelToggle, sharedPoint } from './editor-helpers.js';
 import { memoryProjects, type MemoryProjects } from './memory-projects.js';
 
 let assets: MediaAsset[];
@@ -208,8 +208,35 @@ test('selected context precedes compact animation controls and adjusted sections
   ).toBe(true);
   await expect(page.locator('.layer-keyframe-scope')).toHaveCount(0);
   await expect(page.locator('.layer-keyed-control>.layer-setting-hint')).toHaveCount(0);
+  const animate = page.getByRole('button', { name: 'Animate Colour', exact: true });
+  await expect(animate).toHaveAttribute('aria-pressed', 'false');
+  await expect(page.getByRole('button', { name: 'Keyframe Exposure', exact: true })).toHaveCount(0);
+  await expect(page.locator('.colour-controls .keyframe-setting-navigation')).toHaveCount(0);
+  const before = await current(page);
+  await animate.click();
+  await expect(animate).toHaveAttribute('aria-pressed', 'true');
+  expect(await current(page)).toEqual(before);
+  expect(memory.saves).toBe(0);
+  await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
   const control = page.getByRole('button', { name: 'Keyframe Exposure', exact: true });
   await expect(control).toHaveAccessibleDescription(/Not animated/);
+  const main = control.locator('..');
+  await expect(main).toHaveClass('keyframe-setting-navigation');
+  await expect(main.getByRole('button')).toHaveCount(3);
+  for (const direction of ['Previous', 'Next'] as const) {
+    const button = main.getByRole('button', { name: `${direction} Exposure keyframe`, exact: true });
+    await expect(button).toBeVisible();
+    await expect(button).toBeDisabled();
+    await expect(button).toHaveAttribute('aria-disabled', 'true');
+    await expect(button).toHaveAttribute('tabindex', '-1');
+    await expect(button).toHaveJSProperty('disabled', false);
+    await expect(button).toHaveAttribute('title', `No ${direction.toLowerCase()} Exposure keyframe`);
+    await expect(
+      page
+        .locator('.section-animation-controls')
+        .getByRole('button', { name: `${direction} Colour keyframe`, exact: true }),
+    ).toBeDisabled();
+  }
   await page.getByRole('slider', { name: 'Exposure', exact: true }).fill('0.4');
   await expect(
     page.getByRole('button', { name: 'Colour section', exact: true }).locator('.inspector-section-modified'),
@@ -233,16 +260,61 @@ test('animated visual feedback retains explicit capture, native navigation order
   await expect(diamond).toHaveCSS('border-style', 'dashed');
   await expect(diamond).toHaveAccessibleDescription(/whole track/);
   await expect(page.getByRole('slider', { name: 'Exposure', exact: true })).toBeDisabled();
+  const main = diamond.locator('..');
+  await expect(main).toHaveClass('keyframe-setting-navigation');
+  await expect(main.getByRole('button')).toHaveCount(3);
+  const mainPrevious = main.getByRole('button', { name: 'Previous Exposure keyframe', exact: true });
+  const mainNext = main.getByRole('button', { name: 'Next Exposure keyframe', exact: true });
+  await expect(mainPrevious).toHaveAttribute('title', 'Go to timeline frame 10.');
+  await expect(mainNext).toHaveAttribute('title', 'Go to timeline frame 90.');
   await diamond.focus();
   await page.keyboard.press('Tab');
-  await expect(page.getByRole('button', { name: 'Previous Exposure keyframe', exact: true })).toBeFocused();
+  await expect(mainPrevious).toBeFocused();
   await page.keyboard.press('Tab');
-  await expect(page.getByRole('button', { name: 'Next Exposure keyframe', exact: true })).toBeFocused();
+  await expect(mainNext).toBeFocused();
+  await page.keyboard.press('Tab');
+  // The read-only Exposure inputs and unavailable Brightness arrows are skipped, not the main Exposure pair.
+  await expect(page.getByRole('button', { name: 'Keyframe Brightness', exact: true })).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(page.getByRole('slider', { name: 'Brightness', exact: true })).toBeFocused();
+  await mainNext.focus();
+  await mainNext.press('Enter');
+  await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(90);
+  await expect(mainNext).toBeFocused();
+  await expect(mainNext).toHaveAttribute('aria-disabled', 'true');
+  await expect(mainNext).toHaveAttribute('tabindex', '-1');
+  await mainPrevious.press('Space');
+  await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(10);
+  await expect(mainPrevious).toBeFocused();
+  await expect(mainPrevious).toHaveAttribute('aria-disabled', 'true');
+  await expect(mainPrevious).toHaveAttribute('tabindex', '-1');
   await inspectorTab(page, 'Track keyframes');
+  const keys = layerKeyframes(page, 'Video track 1');
+  const next = keys
+    .locator('[data-keyframe-frame="10"] .layer-keyframe-chip')
+    .getByRole('button', { name: 'Next Exposure keyframe', exact: true });
+  const previous = keys
+    .locator('[data-keyframe-frame="90"] .layer-keyframe-chip')
+    .getByRole('button', { name: 'Previous Exposure keyframe', exact: true });
+  await next.scrollIntoViewIfNeeded();
+  await next.focus();
+  await next.press('Enter');
+  await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(90);
+  await expect(next).toBeFocused();
+  await previous.scrollIntoViewIfNeeded();
+  await previous.press('Space');
+  await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(10);
+  await expect(previous).toBeFocused();
+  await seek(page, 30);
   await page.getByRole('button', { name: 'Animation help', exact: true }).click();
   await expect(page.locator('.animation-legend')).toBeVisible();
   await page.keyboard.press('Escape');
   expect(await current(page)).toEqual(document);
+  await page.evaluate(() => window.pascapLab!.flush());
+  expect(memory.saves).toBe(0);
+  await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Redo', exact: true })).toBeDisabled();
+  await diamond.scrollIntoViewIfNeeded();
   await diamond.click();
   await expect(page.getByRole('slider', { name: 'Exposure', exact: true })).toBeEnabled();
   expect((await current(page)).layers[0]!.keyframes).toEqual([
@@ -252,6 +324,7 @@ test('animated visual feedback retains explicit capture, native navigation order
   ]);
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   expect(await current(page)).toEqual(document);
+  await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
 });
 
 test('hiding the deferred inspector applies a blur draft once and retains its section state', async ({ page }) => {
@@ -451,12 +524,26 @@ test('a failed deferred preview keeps the editor usable and saves pending edits 
   page,
 }) => {
   const before = await current(page);
+  await inspectorTab(page, 'Track');
+  await page.getByRole('button', { name: 'Animate Colour', exact: true }).click();
   await page.route('**/assets/bootstrap-*.js', (route) => route.abort('failed'));
   await page.reload();
   await expect(page.getByRole('button', { name: 'Reload editor', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Play preview', exact: true })).toBeDisabled();
   await inspectorTab(page, 'Track');
+  await expect(page.getByRole('button', { name: 'Animate Colour', exact: true })).toBeDisabled();
   await expect(page.getByRole('button', { name: 'Keyframe Exposure', exact: true })).toBeDisabled();
+  const main = page.locator('.keyframe-setting-navigation').filter({
+    has: page.getByRole('button', { name: 'Keyframe Exposure', exact: true }),
+  });
+  await expect(main.getByRole('button')).toHaveCount(3);
+  for (const direction of ['Previous', 'Next'] as const) {
+    const button = main.getByRole('button', { name: `${direction} Exposure keyframe`, exact: true });
+    await expect(button).toBeDisabled();
+    await expect(button).toHaveAttribute('aria-disabled', 'true');
+    await expect(button).toHaveAttribute('tabindex', '-1');
+    await button.evaluate((element) => (element as HTMLButtonElement).click());
+  }
   await expect(page.getByRole('textbox', { name: 'Project title', exact: true })).toHaveValue(before.title);
   expect(memory.snapshot()).toEqual(before);
   expect(memory.saves).toBe(0);

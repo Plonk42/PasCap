@@ -4,12 +4,15 @@ import { activeLayerSetting, evaluateLayerSetting, hasLayerKeys } from '../share
 import type { ProjectDocument, VideoClip, VideoLayer } from '../shared/model.js';
 import { sourceRateAt, type SpeedSettings } from '../shared/speed.js';
 import { ClipSpeedCurve } from './ClipSpeedCurve.js';
+import { AnimationControls, useAnimationTools } from './AnimationControls.js';
 import './declutter.css';
 import { sourceSeconds } from './display.js';
 import { EasingSelect } from './EasingSelect.js';
 import { HelpPopover } from './HelpPopover.js';
 import { Icon } from './icons.js';
 import { KeyframeToggle } from './KeyframeToggle.js';
+import { InspectorSection } from './InspectorSection.js';
+import { useSpeedNavigation } from './speed-navigation.js';
 import { settingPresentation } from './setting-scope.js';
 import { RateValueControl, SpeedRateField } from './SettingValueControl.js';
 import type { DraftPreview } from './Timeline.js';
@@ -140,9 +143,9 @@ function BaseSpeedControls({
             </div>
           </div>
           <label className="speed-field">
-            Curve
+            Easing
             <EasingSelect
-              aria-label="Ramp curve"
+              aria-label="Ramp easing"
               value={speed.curve}
               disabled={disabled}
               allowHold={false}
@@ -223,6 +226,20 @@ export function SpeedControls({
   const layerContext = `${resetKey ?? layer.id}:${layer.id}`;
   const inputContext = `${layerContext}:${clip?.id ?? 'row'}`;
   const keyed = hasLayerKeys(layer, 'speed');
+  const tools = useAnimationTools(
+    'speed',
+    `${project.id}:${layer.id}:${clip?.id}`,
+    keyed || clip?.speed.mode === 'curve',
+  );
+  const { navigation, inspectedFrame, onSelectStored, previous, next, seekTarget } = useSpeedNavigation({
+    project,
+    clip,
+    layer,
+    frame,
+    projectDuration,
+    onSeek,
+    resetKey: inputContext,
+  });
   const active = activeLayerSetting(layer, 'speed', frame);
   const validFrame = Number.isSafeInteger(frame) && frame >= 0 && frame <= 2_147_483_647;
   const base = clip ? sourceRateAt(clip.speed, sourceFrame ?? clip.sourceIn) : 1;
@@ -234,7 +251,10 @@ export function SpeedControls({
     ? `Set only Speed at timeline frame ${frame} to 1×. Keep the other keyframes, settings and clip bases.`
     : "Reset only the selected clip's speed to constant 1×. Its curve is removed; track keyframes stay unchanged.";
   const updateBase = (speed: SpeedSettings): void => {
-    if (clip && !disabled && !keyed) onEdit({ type: 'speed', clipId: clip.id, speed });
+    if (clip && !disabled && !keyed) {
+      if (speed.mode === 'curve' && !tools.enabled) tools.toggle();
+      onEdit({ type: 'speed', clipId: clip.id, speed });
+    }
   };
   const updateKey = (value: number): void => {
     if (!disabled && validFrame && active)
@@ -267,120 +287,148 @@ export function SpeedControls({
   const customCurve = !keyed && clip?.speed.mode === 'curve';
 
   return (
-    <section className="speed-settings declutter-speed" aria-label="Track and clip speed">
-      <div className="speed-overview">
-        <span>
-          {clip && placedDuration !== null && placedDuration !== clip.sourceOut - clip.sourceIn && (
-            <>
-              {sourceSeconds(clip.sourceOut - clip.sourceIn)} <Icon name="arrow" size={12} />{' '}
-              {sourceSeconds(placedDuration)}
-            </>
-          )}
-        </span>
-        <button
-          type="button"
-          className="text-button"
-          aria-label="Reset speed to 1×"
-          title={resetTitle}
-          disabled={disabled || !validFrame || resetUnavailable}
-          onClick={reset}
-        >
-          <Icon name="reset" size={12} />
-          Reset
-        </button>
-      </div>
-      {clip && keyed && (
-        <p className="clip-speed-override">
-          <Icon name="curve" size={15} />
-          <span>Overridden by track Speed keyframes. This clip keeps its own speed for when they are removed.</span>
-        </p>
-      )}
-      {!keyed && clip && (
-        <BaseSpeedControls
-          clip={clip}
-          disabled={disabled}
-          helpId={helpId}
-          inputContext={inputContext}
-          onChange={updateBase}
-          validate={(speed) => validateEdit({ type: 'speed', clipId: clip.id, speed })}
+    <InspectorSection
+      id="speed"
+      title="Speed"
+      icon="speed"
+      badge={`${rate.toFixed(2)}×`}
+      modified={rate !== 1 || keyed || (!!clip && clip.speed.mode !== 'constant')}
+      help={<SpeedHelp keyed={keyed} helpId={helpId} />}
+      actions={
+        <AnimationControls
+          label="Speed"
+          enabled={tools.enabled}
+          disabled={disabled || navigation.disabled}
+          onToggle={tools.toggle}
+          previous={!!previous}
+          next={!!next}
+          onPrevious={() => seekTarget(previous)}
+          onNext={() => seekTarget(next)}
         />
-      )}
-      {!keyed && clip?.speed.mode === 'curve' && sourceFrameCount !== null && (
-        <ClipSpeedCurve
-          key={`${project.id}:${clip.id}`}
-          project={project}
-          clip={clip}
-          speed={clip.speed}
-          sourceFrameCount={sourceFrameCount}
-          frame={frame}
-          sourceFrame={sourceFrame}
-          disabled={disabled}
-          onEdit={onEdit}
-          onPreview={onPreview}
-          onSeek={onSeek}
-          onPause={onPause}
-        />
-      )}
-      <div className={`layer-setting-heading${clip && !keyed ? ' clip-speed-row-heading' : ''}`}>
-        <span title={hint}>
-          <span>Track speed animation</span>
-          <small className="layer-setting-kind" title={scope}>
-            {keyed && <Icon name="curve" size={12} />}
-            <span className="declutter-sr-only">{scope}</span>
-          </small>
-        </span>
-        <span className="layer-setting-actions">
-          {!keyed && clip && (
-            <output title="Capture the selected clip's current rate as a track-wide keyframe">{rate}×</output>
-          )}
-          <KeyframeToggle
-            layer={layer}
-            setting="speed"
-            label="Speed"
-            frame={frame}
-            value={rate}
-            disabled={disabled}
-            onEdit={onEdit}
-          />
-        </span>
-      </div>
-      {(keyed || !clip) && (
-        <SpeedRateField
-          id={rateId}
-          aria-label="Track speed rate"
-          aria-describedby={helpId}
-          disabled={disabled || !validFrame || !active}
-          value={rate}
-          resetKey={`${layerContext}:${frame}:speed`}
-          hint={hint}
-          validate={(value) =>
-            validateEdit({ type: 'layer-key-value', layerId: layer.id, frame, setting: 'speed', value })
-          }
-          onCommit={updateKey}
-        />
-      )}
-      {graphAvailable && !customCurve && (
-        <>
-          <svg
-            className="speed-graph"
-            viewBox="0 0 220 55"
-            role="img"
-            aria-label={`${keyed ? 'Track' : 'Clip'} speed curve · ${graphRange}`}
+      }
+    >
+      <section className="speed-settings declutter-speed" aria-label="Track and clip speed">
+        <div className="speed-overview">
+          <span>
+            {clip && placedDuration !== null && placedDuration !== clip.sourceOut - clip.sourceIn && (
+              <>
+                {sourceSeconds(clip.sourceOut - clip.sourceIn)} <Icon name="arrow" size={12} />{' '}
+                {sourceSeconds(placedDuration)}
+              </>
+            )}
+          </span>
+          <button
+            type="button"
+            className="text-button"
+            aria-label="Reset speed to 1×"
+            title={resetTitle}
+            disabled={disabled || !validFrame || resetUnavailable}
+            onClick={reset}
           >
-            <path d="M0 48H220" stroke="var(--line)" />
-            <polyline
-              points={speedGraphPoints(clip, layer, projectDuration)}
-              fill="none"
-              stroke="var(--accent)"
-              strokeWidth="2"
+            <Icon name="reset" size={12} />
+            Reset
+          </button>
+        </div>
+        {clip && keyed && (
+          <p className="clip-speed-override">
+            <Icon name="curve" size={15} />
+            <span>Overridden by track Speed keyframes. This clip keeps its own speed for when they are removed.</span>
+          </p>
+        )}
+        {!keyed && clip && (
+          <BaseSpeedControls
+            clip={clip}
+            disabled={disabled}
+            helpId={helpId}
+            inputContext={inputContext}
+            onChange={updateBase}
+            validate={(speed) => validateEdit({ type: 'speed', clipId: clip.id, speed })}
+          />
+        )}
+        {!keyed && clip?.speed.mode === 'curve' && sourceFrameCount !== null && (
+          <div hidden={!tools.enabled}>
+            <ClipSpeedCurve
+              key={`${project.id}:${clip.id}`}
+              project={project}
+              clip={clip}
+              speed={clip.speed}
+              sourceFrameCount={sourceFrameCount}
+              frame={frame}
+              sourceFrame={sourceFrame}
+              disabled={disabled}
+              onEdit={onEdit}
+              onPreview={onPreview}
+              onSeek={navigation.onSeekSourceKeyframe ?? onSeek}
+              onPause={onPause}
+              inspectedFrame={inspectedFrame}
+              onSelectStored={onSelectStored}
             />
-          </svg>
-          <div className="speed-graph-range">
-            <span>{graphRange}</span>
-            <span>0–8×</span>
           </div>
-        </>
-      )}
-    </section>
+        )}
+        <div
+          hidden={!tools.enabled}
+          className={`layer-setting-heading${clip && !keyed ? ' clip-speed-row-heading' : ''}`}
+        >
+          <span title={hint}>
+            <span>Track speed animation</span>
+            <small className="layer-setting-kind" title={scope}>
+              {keyed && <Icon name="curve" size={12} />}
+              <span className="declutter-sr-only">{scope}</span>
+            </small>
+          </span>
+          <span className="layer-setting-actions">
+            {!keyed && clip && (
+              <output title="Capture the selected clip's current rate as a track-wide keyframe">{rate}×</output>
+            )}
+            <KeyframeToggle
+              layer={layer}
+              setting="speed"
+              label="Speed"
+              frame={frame}
+              value={rate}
+              disabled={disabled}
+              onEdit={onEdit}
+            />
+          </span>
+        </div>
+        {(keyed || !clip) && (
+          <SpeedRateField
+            id={rateId}
+            aria-label="Track speed rate"
+            aria-describedby={helpId}
+            disabled={disabled || !validFrame || !active}
+            value={rate}
+            resetKey={`${layerContext}:${frame}:speed`}
+            hint={hint}
+            validate={(value) =>
+              validateEdit({ type: 'layer-key-value', layerId: layer.id, frame, setting: 'speed', value })
+            }
+            onCommit={updateKey}
+          />
+        )}
+        {graphAvailable && !customCurve && (
+          <>
+            <svg
+              className="speed-graph"
+              viewBox="0 0 220 55"
+              role="img"
+              aria-label={`${keyed ? 'Track' : 'Clip'} speed curve · ${graphRange}`}
+            >
+              <path d="M0 48H220" stroke="var(--line)" />
+              <polyline
+                points={speedGraphPoints(clip, layer, projectDuration)}
+                fill="none"
+                stroke="var(--accent)"
+                strokeWidth="2"
+              />
+            </svg>
+            <div className="speed-graph-range">
+              <span>{graphRange}</span>
+              <span>0–8×</span>
+            </div>
+          </>
+        )}
+      </section>
+    </InspectorSection>
   );
 }

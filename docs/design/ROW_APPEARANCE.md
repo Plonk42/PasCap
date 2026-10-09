@@ -80,12 +80,27 @@ and identity curves, without independent clip grades.
 Control vocabulary follows the [editor control catalogue](EDITOR_CONTROLS.md#vocabulary).
 
 **Track → Colour** has ten main widgets: nine scalar video track colour controls plus sole
-Opacity. All use existing slider/exact-field/reset/diamond/channel-navigation
-controls and work on an empty track. Main and stored Opacity sliders/exact fields
-use **0–100%**, neutral **100%**; convert only at the UI boundary. Required
+Opacity. All use existing slider/exact-field/reset controls and work on an empty
+track. Main and stored Opacity sliders/exact fields use **0–100%**, neutral **100%**;
+convert only at the UI boundary. Required
 `VideoLayer.opacity` and `opacity` keyframe values remain **0–1**, without a schema change.
-An animated channel without an enabled setting at
-the real playhead remains read-only until explicitly captured. Sliders never create keyframes.
+Main capture diamonds appear only with the native **Animate Colour** toggle on;
+each retains adjacent per-setting **Previous/Next** buttons because not every
+setting is enabled at every shared keyframe. One section-header Previous/Next pair visits
+the union of Opacity and nine scalar colour keys, skipping speed-only keys.
+Enabled setting chips in stored Keyframes rows retain their per-channel arrows.
+All main and stored per-channel arrows visit strictly earlier/later keyframes
+where that channel is nonnull (zero is enabled), using the shared central
+stored-keyframe cursor, including off-duration inspection.
+Animate is a presentation-only browser-local preference per section. Without a
+stored choice, unanimated Colour starts off and existing colour/Opacity keys start
+on. Turning it off hides main diamonds and adjacent arrows while retaining all
+keyframes, rendering, read-only constraints and history, without a project save or
+Undo step; schema and stored data are unchanged.
+An animated channel without an enabled setting at the real playhead remains
+read-only until explicitly captured, even with Animate off. Capture never uses
+an inspected stored time. Sliders never create keyframes. Track-keyframe selectors
+visibly read **Easing**, retaining contextual accessible names and shared interpolation.
 The nested static HSL and curve editors share video track ownership, with no new diamonds.
 Individual scalar resets target only the track base or current existing keyed setting;
 Reset keyframes targets only existing keyed colour/Opacity settings, preserving HSL/curves.

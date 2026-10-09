@@ -233,6 +233,7 @@ export function App() {
   const [selectedMusicId, setSelectedMusicId] = useState<string | null>(null);
   const [selectedLayerId, setSelectedLayerId] = useState(EMPTY_PROJECT.layers[0]!.id);
   const [keyframeInspection, setKeyframeInspection] = useState<KeyframeInspection | null>(null);
+  const [sourceInspectionEpoch, setSourceInspectionEpoch] = useState(0);
   const [ranges, setRanges] = useState<MediaSelections>({});
   const [boundaryId, setBoundaryId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -501,10 +502,11 @@ export function App() {
     },
     [commit, select, validate],
   );
-  const seek = useCallback((frame: number): void => {
+  const seek = useCallback((frame: number, preserveSourceInspection = false): void => {
     const document = current.current;
     if (!document || drafting.current) return;
     setKeyframeInspection(null);
+    if (!preserveSourceInspection) setSourceInspectionEpoch((epoch) => epoch + 1);
     const duration = calculateLayout(document).duration;
     if (duration) {
       setViewerMode('timeline');
@@ -514,6 +516,7 @@ export function App() {
   const togglePlayback = useCallback(() => {
     if (drafting.current) return;
     setKeyframeInspection(null);
+    setSourceInspectionEpoch((epoch) => epoch + 1);
     setViewerMode('timeline');
     if (engine.current?.diagnostics().playing) engine.current.pause();
     else void engine.current?.play();
@@ -1102,16 +1105,29 @@ export function App() {
     [selectLayer],
   );
   const followPlayhead = useCallback((): void => setKeyframeInspection(null), []);
+  const seekSourceKeyframe = useCallback((frame: number): void => seek(frame, true), [seek]);
   const navigationDisabled = !project || draft !== null || !previewReady;
   const keyframeNavigation = useMemo(
     () => ({
       inspection,
       duration: layout.duration,
       disabled: navigationDisabled,
+      playing: diagnostics?.playing ?? false,
+      sourceEpoch: sourceInspectionEpoch,
+      onSeekSourceKeyframe: seekSourceKeyframe,
       onSeekKeyframe: seekKeyframe,
       onFollowPlayhead: followPlayhead,
     }),
-    [inspection, layout.duration, navigationDisabled, seekKeyframe, followPlayhead],
+    [
+      inspection,
+      layout.duration,
+      navigationDisabled,
+      diagnostics?.playing,
+      sourceInspectionEpoch,
+      seekSourceKeyframe,
+      seekKeyframe,
+      followPlayhead,
+    ],
   );
   const openProject = async (id: string): Promise<boolean> =>
     (
