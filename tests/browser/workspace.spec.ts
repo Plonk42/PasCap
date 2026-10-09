@@ -319,9 +319,10 @@ test('no-project startup performs no hidden create and unavailable service has a
   await page.goto('/');
   await expect(page.getByRole('dialog', { name: 'Projects' })).toBeVisible();
   expect(creates).toBe(0);
-  await expect(
-    page.getByRole('button', { name: 'Keyframe Exposure', exact: true, includeHidden: true }),
-  ).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Animate Colour', exact: true, includeHidden: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Keyframe Exposure', exact: true, includeHidden: true })).toHaveCount(
+    0,
+  );
   await page.route('**/api/health', (route) =>
     route.fulfill({ status: 403, json: { error: 'Local service configuration needs attention.' } }),
   );
