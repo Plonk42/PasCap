@@ -1152,6 +1152,8 @@ test('point moves and history retain input identity and the shared cursor, while
 test('all navigation groups fit the 270px inspector at the default and minimum viewports without overflow or hidden buttons', async ({
   page,
 }) => {
+  // 38 s measured CI-like (software GL, two cores).
+  test.setTimeout(120_000);
   const document = sequence(interleaved());
   await fixture(page, document);
   const resizer = page.getByRole('slider', { name: 'Resize Clip panel', exact: true });

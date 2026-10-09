@@ -346,6 +346,8 @@ test('empty-row native controls preserve exact precision, invalid drafts, indivi
 });
 
 test('main and stored native pointer drafts cancel safely, then release as one save and one Undo', async ({ page }) => {
+  // 25 s measured CI-like (software GL, two cores).
+  test.setTimeout(75_000);
   for (const stored of [false, true]) {
     if (stored) {
       const document = await current(page);
