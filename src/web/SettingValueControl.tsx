@@ -1,14 +1,12 @@
-import { useId, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { COLOUR_CONTROLS, NEUTRAL_COLOUR } from '../shared/colour.js';
 import { KEYFRAME_SETTINGS, type KeyframeSetting } from '../shared/keyframes.js';
 import { Icon } from './icons.js';
 import type { NumberFieldProps } from './NumberField.js';
 import { ValueControl, type ValueControlProps } from './ValueControl.js';
 
-type RangeSetting = Exclude<KeyframeSetting, 'speed'>;
-
 interface RangeSettingProps {
-  setting: RangeSetting;
+  setting: KeyframeSetting;
   id: string;
   value: number;
   disabled: boolean;
@@ -117,16 +115,4 @@ export function RangeSettingControl({
 /** All speed rates share the same bounded slider and unrestricted decimal precision. */
 export function RateValueControl(props: Readonly<Omit<ValueControlProps, 'min' | 'max' | 'step' | 'unit'>>) {
   return <ValueControl {...props} min={0.1} max={8} step={0.05} unit="×" />;
-}
-
-/** A row Speed participant is a rate, never a clip mode or source-time curve. */
-export function SpeedRateField(props: Readonly<Omit<NumberFieldProps, 'min' | 'max' | 'step'>>) {
-  const generatedId = useId();
-  const id = props.id ?? generatedId;
-  return (
-    <div className="speed-field">
-      <label htmlFor={id}>Track rate ×</label>
-      <RateValueControl {...props} id={id} />
-    </div>
-  );
 }

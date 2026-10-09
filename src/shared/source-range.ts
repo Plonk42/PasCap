@@ -1,6 +1,5 @@
 import type { EditCommand } from './commands.js';
-import { compileLayerRetiming } from './layer-retiming.js';
-import type { ProjectDocument, VideoClip, VideoLayer } from './model.js';
+import type { ProjectDocument, VideoClip } from './model.js';
 import { clipDuration } from './speed.js';
 import { calculateLayout } from './timeline.js';
 
@@ -67,9 +66,7 @@ export function trimByOutputFrames(
   if (clip.speed.mode === 'constant')
     return trimByFrames(clip, edge, Math.round(delta * clip.speed.rate), sourceFrameCount);
   const target = Math.max(1, clipDuration(clip) + (edge === 'in' ? -delta : delta));
-  return trimToDuration(clip, edge, sourceFrameCount, target, (candidate) =>
-    durationOrInfinity(() => clipDuration(candidate)),
-  );
+  return trimToDuration(clip, edge, sourceFrameCount, target, safeDuration);
 }
 
 function durationOrInfinity(compile: () => number): number {
@@ -82,8 +79,8 @@ function durationOrInfinity(compile: () => number): number {
     throw error;
   }
 }
-function contextualDuration(clip: VideoClip, layer: VideoLayer, start: number): number {
-  return durationOrInfinity(() => compileLayerRetiming(clip, layer, start).duration);
+function safeDuration(clip: VideoClip): number {
+  return durationOrInfinity(() => clipDuration(clip));
 }
 
 /** Rounding creates duration plateaus. Select the endpoint nearest the current
@@ -170,38 +167,19 @@ function trimToDuration(
   };
 }
 
-/** Find a nonnegative integer start with exactly the retained OUT. With row
- * keys, end(start) is monotonic even when the rate changes at the new start.
- * Integer-source quantisation can skip an end; never silently move that OUT.
- */
-function startForRightEdge(clip: VideoClip, layer: VideoLayer, right: number, preferred: number): number | null {
-  const endAt = (start: number): number => start + contextualDuration(clip, layer, start);
-  let low = 0;
-  let high = right - 1;
-  while (low < high) {
-    const middle = Math.floor((low + high) / 2);
-    if (endAt(middle) < right) low = middle + 1;
-    else high = middle;
-  }
-  const first = low;
-  if (endAt(first) !== right) return null;
-  high = right - 1;
-  while (low < high) {
-    const middle = Math.ceil((low + high) / 2);
-    if (endAt(middle) > right) high = middle - 1;
-    else low = middle;
-  }
-  return Math.max(first, Math.min(low, preferred));
+/** The start that keeps the retained OUT, or null before project frame zero. */
+function startForRightEdge(clip: VideoClip, right: number): number | null {
+  const start = right - safeDuration(clip);
+  return start >= 0 ? start : null;
 }
 
-function minimumPositionedIn(clip: VideoClip, layer: VideoLayer, right: number): number {
-  // Clamp restoration at project frame zero, taking the absolute row-rate
-  // curve into account rather than subtracting a duration compiled at old IN.
+function minimumPositionedIn(clip: VideoClip, right: number): number {
+  // Clamp restoration at project frame zero.
   let low = 0;
   let high = clip.sourceOut - 1;
   while (low < high) {
     const middle = Math.floor((low + high) / 2);
-    if (contextualDuration({ ...clip, sourceIn: middle }, layer, 0) > right) low = middle + 1;
+    if (safeDuration({ ...clip, sourceIn: middle }) > right) low = middle + 1;
     else high = middle;
   }
   return low;
@@ -209,13 +187,11 @@ function minimumPositionedIn(clip: VideoClip, layer: VideoLayer, right: number):
 
 function sourcePositionedTrim(
   clip: VideoClip,
-  layer: VideoLayer,
   right: number,
   sourceIn: number,
-  preferred: number,
 ): Extract<EditCommand, { type: 'trim-place' }> {
-  sourceIn = Math.max(minimumPositionedIn(clip, layer, right), sourceIn);
-  const start = startForRightEdge({ ...clip, sourceIn }, layer, right, preferred);
+  sourceIn = Math.max(minimumPositionedIn(clip, right), sourceIn);
+  const start = startForRightEdge({ ...clip, sourceIn }, right);
   if (start === null)
     throw new Error('This source-frame trim cannot keep the positioned clip OUT at an integer project frame.');
   return { type: 'trim-place', clipId: clip.id, sourceIn, sourceOut: clip.sourceOut, start };
@@ -237,20 +213,19 @@ function betterLeftTrim(candidate: LeftTrim, best: LeftTrim | null, preferred: n
 
 function outputPositionedTrim(
   clip: VideoClip,
-  layer: VideoLayer,
   right: number,
   delta: number,
 ): Extract<EditCommand, { type: 'trim-place' }> {
-  const minimumIn = minimumPositionedIn(clip, layer, right);
+  const minimumIn = minimumPositionedIn(clip, right);
   const preferred = Math.max(0, Math.min(right - 1, clip.start + delta));
   const target = right - preferred;
   const endpoint = nearestEndpoint(minimumIn, clip.sourceOut - 1, clip.sourceIn, target, false, (sourceIn) =>
-    contextualDuration({ ...clip, sourceIn }, layer, preferred),
+    safeDuration({ ...clip, sourceIn }),
   );
   let best: LeftTrim | null = null;
   for (const sourceIn of new Set([endpoint, endpoint - 1, endpoint + 1])) {
     if (sourceIn < minimumIn || sourceIn >= clip.sourceOut) continue;
-    const start = startForRightEdge({ ...clip, sourceIn }, layer, right, preferred);
+    const start = startForRightEdge({ ...clip, sourceIn }, right);
     if (start !== null && betterLeftTrim({ sourceIn, start }, best, preferred, clip.sourceIn))
       best = { sourceIn, start };
   }
@@ -280,11 +255,9 @@ export function trimOnTimeline(
   if (edge !== 'in' || layer.ripple) {
     if (unit === 'source') return sourceCommand;
     const target = Math.max(1, placed.duration + (edge === 'in' ? -delta : delta));
-    return trimToDuration(clip, edge, sourceFrameCount, target, (candidate) =>
-      contextualDuration(candidate, layer, placed.start),
-    );
+    return trimToDuration(clip, edge, sourceFrameCount, target, safeDuration);
   }
   if (delta === 0) return { ...sourceCommand, type: 'trim-place', start: placed.start };
-  if (unit === 'source') return sourcePositionedTrim(clip, layer, placed.end, sourceCommand.sourceIn, placed.start);
-  return outputPositionedTrim(clip, layer, placed.end, delta);
+  if (unit === 'source') return sourcePositionedTrim(clip, placed.end, sourceCommand.sourceIn);
+  return outputPositionedTrim(clip, placed.end, delta);
 }

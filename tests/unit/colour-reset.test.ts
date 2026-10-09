@@ -34,12 +34,12 @@ describe('Colour and row Opacity reset', () => {
     expect(project).toEqual(before);
   });
 
-  it('resets existing Colour participants only, preserving times, easing, Speed and the unkeyed row value', () => {
+  it('resets existing Colour participants only, preserving times, easing and the unkeyed row value', () => {
     const project = createProject('keys', 'Keys');
     const layer = project.layers[0]!;
     layer.opacity = 0.6;
     layer.keyframes = [
-      { frame: 10, interpolation: 'ease-out', values: { ...EMPTY_KEY_VALUES, opacity: 0.2, contrast: 1.5, speed: 2 } },
+      { frame: 10, interpolation: 'ease-out', values: { ...EMPTY_KEY_VALUES, opacity: 0.2, contrast: 1.5 } },
       { frame: 30, interpolation: 'hold', values: { ...EMPTY_KEY_VALUES, opacity: 0.7, hue: 15 } },
     ];
     const before = structuredClone(project);
@@ -63,8 +63,6 @@ describe('Colour and row Opacity reset', () => {
     const layer = createLayer('empty', 'Empty');
     expect(colourResetCommands(layer, 0)).toEqual([]);
     layer.opacity = 0;
-    expect(colourResetCommands(layer, 0)).toEqual([{ type: 'opacity', layerId: layer.id, opacity: 1 }]);
-    layer.keyframes = [{ frame: 10, interpolation: 'hold', values: { ...EMPTY_KEY_VALUES, speed: 2 } }];
     expect(colourResetCommands(layer, 0)).toEqual([{ type: 'opacity', layerId: layer.id, opacity: 1 }]);
   });
 });

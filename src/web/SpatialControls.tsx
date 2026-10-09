@@ -461,8 +461,7 @@ export function TransformSection(props: Readonly<Omit<Props, 'clip'> & { clip: V
     props.project,
     props.clip,
     props.frame,
-    navigation.playing ?? false,
-    navigation.inspection,
+    (navigation.playing ?? false) || navigation.inspection !== null,
   );
   if (inspection !== selection) setSelection(inspection);
   const inspected = inspection?.frame ?? null;

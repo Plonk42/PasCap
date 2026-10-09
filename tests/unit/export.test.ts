@@ -109,12 +109,12 @@ function audioAsset() {
 }
 
 describe('strict production export request and immutable validation', () => {
-  it('offers exactly 720p and UHD profiles, accepts no-music v12 and rejects empty/legacy/unknown requests', () => {
+  it('offers exactly 720p and UHD profiles, accepts no-music v13 and rejects empty/legacy/unknown requests', () => {
     expect(EXPORT_PROFILES.draft720).toMatchObject({ width: 1280, height: 720 });
     expect(EXPORT_PROFILES.final4k).toMatchObject({ width: 3840, height: 2160 });
     const document = documentWithClips();
     expect(exportRequestSchema.parse({ document, profile: 'draft720' }).document.music).toEqual([]);
-    expect(exportRequestSchema.parse({ document, profile: 'draft720' }).document.schemaVersion).toBe(12);
+    expect(exportRequestSchema.parse({ document, profile: 'draft720' }).document.schemaVersion).toBe(13);
     for (const request of [
       { document: createProject('empty', 'Empty'), profile: 'draft720' },
       {
@@ -328,20 +328,18 @@ describe('sequential output-frame chunk planning', () => {
     document.clips[0]!.speed = { mode: 'constant', rate: 0.5 };
     document.clips[1]!.speed = { mode: 'constant', rate: 2 };
     document.clips[2]!.speed = {
-      mode: 'ramp',
-      startRate: 0.5,
-      endRate: 2,
-      anchorIn: 0,
-      anchorOut: 60,
-      curve: 'smooth',
+      mode: 'curve',
+      keyframes: [
+        { frame: 0, rate: 0.5, interpolation: 'smooth' },
+        { frame: 60, rate: 2, interpolation: 'smooth' },
+      ],
     };
     document.clips[3]!.speed = {
-      mode: 'ramp',
-      startRate: 2,
-      endRate: 0.5,
-      anchorIn: 0,
-      anchorOut: 60,
-      curve: 'ease-in',
+      mode: 'curve',
+      keyframes: [
+        { frame: 0, rate: 2, interpolation: 'ease-in' },
+        { frame: 60, rate: 0.5, interpolation: 'ease-in' },
+      ],
     };
     document.layers[0]!.transitions[0] = { leftId: 'clip-0', rightId: 'clip-1', type: 'cross-dissolve', duration: 4 };
     document.layers[0]!.transitions[1] = {
@@ -432,10 +430,18 @@ describe('sequential output-frame chunk planning', () => {
 const speeds: SpeedSettings[] = [
   { mode: 'constant', rate: 0.5 },
   { mode: 'constant', rate: 2.5 },
-  ...(['linear', 'ease-in', 'ease-out', 'smooth'] as const).flatMap((curve) => [
-    { mode: 'ramp' as const, startRate: 0.4, endRate: 3, anchorIn: 2, anchorOut: 42, curve },
-    { mode: 'ramp' as const, startRate: 3, endRate: 0.4, anchorIn: 2, anchorOut: 42, curve },
-  ]),
+  ...(['linear', 'ease-in', 'ease-out', 'smooth'] as const).flatMap((interpolation) =>
+    [
+      [0.4, 3],
+      [3, 0.4],
+    ].map(([first, last]) => ({
+      mode: 'curve' as const,
+      keyframes: [
+        { frame: 2, rate: first!, interpolation },
+        { frame: 42, rate: last!, interpolation },
+      ],
+    })),
+  ),
 ];
 describe('bounded raw-stream discrete retimer (no FFmpeg needed)', () => {
   for (const speed of speeds)
@@ -467,7 +473,13 @@ describe('bounded raw-stream discrete retimer (no FFmpeg needed)', () => {
     });
   for (const speed of [
     { mode: 'constant' as const, rate: 0.5 },
-    { mode: 'ramp' as const, startRate: 0.5, endRate: 2, curve: 'smooth' as const, anchorIn: 19999, anchorOut: 20030 },
+    {
+      mode: 'curve' as const,
+      keyframes: [
+        { frame: 19999, rate: 0.5, interpolation: 'smooth' as const },
+        { frame: 20030, rate: 2, interpolation: 'smooth' as const },
+      ],
+    },
   ])
     it(`owns an immutable shared map even after a cached caller clip is mutated (${speed.mode})`, async () => {
       const directory = await temp();

@@ -10,9 +10,9 @@ deadline; hardware/real-media work requires explicit owner consent.
 
 ## Current baseline
 
-The local schema-12 contract covers no-copy footage import, projects, source
-clips, multi-track timelines, colour/speed/opacity track keyframes, music and verified
-720p/4K export, with precise clip-only speed curves as well as overriding video track Speed.
+The local schema-13 contract covers no-copy footage import, projects, source
+clips, multi-track timelines, colour/opacity track keyframes, music and verified
+720p/4K export, with clip-only constant speed or precise source-frame speed curves.
 Clip-owned crop/scale/translation/rotation and per-setting source-frame animation
 are specified by [#20's current contract](design/SPATIAL_TRANSFORMS.md), without
 claiming qualification or changing milestone status.
@@ -24,8 +24,8 @@ multiplier. The single slider/diamond/navigation lives in **Track → Colour** a
 works on empty tracks; **Placement** contains placement only. Without Opacity keyframes,
 the slider edits the track value; with keyframes, a setting not enabled at the real
 playhead is read-only until explicitly captured. Sliders never create keyframes, and
-unkeyed colour settings are track-owned. Shared keyframes have eleven nullable channels:
-`opacity`, `speed` and nine scalar colour settings, including `temperature` and
+unkeyed colour settings are track-owned. Shared keyframes have ten nullable channels:
+`opacity` and nine scalar colour settings, including `temperature` and
 `tint`. Saved `clip.opacity` and old
 `clipOpacity`/`layerOpacity` channels are rejected; track `opacity` is required and
 valid. Track-owned [Temperature and Tint](design/TEMPERATURE_AND_TINT.md) use
@@ -34,12 +34,12 @@ warms; positive Tint adds magenta. The shared normalized linear-gain formula run
 before Exposure and intentionally colours greys; neutral-white luminance is
 preserved before clipping only. Static track
 [HSL ranges and master/RGB curves](design/HSL_AND_CURVES.md)
-follow scalar grading without adding animation channels. v1–v11 projects
+follow scalar grading without adding animation channels. v1–v12 projects
 and receipt snapshots are preserved/incompatible and require recreation, without
 migration, defaults, null/old-format readers or automatic deletion;
-registry/proxy/current PCM formats remain unchanged. Schema 12 requires a 0–8
+registry/proxy/current PCM formats remain unchanged. Schema 13 requires a 0–8
 identified music track array (`[]` without music); version-1 export receipts
-require strict v12 snapshots and captured audio-source/instance-plan arrays.
+require strict v13 snapshots and captured audio-source/instance-plan arrays.
 Music can extend duration to maximum video/music OUT: closing video fades finish
 at clip OUT, then black while music continues/fades at its own end. One mixed
 output clock and final-only linear-sum clamp retain bounded resources; see
@@ -123,8 +123,8 @@ documented sampled-versus-full identity prerequisite; no unsafe relink action wa
 introduced. [Licensing](LICENSING.md) defines the approved project terms and
 remaining actual-artifact distribution/legal-review gates, not release approval.
 
-The separately approved clip-speed extension adds presets and editable source-frame
-curves without replacing track animation; [#14](https://github.com/Plonk42/PasCap/issues/14)
+Clip speed is clip-only: constant or editable source-frame curves with presets such as
+Ramp up; [#14](https://github.com/Plonk42/PasCap/issues/14)
 records its verification and delivery. It does not approve new optical-flow effects
 or private-media/hardware qualification work.
 

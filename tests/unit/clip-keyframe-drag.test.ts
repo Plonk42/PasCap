@@ -23,17 +23,20 @@ describe('Transform keyframe sliding', () => {
     const project = fixture([30, 60]);
     const plan = planClipKeyframeMove(project, 'clip', 60, 90, 300);
     expect(plan.error).toBe('');
-    expect(plan.command?.spatial.keyframes.map((key) => [key.frame, key.interpolation, key.values.scale])).toEqual([
+    expect(plan.command?.type).toBe('spatial');
+    const spatial = plan.command?.type === 'spatial' ? plan.command.spatial : null;
+    expect(spatial?.keyframes.map((key) => [key.frame, key.interpolation, key.values.scale])).toEqual([
       [30, 'linear', 1],
       [90, 'ease-in', 2],
     ]);
-    expect(plan.document.clips[0]!.spatial).toEqual(plan.command!.spatial);
+    expect(plan.document.clips[0]!.spatial).toEqual(spatial);
     expect(project.clips[0]!.spatial.keyframes[1]!.frame).toBe(60);
   });
 
   it('re-sorts when a key passes its neighbour', () => {
     const plan = planClipKeyframeMove(fixture([30, 60]), 'clip', 60, 20, 300);
-    expect(plan.command?.spatial.keyframes.map((key) => key.frame)).toEqual([20, 30]);
+    expect(plan.document.clips[0]!.spatial.keyframes.map((key) => key.frame)).toEqual([20, 30]);
+    expect(plan.command?.type).toBe('spatial');
   });
 
   it('adds no command for an unchanged frame and rejects collisions and out-of-original frames', () => {
@@ -47,10 +50,43 @@ describe('Transform keyframe sliding', () => {
     expect(planClipKeyframeMove(project, 'clip', 60, -1, 300).error).toMatch(/source frames 0–300/);
   });
 
+  it('moves a clip speed key as one speed command and rejects speed collisions and out-of-original frames', () => {
+    const project = fixture([]);
+    project.clips[0]!.speed = {
+      mode: 'curve',
+      keyframes: [
+        { frame: 10, rate: 1, interpolation: 'linear' },
+        { frame: 70, rate: 2, interpolation: 'smooth' },
+      ],
+    };
+    const plan = planClipKeyframeMove(project, 'clip', 70, 90, 300, 'speed');
+    expect(plan.error).toBe('');
+    expect(plan.command).toEqual({
+      type: 'speed',
+      clipId: 'clip',
+      speed: {
+        mode: 'curve',
+        keyframes: [
+          { frame: 10, rate: 1, interpolation: 'linear' },
+          { frame: 90, rate: 2, interpolation: 'smooth' },
+        ],
+      },
+    });
+    expect(plan.document.clips[0]!.speed).toEqual(plan.command?.type === 'speed' ? plan.command.speed : null);
+    expect(project.clips[0]!.speed).toMatchObject({ keyframes: [{ frame: 10 }, { frame: 70 }] });
+    expect(planClipKeyframeMove(project, 'clip', 70, 70, 300, 'speed').command).toBeNull();
+    const collision = planClipKeyframeMove(project, 'clip', 70, 10, 300, 'speed');
+    expect(collision.error).toBe('A clip speed keyframe already exists at this source frame. Choose another frame.');
+    expect(collision.document).toBe(project);
+    expect(planClipKeyframeMove(project, 'clip', 70, 301, 300, 'speed').error).toBe(
+      'A Speed keyframe must stay within source frames 0–300.',
+    );
+  });
+
   it('maps pointer travel in output frames to source frames at the placed speed', () => {
     const project = fixture([50], 2);
     const placed = calculateLayout(project).clips[0]!;
-    const [marker] = clipKeyframeMarkers(placed, project.layers[0]!);
+    const [marker] = clipKeyframeMarkers(placed);
     expect(clipKeyframeTarget(placed, marker!, 0)).toBe(50);
     expect(clipKeyframeTarget(placed, marker!, 5)).toBe(placed.retiming.sourceAt(marker!.outputFrame + 5));
     expect(clipKeyframeTarget(placed, marker!, 5)).toBeGreaterThan(55);

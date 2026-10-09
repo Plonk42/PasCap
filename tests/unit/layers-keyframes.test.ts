@@ -10,10 +10,8 @@ import {
   type LayerKeyframe,
   type LayerKeyValues,
 } from '../../src/shared/keyframes.js';
-import { compileLayerRetiming } from '../../src/shared/layer-retiming.js';
 import { createClip, createLayer, createProject, projectSchema } from '../../src/shared/model.js';
 import { validateSourceRanges } from '../../src/shared/source-range.js';
-import { compileRetiming } from '../../src/shared/speed.js';
 import { calculateLayout, sampleTimeline } from '../../src/shared/timeline.js';
 
 function point(frame: number, values: Partial<LayerKeyValues>, interpolation: Interpolation = 'linear'): LayerKeyframe {
@@ -228,8 +226,6 @@ describe('project-frame shared row settings', () => {
     expect(colourAt(layer, 40)).toEqual(NEUTRAL_COLOUR);
   });
   it('keeps all nine static grade controls and unkeyed channels independent of participating parameters', () => {
-    const clip = createClip('one', 'source', 300, 400);
-    clip.speed = { mode: 'constant', rate: 0.5 };
     const layer = { ...createProject('p', 'P').layers[0]!, opacity: 0.7 };
     layer.colour = {
       ...NEUTRAL_COLOUR,
@@ -255,11 +251,10 @@ describe('project-frame shared row settings', () => {
     expect(colourAt(layer, 50)).toEqual({ ...layer.colour, exposure: 0, hue: 90 });
     expect(opacityAt(layer, 50)).toBe(0.5);
     expect(layer.opacity).toBe(0.7);
-    expect(compileLayerRetiming(clip, layer, 50)).toBe(compileRetiming(clip));
     expect(layer.colour.exposure).toBe(0.7);
     expect(layer.colour.hue).toBe(30);
   });
-  it('opacity/speed/colour points survive trim/restoration/split at their absolute project frames', () => {
+  it('opacity/colour points survive trim/restoration/split at their absolute project frames', () => {
     let project = applyCommand(createProject('p', 'P'), {
       type: 'insert',
       clip: createClip('a', 'source', 0, 100),
@@ -293,21 +288,6 @@ describe('project-frame shared row settings', () => {
     project = applyCommand(project, {
       type: 'layer-key-toggle',
       layerId: 'video-1',
-      frame: 0,
-      setting: 'speed',
-      value: 1,
-    });
-    project = applyCommand(project, { type: 'layer-key-easing', layerId: 'video-1', frame: 0, interpolation: 'hold' });
-    project = applyCommand(project, {
-      type: 'layer-key-toggle',
-      layerId: 'video-1',
-      frame: 80,
-      setting: 'speed',
-      value: 2,
-    });
-    project = applyCommand(project, {
-      type: 'layer-key-toggle',
-      layerId: 'video-1',
       frame: 10,
       setting: 'exposure',
       value: -0.5,
@@ -334,7 +314,7 @@ describe('project-frame shared row settings', () => {
     const layout = calculateLayout(project);
     expect(layout.clips.map(({ start, duration, end }) => ({ start, duration, end }))).toEqual([
       { start: 0, duration: 50, end: 50 },
-      { start: 50, duration: 40, end: 90 },
+      { start: 50, duration: 50, end: 100 },
     ]);
     expect(layout.clips[1]!.retiming.sourceAt(0)).toBe(50);
     expect(layout.clips[1]!.duration).toBeGreaterThan(0);

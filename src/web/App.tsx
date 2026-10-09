@@ -103,9 +103,6 @@ function timingKey(project: ProjectDocument): string {
         transitions: layer.transitions,
         openingFade: layer.openingFade,
         closingFade: layer.closingFade,
-        keys: layer.keyframes
-          .filter((key) => key.values.speed !== null)
-          .map((key) => ({ frame: key.frame, interpolation: key.interpolation, value: key.values.speed })),
       }))
       .sort((left, right) => left.id.localeCompare(right.id)),
     clips: project.clips.map(({ id, mediaId, layerId, start, sourceIn, sourceOut, speed }) => ({
@@ -905,7 +902,12 @@ export function App() {
       } catch (cause) {
         setError(message(cause, 'Cannot update the preview appearance. Retry preview without changing your project.'));
       }
-      if (requestedFrame.current !== null) {
+      if (draft && draft.frame !== engine.current.diagnostics().frame) {
+        // An appearance-only draft (e.g. a sliding Colour keyframe) still previews its own frame.
+        void engine.current
+          .seek(draft.frame)
+          .catch((cause: unknown) => setError(message(cause, 'Cannot preview this draft.')));
+      } else if (requestedFrame.current !== null) {
         const frame = requestedFrame.current;
         requestedFrame.current = null;
         void engine.current
@@ -1118,7 +1120,7 @@ export function App() {
       setKeyframeInspection(next);
       const preview = engine.current;
       if (lastPreview.current !== `committed:${timingKey(document)}`) requestedFrame.current = next.expectedFrame;
-      // A just-committed Speed move may extend timing before the preview reloads.
+      // A just-committed timing edit may change duration before the preview reloads.
       // Its requestedFrame is already queued; do not seek outside the old loaded layout.
       if (duration && preview && next.expectedFrame < preview.diagnostics().duration) {
         void preview

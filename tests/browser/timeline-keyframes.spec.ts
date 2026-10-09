@@ -61,7 +61,7 @@ function sequence(): ProjectDocument {
   ];
   project.layers[0]!.transitions = [{ leftId: 'first', rightId: 'second', type: 'cut', duration: 0 }];
   project.layers[0]!.keyframes = [
-    sharedPoint(20, { ...scalarColourValues(NEUTRAL_COLOUR), exposure: 0.6, opacity: 0.7, speed: 1 }, 'ease-in'),
+    sharedPoint(20, { ...scalarColourValues(NEUTRAL_COLOUR), exposure: 0.6, opacity: 0.7 }, 'ease-in'),
     sharedPoint(80, { exposure: -0.3 }, 'hold'),
   ];
   return projectSchema.parse(project);
@@ -312,64 +312,15 @@ test('Snap uses stationary boundaries/playhead, Alt bypasses it, and timeline fr
   expect((await current(page)).layers[0]!.keyframes[0]).toEqual({ ...before.layers[0]!.keyframes[0]!, frame: 0 });
 });
 
-test('moving a Speed point recomputes contextual timing but never changes source ranges, static bases or other point channels', async ({
-  page,
-}) => {
-  const project = sequence();
-  project.layers[0]!.keyframes = [
-    sharedPoint(0, { speed: 0.5 }, 'linear'),
-    sharedPoint(70, { speed: 2, exposure: 0.4 }, 'smooth'),
-  ];
-  await fixture(page, project);
-  const expected = applyCommand(project, { type: 'layer-key-move', layerId: 'video-1', frame: 70, nextFrame: 40 });
-  const start = await begin(page, 70);
-  await move(page, start, 40, true);
-  expect(await current(page)).toEqual(project);
-  await page.mouse.up();
-  await page.keyboard.up('Alt');
-  expect(await current(page)).toEqual(expected);
-  expect(expected.clips[0]).toEqual(project.clips[0]);
-  const newSecondStart = calculateLayout(expected).clips[0]!.end;
-  expect(expected.clips[1]).toEqual({ ...project.clips[1]!, start: newSecondStart });
-  expect(expected.clips[1]!.start).not.toBe(project.clips[1]!.start);
-  expect(calculateLayout(expected).duration).not.toBe(calculateLayout(project).duration);
-  await ready(page, expected);
-  await page.getByRole('button', { name: 'Undo', exact: true }).click();
-  expect(await current(page)).toEqual(project);
-  await ready(page, project);
-});
-
-test('a Speed move that invalidates a dissolve is previewed as invalid and leaves all timeline settings/history intact', async ({
-  page,
-}) => {
-  const project = sequence();
-  project.clips = [createClip('first', assets[0]!.id, 0, 30), createClip('second', assets[1]!.id, 30, 60)];
-  project.layers[0]!.transitions = [{ leftId: 'first', rightId: 'second', type: 'cross-dissolve', duration: 18 }];
-  project.layers[0]!.keyframes = [sharedPoint(0, { speed: 1 }, 'hold'), sharedPoint(100, { speed: 8 }, 'hold')];
-  await fixture(page, project);
-  const start = await begin(page, 0);
-  await move(page, start, 110, true);
-  await expect(page.locator('.timeline-layer-key.moving')).toHaveClass(/invalid/);
-  await expect(page.locator('.timeline-bottom')).toContainText('overlap or exceed');
-  await page.mouse.up();
-  await page.keyboard.up('Alt');
-  expect(await current(page)).toEqual(project);
-  await page.evaluate(() => window.pascapLab!.flush());
-  expect(memory.saves).toBe(0);
-  await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
-});
-
-test('a keyboard Speed-point move can extend beyond the old preview duration without an invalid seek', async ({
-  page,
-}) => {
+test('a keyboard point move can go beyond the preview duration without an invalid seek', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
   const project = sequence();
-  project.clips = [createClip('first', assets[0]!.id, 0, 60)];
+  project.clips = [{ ...createClip('first', assets[0]!.id, 0, 60), speed: { mode: 'constant', rate: 0.5 } }];
   project.layers[0]!.transitions = [];
-  project.layers[0]!.keyframes = [sharedPoint(0, { speed: 0.5 }, 'hold'), sharedPoint(110, { speed: 8 }, 'hold')];
+  project.layers[0]!.keyframes = [sharedPoint(0, { exposure: 0 }, 'hold'), sharedPoint(110, { exposure: 0.5 }, 'hold')];
   await fixture(page, project);
-  expect(calculateLayout(project).duration).toBe(111);
+  expect(calculateLayout(project).duration).toBe(120);
   await inspectorTab(page, 'Track keyframes');
   await marker(page, 110).focus();
   await marker(page, 110).press('Shift+ArrowRight');

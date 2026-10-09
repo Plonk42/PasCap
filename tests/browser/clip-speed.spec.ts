@@ -3,7 +3,7 @@ import { clipSpeedPreset } from '../../src/shared/clip-speed.js';
 import type { MediaAsset } from '../../src/shared/media.js';
 import { createClip, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
 import { calculateLayout } from '../../src/shared/timeline.js';
-import { clipAction, expandedInspectorPreferences, sharedPoint } from './editor-helpers.js';
+import { clipAction, expandedInspectorPreferences } from './editor-helpers.js';
 import { memoryProjects, type MemoryProjects } from './memory-projects.js';
 
 let memory: MemoryProjects;
@@ -182,7 +182,7 @@ test('exact frame/rate/easing fields preserve focus, reject collisions and keep 
   expect(document.layers).toEqual(before.layers);
 });
 
-test('point click, source-boundary navigation and Add/Delete are explicit and reversible', async ({ page }) => {
+test('point click, source-boundary navigation and diamond/Delete are explicit and reversible', async ({ page }) => {
   const before = await seedCurve(page);
   await seek(page, 10);
   await point(page, 60).click();
@@ -190,18 +190,11 @@ test('point click, source-boundary navigation and Add/Delete are explicit and re
   const main = page.locator('.keyframe-setting-navigation').filter({
     has: page.getByRole('button', { name: 'Keyframe Speed', exact: true }),
   });
-  await expect(main.getByRole('button')).toHaveCount(3);
-  // Main arrows visit track Speed only; clip-source keys belong to the section union.
-  for (const direction of ['Previous', 'Next'] as const) {
-    const arrow = main.getByRole('button', { name: `${direction} Speed keyframe`, exact: true });
-    await expect(arrow).toBeVisible();
-    await expect(arrow).toBeDisabled();
-    await expect(arrow).toHaveAttribute('aria-disabled', 'true');
-    await expect(arrow).toHaveAttribute('tabindex', '-1');
-    await expect(arrow).toHaveJSProperty('disabled', false);
-    await arrow.evaluate((element) => (element as HTMLButtonElement).click());
-  }
-  await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(60);
+  await expect(main.getByRole('button')).toHaveCount(1);
+  await expect(main.getByRole('button', { name: 'Keyframe Speed', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
   const next = page.locator('.section-keyframe-line').getByRole('button', { name: 'Next Speed keyframe', exact: true });
   await next.click();
   await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(90);
@@ -211,8 +204,16 @@ test('point click, source-boundary navigation and Add/Delete are explicit and re
   await expect(page.locator('.clip-speed-outside')).toContainText('nearest available');
   expect(memory.saves).toBe(0);
   await seek(page, 10);
-  await page.getByRole('button', { name: 'Add clip speed keyframe' }).click();
+  const diamond = page.getByRole('button', { name: 'Keyframe Speed', exact: true });
+  await expect(diamond).toHaveAttribute('aria-pressed', 'false');
+  await expect(page.getByRole('slider', { name: 'Clip speed rate', exact: true })).toBeDisabled();
+  await diamond.click();
+  await expect(diamond).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('slider', { name: 'Clip speed rate', exact: true })).toBeEnabled();
   await expect(page.locator('.clip-speed-point')).toHaveCount(6);
+  const added = await current(page);
+  if (added.clips[0]!.speed.mode !== 'curve') throw new Error('Curve expected');
+  expect(added.clips[0]!.speed.keyframes[1]).toEqual({ frame: 10, rate: 1, interpolation: 'linear' });
   await expect(page.getByRole('spinbutton', { name: 'Clip speed keyframe source frame' })).toHaveValue('10');
   await page.getByRole('button', { name: 'Delete clip speed keyframe' }).click();
   expect(await current(page)).toEqual(before);
@@ -220,20 +221,37 @@ test('point click, source-boundary navigation and Add/Delete are explicit and re
   await expect(point(page, 10)).toBeVisible();
 });
 
-test('graph background seeks without an edit and key removal cannot drop below two points', async ({ page }) => {
-  await seedCurve(page);
+test('graph background seeks without an edit and deleting the last key returns to constant speed', async ({ page }) => {
+  await seedCurve(page, (document) => {
+    document.clips[0]!.speed = {
+      mode: 'curve',
+      keyframes: [
+        { frame: 0, rate: 1, interpolation: 'linear' },
+        { frame: 60, rate: 1.5, interpolation: 'linear' },
+      ],
+    };
+  });
   const graph = page.getByRole('button', { name: 'Seek within clip speed curve' });
   await graph.scrollIntoViewIfNeeded();
   const box = (await graph.boundingBox())!;
   await page.mouse.click(box.x + (box.width * 10) / 120, box.y + box.height * 0.2);
   await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(10);
   expect(memory.saves).toBe(0);
-  for (let index = 0; index < 3; index++)
-    await page.getByRole('button', { name: 'Delete clip speed keyframe' }).click();
-  const document = await current(page);
-  if (document.clips[0]!.speed.mode !== 'curve') throw new Error('Curve expected');
-  expect(document.clips[0]!.speed.keyframes).toHaveLength(2);
-  await expect(page.getByRole('button', { name: 'Delete clip speed keyframe' })).toBeDisabled();
+  const remove = page.getByRole('button', { name: 'Delete clip speed keyframe' });
+  await remove.click();
+  let document = await current(page);
+  expect(document.clips[0]!.speed).toEqual({
+    mode: 'curve',
+    keyframes: [{ frame: 60, rate: 1.5, interpolation: 'linear' }],
+  });
+  await expect(remove).toBeEnabled();
+  await remove.click();
+  document = await current(page);
+  expect(document.clips[0]!.speed).toEqual({ mode: 'constant', rate: 1.5 });
+  await expect(page.getByRole('region', { name: 'Clip speed curve editor' })).toBeHidden();
+  await expect(page.getByRole('combobox', { name: 'Speed mode', exact: true })).toHaveValue('constant');
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(point(page, 60)).toBeVisible();
 });
 
 test('native graph dragging previews live but commits only on release as one Undo', async ({ page }) => {
@@ -247,15 +265,9 @@ test('native graph dragging previews live but commits only on release as one Und
   expect(memory.saves).toBe(0);
   await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
   await expect(page.getByRole('button', { name: 'Keyframe Speed', exact: true })).toBeDisabled();
-  const main = page.locator('.keyframe-setting-navigation').filter({
-    has: page.getByRole('button', { name: 'Keyframe Speed', exact: true }),
-  });
-  for (const direction of ['Previous', 'Next'] as const) {
-    const arrow = main.getByRole('button', { name: `${direction} Speed keyframe`, exact: true });
-    await expect(arrow).toBeDisabled();
-    await expect(arrow).toHaveAttribute('aria-disabled', 'true');
-    await expect(arrow).toHaveAttribute('tabindex', '-1');
-  }
+  const line = page.locator('.speed-settings .section-keyframe-line');
+  for (const direction of ['Previous', 'Next'] as const)
+    await expect(line.getByRole('button', { name: `${direction} Speed keyframe`, exact: true })).toBeDisabled();
   await expect(page.getByRole('button', { name: 'Split at playhead', exact: true })).toBeDisabled();
   await page.mouse.up();
   await expect(point(page, 70)).toBeFocused();
@@ -403,20 +415,6 @@ test('duplicate/trim/split preserve independent clip curves and keep outside-tri
   await page.keyboard.press('s');
   const split = await current(page);
   expect(split.clips.map((item) => item.speed)).toEqual([before.clips[0]!.speed, before.clips[0]!.speed]);
-});
-
-test('row Speed override remains explicit and removing only it restores the clip curve unchanged', async ({ page }) => {
-  const before = await seedCurve(page, (document) => {
-    document.layers[0]!.keyframes = [sharedPoint(0, { speed: 2, exposure: 0.3 }, 'hold')];
-  });
-  await expect(page.locator('.clip-speed-override')).toContainText('Overridden by track Speed keyframes');
-  await expect(page.getByRole('combobox', { name: 'Speed mode', exact: true })).toBeHidden();
-  await page.getByRole('button', { name: 'Keyframe Speed', exact: true }).click();
-  await expect(page.getByRole('region', { name: 'Clip speed curve editor' })).toBeVisible();
-  const document = await current(page);
-  expect(document.clips[0]!.speed).toEqual(before.clips[0]!.speed);
-  expect(document.layers[0]!.keyframes).toEqual([sharedPoint(0, { exposure: 0.3 }, 'hold')]);
-  expect(calculateLayout(document).duration).toBe(120);
 });
 
 test('custom mapped preview uses exact decoded source frames with only two video decoders', async ({ page }) => {

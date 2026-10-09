@@ -1284,7 +1284,7 @@ describe('PreviewEngine observed-frame tolerance and recovery', () => {
     },
   );
 
-  it.each(['clip', 'row'] as const)(
+  it.each(['clip', 'curve'] as const)(
     'finds expected-1 for a held 0.1x source despite its early inverse (%s speed)',
     async (mode) => {
       const project = singleProject(true);
@@ -1293,15 +1293,18 @@ describe('PreviewEngine observed-frame tolerance and recovery', () => {
         {
           frame: 0,
           interpolation: 'linear',
-          values: { ...EMPTY_KEY_VALUES, exposure: 0, speed: mode === 'row' ? 0.1 : null },
+          values: { ...EMPTY_KEY_VALUES, exposure: 0 },
         },
         {
           frame: 50,
           interpolation: 'hold',
-          values: { ...EMPTY_KEY_VALUES, exposure: 1, speed: mode === 'row' ? 0.1 : null },
+          values: { ...EMPTY_KEY_VALUES, exposure: 1 },
         },
       ];
-      if (mode === 'clip') project.clips[0]!.speed = { mode: 'constant', rate: 0.1 };
+      project.clips[0]!.speed =
+        mode === 'clip'
+          ? { mode: 'constant', rate: 0.1 }
+          : { mode: 'curve', keyframes: [{ frame: 0, rate: 0.1, interpolation: 'hold' }] };
       const map = calculateLayout(project).clips[0]!.retiming;
       expect([map.sourceAt(9), map.sourceAt(10), map.outputAt(0)]).toEqual([0, 1, 0]);
       const preview = await running(project);
@@ -1739,16 +1742,15 @@ describe('PreviewEngine spatial appearance', () => {
     expectNoMediaOperations(preview);
   });
 
-  it.each(['clip', 'row'] as const)(
+  it.each(['clip', 'curve'] as const)(
     'samples continuous spatial animation on held decoded frames (%s speed)',
     async (mode) => {
       const project = singleProject(true);
       project.clips[0]!.sourceOut = 6;
-      if (mode === 'clip') project.clips[0]!.speed = { mode: 'constant', rate: 0.1 };
-      else
-        project.layers[0]!.keyframes = [
-          { frame: 0, interpolation: 'hold', values: { ...EMPTY_KEY_VALUES, speed: 0.1 } },
-        ];
+      project.clips[0]!.speed =
+        mode === 'clip'
+          ? { mode: 'constant', rate: 0.1 }
+          : { mode: 'curve', keyframes: [{ frame: 0, rate: 0.1, interpolation: 'hold' }] };
       const spatial = project.clips[0]!.spatial;
       spatial.keyframes = [
         { frame: 0, interpolation: 'linear', values: { ...spatial.base } },
@@ -2244,22 +2246,25 @@ describe('PreviewEngine editor-only ungraded comparison', () => {
     expect(preview.project).toEqual(document);
   });
 
-  it.each(['clip', 'row'] as const)('preserves held-source neighbour mapping (%s speed)', async (mode) => {
+  it.each(['clip', 'curve'] as const)('preserves held-source neighbour mapping (%s speed)', async (mode) => {
     const project = gradedProject(true);
     project.clips[0]!.sourceOut = 6;
     project.layers[0]!.keyframes = [
       {
         frame: 0,
         interpolation: 'linear',
-        values: { ...EMPTY_KEY_VALUES, exposure: -1, speed: mode === 'row' ? 0.1 : null },
+        values: { ...EMPTY_KEY_VALUES, exposure: -1 },
       },
       {
         frame: 50,
         interpolation: 'hold',
-        values: { ...EMPTY_KEY_VALUES, exposure: 1, speed: mode === 'row' ? 0.1 : null },
+        values: { ...EMPTY_KEY_VALUES, exposure: 1 },
       },
     ];
-    if (mode === 'clip') project.clips[0]!.speed = { mode: 'constant', rate: 0.1 };
+    project.clips[0]!.speed =
+      mode === 'clip'
+        ? { mode: 'constant', rate: 0.1 }
+        : { mode: 'curve', keyframes: [{ frame: 0, rate: 0.1, interpolation: 'hold' }] };
     const map = calculateLayout(project).clips[0]!.retiming;
     expect([map.sourceAt(9), map.sourceAt(10), map.outputAt(0)]).toEqual([0, 1, 0]);
     const preview = await running(project);

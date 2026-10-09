@@ -215,41 +215,16 @@ describe('atomic clip source-range plans', () => {
     },
   );
 
-  it('recompiles the suffix at its new project time using overriding row Speed, not raw source length or clip rate', () => {
-    const project = rangeProject();
-    project.clips[0]!.speed = { mode: 'constant', rate: 4 };
-    project.layers[0]!.keyframes = [
-      { frame: 0, interpolation: 'hold', values: { ...EMPTY_KEY_VALUES, speed: 1 } },
-      { frame: 150, interpolation: 'hold', values: { ...EMPTY_KEY_VALUES, speed: 2 } },
-    ];
-    const before = structuredClone(project);
-    expect(calculateLayout(project).clips.map(({ start, duration }) => [start, duration])).toEqual([
-      [20, 165],
-      [185, 50],
-      [235, 50],
-    ]);
-    const plan = planClipSourceRange(project, project.clips[0]!, 'out', 200, 600, 75);
-    expect(plan.error).toBe('');
-    const layout = calculateLayout(plan.document);
-    expect(layout.clips.map(({ start, duration }) => [start, duration])).toEqual([
-      [20, 100],
-      [120, 65],
-      [185, 50],
-    ]);
-    expect(plan.document.clips.map((clip) => clip.start)).toEqual([20, 120, 185]);
-    expect(plan.frame).toBe(119);
-    expect(layout.clips[0]!.retiming.sourceAt(99)).toBe(199);
-    expect(layout.clips[1]!.retiming.sourceAt(30)).toBe(30);
-    expect(layout.clips[1]!.retiming.sourceAt(31)).toBe(32);
-    expect(plan.document.layers[0]!.keyframes).toEqual(before.layers[0]!.keyframes);
-    expect(plan.document.clips[0]!.speed).toEqual(before.clips[0]!.speed);
-    expect(project).toEqual(before);
-  });
-
   it('preserves row points, appearance, original speed/spatial anchors and independent nested data', () => {
     const project = rangeProject();
     const clip = project.clips[0]!;
-    clip.speed = { mode: 'ramp', startRate: 1, endRate: 2, anchorIn: 0, anchorOut: 600, curve: 'linear' };
+    clip.speed = {
+      mode: 'curve',
+      keyframes: [
+        { frame: 0, rate: 1, interpolation: 'linear' },
+        { frame: 600, rate: 2, interpolation: 'linear' },
+      ],
+    };
     clip.spatial.base.translateX = 0.25;
     clip.spatial.keyframes = [
       { frame: 0, interpolation: 'linear', values: { ...NEUTRAL_SPATIAL_POSE, scale: 2 } },
@@ -346,7 +321,7 @@ describe('atomic clip source-range plans', () => {
     expect(plan.frame).toBe(169);
   });
 
-  it('uses static clip retiming for the selected OUT preview when no row Speed participates', () => {
+  it('uses static clip retiming for the selected OUT preview', () => {
     const project = rangeProject();
     project.clips[0]!.speed = { mode: 'constant', rate: 2 };
     const plan = planClipSourceRange(project, project.clips[0]!, 'out', 250, 600, 75);

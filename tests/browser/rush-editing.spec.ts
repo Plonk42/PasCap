@@ -252,7 +252,7 @@ function unchangedOthers(
   editedIds: readonly string[],
   transitions: Readonly<Record<string, readonly Transition[]>> = {},
 ): void {
-  expect(next.schemaVersion).toBe(12);
+  expect(next.schemaVersion).toBe(13);
   expect(next.media).toEqual(before.media);
   expect(next.layers).toEqual(
     before.layers.map((layer) => ({ ...layer, transitions: transitions[layer.id] ?? layer.transitions })),
@@ -558,10 +558,7 @@ test('visible split then S selects each right piece, preserves boundaries and de
   const document = dissolvedSequence();
   document.layers[0]!.colour = { ...document.layers[0]!.colour, contrast: 1.25, saturation: 0.7, hue: 20 };
   document.layers[0]!.opacity = 0.65;
-  document.layers[0]!.keyframes = [
-    sharedPoint(20, { exposure: 0.2, speed: 1 }),
-    sharedPoint(400, { speed: 1, opacity: 0.8 }, 'hold'),
-  ];
+  document.layers[0]!.keyframes = [sharedPoint(20, { exposure: 0.2 }), sharedPoint(400, { opacity: 0.8 }, 'hold')];
   await fixture(page, document);
   const before = await current(page);
   await seek(page, 30);
@@ -736,7 +733,7 @@ test('Q and W retain the mapped displayed frame, ripple dissolves and recover bo
   await expect(page.getByRole('button', { name: 'Redo', exact: true })).toBeEnabled();
 });
 
-test('I/O middle removal is transient then one edit, preserving absolute eleven-channel row points, music and overlays', async ({
+test('I/O middle removal is transient then one edit, preserving absolute ten-channel row points, music and overlays', async ({
   page,
   request,
 }) => {
@@ -747,7 +744,6 @@ test('I/O middle removal is transient then one edit, preserving absolute eleven-
       15,
       {
         opacity: 0.7,
-        speed: 1,
         temperature: 0.2,
         tint: -0.3,
         exposure: 0.3,
@@ -760,17 +756,13 @@ test('I/O middle removal is transient then one edit, preserving absolute eleven-
       },
       'hold',
     ),
-    sharedPoint(1_000, { speed: 1, exposure: 0.6 }, 'smooth'),
+    sharedPoint(1_000, { exposure: 0.6 }, 'smooth'),
   ];
   document.layers.push({
     ...createLayer('upper', 'Video track 2', false),
     opacity: 0.75,
     keyframes: [sharedPoint(200, { opacity: 0.6, hue: 35 }, 'ease-in')],
   });
-  document.clips[0] = {
-    ...document.clips[0]!,
-    speed: { mode: 'constant', rate: 2 },
-  };
   document.layers[0]!.colour = { ...document.layers[0]!.colour, exposure: -0.2, saturation: 0.6 };
   document.layers[0]!.opacity = 0.65;
   document.clips.splice(1, 0, {
@@ -871,7 +863,7 @@ test('overlay middle cuts keep their gap and neighbours fixed; visible quick tri
   document.layers.push({
     ...createLayer('upper', 'Video track 2', false),
     opacity: 0.8,
-    keyframes: [sharedPoint(10, { speed: 1, exposure: 0.2 }), sharedPoint(500, { speed: 1, hue: 25 }, 'hold')],
+    keyframes: [sharedPoint(10, { exposure: 0.2 }), sharedPoint(500, { hue: 25 }, 'hold')],
     transitions: [
       { leftId: 'upper-before', rightId: 'top', type: 'cut', duration: 0 },
       { leftId: 'top', rightId: 'upper-after', type: 'cut', duration: 0 },

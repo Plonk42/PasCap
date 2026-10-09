@@ -38,6 +38,19 @@
 .timeline-clip-key.speed {
   top: 40px;
   color: #ffc7bb;
+  cursor: ew-resize;
+}
+
+.timeline-clip-key.speed.moving > span {
+  outline: 1px solid var(--accent);
+}
+
+.timeline-clip-key.speed.invalid {
+  color: var(--error);
+}
+
+.snap-guide.speed-keyframe-guide {
+  background: #ffc7bb;
 }
 
 /* Transform keys are boxed blue buttons the size of the Colour track markers: that box overlaps the clip's

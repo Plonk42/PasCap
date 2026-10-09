@@ -430,7 +430,7 @@ const HELP_CONTEXTS = [
   },
   { label: 'Placement timing', tab: 'Clip', text: 'Tip: Opacity is in Track → Colour.' },
   { label: 'Colour animation', tab: 'Track', text: 'These settings grade every clip on this track.' },
-  { label: 'Speed timing', tab: 'Clip', text: 'Custom curve changes the speed over the length of this clip.' },
+  { label: 'Speed timing', tab: 'Clip', text: 'A keyframe ◇ changes the speed over the length of this clip.' },
   {
     label: 'Animation',
     tab: 'Track keyframes',
@@ -592,7 +592,7 @@ test('numeric fields retain their descriptions even while the linked help popove
     /Type a frame number or HH:MM:SS:FF in the fields/,
   );
   await expect(page.getByRole('spinbutton', { name: 'Clip speed rate', exact: true })).toHaveAccessibleDescription(
-    /Custom curve changes the speed over the length of this clip/,
+    /A keyframe ◇ changes the speed over the length of this clip/,
   );
   await inspectorTab(page, 'Sequence');
   await expect(page.getByRole('spinbutton', { name: 'Opening fade', exact: true })).toHaveAccessibleDescription(

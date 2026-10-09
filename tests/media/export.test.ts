@@ -39,10 +39,18 @@ const curves = ['linear', 'ease-in', 'ease-out', 'smooth'] as const;
 const speeds: SpeedSettings[] = [
   { mode: 'constant', rate: 0.5 },
   { mode: 'constant', rate: 2 },
-  ...curves.flatMap((curve) => [
-    { mode: 'ramp' as const, startRate: 0.5, endRate: 2, curve, anchorIn: 0, anchorOut: 26 },
-    { mode: 'ramp' as const, startRate: 2, endRate: 0.5, curve, anchorIn: 0, anchorOut: 26 },
-  ]),
+  ...curves.flatMap((interpolation) =>
+    [
+      [0.5, 2],
+      [2, 0.5],
+    ].map(([start, end]): SpeedSettings => ({
+      mode: 'curve',
+      keyframes: [
+        { frame: 0, rate: start!, interpolation },
+        { frame: 26, rate: end!, interpolation: 'hold' },
+      ],
+    })),
+  ),
 ];
 
 async function rawVideo(config: ServiceConfig, asset: MediaAsset): Promise<Buffer> {
@@ -482,7 +490,7 @@ describe.skipIf(!enabled)('production native export · opt-in disposable media o
       expect(needsLayeredExport(project)).toBe(false);
       const result = await completed(project);
       expect(result.receipt.snapshot).toEqual(captured);
-      expect(result.receipt.snapshot.schemaVersion).toBe(12);
+      expect(result.receipt.snapshot.schemaVersion).toBe(13);
       expect(result.receipt.settings.pipeline).toBe('static-single-layer');
       expect(result.receipt.settings.resources).toEqual(EXPORT_RESOURCES);
       expect(result.receipt.settings.layered).toBeNull();
@@ -508,7 +516,7 @@ describe.skipIf(!enabled)('production native export · opt-in disposable media o
     },
   );
 
-  it('exports >2 clips, repeated graded originals, slow/fast and both directions of every ramp with exact numeric pixels', async () => {
+  it('exports >2 clips, repeated graded originals, slow/fast and both directions of every ramp-shaped curve with exact numeric pixels', async () => {
     const project = createProject('native-many', 'Many clips and every speed curve');
     project.layers[0]!.colour = {
       ...NEUTRAL_COLOUR,

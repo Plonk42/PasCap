@@ -25,7 +25,7 @@ function transformKeys(project: ProjectDocument, frames: readonly number[]): voi
 
 function markersFor(project: ProjectDocument) {
   const placed = calculateLayout(project).clips[0]!;
-  return { placed, markers: clipKeyframeMarkers(placed, project.layers[0]!) };
+  return { placed, markers: clipKeyframeMarkers(placed) };
 }
 
 describe('clip-owned timeline keyframe markers', () => {
@@ -34,7 +34,7 @@ describe('clip-owned timeline keyframe markers', () => {
     expect(markersFor(project).markers).toEqual([]);
     project.clips[0]!.spatial.base.scale = 2;
     project.layers[0]!.keyframes = [
-      { frame: 30, interpolation: 'linear', values: { ...EMPTY_KEY_VALUES, speed: 2, exposure: 1 } },
+      { frame: 30, interpolation: 'linear', values: { ...EMPTY_KEY_VALUES, exposure: 1 } },
     ];
     expect(markersFor(project).markers).toEqual([]);
   });
@@ -45,15 +45,14 @@ describe('clip-owned timeline keyframe markers', () => {
     const before = structuredClone(project);
     const { markers } = markersFor(project);
     expect(markers).toEqual([
-      { type: 'transform', sourceFrame: 10, outputFrame: 0, timelineFrame: 17, seekFrame: 17, speedOverridden: false },
-      { type: 'transform', sourceFrame: 30, outputFrame: 20, timelineFrame: 37, seekFrame: 37, speedOverridden: false },
+      { type: 'transform', sourceFrame: 10, outputFrame: 0, timelineFrame: 17, seekFrame: 17 },
+      { type: 'transform', sourceFrame: 30, outputFrame: 20, timelineFrame: 37, seekFrame: 37 },
       {
         type: 'transform',
         sourceFrame: 129,
         outputFrame: 119,
         timelineFrame: 136,
         seekFrame: 136,
-        speedOverridden: false,
       },
       {
         type: 'transform',
@@ -61,7 +60,6 @@ describe('clip-owned timeline keyframe markers', () => {
         outputFrame: 120,
         timelineFrame: 137,
         seekFrame: 136,
-        speedOverridden: false,
       },
     ]);
     expect(project).toEqual(before);
@@ -86,14 +84,6 @@ describe('clip-owned timeline keyframe markers', () => {
   });
 
   it.each([
-    {
-      mode: 'ramp',
-      startRate: 0.5,
-      endRate: 2,
-      curve: 'linear',
-      anchorIn: 0,
-      anchorOut: 120,
-    },
     {
       mode: 'curve',
       keyframes: [
@@ -149,52 +139,6 @@ describe('clip-owned timeline keyframe markers', () => {
       expect(coincident[0]!.timelineFrame).toBe(coincident[1]!.timelineFrame);
       expect(coincident[0]!.seekFrame).toBe(coincident[1]!.seekFrame);
     }
-    expect(markers.every((marker) => !marker.speedOverridden)).toBe(true);
-  });
-
-  it('uses absolute project-time track Speed instead of the stored clip curve and identifies overridden Speed', () => {
-    const project = fixture();
-    transformKeys(project, [40]);
-    project.clips[0]!.speed = {
-      mode: 'curve',
-      keyframes: [
-        { frame: 40, rate: 8, interpolation: 'hold' },
-        { frame: 130, rate: 8, interpolation: 'hold' },
-      ],
-    };
-    project.layers[0]!.keyframes = [
-      { frame: 0, interpolation: 'linear', values: { ...EMPTY_KEY_VALUES, speed: 0.5 } },
-      { frame: 30, interpolation: 'hold', values: { ...EMPTY_KEY_VALUES, exposure: 1 } },
-      { frame: 100, interpolation: 'hold', values: { ...EMPTY_KEY_VALUES, speed: 2 } },
-    ];
-    project.clips[0]!.start = 20;
-    const before = structuredClone(project);
-    const { placed, markers } = markersFor(project);
-    // From project frame 20, source consumption is 0.8*t + 0.0075*t².
-    const continuous = (-0.8 + Math.sqrt(0.8 ** 2 + 4 * 0.0075 * 30)) / (2 * 0.0075);
-    expect(Math.floor(continuous)).toBe(29);
-    expect(placed.duration).toBe(84);
-    expect(markers[0]).toMatchObject({
-      type: 'transform',
-      outputFrame: 29,
-      timelineFrame: 49,
-      seekFrame: 50,
-      speedOverridden: false,
-    });
-    expect(markers[1]).toMatchObject({
-      type: 'speed',
-      sourceFrame: 40,
-      outputFrame: 29,
-      timelineFrame: 49,
-      seekFrame: 50,
-      speedOverridden: true,
-    });
-    expect(markers).toHaveLength(3);
-    expect(project).toEqual(before);
-    project.clips[0]!.start = 30;
-    const moved = markersFor(project);
-    expect(moved.markers[0]!.outputFrame).not.toBe(markers[0]!.outputFrame);
-    expect(moved.markers[0]!.outputFrame).toBe(moved.placed.retiming.outputAt(40));
   });
 
   it('uses each contextual Ripple placement, not a saved suffix start or another clip’s map', () => {
@@ -205,19 +149,15 @@ describe('clip-owned timeline keyframe markers', () => {
     second.start = 999;
     project.clips.push(second);
     project.layers[0]!.transitions = [{ leftId: 'clip', rightId: 'second', type: 'cut', duration: 0 }];
-    project.layers[0]!.keyframes = [
-      { frame: 0, interpolation: 'linear', values: { ...EMPTY_KEY_VALUES, speed: 0.5 } },
-      { frame: 100, interpolation: 'hold', values: { ...EMPTY_KEY_VALUES, speed: 2 } },
-    ];
     const layout = calculateLayout(project);
     const firstPlaced = layout.clips[0]!;
     const secondPlaced = layout.clips[1]!;
-    const firstMarker = clipKeyframeMarkers(firstPlaced, project.layers[0]!)[0]!;
-    const secondMarker = clipKeyframeMarkers(secondPlaced, project.layers[0]!)[0]!;
+    const firstMarker = clipKeyframeMarkers(firstPlaced)[0]!;
+    const secondMarker = clipKeyframeMarkers(secondPlaced)[0]!;
     expect(secondPlaced.start).toBe(firstPlaced.end);
     expect(secondPlaced.start).not.toBe(second.start);
     expect(secondMarker.timelineFrame).toBe(secondPlaced.start + secondPlaced.retiming.outputAt(30));
-    expect(secondMarker.outputFrame).toBeLessThan(firstMarker.outputFrame);
+    expect(secondMarker.outputFrame).toBe(firstMarker.outputFrame);
     expect(secondMarker.seekFrame).toBe(previewClipSource(project, 'second', 30));
   });
 
@@ -284,10 +224,10 @@ describe('clip-owned timeline keyframe markers', () => {
     expect(markers.map((marker) => marker.seekFrame)).toEqual([17, 17, 18]);
   });
 
-  it('bounds one-frame preview targets even with a fast track override and an OUT boundary', () => {
+  it('bounds one-frame preview targets even with a fast clip rate and an OUT boundary', () => {
     const project = fixture(7, 10, 5);
     transformKeys(project, [7, 8, 9, 10]);
-    project.layers[0]!.keyframes = [{ frame: 0, interpolation: 'hold', values: { ...EMPTY_KEY_VALUES, speed: 8 } }];
+    project.clips[0]!.speed = { mode: 'constant', rate: 8 };
     const { placed, markers } = markersFor(project);
     expect(placed.duration).toBe(1);
     expect(markers.map((marker) => marker.outputFrame)).toEqual([0, 0, 0, 1]);

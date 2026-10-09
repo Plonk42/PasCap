@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { clipSpeedPreset } from '../../src/shared/clip-speed.js';
 import { applyCommand, EditHistory, type EditCommand } from '../../src/shared/commands.js';
 import { needsLayeredExport, planExport, planLayeredExport } from '../../src/shared/export.js';
 import { EMPTY_KEY_VALUES } from '../../src/shared/keyframes.js';
@@ -56,7 +57,7 @@ function fixture(): ProjectDocument {
   return projectSchema.parse(document);
 }
 
-describe('strict schema-12 spatial persistence', () => {
+describe('strict schema-13 spatial persistence', () => {
   it('creates independent explicit neutral settings and round-trips complete poses and off-trim keys', () => {
     const first = createClip('first', 'original', 0, 1);
     const second = createClip('second', 'original', 0, 1);
@@ -65,9 +66,9 @@ describe('strict schema-12 spatial persistence', () => {
     expect(first.spatial.base).not.toBe(second.spatial.base);
     expect(first.spatial.keyframes).not.toBe(second.spatial.keyframes);
     const document = fixture();
-    expect(document.schemaVersion).toBe(12);
+    expect(document.schemaVersion).toBe(13);
     expect(projectSchema.parse(JSON.parse(JSON.stringify(document)))).toEqual(document);
-    for (const schemaVersion of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11])
+    for (const schemaVersion of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])
       expect(projectSchema.safeParse({ ...document, schemaVersion }).success).toBe(false);
   });
 
@@ -331,14 +332,13 @@ describe('atomic spatial replacement and source-anchor preservation', () => {
 });
 
 describe('continuous placed-map spatial sampling and export dispatch', () => {
-  it.each(['constant', 'ramp', 'curve', 'row'] as const)(
+  it.each(['constant', 'ramp-up', 'curve'] as const)(
     'evaluates spatial at the actual %s source position while grade/Opacity stay in project time',
     (mode) => {
       const document = fixture();
       const clip = document.clips[0]!;
       if (mode === 'constant') clip.speed = { mode: 'constant', rate: 0.5 };
-      if (mode === 'ramp')
-        clip.speed = { mode: 'ramp', startRate: 0.5, endRate: 2, anchorIn: 0, anchorOut: 100, curve: 'smooth' };
+      if (mode === 'ramp-up') clip.speed = clipSpeedPreset(clip, mode);
       if (mode === 'curve')
         clip.speed = {
           mode: 'curve',
@@ -347,7 +347,6 @@ describe('continuous placed-map spatial sampling and export dispatch', () => {
             { frame: 100, rate: 2, interpolation: 'hold' },
           ],
         };
-      if (mode === 'row') document.layers[0]!.keyframes[0]!.values.speed = 0.5;
       const layout = calculateLayout(document);
       const placed = layout.clips[0]!;
       const sample = sampleTimeline(document, placed.start + 1, layout)[0]!;

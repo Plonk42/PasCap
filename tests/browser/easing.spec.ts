@@ -11,7 +11,7 @@ async function current(page: Page): Promise<ProjectDocument> {
   return projectSchema.parse(await page.evaluate(() => window.pascapLab!.project()));
 }
 
-for (const context of ['shared', 'ramp', 'clip'] as const) {
+for (const context of ['shared', 'clip'] as const) {
   test(`${context} easing graphs keep native selection, exact shapes and one-step Undo in the 270px Inspector`, async ({
     page,
     request,
@@ -25,15 +25,6 @@ for (const context of ['shared', 'ramp', 'clip'] as const) {
     document.media.videoIds = [asset.id];
     const clip = createClip('excerpt', asset.id, 0, 120);
     if (context === 'clip') clip.speed = clipSpeedPreset(clip, 'flat');
-    else if (context === 'ramp')
-      clip.speed = {
-        mode: 'ramp',
-        startRate: 0.5,
-        endRate: 2,
-        curve: 'smooth',
-        anchorIn: 0,
-        anchorOut: 120,
-      };
     document.clips = [clip];
     document.layers[0]!.keyframes = [sharedPoint(10, { exposure: 0.2, opacity: 0.4 }, 'smooth')];
     const unexpected: string[] = [];
@@ -75,12 +66,7 @@ for (const context of ['shared', 'ramp', 'clip'] as const) {
     await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
     if (context === 'shared') await editLayerPoint(page, 'Video track 1', 10);
     else await inspectorTab(page, 'Clip');
-    const label =
-      context === 'shared'
-        ? 'Track keyframe easing 10'
-        : context === 'ramp'
-          ? 'Ramp easing'
-          : 'Clip speed keyframe easing';
+    const label = context === 'shared' ? 'Track keyframe easing 10' : 'Clip speed keyframe easing';
     const select = page.getByRole('combobox', { name: label, exact: true });
     const choice = select.locator('..');
     const graph = choice.locator('.easing-graph');
@@ -92,13 +78,13 @@ for (const context of ['shared', 'ramp', 'clip'] as const) {
       /Graph: time runs left to right; value progress runs bottom to top/,
     );
     const before = await current(page);
-    expect(before.schemaVersion).toBe(12);
+    expect(before.schemaVersion).toBe(13);
     expect(before.layers[0]!.opacity).toBe(1);
     expect(before.clips[0]).not.toHaveProperty('opacity');
-    expect(Object.keys(before.layers[0]!.keyframes[0]!.values)).toHaveLength(11);
+    expect(Object.keys(before.layers[0]!.keyframes[0]!.values)).toHaveLength(10);
     const initialValue = (await select.inputValue())!;
     expect(memory.saves).toBe(0);
-    for (const value of interpolationSchema.options.filter((shape) => context !== 'ramp' || shape !== 'hold')) {
+    for (const value of interpolationSchema.options) {
       await select.selectOption(value);
       const expectedPoints = Array.from(
         { length: 33 },
@@ -109,8 +95,6 @@ for (const context of ['shared', 'ramp', 'clip'] as const) {
       await expect(graph.locator('polyline')).toHaveAttribute('points', expectedPoints.join(' '));
       const expected = structuredClone(before);
       if (context === 'shared') expected.layers[0]!.keyframes[0]!.interpolation = value;
-      else if (context === 'ramp' && expected.clips[0]!.speed.mode === 'ramp' && value !== 'hold')
-        expected.clips[0]!.speed.curve = value;
       else if (context === 'clip' && expected.clips[0]!.speed.mode === 'curve')
         expected.clips[0]!.speed.keyframes[0]!.interpolation = value;
       expect(await current(page)).toEqual(expected);
@@ -122,8 +106,8 @@ for (const context of ['shared', 'ramp', 'clip'] as const) {
     await select.focus();
     await select.press('Home');
     await expect(select).toBeFocused();
-    await expect(select).toHaveValue(context === 'ramp' ? 'linear' : 'hold');
-    await expect(choice).toHaveAttribute('data-easing', context === 'ramp' ? 'linear' : 'hold');
+    await expect(select).toHaveValue('hold');
+    await expect(choice).toHaveAttribute('data-easing', 'hold');
     await page.getByRole('button', { name: 'Undo', exact: true }).click();
     expect(await current(page)).toEqual(before);
     await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();

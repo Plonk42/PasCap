@@ -10,7 +10,6 @@ import { MediaLibrary } from '../../src/server/library.js';
 import { runProcess } from '../../src/server/process.js';
 import { compositePixel } from '../../src/shared/composition.js';
 import { EXPORT_PROFILES, type ExportProfile } from '../../src/shared/export.js';
-import { EMPTY_KEY_VALUES } from '../../src/shared/keyframes.js';
 import type { MediaAsset } from '../../src/shared/media.js';
 import { createClip, createLayer, createProject, type ProjectDocument } from '../../src/shared/model.js';
 import type { SpeedCurve } from '../../src/shared/speed.js';
@@ -210,7 +209,7 @@ describe.skipIf(!enabled)('clip speed curves · exact native maps on disposable 
     });
   }, 120_000);
 
-  it('uses custom clip maps in layered export while an overlay row Speed overrides only its own saved clip base', async () => {
+  it('uses every clip-owned custom map in layered export across overlapping rows', async () => {
     const document = createProject('layered-clip-curves', 'Disposable layered custom speed');
     const speed: SpeedCurve = {
       mode: 'curve',
@@ -220,18 +219,18 @@ describe.skipIf(!enabled)('clip speed curves · exact native maps on disposable 
         { frame: 32, rate: 0.5, interpolation: 'hold' },
       ],
     };
+    const upperSpeed: SpeedCurve = {
+      mode: 'curve',
+      keyframes: [
+        { frame: 10, rate: 2, interpolation: 'linear' },
+        { frame: 20, rate: 0.5, interpolation: 'hold' },
+      ],
+    };
     document.clips = [
       { ...createClip('base', assets[0]!.id, 2, 22), speed },
-      { ...createClip('upper', assets[1]!.id, 10, 20), layerId: 'upper', start: 3, speed },
+      { ...createClip('upper', assets[1]!.id, 10, 20), layerId: 'upper', start: 3, speed: upperSpeed },
     ];
-    document.layers.push({
-      ...createLayer('upper', 'Upper', false),
-      opacity: 0.6,
-      keyframes: [
-        { frame: 0, interpolation: 'linear', values: { ...EMPTY_KEY_VALUES, speed: 2 } },
-        { frame: 20, interpolation: 'hold', values: { ...EMPTY_KEY_VALUES, speed: 0.5 } },
-      ],
-    });
+    document.layers.push({ ...createLayer('upper', 'Upper', false), opacity: 0.6 });
     const receipt = await completed(document);
     const report = receipt.settings.layered!;
     expect(receipt.settings.pipeline).toBe('sequential-layered');
@@ -243,7 +242,7 @@ describe.skipIf(!enabled)('clip speed curves · exact native maps on disposable 
       expect(retiming.decodedFrames).toBe(document.clips[index]!.sourceOut - document.clips[index]!.sourceIn);
       expect(retiming.outputFrames).toBe(calculateLayout(document).clips[index]!.duration);
     });
-    expect(receipt.snapshot.clips[1]!.speed).toEqual(speed);
+    expect(receipt.snapshot.clips[1]!.speed).toEqual(upperSpeed);
   }, 120_000);
 
   it('exports three UHD frames with the exact custom linear map rather than dropping curve keys at final quality', async () => {

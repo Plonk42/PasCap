@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { applyCommand } from '../../src/shared/commands.js';
-import { EMPTY_KEY_VALUES } from '../../src/shared/keyframes.js';
 import { createClip, createLayer, createProject } from '../../src/shared/model.js';
 import { calculateLayout } from '../../src/shared/timeline.js';
 import { placementSnapPoints, planTimelineDrop, snapPlacement } from '../../src/web/timeline-placement.js';
@@ -85,24 +84,15 @@ describe('one authoritative timeline drop plan', () => {
     expect(primary).toMatchObject({ start: 120, index: 2, mode: 'ripple', error: '' });
   });
 
-  it('solves a trailing-edge magnet with the duration at its new row-rate placement', () => {
+  it('solves a trailing-edge magnet with the fixed retimed clip duration', () => {
     let document = project();
-    document = applyCommand(document, {
-      type: 'layer-update',
-      layer: {
-        ...document.layers[1]!,
-        keyframes: [
-          { frame: 0, interpolation: 'linear', values: { ...EMPTY_KEY_VALUES, speed: 1 } },
-          { frame: 100, interpolation: 'hold', values: { ...EMPTY_KEY_VALUES, speed: 3 } },
-        ],
-      },
-    });
+    document = applyCommand(document, { type: 'speed', clipId: 'b', speed: { mode: 'constant', rate: 2 } });
     const before = JSON.stringify(document);
     const plan = planTimelineDrop(document, { kind: 'clip', clipId: 'b', grabFrame: 13 }, 'upper', 55, true, 3, 69);
-    expect(plan).toMatchObject({ start: 40, duration: 29, guide: 69, error: '' });
+    expect(plan).toMatchObject({ start: 39, duration: 30, guide: 69, error: '' });
     const next = applyCommand(document, plan.command!);
     const placed = calculateLayout(next).clips.find((clip) => clip.clip.id === 'b')!;
-    expect([placed.start, placed.duration, placed.end]).toEqual([40, 29, 69]);
+    expect([placed.start, placed.duration, placed.end]).toEqual([39, 30, 69]);
     expect(next.layers).toEqual(
       document.layers.map((layer) =>
         layer.id === 'video-1'
@@ -116,21 +106,14 @@ describe('one authoritative timeline drop plan', () => {
     expect(JSON.stringify(document)).toBe(before);
   });
 
-  it('reports the exact contextual batch width and consecutive media starts across a row speed curve', () => {
-    let document = project();
-    document = applyCommand(document, {
-      type: 'layer-update',
-      layer: {
-        ...document.layers[1]!,
-        keyframes: [
-          { frame: 0, interpolation: 'linear', values: { ...EMPTY_KEY_VALUES, speed: 1 } },
-          { frame: 100, interpolation: 'hold', values: { ...EMPTY_KEY_VALUES, speed: 3 } },
-        ],
-      },
-    });
-    const clips = [createClip('new-a', 'a', 10, 70), createClip('new-b', 'b', 20, 80)];
+  it('reports the exact batch width and consecutive media starts of retimed clips', () => {
+    const document = project();
+    const clips = [
+      { ...createClip('new-a', 'a', 10, 70), speed: { mode: 'constant' as const, rate: 2 } },
+      createClip('new-b', 'b', 20, 80),
+    ];
     const plan = planTimelineDrop(document, { kind: 'media', clips }, 'upper', 42, false, 3, 0);
-    expect(plan).toMatchObject({ start: 42, duration: 51, guide: null, error: '' });
+    expect(plan).toMatchObject({ start: 42, duration: 90, guide: null, error: '' });
     let next = applyCommand(document, {
       type: 'insert',
       clip: { ...clips[0]!, layerId: 'upper', start: 42 },
@@ -140,8 +123,8 @@ describe('one authoritative timeline drop plan', () => {
     next = applyCommand(next, { type: 'insert', clip: { ...clips[1]!, layerId: 'upper', start: first.end }, index: 4 });
     const placed = calculateLayout(next).clips.filter((clip) => clip.clip.layerId === 'upper');
     expect(placed.map((clip) => [clip.start, clip.duration, clip.end])).toEqual([
-      [42, 28, 70],
-      [70, 23, 93],
+      [42, 30, 72],
+      [72, 60, 132],
     ]);
     expect(placed.at(-1)!.end - placed[0]!.start).toBe(plan.duration);
   });

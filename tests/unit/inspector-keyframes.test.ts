@@ -6,7 +6,7 @@ import { createProject } from '../../src/shared/model.js';
 import { Inspector } from '../../src/web/Inspector.js';
 import { KeyframeNavigationContext } from '../../src/web/keyframe-navigation.js';
 import { KeyframeControls } from '../../src/web/KeyframeControls.js';
-import { RangeSettingControl, SpeedRateField } from '../../src/web/SettingValueControl.js';
+import { RangeSettingControl } from '../../src/web/SettingValueControl.js';
 
 const navigation = {
   inspection: null,
@@ -76,29 +76,18 @@ describe('dedicated Inspector keyframe controls', () => {
 
   it.each(KEYFRAME_SETTINGS)('$label shares its setting-specific bounds and accessible controls', (setting) => {
     const name = `${setting.label} keyframe value 200`;
-    const markup =
-      setting.key === 'speed'
-        ? renderToStaticMarkup(
-            createElement(SpeedRateField, {
-              id: 'rate',
-              value: 1,
-              disabled: false,
-              'aria-label': name,
-              onCommit: vi.fn(),
-            }),
-          )
-        : renderToStaticMarkup(
-            createElement(RangeSettingControl, {
-              setting: setting.key,
-              id: 'value',
-              label: name,
-              value: setting.min,
-              disabled: false,
-              hint: 'Stored point 200',
-              exact: { resetKey: 'point' },
-              onCommit: vi.fn(),
-            }),
-          );
+    const markup = renderToStaticMarkup(
+      createElement(RangeSettingControl, {
+        setting: setting.key,
+        id: 'value',
+        label: name,
+        value: setting.min,
+        disabled: false,
+        hint: 'Stored point 200',
+        exact: { resetKey: 'point' },
+        onCommit: vi.fn(),
+      }),
+    );
     const scale = setting.key === 'opacity' ? 100 : 1;
     expect(markup).toContain(`min="${setting.min * scale}"`);
     expect(markup).toContain(`max="${setting.max * scale}"`);
@@ -112,7 +101,7 @@ describe('dedicated Inspector keyframe controls', () => {
   it('renders only existing participants, including off-duration points, without adding diamonds or clip-speed modes', () => {
     const project = createProject('points', 'Points');
     project.layers[0]!.keyframes = [
-      { frame: 200, interpolation: 'hold', values: { ...EMPTY_KEY_VALUES, exposure: 0.5, speed: 2 } },
+      { frame: 200, interpolation: 'hold', values: { ...EMPTY_KEY_VALUES, exposure: 0.5, opacity: 0.4 } },
     ];
     const markup = renderToStaticMarkup(
       createElement(
@@ -129,7 +118,7 @@ describe('dedicated Inspector keyframe controls', () => {
       ),
     );
     expect(markup).toContain('Exposure keyframe value 200');
-    expect(markup).toContain('Speed keyframe value 200');
+    expect(markup).toContain('Opacity keyframe value 200');
     expect(markup).not.toContain('Brightness keyframe value');
     expect(markup).not.toContain('aria-label="Keyframe Exposure"');
     expect(markup).not.toContain('Speed mode');

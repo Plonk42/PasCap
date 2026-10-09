@@ -2,7 +2,6 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import { interpolatedProgress, interpolationSchema } from '../../src/shared/keyframes.js';
-import { curveValue } from '../../src/shared/speed.js';
 import { EasingSelect, easingGraphPoints } from '../../src/web/EasingSelect.js';
 
 describe('easing selection graphs', () => {
@@ -14,7 +13,6 @@ describe('easing selection graphs', () => {
     for (let index = 0; index <= 32; index++) {
       const progress = index / 32;
       expect(points[index]).toEqual([6 + progress * 84, 50 - 44 * interpolatedProgress(progress, curve)]);
-      if (curve !== 'hold') expect(interpolatedProgress(progress, curve)).toBe(curveValue(progress, curve));
     }
     expect(points[0]).toEqual([6, 50]);
     expect(points.at(-1)).toEqual([90, 6]);
@@ -43,19 +41,17 @@ describe('easing selection graphs', () => {
     expect(markup).not.toContain('tabindex');
   });
 
-  it('retains the ramp options and label without introducing Hold', () => {
+  it('always offers all five plain-labelled shapes, including Hold, when disabled', () => {
     const markup = renderToStaticMarkup(
       createElement(EasingSelect, {
         value: 'smooth',
         onChange: vi.fn(),
-        allowHold: false,
-        ramp: true,
         disabled: true,
       }),
     );
-    expect(markup.match(/<option/g)).toHaveLength(4);
-    expect(markup).not.toContain('value="hold"');
-    expect(markup).toContain('Smooth (S curve)');
+    expect(markup.match(/<option/g)).toHaveLength(5);
+    expect(markup).toContain('value="hold"');
+    expect(markup).not.toContain('Smooth (S curve)');
     expect(markup).toContain('disabled=""');
   });
 });

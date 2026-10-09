@@ -38,7 +38,7 @@ function point(frame: number, values: Partial<LayerKeyValues>): LayerKeyframe {
 }
 
 const interleaved = [0, 100, 200].flatMap((start) =>
-  KEYFRAME_SETTINGS.map(({ key }, index) => point(start + index * 3, { [key]: key === 'speed' ? 1 : 0 })),
+  KEYFRAME_SETTINGS.map(({ key }, index) => point(start + index * 3, { [key]: 0 })),
 );
 
 function project(
@@ -131,7 +131,7 @@ describe('ordered per-setting keyframe neighbours', () => {
     expect(keyframeNeighbors(interleaved, middle.frame + 1, key)).toEqual({ previous: middle, next: last });
     expect(keyframeNeighbors(interleaved, last.frame, key)).toEqual({ previous: middle, next: null });
     expect(keyframeNeighbors(interleaved, last.frame + 1, key)).toEqual({ previous: last, next: null });
-    expect(first.values[key]).toBe(key === 'speed' ? 1 : 0);
+    expect(first.values[key]).toBe(0);
     expect(keyframeNeighbors(interleaved, middle.frame, key).previous).toBe(first);
   });
 
@@ -290,7 +290,7 @@ describe('one editor-only stored-point cursor', () => {
     expect(history.canUndo).toBe(false);
     expect(history.canRedo).toBe(false);
     expect(projectSchema.parse(history.current)).toEqual(document);
-    expect(history.current.schemaVersion).toBe(12);
+    expect(history.current.schemaVersion).toBe(13);
   });
 
   it.each([-1, NaN, Infinity, 0.5, 2_147_483_648])(
@@ -475,15 +475,20 @@ describe('main diamonds with per-setting arrows and stored-channel navigation', 
     );
     for (const { label } of KEYFRAME_SETTINGS) {
       expect(inspector.split(`aria-label="Keyframe ${label}"`)).toHaveLength(2);
-      // One main pair and three stored participants; Speed additionally has its section union.
-      const count = label === 'Speed' ? 5 : 4;
+      // One main pair and three stored participants.
       for (const direction of ['Previous', 'Next'])
-        expect(inspector.split(`aria-label="${direction} ${label} keyframe"`)).toHaveLength(count + 1);
+        expect(inspector.split(`aria-label="${direction} ${label} keyframe"`)).toHaveLength(5);
     }
     const diamonds = [
       ...inspector.matchAll(/<span class="keyframe-setting-navigation"[\s\S]*?<\/button><\/span><\/span>/g),
     ];
-    expect(diamonds).toHaveLength(11 + SPATIAL_CONTROLS.length);
+    // Ten track settings, the clip Speed diamond and each Transform setting.
+    expect(diamonds).toHaveLength(KEYFRAME_SETTINGS.length + 1 + SPATIAL_CONTROLS.length);
+    const speedDiamond = diamonds.findIndex(([markup]) => markup.includes('aria-label="Keyframe Speed"'));
+    // The single-setting Speed section relies on its keyframe-line pair, without a duplicate per-setting pair.
+    expect(buttons(diamonds.splice(speedDiamond, 1)[0]![0])).toHaveLength(1);
+    for (const direction of ['Previous', 'Next'])
+      expect(inspector.split(`aria-label="${direction} Speed keyframe"`)).toHaveLength(2);
     for (const { label } of SPATIAL_CONTROLS) {
       // Each Transform setting has one diamond with one Previous/Next pair, like Colour.
       expect(inspector.split(`aria-label="Keyframe ${label}"`)).toHaveLength(2);
@@ -529,7 +534,7 @@ describe('main diamonds with per-setting arrows and stored-channel navigation', 
       ),
     );
     expect(sidebar).toContain('Track options Video track 1');
-    expect(KEYFRAME_SETTINGS).toHaveLength(11);
+    expect(KEYFRAME_SETTINGS).toHaveLength(10);
     expect(inspector).toContain('aria-label="Keyframe Opacity"');
     expect(inspector).not.toContain('Keyframe Track opacity');
     expect(inspector).not.toContain('Keyframe Clip opacity');
@@ -543,19 +548,10 @@ describe('Colour section union navigation', () => {
   it.each([0, 10, 20, 30, 40, 2_147_483_647])('visits Opacity and scalar Colour only from frame %s', (frame) => {
     const layer = {
       ...createProject('union', 'Union').layers[0]!,
-      keyframes: [
-        point(0, { opacity: 0 }),
-        point(10, { speed: 1 }),
-        point(20, { temperature: 0, tint: 0 }),
-        point(30, { speed: 2 }),
-        point(40, { shadows: 0 }),
-      ],
+      keyframes: [point(0, { opacity: 0 }), point(20, { temperature: 0, tint: 0 }), point(40, { shadows: 0 })],
     };
-    const settings = KEYFRAME_SETTINGS.filter(({ key }) => key !== 'speed').map(({ key }) => key);
-    const expected = keyframeNeighbors(
-      layer.keyframes.filter((key) => key.values.speed === null),
-      frame,
-    );
+    const settings = KEYFRAME_SETTINGS.map(({ key }) => key);
+    const expected = keyframeNeighbors(layer.keyframes, frame);
     const context = navigation();
     const markup = renderToStaticMarkup(
       createElement(

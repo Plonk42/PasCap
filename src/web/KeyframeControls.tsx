@@ -12,7 +12,7 @@ import { keyframeNavigationFrame, keySeekHint, useKeyframeNavigation } from './k
 import './layer-keyframes.css';
 import { livePreview } from './live-preview.js';
 import { NumberField } from './NumberField.js';
-import { RangeSettingControl, ResetLabel, SpeedRateField } from './SettingValueControl.js';
+import { RangeSettingControl } from './SettingValueControl.js';
 
 export interface KeyframeControlsProps {
   project: ProjectDocument;
@@ -258,43 +258,17 @@ function KeyframePointRow({
               const resetKey = `${context}:${row.id}:${setting.key}`;
               return (
                 <div className="keyframe-value colour-control" key={setting.key}>
-                  {setting.key === 'speed' ? (
-                    <>
-                      <div className="layer-setting-heading">
-                        <ResetLabel
-                          htmlFor={id}
-                          title={hint}
-                          onReset={() => {
-                            if (!disabled && value !== 1) onCommit(1);
-                          }}
-                        >
-                          Speed
-                        </ResetLabel>
-                      </div>
-                      <SpeedRateField
-                        id={id}
-                        aria-label={label}
-                        value={value}
-                        disabled={disabled}
-                        resetKey={resetKey}
-                        hint={hint}
-                        validate={validate}
-                        onCommit={onCommit}
-                      />
-                    </>
-                  ) : (
-                    <RangeSettingControl
-                      setting={setting.key}
-                      id={id}
-                      label={label}
-                      value={value}
-                      disabled={disabled}
-                      hint={hint}
-                      exact={{ resetKey, validate }}
-                      onCommit={onCommit}
-                      onDraft={(next) => livePreview(next === null ? null : command(next))}
-                    />
-                  )}
+                  <RangeSettingControl
+                    setting={setting.key}
+                    id={id}
+                    label={label}
+                    value={value}
+                    disabled={disabled}
+                    hint={hint}
+                    exact={{ resetKey, validate }}
+                    onCommit={onCommit}
+                    onDraft={(next) => livePreview(next === null ? null : command(next))}
+                  />
                 </div>
               );
             })}

@@ -17,12 +17,12 @@ This guide is not a delivery ledger or a fresh validation result.
   the normal treatment; main capture diamonds are always visible: hollow when the setting is not enabled at the real playhead,
   filled when enabled. **Animation help** explains the states once. Titles and screen-reader descriptions retain
   each setting's scope and capture instructions.
-- Each main scalar Colour/Opacity and track Speed diamond retains adjacent per-setting **Previous/Next** buttons
+- Each main scalar Colour/Opacity diamond retains adjacent per-setting **Previous/Next** buttons
   because not every setting is enabled at every shared keyframe.
 - Each expanded section's keyframe line shows the keyframe count, one **Previous/Next** pair and Reset.
   Colour visits Opacity/scalar colour keyframes; Speed visits
-  track Speed keyframes and all retained custom speed source keyframes of the
-  selected clip, even under a track Speed override. Speed and Transform stored
+  all retained custom speed source keyframes of the selected clip (its single
+  **Keyframe Speed** diamond has no extra per-setting arrows). Speed and Transform stored
   navigation includes off-trim/original-exclusive-OUT keyframes, previewing the
   nearest mapped image with independent clip-local stored-source cursors, separate
   from central track inspection. Successive stored keyframes stay reachable even
@@ -60,12 +60,12 @@ This guide is not a delivery ledger or a fresh validation result.
   uncertainty, errors/recheck and disclosed location/assumptions. Snapshot and
   native processing details remain available in **Rendering details**.
 
-Schema 12 requires complete video track Colour with Temperature/Tint and static HSL/curves,
+Schema 13 requires complete video track Colour with Temperature/Tint and static HSL/curves,
 clip spatial base/per-setting source-frame keyframes and uses a
 required 0–8 `music` array with unique required music track IDs and
 uniform video tracks with required Ripple/transitions/fades and
-numeric `VideoLayer.opacity` in 0–1 (1 on new tracks), plus eleven nullable keyframe
-channels: `opacity`, `speed` and nine scalar colour settings. Video tracks
+numeric `VideoLayer.opacity` in 0–1 (1 on new tracks), plus ten nullable keyframe
+channels: `opacity` and nine scalar colour settings. Video tracks
 follow saved bottom-to-top composition order. Track options exposes default-on
 Ripple: enabling closes gaps from the first current start in one Undo; while on,
 later clips continuously sequence there. Turning it off keeps actual placements.
@@ -82,12 +82,12 @@ $w_i$ dissolve weight and $m_i$ spatial pixel coverage. Exact neutral poses
 preserve opaque black letterboxing after grading; nonneutral uncovered pixels
 reveal lower footage. Each source uses the same evaluated track Opacity at that
 project frame, from the track value or its overriding curve.
-v1–v11 project/receipt snapshots remain unchanged/incompatible
+v1–v12 project/receipt snapshots remain unchanged/incompatible
 and require recreation, without migration, defaults or automatic deletion.
 Track `opacity` is the required sole stored value, not obsolete; saved `clip.opacity`
 and old `clipOpacity`/`layerOpacity` keyframe channels are invalid.
 Registry/proxy/current PCM formats do not change. Version-1 export receipts require
-strict v12 snapshots and captured audio-source/instance-plan arrays, rejecting
+strict v13 snapshots and captured audio-source/instance-plan arrays, rejecting
 invalid arrays/older snapshots without rewriting successful exports. No null
 fallback or old-format reader is permitted. Source-copy prohibition,
 track keyframes, source choices, media preparation, Activity and both export

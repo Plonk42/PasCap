@@ -12,25 +12,18 @@ import {
 import type { AudioAsset } from '../shared/audio.js';
 import { applyCommand, type EditCommand } from '../shared/commands.js';
 import { KEYFRAME_SETTINGS, keySettings } from '../shared/keyframes.js';
-import { compileLayerRetiming } from '../shared/layer-retiming.js';
 import { resolveMediaSelection, type MediaSelections } from '../shared/media-selection.js';
 import type { MediaAsset } from '../shared/media.js';
-import {
-  createClip,
-  createLayer,
-  MAX_VIDEO_LAYERS,
-  type ProjectDocument,
-  type VideoClip,
-  type VideoLayer,
-} from '../shared/model.js';
+import { createClip, createLayer, MAX_VIDEO_LAYERS, type ProjectDocument, type VideoClip } from '../shared/model.js';
 import type { ClipCutRange } from '../shared/rush-editing.js';
 import { snapFrame, snapPoints } from '../shared/snap.js';
 import { trimOnTimeline, type TrimEdge } from '../shared/source-range.js';
 import { spatialKeyChannels } from '../shared/spatial.js';
+import { clipDuration } from '../shared/speed.js';
 import { calculateLayout, type PlacedClip } from '../shared/timeline.js';
 import { formatTimecode, framesToSeconds, secondsToFrames } from '../shared/timing.js';
 import { clipKeyframeMarkers, type ClipKeyframeMarker } from './clip-keyframe-markers.js';
-import { transformKeyframeKind, transformKeyframeTarget, type TransformKeyframeTarget } from './clip-keyframe-drag.js';
+import { clipKeyframeKind, clipKeyframeSlideTarget, type ClipKeyframeTarget } from './clip-keyframe-drag.js';
 import type { InspectorSectionTarget } from './InspectorSection.js';
 import { SPATIAL_CONTROLS } from './spatial-editor.js';
 import './clip-keyframe-markers.css';
@@ -46,7 +39,6 @@ import { Icon } from './icons.js';
 import { keyframeNavigationFrame, useKeyframeNavigation } from './keyframe-navigation.js';
 import {
   KeyframeMarkers,
-  keyframeMarkerGuards,
   useKeyframeSlide,
   type KeyframeSlide,
   type KeyframeSlideDraft,
@@ -152,9 +144,17 @@ function interactionMessage(
   return '';
 }
 
+function clipKeyDraft(
+  transform: KeyframeSlideDraft<ClipKeyframeTarget> | null,
+  speed: KeyframeSlideDraft<ClipKeyframeTarget> | null,
+): { type: string; draft: KeyframeSlideDraft<ClipKeyframeTarget> } | null {
+  if (transform) return { type: 'Transform', draft: transform };
+  return speed ? { type: 'Speed', draft: speed } : null;
+}
+
 function timelineInteractionMessage(
   keyframe: KeyframeSlideDraft<KeyframeSlideTarget> | null,
-  clipKeyframe: KeyframeSlideDraft<TransformKeyframeTarget> | null,
+  clipKeyframe: { type: string; draft: KeyframeSlideDraft<ClipKeyframeTarget> } | null,
   error: string,
   plan: DropPlan | null,
   draft: ProjectDocument | null,
@@ -162,7 +162,8 @@ function timelineInteractionMessage(
 ): string {
   if (clipKeyframe)
     return (
-      clipKeyframe.error || `Transform keyframe · source frame ${clipKeyframe.frame} · release to apply · Esc cancels`
+      clipKeyframe.draft.error ||
+      `${clipKeyframe.type} keyframe · source frame ${clipKeyframe.draft.frame} · release to apply · Esc cancels`
     );
   if (keyframe)
     return (
@@ -188,14 +189,8 @@ function keyboardTrimDelta(key: string, shift: boolean, clip: VideoClip, edge: T
 }
 
 function speedLabel(clip: VideoClip): string {
-  switch (clip.speed.mode) {
-    case 'constant':
-      return clip.speed.rate === 1 ? '' : ` · ${clip.speed.rate}×`;
-    case 'ramp':
-      return ' · ramp';
-    case 'curve':
-      return ' · curve';
-  }
+  if (clip.speed.mode === 'curve') return ' · curve';
+  return clip.speed.rate === 1 ? '' : ` · ${clip.speed.rate}×`;
 }
 
 function timelineEmptyMessage(project: ProjectDocument): string {
@@ -324,13 +319,10 @@ function TimelineMusicLanes(
 
 type ClipMarkerProps = Readonly<{
   placed: PlacedClip;
-  layer: VideoLayer;
   name: string;
   blocked: () => boolean;
-  onSelect: Props['onSelect'];
-  onSeek: Props['onSeek'];
-  onOpenSection: Props['onOpenSection'];
-  slide: KeyframeSlide<TransformKeyframeTarget>;
+  transforms: KeyframeSlide<ClipKeyframeTarget>;
+  speeds: KeyframeSlide<ClipKeyframeTarget>;
 }>;
 
 function clipMarkerView(props: ClipMarkerProps, marker: ClipKeyframeMarker, sourceFrame: number, at: number | null) {
@@ -340,14 +332,18 @@ function clipMarkerView(props: ClipMarkerProps, marker: ClipKeyframeMarker, sour
     marker.type === 'transform'
       ? props.placed.clip.spatial.keyframes.find((key) => key.frame === marker.sourceFrame)
       : undefined;
+  const speedKey =
+    marker.type === 'speed' && props.placed.clip.speed.mode === 'curve'
+      ? props.placed.clip.speed.keyframes.find((key) => key.frame === marker.sourceFrame)
+      : undefined;
   const settings = transformKey
     ? spatialKeyChannels(transformKey)
         .map((channel) => SPATIAL_CONTROLS.find((control) => control.key === channel)!.label)
         .join(', ')
     : '';
   const nameSuffix = settings ? ` (${settings})` : '';
-  const titleSuffix = settings ? ` · ${settings}` : '';
-  const slideHint = marker.type === 'transform' ? ' · Drag to move; Arrow keys: 1 source frame, Shift: 10' : '';
+  let titleSuffix = settings ? ` · ${settings}` : '';
+  if (speedKey) titleSuffix = ` · ${speedKey.rate}×`;
   const output =
     at === null ? marker.outputFrame : Math.max(0, Math.min(props.placed.duration, at - props.placed.start));
   return {
@@ -357,53 +353,29 @@ function clipMarkerView(props: ClipMarkerProps, marker: ClipKeyframeMarker, sour
     'data-timeline-frame': marker.timelineFrame,
     'data-seek-frame': marker.seekFrame,
     'aria-label': `${type} keyframe source ${sourceFrame} on clip ${props.placed.clip.id}, ${props.name}${nameSuffix}`,
-    title: `${type} · source frame ${sourceFrame}${titleSuffix} · timeline frame ${marker.timelineFrame} (${formatTimecode(marker.timelineFrame)}) · Preview source ${displayedSource} at timeline frame ${marker.seekFrame}${marker.speedOverridden ? ' · Clip Speed overridden by video track Speed' : ''}${slideHint}`,
+    title: `${type} · source frame ${sourceFrame}${titleSuffix} · timeline frame ${marker.timelineFrame} (${formatTimecode(marker.timelineFrame)}) · Preview source ${displayedSource} at timeline frame ${marker.seekFrame} · Drag to move; Arrow keys: 1 source frame, Shift: 10`,
     style: { '--clip-keyframe-position': `${(output / props.placed.duration) * 100}%` } as CSSProperties,
     children: <span aria-hidden="true">{marker.type === 'transform' ? '▼' : '◆'}</span>,
   };
 }
 
-/** Transform keys slide like shared track keys; custom-speed keys only select and seek. */
+/** Transform and custom-speed keys both slide like shared track keys. */
 function ClipKeyframeMarkers(props: ClipMarkerProps) {
-  const markers = clipKeyframeMarkers(props.placed, props.layer);
+  const markers = clipKeyframeMarkers(props.placed);
   if (!markers.length) return null;
-  const transforms = markers.filter((marker) => marker.type === 'transform');
   return (
     <div className="clip-keyframe-markers">
-      <KeyframeMarkers
-        slide={props.slide}
-        targets={transforms.map((marker) => transformKeyframeTarget(props.placed, marker))}
-        blocked={props.blocked}
-        view={({ marker }, state) => clipMarkerView(props, marker, state.frame, state.at)}
-      />
-      {markers
-        .filter((marker) => marker.type === 'speed')
-        .map((marker) => (
-          <button
-            type="button"
-            key={`speed-${marker.sourceFrame}`}
-            {...clipMarkerView(props, marker, marker.sourceFrame, null)}
-            disabled={props.blocked()}
-            draggable={false}
-            {...keyframeMarkerGuards}
-            onPointerDown={(event) => {
-              event.preventDefault();
-              event.stopPropagation();
-              if (event.button === 0 && !props.blocked()) event.currentTarget.focus({ preventScroll: true });
-            }}
-            onPointerMove={(event) => event.stopPropagation()}
-            onPointerUp={(event) => event.stopPropagation()}
-            onPointerCancel={(event) => event.stopPropagation()}
-            onKeyDown={(event) => event.stopPropagation()}
-            onClick={(event) => {
-              event.stopPropagation();
-              if (props.blocked()) return;
-              props.onSelect(props.placed.clip.id);
-              props.onSeek(marker.seekFrame);
-              props.onOpenSection('speed');
-            }}
-          />
-        ))}
+      {(['transform', 'speed'] as const).map((type) => (
+        <KeyframeMarkers
+          key={type}
+          slide={type === 'transform' ? props.transforms : props.speeds}
+          targets={markers
+            .filter((marker) => marker.type === type)
+            .map((marker) => clipKeyframeSlideTarget(props.placed, marker))}
+          blocked={props.blocked}
+          view={({ marker }, state) => clipMarkerView(props, marker, state.frame, state.at)}
+        />
+      ))}
     </div>
   );
 }
@@ -486,13 +458,13 @@ export function Timeline(props: Readonly<Props>) {
     onEdit,
     onError,
   });
+  const clipKindOptions = {
+    frameCountOf: (mediaId: string) => assets.find((asset) => asset.id === mediaId)?.metadata.frameCount ?? 0,
+    onSelect,
+    onSeek,
+  };
   const clipKeys = useKeyframeSlide({
-    kind: transformKeyframeKind({
-      frameCountOf: (mediaId) => assets.find((asset) => asset.id === mediaId)?.metadata.frameCount ?? 0,
-      onSelect,
-      onSeek,
-      onOpenTransform: () => props.onOpenSection('transform'),
-    }),
+    kind: clipKeyframeKind('transform', { ...clipKindOptions, onOpen: () => props.onOpenSection('transform') }),
     project,
     frame,
     scale,
@@ -505,7 +477,21 @@ export function Timeline(props: Readonly<Props>) {
     onEdit,
     onError,
   });
-  const gestureActive = keyframes.active || clipKeys.active;
+  const speedKeys = useKeyframeSlide({
+    kind: clipKeyframeKind('speed', { ...clipKindOptions, onOpen: () => props.onOpenSection('speed') }),
+    project,
+    frame,
+    scale,
+    width: baselineWidth,
+    disabled: keyframeNavigation.disabled || musicGesture !== null || keyframes.active || clipKeys.active,
+    snapping,
+    viewport: scroll,
+    onPause,
+    onPreview,
+    onEdit,
+    onError,
+  });
+  const gestureActive = keyframes.active || clipKeys.active || speedKeys.active;
 
   // Extra recoverable head space exists only during a trim. Shift the scroll by
   // the identical amount before paint, so neither selection nor gesture start
@@ -561,26 +547,26 @@ export function Timeline(props: Readonly<Props>) {
     return () => window.removeEventListener('keydown', escape, true);
   });
 
-  const visible = keyframes.draft?.document ?? clipKeys.draft?.document ?? draft ?? musicGesture?.document ?? project;
+  const visible =
+    keyframes.draft?.document ??
+    clipKeys.draft?.document ??
+    speedKeys.draft?.document ??
+    draft ??
+    musicGesture?.document ??
+    project;
   const layout = calculateLayout(visible);
   const baseLayout = calculateLayout(project);
   const selected = layout.clips.find((placed) => placed.clip.id === selectedClipId);
   const source = assets.find((asset) => asset.id === selected?.clip.mediaId);
-  const selectedLayer = project.layers.find((layer) => layer.id === selected?.clip.layerId);
   // Reserve access to omitted head/tail footage, including the first/last clip.
   // Outward trimming must not require dragging beyond the edge of the browser.
-  const availableHead =
-    selected && selectedLayer
-      ? compileLayerRetiming({ ...selected.clip, sourceIn: 0 }, selectedLayer, selected.start).duration -
-        selected.duration
-      : 0;
+  const availableHead = selected ? clipDuration({ ...selected.clip, sourceIn: 0 }) - selected.duration : 0;
   // Selection must not move frame zero beneath the mouse. The timeline origin
   // stays fixed; omitted source is still recoverable through handles/Home/End.
   const leading = drag.current?.leading ?? movement.current?.leading ?? musicGesture?.leading ?? 32;
   const unusedTail =
-    source && selected && selectedLayer
-      ? compileLayerRetiming({ ...selected.clip, sourceOut: source.metadata.frameCount }, selectedLayer, selected.start)
-          .duration -
+    source && selected
+      ? clipDuration({ ...selected.clip, sourceOut: source.metadata.frameCount }) -
         selected.duration -
         (layout.duration - selected.end)
       : 0;
@@ -603,6 +589,7 @@ export function Timeline(props: Readonly<Props>) {
     drag.current?.width ?? 0,
     movement.current?.width ?? 0,
     keyframes.draft?.width ?? 0,
+    speedKeys.draft?.width ?? 0,
     musicGesture?.width ?? 0,
   );
   const interactionBlocked =
@@ -780,9 +767,7 @@ export function Timeline(props: Readonly<Props>) {
     const asset = assets.find((item) => item.id === clip.mediaId);
     if (!asset || !scroll.current) return;
     const placed = baseLayout.clips.find((item) => item.clip.id === clip.id)!;
-    const layer = project.layers.find((item) => item.id === clip.layerId)!;
-    const recoverableHead =
-      compileLayerRetiming({ ...clip, sourceIn: 0 }, layer, placed.start).duration - placed.duration;
+    const recoverableHead = clipDuration({ ...clip, sourceIn: 0 }) - placed.duration;
     const originShift = edge === 'in' ? Math.max(0, Math.ceil((recoverableHead - placed.start) * scale)) : 0;
     event.preventDefault();
     event.stopPropagation();
@@ -1001,7 +986,14 @@ export function Timeline(props: Readonly<Props>) {
 
   const interactionStatus = musicGesture
     ? musicGesture.error || `Music track · ${formatTimecode(musicGesture.start)} · release to apply · Esc cancels`
-    : timelineInteractionMessage(keyframes.draft, clipKeys.draft, dragError, dropPlan, draft, selected?.clip);
+    : timelineInteractionMessage(
+        keyframes.draft,
+        clipKeyDraft(clipKeys.draft, speedKeys.draft),
+        dragError,
+        dropPlan,
+        draft,
+        selected?.clip,
+      );
   return (
     <section className="timeline-panel panel" id="timeline-pane" tabIndex={-1} aria-label="Video timeline">
       <div className="timeline-toolbar">
@@ -1160,19 +1152,14 @@ export function Timeline(props: Readonly<Props>) {
                 )}
               </button>
             ))}
-            {selected && source && selectedLayer && (
+            {selected && source && (
               <div
                 className="available-source"
                 aria-label="Available original recording"
                 style={{
                   top: rowTop(selected.clip.layerId) - 5,
                   left: leading + (selected.start - availableHead) * scale,
-                  width:
-                    compileLayerRetiming(
-                      { ...selected.clip, sourceIn: 0, sourceOut: source.metadata.frameCount },
-                      selectedLayer,
-                      selected.start,
-                    ).duration * scale,
+                  width: clipDuration({ ...selected.clip, sourceIn: 0, sourceOut: source.metadata.frameCount }) * scale,
                 }}
               />
             )}
@@ -1288,13 +1275,10 @@ export function Timeline(props: Readonly<Props>) {
                   </button>
                   <ClipKeyframeMarkers
                     placed={currentPlaced}
-                    layer={visible.layers.find((layer) => layer.id === clip.layerId)!}
                     name={name}
                     blocked={clipMarkerBlocked}
-                    onSelect={onSelect}
-                    onSeek={onSeek}
-                    onOpenSection={props.onOpenSection}
-                    slide={clipKeys}
+                    transforms={clipKeys}
+                    speeds={speedKeys}
                   />
                   {(['in', 'out'] as const).map((edge) => (
                     <button
@@ -1439,6 +1423,7 @@ export function Timeline(props: Readonly<Props>) {
               [
                 ['track', keyframes.draft?.guide],
                 ['transform', clipKeys.draft?.guide],
+                ['speed', speedKeys.draft?.guide],
               ] as const
             ).map(
               ([type, guide]) =>
@@ -1480,7 +1465,12 @@ export function Timeline(props: Readonly<Props>) {
         <div className="timeline-bottom">
           <span
             className={
-              dragError || dropPlan?.error || keyframes.draft?.error || clipKeys.draft?.error || musicGesture?.error
+              dragError ||
+              dropPlan?.error ||
+              keyframes.draft?.error ||
+              clipKeys.draft?.error ||
+              speedKeys.draft?.error ||
+              musicGesture?.error
                 ? 'trim-error'
                 : ''
             }

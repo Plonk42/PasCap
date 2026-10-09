@@ -1,48 +1,37 @@
-# Speed and audio contract · project v12
+# Speed and audio contract · project v13
 
 Nine video track-owned scalar Colour controls include Temperature/Tint (−1…1, neutral 0),
 whose normalized linear gains precede Exposure. Positive Temperature warms;
 positive Tint adds magenta; nonzero settings intentionally colour greys. They
-can be keyed independently in video track animation without changing Speed semantics.
-See [Temperature and Tint](design/TEMPERATURE_AND_TINT.md).
+can be keyed independently in video track animation, which is appearance-only and
+never changes timing. See [Temperature and Tint](design/TEMPERATURE_AND_TINT.md).
 Static track HSL and master/RGB colour curves follow scalar grading and precede
 black fades/coverage. They remain active with scalar keyframes, add no animation
 channels and are unrelated to speed curves. Compare/Ungraded bypasses all Colour
 without changing retiming, geometry, Opacity or music. Required data/resources:
 [HSL_AND_CURVES.md](design/HSL_AND_CURVES.md).
 
-## Two distinct retiming contracts
+## Clip speed
 
-Speed is positive, **0.1×–8×**. Clips store independent **constant, ramp or custom
-keyframed curves**; shared track keyframes can override Speed across every clip in their
-video track. Clip keyframes use original-source frames, while track keyframes use project frames.
-Do not confuse the track's project-time integral with a clip's source-time integral.
+Speed belongs only to the clip and is positive, **0.1×–8×**. Strict schema 13
+requires each clip's `speed` to be `{ mode: 'constant', rate }` or
+`{ mode: 'curve', keyframes }`; there is no track Speed setting, ramp mode or
+project-wide speed field. A clip's duration and sampled frames depend only on its
+own speed and source range, never on its track, start, Ripple position or other
+clips: moving it to another track or time never changes its duration.
 
-### Static clip base: source-time constant/ramp
+### Constant speed
 
-When the video track has **no keyed Speed settings**, a constant-rate clip has duration
+A constant-rate clip has duration
 $\max(1,\operatorname{round}(\text{sourceFrames}/\text{rate}))$. Its effective
 playback rate uses `sourceFrames / outputFrames` to distribute duration rounding.
 
-Ramps store start/end rates, source-frame anchor IN/OUT, and a curve profile.
-The curve is evaluated on **source progress**: linear $u$, ease-in $u^2$, ease-out
-$2u-u^2$, smooth $3u^2-2u^3$. Outside the anchors it holds the nearest endpoint
-rate. Trimming/restoring/splitting/duplication retain those original-source anchors.
+### Custom curve: source-frame keyframes
 
-The existing $dt = ds/r(s)$ map uses deterministic midpoint integration over
-256–4096 uniform intervals. It rounds total output duration once, to at least one
-integer frame, and rescales its integrated time map to that rounded duration.
-Source sampling floors the mapped source position, with source OUT exclusive.
-Each split piece compiles/rounds independently; static-base splitting can change
-the sum by one frame. This source-anchor contract is retained, not converted into
-track keyframes.
-
-### Clip-instance custom curve: source-frame keyframes
-
-The `speed` union also accepts a strict `{ mode: 'curve', keyframes }` value.
-Each of **2–256** keyframes requires `{ frame, rate, interpolation }`: a unique ascending
-integer original-source frame, rate **0.1–8**, and hold/linear/ease-in/ease-out/smooth
-easing toward the next keyframe. First/last rates hold outside their interval. A keyframe
+A curve requires **1–256** keyframes `{ frame, rate, interpolation }`: unique ascending
+integer original-source frames, rates **0.1–8**, and hold/linear/ease-in/ease-out/smooth
+easing toward the next keyframe. First/last rates hold outside their interval, so a
+single keyframe holds its rate across the whole clip. A keyframe
 at the original's exclusive OUT is a valid boundary anchor, but none may exceed
 the registered original; keyframes outside the current trim remain stored.
 
@@ -51,79 +40,42 @@ one-source-frame holds in long recordings. Hold/constant intervals and linear
 rate ramps have closed-form integrals/inverses. Eased intervals use bounded
 16-point Gauss–Legendre quadrature with dimensionless tolerance $10^{-12}$ and
 maximum subdivision depth 14; inverse queries use bounded binary search. Storage
-is proportional to keyframes, not source or output duration. Existing constant/ramp
-compilers and their rounding remain unchanged.
+is proportional to keyframes, not source or output duration.
 
-As for the old source-ramp base, only the final output duration is rounded, its
-clock is normalised once to that duration, and mapped source positions are floored
-within source IN/OUT. Slow motion repeats recorded frames and fast motion drops
-them; no optical-flow frames are generated. Native decode still checks every
-selected original frame, even when output sampling skips it.
+Only the final output duration is rounded, once, to at least one integer frame;
+its clock is normalised once to that duration, and mapped source positions are
+floored within source IN/OUT (OUT exclusive). Slow motion repeats recorded frames
+and fast motion drops them; no optical-flow frames are generated. Native decode
+still checks every selected original frame, even when output sampling skips it.
 
-Clip curves belong to **one clip**. Trims, moves, splits and marked
-cuts retain original-source anchors; split/cut/duplicate copies are independent.
-Every retained piece recompiles/rounds its duration once. Curves are carried in
-the required `speed` field of strict schema 12, without an optional fallback,
-data migration or project-wide speed field. A mode/preset change
-is a deliberate editing command, not a conversion on load.
+Clip curves belong to **one clip**. Trims, moves (including to another track),
+splits and marked cuts retain original-source anchors, including off-trim and
+original exclusive-OUT keyframes; split/cut/duplicate pieces receive independent
+deep copies. Every retained piece compiles/rounds its own duration once, so a split
+can change the total by one frame. There is no optional fallback or data migration;
+a mode/preset change is a deliberate editing command, not a conversion on load.
 
-Original preset shapes provide Flat, Accelerate, Decelerate, Slow centre and Fast
-centre templates on the selected source range. Their keyframes remain ordinary
-editable data, not hidden saved preset IDs. The same `PlacedClip.retiming` map is
-used for preview, source trims, static/composited native export and storage planning.
-Keyed video track Speed settings retain their existing precedence: they override this
-clip curve, not multiply it, and removing them restores the clip's independent
-base without deleting any clip keyframes.
-
-### Shared video track Speed: absolute project-time rate
-
-Schema-12 track keyframes require eleven nullable channels: Opacity (`opacity`),
-Speed (`speed`) and nine scalar colour settings. In control order: `opacity`,
-`speed`, `temperature`, `tint`, `exposure`, `brightness`, `contrast`, `hue`,
-`saturation`, `highlights`, `shadows`; static HSL/curves add no channels.
-Once any keyframe on the track enables Speed, the track's rate curve **overrides
-every clip's entire constant/ramp/custom-curve base**, not just an interval between keyframes. Only
-keyed Speed settings define its intervals; unrelated colour/opacity-only keyframes are
-skipped. Each left keyframe with Speed enabled supplies its shared hold/linear/ease-in/
-ease-out/smooth easing to the next keyframe with Speed enabled. Before the first/after the
-last, the endpoint rate holds. The saved clip base stays independent and is used
-again if the last keyed Speed setting is removed.
-
-For a clip placed at absolute project frame $P$, source length
-$L=S_{\mathrm{out}}-S_{\mathrm{in}}$ and local elapsed output time $\tau$,
-source consumption is:
-
-$$
-s(\tau)=S_{\mathrm{in}}+\int_P^{P+\tau}r(t)\,dt,
-\qquad ds=r(t)\,dt.
-$$
-
-Rate intervals are integrated **analytically**, using the easing polynomials.
-Their progress primitives are 0 (hold), $u^2/2$ (linear), $u^3/3$ (ease-in),
-$u^2-u^3/3$ (ease-out), and $u^3-u^4/2$ (smooth). Positive rates make source
-consumption monotonic; inversion locates the segment and solves its integral
-(directly for a held/constant rate, bounded binary inversion otherwise).
-
-Solve $s(\tau_{\mathrm{end}})=S_{\mathrm{out}}$ and round **only the duration**:
-$D=\max(1,\operatorname{round}(\tau_{\mathrm{end}}))$. **Keyframe times, rates and
-the integral are never rescaled** to that rounded duration. At integer output
-positions $0\le n<D$, sample $\lfloor s(n)\rfloor$ within
-$[S_{\mathrm{in}},S_{\mathrm{out}}-1]$. The map repeats held source frames or drops
-unsampled frames; it does not synthesize optical-flow images. The analytic map
-stores keyframe intervals, not a duration-sized frame array.
+Presets **Flat, Ramp up, Ramp down, Accelerate, Decelerate, Slow centre and Fast
+centre** deliberately replace the clip's keyframes with Smooth-eased keyframes spread
+evenly across the selected source range. Ramp up and Ramp down place two keyframes
+at source IN and OUT: 0.5×→2× and 2×→0.5×. Choosing **Custom curve** for a constant
+clip creates a flat curve at its rate; choosing **Constant speed** returns to
+constant 1×. Removing the last keyframe keeps its rate as constant speed. Keyframes
+remain ordinary editable data, not hidden saved preset IDs.
 
 ### Placement, preview and native parity
 
-`calculateLayout()` compiles one **`PlacedClip.retiming`** at each clip's actual
-video track/start. Preview seeking, decoder rates, inverse queries and native original
-retiming/span checks consume that same map. Native output requires a monotonic,
+`calculateLayout()` places each clip with its own compiled **`PlacedClip.retiming`**,
+the single authoritative map for layout, UI, preview seeking, decoder rates, inverse
+queries, native original retiming/span checks and storage planning, in static and
+composited export alike. Native output requires a monotonic,
 integer, in-range `sourceAt` result and exact frame counts; a malformed supplied
-map is rejected rather than falling back to a clip's static speed.
+map is rejected rather than falling back to a clip's stored speed.
 
 Clip spatial geometry evaluates at the same map's continuous
 `sourcePositionAt(localOutputFrame)`, while `sourceAt` identifies the integer
 recorded image. Slow motion may animate crop/scale/translation/rotation over a
-held image without optical flow. Video track Speed changes this continuous map, not the
+held image without optical flow. Clip speed changes this continuous map, not the
 clip's stored spatial keyframes: trim/move/split/cut/duplicate retain original-source
 anchors, including off-trim and original exclusive-OUT keyframes, with independent
 deep copies for new pieces. Spatial edits are appearance-only and do not change
@@ -140,7 +92,7 @@ With graded RGB $G_i$, black-fade brightness $b_i$, evaluated Opacity $o_i$ and
 dissolve weight $w_i$ and spatial pixel coverage $m_i$, each track forms one group
 with $C = \sum_i G_i b_i o_i w_i m_i$ and $A = \sum_i o_i w_i m_i$. Source-over is
 $\mathrm{result} = C + \mathrm{lower}(1 - A)$, with no track multiplier; black fades
-change RGB without reducing coverage. Any shared track keyframe, even speed-only,
+change RGB without reducing coverage. Any shared track keyframe
 requires the composited export path; any nonneutral spatial base or spatial keyframe
 (even neutral keyframes) does too. Exact neutral poses retain opaque black letterboxing
 after grading; nonneutral uncovered pixels reveal lower footage. The static chunk
@@ -158,132 +110,92 @@ until captured with the diamond; sliders never create keyframes. Unkeyed colour
 settings edit the track base. **Placement** contains placement only; Track options
 contains rename, Ripple, ordering and deletion, with visibility separate.
 
-With video track Speed keyframes, moving the same clip changes its contextual duration.
 Each track's **Ripple** setting governs placement. While on (the new-track default),
-clips continuously sequence from the first anchor, subtracting dissolve overlaps
-and recompiling downstream durations at their new starts; commands persist these
-actual starts. Enabling Ripple closes gaps in one Undo step while retaining the
+clips continuously sequence from the first anchor, subtracting dissolve overlaps;
+a speed edit that changes a clip's duration re-sequences its suffix, and commands
+persist these actual starts. Enabling Ripple closes gaps in one Undo step while retaining the
 first current start; turning it off captures actual placements. While off, starts
 stay independent and duration edits never move unrelated clips. Other tracks,
 music and absolute track keyframes stay put. Transition/fade durations remain **output**
 frames on their own track. Invalid fade/transition regions, arbitrary same-track
-overlap or triple overlap reject the entire edit, including a rate/keyframe-time/easing change.
-This includes direct marker dragging and marker keyboard moves: a timing conflict
-rejects the **whole shared keyframe**, never just its keyed Speed setting, and never
-shortens transitions to make the destination fit.
+overlap or triple overlap reject the entire edit, including a rate, keyframe-frame or
+easing change, and never shorten transitions to make it fit. Shared track keyframes
+are appearance-only: moving or editing them never retimes a clip.
 
-Moving ghosts and commits use the same contextual duration calculation. A
-trailing-edge magnet solves the new start/end against the track curve rather than
-using the old width. Left handle/keyboard trims with Ripple off retain timeline OUT; an
-unrepresentable integer-frame result is explicitly rejected. **Clip → Range**
+Moving ghosts and commits use the clip's own duration, which its destination never
+changes. Left handle/keyboard trims with Ripple off retain timeline OUT; restoring IN
+is limited so the start never precedes project frame 0. **Clip → Range**
 text fields, bar handles and **Restore full recording** use ordinary source-range trim:
 retain the start in either mode and re-sequence the Ripple suffix normally, not
 the timeline left handle's retained-OUT rule. Ripple-on timeline left trims keep their sequence
 start and recompile the suffix. Only the first anchor supports numeric start/nudge
 while on; later clips expose the reason to turn Ripple off or drag to reorder.
 Trim/move/split/duplicate never copy or shift track keyframes; each
-split piece has its own contextual duration rounding, so exact total duration is
+split piece rounds its own duration, so exact total duration is
 not guaranteed. Originals and full proxies remain unchanged.
 
 ### Editing speed
 
 Playback rates use the shared native slider plus an adjacent exact `NumberField`,
-bounded to **0.1×–8×**: constant speed, ramp endpoints, a selected custom-curve
-keyframe's rate, and main/stored track Speed. Modes, presets and the curve graph remain
+bounded to **0.1×–8×**: the main **Speed ×** row and a selected curve keyframe's rate.
+Modes, presets and the curve graph remain
 separate controls. Pointer sliding changes only a transient local value draft (only Colour, Opacity and HSL sliders also preview it in the image); release applies one validated document edit and updates the image. Escape, pointer cancellation, lost capture or window blur restores the starting value without save/history. Each keyboard slider adjustment is an individual validated edit.
 Numeric entry retains full precision, applies on Enter/blur and restores on Escape;
 invalid drafts remain editable without clamping or rounding.
 
-In **Clip → Speed** there is no Animate toggle or stored preference; the keyframe line (count, Previous/Next and Reset) shows while the section is expanded.
+**Clip → Speed** follows the Colour/Transform pattern, with no Animate toggle or
+stored preference. While expanded, its keyframe line shows **N keyframes**, one
+native **Previous/Next** pair and **Reset** (constant 1×, removing the keyframes);
+the line is hidden while collapsed. Below it come the source → output duration
+overview, the **Speed mode** select (**Constant speed / Custom curve**), the
+constant **0.25×–4×** presets (constant mode only) and the main **Speed ×** row.
 
-The track Speed diamond explicitly joins/leaves Speed at the
-real project frame, capturing the displayed rate, never an inspected stored time.
-Changing a value never creates implicit endpoint keyframes. Per-setting
-**Previous/Next** buttons remain beside the main diamond because not every setting
-is enabled at every shared keyframe. One native **Previous/Next** pair in the keyframe line, beside the count, visits the union of track Speed keyframes and **all retained custom speed source
-keyframes of the selected clip**, including off-trim keyframes and the original
-exclusive OUT. Clip keyframes preview the nearest mapped image through authoritative
-`PlacedClip.retiming`: off-trim keyframes use the first/last available output image,
-and original OUT never requests an out-of-range image. A clip-local stored-source
-cursor, independent of the central track inspection cursor, advances through
-successive clip keyframes even when several preview the same image. Stored source
-time stays distinct from the actual displayed source frame. Track Speed overrides
-retained clip keyframes without deleting them or removing them from navigation,
-and the override is indicated. Colour/Opacity-only track keyframes are skipped.
-Navigation is editor-only, preserving
-the Inspector tab/focus without a rate/base edit, history or save. Enabled Speed
-chips in stored Keyframes rows retain their per-channel arrows too. Main and
-stored Speed arrows visit only strictly earlier/later track keyframes where
-Speed is nonnull. All main and stored per-channel arrows use that same nonnull
-rule (zero is enabled for channels that allow it) and the shared central
-off-duration inspection cursor, skipping unrelated enabled settings.
+Previous/Next visits **all retained clip speed keyframes**, including off-trim
+keyframes and the original exclusive OUT, previewing the nearest mapped image
+through authoritative `PlacedClip.retiming`: off-trim keyframes use the first/last
+available output image, and original OUT never requests an out-of-range image.
+A clip-local stored-source cursor, of the same design as Transform's and independent
+of the central track inspection cursor, advances through successive keyframes even
+when several preview the same image. Stored source time stays distinct from the
+actual displayed source frame. Navigation is editor-only, preserving the Inspector
+tab/focus without an edit, history or save. Speed has a single setting, so this
+pair is its only keyframe navigation: unlike Colour and Transform, whose settings
+share keyframes, there are no second per-setting arrows beside its diamond.
 
-The main animated rate controls are read-only where Speed is not enabled, until its hollow diamond is clicked; they are shown dimmed with a lock cue.
-Unanimated Speed uses **Constant speed / Ramp up / Ramp down**
-or **Custom curve** clip controls. Reset to 1× affects only the active keyed track Speed
-setting at the playhead, otherwise the selected clip's base.
+In the **Speed ×** row, double-clicking the name resets the editable rate to 1×.
+The capture diamond **Keyframe Speed** (◇ hollow / ◆ filled, `aria-pressed`)
+captures the rate at the **actually displayed source frame** with Linear easing
+(a constant clip becomes a one-keyframe curve), or removes the keyframe there;
+removing the last keyframe keeps its rate as constant speed. A capture retimes the
+clip, so preview then seeks to the new keyframe's mapped image. Capture never uses
+an inspected stored time. The slider/exact field (**Clip speed rate**) edits the
+constant rate in constant mode. In curve mode it is read-only, dimmed with the lock
+cue **Add a keyframe ◇ to edit**, unless a keyframe exists at the displayed source
+frame; it then edits that keyframe's rate and preview follows the keyframe.
+Sliders never create keyframes. Each accepted edit is one Undo step; timing
+conflicts remain inline errors.
 
-The **Track → Keyframes** section contains the
-directly visible whole-track keyframe list and keyframe navigation. Its toolbar's
-**Animation help** includes keyframe-timing guidance, with no separate Keyframe timing
-help button. There is no outer list disclosure or per-track list expansion preference;
-nested **Edit** details remain collapsible and preserve drafts
-and input identity through reordering and Undo. **Keyframes → Edit**
-edits stored keyframe times, easing and existing enabled settings, including beyond current duration
-or on an empty track. A stored keyed Speed setting reuses the **Track rate ×** slider/exact
-`NumberField` (double-click **Speed** resets it to 1×), not clip mode/preset/source-curve controls. Enter/blur applies
-the precise rate; Escape restores. The same **0.1×–8×** bounds and contextual timing
-validation apply. Invalid drafts retain inline errors rather than being clamped,
-rounded or used to shorten conflicting fades/transitions.
-
-Each accepted stored rate/reset changes only that existing keyed Speed setting in
-**one Undo step**. Its time, shared easing, other enabled settings/keyframes and the saved
-clip bases stay unchanged; it never implicitly joins Speed or requests a seek.
-Stored keyed colour/opacity settings likewise reuse the main sliders and individual
-colour resets, with one exact `NumberField` beside each slider as the sole numeric
-value display, targeting only that stored keyed setting. Opacity numeric entry uses
-**0–100%**, neutral **100%**, in both main and stored controls; stored values remain **0–1**.
-
-Drag a track keyframe marker horizontally or use its one-/ten-frame keyboard moves to move
-all enabled settings and their existing easing in **one Undo step**, using the same
-validation as the shared time field. Valid pointer drafts preview the recalculated
-contextual layout without saving; occupied frames and invalid timing never merge,
-overwrite, shrink transitions or commit an earlier valid preview. Escape, pointer
-cancellation, lost capture or window blur restores preview/document/scroll.
-Source ranges, static clip bases, other track keyframes and music are not copied/shifted;
-Speed can naturally recompile clip durations and Ripple-derived track starts.
-
-Main per-setting arrows, stored-setting chip arrows, section navigation to track
-keyframes and track/list navigation share a stored-keyframe inspection cursor,
-so several off-duration Speed keyframes remain reachable even when preview clamps to the same
-last frame. Marker and whole-track keyframe navigation keep the chosen Inspector tab.
-Labels distinguish stored time from actual preview. The main Clip rate field and
-diamond capture still use the **real playhead**, not the inspected off-duration
-time; list controls target their stored keyframe. Storing/moving a keyframe beyond
-duration does not extend the sequence merely for that keyframe; actual clip
-retiming or a music track's OUT can change project duration. Details:
-[LAYERS_AND_KEYFRAMES.md](LAYERS_AND_KEYFRAMES.md).
+Shared video track keyframes contain only Opacity and Colour settings; they never
+affect speed or duration. Storing/moving one beyond duration does not extend the
+sequence; actual clip retiming or a music track's OUT can change project duration.
+Details: [LAYERS_AND_KEYFRAMES.md](LAYERS_AND_KEYFRAMES.md).
 
 ### Precise clip-curve editor
 
-With a clip selected and no overriding track Speed keyframes, open **Clip → Speed**,
-choose **Custom curve**. A constant rate becomes a flat
-editable curve; converting an old
-ramp retains its original anchors and easing. Flat, Accelerate, Decelerate, Slow
-centre and Fast centre buttons deliberately replace only this clip's speed keyframes.
-
-The graph uses source time horizontally and a logarithmic **0.1×–8×** speed axis
+With a clip selected, open **Clip → Speed** and choose **Custom curve**, or capture a
+keyframe with the diamond. The curve editor shows the presets above, then the graph:
+source time horizontally and a logarithmic **0.1×–8×** speed axis
 vertically. A vertical line identifies the actually displayed source frame. Click
-the background or a keyframe to preview, then **Add keyframe** captures speed at an
-unkeyed displayed source frame. The original exclusive-OUT keyframe previews the last
+the background or a keyframe to preview. The original exclusive-OUT keyframe previews the last
 output frame, never an invented source frame. Source navigation compares the
 two adjacent mapped outputs, showing the exact source image when available or
 the closest rendered image when fast playback skips it; the stored keyframe stays
-at its requested source frame. The Speed keyframe line's navigation visits
-all retained clip source keyframes alongside track Speed keyframes, including
-off-trim and original-OUT keyframes. The native keyframe selector also retains
-access to them; clip selection uses the independent stored-source cursor above,
-not the clamped preview frame as a substitute for stored source time.
+at its requested source frame. The keyframe line's navigation and the native
+**Selected clip speed keyframe** selector reach all retained clip source keyframes,
+including off-trim and original-OUT keyframes, through the independent stored-source
+cursor above, not the clamped preview frame as a substitute for stored source time.
+The trash beside the selector, **Delete clip speed keyframe**, removes the selected
+keyframe; deleting the last one returns the clip to constant speed at its rate.
 
 **Source frame / Speed × / Easing** provide exact editing: source frame
 uses a native integer `NumberField`; Speed × pairs a slider with an exact field.
@@ -291,12 +203,12 @@ Numeric fields retain full entered decimal precision and commit on Enter/blur; i
 out-of-original positions and timing conflicts retain the draft with inline
 errors. They do not automatically seek. Escape restores the field. Easing belongs
 to the left keyframe; the last rate holds without a next interval.
-Custom clip-speed, ramp, Transform and track-keyframe selectors all visibly read
-**Easing**, retaining contextual accessible names such as **Ramp easing** and
-**Track keyframe easing N**. Clip-speed, ramp and track-keyframe selectors retain
+Custom clip-speed, Transform and track-keyframe selectors all visibly read
+**Easing**, retaining contextual accessible names such as **Track keyframe easing N**.
+Clip-speed and track-keyframe selectors retain
 the same compact selected-shape graph and accessible description. It illustrates
-the existing progress function, not a new rate or interpolation rule; ramp curves
-still exclude Hold. Selection remains native and commits once, with one Undo step.
+the existing progress function, not a new rate or interpolation rule.
+Selection remains native and commits once, with one Undo step.
 
 Graph-keyframe dragging is separate from the release-only value slider. Drag a keyframe
 horizontally to change its integer source frame and vertically to change its speed,
@@ -311,30 +223,40 @@ preview/document. Other edit/navigation gestures are disabled during capture.
 
 Focused keyframe Left/Right changes one source frame (Shift ten), Up/Down changes
 0.01× (Shift 0.1×) while retaining the entered decimal precision, Enter previews it,
-and Delete removes it if at least two
-keyframes remain. These controls isolate timeline shortcuts; the source frame field
+and Delete removes it; removing the last keyframe keeps its rate as constant speed.
+These controls isolate timeline shortcuts; the source frame field
 remains reachable if a keyframe moves outside the visible trim. New keyframes select
-themselves. Reset removes this clip curve in favour of constant 1× without
-changing track keyframes or other clips. The **Video track speed animation** controls remain
-separate; an explicit override notice appears when track Speed suppresses clip speed.
+themselves. The keyframe line's Reset returns this clip to constant 1× without
+changing track keyframes or other clips.
 
 ### Timeline clip-speed markers
 
 Inside each clip rectangle, custom-speed source keyframes appear in a salmon/dashed
-**◆** lane, distinct from the boxed blue **▼** Transform lane. Positions follow
-authoritative retiming, including a track Speed override; retained overridden
-keyframes are indicated, not deleted. Off-trim keyframes are omitted. Exclusive OUT has a
-boundary marker that seeks the final available frame. Click, Enter or Space
-selects the clip, seeks its nearest mapped image and opens Clip → Speed without
-editing; Transform keys, unlike these, slide on the timeline. Keyboard handling is isolated from timeline shortcuts. These
-markers are distinct from draggable shared project-time track markers and from
-the editable source-speed graph. Unlike these markers, Speed and Transform stored
-navigation reaches all retained off-trim/original-OUT keyframes; neither navigation
-nor inspection supplies a fake frame for main capture.
+**◆** lane, distinct from the boxed blue **▼** Transform lane; each title lists the
+keyframe's rate. Positions follow authoritative retiming. Off-trim keyframes are
+omitted. Exclusive OUT has a boundary marker that seeks the final available frame.
+Click, Enter or Space selects the clip, seeks its nearest mapped image and opens
+Clip → Speed; a click edits nothing.
+
+Speed keyframes slide exactly like Transform keys, through the shared
+`useKeyframeSlide`/`KeyframeMarkers`. Drag horizontally: after a 3-pixel threshold,
+capture-relative output-frame travel maps through the captured placed retiming to
+an original source frame, snapping to boundaries and the playhead (Alt bypasses;
+snapping to the clip end lands on exclusive OUT). Or press ←/→ for one source frame
+(Shift ten). Drafts preview without history/save, the preview following the dragged
+keyframe. A valid release is one `speed` command and one Undo step. Moving a speed
+keyframe retimes the clip, so its duration and Ripple suffix can change;
+overlap/fade/transition conflicts reject the release. Escape, pointer cancellation,
+lost capture, window blur, an occupied frame or a frame outside the original
+restores. Keyboard handling is isolated from timeline shortcuts. These markers are
+distinct from shared project-time track markers and from the editable source-speed
+graph. Stored navigation still reaches all retained off-trim/original-OUT keyframes
+through the clip-local cursor; neither navigation nor inspection supplies a fake
+frame for main capture.
 
 ## Music
 
-Strict schema 12 requires `music: MusicTrack[]`, with **0–8 independent music tracks**
+Strict schema 13 requires `music: MusicTrack[]`, with **0–8 independent music tracks**
 and unique required track `id` values; `[]` means no music. Each music track
 requires `mediaId`, `sourceIn`, `sourceOut`, `start`, `duration`, `gainDb`, `fadeIn`,
 `fadeOut` and `loop`. Several music tracks can use the same registered recording
@@ -460,7 +382,7 @@ preview caches remain unchanged but are not current playback input. Missing curr
 PCM caches appear as an explicit **Prepare** action on the file in Media → Music;
 startup/library reads never prepare, rewrite or delete them. Prepare deliberately
 to create the current cache, retaining originals and older generated files. Project
-schema is 12; registry, video-proxy and PCM cache formats are unchanged. Native export
+schema is 13; registry, video-proxy and PCM cache formats are unchanged. Native export
 still reads original audio, not the preview transport.
 
 Native mixing decodes **one original at a time** to exact selected **48 kHz stereo
@@ -482,12 +404,12 @@ cancellation cleans only owned scratch/partials and preserves completed outputs.
 
 ## Versioning
 
-Project schema **v12** requires explicit `media.videoIds` and `media.audioIds` arrays,
+Project schema **v13** requires explicit `media.videoIds` and `media.audioIds` arrays,
 unique and limited to 10,000 IDs each, plus complete video track colour with Temperature/Tint
-and static HSL/curves, clip constant/ramp/custom-curve
+and static HSL/curves, clip constant or 1–256-keyframe custom-curve
 speed, required clip `spatial: { base, keyframes }` with eight-value base and
 0–256 source-frame keyframes with required easing, track keyframe arrays with
-all eleven nullable value fields, placement and music
+all ten nullable value fields, placement and music
 source OUT. `music` is a required 0–8 array with unique required music track IDs and
 all per-track fields above; `[]` is the sole no-music representation, not null
 or a compatibility default. Every video track also requires `ripple`, `transitions`, `openingFade` and
@@ -496,14 +418,14 @@ not a default for missing saved fields. Transitions/fades are track-local, with
 no special first-track identity. Video tracks display and composite in their saved bottom-to-top array order.
 The sole track `opacity` channel overrides the track's saved `opacity` on every clip,
 including both dissolve sources; otherwise all use the saved track value.
-Required nullable channels are `opacity`, `speed` and the nine scalar colour settings,
+Required nullable channels are `opacity` and the nine scalar colour settings,
 including `temperature` and `tint`. Missing saved bases/channels are invalid, not defaulted.
 Track `opacity` is valid and required; saved `clip.opacity` and old
 `clipOpacity`/`layerOpacity` channels are rejected, not defaulted.
 New projects have empty video/music bins. Standalone audio imports belong
 to the open project's bin; every music track's references also count as membership.
 Global registered music/proxies are reusable on deliberate import, never automatically
-inherited by a new project. Earlier v1–v11 projects and export receipt snapshots remain unchanged
+inherited by a new project. Earlier v1–v12 projects and export receipt snapshots remain unchanged
 and incompatible. There is no migration, compatibility reader, null fallback, default-field
 injection or automatic deletion; recreate projects and import their media to reuse
 registered assets/verified ready proxies. Confirmed project deletion affects only
@@ -513,7 +435,7 @@ Registry/video-proxy/current PCM formats, source guards and native video budgets
 native composition uses the sole Opacity contract without a track multiplier.
 Preview uses the current explicitly prepared PCM cache described above.
 
-Export receipts remain **version 1** with a strict **v12** snapshot, required
+Export receipts remain **version 1** with a strict **v13** snapshot, required
 `musicSources` captured unique-original array and `settings.audio` identified
 instance-plan array (`[]` for each without music). Plans preserve independent
 timing/gain/fades/loop; several may refer to the same captured original. The plan

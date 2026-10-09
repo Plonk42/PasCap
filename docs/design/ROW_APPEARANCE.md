@@ -1,4 +1,4 @@
-# Owner-approved video track-only Colour and Opacity · schema 12
+# Owner-approved video track-only Colour and Opacity · schema 13
 
 Required Colour includes nine scalar settings, including Temperature and Tint,
 eight static HSL bands and four master/RGB colour curves. HSL/curves share video track
@@ -22,18 +22,18 @@ intentionally colour greys; normalized linear gains precede Exposure, preserving
 neutral-white linear luminance before clipping only, not arbitrary/final images.
 Other scalar bounds and neutral values retain the existing SDR contract.
 No optional legacy field, additive parameter merge, migration or default-on-load exists.
-Schema 12 rejects versions 1–11 without rewriting or deleting their documents.
-Receipt format remains 1 with strict schema-12 snapshots; registry, proxies and
+Schema 13 rejects versions 1–12 without rewriting or deleting their documents.
+Receipt format remains 1 with strict schema-13 snapshots; registry, proxies and
 PCM formats are unchanged. Recreate incompatible projects deliberately.
 
 The nine shared scalar colour channels override **video track colour**, independently, in
 absolute project time. Skip keyframes without the relevant enabled setting, interpolate parameter values
 using the left keyframe's easing for that setting, and hold endpoints. Removing the last keyframe for a setting
 reveals the unchanged track base. HSL and curves remain static.
-Video track Speed retains its distinct clip-speed override contract. Opacity ownership,
+Speed is clip-only and never a track channel. Opacity ownership,
 source-over composition, spatial coverage and black-fade coverage are unchanged.
-Every keyframe requires all eleven nullable fields, in control order: `opacity`,
-`speed`, `temperature`, `tint`, `exposure`, `brightness`, `contrast`, `hue`,
+Every keyframe requires all ten nullable fields, in control order: `opacity`,
+`temperature`, `tint`, `exposure`, `brightness`, `contrast`, `hue`,
 `saturation`, `highlights`, `shadows`. Missing fields are invalid, never defaulted.
 
 For example, clips A and B on one video track both use Exposure 0.5 without keyframes.
@@ -86,7 +86,7 @@ convert only at the UI boundary. Required
 `VideoLayer.opacity` and `opacity` keyframe values remain **0–1**, without a schema change.
 Main capture diamonds are always visible; each retains adjacent per-setting **Previous/Next** buttons because not every
 setting is enabled at every shared keyframe. One keyframe-line Previous/Next pair (with the keyframe count) visits
-the union of Opacity and nine scalar colour keys, skipping speed-only keys.
+the union of Opacity and nine scalar colour keys.
 Enabled setting chips in stored Keyframes rows retain their per-channel arrows.
 All main and stored per-channel arrows visit strictly earlier/later keyframes
 where that channel is nonnull (zero is enabled), using the shared central

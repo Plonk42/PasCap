@@ -7,7 +7,6 @@ import {
   type LayerKeyframe,
   type LayerKeyValues,
 } from '../../src/shared/keyframes.js';
-import { compileLayerRetiming } from '../../src/shared/layer-retiming.js';
 import {
   BASE_LAYER_ID,
   createClip,
@@ -49,8 +48,14 @@ const SPEEDS: { name: string; speed: SpeedSettings }[] = [
   { name: 'constant slow', speed: { mode: 'constant', rate: 0.5 } },
   { name: 'constant fast', speed: { mode: 'constant', rate: 2 } },
   {
-    name: 'source ramp',
-    speed: { mode: 'ramp', startRate: 0.5, endRate: 3, anchorIn: 0, anchorOut: 600, curve: 'smooth' },
+    name: 'source curve',
+    speed: {
+      mode: 'curve',
+      keyframes: [
+        { frame: 0, rate: 0.5, interpolation: 'smooth' },
+        { frame: 600, rate: 3, interpolation: 'smooth' },
+      ],
+    },
   },
 ];
 
@@ -117,7 +122,7 @@ function overlayProject(
   upper.opacity = 0.65;
   document.layers.push(upper, row('other-row', [point(50, { opacity: 0.4 })]));
   const selected = rushClip('top', upper.id, 50, speed);
-  const end = selected.start + compileLayerRetiming(selected, upper, selected.start).duration;
+  const end = selected.start + compileRetiming(selected).duration;
   document.clips = [
     createClip('base', 'recording', 300, 400),
     { ...createClip('upper-before', 'other', 0, 20), layerId: upper.id, start: 10 },
@@ -313,34 +318,6 @@ describe('project marks on one selected rush excerpt', () => {
       sourceIn: 219,
       sourceOut: 220,
     });
-  });
-
-  it('uses the placed map after incoming dissolve and absolute row-speed integration', () => {
-    const keys = [
-      point(0, { speed: 1, opacity: 0.7, exposure: -0.4 }),
-      point(100, { speed: 3, hue: 15 }),
-      point(1_000, { saturation: 0.8 }, 'hold'),
-    ];
-    const document = applyCommand(primaryProject({ mode: 'constant', rate: 8 }, keys), {
-      type: 'transition',
-      transition: { leftId: 'before', rightId: 'rush', type: 'cross-dissolve', duration: 5 },
-    });
-    const selected = placed(document, 'rush');
-    expect(selected.start).toBe(37);
-    const range = { clipId: 'rush', inFrame: selected.start + 10, outFrame: selected.start + 30 };
-    expect(sourceRangeForCut(document, range)).toEqual({ sourceIn: 118, sourceOut: 161 });
-    expect(compileRetiming(selected.clip).sourceAt(10)).not.toBe(118);
-    const next = singleCommit(document, removeMarkedRange(document, range, 'right'));
-    expectUnchangedOthers(document, next, 'rush');
-    expect(next.layers[0]!.keyframes).toEqual(keys);
-    expect(next.clips.find((clip) => clip.id === 'right')!.speed).toEqual({ mode: 'constant', rate: 8 });
-    expect(next.layers[0]!.transitions.slice(0, 2)).toEqual([
-      { leftId: 'before', rightId: 'rush', type: 'cross-dissolve', duration: 5 },
-      { leftId: 'rush', rightId: 'right', type: 'cut', duration: 0 },
-    ]);
-    expect(placed(next, 'after').duration).toBe(
-      compileLayerRetiming(placed(next, 'after').clip, next.layers[0]!, placed(next, 'after').start).duration,
-    );
   });
 });
 
@@ -590,7 +567,7 @@ describe('atomic source removal on the primary ripple row', () => {
   });
 
   it.each(SPEEDS)(
-    'preserves static settings/source ramp anchors and rephases valid excerpt durations: $name',
+    'preserves static settings/source curve anchors and rephases valid excerpt durations: $name',
     ({ speed }) => {
       const document = primaryProject(speed, [
         point(15, { exposure: 0.25, opacity: 0.4 }),
@@ -608,7 +585,7 @@ describe('atomic source removal on the primary ripple row', () => {
         expect(next.layers.map((layer) => layer.colour)).toEqual(document.layers.map((layer) => layer.colour));
         expect(excerpt.clip).not.toHaveProperty('opacity');
         expect(next.layers[0]!.opacity).toBe(0.65);
-        expect(excerpt.duration).toBe(compileLayerRetiming(excerpt.clip, next.layers[0]!, excerpt.start).duration);
+        expect(excerpt.duration).toBe(compileRetiming(excerpt.clip).duration);
         const samples = Array.from({ length: excerpt.duration }, (_, frame) => excerpt.retiming.sourceAt(frame));
         expect(
           samples.every(
@@ -618,8 +595,8 @@ describe('atomic source removal on the primary ripple row', () => {
         ).toBe(true);
       }
       expect(left.clip.speed).not.toBe(right.clip.speed);
-      if (left.clip.speed.mode === 'ramp') {
-        left.clip.speed.anchorIn = 50;
+      if (left.clip.speed.mode === 'curve') {
+        left.clip.speed.keyframes[0]!.frame = 50;
         expect(right.clip.speed).toEqual(speed);
         expect(placed(document, 'rush').clip.speed).toEqual(speed);
       }
@@ -680,36 +657,6 @@ describe('positioned overlay removal without neighbour ripple', () => {
     expect(placed(next, 'top').clip).toEqual({ ...original.clip, sourceOut: 140 });
     expectUnchangedOthers(document, next, 'top');
     expect(placed(next, 'upper-after').start).toBe(placed(document, 'upper-after').start);
-  });
-
-  it('maps overlay marks/cut placement with absolute row speed, retaining fixed eleven-channel points', () => {
-    const keys = [
-      point(0, { speed: 1, opacity: 0.6, temperature: 0.2, tint: -0.3, exposure: 0.3 }),
-      point(100, {
-        speed: 3,
-        brightness: 0.1,
-        contrast: 1.1,
-        hue: 30,
-        saturation: 0.8,
-        highlights: 0.2,
-        shadows: -0.1,
-      }),
-      point(1_000, { exposure: 0.7 }, 'hold'),
-    ];
-    const document = overlayProject({ mode: 'constant', rate: 8 }, keys);
-    const original = placed(document, 'top');
-    expect(sourceRangeForCut(document, { clipId: 'top', inFrame: 60, outFrame: 75 })).toEqual({
-      sourceIn: 121,
-      sourceOut: 156,
-    });
-    expect(original).toMatchObject({ start: 50, duration: 48, end: 98 });
-    const next = singleCommit(document, removal('top', 140, 170));
-    expect(placed(next, 'top')).toMatchObject({ start: 50, duration: 18, end: 68 });
-    expect(placed(next, 'right')).toMatchObject({ start: 80, duration: 18, end: 98 });
-    expect(placed(next, 'right').start).toBe(original.start + original.retiming.outputAt(170));
-    expect(next.layers[1]!.keyframes).toEqual(keys);
-    expectUnchangedOthers(document, next, 'top');
-    expect(placed(next, 'upper-after')).toMatchObject({ start: 108, duration: 7, end: 115 });
   });
 
   it('documents duration rephasing rather than silently converting a cut to an OUT-preserving trim', () => {
@@ -787,64 +734,23 @@ describe('quick trims retain the displayed original frame', () => {
     }
   });
 
-  it('quick-trims through row-speed override using the selected placed context', () => {
-    const keys = [point(0, { speed: 1, exposure: 0.5 }), point(100, { speed: 3 }), point(1_000, { opacity: 0.4 })];
-    const document = primaryProject({ mode: 'constant', rate: 8 }, keys);
-    const selected = placed(document, 'rush');
-    expect(selected.start).toBe(42);
-    expect(selected.retiming.sourceAt(10)).toBe(119);
-    for (const edge of ['in', 'out'] as const) {
-      const next = singleCommit(document, trimAtPlayhead(document, 'rush', selected.start + 10, edge));
-      expect(placed(next, 'rush').clip).toMatchObject({
-        sourceIn: edge === 'in' ? 119 : 100,
-        sourceOut: edge === 'out' ? 120 : 220,
-      });
-      expect(next.layers[0]!.keyframes).toEqual(keys);
-      expectUnchangedOthers(document, next, 'rush');
-    }
-  });
-
   it.each(['in', 'out'] as const)(
     'keeps overlay neighbours fixed for quick %s trim and preserves OUT on IN trim',
     (edge) => {
-      const keys = [point(0, { speed: 1 }), point(100, { speed: 3 }), point(1_000, { hue: 60 })];
-      const document = overlayProject({ mode: 'constant', rate: 8 }, keys);
+      const keys = [point(0, { exposure: 0.5 }), point(100, { opacity: 0.4 }), point(1_000, { hue: 60 })];
+      const document = overlayProject({ mode: 'constant', rate: 2 }, keys);
       const selected = placed(document, 'top');
       const next = singleCommit(document, trimAtPlayhead(document, 'top', 70, edge));
       const retained = placed(next, 'top');
       expect(retained.clip).toMatchObject({
-        sourceIn: edge === 'in' ? 144 : 100,
-        sourceOut: edge === 'out' ? 145 : 220,
+        sourceIn: edge === 'in' ? 140 : 100,
+        sourceOut: edge === 'out' ? 141 : 220,
       });
       if (edge === 'in') expect(retained.end).toBe(selected.end);
       else expect(retained.start).toBe(selected.start);
       expectUnchangedOthers(document, next, 'top');
     },
   );
-
-  it('rejects an unrepresentable overlay IN trim but permits its positioned source-prefix cut', () => {
-    const document = overlayProject({ mode: 'constant', rate: 1 }, [
-      point(0, { speed: 7.5 }, 'hold'),
-      point(40, { speed: 0.1 }),
-    ]);
-    const clip = document.clips.find((item) => item.id === 'top')!;
-    clip.start = 30;
-    clip.sourceOut = 185;
-    const parsed = projectSchema.parse(document);
-    const selected = placed(parsed, 'top');
-    expect(selected.end).toBe(140);
-    expect(selected.retiming.sourceAt(1)).toBe(107);
-    const before = structuredClone(parsed);
-    const history = new EditHistory(parsed);
-    expect(() => history.commit(trimAtPlayhead(history.current, 'top', 31, 'in'))).toThrow(
-      'cannot keep the positioned clip OUT',
-    );
-    expect(history.current).toEqual(before);
-    expect(history.canUndo).toBe(false);
-    const cut = singleCommit(parsed, removal('top', 100, 107));
-    expect(placed(cut, 'top')).toMatchObject({ start: 30, duration: 40, end: 70 });
-    expectUnchangedOthers(parsed, cut, 'top');
-  });
 
   it.each(SPEEDS)('retains at least one original frame when trimming at either extreme: $name', ({ speed }) => {
     const document = primaryProject(speed);

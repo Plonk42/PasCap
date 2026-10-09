@@ -1,4 +1,4 @@
-# Clip spatial transforms · strict project schema 12
+# Clip spatial transforms · strict project schema 13
 
 Current contract for [#20](https://github.com/Plonk42/PasCap/issues/20) and
 [#90](https://github.com/Plonk42/PasCap/issues/90): static and keyframed crop, uniform
@@ -18,7 +18,7 @@ Implementation authorities: [pose/schema/mapping](../../src/shared/spatial.ts),
 
 ## Required data and ownership
 
-Every schema-12 clip requires `spatial: { base, keyframes }`. Both objects and all
+Every schema-13 clip requires `spatial: { base, keyframes }`. Both objects and all
 keyframes are strict: no unknown fields, optional legacy values, coercion, persisted
 defaults or load-time repair. `base` is one complete eight-value pose;
 `keyframes` is a required array of **0–256** keys. Each key requires
@@ -43,8 +43,8 @@ covers nothing and the clip displays nothing there. It is never rejected or repa
 Neutral creation values are not defaults for missing saved data. Spatial keyframes
 belong only to `clip.spatial`; they add no video track channels or shared track markers.
 Their separate source-keyframe lane is inside each timeline clip rectangle.
-The eleven nullable shared video track channels (Opacity, Speed and nine scalar colour
-fields), track-only Colour ownership, clip-owned speed and final
+The ten nullable shared video track channels (Opacity and nine scalar colour
+fields), track-only Colour ownership, clip-only speed and final
 [#67](https://github.com/Plonk42/PasCap/issues/67) sole video track **Opacity** remain
 unchanged. No saved `clip.opacity` or second opacity multiplier is introduced.
 
@@ -66,8 +66,8 @@ neutral base.
 The authoritative `PlacedClip.retiming` provides two distinct queries:
 `sourceAt(localOutputFrame)` identifies the integer recorded image;
 `sourcePositionAt(localOutputFrame)` supplies continuous original-source position
-for spatial evaluation. Constant, ramp, custom clip speed and overriding video track
-Speed all use that same placed map. Geometry can move while slow motion holds
+for spatial evaluation. Constant and custom-curve clip speed both use that same
+placed map. Geometry can move while slow motion holds
 one recorded image; no optical-flow or intermediate recorded image is invented.
 Video track colour and Opacity still evaluate at absolute project time.
 
@@ -221,18 +221,17 @@ Source keyframes use the clip's authoritative retiming to locate output position
 off-trim keyframes are omitted. A keyframe at exclusive OUT is a boundary marker and seeks
 the final available frame. Click, Enter or Space selects the clip, seeks the
 nearest mapped image and opens Clip → Transform; a click edits nothing. A key slides to another original source frame by dragging (pointer travel in output frames mapped through the placed retiming; zero travel keeps its frame) or ←/→ (one source frame, Shift ten), keeping its easing and enabled settings. Drafts preview without history/save; a valid release is one `spatial` command and one Undo step, while Escape, cancellation, lost capture, blur, an occupied frame or an out-of-original frame restores. Marker keyboard
-events do not also invoke timeline shortcuts. Speed markers indicate a track
-Speed override, which retains the clip's source keyframes. Speed and Transform
+events do not also invoke timeline shortcuts. Speed and Transform
 stored navigation still reaches all retained off-trim/original-OUT keyframes
 through independent clip-local source inspection;
 main capture never substitutes that stored time for the real displayed source frame.
 
 ## Preservation
 
-Projects and version-1 export receipt snapshots must satisfy strict **schema 12**,
+Projects and version-1 export receipt snapshots must satisfy strict **schema 13**,
 including required clip spatial data and the unchanged identified music arrays.
-Required video track Colour includes Temperature/Tint and static HSL/curves, with eleven
-required nullable track keyframe fields. Incompatible v1–v11 projects/receipt snapshots
+Required video track Colour includes Temperature/Tint and static HSL/curves, with ten
+required nullable track keyframe fields. Incompatible v1–v12 projects/receipt snapshots
 and completed videos remain untouched.
 Recreate projects deliberately; do not migrate, default-fill, rewrite or delete old
 data automatically. Registry/proxy/PCM and receipt/report format versions do not

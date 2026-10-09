@@ -10,6 +10,7 @@ import { removeSpatialKey, replaceSpatialKey, spatialPlayhead } from '../../src/
 import {
   inspectSpatialKeyframe,
   reconcileSpatialInspection,
+  speedFrames,
   type SpatialInspection,
 } from '../../src/web/spatial-navigation.js';
 
@@ -46,7 +47,6 @@ function reconcile(inspection: SpatialInspection | null, project: ProjectDocumen
     project.clips[0] ?? null,
     observedFrame,
     false,
-    null,
   );
 }
 
@@ -106,7 +106,6 @@ describe('clip-local Transform stored-source cursor', () => {
         project.clips[0]!,
         17,
         false,
-        null,
       );
       expect(cleared).toBeNull();
       expect(reconcile(cleared, project)).toBeNull();
@@ -122,23 +121,21 @@ describe('clip-local Transform stored-source cursor', () => {
       project.clips[0]!,
       17,
       true,
-      null,
     );
     expect(cleared).toBeNull();
     expect(reconcile(cleared, project)).toBeNull();
   });
 
-  it('clears for any central track inspection without substituting its stored time', () => {
+  it('clears while a central track inspection interrupts it, without substituting its stored time', () => {
     const project = fixture();
     project.layers[0]!.keyframes = [
       { frame: 100, interpolation: 'linear', values: { ...EMPTY_KEY_VALUES, opacity: 0 } },
     ];
     const central = inspectKeyframe(project.id, project.layers[0]!, 100, 17, 77)!;
     const cursor = inspect(project, 2);
-    for (const inspection of [central, { ...central, projectId: 'foreign', layerId: 'foreign' }])
-      expect(
-        reconcileSpatialInspection(cursor, context(project), project, project.clips[0]!, 17, false, inspection),
-      ).toBeNull();
+    expect(
+      reconcileSpatialInspection(cursor, context(project), project, project.clips[0]!, 17, central !== null),
+    ).toBeNull();
     expect(cursor.frame).toBe(2);
     expect(central.frame).toBe(100);
   });
@@ -150,11 +147,11 @@ describe('clip-local Transform stored-source cursor', () => {
     expect(inspectSpatialKeyframe(context(project), project, clip, 12, 17)).toBeNull();
     for (const foreign of [null, { ...clip, id: 'foreign' }, { ...clip, layerId: 'foreign' }]) {
       expect(inspectSpatialKeyframe(context(project), project, foreign, 2, 17)).toBeNull();
-      expect(reconcileSpatialInspection(cursor, context(project), project, foreign, 17, false, null)).toBeNull();
+      expect(reconcileSpatialInspection(cursor, context(project), project, foreign, 17, false)).toBeNull();
     }
     const removed = { ...project, clips: [] };
     expect(inspectSpatialKeyframe(context(project), removed, clip, 2, 17)).toBeNull();
-    expect(reconcileSpatialInspection(cursor, context(project), removed, clip, 17, false, null)).toBeNull();
+    expect(reconcileSpatialInspection(cursor, context(project), removed, clip, 17, false)).toBeNull();
   });
 
   it('follows one selected key through reordering and Undo/Redo without seeking or changing its base', () => {
@@ -218,11 +215,9 @@ describe('clip-local Transform stored-source cursor', () => {
     expect(reconcile(cursor, replaced)).toBeNull();
   });
 
-  it.each([0.25, 1.125, 4, 8])('keeps authoritative nearest previews under a %s× track override', (rate) => {
+  it.each([0.25, 1.125, 4, 8])('keeps authoritative nearest previews at a %s× clip speed', (rate) => {
     const project = fixture([0, 31, 32, 33, 60, 90, 120]);
-    project.layers[0]!.keyframes = [
-      { frame: 0, interpolation: 'linear', values: { ...EMPTY_KEY_VALUES, speed: rate } },
-    ];
+    project.clips[0]!.speed = { mode: 'constant', rate };
     const placed = calculateLayout(project).clips[0]!;
     for (const key of project.clips[0]!.spatial.keyframes) {
       const cursor = inspect(project, key.frame);
@@ -233,6 +228,40 @@ describe('clip-local Transform stored-source cursor', () => {
     }
     expect(inspect(project, 120).expectedFrame).toBe(placed.end - 1);
     expect(spatialPlayhead(project, 'clip', placed.end - 1)!.frame).toBeLessThan(90);
+  });
+
+  it('navigates retained clip speed keys, including off-trim and original OUT, with the Speed frame list', () => {
+    const project = fixture([60]);
+    project.clips[0]!.speed = {
+      mode: 'curve',
+      keyframes: [
+        { frame: 0, rate: 0.5, interpolation: 'linear' },
+        { frame: 45, rate: 2, interpolation: 'smooth' },
+        { frame: 120, rate: 1, interpolation: 'hold' },
+      ],
+    };
+    const clip = project.clips[0]!;
+    expect(inspectSpatialKeyframe(context(project), project, clip, 60, 17, speedFrames)).toBeNull();
+    for (const frame of [0, 45, 120]) {
+      const cursor = inspectSpatialKeyframe(context(project), project, clip, frame, 17, speedFrames)!;
+      expect(cursor).toMatchObject({
+        frame,
+        frames: [0, 45, 120],
+        expectedFrame: previewClipSource(project, 'clip', frame),
+      });
+      const arrived = reconcileSpatialInspection(
+        cursor,
+        context(project),
+        project,
+        clip,
+        cursor.expectedFrame,
+        false,
+        speedFrames,
+      );
+      expect(arrived?.frame).toBe(frame);
+    }
+    project.clips[0]!.speed = { mode: 'constant', rate: 1 };
+    expect(speedFrames(project.clips[0]!)).toEqual([]);
   });
 
   it('adds no persisted fields, history entries, duration changes or edits while inspecting', () => {

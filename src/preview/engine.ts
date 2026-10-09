@@ -112,9 +112,6 @@ function timingKey(project: ProjectDocument): string {
         transitions: layer.transitions,
         opening: layer.openingFade,
         closing: layer.closingFade,
-        rates: layer.keyframes
-          .filter((key) => key.values.speed !== null)
-          .map((key) => ({ frame: key.frame, interpolation: key.interpolation, value: key.values.speed })),
       }))
       .sort((left, right) => left.id.localeCompare(right.id)),
     music: project.music,

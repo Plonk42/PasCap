@@ -77,7 +77,7 @@ export async function clipAction(page: Page, name: string): Promise<void> {
   await action.click();
 }
 
-/** All eleven nullable values are present, even when only one channel participates. */
+/** All ten nullable values are present, even when only one channel participates. */
 export function sharedPoint(
   frame: number,
   values: Partial<LayerKeyValues>,

@@ -82,8 +82,7 @@
 .layer-keyframe-scope,
 .layer-keyframe-position,
 .layer-setting-hint,
-.layer-keyframe-dependencies,
-.speed-graph-range {
+.layer-keyframe-dependencies {
   color: var(--muted);
   font-size: 11px;
   line-height: 1.5;
@@ -254,13 +253,6 @@
 .layer-setting-actions output {
   font-size: 12px;
   font-variant-numeric: tabular-nums;
-}
-
-.speed-graph-range {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-  margin-top: 3px;
 }
 
 .timeline-layer-key {

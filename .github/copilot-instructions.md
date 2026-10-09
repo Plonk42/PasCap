@@ -80,6 +80,10 @@ PasCap is a solo, pre-release project: optimize for fast iteration. Details are 
 
 - Shared integer-frame layout/retiming (`PlacedClip.retiming`) is authoritative for
   UI, preview and native export. Per-frame rendering stays outside React.
+- Speed is clip-only: strict constant `rate` or a 1–256-keyframe curve on original
+  source frames (presets such as Ramp up replace its keyframes). A clip's duration
+  depends only on its own speed and source range, never its track, start or Ripple
+  position; there is no track Speed channel.
 - Sliding timeline keyframe markers (track, Transform and any new type) must use
   `useKeyframeSlide`/`KeyframeMarkers` in `src/web/keyframe-slide.tsx`; a type
   only supplies its `KeyframeSlideKind`, never its own drag/keyboard handling.
@@ -90,9 +94,9 @@ PasCap is a solo, pre-release project: optimize for fast iteration. Details are 
   channel is nonnull (zero is enabled), sharing the central off-duration inspection cursor. Each expanded
   section has one keyframe line (count, one Previous/Next pair over the same set, Reset), hidden
   while collapsed. The pair: Colour visits Opacity/nine scalar
-  colour keyframes; Speed visits track Speed keyframes and **all retained custom
-  speed source keyframes of the selected clip**, including off-trim keyframes and
-  original exclusive OUT, even under a track Speed override. Clip source navigation
+  colour keyframes; Speed visits **all retained custom speed source keyframes of the
+  selected clip**, including off-trim keyframes and original exclusive OUT; Speed's
+  single setting has no extra per-setting arrows beside its diamond. Clip source navigation
   previews the nearest image mapped by authoritative retiming, using an independent
   clip-local stored-source cursor, not central track inspection or a clamped
   playhead as stored time. Transform likewise visits all retained source
@@ -103,7 +107,7 @@ PasCap is a solo, pre-release project: optimize for fast iteration. Details are 
   Navigation never edits,
   saves or creates history. See [speed/audio](../docs/SPEED_AND_AUDIO.md) and
   [spatial transforms](../docs/design/SPATIAL_TRANSFORMS.md).
-- Strict schema 12 requires complete row Colour with nine scalar fields plus
+- Strict schema 13 requires complete row Colour with nine scalar fields plus
   `colour.hsl` (eight complete named bands) and `colour.curves` (master/red/green/blue
   2–16-point arrays). HSL/curves remain static, not animation channels. All Colour
   is row-owned, keyed or not; clips have no colour/correction. Neutral creators
@@ -158,8 +162,8 @@ PasCap is a solo, pre-release project: optimize for fast iteration. Details are 
 - Final approved [#67](https://github.com/Plonk42/PasCap/issues/67): **Opacity** is
   one row-owned setting, not a clip setting. `VideoLayer.opacity` is a required
   number in 0–1; new tracks start at 1 (100%). No saved `clip.opacity` field.
-  The sole row Opacity key channel is `opacity`; points require all eleven nullable
-  channels: `opacity`, `speed`, `temperature`, `tint`, `exposure`, `brightness`,
+  The sole row Opacity key channel is `opacity`; points require all ten nullable
+  channels: `opacity`, `temperature`, `tint`, `exposure`, `brightness`,
   `contrast`, `hue`, `saturation`, `highlights`, `shadows`. Reject missing row opacity,
   saved `clip.opacity` and old `clipOpacity`/`layerOpacity` channels; do not supply
   compatibility defaults. `layer.opacity` is the valid sole stored row value.
@@ -178,10 +182,10 @@ PasCap is a solo, pre-release project: optimize for fast iteration. Details are 
   $\mathrm{result} = C + \mathrm{lower}(1 - A)$, evaluating row Opacity for each
   source with no additional layer multiplier; $m_i$ is spatial source coverage,
   including opaque neutral letterboxing. Black fades never reduce that coverage.
-  Version-1 export receipts require strict v12 snapshots and captured audio-source/
+  Version-1 export receipts require strict v13 snapshots and captured audio-source/
   instance-plan arrays; receipt, registry/proxy/PCM and benchmark format versions
   remain independent and unchanged.
-  Reject and preserve incompatible v1–v11 projects/receipt snapshots; require recreation,
+  Reject and preserve incompatible v1–v12 projects/receipt snapshots; require recreation,
   without migrations, compatibility defaults or automatic deletion.
 - Music is a required 0–8 array of independently identified instances, never null
   or singular. Duration is the maximum of all video and music OUTs. After the last

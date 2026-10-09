@@ -6,11 +6,6 @@ import { previewFrameFor } from './keyframe-navigation.js';
 import type { KeyframeSlideKind, KeyframeSlideTarget } from './keyframe-slide.js';
 import type { InspectorSectionTarget } from './InspectorSection.js';
 
-/** A shared keyframe opens Colour when it enables any colour or Opacity setting, otherwise Speed. */
-export function keyframeSection(values: Readonly<Record<string, number | null>>): InspectorSectionTarget {
-  return Object.entries(values).some(([setting, value]) => setting !== 'speed' && value !== null) ? 'colour' : 'speed';
-}
-
 type MoveKey = Extract<EditCommand, { type: 'layer-key-move' }>;
 export interface KeyframeDragPlan {
   frame: number;
@@ -68,10 +63,9 @@ export function trackKeyframeKind(options: {
       planKeyframeDrag(project, scope, origin, trackKeyframeFrame(origin, delta), [], 0),
     seekFrame: (document, _target, frame) => previewFrameFor(frame, calculateLayout(document).duration),
     select: ({ scope }) => options.onSelectLayer(scope),
-    reveal: (document, { scope }, frame, open) => {
+    reveal: (_document, { scope }, frame, open) => {
       options.onSeekKeyframe(scope, frame);
-      const point = document.layers.find((layer) => layer.id === scope)?.keyframes.find((item) => item.frame === frame);
-      if (open && point) options.onOpenSection(keyframeSection(point.values));
+      if (open) options.onOpenSection('colour');
     },
     selector: ({ scope }, frame) => `[data-keyframe-layer="${CSS.escape(scope)}"][data-layer-keyframe="${frame}"]`,
   };

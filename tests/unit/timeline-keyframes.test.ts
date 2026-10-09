@@ -22,7 +22,7 @@ function fixture() {
   const point: LayerKeyframe = {
     frame: 20,
     interpolation: 'ease-in',
-    values: { ...EMPTY_KEY_VALUES, ...scalarColourValues(NEUTRAL_COLOUR), opacity: 0.7, speed: 1 },
+    values: { ...EMPTY_KEY_VALUES, ...scalarColourValues(NEUTRAL_COLOUR), opacity: 0.7 },
   };
   const other: LayerKeyframe = { frame: 80, interpolation: 'hold', values: { ...EMPTY_KEY_VALUES, exposure: 0.5 } };
   project.layers[0]!.keyframes = [point, other];
@@ -46,7 +46,7 @@ describe('capture-relative marker geometry', () => {
 });
 
 describe('shared-point drag planning', () => {
-  it('moves all eleven participants/easing across another point atomically and changes no other project data', () => {
+  it('moves all ten participants/easing across another point atomically and changes no other project data', () => {
     const { project, point, other } = fixture();
     const bytes = JSON.stringify(project);
     const plan = planKeyframeDrag(project, 'video-1', 20, 90, [], 0);
@@ -94,20 +94,6 @@ describe('shared-point drag planning', () => {
     expect(plan.document.layers[0]!.keyframes.at(-1)).toEqual({ ...point, frame: 200 });
     expect(calculateLayout(plan.document).duration).toBe(calculateLayout(project).duration);
     expect(plan.document.clips).toEqual(project.clips);
-  });
-  it('rejects speed timing that would invalidate a transition instead of shortening clips/fades silently', () => {
-    const project = createProject('invalid-speed-move', 'Atomic row speed');
-    project.clips = [createClip('a', 'video', 0, 30), createClip('b', 'video', 30, 60)];
-    project.layers[0]!.transitions = [{ leftId: 'a', rightId: 'b', type: 'cross-dissolve', duration: 18 }];
-    project.layers[0]!.keyframes = [
-      { frame: 0, interpolation: 'hold', values: { ...EMPTY_KEY_VALUES, speed: 1 } },
-      { frame: 100, interpolation: 'hold', values: { ...EMPTY_KEY_VALUES, speed: 8 } },
-    ];
-    expect(calculateLayout(project).duration).toBe(42);
-    const plan = planKeyframeDrag(project, 'video-1', 0, 110, [], 0);
-    expect(plan.error).toContain('overlap or exceed');
-    expect(plan.command).toBeNull();
-    expect(plan.document).toBe(project);
   });
   it.each([-1, 0.5, NaN, Infinity, 2_147_483_648])(
     'rejects destination frame %s without altering the snapshot',

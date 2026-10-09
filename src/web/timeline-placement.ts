@@ -1,6 +1,6 @@
 import { applyCommand, type EditCommand } from '../shared/commands.js';
-import { compileLayerRetiming } from '../shared/layer-retiming.js';
 import type { ProjectDocument, VideoClip } from '../shared/model.js';
+import { clipDuration } from '../shared/speed.js';
 import { calculateLayout, layerClips } from '../shared/timeline.js';
 
 export type TimelinePayload =
@@ -94,7 +94,7 @@ function rippleSlots(
     const incoming = transitions[index - 1];
     if (incoming?.type === 'cross-dissolve') cursor -= incoming.duration;
     const start = cursor;
-    cursor += compileLayerRetiming(clip, layer, start).duration;
+    cursor += clipDuration(clip);
     return { clip, start, end: cursor };
   });
   return Array.from({ length: ordered.length + 1 }, (_, order) => {
@@ -137,45 +137,13 @@ function draggedClips(project: ProjectDocument, payload: TimelinePayload): reado
   return [clip];
 }
 
-function durationAt(project: ProjectDocument, clips: readonly VideoClip[], layerId: string, start: number): number {
-  const layer = project.layers.find((item) => item.id === layerId)!;
-  let cursor = start;
-  for (const clip of clips) cursor += compileLayerRetiming(clip, layer, cursor).duration;
-  return cursor - start;
+function durationAt(clips: readonly VideoClip[]): number {
+  return clips.reduce((total, clip) => total + clipDuration(clip), 0);
 }
 
-function startEndingAt(
-  point: number,
-  minimum: number,
-  maximum: number,
-  preferred: number,
-  endAt: (start: number) => number,
-): number | null {
-  if (point < endAt(minimum) || point > endAt(maximum)) return null;
-  let low = minimum;
-  let high = maximum;
-  while (low < high) {
-    const middle = Math.floor((low + high) / 2);
-    if (endAt(middle) < point) low = middle + 1;
-    else high = middle;
-  }
-  if (endAt(low) !== point) return null;
-  const first = low;
-  high = maximum;
-  while (low < high) {
-    const middle = Math.ceil((low + high) / 2);
-    if (endAt(middle) > point) high = middle - 1;
-    else low = middle;
-  }
-  return Math.max(first, Math.min(low, preferred));
-}
-
-/** The trailing edge changes length when it moves across a row rate curve.
- * Solve its actual contextual end instead of snapping with the old width. */
+/** Leading or trailing edge snaps; a clip keeps its own duration wherever it moves. */
 function snapRowPlacement(
-  project: ProjectDocument,
   clips: readonly VideoClip[],
-  layerId: string,
   requested: number,
   points: readonly number[],
   tolerance: number,
@@ -191,13 +159,10 @@ function snapRowPlacement(
       closest = distance;
     }
   };
-  const minimum = Math.max(0, requested - Math.ceil(tolerance));
-  const maximum = requested + Math.ceil(tolerance);
-  const endAt = (candidate: number): number => candidate + durationAt(project, clips, layerId, candidate);
+  const duration = durationAt(clips);
   for (const point of points) {
     consider(point, point);
-    const trailing = startEndingAt(point, minimum, maximum, requested, endAt);
-    if (trailing !== null) consider(trailing, point);
+    consider(point - duration, point);
   }
   return { start, guide };
 }
@@ -239,9 +204,7 @@ export function planTimelineDrop(
       if (payload.kind === 'clip' && previousFirst?.id === first.id && slot === slots[0]) start = requested;
     } else if (snapping) {
       const snapped = snapRowPlacement(
-        project,
         clips,
-        layerId,
         requested,
         placementSnapPoints(project, payload.kind === 'clip' ? payload.clipId : null, playhead),
         tolerance,
@@ -253,7 +216,7 @@ export function planTimelineDrop(
     plan.start = start;
     plan.guide = guide;
     plan.command = payload.kind === 'clip' ? { type: 'place', clipId: payload.clipId, layerId, start, index } : null;
-    plan.duration = durationAt(project, clips, layerId, start);
+    plan.duration = durationAt(clips);
     const candidate = candidateDocument(project, payload, plan);
     const layout = calculateLayout(candidate);
     const placed = layout.clips.find((item) => item.clip.id === first.id)!;

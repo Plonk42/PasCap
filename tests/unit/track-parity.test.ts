@@ -10,7 +10,6 @@ import {
   planLayeredExport,
 } from '../../src/shared/export.js';
 import { EMPTY_KEY_VALUES, type LayerKeyframe } from '../../src/shared/keyframes.js';
-import { compileLayerRetiming } from '../../src/shared/layer-retiming.js';
 import {
   BASE_LAYER_ID,
   createClip,
@@ -30,10 +29,10 @@ import { unsupportedProject } from './project-fixtures.js';
 const TRACK_IDS = ['ground', 'middle', 'sky'];
 const cases = TRACK_IDS.flatMap((layerId) => [false, true].map((ripple) => ({ layerId, ripple })));
 const cut = (leftId: string, rightId: string): Transition => ({ leftId, rightId, type: 'cut', duration: 0 });
-const point = (frame: number, speed: number): LayerKeyframe => ({
+const point = (frame: number): LayerKeyframe => ({
   frame,
   interpolation: 'hold',
-  values: { ...EMPTY_KEY_VALUES, speed, exposure: 0.123456789 },
+  values: { ...EMPTY_KEY_VALUES, exposure: 0.123456789 },
 });
 
 function fixture(selectedId = 'middle', ripple = false): ProjectDocument {
@@ -109,10 +108,10 @@ function rejected(document: ProjectDocument, command: EditCommand, message: stri
   expect(history.canRedo).toBe(false);
 }
 
-describe('strict uniform schema-12 tracks', () => {
+describe('strict uniform schema-13 tracks', () => {
   it('uses Ripple ON for the initial track and every newly created track', () => {
     const initial = createProject('new', 'New');
-    expect(initial.schemaVersion).toBe(12);
+    expect(initial.schemaVersion).toBe(13);
     expect(initial.layers).toEqual([createLayer(BASE_LAYER_ID, 'Video track 1')]);
     for (const id of [BASE_LAYER_ID, ...Array.from({ length: 8 }, (_, index) => `arbitrary-${index}`)]) {
       expect(createLayer(id, 'Track')).toEqual({
@@ -144,7 +143,7 @@ describe('strict uniform schema-12 tracks', () => {
     }
     for (const extra of [{ transitions: [] }, { openingFade: 0 }, { closingFade: 0 }])
       expect(projectSchema.safeParse({ ...document, ...extra }).success).toBe(false);
-    for (const schemaVersion of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11])
+    for (const schemaVersion of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])
       expect(projectSchema.safeParse({ ...document, schemaVersion }).success).toBe(false);
     expect(projectSchema.safeParse(unsupportedProject(5, 'old', 'Unsupported topology')).success).toBe(false);
     expect(document).not.toHaveProperty('transitions');
@@ -235,7 +234,7 @@ describe('independent Ripple toggles and packed placements', () => {
   it.each(TRACK_IDS)('enabling %s closes gaps from its existing anchor in exactly one Undo', (layerId) => {
     const document = fixture(layerId, false);
     const layer = document.layers.find((item) => item.id === layerId)!;
-    layer.keyframes = [point(0, 1), point(600, 1)];
+    layer.keyframes = [point(0), point(600)];
     layer.openingFade = 2;
     layer.closingFade = 3;
     // Chronological order must be captured rather than the interleaved flat order.
@@ -267,28 +266,6 @@ describe('independent Ripple toggles and packed placements', () => {
     expect(starts(moved, layerId)).toEqual([10, 40, 120]);
     expectOtherTracks(document, moved, layerId);
   });
-
-  it.each(TRACK_IDS)(
-    'packing %s rejects a contextual Speed/fade conflict instead of shortening its retained fade',
-    (layerId) => {
-      const document = fixture(layerId, false);
-      const layer = document.layers.find((item) => item.id === layerId)!;
-      layer.keyframes = [point(0, 8), point(100, 1)];
-      layer.closingFade = 10;
-      expect(
-        calculateLayout(document)
-          .clips.filter((clip) => clip.clip.layerId === layerId)
-          .map((clip) => [clip.start, clip.duration]),
-      ).toEqual([
-        [10, 4],
-        [60, 4],
-        [110, 30],
-      ]);
-      rejected(document, { type: 'layer-update', layer: { ...layer, ripple: true } }, 'regions overlap or exceed');
-      expect(layer.closingFade).toBe(10);
-      expect(starts(document, layerId)).toEqual([10, 60, 110]);
-    },
-  );
 
   it.each(TRACK_IDS)('disabling %s retains a dissolve and all of its actual saved integer starts', (layerId) => {
     const original = fixture(layerId, true);
@@ -397,7 +374,7 @@ describe('independent Ripple toggles and packed placements', () => {
       const targetId = TRACK_IDS[(TRACK_IDS.indexOf(layerId) + 1) % TRACK_IDS.length]!;
       const selected = document.clips.find((clip) => clip.id === `${layerId}-a`)!;
       document.layers.forEach((layer) => {
-        layer.keyframes = [point(0, 1), point(600, 1)];
+        layer.keyframes = [point(0), point(600)];
       });
       document.layers.find((layer) => layer.id === layerId)!.colour.exposure = 0.123456789;
       document.layers.find((layer) => layer.id === layerId)!.opacity = 0.654321;
@@ -499,77 +476,13 @@ describe('independent Ripple toggles and packed placements', () => {
   );
 
   it.each(cases)(
-    'absolute row Speed on $layerId retimes atomically with Ripple=$ripple and preserves full decimal precision',
+    'clip Speed on $layerId rejects fade and placement conflicts atomically with Ripple=$ripple',
     ({ layerId, ripple }) => {
-      const document = fixture(layerId, ripple);
-      const layer = document.layers.find((item) => item.id === layerId)!;
-      layer.keyframes = [point(0, 1), { ...point(60, 2), interpolation: 'linear' }];
-      // Hold rates make contextual suffix durations independently calculable.
-      for (const placed of calculateLayout(document).clips) placed.clip.start = placed.start;
-      const history = new EditHistory(document);
-      const changed = history.commit({
-        type: 'layer-key-value',
-        layerId,
-        frame: 0,
-        setting: 'speed',
-        value: 1.23456789,
-      });
-      expect(changed.layers.find((item) => item.id === layerId)!.keyframes[0]!.values.speed).toBe(1.23456789);
-      const track = calculateLayout(changed).clips.filter((item) => item.clip.layerId === layerId);
-      expect(track.map((clip) => [clip.start, clip.duration])).toEqual(
-        ripple
-          ? [
-              [10, 24],
-              [34, 24],
-              [58, 16],
-            ]
-          : [
-              [10, 24],
-              [60, 15],
-              [110, 15],
-            ],
-      );
-      expect(track.map((clip) => [clip.retiming.sourceAt(0), clip.retiming.sourceAt(5)])).toEqual(
-        ripple
-          ? [
-              [100, 106],
-              [100, 106],
-              [100, 108],
-            ]
-          : [
-              [100, 106],
-              [100, 110],
-              [100, 110],
-            ],
-      );
-      for (const clip of changed.clips) {
-        const original = document.clips.find((item) => item.id === clip.id)!;
-        expect({ ...clip, start: original.start }).toEqual(original);
-      }
-      for (const placed of calculateLayout(changed).clips.filter((item) => item.clip.layerId === layerId)) {
-        expect(placed.retiming.duration).toBe(
-          compileLayerRetiming(
-            placed.clip,
-            changed.layers.find((item) => item.id === layerId)!,
-            placed.start,
-          ).duration,
-        );
-        expect(placed.clip.start).toBe(placed.start);
-      }
-      if (!ripple) expect(starts(changed, layerId)).toEqual(starts(document, layerId));
-      expect(changed.clips.filter((clip) => clip.layerId !== layerId)).toEqual(
-        document.clips.filter((clip) => clip.layerId !== layerId),
-      );
-      expect(changed.music).toEqual(document.music);
-      expect(history.undo()).toEqual(document);
-      expect(history.canUndo).toBe(false);
-      expect(history.redo()).toEqual(changed);
       const conflict = fixture(layerId, ripple);
-      const conflictLayer = conflict.layers.find((item) => item.id === layerId)!;
-      conflictLayer.openingFade = 20;
+      conflict.layers.find((item) => item.id === layerId)!.openingFade = 20;
       rejected(
         conflict,
-        { type: 'layer-key-toggle', layerId, frame: 0, setting: 'speed', value: 8 },
+        { type: 'speed', clipId: `${layerId}-a`, speed: { mode: 'constant', rate: 8 } },
         'regions overlap or exceed',
       );
       if (!ripple)
@@ -578,42 +491,6 @@ describe('independent Ripple toggles and packed placements', () => {
           { type: 'speed', clipId: `${layerId}-a`, speed: { mode: 'constant', rate: 0.1 } },
           'cannot overlap',
         );
-    },
-  );
-
-  it.each(cases)(
-    'a whole Speed point move on $layerId uses absolute time with Ripple=$ripple and retains the redo branch on rejection',
-    ({ layerId, ripple }) => {
-      const document = fixture(layerId, ripple);
-      const layer = document.layers.find((item) => item.id === layerId)!;
-      layer.keyframes = [point(0, 1), { ...point(200, 2), interpolation: 'smooth' }];
-      const history = new EditHistory(document);
-      const next = history.commit({ type: 'layer-key-move', layerId, frame: 200, nextFrame: 60 });
-      expect(next.layers.find((item) => item.id === layerId)!.keyframes).toEqual([
-        layer.keyframes[0],
-        { ...layer.keyframes[1]!, frame: 60 },
-      ]);
-      expect(starts(next, layerId)).toEqual(ripple ? [10, 40, 65] : [10, 60, 110]);
-      expect(
-        calculateLayout(next)
-          .clips.filter((clip) => clip.clip.layerId === layerId)
-          .map((clip) => clip.duration),
-      ).toEqual(ripple ? [30, 25, 15] : [30, 15, 15]);
-      expectOtherTracks(document, next, layerId, [layer.keyframes[0]!, { ...layer.keyframes[1]!, frame: 60 }]);
-      expect(history.undo()).toEqual(document);
-      expect(history.canUndo).toBe(false);
-      expect(history.canRedo).toBe(true);
-      expect(() => history.commit({ type: 'layer-key-move', layerId, frame: 200, nextFrame: 0 })).toThrow(
-        'destination frame',
-      );
-      expect(history.current).toEqual(document);
-      expect(history.canUndo).toBe(false);
-      expect(history.canRedo).toBe(true);
-      expect(history.redo()).toEqual(next);
-      const constrained = structuredClone(document);
-      constrained.layers.find((item) => item.id === layerId)!.openingFade = 20;
-      constrained.layers.find((item) => item.id === layerId)!.keyframes[1]!.values.speed = 8;
-      rejected(constrained, { type: 'layer-key-move', layerId, frame: 0, nextFrame: 210 }, 'regions overlap or exceed');
     },
   );
 });
@@ -643,7 +520,7 @@ describe('track-owned transitions, fades, gaps and group composition', () => {
     ({ layerId, ripple }) => {
       const document = fixture(layerId, ripple);
       const layer = document.layers.find((item) => item.id === layerId)!;
-      layer.keyframes = [point(600, 1)];
+      layer.keyframes = [point(600)];
       layer.openingFade = 3;
       layer.closingFade = 4;
       let empty = document;

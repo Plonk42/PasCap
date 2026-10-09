@@ -194,7 +194,7 @@ test('the initial track and every newly added track default to Ripple on with in
   await page.getByRole('button', { name: 'Add video track', exact: true }).click();
   const added = await current(page);
   await ready(page, added);
-  expect(added.schemaVersion).toBe(12);
+  expect(added.schemaVersion).toBe(13);
   for (const field of ['transitions', 'openingFade', 'closingFade']) expect(added).not.toHaveProperty(field);
   expect(added.layers.slice(0, 2)).toEqual(before.layers);
   expect(added.clips).toEqual(before.clips);
@@ -351,35 +351,6 @@ for (const row of [0, 1]) {
     await undoOnce(page, before);
   });
 }
-
-test('a contextually invalid Ripple enable is rejected as a whole without changing fades, points, history or saves', async ({
-  page,
-}) => {
-  const document = twoTracks();
-  const upper = document.layers[1]!;
-  upper.ripple = false;
-  upper.closingFade = 10;
-  upper.keyframes = [sharedPoint(0, { speed: 8, exposure: 0.4 }, 'hold'), sharedPoint(100, { speed: 0.5 }, 'hold')];
-  upper.transitions = [{ leftId: 'fast', rightId: 'slow', type: 'cut', duration: 0 }];
-  document.clips = [
-    document.clips[0]!,
-    { ...createClip('fast', assets[0]!.id, 0, 30, upper.id), start: 20 },
-    { ...createClip('slow', assets[1]!.id, 30, 60, upper.id), start: 100 },
-  ];
-  await fixture(page, document);
-  const before = await current(page);
-  const saves = memory.saves;
-  await openOptions(page, 'Track options Video track 2');
-  const ripple = page.getByRole('checkbox', { name: 'Ripple on track Video track 2', exact: true });
-  await ripple.click();
-  await expect(ripple).not.toBeChecked();
-  await expect(page.locator('.error-banner')).toContainText('Fade/transition regions overlap or exceed clip slow.');
-  expect(await current(page)).toEqual(before);
-  await page.evaluate(() => window.pascapLab!.flush());
-  expect(memory.saves).toBe(saves);
-  expect(memory.snapshot()).toEqual(before);
-  await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
-});
 
 function boundaries(): ProjectDocument {
   const document = twoTracks();

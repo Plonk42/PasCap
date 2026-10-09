@@ -30,14 +30,13 @@ export interface ExportDialogProps {
 }
 
 export function summarizeExport(project: ProjectDocument) {
-  const keys = { points: 0, settings: 0, speed: 0, colour: 0, opacity: 0 };
+  const keys = { points: 0, settings: 0, colour: 0, opacity: 0 };
   for (const layer of project.layers) {
     keys.points += layer.keyframes.length;
     for (const point of layer.keyframes) {
       for (const setting of keySettings(point)) {
         keys.settings++;
-        if (setting === 'speed') keys.speed++;
-        else if (setting === 'opacity') keys.opacity++;
+        if (setting === 'opacity') keys.opacity++;
         else keys.colour++;
       }
     }
@@ -246,8 +245,8 @@ export function ExportDialog({
           <p>After submission, rendering continues in Activity and the editor remains available.</p>
         </section>
         <p className="activity-hint">
-          {settings.width} × {settings.height} · {summary.keys.speed} speed values · {summary.keys.colour} colour values
-          · {summary.keys.opacity} opacity values.
+          {settings.width} × {settings.height} · {summary.keys.colour} colour values · {summary.keys.opacity} opacity
+          values.
         </p>
         {summary.layered ? (
           <aside className="activity-export-warning" aria-labelledby={`${id}-resources`}>
