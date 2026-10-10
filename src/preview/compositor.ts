@@ -1,4 +1,10 @@
-import { CURVE_CHANNELS, HSL_BANDS, isIdentityCurve, isNeutralHsl } from '../shared/advanced-colour.js';
+import {
+  colourCurveSlopes,
+  CURVE_CHANNELS,
+  HSL_BANDS,
+  isIdentityCurve,
+  isNeutralHsl,
+} from '../shared/advanced-colour.js';
 import { gradePixel, NEUTRAL_COLOUR, temperatureTintGains, type ColourSettings, type RGB } from '../shared/colour.js';
 import { compositePixel } from '../shared/composition.js';
 import { compileSpatialMapping, NEUTRAL_SPATIAL_POSE, type SpatialPose } from '../shared/spatial.js';
@@ -75,7 +81,7 @@ export class Compositor {
   readonly #sizes: [number, number][] = [];
   readonly #uniforms = new Map<string, WebGLUniformLocation>();
   readonly #hslUniform = new Float32Array(32);
-  readonly #curveUniform = new Float32Array(128);
+  readonly #curveUniform = new Float32Array(192);
   #disposed = false;
   constructor(readonly canvas: HTMLCanvasElement) {
     const gl = canvas.getContext('webgl2', {
@@ -296,15 +302,17 @@ export class Compositor {
         });
         gl.uniform4fv(this.#location(`hsl${index}[0]`), this.#hslUniform);
         this.#curveUniform.fill(0);
-        CURVE_CHANNELS.forEach((channel, at) =>
-          settings.curves[channel].forEach((point, position) => {
-            this.#curveUniform.set([point.x, point.y], at * 32 + position * 2);
-          }),
-        );
+        CURVE_CHANNELS.forEach((channel, at) => {
+          const points = settings.curves[channel];
+          const slopes = colourCurveSlopes(points);
+          points.forEach((point, position) => {
+            this.#curveUniform.set([point.x, point.y, slopes[position]!], at * 48 + position * 3);
+          });
+        });
         for (let channel = 0; channel < 4; channel++)
-          gl.uniform2fv(
+          gl.uniform3fv(
             this.#location(`curve${index}_${channel}[0]`),
-            this.#curveUniform.subarray(channel * 32, (channel + 1) * 32),
+            this.#curveUniform.subarray(channel * 48, (channel + 1) * 48),
           );
         gl.uniform4iv(
           this.#location(`curveCounts${index}`),

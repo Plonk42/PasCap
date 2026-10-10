@@ -67,18 +67,57 @@ export function isIdentityCurve(points: readonly ColourCurvePoint[]): boolean {
 export function evaluateColourCurve(points: readonly ColourCurvePoint[], input: number): number {
   return compileColourCurve(points)(input);
 }
+/** Monotone cubic (Fritsch–Butland/PCHIP) node slopes: smooth, never overshooting neighbouring outputs. */
+export function colourCurveSlopes(points: readonly ColourCurvePoint[]): Float64Array {
+  const last = points.length - 1;
+  const width = (at: number): number => points[at + 1]!.x - points[at]!.x;
+  const secant = (at: number): number => (points[at + 1]!.y - points[at]!.y) / width(at);
+  const slopes = new Float64Array(points.length);
+  if (last === 1) {
+    slopes.fill(secant(0));
+    return slopes;
+  }
+  for (let at = 1; at < last; at++) {
+    const left = secant(at - 1),
+      right = secant(at);
+    if (left * right <= 0) continue;
+    const leftWeight = 2 * width(at) + width(at - 1),
+      rightWeight = width(at) + 2 * width(at - 1);
+    slopes[at] = (leftWeight + rightWeight) / (leftWeight / left + rightWeight / right);
+  }
+  slopes[0] = endSlope(width(0), width(1), secant(0), secant(1));
+  slopes[last] = endSlope(width(last - 1), width(last - 2), secant(last - 1), secant(last - 2));
+  return slopes;
+}
+function endSlope(near: number, far: number, nearSecant: number, farSecant: number): number {
+  const slope = ((2 * near + far) * nearSecant - near * farSecant) / (near + far);
+  if (Math.sign(slope) !== Math.sign(nearSecant)) return 0;
+  if (Math.sign(nearSecant) !== Math.sign(farSecant) && Math.abs(slope) > Math.abs(3 * nearSecant))
+    return 3 * nearSecant;
+  return slope;
+}
 /** Determine identity once for a frame's already validated curve. */
 export function compileColourCurve(points: readonly ColourCurvePoint[]): (input: number) => number {
   if (isIdentityCurve(points)) return (input) => input;
   const xs = Float64Array.from(points, (point) => point.x);
   const ys = Float64Array.from(points, (point) => point.y);
+  const slopes = colourCurveSlopes(points);
   const last = ys.length - 1;
   return (input) => {
+    if (input <= 0) return ys[0]!;
     for (let index = 1; index <= last; index++) {
-      if (input <= xs[index]!)
-        return (
-          ys[index - 1]! + ((ys[index]! - ys[index - 1]!) * (input - xs[index - 1]!)) / (xs[index]! - xs[index - 1]!)
-        );
+      if (input <= xs[index]!) {
+        const width = xs[index]! - xs[index - 1]!;
+        const t = (input - xs[index - 1]!) / width,
+          t2 = t * t,
+          t3 = t2 * t;
+        const value =
+          (2 * t3 - 3 * t2 + 1) * ys[index - 1]! +
+          (t3 - 2 * t2 + t) * width * slopes[index - 1]! +
+          (3 * t2 - 2 * t3) * ys[index]! +
+          (t3 - t2) * width * slopes[index]!;
+        return Math.min(1, Math.max(0, value));
+      }
     }
     return ys[last]!;
   };

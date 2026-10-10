@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
 import {
   colourCurveSchema,
+  colourCurveSlopes,
   createColourCurves,
   createHslSettings,
   CURVE_CHANNELS,
@@ -41,6 +42,26 @@ const HSL_CONTROLS = [
 
 function isHistoryShortcut(event: KeyboardEvent<HTMLButtonElement>): boolean {
   return (event.ctrlKey || event.metaKey) && ['z', 'y'].includes(event.key.toLowerCase());
+}
+
+/** Each Hermite segment is exactly one cubic Bézier; an invalid draft falls back to straight lines. */
+function curvePath(points: readonly ColourCurvePoint[]): string {
+  const at = (x: number, y: number): string => `${x * 100} ${(1 - y) * 100}`;
+  const start = `M${at(points[0]!.x, points[0]!.y)}`;
+  if (!colourCurveSchema.safeParse(points).success)
+    return `${start}${points
+      .slice(1)
+      .map((point) => `L${at(point.x, point.y)}`)
+      .join('')}`;
+  const slopes = colourCurveSlopes(points);
+  return `${start}${points
+    .slice(1)
+    .map((right, index) => {
+      const left = points[index]!;
+      const third = (right.x - left.x) / 3;
+      return `C${at(left.x + third, left.y + third * slopes[index]!)} ${at(right.x - third, right.y - third * slopes[index + 1]!)} ${at(right.x, right.y)}`;
+    })
+    .join('')}`;
 }
 
 /** Preserve local point identity through a single input move and Undo; never save IDs. */
@@ -287,7 +308,7 @@ function CurveEditor({
       <div className={`colour-curve-plot${draft && error ? ' invalid' : ''}`}>
         <svg viewBox="0 0 100 100" preserveAspectRatio="none" role="img" aria-label={`${channel} encoded colour curve`}>
           <path d="M0 100L100 0M25 0V100M50 0V100M75 0V100M0 25H100M0 50H100M0 75H100" className="colour-curve-grid" />
-          <polyline points={shown.map((point) => `${point.x * 100},${(1 - point.y) * 100}`).join(' ')} />
+          <path d={curvePath(shown)} />
         </svg>
         {shown.map((point, at) => (
           <button

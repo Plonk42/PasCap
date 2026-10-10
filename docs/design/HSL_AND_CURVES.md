@@ -46,8 +46,15 @@ offset and add the lightness offset. Clamp resulting saturation/lightness to gam
 not editor input. Convert the resulting HSL back to encoded RGB. All-neutral HSL
 returns its input exactly, as do identity curves and an entirely neutral grade.
 
-Curves use piecewise-linear interpolation, first master on each encoded component,
-then that component's channel curve. Outputs need not ascend. Arbitrarily narrow
+Curves are smooth: a monotone cubic Hermite spline (Fritsch–Butland/PCHIP slopes)
+through the control nodes, first master on each encoded component,
+then that component's channel curve. Interior slopes are the weighted harmonic mean
+of the neighbouring secants, zero where those secants change sign or either is flat;
+end slopes use the three-node shape-preserving formula, and two nodes give a straight
+line. Each segment therefore stays between its two node outputs (no overshoot, no
+clipping needed), collinear nodes stay a straight line, and nodes are hit exactly.
+CPU, native and GPU evaluate the same spline from the same slopes; the editor graph
+draws it as one cubic Bézier per segment. Outputs need not ascend. Arbitrarily narrow
 valid knees are evaluated analytically in native export, not approximated by a
 65³ advanced-colour LUT. Nonneutral HSL or curves route even otherwise static
 projects through composited export. Each such source evaluates the complete nine
@@ -79,7 +86,7 @@ never apply a former track's draft to another track. Same-track clip selection r
 track ownership. Control vocabulary follows the [editor control catalogue](EDITOR_CONTROLS.md#vocabulary).
 
 GPU uses bounded uniforms for two sources: eight HSL vec4 entries and four arrays
-of at most sixteen vec2 control nodes per source, plus counts/neutral flags. No extra LUT
+of at most sixteen vec3 (input, output, slope) control nodes per source, plus counts/neutral flags. No extra LUT
 texture, decoder, full-frame buffer, per-track uniform multiplier or native child.
 The compositor owns three fixed shader programs, compiled before playback: the
 complete grouped advanced program, its exact single-source specialization and

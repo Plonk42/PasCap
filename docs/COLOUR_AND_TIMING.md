@@ -254,5 +254,5 @@ curves, black-fade brightness and group coverage/source-over. HSL/curves add no
 channels to the ten nullable track fields. HSL protects greys in its incoming
 RGB, not greys already coloured by Temperature/Tint. Compare/Ungraded bypasses
 the entire colour transform, not geometry or coverage. Precise advanced bounds,
-circular weighting, piecewise-linear curves and resource budgets are in
+circular weighting, smooth monotone cubic curves and resource budgets are in
 [HSL_AND_CURVES.md](design/HSL_AND_CURVES.md).

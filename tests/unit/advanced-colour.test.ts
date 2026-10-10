@@ -4,6 +4,8 @@ import { composeLayerFrame, type LayerFrameSource } from '../../src/server/layer
 import {
   applyHsl,
   colourCurveSchema,
+  colourCurveSlopes,
+  compileColourCurve,
   CURVE_CHANNELS,
   evaluateColourCurve,
   HSL_BANDS,
@@ -110,10 +112,42 @@ describe('strict schema-13 static advanced row colour', () => {
       { x: 1, y: 0 },
     ];
     expect(colourSchema.parse(settings)).toEqual(settings);
+    // Smooth master: endpoint slope 2.2, zero slope at the 0.8 peak → 0.6375 at 0.25.
     const result = gradePixel([0.25, 0.25, 0.25], settings);
-    expect(result[0]).toBeCloseTo(0.5, 12);
-    expect(result[1]).toBeCloseTo(0.5, 12);
+    expect(result[0]).toBeCloseTo(0.3625, 12);
+    expect(result[1]).toBeCloseTo(0.6375, 12);
     expect(gradePixel([0, 1, 0], settings)).toEqual([0.8, 0.4, 0.2]);
+  });
+  it('smooths curves with continuous slopes, no overshoot and exact lines and nodes', () => {
+    const points = [
+      { x: 0, y: 0.1 },
+      { x: 0.2, y: 0.15 },
+      { x: 0.45, y: 0.9 },
+      { x: 0.7, y: 0.85 },
+      { x: 1, y: 0.95 },
+    ];
+    const curve = compileColourCurve(points);
+    for (const point of points) expect(curve(point.x)).toBe(point.y);
+    for (let at = 0; at < points.length - 1; at++) {
+      const low = Math.min(points[at]!.y, points[at + 1]!.y),
+        high = Math.max(points[at]!.y, points[at + 1]!.y);
+      for (let step = 1; step < 100; step++) {
+        const value = curve(points[at]!.x + ((points[at + 1]!.x - points[at]!.x) * step) / 100);
+        expect(value).toBeGreaterThanOrEqual(low);
+        expect(value).toBeLessThanOrEqual(high);
+      }
+    }
+    const derivative = (x: number, side: number): number => (curve(x + side * 1e-7) - curve(x)) / (side * 1e-7);
+    for (const { x } of points.slice(1, -1)) expect(derivative(x, -1)).toBeCloseTo(derivative(x, 1), 4);
+    // Interior smoothing: halfway between nodes 0.2→0.45 is not the straight-line midpoint.
+    expect(Math.abs(curve(0.325) - 0.525)).toBeGreaterThan(0.01);
+    const line = compileColourCurve([
+      { x: 0, y: 0.8 },
+      { x: 0.3, y: 0.62 },
+      { x: 1, y: 0.2 },
+    ]);
+    for (let step = 0; step <= 20; step++) expect(line(step / 20)).toBeCloseTo(0.8 - 0.6 * (step / 20), 12);
+    expect(colourCurveSlopes(points)[3]).toBe(0);
   });
   it('preserves exact identity for all-neutral grading and any identity curve point count', () => {
     const settings = createColourSettings();
