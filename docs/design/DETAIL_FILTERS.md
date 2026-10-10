@@ -84,10 +84,13 @@ Colour and Detail, never geometry, Opacity, fades, stacking or music.
 
 ## Preview, export and resources
 
-The WebGL shader generates its tap tables from the same constants as the CPU kernel,
-in the existing three fixed programs; uniforms are one `vec4` and one `vec2` per
-source. Neutral sources take a uniform branch with no extra taps. No texture,
-framebuffer, decoder or pass is added; sources are still graded once.
+The WebGL shader generates its tap tables from the same constants as the CPU kernel.
+The kernel lives only in three separate detail variants of the fixed programs, compiled
+when a loaded or edited project first contains nonneutral detail, before any draw uses
+them; uniforms are one `vec4` and one `vec2` per source. Groups whose sources are all
+neutral (and Compare) keep the unchanged programs: software rasterizers can pay for
+texture taps behind an untaken uniform branch. No texture, framebuffer, decoder or
+pass is added; sources are still graded once.
 
 Any nonneutral clip detail requires composited export; the static LUT fast path
 cannot represent a neighbourhood filter. The native compositor evaluates the shared

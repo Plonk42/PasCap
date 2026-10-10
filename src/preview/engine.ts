@@ -1,5 +1,5 @@
 import { colourSchema, NEUTRAL_COLOUR, type ColourSettings } from '../shared/colour.js';
-import { NEUTRAL_DETAIL } from '../shared/detail.js';
+import { isNeutralDetail, NEUTRAL_DETAIL } from '../shared/detail.js';
 import { projectSchema, type ProjectDocument } from '../shared/model.js';
 import {
   calculateLayout,
@@ -485,6 +485,11 @@ export class PreviewEngine {
     });
   }
 
+  /** Detail shader variants compile when a document first needs them, before any draw uses them. */
+  #prepareDetail(): void {
+    if (this.#compositor.available && this.#document?.clips.some((clip) => !isNeutralDetail(clip.detail)))
+      this.#compositor.prepareDetail();
+  }
   async loadProject(
     document: ProjectDocument,
     proxyUrl: (mediaId: string) => string,
@@ -500,6 +505,7 @@ export class PreviewEngine {
     const signal = this.#beginOperation();
     if (snapshot.id !== this.#document?.id) this.#ungraded = false;
     this.#document = snapshot;
+    this.#prepareDetail();
     this.#layout = calculateLayout(snapshot);
     this.#proxyUrl = proxyUrl;
     this.#originalDimensions = originalDimensions;
@@ -587,6 +593,7 @@ export class PreviewEngine {
     const frame = this.#busy ? this.#operationFrame : this.#frame;
     const previous = sampleTimeline(this.#document, frame, this.#layout).map((layer) => layer.clipId);
     this.#document = snapshot;
+    this.#prepareDetail();
     this.#layout = calculateLayout(snapshot);
     const required = sampleTimeline(snapshot, frame, this.#layout).map((layer) => layer.clipId);
     const changed = required.length !== previous.length || required.some((id) => !previous.includes(id));

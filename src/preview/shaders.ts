@@ -111,6 +111,16 @@ vec3 detailFilter(sampler2D source, vec2 coordinate, vec3 centre, vec4 detail, v
   if (detail.x > 0.0) delta += ${glslFloat(SHARPEN_GAIN)} * detail.x * (base - dot(gaussian, luma));
   return clamp(denoised + delta, 0.0, 1.0);
 }`;
+// (sharpen, clarity, denoise, denoise range factor) and the 1/720-image-height step in texture UV.
+const detailUniforms = `uniform vec4 detail0;
+uniform vec4 detail1;
+uniform vec2 detailStep0;
+uniform vec2 detailStep1;`;
+const detailSample = `vec3 centre = texture(source, coordinate).rgb;
+  vec4 detail = sourceIndex == 0 ? detail0 : detail1;
+  if (all(equal(detail.xyz, vec3(0.0)))) return centre;
+  vec2 stride = sourceIndex == 0 ? detailStep0 : detailStep1;
+  return detailFilter(source, coordinate, centre, detail, stride);`;
 
 const singleMain = `void main() {
   vec4 left = vec4(0.0);
@@ -133,7 +143,7 @@ const groupMain = `void main() {
 }`;
 
 // Deliberately implements docs/COLOUR_AND_TIMING.md, not an approximation of eq/hue.
-const createFragmentShader = (single: boolean): string => `#version 300 es
+const createFragmentShader = (single: boolean, detail: boolean): string => `#version 300 es
 precision highp float;
 precision highp sampler2D;
 in vec2 uv;
@@ -165,12 +175,7 @@ uniform ivec4 curveCounts1;
 uniform ivec4 curveIdentity0;
 uniform ivec4 curveIdentity1;
 uniform vec2 neutralHsl;
-// (sharpen, clarity, denoise, denoise range factor) and the 1/720-image-height step in texture UV.
-uniform vec4 detail0;
-uniform vec4 detail1;
-uniform vec2 detailStep0;
-uniform vec2 detailStep1;
-
+${detail ? detailUniforms : ''}
 const float alpha = 1.09929682680944;
 const float beta = 0.018053968510807;
 const vec3 luma = vec3(0.2126, 0.7152, 0.0722);
@@ -181,7 +186,7 @@ float decode709(float v) {
 float encode709(float v) {
   return v < beta ? 4.5 * v : alpha * pow(v, 0.45) - (alpha - 1.0);
 }
-${detailFunction}
+${detail ? detailFunction : ''}
 vec3 scalarGrade(vec3 code, vec4 tone, vec3 extra, vec3 correction) {
   if (all(equal(correction, vec3(1.0))) && all(equal(tone, vec4(0.0, 0.0, 1.0, 1.0))) &&
       all(equal(extra, vec3(0.0)))) return code;
@@ -246,11 +251,7 @@ vec3 grade(vec3 code, vec4 tone, vec3 extra, int sourceIndex) {
               curve1_3Value(curve1_0Value(rgb.b)));
 }
 vec3 sampleRgb(sampler2D source, vec2 coordinate, int sourceIndex) {
-  vec3 centre = texture(source, coordinate).rgb;
-  vec4 detail = sourceIndex == 0 ? detail0 : detail1;
-  if (all(equal(detail.xyz, vec3(0.0)))) return centre;
-  vec2 stride = sourceIndex == 0 ? detailStep0 : detailStep1;
-  return detailFilter(source, coordinate, centre, detail, stride);
+  ${detail ? detailSample : 'return texture(source, coordinate).rgb;'}
 }
 vec3 sampleGraded(sampler2D source, vec4 tone, vec3 extra, float aspect, int sourceIndex) {
   vec2 local = uv;
@@ -272,17 +273,24 @@ vec4 sampleSpatial(sampler2D source, vec4 tone, vec3 extra, float aspect,
 }
 ${single ? singleMain : groupMain}`;
 
-export const fragmentShader = createFragmentShader(false);
+export const fragmentShader = createFragmentShader(false, false);
 // A fixed single-source specialization lets drivers eliminate unused source-1
 // grade arrays/functions. Dissolves retain the complete grouped shader above.
-export const singleFragmentShader = createFragmentShader(true);
+export const singleFragmentShader = createFragmentShader(true, false);
 
 // Share geometry/composition verbatim. Rows with identity advanced settings use
 // a scalar-only program, avoiding driver execution cost of unused bounded arrays.
-export const scalarFragmentShader =
-  fragmentShader.slice(0, fragmentShader.indexOf('float hueComponent')) +
+const scalarOf = (shader: string): string =>
+  shader.slice(0, shader.indexOf('float hueComponent')) +
   `vec3 grade(vec3 code, vec4 tone, vec3 extra, int sourceIndex) {
     return scalarGrade(code, tone, extra, sourceIndex == 0 ? correction0 : correction1);
   }
 ` +
-  fragmentShader.slice(fragmentShader.indexOf('vec3 sampleRgb'));
+  shader.slice(shader.indexOf('vec3 sampleRgb'));
+export const scalarFragmentShader = scalarOf(fragmentShader);
+
+// Software rasterizers can execute untaken uniform branches' texture taps, so neutral
+// clips never run the detail kernel: it lives only in these separate variants.
+export const detailFragmentShader = createFragmentShader(false, true);
+export const singleDetailFragmentShader = createFragmentShader(true, true);
+export const scalarDetailFragmentShader = scalarOf(detailFragmentShader);

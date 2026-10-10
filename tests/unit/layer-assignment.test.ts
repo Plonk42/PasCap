@@ -155,6 +155,7 @@ vi.mock('../../src/preview/compositor.js', () => ({
     setDecoderCount(count: number): void {
       this.count = count;
     }
+    prepareDetail(): void {}
     uploadVideo(slot: number, video: HTMLVideoElement): void {
       this.uploads.push({ slot, video });
     }
