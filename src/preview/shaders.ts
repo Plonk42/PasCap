@@ -10,7 +10,7 @@ void main() {
 // Constant channel/source array selection avoids dynamic indexing across all
 // 64 points in software drivers. Generate once, never per frame or project.
 const curveUniforms = [0, 1]
-  .flatMap((source) => [0, 1, 2, 3].map((channel) => `uniform vec2 curve${source}_${channel}[16];`))
+  .flatMap((source) => [0, 1, 2, 3].map((channel) => `uniform vec3 curve${source}_${channel}[16];`))
   .join('\n');
 const curveFunctions = [0, 1]
   .flatMap((source) =>
@@ -28,9 +28,15 @@ float curve${source}_${channel}Value(float value) {
     if (value <= curve${source}_${channel}[middle].x) high = middle;
     else low = middle;
   }
-  vec2 left = curve${source}_${channel}[low];
-  vec2 right = curve${source}_${channel}[high];
-  return mix(left.y, right.y, (value - left.x) / (right.x - left.x));
+  vec3 left = curve${source}_${channel}[low];
+  vec3 right = curve${source}_${channel}[high];
+  // Cubic Hermite with shared monotone (x, y, slope) nodes; matches compileColourCurve.
+  float width = right.x - left.x;
+  float t = (value - left.x) / width;
+  float t2 = t * t;
+  float t3 = t2 * t;
+  return clamp((2.0 * t3 - 3.0 * t2 + 1.0) * left.y + (t3 - 2.0 * t2 + t) * width * left.z +
+               (3.0 * t2 - 2.0 * t3) * right.y + (t3 - t2) * width * right.z, 0.0, 1.0);
 }`,
     ),
   )
