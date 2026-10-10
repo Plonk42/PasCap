@@ -1,7 +1,9 @@
-# Clip Sharpen, Clarity and Denoise · strict project schema 14
+# Clip Sharpen, Clarity and Denoise, and track HDR · strict project schema 15
 
 Current contract for [#123](https://github.com/Plonk42/PasCap/issues/123): three
-static, clip-owned detail filters applied identically in preview and native export.
+static, clip-owned detail filters applied identically in preview and native export,
+plus the keyframable track Colour **HDR** look that shares their kernel (see
+[HDR look](#hdr-look)).
 This describes the implementation contract, not hardware/long-run qualification,
 release approval or milestone closure. Usage is in [the user guide](../USER_GUIDE.md).
 
@@ -23,7 +25,7 @@ Implementation authorities: [settings and kernel](../../src/shared/detail.ts),
 
 ## Required data
 
-Every schema-14 clip requires `detail: { sharpen, clarity, denoise }`, strict, with no
+Every schema-15 clip requires `detail: { sharpen, clarity, denoise }`, strict, with no
 unknown fields, coercion, persisted defaults or load-time repair.
 
 | Field     | Bounds | Neutral (new clips) | Meaning                                                     |
@@ -35,7 +37,7 @@ unknown fields, coercion, persisted defaults or load-time repair.
 Neutral values are creation values only, never defaults for missing saved data.
 Split, marked cuts and duplicate copy the clip's detail into each retained piece;
 trims, moves (including to another track) and Ripple leave it unchanged. Detail never
-changes timing, placement, speed, track Colour/Opacity or music. Projects 1–13 and
+changes timing, placement, speed, track Colour/Opacity or music. Projects 1–14 and
 their receipt snapshots are rejected and preserved, without migration; recreate them.
 
 ## Kernel
@@ -48,7 +50,7 @@ look scales with the image rather than the output resolution. Every tap is a bil
 sample clamped to the image content (never decode padding). Values are encoded
 BT.709 RGB in 0–1 and luma is $Y = 0.2126R + 0.7152G + 0.0722B$.
 
-For centre sample $c$ the stages run **Denoise → Clarity → Sharpen**:
+For centre sample $c$ the stages run **Denoise → HDR → Clarity → Sharpen**:
 
 1. **Fine ring** (only when Sharpen or Denoise is nonzero): the eight neighbours at
    unit offsets $(\pm1, 0), (0, \pm1), (\pm1, \pm1)$ with Gaussian spatial weights
@@ -65,17 +67,55 @@ For centre sample $c$ the stages run **Denoise → Clarity → Sharpen**:
 4. **Sharpen** contributes $2 \cdot \mathrm{sharpen} \cdot (y - Y(G))$. Using the denoised
    centre against the raw Gaussian keeps sharpening from re-amplifying removed noise.
 
-The output is $\mathrm{clamp}(D + \text{clarity term} + \text{sharpen term}, 0, 1)$ per
-channel: luma detail is added equally to R, G and B, so it does not create colour
-fringes. At most 33 taps per source pixel; Sharpen alone needs 9, Clarity alone 17.
+The output is $\mathrm{clamp}(D' + \text{clarity term} + \text{sharpen term}, 0, 1)$ per
+channel, where $D'$ is $D$ after [HDR](#hdr-look) ($D' = D$ at HDR 0). Clarity and
+Sharpen measure $y = Y(D)$ before HDR, so they never re-amplify the tone change.
+Luma detail is added equally to R, G and B, so it does not create colour
+fringes. At most 33 taps per source pixel without HDR (57 with it); Sharpen alone
+needs 9, Clarity alone 17, HDR alone 25.
 
-**Exact neutral settings are a bypass**: all three zero skip the kernel entirely, so
-neutral output is bit-identical to unfiltered rendering in preview, static and
-composited export. Any nonzero value, however small, uses the kernel.
+**Exact neutral settings are a bypass**: all three zero and track HDR exactly zero skip
+the kernel entirely, so neutral output is bit-identical to unfiltered rendering in
+preview, static and composited export. Any nonzero value, however small, uses the kernel.
+
+## HDR look
+
+**HDR** is an SDR local tone-mapping look, not HDR output, Kelvin or automatic
+exposure: it opens shadows and recovers highlights over large areas while boosting
+local detail, preserving true black, mid-grey and white on flat areas.
+
+- **Data**: required track `colour.hdr` in **0–1**, neutral 0 on new tracks, and the
+  eleventh nullable track keyframe channel `hdr`, after `shadows`. It is keyframed,
+  interpolated, held and reset exactly like the other scalar Colour settings, at
+  absolute project time; both dissolve sources and every clip on the track use the
+  same evaluated value. Missing fields are invalid; schema 14 is rejected and preserved.
+- **Not a grade stage**: it is excluded from the per-pixel grade, its LUTs and LUT
+  identity, so animating HDR reuses one scalar LUT. It runs in this kernel, on source
+  taps after Denoise, with the evaluated amount $h$.
+- **Base**: an edge-aware large-scale luma mean $B$ of the centre ($y = Y(D)$, weight 1)
+  and 24 taps on rings of eight directions at radii 6, 16 (rotated 22.5°) and 32 units,
+  with spatial weight $e^{-r^2/(2\cdot16^2)}$ and range weight
+  $e^{-(Y(t)-y)^2/(2\cdot0.12^2)}$ on each tap's luma $Y(t)$. The range weight keeps
+  a strong edge from pulling the base across it, avoiding halos.
+- **Tone**: target luma $y' = B + h\,B(1-B)(1-2B) + (y-B)(1+h)$: the base keeps 0, ½
+  and 1 while shadows rise and highlights fall (monotonic for $h \le 1$), and the local
+  residual $y-B$ is boosted up to ×2.
+- **Colour**: with $\Delta = y' - y$ and blend $b = \min(1, y/0.1)$, each channel becomes
+  $D_i + \Delta + b\,(D_i\,y'/y - D_i - \Delta)$ (just $D_i + \Delta$ at $y = 0$): a
+  hue-preserving luma ratio, fading to an additive change in deep shadows where the
+  ratio would amplify noise.
+
+Any nonzero HDR base or HDR keyframe requires composited export (keyframes already do).
+In preview, HDR uses the detail program variants below (one extra `vec2` uniform for
+both sources' amounts); no texture, buffer, decoder,
+LUT or native process is added. The diagnostic two-clip reference and measurement
+helper reject HDR. **Track → Colour** lists HDR last, with the common slider/exact
+field, capture diamond and Previous/Next arrows, live slider preview and one Undo
+per release. Compare bypasses it with the rest of Colour.
 
 ## Pipeline order
 
-Inverse spatial mapping → **Detail** on source taps → track Colour (Temperature/Tint
+Inverse spatial mapping → **Detail and HDR** on source taps → track Colour grade (Temperature/Tint
 … curves) → black fades → Opacity/spatial coverage and grouped source-over. Detail
 is not graded twice, does not change coverage and leaves the exact-neutral opaque
 letterbox path in place: with a neutral pose the filter runs at each fitted pixel
@@ -86,9 +126,10 @@ Colour and Detail, never geometry, Opacity, fades, stacking or music.
 
 The WebGL shader generates its tap tables from the same constants as the CPU kernel.
 The kernel lives only in three separate detail variants of the fixed programs, compiled
-when a loaded or edited project first contains nonneutral detail, before any draw uses
-them; uniforms are one `vec4` and one `vec2` per source. Groups whose sources are all
-neutral (and Compare) keep the unchanged programs: software rasterizers can pay for
+when a loaded or edited project first contains nonneutral detail, nonzero track HDR or
+HDR keyframes (including a live HDR slider draft), before any draw uses them; uniforms
+are one `vec4` and one `vec2` per source plus the shared HDR `vec2`. Groups whose
+sources are all neutral with HDR 0 (and Compare) keep the unchanged programs: software rasterizers can pay for
 texture taps behind an untaken uniform branch. No texture, framebuffer, decoder or
 pass is added; sources are still graded once.
 
@@ -117,9 +158,11 @@ only that setting; **Reset detail** restores all three in one Undo step.
 ## Validation and parity gates
 
 - Unit: strict schema, neutral bypass, an independent transcription of the kernel
-  (agreement to $10^{-12}$), edge/noise behaviour, commands, export routing and the
+  including HDR (agreement to $10^{-12}$), edge/noise behaviour, HDR black/grey/white
+  preservation, detail boost, hue preservation and no halo at a strong edge, commands,
+  export routing, one reused LUT while HDR animates and the
   native compositor at 720p and UHD (≤ 0.01/255 before RGBA16 rounding).
-- GPU (SwiftShader in CI): every setting and a rotated/scaled combination against the
+- GPU (SwiftShader in CI): every setting, track HDR and rotated/scaled combinations against the
   CPU kernel on a 720p synthetic texture at 1280×720 and 3840×2160, max < 2/255 and
   mean < 0.6/255 per channel; each case must change the fixture by more than 8/255.
   Measured locally: max 0.50, mean 0.20–0.21.

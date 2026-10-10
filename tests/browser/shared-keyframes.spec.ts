@@ -276,7 +276,7 @@ test('the first hollow diamond creates one point; same-frame channels merge inde
   await baseRate.fill('1.25');
   await baseRate.press('Enter');
   const bases = await current(page);
-  expect(bases.schemaVersion).toBe(14);
+  expect(bases.schemaVersion).toBe(15);
   expect(bases.layers[0]!.opacity).toBe(0.7);
   expect(bases.clips.every((clip) => !('opacity' in clip))).toBe(true);
   expect(bases.layers[0]?.keyframes).toEqual([]);
@@ -912,7 +912,7 @@ test('numeric trim, mapped split, duplicate and overlay moves keep absolute row 
   await expect(page.getByRole('button', { name: 'Track keyframe 5 on Video track 2', exact: true })).toHaveCount(1);
   await page.evaluate(() => window.pascapLab!.flush());
   const saved = memory.snapshot();
-  expect(saved.schemaVersion).toBe(14);
+  expect(saved.schemaVersion).toBe(15);
   expect(saved.layers).toEqual(document.layers);
   expect(saved.clips).toEqual(moved.clips);
   for (const layer of saved.layers)

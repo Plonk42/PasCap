@@ -213,7 +213,7 @@ describe('strict row-only Colour and Opacity', () => {
 
   it('requires complete row colour and rejects both clip fields and every older schema', () => {
     const project = fixture();
-    for (let schemaVersion = 1; schemaVersion < 14; schemaVersion++)
+    for (let schemaVersion = 1; schemaVersion < 15; schemaVersion++)
       expect(projectSchema.safeParse({ ...project, schemaVersion }).success).toBe(false);
     const { colour: _row, ...missingRow } = project.layers[0]!;
     for (const invalid of [

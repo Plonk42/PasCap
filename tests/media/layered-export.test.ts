@@ -129,7 +129,7 @@ function coverage(samples: PreviewLayer[]): number {
   return result;
 }
 
-describe.skipIf(!enabled)('schema-14 layered native export · disposable synthetic sources only', () => {
+describe.skipIf(!enabled)('schema-15 layered native export · disposable synthetic sources only', () => {
   let root: string;
   let config: ServiceConfig;
   let jobs: JobQueue;
@@ -907,7 +907,8 @@ describe.skipIf(!enabled)('schema-14 layered native export · disposable synthet
         'hold',
       ),
     ];
-    for (const { key } of COLOUR_CONTROLS) {
+    // HDR is a source-tap stage, covered by tests/media/spatial-transforms.test.ts.
+    for (const { key } of COLOUR_CONTROLS.filter((control) => control.key !== 'hdr')) {
       expect(hasLayerKeys(project.layers[0]!, key)).toBe(true);
       expect(
         project.layers[0]!.keyframes.filter((keyframe) => keyframe.values[key] !== null).length,

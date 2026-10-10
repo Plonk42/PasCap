@@ -21,6 +21,7 @@ export const colourSchema = z
     saturation: z.number().min(0).max(2),
     highlights: z.number().min(-1).max(1),
     shadows: z.number().min(-1).max(1),
+    hdr: z.number().min(0).max(1),
     hsl: hslSchema,
     curves: curvesSchema,
   })
@@ -39,6 +40,7 @@ export function createColourSettings(): ColourSettings {
     saturation: 1,
     highlights: 0,
     shadows: 0,
+    hdr: 0,
     hsl: createHslSettings(),
     curves: createColourCurves(),
   };
@@ -63,9 +65,10 @@ export const COLOUR_CONTROLS = [
   { key: 'saturation', label: 'Saturation', min: 0, max: 2, step: 0.01, unit: '×' },
   { key: 'highlights', label: 'Highlights', min: -1, max: 1, step: 0.01, unit: '' },
   { key: 'shadows', label: 'Shadows', min: -1, max: 1, step: 0.01, unit: '' },
+  { key: 'hdr', label: 'HDR', min: 0, max: 1, step: 0.01, unit: '' },
 ] as const;
 export type ScalarColourSetting = (typeof COLOUR_CONTROLS)[number]['key'];
-/** Only the nine numeric channels, never static structured settings. */
+/** Only the ten numeric channels, never static structured settings. */
 export function scalarColourValues(settings: ColourSettings): Record<ScalarColourSetting, number> {
   return Object.fromEntries(COLOUR_CONTROLS.map(({ key }) => [key, settings[key]])) as Record<
     ScalarColourSetting,
@@ -103,7 +106,7 @@ export function gradePixel(rgb: RGB, settings: ColourSettings): RGB {
 }
 /** Exact frame-owned grade; cache only bounded settings/functions, never pixels. */
 export function compilePixelGrade(settings: ColourSettings): (rgb: RGB) => RGB {
-  if (isNeutralColour(settings)) return (rgb) => rgb;
+  if (isNeutralScalarColour(settings) && isNeutralAdvancedColour(settings)) return (rgb) => rgb;
   const grade = compileGradeInto(settings);
   const triple = new Float64Array(3);
   return (rgb) => {
@@ -142,8 +145,9 @@ export function compileGradeInto(settings: ColourSettings): PixelGrade {
     },
   };
 }
+/** HDR is a neighbourhood stage before grading (src/shared/detail.ts), not part of the per-pixel grade. */
 function isNeutralScalarColour(settings: ColourSettings): boolean {
-  return COLOUR_CONTROLS.every(({ key }) => settings[key] === NEUTRAL_COLOUR[key]);
+  return COLOUR_CONTROLS.every(({ key }) => key === 'hdr' || settings[key] === NEUTRAL_COLOUR[key]);
 }
 /** Scalar SDR stages from decoded linear input to an encoded triple. */
 function compileScalarGrade(
@@ -178,7 +182,7 @@ function compileScalarGrade(
 }
 
 export function isNeutralColour(settings: ColourSettings): boolean {
-  return isNeutralScalarColour(settings) && isNeutralAdvancedColour(settings);
+  return settings.hdr === 0 && isNeutralScalarColour(settings) && isNeutralAdvancedColour(settings);
 }
 
 export function isNeutralAdvancedColour(settings: ColourSettings): boolean {

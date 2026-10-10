@@ -46,7 +46,7 @@ describe('capture-relative marker geometry', () => {
 });
 
 describe('shared-point drag planning', () => {
-  it('moves all ten participants/easing across another point atomically and changes no other project data', () => {
+  it('moves all eleven participants/easing across another point atomically and changes no other project data', () => {
     const { project, point, other } = fixture();
     const bytes = JSON.stringify(project);
     const plan = planKeyframeDrag(project, 'video-1', 20, 90, [], 0);

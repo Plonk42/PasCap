@@ -100,7 +100,11 @@ export function needsLayeredExport(document: ProjectDocument): boolean {
     document.clips.some((clip) => hasSpatialEdits(clip.spatial) || !isNeutralDetail(clip.detail)) ||
     document.layers.some(
       (layer) =>
-        !layer.enabled || layer.opacity !== 1 || layer.keyframes.length > 0 || !isNeutralAdvancedColour(layer.colour),
+        !layer.enabled ||
+        layer.opacity !== 1 ||
+        layer.keyframes.length > 0 ||
+        layer.colour.hdr !== 0 ||
+        !isNeutralAdvancedColour(layer.colour),
     )
   )
     return true;
@@ -238,7 +242,7 @@ export function planExport(document: ProjectDocument): ExportPlan {
   const snapshot = exportDocumentSchema.parse(document);
   if (needsLayeredExport(snapshot))
     throw new Error(
-      'Multiple/disabled tracks, opacity, shared track keyframes, HSL/curves, spatial edits, detail filters, gaps, leading starts or music beyond video OUT require the layered exporter, not a static chunk plan.',
+      'Multiple/disabled tracks, opacity, shared track keyframes, HDR, HSL/curves, spatial edits, detail filters, gaps, leading starts or music beyond video OUT require the layered exporter, not a static chunk plan.',
     );
   const layout = calculateLayout(snapshot);
   validateDuration(layout);

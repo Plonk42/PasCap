@@ -223,8 +223,8 @@ test('unkeyed settings keep diamonds with visible guarded per-setting arrows and
   page,
 }) => {
   const document = await current(page);
-  expect(KEYFRAME_SETTINGS).toHaveLength(10);
-  await expect(inspector(page).getByRole('button', { name: /^Keyframe / })).toHaveCount(10);
+  expect(KEYFRAME_SETTINGS).toHaveLength(11);
+  await expect(inspector(page).getByRole('button', { name: /^Keyframe / })).toHaveCount(11);
   for (const { label } of KEYFRAME_SETTINGS) {
     await settingTab(page, label);
     const toggle = diamond(page, label);
@@ -283,7 +283,7 @@ test('Colour section arrows visit the Opacity/scalar union and share chip inspec
       .locator('.colour-controls')
       .locator('.keyframe-setting-navigation')
       .getByRole('button', { name: /^(Previous|Next) .* keyframe$/ }),
-  ).toHaveCount(20);
+  ).toHaveCount(22);
   for (const frame of [10, 30, 50, 100, 130, 160]) {
     await next.scrollIntoViewIfNeeded();
     await next.click();
@@ -671,7 +671,7 @@ test('main diamond tabs through Previous/Next before its value controls and stor
   await readOnly(page, document);
 });
 
-test('all ten setting buttons remain present and disabled throughout a native trim draft', async ({ page }) => {
+test('all eleven setting buttons remain present and disabled throughout a native trim draft', async ({ page }) => {
   const document = sequence(interleaved());
   await fixture(page, document);
   await seek(page, 45);
