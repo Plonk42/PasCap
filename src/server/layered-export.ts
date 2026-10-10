@@ -23,7 +23,7 @@ import type { JobContext } from './jobs.js';
 import { ColourLutCache, checkLayeredCancellation } from './layered-colour.js';
 import { composeLayerFrame, fittedContent, type LayerFrameSource } from './layered-frame.js';
 import { CompositorPool } from './layered-pool.js';
-import { NATIVE_THREADS } from './native-threads.js';
+import { FFV1_SLICES, NATIVE_THREADS } from './native-threads.js';
 import { runProcess } from './process.js';
 import { runRawVideoPass, writeRawFrame, type RawFrameReader, type RawPassReport } from './raw-process.js';
 import { retimeRawVideo, type RawRetimingReport } from './retime-process.js';
@@ -204,6 +204,8 @@ function losslessEncoder(target: Readonly<ExportProfileSettings>, filename: stri
     '1',
     '-slicecrc',
     '1',
+    '-slices',
+    FFV1_SLICES,
     '-g',
     '1',
     '-pix_fmt',
