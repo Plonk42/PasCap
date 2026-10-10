@@ -1,4 +1,4 @@
-# Clip spatial transforms · strict project schema 13
+# Clip spatial transforms · strict project schema 14
 
 Current contract for [#20](https://github.com/Plonk42/PasCap/issues/20) and
 [#90](https://github.com/Plonk42/PasCap/issues/90): static and keyframed crop, uniform
@@ -18,7 +18,7 @@ Implementation authorities: [pose/schema/mapping](../../src/shared/spatial.ts),
 
 ## Required data and ownership
 
-Every schema-13 clip requires `spatial: { base, keyframes }`. Both objects and all
+Every schema-14 clip requires `spatial: { base, keyframes }`. Both objects and all
 keyframes are strict: no unknown fields, optional legacy values, coercion, persisted
 defaults or load-time repair. `base` is one complete eight-value pose;
 `keyframes` is a required array of **0–256** keys. Each key requires
@@ -127,7 +127,7 @@ Both dissolve sources use the same video track Opacity value/curve, but their ow
 poses and masks. No second track/group opacity multiplier exists. Black fades
 change RGB, not available coverage. Spatial RGB resampling precedes grading;
 neither graded endpoint images nor endpoint LUTs are interpolated for animation.
-Ungraded comparison bypasses colour only, preserving spatial geometry/coverage.
+Ungraded comparison bypasses colour and clip detail filters only, preserving spatial geometry/coverage.
 
 ## Preview, native export and resource boundaries
 
@@ -158,9 +158,9 @@ two decoder/texture slots per video track (16 for eight), plus one source-review
 
 ## Clip → Transform controls
 
-**Transform** is the second Clip section (after Speed, before Range and Placement), collapsed for
+**Transform** is the second Clip section (after Speed, before Detail, Range and Placement), collapsed for
 new preferences. Clip's **Expand all / Collapse all** includes **Speed**, **Transform**,
-**Range** and **Placement**. Existing expansion preferences remain
+**Detail**, **Range** and **Placement**. Existing expansion preferences remain
 respected; **Transform animation** heading help is reachable while collapsed.
 An empty video track shows no Clip sections, only **Select a clip on … to edit it.**
 
@@ -228,10 +228,10 @@ main capture never substitutes that stored time for the real displayed source fr
 
 ## Preservation
 
-Projects and version-1 export receipt snapshots must satisfy strict **schema 13**,
+Projects and version-1 export receipt snapshots must satisfy strict **schema 14**,
 including required clip spatial data and the unchanged identified music arrays.
 Required video track Colour includes Temperature/Tint and static HSL/curves, with ten
-required nullable track keyframe fields. Incompatible v1–v12 projects/receipt snapshots
+required nullable track keyframe fields. Incompatible v1–v13 projects/receipt snapshots
 and completed videos remain untouched.
 Recreate projects deliberately; do not migrate, default-fill, rewrite or delete old
 data automatically. Registry/proxy/PCM and receipt/report format versions do not

@@ -1,0 +1,17 @@
+.detail-editor {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+.inspector-section-content > .detail-editor {
+  padding: 0 14px 13px;
+}
+.detail-field {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.detail-tools {
+  display: flex;
+  justify-content: flex-end;
+}

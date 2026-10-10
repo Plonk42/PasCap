@@ -7,10 +7,27 @@ import {
 } from '../shared/advanced-colour.js';
 import { gradePixel, NEUTRAL_COLOUR, temperatureTintGains, type ColourSettings, type RGB } from '../shared/colour.js';
 import { compositePixel } from '../shared/composition.js';
+import {
+  DETAIL_REFERENCE_LINES,
+  denoiseRangeFactor,
+  isNeutralDetail,
+  NEUTRAL_DETAIL,
+  type DetailSettings,
+} from '../shared/detail.js';
 import { compileSpatialMapping, NEUTRAL_SPATIAL_POSE, type SpatialPose } from '../shared/spatial.js';
 import type { PreviewLayer } from '../shared/timeline.js';
 import { MAX_DECODER_SLOTS } from './assignment.js';
-import { fragmentShader, scalarFragmentShader, singleFragmentShader, vertexShader } from './shaders.js';
+import {
+  detailFragmentShader,
+  fragmentShader,
+  scalarDetailFragmentShader,
+  scalarFragmentShader,
+  singleDetailFragmentShader,
+  singleFragmentShader,
+  vertexShader,
+} from './shaders.js';
+
+const DETAIL_UNIFORMS = ['detail0', 'detail1', 'detailStep0', 'detailStep1'];
 
 type GradePath = 'full' | 'single' | 'scalar';
 
@@ -19,6 +36,7 @@ export interface CompositeClip {
   settings: ColourSettings;
   aspect: number;
   spatial: SpatialPose;
+  detail: DetailSettings;
   originalWidth: number;
   originalHeight: number;
   opacity: number;
@@ -74,7 +92,12 @@ export class Compositor {
   #singleProgram: WebGLProgram | null = null;
   readonly #scalarUniforms = new Map<string, WebGLUniformLocation>();
   readonly #singleUniforms = new Map<string, WebGLUniformLocation>();
+  readonly #detailPrograms = new Map<
+    GradePath,
+    { program: WebGLProgram; uniforms: Map<string, WebGLUniformLocation> }
+  >();
   #gradePath: GradePath = 'full';
+  #detail = false;
   #advanced = true;
   readonly #vao: WebGLVertexArrayObject;
   readonly #textures: WebGLTexture[] = [];
@@ -176,8 +199,36 @@ export class Compositor {
     }
   }
   #location(name: string): WebGLUniformLocation | null {
+    if (this.#detail) return this.#detailPrograms.get(this.#gradePath)!.uniforms.get(name) ?? null;
     const uniforms = this.#gradePath === 'single' ? this.#singleUniforms : this.#scalarUniforms;
     return (this.#gradePath === 'full' ? this.#uniforms : uniforms).get(name) ?? null;
+  }
+
+  /** Compile the detail variants ahead of a draw that needs them, never against a running clock. */
+  prepareDetail(): void {
+    if (this.#disposed) return;
+    for (const path of ['full', 'single', 'scalar'] as const) this.#detailProgram(path);
+  }
+  #detailProgram(path: GradePath): WebGLProgram {
+    const existing = this.#detailPrograms.get(path);
+    if (existing) return existing.program;
+    const gl = this.gl;
+    const sources = {
+      full: detailFragmentShader,
+      single: singleDetailFragmentShader,
+      scalar: scalarDetailFragmentShader,
+    };
+    const program = createProgram(gl, sources[path]);
+    const uniforms = new Map<string, WebGLUniformLocation>();
+    for (const name of [...this.#uniforms.keys(), ...DETAIL_UNIFORMS]) {
+      const location = gl.getUniformLocation(program, name);
+      if (location !== null) uniforms.set(name, location);
+    }
+    this.#detailPrograms.set(path, { program, uniforms });
+    if (path === 'full' && DETAIL_UNIFORMS.some((name) => !uniforms.has(name))) {
+      throw new Error('Missing compositor detail uniforms.');
+    }
+    return program;
   }
 
   #gradeProgram(path: GradePath): WebGLProgram {
@@ -195,10 +246,11 @@ export class Compositor {
     }
     return program;
   }
-  #useGrade(path: GradePath): void {
+  #useGrade(path: GradePath, detail = false): void {
     const gl = this.gl;
-    const program = this.#gradeProgram(path);
+    const program = detail ? this.#detailProgram(path) : this.#gradeProgram(path);
     this.#gradePath = path;
+    this.#detail = detail;
     this.#advanced = path !== 'scalar';
     gl.useProgram(program);
     gl.uniform1i(this.#location('source0'), 0);
@@ -268,6 +320,7 @@ export class Compositor {
       settings: { ...NEUTRAL_COLOUR },
       aspect: this.canvas.width / this.canvas.height,
       spatial: { ...NEUTRAL_SPATIAL_POSE },
+      detail: { ...NEUTRAL_DETAIL },
       originalWidth: this.canvas.width,
       originalHeight: this.canvas.height,
       opacity: 0,
@@ -281,7 +334,8 @@ export class Compositor {
         CURVE_CHANNELS.some((channel) => !isIdentityCurve(source.settings.curves[channel])),
     );
     const advancedPath = group.clips.length === 1 ? 'single' : 'full';
-    this.#useGrade(advanced ? advancedPath : 'scalar');
+    const detailed = sources.some((source) => !isNeutralDetail(source.detail));
+    this.#useGrade(advanced ? advancedPath : 'scalar', detailed);
     const mappings = sources.map((source) =>
       compileSpatialMapping(
         source.spatial,
@@ -349,6 +403,14 @@ export class Compositor {
         settings.highlights,
         settings.shadows,
       );
+      if (detailed) {
+        const { sharpen, clarity, denoise } = source.detail;
+        gl.uniform4f(this.#location(`detail${index}`), sharpen, clarity, denoise, denoiseRangeFactor(denoise));
+        // Texture UV spans the image: one step is 1/720 of its height, in the original aspect.
+        const stepV = 1 / DETAIL_REFERENCE_LINES;
+        const stepU = (stepV * source.originalHeight) / source.originalWidth;
+        gl.uniform2f(this.#location(`detailStep${index}`), stepU, stepV);
+      }
     }
     gl.uniform2f(
       this.#location('coverage'),
@@ -388,6 +450,7 @@ export class Compositor {
     this.gl.deleteProgram(this.#program);
     if (this.#scalarProgram) this.gl.deleteProgram(this.#scalarProgram);
     if (this.#singleProgram) this.gl.deleteProgram(this.#singleProgram);
+    for (const { program } of this.#detailPrograms.values()) this.gl.deleteProgram(program);
   }
 }
 
@@ -424,6 +487,7 @@ export function verifyGpuColour(settings: ColourSettings): GpuComparison {
             settings,
             aspect: 1,
             spatial: { ...NEUTRAL_SPATIAL_POSE },
+            detail: { ...NEUTRAL_DETAIL },
             originalWidth: 17,
             originalHeight: 17,
             opacity: 1,
@@ -497,6 +561,7 @@ function comparisonSource(
       sourceFrame: 0,
       sourcePosition: 0,
       spatial: { ...NEUTRAL_SPATIAL_POSE },
+      detail: { ...NEUTRAL_DETAIL },
       colour: settings,
       opacity,
       blendWeight,
@@ -508,6 +573,7 @@ function comparisonSource(
       settings,
       aspect: 1,
       spatial: { ...NEUTRAL_SPATIAL_POSE },
+      detail: { ...NEUTRAL_DETAIL },
       originalWidth: 1,
       originalHeight: 1,
       opacity,

@@ -7,6 +7,14 @@ import {
   type ColourSettings,
   type PixelGrade,
 } from '../shared/colour.js';
+import {
+  compileDetail,
+  detailSchema,
+  isNeutralDetail,
+  type DetailFilter,
+  type DetailSampler,
+  type DetailSettings,
+} from '../shared/detail.js';
 import { forEachSerial } from '../shared/serial.js';
 import { compileSpatialMapping, type SpatialMapping } from '../shared/spatial.js';
 import type { PreviewLayer } from '../shared/timeline.js';
@@ -33,13 +41,17 @@ export interface FrameSource {
   lut: Float32Array | null;
   /** Nonneutral HSL/curves grade exactly per pixel instead of through the LUT. */
   exactColour: ColourSettings | null;
+  /** Nonneutral clip Sharpen/Clarity/Denoise, applied to source taps before grading. */
+  detail: DetailSettings | null;
   multiplier: number;
   coverage: number;
   mapping: SpatialMapping;
   fullCanvas: boolean;
 }
-interface PreparedSource extends Omit<FrameSource, 'exactColour'> {
+interface PreparedSource extends Omit<FrameSource, 'exactColour' | 'detail'> {
   exactColour: PixelGrade | null;
+  detail: DetailFilter | null;
+  sampler: DetailSampler;
 }
 
 function hasGradedContent(source: PreparedSource, x: number, y: number): boolean {
@@ -72,17 +84,14 @@ function validateBounds(bounds: ContentBounds, target: { width: number; height: 
     throw new Error('Invalid fitted source content rectangle.');
 }
 
-/** Inverse original-aspect geometry, then bilinear sampling of the existing fitted RGB. */
-function sampleSpatialRgb(source: PreparedSource, x: number, y: number, out: Float64Array): boolean {
+/** Bilinear 0–255 RGB of the existing fitted content at original (u, v), clamped to that content. */
+function sampleFitted(
+  source: Pick<FrameSource, 'mapping' | 'bounds' | 'rgb'>,
+  u: number,
+  v: number,
+  out: Float64Array,
+): void {
   const { mapping, bounds, rgb } = source;
-  const [a, b, c, d, e, f] = mapping.affine;
-  const outputX = (x + 0.5) / mapping.targetWidth;
-  const outputY = (y + 0.5) / mapping.targetHeight;
-  const u = a * outputX + b * outputY + c;
-  const v = d * outputX + e * outputY + f;
-  if (u < mapping.cropLeft || u >= 1 - mapping.cropRight || v < mapping.cropTop || v >= 1 - mapping.cropBottom)
-    return false;
-  if (source.multiplier === 0) return true;
   const sampleX = bounds.x + u * bounds.width - 0.5;
   const sampleY = bounds.y + v * bounds.height - 0.5;
   const left = Math.floor(sampleX);
@@ -103,6 +112,32 @@ function sampleSpatialRgb(source: PreparedSource, x: number, y: number, out: Flo
     const lower = rgb[bottomLeft + channel]! + (rgb[bottomRight + channel]! - rgb[bottomLeft + channel]!) * fractionX;
     out[channel] = upper + (lower - upper) * fractionY;
   }
+}
+
+/** Detail output is encoded 0–1; scale back to the 0–255 sample domain shared by both grade paths. */
+function sampleSource(source: PreparedSource, u: number, v: number, out: Float64Array): void {
+  if (!source.detail) {
+    sampleFitted(source, u, v, out);
+    return;
+  }
+  source.detail.apply(source.sampler, u, v, out);
+  out[0] = out[0]! * 255;
+  out[1] = out[1]! * 255;
+  out[2] = out[2]! * 255;
+}
+
+/** Inverse original-aspect geometry, then (filtered) bilinear sampling of the existing fitted RGB. */
+function sampleSpatialRgb(source: PreparedSource, x: number, y: number, out: Float64Array): boolean {
+  const { mapping } = source;
+  const [a, b, c, d, e, f] = mapping.affine;
+  const outputX = (x + 0.5) / mapping.targetWidth;
+  const outputY = (y + 0.5) / mapping.targetHeight;
+  const u = a * outputX + b * outputY + c;
+  const v = d * outputX + e * outputY + f;
+  if (u < mapping.cropLeft || u >= 1 - mapping.cropRight || v < mapping.cropTop || v >= 1 - mapping.cropBottom)
+    return false;
+  if (source.multiplier === 0) return true;
+  sampleSource(source, u, v, out);
   return true;
 }
 
@@ -119,6 +154,13 @@ function sampleGradedSource(
     // Identity preserves byte indexing and opaque, ungraded black letterboxing.
     if (!hasGradedContent(source, x, y)) {
       graded.fill(0);
+      return true;
+    }
+    if (source.detail) {
+      // Pixel centres of the fitted content: the centre tap equals the byte-indexed sample.
+      const { bounds } = source;
+      sampleSource(source, (x + 0.5 - bounds.x) / bounds.width, (y + 0.5 - bounds.y) / bounds.height, resampled);
+      gradeSampledRgb(source, resampled, graded);
       return true;
     }
     const red = source.rgb[inputOffset]!;
@@ -182,6 +224,7 @@ async function prepareSources(
       bounds: source.bounds,
       lut: exactColour ? null : await cache.get(colour, signal, pool), // NOSONAR -- two borrowed slots, never parallel LUT builds.
       exactColour,
+      detail: isNeutralDetail(source.sample.detail) ? null : detailSchema.parse(source.sample.detail),
       multiplier: source.sample.opacity * source.sample.blendWeight * source.sample.brightness * 65535,
       coverage: source.sample.opacity * source.sample.blendWeight,
       mapping,
@@ -217,10 +260,22 @@ export function composeRows(
   rowStart: number,
   rowEnd: number,
 ): void {
-  const prepared: PreparedSource[] = sources.map((source) => ({
-    ...source,
-    exactColour: source.exactColour ? compileGradeInto(source.exactColour) : null,
-  }));
+  const prepared: PreparedSource[] = sources.map((source) => {
+    const sampled = new Float64Array(3);
+    return {
+      ...source,
+      exactColour: source.exactColour ? compileGradeInto(source.exactColour) : null,
+      detail: source.detail
+        ? compileDetail(source.detail, source.mapping.fittedWidth / source.mapping.fittedHeight)
+        : null,
+      sampler: (u, v, out) => {
+        sampleFitted(source, u, v, sampled);
+        out[0] = sampled[0]! / 255;
+        out[1] = sampled[1]! / 255;
+        out[2] = sampled[2]! / 255;
+      },
+    };
+  });
   const graded = new Float64Array(3);
   const resampled = new Float64Array(3);
   for (let y = rowStart; y < rowEnd; y++) {

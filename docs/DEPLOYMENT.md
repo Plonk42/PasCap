@@ -70,7 +70,7 @@ external desktop file/folder drag-and-drop import**. External drops prevent
 navigation and show Import guidance without a POST. Internal ready-Media-to-Timeline
 dragging remains supported. Imports reference originals; generated proxies/
 thumbnails, project/registry metadata, exports/receipts and scratch are the only
-new local data, not duplicate original footage. Projects use strict schema 13 with
+new local data, not duplicate original footage. Projects use strict schema 14 with
 complete required video track Colour, including Temperature/Tint and static HSL/curves,
 no clip colour/correction fields, required clip `spatial` base/per-setting original-source keyframes and
 required `music` array (0–8 independent music tracks, unique required IDs; `[]` without
@@ -81,10 +81,10 @@ required per-track Ripple, transitions, opening/closing fades and numeric
 `tint`. HSL/curves remain static. Track `opacity` is the sole saved
 Opacity value; saved `clip.opacity` and old `clipOpacity`/`layerOpacity` channels
 are rejected. The track value or its overriding keyframes supply Opacity to each source
-in a dissolve group, without an additional track multiplier. v1–v12 projects
+in a dissolve group, without an additional track multiplier. v1–v13 projects
 and receipt snapshots remain unchanged/incompatible and require project recreation,
 without migration, compatibility defaults, null/old-format readers or automatic deletion.
-Export receipts remain version 1 with strict v13 snapshots and required captured
+Export receipts remain version 1 with strict v14 snapshots and required captured
 audio-source/instance-plan arrays; invalid arrays/older snapshots remain preserved
 and rejected. Registry/proxy/current PCM formats and source identity checks are unchanged.
 

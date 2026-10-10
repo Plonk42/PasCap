@@ -14,7 +14,7 @@ Ripple, transitions/fades, grouped dissolves and resource bounds retain their
 semantics. [#35's current schema-8 contract](MULTIPLE_MUSIC.md) supersedes the
 historical body's video-only duration/single-music assumptions: music can extend
 project OUT, with closing video fades at clip OUT then black through the music
-tail. [#89](https://github.com/Plonk42/PasCap/issues/89)'s current schema-13 contract
+tail. [#89](https://github.com/Plonk42/PasCap/issues/89)'s current schema-14 contract
 supersedes the historical body's track Speed and contextual track-Speed duration
 descriptions: speed is clip-only, a clip's duration never depends on its track or
 start, and shared track keyframes are appearance-only. Historical semantics and identifiers are unchanged; explanatory terminology follows

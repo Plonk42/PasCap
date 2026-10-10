@@ -1,4 +1,5 @@
 import { colourSchema, NEUTRAL_COLOUR, type ColourSettings } from '../shared/colour.js';
+import { isNeutralDetail, NEUTRAL_DETAIL } from '../shared/detail.js';
 import { projectSchema, type ProjectDocument } from '../shared/model.js';
 import {
   calculateLayout,
@@ -484,6 +485,11 @@ export class PreviewEngine {
     });
   }
 
+  /** Detail shader variants compile when a document first needs them, before any draw uses them. */
+  #prepareDetail(): void {
+    if (this.#compositor.available && this.#document?.clips.some((clip) => !isNeutralDetail(clip.detail)))
+      this.#compositor.prepareDetail();
+  }
   async loadProject(
     document: ProjectDocument,
     proxyUrl: (mediaId: string) => string,
@@ -499,6 +505,7 @@ export class PreviewEngine {
     const signal = this.#beginOperation();
     if (snapshot.id !== this.#document?.id) this.#ungraded = false;
     this.#document = snapshot;
+    this.#prepareDetail();
     this.#layout = calculateLayout(snapshot);
     this.#proxyUrl = proxyUrl;
     this.#originalDimensions = originalDimensions;
@@ -555,7 +562,7 @@ export class PreviewEngine {
       if (this.#isCurrent(signal)) this.#handleError(error);
     }
   }
-  /** Editor-only grade bypass: keep source clocks, coverage and the saved grade. */
+  /** Editor-only bypass of Colour and clip detail filters: keep source clocks, coverage and saved settings. */
   setUngraded(enabled: boolean): void {
     if (this.#disposed || !this.#document || this.#ungraded === enabled) return;
     this.#ungraded = enabled;
@@ -586,6 +593,7 @@ export class PreviewEngine {
     const frame = this.#busy ? this.#operationFrame : this.#frame;
     const previous = sampleTimeline(this.#document, frame, this.#layout).map((layer) => layer.clipId);
     this.#document = snapshot;
+    this.#prepareDetail();
     this.#layout = calculateLayout(snapshot);
     const required = sampleTimeline(snapshot, frame, this.#layout).map((layer) => layer.clipId);
     const changed = required.length !== previous.length || required.some((id) => !previous.includes(id));
@@ -703,6 +711,7 @@ export class PreviewEngine {
             settings: this.#ungraded ? NEUTRAL_COLOUR : layer.colour,
             aspect: this.#slotFor(layer.clipId).aspect,
             spatial: layer.spatial,
+            detail: this.#ungraded ? NEUTRAL_DETAIL : layer.detail,
             originalWidth: dimensions.width,
             originalHeight: dimensions.height,
             opacity: layer.opacity,
