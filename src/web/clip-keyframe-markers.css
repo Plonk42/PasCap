@@ -16,82 +16,73 @@
   flex-wrap: nowrap;
 }
 
+/* Clip keys are boxed buttons the size of the Colour track markers, which overlap the clip's bottom edge by
+ * 19px: blue Transform ▼ boxes overlap its top edge by 19px (the clip label sits below), slightly shorter
+ * salmon Speed ◆ boxes sit between the label and the Colour markers.
+ */
 .timeline-clip-key {
   position: absolute;
-  top: 28px;
-  left: clamp(0px, calc(var(--clip-keyframe-position) - 6px), max(0px, calc(100% - 12px)));
-  width: min(12px, 100%);
-  height: 10px;
-  min-width: 0;
-  padding: 0;
-  border: 0;
-  border-radius: 2px;
-  background: transparent;
-  color: #b7e6ff;
-  font-size: 10px;
-  line-height: 1;
-  cursor: pointer;
-  touch-action: none;
-  pointer-events: auto;
-}
-
-.timeline-clip-key.speed {
-  top: 40px;
-  color: #ffc7bb;
-  cursor: ew-resize;
-}
-
-.timeline-clip-key.speed.moving > span {
-  outline: 1px solid var(--accent);
-}
-
-.timeline-clip-key.speed.invalid {
-  color: var(--error);
-}
-
-.snap-guide.speed-keyframe-guide {
-  background: #ffc7bb;
-}
-
-/* Transform keys are boxed blue buttons the size of the Colour track markers: that box overlaps the clip's
- * bottom edge by 19px (3px beyond it), this one overlaps the top edge by 19px. The clip label sits below.
- */
-.timeline-clip-key.transform {
   top: 0;
   left: clamp(0px, calc(var(--clip-keyframe-position) - 10px), max(0px, calc(100% - 20px)));
   width: min(20px, 100%);
   height: 22px;
-  background: #1b3446ee;
-  border: 1px solid #5d93b8;
+  min-width: 0;
+  padding: 0;
+  border: 1px solid;
   border-radius: 4px;
-  color: #c4e9ff;
   font-size: 13px;
+  line-height: 1;
   cursor: ew-resize;
+  touch-action: none;
+  pointer-events: auto;
 }
 
-.timeline-clip-key.transform > span {
-  line-height: 20px;
+.timeline-clip-key.transform {
+  background: #1b3446ee;
+  border-color: #5d93b8;
+  color: #c4e9ff;
+}
+
+.timeline-clip-key.transform:is(:hover, :focus-visible):not(:disabled) {
+  background: #264b66;
+  border-color: #9fd2f2;
+}
+
+.timeline-clip-key.speed {
+  top: 38px;
+  height: 18px;
+  background: #43271fee;
+  border-color: #b9735f;
+  color: #ffc7bb;
+}
+
+.timeline-clip-key.speed > span {
+  line-height: 16px;
+}
+
+.timeline-clip-key.speed:is(:hover, :focus-visible):not(:disabled) {
+  background: #63362a;
+  border-color: #f2a996;
 }
 
 .snap-guide.transform-keyframe-guide {
   background: #c4e9ff;
 }
 
-.timeline-clip-key.transform.moving {
+.snap-guide.speed-keyframe-guide {
+  background: #ffc7bb;
+}
+
+.timeline-clip-key.moving {
   outline: 2px solid var(--accent);
   outline-offset: -2px;
   cursor: grabbing;
 }
 
-.timeline-clip-key.transform.invalid {
+.timeline-clip-key.invalid {
   border-color: var(--error);
   color: var(--error);
   outline-color: var(--error);
-}
-
-.timeline-clip-key.transform:is(:hover, :focus-visible):not(:disabled) {
-  background: #264b66;
-  border-color: #9fd2f2;
 }
 
 .product-workspace .timeline-clip:has(.timeline-clip-key.transform) .timeline-clip-label {
@@ -103,15 +94,12 @@
   z-index: 6;
   display: block;
   width: 100%;
+  line-height: 20px;
   text-align: center;
   text-shadow:
     0 0 2px #101512,
     0 0 2px #101512;
   pointer-events: none;
-}
-
-.timeline-clip-key.speed > span {
-  border-bottom: 1px dashed currentColor;
 }
 
 /* The global hover filter would create a stacking context, hiding edge glyphs
@@ -127,12 +115,6 @@
 
 .timeline-clip-key:disabled > span {
   opacity: 0.6;
-}
-
-.timeline-clip-key:not(.transform):is(:hover, :focus-visible):not(:disabled) > span {
-  background: #14251e;
-  box-shadow: inset 0 0 0 1px currentColor;
-  border-radius: 2px;
 }
 
 .timeline-clip-key:focus-visible {

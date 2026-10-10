@@ -152,8 +152,8 @@ the neutral base. There is no graph/canvas gizmo. Exact
 invalid drafts and release-only sliders follow the common validation/cancellation
 pattern. See [SPATIAL_TRANSFORMS.md](SPATIAL_TRANSFORMS.md).
 
-Inside each timeline clip rectangle, Transform keys are boxed blue **▼** buttons at the clip's top edge, the same size as the Colour markers that overlap the bottom edge by the same amount; the clip label sits below them and salmon/dashed
-**◆** custom-speed lanes show source keyframes at authoritative retimed output positions.
+Inside each timeline clip rectangle, Transform keys are boxed blue **▼** buttons at the clip's top edge, the same size as the Colour markers that overlap the bottom edge by the same amount; the clip label sits below them and boxed salmon
+**◆** custom-speed buttons, below the label and above the Colour markers, show source keyframes at authoritative retimed output positions.
 Off-trim keyframes are omitted; exclusive OUT has a boundary marker that seeks the
 final available frame. Click, Enter or Space selects the clip, seeks its nearest
 mapped image and opens Clip → Transform (Clip → Speed for ◆); a click edits nothing. Transform and speed keys also slide by drag or ←/→ (one source frame, Shift ten): previewed, one Undo step on a valid release, restored by Escape or an occupied frame; moving a speed key retimes its clip.

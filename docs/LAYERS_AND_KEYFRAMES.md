@@ -367,7 +367,7 @@ music are copied or shifted, and no clip is retimed. There is no cross-track key
 ### Clip source-keyframe lanes
 
 Inside each clip rectangle, Transform keyframes use a boxed blue **▼** button lane and
-custom speed keyframes a distinct salmon/dashed **◆** lane. Their positions use
+custom speed keyframes a distinct boxed salmon **◆** lane. Their positions use
 authoritative clip retiming; off-trim
 keyframes are omitted. An exclusive-OUT keyframe has a boundary marker that seeks
 the final available frame.

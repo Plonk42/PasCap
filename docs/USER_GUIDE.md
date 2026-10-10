@@ -384,7 +384,7 @@ Details: [spatial transforms](design/SPATIAL_TRANSFORMS.md).
 
 ### Seek clip source keyframes from the timeline
 
-Inside each clip rectangle, boxed blue **▼** Transform and salmon/dashed **◆**
+Inside each clip rectangle, boxed blue **▼** Transform and boxed salmon **◆**
 custom-speed lanes distinguish source keyframes from shared project-time track markers.
 Positions follow authoritative retiming. Off-trim keyframes are omitted. An
 exclusive-OUT boundary marker seeks the final available frame. Click or focus a

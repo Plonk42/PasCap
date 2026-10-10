@@ -374,7 +374,7 @@ and retimes no clip.
 ### Clip source-keyframe markers
 
 Inside each timeline clip rectangle, Transform keyframes use a boxed blue **▼** button lane
-and custom-speed keyframes a separate salmon/dashed **◆** lane. Marker output positions
+and custom-speed keyframes a separate boxed salmon **◆** lane. Marker output positions
 come from authoritative `PlacedClip.retiming`.
 Off-trim keyframes are omitted; exclusive OUT has a boundary marker that seeks the
 final available frame.
