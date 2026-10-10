@@ -813,7 +813,8 @@ export function MediaLibrary({
             <span className="privacy-badge">No-copy import</span>
           </div>
           <p className="control-hint declutter-import-copy">
-            Originals stay local and unchanged. Only selected paths are registered; proxies are queued automatically.
+            Select original recordings accessible to the PasCap service. They stay local and unchanged: only the
+            selected paths are registered and proxies are queued automatically.
           </p>
           <Suspense fallback={<output>Opening recording browser…</output>}>
             <FootageBrowser

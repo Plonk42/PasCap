@@ -140,10 +140,6 @@ export function FootageBrowser({ busy, onRegister, onResult }: Readonly<Props>) 
 
   return (
     <section className="footage-browser" aria-label="Browse original recordings" aria-busy={loading || registering}>
-      <h3>Browse recordings</h3>
-      <p className="control-hint">
-        Select original recordings accessible to the PasCap service. No recording bytes are uploaded or copied.
-      </p>
       <div className="footage-location-tools">
         <label className="activity-field">
           <span>Recording location</span>
