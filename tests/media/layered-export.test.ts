@@ -245,6 +245,13 @@ describe.skipIf(!enabled)('schema-15 layered native export · disposable synthet
     if (root) await rm(root, { recursive: true, force: true });
   });
 
+  function nativeArguments(offset: number): (readonly string[])[] {
+    return vi
+      .mocked(spawn)
+      .mock.calls.slice(offset)
+      .filter((call) => call[0] === config.ffmpeg)
+      .map((call) => (call[1] ?? []) as readonly string[]);
+  }
   function simple(frames = 4): ProjectDocument {
     const project = createProject('native-layered', 'Disposable layered export');
     project.layers.push({ ...layer('video-2'), opacity: 0.5 });
@@ -789,7 +796,9 @@ describe.skipIf(!enabled)('schema-15 layered native export · disposable synthet
           target: { ...EXPORT_PROFILES.draft720, width: WIDTH, height: HEIGHT },
           context: { id: randomUUID(), signal: new AbortController().signal, update: () => {} },
         });
-        expect(await readdir(work)).toEqual([result.filename]);
+        const [output] = result.chunks;
+        expect(result.chunks).toEqual([{ filename: output!.filename, duration: layout.duration }]);
+        expect(await readdir(work)).toEqual([output!.filename]);
         expect(result.report).toMatchObject({
           layerPasses: count,
           sourceOverPasses: count - 1,
@@ -824,7 +833,7 @@ describe.skipIf(!enabled)('schema-15 layered native export · disposable synthet
           });
           expect(report.largestReadChunkBytes).toBeLessThanOrEqual(256 * 1024);
         }
-        await losslessParity(project, path.join(work, result.filename));
+        await losslessParity(project, path.join(work, output!.filename));
       } finally {
         await rm(work, { recursive: true, force: true });
       }
@@ -1157,7 +1166,10 @@ describe.skipIf(!enabled)('schema-15 layered native export · disposable synthet
         target: { ...EXPORT_PROFILES.draft720, width: WIDTH, height: HEIGHT },
         context: { id: randomUUID(), signal: new AbortController().signal, update: () => {} },
       });
-      expect(await readdir(work)).toEqual([result.filename]);
+      const duration = calculateLayout(project).duration;
+      const [output] = result.chunks;
+      expect(result.chunks).toEqual([{ filename: output!.filename, duration }]);
+      expect(await readdir(work)).toEqual([output!.filename]);
       const bytes = await runProcess(config.ffmpeg, [
         '-hide_banner',
         '-loglevel',
@@ -1166,7 +1178,7 @@ describe.skipIf(!enabled)('schema-15 layered native export · disposable synthet
         '-threads',
         '2',
         '-i',
-        path.join(work, result.filename),
+        path.join(work, output!.filename),
         '-map',
         '0:v:0',
         '-an',
@@ -1183,7 +1195,6 @@ describe.skipIf(!enabled)('schema-15 layered native export · disposable synthet
         'pipe:1',
       ]);
       const actual = new Uint16Array(bytes.buffer, bytes.byteOffset, bytes.length / 2);
-      const duration = calculateLayout(project).duration;
       expect(bytes).toHaveLength(duration * PIXELS * 8);
       let maximumMae = 0;
       for (let frame = 0; frame < duration; frame++) {
@@ -1228,9 +1239,14 @@ describe.skipIf(!enabled)('schema-15 layered native export · disposable synthet
       exposure: 0.4,
       highlights: -0.2,
     };
+    const spawnOffset = vi.mocked(spawn).mock.calls.length;
     const result = await complete(project);
     bounds(result.receipt);
     await parity(project, result.filename);
+    // The final source-over writes H.264 directly; only earlier groups stay lossless.
+    const native = nativeArguments(spawnOffset);
+    expect(native.filter((args) => args.includes('libx264') && args.includes('pipe:0'))).toHaveLength(1);
+    expect(native.filter((args) => args.includes('libx264') && !args.includes('pipe:0'))).toHaveLength(0);
     for (const frame of [3, 4]) {
       const base = sampleTimeline(project, frame).find((sample) => sample.layerId === 'video-1')!;
       expect(base.brightness).toBe(0);
@@ -1250,9 +1266,14 @@ describe.skipIf(!enabled)('schema-15 layered native export · disposable synthet
       point(7, { opacity: 0.9, exposure: 0.7, hue: 40, brightness: 0.06, saturation: 0.8 }, 'hold'),
     ];
     expect(needsLayeredExport(project)).toBe(true);
+    const spawnOffset = vi.mocked(spawn).mock.calls.length;
     const result = await complete(project);
     bounds(result.receipt);
     await parity(project, result.filename);
+    // The only track's span encodes H.264 directly, without a lossless RGBA16 timeline.
+    const native = nativeArguments(spawnOffset);
+    expect(native.filter((args) => args.includes('ffv1') && args.includes('gbrap16le'))).toHaveLength(0);
+    expect(native.filter((args) => args.includes('libx264') && args.includes('pipe:0'))).toHaveLength(1);
     expect(result.receipt.retiming[0]).toMatchObject({ decodedFrames: 4, outputFrames: 8 });
     // The same held original frame receives different grades at distinct project frames.
     expect(result.receipt.settings.layered!.lutsGenerated).toBe(8);
