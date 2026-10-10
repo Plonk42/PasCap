@@ -10,12 +10,14 @@ deadline; hardware/real-media work requires explicit owner consent.
 
 ## Current baseline
 
-The local schema-13 contract covers no-copy footage import, projects, source
+The local schema-14 contract covers no-copy footage import, projects, source
 clips, multi-track timelines, colour/opacity track keyframes, music and verified
 720p/4K export, with clip-only constant speed or precise source-frame speed curves.
 Clip-owned crop/scale/translation/rotation and per-setting source-frame animation
 are specified by [#20's current contract](design/SPATIAL_TRANSFORMS.md), without
-claiming qualification or changing milestone status.
+claiming qualification or changing milestone status. Static clip Sharpen, Clarity
+and Denoise follow [#123's contract](design/DETAIL_FILTERS.md), likewise without a
+qualification claim.
 The final approved [#67](https://github.com/Plonk42/PasCap/issues/67) contract has
 one video track-owned **Opacity** setting: required numeric `VideoLayer.opacity` in 0–1,
 initially 1 (100%) on new tracks. Its sole track channel, `opacity`, overrides that
@@ -34,12 +36,12 @@ warms; positive Tint adds magenta. The shared normalized linear-gain formula run
 before Exposure and intentionally colours greys; neutral-white luminance is
 preserved before clipping only. Static track
 [HSL ranges and master/RGB curves](design/HSL_AND_CURVES.md)
-follow scalar grading without adding animation channels. v1–v12 projects
+follow scalar grading without adding animation channels. v1–v13 projects
 and receipt snapshots are preserved/incompatible and require recreation, without
 migration, defaults, null/old-format readers or automatic deletion;
-registry/proxy/current PCM formats remain unchanged. Schema 13 requires a 0–8
+registry/proxy/current PCM formats remain unchanged. Schema 14 requires a 0–8
 identified music track array (`[]` without music); version-1 export receipts
-require strict v13 snapshots and captured audio-source/instance-plan arrays.
+require strict v14 snapshots and captured audio-source/instance-plan arrays.
 Music can extend duration to maximum video/music OUT: closing video fades finish
 at clip OUT, then black while music continues/fades at its own end. One mixed
 output clock and final-only linear-sum clamp retain bounded resources; see

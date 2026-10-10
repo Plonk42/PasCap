@@ -10,6 +10,7 @@ import { ColourCurvesSection, HslRangesSection } from './AdvancedColour.js';
 import { TrackAnimationControls } from './AnimationControls.js';
 import { ClipSourceRange } from './ClipSourceRange.js';
 import { colourResetCommands } from './colour-reset.js';
+import { DetailSection } from './DetailControls.js';
 import { shortName, sourceSeconds } from './display.js';
 import { HelpPopover } from './HelpPopover.js';
 import { Icon } from './icons.js';
@@ -716,6 +717,13 @@ export function Inspector({
                 disabled={drafting}
                 onEdit={onEdit}
                 onSeek={onSeek}
+              />
+              <DetailSection
+                key={`detail:${project.id}:${clip.id}`}
+                project={project}
+                clip={clip}
+                disabled={drafting}
+                onEdit={onEdit}
               />
               {asset && (
                 <SourceRangeSection

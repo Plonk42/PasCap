@@ -1,4 +1,4 @@
-# Speed and audio contract · project v13
+# Speed and audio contract · project v14
 
 Nine video track-owned scalar Colour controls include Temperature/Tint (−1…1, neutral 0),
 whose normalized linear gains precede Exposure. Positive Temperature warms;
@@ -13,7 +13,7 @@ without changing retiming, geometry, Opacity or music. Required data/resources:
 
 ## Clip speed
 
-Speed belongs only to the clip and is positive, **0.1×–8×**. Strict schema 13
+Speed belongs only to the clip and is positive, **0.1×–8×**. Strict schema 14
 requires each clip's `speed` to be `{ mode: 'constant', rate }` or
 `{ mode: 'curve', keyframes }`; there is no track Speed setting, ramp mode or
 project-wide speed field. A clip's duration and sampled frames depend only on its
@@ -94,7 +94,7 @@ with $C = \sum_i G_i b_i o_i w_i m_i$ and $A = \sum_i o_i w_i m_i$. Source-over 
 $\mathrm{result} = C + \mathrm{lower}(1 - A)$, with no track multiplier; black fades
 change RGB without reducing coverage. Any shared track keyframe
 requires the composited export path; any nonneutral spatial base or spatial keyframe
-(even neutral keyframes) does too. Exact neutral poses retain opaque black letterboxing
+(even neutral keyframes) does too, as does any clip [detail filter](design/DETAIL_FILTERS.md). Exact neutral poses retain opaque black letterboxing
 after grading; nonneutral uncovered pixels reveal lower footage. The static chunk
 plan cannot silently omit these edits.
 Opacity is composition coverage, not part of the SDR RGB grade.
@@ -256,7 +256,7 @@ frame for main capture.
 
 ## Music
 
-Strict schema 13 requires `music: MusicTrack[]`, with **0–8 independent music tracks**
+Strict schema 14 requires `music: MusicTrack[]`, with **0–8 independent music tracks**
 and unique required track `id` values; `[]` means no music. Each music track
 requires `mediaId`, `sourceIn`, `sourceOut`, `start`, `duration`, `gainDb`, `fadeIn`,
 `fadeOut` and `loop`. Several music tracks can use the same registered recording
@@ -382,7 +382,7 @@ preview caches remain unchanged but are not current playback input. Missing curr
 PCM caches appear as an explicit **Prepare** action on the file in Media → Music;
 startup/library reads never prepare, rewrite or delete them. Prepare deliberately
 to create the current cache, retaining originals and older generated files. Project
-schema is 13; registry, video-proxy and PCM cache formats are unchanged. Native export
+schema is 14; registry, video-proxy and PCM cache formats are unchanged. Native export
 still reads original audio, not the preview transport.
 
 Native mixing decodes **one original at a time** to exact selected **48 kHz stereo
@@ -404,7 +404,7 @@ cancellation cleans only owned scratch/partials and preserves completed outputs.
 
 ## Versioning
 
-Project schema **v13** requires explicit `media.videoIds` and `media.audioIds` arrays,
+Project schema **v14** requires explicit `media.videoIds` and `media.audioIds` arrays,
 unique and limited to 10,000 IDs each, plus complete video track colour with Temperature/Tint
 and static HSL/curves, clip constant or 1–256-keyframe custom-curve
 speed, required clip `spatial: { base, keyframes }` with eight-value base and
@@ -425,7 +425,7 @@ Track `opacity` is valid and required; saved `clip.opacity` and old
 New projects have empty video/music bins. Standalone audio imports belong
 to the open project's bin; every music track's references also count as membership.
 Global registered music/proxies are reusable on deliberate import, never automatically
-inherited by a new project. Earlier v1–v12 projects and export receipt snapshots remain unchanged
+inherited by a new project. Earlier v1–v13 projects and export receipt snapshots remain unchanged
 and incompatible. There is no migration, compatibility reader, null fallback, default-field
 injection or automatic deletion; recreate projects and import their media to reuse
 registered assets/verified ready proxies. Confirmed project deletion affects only
@@ -435,7 +435,7 @@ Registry/video-proxy/current PCM formats, source guards and native video budgets
 native composition uses the sole Opacity contract without a track multiplier.
 Preview uses the current explicitly prepared PCM cache described above.
 
-Export receipts remain **version 1** with a strict **v13** snapshot, required
+Export receipts remain **version 1** with a strict **v14** snapshot, required
 `musicSources` captured unique-original array and `settings.audio` identified
 instance-plan array (`[]` for each without music). Plans preserve independent
 timing/gain/fades/loop; several may refer to the same captured original. The plan

@@ -1,4 +1,5 @@
 import { colourSchema, NEUTRAL_COLOUR, type ColourSettings } from '../shared/colour.js';
+import { NEUTRAL_DETAIL } from '../shared/detail.js';
 import { projectSchema, type ProjectDocument } from '../shared/model.js';
 import {
   calculateLayout,
@@ -555,7 +556,7 @@ export class PreviewEngine {
       if (this.#isCurrent(signal)) this.#handleError(error);
     }
   }
-  /** Editor-only grade bypass: keep source clocks, coverage and the saved grade. */
+  /** Editor-only bypass of Colour and clip detail filters: keep source clocks, coverage and saved settings. */
   setUngraded(enabled: boolean): void {
     if (this.#disposed || !this.#document || this.#ungraded === enabled) return;
     this.#ungraded = enabled;
@@ -703,6 +704,7 @@ export class PreviewEngine {
             settings: this.#ungraded ? NEUTRAL_COLOUR : layer.colour,
             aspect: this.#slotFor(layer.clipId).aspect,
             spatial: layer.spatial,
+            detail: this.#ungraded ? NEUTRAL_DETAIL : layer.detail,
             originalWidth: dimensions.width,
             originalHeight: dimensions.height,
             opacity: layer.opacity,

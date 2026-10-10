@@ -1,4 +1,4 @@
-# Video track HSL ranges and colour curves · strict project 13
+# Video track HSL ranges and colour curves · strict project 14
 
 All colour belongs to the video track, keyed or unkeyed. Clips have no colour or
 correction fields. Nine scalar colour controls, including Temperature and Tint,
@@ -19,7 +19,7 @@ green and blue arrays, each 2…16 strict `{ x, y }` control nodes with finite c
 in 0…1. Inputs strictly ascend, with first x=0 and last x=1. Endpoint outputs are
 editable; nonmonotonic outputs are valid. No control-node IDs or preset fields are saved.
 Neutral factories create independent nested objects/arrays. They are only creators,
-never repairs for missing saved fields. Projects 1…12 and their receipt snapshots
+never repairs for missing saved fields. Projects 1…13 and their receipt snapshots
 are incompatible and preserved; recreate deliberately. Receipt format remains 1;
 registry, proxy and PCM formats are unchanged. No migration or automatic deletion.
 

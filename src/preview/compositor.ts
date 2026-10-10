@@ -7,6 +7,7 @@ import {
 } from '../shared/advanced-colour.js';
 import { gradePixel, NEUTRAL_COLOUR, temperatureTintGains, type ColourSettings, type RGB } from '../shared/colour.js';
 import { compositePixel } from '../shared/composition.js';
+import { DETAIL_REFERENCE_LINES, denoiseRangeFactor, NEUTRAL_DETAIL, type DetailSettings } from '../shared/detail.js';
 import { compileSpatialMapping, NEUTRAL_SPATIAL_POSE, type SpatialPose } from '../shared/spatial.js';
 import type { PreviewLayer } from '../shared/timeline.js';
 import { MAX_DECODER_SLOTS } from './assignment.js';
@@ -19,6 +20,7 @@ export interface CompositeClip {
   settings: ColourSettings;
   aspect: number;
   spatial: SpatialPose;
+  detail: DetailSettings;
   originalWidth: number;
   originalHeight: number;
   opacity: number;
@@ -134,6 +136,10 @@ export class Compositor {
         'curveIdentity0',
         'curveIdentity1',
         'neutralHsl',
+        'detail0',
+        'detail1',
+        'detailStep0',
+        'detailStep1',
       ];
       for (const name of names) {
         const location = gl.getUniformLocation(program, name);
@@ -268,6 +274,7 @@ export class Compositor {
       settings: { ...NEUTRAL_COLOUR },
       aspect: this.canvas.width / this.canvas.height,
       spatial: { ...NEUTRAL_SPATIAL_POSE },
+      detail: { ...NEUTRAL_DETAIL },
       originalWidth: this.canvas.width,
       originalHeight: this.canvas.height,
       opacity: 0,
@@ -349,6 +356,11 @@ export class Compositor {
         settings.highlights,
         settings.shadows,
       );
+      const { sharpen, clarity, denoise } = source.detail;
+      gl.uniform4f(this.#location(`detail${index}`), sharpen, clarity, denoise, denoiseRangeFactor(denoise));
+      // Texture UV spans the image: one step is 1/720 of its height, in the original aspect.
+      const stepV = 1 / DETAIL_REFERENCE_LINES;
+      gl.uniform2f(this.#location(`detailStep${index}`), (stepV * source.originalHeight) / source.originalWidth, stepV);
     }
     gl.uniform2f(
       this.#location('coverage'),
@@ -424,6 +436,7 @@ export function verifyGpuColour(settings: ColourSettings): GpuComparison {
             settings,
             aspect: 1,
             spatial: { ...NEUTRAL_SPATIAL_POSE },
+            detail: { ...NEUTRAL_DETAIL },
             originalWidth: 17,
             originalHeight: 17,
             opacity: 1,
@@ -497,6 +510,7 @@ function comparisonSource(
       sourceFrame: 0,
       sourcePosition: 0,
       spatial: { ...NEUTRAL_SPATIAL_POSE },
+      detail: { ...NEUTRAL_DETAIL },
       colour: settings,
       opacity,
       blendWeight,
@@ -508,6 +522,7 @@ function comparisonSource(
       settings,
       aspect: 1,
       spatial: { ...NEUTRAL_SPATIAL_POSE },
+      detail: { ...NEUTRAL_DETAIL },
       originalWidth: 1,
       originalHeight: 1,
       opacity,

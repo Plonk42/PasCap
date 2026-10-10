@@ -304,6 +304,7 @@ function expectedGroups(
               settings: sample.colour,
               aspect: 16 / 9,
               spatial: sample.spatial,
+              detail: sample.detail,
               originalWidth: 1920,
               originalHeight: 1080,
               opacity: sample.opacity,

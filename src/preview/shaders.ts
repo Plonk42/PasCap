@@ -1,3 +1,11 @@
+import {
+  CLARITY_GAIN,
+  DETAIL_CLARITY_TAPS,
+  DETAIL_FINE_TAPS,
+  DETAIL_WIDE_TAPS,
+  SHARPEN_GAIN,
+} from '../shared/detail.js';
+
 export const vertexShader = `#version 300 es
 precision highp float;
 out vec2 uv;
@@ -41,6 +49,68 @@ float curve${source}_${channel}Value(float value) {
     ),
   )
   .join('\n');
+
+const glslFloat = (value: number): string => (Number.isInteger(value) ? `${value}.0` : String(value));
+const glslVec2Array = (name: string, taps: readonly { x: number; y: number }[]): string =>
+  `const vec2 ${name}[${taps.length}] = vec2[${taps.length}](${taps
+    .map(({ x, y }) => `vec2(${glslFloat(x)}, ${glslFloat(y)})`)
+    .join(', ')});`;
+const glslFloatArray = (name: string, values: readonly number[]): string =>
+  `const float ${name}[${values.length}] = float[${values.length}](${values.map(glslFloat).join(', ')});`;
+const fineTotal = 1 + DETAIL_FINE_TAPS.reduce((sum, tap) => sum + tap.weight, 0);
+
+// The same taps, weights and order as compileDetail() in src/shared/detail.ts.
+const detailFunction = `
+${glslVec2Array('detailFine', DETAIL_FINE_TAPS)}
+${glslFloatArray(
+  'detailFineWeight',
+  DETAIL_FINE_TAPS.map((tap) => tap.weight),
+)}
+${glslVec2Array('detailWide', DETAIL_WIDE_TAPS)}
+${glslFloatArray(
+  'detailWideWeight',
+  DETAIL_WIDE_TAPS.map((tap) => tap.weight),
+)}
+${glslVec2Array('detailClarity', DETAIL_CLARITY_TAPS)}
+vec3 detailFilter(sampler2D source, vec2 coordinate, vec3 centre, vec4 detail, vec2 stride) {
+  vec3 denoised = centre;
+  vec3 gaussian = centre;
+  if (detail.x > 0.0 || detail.z > 0.0) {
+    float denoisedWeight = 1.0;
+    for (int i = 0; i < ${DETAIL_FINE_TAPS.length}; i++) {
+      vec3 tap = texture(source, coordinate + detailFine[i] * stride).rgb;
+      gaussian += detailFineWeight[i] * tap;
+      if (detail.z > 0.0) {
+        vec3 difference = tap - centre;
+        float weight = detailFineWeight[i] * exp(-dot(difference, difference) * detail.w);
+        denoised += weight * tap;
+        denoisedWeight += weight;
+      }
+    }
+    if (detail.z > 0.0) {
+      for (int i = 0; i < ${DETAIL_WIDE_TAPS.length}; i++) {
+        vec3 tap = texture(source, coordinate + detailWide[i] * stride).rgb;
+        vec3 difference = tap - centre;
+        float weight = detailWideWeight[i] * exp(-dot(difference, difference) * detail.w);
+        denoised += weight * tap;
+        denoisedWeight += weight;
+      }
+    }
+    gaussian /= ${glslFloat(fineTotal)};
+    denoised /= denoisedWeight;
+  }
+  float base = dot(denoised, luma);
+  float delta = 0.0;
+  if (detail.y != 0.0) {
+    float mean = dot(centre, luma);
+    for (int i = 0; i < ${DETAIL_CLARITY_TAPS.length}; i++)
+      mean += dot(texture(source, coordinate + detailClarity[i] * stride).rgb, luma);
+    mean /= ${glslFloat(DETAIL_CLARITY_TAPS.length + 1)};
+    delta += ${glslFloat(CLARITY_GAIN)} * detail.y * clamp(4.0 * base * (1.0 - base), 0.0, 1.0) * (base - mean);
+  }
+  if (detail.x > 0.0) delta += ${glslFloat(SHARPEN_GAIN)} * detail.x * (base - dot(gaussian, luma));
+  return clamp(denoised + delta, 0.0, 1.0);
+}`;
 
 const singleMain = `void main() {
   vec4 left = vec4(0.0);
@@ -95,6 +165,11 @@ uniform ivec4 curveCounts1;
 uniform ivec4 curveIdentity0;
 uniform ivec4 curveIdentity1;
 uniform vec2 neutralHsl;
+// (sharpen, clarity, denoise, denoise range factor) and the 1/720-image-height step in texture UV.
+uniform vec4 detail0;
+uniform vec4 detail1;
+uniform vec2 detailStep0;
+uniform vec2 detailStep1;
 
 const float alpha = 1.09929682680944;
 const float beta = 0.018053968510807;
@@ -106,6 +181,7 @@ float decode709(float v) {
 float encode709(float v) {
   return v < beta ? 4.5 * v : alpha * pow(v, 0.45) - (alpha - 1.0);
 }
+${detailFunction}
 vec3 scalarGrade(vec3 code, vec4 tone, vec3 extra, vec3 correction) {
   if (all(equal(correction, vec3(1.0))) && all(equal(tone, vec4(0.0, 0.0, 1.0, 1.0))) &&
       all(equal(extra, vec3(0.0)))) return code;
@@ -169,15 +245,19 @@ vec3 grade(vec3 code, vec4 tone, vec3 extra, int sourceIndex) {
               curve1_2Value(curve1_0Value(rgb.g)),
               curve1_3Value(curve1_0Value(rgb.b)));
 }
-vec3 sampleRgb(sampler2D source, vec2 coordinate) {
-  return texture(source, coordinate).rgb;
+vec3 sampleRgb(sampler2D source, vec2 coordinate, int sourceIndex) {
+  vec3 centre = texture(source, coordinate).rgb;
+  vec4 detail = sourceIndex == 0 ? detail0 : detail1;
+  if (all(equal(detail.xyz, vec3(0.0)))) return centre;
+  vec2 stride = sourceIndex == 0 ? detailStep0 : detailStep1;
+  return detailFilter(source, coordinate, centre, detail, stride);
 }
 vec3 sampleGraded(sampler2D source, vec4 tone, vec3 extra, float aspect, int sourceIndex) {
   vec2 local = uv;
   if (aspect > canvasAspect) local.y = (uv.y - 0.5) * aspect / canvasAspect + 0.5;
   else local.x = (uv.x - 0.5) * canvasAspect / aspect + 0.5;
   if (any(lessThan(local, vec2(0.0))) || any(greaterThan(local, vec2(1.0)))) return vec3(0.0);
-  return grade(sampleRgb(source, local), tone, extra, sourceIndex);
+  return grade(sampleRgb(source, local, sourceIndex), tone, extra, sourceIndex);
 }
 vec4 sampleSpatial(sampler2D source, vec4 tone, vec3 extra, float aspect,
                    vec3 rowU, vec3 rowV, vec4 crop, float neutral, int sourceIndex) {
@@ -188,7 +268,7 @@ vec4 sampleSpatial(sampler2D source, vec4 tone, vec3 extra, float aspect,
   // Crop IN is inclusive; OUT is exclusive, without refitting the image.
   if (original.x < crop.x || original.x >= 1.0 - crop.y ||
       original.y < crop.z || original.y >= 1.0 - crop.w) return vec4(0.0);
-  return vec4(grade(sampleRgb(source, vec2(original.x, 1.0 - original.y)), tone, extra, sourceIndex), 1.0);
+  return vec4(grade(sampleRgb(source, vec2(original.x, 1.0 - original.y), sourceIndex), tone, extra, sourceIndex), 1.0);
 }
 ${single ? singleMain : groupMain}`;
 

@@ -74,13 +74,13 @@ export class ProjectStore {
     return { value: JSON.parse(await readFile(filename, 'utf8')) as unknown, updatedAt: info.mtime.toISOString() };
   }
   private decode(id: string, value: unknown): ProjectDocument {
-    if (typeof value !== 'object' || value === null || !('schemaVersion' in value) || value.schemaVersion !== 13) {
+    if (typeof value !== 'object' || value === null || !('schemaVersion' in value) || value.schemaVersion !== 14) {
       const rawVersion =
         typeof value === 'object' && value !== null && 'schemaVersion' in value ? value.schemaVersion : undefined;
       const version =
         typeof rawVersion === 'string' || typeof rawVersion === 'number' ? String(rawVersion) : 'missing or invalid';
       throw new ServiceError(
-        `Unsupported project schema version ${version}; this build requires version 13 with clip-owned speed (constant or keyframes), track-owned Colour, Temperature, Tint, HSL ranges, curves and Opacity, ten required nullable keyframe channels, explicit clip spatial settings, identified music instances and per-track Ripple, transitions and fades. No migration is performed.`,
+        `Unsupported project schema version ${version}; this build requires version 14 with clip-owned speed (constant or keyframes), track-owned Colour, Temperature, Tint, HSL ranges, curves and Opacity, ten required nullable keyframe channels, explicit clip spatial and detail settings, identified music instances and per-track Ripple, transitions and fades. No migration is performed.`,
         422,
       );
     }
@@ -97,7 +97,7 @@ export class ProjectStore {
             .join('; ')
         : errorMessage(error);
     return new ServiceError(
-      `Cannot open this project: ${message} Restore a valid version 13 project, open it with a compatible PasCap version, or create a new project. The existing file was not changed.`,
+      `Cannot open this project: ${message} Restore a valid version 14 project, open it with a compatible PasCap version, or create a new project. The existing file was not changed.`,
       422,
     );
   }

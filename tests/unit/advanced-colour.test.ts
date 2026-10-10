@@ -25,6 +25,7 @@ import { colourAt } from '../../src/shared/composition.js';
 import { needsLayeredExport, planExport } from '../../src/shared/export.js';
 import { EMPTY_KEY_VALUES, KEYFRAME_SETTINGS } from '../../src/shared/keyframes.js';
 import { createClip, createLayer, createProject, projectSchema } from '../../src/shared/model.js';
+import { NEUTRAL_DETAIL } from '../../src/shared/detail.js';
 import { NEUTRAL_SPATIAL_POSE } from '../../src/shared/spatial.js';
 import { colourResetCommands } from '../../src/web/colour-reset.js';
 
@@ -34,7 +35,7 @@ function hueRgb(hue: number): RGB {
   return [value(0), value(-120), value(-240)];
 }
 
-describe('strict schema-13 static advanced row colour', () => {
+describe('strict schema-14 static advanced row colour', () => {
   it('creates deeply independent bands and curves for settings, rows and projects', () => {
     const a = createColourSettings(),
       b = createColourSettings();
@@ -315,6 +316,7 @@ describe('strict schema-13 static advanced row colour', () => {
           sourceFrame: 0,
           sourcePosition: 0,
           spatial: { ...NEUTRAL_SPATIAL_POSE, translateX: kind === 'byte' ? 0 : (128 - value * 255) / 4 },
+          detail: { ...NEUTRAL_DETAIL },
           colour: colourSchema.parse(settings),
           weight: 1,
           blendWeight: 1,
@@ -383,6 +385,7 @@ describe('strict schema-13 static advanced row colour', () => {
           sourceFrame: 0,
           sourcePosition: 0,
           spatial: { ...NEUTRAL_SPATIAL_POSE, translateX: 0.0625 },
+          detail: { ...NEUTRAL_DETAIL },
           colour: settings,
           weight: blendWeight,
           blendWeight,

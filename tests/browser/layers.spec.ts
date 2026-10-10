@@ -387,7 +387,7 @@ test('layered native UI export includes keyed opacity and colour in an immutable
   const { receiptUrl } = await freshExportLinks(page, request, accepted, 90_000);
   const receipt = (await (await request.get(receiptUrl)).json()) as ExportReceipt;
   const snapshot = projectSchema.parse(receipt.snapshot);
-  expect(snapshot.schemaVersion).toBe(13);
+  expect(snapshot.schemaVersion).toBe(14);
   expect(snapshot.layers).toHaveLength(2);
   expect(snapshot.layers[1]?.keyframes).toEqual(document.layers[1]?.keyframes);
   expect(snapshot.clips[1]).not.toHaveProperty('animation');

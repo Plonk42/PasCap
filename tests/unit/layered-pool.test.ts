@@ -9,6 +9,7 @@ import {
   NEUTRAL_COLOUR,
   type ColourSettings,
 } from '../../src/shared/colour.js';
+import { NEUTRAL_DETAIL } from '../../src/shared/detail.js';
 import { NEUTRAL_SPATIAL_POSE, type SpatialPose } from '../../src/shared/spatial.js';
 
 const target = { width: 37, height: 23 };
@@ -37,6 +38,7 @@ function source(
       sourceFrame: 3,
       sourcePosition: 3.25,
       spatial: { ...NEUTRAL_SPATIAL_POSE, ...pose },
+      detail: { ...NEUTRAL_DETAIL },
       colour,
       weight: blendWeight,
       blendWeight,

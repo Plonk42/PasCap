@@ -10,6 +10,7 @@ import { gradePixel, NEUTRAL_COLOUR, type ColourSettings, type RGB } from '../..
 import { LAYERED_EXPORT_RESOURCES, planLayeredExport } from '../../src/shared/export.js';
 import { mediaAssetSchema } from '../../src/shared/media.js';
 import { createClip, createProject } from '../../src/shared/model.js';
+import { NEUTRAL_DETAIL } from '../../src/shared/detail.js';
 import { NEUTRAL_SPATIAL_POSE, type SpatialPose } from '../../src/shared/spatial.js';
 import type { PreviewLayer } from '../../src/shared/timeline.js';
 import * as timeline from '../../src/shared/timeline.js';
@@ -34,6 +35,7 @@ function sample(pose: Partial<SpatialPose> = {}, overrides: Partial<PreviewLayer
     sourceFrame: 7,
     sourcePosition: 7.5,
     spatial: { ...NEUTRAL_SPATIAL_POSE, ...pose },
+    detail: { ...NEUTRAL_DETAIL },
     colour: { ...NEUTRAL_COLOUR },
     weight: 1,
     blendWeight: 1,
