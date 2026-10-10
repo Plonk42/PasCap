@@ -177,6 +177,28 @@ test('navigation, natural names, filtering and selection send paths only and nev
   expect(memory.snapshot().media.videoIds).toEqual([ready.id]);
 });
 
+test('Shift-click selects and deselects a range of recordings, with the registration bar always visible', async ({
+  page,
+}) => {
+  const names = ['A.mp4', 'B.mp4', 'C.mp4', 'D.mp4', 'E.mp4', 'F.mp4', 'G.mp4', 'H.mp4', 'I.mp4', 'J.mp4'];
+  const listing = directory(names.map((name) => ({ kind: 'video', name, path: `/approved/${name}`, size: 1024 ** 2 })));
+  await page.route('**/api/footage/roots', (route) => route.fulfill({ json: { roots: [root] } }));
+  await page.route(/\/api\/footage\?/, (route) => route.fulfill({ json: listing }));
+  await openImport(page);
+  const box = (name: string) => page.getByRole('checkbox', { name: `Select recording ${name}` });
+  await box('B.mp4').click();
+  await box('E.mp4').click({ modifiers: ['Shift'] });
+  await expect(page.locator('.footage-registration')).toContainText('4 selected');
+  await box('J.mp4').click({ modifiers: ['Shift'] });
+  await expect(page.locator('.footage-registration')).toContainText('9 selected');
+  await box('G.mp4').click({ modifiers: ['Shift'] });
+  await expect(page.locator('.footage-registration')).toContainText('5 selected');
+  await expect(box('H.mp4')).not.toBeChecked();
+  await expect(box('G.mp4')).not.toBeChecked();
+  await expect(box('F.mp4')).toBeChecked();
+  await expect(page.getByRole('button', { name: 'Register selected recordings' })).toBeInViewport({ ratio: 1 });
+});
+
 test('partial registration and queue failures preserve accepted sources and report missing originals without a hidden retry', async ({
   page,
 }) => {

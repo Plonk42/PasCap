@@ -31,6 +31,7 @@ export function FootageBrowser({ busy, onRegister, onResult }: Readonly<Props>) 
   const [registering, setRegistering] = useState(false);
   const pending = useRef(false);
   const mounted = useRef(false);
+  const anchor = useRef<string | null>(null);
   const root = roots.find((item) => item.id === rootId);
   const blocked = busy || registering;
   const loading = loadingRoots || loadingDirectory;
@@ -88,6 +89,7 @@ export function FootageBrowser({ busy, onRegister, onResult }: Readonly<Props>) 
 
   const navigate = (next: string | undefined): void => {
     setDirectory(next);
+    anchor.current = null;
     setQuery('');
     setDirectoryError('');
   };
@@ -106,6 +108,17 @@ export function FootageBrowser({ busy, onRegister, onResult }: Readonly<Props>) 
       return;
     }
     setSelected(next);
+  };
+  const toggleRecording = (path: string, shift: boolean): void => {
+    const from = shift && anchor.current ? videos.findIndex((item) => item.path === anchor.current) : -1;
+    const to = videos.findIndex((item) => item.path === path);
+    anchor.current = path;
+    if (from < 0 || to < 0) {
+      toggle([path], selected.has(path));
+      return;
+    }
+    const range = videos.slice(Math.min(from, to), Math.max(from, to) + 1).map((item) => item.path);
+    toggle(range, selected.has(path));
   };
   const register = async (): Promise<void> => {
     if (blocked || pending.current || !selected.size) return;
@@ -255,7 +268,9 @@ export function FootageBrowser({ busy, onRegister, onResult }: Readonly<Props>) 
                           aria-label={`Select recording ${item.name}`}
                           checked={selected.has(item.path)}
                           disabled={blocked}
-                          onChange={() => toggle([item.path], selected.has(item.path))}
+                          onChange={(event) =>
+                            toggleRecording(item.path, (event.nativeEvent as MouseEvent).shiftKey === true)
+                          }
                         />
                         <Icon name="video" size={17} />
                         <span>{item.name}</span>

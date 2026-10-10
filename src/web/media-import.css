@@ -106,10 +106,30 @@
 }
 
 .footage-registration {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 8px;
+  padding: 8px 0;
+  background: var(--surface);
+}
+
+.import-dialog .footage-browser {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.import-dialog .footage-entry-list {
+  flex: 1 1 auto;
+  min-height: 96px;
+  max-height: none;
+}
+
+.footage-recording {
+  user-select: none;
 }
 
 .footage-registration > span,
