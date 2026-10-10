@@ -533,7 +533,10 @@ That pipeline remains sequential, with at most one original decoder, two interme
 encoder, and at most three native video children per pass. Each enabled populated
 track first renders a premultiplied RGBA16 group from at most two RGB sources;
 subsequent source-over passes merge group and lower accumulator without regrading
-or applying another opacity multiplier. Final H.264 is encoded once.
+or applying another opacity multiplier. The last pass encodes H.264 directly from its
+composited frames, never through a lossless copy of the finished timeline: the final
+source-over as one stream, or a single track's spans as consecutive chunks joined
+without re-encoding, like static export.
 Four reusable raw buffers (two RGB8 and two RGBA16) use **22 bytes/pixel =
 182,476,800 bytes at UHD**; two reusable **65³ Float32 LUTs** add
 **6,591,000 bytes**, with native codec/pipe/filter memory and selected audio PCM
@@ -559,7 +562,8 @@ Results are byte-identical to in-process composition.
 
 At most two retained lossless clip files and **three** timeline representations
 coexist: lower accumulator, track group and output (or group spans and their joined
-group). A span collection counts as one. Inputs are deleted after their serial pass.
+group). A span collection counts as one, including the last pass's H.264 output.
+Inputs are deleted after their serial pass.
 The final mixed audio and MP4 remain through verification. Scratch grows
 with those duration-dependent representations, not simultaneously decoded
 originals: these are concurrency bounds, not a fixed memory/disk-in-GB promise.
