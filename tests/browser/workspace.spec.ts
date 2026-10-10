@@ -449,6 +449,33 @@ test('an accepted export remains in Activity when status refresh fails, without 
   await expect(page.getByRole('button', { name: 'Open activity' })).toBeFocused();
 });
 
+test('only a running export shows a time-remaining line, a placeholder before enough progress', async ({ page }) => {
+  const job = (id: string, state: MediaJob['state'], kind: MediaJob['kind']): MediaJob => ({
+    id,
+    kind,
+    label: `${id} label`,
+    state,
+    progress: state === 'running' ? 0.1 : 0,
+    message: '',
+    createdAt: '2026-10-03T10:00:00Z',
+    finishedAt: null,
+    outputUrl: null,
+    receiptUrl: null,
+  });
+  const jobs = [
+    job('running-export', 'running', 'export'),
+    job('queued-export', 'queued', 'export'),
+    job('running-prepare', 'running', 'prepare'),
+  ];
+  await page.route('**/api/jobs', (route) => route.fulfill({ json: { jobs } }));
+  await page.getByRole('button', { name: 'Open activity' }).click();
+  const row = (id: string) => page.locator('.activity-job').filter({ hasText: `${id} label` });
+  await expect(row('running-export').locator('.activity-job-eta')).toHaveText('Estimating time left…');
+  await expect(row('queued-export').locator('.activity-job-eta')).toHaveCount(0);
+  await expect(row('running-prepare').locator('.activity-job-eta')).toHaveCount(0);
+  await expect(page.locator('.activity-job-eta[aria-live]')).toHaveCount(0);
+});
+
 test('rejected exports stay in their dialog with an explicit recovery action and no native output link', async ({
   page,
 }) => {

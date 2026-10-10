@@ -798,8 +798,14 @@ draft database or interrupted-render resume is claimed.
 Activity is a nonmodal drawer, with running first, FIFO queued jobs, then history by
 completion date. It includes video/audio preparation, reference renders, exports,
 failures and cancellations. Progress is numeric/bar-based; settled outcomes are
-announced without reading every progress poll aloud. Escape closes a focused drawer
-and returns focus to Activity, without pausing the editor or native job.
+announced without reading every progress poll aloud. A **running export** also shows
+a coarse **time remaining** line (for example "about 5 min left") below its bar, or
+"Estimating time left…" until at least 15 s and 2 % of progress have been observed.
+It extrapolates the average progress rate observed in this browser over the last two
+minutes, so it adapts when a phase is faster or slower and lengthens during a plateau;
+it is an estimate, not a guarantee. Queued, cancelling and settled jobs and
+preparation jobs show none, and the line is plain text, not a live region. Escape closes
+a focused drawer and returns focus to Activity, without pausing the editor or native job.
 
 Export shows the project title, contextual duration and quality up front, then an
 **Output name** field (default project title + quality, validated as 1–100

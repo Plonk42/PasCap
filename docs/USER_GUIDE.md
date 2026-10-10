@@ -568,8 +568,10 @@ snapshot: later edits cannot change that render. The **Output name** field defau
 to the project title plus quality (for example `Flight · 720p`) until edited; it
 labels the job and names the downloaded `.mp4` (1–100 characters, no slashes or
 control characters). It never chooses a folder or overwrites a file: each export
-keeps its own output directory. Activity exposes progress,
-cancellation and verified MP4/receipt links. **Cancelling…** is pending until
+keeps its own output directory. Activity exposes progress, a rough
+time remaining for a running export ("about 5 min left", shown once enough progress has
+been observed, never a guarantee), cancellation and verified MP4/receipt links.
+**Cancelling…** is pending until
 confirmed; a failed status read keeps known jobs and never resubmits the export.
 Successful outputs survive later failures/restarts; interrupted exports are not
 resumed or published as finished. Long 4K/composited renders can need substantial
