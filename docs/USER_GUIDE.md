@@ -254,7 +254,7 @@ adds green. Nonzero settings intentionally colour greys. The common gain formula
 runs in linear RGB before Exposure; it preserves neutral-white linear luminance
 before clipping only, not final brightness or arbitrary coloured pixels.
 
-Sliders, exact fields and double-click-the-name reset to 0 use the same main/stored
+Sliders, exact fields and the **Reset** icon beside each setting's name (or double-click the name) reset it to 0 and use the same main/stored
 control rules as other scalar Colour settings. Main diamonds come with adjacent per-setting Previous/Next buttons; its header visits the
 colour/Opacity union, while main and stored-setting chip arrows visit individual
 channels. Without keyframes, edit the track base even on an empty

@@ -22,21 +22,70 @@ interface RangeSettingProps {
   exact?: Pick<NumberFieldProps, 'resetKey' | 'validate'>;
 }
 
+/** Compact reset beside a setting's name; `blocked` is the reason it cannot apply, else it resets that setting alone. */
+export function ResetButton({
+  name,
+  blocked,
+  onReset,
+}: Readonly<{ name: string; blocked: string | null; onReset: () => void }>) {
+  return (
+    <button
+      type="button"
+      className="setting-reset"
+      aria-label={`Reset ${name}`}
+      aria-disabled={blocked !== null}
+      tabIndex={blocked === null ? 0 : -1}
+      title={blocked ?? `Reset ${name}`}
+      onClick={() => {
+        if (blocked === null) onReset();
+      }}
+    >
+      <Icon name="reset" size={11} />
+    </button>
+  );
+}
+
 /**
- * A setting's visible name; double-clicking it resets that control. It is not a focusing label:
- * moving focus could scroll the control between the two clicks. The inputs carry their own names.
+ * A setting's visible name with its reset button; double-clicking the name resets it too. The name is
+ * not a focusing label: moving focus could scroll the control between the two clicks.
  */
 export function ResetLabel({
   htmlFor,
   title,
+  name,
+  blocked,
   onReset,
   children,
-}: Readonly<{ htmlFor: string; title?: string; onReset: () => void; children: ReactNode }>) {
+}: Readonly<{
+  htmlFor: string;
+  title?: string;
+  name: string;
+  blocked: string | null;
+  onReset: () => void;
+  children: ReactNode;
+}>) {
   return (
-    <span className="setting-name" id={`${htmlFor}-name`} title={title} onDoubleClick={onReset}>
-      {children}
+    <span className="setting-reset-group">
+      <span
+        className="setting-name"
+        id={`${htmlFor}-name`}
+        title={title}
+        onDoubleClick={() => {
+          if (blocked === null) onReset();
+        }}
+      >
+        {children}
+      </span>
+      <ResetButton name={name} blocked={blocked} onReset={onReset} />
     </span>
   );
+}
+
+/** Why a reset cannot apply, or null when it can. Neutral values add no history entry. */
+export function resetBlocked(neutral: boolean, disabled: boolean, animatedLocked = false): string | null {
+  if (animatedLocked) return 'Add a keyframe to edit this setting before resetting it.';
+  if (disabled) return 'This setting cannot be edited right now.';
+  return neutral ? 'Already at its default value.' : null;
 }
 
 /** Visible without hover: an animated value without a keyframe here is read-only until its diamond captures one. */
@@ -80,9 +129,9 @@ export function RangeSettingControl({
         <ResetLabel
           htmlFor={id}
           title={hint}
-          onReset={() => {
-            if (!disabled && value !== neutral) onCommit(neutral);
-          }}
+          name={name}
+          blocked={resetBlocked(value === neutral, disabled, Boolean(locked))}
+          onReset={() => onCommit(neutral)}
         >
           {definition.label}
           {scope}

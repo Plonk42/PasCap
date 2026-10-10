@@ -121,6 +121,40 @@
   color: #c4e9ff;
 }
 
+/* The reset icon sits in the free space after a setting's name; negative margins keep row height unchanged. */
+.setting-reset-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+}
+
+.setting-reset {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
+  margin: -4px 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  opacity: 0.6;
+  cursor: pointer;
+}
+
+.setting-reset:is(:hover, :focus-visible) {
+  opacity: 1;
+}
+
+.setting-reset[aria-disabled='true'] {
+  opacity: 0.25;
+  cursor: default;
+}
+
 .clip-speed-rate-field {
   display: grid;
   min-width: 0;

@@ -162,7 +162,7 @@ test('all participants reuse their main control bounds and resets with one exact
     const fieldBox = (await field.boundingBox())!;
     expect(fieldBox.x).toBeGreaterThanOrEqual(sliderBox.x + sliderBox.width);
     expect(Math.abs(fieldBox.y + fieldBox.height / 2 - (sliderBox.y + sliderBox.height / 2))).toBeLessThanOrEqual(2);
-    await expect(row.getByRole('button', { name: `Reset ${name}`, exact: true })).toHaveCount(0);
+    await expect(row.getByRole('button', { name: `Reset ${name}`, exact: true })).toHaveCount(1);
   }
   await expect(row.locator('output')).toHaveCount(0);
   const before = await current(page);

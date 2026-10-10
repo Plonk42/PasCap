@@ -22,6 +22,7 @@ import { Icon } from './icons.js';
 import { InspectorSection } from './InspectorSection.js';
 import { livePreview } from './live-preview.js';
 import { NumberField } from './NumberField.js';
+import { ResetLabel, resetBlocked } from './SettingValueControl.js';
 import type { DraftPreview } from './Timeline.js';
 import { ValueControl } from './ValueControl.js';
 
@@ -449,8 +450,16 @@ export function HslRangesSection(props: Readonly<Props>) {
           });
           return (
             <div className="advanced-hsl-control" key={control.key}>
-              <span>{control.label}</span>
+              <ResetLabel
+                htmlFor={`${context}-${control.key}`}
+                name={`HSL ${control.key}`}
+                blocked={resetBlocked(layer.colour.hsl[band][control.key] === 0, disabled)}
+                onReset={() => commit(withValue(0))}
+              >
+                {control.label}
+              </ResetLabel>
               <ValueControl
+                id={`${context}-${control.key}`}
                 aria-label={`HSL ${control.key}`}
                 value={layer.colour.hsl[band][control.key]}
                 min={control.min}

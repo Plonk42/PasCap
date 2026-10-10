@@ -32,7 +32,7 @@ import {
   toggleSpatialChannel,
 } from './spatial-editor.js';
 import { inspectSpatialKeyframe, reconcileSpatialInspection, type SpatialInspection } from './spatial-navigation.js';
-import { LockedCue, ResetLabel } from './SettingValueControl.js';
+import { LockedCue, ResetLabel, resetBlocked } from './SettingValueControl.js';
 import { ValueControl } from './ValueControl.js';
 
 interface Props {
@@ -194,10 +194,13 @@ function PoseFields({
               <ResetLabel
                 htmlFor={fieldId}
                 title={`Double-click to reset ${control.label}`}
-                onReset={() => {
-                  if (!locked && onReset && values[control.key] !== NEUTRAL_SPATIAL_POSE[control.key])
-                    onReset(control.key);
-                }}
+                name={control.label}
+                blocked={resetBlocked(
+                  values[control.key] === NEUTRAL_SPATIAL_POSE[control.key],
+                  locked || !onReset,
+                  readOnly?.(control.key) ?? false,
+                )}
+                onReset={() => onReset?.(control.key)}
               >
                 {control.label}
                 {unit}
