@@ -94,7 +94,7 @@ PasCap is a solo, pre-release project: optimize for fast iteration. Details are 
   channel is nonnull (zero is enabled), sharing the central off-duration inspection cursor. Each expanded
   section has one keyframe line (count, one Previous/Next pair over the same set, Reset), hidden
   while collapsed. The pair: Colour visits Opacity/nine scalar
-  colour keyframes; Speed visits **all retained custom speed source keyframes of the
+  colour/HDR keyframes; Speed visits **all retained custom speed source keyframes of the
   selected clip**, including off-trim keyframes and original exclusive OUT; Speed's
   single setting has no extra per-setting arrows beside its diamond. Clip source navigation
   previews the nearest image mapped by authoritative retiming, using an independent
@@ -107,8 +107,8 @@ PasCap is a solo, pre-release project: optimize for fast iteration. Details are 
   Navigation never edits,
   saves or creates history. See [speed/audio](../docs/SPEED_AND_AUDIO.md) and
   [spatial transforms](../docs/design/SPATIAL_TRANSFORMS.md).
-- Strict schema 14 requires complete row Colour with nine scalar fields plus
-  `colour.hsl` (eight complete named bands) and `colour.curves` (master/red/green/blue
+- Strict schema 15 requires complete row Colour with nine graded scalar fields,
+  `hdr`, `colour.hsl` (eight complete named bands) and `colour.curves` (master/red/green/blue
   2–16-point arrays). HSL/curves remain static, not animation channels. All Colour
   is row-owned, keyed or not; clips have no colour/correction. Neutral creators
   deep-clone nested structures; never repair missing saved fields. Advanced resets
@@ -124,7 +124,7 @@ PasCap is a solo, pre-release project: optimize for fast iteration. Details are 
   curves → fades/coverage. CPU/reference/native/GPU use the same math and order.
   Nonzero settings intentionally colour greys; normalization preserves neutral-white
   linear luminance before clipping only, not arbitrary pixels or final output.
-  No Kelvin/HDR/AWB. Main/stored slider/exact-field/reset/diamond/navigation retain
+  No Kelvin/HDR output/AWB. Main/stored slider/exact-field/reset/diamond/navigation retain
   explicit capture, row ownership, empty-row editing and one-step gestures.
   Compare bypasses all Colour, including Temperature/Tint, and clip Detail, never coverage or geometry.
   See [Temperature and Tint](../docs/design/TEMPERATURE_AND_TINT.md).
@@ -169,12 +169,17 @@ clarity −1–1, denoise 0–1 }`, neutral 0, with no keyframes or track channe
   Compare bypasses Colour and Detail. Clip → Detail is the third section, collapsed
   by default, with live slider preview and one Undo per release. See
   [detail filters](../docs/design/DETAIL_FILTERS.md).
+- Track Colour **HDR** (`colour.hdr` 0–1, eleventh keyframe channel `hdr`) is an SDR
+  local tone-mapping look evaluated at project time but applied in the shared detail
+  kernel on source taps before grading (Denoise → HDR → Clarity → Sharpen), excluded
+  from the per-pixel grade and LUT identity; nonzero or keyed HDR needs composited
+  export. See [detail filters](../docs/design/DETAIL_FILTERS.md).
 - Final approved [#67](https://github.com/Plonk42/PasCap/issues/67): **Opacity** is
   one row-owned setting, not a clip setting. `VideoLayer.opacity` is a required
   number in 0–1; new tracks start at 1 (100%). No saved `clip.opacity` field.
-  The sole row Opacity key channel is `opacity`; points require all ten nullable
+  The sole row Opacity key channel is `opacity`; points require all eleven nullable
   channels: `opacity`, `temperature`, `tint`, `exposure`, `brightness`,
-  `contrast`, `hue`, `saturation`, `highlights`, `shadows`. Reject missing row opacity,
+  `contrast`, `hue`, `saturation`, `highlights`, `shadows`, `hdr`. Reject missing row opacity,
   saved `clip.opacity` and old `clipOpacity`/`layerOpacity` channels; do not supply
   compatibility defaults. `layer.opacity` is the valid sole stored row value.
   Put the single **Opacity** slider/diamond/navigation in **Track → Colour** beside
@@ -192,10 +197,10 @@ clarity −1–1, denoise 0–1 }`, neutral 0, with no keyframes or track channe
   $\mathrm{result} = C + \mathrm{lower}(1 - A)$, evaluating row Opacity for each
   source with no additional layer multiplier; $m_i$ is spatial source coverage,
   including opaque neutral letterboxing. Black fades never reduce that coverage.
-  Version-1 export receipts require strict v14 snapshots and captured audio-source/
+  Version-1 export receipts require strict v15 snapshots and captured audio-source/
   instance-plan arrays; receipt, registry/proxy/PCM and benchmark format versions
   remain independent and unchanged.
-  Reject and preserve incompatible v1–v13 projects/receipt snapshots; require recreation,
+  Reject and preserve incompatible v1–v14 projects/receipt snapshots; require recreation,
   without migrations, compatibility defaults or automatic deletion.
 - Music is a required 0–8 array of independently identified instances, never null
   or singular. Duration is the maximum of all video and music OUTs. After the last

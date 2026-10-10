@@ -27,7 +27,7 @@ import {
   vertexShader,
 } from './shaders.js';
 
-const DETAIL_UNIFORMS = ['detail0', 'detail1', 'detailStep0', 'detailStep1'];
+const DETAIL_UNIFORMS = ['detail0', 'detail1', 'detailStep0', 'detailStep1', 'hdr'];
 
 type GradePath = 'full' | 'single' | 'scalar';
 
@@ -334,7 +334,7 @@ export class Compositor {
         CURVE_CHANNELS.some((channel) => !isIdentityCurve(source.settings.curves[channel])),
     );
     const advancedPath = group.clips.length === 1 ? 'single' : 'full';
-    const detailed = sources.some((source) => !isNeutralDetail(source.detail));
+    const detailed = sources.some((source) => !isNeutralDetail(source.detail) || source.settings.hdr !== 0);
     this.#useGrade(advanced ? advancedPath : 'scalar', detailed);
     const mappings = sources.map((source) =>
       compileSpatialMapping(
@@ -412,6 +412,7 @@ export class Compositor {
         gl.uniform2f(this.#location(`detailStep${index}`), stepU, stepV);
       }
     }
+    if (detailed) gl.uniform2f(this.#location('hdr'), sources[0]!.settings.hdr, sources[1]!.settings.hdr);
     gl.uniform2f(
       this.#location('coverage'),
       sources[0]!.opacity * sources[0]!.blendWeight,

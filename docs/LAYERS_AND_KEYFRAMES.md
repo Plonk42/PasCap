@@ -1,7 +1,8 @@
-# Video tracks, shared keyframes and source review · project v14
+# Video tracks, shared keyframes and source review · project v15
 
-Required video track Colour includes nine scalar fields, including **Temperature** and
-**Tint**, plus static **HSL ranges** and **Colour curves**. Temperature/Tint use
+Required video track Colour includes nine graded scalar fields, including **Temperature** and
+**Tint**, the **HDR** look (0–1, applied before grading with the clip
+[detail filters](design/DETAIL_FILTERS.md#hdr-look)), plus static **HSL ranges** and **Colour curves**. Temperature/Tint use
 −1…1, neutral 0; positive values warm/add magenta respectively and intentionally
 colour greys. Their normalized linear gains run before Exposure. See
 [Temperature and Tint](design/TEMPERATURE_AND_TINT.md).
@@ -106,10 +107,10 @@ original-source keyframes. All shared track keyframes use absolute integer
 clip on that track, including clips from different recordings and both sources
 in that track's dissolve. They do not restart at a clip's IN, start or boundary.
 
-Schema 14 requires `layers[].keyframes` as ordered `{ frame, interpolation, values }`
+Schema 15 requires `layers[].keyframes` as ordered `{ frame, interpolation, values }`
 keyframes, with **at most 256 keyframes per track**. Frames are unique, strictly ascending,
 non-negative and at most 2,147,483,647. Every keyframe's `values` object (`LayerKeyValues`)
-requires **all ten nullable fields** below: a number enables that setting; `null` leaves it disabled. Omitted/unknown
+requires **all eleven nullable fields** below: a number enables that setting; `null` leaves it disabled. Omitted/unknown
 fields and all-null keyframes are invalid, not repaired with defaults.
 
 | Channel                     | Value          | Value when this channel has no track keyframes            |
@@ -124,9 +125,10 @@ fields and all-null keyframes are invalid, not repaired with defaults.
 | Saturation (`saturation`)   | 0–2            | The track's saved colour value                            |
 | Highlights (`highlights`)   | −1 to +1       | The track's saved colour value                            |
 | Shadows (`shadows`)         | −1 to +1       | The track's saved colour value                            |
+| HDR (`hdr`)                 | 0 to 1         | The track's saved colour value, initially 0               |
 
-The exact ten required value fields are `opacity`, `temperature`, `tint`, `exposure`,
-`brightness`, `contrast`, `hue`, `saturation`, `highlights` and `shadows`; every
+The exact eleven required value fields are `opacity`, `temperature`, `tint`, `exposure`,
+`brightness`, `contrast`, `hue`, `saturation`, `highlights`, `shadows` and `hdr`; every
 track channel is appearance-only and never changes timing.
 Clip documents contain independent **constant or custom-keyframed**
 speed, required `spatial: { base, keyframes }` and static `detail` (Sharpen, Clarity,
@@ -153,7 +155,7 @@ it; track keyframes never change clip durations.
 
 ## Independent channel interpolation
 
-Enabled settings are independent, including between the nine scalar colour parameters.
+Enabled settings are independent, including between the nine scalar colour parameters and HDR.
 Each keyframe's easing is shared by its enabled settings, but **each channel interpolates
 to its own next keyframe with that setting enabled**, skipping keyframes where that channel is null.
 For example, Exposure at frames 10 and 30 interpolates across a Contrast-only keyframe
@@ -210,7 +212,7 @@ Colour, Speed and Transform always show their capture diamonds while the section
   disable actions; hollow status itself cannot.
 
 Each section's keyframe line has one native **Previous/Next** pair, beside the count of the keyframes it visits.
-Colour visits the union of Opacity and nine scalar colour keyframes. Speed visits all
+Colour visits the union of Opacity, nine scalar colour and HDR keyframes. Speed visits all
 retained custom speed source keyframes of the selected clip, including off-trim
 keyframes and the original exclusive OUT, previewing the nearest mapped image through
 authoritative `PlacedClip.retiming`. Transform likewise visits all retained
@@ -518,14 +520,14 @@ Export reads one original at a time through the shared backpressured frame mappe
 The plain static single-track path retains at most two lossless clips, two
 intermediate decoders and one reusable RGB frame (24.9 MB UHD), plus native memory.
 
-The static fast path is eligible only with neutral HSL/identity colour curves and one enabled video track with Opacity 1,
+The static fast path is eligible only with neutral HSL/identity colour curves, HDR 0 and one enabled video track with Opacity 1,
 no track keyframes, exactly neutral clip spatial bases and no spatial keyframes, neutral clip
 [detail filters](design/DETAIL_FILTERS.md), a zero first
 start and no internal gaps, covering the **full project duration**. Music beyond
 video OUT requires composited export's trailing black spans,
 not a held last image. Ripple itself is not
 an eligibility requirement. Other valid timelines, including any (even
-neutral) track keyframe or any spatial edit/keyframe (even neutral keyframes), use the generalized
+neutral) track keyframe, nonzero HDR or any spatial edit/keyframe (even neutral keyframes), use the generalized
 composited path; static planning rejects them.
 That pipeline remains sequential, with at most one original decoder, two intermediate readers and one
 encoder, and at most three native video children per pass. Each enabled populated
@@ -582,18 +584,18 @@ not all sources or loop repetitions. It grows with duration and is additional to
 the unchanged video raw-buffer/child/LUT bounds above. Cancellation/failure removes
 only owned scratch, never originals, saved projects or successful outputs.
 
-Schema **v14 is strict**, including complete required video track `colour` with Temperature/Tint and static HSL/curves, no clip colour/correction fields, and clip `spatial` base/eight-value
+Schema **v15 is strict**, including complete required video track `colour` with Temperature/Tint/HDR and static HSL/curves, no clip colour/correction fields, and clip `spatial` base/eight-value
 source-frame keyframes and required unique `media.videoIds` / `media.audioIds`
 arrays, at most 10,000 IDs each, and all required per-track settings. Project-level
 transitions/fades, saved `clip.opacity` and old `clipOpacity`/`layerOpacity` keyframe
 channels are not accepted. `VideoLayer.opacity` is the required sole stored track
 value, a number in 0–1; 1 is a new-track initial value, not a missing-field default.
-Keyframes require exactly the ten nullable fields listed above, including `opacity`, `temperature` and `tint`.
+Keyframes require exactly the eleven nullable fields listed above, including `opacity`, `temperature`, `tint` and `hdr`.
 The required `music` array contains 0–8 independent music tracks with unique required
 IDs and complete source IN/OUT/start/duration/gain/fades/loop fields; `[]` without
 music, never a null/singular value or default. Version-1 export receipts require
-a strict v14 snapshot plus captured audio-source/instance-plan arrays.
-Older v1–v13 project documents and export receipt snapshots remain unchanged/incompatible;
+a strict v15 snapshot plus captured audio-source/instance-plan arrays.
+Older v1–v14 project documents and export receipt snapshots remain unchanged/incompatible;
 there are no migrations, compatibility fallback/default fields or automatic deletion
 of projects, receipts or successful videos. Create a new project and deliberately
 import its media; registered media and currently verified ready proxies remain reusable.

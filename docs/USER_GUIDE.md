@@ -13,21 +13,21 @@ inherit the shared media registry. Importing the same original into another proj
 deliberately adds it to that project's bin and reuses eligible verified proxies.
 Removing a clip or music track does not remove the imported recording.
 
-Projects use **strict format v14**, with complete required video track colour and clip spatial base/per-setting
+Projects use **strict format v15**, with complete required video track colour and clip spatial base/per-setting
 source-frame keyframes and a required `music` array of 0–8 independent
 music tracks and unique required IDs (`[]` without music), every video track's Ripple, transitions and
 opening/closing fades and required numeric `opacity` in 0–1 (1 on new tracks),
-with ten nullable animation channels, in control order: `opacity`,
+with eleven nullable animation channels, in control order: `opacity`,
 `temperature`, `tint`, `exposure`, `brightness`, `contrast`, `hue`, `saturation`,
-`highlights`, `shadows`. Clip speed is constant or a 1–256-keyframe custom curve.
-Video track Colour requires Temperature/Tint bases and static
+`highlights`, `shadows`, `hdr`. Clip speed is constant or a 1–256-keyframe custom curve.
+Video track Colour requires Temperature/Tint/HDR bases and static
 HSL/curves; missing fields and saved clip colour/correction are invalid.
 Track `opacity` is the sole saved Opacity value; saved `clip.opacity` and old
 `clipOpacity`/`layerOpacity` keyframe channels are invalid, not ignored or defaulted.
-v1–v13 project documents and receipt snapshots
+v1–v14 project documents and receipt snapshots
 stay on disk but are incompatible: there is no migration, compatibility default,
 null fallback, old-format reader, automatic repair or deletion. Export receipts
-remain version 1 with a strict v14 snapshot and required audio-source/instance-plan arrays.
+remain version 1 with a strict v15 snapshot and required audio-source/instance-plan arrays.
 Create a new project and import its media deliberately. Finished videos remain
 untouched. **Delete project** requires confirmation and deletes only the saved
 project document, not originals, the shared registry/proxy cache or exports/receipts.
@@ -199,7 +199,7 @@ All static and keyed Colour belongs to its video track, not the clip.
 Find its single native slider/exact numeric field in **Track → Colour**, with its
 capture diamond and adjacent per-setting Previous/Next buttons, alongside Temperature, Tint, Exposure,
 Brightness, Contrast, Hue, Saturation,
-Highlights and Shadows.
+Highlights, Shadows and HDR.
 Main and stored sliders/exact fields use **0–100%**, neutral **100%**.
 Saved track `opacity` and keyframe values remain **0–1**; this is UI conversion only, not a schema change.
 Without Opacity keyframes, either value control edits the track's saved `opacity` and works even
@@ -228,8 +228,8 @@ Colour, Speed and Transform always show their capture diamonds while the section
 
 Colour and Transform capture buttons have adjacent per-setting **Previous/Next** buttons
 because not every setting is enabled at every keyframe; Speed has a single setting, so its
-keyframe line's pair is enough. Each section's keyframe line counts the keyframes its single **Previous/Next** pair visits. Colour visits any Opacity or scalar
-colour keyframe. Speed visits **all retained custom
+keyframe line's pair is enough. Each section's keyframe line counts the keyframes its single **Previous/Next** pair visits. Colour visits any Opacity, scalar
+colour or HDR keyframe. Speed visits **all retained custom
 speed source keyframes of the selected clip**, including off-trim keyframes and the
 original exclusive OUT, previewing the nearest mapped image.
 Transform likewise visits all retained source keyframes. Speed and
@@ -271,6 +271,14 @@ protection does not undo Temperature/Tint colouring. Ungraded comparison bypasse
 all these Colour stages, retaining Opacity and geometry. Exact processing:
 [Temperature/Tint](design/TEMPERATURE_AND_TINT.md) and
 [HSL/curves](design/HSL_AND_CURVES.md).
+
+### HDR
+
+**HDR**, last in **Track → Colour**, opens shadows and recovers highlights while
+boosting local detail, like a tone-mapped look; **0** is off and **1** is the strongest.
+It is an SDR effect, not HDR output, and can be keyframed like the other Colour
+settings. Nonzero or keyed HDR makes export use the slower composited path.
+Ungraded comparison bypasses it. Details: [detail filters](design/DETAIL_FILTERS.md#hdr-look).
 
 ### Compare graded and ungraded preview
 
@@ -421,9 +429,9 @@ and a directly visible shared keyframe list. The toolbar's **Animation help** co
 animation and keyframe-timing guidance. **Clip** keeps source/clip settings and playhead
 Speed/Transform controls; **Track → Colour** keeps Opacity and Colour controls.
 All shared track keyframes use absolute project frames and affect every clip on that track.
-Ten settings can be keyed independently:
-Opacity (`opacity`) and the nine scalar colour controls, including
-Temperature and Tint. HSL/curves remain static and Speed is clip-only. At most 256
+Eleven settings can be keyed independently:
+Opacity (`opacity`), the nine scalar colour controls, including
+Temperature and Tint, and HDR (`hdr`). HSL/curves remain static and Speed is clip-only. At most 256
 shared keyframes are allowed per video track.
 
 - Each main setting has a **hollow ◇ / filled ◆ diamond**
@@ -615,7 +623,7 @@ indicate adjusted settings without expanding everything. Animated channels use
 an amber curve/diamond: dashed between keyframes, filled when the setting is enabled
 at the playhead. **Animation help** in the Keyframes toolbar explains scope,
 capture and keyframe timing; there is no separate Keyframe timing help button.
-All ten track settings retain their unkeyed values, explicit capture and stored-keyframe editing.
+All eleven track settings retain their unkeyed values, explicit capture and stored-keyframe editing.
 Search/filter clear actions,
 mixed select-all and always-visible media Add simplify the library.
 
@@ -667,7 +675,7 @@ in memory and automatic write retries stop. **Retry save** is offered only for
 recoverable transport/server errors. On a revision conflict, **Review latest save**
 offers keeping the draft, **Download unsaved project**, or explicitly discarding
 local changes and reloading. It never silently overwrites or rebases another save.
-Download before discarding; the v14 JSON snapshot is for manual recovery/examination,
+Download before discarding; the v15 JSON snapshot is for manual recovery/examination,
 not a supported JSON-import or migration flow. Unapplied input/pointer drafts are
 not committed project edits.
 

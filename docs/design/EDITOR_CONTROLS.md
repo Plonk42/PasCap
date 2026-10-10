@@ -3,7 +3,7 @@
 ## Scope and decisions
 
 Controls use native elements, the existing editor layout and strict project
-schema 14, including complete track Colour, clip-only speed, clip spatial settings and 0–8 independent music tracks. No UI framework or icon dependency is introduced. Exact
+schema 15, including complete track Colour, clip-only speed, clip spatial settings and 0–8 independent music tracks. No UI framework or icon dependency is introduced. Exact
 timing entry is retained: Clip Range uses timecode text fields and a
 full-original range bar; other frame/duration/fade fields retain numeric steppers.
 
@@ -35,7 +35,7 @@ neither needs replacing merely to make their implementation identical.
 
 This is the source of terminology for visible UI text, help, accessible names,
 test selectors and current-behaviour guides. Internal identifiers, persisted fields
-and technical paths stay unchanged; this glossary does not change schema 14.
+and technical paths stay unchanged; this glossary does not change schema 15.
 
 - **Recording**: the complete original file, video or music. Use **video recording**
   or **music recording** when the distinction matters; never bare “video” for a file.
@@ -66,6 +66,9 @@ and technical paths stay unchanged; this glossary does not change schema 14.
   slider/exact-field/reset pattern, capture diamonds,
   adjacent per-setting Previous/Next buttons, section navigation and stored-setting
   chip arrows. No Kelvin or AWB label.
+- **HDR** is a track-owned 0–1 Colour control, neutral 0: an SDR local tone-mapping
+  look, not HDR output. It is keyframable like the other Colour settings and runs
+  on source taps before the grade, with the clip detail filters.
 - **Transform** is clip-owned crop, Scale, Translate X/Y and Rotation; its single
   diamond captures the full eight-value source-frame pose, not an enabled track setting.
 - **Keyframe line**: the first row of an expanded Colour, Speed or Transform section: **N keyframes**, one
@@ -101,7 +104,7 @@ and technical paths stay unchanged; this glossary does not change schema 14.
 - Easing/modes/recordings: native select; selected easing has its existing graph.
 - Boolean settings: native checkbox. Main scalar Colour/Opacity controls expose a capture diamond with
   `aria-pressed` and adjacent per-setting **Previous/Next** buttons, since a shared
-  keyframe need not enable every setting. Colour's keyframe-line Previous/Next pair visits the union of Opacity and nine scalar keyframes.
+  keyframe need not enable every setting. Colour's keyframe-line Previous/Next pair visits the union of Opacity, nine scalar and HDR keyframes.
   Clip **Speed ×** has one **Keyframe Speed** diamond capturing or removing a keyframe at the
   actually displayed source frame, without extra per-setting arrows; in curve mode its rate is
   read-only without a keyframe there. Speed's pair visits all retained

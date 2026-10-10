@@ -1,4 +1,4 @@
-# Multiple music tracks · strict project schema 14
+# Multiple music tracks · strict project schema 15
 
 Current contract for [#35](https://github.com/Plonk42/PasCap/issues/35). This specifies
 the required behaviour, not completed implementation, test evidence or release
@@ -10,7 +10,7 @@ Usage belongs in [the user guide](../USER_GUIDE.md) and
 
 ## Strict document and track identity
 
-- `schemaVersion` is exactly **14**. Required `music: MusicTrack[]` contains **0–8**
+- `schemaVersion` is exactly **15**. Required `music: MusicTrack[]` contains **0–8**
   independent music tracks; `[]` means no music. Omitted fields, `null`, a single
   object, unknown fields and duplicate track IDs are invalid. There are no
   migrations, compatibility readers, null fallbacks or injected defaults.
@@ -28,16 +28,16 @@ Usage belongs in [the user guide](../USER_GUIDE.md) and
   membership, each limited to 10,000 IDs. Every music reference also counts as
   visible membership; importing does not place music implicitly.
 - Video contracts do not change: 1–8 uniform tracks, required Ripple/transitions/
-  opening/closing fades and sole video track `opacity` in 0–1. All ten nullable keyframe
-  channels are `opacity` and nine scalar colour fields, including
-  `temperature` and `tint`. Complete static/keyed Colour remains video track-owned;
+  opening/closing fades and sole video track `opacity` in 0–1. All eleven nullable keyframe
+  channels are `opacity`, nine scalar colour fields (including
+  `temperature` and `tint`) and `hdr`. Complete static/keyed Colour remains video track-owned;
   HSL/curves remain static. There is no clip colour/correction, clip opacity or
   second opacity channel. Clip-only constant/custom source-frame speed retains
-  its ownership and retiming. Schema 14 also requires clip-owned spatial
+  its ownership and retiming. Schema 15 also requires clip-owned spatial
   base/per-setting source-frame keyframes;
   [spatial transforms](SPATIAL_TRANSFORMS.md) do not change music or video track Opacity.
 
-v1–v13 projects and receipt snapshots are incompatible and preserved byte-for-byte,
+v1–v14 projects and receipt snapshots are incompatible and preserved byte-for-byte,
 along with finished exports. Recreate projects deliberately; do not rewrite,
 repair or delete them automatically. Registry, video-proxy and current
 `pcm16-48k-stereo-mono-unity-v3` PCM cache formats and source guards are unchanged.
@@ -65,7 +65,7 @@ least one retained video clip; this is not an audio-only export feature.
 
 A music tail beyond video OUT requires the **composited exporter**, which fills
 trailing black frames through project OUT. The static fast path still requires
-one enabled, opaque, unanimated, zero-origin contiguous video track with exactly
+one enabled, opaque, unanimated, zero-origin contiguous video track with HDR 0, exactly
 neutral spatial bases and no spatial keyframes, covering
 the entire project duration. No frozen-last-image or shortened-audio shortcut is
 permitted.
@@ -198,7 +198,7 @@ for those video budgets.
 
 ## Receipts, preservation and acceptance
 
-Export receipt format remains **version 1**, with a strict **schema-14 project
+Export receipt format remains **version 1**, with a strict **schema-15 project
 snapshot**. Required `musicSources` is an array of captured unique registered
 audio assets; required `settings.audio` is an array of instance plans carrying
 `id`/`mediaId` and independent timing/gain/fades/loop sample positions. Both are

@@ -290,7 +290,7 @@ describe('one editor-only stored-point cursor', () => {
     expect(history.canUndo).toBe(false);
     expect(history.canRedo).toBe(false);
     expect(projectSchema.parse(history.current)).toEqual(document);
-    expect(history.current.schemaVersion).toBe(14);
+    expect(history.current.schemaVersion).toBe(15);
   });
 
   it.each([-1, NaN, Infinity, 0.5, 2_147_483_648])(
@@ -534,7 +534,7 @@ describe('main diamonds with per-setting arrows and stored-channel navigation', 
       ),
     );
     expect(sidebar).toContain('Track options Video track 1');
-    expect(KEYFRAME_SETTINGS).toHaveLength(10);
+    expect(KEYFRAME_SETTINGS).toHaveLength(11);
     expect(inspector).toContain('aria-label="Keyframe Opacity"');
     expect(inspector).not.toContain('Keyframe Track opacity');
     expect(inspector).not.toContain('Keyframe Clip opacity');

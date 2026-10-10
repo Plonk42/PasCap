@@ -1,5 +1,6 @@
 import { colourSchema, NEUTRAL_COLOUR, type ColourSettings } from '../shared/colour.js';
 import { isNeutralDetail, NEUTRAL_DETAIL } from '../shared/detail.js';
+import { hasLayerKeys } from '../shared/keyframes.js';
 import { projectSchema, type ProjectDocument } from '../shared/model.js';
 import {
   calculateLayout,
@@ -487,7 +488,13 @@ export class PreviewEngine {
 
   /** Detail shader variants compile when a document first needs them, before any draw uses them. */
   #prepareDetail(): void {
-    if (this.#compositor.available && this.#document?.clips.some((clip) => !isNeutralDetail(clip.detail)))
+    const document = this.#document;
+    if (
+      this.#compositor.available &&
+      document &&
+      (document.clips.some((clip) => !isNeutralDetail(clip.detail)) ||
+        document.layers.some((layer) => layer.colour.hdr !== 0 || hasLayerKeys(layer, 'hdr')))
+    )
       this.#compositor.prepareDetail();
   }
   async loadProject(
@@ -578,6 +585,7 @@ export class PreviewEngine {
     const layer = this.#document.layers.find((item) => item.id === layerId);
     if (!layer) throw new Error('The graded track does not exist.');
     layer.colour = colourSchema.parse(settings);
+    this.#prepareDetail();
     this.#dirty = true;
     this.#colourRequested = performance.now();
     if (!this.#playing && !this.#busy && this.#status === 'paused') this.#drawFrame(this.#frame);
