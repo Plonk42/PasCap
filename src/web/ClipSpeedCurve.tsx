@@ -11,7 +11,7 @@ import { EasingSelect } from './EasingSelect.js';
 import { Icon } from './icons.js';
 import { useKeyframeNavigation } from './keyframe-navigation.js';
 import { NumberField } from './NumberField.js';
-import { RateValueControl } from './SettingValueControl.js';
+import { RateValueControl, ResetButton, resetBlocked } from './SettingValueControl.js';
 import type { DraftPreview } from './Timeline.js';
 import { useClipSpeedDrag } from './use-clip-speed-drag.js';
 
@@ -382,7 +382,14 @@ export function ClipSpeedCurve({
           />
         </label>
         <div className="clip-speed-rate-field">
-          <label htmlFor={`${helpId}-rate`}>Speed ×</label>
+          <span className="setting-reset-group">
+            <label htmlFor={`${helpId}-rate`}>Speed ×</label>
+            <ResetButton
+              name="Speed keyframe rate"
+              blocked={resetBlocked(selected.rate === 1, unavailable)}
+              onReset={() => change(updateClipSpeedKey(current, selected.frame, { rate: 1 }))}
+            />
+          </span>
           <RateValueControl
             id={`${helpId}-rate`}
             aria-label="Clip speed keyframe rate"

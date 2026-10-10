@@ -14,7 +14,7 @@ import { HelpPopover } from './HelpPopover.js';
 import { Icon } from './icons.js';
 import { InspectorSection } from './InspectorSection.js';
 import { livePreview } from './live-preview.js';
-import { ResetLabel } from './SettingValueControl.js';
+import { ResetLabel, resetBlocked } from './SettingValueControl.js';
 import { ValueControl } from './ValueControl.js';
 
 interface Props {
@@ -59,10 +59,9 @@ export function DetailSection({ project, clip, disabled, onEdit }: Readonly<Prop
                 <ResetLabel
                   htmlFor={fieldId}
                   title={`Double-click to reset ${control.label}`}
-                  onReset={() => {
-                    if (value !== NEUTRAL_DETAIL[control.key])
-                      commit(withValue(control.key, NEUTRAL_DETAIL[control.key]));
-                  }}
+                  name={control.label}
+                  blocked={resetBlocked(value === NEUTRAL_DETAIL[control.key], disabled)}
+                  onReset={() => commit(withValue(control.key, NEUTRAL_DETAIL[control.key]))}
                 >
                   {control.label}
                 </ResetLabel>

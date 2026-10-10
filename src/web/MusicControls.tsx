@@ -12,6 +12,7 @@ import { Modal } from './Modal.js';
 import { createMusicInstance, musicInstanceEdit, videoTimelineDuration } from './music-ui.js';
 import { NumberField } from './NumberField.js';
 import { Popover } from './Popover.js';
+import { ResetButton, resetBlocked } from './SettingValueControl.js';
 import { ValueControl } from './ValueControl.js';
 
 interface Props {
@@ -386,7 +387,14 @@ function MusicInstanceControls({
         </button>
       </div>
       <div className="speed-field">
-        <label htmlFor={`${helpId}-gain`}>Gain dB</label>
+        <span className="setting-reset-group">
+          <label htmlFor={`${helpId}-gain`}>Gain dB</label>
+          <ResetButton
+            name="Music gain"
+            blocked={resetBlocked(music.gainDb === 0, drafting)}
+            onReset={() => update({ gainDb: 0 })}
+          />
+        </span>
         <ValueControl
           id={`${helpId}-gain`}
           aria-label="Music gain"

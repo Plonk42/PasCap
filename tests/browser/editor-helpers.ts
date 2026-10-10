@@ -46,7 +46,7 @@ export async function settingTab(page: Page, label: string): Promise<void> {
   if ((await tab.getAttribute('aria-selected')) !== 'true') await tab.dispatchEvent('click');
 }
 
-/** Double-clicking a setting's name resets only that setting; there is no per-control reset button. */
+/** Double-clicking a setting's name resets only that setting, like its Reset button. */
 export async function resetSetting(scope: Page | Locator, name: string): Promise<void> {
   const id = await scope.getByRole('slider', { name, exact: true }).getAttribute('id');
   await scope.locator(`[id="${id}-name"]`).dblclick();

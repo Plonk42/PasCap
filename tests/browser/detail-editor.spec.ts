@@ -164,6 +164,31 @@ test('exact fields reject invalid drafts, names reset one setting, Reset detail 
     });
 });
 
+test('each Detail slider has its own reset button: one Undo step, disabled at its default, no overflow', async ({
+  page,
+}) => {
+  await openEditor(page, true);
+  const sharpen = page.getByRole('spinbutton', { name: 'Clip Sharpen', exact: true });
+  const reset = page.getByRole('button', { name: 'Reset Sharpen', exact: true });
+  await expect(reset).toHaveAttribute('aria-disabled', 'true');
+  await expect(reset).toHaveAttribute('tabindex', '-1');
+  const before = await current(page);
+  await reset.dispatchEvent('click');
+  expect(await current(page)).toEqual(before);
+  await expect(undo(page)).toBeDisabled();
+  await sharpen.fill('0.6');
+  await sharpen.press('Enter');
+  await expect.poll(async () => (await current(page)).clips[0]!.detail.sharpen).toBe(0.6);
+  await expect(reset).toHaveAttribute('aria-disabled', 'false');
+  await reset.click();
+  await expect.poll(async () => (await current(page)).clips[0]!.detail.sharpen).toBe(0);
+  await expect(reset).toHaveAttribute('aria-disabled', 'true');
+  await undo(page).click();
+  await expect.poll(async () => (await current(page)).clips[0]!.detail.sharpen).toBe(0.6);
+  const panel = page.locator('.inspector-panel');
+  expect(await panel.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+});
+
 test('Detail is a Clip section, collapsed by default and included in Expand all', async ({ page }) => {
   await openEditor(page, false);
   const section = page.getByRole('button', { name: 'Detail section', exact: true });

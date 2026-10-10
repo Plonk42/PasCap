@@ -122,7 +122,10 @@ and technical paths stay unchanged; this glossary does not change schema 15.
   enabled), sharing the central off-duration inspection cursor with section
   navigation to track keyframes and track/list navigation. A read-only animated main value is visibly locked without hover: dimmed slider and
   field plus a lock cue (**Add a keyframe ◇ to edit**). Interacting with it never creates a keyframe or edit.
-  Double-clicking a setting's name resets only that setting; sections keep one Reset in their keyframe line (Colour, Speed, Transform) and HSL/curves name theirs
+  Every slider setting (Colour, Opacity, HSL, Transform, Detail, Speed rates, stored keyframe values, music gain) has a compact
+  **Reset** icon button beside its name, labelled **Reset <setting>**: it restores only that setting's neutral value in one Undo step, is
+  dimmed with an explanatory tooltip and `aria-disabled` at its default or when the value is read-only/locked, and adds no row or
+  width. Double-clicking the name does the same; sections keep one Reset in their keyframe line (Colour, Speed, Transform) and HSL/curves name theirs
   **Reset red** / **Reset all**.
 - Tabs: native buttons with one selected appearance and existing arrow/Home/End
   behavior. Disclosures keep mounted drafts; options use the existing Popover.

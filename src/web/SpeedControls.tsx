@@ -14,7 +14,7 @@ import { InspectorSection } from './InspectorSection.js';
 import { useKeyframeNavigation } from './keyframe-navigation.js';
 import './keyframe-navigation.css';
 import './layer-keyframes.css';
-import { LockedCue, RateValueControl, ResetLabel } from './SettingValueControl.js';
+import { LockedCue, RateValueControl, ResetLabel, resetBlocked } from './SettingValueControl.js';
 import {
   inspectSpatialKeyframe,
   reconcileSpatialInspection,
@@ -88,9 +88,9 @@ function SpeedRate({
         <ResetLabel
           htmlFor={rateId}
           title="Double-click to reset Speed to 1×"
-          onReset={() => {
-            if (!disabled && !locked && rate !== 1) change(edit(1), sourceFrame ?? undefined);
-          }}
+          name="Speed"
+          blocked={resetBlocked(rate === 1, disabled, locked)}
+          onReset={() => change(edit(1), sourceFrame ?? undefined)}
         >
           Speed ×
         </ResetLabel>
