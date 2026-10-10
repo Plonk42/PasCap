@@ -8,6 +8,7 @@ import {
   createDetailSettings,
   denoiseRangeFactor,
   detailSchema,
+  detailTapCount,
   isNeutralDetail,
   NEUTRAL_DETAIL,
   type DetailSettings,
@@ -138,6 +139,15 @@ describe('clip detail settings', () => {
     expect(isNeutralDetail(NEUTRAL_DETAIL)).toBe(true);
     expect(isNeutralDetail({ sharpen: Number.MIN_VALUE, clarity: 0, denoise: 0 })).toBe(false);
     expect(compileDetail(NEUTRAL_DETAIL, 1, 0)).toBeNull();
+  });
+
+  it('counts the kernel taps each setting adds', () => {
+    expect(detailTapCount(NEUTRAL_DETAIL, false)).toBe(0);
+    expect(detailTapCount({ sharpen: 0.3, clarity: 0, denoise: 0 }, false)).toBe(8);
+    expect(detailTapCount({ sharpen: 0, clarity: 0, denoise: 0.2 }, false)).toBe(16);
+    expect(detailTapCount({ sharpen: 0, clarity: -0.5, denoise: 0 }, false)).toBe(16);
+    expect(detailTapCount(NEUTRAL_DETAIL, true)).toBe(24);
+    expect(detailTapCount({ sharpen: 0.4, clarity: 0.5, denoise: 0.3 }, true)).toBe(56);
   });
 
   it('matches an independent transcription of the Denoise → Clarity → Sharpen kernel', () => {
