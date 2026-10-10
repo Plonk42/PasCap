@@ -96,7 +96,7 @@ An animated channel without an enabled setting at the real playhead remains
 read-only until explicitly captured. Capture never uses
 an inspected stored time. Sliders never create keyframes. Track-keyframe selectors
 visibly read **Easing**, retaining contextual accessible names and shared interpolation.
-The nested static HSL and curve editors share video track ownership, with no new diamonds.
+The static **HSL ranges** and **Colour curves** Track sections share video track ownership, with no new diamonds.
 Individual scalar resets target only the track base or current existing keyed setting;
 Colour Reset on an animated track targets only existing keyed colour/Opacity settings, preserving HSL/curves.
 No reset overwrites another keyframe or the saved base beneath a keyed channel.

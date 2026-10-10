@@ -1,12 +1,12 @@
 import { useEffect, useId, type KeyboardEvent, type ReactNode } from 'react';
-import { COLOUR_CONTROLS, isNeutralColour, NEUTRAL_COLOUR } from '../shared/colour.js';
+import { COLOUR_CONTROLS, NEUTRAL_COLOUR } from '../shared/colour.js';
 import { applyCommand, type EditCommand } from '../shared/commands.js';
 import { colourAt } from '../shared/composition.js';
 import { activeLayerSetting, evaluateLayerSetting, hasLayerKeys, type KeyframeSetting } from '../shared/keyframes.js';
 import type { MediaAsset } from '../shared/media.js';
 import type { ProjectDocument, Transition, VideoClip, VideoLayer } from '../shared/model.js';
 import { calculateLayout, type TimelineLayout } from '../shared/timeline.js';
-import { AdvancedColour } from './AdvancedColour.js';
+import { ColourCurvesSection, HslRangesSection } from './AdvancedColour.js';
 import { TrackAnimationControls } from './AnimationControls.js';
 import { ClipSourceRange } from './ClipSourceRange.js';
 import { colourResetCommands } from './colour-reset.js';
@@ -271,17 +271,7 @@ function ColourControl({
   );
 }
 
-function ColourSection({
-  layer,
-  frame,
-  resetKey,
-  disabled,
-  onEdit,
-  id,
-  project,
-  onPause,
-  onPreview,
-}: Readonly<LayerControlProps & { id: string } & Pick<Props, 'project' | 'onPause' | 'onPreview'>>) {
+function ColourSection({ layer, frame, resetKey, disabled, onEdit, id }: Readonly<LayerControlProps & { id: string }>) {
   const colour = colourAt(layer, frame);
   const opacity = evaluateLayerSetting(layer, 'opacity', frame, layer.opacity);
   const animated =
@@ -304,7 +294,7 @@ function ColourSection({
       id="colour"
       title="Colour"
       icon="colour"
-      modified={adjusted > 0 || !isNeutralColour(layer.colour)}
+      modified={adjusted > 0}
       help={
         <HelpPopover label="Colour animation" guide="colour-speed-and-shared-video-track-keyframes">
           <p>These settings grade every clip on this track. To grade one clip differently, put it on its own track.</p>
@@ -354,16 +344,6 @@ function ColourSection({
           />
         ))}
       </div>
-      <AdvancedColour
-        key={`${project.id}:${layer.id}`}
-        project={project}
-        layer={layer}
-        frame={frame}
-        disabled={disabled}
-        onEdit={onEdit}
-        onPause={onPause}
-        onPreview={onPreview}
-      />
     </InspectorSection>
   );
 }
@@ -865,15 +845,32 @@ export function Inspector({
                 <span>{trackScope(trackClips.length)}</span>
               </div>
               <ColourSection
-                project={project}
-                onPause={onPause}
-                onPreview={onPreview}
                 layer={layer}
                 frame={frame}
                 resetKey={`${inputContext}:${frame}`}
                 disabled={drafting}
                 onEdit={onEdit}
                 id={colourControlId}
+              />
+              <HslRangesSection
+                key={`hsl:${project.id}:${layer.id}`}
+                project={project}
+                layer={layer}
+                frame={frame}
+                disabled={drafting}
+                onEdit={onEdit}
+                onPause={onPause}
+                onPreview={onPreview}
+              />
+              <ColourCurvesSection
+                key={`curves:${project.id}:${layer.id}`}
+                project={project}
+                layer={layer}
+                frame={frame}
+                disabled={drafting}
+                onEdit={onEdit}
+                onPause={onPause}
+                onPreview={onPreview}
               />
               <InspectorSection
                 id="keyframes"

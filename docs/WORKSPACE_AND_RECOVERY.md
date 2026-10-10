@@ -43,7 +43,7 @@ They are not Kelvin/HDR/automatic white balance. HSL/curves remain static. See
   Clip ("Clip N of M · track") contains the selected clip's **Speed**,
   **Transform**, **Range** and **Placement**; an empty video track shows one line instead.
   Track ("Applies to all N clips on this track") contains Colour with the single
-  track-owned Opacity control, Keyframes (the whole-keyframe list, enabled-setting chips,
+  track-owned Opacity control, **HSL ranges**, **Colour curves**, Keyframes (the whole-keyframe list, enabled-setting chips,
   Animation help and keyframe navigation), Transitions and Fades;
   Audio owns selected-track music controls (**Music track / Recording / Add music
   track / Delete selected music track**).
@@ -172,20 +172,20 @@ Selecting a clip or track keeps the chosen tab; explicit Cut/Fade/Dissolve bound
 buttons open Track with that boundary expanded.
 **Expand all / Collapse all** is an icon button on the Inspector tab bar that changes
 only the visible tab's sections, including temporarily absent ones: Clip's **Speed**,
-**Transform**, **Range** and **Placement**; Track's **Colour**, **Keyframes**,
+**Transform**, **Range** and **Placement**; Track's **Colour**, **HSL ranges**, **Colour curves**, **Keyframes**,
 **Transitions** and **Fades**; Audio's **Music**. It is hidden while Clip has no
 selected clip or Track no selected track. A mixed state offers Expand all. Individual toggles
 and the existing section preferences remain authoritative. Other tabs'
 sections, each keyframe's nested **Edit**, other nested details and help are unchanged.
 Bulk expansion is presentation-only and leaves mounted drafts, processing, history
 and saves unchanged. If preference storage fails, choices still work for the session.
-New preferences keep **Speed**, **Transform**, **Range** and **Placement** collapsed and Track sections open;
+New preferences keep **Speed**, **Transform**, **Range**, **Placement**, **HSL ranges** and **Colour curves** collapsed and the other Track sections open;
 existing expansion preferences remain respected. Help/reset details are contextual,
 not repeated across the main workspace. Collapsing never disables processing.
 
 All inline help uses a small **question-mark button**, including animation, source,
 opacity, speed, Transform, colour, keyframe/transition/fade/audio timing and startup details.
-Inspector **Speed**, **Transform**, **Range**, **Placement**, **Colour**, Transition and Sequence
+Inspector **Speed**, **Transform**, **Range**, **Placement**, **Colour**, **HSL ranges**, **Colour curves**, Transition and Sequence
 fades put help beside their titles, reachable even when collapsed. Expansion and
 help are independent native buttons in normal section → help → fields Tab order
 (an open help's **Learn more** link comes right after its button);

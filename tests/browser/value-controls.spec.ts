@@ -782,12 +782,8 @@ test('common widgets fit 270px inspectors at the default and minimum viewports w
     for (const tab of ['Clip', 'Track', 'Audio'] as const) {
       await inspectorTab(page, tab);
       if (tab === 'Track') {
-        await inspector
-          .locator('.advanced-colour details')
-          .first()
-          .evaluate((element) => {
-            (element as HTMLDetailsElement).open = true;
-          });
+        const hsl = inspector.getByRole('button', { name: 'HSL ranges section', exact: true });
+        if ((await hsl.getAttribute('aria-expanded')) !== 'true') await hsl.click();
         await editLayerPoint(page, 'Video track 1', 0);
       }
       const widgets = await inspector.locator('.value-control').evaluateAll((elements) =>

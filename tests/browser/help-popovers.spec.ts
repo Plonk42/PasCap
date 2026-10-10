@@ -177,23 +177,26 @@ test('Track and Audio bulk expansion change only their own sections', async ({ p
   const before = await current(page);
   const sections = (ids: string[]) =>
     page.evaluate((list) => list.map((id) => localStorage.getItem(`pascap-section-${id}`)), ids);
-  const trackIds = ['colour', 'keyframes', 'transition', 'fades'];
+  const trackIds = ['colour', 'hsl', 'curves', 'keyframes', 'transition', 'fades'];
   const otherIds = ['speed', 'transform', 'source', 'layer-opacity', 'music'];
   const others = await sections(otherIds);
   await inspectorTab(page, 'Track');
+  // HSL ranges and Colour curves start collapsed, so the Track tab starts mixed.
+  await page.getByRole('button', { name: 'Expand all Track sections', exact: true }).click();
+  expect(await sections(trackIds)).toEqual(['open', 'open', 'open', 'open', 'open', 'open']);
   const collapse = page.getByRole('button', { name: 'Collapse all Track sections', exact: true });
   await collapse.focus();
   await collapse.press('Enter');
   await expect(page.getByRole('button', { name: 'Expand all Track sections', exact: true })).toBeFocused();
-  for (const title of ['Colour', 'Keyframes', 'Transitions', 'Fades'])
+  for (const title of ['Colour', 'HSL ranges', 'Colour curves', 'Keyframes', 'Transitions', 'Fades'])
     await expect(page.getByRole('button', { name: `${title} section`, exact: true })).toHaveAttribute(
       'aria-expanded',
       'false',
     );
-  expect(await sections(trackIds)).toEqual(['closed', 'closed', 'closed', 'closed']);
+  expect(await sections(trackIds)).toEqual(['closed', 'closed', 'closed', 'closed', 'closed', 'closed']);
   expect(await sections(otherIds)).toEqual(others);
   await page.getByRole('button', { name: 'Expand all Track sections', exact: true }).click();
-  expect(await sections(trackIds)).toEqual(['open', 'open', 'open', 'open']);
+  expect(await sections(trackIds)).toEqual(['open', 'open', 'open', 'open', 'open', 'open']);
   await inspectorTab(page, 'Audio');
   await page.getByRole('button', { name: 'Collapse all Audio sections', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Music section', exact: true })).toHaveAttribute(

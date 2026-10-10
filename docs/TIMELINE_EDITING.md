@@ -634,4 +634,4 @@ and both-runtime acceptance belong to
 [DEPLOYMENT.md](DEPLOYMENT.md). Actual-commit correctness results are available in
 [GitHub Actions](https://github.com/Plonk42/PasCap/actions).
 
-Video track Colour includes static **HSL ranges** and **Colour curves** in nested Track → Colour sections. They affect every clip and both dissolve sources on the track, whether or not its nine scalar channels are keyed. Moves use the destination track's complete colour; clip edits never copy these settings. They are not speed curves or new animation channels. See [the schema-13 HSL/curves contract](design/HSL_AND_CURVES.md).
+Video track Colour includes static **HSL ranges** and **Colour curves**, each in its own collapsible Track section after Colour. They affect every clip and both dissolve sources on the track, whether or not its nine scalar channels are keyed. Moves use the destination track's complete colour; clip edits never copy these settings. They are not speed curves or new animation channels. See [the schema-13 HSL/curves contract](design/HSL_AND_CURVES.md).

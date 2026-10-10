@@ -477,15 +477,15 @@ The inspector uses **Clip / Track / Audio** tabs, split by ownership. **Clip**
 holds the selected clip's **Speed**, **Transform**, **Range** and **Placement** (placement only) under a "Clip N of M · track" header; on an empty video track it shows only
 "Select a clip on … to edit it." **Track** holds everything the whole video track owns
 under an "Applies to all N clips on this track" header: Colour (including the sole
-track Opacity control, HSL and curves), Keyframes (the shared keyframe list with
+track Opacity control), HSL ranges, Colour curves, Keyframes (the shared keyframe list with
 Animation help, enabled-setting chips and whole-track navigation), Transitions (every
 boundary of the track, left to right, with the selected one expanded) and Fades.
 Music belongs to Audio, with detailed **Placement & fades**.
 Sections retain their expansion in local browser storage.
-New defaults collapse **Speed**, **Transform**, **Range** and **Placement** controls, while Track
-sections stay open. Existing section preferences are not reset. **Expand all / Collapse all**
+New defaults collapse **Speed**, **Transform**, **Range**, **Placement**, **HSL ranges** and
+**Colour curves**, while the other Track sections stay open. Existing section preferences are not reset. **Expand all / Collapse all**
 affects only the visible tab's sections: Clip's **Speed**, **Transform**, **Range** and
-**Placement**; Track's **Colour**, **Keyframes**, **Transitions** and **Fades**; Audio's
+**Placement**; Track's **Colour**, **HSL ranges**, **Colour curves**, **Keyframes**, **Transitions** and **Fades**; Audio's
 **Music**. Other tabs, nested keyframe disclosures and
 help remain unchanged; the shared list has no expansion preference.
 Hidden tab/section content stays mounted, retaining valid/invalid drafts within
