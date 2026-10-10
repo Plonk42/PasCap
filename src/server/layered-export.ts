@@ -483,7 +483,7 @@ class SequentialLayeredRenderer {
       await readers[index]!.requireFrame(this.#rgb[index]!); // NOSONAR -- at most two reusable intermediate frames.
       const sourceClip = document.clips[clip.index]!;
       const sample = samples.find((item) => item.clipId === sourceClip.id);
-      if (!sample || sample.sourceFrame !== maps[index]!.sourceAt(clip.offset + frame))
+      if (sample?.sourceFrame !== maps[index]!.sourceAt(clip.offset + frame))
         throw new Error('Layered sample differs from the exact shared sourceAt map.');
       const sourcePosition = maps[index]!.sourcePositionAt(clip.offset + frame);
       if (

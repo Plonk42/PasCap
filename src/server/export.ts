@@ -886,50 +886,40 @@ async function renderClips(
   let retained: { index: number; filename: string } | null = null;
   const chunkFiles: string[] = [];
   const retiming: RawRetimingReport[] = [];
-  for (const [ordinal, clip] of inputs.plan.clips.entries()) {
+  await forEachSerial(inputs.plan.clips, async (clip, ordinal) => {
     const index = clip.index;
     checkCancelled(context);
     progress(0, `Generating clip ${ordinal + 1} / ${inputs.plan.clips.length} LUT`);
-    const result = await retimeClip(
-      inputs,
-      index,
-      environment, // NOSONAR -- decode only one original at a time.
-      (frames) =>
-        progress(
-          frames,
-          `Retiming original clip ${ordinal + 1} / ${inputs.plan.clips.length}: ${frames} / ${clip.duration} output frames`,
-        ),
+    const result = await retimeClip(inputs, index, environment, (frames) =>
+      progress(
+        frames,
+        `Retiming original clip ${ordinal + 1} / ${inputs.plan.clips.length}: ${frames} / ${clip.duration} output frames`,
+      ),
     );
     retiming.push(result.report);
     finishedWork += clip.duration;
-    for (const chunk of inputs.plan.chunks.filter((item) =>
+    const chunks = inputs.plan.chunks.filter((item) =>
       item.kind === 'body' ? item.clipIndex === index : item.rightIndex === index,
-    )) {
+    );
+    await forEachSerial(chunks, async (chunk) => {
       const chunkFile = `chunk-${String(chunkFiles.length).padStart(5, '0')}.mp4`;
       const filenames =
         chunk.kind === 'body' ? [result.filename] : [requireRetained(retained, chunk.leftIndex), result.filename];
-      await encodeChunk(
-        chunk,
-        filenames,
-        chunkFile,
-        environment, // NOSONAR -- a dissolve opens at most two intermediate decoders.
-        (frames) =>
-          progress(
-            frames,
-            `Encoding ${chunk.kind} chunk ${chunkFiles.length + 1}: ${frames} / ${chunk.duration} frames`,
-          ),
+      await encodeChunk(chunk, filenames, chunkFile, environment, (frames) =>
+        progress(frames, `Encoding ${chunk.kind} chunk ${chunkFiles.length + 1}: ${frames} / ${chunk.duration} frames`),
       );
       chunkFiles.push(chunkFile);
       finishedWork += chunk.duration;
       if (chunk.kind === 'dissolve') {
-        await rm(path.join(directory, retained!.filename)); // NOSONAR -- free the old tail before processing another clip.
+        // Free the old tail before processing another clip.
+        await rm(path.join(directory, retained!.filename));
         retained = null;
       }
-    }
+    });
     const outgoing = inputs.snapshot.layers[0]!.transitions[ordinal];
     if (outgoing?.type === 'cross-dissolve') retained = { index, filename: result.filename };
-    else await rm(path.join(directory, result.filename)); // NOSONAR -- bound lossless scratch files to two clips.
-  }
+    else await rm(path.join(directory, result.filename)); // Bound lossless scratch files to two clips.
+  });
   if (retained) throw new ServiceError('Exporter retained an unused dissolve tail.', 500);
   return { chunkFiles, retiming };
 }
