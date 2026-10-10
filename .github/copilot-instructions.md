@@ -107,7 +107,7 @@ PasCap is a solo, pre-release project: optimize for fast iteration. Details are 
   Navigation never edits,
   saves or creates history. See [speed/audio](../docs/SPEED_AND_AUDIO.md) and
   [spatial transforms](../docs/design/SPATIAL_TRANSFORMS.md).
-- Strict schema 13 requires complete row Colour with nine scalar fields plus
+- Strict schema 14 requires complete row Colour with nine scalar fields plus
   `colour.hsl` (eight complete named bands) and `colour.curves` (master/red/green/blue
   2–16-point arrays). HSL/curves remain static, not animation channels. All Colour
   is row-owned, keyed or not; clips have no colour/correction. Neutral creators
@@ -126,14 +126,14 @@ PasCap is a solo, pre-release project: optimize for fast iteration. Details are 
   linear luminance before clipping only, not arbitrary pixels or final output.
   No Kelvin/HDR/AWB. Main/stored slider/exact-field/reset/diamond/navigation retain
   explicit capture, row ownership, empty-row editing and one-step gestures.
-  Compare bypasses all Colour, including Temperature/Tint, never coverage or geometry.
+  Compare bypasses all Colour, including Temperature/Tint, and clip Detail, never coverage or geometry.
   See [Temperature and Tint](../docs/design/TEMPERATURE_AND_TINT.md).
 - Owner-approved #70: required row `colour` contains all nine scalar SDR channels,
   neutral on new rows, with sole row `opacity` initially 1. Reject saved
   `clip.colour`, `clip.correction` and missing row colour. Static and keyed Colour
   have identical row ownership; different treatments require different rows.
   Grade sampled RGB once with evaluated row Colour before fades/coverage.
-  Ungraded neutralizes only row Colour. Native LUTs use only row Colour, with two
+  Ungraded neutralizes row Colour and clip Detail only. Native LUTs use only row Colour, with two
   reused buffers and unchanged bounds. Controls/keys work on empty rows. Moves/new
   clips adopt destination bases/keys/Opacity; trim/split/cut/duplicate preserve
   row bases and absolute points, without per-clip colour copies. HSL and curves
@@ -159,6 +159,16 @@ PasCap is a solo, pre-release project: optimize for fast iteration. Details are 
   stored-key navigation/exact fields and release-only value sliders. Any spatial
   edit/key requires layered export; native 22 bytes/pixel, two LUTs and process
   bounds remain unchanged. See [spatial transforms](../docs/design/SPATIAL_TRANSFORMS.md).
+- Owner-approved #123: every clip requires strict static `detail: { sharpen 0–1,
+clarity −1–1, denoise 0–1 }`, neutral 0, with no keyframes or track channel; split/
+  cut/duplicate copy it. Filters run on bilinear source taps around the inverse-mapped
+  point, before the Colour grade: Denoise (spatial bilateral) → Clarity → Sharpen,
+  radii in 1/720 of the image height. Exact neutral bypasses the kernel (bit-identical).
+  Shader tap tables and the native compositor share `src/shared/detail.ts`; any
+  nonneutral detail requires composited export without new buffers or processes.
+  Compare bypasses Colour and Detail. Clip → Detail is the third section, collapsed
+  by default, with live slider preview and one Undo per release. See
+  [detail filters](../docs/design/DETAIL_FILTERS.md).
 - Final approved [#67](https://github.com/Plonk42/PasCap/issues/67): **Opacity** is
   one row-owned setting, not a clip setting. `VideoLayer.opacity` is a required
   number in 0–1; new tracks start at 1 (100%). No saved `clip.opacity` field.
@@ -182,10 +192,10 @@ PasCap is a solo, pre-release project: optimize for fast iteration. Details are 
   $\mathrm{result} = C + \mathrm{lower}(1 - A)$, evaluating row Opacity for each
   source with no additional layer multiplier; $m_i$ is spatial source coverage,
   including opaque neutral letterboxing. Black fades never reduce that coverage.
-  Version-1 export receipts require strict v13 snapshots and captured audio-source/
+  Version-1 export receipts require strict v14 snapshots and captured audio-source/
   instance-plan arrays; receipt, registry/proxy/PCM and benchmark format versions
   remain independent and unchanged.
-  Reject and preserve incompatible v1–v12 projects/receipt snapshots; require recreation,
+  Reject and preserve incompatible v1–v13 projects/receipt snapshots; require recreation,
   without migrations, compatibility defaults or automatic deletion.
 - Music is a required 0–8 array of independently identified instances, never null
   or singular. Duration is the maximum of all video and music OUTs. After the last
@@ -200,6 +210,7 @@ PasCap is a solo, pre-release project: optimize for fast iteration. Details are 
   [speed/audio](../docs/SPEED_AND_AUDIO.md),
   [Temperature and Tint](../docs/design/TEMPERATURE_AND_TINT.md),
   [spatial transforms](../docs/design/SPATIAL_TRANSFORMS.md),
+  [detail filters](../docs/design/DETAIL_FILTERS.md),
   [workspace/recovery](../docs/WORKSPACE_AND_RECOVERY.md) and
   [development](../docs/DEVELOPMENT.md). Guides describe current behaviour only;
   history belongs in Git and issues.

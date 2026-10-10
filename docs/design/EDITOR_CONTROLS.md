@@ -3,7 +3,7 @@
 ## Scope and decisions
 
 Controls use native elements, the existing editor layout and strict project
-schema 13, including complete track Colour, clip-only speed, clip spatial settings and 0–8 independent music tracks. No UI framework or icon dependency is introduced. Exact
+schema 14, including complete track Colour, clip-only speed, clip spatial settings and 0–8 independent music tracks. No UI framework or icon dependency is introduced. Exact
 timing entry is retained: Clip Range uses timecode text fields and a
 full-original range bar; other frame/duration/fade fields retain numeric steppers.
 
@@ -14,6 +14,7 @@ full-original range bar; other frame/duration/fade fields retain numeric stepper
 | Colour / Opacity              | Native slider and exact field in main/stored editors                                                                                | Opacity UI 0–100%, neutral 100%; stored track/keyframe values remain 0–1                                                             |
 | Speed                         | Clip constant rate or 1–256 source-frame keyframes; Keyframe Speed diamond                                                          | Bounded slider/exact-value pattern; retain presets and curve graph                                                                   |
 | Transform                     | Eight clip pose sliders/exact fields, each with its own blue triangle and Previous/Next, stored source-keyframe selector/navigation | Explicit per-setting source-frame capture; retain off-trim keyframes and distinguish stored time from preview                        |
+| Detail                        | Clip Sharpen, Clarity and Denoise sliders/exact fields with **Reset detail**                                                        | Static, no keyframes; live image preview while dragging; one Undo per release                                                        |
 | Audio                         | Music track / Recording selects, Add music track, selected-track trash and gain slider                                              | Independent identified tracks; exact gain draft; import never implicitly places                                                      |
 | Clip Range                    | One full-original hatched range bar with draggable IN/OUT; exact text fields below its ends                                         | Display 30 fps NDF timecode; accept whole original frames or timecode                                                                |
 | Other frames, duration, fades | Integer timing needs exact entry and contextual validation                                                                          | Retain native numeric steppers and timecode feedback, not arbitrary slider limits                                                    |
@@ -34,7 +35,7 @@ neither needs replacing merely to make their implementation identical.
 
 This is the source of terminology for visible UI text, help, accessible names,
 test selectors and current-behaviour guides. Internal identifiers, persisted fields
-and technical paths stay unchanged; this glossary does not change schema 13.
+and technical paths stay unchanged; this glossary does not change schema 14.
 
 - **Recording**: the complete original file, video or music. Use **video recording**
   or **music recording** when the distinction matters; never bare “video” for a file.
@@ -131,13 +132,13 @@ and technical paths stay unchanged; this glossary does not change schema 13.
 ## Placement
 
 Keep Media for recording discovery/import; the centre's Timeline/Source preview
-tabs for viewing; Clip for speed/Transform/source range/placement; Track for Colour,
+tabs for viewing; Clip for speed/Transform/Detail/source range/placement; Track for Colour,
 Opacity, HSL ranges, Colour curves, shared Keyframes, transitions and fades; Audio for music. Track options owns
 rename, Ripple, stacking and deletion. No tab relocation is justified by the audit.
 Keep frequent split/trim/delete/cut actions directly in Timeline, not in another
 toolbar. Detailed controls and diagnostics remain contextual/collapsible.
 
-Transform is Clip's second section (after Speed, before Range and Placement), collapsed by default and included
+Transform is Clip's second section (after Speed, before Detail, Range and Placement), collapsed by default and included
 in Expand all/Collapse all. **Transform animation** heading help remains reachable
 while collapsed. **Crop left/right/top/bottom / Scale / Translate X/Y / Rotation °**
 pair native sliders with exact fields. Main values edit the base for an unkeyed setting,

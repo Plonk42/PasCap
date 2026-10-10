@@ -12,6 +12,7 @@ import {
   type ProjectDocument,
 } from '../../src/shared/model.js';
 import { evaluateSpatial } from '../../src/shared/spatial.js';
+import { NEUTRAL_DETAIL } from '../../src/shared/detail.js';
 import { calculateLayout, sampleTimeline } from '../../src/shared/timeline.js';
 import { framesToSeconds, type FrameRate } from '../../src/shared/timing.js';
 
@@ -40,6 +41,7 @@ type Surface = { clips: (CompositeGroup['clips'][number] & Texture)[] }[];
 interface CompositorDouble {
   visible: Surface | null;
   setDecoderCount: Mock<(count: number) => void>;
+  prepareDetail: Mock<() => void>;
   clear: Mock<() => void>;
   uploadVideo: Mock<(index: number, video: HTMLVideoElement) => void>;
   drawFrame: Mock<(groups: readonly CompositeGroup[]) => void>;
@@ -150,6 +152,7 @@ vi.mock('../../src/preview/compositor.js', () => ({
       doubles.compositors.push(this);
     }
     setDecoderCount = vi.fn((_count: number): void => {});
+    prepareDetail = vi.fn((): void => {});
     uploadVideo = vi.fn((index: number, video: HTMLVideoElement): void => {
       const slot = doubles.slots.find((item) => item.video === video);
       if (!slot?.ready) throw new Error('Cannot upload an unavailable decoded frame');
@@ -431,6 +434,7 @@ function expectSurface(preview: RunningPreview, frame: number, ungraded = false)
                 settings: ungraded ? NEUTRAL_COLOUR : layer.colour,
                 aspect: 16 / 9,
                 spatial: layer.spatial,
+                detail: ungraded ? NEUTRAL_DETAIL : layer.detail,
                 originalWidth: 1920,
                 originalHeight: 1080,
                 opacity: layer.opacity,
@@ -1740,6 +1744,25 @@ describe('PreviewEngine spatial appearance', () => {
     expectSurface(preview, 8, true);
     expect(preview.compositor.visible![0]!.clips[0]!.spatial).toEqual(edited.clips[0]!.spatial.base);
     expectNoMediaOperations(preview);
+  });
+
+  it('redraws clip detail edits live and bypasses them only while comparing, without media operations', async () => {
+    const preview = await paused(gradedProject(true));
+    expect(preview.compositor.prepareDetail).not.toHaveBeenCalled();
+    const edited = structuredClone(preview.project);
+    edited.clips[0]!.detail = { sharpen: 0.6, clarity: -0.3, denoise: 0.2 };
+    preview.engine.updateProjectAppearance(edited);
+    expect(preview.compositor.prepareDetail).toHaveBeenCalledTimes(1);
+    preview.project = edited;
+    expectSurface(preview, 8);
+    expect(preview.compositor.visible![0]!.clips[0]!.detail).toEqual(edited.clips[0]!.detail);
+    expectNoMediaOperations(preview);
+    preview.engine.setUngraded(true);
+    expectSurface(preview, 8, true);
+    expect(preview.compositor.visible![0]!.clips[0]!.detail).toEqual(NEUTRAL_DETAIL);
+    preview.engine.setUngraded(false);
+    expect(preview.compositor.visible![0]!.clips[0]!.detail).toEqual(edited.clips[0]!.detail);
+    expect(preview.compositor.uploadVideo).not.toHaveBeenCalled();
   });
 
   it.each(['clip', 'curve'] as const)(

@@ -19,15 +19,15 @@ async function temp(): Promise<string> {
   return root;
 }
 
-describe.skipIf(!enabled)('schema-13 storage/archive integration · generated files only, no migrations', () => {
+describe.skipIf(!enabled)('schema-14 storage/archive integration · generated files only, no migrations', () => {
   afterEach(async () => {
     await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
   });
 
-  it('loads strict v13 row gains/ten-channel points and preserves unsupported v1–v12', async () => {
+  it('loads strict v14 row gains/ten-channel points and preserves unsupported v1–v13', async () => {
     const root = await temp();
     const store = new ProjectStore(root);
-    const project = createProject('strict-v13', 'Strict current document');
+    const project = createProject('strict-v14', 'Strict current document');
     project.media = { videoIds: ['generated-original', 'unplaced-original'], audioIds: ['unplaced-music'] };
     project.clips = [
       { ...createClip('current-clip', 'generated-original', 0, 4), speed: { mode: 'constant', rate: 0.5 } },
@@ -39,7 +39,7 @@ describe.skipIf(!enabled)('schema-13 storage/archive integration · generated fi
       { frame: 5000, interpolation: 'ease-out', values: { ...EMPTY_KEY_VALUES, exposure: 0.25, tint: 1 } },
     ];
     const saved = await store.save(project, 0);
-    expect(saved.schemaVersion).toBe(13);
+    expect(saved.schemaVersion).toBe(14);
     expect(saved.media).toEqual(project.media);
     expect(saved.layers[0]!.colour).toMatchObject({ temperature: 0.75, tint: -0.65 });
     expect(saved.layers[0]!.keyframes).toEqual(project.layers[0]!.keyframes);
@@ -53,7 +53,7 @@ describe.skipIf(!enabled)('schema-13 storage/archive integration · generated fi
     const currentPath = path.join(root, 'projects', `${saved.id}.json`);
     const currentBytes = await readFile(currentPath);
     const old = [];
-    for (const version of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]) {
+    for (const version of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]) {
       const id = `original-v${version}`;
       const title = `Preserved original version ${version}`;
       const document = unsupportedProject(version, id, title);
@@ -61,7 +61,7 @@ describe.skipIf(!enabled)('schema-13 storage/archive integration · generated fi
       const filename = path.join(root, 'projects', `${id}.json`);
       await writeFile(filename, bytes);
       old.push({ id, title, version, filename, bytes });
-      await expect(store.load(id)).rejects.toThrow(`schema version ${version}; this build requires version 13`);
+      await expect(store.load(id)).rejects.toThrow(`schema version ${version}; this build requires version 14`);
       await expect(store.rename(id, 'Must not rewrite an older file', 0)).rejects.toThrow(
         'existing file was not changed',
       );
@@ -83,7 +83,7 @@ describe.skipIf(!enabled)('schema-13 storage/archive integration · generated fi
         revision: 0,
         clipCount: 0,
         duration: 0,
-        error: expect.stringContaining(`requires version 13`),
+        error: expect.stringContaining(`requires version 14`),
       });
       expect(await readFile(entry.filename)).toEqual(entry.bytes);
     }
@@ -136,12 +136,12 @@ describe.skipIf(!enabled)('schema-13 storage/archive integration · generated fi
     expect(await readFile(filename)).toEqual(bytes);
   });
 
-  it('rejects missing/out-of-range v13 gains and removed appearance/speed fields without defaults', async () => {
+  it('rejects missing/out-of-range v14 gains and removed appearance/speed fields without defaults', async () => {
     const root = await temp();
     const store = new ProjectStore(root);
     const directory = path.join(root, 'projects');
     await mkdir(directory);
-    const valid = createProject('malformed-v13', 'Must remain strict');
+    const valid = createProject('malformed-v14', 'Must remain strict');
     valid.clips = [createClip('current', 'generated-original', 0, 4)];
     const missingMedia: Record<string, unknown> = { ...valid };
     delete missingMedia['media'];
@@ -271,7 +271,7 @@ describe.skipIf(!enabled)('schema-13 storage/archive integration · generated fi
     expect((await store.list()).every((summary) => !summary.compatible)).toBe(true);
   });
 
-  it('restores only strict v13 snapshots in version-1 receipts and preserves earlier outputs/receipts byte-for-byte', async () => {
+  it('restores only strict v14 snapshots in version-1 receipts and preserves earlier outputs/receipts byte-for-byte', async () => {
     const root = await temp();
     const config = createConfig({ dataDir: root });
     const jobs = new JobQueue();
@@ -305,15 +305,15 @@ describe.skipIf(!enabled)('schema-13 storage/archive integration · generated fi
       return { id, folder, receipt, output };
     }
     try {
-      const current = await archive(snapshot, 'v13');
+      const current = await archive(snapshot, 'v14');
       const older = [];
-      for (const version of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]) {
+      for (const version of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]) {
         const document = unsupportedProject(version, `old-${version}`, `Original ${version}`);
         older.push({ ...(await archive(document, `v${version}`)), version });
       }
       const missingRow: Record<string, unknown> = { ...snapshot.layers[0]! };
       delete missingRow['keyframes'];
-      const malformed = await archive({ ...snapshot, layers: [missingRow] }, 'Malformed v13');
+      const malformed = await archive({ ...snapshot, layers: [missingRow] }, 'Malformed v14');
       const missingTiming = [];
       for (const field of ['opacity', 'ripple', 'transitions', 'openingFade', 'closingFade']) {
         const row: Record<string, unknown> = { ...snapshot.layers[0]! };
@@ -366,7 +366,7 @@ describe.skipIf(!enabled)('schema-13 storage/archive integration · generated fi
           ),
         );
       const warnings = await restoreExports(config, jobs);
-      expect(warnings).toHaveLength(25);
+      expect(warnings).toHaveLength(26);
       expect(jobs.list().map((job) => job.id)).toEqual([current.id]);
       expect(jobs.get(current.id)).toMatchObject({
         kind: 'export',
@@ -377,7 +377,7 @@ describe.skipIf(!enabled)('schema-13 storage/archive integration · generated fi
       });
       for (const entry of older) {
         expect(warnings.find((warning) => warning.startsWith(`${entry.id}:`))).toContain(
-          `Unsupported export snapshot schema version ${entry.version}; this build requires version 13`,
+          `Unsupported export snapshot schema version ${entry.version}; this build requires version 14`,
         );
         expect(warnings.find((warning) => warning.startsWith(`${entry.id}:`))).toContain(
           'successful output were not changed',
@@ -399,7 +399,7 @@ describe.skipIf(!enabled)('schema-13 storage/archive integration · generated fi
         expect(await readFile(path.join(entry.folder, 'receipt.json'))).toEqual(entry.receipt);
         expect(await readFile(path.join(entry.folder, 'export.mp4'))).toEqual(entry.output);
       }
-      expect(await restoreExports(config, jobs)).toHaveLength(25);
+      expect(await restoreExports(config, jobs)).toHaveLength(26);
       expect(jobs.list()).toHaveLength(1);
     } finally {
       await jobs.close();

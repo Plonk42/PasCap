@@ -108,10 +108,10 @@ function rejected(document: ProjectDocument, command: EditCommand, message: stri
   expect(history.canRedo).toBe(false);
 }
 
-describe('strict uniform schema-13 tracks', () => {
+describe('strict uniform schema-14 tracks', () => {
   it('uses Ripple ON for the initial track and every newly created track', () => {
     const initial = createProject('new', 'New');
-    expect(initial.schemaVersion).toBe(13);
+    expect(initial.schemaVersion).toBe(14);
     expect(initial.layers).toEqual([createLayer(BASE_LAYER_ID, 'Video track 1')]);
     for (const id of [BASE_LAYER_ID, ...Array.from({ length: 8 }, (_, index) => `arbitrary-${index}`)]) {
       expect(createLayer(id, 'Track')).toEqual({
@@ -143,7 +143,7 @@ describe('strict uniform schema-13 tracks', () => {
     }
     for (const extra of [{ transitions: [] }, { openingFade: 0 }, { closingFade: 0 }])
       expect(projectSchema.safeParse({ ...document, ...extra }).success).toBe(false);
-    for (const schemaVersion of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])
+    for (const schemaVersion of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13])
       expect(projectSchema.safeParse({ ...document, schemaVersion }).success).toBe(false);
     expect(projectSchema.safeParse(unsupportedProject(5, 'old', 'Unsupported topology')).success).toBe(false);
     expect(document).not.toHaveProperty('transitions');

@@ -11,6 +11,7 @@ import { renderLayeredExport, type LayeredRenderReport } from '../../src/server/
 import { MediaLibrary } from '../../src/server/library.js';
 import { runProcess } from '../../src/server/process.js';
 import { gradePixel, NEUTRAL_COLOUR, type RGB } from '../../src/shared/colour.js';
+import { compileDetail, type DetailFilter, type DetailSettings } from '../../src/shared/detail.js';
 import {
   EXPORT_PROFILES,
   LAYERED_EXPORT_RESOURCES,
@@ -76,6 +77,8 @@ interface ReferenceSource {
   bounds: Bounds;
   rgb: Buffer;
   neutral: boolean;
+  /** Shared detail kernel on this independent bilinear sampler; null when neutral. */
+  detail: DetailFilter | null;
   cosine: number;
   sine: number;
   denominatorX: number;
@@ -105,16 +108,8 @@ function covered(source: ReferenceSource, u: number, v: number): boolean {
   );
 }
 
-function sourceRgb(source: ReferenceSource, u: number, v: number, x: number, y: number, target: Target): RGB {
+function fittedRgb(source: ReferenceSource, u: number, v: number, target: Target, out: Float64Array): void {
   const bounds = source.bounds;
-  if (source.neutral) {
-    if (x < bounds.x || x >= bounds.x + bounds.width || y < bounds.y || y >= bounds.y + bounds.height) return [0, 0, 0]; // Exact legacy padding: opaque, black and never graded.
-    const offset = (y * target.width + x) * 3;
-    return gradePixel(
-      [source.rgb[offset]! / 255, source.rgb[offset + 1]! / 255, source.rgb[offset + 2]! / 255],
-      source.sample.colour,
-    );
-  }
   const px = bounds.x + u * bounds.width - 0.5;
   const py = bounds.y + v * bounds.height - 0.5;
   const column = Math.floor(px);
@@ -128,12 +123,30 @@ function sourceRgb(source: ReferenceSource, u: number, v: number, x: number, y: 
         3 +
         channel
     ]! / 255;
-  const rgb = [0, 1, 2].map(
-    (channel) =>
+  for (let channel = 0; channel < 3; channel++)
+    out[channel] =
       (value(column, row, channel) * (1 - dx) + value(column + 1, row, channel) * dx) * (1 - dy) +
-      (value(column, row + 1, channel) * (1 - dx) + value(column + 1, row + 1, channel) * dx) * dy,
-  ) as unknown as RGB;
-  return gradePixel(rgb, source.sample.colour);
+      (value(column, row + 1, channel) * (1 - dx) + value(column + 1, row + 1, channel) * dx) * dy;
+}
+
+function sourceRgb(source: ReferenceSource, u: number, v: number, x: number, y: number, target: Target): RGB {
+  const bounds = source.bounds;
+  if (source.neutral) {
+    if (x < bounds.x || x >= bounds.x + bounds.width || y < bounds.y || y >= bounds.y + bounds.height) return [0, 0, 0]; // Exact legacy padding: opaque, black and never graded.
+    if (!source.detail) {
+      const offset = (y * target.width + x) * 3;
+      return gradePixel(
+        [source.rgb[offset]! / 255, source.rgb[offset + 1]! / 255, source.rgb[offset + 2]! / 255],
+        source.sample.colour,
+      );
+    }
+    u = (x + 0.5 - bounds.x) / bounds.width;
+    v = (y + 0.5 - bounds.y) / bounds.height;
+  }
+  const out = new Float64Array(3);
+  if (source.detail) source.detail.apply((su, sv, target_) => fittedRgb(source, su, sv, target, target_), u, v, out);
+  else fittedRgb(source, u, v, target, out);
+  return gradePixel([out[0]!, out[1]!, out[2]!], source.sample.colour);
 }
 
 function referencePixel(groups: readonly ReferenceSource[][], x: number, y: number, target: Target): readonly number[] {
@@ -344,6 +357,7 @@ describe.skipIf(!enabled)('spatial transforms · real native FFmpeg, disposable 
         neutral: (Object.keys(spatial) as (keyof SpatialPose)[]).every(
           (key) => spatial[key] === NEUTRAL_SPATIAL_POSE[key],
         ),
+        detail: compileDetail(sample.detail, asset.metadata.width / asset.metadata.height),
         cosine: Math.cos(radians),
         sine: Math.sin(radians),
         denominatorX: fit * asset.metadata.width * spatial.scale,
@@ -517,7 +531,7 @@ describe.skipIf(!enabled)('spatial transforms · real native FFmpeg, disposable 
     }
   }
 
-  const staticCases: { name: string; changes: Partial<SpatialPose>; asset: number }[] = [
+  const staticCases: { name: string; changes: Partial<SpatialPose>; asset: number; detail?: DetailSettings }[] = [
     {
       name: 'crop with exact inclusive IN/exclusive OUT pixel centres',
       asset: 0,
@@ -545,12 +559,25 @@ describe.skipIf(!enabled)('spatial transforms · real native FFmpeg, disposable 
         cropBottom: 0.23,
       },
     },
+    {
+      name: 'Sharpen, Clarity and Denoise on the neutral letterboxed path',
+      asset: 1,
+      changes: {},
+      detail: { sharpen: 0.8, clarity: 0.6, denoise: 0.5 },
+    },
+    {
+      name: 'Sharpen, negative Clarity and Denoise before a rotated, scaled grade',
+      asset: 0,
+      changes: { scale: 1.2, rotation: 13, translateX: 0.04 },
+      detail: { sharpen: 0.5, clarity: -0.7, denoise: 0.9 },
+    },
   ];
 
-  it.each(staticCases)('720p lossless native parity: $name', async ({ changes, asset }) => {
+  it.each(staticCases)('720p lossless native parity: $name', async ({ changes, asset, detail }) => {
     const project = createProject('static-spatial', 'Disposable one-frame spatial test');
     const clip = createClip('pattern', assets[asset]!.id, 1, 2);
     clip.spatial.base = pose(changes);
+    if (detail) clip.detail = detail;
     project.clips = [clip];
     const captured = projectSchema.parse(project);
     expect(needsLayeredExport(captured)).toBe(true);

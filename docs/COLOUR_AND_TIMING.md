@@ -1,4 +1,4 @@
-# PasCap colour and timing contract · project v13
+# PasCap colour and timing contract · project v14
 
 This specification is shared by the CPU reference, WebGL2 shader and native
 scalar LUT or exact advanced-colour export. It is elementary SDR grading, not
@@ -48,7 +48,9 @@ See [track appearance](design/ROW_APPEARANCE.md) for ownership, UI and strict st
   `V = 4.5 L` below `β`, otherwise `V = α L^0.45 − (α − 1)`.
 - Grade each decoder independently, then blend **encoded** RGB for dissolves.
   Black fades multiply already-graded encoded RGB. Thus tinted/lifted black cannot
-  contaminate fade-to-black. No hidden sharpening, tone mapping or loudness change.
+  contaminate fade-to-black. No hidden sharpening, tone mapping or loudness change;
+  clip **Sharpen/Clarity/Denoise** run only when set, on source taps before this
+  grade ([detail filters](design/DETAIL_FILTERS.md)).
 - With neutral HSL/identity curves, static single-track export generates a 65³
   scalar cube for FFmpeg `lut3d` tetrahedral interpolation. Composited/animated export
   reuses at most two scalar-only in-memory 65³ Float32 LUTs from **evaluated parameters**.
@@ -183,7 +185,7 @@ resets to normal graded preview. Export continues to use the saved grading contr
 
 ## Music sampling and mixing
 
-Strict schema 13 requires a 0–8 `music` array of independent uniquely identified
+Strict schema 14 requires a 0–8 `music` array of independent uniquely identified
 music tracks, `[]` without music. Each has source IN/OUT, start/duration, gain, fades
 and loop; source-video audio remains disabled. At 48 kHz, source/placement/duration/
 fade positions round independently to integer samples using the rational frame
@@ -228,19 +230,19 @@ neutral HSL and identity curves, exactly neutral spatial
 bases without spatial keyframes, without music, extra tracks or track keyframes,
 and is limited to 3,600 project frames. It refuses unsupported
 documents regardless of Ripple or track ID.
-It requires a strict schema-13 project snapshot, including explicit project media
+It requires a strict schema-14 project snapshot, including explicit project media
 membership; its reference receipt format remains independently version 1. New
-measurement reports must identify their v13 project snapshot without overwriting
+measurement reports must identify their v14 project snapshot without overwriting
 historical reports; the report identifier is separate from the project schema.
 Project identifiers such as `preview-lab`/`preview-lab-v6` are not schema versions
 and are not renamed by this contract.
-v1–v12 project documents and receipt snapshots are incompatible and preserved;
+v1–v13 project documents and receipt snapshots are incompatible and preserved;
 recreate projects deliberately, with no migration, compatibility defaults or
-old-format/null fallback readers or automatic deletion. Strict v13 requires
+old-format/null fallback readers or automatic deletion. Strict v14 requires
 complete video track `colour`, including Temperature/Tint bases and static HSL/curves,
 all ten nullable keyframe fields, constant or custom-curve clip speed, clip `spatial` base/per-setting keyframes and track `opacity`; saved `clip.colour`, `clip.correction`, `clip.opacity` and
 old `clipOpacity`/`layerOpacity` keyframe fields are rejected, not defaulted.
-Production export receipts also remain version 1, with strict v13 snapshots and
+Production export receipts also remain version 1, with strict v14 snapshots and
 required `musicSources` captured-original/`settings.audio` identified-plan arrays;
 older snapshots or invalid arrays are rejected without rewriting receipts/MP4s.
 Registry/proxy/current PCM formats and source guards are unchanged.

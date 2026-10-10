@@ -1,5 +1,6 @@
 import type { ColourSettings } from './colour.js';
 import { colourAt, opacityAt } from './composition.js';
+import type { DetailSettings } from './detail.js';
 import type { ProjectDocument, Transition, VideoClip, VideoLayer } from './model.js';
 import { evaluateSpatial, type SpatialPose } from './spatial.js';
 import { compileRetiming, type Retiming } from './speed.js';
@@ -30,6 +31,7 @@ export interface PreviewLayer {
   sourceFrame: number;
   sourcePosition: number;
   spatial: SpatialPose;
+  detail: DetailSettings;
   colour: ColourSettings;
   weight: number;
   blendWeight: number;
@@ -243,6 +245,7 @@ export function sampleTimeline(
         sourceFrame,
         sourcePosition,
         spatial: evaluateSpatial(placed.clip.spatial, sourcePosition),
+        detail: placed.clip.detail,
         colour: colourAt(layer, frame),
         weight: blendWeight * brightness,
         blendWeight,

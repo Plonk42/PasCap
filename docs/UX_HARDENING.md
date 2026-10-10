@@ -60,7 +60,7 @@ This guide is not a delivery ledger or a fresh validation result.
   uncertainty, errors/recheck and disclosed location/assumptions. Snapshot and
   native processing details remain available in **Rendering details**.
 
-Schema 13 requires complete video track Colour with Temperature/Tint and static HSL/curves,
+Schema 14 requires complete video track Colour with Temperature/Tint and static HSL/curves,
 clip spatial base/per-setting source-frame keyframes and uses a
 required 0–8 `music` array with unique required music track IDs and
 uniform video tracks with required Ripple/transitions/fades and
@@ -82,12 +82,12 @@ $w_i$ dissolve weight and $m_i$ spatial pixel coverage. Exact neutral poses
 preserve opaque black letterboxing after grading; nonneutral uncovered pixels
 reveal lower footage. Each source uses the same evaluated track Opacity at that
 project frame, from the track value or its overriding curve.
-v1–v12 project/receipt snapshots remain unchanged/incompatible
+v1–v13 project/receipt snapshots remain unchanged/incompatible
 and require recreation, without migration, defaults or automatic deletion.
 Track `opacity` is the required sole stored value, not obsolete; saved `clip.opacity`
 and old `clipOpacity`/`layerOpacity` keyframe channels are invalid.
 Registry/proxy/current PCM formats do not change. Version-1 export receipts require
-strict v13 snapshots and captured audio-source/instance-plan arrays, rejecting
+strict v14 snapshots and captured audio-source/instance-plan arrays, rejecting
 invalid arrays/older snapshots without rewriting successful exports. No null
 fallback or old-format reader is permitted. Source-copy prohibition,
 track keyframes, source choices, media preparation, Activity and both export

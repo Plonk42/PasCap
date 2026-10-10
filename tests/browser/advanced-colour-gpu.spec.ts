@@ -11,6 +11,7 @@ import {
   type ColourSettings,
   type RGB,
 } from '../../src/shared/colour.js';
+import { NEUTRAL_DETAIL } from '../../src/shared/detail.js';
 import { NEUTRAL_SPATIAL_POSE } from '../../src/shared/spatial.js';
 
 let script: string;
@@ -142,6 +143,7 @@ test('real GPU exact greys, near-grey chroma and circular hue boundaries retain 
                     settings,
                     aspect: canvas.width,
                     spatial,
+                    detail: { sharpen: 0, clarity: 0, denoise: 0 },
                     originalWidth: canvas.width,
                     originalHeight: 1,
                     opacity: 1,
@@ -222,6 +224,7 @@ test('single-source specialization and grouped paths preserve all sixteen curve 
           slot: 0,
           settings,
           spatial,
+          detail: { sharpen: 0, clarity: 0, denoise: 0 },
           aspect: 1,
           originalWidth: 17,
           originalHeight: 17,
@@ -300,6 +303,7 @@ test('Temperature/Tint GPU extremes tint greys with normalized linear gains befo
                   slot: 0,
                   settings,
                   spatial,
+                  detail: { sharpen: 0, clarity: 0, denoise: 0 },
                   aspect: 1,
                   originalWidth: 17,
                   originalHeight: 17,
@@ -402,6 +406,7 @@ test('Temperature/Tint: scalar/single/full switches preserve opacity and fades',
     slot,
     settings,
     spatial: NEUTRAL_SPATIAL_POSE,
+    detail: NEUTRAL_DETAIL,
     aspect: 1,
     originalWidth: 17,
     originalHeight: 17,

@@ -1,4 +1,4 @@
-# Video tracks, shared keyframes and source review · project v13
+# Video tracks, shared keyframes and source review · project v14
 
 Required video track Colour includes nine scalar fields, including **Temperature** and
 **Tint**, plus static **HSL ranges** and **Colour curves**. Temperature/Tint use
@@ -106,7 +106,7 @@ original-source keyframes. All shared track keyframes use absolute integer
 clip on that track, including clips from different recordings and both sources
 in that track's dissolve. They do not restart at a clip's IN, start or boundary.
 
-Schema 13 requires `layers[].keyframes` as ordered `{ frame, interpolation, values }`
+Schema 14 requires `layers[].keyframes` as ordered `{ frame, interpolation, values }`
 keyframes, with **at most 256 keyframes per track**. Frames are unique, strictly ascending,
 non-negative and at most 2,147,483,647. Every keyframe's `values` object (`LayerKeyValues`)
 requires **all ten nullable fields** below: a number enables that setting; `null` leaves it disabled. Omitted/unknown
@@ -129,7 +129,8 @@ The exact ten required value fields are `opacity`, `temperature`, `tint`, `expos
 `brightness`, `contrast`, `hue`, `saturation`, `highlights` and `shadows`; every
 track channel is appearance-only and never changes timing.
 Clip documents contain independent **constant or custom-keyframed**
-speed and required `spatial: { base, keyframes }`, with no colour/correction or `opacity` field.
+speed, required `spatial: { base, keyframes }` and static `detail` (Sharpen, Clarity,
+Denoise), with no colour/correction or `opacity` field.
 Shared track animation has no per-property track keyframe arrays. Clip speed and spatial
 keyframes use original-source frames in their separate clip-owned settings; neither
 changes track-channel ownership. Spatial keyframes enable each of the eight settings independently (nullable per setting), like track keyframes.
@@ -474,7 +475,7 @@ offscreen/unmount/project-switch releases the review decoder.
 ## Inspector and resource limits
 
 The inspector uses **Clip / Track / Audio** tabs, split by ownership. **Clip**
-holds the selected clip's **Speed**, **Transform**, **Range** and **Placement** (placement only) under a "Clip N of M · track" header; on an empty video track it shows only
+holds the selected clip's **Speed**, **Transform**, **Detail**, **Range** and **Placement** (placement only) under a "Clip N of M · track" header; on an empty video track it shows only
 "Select a clip on … to edit it." **Track** holds everything the whole video track owns
 under an "Applies to all N clips on this track" header: Colour (including the sole
 track Opacity control), HSL ranges, Colour curves, Keyframes (the shared keyframe list with
@@ -482,9 +483,9 @@ Animation help, enabled-setting chips and whole-track navigation), Transitions (
 boundary of the track, left to right, with the selected one expanded) and Fades.
 Music belongs to Audio, with detailed **Placement & fades**.
 Sections retain their expansion in local browser storage.
-New defaults collapse **Speed**, **Transform**, **Range**, **Placement**, **HSL ranges** and
+New defaults collapse **Speed**, **Transform**, **Detail**, **Range**, **Placement**, **HSL ranges** and
 **Colour curves**, while the other Track sections stay open. Existing section preferences are not reset. **Expand all / Collapse all**
-affects only the visible tab's sections: Clip's **Speed**, **Transform**, **Range** and
+affects only the visible tab's sections: Clip's **Speed**, **Transform**, **Detail**, **Range** and
 **Placement**; Track's **Colour**, **HSL ranges**, **Colour curves**, **Keyframes**, **Transitions** and **Fades**; Audio's
 **Music**. Other tabs, nested keyframe disclosures and
 help remain unchanged; the shared list has no expansion preference.
@@ -518,7 +519,8 @@ The plain static single-track path retains at most two lossless clips, two
 intermediate decoders and one reusable RGB frame (24.9 MB UHD), plus native memory.
 
 The static fast path is eligible only with neutral HSL/identity colour curves and one enabled video track with Opacity 1,
-no track keyframes, exactly neutral clip spatial bases and no spatial keyframes, a zero first
+no track keyframes, exactly neutral clip spatial bases and no spatial keyframes, neutral clip
+[detail filters](design/DETAIL_FILTERS.md), a zero first
 start and no internal gaps, covering the **full project duration**. Music beyond
 video OUT requires composited export's trailing black spans,
 not a held last image. Ripple itself is not
@@ -580,7 +582,7 @@ not all sources or loop repetitions. It grows with duration and is additional to
 the unchanged video raw-buffer/child/LUT bounds above. Cancellation/failure removes
 only owned scratch, never originals, saved projects or successful outputs.
 
-Schema **v13 is strict**, including complete required video track `colour` with Temperature/Tint and static HSL/curves, no clip colour/correction fields, and clip `spatial` base/eight-value
+Schema **v14 is strict**, including complete required video track `colour` with Temperature/Tint and static HSL/curves, no clip colour/correction fields, and clip `spatial` base/eight-value
 source-frame keyframes and required unique `media.videoIds` / `media.audioIds`
 arrays, at most 10,000 IDs each, and all required per-track settings. Project-level
 transitions/fades, saved `clip.opacity` and old `clipOpacity`/`layerOpacity` keyframe
@@ -590,8 +592,8 @@ Keyframes require exactly the ten nullable fields listed above, including `opaci
 The required `music` array contains 0–8 independent music tracks with unique required
 IDs and complete source IN/OUT/start/duration/gain/fades/loop fields; `[]` without
 music, never a null/singular value or default. Version-1 export receipts require
-a strict v13 snapshot plus captured audio-source/instance-plan arrays.
-Older v1–v12 project documents and export receipt snapshots remain unchanged/incompatible;
+a strict v14 snapshot plus captured audio-source/instance-plan arrays.
+Older v1–v13 project documents and export receipt snapshots remain unchanged/incompatible;
 there are no migrations, compatibility fallback/default fields or automatic deletion
 of projects, receipts or successful videos. Create a new project and deliberately
 import its media; registered media and currently verified ready proxies remain reusable.

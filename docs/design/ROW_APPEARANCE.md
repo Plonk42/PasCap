@@ -1,4 +1,4 @@
-# Owner-approved video track-only Colour and Opacity · schema 13
+# Owner-approved video track-only Colour and Opacity · schema 14
 
 Required Colour includes nine scalar settings, including Temperature and Tint,
 eight static HSL bands and four master/RGB colour curves. HSL/curves share video track
@@ -22,8 +22,8 @@ intentionally colour greys; normalized linear gains precede Exposure, preserving
 neutral-white linear luminance before clipping only, not arbitrary/final images.
 Other scalar bounds and neutral values retain the existing SDR contract.
 No optional legacy field, additive parameter merge, migration or default-on-load exists.
-Schema 13 rejects versions 1–12 without rewriting or deleting their documents.
-Receipt format remains 1 with strict schema-13 snapshots; registry, proxies and
+Schema 14 rejects versions 1–13 without rewriting or deleting their documents.
+Receipt format remains 1 with strict schema-14 snapshots; registry, proxies and
 PCM formats are unchanged. Recreate incompatible projects deliberately.
 
 The nine shared scalar colour channels override **video track colour**, independently, in
@@ -54,7 +54,7 @@ $$G_i=\mathrm{grade}(RGB_i, rowColour(t)).$$
 
 There is one ordered SDR grade, not a composed or double-grade transform. An exactly
 neutral track grade returns its input unchanged. Grading precedes black fades,
-dissolve group sums and track Opacity/coverage. Ungraded preview neutralizes all video track Colour,
+dissolve group sums and track Opacity/coverage. Ungraded preview neutralizes all video track Colour and clip Detail,
 preserving observed frames, retiming, geometry, Opacity, fades, stacking and music.
 Appearance edits do not restart unchanged media or alter timing.
 Texture, decoder and full-frame buffer counts stay unchanged. Exact neutral spatial

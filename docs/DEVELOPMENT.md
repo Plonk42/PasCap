@@ -1,12 +1,12 @@
 # Development
 
-Current strict schema **13** requires nine scalar bases in each video track's `colour`,
+Current strict schema **14** requires nine scalar bases in each video track's `colour`,
 including Temperature/Tint (−1…1, neutral 0), all eight HSL bands and all four
 colour curves. Shared keyframes require ten nullable fields, in control order:
 `opacity`, `temperature`, `tint`, `exposure`, `brightness`, `contrast`,
 `hue`, `saturation`, `highlights`, `shadows`. HSL/curves remain static; speed is
 clip-only (constant or 1–256 source-frame keyframes).
-Reject/preserve v1–v12 documents and receipt snapshots; no load defaults,
+Reject/preserve v1–v13 documents and receipt snapshots; no load defaults,
 migrations, legacy acceptance or automatic deletion. CPU/reference/native/GPU
 must use the same [Temperature/Tint gain math](design/TEMPERATURE_AND_TINT.md)
 before Exposure, including intentionally coloured greys and pre-clipping
@@ -19,7 +19,7 @@ scalar LUT paths. At most two native 65³ Float32 buffers (6,591,000 bytes) rema
 available, without an extra decoder, texture, full-frame buffer or child process.
 Exact advanced grading remains the costliest export path, especially at UHD. See
 [HSL_AND_CURVES.md](design/HSL_AND_CURVES.md). New reference/measurement metadata
-identifies strict schema 13; historical reports remain unchanged.
+identifies strict schema 14; historical reports remain unchanged.
 
 Local Linux setup and contributing. Editing: [USER_GUIDE.md](USER_GUIDE.md). Service
 paths and **future, not implemented** containers: [DEPLOYMENT.md](DEPLOYMENT.md).
@@ -313,7 +313,7 @@ originals in `.pascap/browser-footage/synthetic-sources/` are outside that cache
 `browse-camera-*` means generated patterns, not real recordings. The
 [fixture factory](../scripts/fixtures.ts) uses `preview-lab-v6` outside the browser
 cache and `preview-lab` inside it. These are project identifiers, not schema
-versions; newly generated documents must satisfy strict v13, including complete video track
+versions; newly generated documents must satisfy strict v14, including complete video track
 colour with Temperature/Tint, all ten nullable channels and clip spatial
 base/per-setting keyframes. Bin resets never imply
 a global-library fallback.
@@ -411,7 +411,7 @@ the independent one-frame A/V, single-epoch and completion assertions.
 **Do not run these in CI or without the owner's explicit approval for real jobs.**
 The [sample helper](../scripts/prepare-samples.ts) targets **DJI_0468.MP4 and DJI_0469.MP4
 only**: pass an **explicit folder after `--`**, never rely on a personal-path default.
-It reuses ready proxies but may prepare missing ones; creates only an absent v13
+It reuses ready proxies but may prepare missing ones; creates only an absent v14
 sample, never overwrites or migrates existing edits.
 
 The [measurement helper](../scripts/measure-preview.ts) accepts exactly **two
@@ -419,7 +419,7 @@ The [measurement helper](../scripts/measure-preview.ts) accepts exactly **two
 extra tracks, spatial edits/keyframes or shared track keyframes
 (even neutral keyframes). `PASCAP_MEASURE_URL` selects that project.
 Measurement uses static scalar track Colour (including Temperature/Tint), neutral
-HSL and identity curves; metadata must identify the strict v13 snapshot independently of the
+HSL and identity curves; metadata must identify the strict v14 snapshot independently of the
 report format/identifier; historical reports and receipt snapshots stay untouched.
 `npm run measure -- --skip-playback --reference` skips playback benchmarking but
 **renders a native reference**; `--headed --reference` adds repeated playback. The edit
@@ -458,14 +458,15 @@ run on at most eight worker threads sharing those buffers, without copies. Two r
 three timeline representations bound concurrency, **not disk GB**;
 scratch grows with duration ([resource contract](LAYERS_AND_KEYFRAMES.md#inspector-and-resource-limits)).
 The static fast path requires one enabled, unanimated, zero-origin contiguous
-video track with Opacity 1, neutral HSL/identity colour curves and exactly neutral spatial bases without spatial keyframes;
-any spatial edit/keyframe (even neutral keyframes) or unsupported placement/coverage uses
+video track with Opacity 1, neutral HSL/identity colour curves, exactly neutral spatial bases without spatial keyframes
+and neutral clip Sharpen/Clarity/Denoise;
+any spatial edit/keyframe (even neutral keyframes), [detail filter](design/DETAIL_FILTERS.md) or unsupported placement/coverage uses
 generalized composited export, regardless
 of Ripple or track ID.
 Processing: [track keyframes](LAYERS_AND_KEYFRAMES.md), [retiming/audio](SPEED_AND_AUDIO.md)
 and [grading equations](COLOUR_AND_TIMING.md#colour).
 
-Strict schema 13 requires `clip.spatial: { base, keyframes }`: eight complete pose
+Strict schema 14 requires `clip.spatial: { base, keyframes }`: eight complete pose
 values and 0–256 per-setting original-source keyframes with required easing. Shared
 [spatial mapping](../src/shared/spatial.ts) uses unrounded original-aspect contain
 fit, original-centre pivot and half-open crop bounds; crop does not refit.
@@ -566,11 +567,11 @@ independent numeric IN/OUT pair (Enter/blur applies, Escape restores) is unchang
 - Never modify/copy/delete owner's originals or commit private paths/device IDs,
   saved project IDs, real media/cache or reports. Preserve fingerprints, symlink
   rejection, cache exclusion and HTTP guards.
-- Keep **strict schema 13**: complete required video track `colour`, including
+- Keep **strict schema 14**: complete required video track `colour`, including
   Temperature/Tint and static HSL/curves; reject saved `clip.colour`
   and `clip.correction`. Grade sources once with evaluated track Colour, retaining
   two LUT buffers and existing raw/process budgets. Main Colour controls and keyframes
-  have identical track scope and work empty. See [track appearance](design/ROW_APPEARANCE.md). Required clip spatial base/per-setting source-frame keyframes,
+  have identical track scope and work empty. See [track appearance](design/ROW_APPEARANCE.md). Required clip spatial base/per-setting source-frame keyframes and static clip `detail`,
   required unique video/audio membership, all ten nullable
   channels and per-track `ripple`, `transitions`, `openingFade`, `closingFade` and
   numeric `opacity` in 0–1. A new track starts at 1; a missing saved field is invalid.
@@ -582,7 +583,7 @@ independent numeric IN/OUT pair (Enter/blur applies, Escape restores) is unchang
   transitions/fades, compatibility fields/defaults/migration or mandatory first-track
   ID. Require a 0–8 `music` array with unique instance IDs and complete independent
   settings, plus captured audio-source/instance-plan arrays in current receipts.
-  Reject and preserve incompatible v1–v12 projects/receipt snapshots and finished videos,
+  Reject and preserve incompatible v1–v13 projects/receipt snapshots and finished videos,
   without automatic deletion; recreate projects deliberately. Registry/proxy formats,
   source protections and native resource budgets remain unchanged.
 - Reuse `JobQueue`, library and backpressured raw/retime helpers: one heavy job,

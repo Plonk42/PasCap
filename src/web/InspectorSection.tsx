@@ -19,6 +19,7 @@ const SECTION_DEFAULTS = {
   'layer-opacity': false,
   speed: false,
   transform: false,
+  detail: false,
   colour: true,
   hsl: false,
   curves: false,
@@ -29,7 +30,7 @@ const SECTION_DEFAULTS = {
 };
 type SectionId = keyof typeof SECTION_DEFAULTS;
 const TAB_SECTIONS: Record<InspectorMode, readonly SectionId[]> = {
-  clip: ['speed', 'transform', 'source', 'layer-opacity'],
+  clip: ['speed', 'transform', 'detail', 'source', 'layer-opacity'],
   track: ['colour', 'hsl', 'curves', 'keyframes', 'transition', 'fades'],
   audio: ['music'],
 };

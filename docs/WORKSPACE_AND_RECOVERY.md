@@ -1,6 +1,6 @@
 # Desktop workspace and recovery
 
-The workspace uses **strict schema 13 with complete required video track colour, independent clip spatial settings and clip-only speed, uniform video tracks, required per-track
+The workspace uses **strict schema 14 with complete required video track colour, independent clip spatial settings and clip-only speed, uniform video tracks, required per-track
 Ripple/transitions/fades, 0–8 independently identified music tracks, project-specific
 video/music bins and draggable shared project-time track keyframes**, with per-setting channel navigation. Layout preferences,
 stored-keyframe inspection and recovery feedback remain editor-only. Source protection,
@@ -17,7 +17,7 @@ The intended discrete-GPU and long real-flight checks remain deferred.
 Main **Track → Colour** edits nine scalar video track colour values and sole Opacity, including
 on empty tracks. Static and keyed Colour share this track ownership on every clip.
 Different treatments require different tracks; there is no per-clip grade or scope
-toggle. Sources are graded once; Ungraded neutralizes track Colour only.
+toggle. Sources are graded once; Ungraded neutralizes track Colour and clip Detail only.
 See [track appearance](design/ROW_APPEARANCE.md) for reset, context and storage details.
 **Temperature / Tint** precede Exposure, use normalized −1…1 values and Reset to
 0, and retain native sliders/exact fields in main and stored editors. Main
@@ -41,7 +41,7 @@ They are not Kelvin/HDR/automatic white balance. HSL/curves remain static. See
 - Right: scrollable **Clip / Track / Audio** inspector tabs
   with readable inputs and independent collapsible sections, split by ownership.
   Clip ("Clip N of M · track") contains the selected clip's **Speed**,
-  **Transform**, **Range** and **Placement**; an empty video track shows one line instead.
+  **Transform**, **Detail**, **Range** and **Placement**; an empty video track shows one line instead.
   Track ("Applies to all N clips on this track") contains Colour with the single
   track-owned Opacity control, **HSL ranges**, **Colour curves**, Keyframes (the whole-keyframe list, enabled-setting chips,
   Animation help and keyframe navigation), Transitions and Fades;
@@ -172,20 +172,20 @@ Selecting a clip or track keeps the chosen tab; explicit Cut/Fade/Dissolve bound
 buttons open Track with that boundary expanded.
 **Expand all / Collapse all** is an icon button on the Inspector tab bar that changes
 only the visible tab's sections, including temporarily absent ones: Clip's **Speed**,
-**Transform**, **Range** and **Placement**; Track's **Colour**, **HSL ranges**, **Colour curves**, **Keyframes**,
+**Transform**, **Detail**, **Range** and **Placement**; Track's **Colour**, **HSL ranges**, **Colour curves**, **Keyframes**,
 **Transitions** and **Fades**; Audio's **Music**. It is hidden while Clip has no
 selected clip or Track no selected track. A mixed state offers Expand all. Individual toggles
 and the existing section preferences remain authoritative. Other tabs'
 sections, each keyframe's nested **Edit**, other nested details and help are unchanged.
 Bulk expansion is presentation-only and leaves mounted drafts, processing, history
 and saves unchanged. If preference storage fails, choices still work for the session.
-New preferences keep **Speed**, **Transform**, **Range**, **Placement**, **HSL ranges** and **Colour curves** collapsed and the other Track sections open;
+New preferences keep **Speed**, **Transform**, **Detail**, **Range**, **Placement**, **HSL ranges** and **Colour curves** collapsed and the other Track sections open;
 existing expansion preferences remain respected. Help/reset details are contextual,
 not repeated across the main workspace. Collapsing never disables processing.
 
 All inline help uses a small **question-mark button**, including animation, source,
 opacity, speed, Transform, colour, keyframe/transition/fade/audio timing and startup details.
-Inspector **Speed**, **Transform**, **Range**, **Placement**, **Colour**, **HSL ranges**, **Colour curves**, Transition and Sequence
+Inspector **Speed**, **Transform**, **Detail**, **Range**, **Placement**, **Colour**, **HSL ranges**, **Colour curves**, Transition and Sequence
 fades put help beside their titles, reachable even when collapsed. Expansion and
 help are independent native buttons in normal section → help → fields Tab order
 (an open help's **Learn more** link comes right after its button);
@@ -239,7 +239,7 @@ there is no global comparison shortcut. **Source preview** is unaffected.
 The ungraded view is the composed preview without grading, not original-resolution
 footage or the selected clip in isolation. All evaluated colour settings are neutral
 across enabled video tracks, including track colour bases/keyframes and both dissolve
-sources. Exact observed source frames and retiming, spatial geometry/coverage, track Opacity,
+sources, and every clip's Sharpen/Clarity/Denoise is bypassed. Exact observed source frames and retiming, spatial geometry/coverage, track Opacity,
 visibility, black fades, stacking and music are preserved.
 
 This mode belongs only to the editor's preview engine: toggling causes no seek,
@@ -498,7 +498,7 @@ uncertain write keeps selection and the actual error visible, with guidance to c
 Activity/project state before repeating the import; there is no automatic write retry.
 Late folder reads are aborted on navigation/dismissal. Manual music paths remain
 deliberate imports outside browser roots and never expand configured roots. No original is
-copied: strict schema 13 references registered originals in place, with only
+copied: strict schema 14 references registered originals in place, with only
 generated proxies/thumbnails, metadata, exports/receipts and scratch written locally.
 
 There is no upload endpoint, browser file picker, optional copy flow or true
@@ -657,7 +657,7 @@ saved document. It never deletes original recordings, shared registry entries,
 proxies/cache files, successful MP4s or receipts. This is not cache garbage
 collection; another project's membership and immutable export snapshots are unaffected.
 
-Only strict v13 projects and v13 project snapshots in version-1 export receipts are interpreted.
+Only strict v14 projects and v14 project snapshots in version-1 export receipts are interpreted.
 Every video track requires complete Colour, including `temperature` and `tint` bases
 and static HSL/curves; missing fields and clip colour/correction are invalid.
 Every clip requires constant or 1–256-keyframe custom-curve speed and complete spatial
@@ -681,7 +681,7 @@ ten nullable fields, in control order: `opacity`, `temperature`,
 `shadows`. HSL/curves remain static. Track
 `opacity` is the sole valid stored value; saved `clip.opacity` and old
 `clipOpacity`/`layerOpacity` channels are invalid, not ignored or defaulted.
-Earlier v1–v12 projects/receipt snapshots are preserved, incompatible
+Earlier v1–v13 projects/receipt snapshots are preserved, incompatible
 and never migrated or rewritten with fallback/default local fields or old-format
 readers. **Create a new
 project** and import its media deliberately; there is no automatic deletion of
@@ -778,7 +778,7 @@ invalid release leaves the saved document and history unchanged.
 For an HTTP 409 or incompatible save response, **Review latest save** explains:
 
 1. **Keep editing this draft** — no saved document changes; the save error persists.
-2. **Download unsaved project** — download a strict v13 JSON snapshot with the current
+2. **Download unsaved project** — download a strict v14 JSON snapshot with the current
    local changes/expected revision before replacing them.
 3. **Discard local changes and reload** — explicitly replace local history/document
    with a newly read saved version. It performs no overwrite POST/PUT.
@@ -807,7 +807,7 @@ track keyframes and animated settings, and all independent music tracks. A keyfr
 with several channels counts once, not as separate clip/channel keyframes. Both 720p/4K
 use originals. The static fast path requires neutral HSL/identity colour curves and one enabled, unanimated,
 zero-origin contiguous video track with Opacity 1, exactly neutral spatial bases
-and no spatial keyframes; any spatial edit/keyframe (even neutral keyframes), track keyframe, leading start,
+and no spatial keyframes; any spatial edit/keyframe (even neutral keyframes), clip detail filter, track keyframe, leading start,
 gap, unsupported coverage or music beyond video OUT uses generalized composited
 export. Static video must cover full project duration; composited export fills music
 tails with black rather than holding a last image. That path renders

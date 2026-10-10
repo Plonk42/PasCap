@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { isNeutralAdvancedColour } from './colour.js';
+import { isNeutralDetail } from './detail.js';
 import {
   MAX_MUSIC_TRACKS,
   MAX_VIDEO_LAYERS,
@@ -96,7 +97,7 @@ export const LAYERED_EXPORT_RESOURCES = Object.freeze({
 export function needsLayeredExport(document: ProjectDocument): boolean {
   if (
     document.layers.length !== 1 ||
-    document.clips.some((clip) => hasSpatialEdits(clip.spatial)) ||
+    document.clips.some((clip) => hasSpatialEdits(clip.spatial) || !isNeutralDetail(clip.detail)) ||
     document.layers.some(
       (layer) =>
         !layer.enabled || layer.opacity !== 1 || layer.keyframes.length > 0 || !isNeutralAdvancedColour(layer.colour),
@@ -237,7 +238,7 @@ export function planExport(document: ProjectDocument): ExportPlan {
   const snapshot = exportDocumentSchema.parse(document);
   if (needsLayeredExport(snapshot))
     throw new Error(
-      'Multiple/disabled tracks, opacity, shared track keyframes, HSL/curves, spatial edits, gaps, leading starts or music beyond video OUT require the layered exporter, not a static chunk plan.',
+      'Multiple/disabled tracks, opacity, shared track keyframes, HSL/curves, spatial edits, detail filters, gaps, leading starts or music beyond video OUT require the layered exporter, not a static chunk plan.',
     );
   const layout = calculateLayout(snapshot);
   validateDuration(layout);

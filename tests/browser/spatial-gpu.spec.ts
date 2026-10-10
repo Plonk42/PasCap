@@ -4,6 +4,7 @@ import { build } from 'vite';
 import type { CompositeClip, CompositeGroup } from '../../src/preview/compositor.js';
 import { CURVE_CHANNELS, HSL_BANDS } from '../../src/shared/advanced-colour.js';
 import { createColourSettings, gradePixel, NEUTRAL_COLOUR, type RGB } from '../../src/shared/colour.js';
+import { NEUTRAL_DETAIL } from '../../src/shared/detail.js';
 import { NEUTRAL_SPATIAL_POSE, type SpatialPose } from '../../src/shared/spatial.js';
 
 // Bundle the real compositor in memory only: no editor, fixtures, original media,
@@ -57,6 +58,7 @@ function clip(slot: number, pose: Partial<SpatialPose> = {}, overrides: Partial<
     originalWidth: 4031,
     originalHeight: 3017,
     spatial: { ...NEUTRAL_SPATIAL_POSE, ...pose },
+    detail: { ...NEUTRAL_DETAIL },
     opacity: 1,
     blendWeight: 1,
     brightness: 1,
@@ -637,6 +639,7 @@ test('synthetic orientation and dyadic half-open crop edges preserve lower cover
       originalWidth: 8,
       originalHeight: 8,
       spatial,
+      detail: { sharpen: 0, clarity: 0, denoise: 0 },
       opacity: 1,
       blendWeight: 1,
       brightness: 1,

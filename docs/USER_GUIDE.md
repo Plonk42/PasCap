@@ -13,7 +13,7 @@ inherit the shared media registry. Importing the same original into another proj
 deliberately adds it to that project's bin and reuses eligible verified proxies.
 Removing a clip or music track does not remove the imported recording.
 
-Projects use **strict format v13**, with complete required video track colour and clip spatial base/per-setting
+Projects use **strict format v14**, with complete required video track colour and clip spatial base/per-setting
 source-frame keyframes and a required `music` array of 0–8 independent
 music tracks and unique required IDs (`[]` without music), every video track's Ripple, transitions and
 opening/closing fades and required numeric `opacity` in 0–1 (1 on new tracks),
@@ -24,10 +24,10 @@ Video track Colour requires Temperature/Tint bases and static
 HSL/curves; missing fields and saved clip colour/correction are invalid.
 Track `opacity` is the sole saved Opacity value; saved `clip.opacity` and old
 `clipOpacity`/`layerOpacity` keyframe channels are invalid, not ignored or defaulted.
-v1–v12 project documents and receipt snapshots
+v1–v13 project documents and receipt snapshots
 stay on disk but are incompatible: there is no migration, compatibility default,
 null fallback, old-format reader, automatic repair or deletion. Export receipts
-remain version 1 with a strict v13 snapshot and required audio-source/instance-plan arrays.
+remain version 1 with a strict v14 snapshot and required audio-source/instance-plan arrays.
 Create a new project and import its media deliberately. Finished videos remain
 untouched. **Delete project** requires confirmation and deletes only the saved
 project document, not originals, the shared registry/proxy cache or exports/receipts.
@@ -282,7 +282,7 @@ paused or playing; there is no global shortcut. **Source preview** is unchanged.
 Ungraded means the **composed timeline preview without grading**, not an
 original-resolution view or an isolated selected clip. It neutralizes all evaluated
 colour settings across enabled video tracks, including track colour bases/keyframes and both
-dissolve sources. Exact observed source frames, retiming, track Opacity,
+dissolve sources, and every clip's Sharpen, Clarity and Denoise. Exact observed source frames, retiming, track Opacity,
 spatial geometry/coverage, visibility, black fades, stacking and music remain unchanged.
 
 Comparison is editor-only: toggling never seeks, saves, enters Undo history, changes
@@ -382,6 +382,23 @@ there is no optical flow. Transform edits do not change timing, track Opacity,
 music, originals or proxies. Native Export supports these transforms through the
 composited path; the diagnostic two-clip reference does not.
 Details: [spatial transforms](design/SPATIAL_TRANSFORMS.md).
+
+### Sharpen, clarity and denoise a clip
+
+Select a clip and open **Clip → Detail** (collapsed initially, after Transform).
+**Sharpen** (0–1) crisps fine edges, **Clarity** (−1–1) adds midtone local contrast
+or, below zero, softens it, and **Denoise** (0–1) smooths grain while keeping strong
+edges. Each has a native slider and an exact field; 0 leaves the clip untouched.
+Dragging a slider previews the result live in the image; releasing commits one Undo
+step, and Escape cancels. Double-click a setting's name to reset it, or use
+**Reset detail** for all three. Settings belong to this clip only, are not animated,
+follow it to another track and are copied by Split, Cut range and Duplicate.
+
+The filters work on the recording before the track's Colour, scaled to the image
+height, so the 720p preview shows what both export profiles produce. **Compare**
+hides them together with Colour. Any detail setting renders through the composited
+exporter and makes it slower, especially in 4K. Details:
+[detail filters](design/DETAIL_FILTERS.md).
 
 ### Seek clip source keyframes from the timeline
 
@@ -556,7 +573,7 @@ resources and pending acceptance; this guide does not claim those tests passed.
 
 ## Workspace and keyboard
 
-Use **Clip** for the selected clip's **Speed**, **Transform**, **Range** and **Placement**;
+Use **Clip** for the selected clip's **Speed**, **Transform**, **Detail**, **Range** and **Placement**;
 **Track** for everything the whole video track owns (Colour and Opacity, keyframes,
 transitions and fades); and **Audio** for music. Each tab names its scope at the top.
 Selecting a clip or a populated/empty video track preserves the chosen tab and updates
@@ -572,7 +589,7 @@ and tooltips. See the [editor control catalogue](design/EDITOR_CONTROLS.md#vocab
 control conventions and vocabulary.
 
 **Expand all / Collapse all** is an icon button on the Inspector tab bar for the
-visible tab: Clip's **Speed**, **Transform**, **Range** and **Placement**; Track's
+visible tab: Clip's **Speed**, **Transform**, **Detail**, **Range** and **Placement**; Track's
 **Colour**, **Keyframes**, **Transitions** and **Fades**; Audio's **Music**. Other
 tabs, nested disclosures and help remain unchanged.
 
@@ -650,7 +667,7 @@ in memory and automatic write retries stop. **Retry save** is offered only for
 recoverable transport/server errors. On a revision conflict, **Review latest save**
 offers keeping the draft, **Download unsaved project**, or explicitly discarding
 local changes and reloading. It never silently overwrites or rebases another save.
-Download before discarding; the v13 JSON snapshot is for manual recovery/examination,
+Download before discarding; the v14 JSON snapshot is for manual recovery/examination,
 not a supported JSON-import or migration flow. Unapplied input/pointer drafts are
 not committed project edits.
 
