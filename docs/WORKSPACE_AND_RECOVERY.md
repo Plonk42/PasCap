@@ -454,7 +454,7 @@ Trim/move/split/duplicate do not copy or shift track keyframes. The contract is 
 
 ### Clip source-keyframe lanes
 
-Inside each timeline clip rectangle, boxed blue **▼** Transform and salmon/dashed
+Inside each timeline clip rectangle, boxed blue **▼** Transform and boxed salmon
 **◆** custom-speed lanes show source keyframes at authoritative retimed output
 positions. Off-trim keyframes are omitted; exclusive
 OUT has a boundary marker that seeks the final available frame. Click, Enter or Space selects the clip,

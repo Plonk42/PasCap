@@ -214,7 +214,7 @@ is no Transform canvas gizmo; timeline markers slide as described below.
 
 ### Timeline source-keyframe markers
 
-Each clip rectangle shows Transform keys as boxed blue **▼** buttons overlapping its top edge, the same size as the amber Colour track markers (which overlap the bottom edge by the same amount), clear of the bottom shared project-time track markers and the salmon/dashed **◆** custom-speed lane (the clip label sits below them); the tab shape and the marker's accessible name and tooltip (which
+Each clip rectangle shows Transform keys as boxed blue **▼** buttons overlapping its top edge, the same size as the amber Colour track markers (which overlap the bottom edge by the same amount), clear of the bottom shared project-time track markers and the boxed salmon **◆** custom-speed lane (the clip label sits below them); the tab shape and the marker's accessible name and tooltip (which
 list the enabled settings) distinguish it without relying on colour. One marker
 represents one key, however many settings it enables.
 Source keyframes use the clip's authoritative retiming to locate output positions;

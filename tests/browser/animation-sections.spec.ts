@@ -676,15 +676,19 @@ for (const viewport of [
           type: element.getAttribute('data-clip-keyframe'),
           top: getComputedStyle(element).top,
           colour: getComputedStyle(element).color,
-          border: getComputedStyle(element.querySelector('span')!).borderBottomStyle,
+          border: getComputedStyle(element).borderTopStyle,
+          borderColour: getComputedStyle(element).borderTopColor,
+          width: element.getBoundingClientRect().width,
         })),
       );
       const transform = appearance.find(({ type }) => type === 'transform')!;
       const speed = appearance.find(({ type }) => type === 'speed')!;
       expect(transform.top).not.toBe(speed.top);
       expect(transform.colour).not.toBe(speed.colour);
-      expect(speed.border).toBe('dashed');
-      expect(transform.border).not.toBe('dashed');
+      expect(transform.borderColour).not.toBe(speed.borderColour);
+      // Both are boxed buttons of the same family as the Colour track markers.
+      expect([transform.border, speed.border]).toEqual(['solid', 'solid']);
+      expect(speed.width).toBe(transform.width);
       for (const activation of [
         { type: 'transform', source: 20, key: null },
         { type: 'speed', source: 80, key: 'Space' },

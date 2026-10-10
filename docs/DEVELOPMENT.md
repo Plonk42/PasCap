@@ -521,7 +521,7 @@ never an inspected stored time. All visible
 track/Transform/clip-speed easing labels read **Easing**, retaining contextual
 accessible names such as **Track keyframe easing N**.
 
-Inside timeline clip rectangles, boxed blue **▼** Transform and salmon/dashed **◆**
+Inside timeline clip rectangles, boxed blue **▼** Transform and boxed salmon **◆**
 custom-speed lanes place source keyframes at authoritative retimed output positions.
 Off-trim keyframes are omitted; exclusive OUT has a boundary marker seeking the final
 available frame. Click, Enter or Space selects the clip, seeks its nearest

@@ -231,7 +231,7 @@ changing track keyframes or other clips.
 
 ### Timeline clip-speed markers
 
-Inside each clip rectangle, custom-speed source keyframes appear in a salmon/dashed
+Inside each clip rectangle, custom-speed source keyframes appear as boxed salmon
 **◆** lane, distinct from the boxed blue **▼** Transform lane; each title lists the
 keyframe's rate. Positions follow authoritative retiming. Off-trim keyframes are
 omitted. Exclusive OUT has a boundary marker that seeks the final available frame.
