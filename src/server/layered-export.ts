@@ -4,6 +4,7 @@ import path from 'node:path';
 import type { Writable } from 'node:stream';
 import { setImmediate as yieldToEvents } from 'node:timers/promises';
 import { isDeepStrictEqual } from 'node:util';
+import { detailTapCount } from '../shared/detail.js';
 import {
   LAYERED_EXPORT_RESOURCES,
   planLayeredExport,
@@ -41,6 +42,8 @@ const FPS = '30000/1001';
 const CLOCK = 'settb=expr=1/30000,setpts=N*1001';
 const RGB_TAGS = 'setparams=range=full:color_primaries=bt709:color_trc=bt709:colorspace=gbr';
 const seconds = (frame: number): string => framesToSeconds(frame).toFixed(12);
+/** Measured at UHD: a retimed frame takes about 0.15 s and each detail kernel tap adds about 0.09 s. */
+const PROGRESS_UNITS_PER_TAP = 0.6;
 
 export interface LayeredExportOptions {
   document: ProjectDocument;
@@ -107,6 +110,10 @@ interface Span {
 export interface TimelineChunk {
   filename: string;
   duration: number;
+}
+
+function chunkClips(chunk: ExportChunk): number[] {
+  return chunk.kind === 'body' ? [chunk.clipIndex] : [chunk.leftIndex, chunk.rightIndex];
 }
 
 function trackReaders(
@@ -347,13 +354,32 @@ class SequentialLayeredRenderer {
     };
     const active = plan.layers.filter((layer) => layer.enabled && layer.clips.length > 0);
     this.#totalWork =
-      active.reduce((sum, layer) => sum + layer.clips.reduce((frames, clip) => frames + clip.duration, 0), 0) +
-      plan.duration * Math.max(1, 2 * active.length - 1);
+      active.reduce(
+        (sum, layer) =>
+          sum +
+          layer.clips.reduce((frames, clip) => frames + clip.duration, 0) +
+          layer.plan.chunks.reduce(
+            (work, chunk) => work + chunk.duration * (this.frameCost(layer.id, chunkClips(chunk)) - 1),
+            plan.duration,
+          ),
+        0,
+      ) +
+      plan.duration * Math.max(0, active.length - 1) +
+      (active.length ? 0 : plan.duration);
     if (
       this.#report.rawFrameBuffers !== LAYERED_EXPORT_RESOURCES.rawFrameBuffers ||
       this.#report.rawBufferBytes !== pixels * LAYERED_EXPORT_RESOURCES.rawBytesPerPixel
     )
       throw new Error('Layered raw-buffer allocation differs from the resource contract.');
+  }
+  /** Progress units of one composed frame, where a retimed or source-over frame is one unit. */
+  private frameCost(layerId: string, clipIndexes: readonly number[]): number {
+    const layer = this.options.document.layers.find((item) => item.id === layerId)!;
+    const hdr = layer.colour.hdr > 0 || layer.keyframes.some((key) => (key.values.hdr ?? 0) > 0);
+    return clipIndexes.reduce(
+      (cost, index) => cost + PROGRESS_UNITS_PER_TAP * detailTapCount(this.options.document.clips[index]!.detail, hdr),
+      1,
+    );
   }
   private update(frames: number, message: string): void {
     checkLayeredCancellation(this.options.context.signal);
@@ -522,6 +548,10 @@ class SequentialLayeredRenderer {
     }
     const filename = `span-${String(this.#spanId++).padStart(5, '0')}.${final ? 'mp4' : 'nut'}`;
     const progressStep = Math.max(1, Math.floor(span.duration / 100));
+    const cost = this.frameCost(
+      layerId,
+      clips.map((clip) => clip.index),
+    );
     const maps = clips.map((clip) => {
       const placed = this.placed(clip.index);
       if (
@@ -553,7 +583,7 @@ class SequentialLayeredRenderer {
         await writeRawFrame(encoder, this.#rgba[0]);
         if (frame === 0 || (frame + 1) % progressStep === 0 || frame + 1 === span.duration) {
           this.update(
-            frame + 1,
+            (frame + 1) * cost,
             `Rendering track group ${layerId}: project frame ${span.start + frame + 1} / ${this.#layout.duration}`,
           );
         }
@@ -562,7 +592,7 @@ class SequentialLayeredRenderer {
       await forEachSerial(readers, (reader, index) => reader.requireEnd(this.#rgb[index]!));
     });
     this.recordPass(report);
-    this.#finishedWork += span.duration;
+    this.#finishedWork += span.duration * cost;
     this.#report.compositeFrames += span.duration;
     this.#report.compositePixels += span.duration * target.width * target.height;
     return { filename, duration: span.duration };

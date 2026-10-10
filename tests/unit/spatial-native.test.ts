@@ -9,7 +9,7 @@ import * as retime from '../../src/server/retime-process.js';
 import { gradePixel, NEUTRAL_COLOUR, type ColourSettings, type RGB } from '../../src/shared/colour.js';
 import { LAYERED_EXPORT_RESOURCES, planLayeredExport } from '../../src/shared/export.js';
 import { mediaAssetSchema } from '../../src/shared/media.js';
-import { createClip, createProject } from '../../src/shared/model.js';
+import { createClip, createProject, type ProjectDocument } from '../../src/shared/model.js';
 import { NEUTRAL_DETAIL } from '../../src/shared/detail.js';
 import { NEUTRAL_SPATIAL_POSE, type SpatialPose } from '../../src/shared/spatial.js';
 import type { PreviewLayer } from '../../src/shared/timeline.js';
@@ -616,6 +616,27 @@ describe('layered renderer metadata and continuous retiming ownership with memor
       expect(fixture.frames[frame]).toEqual(expected);
     }
     expect(fixture.document).toEqual(before);
+  });
+
+  it('weights progress by the detail kernel cost of each composed frame', async () => {
+    const progressAtFirstComposedFrame = async (edit: (document: ProjectDocument) => void): Promise<number> => {
+      const fixture = setup();
+      edit(fixture.document);
+      fixture.options.plan = planLayeredExport(fixture.document);
+      const updates: Array<[number, string]> = [];
+      await renderLayeredExport({
+        ...fixture.options,
+        context: { ...fixture.options.context, update: (progress, message) => updates.push([progress, message]) },
+      });
+      return updates.find(([, message]) => message.startsWith('Rendering track group'))![0];
+    };
+    // Four retimed frames count one unit each; a composed frame counts 1 + 0.6 per kernel tap (8 Sharpen + 24 HDR).
+    expect(await progressAtFirstComposedFrame(() => {})).toBeCloseTo(0.04 + (0.78 * 5) / 8, 12);
+    const detailed = await progressAtFirstComposedFrame((document) => {
+      document.clips[0]!.detail.sharpen = 0.3;
+      document.layers[0]!.colour.hdr = 0.27;
+    });
+    expect(detailed).toBeCloseTo(0.04 + (0.78 * (4 + 20.2)) / (4 + 4 * 20.2), 12);
   });
 
   it.each([7.25, NaN, Infinity, -Infinity])(
