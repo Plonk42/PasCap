@@ -70,6 +70,32 @@ export const DETAIL_CLARITY_TAPS = [5, 10].flatMap((radius) =>
 );
 const FINE_WEIGHT = 1 + DETAIL_FINE_TAPS.reduce((sum, tap) => sum + tap.weight, 0);
 
+/** Track HDR look: edge-aware base compression plus detail boost; see docs/design/DETAIL_FILTERS.md. */
+export const HDR_SPATIAL_SIGMA = 16;
+export const HDR_RANGE_SIGMA = 0.12;
+export const HDR_RANGE_FACTOR = 1 / (2 * HDR_RANGE_SIGMA * HDR_RANGE_SIGMA);
+export const HDR_COMPRESSION = 1;
+export const HDR_DETAIL_GAIN = 1;
+/** Below this encoded luma, the luma change blends from chroma-preserving ratio to additive. */
+export const HDR_RATIO_FLOOR = 0.1;
+const EIGHTH_TURN = Math.PI / 8;
+/** Three rings of eight at radii 6, 16 and 32 units; the middle ring is rotated 22.5°. */
+export const HDR_TAPS = [
+  { radius: 6, rotation: 0 },
+  { radius: 16, rotation: EIGHTH_TURN },
+  { radius: 32, rotation: 0 },
+].flatMap(({ radius, rotation }) =>
+  DIRECTIONS.map(([x, y]) => {
+    const cos = Math.cos(rotation);
+    const sin = Math.sin(rotation);
+    return {
+      x: radius * (x * cos - y * sin),
+      y: radius * (x * sin + y * cos),
+      weight: Math.exp(-(radius * radius) / (2 * HDR_SPATIAL_SIGMA * HDR_SPATIAL_SIGMA)),
+    };
+  }),
+);
+
 /** Writes encoded BT.709 RGB in 0–1 at normalized original-image coordinates. */
 export type DetailSampler = (u: number, v: number, out: Float64Array) => void;
 export interface DetailFilter {
@@ -92,12 +118,14 @@ export function denoiseRangeFactor(denoise: number): number {
 }
 
 /**
- * Denoise → Clarity → Sharpen on source pixels, before grading. Null when neutral.
+ * Denoise → HDR → Clarity → Sharpen on source pixels, before grading. Null when neutral.
  * `aspect` is the original width / height, so radii follow the image height.
+ * `hdr` is the evaluated track Colour HDR amount at this project frame.
  */
-export function compileDetail(settings: Readonly<DetailSettings>, aspect: number): DetailFilter | null {
+export function compileDetail(settings: Readonly<DetailSettings>, aspect: number, hdr: number): DetailFilter | null {
   const { sharpen, clarity, denoise } = detailSchema.parse(settings);
-  if (isNeutralDetail({ sharpen, clarity, denoise })) return null;
+  if (!Number.isFinite(hdr) || hdr < 0 || hdr > 1) throw new Error('HDR must be between 0 and 1.');
+  if (isNeutralDetail({ sharpen, clarity, denoise }) && hdr === 0) return null;
   if (!Number.isFinite(aspect) || aspect <= 0) throw new Error('Detail filters need a positive image aspect.');
   const stepV = 1 / DETAIL_REFERENCE_LINES;
   const stepU = stepV / aspect;
@@ -141,6 +169,34 @@ export function compileDetail(settings: Readonly<DetailSettings>, aspect: number
     }
     return sum / (DETAIL_CLARITY_TAPS.length + 1);
   };
+  const compression = HDR_COMPRESSION * hdr;
+  const detailGain = 1 + HDR_DETAIL_GAIN * hdr;
+  // Bilateral large-scale luma base, then compress it (black/white fixed) and boost the residual.
+  const toneMap = (sample: DetailSampler, u: number, v: number, y: number): void => {
+    let sum = y;
+    let total = 1;
+    for (const { x, y: offset, weight } of HDR_TAPS) {
+      sample(u + x * stepU, v + offset * stepV, tap);
+      const level = luma(tap);
+      const difference = level - y;
+      const w = weight * Math.exp(-difference * difference * HDR_RANGE_FACTOR);
+      sum += w * level;
+      total += w;
+    }
+    const base = sum / total;
+    const target = base + compression * base * (1 - base) * (1 - 2 * base) + (y - base) * detailGain;
+    const lift = target - y;
+    if (y <= 0) {
+      for (let channel = 0; channel < 3; channel++) denoised[channel]! += lift;
+      return;
+    }
+    const ratio = target / y;
+    const blend = Math.min(1, y / HDR_RATIO_FLOOR);
+    for (let channel = 0; channel < 3; channel++) {
+      const value = denoised[channel]!;
+      denoised[channel] = value + lift + blend * (value * ratio - value - lift);
+    }
+  };
   return {
     apply(sample, u, v, out) {
       sample(u, v, centre);
@@ -154,6 +210,7 @@ export function compileDetail(settings: Readonly<DetailSettings>, aspect: number
         delta += CLARITY_GAIN * clarity * midtones * (base - localMean(sample, u, v));
       }
       if (sharpen > 0) delta += SHARPEN_GAIN * sharpen * (base - luma(gaussian));
+      if (hdr > 0) toneMap(sample, u, v, base);
       for (let channel = 0; channel < 3; channel++) out[channel] = Math.min(1, Math.max(0, denoised[channel]! + delta));
     },
   };

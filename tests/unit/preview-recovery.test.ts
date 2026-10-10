@@ -1765,6 +1765,19 @@ describe('PreviewEngine spatial appearance', () => {
     expect(preview.compositor.uploadVideo).not.toHaveBeenCalled();
   });
 
+  it('prepares the detail programs for a live track HDR draft and bypasses HDR only while comparing', async () => {
+    const preview = await paused(gradedProject(true));
+    const layer = preview.project.layers[0]!;
+    preview.engine.updateColour(layer.id, { ...layer.colour, hdr: 0 });
+    expect(preview.compositor.prepareDetail).not.toHaveBeenCalled();
+    preview.engine.updateColour(layer.id, { ...layer.colour, hdr: 0.7 });
+    expect(preview.compositor.prepareDetail).toHaveBeenCalledTimes(1);
+    expect(preview.compositor.visible![0]!.clips[0]!.settings.hdr).toBe(0.7);
+    preview.engine.setUngraded(true);
+    expect(preview.compositor.visible![0]!.clips[0]!.settings.hdr).toBe(0);
+    expectNoMediaOperations(preview);
+  });
+
   it.each(['clip', 'curve'] as const)(
     'samples continuous spatial animation on held decoded frames (%s speed)',
     async (mode) => {

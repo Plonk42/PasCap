@@ -357,7 +357,7 @@ describe.skipIf(!enabled)('spatial transforms · real native FFmpeg, disposable 
         neutral: (Object.keys(spatial) as (keyof SpatialPose)[]).every(
           (key) => spatial[key] === NEUTRAL_SPATIAL_POSE[key],
         ),
-        detail: compileDetail(sample.detail, asset.metadata.width / asset.metadata.height),
+        detail: compileDetail(sample.detail, asset.metadata.width / asset.metadata.height, sample.colour.hdr),
         cosine: Math.cos(radians),
         sine: Math.sin(radians),
         denominatorX: fit * asset.metadata.width * spatial.scale,
@@ -531,7 +531,13 @@ describe.skipIf(!enabled)('spatial transforms · real native FFmpeg, disposable 
     }
   }
 
-  const staticCases: { name: string; changes: Partial<SpatialPose>; asset: number; detail?: DetailSettings }[] = [
+  const staticCases: {
+    name: string;
+    changes: Partial<SpatialPose>;
+    asset: number;
+    detail?: DetailSettings;
+    hdr?: number;
+  }[] = [
     {
       name: 'crop with exact inclusive IN/exclusive OUT pixel centres',
       asset: 0,
@@ -571,13 +577,22 @@ describe.skipIf(!enabled)('spatial transforms · real native FFmpeg, disposable 
       changes: { scale: 1.2, rotation: 13, translateX: 0.04 },
       detail: { sharpen: 0.5, clarity: -0.7, denoise: 0.9 },
     },
+    { name: 'track HDR on the neutral letterboxed path', asset: 1, changes: {}, hdr: 0.8 },
+    {
+      name: 'track HDR with clip detail before a rotated, scaled grade',
+      asset: 0,
+      changes: { scale: 1.2, rotation: 13, translateX: 0.04 },
+      detail: { sharpen: 0.4, clarity: 0.3, denoise: 0.5 },
+      hdr: 0.6,
+    },
   ];
 
-  it.each(staticCases)('720p lossless native parity: $name', async ({ changes, asset, detail }) => {
+  it.each(staticCases)('720p lossless native parity: $name', async ({ changes, asset, detail, hdr }) => {
     const project = createProject('static-spatial', 'Disposable one-frame spatial test');
     const clip = createClip('pattern', assets[asset]!.id, 1, 2);
     clip.spatial.base = pose(changes);
     if (detail) clip.detail = detail;
+    if (hdr) project.layers[0]!.colour.hdr = hdr;
     project.clips = [clip];
     const captured = projectSchema.parse(project);
     expect(needsLayeredExport(captured)).toBe(true);

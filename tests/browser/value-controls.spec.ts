@@ -324,7 +324,7 @@ test('row Colour captures its base and keeps precise release-only edits identica
   expect(changed.clips).toEqual(document.clips);
 });
 
-test('empty rows expose all ten editable row appearance widgets and no clip colour scope', async ({ page }) => {
+test('empty rows expose all eleven editable row appearance widgets and no clip colour scope', async ({ page }) => {
   const document = await current(page);
   document.clips = [];
   document.music = [];
@@ -814,8 +814,8 @@ test('common widgets fit 270px inspectors at the default and minimum viewports w
             };
           }),
       );
-      // Clip: speed rate, eight Transform and three Detail values; Track: ten Colour/Opacity, three HSL and three stored values.
-      expect(widgets.length, `${width}px ${tab}`).toBe(tab === 'Clip' ? 12 : tab === 'Track' ? 16 : 1);
+      // Clip: speed rate, eight Transform and three Detail values; Track: eleven Colour/Opacity, three HSL and three stored values.
+      expect(widgets.length, `${width}px ${tab}`).toBe(tab === 'Clip' ? 12 : tab === 'Track' ? 17 : 1);
       for (const widget of widgets) {
         expect(widget.inputs, `${width}px ${widget.name}`).toBe(2);
         expect(widget.outputs).toBe(0);

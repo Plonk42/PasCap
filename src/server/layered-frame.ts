@@ -41,8 +41,10 @@ export interface FrameSource {
   lut: Float32Array | null;
   /** Nonneutral HSL/curves grade exactly per pixel instead of through the LUT. */
   exactColour: ColourSettings | null;
-  /** Nonneutral clip Sharpen/Clarity/Denoise, applied to source taps before grading. */
+  /** Clip Sharpen/Clarity/Denoise applied to source taps before grading; null when they and HDR are neutral. */
   detail: DetailSettings | null;
+  /** Evaluated track Colour HDR amount, a neighbourhood stage of the same detail kernel. */
+  hdr: number;
   multiplier: number;
   coverage: number;
   mapping: SpatialMapping;
@@ -210,7 +212,9 @@ async function prepareSources(
   for (const source of sources) {
     validateBounds(source.bounds, target);
     // Validate and choose the grading path once per source/frame, never per pixel.
-    const colour = colourSchema.parse(source.sample.colour);
+    const evaluated = colourSchema.parse(source.sample.colour);
+    // HDR runs in the detail stage: keep it out of LUT identity so animation reuses one LUT.
+    const colour = { ...evaluated, hdr: 0 };
     const exactColour = isNeutralAdvancedColour(colour) ? null : colour;
     const mapping = compileSpatialMapping(
       source.sample.spatial,
@@ -224,7 +228,9 @@ async function prepareSources(
       bounds: source.bounds,
       lut: exactColour ? null : await cache.get(colour, signal, pool), // NOSONAR -- two borrowed slots, never parallel LUT builds.
       exactColour,
-      detail: isNeutralDetail(source.sample.detail) ? null : detailSchema.parse(source.sample.detail),
+      detail:
+        isNeutralDetail(source.sample.detail) && evaluated.hdr === 0 ? null : detailSchema.parse(source.sample.detail),
+      hdr: evaluated.hdr,
       multiplier: source.sample.opacity * source.sample.blendWeight * source.sample.brightness * 65535,
       coverage: source.sample.opacity * source.sample.blendWeight,
       mapping,
@@ -266,7 +272,7 @@ export function composeRows(
       ...source,
       exactColour: source.exactColour ? compileGradeInto(source.exactColour) : null,
       detail: source.detail
-        ? compileDetail(source.detail, source.mapping.fittedWidth / source.mapping.fittedHeight)
+        ? compileDetail(source.detail, source.mapping.fittedWidth / source.mapping.fittedHeight, source.hdr)
         : null,
       sampler: (u, v, out) => {
         sampleFitted(source, u, v, sampled);

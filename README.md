@@ -19,7 +19,7 @@ deployment targets.
 - No-copy footage browsing, verified editing proxies, thumbnails and reusable recording ranges.
 - Up to eight uniform video tracks, each with Ripple on by default; turn it off for independent placement.
 - Recoverable trims, split, duplication, marked-range cutting, snapping, Undo/Redo and source review.
-- Independent clip speed/spatial settings, video track-owned Colour/Opacity, and **shared track-wide keyframes** for Opacity and nine scalar colour settings, including Temperature and Tint.
+- Independent clip speed/spatial settings, video track-owned Colour/Opacity, and **shared track-wide keyframes** for Opacity, nine scalar colour settings (including Temperature and Tint) and HDR.
 - Clip-only constant speed or precise source-frame speed curves with presets such as Ramp up, a capture diamond, draggable keyframes and exact rate/easing inputs.
 - Clip-only crop, uniform scale, translation and rotation, with full-pose original-source keyframes.
 - Draggable timeline keyframes and setting-specific Previous/Next navigation.
@@ -84,9 +84,11 @@ not the SDR RGB grade, with no additional track multiplier or sidebar duplicate.
 **Temperature / Tint** use normalized **−1…1** values, neutral **0**: positive
 Temperature warms, positive Tint adds magenta. They are track-owned, independently
 keyable and editable on empty tracks. Nonzero settings intentionally colour greys;
-the shared linear-gain formula runs before Exposure, not as Kelvin/HDR/automatic
+the shared linear-gain formula runs before Exposure, not as Kelvin/HDR output/automatic
 white balance. Static HSL/curves add no animation channels. See
 [Temperature and Tint](docs/design/TEMPERATURE_AND_TINT.md).
+**HDR** (0–1, neutral 0) is a keyable SDR local tone-mapping look applied with the
+clip detail filters before grading; see [detail filters](docs/design/DETAIL_FILTERS.md#hdr-look).
 **Clip → Placement** contains placement only.
 Track options contains only rename, Ripple, ordering and deletion; visibility
 remains a separate sidebar control.
@@ -132,17 +134,17 @@ Missing mounts and symlinks fail explicitly. In the eventual container package,
 originals will be read-only bind mounts and application data will be a separate
 persistent writable mount. See [deployment design](docs/DEPLOYMENT.md).
 
-**Project format:** strict schema **v14**, with required complete video track `colour`, including `temperature` and `tint`, no clip colour/correction field, clip `spatial` base and
+**Project format:** strict schema **v15**, with required complete video track `colour`, including `temperature`, `tint` and `hdr`, no clip colour/correction field, clip `spatial` base and
 0–256 full-pose source-frame keyframes, required `music` array (0–8
 music tracks, unique required IDs; `[]` without music), per-track Ripple,
 transitions, fades and numeric `VideoLayer.opacity` (0–1; new tracks start at 1),
-and exactly ten nullable keyframe channels: `opacity`, `temperature`,
+and exactly eleven nullable keyframe channels: `opacity`, `temperature`,
 `tint`, `exposure`, `brightness`, `contrast`, `hue`, `saturation`, `highlights`,
-`shadows`. HSL/curves remain static. Track `opacity` is required and valid; saved `clip.opacity` and old
+`shadows`, `hdr`. HSL/curves remain static. Track `opacity` is required and valid; saved `clip.opacity` and old
 `clipOpacity`/`layerOpacity` channels are rejected, not ignored or defaulted.
-v1–v13 projects and receipt snapshots remain unchanged
+v1–v14 projects and receipt snapshots remain unchanged
 on disk but are incompatible: recreate projects and import media deliberately.
-Export receipts remain version 1 with a strict v14 snapshot and required captured
+Export receipts remain version 1 with a strict v15 snapshot and required captured
 audio-source/instance-plan arrays. Registry/proxy/current PCM cache formats and
 source protections do not change. There are no migrations, null fallbacks,
 compatibility readers, default-filled legacy fields or automatic deletions.
@@ -184,11 +186,11 @@ real-workload qualification, and local Docker/Podman packaging. See
 - [Timing and colour contract](docs/COLOUR_AND_TIMING.md)
 - [Tracks and keyframes](docs/LAYERS_AND_KEYFRAMES.md)
 - [Speed, audio and export](docs/SPEED_AND_AUDIO.md)
-- [Video track appearance/schema-14 contract](docs/design/ROW_APPEARANCE.md)
-- [Temperature and Tint/schema-14 contract](docs/design/TEMPERATURE_AND_TINT.md)
-- [Spatial transforms/schema-14 contract](docs/design/SPATIAL_TRANSFORMS.md)
-- [Clip detail filters/schema-14 contract](docs/design/DETAIL_FILTERS.md)
-- [Multiple music/schema-14 contract](docs/design/MULTIPLE_MUSIC.md) — required behaviour; implementation/validation acceptance remains pending, not a test or release claim.
+- [Video track appearance/schema-15 contract](docs/design/ROW_APPEARANCE.md)
+- [Temperature and Tint/schema-15 contract](docs/design/TEMPERATURE_AND_TINT.md)
+- [Spatial transforms/schema-15 contract](docs/design/SPATIAL_TRANSFORMS.md)
+- [Clip detail filters and HDR/schema-15 contract](docs/design/DETAIL_FILTERS.md)
+- [Multiple music/schema-15 contract](docs/design/MULTIPLE_MUSIC.md) — required behaviour; implementation/validation acceptance remains pending, not a test or release claim.
 - [Deployment target](docs/DEPLOYMENT.md)
 - [Historical feasibility study](docs/FEASIBILITY_REPORT.md)
 

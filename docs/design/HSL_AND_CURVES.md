@@ -1,10 +1,11 @@
-# Video track HSL ranges and colour curves · strict project 14
+# Video track HSL ranges and colour curves · strict project 15
 
 All colour belongs to the video track, keyed or unkeyed. Clips have no colour or
 correction fields. Nine scalar colour controls, including Temperature and Tint,
 can be keyed independently in video track animation. HSL ranges and colour curves are
-**static video track settings**, including on empty tracks; the ten nullable keyframe
-channels are Opacity and those nine scalars. Animation does not suppress
+**static video track settings**, including on empty tracks; the eleven nullable keyframe
+channels are Opacity, those nine scalars and HDR (a detail-stage look applied
+before grading; see [detail filters](DETAIL_FILTERS.md#hdr-look)). Animation does not suppress
 or replace advanced static settings. Temperature/Tint use normalized −1…1,
 neutral 0, and linear gains before Exposure; see
 [their exact contract](TEMPERATURE_AND_TINT.md).
@@ -19,14 +20,14 @@ green and blue arrays, each 2…16 strict `{ x, y }` control nodes with finite c
 in 0…1. Inputs strictly ascend, with first x=0 and last x=1. Endpoint outputs are
 editable; nonmonotonic outputs are valid. No control-node IDs or preset fields are saved.
 Neutral factories create independent nested objects/arrays. They are only creators,
-never repairs for missing saved fields. Projects 1…13 and their receipt snapshots
+never repairs for missing saved fields. Projects 1…14 and their receipt snapshots
 are incompatible and preserved; recreate deliberately. Receipt format remains 1;
 registry, proxy and PCM formats are unchanged. No migration or automatic deletion.
 
 The exact order is inverse BT.709 → normalized Temperature/Tint linear gains →
 Exposure → Contrast → Brightness → Shadows/Highlights → Hue/Saturation → final
 linear clipping/BT.709 encoding → encoded HSL → master curve → separate RGB curves →
-black-fade brightness → grouped coverage and source-over. This is not HDR,
+black-fade brightness → grouped coverage and source-over. This is not HDR output,
 scene-linear HSL, automatic white balance, a speed curve or a per-clip correction.
 Compare/Ungraded bypasses **all** colour stages, retaining
 geometry, timing, visibility, Opacity, black fades and music.
@@ -67,8 +68,8 @@ quantisation remain measured approximations under the unchanged error gates.
 
 ## Editing, resets and resource ownership
 
-Track → Colour contains nine scalar sliders (Temperature/Tint before Exposure)
-and sole Opacity control. The separate, initially collapsed Track sections
+Track → Colour contains nine scalar sliders (Temperature/Tint before Exposure),
+HDR and sole Opacity control. The separate, initially collapsed Track sections
 **HSL ranges** and **Colour curves** (after Colour) contain native band/channel/control-node selectors, exact
 numeric fields and a compact SVG curve graph. HSL uses native sliders and exact
 fields, with no diamonds. Curve endpoint inputs are locked; outputs remain editable.

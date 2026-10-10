@@ -14,7 +14,7 @@ HSL/curves remain static. See [Temperature and Tint](design/TEMPERATURE_AND_TINT
 See [track appearance](design/ROW_APPEARANCE.md).
 
 The media library describes complete recordings belonging to the open project's
-bin, not every globally registered source. Strict schema 14 requires unique
+bin, not every globally registered source. Strict schema 15 requires unique
 `media.videoIds` and `media.audioIds` arrays (10,000 IDs maximum each). Imports add
 membership even without timeline placement; clip/music references also remain
 visible. New projects start with both arrays empty. **Remove from project** (the
@@ -104,7 +104,7 @@ Import guidance, **without a POST**. Internal dragging of ready registered Media
 into Timeline remains unchanged. Uncertain registration results are not retried
 automatically; check Media/Activity before resubmitting.
 
-Strict schema 14 requires complete video track colour with Temperature/Tint and static HSL/curves, clip spatial settings, per-track Ripple, transitions and fades, and a required
+Strict schema 15 requires complete video track colour with Temperature/Tint/HDR and static HSL/curves, clip spatial settings, per-track Ripple, transitions and fades, and a required
 0–8 identified music track `music` array (`[]` without music); registry/proxy/PCM
 formats are unchanged. Only generated proxies/thumbnails, metadata,
 exports/receipts and scratch are created, not duplicate originals. Keep originals
@@ -311,11 +311,11 @@ and undoable, and never move music, other tracks or absolute track keyframes.
 
 ## Track keyframes, time ruler and transitions
 
-Schema-14 shared track keyframes belong to the **whole video track**, not individual clips. One ordered
-keyframe at a project frame has ten required nullable channels: **Opacity**
-(`opacity`) and nine scalar colour settings, enabled independently.
+Schema-15 shared track keyframes belong to the **whole video track**, not individual clips. One ordered
+keyframe at a project frame has eleven required nullable channels: **Opacity**
+(`opacity`), nine scalar colour settings and **HDR** (`hdr`), enabled independently.
 In control order: `opacity`, `temperature`, `tint`, `exposure`,
-`brightness`, `contrast`, `hue`, `saturation`, `highlights`, `shadows`.
+`brightness`, `contrast`, `hue`, `saturation`, `highlights`, `shadows`, `hdr`.
 Static HSL/curves are not animation channels; speed is clip-only.
 Every `VideoLayer` also requires numeric `opacity` in 0–1, initially 1 (100%) on
 new tracks. Without Opacity keyframes, every clip uses the track value; keyframes override it
@@ -384,7 +384,7 @@ shortcuts. These are not the draggable shared project-time track markers above.
 ### Channel navigation and off-duration inspection
 
 Each section's keyframe line has one native **Previous/Next** pair, beside the keyframe count it visits.
-Colour visits the union of Opacity and nine scalar keyframes. Speed visits all
+Colour visits the union of Opacity, nine scalar and HDR keyframes. Speed visits all
 retained custom speed source keyframes of the selected clip, including off-trim
 keyframes and original exclusive OUT, previewing the nearest mapped image through
 authoritative retiming. Transform likewise
@@ -498,18 +498,18 @@ insertion remains boundary-based even with Snap off or Alt held; only an explici
 move of its retained first clip changes the anchor. The
 toggle persists for the current timeline session, not the renderable document.
 
-Projects are named separate **version-14** documents with complete required video track colour, clip spatial
+Projects are named separate **version-15** documents with complete required video track colour, clip spatial
 base/per-setting source-frame keyframes and per-track Ripple,
 transitions, opening/closing fades and numeric `opacity` in 0–1. New tracks start
 at 1 (100%); a missing saved field is invalid. Switching flushes autosave first,
 blocks on failed saves, and resets session selection/history; successful export
-snapshots are independent of the open project. Earlier v1–v13 projects and receipt
+snapshots are independent of the open project. Earlier v1–v14 projects and receipt
 snapshots remain incompatible and preserved, without migration/fabricated defaults.
 There is no automatic deletion. Track `opacity` is the required sole stored value;
 saved `clip.opacity` and old `clipOpacity`/`layerOpacity` keyframe fields are rejected,
-not ignored or defaulted. Keyframes require exactly ten nullable channels: `opacity`
-and nine scalar colour fields, including required `temperature` and `tint`.
-Track Colour requires both bases and static HSL/curves; missing fields are invalid.
+not ignored or defaulted. Keyframes require exactly eleven nullable channels: `opacity`,
+nine scalar colour fields (including required `temperature` and `tint`) and `hdr`.
+Track Colour requires those bases and static HSL/curves; missing fields are invalid.
 Recreate projects and deliberately import recordings/music
 to reuse registered sources/verified ready proxies. Confirmed project deletion removes only its saved
 document, never originals, the shared registry/proxy cache or successful exports/
@@ -521,7 +521,7 @@ are unchanged.
 The required `music` array holds **0–8 independent music tracks**, each with a unique
 required `id`, registered `mediaId`, source IN/OUT, start/duration, gain, fades and
 loop flag. No null/singular fallback, omitted-field default or old-format reader
-is accepted. Version-1 export receipts require a strict v14 snapshot and captured
+is accepted. Version-1 export receipts require a strict v15 snapshot and captured
 audio-source/instance-plan arrays; older snapshots/invalid arrays are rejected
 while the receipt and finished output remain preserved. Current PCM format is unchanged.
 
@@ -613,7 +613,7 @@ Diagnostic counters, shader tests and the two-clip native comparison tool remain
 hidden behind Diagnostics. **Export** uses the bounded native multi-clip
 renderer, with profiles for 720p drafts and 4K finals. The diagnostic two-clip
 reference remains limited to two normal-speed clips on one enabled,
-zero-origin contiguous video track with Opacity 1 and neutral spatial bases and detail filters without
+zero-origin contiguous video track with Opacity 1, HDR 0 and neutral spatial bases and detail filters without
 spatial keyframes, without music/extra tracks/shared track keyframes
 and at most 3,600 project frames.
 Clip sections collapse independently and retain expansion across reloads; collapsing
@@ -634,4 +634,4 @@ and both-runtime acceptance belong to
 [DEPLOYMENT.md](DEPLOYMENT.md). Actual-commit correctness results are available in
 [GitHub Actions](https://github.com/Plonk42/PasCap/actions).
 
-Video track Colour includes static **HSL ranges** and **Colour curves**, each in its own collapsible Track section after Colour. They affect every clip and both dissolve sources on the track, whether or not its nine scalar channels are keyed. Moves use the destination track's complete colour; clip edits never copy these settings. They are not speed curves or new animation channels. See [the schema-14 HSL/curves contract](design/HSL_AND_CURVES.md).
+Video track Colour includes static **HSL ranges** and **Colour curves**, each in its own collapsible Track section after Colour. They affect every clip and both dissolve sources on the track, whether or not its nine scalar channels are keyed. Moves use the destination track's complete colour; clip edits never copy these settings. They are not speed curves or new animation channels. See [the schema-15 HSL/curves contract](design/HSL_AND_CURVES.md).

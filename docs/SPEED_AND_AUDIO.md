@@ -1,4 +1,4 @@
-# Speed and audio contract · project v14
+# Speed and audio contract · project v15
 
 Nine video track-owned scalar Colour controls include Temperature/Tint (−1…1, neutral 0),
 whose normalized linear gains precede Exposure. Positive Temperature warms;
@@ -9,11 +9,12 @@ Static track HSL and master/RGB colour curves follow scalar grading and precede
 black fades/coverage. They remain active with scalar keyframes, add no animation
 channels and are unrelated to speed curves. Compare/Ungraded bypasses all Colour
 without changing retiming, geometry, Opacity or music. Required data/resources:
-[HSL_AND_CURVES.md](design/HSL_AND_CURVES.md).
+[HSL_AND_CURVES.md](design/HSL_AND_CURVES.md). The keyable track HDR look is
+likewise appearance-only; see [detail filters](design/DETAIL_FILTERS.md#hdr-look).
 
 ## Clip speed
 
-Speed belongs only to the clip and is positive, **0.1×–8×**. Strict schema 14
+Speed belongs only to the clip and is positive, **0.1×–8×**. Strict schema 15
 requires each clip's `speed` to be `{ mode: 'constant', rate }` or
 `{ mode: 'curve', keyframes }`; there is no track Speed setting, ramp mode or
 project-wide speed field. A clip's duration and sampled frames depend only on its
@@ -94,7 +95,7 @@ with $C = \sum_i G_i b_i o_i w_i m_i$ and $A = \sum_i o_i w_i m_i$. Source-over 
 $\mathrm{result} = C + \mathrm{lower}(1 - A)$, with no track multiplier; black fades
 change RGB without reducing coverage. Any shared track keyframe
 requires the composited export path; any nonneutral spatial base or spatial keyframe
-(even neutral keyframes) does too, as does any clip [detail filter](design/DETAIL_FILTERS.md). Exact neutral poses retain opaque black letterboxing
+(even neutral keyframes) does too, as does nonzero track HDR or any clip [detail filter](design/DETAIL_FILTERS.md). Exact neutral poses retain opaque black letterboxing
 after grading; nonneutral uncovered pixels reveal lower footage. The static chunk
 plan cannot silently omit these edits.
 Opacity is composition coverage, not part of the SDR RGB grade.
@@ -256,7 +257,7 @@ frame for main capture.
 
 ## Music
 
-Strict schema 14 requires `music: MusicTrack[]`, with **0–8 independent music tracks**
+Strict schema 15 requires `music: MusicTrack[]`, with **0–8 independent music tracks**
 and unique required track `id` values; `[]` means no music. Each music track
 requires `mediaId`, `sourceIn`, `sourceOut`, `start`, `duration`, `gainDb`, `fadeIn`,
 `fadeOut` and `loop`. Several music tracks can use the same registered recording
@@ -382,7 +383,7 @@ preview caches remain unchanged but are not current playback input. Missing curr
 PCM caches appear as an explicit **Prepare** action on the file in Media → Music;
 startup/library reads never prepare, rewrite or delete them. Prepare deliberately
 to create the current cache, retaining originals and older generated files. Project
-schema is 14; registry, video-proxy and PCM cache formats are unchanged. Native export
+schema is 15; registry, video-proxy and PCM cache formats are unchanged. Native export
 still reads original audio, not the preview transport.
 
 Native mixing decodes **one original at a time** to exact selected **48 kHz stereo
@@ -404,12 +405,12 @@ cancellation cleans only owned scratch/partials and preserves completed outputs.
 
 ## Versioning
 
-Project schema **v14** requires explicit `media.videoIds` and `media.audioIds` arrays,
-unique and limited to 10,000 IDs each, plus complete video track colour with Temperature/Tint
+Project schema **v15** requires explicit `media.videoIds` and `media.audioIds` arrays,
+unique and limited to 10,000 IDs each, plus complete video track colour with Temperature/Tint/HDR
 and static HSL/curves, clip constant or 1–256-keyframe custom-curve
 speed, required clip `spatial: { base, keyframes }` with eight-value base and
 0–256 source-frame keyframes with required easing, track keyframe arrays with
-all ten nullable value fields, placement and music
+all eleven nullable value fields, placement and music
 source OUT. `music` is a required 0–8 array with unique required music track IDs and
 all per-track fields above; `[]` is the sole no-music representation, not null
 or a compatibility default. Every video track also requires `ripple`, `transitions`, `openingFade` and
@@ -418,14 +419,14 @@ not a default for missing saved fields. Transitions/fades are track-local, with
 no special first-track identity. Video tracks display and composite in their saved bottom-to-top array order.
 The sole track `opacity` channel overrides the track's saved `opacity` on every clip,
 including both dissolve sources; otherwise all use the saved track value.
-Required nullable channels are `opacity` and the nine scalar colour settings,
-including `temperature` and `tint`. Missing saved bases/channels are invalid, not defaulted.
+Required nullable channels are `opacity`, the nine scalar colour settings
+(including `temperature` and `tint`) and `hdr`. Missing saved bases/channels are invalid, not defaulted.
 Track `opacity` is valid and required; saved `clip.opacity` and old
 `clipOpacity`/`layerOpacity` channels are rejected, not defaulted.
 New projects have empty video/music bins. Standalone audio imports belong
 to the open project's bin; every music track's references also count as membership.
 Global registered music/proxies are reusable on deliberate import, never automatically
-inherited by a new project. Earlier v1–v13 projects and export receipt snapshots remain unchanged
+inherited by a new project. Earlier v1–v14 projects and export receipt snapshots remain unchanged
 and incompatible. There is no migration, compatibility reader, null fallback, default-field
 injection or automatic deletion; recreate projects and import their media to reuse
 registered assets/verified ready proxies. Confirmed project deletion affects only
@@ -435,7 +436,7 @@ Registry/video-proxy/current PCM formats, source guards and native video budgets
 native composition uses the sole Opacity contract without a track multiplier.
 Preview uses the current explicitly prepared PCM cache described above.
 
-Export receipts remain **version 1** with a strict **v14** snapshot, required
+Export receipts remain **version 1** with a strict **v15** snapshot, required
 `musicSources` captured unique-original array and `settings.audio` identified
 instance-plan array (`[]` for each without music). Plans preserve independent
 timing/gain/fades/loop; several may refer to the same captured original. The plan

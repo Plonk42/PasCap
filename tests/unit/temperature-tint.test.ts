@@ -24,10 +24,10 @@ describe('normalized linear Temperature and Tint', () => {
     expect(gradePixel(input, settings)).toBe(input);
     expect(compilePixelGrade(settings)(input)).toBe(input);
     expect(createLayer('empty', 'Empty').colour).toEqual(settings);
-    expect(Object.keys(EMPTY_KEY_VALUES)).toHaveLength(10);
+    expect(Object.keys(EMPTY_KEY_VALUES)).toHaveLength(11);
     const project = createProject('strict', 'Strict');
-    expect(project.schemaVersion).toBe(14);
-    for (let schemaVersion = 1; schemaVersion < 14; schemaVersion++)
+    expect(project.schemaVersion).toBe(15);
+    for (let schemaVersion = 1; schemaVersion < 15; schemaVersion++)
       expect(projectSchema.safeParse({ ...project, schemaVersion }).success).toBe(false);
     for (const channel of ['temperature', 'tint'] as const) {
       const incomplete = { ...settings };

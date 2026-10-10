@@ -45,8 +45,8 @@ export function validateReference(project: ProjectDocument, library: MediaLibrar
     throw new ServiceError('The diagnostic reference only supports normal speed. Use Export for retimed clips.');
   if (snapshot.clips.some((clip) => hasSpatialEdits(clip.spatial)))
     throw new ServiceError('The diagnostic reference does not support spatial edits or spatial keyframes. Use Export.');
-  if (snapshot.clips.some((clip) => !isNeutralDetail(clip.detail)))
-    throw new ServiceError('The diagnostic reference does not support Sharpen, Clarity or Denoise. Use Export.');
+  if (snapshot.clips.some((clip) => !isNeutralDetail(clip.detail)) || snapshot.layers[0]!.colour.hdr !== 0)
+    throw new ServiceError('The diagnostic reference does not support HDR, Sharpen, Clarity or Denoise. Use Export.');
   const layout = calculateLayout(snapshot);
   const [left, right] = layout.clips;
   const transition = snapshot.layers[0]!.transitions[0]!;

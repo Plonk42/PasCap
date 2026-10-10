@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ColourLutCache } from '../../src/server/layered-colour.js';
 import { composeLayerFrame, composeRows, type FrameSource } from '../../src/server/layered-frame.js';
-import { createColourSettings, gradePixel, type RGB } from '../../src/shared/colour.js';
+import { colourSchema, createColourSettings, gradePixel, isNeutralColour, type RGB } from '../../src/shared/colour.js';
 import { applyCommand } from '../../src/shared/commands.js';
 import {
   compileDetail,
@@ -20,7 +20,7 @@ import { calculateLayout, sampleTimeline, type PreviewLayer } from '../../src/sh
 type Image = (u: number, v: number) => RGB;
 
 /** Independent transcription of the documented kernel, without the production tap tables. */
-function reference(image: Image, u: number, v: number, settings: DetailSettings, aspect: number): RGB {
+function reference(image: Image, u: number, v: number, settings: DetailSettings, aspect: number, hdr = 0): RGB {
   const dv = 1 / 720;
   const du = dv / aspect;
   const luma = (rgb: RGB): number => 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2];
@@ -68,11 +68,35 @@ function reference(image: Image, u: number, v: number, settings: DetailSettings,
     delta += settings.clarity * Math.min(1, Math.max(0, 4 * base * (1 - base))) * (base - mean);
   }
   if (settings.sharpen > 0) delta += 2 * settings.sharpen * (base - luma(gaussian));
+  if (hdr > 0) {
+    let sum = base;
+    let total = 1;
+    for (const [radius, rotation] of [
+      [6, 0],
+      [16, Math.PI / 8],
+      [32, 0],
+    ] as const)
+      for (let k = 0; k < 8; k++) {
+        const angle = (k * Math.PI) / 4 + rotation;
+        const level = luma(image(u + Math.cos(angle) * radius * du, v + Math.sin(angle) * radius * dv));
+        const weight =
+          Math.exp(-(radius * radius) / (2 * 16 * 16)) * Math.exp(-((level - base) ** 2) / (2 * 0.12 ** 2));
+        sum += weight * level;
+        total += weight;
+      }
+    const b = sum / total;
+    const target = b + hdr * b * (1 - b) * (1 - 2 * b) + (base - b) * (1 + hdr);
+    const lift = target - base;
+    const blend = Math.min(1, base / 0.1);
+    denoised = denoised.map((channel) =>
+      base > 0 ? channel + lift + blend * ((channel * target) / base - channel - lift) : channel + lift,
+    ) as unknown as RGB;
+  }
   return denoised.map((channel) => Math.min(1, Math.max(0, channel + delta))) as unknown as RGB;
 }
 
-function run(image: Image, u: number, v: number, settings: DetailSettings, aspect = 16 / 9): RGB {
-  const filter = compileDetail(settings, aspect);
+function run(image: Image, u: number, v: number, settings: DetailSettings, aspect = 16 / 9, hdr = 0): RGB {
+  const filter = compileDetail(settings, aspect, hdr);
   if (!filter) return image(u, v);
   const out = new Float64Array(3);
   filter.apply(
@@ -113,7 +137,7 @@ describe('clip detail settings', () => {
       expect(detailSchema.safeParse(invalid).success).toBe(false);
     expect(isNeutralDetail(NEUTRAL_DETAIL)).toBe(true);
     expect(isNeutralDetail({ sharpen: Number.MIN_VALUE, clarity: 0, denoise: 0 })).toBe(false);
-    expect(compileDetail(NEUTRAL_DETAIL, 1)).toBeNull();
+    expect(compileDetail(NEUTRAL_DETAIL, 1, 0)).toBeNull();
   });
 
   it('matches an independent transcription of the Denoise → Clarity → Sharpen kernel', () => {
@@ -180,6 +204,92 @@ describe('clip detail settings', () => {
     const denoise = { sharpen: 0, clarity: 0, denoise: 1 };
     expect(run(noisy, left, 0.5, denoise)[0]).toBeLessThan(0.3);
     expect(run(noisy, right, 0.5, denoise)[0]).toBeGreaterThan(0.7);
+  });
+});
+
+describe('track HDR look', () => {
+  it('is a bounded eleventh track Colour channel that skips the per-pixel grade', () => {
+    expect(createColourSettings().hdr).toBe(0);
+    expect(colourSchema.safeParse({ ...createColourSettings(), hdr: 1.01 }).success).toBe(false);
+    expect(colourSchema.safeParse({ ...createColourSettings(), hdr: -0.01 }).success).toBe(false);
+    const { hdr: _hdr, ...missing } = createColourSettings();
+    expect(colourSchema.safeParse(missing).success).toBe(false);
+    const hdrOnly = { ...createColourSettings(), hdr: 0.8 };
+    expect(isNeutralColour(hdrOnly)).toBe(false);
+    const input: RGB = [0.2, 0.4, 0.6];
+    expect(gradePixel(input, hdrOnly)).toBe(input);
+    expect(compileDetail(NEUTRAL_DETAIL, 1, 0.01)).not.toBeNull();
+    for (const invalid of [-0.01, 1.01, Number.NaN]) expect(() => compileDetail(NEUTRAL_DETAIL, 1, invalid)).toThrow();
+  });
+
+  it('matches an independent transcription of the Denoise → HDR → Clarity → Sharpen kernel', () => {
+    const cases: [DetailSettings, number][] = [
+      [NEUTRAL_DETAIL, 0.5],
+      [NEUTRAL_DETAIL, 1],
+      [{ sharpen: 0.35, clarity: 0.4, denoise: 0.8 }, 0.7],
+    ];
+    for (const [settings, hdr] of cases)
+      for (const [u, v] of [
+        [0.31, 0.43],
+        [0.02, 0.97],
+        [0.77, 0.12],
+      ]) {
+        const actual = run(textured, u!, v!, settings, 4 / 3, hdr);
+        reference(textured, u!, v!, settings, 4 / 3, hdr).forEach((channel, index) =>
+          expect(actual[index]).toBeCloseTo(channel, 12),
+        );
+      }
+  });
+
+  it('keeps black, mid-grey and white, lifts shadows and recovers highlights on flat areas', () => {
+    const flat =
+      (level: number): Image =>
+      () => [level, level, level];
+    for (const level of [0, 0.5, 1])
+      expect(run(flat(level), 0.5, 0.5, NEUTRAL_DETAIL, 16 / 9, 1)[0]).toBeCloseTo(level, 12);
+    expect(run(flat(0.2), 0.5, 0.5, NEUTRAL_DETAIL, 16 / 9, 1)[0]).toBeGreaterThan(0.25);
+    expect(run(flat(0.8), 0.5, 0.5, NEUTRAL_DETAIL, 16 / 9, 1)[0]).toBeLessThan(0.75);
+    const dimmer = run(flat(0.2), 0.5, 0.5, NEUTRAL_DETAIL, 16 / 9, 0.3)[0]!;
+    expect(dimmer).toBeGreaterThan(0.2);
+    expect(dimmer).toBeLessThan(run(flat(0.2), 0.5, 0.5, NEUTRAL_DETAIL, 16 / 9, 1)[0]!);
+  });
+
+  it('boosts local detail, preserves hue in colour and does not halo across a strong edge', () => {
+    const fine: Image = (u) => {
+      const level = 0.5 + 0.05 * Math.sin(u * 1280 * 0.7);
+      return [level, level, level];
+    };
+    const u = (Math.PI / 2 / 0.7 + 0.5) / 1280;
+    const input = fine(u, 0.5)[0] - 0.5;
+    expect(run(fine, u, 0.5, NEUTRAL_DETAIL, 16 / 9, 1)[0]! - 0.5).toBeGreaterThan(1.6 * input);
+    const tinted: Image = () => [0.3, 0.2, 0.1];
+    const [red, green, blue] = run(tinted, 0.5, 0.5, NEUTRAL_DETAIL, 16 / 9, 1);
+    expect(red! / blue!).toBeCloseTo(3, 10);
+    expect(green! / blue!).toBeCloseTo(2, 10);
+    const edge: Image = (x) => (x < 0.5 ? [0.1, 0.1, 0.1] : [0.9, 0.9, 0.9]);
+    const pixel = 1 / 720 / (16 / 9);
+    const near = run(edge, 0.5 - 3 * pixel, 0.5, NEUTRAL_DETAIL, 16 / 9, 1)[0]!;
+    const far = run(edge, 0.2, 0.5, NEUTRAL_DETAIL, 16 / 9, 1)[0]!;
+    expect(far).toBeGreaterThan(0.15);
+    expect(Math.abs(near - far)).toBeLessThan(1e-3);
+  });
+
+  it('routes nonzero or keyed track HDR through the composited exporter', () => {
+    const document = project(NEUTRAL_DETAIL);
+    const layer = document.layers[0]!;
+    expect(needsLayeredExport(document)).toBe(false);
+    const withHdr = { ...document, layers: [{ ...layer, colour: { ...layer.colour, hdr: 0.4 } }] };
+    expect(needsLayeredExport(projectSchema.parse(withHdr))).toBe(true);
+    const keyed = applyCommand(document, {
+      type: 'layer-key-toggle',
+      layerId: layer.id,
+      frame: 5,
+      setting: 'hdr',
+      value: 0.6,
+    });
+    expect(keyed.layers[0]!.keyframes[0]!.values.hdr).toBe(0.6);
+    expect(sampleTimeline(keyed, 20)[0]!.colour.hdr).toBe(0.6);
+    expect(needsLayeredExport(keyed)).toBe(true);
   });
 });
 
@@ -251,11 +361,13 @@ function bilinearImage(rgb: Uint8Array, width: number, height: number): Image {
 
 describe('native detail filtering', () => {
   const detail = { sharpen: 0.6, clarity: 0.5, denoise: 0.4 };
-  for (const [width, height, rows] of [
-    [1280, 720, [0, 1, 359, 718, 719]],
-    [3840, 2160, [0, 1080, 2159]],
+  for (const [width, height, rows, hdr] of [
+    [1280, 720, [0, 1, 359, 718, 719], 0],
+    [1280, 720, [0, 359, 719], 0.6],
+    [3840, 2160, [0, 1080, 2159], 0],
+    [3840, 2160, [0, 2159], 0.6],
   ] as const)
-    it(`matches the shared reference before grading at ${width}×${height}, including content edges`, () => {
+    it(`matches the shared reference before grading at ${width}×${height} with HDR ${hdr}, including content edges`, () => {
       const rgb = fitted(width, height);
       const image = bilinearImage(rgb, width, height);
       const source: FrameSource = {
@@ -264,6 +376,7 @@ describe('native detail filtering', () => {
         lut: null,
         exactColour,
         detail,
+        hdr,
         multiplier: 65535,
         coverage: 1,
         mapping: compileSpatialMapping(NEUTRAL_SPATIAL_POSE, width * 2, height * 2, width, height),
@@ -276,7 +389,7 @@ describe('native detail filtering', () => {
         for (const x of [0, 1, Math.floor(width / 3), width - 2, width - 1]) {
           const u = (x + 0.5) / width;
           const v = (row + 0.5) / height;
-          const expected = gradePixel(reference(image, u, v, detail, width / height), exactColour);
+          const expected = gradePixel(reference(image, u, v, detail, width / height, hdr), exactColour);
           for (let channel = 0; channel < 3; channel++)
             maximum = Math.max(
               maximum,
@@ -339,5 +452,43 @@ describe('native detail filtering', () => {
       return new Uint16Array(buffer.buffer, buffer.byteOffset, target.width * target.height * 4);
     })();
     expect(unfiltered).not.toEqual(neutral);
+  });
+
+  it('applies evaluated track HDR without clip detail and reuses one scalar LUT while HDR animates', async () => {
+    const target = { width: 48, height: 27 };
+    const rgb = Buffer.from(fitted(target.width, target.height));
+    const colour = { ...createColourSettings(), exposure: 0.1 };
+    const cache = new ColourLutCache();
+    const render = async (hdr: number): Promise<Uint16Array> => {
+      const buffer = Buffer.alloc(target.width * target.height * 8);
+      const sample: PreviewLayer = {
+        clipId: 'clip',
+        mediaId: 'media',
+        layerId: 'row',
+        sourceFrame: 0,
+        sourcePosition: 0,
+        spatial: { ...NEUTRAL_SPATIAL_POSE },
+        detail: { ...NEUTRAL_DETAIL },
+        colour: { ...colour, hdr },
+        weight: 1,
+        blendWeight: 1,
+        brightness: 1,
+        opacity: 1,
+      };
+      await composeLayerFrame(
+        buffer,
+        target,
+        [{ sample, rgb, bounds: { x: 0, y: 0, ...target }, original: { width: 480, height: 270 } }],
+        cache,
+        new AbortController().signal,
+      );
+      return new Uint16Array(buffer.buffer, buffer.byteOffset, target.width * target.height * 4);
+    };
+    const plain = await render(0);
+    const low = await render(0.3);
+    const high = await render(0.9);
+    expect(low).not.toEqual(plain);
+    expect(high).not.toEqual(low);
+    expect(cache.report.generated).toBe(1);
   });
 });

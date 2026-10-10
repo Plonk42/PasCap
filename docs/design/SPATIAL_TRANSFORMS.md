@@ -1,4 +1,4 @@
-# Clip spatial transforms · strict project schema 14
+# Clip spatial transforms · strict project schema 15
 
 Current contract for [#20](https://github.com/Plonk42/PasCap/issues/20) and
 [#90](https://github.com/Plonk42/PasCap/issues/90): static and keyframed crop, uniform
@@ -18,7 +18,7 @@ Implementation authorities: [pose/schema/mapping](../../src/shared/spatial.ts),
 
 ## Required data and ownership
 
-Every schema-14 clip requires `spatial: { base, keyframes }`. Both objects and all
+Every schema-15 clip requires `spatial: { base, keyframes }`. Both objects and all
 keyframes are strict: no unknown fields, optional legacy values, coercion, persisted
 defaults or load-time repair. `base` is one complete eight-value pose;
 `keyframes` is a required array of **0–256** keys. Each key requires
@@ -43,8 +43,8 @@ covers nothing and the clip displays nothing there. It is never rejected or repa
 Neutral creation values are not defaults for missing saved data. Spatial keyframes
 belong only to `clip.spatial`; they add no video track channels or shared track markers.
 Their separate source-keyframe lane is inside each timeline clip rectangle.
-The ten nullable shared video track channels (Opacity and nine scalar colour
-fields), track-only Colour ownership, clip-only speed and final
+The eleven nullable shared video track channels (Opacity, nine scalar colour
+fields and HDR), track-only Colour ownership, clip-only speed and final
 [#67](https://github.com/Plonk42/PasCap/issues/67) sole video track **Opacity** remain
 unchanged. No saved `clip.opacity` or second opacity multiplier is introduced.
 
@@ -141,7 +141,8 @@ Native LUT interpolation, fitted decode resolution and final H.264/YUV
 quantisation are approximations, not bitwise GPU/native equivalence.
 
 Any nonneutral saved base or **any** spatial keyframes, even all-neutral keyframes, require
-composited export. Static export additionally needs one enabled video track with Opacity 1,
+composited export. Static export additionally needs one enabled video track with Opacity 1
+and HDR 0,
 no track keyframes, zero origin, no internal gaps and coverage of full project duration.
 The two-normal-speed-clip diagnostic reference rejects spatial edits/keyframes;
 use production Export. Its receipt/report formats are independent of project schema.
@@ -228,10 +229,10 @@ main capture never substitutes that stored time for the real displayed source fr
 
 ## Preservation
 
-Projects and version-1 export receipt snapshots must satisfy strict **schema 14**,
+Projects and version-1 export receipt snapshots must satisfy strict **schema 15**,
 including required clip spatial data and the unchanged identified music arrays.
-Required video track Colour includes Temperature/Tint and static HSL/curves, with ten
-required nullable track keyframe fields. Incompatible v1–v13 projects/receipt snapshots
+Required video track Colour includes Temperature/Tint/HDR and static HSL/curves, with eleven
+required nullable track keyframe fields. Incompatible v1–v14 projects/receipt snapshots
 and completed videos remain untouched.
 Recreate projects deliberately; do not migrate, default-fill, rewrite or delete old
 data automatically. Registry/proxy/PCM and receipt/report format versions do not

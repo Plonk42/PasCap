@@ -10,13 +10,13 @@ deadline; hardware/real-media work requires explicit owner consent.
 
 ## Current baseline
 
-The local schema-14 contract covers no-copy footage import, projects, source
+The local schema-15 contract covers no-copy footage import, projects, source
 clips, multi-track timelines, colour/opacity track keyframes, music and verified
 720p/4K export, with clip-only constant speed or precise source-frame speed curves.
 Clip-owned crop/scale/translation/rotation and per-setting source-frame animation
 are specified by [#20's current contract](design/SPATIAL_TRANSFORMS.md), without
 claiming qualification or changing milestone status. Static clip Sharpen, Clarity
-and Denoise follow [#123's contract](design/DETAIL_FILTERS.md), likewise without a
+and Denoise and the keyable track HDR look follow [#123's contract](design/DETAIL_FILTERS.md), likewise without a
 qualification claim.
 The final approved [#67](https://github.com/Plonk42/PasCap/issues/67) contract has
 one video track-owned **Opacity** setting: required numeric `VideoLayer.opacity` in 0–1,
@@ -26,9 +26,9 @@ multiplier. The single slider/diamond/navigation lives in **Track → Colour** a
 works on empty tracks; **Placement** contains placement only. Without Opacity keyframes,
 the slider edits the track value; with keyframes, a setting not enabled at the real
 playhead is read-only until explicitly captured. Sliders never create keyframes, and
-unkeyed colour settings are track-owned. Shared keyframes have ten nullable channels:
-`opacity` and nine scalar colour settings, including `temperature` and
-`tint`. Saved `clip.opacity` and old
+unkeyed colour settings are track-owned. Shared keyframes have eleven nullable channels:
+`opacity`, nine scalar colour settings (including `temperature` and
+`tint`) and `hdr`. Saved `clip.opacity` and old
 `clipOpacity`/`layerOpacity` channels are rejected; track `opacity` is required and
 valid. Track-owned [Temperature and Tint](design/TEMPERATURE_AND_TINT.md) use
 normalized −1…1, neutral 0, with independent animation. Positive Temperature
@@ -36,12 +36,12 @@ warms; positive Tint adds magenta. The shared normalized linear-gain formula run
 before Exposure and intentionally colours greys; neutral-white luminance is
 preserved before clipping only. Static track
 [HSL ranges and master/RGB curves](design/HSL_AND_CURVES.md)
-follow scalar grading without adding animation channels. v1–v13 projects
+follow scalar grading without adding animation channels. v1–v14 projects
 and receipt snapshots are preserved/incompatible and require recreation, without
 migration, defaults, null/old-format readers or automatic deletion;
-registry/proxy/current PCM formats remain unchanged. Schema 14 requires a 0–8
+registry/proxy/current PCM formats remain unchanged. Schema 15 requires a 0–8
 identified music track array (`[]` without music); version-1 export receipts
-require strict v14 snapshots and captured audio-source/instance-plan arrays.
+require strict v15 snapshots and captured audio-source/instance-plan arrays.
 Music can extend duration to maximum video/music OUT: closing video fades finish
 at clip OUT, then black while music continues/fades at its own end. One mixed
 output clock and final-only linear-sum clamp retain bounded resources; see
@@ -167,7 +167,8 @@ bundle private footage or promise GPU-native encoding.
 - No new rendering effect is scheduled from an inspection checklist alone.
 - [The implementation plan](../EDITOR_IMPLEMENTATION_PLAN.md) is retained as design
   history, not an approved implementation backlog.
-- Titles, general-purpose masks, optical flow, HDR, cloud/mobile/collaboration and native
+- Titles, general-purpose masks, optical flow, HDR output or HDR footage (the track
+  HDR look is an SDR effect), cloud/mobile/collaboration and native
   GPU encoding remain outside the current delivery milestones.
 
 Proposals should explain a user problem, scope, observable acceptance and

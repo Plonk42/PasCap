@@ -64,10 +64,10 @@ function bilinear(u: number, t: number, out: Float64Array): void {
       (at(x, y + 1, channel) * (1 - dx) + at(x + 1, y + 1, channel) * dx) * dy;
 }
 
-function clip(detail: DetailSettings, pose: Partial<SpatialPose> = {}): CompositeClip {
+function clip(detail: DetailSettings, pose: Partial<SpatialPose> = {}, hdr = 0): CompositeClip {
   return {
     slot: 0,
-    settings: { ...NEUTRAL_COLOUR },
+    settings: { ...NEUTRAL_COLOUR, hdr },
     aspect: textureWidth / textureHeight,
     spatial: { ...NEUTRAL_SPATIAL_POSE, ...pose },
     detail,
@@ -95,7 +95,7 @@ function expected(source: CompositeClip, x: number, y: number, width: number, he
   }
   const out = new Float64Array(3);
   const sampler = (su: number, sv: number, target: Float64Array): void => bilinear(su, 1 - sv, target);
-  const filter = compileDetail(source.detail, source.originalWidth / source.originalHeight);
+  const filter = compileDetail(source.detail, source.originalWidth / source.originalHeight, source.settings.hdr);
   if (filter) filter.apply(sampler, u, v, out);
   else sampler(u, v, out);
   return [out[0]!, out[1]!, out[2]!];
@@ -109,6 +109,11 @@ const cases: { name: string; source: CompositeClip }[] = [
   {
     name: 'all three on a rotated, scaled clip',
     source: clip({ sharpen: 0.5, clarity: 0.4, denoise: 0.5 }, { scale: 0.83, rotation: 17 }),
+  },
+  { name: 'track HDR', source: clip({ sharpen: 0, clarity: 0, denoise: 0 }, {}, 0.8) },
+  {
+    name: 'track HDR with all three on a rotated, scaled clip',
+    source: clip({ sharpen: 0.5, clarity: 0.4, denoise: 0.5 }, { scale: 0.83, rotation: 17 }, 0.6),
   },
 ];
 
@@ -194,7 +199,11 @@ for (const [width, height] of [
       });
     // The fixture must be sensitive: every filter visibly changes the unfiltered image.
     for (const item of cases) {
-      const unfiltered = { ...item.source, detail: { sharpen: 0, clarity: 0, denoise: 0 } };
+      const unfiltered = {
+        ...item.source,
+        settings: { ...item.source.settings, hdr: 0 },
+        detail: { sharpen: 0, clarity: 0, denoise: 0 },
+      };
       const change = Math.max(
         ...points.flatMap(([x, y]) => {
           const filtered = expected(item.source, x!, y!, width, height);

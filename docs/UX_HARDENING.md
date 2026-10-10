@@ -60,12 +60,12 @@ This guide is not a delivery ledger or a fresh validation result.
   uncertainty, errors/recheck and disclosed location/assumptions. Snapshot and
   native processing details remain available in **Rendering details**.
 
-Schema 14 requires complete video track Colour with Temperature/Tint and static HSL/curves,
+Schema 15 requires complete video track Colour with Temperature/Tint/HDR and static HSL/curves,
 clip spatial base/per-setting source-frame keyframes and uses a
 required 0–8 `music` array with unique required music track IDs and
 uniform video tracks with required Ripple/transitions/fades and
-numeric `VideoLayer.opacity` in 0–1 (1 on new tracks), plus ten nullable keyframe
-channels: `opacity` and nine scalar colour settings. Video tracks
+numeric `VideoLayer.opacity` in 0–1 (1 on new tracks), plus eleven nullable keyframe
+channels: `opacity`, nine scalar colour settings and `hdr`. Video tracks
 follow saved bottom-to-top composition order. Track options exposes default-on
 Ripple: enabling closes gaps from the first current start in one Undo; while on,
 later clips continuously sequence there. Turning it off keeps actual placements.
@@ -82,12 +82,12 @@ $w_i$ dissolve weight and $m_i$ spatial pixel coverage. Exact neutral poses
 preserve opaque black letterboxing after grading; nonneutral uncovered pixels
 reveal lower footage. Each source uses the same evaluated track Opacity at that
 project frame, from the track value or its overriding curve.
-v1–v13 project/receipt snapshots remain unchanged/incompatible
+v1–v14 project/receipt snapshots remain unchanged/incompatible
 and require recreation, without migration, defaults or automatic deletion.
 Track `opacity` is the required sole stored value, not obsolete; saved `clip.opacity`
 and old `clipOpacity`/`layerOpacity` keyframe channels are invalid.
 Registry/proxy/current PCM formats do not change. Version-1 export receipts require
-strict v14 snapshots and captured audio-source/instance-plan arrays, rejecting
+strict v15 snapshots and captured audio-source/instance-plan arrays, rejecting
 invalid arrays/older snapshots without rewriting successful exports. No null
 fallback or old-format reader is permitted. Source-copy prohibition,
 track keyframes, source choices, media preparation, Activity and both export
@@ -236,7 +236,7 @@ two 65³ Float32 LUTs add **6,591,000 bytes**, excluding native/audio memory.
 One original decoder, two intermediate readers, one encoder and three video children
 per serial pass bound concurrency, not duration-dependent disk use. The static
 fast path requires one enabled, unanimated, zero-origin contiguous track
-with track Opacity 1, exactly neutral spatial bases and no spatial keyframes; spatial
+with track Opacity 1 and HDR 0, exactly neutral spatial bases and no spatial keyframes; spatial
 edits/keyframes (even neutral keyframes) or unsupported placement/coverage use generalized
 composited export, with unchanged raw-buffer/LUT/process budgets.
 

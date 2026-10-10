@@ -3,6 +3,11 @@ import {
   DETAIL_CLARITY_TAPS,
   DETAIL_FINE_TAPS,
   DETAIL_WIDE_TAPS,
+  HDR_COMPRESSION,
+  HDR_DETAIL_GAIN,
+  HDR_RANGE_FACTOR,
+  HDR_RATIO_FLOOR,
+  HDR_TAPS,
   SHARPEN_GAIN,
 } from '../shared/detail.js';
 
@@ -72,7 +77,30 @@ ${glslFloatArray(
   DETAIL_WIDE_TAPS.map((tap) => tap.weight),
 )}
 ${glslVec2Array('detailClarity', DETAIL_CLARITY_TAPS)}
-vec3 detailFilter(sampler2D source, vec2 coordinate, vec3 centre, vec4 detail, vec2 stride) {
+${glslVec2Array('hdrTaps', HDR_TAPS)}
+${glslFloatArray(
+  'hdrWeight',
+  HDR_TAPS.map((tap) => tap.weight),
+)}
+vec3 hdrTone(sampler2D source, vec2 coordinate, vec3 rgb, float y, float amount, vec2 stride) {
+  float sum = y;
+  float total = 1.0;
+  for (int i = 0; i < ${HDR_TAPS.length}; i++) {
+    float level = dot(texture(source, coordinate + hdrTaps[i] * stride).rgb, luma);
+    float difference = level - y;
+    float weight = hdrWeight[i] * exp(-difference * difference * ${glslFloat(HDR_RANGE_FACTOR)});
+    sum += weight * level;
+    total += weight;
+  }
+  float base = sum / total;
+  float target = base + ${glslFloat(HDR_COMPRESSION)} * amount * base * (1.0 - base) * (1.0 - 2.0 * base) +
+                 (y - base) * (1.0 + ${glslFloat(HDR_DETAIL_GAIN)} * amount);
+  float lift = target - y;
+  if (y <= 0.0) return rgb + lift;
+  float blend = min(1.0, y / ${glslFloat(HDR_RATIO_FLOOR)});
+  return rgb + lift + blend * (rgb * (target / y) - rgb - lift);
+}
+vec3 detailFilter(sampler2D source, vec2 coordinate, vec3 centre, vec4 detail, vec2 stride, float hdrAmount) {
   vec3 denoised = centre;
   vec3 gaussian = centre;
   if (detail.x > 0.0 || detail.z > 0.0) {
@@ -109,18 +137,22 @@ vec3 detailFilter(sampler2D source, vec2 coordinate, vec3 centre, vec4 detail, v
     delta += ${glslFloat(CLARITY_GAIN)} * detail.y * clamp(4.0 * base * (1.0 - base), 0.0, 1.0) * (base - mean);
   }
   if (detail.x > 0.0) delta += ${glslFloat(SHARPEN_GAIN)} * detail.x * (base - dot(gaussian, luma));
+  if (hdrAmount > 0.0) denoised = hdrTone(source, coordinate, denoised, base, hdrAmount, stride);
   return clamp(denoised + delta, 0.0, 1.0);
 }`;
-// (sharpen, clarity, denoise, denoise range factor) and the 1/720-image-height step in texture UV.
+// (sharpen, clarity, denoise, denoise range factor), the 1/720-image-height step in texture UV
+// and the evaluated track Colour HDR amount per source.
 const detailUniforms = `uniform vec4 detail0;
 uniform vec4 detail1;
 uniform vec2 detailStep0;
-uniform vec2 detailStep1;`;
+uniform vec2 detailStep1;
+uniform vec2 hdr;`;
 const detailSample = `vec3 centre = texture(source, coordinate).rgb;
   vec4 detail = sourceIndex == 0 ? detail0 : detail1;
-  if (all(equal(detail.xyz, vec3(0.0)))) return centre;
+  float hdrAmount = sourceIndex == 0 ? hdr.x : hdr.y;
+  if (all(equal(detail.xyz, vec3(0.0))) && hdrAmount == 0.0) return centre;
   vec2 stride = sourceIndex == 0 ? detailStep0 : detailStep1;
-  return detailFilter(source, coordinate, centre, detail, stride);`;
+  return detailFilter(source, coordinate, centre, detail, stride, hdrAmount);`;
 
 const singleMain = `void main() {
   vec4 left = vec4(0.0);

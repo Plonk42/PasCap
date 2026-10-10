@@ -1,6 +1,8 @@
-# Owner-approved video track-only Colour and Opacity · schema 14
+# Owner-approved video track-only Colour and Opacity · schema 15
 
-Required Colour includes nine scalar settings, including Temperature and Tint,
+Required Colour includes nine graded scalar settings, including Temperature and Tint,
+the HDR look (applied before grading with the clip detail filters; see
+[detail filters](DETAIL_FILTERS.md#hdr-look)),
 eight static HSL bands and four master/RGB colour curves. HSL/curves share video track
 ownership but add no nullable animation channels. Scalar keyframes override their own
 bases only; advanced colour remains active. Exact gain math and complete SDR
@@ -11,7 +13,7 @@ order: [Temperature/Tint](TEMPERATURE_AND_TINT.md) and
 
 Each video track requires complete `VideoLayer.colour`, neutral on creation,
 alongside its sole required `opacity`, initially 1. Colour contains the nine
-scalar channels plus required HSL and curves. Clips have no colour or correction
+graded scalar channels, `hdr`, plus required HSL and curves. Clips have no colour or correction
 field: both `clip.colour` and `clip.correction` are invalid.
 The owner-approved scope is identical with or without animation: every clip on
 the same video track shares all colour treatment. Different treatments require different
@@ -22,19 +24,19 @@ intentionally colour greys; normalized linear gains precede Exposure, preserving
 neutral-white linear luminance before clipping only, not arbitrary/final images.
 Other scalar bounds and neutral values retain the existing SDR contract.
 No optional legacy field, additive parameter merge, migration or default-on-load exists.
-Schema 14 rejects versions 1–13 without rewriting or deleting their documents.
-Receipt format remains 1 with strict schema-14 snapshots; registry, proxies and
+Schema 15 rejects versions 1–14 without rewriting or deleting their documents.
+Receipt format remains 1 with strict schema-15 snapshots; registry, proxies and
 PCM formats are unchanged. Recreate incompatible projects deliberately.
 
-The nine shared scalar colour channels override **video track colour**, independently, in
+The nine shared scalar colour channels and HDR override **video track colour**, independently, in
 absolute project time. Skip keyframes without the relevant enabled setting, interpolate parameter values
 using the left keyframe's easing for that setting, and hold endpoints. Removing the last keyframe for a setting
 reveals the unchanged track base. HSL and curves remain static.
 Speed is clip-only and never a track channel. Opacity ownership,
 source-over composition, spatial coverage and black-fade coverage are unchanged.
-Every keyframe requires all ten nullable fields, in control order: `opacity`,
+Every keyframe requires all eleven nullable fields, in control order: `opacity`,
 `temperature`, `tint`, `exposure`, `brightness`, `contrast`, `hue`,
-`saturation`, `highlights`, `shadows`. Missing fields are invalid, never defaulted.
+`saturation`, `highlights`, `shadows`, `hdr`. Missing fields are invalid, never defaulted.
 
 For example, clips A and B on one video track both use Exposure 0.5 without keyframes.
 An Exposure curve applies the same evaluated value to both at any project frame,
@@ -61,8 +63,8 @@ Texture, decoder and full-frame buffer counts stay unchanged. Exact neutral spat
 poses retain their existing opaque black letterbox path.
 
 With neutral HSL and identity curves, static export generates a 65³ scalar LUT
-from the video track's Colour alone; nonneutral scalar colour retains this cheap path.
-Track keyframes, spatial edits or nonneutral HSL/curves require composited export. Scalar-only
+from the video track's Colour alone; nonneutral scalar colour with HDR 0 retains this cheap path.
+Track keyframes, nonzero HDR, spatial edits or nonneutral HSL/curves require composited export. Scalar-only
 composited grades use evaluated track parameters and at most two reused LUT arrays.
 Advanced grades evaluate the complete scalar/HSL/curve transform exactly on the
 fractional sampled RGB. Source/frame compilation determines neutral stages once,
@@ -73,20 +75,20 @@ Scalar LUT interpolation and H.264 quantisation remain measured approximations,
 not bitwise shader equivalence. Sharp curves are tested after production-resolution
 input scaling: grading and resampling do not commute. The two-clip diagnostic
 reference and measurement helper accept static scalar video track Colour with neutral HSL
-and identity curves, without independent clip grades.
+and identity curves and HDR 0, without independent clip grades.
 
 ## Inspector and history
 
 Control vocabulary follows the [editor control catalogue](EDITOR_CONTROLS.md#vocabulary).
 
-**Track → Colour** has ten main widgets: nine scalar video track colour controls plus sole
-Opacity. All use existing slider/exact-field/reset controls and work on an empty
+**Track → Colour** has eleven main widgets: nine graded scalar video track colour controls,
+HDR and sole Opacity. All use existing slider/exact-field/reset controls and work on an empty
 track. Main and stored Opacity sliders/exact fields use **0–100%**, neutral **100%**;
 convert only at the UI boundary. Required
 `VideoLayer.opacity` and `opacity` keyframe values remain **0–1**, without a schema change.
 Main capture diamonds are always visible; each retains adjacent per-setting **Previous/Next** buttons because not every
 setting is enabled at every shared keyframe. One keyframe-line Previous/Next pair (with the keyframe count) visits
-the union of Opacity and nine scalar colour keys.
+the union of Opacity, nine scalar colour and HDR keys.
 Enabled setting chips in stored Keyframes rows retain their per-channel arrows.
 All main and stored per-channel arrows visit strictly earlier/later keyframes
 where that channel is nonnull (zero is enabled), using the shared central

@@ -78,10 +78,10 @@ for (const context of ['shared', 'clip'] as const) {
       /Graph: time runs left to right; value progress runs bottom to top/,
     );
     const before = await current(page);
-    expect(before.schemaVersion).toBe(14);
+    expect(before.schemaVersion).toBe(15);
     expect(before.layers[0]!.opacity).toBe(1);
     expect(before.clips[0]).not.toHaveProperty('opacity');
-    expect(Object.keys(before.layers[0]!.keyframes[0]!.values)).toHaveLength(10);
+    expect(Object.keys(before.layers[0]!.keyframes[0]!.values)).toHaveLength(11);
     const initialValue = (await select.inputValue())!;
     expect(memory.saves).toBe(0);
     for (const value of interpolationSchema.options) {
