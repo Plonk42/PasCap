@@ -32,7 +32,7 @@ import { assertSourceIdentity } from './files.js';
 import type { JobContext } from './jobs.js';
 import { renderLayeredExport, type LayeredRenderReport } from './layered-export.js';
 import type { MediaLibrary } from './library.js';
-import { FFV1_SLICES, NATIVE_THREADS } from './native-threads.js';
+import { FFV1_SLICE_ARGUMENTS, NATIVE_THREADS } from './native-threads.js';
 import { inspectStreams, probeVideo } from './probe.js';
 import { runProcess } from './process.js';
 import { nativeFadeFilters } from './reference.js';
@@ -393,8 +393,7 @@ async function retimeClip(
       '1',
       '-slicecrc',
       '1',
-      '-slices',
-      FFV1_SLICES,
+      ...FFV1_SLICE_ARGUMENTS,
       '-g',
       '1',
       '-pix_fmt',

@@ -10,9 +10,12 @@ export function nativeThreadCount(cores = availableParallelism()): number {
 
 export const NATIVE_THREADS = String(nativeThreadCount());
 
-/** FFV1 threads encode whole slices; FFmpeg's default 2×2 grid leaves threads beyond four idle. */
-export function ffv1SliceCount(threads = nativeThreadCount()): number {
-  return threads > 2 ? 16 : 4;
+/**
+ * FFV1 threads encode whole slices; FFmpeg's default 2×2 grid leaves threads beyond four idle.
+ * Two threads keep FFmpeg's choice, which also enlarges the grid where 2×2 slices are too big (UHD RGBA16).
+ */
+export function ffv1SliceArguments(threads = nativeThreadCount()): string[] {
+  return threads > 2 ? ['-slices', '16'] : [];
 }
 
-export const FFV1_SLICES = String(ffv1SliceCount());
+export const FFV1_SLICE_ARGUMENTS = ffv1SliceArguments();

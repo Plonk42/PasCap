@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ffv1SliceCount, nativeThreadCount } from '../../src/server/native-threads.js';
+import { ffv1SliceArguments, nativeThreadCount } from '../../src/server/native-threads.js';
 
 describe('nativeThreadCount', () => {
   it.each([
@@ -15,12 +15,12 @@ describe('nativeThreadCount', () => {
   });
 });
 
-describe('ffv1SliceCount', () => {
+describe('ffv1SliceArguments', () => {
   it.each([
-    [2, 4],
-    [3, 16],
-    [8, 16],
-  ])('uses a valid FFV1 slice grid for %i threads (%i)', (threads, expected) => {
-    expect(ffv1SliceCount(threads)).toBe(expected);
+    [2, []],
+    [3, ['-slices', '16']],
+    [8, ['-slices', '16']],
+  ])('chooses FFV1 slicing for %i threads', (threads, expected) => {
+    expect(ffv1SliceArguments(threads)).toEqual(expected);
   });
 });
