@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import type { MediaJob } from '../shared/media.js';
 import './activity.css';
 import { Icon } from './icons.js';
+import { estimateRemainingMs, formatEta, recordProgress, type ProgressSample } from './job-eta.js';
 
 export interface JobsProps {
   jobs: readonly MediaJob[];
@@ -98,6 +99,8 @@ export function Jobs({ jobs, onCancel, open, onOpen, onClose, busy, error, onRef
   const cancellationRequests = useRef(new Set<string>());
   const [cancelling, setCancelling] = useState<ReadonlySet<string>>(new Set());
   const [cancelErrors, setCancelErrors] = useState<Readonly<Record<string, string>>>({});
+  const [etas, setEtas] = useState<Readonly<Record<string, string | null>>>({});
+  const observed = useRef(new Map<string, readonly ProgressSample[]>());
   const ordered = orderActivityJobs(jobs);
   const active = ordered.filter(isActiveJob);
   const history = ordered.filter((job) => !isActiveJob(job));
@@ -128,6 +131,24 @@ export function Jobs({ jobs, onCancel, open, onOpen, onClose, busy, error, onRef
       element.removeEventListener('keydown', closeOnEscape);
     };
   }, [open, onClose]);
+
+  useEffect(() => {
+    const now = Date.now();
+    const next: Record<string, string | null> = {};
+    const running = jobs.filter((job) => job.kind === 'export' && job.state === 'running');
+    for (const job of running) {
+      const samples = recordProgress(observed.current.get(job.id) ?? [], now, job.progress);
+      observed.current.set(job.id, samples);
+      next[job.id] = formatEta(estimateRemainingMs(samples));
+    }
+    for (const jobId of observed.current.keys()) if (!(jobId in next)) observed.current.delete(jobId);
+    setEtas((previous) => {
+      const keys = Object.keys(next);
+      return keys.length === Object.keys(previous).length && keys.every((key) => previous[key] === next[key])
+        ? previous
+        : next;
+    });
+  }, [jobs]);
 
   useEffect(() => {
     const activeIds = new Set(jobs.filter(isActiveJob).map((job) => job.id));
@@ -181,6 +202,9 @@ export function Jobs({ jobs, onCancel, open, onOpen, onClose, busy, error, onRef
           <progress max={1} value={job.progress} aria-label={`Progress for ${job.label}`} />
           <span>{Math.round(job.progress * 100)}%</span>
         </div>
+      )}
+      {job.kind === 'export' && job.state === 'running' && !cancelling.has(job.id) && (
+        <p className="activity-hint activity-job-eta">{etas[job.id] ?? 'Estimating time left…'}</p>
       )}
       <div className="activity-job-times">
         <JobTime label="Created" value={job.createdAt} />
