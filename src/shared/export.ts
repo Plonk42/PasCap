@@ -56,11 +56,8 @@ export const EXPORT_PROFILES: Readonly<Record<ExportProfile, Readonly<ExportProf
   final4k: Object.freeze({ width: 3840, height: 2160, crf: 18, preset: 'medium', level: '5.1' }),
 });
 
-/** Limits are per process, not a promise that native codecs use only one frame. */
+/** Limits are per process, not a promise that native codecs use only one frame. Thread counts: server/native-threads.ts. */
 export const EXPORT_RESOURCES = Object.freeze({
-  threadsPerDecoder: 2,
-  threadsPerEncoder: 2,
-  filterThreads: 2,
   maxOriginalVideoDecoders: 1,
   maxIntermediateVideoDecoders: 2,
   maxLosslessClipsOnDisk: 2,
