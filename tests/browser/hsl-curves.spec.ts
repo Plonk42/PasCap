@@ -86,7 +86,25 @@ test('curve endpoints, exact collisions, nonmonotonic values, maximum points and
     ]);
 });
 
-test('captured curve drafts cancel, reject the final invalid destination and commit once with Undo', async ({
+test('releasing a curve drag far outside the plot commits a node clamped between its neighbours', async ({ page }) => {
+  await openSection(page, 'Colour curves');
+  await page.getByRole('button', { name: 'Add colour curve control node', exact: true }).click();
+  await expect.poll(() => memory.saves).toBe(1);
+  const box = (await page.getByRole('button', { name: 'Colour curve control node 2', exact: true }).boundingBox())!;
+  const x = box.x + box.width / 2,
+    y = box.y + box.height / 2;
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  await page.mouse.move(x + 600, y + 600, { steps: 4 });
+  await page.mouse.up();
+  await expect.poll(() => memory.saves).toBe(2);
+  const [, node] = (await current(page)).layers[0]!.colour.curves.master;
+  expect(node!.x).toBeGreaterThan(0.99);
+  expect(node!.x).toBeLessThan(1);
+  expect(node!.y).toBe(0);
+});
+
+test('captured curve drafts cancel, stay inside the plot between neighbours and commit once with Undo', async ({
   page,
 }) => {
   await openSection(page, 'Colour curves');
@@ -108,8 +126,13 @@ test('captured curve drafts cancel, reject the final invalid destination and com
   await page.mouse.move(x, y);
   await page.mouse.down();
   await page.mouse.move(x + 10, y - 10);
-  await page.mouse.move(x + 400, y - 10);
-  await expect(page.locator('.colour-curve-plot')).toHaveClass(/invalid/);
+  await page.mouse.move(x + 400, y - 400);
+  const plot = (await page.locator('.colour-curve-plot').boundingBox())!;
+  const dragged = (await point.boundingBox())!;
+  expect(dragged.x + dragged.width / 2).toBeLessThanOrEqual(plot.x + plot.width + 0.5);
+  expect(dragged.y + dragged.height / 2).toBeGreaterThanOrEqual(plot.y - 0.5);
+  await expect(page.locator('.colour-curve-plot')).not.toHaveClass(/invalid/);
+  await page.keyboard.press('Escape');
   await page.mouse.up();
   expect((await current(page)).layers[0]!.colour.curves.master).toEqual(original);
   expect(memory.saves).toBe(1);

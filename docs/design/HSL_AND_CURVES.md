@@ -70,13 +70,17 @@ quantisation remain measured approximations under the unchanged error gates.
 
 Track → Colour contains nine scalar sliders (Temperature/Tint before Exposure),
 HDR and sole Opacity control. The separate, initially collapsed Track sections
-**HSL ranges** and **Colour curves** (after Colour) contain native band/channel/control-node selectors, exact
+**HSL ranges** and **Colour curves** (after Colour) contain native band/channel selectors, exact
 numeric fields and a compact SVG curve graph. HSL uses native sliders and exact
-fields, with no diamonds. Curve endpoint inputs are locked; outputs remain editable.
+fields, with no diamonds. The curve footer is one row: exact Input and Output fields for the selected control
+node, then Add and Delete, followed by Reset channel / Reset all. There is no node select or Previous/Next:
+choose a node by clicking or focusing its graph point. Curve endpoint inputs are locked (their field is
+disabled); outputs remain editable.
 Add inserts a sampled control node; delete removes only an interior control node. Graph dragging
-edits both coordinates from capture-relative geometry. Drafts never save or enter
-history; release commits one complete validated video track colour command. Invalid final
-positions reject, never commit an earlier valid draft. Escape, cancellation, lost
+edits both coordinates from capture-relative geometry, clamped to the 0–1 plot: an interior node stays strictly
+between its neighbours (a margin of at most 0.001 keeps it from merging) and endpoint inputs stay fixed. Drafts never save or enter
+history; release commits one complete validated video track colour command. Exact fields still reject invalid
+values. Escape, cancellation, lost
 capture and window blur restore. Keyboard/exact fields remain usable at 270 px.
 
 Band/all-HSL and channel/all-curves resets affect only their respective static

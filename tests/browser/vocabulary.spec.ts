@@ -70,7 +70,7 @@ for (const viewport of [
     await expect(page.locator('.editor-help-content:popover-open')).toContainText('track');
     await page.keyboard.press('Escape');
     await page.getByRole('button', { name: 'Colour curves section', exact: true }).click();
-    await expect(page.getByRole('combobox', { name: 'Selected colour curve control node', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Colour curve control node 1', exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Delete colour curve control node', exact: true })).toBeDisabled();
 
     await inspectorTab(page, 'Clip');

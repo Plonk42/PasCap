@@ -40,6 +40,14 @@ const HSL_CONTROLS = [
   { key: 'lightness', label: 'Lightness offset', min: -0.5, max: 0.5, step: 0.005 },
 ] as const;
 
+const clamp = (value: number, low: number, high: number): number => Math.min(high, Math.max(low, value));
+
+/** Open interval between neighbours, kept a small margin away so a drag never merges nodes. */
+function dragSpan(left: number, right: number): [number, number] {
+  const margin = Math.min(0.001, (right - left) / 4);
+  return [left + margin, right - margin];
+}
+
 function isHistoryShortcut(event: KeyboardEvent<HTMLButtonElement>): boolean {
   return (event.ctrlKey || event.metaKey) && ['z', 'y'].includes(event.key.toLowerCase());
 }
@@ -237,14 +245,14 @@ function CurveEditor({
       dy = event.clientY - active.y;
     if (!active.moved && Math.hypot(dx, dy) < 3) return;
     active.moved = true;
+    const original = active.colour.curves[channel];
+    const left = original[active.index - 1];
+    const right = original[active.index + 1];
+    // Interior nodes stay strictly between their neighbours; endpoint inputs are fixed.
     const x =
-      active.index === 0 || active.index === active.colour.curves[channel].length - 1
-        ? active.origin.x
-        : active.origin.x + dx / active.width;
-    const y = active.origin.y - dy / active.height;
-    active.points = active.colour.curves[channel].map((point, position) =>
-      position === active.index ? { x, y } : point,
-    );
+      left && right ? clamp(active.origin.x + dx / active.width, ...dragSpan(left.x, right.x)) : active.origin.x;
+    const y = clamp(active.origin.y - dy / active.height, 0, 1);
+    active.points = original.map((point, position) => (position === active.index ? { x, y } : point));
     active.error = validate(active.points);
     setDraft(active.points);
     setError(active.error ?? '');
@@ -323,6 +331,9 @@ function CurveEditor({
             onClick={() => {
               if (!unavailable) selection.select(points[at]!.x);
             }}
+            onFocus={() => {
+              if (!unavailable) selection.select(points[at]!.x);
+            }}
             onKeyDown={(event) => keyboard(event, at)}
             onPointerDown={(event) => begin(event, at)}
             onPointerMove={move}
@@ -332,19 +343,32 @@ function CurveEditor({
           />
         ))}
       </div>
-      <div className="advanced-colour-tools">
-        <select
-          aria-label="Selected colour curve control node"
-          value={index}
-          disabled={unavailable}
-          onChange={(event) => selection.select(points[Number(event.currentTarget.value)]!.x)}
-        >
-          {points.map((point, at) => (
-            <option key={selection.ids[at]} value={at}>
-              Control node {at + 1} · {point.x}
-            </option>
-          ))}
-        </select>
+      <div className="colour-curve-fields">
+        <label>
+          Input 0–1
+          <NumberField
+            aria-label="Colour curve input"
+            value={selected.x}
+            min={0}
+            max={1}
+            resetKey={context}
+            disabled={unavailable || endpoint}
+            validate={(x) => validate(replace(index, { x }))}
+            onCommit={(x) => change(replace(index, { x }))}
+          />
+        </label>
+        <label>
+          Output 0–1
+          <NumberField
+            aria-label="Colour curve output"
+            value={selected.y}
+            min={0}
+            max={1}
+            resetKey={context}
+            disabled={unavailable}
+            onCommit={(y) => change(replace(index, { y }))}
+          />
+        </label>
         <button
           type="button"
           className="icon-button"
@@ -362,56 +386,6 @@ function CurveEditor({
           onClick={() => change(points.filter((_, at) => at !== index))}
         >
           <Icon name="trash" size={14} />
-        </button>
-      </div>
-      <div className="colour-curve-fields">
-        <label>
-          Input 0–1
-          <NumberField
-            aria-label="Colour curve input"
-            value={selected.x}
-            min={0}
-            max={1}
-            resetKey={context}
-            disabled={unavailable || endpoint}
-            {...(endpoint ? { hint: 'End control node input is fixed.' } : {})}
-            validate={(x) => validate(replace(index, { x }))}
-            onCommit={(x) => change(replace(index, { x }))}
-          />
-        </label>
-        <label>
-          Output 0–1
-          <NumberField
-            aria-label="Colour curve output"
-            value={selected.y}
-            min={0}
-            max={1}
-            resetKey={context}
-            disabled={unavailable}
-            onCommit={(y) => change(replace(index, { y }))}
-          />
-        </label>
-      </div>
-      <div className="advanced-colour-tools">
-        <button
-          type="button"
-          className="text-button"
-          disabled={unavailable || index === 0}
-          aria-label="Previous colour curve control node"
-          onClick={() => selection.select(points[index - 1]!.x)}
-        >
-          <Icon name="back" size={14} />
-          Previous
-        </button>
-        <button
-          type="button"
-          className="text-button"
-          disabled={unavailable || index === points.length - 1}
-          aria-label="Next colour curve control node"
-          onClick={() => selection.select(points[index + 1]!.x)}
-        >
-          Next
-          <Icon name="forward" size={14} />
         </button>
       </div>
       {error && (
