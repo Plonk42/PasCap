@@ -32,7 +32,7 @@ import { assertSourceIdentity } from './files.js';
 import type { JobContext } from './jobs.js';
 import { renderLayeredExport, type LayeredRenderReport } from './layered-export.js';
 import type { MediaLibrary } from './library.js';
-import { NATIVE_THREADS } from './native-threads.js';
+import { FFV1_SLICE_ARGUMENTS, NATIVE_THREADS } from './native-threads.js';
 import { inspectStreams, probeVideo } from './probe.js';
 import { runProcess } from './process.js';
 import { nativeFadeFilters } from './reference.js';
@@ -228,6 +228,7 @@ export async function renderExport(
 const BASE_ARGS = ['-hide_banner', '-loglevel', 'error', '-nostdin', '-n'];
 const FPS = '30000/1001';
 const CLOCK = 'settb=expr=1/30000,setpts=N*1001';
+const RGB_TAGS = 'setparams=range=full:color_primaries=bt709:color_trc=bt709:colorspace=gbr';
 const RGB_TO_VIDEO =
   'scale=in_color_matrix=bt709:out_color_matrix=bt709:in_range=pc:out_range=tv,format=yuv420p,' +
   'setparams=range=limited:color_primaries=bt709:color_trc=bt709:colorspace=bt709';
@@ -392,6 +393,7 @@ async function retimeClip(
       '1',
       '-slicecrc',
       '1',
+      ...FFV1_SLICE_ARGUMENTS,
       '-g',
       '1',
       '-pix_fmt',
@@ -884,50 +886,40 @@ async function renderClips(
   let retained: { index: number; filename: string } | null = null;
   const chunkFiles: string[] = [];
   const retiming: RawRetimingReport[] = [];
-  for (const [ordinal, clip] of inputs.plan.clips.entries()) {
+  await forEachSerial(inputs.plan.clips, async (clip, ordinal) => {
     const index = clip.index;
     checkCancelled(context);
     progress(0, `Generating clip ${ordinal + 1} / ${inputs.plan.clips.length} LUT`);
-    const result = await retimeClip(
-      inputs,
-      index,
-      environment, // NOSONAR -- decode only one original at a time.
-      (frames) =>
-        progress(
-          frames,
-          `Retiming original clip ${ordinal + 1} / ${inputs.plan.clips.length}: ${frames} / ${clip.duration} output frames`,
-        ),
+    const result = await retimeClip(inputs, index, environment, (frames) =>
+      progress(
+        frames,
+        `Retiming original clip ${ordinal + 1} / ${inputs.plan.clips.length}: ${frames} / ${clip.duration} output frames`,
+      ),
     );
     retiming.push(result.report);
     finishedWork += clip.duration;
-    for (const chunk of inputs.plan.chunks.filter((item) =>
+    const chunks = inputs.plan.chunks.filter((item) =>
       item.kind === 'body' ? item.clipIndex === index : item.rightIndex === index,
-    )) {
+    );
+    await forEachSerial(chunks, async (chunk) => {
       const chunkFile = `chunk-${String(chunkFiles.length).padStart(5, '0')}.mp4`;
       const filenames =
         chunk.kind === 'body' ? [result.filename] : [requireRetained(retained, chunk.leftIndex), result.filename];
-      await encodeChunk(
-        chunk,
-        filenames,
-        chunkFile,
-        environment, // NOSONAR -- a dissolve opens at most two intermediate decoders.
-        (frames) =>
-          progress(
-            frames,
-            `Encoding ${chunk.kind} chunk ${chunkFiles.length + 1}: ${frames} / ${chunk.duration} frames`,
-          ),
+      await encodeChunk(chunk, filenames, chunkFile, environment, (frames) =>
+        progress(frames, `Encoding ${chunk.kind} chunk ${chunkFiles.length + 1}: ${frames} / ${chunk.duration} frames`),
       );
       chunkFiles.push(chunkFile);
       finishedWork += chunk.duration;
       if (chunk.kind === 'dissolve') {
-        await rm(path.join(directory, retained!.filename)); // NOSONAR -- free the old tail before processing another clip.
+        // Free the old tail before processing another clip.
+        await rm(path.join(directory, retained!.filename));
         retained = null;
       }
-    }
+    });
     const outgoing = inputs.snapshot.layers[0]!.transitions[ordinal];
     if (outgoing?.type === 'cross-dissolve') retained = { index, filename: result.filename };
-    else await rm(path.join(directory, result.filename)); // NOSONAR -- bound lossless scratch files to two clips.
-  }
+    else await rm(path.join(directory, result.filename)); // Bound lossless scratch files to two clips.
+  });
   if (retained) throw new ServiceError('Exporter retained an unused dissolve tail.', 500);
   return { chunkFiles, retiming };
 }
@@ -953,48 +945,34 @@ async function renderVideo(
     directory,
     context,
     target,
-  });
-  checkCancelled(context);
-  const filename = 'chunk-layered.mp4';
-  // The RGB channels already contain the premultiplied composite. Dropping alpha
-  // flattens against opaque black, including completely empty/disabled-layer holds.
-  await runProcess(
-    library.config.ffmpeg,
-    [
+    // The RGB channels already contain the premultiplied composite. Dropping alpha
+    // flattens against opaque black, including completely empty/disabled-layer holds.
+    finalEncoder: (filename, frames) => [
       ...BASE_ARGS,
-      '-xerror',
-      '-err_detect',
-      'explode',
+      '-f',
+      'rawvideo',
+      '-pixel_format',
+      'rgba64le',
+      '-video_size',
+      `${target.width}x${target.height}`,
+      '-framerate',
+      FPS,
       '-threads',
       NATIVE_THREADS,
       '-i',
-      result.filename,
+      'pipe:0',
       '-map',
       '0:v:0',
       '-filter_threads',
       NATIVE_THREADS,
       '-vf',
-      `format=gbrp16le,${CLOCK},${RGB_TO_VIDEO}`,
-      ...h264Arguments(target, inputs.plan.duration),
+      `format=gbrp16le,setsar=1,${CLOCK},${RGB_TAGS},${RGB_TO_VIDEO}`,
+      ...h264Arguments(target, frames),
       filename,
     ],
-    {
-      cwd: directory,
-      signal: context.signal,
-      onProgress: (fields) => {
-        const frame = Number(fields['frame']);
-        if (Number.isFinite(frame))
-          context.update(
-            0.82 + 0.01 * Math.max(0, Math.min(1, frame / inputs.plan.duration)),
-            'Encoding the complete layered composite to H.264 once',
-          );
-      },
-    },
-  );
-  result.report.nativeVideoProcesses++;
-  result.report.peakIntermediateVideoDecoders = Math.max(result.report.peakIntermediateVideoDecoders, 1);
-  await rm(path.join(directory, result.filename));
-  return { chunks: [{ filename, duration: inputs.plan.duration }], retiming: result.retiming, layered: result.report };
+  });
+  checkCancelled(context);
+  return { chunks: result.chunks, retiming: result.retiming, layered: result.report };
 }
 
 async function renderCapturedExport(
@@ -1083,7 +1061,7 @@ async function renderCapturedExport(
           ? 'shared sampleTimeline evaluates independently participating layer point channels at absolute project frames across every clip in the row; row-owned Opacity supplies the same source coverage for every dissolve participant, using the row setting when unkeyed; source frames use placed.retiming.sourceAt(projectFrame - placed.start); at most two reusable in-memory CPU-reference 65³ Float32 LUTs, tetrahedral approximation (not bitwise); clip brightness after grading, coverage independent of black fades; C=sum(G*b*o*w), A=sum(o*w), result=C+lower*(1-A), no group opacity multiplier; source-over encoded BT.709; black padding after grade'
           : 'One static CPU-reference 65³ LUT per instance, native tetrahedral interpolation before output-frame black fades',
         scratchPolicy: layered
-          ? 'At most three full lossless timeline representations (a span collection counts as one) and two RGB clip files. Each track is graded once into a premultiplied RGBA16 group, then source-overed onto the lower accumulator without regrading. Delete lower/group after their bounded composition pass and clip files immediately after their last span. One final H.264 encode. No LUT files. Audio retains at most one selected PCM16 file and two stereo Float64 accumulators, deleting consumed inputs after each serial pass. Disk scales with duration, not a fixed GB limit. All owned scratch/partials removed on failure/cancel; successful exports never overwritten.'
+          ? 'At most three full lossless timeline representations (a span collection counts as one) and two RGB clip files. Each track is graded once into a premultiplied RGBA16 group, then source-overed onto the lower accumulator without regrading. Delete lower/group after their bounded composition pass and clip files immediately after their last span. The last pass encodes H.264 directly (final source-over, or the span chunks of a single track), without a lossless copy of the finished timeline. No LUT files. Audio retains at most one selected PCM16 file and two stereo Float64 accumulators, deleting consumed inputs after each serial pass. Disk scales with duration, not a fixed GB limit. All owned scratch/partials removed on failure/cancel; successful exports never overwritten.'
           : 'At most two complete lossless clips; delete the previous clip immediately after its tail. Keep compressed chunks until mux/verification. Audio retains at most one selected PCM16 file and two stereo Float64 accumulators, deleting consumed inputs after each serial pass. Peak disk scales with two clips + chunks + bounded audio files + final MP4, not all originals. All scratch removed before publication; failed/cancelled job directory removed.',
         audio: music,
         audioPlacement:

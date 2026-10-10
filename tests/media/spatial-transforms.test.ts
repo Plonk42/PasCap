@@ -400,7 +400,9 @@ describe.skipIf(!enabled)('spatial transforms · real native FFmpeg, disposable 
       context: { id: randomUUID(), signal: new AbortController().signal, update: () => {} },
     });
     resourceBounds(result.report, target, project);
-    expect(await readdir(directory)).toEqual([result.filename]);
+    const [output] = result.chunks;
+    expect(result.chunks).toEqual([{ filename: output!.filename, duration: calculateLayout(project).duration }]);
+    expect(await readdir(directory)).toEqual([output!.filename]);
     expect(result.retiming).toHaveLength(project.clips.length);
     for (const [index, report] of result.retiming.entries()) {
       const placed = calculateLayout(project).clips.find(
@@ -414,7 +416,7 @@ describe.skipIf(!enabled)('spatial transforms · real native FFmpeg, disposable 
       });
       expect(report.largestReadChunkBytes).toBeLessThanOrEqual(256 * 1024);
     }
-    return path.join(directory, result.filename);
+    return path.join(directory, output!.filename);
   }
 
   async function exactFrames(filename: string, target: Target, count: number, packets = false): Promise<void> {
