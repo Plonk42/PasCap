@@ -13,6 +13,7 @@ import {
   fingerprintFile,
 } from './files.js';
 import { JobQueue, type JobContext } from './jobs.js';
+import { NATIVE_THREADS } from './native-threads.js';
 import { probeVideo } from './probe.js';
 import { runProcess } from './process.js';
 import { atomicWrite, ensurePrivateDirectory, SerialWriter } from './storage.js';
@@ -363,7 +364,7 @@ export class MediaLibrary {
           '-nostdin',
           '-n',
           '-threads',
-          '2',
+          NATIVE_THREADS,
           '-i',
           asset.sourcePath,
           '-map',
@@ -394,9 +395,9 @@ export class MediaLibrary {
           '-flags',
           '+cgop',
           '-threads',
-          '2',
+          NATIVE_THREADS,
           '-filter_threads',
-          '2',
+          NATIVE_THREADS,
           '-color_primaries',
           'bt709',
           '-color_trc',
