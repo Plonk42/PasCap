@@ -39,6 +39,7 @@ export type IconName =
   | 'layers'
   | 'music'
   | 'curve'
+  | 'tone-curve'
   | 'magnet'
   | 'cut'
   | 'warning'
@@ -87,6 +88,7 @@ const paths: Record<IconName, string> = {
   layers: 'm3 8 9-5 9 5-9 5-9-5Zm0 5 9 5 9-5M3 18l9 5 9-5',
   music: 'M9 17V5l11-2v12M9 17a3 3 0 1 1-3-3c2 0 3 1 3 3Zm11-2a3 3 0 1 1-3-3c2 0 3 1 3 3Z',
   curve: 'M3 18c8 0 10-12 18-12M3 15v6m18-18v6',
+  'tone-curve': 'M3 3h18v18H3V3Zm3 15c6 0 5-12 12-12',
   magnet: 'M5 3v9a7 7 0 0 0 14 0V3h-5v9a2 2 0 0 1-4 0V3H5Zm0 5h5m4 0h5',
   cut: 'm7 7 10 10M7 17 17 7M6 3a3 3 0 1 1 0 6 3 3 0 0 1 0-6Zm0 12a3 3 0 1 1 0 6 3 3 0 0 1 0-6Zm11-8 4-4m-4 14 4 4',
   warning: 'm12 3 10 18H2L12 3Zm0 6v5m0 3h.1',

@@ -6,6 +6,8 @@ import {
   CURVE_CHANNELS,
   evaluateColourCurve,
   HSL_BANDS,
+  isIdentityCurve,
+  isNeutralHsl,
   type ColourCurvePoint,
   type CurveChannel,
   type HslBand,
@@ -16,6 +18,7 @@ import type { ProjectDocument, VideoLayer } from '../shared/model.js';
 import './advanced-colour.css';
 import { HelpPopover } from './HelpPopover.js';
 import { Icon } from './icons.js';
+import { InspectorSection } from './InspectorSection.js';
 import { livePreview } from './live-preview.js';
 import { NumberField } from './NumberField.js';
 import type { DraftPreview } from './Timeline.js';
@@ -399,20 +402,34 @@ function CurveEditor({
   );
 }
 
-export function AdvancedColour(props: Readonly<Props>) {
-  const { layer, project, disabled, onEdit } = props;
-  const [band, setBand] = useState<HslBand>('red');
-  const [channel, setChannel] = useState<CurveChannel>('master');
-  const commit = (colour: ColourSettings): void => {
+function colourCommit({ layer, disabled, onEdit }: Readonly<Props>) {
+  return (colour: ColourSettings): void => {
     if (!disabled) onEdit({ type: 'colour', layerId: layer.id, colour: colourSchema.parse(colour) });
   };
+}
+
+export function HslRangesSection(props: Readonly<Props>) {
+  const { layer, project, disabled } = props;
+  const [band, setBand] = useState<HslBand>('red');
+  const commit = colourCommit(props);
   const context = `${project.id}:${layer.id}:${band}`;
   return (
-    <div className="advanced-colour">
-      <details>
-        <summary>
-          HSL ranges <small>Static track</small>
-        </summary>
+    <InspectorSection
+      id="hsl"
+      title="HSL ranges"
+      icon="sliders"
+      modified={!isNeutralHsl(layer.colour.hsl)}
+      help={
+        <HelpPopover label="HSL ranges" guide="colour-speed-and-shared-video-track-keyframes">
+          <p>
+            Shift the hue, saturation or lightness of one colour range, such as the blues, on every clip on this track.
+            Neighbouring ranges blend smoothly and greys stay untouched.
+          </p>
+          <p className="editor-help-tip">Tip: Reset all returns every range to neutral.</p>
+        </HelpPopover>
+      }
+    >
+      <div className="advanced-colour">
         <div className="advanced-colour-tools">
           <label>
             <span>Range</span>
@@ -429,13 +446,6 @@ export function AdvancedColour(props: Readonly<Props>) {
               ))}
             </select>
           </label>
-          <HelpPopover label="HSL ranges" guide="colour-speed-and-shared-video-track-keyframes">
-            <p>
-              Shift the hue, saturation or lightness of one colour range, such as the blues, on every clip on this
-              track. Neighbouring ranges blend smoothly and greys stay untouched.
-            </p>
-            <p className="editor-help-tip">Tip: Reset all returns every range to neutral.</p>
-          </HelpPopover>
         </div>
         {HSL_CONTROLS.map((control) => {
           const withValue = (value: number): ColourSettings => ({
@@ -484,11 +494,34 @@ export function AdvancedColour(props: Readonly<Props>) {
             Reset all
           </button>
         </div>
-      </details>
-      <details>
-        <summary>
-          Colour curves <small>Static track</small>
-        </summary>
+      </div>
+    </InspectorSection>
+  );
+}
+
+export function ColourCurvesSection(props: Readonly<Props>) {
+  const { layer, project, disabled } = props;
+  const [channel, setChannel] = useState<CurveChannel>('master');
+  const commit = colourCommit(props);
+  return (
+    <InspectorSection
+      id="curves"
+      title="Colour curves"
+      icon="tone-curve"
+      modified={!Object.values(layer.colour.curves).every(isIdentityCurve)}
+      help={
+        <HelpPopover label="Colour curves" guide="colour-speed-and-shared-video-track-keyframes">
+          <p>
+            Drag control nodes to reshape brightness or colour: Master changes everything, Red, Green and Blue one
+            channel each. Add a node to bend another part of the curve.
+          </p>
+          <p className="editor-help-tip">
+            Tip: select a node and use the arrow keys for fine steps; Escape cancels a drag.
+          </p>
+        </HelpPopover>
+      }
+    >
+      <div className="advanced-colour">
         <div className="advanced-colour-tools">
           <label>
             <span>Channel</span>
@@ -505,15 +538,6 @@ export function AdvancedColour(props: Readonly<Props>) {
               ))}
             </select>
           </label>
-          <HelpPopover label="Colour curves" guide="colour-speed-and-shared-video-track-keyframes">
-            <p>
-              Drag control nodes to reshape brightness or colour: Master changes everything, Red, Green and Blue one
-              channel each. Add a node to bend another part of the curve.
-            </p>
-            <p className="editor-help-tip">
-              Tip: select a node and use the arrow keys for fine steps; Escape cancels a drag.
-            </p>
-          </HelpPopover>
         </div>
         <CurveEditor key={`${project.id}:${layer.id}:${channel}`} {...props} channel={channel} />
         <div className="advanced-colour-tools">
@@ -539,7 +563,7 @@ export function AdvancedColour(props: Readonly<Props>) {
             Reset all
           </button>
         </div>
-      </details>
-    </div>
+      </div>
+    </InspectorSection>
   );
 }

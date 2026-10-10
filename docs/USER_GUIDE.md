@@ -264,7 +264,7 @@ Removing the final keyed setting reveals the unchanged saved track base. Slider
 movement stays local until release; valid edits make one Undo step, invalid or
 cancelled edits apply nothing. Numeric entry retains its precision.
 
-Nested **HSL ranges** and **Colour curves** also belong to the video track, but remain
+The **HSL ranges** and **Colour curves** sections, below Colour in Track, also belong to the video track, but remain
 static, with no animation diamonds. They follow scalar grading, so HSL's grey
 protection does not undo Temperature/Tint colouring. Ungraded comparison bypasses
 all these Colour stages, retaining Opacity and geometry. Exact processing:

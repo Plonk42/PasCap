@@ -132,7 +132,7 @@ and technical paths stay unchanged; this glossary does not change schema 13.
 
 Keep Media for recording discovery/import; the centre's Timeline/Source preview
 tabs for viewing; Clip for speed/Transform/source range/placement; Track for Colour,
-Opacity, shared Keyframes, transitions and fades; Audio for music. Track options owns
+Opacity, HSL ranges, Colour curves, shared Keyframes, transitions and fades; Audio for music. Track options owns
 rename, Ripple, stacking and deletion. No tab relocation is justified by the audit.
 Keep frequent split/trim/delete/cut actions directly in Timeline, not in another
 toolbar. Detailed controls and diagnostics remain contextual/collapsible.
