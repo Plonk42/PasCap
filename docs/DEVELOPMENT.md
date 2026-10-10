@@ -453,7 +453,10 @@ Groups merge bottom-to-top as $\mathrm{result} = C + \mathrm{lower}(1 - A)$,
 without regrading or another opacity multiplier. Opacity is composition coverage,
 not SDR RGB grading; unkeyed colour settings are track-owned. Black fades preserve coverage;
 each dissolve remains one group. Serial limits: one original decoder, two intermediate readers,
-one encoder and three native video children per pass. Four raw buffers (two RGB8,
+one encoder and three native video children per pass. Each video decoder, filter
+and encoder (proxy preparation, export, verification) uses half the host cores,
+bounded to 2–8 threads ([policy](../src/server/native-threads.ts)); audio and
+thumbnail work keep two. Four raw buffers (two RGB8,
 two RGBA16) use **22 bytes/pixel = 182,476,800 bytes at UHD**; two 65³ Float32 LUTs
 add **6,591,000 bytes**, excluding native/audio memory. CPU composition/LUT bands
 run on at most eight worker threads sharing those buffers, without copies. Two retained clip files and
