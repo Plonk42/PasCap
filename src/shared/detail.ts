@@ -96,6 +96,16 @@ export const HDR_TAPS = [
   }),
 );
 
+/** Kernel taps per pixel beyond the centre: the dominant per-pixel cost of these filters. */
+export function detailTapCount(settings: Readonly<DetailSettings>, hdr: boolean): number {
+  return (
+    (settings.sharpen > 0 || settings.denoise > 0 ? DETAIL_FINE_TAPS.length : 0) +
+    (settings.denoise > 0 ? DETAIL_WIDE_TAPS.length : 0) +
+    (settings.clarity === 0 ? 0 : DETAIL_CLARITY_TAPS.length) +
+    (hdr ? HDR_TAPS.length : 0)
+  );
+}
+
 /** Writes encoded BT.709 RGB in 0–1 at normalized original-image coordinates. */
 export type DetailSampler = (u: number, v: number, out: Float64Array) => void;
 export interface DetailFilter {
