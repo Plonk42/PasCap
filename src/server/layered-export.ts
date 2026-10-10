@@ -1,6 +1,7 @@
 import { rename, rm } from 'node:fs/promises';
 import { endianness } from 'node:os';
 import path from 'node:path';
+import type { Writable } from 'node:stream';
 import { setImmediate as yieldToEvents } from 'node:timers/promises';
 import { isDeepStrictEqual } from 'node:util';
 import {
@@ -25,7 +26,13 @@ import { composeLayerFrame, fittedContent, type LayerFrameSource } from './layer
 import { CompositorPool } from './layered-pool.js';
 import { FFV1_SLICES, NATIVE_THREADS } from './native-threads.js';
 import { runProcess } from './process.js';
-import { runRawVideoPass, writeRawFrame, type RawFrameReader, type RawPassReport } from './raw-process.js';
+import {
+  runRawVideoPass,
+  writeRawFrame,
+  type RawFrameReader,
+  type RawPassReport,
+  type RawVideoPass,
+} from './raw-process.js';
 import { retimeRawVideo, type RawRetimingReport } from './retime-process.js';
 import { atomicWrite } from './storage.js';
 
@@ -44,6 +51,11 @@ export interface LayeredExportOptions {
   directory: string;
   target: Readonly<ExportProfileSettings>;
   context: JobContext;
+  /**
+   * Native arguments encoding raw premultiplied rgba64le stdin frames to `filename`. The last
+   * pass then writes its frames there directly; without it the output stays lossless RGBA16.
+   */
+  finalEncoder?: (filename: string, frames: number) => string[];
 }
 export interface LayeredRenderReport {
   renderedClipIds: string[];
@@ -74,7 +86,8 @@ export interface LayeredRenderReport {
   elapsedMs: number;
 }
 export interface LayeredRenderResult {
-  filename: string;
+  /** Consecutive files covering the whole timeline once, in order. */
+  chunks: TimelineChunk[];
   retiming: RawRetimingReport[];
   report: LayeredRenderReport;
 }
@@ -91,7 +104,7 @@ interface Span {
   start: number;
   duration: number;
 }
-interface LosslessChunk {
+export interface TimelineChunk {
   filename: string;
   duration: number;
 }
@@ -491,7 +504,12 @@ class SequentialLayeredRenderer {
     }
     return sources;
   }
-  private async span(layerId: string, span: Span, clips: readonly ClipReader[]): Promise<LosslessChunk> {
+  private async span(
+    layerId: string,
+    span: Span,
+    clips: readonly ClipReader[],
+    final: boolean,
+  ): Promise<TimelineChunk> {
     const { ffmpeg, directory, target, document, context } = this.options;
     if (
       !Number.isSafeInteger(span.duration) ||
@@ -503,7 +521,7 @@ class SequentialLayeredRenderer {
     ) {
       throw new Error('Invalid bounded layered span.');
     }
-    const filename = `span-${String(this.#spanId++).padStart(5, '0')}.nut`;
+    const filename = `span-${String(this.#spanId++).padStart(5, '0')}.${final ? 'mp4' : 'nut'}`;
     const progressStep = Math.max(1, Math.floor(span.duration / 100));
     const maps = clips.map((clip) => {
       const placed = this.placed(clip.index);
@@ -522,7 +540,7 @@ class SequentialLayeredRenderer {
       const readers = clips.map((clip) =>
         pass.reader(losslessReader(clip.filename, clip.offset, span.duration, false), 'retimed clip decoder'),
       );
-      const encoder = pass.encoder(losslessEncoder(target, filename, true), 'premultiplied RGBA16 encoder');
+      const encoder = this.encoder(pass, filename, span.duration, final, 'premultiplied RGBA16 encoder');
       await forEachSerial(frameIndices(span.duration), async (frame) => {
         pass.check();
         this.#rgba[0].fill(0); // A standalone transparent group, never the lower composite.
@@ -550,7 +568,13 @@ class SequentialLayeredRenderer {
     this.#report.compositePixels += span.duration * target.width * target.height;
     return { filename, duration: span.duration };
   }
-  private async join(chunks: LosslessChunk[], output: string): Promise<string> {
+  private encoder(pass: RawVideoPass, filename: string, frames: number, final: boolean, label: string): Writable {
+    const { finalEncoder, target } = this.options;
+    return final && finalEncoder
+      ? pass.encoder(finalEncoder(filename, frames), 'final video encoder')
+      : pass.encoder(losslessEncoder(target, filename, true), label);
+  }
+  private async join(chunks: TimelineChunk[], output: string): Promise<string> {
     const { directory, ffmpeg, context, plan } = this.options;
     if (chunks.reduce((sum, chunk) => sum + chunk.duration, 0) !== plan.duration)
       throw new Error('Track chunks must cover every authoritative project frame exactly once.');
@@ -600,9 +624,10 @@ class SequentialLayeredRenderer {
     this.timeline(-1);
     return output;
   }
-  private async group(layer: LayeredExportLayer, layerIndex: number): Promise<string> {
+  /** A final group is encoded span by span and returned unjoined; any other is one lossless file. */
+  private async group(layer: LayeredExportLayer, layerIndex: number, final: boolean): Promise<TimelineChunk[]> {
     const { plan } = this.options;
-    const chunks: LosslessChunk[] = [];
+    const chunks: TimelineChunk[] = [];
     let retained: RetainedClip | null = null;
     let cursor = 0;
     this.timeline(1);
@@ -614,8 +639,8 @@ class SequentialLayeredRenderer {
       await forEachSerial(relevant, async (chunk) => {
         if (chunk.start < cursor) throw new Error('Track group chunks overlap.');
         if (cursor < chunk.start)
-          chunks.push(await this.span(layer.id, { start: cursor, duration: chunk.start - cursor }, []));
-        chunks.push(await this.span(layer.id, chunk, trackReaders(chunk, clip.index, filename, retained)));
+          chunks.push(await this.span(layer.id, { start: cursor, duration: chunk.start - cursor }, [], final));
+        chunks.push(await this.span(layer.id, chunk, trackReaders(chunk, clip.index, filename, retained), final));
         cursor = chunk.start + chunk.duration;
         if (chunk.kind === 'dissolve') {
           await this.removeClip(retained!.filename);
@@ -628,19 +653,19 @@ class SequentialLayeredRenderer {
     });
     if (retained) throw new Error('An unused track dissolve tail remained.');
     if (cursor < plan.duration)
-      chunks.push(await this.span(layer.id, { start: cursor, duration: plan.duration - cursor }, []));
+      chunks.push(await this.span(layer.id, { start: cursor, duration: plan.duration - cursor }, [], final));
     this.#report.layerPasses++;
-    return this.join(chunks, `group-${layerIndex}.nut`);
+    return final ? chunks : [{ filename: await this.join(chunks, `group-${layerIndex}.nut`), duration: plan.duration }];
   }
-  private async composite(lower: string, group: string, layerIndex: number): Promise<string> {
+  private async composite(lower: string, group: string, layerIndex: number, final: boolean): Promise<string> {
     const { plan, ffmpeg, directory, target, context } = this.options;
-    const filename = `accumulator-${layerIndex}.nut`;
+    const filename = final ? 'composite.mp4' : `accumulator-${layerIndex}.nut`;
     const progressStep = Math.max(1, Math.floor(plan.duration / 100));
     this.timeline(1); // Lower + independently graded group + output accumulator.
     const report = await runRawVideoPass({ ffmpeg, cwd: directory, signal: context.signal }, async (pass) => {
       const below = pass.reader(losslessReader(lower, 0, plan.duration, true), 'lower RGBA16 timeline decoder');
       const above = pass.reader(losslessReader(group, 0, plan.duration, true), 'track RGBA16 group decoder');
-      const encoder = pass.encoder(losslessEncoder(target, filename, true), 'source-over RGBA16 encoder');
+      const encoder = this.encoder(pass, filename, plan.duration, final, 'source-over RGBA16 encoder');
       await forEachSerial(frameIndices(plan.duration), async (frame) => {
         pass.check();
         await below.requireFrame(this.#rgba[0]);
@@ -681,23 +706,34 @@ class SequentialLayeredRenderer {
   }
   private async renderPasses(): Promise<LayeredRenderResult> {
     const started = performance.now();
-    let filename: string | null = null;
-    await forEachSerial(this.options.plan.layers, async (layer, index) => {
-      if (!layer.enabled || !layer.clips.length) return;
-      const group = await this.group(layer, index);
-      filename = filename === null ? group : await this.composite(filename, group, index);
+    const { plan, finalEncoder } = this.options;
+    const active = plan.layers.flatMap((layer, index) => (layer.enabled && layer.clips.length ? [index] : []));
+    const last = finalEncoder ? active.at(-1) : undefined;
+    let lower: string | null = null;
+    let chunks: TimelineChunk[] = [];
+    await forEachSerial(active, async (index) => {
+      const layer = plan.layers[index]!;
+      if (lower === null) {
+        chunks = await this.group(layer, index, index === last);
+        if (index !== last) lower = chunks[0]!.filename;
+        return;
+      }
+      const [group] = await this.group(layer, index, false);
+      const filename = await this.composite(lower, group!.filename, index, index === last);
+      chunks = [{ filename, duration: plan.duration }];
+      lower = filename;
     });
-    if (filename === null) {
+    if (!active.length) {
       this.timeline(1);
-      const gap = await this.span(
-        this.options.plan.layers[0]!.id,
-        { start: 0, duration: this.options.plan.duration },
-        [],
-      );
-      filename = await this.join([gap], 'transparent-timeline.nut');
+      const gap = await this.span(plan.layers[0]!.id, { start: 0, duration: plan.duration }, [], !!finalEncoder);
+      chunks = finalEncoder
+        ? [gap]
+        : [{ filename: await this.join([gap], 'transparent-timeline.nut'), duration: plan.duration }];
     }
     if (this.#clipFiles || this.#timelines !== 1)
       throw new Error('Layered renderer left unexpected scratch representations.');
+    if (chunks.reduce((sum, chunk) => sum + chunk.duration, 0) !== plan.duration)
+      throw new Error('Layered output must cover every authoritative project frame exactly once.');
     const lut = this.#cache.report;
     Object.assign(this.#report, {
       peakLutEntries: lut.peakEntries,
@@ -706,8 +742,8 @@ class SequentialLayeredRenderer {
       lutGenerationMs: lut.generationMs,
       elapsedMs: performance.now() - started,
     });
-    this.update(0, 'Layered lossless composite complete; encoding H.264 once');
-    return { filename, retiming: this.#retiming, report: this.#report };
+    this.update(0, 'Layered composite complete');
+    return { chunks, retiming: this.#retiming, report: this.#report };
   }
 }
 
