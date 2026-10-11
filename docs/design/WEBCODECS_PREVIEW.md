@@ -90,6 +90,12 @@ or dissolve can start from prefilled frames.
 - If a required frame has not arrived after five seconds of buffering, playback
   stops with **Video decoder _N_ did not deliver source frame _S_ within 5
   seconds.** A reader failure stops playback with its own message.
+- **Playing** promises an image within one frame of the clock. When a draw itself
+  outlasts a frame on a slow renderer, the status is **Catching up with the clock**
+  instead, without counting a decoder stall; the next frame is drawn at the clock.
+  While playing, status snapshots are published only by the display tick right
+  after it draws, so a Compare toggle or new subscriber never receives an image
+  drawn before the clock moved on.
 - Pause, seek, timing edits, project changes and disposal stop the affected
   streams; their in-flight frames are discarded by generation.
 

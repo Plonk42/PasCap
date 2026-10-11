@@ -705,7 +705,8 @@ Playback presents only exact decoded source frames for the clock frame
 is late, the previous image stays on screen and the status shows buffering: without
 music the clock waits, with music it continues and late frames are skipped. A frame
 still missing after five seconds stops playback with an explicit decoder error;
-failed music synchronization restarts music. Renderer throughput can still
+failed music synchronization restarts music. A draw that outlasts a frame on a slow
+renderer reports **Catching up with the clock** rather than Playing. Renderer throughput can still
 interrupt playback; this is not gapless audio or intended-GPU/long-run qualification.
 
 When exact decoded sources and every evaluated composition value are unchanged,

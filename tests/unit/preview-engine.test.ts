@@ -758,6 +758,27 @@ describe('playback on one clock', () => {
     expect(music().pause).toHaveBeenCalledTimes(pauses);
   });
 
+  it('reports a draw that outlasts the clock as catching up, never as Playing', async () => {
+    const project = singleProject(true);
+    const { engine, anchor } = await playing(project, 8);
+    const draw = compositor().drawFrame.getMockImplementation()!;
+    compositor().drawFrame.mockImplementation((groups) => {
+      draw(groups);
+      state.now += framesToSeconds(2) * 1000;
+    });
+    tick(anchor, 1);
+    expect(engine.diagnostics()).toMatchObject({
+      status: 'buffering',
+      message: 'Catching up with the clock',
+      frame: 9,
+    });
+    expect(engine.diagnostics().stalls).toBe(0);
+    compositor().drawFrame.mockImplementation(draw);
+    tick(anchor, 4);
+    expect(engine.diagnostics()).toMatchObject({ status: 'playing', frame: 12 });
+    expect(music().start).toHaveBeenCalledOnce();
+  });
+
   it('preloads the next clip so a cut presents without waiting, and names a late boundary', async () => {
     const project = cutProject(true);
     const { engine, anchor } = await playing(project, 15);
@@ -1133,6 +1154,21 @@ describe('editor-only ungraded comparison', () => {
     expect(streams().starts).toHaveLength(starts);
     expect(music().start).toHaveBeenCalledOnce();
     expect(music().pause).toHaveBeenCalledTimes(pauses);
+  });
+
+  it('publishes playback snapshots only from the tick that draws at the clock', async () => {
+    const project = singleProject(true);
+    const { engine, anchor } = await playing(project, 8);
+    tick(anchor, 1);
+    const seen: { frame: number; ungraded: boolean; status: string }[] = [];
+    engine.subscribe(({ frame, ungraded, status }) => seen.push({ frame, ungraded, status }));
+    state.now = anchor + framesToSeconds(5) * 1000;
+    engine.setUngraded(true);
+    expect(seen).toEqual([]);
+    tick(anchor, 5);
+    expect(seen).toEqual([{ frame: 13, ungraded: true, status: 'playing' }]);
+    engine.pause();
+    expect(seen.at(-1)).toMatchObject({ status: 'paused', frame: 13 });
   });
 });
 

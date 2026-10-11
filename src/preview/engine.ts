@@ -156,6 +156,8 @@ export class PreviewEngine {
   #surfaceKey: string | null = null;
   #dirty = true;
   #lastEmit = 0;
+  #ticking = false;
+  #emitPending = false;
   readonly #seekTimes: number[] = [];
   readonly #renderTimes: number[] = [];
   #renderedFrames = 0;
@@ -184,7 +186,8 @@ export class PreviewEngine {
   }
   subscribe(listener: (diagnostics: PreviewDiagnostics) => void): () => void {
     this.#listeners.add(listener);
-    listener(this.diagnostics());
+    if (this.#playing && !this.#ticking) this.#emitPending = true;
+    else listener(this.diagnostics());
     return () => {
       this.#listeners.delete(listener);
     };
@@ -226,8 +229,15 @@ export class PreviewEngine {
     };
   }
   #emit(force = false): void {
+    // While playing, the image is current only right after a tick draws it at the
+    // clock: other changes are published by the next tick, not as a stale snapshot.
+    if (this.#playing && !this.#ticking) {
+      this.#emitPending = true;
+      return;
+    }
     const now = performance.now();
-    if (!force && now - this.#lastEmit < 100) return;
+    if (!force && !this.#emitPending && now - this.#lastEmit < 100) return;
+    this.#emitPending = false;
     this.#lastEmit = now;
     const diagnostics = this.diagnostics();
     for (const listener of this.#listeners) listener(diagnostics);
@@ -687,14 +697,15 @@ export class PreviewEngine {
   readonly #tick = (now: number): void => {
     if (this.#disposed) return;
     this.#raf = requestAnimationFrame(this.#tick);
-    if (this.#playing && this.#document && !this.#busy) {
-      try {
-        this.#advance(now);
-      } catch (error) {
-        this.#handleError(error);
-      }
+    this.#ticking = true;
+    try {
+      if (this.#playing && this.#document && !this.#busy) this.#advance(now);
+    } catch (error) {
+      this.#handleError(error);
+    } finally {
+      this.#emit();
+      this.#ticking = false;
     }
-    this.#emit();
   };
   #expectedFrame(now: number): number {
     // rAF may precede a clock anchor established in this display cycle.
@@ -747,7 +758,10 @@ export class PreviewEngine {
     }
     this.#drawFrame(frame);
     this.#endStall(now);
-    this.#setStatus('playing', 'Playing');
+    // A draw can outlast a frame on a slow renderer: Playing promises an image
+    // within one frame of the clock, so a late image is reported as catching up.
+    if (this.#expectedFrame(performance.now()) > frame + 1) this.#setStatus('buffering', 'Catching up with the clock');
+    else this.#setStatus('playing', 'Playing');
   }
   #handleError(error: unknown): void {
     if (error instanceof DOMException && error.name === 'AbortError') return;
