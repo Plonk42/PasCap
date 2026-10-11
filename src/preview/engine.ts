@@ -996,7 +996,7 @@ export class PreviewEngine {
       return;
     }
     const required = layers.map((layer) => layer.clipId);
-    if (required.some((id) => !this.#playingClips.includes(id))) {
+    if (!this.#handOver(layers, expected)) {
       void this.#alignPlayback(expected, true);
       return;
     }
@@ -1029,6 +1029,34 @@ export class PreviewEngine {
       if (this.#music.hasMusic) void this.#catchUpVideo();
       else void this.#alignPlayback(expected, false);
     }
+  }
+  /** Start preloaded entering clips in place; false when any needs a seek. */
+  #handOver(layers: readonly PreviewLayer[], expected: number): boolean {
+    const entering = layers.filter((layer) => !this.#playingClips.includes(layer.clipId));
+    if (!entering.length) return true;
+    const ready = entering.every((layer) => {
+      const index = this.#assignments.indexOf(layer.clipId);
+      const slot = this.#slots[index];
+      if (!slot?.ready || this.#preloads.has(slot)) return false;
+      const placed = this.#layout.clips.find((item) => item.clip.id === layer.clipId)!;
+      return [expected - 1, expected, expected + 1].some(
+        (frame) =>
+          frame >= placed.start &&
+          frame < placed.start + placed.retiming.duration &&
+          placed.retiming.sourceAt(frame - placed.start) === slot.decodedFrame,
+      );
+    });
+    if (!ready) return false;
+    for (const layer of entering) {
+      const slot = this.#slotFor(layer.clipId);
+      const placed = this.#layout.clips.find((item) => item.clip.id === layer.clipId)!;
+      slot.setRate(placed.retiming.rateAt(expected - placed.start));
+      this.#playingClips.push(layer.clipId);
+      void slot.play().catch((error: unknown) => {
+        if (this.#playing && this.#playingClips.includes(layer.clipId)) this.#handleError(error);
+      });
+    }
+    return true;
   }
   #handleError(error: unknown): void {
     if (error instanceof DOMException && error.name === 'AbortError') return;

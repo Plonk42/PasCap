@@ -1563,6 +1563,53 @@ describe('PreviewEngine observed-frame tolerance and recovery', () => {
     expectSurface(preview, 10);
   });
 
+  it.each([10, 11])(
+    'hands a preloaded exact next clip over at clock frame %i without restarting music or seeking',
+    async (frame) => {
+      const project = singleProject(true);
+      project.clips[0]!.sourceOut = 10;
+      const right = createClip('right', 'next-video', 100, 120);
+      right.start = 10;
+      project.clips.push(right);
+      project.media.videoIds.push('next-video');
+      project.layers[0]!.transitions = [{ leftId: 'clip', rightId: 'right', type: 'cut', duration: 0 }];
+      const preview = await running(project, 9);
+      const left = slotFor(preview);
+      const slot = slotFor(preview, 'right');
+      slot.observe(100);
+      vi.clearAllMocks();
+      tick(preview, frame);
+      await settle();
+      expect(preview.engine.diagnostics()).toMatchObject({ status: 'playing', frame: 10, boundaryStalls: 0 });
+      expectSurface(preview, 10);
+      expect(slot.play).toHaveBeenCalledOnce();
+      expect(slot.seek).not.toHaveBeenCalled();
+      expect(left.pause).toHaveBeenCalled();
+      expect(preview.music.pause).not.toHaveBeenCalled();
+      expect(preview.music.start).not.toHaveBeenCalled();
+    },
+  );
+
+  it('does not hand over a preloaded clip whose first frame is beyond the one-frame bound', async () => {
+    const project = singleProject(true);
+    project.clips[0]!.sourceOut = 10;
+    const right = createClip('right', 'next-video', 100, 120);
+    right.start = 10;
+    project.clips.push(right);
+    project.media.videoIds.push('next-video');
+    project.layers[0]!.transitions = [{ leftId: 'clip', rightId: 'right', type: 'cut', duration: 0 }];
+    const preview = await running(project, 9);
+    const slot = slotFor(preview, 'right');
+    slot.observe(100);
+    const pending = holdNextSeek(slot);
+    vi.clearAllMocks();
+    tick(preview, 12);
+    await settle();
+    expect(preview.engine.diagnostics()).toMatchObject({ status: 'buffering', boundaryStalls: 1 });
+    expect(pending.request().frame).toBe(102);
+    expect(preview.compositor.drawFrame).not.toHaveBeenCalled();
+  });
+
   it('renders a deliberate empty project-frame gap as black without decoded-frame recovery', async () => {
     const project = singleProject(true);
     project.clips[0]!.sourceOut = 10;
