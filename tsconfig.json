@@ -23,6 +23,7 @@
     "tests",
     "scripts",
     "vite.config.ts",
+    "vite.gpu-worker.config.ts",
     "vitest.config.ts",
     "playwright.config.ts",
     "playwright.ci-like.config.ts"

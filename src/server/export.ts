@@ -945,6 +945,7 @@ async function renderVideo(
     directory,
     context,
     target,
+    ...(library.config.gpuCompositing ? { gpu: { chrome: library.config.chrome } } : {}),
     // The RGB channels already contain the premultiplied composite. Dropping alpha
     // flattens against opaque black, including completely empty/disabled-layer holds.
     finalEncoder: (filename, frames) => [

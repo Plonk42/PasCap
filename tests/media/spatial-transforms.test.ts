@@ -389,7 +389,7 @@ describe.skipIf(!enabled)('spatial transforms · real native FFmpeg, disposable 
     expect(report.compositePixels).toBe(report.compositeFrames * target.width * target.height);
   }
 
-  async function lossless(project: ProjectDocument, target: Target, directory: string): Promise<string> {
+  async function lossless(project: ProjectDocument, target: Target, directory: string, gpu = false): Promise<string> {
     const result = await renderLayeredExport({
       document: project,
       plan: planLayeredExport(project),
@@ -398,8 +398,12 @@ describe.skipIf(!enabled)('spatial transforms · real native FFmpeg, disposable 
       directory,
       target: { ...EXPORT_PROFILES.draft720, ...target },
       context: { id: randomUUID(), signal: new AbortController().signal, update: () => {} },
+      // CI has no GPU: SwiftShader is accepted here only to exercise the real worker page.
+      ...(gpu ? { gpu: { chrome: config.chrome, softwareRenderer: true } } : {}),
     });
     resourceBounds(result.report, target, project);
+    expect(result.report.gpuFallback).toBeNull();
+    expect(result.report.gpuFrames).toBe(gpu ? calculateLayout(project).duration : 0);
     const [output] = result.chunks;
     expect(result.chunks).toEqual([{ filename: output!.filename, duration: calculateLayout(project).duration }]);
     expect(await readdir(directory)).toEqual([output!.filename]);
@@ -590,6 +594,23 @@ describe.skipIf(!enabled)('spatial transforms · real native FFmpeg, disposable 
   ];
 
   it.each(staticCases)('720p lossless native parity: $name', async ({ changes, asset, detail, hdr }) => {
+    await staticParity(changes, asset, detail, hdr, false);
+  });
+
+  it.each(staticCases.filter((item) => item.detail || item.hdr))(
+    '720p lossless native parity through the GPU worker: $name',
+    async ({ changes, asset, detail, hdr }) => {
+      await staticParity(changes, asset, detail, hdr, true);
+    },
+  );
+
+  async function staticParity(
+    changes: Partial<SpatialPose>,
+    asset: number,
+    detail: DetailSettings | undefined,
+    hdr: number | undefined,
+    gpu: boolean,
+  ): Promise<void> {
     const project = createProject('static-spatial', 'Disposable one-frame spatial test');
     const clip = createClip('pattern', assets[asset]!.id, 1, 2);
     clip.spatial.base = pose(changes);
@@ -600,14 +621,14 @@ describe.skipIf(!enabled)('spatial transforms · real native FFmpeg, disposable 
     expect(needsLayeredExport(captured)).toBe(true);
     const work = await mkdtemp(path.join(root, 'static-'));
     try {
-      const filename = await lossless(captured, EXPORT_PROFILES.draft720, work);
+      const filename = await lossless(captured, EXPORT_PROFILES.draft720, work, gpu);
       await parity(captured, EXPORT_PROFILES.draft720, filename);
       expect(project).toEqual(captured);
       await unchanged();
     } finally {
       await rm(work, { recursive: true, force: true });
     }
-  });
+  }
 
   function compound(): ProjectDocument {
     const project = createProject('animated-spatial', 'Four-frame held-source spatial dissolve');
