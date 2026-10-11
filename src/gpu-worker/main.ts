@@ -1,7 +1,9 @@
 import { Compositor, type CompositeClip } from '../preview/compositor.js';
 import { whileSerial } from '../shared/serial.js';
 import {
+  GPU_OFFSET_HEADER,
   GPU_PROTOCOL_VERSION,
+  GPU_RESULT_BANDS,
   GPU_SEQUENCE_HEADER,
   GPU_TOKEN_HEADER,
   type GpuFailure,
@@ -55,16 +57,43 @@ function createTarget(gl: WebGL2RenderingContext, width: number, height: number,
   };
 }
 
-function readGroup(gl: WebGL2RenderingContext, target: Target, width: number, height: number): void {
+/** Reads one row band (readback order) into the shared output, as normalized 16-bit RGBA. */
+function readBand(gl: WebGL2RenderingContext, target: Target, width: number, start: number, rows: number): void {
+  const offset = start * width * 4;
   if (target.floats) {
-    gl.readPixels(0, 0, width, height, gl.RGBA, gl.FLOAT, target.floats);
     const { floats, output } = target;
-    for (let index = 0; index < floats.length; index++)
+    gl.readPixels(0, start, width, rows, gl.RGBA, gl.FLOAT, floats, offset);
+    for (let index = offset; index < offset + rows * width * 4; index++)
       output[index] = Math.round(Math.min(1, Math.max(0, floats[index]!)) * 65535);
-  } else gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_SHORT, target.output);
-  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  } else gl.readPixels(0, start, width, rows, gl.RGBA, gl.UNSIGNED_SHORT, target.output, offset);
   const error = gl.getError();
   if (error !== gl.NO_ERROR || gl.isContextLost()) throw new Error(`WebGL readback failed (error ${error}).`);
+}
+
+/** Each band is posted while the next one is read back, overlapping readback with transport. */
+async function postGroup(compositor: Compositor, target: Target, sequence: number): Promise<void> {
+  const gl = compositor.gl;
+  const { width, height } = compositor.canvas;
+  const rows = Math.ceil(height / GPU_RESULT_BANDS);
+  const posts: Promise<Response>[] = [];
+  try {
+    for (let start = 0; start < height; start += rows) {
+      const count = Math.min(rows, height - start);
+      readBand(gl, target, width, start, count);
+      const offset = start * width * 4;
+      posts.push(
+        request('/result', {
+          method: 'POST',
+          headers: { [GPU_SEQUENCE_HEADER]: String(sequence), [GPU_OFFSET_HEADER]: String(offset * 2) },
+          body: target.output.subarray(offset, offset + count * width * 4),
+        }),
+      );
+    }
+  } finally {
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    await Promise.allSettled(posts);
+  }
+  await Promise.all(posts);
 }
 
 function drawFrame(
@@ -94,7 +123,6 @@ function drawFrame(
   });
   if (offset !== bytes.length) throw new Error('The frame bundle length differs from its sources.');
   compositor.drawExportGroup(target.framebuffer, { clips });
-  readGroup(compositor.gl, target, compositor.canvas.width, compositor.canvas.height);
 }
 
 /** One frame: false once the service closes the loop; 204 is an idle poll. */
@@ -107,15 +135,10 @@ async function serveFrame(compositor: Compositor, target: Target): Promise<boole
   const header = JSON.parse(new TextDecoder().decode(bytes.subarray(4, 4 + length))) as GpuFrameHeader;
   try {
     drawFrame(compositor, target, bytes, header, 4 + length);
+    await postGroup(compositor, target, header.sequence);
   } catch (error) {
     await fail(header.sequence, error);
-    return true;
   }
-  await request('/result', {
-    method: 'POST',
-    headers: { [GPU_SEQUENCE_HEADER]: String(header.sequence) },
-    body: target.output,
-  });
   return true;
 }
 

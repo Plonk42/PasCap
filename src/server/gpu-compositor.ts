@@ -7,6 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
+  GPU_OFFSET_HEADER,
   GPU_PROTOCOL_VERSION,
   GPU_SEQUENCE_HEADER,
   GPU_TOKEN_HEADER,
@@ -85,7 +86,9 @@ interface Frame {
   sources: readonly GpuGroupSource[];
   output: Buffer;
   sent: boolean;
-  receiving: boolean;
+  /** Received result bands, [start, end) byte offsets in readback order. */
+  bands: [number, number][];
+  received: number;
   done: Deferred<void>;
 }
 
@@ -339,7 +342,8 @@ export class GpuCompositor {
       sources,
       output,
       sent: false,
-      receiving: false,
+      bands: [],
+      received: 0,
       done: deferred<void>(),
     };
     this.#frame = frame;
@@ -503,34 +507,43 @@ export class GpuCompositor {
   #result(request: IncomingMessage, response: ServerResponse): Promise<void> {
     const frame = this.#frame;
     const expected = this.#options.width * this.#options.height * 8;
+    const rowBytes = this.#options.width * 8;
+    const offset = Number(request.headers[GPU_OFFSET_HEADER]);
+    const length = Number(request.headers['content-length']);
     if (
       !frame?.sent ||
-      frame.receiving ||
       Number(request.headers[GPU_SEQUENCE_HEADER]) !== frame.sequence ||
-      Number(request.headers['content-length']) !== expected
+      !Number.isSafeInteger(offset) ||
+      !Number.isSafeInteger(length) ||
+      offset < 0 ||
+      length < rowBytes ||
+      offset % rowBytes ||
+      length % rowBytes ||
+      offset + length > expected ||
+      frame.bands.some(([start, end]) => offset < end && start < offset + length)
     )
-      throw new Error('unexpected GPU result');
-    frame.receiving = true;
-    const rowBytes = this.#options.width * 8;
+      throw new Error('unexpected GPU result band');
+    frame.bands.push([offset, offset + length]);
     let received = 0;
     return new Promise<void>((resolve, reject) => {
       request.on('data', (chunk: Buffer) => {
-        if (received + chunk.length > expected) {
+        if (received + chunk.length > length) {
           request.destroy();
-          reject(new Error('oversized GPU result'));
+          reject(new Error('oversized GPU result band'));
           return;
         }
-        copyReversedRows(frame.output, chunk, received, rowBytes);
+        copyReversedRows(frame.output, chunk, offset + received, rowBytes);
         received += chunk.length;
       });
       request.once('error', reject);
       request.once('end', () => {
-        if (received !== expected) {
-          reject(new Error('truncated GPU result'));
+        if (received !== length) {
+          reject(new Error('truncated GPU result band'));
           return;
         }
         response.writeHead(204).end();
-        frame.done.resolve();
+        frame.received += length;
+        if (frame.received === expected) frame.done.resolve();
         resolve();
       });
     });

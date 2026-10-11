@@ -560,6 +560,12 @@ buffer or native child. One frame or LUT is in flight at a time, every band sett
 before its buffers are reused, and the pool is terminated when the export ends.
 Results are byte-identical to in-process composition.
 
+Each track-group span pass overlaps its stages inside the same four buffers: a
+single-source span reads its next retimed frame into the second RGB8 buffer while the
+current one is composed, and the encoder consumes each composed group from alternating
+RGBA16 buffers while the next is composed. A dissolve needs both RGB8 buffers, so it
+reads after composing. The source-over pass stays serial; it has no spare buffer.
+
 Group frames using the detail/HDR kernel are composited instead by a GPU worker page
 in one headless Chrome process per export when a hardware renderer starts, with the
 same shaders as the preview; it streams RGBA16 results into the existing accumulator,
