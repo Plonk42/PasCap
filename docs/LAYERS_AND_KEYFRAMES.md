@@ -560,6 +560,13 @@ buffer or native child. One frame or LUT is in flight at a time, every band sett
 before its buffers are reused, and the pool is terminated when the export ends.
 Results are byte-identical to in-process composition.
 
+Group frames using the detail/HDR kernel are composited instead by a GPU worker page
+in one headless Chrome process per export when a hardware renderer starts, with the
+same shaders as the preview; it streams RGBA16 results into the existing accumulator,
+adding no Node frame buffer, decoder or FFmpeg child. Without a hardware GPU, or after
+any GPU failure, the CPU compositor above is used. See
+[the GPU export worker](design/DETAIL_FILTERS.md#gpu-export-worker).
+
 At most two retained lossless clip files and **three** timeline representations
 coexist: lower accumulator, track group and output (or group spans and their joined
 group). A span collection counts as one, including the last pass's H.264 output.

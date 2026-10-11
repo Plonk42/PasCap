@@ -4,7 +4,7 @@ import path from 'node:path';
 import type { Writable } from 'node:stream';
 import { setImmediate as yieldToEvents } from 'node:timers/promises';
 import { isDeepStrictEqual } from 'node:util';
-import { detailTapCount } from '../shared/detail.js';
+import { detailTapCount, isNeutralDetail } from '../shared/detail.js';
 import {
   LAYERED_EXPORT_RESOURCES,
   planLayeredExport,
@@ -21,9 +21,10 @@ import { calculateLayout, sampleTimeline, type PlacedClip, type PreviewLayer } f
 import { framesToSeconds } from '../shared/timing.js';
 import { ServiceError } from './errors.js';
 import { assertSourceIdentity } from './files.js';
+import { startGpuCompositor, type GpuCompositor, type GpuGroupSource } from './gpu-compositor.js';
 import type { JobContext } from './jobs.js';
 import { ColourLutCache, checkLayeredCancellation } from './layered-colour.js';
-import { composeLayerFrame, fittedContent, type LayerFrameSource } from './layered-frame.js';
+import { composeLayerFrame, fittedContent, validateLayerGroup, type LayerFrameSource } from './layered-frame.js';
 import { CompositorPool } from './layered-pool.js';
 import { FFV1_SLICE_ARGUMENTS, NATIVE_THREADS } from './native-threads.js';
 import { runProcess } from './process.js';
@@ -44,6 +45,8 @@ const RGB_TAGS = 'setparams=range=full:color_primaries=bt709:color_trc=bt709:col
 const seconds = (frame: number): string => framesToSeconds(frame).toFixed(12);
 /** Measured at UHD: a retimed frame takes about 0.15 s and each detail kernel tap adds about 0.09 s. */
 const PROGRESS_UNITS_PER_TAP = 0.6;
+/** A GPU detail/HDR group frame, mostly loopback transport: about one retimed frame. */
+const PROGRESS_UNITS_PER_GPU_FRAME = 1;
 
 export interface LayeredExportOptions {
   document: ProjectDocument;
@@ -59,6 +62,11 @@ export interface LayeredExportOptions {
    * pass then writes its frames there directly; without it the output stays lossless RGBA16.
    */
   finalEncoder?: (filename: string, frames: number) => string[];
+  /**
+   * Composite detail/HDR track groups in a headless-browser GPU worker, falling back to the
+   * CPU compositor when no hardware renderer starts. Absent: CPU only.
+   */
+  gpu?: { chrome: string | null; softwareRenderer?: boolean };
 }
 export interface LayeredRenderReport {
   renderedClipIds: string[];
@@ -86,6 +94,12 @@ export interface LayeredRenderReport {
   compositeFrames: number;
   compositePixels: number;
   compositionMs: number;
+  /** Hardware renderer of the GPU worker, when one started. */
+  gpuRenderer: string | null;
+  /** Detail/HDR group frames composited by the GPU worker. */
+  gpuFrames: number;
+  /** Why detail/HDR groups (or the rest of them) used the CPU compositor instead. */
+  gpuFallback: string | null;
   elapsedMs: number;
 }
 export interface LayeredRenderResult {
@@ -136,6 +150,27 @@ function trackReaders(
 
 function* frameIndices(count: number): Generator<number> {
   for (let index = 0; index < count; index++) yield index;
+}
+
+function usesDetailKernel(sources: readonly LayerFrameSource[]): boolean {
+  return sources.some((source) => !isNeutralDetail(source.sample.detail) || source.sample.colour.hdr !== 0);
+}
+
+function gpuSources(sources: readonly LayerFrameSource[]): GpuGroupSource[] {
+  return sources.map(({ sample, rgb, bounds, original }) => ({
+    rgb,
+    bounds,
+    parameters: {
+      colour: sample.colour,
+      spatial: sample.spatial,
+      detail: sample.detail,
+      originalWidth: original.width,
+      originalHeight: original.height,
+      opacity: sample.opacity,
+      blendWeight: sample.blendWeight,
+      brightness: sample.brightness,
+    },
+  }));
 }
 
 /** The same four raw buffers, shareable with compositor workers instead of copied. */
@@ -293,8 +328,9 @@ class SequentialLayeredRenderer {
   readonly #rgb: readonly [Buffer, Buffer];
   readonly #retiming: RawRetimingReport[] = [];
   readonly #report: LayeredRenderReport;
-  readonly #totalWork: number;
+  #totalWork: number;
   #pool: CompositorPool | null = null;
+  #gpu: GpuCompositor | null = null;
   #finishedWork = 0;
   #progress = 0.04;
   #clipFiles = 0;
@@ -350,10 +386,22 @@ class SequentialLayeredRenderer {
       compositeFrames: 0,
       compositePixels: 0,
       compositionMs: 0,
+      gpuRenderer: null,
+      gpuFrames: 0,
+      gpuFallback: null,
       elapsedMs: 0,
     };
+    this.#totalWork = this.totalWork();
+    if (
+      this.#report.rawFrameBuffers !== LAYERED_EXPORT_RESOURCES.rawFrameBuffers ||
+      this.#report.rawBufferBytes !== pixels * LAYERED_EXPORT_RESOURCES.rawBytesPerPixel
+    )
+      throw new Error('Layered raw-buffer allocation differs from the resource contract.');
+  }
+  private totalWork(): number {
+    const { plan } = this.options;
     const active = plan.layers.filter((layer) => layer.enabled && layer.clips.length > 0);
-    this.#totalWork =
+    return (
       active.reduce(
         (sum, layer) =>
           sum +
@@ -365,21 +413,19 @@ class SequentialLayeredRenderer {
         0,
       ) +
       plan.duration * Math.max(0, active.length - 1) +
-      (active.length ? 0 : plan.duration);
-    if (
-      this.#report.rawFrameBuffers !== LAYERED_EXPORT_RESOURCES.rawFrameBuffers ||
-      this.#report.rawBufferBytes !== pixels * LAYERED_EXPORT_RESOURCES.rawBytesPerPixel
-    )
-      throw new Error('Layered raw-buffer allocation differs from the resource contract.');
+      (active.length ? 0 : plan.duration)
+    );
   }
   /** Progress units of one composed frame, where a retimed or source-over frame is one unit. */
   private frameCost(layerId: string, clipIndexes: readonly number[]): number {
     const layer = this.options.document.layers.find((item) => item.id === layerId)!;
     const hdr = layer.colour.hdr > 0 || layer.keyframes.some((key) => (key.values.hdr ?? 0) > 0);
-    return clipIndexes.reduce(
-      (cost, index) => cost + PROGRESS_UNITS_PER_TAP * detailTapCount(this.options.document.clips[index]!.detail, hdr),
-      1,
+    const taps = clipIndexes.reduce(
+      (sum, index) => sum + detailTapCount(this.options.document.clips[index]!.detail, hdr),
+      0,
     );
+    if (!taps) return 1;
+    return 1 + (this.#gpu ? PROGRESS_UNITS_PER_GPU_FRAME : PROGRESS_UNITS_PER_TAP * taps);
   }
   private update(frames: number, message: string): void {
     checkLayeredCancellation(this.options.context.signal);
@@ -578,13 +624,13 @@ class SequentialLayeredRenderer {
         );
         const sources = await this.readSources(clips, readers, maps, frame, samples);
         const started = performance.now();
-        await composeLayerFrame(this.#rgba[0], target, sources, this.#cache, context.signal, this.#pool);
+        await this.composeGroup(sources);
         this.#report.compositionMs += performance.now() - started;
         await writeRawFrame(encoder, this.#rgba[0]);
         if (frame === 0 || (frame + 1) % progressStep === 0 || frame + 1 === span.duration) {
           this.update(
             (frame + 1) * cost,
-            `Rendering track group ${layerId}: project frame ${span.start + frame + 1} / ${this.#layout.duration}`,
+            `Rendering track group ${layerId}${this.#gpu && cost > 1 ? ' on the GPU' : ''}: project frame ${span.start + frame + 1} / ${this.#layout.duration}`,
           );
         }
       });
@@ -724,11 +770,64 @@ class SequentialLayeredRenderer {
     this.#report.compositePixels += plan.duration * target.width * target.height;
     return filename;
   }
+  /** Detail/HDR groups go to the GPU worker when one runs; a GPU failure finishes on the CPU. */
+  private async composeGroup(sources: LayerFrameSource[]): Promise<void> {
+    const { target, context } = this.options;
+    const gpu = this.#gpu;
+    if (gpu && usesDetailKernel(sources) && validateLayerGroup(this.#rgba[0], target, sources) > 0) {
+      try {
+        await gpu.compose(this.#rgba[0], gpuSources(sources));
+        this.#report.gpuFrames++;
+        return;
+      } catch (error) {
+        checkLayeredCancellation(context.signal);
+        const reason = error instanceof Error ? error.message : 'unknown failure';
+        this.#report.gpuFallback = `GPU stopped after ${this.#report.gpuFrames} frames: ${reason}`;
+        this.#gpu = null;
+        await gpu.close();
+        this.update(0, `GPU compositing stopped (${reason}); continuing on the CPU compositor`);
+        this.#rgba[0].fill(0);
+      }
+    }
+    await composeLayerFrame(this.#rgba[0], target, sources, this.#cache, context.signal, this.#pool);
+  }
+  private async startGpu(): Promise<void> {
+    const { gpu, document, plan, target, context } = this.options;
+    const detailed = plan.layers.some(
+      (layer) =>
+        layer.enabled &&
+        this.frameCost(
+          layer.id,
+          document.clips.flatMap((clip, index) => (clip.layerId === layer.id ? [index] : [])),
+        ) > 1,
+    );
+    if (!gpu || !detailed) return;
+    this.update(0, 'Starting the GPU compositor');
+    const started = await startGpuCompositor({
+      width: target.width,
+      height: target.height,
+      signal: context.signal,
+      chrome: gpu.chrome,
+      softwareRenderer: gpu.softwareRenderer ?? false,
+    });
+    if (!started.compositor) {
+      this.#report.gpuFallback = started.reason;
+      this.update(0, `GPU compositing unavailable (${started.reason}); using the CPU compositor`);
+      return;
+    }
+    this.#gpu = started.compositor;
+    this.#report.gpuRenderer = started.compositor.renderer;
+    this.#totalWork = this.totalWork();
+    this.update(0, `Compositing detail and HDR on the GPU: ${started.compositor.renderer}`);
+  }
   async render(): Promise<LayeredRenderResult> {
     this.#pool = CompositorPool.forHost();
     try {
+      await this.startGpu();
       return await this.renderPasses();
     } finally {
+      await this.#gpu?.close();
+      this.#gpu = null;
       await this.#pool?.close();
       this.#pool = null;
     }

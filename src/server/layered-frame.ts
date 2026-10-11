@@ -313,6 +313,18 @@ function* rowBatches(height: number, rows: number): Generator<number> {
   for (let row = 0; row < height; row += rows) yield row;
 }
 
+/** Validates one group's frames and returns its coverage; zero coverage needs no rendering. */
+export function validateLayerGroup(
+  accumulator: Buffer,
+  target: { width: number; height: number },
+  sources: readonly LayerFrameSource[],
+): number {
+  validateFrames(accumulator, target.width * target.height, sources);
+  if (!sources.length) return 0;
+  for (const source of sources) validateBounds(source.bounds, target);
+  return groupCoverage(sources);
+}
+
 /**
  * A single source-over GROUP, exactly the grouping/coverage rules in compositePixel.
  * RGB is encoded BT.709 and premultiplied; alpha is coverage, never black-fade
@@ -330,10 +342,7 @@ export async function composeLayerFrame(
 ): Promise<void> {
   checkLayeredCancellation(signal);
   const pixels = target.width * target.height;
-  validateFrames(accumulator, pixels, sources);
-  if (!sources.length) return;
-  const coverage = groupCoverage(sources);
-  if (coverage === 0) return;
+  if (validateLayerGroup(accumulator, target, sources) === 0) return;
   const prepared = await prepareSources(sources, target, cache, signal, pool);
   const output = new Uint16Array(accumulator.buffer, accumulator.byteOffset, pixels * 4);
   if (pool) await pool.composeRows(output, target, prepared);

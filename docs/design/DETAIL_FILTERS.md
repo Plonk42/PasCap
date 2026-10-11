@@ -142,6 +142,41 @@ unchanged. Up to 33 bilinear taps per source pixel make detail the costliest
 composited path after exact HSL/curves, especially at UHD. The diagnostic two-clip
 reference and the measurement helper reject nonneutral detail.
 
+### GPU export worker
+
+When a hardware GPU is available, export renders every track group frame that uses
+the kernel (nonneutral detail or HDR on either source) with the **same WebGL
+programs as the preview**, in one headless Chrome page the service launches per
+export ([service side](../../src/server/gpu-compositor.ts),
+[page](../../src/gpu-worker/main.ts)). Other group frames stay on the CPU
+compositor, which remains the parity reference.
+
+- **Launch**: `PASCAP_CHROME` or `google-chrome`/`chromium` from PATH, `--headless=new`,
+  a temporary profile and no DevTools port, trying ANGLE `gl` then `vulkan` with the GPU
+  blocklist ignored. The page reports its renderer; software renderers (SwiftShader,
+  llvmpipe, lavapipe) are rejected because they are no faster than the CPU pool. A
+  missing browser, rejected renderer, 30-second startup timeout or any later failure
+  (page error, browser exit, 60-second frame timeout) falls back to the CPU compositor
+  for the rest of the export, reported in Activity and in the receipt's layered report
+  (`gpuRenderer`, `gpuFrames`, `gpuFallback`). `PASCAP_GPU_COMPOSITING=off` disables it.
+- **Transport**: plain loopback HTTP on a per-launch port with a random token, Host check
+  and one frame in flight. The page fetches each frame's fitted RGB8 content and the
+  same evaluated per-source parameters as the CPU path, draws the group over transparent
+  black into a 16-bit render target (`EXT_texture_norm16`, else RGBA32F) and posts the
+  premultiplied RGBA16 result, which the service streams straight into the existing
+  accumulator. Node gains no frame buffer; cancellation and failure stop the browser
+  and delete its profile.
+- **Budget**: one browser process (with its own GPU/renderer helpers) per export, two
+  source textures, one target-size render target and readback array in the page.
+- **Parity**: the shaders meet the GPU gates above against the CPU kernel; the native
+  720p detail/HDR parity cases also run through the worker (SwiftShader, accepted only
+  in tests) under the unchanged canonical and full-resolution coverage gates.
+  Transformed coverage edges are computed in float32, as in the preview.
+- **Measured** (synthetic UHD, HDR 0.27 + Sharpen 0.3, Intel UHD GT1 iGPU): group
+  composition 2.77 s → 0.21 s per frame in isolation (0.33 s inside an export, mostly
+  loopback transport); a 30-frame lossless layered render 98.5 s → 26.4 s, where the
+  FFmpeg passes and ≈ 3 s of browser startup now dominate.
+
 ## Editing
 
 **Detail** is the third Clip section (after Speed and Transform, before Range and

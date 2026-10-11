@@ -165,7 +165,10 @@ clarity −1–1, denoise 0–1 }`, neutral 0, with no keyframes or track channe
   point, before the Colour grade: Denoise (spatial bilateral) → Clarity → Sharpen,
   radii in 1/720 of the image height. Exact neutral bypasses the kernel (bit-identical).
   Shader tap tables and the native compositor share `src/shared/detail.ts`; any
-  nonneutral detail requires composited export without new buffers or processes.
+  nonneutral detail requires composited export without new Node buffers or native processes.
+  #147: export composites detail/HDR groups in one service-owned headless Chrome GPU
+  worker page (same shaders, loopback HTTP, software renderers rejected) with automatic
+  CPU fallback; the CPU kernel stays the parity reference.
   Compare bypasses Colour and Detail. Clip → Detail is the third section, collapsed
   by default, with live slider preview and one Undo per release. See
   [detail filters](../docs/design/DETAIL_FILTERS.md).

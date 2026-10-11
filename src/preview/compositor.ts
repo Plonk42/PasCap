@@ -294,6 +294,36 @@ export class Compositor {
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
     this.#sizes[slot] = [width, height];
   }
+  /** Tightly packed RGB8 rows, first row at the image bottom like uploadPixels. */
+  uploadRgb(slot: 0 | 1, pixels: Uint8Array, width: number, height: number): void {
+    const gl = this.gl;
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, this.#texture(slot));
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+    gl.pixelStorei(gl.UNPACK_COLORSPACE_CONVERSION_WEBGL, gl.NONE);
+    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+    try {
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB8, width, height, 0, gl.RGB, gl.UNSIGNED_BYTE, pixels);
+    } finally {
+      gl.pixelStorei(gl.UNPACK_ALIGNMENT, 4);
+    }
+    this.#sizes[slot] = [width, height];
+  }
+  /**
+   * One premultiplied group over transparent black into an export render target the size
+   * of the canvas, without blending. Leaves that framebuffer bound for readback.
+   */
+  drawExportGroup(framebuffer: WebGLFramebuffer, group: CompositeGroup): void {
+    if (this.#disposed || this.gl.isContextLost()) throw new Error('The compositor is unavailable.');
+    const gl = this.gl;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
+    gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+    gl.disable(gl.BLEND);
+    gl.clearColor(0, 0, 0, 0);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.bindVertexArray(this.#vao);
+    this.#drawGroup(group);
+  }
   /** Groups are bottom-to-top; each track's dissolve is drawn exactly once. */
   drawFrame(groups: readonly CompositeGroup[]): void {
     if (this.#disposed || this.gl.isContextLost()) return;
