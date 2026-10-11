@@ -45,7 +45,6 @@ interface PlaybackObservations {
 declare global {
   interface Window {
     gradeComparisonPixels: Record<string, Uint8Array>;
-    gradeComparisonNativeEvents: { seeking: number; seeked: number; loadstart: number };
     gradeComparisonPlayback: PlaybackObservations;
   }
 }
@@ -406,7 +405,6 @@ async function seek(page: Page, document: ProjectDocument, frame: number): Promi
   for (const sample of sampleTimeline(document, frame)) {
     const slot = state.assignedClipIds.indexOf(sample.clipId);
     expect(slot).toBeGreaterThanOrEqual(0);
-    expect(state.decoderReady[slot]).toBe(true);
     expect(state.decodedSourceFrames[slot]).toBe(sample.sourceFrame);
   }
   return state;
@@ -475,20 +473,8 @@ async function renderingBarrier(page: Page): Promise<void> {
   );
 }
 
-async function watchNativeSeeks(page: Page): Promise<void> {
-  await renderingBarrier(page);
-  await page.evaluate(() => {
-    const events = { seeking: 0, seeked: 0, loadstart: 0 };
-    window.gradeComparisonNativeEvents = events;
-    for (const video of document.querySelectorAll('video[data-pascap-decoder]')) {
-      video.addEventListener('seeking', () => events.seeking++);
-      video.addEventListener('seeked', () => events.seeked++);
-      video.addEventListener('loadstart', () => events.loadstart++);
-    }
-  });
-}
-
 async function pausedIdentity(page: Page) {
+  await renderingBarrier(page);
   return page.evaluate(() => {
     const state = window.pascapLab!.engine.diagnostics();
     return {
@@ -497,12 +483,12 @@ async function pausedIdentity(page: Page) {
       frame: state.frame,
       requestedFrame: state.requestedFrame,
       decodedSourceFrames: state.decodedSourceFrames,
-      decoderReady: state.decoderReady,
+      queuedFrames: state.queuedFrames,
+      decodedFrames: state.decodedFrames,
+      activeDecoders: state.activeDecoders,
       assignedClipIds: state.assignedClipIds,
       decoderCount: state.decoderCount,
-      observedDecodedFrames: state.observedDecodedFrames,
       seekSamples: state.seekSamples,
-      native: { ...window.gradeComparisonNativeEvents },
     };
   });
 }
@@ -522,7 +508,6 @@ test('native click, Space and Enter compare the exact paused frame without seeki
 }) => {
   await openFixture(page, comparison.single);
   await seek(page, comparison.single, 30);
-  await watchNativeSeeks(page);
   const original = await pausedIdentity(page);
   const graded = await capture(page, 'graded');
   expect(graded.bytes).toBe(1280 * 720 * 4);
@@ -695,7 +680,6 @@ test('a colour edit while bypassed saves once, returns the new grade and has a s
   await compareButton(page).click();
   await expectMode(page, true);
   const bypass = await capture(page, 'bypass-before-edit');
-  await watchNativeSeeks(page);
   const identity = await pausedIdentity(page);
   comparison.guard.permittedSaves = 1;
   await inspectorTab(page, 'Track');
@@ -774,7 +758,6 @@ test('comparison survives seek and timing reload, but clears on project switches
   expect(state.ungraded).toBe(true);
   const sample = sampleTimeline(trimmed, state.frame)[0]!;
   const slot = state.assignedClipIds.indexOf(sample.clipId);
-  expect(state.decoderReady[slot]).toBe(true);
   expect(state.decodedSourceFrames[slot]).toBe(sample.sourceFrame);
   await expectMode(page, true);
   expect(await capture(page, 'after-timing-reload')).toMatchObject({ opaque: true });
@@ -882,35 +865,17 @@ test('comparison during music playback preserves the real worklet epoch and stri
   );
   await page.evaluate((sourceFrames) => {
     const engine = window.pascapLab!.engine;
-    // Observe actual texture uploads, so a later decoded callback cannot be
-    // mistaken for the source image of a legitimately retained Playing frame.
-    // Pass all native GL calls through unchanged; never synthesize readiness.
+    // Observe actual texture uploads: each decoded VideoFrame's timestamp is its
+    // source frame. Pass all native GL calls through unchanged.
     engine.capturePixels();
     const initial = engine.diagnostics();
-    const uploaded = new Map<number, { frame: number; ready: boolean }>();
-    const videos = Array.from(document.querySelectorAll<HTMLVideoElement>('video[data-pascap-decoder]'));
-    for (const [slot, frame] of initial.decodedSourceFrames.entries())
-      uploaded.set(slot, { frame, ready: initial.decoderReady[slot] === true });
+    let uploaded = initial.decodedSourceFrames[initial.assignedClipIds.indexOf('music-comparison-clip')];
     const gl = engine.canvas.getContext('webgl2')!;
     const texImage2D = gl.texImage2D;
     Reflect.set(gl, 'texImage2D', function (this: WebGL2RenderingContext, ...args: unknown[]) {
-      const result = Reflect.apply(texImage2D, this, args);
-      const video = args.at(-1);
-      if (video instanceof HTMLVideoElement && video.dataset['pascapDecoder'] !== undefined) {
-        // Native decoder identities are monotonic, not pool array positions
-        // after the startup empty-project resize. DOM creation order matches
-        // this unchanged two-slot fixture's pool, without guessing a source.
-        const slot = videos.indexOf(video);
-        const state = engine.diagnostics();
-        uploaded.set(slot, {
-          frame: state.decodedSourceFrames[slot]!,
-          ready:
-            state.decoderReady[slot] === true &&
-            !video.seeking &&
-            video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA,
-        });
-      }
-      return result;
+      const source = args.at(-1);
+      if (source instanceof VideoFrame) uploaded = source.timestamp;
+      return Reflect.apply(texImage2D, this, args);
     });
     const evidence: PlaybackObservations = {
       notifications: 0,
@@ -947,8 +912,8 @@ test('comparison during music playback preserves the real worklet epoch and stri
         const music = window.musicStreamEvidence;
         const receipt = music.receipt;
         const output = music.context?.getOutputTimestamp();
-        // Independent consumed-sample/output-device clock, never currentTime,
-        // guessed video identities or the engine's own musicDriftFrames alone.
+        // Independent consumed-sample/output-device clock, never guessed video
+        // identities or the engine's own musicDriftFrames alone.
         const samples = receipt && output ? receipt.samples + output.contextTime! * 48_000 - receipt.contextFrame : NaN;
         const audioFrame = Math.floor((receipt?.startFrame ?? NaN) + samples / ((48_000 * 1001) / 30_000) + 1e-7);
         const drift = Math.abs(audioFrame - state.frame);
@@ -959,14 +924,12 @@ test('comparison during music playback preserves the real worklet epoch and stri
         )
           evidence.violations.push(`Invalid Playing A/V bound at ${state.frame}: ${drift}`);
         const slot = state.assignedClipIds.indexOf('music-comparison-clip');
-        const image = uploaded.get(slot);
-        // Use the authoritative map, including held slow-motion images, not a
-        // currentTime guess or the earliest inverse of a repeated source frame.
+        // Use the authoritative map, including held slow-motion images.
         if (
-          (slot < 0 || !image?.ready || image.frame !== sourceFrames[state.frame] || state.decoderCount !== 2) &&
+          (slot < 0 || uploaded !== sourceFrames[state.frame] || state.decoderCount !== 2) &&
           evidence.violations.length < 10
         )
-          evidence.violations.push(`Invalid accepted source at ${state.frame}: ${image?.frame}`);
+          evidence.violations.push(`Invalid accepted source at ${state.frame}: ${uploaded}`);
         if (state.renderedFrames > rendered) {
           if (state.ungraded) evidence.ungradedDraws++;
           else evidence.gradedDraws++;
@@ -992,7 +955,7 @@ test('comparison during music playback preserves the real worklet epoch and stri
             evidence.samples.push({
               frame: state.frame,
               requestedFrame: state.requestedFrame,
-              sourceFrame: image?.frame ?? -1,
+              sourceFrame: uploaded ?? -1,
               ungraded: state.ungraded,
               generation: receipt?.generation ?? -1,
             });
@@ -1093,7 +1056,6 @@ test('comparison during music playback preserves the real worklet epoch and stri
     }));
     expect(result.state.status, result.state.message).toBe('paused');
     expect(result.state.frame).toBe(duration - 1);
-    expect(result.state.decoderReady[result.state.assignedClipIds.indexOf('music-comparison-clip')]).toBe(true);
     expect(result.state.decodedSourceFrames[result.state.assignedClipIds.indexOf('music-comparison-clip')]).toBe(
       sourceFrames[duration - 1],
     );

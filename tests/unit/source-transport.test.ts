@@ -1,75 +1,177 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { SourceTransport, type SourceTransportState } from '../../src/web/source-transport.js';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { framesToSeconds, PROJECT_FPS } from '../../src/shared/timing.js';
+import { SourceTransport, type SourceTransportState } from '../../src/web/source-transport.js';
 
-function deferred() {
-  let resolve!: () => void;
-  let reject!: (cause: unknown) => void;
-  const promise = new Promise<void>((yes, no) => {
-    resolve = yes;
-    reject = no;
-  });
-  return { promise, resolve, reject };
+interface FakeFrame {
+  sourceFrame: number;
+  closed: boolean;
+  close(): void;
 }
+
+/** One WebCodecs decoder lane: requested frames are decoded when a test says so (or at once). */
+class Frames {
+  auto = true;
+  generation = 0;
+  url = '';
+  pending: number[] = [];
+  queue: FakeFrame[] = [];
+  error: Error | null = null;
+  readonly open = new Set<FakeFrame>();
+  readonly starts: { url: string; frames: number[]; complete: boolean }[] = [];
+  readonly listeners = new Set<() => void>();
+  disposed = false;
+  start = vi.fn((_lane: number, url: string, frames: number[], complete: boolean): void => {
+    this.#reset();
+    this.url = url;
+    this.pending = [...frames];
+    this.starts.push({ url, frames: [...frames], complete });
+    if (this.auto) this.decode();
+  });
+  stop = vi.fn((_lane: number): void => this.#reset());
+  dispose = vi.fn((): void => {
+    this.#reset();
+    this.disposed = true;
+  });
+  #reset(): void {
+    this.queue.forEach((frame) => frame.close());
+    this.queue = [];
+    this.pending = [];
+    this.error = null;
+    this.generation++;
+    this.listeners.forEach((listener) => listener());
+  }
+  decode(count = Infinity): void {
+    for (let index = 0; index < count && this.queue.length < 6 && this.pending.length; index++) {
+      const open = this.open;
+      const frame: FakeFrame = {
+        sourceFrame: this.pending.shift()!,
+        closed: false,
+        close() {
+          this.closed = true;
+          open.delete(this);
+        },
+      };
+      open.add(frame);
+      this.queue.push(frame);
+    }
+    this.listeners.forEach((listener) => listener());
+  }
+  fail(message: string): void {
+    this.error = new Error(message);
+    this.listeners.forEach((listener) => listener());
+  }
+  #advance(sourceFrame: number): void {
+    if (this.error) throw this.error;
+    while (this.queue.length && this.queue[0]!.sourceFrame < sourceFrame) this.queue.shift()!.close();
+  }
+  take = vi.fn((_lane: number, sourceFrame: number) => {
+    this.#advance(sourceFrame);
+    if (this.queue[0]?.sourceFrame !== sourceFrame) return null;
+    const frame = this.queue.shift()!;
+    if (this.auto) this.decode();
+    return frame as unknown as VideoFrame;
+  });
+  ready = vi.fn(
+    (_lane: number, sourceFrame: number, count: number, signal: AbortSignal): Promise<void> =>
+      new Promise((resolve, reject) => {
+        const generation = this.generation;
+        const check = (): void => {
+          if (signal.aborted || generation !== this.generation) {
+            this.listeners.delete(check);
+            reject(new DOMException('Cancelled', 'AbortError'));
+            return;
+          }
+          try {
+            this.#advance(sourceFrame);
+          } catch (error) {
+            this.listeners.delete(check);
+            reject(error);
+            return;
+          }
+          if (this.queue[0]?.sourceFrame === sourceFrame && this.queue.length >= count) {
+            this.listeners.delete(check);
+            resolve();
+          }
+        };
+        this.listeners.add(check);
+        signal.addEventListener('abort', check, { once: true });
+        check();
+      }),
+  );
+}
+
+let now = 1000;
+const raf = new Map<number, FrameRequestCallback>();
+let nextRaf = 0;
+beforeEach(() => {
+  now = 1000;
+  raf.clear();
+  vi.spyOn(performance, 'now').mockImplementation(() => now);
+  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+    raf.set(++nextRaf, callback);
+    return nextRaf;
+  });
+  vi.stubGlobal('cancelAnimationFrame', (id: number) => raf.delete(id));
+});
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+});
 
 async function settle(): Promise<void> {
   for (let index = 0; index < 8; index++) await Promise.resolve();
 }
-
-function fixture(frame = 20, sourceIn = 10, sourceOut = 40) {
-  const video = Object.assign(new EventTarget(), {
-    currentTime: framesToSeconds(frame + 0.25),
-    paused: true,
-    error: null,
-  });
-  const states: SourceTransportState[] = [];
-  const decoder = {
-    video: video as unknown as HTMLVideoElement,
-    decodedFrame: frame,
-    ready: true,
-    load: vi.fn(async (_url: string, _rate: unknown, _signal: AbortSignal) => {}),
-    seek: vi.fn(async (target: number, _signal: AbortSignal) => {
-      decoder.ready = true;
-      decoder.decodedFrame = target;
-      video.currentTime = framesToSeconds(target + 0.25);
-      video.paused = true;
-    }),
-    play: vi.fn(async () => {
-      video.paused = false;
-    }),
-    pause: vi.fn(() => {
-      video.paused = true;
-    }),
-    dispose: vi.fn(() => {
-      video.paused = true;
-    }),
-  };
-  const range = { mediaId: 'pattern', sourceIn, sourceOut };
-  const transport = new SourceTransport(decoder, PROJECT_FPS, 120, range, frame, (state) => states.push({ ...state }));
-  const observed = (next: number) => {
-    decoder.decodedFrame = next;
-    video.currentTime = framesToSeconds(next + 0.25);
-    transport.observed();
-  };
-  return { transport, decoder, video, states, observed, range };
+/** Display callbacks at `frames` source frames after `anchor`. */
+function tick(anchor: number, frames: number): void {
+  now = anchor + framesToSeconds(frames + 0.1) * 1000;
+  const pending = [...raf.values()];
+  raf.clear();
+  pending.forEach((callback) => callback(now));
 }
 
-afterEach(() => vi.useRealTimers());
+function fixture(frame = 20, sourceIn = 10, sourceOut = 40) {
+  const frames = new Frames();
+  const drawn: number[] = [];
+  const states: SourceTransportState[] = [];
+  const range = { mediaId: 'pattern', sourceIn, sourceOut };
+  const transport = new SourceTransport(
+    frames,
+    (decoded) => drawn.push((decoded as unknown as FakeFrame).sourceFrame),
+    PROJECT_FPS,
+    120,
+    range,
+    frame,
+    (state) => states.push({ ...state }),
+  );
+  return { transport, frames, drawn, states, range };
+}
+async function loaded(frame = 20, sourceIn = 10, sourceOut = 40) {
+  const f = fixture(frame, sourceIn, sourceOut);
+  f.transport.load('/api/media/pattern/proxy');
+  await settle();
+  expect(f.transport.state).toMatchObject({ status: 'paused', frame });
+  return f;
+}
+async function started(f: Awaited<ReturnType<typeof loaded>>): Promise<number> {
+  f.transport.play();
+  await settle();
+  expect(f.transport.state.status).toBe('playing');
+  return now;
+}
 
-describe('owned source proxy playback', () => {
-  it('loads once and follows the latest seek without cancelling its resource load', async () => {
+describe('owned source proxy transport', () => {
+  it('shows the requested exact frame on load and follows the latest seek', async () => {
     const f = fixture();
-    const loading = deferred();
-    f.decoder.load.mockImplementation(() => loading.promise);
-    const load = f.transport.load('/api/media/pattern/proxy');
     f.transport.follow(34);
-    loading.resolve();
-    await load;
+    expect(f.frames.start).not.toHaveBeenCalled();
+    f.transport.load('/api/media/pattern/proxy');
     await settle();
-    expect(f.decoder.load).toHaveBeenCalledTimes(1);
-    expect(f.decoder.seek).toHaveBeenCalledWith(34, expect.any(AbortSignal));
+    expect(f.frames.starts).toEqual([{ url: '/api/media/pattern/proxy', frames: [34], complete: true }]);
     expect(f.transport.state).toMatchObject({ status: 'paused', frame: 34 });
+    expect(f.drawn).toEqual([34]);
+    expect(f.frames.stop).toHaveBeenCalled();
     f.transport.dispose();
+    expect(f.frames.open.size).toBe(0);
   });
 
   it.each([
@@ -77,262 +179,168 @@ describe('owned source proxy playback', () => {
     [999, 119],
     [13.6, 14],
   ])('bounds source scrub %s to %s', async (requested, expected) => {
-    const f = fixture();
-    await f.transport.load('proxy');
-    await settle();
+    const f = await loaded();
     f.transport.seek(requested);
     await settle();
     expect(f.transport.state.frame).toBe(expected);
     f.transport.dispose();
   });
 
+  it('hides the image while an exact frame is decoded and ignores an obsolete seek', async () => {
+    const f = await loaded();
+    f.frames.auto = false;
+    f.transport.seek(60);
+    expect(f.transport.state).toMatchObject({ status: 'buffering', frame: null, requestedFrame: 60 });
+    f.transport.seek(15);
+    f.frames.decode();
+    await settle();
+    expect(f.transport.state).toMatchObject({ status: 'paused', frame: 15 });
+    expect(f.drawn).toEqual([20, 15]);
+    f.transport.dispose();
+  });
+
   it.each([
-    [20, 20],
-    [5, 10],
-    [39, 10],
-    [75, 10],
-  ])('starts frame %s at %s inside applied IN/OUT', async (frame, start) => {
-    const f = fixture(frame);
-    await f.transport.load('proxy');
-    await settle();
+    [20, 20, [21, 22]],
+    [5, 10, [10, 11]],
+    [39, 10, [10, 11]],
+    [75, 10, [10, 11]],
+  ])('plays from frame %s at %s inside the applied IN/OUT', async (frame, start, first) => {
+    const f = await loaded(frame);
     f.transport.play();
+    expect(f.transport.state).toMatchObject({
+      status: 'starting',
+      requestedFrame: start,
+      frame,
+    });
+    expect(f.frames.starts.at(-1)!.frames.slice(0, 2)).toEqual(first);
+    expect(f.frames.starts.at(-1)!.frames.at(-1)).toBe(39);
     await settle();
-    expect(f.decoder.seek).toHaveBeenLastCalledWith(start, expect.any(AbortSignal));
-    expect(f.transport.state).toMatchObject({ status: 'playing', frame: start });
-    expect(f.video.paused).toBe(false);
+    expect(f.transport.state.status).toBe('playing');
     f.transport.dispose();
   });
 
-  it('publishes observed callbacks without seeking or accumulating React frame feedback', async () => {
-    const f = fixture();
-    await f.transport.load('proxy');
-    await settle();
-    f.transport.play();
-    await settle();
-    f.decoder.seek.mockClear();
-    for (const frame of [21, 23, 26]) {
-      f.observed(frame);
-      f.transport.follow(frame);
+  it('presents every source frame on the wall clock and stops exactly on OUT − 1', async () => {
+    const f = await loaded(30);
+    const anchor = await started(f);
+    for (let frame = 31; frame <= 38; frame++) {
+      tick(anchor, frame - 30);
+      expect(f.transport.state).toMatchObject({ status: 'playing', frame });
     }
-    expect(f.decoder.seek).not.toHaveBeenCalled();
-    expect(f.transport.state).toMatchObject({ status: 'playing', frame: 26 });
-    f.transport.dispose();
-  });
-
-  it.each([39, 40, 47])('pauses and seeks exact OUT−1 after observed frame %s; never loops', async (frame) => {
-    const f = fixture();
-    await f.transport.load('proxy');
-    await settle();
+    tick(anchor, 20);
+    expect(f.transport.state).toMatchObject({ status: 'paused', frame: 39, requestedFrame: 39 });
+    expect(f.drawn).toEqual([30, 31, 32, 33, 34, 35, 36, 37, 38, 39]);
+    expect(raf.size).toBe(0);
     f.transport.play();
     await settle();
-    f.observed(frame);
-    await settle();
-    expect(f.transport.state).toMatchObject({ status: 'paused', frame: 39, requestedFrame: 39 });
-    expect(f.video.paused).toBe(true);
-    expect(f.decoder.play).toHaveBeenCalledTimes(1);
+    expect(f.frames.starts.at(-1)!.frames[0]).toBe(10);
     f.transport.dispose();
   });
 
-  it('keeps a one-frame range exact without starting native playback', async () => {
-    const f = fixture(4, 30, 31);
-    await f.transport.load('proxy');
-    await settle();
+  it('stops the clock at a frame that is not decoded yet, then continues from it', async () => {
+    const f = await loaded(20);
+    const anchor = await started(f);
+    f.frames.auto = false;
+    for (let frame = 21; frame <= 26; frame++) tick(anchor, frame - 20);
+    expect(f.transport.state.frame).toBe(26);
+    tick(anchor, 7);
+    tick(now, 30);
+    expect(f.transport.state).toMatchObject({ status: 'playing', frame: 26 });
+    f.frames.decode();
+    tick(now, 0);
+    expect(f.transport.state).toMatchObject({ status: 'playing', frame: 27 });
+    tick(now - framesToSeconds(0.1) * 1000, 1);
+    expect(f.transport.state.frame).toBe(28);
+    expect(f.drawn.slice(-3)).toEqual([26, 27, 28]);
+    f.transport.dispose();
+  });
+
+  it('reports a bounded stall without inventing frames', async () => {
+    const f = await loaded(20);
+    const anchor = await started(f);
+    f.frames.auto = false;
+    f.frames.queue.splice(0).forEach((frame) => frame.close());
+    tick(anchor, 1);
+    now += 4_900;
+    tick(now, 0);
+    expect(f.transport.state.status).toBe('playing');
+    now += 200;
+    tick(now, 0);
+    expect(f.transport.state).toMatchObject({ status: 'error', frame: null });
+    expect(f.transport.state.error).toContain('within 5 seconds');
+    f.transport.dispose();
+  });
+
+  it('keeps a one-frame range exact without playing', async () => {
+    const f = await loaded(4, 30, 31);
     f.transport.play();
     await settle();
     expect(f.transport.state).toMatchObject({ status: 'paused', frame: 30 });
-    expect(f.decoder.play).not.toHaveBeenCalled();
+    f.transport.play();
+    await settle();
+    expect(f.frames.starts.map((start) => start.frames)).toEqual([[4], [30]]);
     f.transport.dispose();
   });
 
-  it('pause captures the actual observed frame, not native currentTime', async () => {
-    const f = fixture();
-    await f.transport.load('proxy');
-    await settle();
-    f.transport.play();
-    await settle();
-    f.observed(25);
-    f.video.currentTime = framesToSeconds(28.25);
+  it('pauses on the displayed exact frame without decoding it again', async () => {
+    const f = await loaded(20);
+    const anchor = await started(f);
+    tick(anchor, 5);
+    const starts = f.frames.starts.length;
     f.transport.pause();
-    await settle();
-    expect(f.transport.state).toMatchObject({ status: 'paused', frame: 25 });
+    expect(f.transport.state).toMatchObject({ status: 'paused', frame: 25, requestedFrame: 25 });
+    expect(f.frames.starts).toHaveLength(starts);
+    expect(raf.size).toBe(0);
     f.transport.dispose();
   });
 
-  it('cancelling startup during its initial seek reacquires a paused exact frame instead of staying busy', async () => {
-    const f = fixture(5);
-    await f.transport.load('proxy');
-    await settle();
-    const seeking = deferred();
-    f.decoder.seek.mockImplementationOnce(() => {
-      f.decoder.ready = false;
-      return seeking.promise;
-    });
+  it('cancelling startup before its first frame keeps the displayed exact frame', async () => {
+    const f = await loaded(5);
+    f.frames.auto = false;
     f.transport.play();
-    expect(f.transport.state).toMatchObject({ status: 'starting', frame: null, requestedFrame: 10 });
+    expect(f.transport.state).toMatchObject({ status: 'starting', frame: 5, requestedFrame: 10 });
     f.transport.pause();
+    expect(f.transport.state).toMatchObject({ status: 'paused', frame: 5, requestedFrame: 5 });
+    f.frames.decode();
     await settle();
-    expect(f.transport.state).toMatchObject({ status: 'paused', frame: 10 });
-    seeking.resolve();
-    await settle();
-    expect(f.decoder.play).not.toHaveBeenCalled();
+    expect(f.transport.state).toMatchObject({ status: 'paused', frame: 5 });
+    expect(f.drawn).toEqual([5]);
+    expect(f.frames.starts).toHaveLength(2);
     f.transport.dispose();
   });
 
-  it.each(['pause', 'seek', 'range', 'dispose'] as const)(
-    'a late native play completion cannot restart after %s',
-    async (action) => {
-      const f = fixture();
-      const playing = deferred();
-      f.decoder.play.mockImplementation(async () => {
-        await playing.promise;
-        f.video.paused = false;
-      });
-      await f.transport.load('proxy');
-      await settle();
-      f.transport.play();
-      await settle();
-      expect(f.transport.state).toMatchObject({ status: 'starting', pendingPlay: true });
-      if (action === 'pause') f.transport.pause();
-      if (action === 'seek') f.transport.seek(50);
-      if (action === 'range') f.transport.setRange({ ...f.range, sourceOut: 31 });
-      if (action === 'dispose') f.transport.dispose();
-      await settle();
-      f.transport.play();
-      expect(f.decoder.play).toHaveBeenCalledTimes(1);
-      playing.resolve();
-      await settle();
-      expect(f.video.paused).toBe(true);
-      if (action !== 'dispose') {
-        expect(f.transport.state.pendingPlay).toBe(false);
-        expect(f.transport.state.status).toBe('paused');
-        f.transport.dispose();
-      }
-    },
-  );
-
-  it.each(['starting', 'playing'] as const)('reports a bounded %s timeout without inventing frames', async (status) => {
-    vi.useFakeTimers();
-    const f = fixture();
-    const playing = deferred();
-    if (status === 'starting') f.decoder.play.mockImplementation(() => playing.promise);
-    await f.transport.load('proxy');
-    await settle();
+  it('a range change pauses playback first', async () => {
+    const f = await loaded(20);
+    const anchor = await started(f);
+    tick(anchor, 2);
+    f.transport.setRange({ ...f.range, sourceOut: 31 });
+    expect(f.transport.state).toMatchObject({ status: 'paused', frame: 22 });
     f.transport.play();
     await settle();
-    await vi.advanceTimersByTimeAsync(5_000);
-    expect(f.transport.state).toMatchObject({ status: 'error', frame: null });
-    expect(f.transport.state.error).toContain('within 5 seconds');
-    expect(f.video.paused).toBe(true);
-    playing.resolve();
-    await settle();
-    expect(f.transport.state.status).toBe('error');
+    expect(f.frames.starts.at(-1)!.frames.at(-1)).toBe(30);
     f.transport.dispose();
   });
 
-  it('real observed progress renews only the bounded stalled-frame deadline', async () => {
-    vi.useFakeTimers();
-    const f = fixture();
-    await f.transport.load('proxy');
+  it.each(['seek', 'play'] as const)('reports a decoder failure during %s', async (operation) => {
+    const f = await loaded();
+    f.frames.auto = false;
+    if (operation === 'play') f.transport.play();
+    else f.transport.seek(35);
+    f.frames.fail('deliberate source failure');
     await settle();
-    f.transport.play();
-    await settle();
-    await vi.advanceTimersByTimeAsync(4_900);
-    f.observed(21);
-    await vi.advanceTimersByTimeAsync(4_900);
-    expect(f.transport.state.status).toBe('playing');
-    await vi.advanceTimersByTimeAsync(100);
-    expect(f.transport.state.status).toBe('error');
-    f.transport.dispose();
-  });
-
-  it('cancelling a never-settling native play still exposes a bounded Retry error', async () => {
-    vi.useFakeTimers();
-    const f = fixture();
-    const playing = deferred();
-    f.decoder.play.mockImplementation(() => playing.promise);
-    await f.transport.load('proxy');
-    await settle();
-    f.transport.play();
-    await settle();
-    f.transport.pause();
-    await settle();
-    expect(f.transport.state).toMatchObject({ status: 'paused', pendingPlay: true });
-    await vi.advanceTimersByTimeAsync(5_000);
-    expect(f.transport.state.status).toBe('error');
-    expect(f.transport.state.error).toContain('start did not finish');
-    playing.resolve();
-    await settle();
-    expect(f.video.paused).toBe(true);
-    f.transport.dispose();
-  });
-
-  it.each(['load', 'seek', 'play'] as const)('reports an owned %s rejection', async (operation) => {
-    const f = fixture();
-    f.decoder[operation].mockRejectedValueOnce(new Error('deliberate source failure'));
-    await f.transport.load('proxy');
-    await settle();
-    if (operation === 'play') {
-      f.transport.play();
-      await settle();
-    }
     expect(f.transport.state).toMatchObject({ status: 'error', frame: null, error: 'deliberate source failure' });
     f.transport.dispose();
   });
 
-  it('an obsolete seek cannot replace its newer requested frame', async () => {
-    const f = fixture();
-    await f.transport.load('proxy');
-    await settle();
-    const old = deferred();
-    f.decoder.seek.mockImplementationOnce(() => old.promise);
-    f.transport.seek(60);
-    const signal = f.decoder.seek.mock.calls.at(-1)![1];
-    f.transport.seek(15);
-    await settle();
-    old.resolve();
-    await settle();
-    expect(signal.aborted).toBe(true);
-    expect(f.transport.state).toMatchObject({ status: 'paused', frame: 15 });
-    f.transport.dispose();
-  });
-
-  it('rejects a seek that did not deliver its exact rVFC frame', async () => {
-    const f = fixture();
-    f.decoder.seek.mockImplementation(async () => {});
-    await f.transport.load('proxy');
-    await settle();
-    f.transport.seek(35);
-    await settle();
-    expect(f.transport.state.status).toBe('error');
-    expect(f.transport.state.error).toContain('exact frame');
-    f.transport.dispose();
-  });
-
-  it('disposal aborts the pending load and ignores late completions and frame callbacks', async () => {
-    const f = fixture();
-    const loading = deferred();
-    f.decoder.load.mockImplementation(() => loading.promise);
-    const load = f.transport.load('proxy');
-    const signal = f.decoder.load.mock.calls[0]![2];
+  it('disposal releases the decoder and ignores late frames', async () => {
+    const f = await loaded();
+    f.frames.auto = false;
+    f.transport.seek(50);
     f.transport.dispose();
     const count = f.states.length;
-    loading.resolve();
-    await load;
-    f.observed(22);
-    expect(signal.aborted).toBe(true);
-    expect(f.decoder.dispose).toHaveBeenCalledTimes(1);
+    f.frames.decode();
+    await settle();
+    expect(f.frames.dispose).toHaveBeenCalledOnce();
     expect(f.states).toHaveLength(count);
-  });
-
-  it('a native ended event retains the exact final included source frame', async () => {
-    const f = fixture(100, 90, 120);
-    await f.transport.load('proxy');
-    await settle();
-    f.transport.play();
-    await settle();
-    f.video.dispatchEvent(new Event('ended'));
-    await settle();
-    expect(f.transport.state).toMatchObject({ status: 'paused', frame: 119 });
-    f.transport.dispose();
+    expect(f.frames.open.size).toBe(0);
   });
 });

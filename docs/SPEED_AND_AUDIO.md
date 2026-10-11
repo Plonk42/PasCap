@@ -342,21 +342,18 @@ thread keeps epoch start/stop, startup prefill handoff and receipt validation.
 The rendering thread owns consecutive mixed samples and their context-frame
 receipts. Its first real rendered mixed sample supplies the clock origin; video starts
 only once the output device reaches that origin. Project time follows the audio
-output timestamp, not graph processing ahead of the speakers or an approximate
-HTMLMediaElement currentTime. Elapsed rendering before acknowledgement is retained.
+output timestamp, not graph processing ahead of the speakers.
+Elapsed rendering before acknowledgement is retained.
 Consumption receipts independently check the unchanged one-project-frame drift
 bound. Actual processor failures, range errors and empty-queue underruns remain
 explicit; a source underrun freezes consumption instead of inventing successful
 silence. Pause, seek, cancellation and disposal invalidate their complete epoch,
 pending reads and late receipts; an obsolete completion cannot resume playback.
-Video still uses integer project frames and exact observed source identities.
-Normal decoded-callback latency within one project frame does not clear a valid
-accepted image or restart music. Preview checks exact source maps for the clock
-frame and its one-frame neighbours across every active source; a held source
-frame's earliest inverse is not treated as its unique project time. Retaining an
-uploaded image requires the same active clips and unchanged appearance. Larger or
-incompatible mismatches, new sources and failed music synchronization still expose
-buffering and require exact source readiness before recovery.
+Video uses integer project frames and exact decoded source frames
+([WebCodecs preview decoding](design/WEBCODECS_PREVIEW.md)). Music does not wait
+for video: a late decoder holds the previous image while the audio clock continues,
+and skips frames the clock has passed. Only a failed music synchronization restarts
+music, after the required decoded frames are ready again.
 Placement, source IN/OUT, duration and loop boundaries use independently rounded
 integer 48 kHz sample positions, matching native audio placement. Selected-range
 wraps are filled into consecutive mixed blocks without a music restart; valid placement

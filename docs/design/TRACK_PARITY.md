@@ -34,7 +34,7 @@ The initial generated `video-1` is an ordinary identity, not a required base.
 | [Model](../../src/shared/model.ts), [layout](../../src/shared/timeline.ts), [commands](../../src/shared/commands.ts)                                   | Required track settings, local pair topology, continuous Ripple and atomic actual-start persistence                              |
 | [Source trim](../../src/shared/source-range.ts), [marked cuts](../../src/shared/rush-editing.ts), [drop planning](../../src/web/timeline-placement.ts) | Ripple chooses sequence slots versus independent placement; source anchors and contextual maps are shared by ghost and commit    |
 | [Inspector](../../src/web/Inspector.tsx), [track controls](../../src/web/Layers.tsx), [action guards](../../src/web/layer-actions.ts)                  | Every track exposes the same controls, selected-track transitions/fades and accessible setting-specific start/nudge restrictions |
-| [Tracks](../../src/web/timeline-rows.ts), [preview](../../src/preview/engine.ts), [pool](../../src/preview/assignment.ts)                              | Uniform array-order tracks; track-local timing and two reusable slots per track                                                  |
+| [Tracks](../../src/web/timeline-rows.ts), [preview](../../src/preview/engine.ts), [decoding](WEBCODECS_PREVIEW.md)                                     | Uniform array-order tracks; track-local timing and two decoders per track                                                        |
 | [Composition](../../src/shared/composition.ts), [export planning](../../src/shared/export.ts), [native groups](../../src/server/layered-export.ts)     | Independent track dissolves; premultiplied groups followed by serial source-over, without regrading                              |
 | [Storage](../../src/server/storage.ts), [archive restoration](../../src/server/export-archive.ts)                                                      | Strict schema-6 projects/snapshots; old files retained unchanged and incompatible                                                |
 
@@ -55,7 +55,7 @@ the design rationale, not a second mutable implementation checklist.
 | Project-owned transitions and opening/closing fades                          | **Uniform capability:** required track-local topology/fades, including empty-track dormant settings and explicit positioned dissolve placement |
 | Irremovable initial identity and special stack limits                        | **Composition constraint only:** last-track deletion and actual top/bottom endpoints; no identity privilege                                    |
 | Primary-first/reversed-other track display and track hit tests               | **Composition constraint only:** saved bottom-to-top array order drives headers, lanes, reveal, markers and drop targeting                     |
-| Primary dissolve plus one-source other-track decoder allocation              | **Uniform capability:** two reusable slots per track; timing invalidation includes each populated track's settings/order                       |
+| Primary dissolve plus one-source other-track decoder allocation              | **Uniform capability:** two decoders per track; timing invalidation includes each populated track's settings/order                             |
 | Primary export plan/group versus single-source overlay passes                | **Uniform capability:** independently planned track groups and serial premultiplied source-over; static eligibility uses content, not identity |
 | Global base duration, project fade summaries and schema-5 admission          | **Uniform contract:** maximum clip OUT, per-track summaries/settings and strict schema-6 project/receipt admission                             |
 
@@ -175,10 +175,10 @@ old receipts are not rewritten or restored as current-schema jobs.
 
 ## Accepted preview and native resources
 
-- Preview can require two sources per enabled track: at most **16 pooled decoders
-  for eight tracks**, plus the separate visible source reviewer. Slots are reused
-  with observed-frame checks and disposed when the pool shrinks, never allocated
-  per stored clip.
+- Preview can require two sources per enabled track: at most **16 WebCodecs decoders
+  for eight tracks**, plus the separate visible source-review decoder. Decoders are
+  reassigned between clips with exact decoded source frames and released when the
+  budget shrinks, never allocated per stored clip.
 - Native export renders each track's premultiplied group with
   at most two RGB readers, then source-overs that RGBA16 group onto the lower
   accumulator using at most two RGBA16 readers. Keep one original decoder, two

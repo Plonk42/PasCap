@@ -617,7 +617,7 @@ test('the ordinary initial track can be removed; only deleting the last remainin
   await undoOnce(page, before);
 });
 
-test('eight concurrent track dissolves use exactly sixteen reusable decoder slots and releasing a track shrinks the pool', async ({
+test('eight concurrent track dissolves use exactly sixteen decoders and releasing a track shrinks the budget', async ({
   page,
 }) => {
   const document = twoTracks();
@@ -637,39 +637,25 @@ test('eight concurrent track dissolves use exactly sixteen reusable decoder slot
   const expected = sampleTimeline(before, 50);
   expect(expected).toHaveLength(16);
   await captureAt(page, 50);
-  const captured = await page.evaluate(() => ({
-    state: window.pascapLab!.engine.diagnostics(),
-    videos: Array.from(
-      globalThis.document.querySelectorAll<HTMLVideoElement>('video[data-pascap-decoder]'),
-      (video) => ({
-        seeking: video.seeking,
-        readyState: video.readyState,
-        frame: Math.floor((video.currentTime * 30000) / 1001 + 1e-7),
-      }),
-    ),
-  }));
-  expect(captured.state.status, captured.state.message).toBe('paused');
-  expect(captured.state.frame).toBe(50);
-  expect(captured.state.decoderCount).toBe(16);
-  await expect(page.locator('video[data-pascap-decoder]')).toHaveCount(16);
-  expect(captured.state.assignedClipIds.filter((id) => id !== null).sort()).toEqual(
+  const state = await page.evaluate(() => window.pascapLab!.engine.diagnostics());
+  expect(state.status, state.message).toBe('paused');
+  expect(state.frame).toBe(50);
+  expect(state.decoderCount).toBe(16);
+  expect(state.assignedClipIds.filter((id) => id !== null).sort()).toEqual(
     expected.map((source) => source.clipId).sort(),
   );
-  for (const source of expected) {
-    const slot = captured.state.assignedClipIds.indexOf(source.clipId);
-    expect(slot).toBeGreaterThanOrEqual(0);
-    expect(captured.videos[slot]).toMatchObject({ seeking: false, frame: source.sourceFrame });
-    expect(captured.videos[slot]!.readyState).toBeGreaterThanOrEqual(2);
-  }
+  for (const source of expected)
+    expect(state.decodedSourceFrames[state.assignedClipIds.indexOf(source.clipId)]).toBe(source.sourceFrame);
+  const decoders = (): Promise<number> => page.evaluate(() => window.pascapLab!.engine.diagnostics().decoderCount);
   await openOptions(page, 'Track options Video track 8');
   await page.getByRole('button', { name: 'Delete track Video track 8', exact: true }).click();
   const after = await current(page);
   await ready(page, after);
   expect(after.layers).toEqual(before.layers.slice(0, 7));
   expect(after.clips).toEqual(before.clips.filter((clip) => clip.layerId !== 'row-8'));
-  await expect(page.locator('video[data-pascap-decoder]')).toHaveCount(14);
+  await expect.poll(decoders).toBe(14);
   await undoOnce(page, before);
-  await expect(page.locator('video[data-pascap-decoder]')).toHaveCount(16);
+  await expect.poll(decoders).toBe(16);
 });
 
 test('export discloses three timeline representations and four 22-byte-per-pixel raw buffers without starting a render', async ({

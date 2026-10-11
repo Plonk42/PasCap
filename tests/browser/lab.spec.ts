@@ -11,6 +11,7 @@ import {
   clipAction,
   closeOptions,
   expandedInspectorPreferences,
+  expectDecoders,
   freshExportLinks,
   inspectorTab,
   openOptions,
@@ -76,7 +77,7 @@ test('compact library handles 12 recordings and the editor fits the desktop view
   await page.getByRole('textbox', { name: 'Search media' }).fill('pattern-a');
   await expect(recordings).toHaveCount(1);
   await expect(music).toHaveCount(0);
-  await expect(page.locator('video[data-pascap-decoder]')).toHaveCount(2);
+  await expectDecoders(page, 2);
   await page.getByRole('textbox', { name: 'Search media' }).fill('');
   await openOptions(page, 'Media options');
   await page.getByRole('combobox', { name: 'Filter media' }).selectOption('ready');
@@ -240,9 +241,9 @@ test('playback and colour updates run outside React, shortcuts ignore text input
   await page.evaluate(() => window.pascapLab!.flush());
 });
 
-test('disposal removes both decoder elements and stops engine playback', async ({ page }) => {
+test('disposal releases both decoders and stops engine playback', async ({ page }) => {
   await page.evaluate(() => window.pascapLab!.engine.dispose());
-  await expect(page.locator('video[data-pascap-decoder]')).toHaveCount(0);
+  await expectDecoders(page, 0);
   await expect(page.locator('audio[data-pascap-music]')).toHaveCount(0);
   expect(await page.evaluate(() => window.pascapLab!.engine.diagnostics().status)).toBe('disposed');
 });
@@ -787,7 +788,6 @@ test('seeks across five excerpts including a new recording using only two reusab
     expect(state.assignedClipIds).toContain(placed.clip.id);
     expect(state.decoderCount).toBe(2);
   }
-  await expect(page.locator('video[data-pascap-decoder]')).toHaveCount(2);
 });
 
 test('split, delete and undo work on named timeline clips', async ({ page }) => {
@@ -878,20 +878,9 @@ test('playback crosses different recordings and dissolves with only two decoder 
       { timeout: 45_000 },
     );
   } finally {
-    // Synthetic diagnostics only: renderer, frame progress and element state.
+    // Synthetic diagnostics only: renderer, frame progress and decoder state.
     // Preserve useful evidence even when the bounded completion check fails.
-    const diagnostics = await page.evaluate(() => ({
-      preview: window.pascapLab!.engine.diagnostics(),
-      decoders: Array.from(document.querySelectorAll<HTMLVideoElement>('video[data-pascap-decoder]'), (video) => ({
-        index: video.dataset['pascapDecoder'],
-        currentTime: video.currentTime,
-        paused: video.paused,
-        ended: video.ended,
-        seeking: video.seeking,
-        readyState: video.readyState,
-        error: video.error?.message ?? null,
-      })),
-    }));
+    const diagnostics = await page.evaluate(() => ({ preview: window.pascapLab!.engine.diagnostics() }));
     console.log('Synthetic bounded playback diagnostics:', JSON.stringify(diagnostics));
     await test.info().attach('bounded-playback-diagnostics', {
       body: JSON.stringify(diagnostics, null, 2),
@@ -902,7 +891,6 @@ test('playback crosses different recordings and dissolves with only two decoder 
   expect(state.status, state.message).not.toBe('error');
   expect(state.frame).toBe(143);
   expect(state.decoderCount).toBe(2);
-  await expect(page.locator('video[data-pascap-decoder]')).toHaveCount(2);
 });
 
 test('pointer cancellation restores the committed source range', async ({ page }) => {

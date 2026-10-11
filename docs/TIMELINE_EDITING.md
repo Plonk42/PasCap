@@ -464,20 +464,19 @@ saved track value or overriding `opacity` curve; it is not applied again to the 
 Nonneutral transformed/cropped pixels outside the original have zero coverage;
 exact neutral poses retain the old opaque black letterboxing after grading.
 
-A nonempty one-video-track project uses **two reusable video elements/textures**; eight
-tracks use **16**, two slots per track, never one per stored clip.
-A required clip retains its decoder; only inactive slots may be reassigned.
-Next sources per enabled video track are speculatively preloaded in free slots. During
-playback, a clip that enters (cut, dissolve or another track) starts in place from its
-preloaded slot when that slot already shows a source frame within one project frame of the
-clock; music and the other decoders keep running. Otherwise the boundary buffers, seeks
-every active source and restarts music (**Diagnostics** counts these as stalls at clip
-boundaries, separately from mid-clip stalls, with the total stall time). Source
-review uses one separate muted/paused decoder, not another timeline slot.
+Preview decodes editing proxies with WebCodecs in a worker: a nonempty
+one-video-track project uses **two decoders/textures**; eight tracks use **16**, two
+per track, never one per stored clip. Each decoder delivers exact source frames;
+active clips keep their decoders and the next clip of each enabled track is
+prefilled in a free one, so cuts, dissolves and clips on other tracks start without
+seeking during playback. A required frame that is not yet decoded holds the
+previous image and buffers (**Diagnostics** counts stalls at clip boundaries
+separately from mid-clip stalls, with the total stall time); with music the
+audio clock continues and late frames are skipped. Source review uses its own
+one-decoder worker. See [WebCodecs preview decoding](design/WEBCODECS_PREVIEW.md).
 
-Resource changes invalidate uploaded texture identity and require a newly observed
-decoded frame. Direct/rapid seeks cancel obsolete loads and speculative preloads.
-The compositor does not upload a stale frame while the target recording loads.
+Seeks and timing changes discard obsolete decoded frames by stream generation;
+no stale frame is uploaded while the target recording decodes.
 All track opacity/colour channels use project time, so coverage and grading can change
 even on held source frames. Appearance-only edits update rendering without reloading
 unchanged timing/music. Source/speed/placement edits pause and reload
@@ -579,10 +578,10 @@ feedback previews IN or the last included frame (OUT − 1) with an overlay hint
 the image; Escape, pointer cancellation, capture loss or window blur restores the
 applied range and prior source frame. Missing snapshots degrade to an explicit
 **Snapshots unavailable** track without starting preparation.
-The round **Play / Pause** button at the left of the source range strip plays only the
-verified muted proxy within the applied range,
-from the current observed frame if it precedes the last included frame, otherwise
-from IN. It stops and seeks exactly OUT − 1, without looping or audio. A one-frame
+The round **Play / Pause** button at the left of the source range strip plays the
+verified proxy, without audio, within the applied range,
+from the current displayed frame if it precedes the last included frame, otherwise
+from IN. It stops on exactly OUT − 1, without looping. A one-frame
 range simply displays that frame. Numeric drafts do not change the played range.
 Scrubbing, trimming, marking and numeric range edits pause first; closing, hiding, switching
 recordings/projects or leaving Source preview cancels pending playback and releases

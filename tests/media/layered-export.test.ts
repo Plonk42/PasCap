@@ -765,8 +765,11 @@ describe.skipIf(!enabled)('schema-15 layered native export · disposable synthet
       expect(sampleTimeline(project, overlap.start + 1, layout)).toHaveLength(count * 2);
       for (const placed of layout.clips.filter((placed) => placed.clip.layerId === 'packed-track')) {
         expect(placed.retiming).toBe(compileRetiming(placed.clip));
-        const rates = Array.from({ length: placed.duration }, (_, offset) => placed.retiming.rateAt(offset));
-        expect(new Set(rates).size).toBeGreaterThan(1);
+        const steps = Array.from(
+          { length: placed.duration },
+          (_, offset) => placed.retiming.sourcePositionAt(offset + 1) - placed.retiming.sourcePositionAt(offset),
+        );
+        expect(new Set(steps.map((step) => step.toFixed(9))).size).toBeGreaterThan(1);
       }
       assertSharedSamples(project);
       const plan = planLayeredExport(project);

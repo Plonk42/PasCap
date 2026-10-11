@@ -1,6 +1,5 @@
 import { useState } from 'react';
-import { MAX_DECODER_SLOTS } from '../preview/assignment.js';
-import { verifyGpuColour, type GpuComparison } from '../preview/compositor.js';
+import { MAX_VIDEO_DECODERS, verifyGpuColour, type GpuComparison } from '../preview/compositor.js';
 import type { PreviewDiagnostics } from '../preview/engine.js';
 import { NEUTRAL_COLOUR, type ColourSettings } from '../shared/colour.js';
 import { milliseconds } from './display.js';
@@ -67,8 +66,8 @@ export function Diagnostics({
       </div>
       <p className="gpu-renderer">{diagnostics?.renderer}</p>
       <p className="control-hint">
-        Two reusable video decoders per track, up to {MAX_DECODER_SLOTS} for concurrent track dissolves; source review
-        adds at most one while visible. No decoder is allocated per stored clip.
+        Two WebCodecs video decoders per track, up to {MAX_VIDEO_DECODERS}: both dissolve sources, or the active and
+        next clip. Source review adds one while visible. No decoder is allocated per stored clip.
       </p>
       <div className="diagnostic-actions">
         <button

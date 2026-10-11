@@ -13,6 +13,11 @@ export async function openOptions(page: Page, label: string): Promise<void> {
   if ((await trigger.getAttribute('aria-expanded')) !== 'true') await trigger.click();
 }
 
+/** The timeline preview's decoder budget: two per video track once there is footage. */
+export async function expectDecoders(page: Page, count: number): Promise<void> {
+  await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().decoderCount)).toBe(count);
+}
+
 /** Media/Clip panel toggles live in Workspace options. */
 export async function panelToggle(page: Page, name: 'Media' | 'Clip'): Promise<Locator> {
   await openOptions(page, 'Workspace options');

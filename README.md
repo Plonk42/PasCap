@@ -33,7 +33,7 @@ deployment targets.
 
 - **Linux**, Node.js **22.12+ or 24 LTS** and npm.
 - Native **FFmpeg and ffprobe**. The tested development toolchain is **FFmpeg 8.0.1** with `libx264`, FFV1, AAC and the required colour/transition filters. Older distribution packages have not been certified.
-- A current desktop browser with **WebGL2** and `requestVideoFrameCallback`. Automated browser tests use Google Chrome.
+- A current desktop browser with **WebCodecs** (H.264 `VideoDecoder`), **WebGL2** and AudioWorklet. Automated browser tests use Google Chrome.
 - Enough disk space for generated proxies and export scratch. Long lossless 4K intermediate files can be large; there is no fixed-GB scratch guarantee.
 
 Video support is deliberately strict: **constant 30000/1001 fps**, landscape/unrotated,

@@ -4,6 +4,7 @@ import { applyCommand } from '../../src/shared/commands.js';
 import { EMPTY_KEY_VALUES } from '../../src/shared/keyframes.js';
 import type { MediaAsset } from '../../src/shared/media.js';
 import { createClip, createLayer, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
+import { sourceRateAt } from '../../src/shared/speed.js';
 import { calculateLayout, sampleTimeline } from '../../src/shared/timeline.js';
 import {
   clipAction,
@@ -255,9 +256,7 @@ async function captureAt(page: Page, frame: number) {
     return {
       state: engine.diagnostics(),
       pixelSum,
-      sourceFrames: Array.from(document.querySelectorAll<HTMLVideoElement>('video[data-pascap-decoder]'), (video) =>
-        Math.floor((video.currentTime * 30000) / 1001 + 1e-7),
-      ),
+      sourceFrames: engine.diagnostics().decodedSourceFrames,
     };
   });
 }
@@ -593,7 +592,7 @@ test('whole-row curves continue across different clips and their dissolve, while
       expect(slot).toBeGreaterThanOrEqual(0);
       expect(captured.sourceFrames[slot]).toBe(sample.sourceFrame);
       const placed = layout.clips.find((item) => item.clip.id === sample.clipId)!;
-      if (sample.clipId === 'first') expect(placed.retiming.rateAt(frame - placed.start)).toBeCloseTo(2);
+      if (sample.clipId === 'first') expect(sourceRateAt(placed.clip.speed, sample.sourcePosition)).toBeCloseTo(2);
     }
   }
   await page

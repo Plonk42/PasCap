@@ -582,7 +582,7 @@ describe('fixed clip durations through trims, splits, duplicates and fixed row k
     expect(split.layers[0]!.colour).toEqual(original.layers[0]!.colour);
     expect(split.clips[1]).not.toHaveProperty('animation');
     expect(split.layers[1]!.keyframes).toEqual(keys);
-    expect(layout.clips[1]!.retiming.rateAt(0)).toBeCloseTo(45 / 11);
+    expect(layout.clips[1]!.duration).toBe(11);
     const sequenceProject = applyCommand(sequence(colourKeys()), {
       type: 'transition',
       transition: { leftId: 'clip-0', rightId: 'clip-1', type: 'cross-dissolve', duration: 10 },

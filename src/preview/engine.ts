@@ -1,7 +1,7 @@
 import { colourSchema, NEUTRAL_COLOUR, type ColourSettings } from '../shared/colour.js';
 import { isNeutralDetail, NEUTRAL_DETAIL } from '../shared/detail.js';
 import { hasLayerKeys } from '../shared/keyframes.js';
-import { projectSchema, type ProjectDocument } from '../shared/model.js';
+import { projectSchema, type ProjectDocument, type VideoClip } from '../shared/model.js';
 import {
   calculateLayout,
   layerClips,
@@ -10,11 +10,10 @@ import {
   type PreviewLayer,
   type TimelineLayout,
 } from '../shared/timeline.js';
-import { framesToSeconds, PROJECT_FPS, sameRate, secondsToFrames } from '../shared/timing.js';
-import { allocateDecoders, decoderPoolSize, type DecoderPoolAssignments } from './assignment.js';
-import { Compositor, type CompositeGroup } from './compositor.js';
-import { VideoDecoderSlot } from './decoder.js';
+import { PROJECT_FPS, sameRate, secondsToFrames } from '../shared/timing.js';
+import { Compositor, MAX_VIDEO_DECODERS, type CompositeGroup } from './compositor.js';
 import { MusicPlayback } from './music.js';
+import { VideoStreams } from './video-streams.js';
 
 export type PreviewStatus = 'empty' | 'loading' | 'paused' | 'playing' | 'seeking' | 'buffering' | 'error' | 'disposed';
 /** Authoritative original metadata, never dimensions inferred from a proxy. */
@@ -31,11 +30,13 @@ export interface PreviewDiagnostics {
   frame: number;
   duration: number;
   requestedFrame: number;
+  /** Source frame in each decoder's texture, -1 when none. */
   decodedSourceFrames: number[];
-  decoderReady: boolean[];
+  /** Decoded frames waiting in each decoder's queue. */
+  queuedFrames: number[];
   previewFps: number;
   renderedFrames: number;
-  observedDecodedFrames: number;
+  decodedFrames: number;
   lastSeekMs: number | null;
   medianSeekMs: number | null;
   seekSamples: number;
@@ -44,8 +45,6 @@ export interface PreviewDiagnostics {
   boundaryStalls: number;
   stallMilliseconds: number;
   droppedDecodedFrames: number;
-  lateDecodedCallbacks: number;
-  maximumClockErrorFrames: number;
   activeDecoders: number;
   decoderCount: number;
   assignedClipIds: (string | null)[];
@@ -56,36 +55,34 @@ export interface PreviewDiagnostics {
   musicDriftFrames: number;
 }
 
+/** Output frames whose source frames are requested ahead of the clock; the decoder budget bounds decoding. */
+const STREAM_WINDOW = 60;
+/** Decoded frames each active source holds before the clock starts. */
+const PREFILL_FRAMES = 3;
+/** A decoder that delivers nothing for this long has failed, not merely fallen behind. */
+const STALL_DEADLINE_MS = 5_000;
+
+/** One timeline video decoder and its compositor texture. */
+interface Lane {
+  readonly index: number;
+  clipId: string | null;
+  streaming: boolean;
+  /** Next local output frame of the clip whose source frame is not yet requested. */
+  requested: number;
+  lastRequested: number;
+  firstRequested: number | null;
+  requestedCount: number;
+  /** A frame of the assigned clip has been presented, so a later wait is mid-clip. */
+  presented: boolean;
+  shown: { mediaId: string; sourceFrame: number } | null;
+  aspect: number;
+}
+
 function median(values: number[]): number | null {
   if (!values.length) return null;
   const sorted = [...values].sort((a, b) => a - b);
   const middle = Math.floor(sorted.length / 2);
   return sorted.length % 2 ? sorted[middle]! : (sorted[middle - 1]! + sorted[middle]!) / 2;
-}
-
-function waitForMedia<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
-  return new Promise((resolve, reject) => {
-    const abort = (): void => reject(new DOMException('Obsolete media operation cancelled.', 'AbortError'));
-    signal.addEventListener('abort', abort, { once: true });
-    void promise.then(
-      (value) => {
-        signal.removeEventListener('abort', abort);
-        resolve(value);
-      },
-      (error: unknown) => {
-        signal.removeEventListener('abort', abort);
-        reject(error);
-      },
-    );
-    if (signal.aborted) {
-      signal.removeEventListener('abort', abort);
-      abort();
-    }
-  });
-}
-
-function sameClips(left: readonly string[], right: readonly string[]): boolean {
-  return left.length === right.length && left.every((id) => right.includes(id));
 }
 
 /** Appearance may change stacking/visibility, but never source clocks or music. */
@@ -120,13 +117,18 @@ function timingKey(project: ProjectDocument): string {
   });
 }
 
-/** Observed source frames and premultiplied layer groups on a bounded decoder pool. */
+/**
+ * Exact decoded source frames composed on one clock. WebCodecs decoders run in
+ * a worker, two per track at most: the active clip and the next one, or both
+ * dissolve sources. A frame is drawn only when every active source has its
+ * exact frame for the clock frame; otherwise the image holds and playback is
+ * buffering until the decoders deliver.
+ */
 export class PreviewEngine {
   #compositor: Compositor;
   readonly #music = new MusicPlayback();
-  readonly #slots: VideoDecoderSlot[] = [];
-  #assignments: DecoderPoolAssignments = [];
-  #nextSlotIndex = 0;
+  readonly #streams: VideoStreams;
+  readonly #lanes: Lane[] = [];
   #proxyUrl: (mediaId: string) => string = () => {
     throw new Error('No media resolver loaded.');
   };
@@ -136,8 +138,6 @@ export class PreviewEngine {
   };
   #layout: TimelineLayout = { clips: [], transitions: [], duration: 0 };
   #controller = new AbortController();
-  #catchUpController: AbortController | null = null;
-  readonly #preloads = new Map<VideoDecoderSlot, { clipId: string; controller: AbortController }>();
   #operationFrame = 0;
   readonly #listeners = new Set<(diagnostics: PreviewDiagnostics) => void>();
   #raf = 0;
@@ -150,13 +150,14 @@ export class PreviewEngine {
   #frame = 0;
   #clockFrame = 0;
   #clockTime = 0;
+  /** Without music, the clock stops at a frame the decoders have not delivered. */
+  #clockHeld = false;
   #lastDrawnFrame = -1;
   #surfaceKey: string | null = null;
   #dirty = true;
   #lastEmit = 0;
-  #publication = 0;
-  #playingClips: string[] = [];
-  readonly #uploadedFrames: number[] = [];
+  #ticking = false;
+  #emitPending = false;
   readonly #seekTimes: number[] = [];
   readonly #renderTimes: number[] = [];
   #renderedFrames = 0;
@@ -166,33 +167,27 @@ export class PreviewEngine {
   #boundaryStalls = 0;
   #stallStart = 0;
   #stallTotal = 0;
-  #mismatchStart = 0;
-  #maxClockError = 0;
 
   constructor(readonly canvas: HTMLCanvasElement) {
     canvas.width = 1280;
     canvas.height = 720;
     try {
+      if (typeof VideoDecoder !== 'function' || typeof VideoFrame !== 'function')
+        throw new Error('Timeline preview requires WebCodecs video decoding. Use a current Chrome or Firefox.');
       this.#compositor = new Compositor(canvas);
     } catch (error) {
       this.#music.dispose();
       throw error;
     }
-    try {
-      this.#resizePool(2);
-    } catch (error) {
-      for (const slot of this.#slots) slot.dispose();
-      this.#music.dispose();
-      this.#compositor.dispose();
-      throw error;
-    }
+    this.#streams = new VideoStreams(MAX_VIDEO_DECODERS);
     canvas.addEventListener('webglcontextlost', this.#onContextLost);
     canvas.addEventListener('webglcontextrestored', this.#onContextRestored);
     this.#raf = requestAnimationFrame(this.#tick);
   }
   subscribe(listener: (diagnostics: PreviewDiagnostics) => void): () => void {
     this.#listeners.add(listener);
-    this.#publish([listener], ++this.#publication);
+    if (this.#playing && !this.#ticking) this.#emitPending = true;
+    else listener(this.diagnostics());
     return () => {
       this.#listeners.delete(listener);
     };
@@ -210,11 +205,11 @@ export class PreviewEngine {
       frame: this.#frame,
       duration: this.#layout.duration,
       requestedFrame: this.#operationFrame,
-      decodedSourceFrames: this.#slots.map((slot) => slot.decodedFrame),
-      decoderReady: this.#slots.map((slot) => slot.ready),
+      decodedSourceFrames: this.#lanes.map((lane) => lane.shown?.sourceFrame ?? -1),
+      queuedFrames: this.#lanes.map((lane) => this.#streams.queued(lane.index)),
       previewFps: this.#playing ? (Math.max(0, recent.length - 1) / interval) * 1000 : 0,
       renderedFrames: this.#renderedFrames,
-      observedDecodedFrames: this.#slots.reduce((sum, slot) => sum + slot.observedFrames, 0),
+      decodedFrames: this.#streams.decodedFrames,
       lastSeekMs: this.#seekTimes.at(-1) ?? null,
       medianSeekMs: median(this.#seekTimes),
       seekSamples: this.#seekTimes.length,
@@ -222,12 +217,10 @@ export class PreviewEngine {
       stalls: this.#stalls,
       boundaryStalls: this.#boundaryStalls,
       stallMilliseconds: this.#stallTotal + (this.#stallStart ? now - this.#stallStart : 0),
-      droppedDecodedFrames: this.#slots.reduce((sum, slot) => sum + slot.droppedFrames, 0),
-      lateDecodedCallbacks: this.#slots.reduce((sum, slot) => sum + slot.lateCallbacks, 0),
-      maximumClockErrorFrames: this.#maxClockError,
-      activeDecoders: this.#playingClips.length,
-      decoderCount: this.#slots.length,
-      assignedClipIds: [...this.#assignments],
+      droppedDecodedFrames: this.#streams.droppedFrames,
+      activeDecoders: this.#lanes.filter((lane) => lane.streaming).length,
+      decoderCount: this.#lanes.length,
+      assignedClipIds: this.#lanes.map((lane) => lane.clipId),
       renderer: this.#compositor.renderer,
       gpuTextureMiB: this.#compositor.gpuTextureMiB,
       jsHeapMiB: memory ? memory.usedJSHeapSize / 1024 ** 2 : null,
@@ -235,255 +228,216 @@ export class PreviewEngine {
       musicDriftFrames: this.#music.errorFrames,
     };
   }
-  #playingEligibility(document: ProjectDocument, layout: TimelineLayout, accepted: number): Set<number> {
-    // Neighbours need the same active clip set, not identical grades or sourceAt
-    // values. Resolve these expensive queries before the final output-clock read.
-    const drawn = sampleTimeline(document, accepted, layout).map((layer) => layer.clipId);
-    return new Set(
-      [accepted - 1, accepted, accepted + 1].filter((candidate) => {
-        if (candidate < 0 || candidate >= layout.duration) return false;
-        if (candidate === accepted) return true;
-        return sameClips(
-          drawn,
-          sampleTimeline(document, candidate, layout).map((layer) => layer.clipId),
-        );
-      }),
-    );
-  }
-  #validatePlayingPublication(): boolean {
-    if (!this.#playing || this.#busy || this.#status !== 'playing' || !this.#document || !this.#music.hasMusic) {
-      return true;
-    }
-    // Upload/draw work can outlive the clock read used to select an image.
-    // Diagnostics and earlier listeners can outlive it too. Reuse the same
-    // source-set/appearance and one-frame test at every dispatch boundary.
-    try {
-      const document = this.#document;
-      const layout = this.#layout;
-      const accepted = this.#frame;
-      const dirty = this.#dirty;
-      const status = this.#status;
-      const busy = this.#busy;
-      const playing = this.#playing;
-      const publication = this.#publication;
-      const current = (): boolean =>
-        !this.#disposed &&
-        this.#document === document &&
-        this.#layout === layout &&
-        this.#frame === accepted &&
-        this.#status === status &&
-        this.#busy === busy &&
-        this.#playing === playing &&
-        this.#publication === publication;
-      const eligible = this.#playingEligibility(document, layout, accepted);
-      if (!current()) return false;
-      const now = performance.now();
-      const frame = this.#expectedFrame(now);
-      if (!current()) return false;
-      // Successful publication does only scalar/membership checks after that
-      // read. An invalidated image may query the failure path, never publish.
-      if (dirty || this.#dirty !== dirty || !eligible.has(frame)) {
-        const required = sampleTimeline(document, frame, layout);
-        if (!current()) return false;
-        // A clock crossing into a genuine empty composition needs no decoded
-        // callback. Draw current black (or finish), never retain ended footage
-        // or call it a video mismatch. Nonempty images keep the one-frame bound.
-        if (!required.length) {
-          this.#advance(performance.now());
-          return false;
-        }
-        this.#operationFrame = frame;
-        if (!this.#mismatchStart) this.#mismatchStart = now;
-        this.#clearSurface();
-        this.#setStatus('buffering', 'Waiting for decoded frames');
-        return false;
-      }
-    } catch (error) {
-      this.#handleError(error);
-      return false;
-    }
-    return true;
-  }
-  #publish(listeners: readonly ((diagnostics: PreviewDiagnostics) => void)[], publication: number): void {
-    const diagnostics = this.diagnostics();
-    if (publication !== this.#publication || !this.#validatePlayingPublication()) return;
-    // One snapshot, one bounded pass. A nested publication supersedes this
-    // entire pass, including when diagnostics construction itself reenters.
-    // Never retry obsolete Playing; black advancement can publish next tick.
-    for (const listener of listeners) {
-      if (publication !== this.#publication) return;
-      if (!this.#validatePlayingPublication() || publication !== this.#publication) return;
-      if (this.#listeners.has(listener)) listener(diagnostics);
-    }
-  }
   #emit(force = false): void {
-    const publication = ++this.#publication;
-    // Keep the post-render surface check even on throttled ticks or with no
-    // subscribers; notification throttling must not retain a stale image.
-    if (!this.#validatePlayingPublication()) return;
+    // While playing, the image is current only right after a tick draws it at the
+    // clock: other changes are published by the next tick, not as a stale snapshot.
+    if (this.#playing && !this.#ticking) {
+      this.#emitPending = true;
+      return;
+    }
     const now = performance.now();
-    if (!force && now - this.#lastEmit < 100) return;
+    if (!force && !this.#emitPending && now - this.#lastEmit < 100) return;
+    this.#emitPending = false;
     this.#lastEmit = now;
-    this.#publish([...this.#listeners], publication);
+    const diagnostics = this.diagnostics();
+    for (const listener of this.#listeners) listener(diagnostics);
   }
   #setStatus(status: PreviewStatus, message: string): void {
     if (this.#status === status && this.#message === message) return;
     this.#status = status;
     this.#message = message;
-    if (status === 'buffering') {
-      if (!this.#stallStart) {
-        this.#stallStart = performance.now();
-        this.#stalls++;
-      }
-    } else if (this.#stallStart) {
-      this.#stallTotal += performance.now() - this.#stallStart;
-      this.#stallStart = 0;
-    }
     this.#emit(true);
   }
-  #cancelPreloads(): void {
-    for (const [slot, preload] of this.#preloads) {
-      preload.controller.abort();
-      slot.pause();
+  #beginStall(boundary: boolean, now: number): void {
+    if (!this.#stallStart) {
+      this.#stallStart = now;
+      this.#stalls++;
+      if (boundary) this.#boundaryStalls++;
     }
-    this.#preloads.clear();
+    this.#setStatus('buffering', boundary ? 'Loading next clip' : 'Waiting for decoded frames');
+  }
+  #endStall(now: number): void {
+    if (!this.#stallStart) return;
+    this.#stallTotal += now - this.#stallStart;
+    this.#stallStart = 0;
+  }
+  #stopStreams(): void {
+    for (const lane of this.#lanes) {
+      if (!lane.streaming) continue;
+      lane.streaming = false;
+      this.#streams.stop(lane.index);
+    }
   }
   #beginOperation(): AbortSignal {
     this.#music.pause();
     this.#controller.abort();
-    this.#catchUpController?.abort();
-    this.#catchUpController = null;
-    this.#cancelPreloads();
     this.#controller = new AbortController();
     this.#busy = true;
-    for (const slot of this.#slots) slot.pause();
-    this.#playingClips = [];
+    this.#stopStreams();
     return this.#controller.signal;
   }
   #isCurrent(signal: AbortSignal): boolean {
     return !this.#disposed && !signal.aborted && signal === this.#controller.signal;
   }
-  #resizePool(count: number, required: readonly string[] = []): void {
-    if (count === this.#slots.length) return;
-    if (required.length > count) throw new Error('Active sources exceed the requested decoder pool.');
-    this.#cancelPreloads();
-    const active = new Set(required);
-    while (this.#slots.length > count) {
-      let index = this.#slots.length - 1;
-      while (index >= 0 && active.has(this.#assignments[index]!)) index--;
-      if (index < 0) throw new Error('Cannot remove a required decoder.');
-      this.#slots.splice(index, 1)[0]!.dispose();
-      this.#assignments.splice(index, 1);
-      this.#uploadedFrames.splice(index, 1);
+
+  /** Two decoders per track, and none without footage or WebGL. */
+  #resizeLanes(): void {
+    const count = this.#document?.clips.length && this.#compositor.available ? 2 * this.#document.layers.length : 0;
+    while (this.#lanes.length > count) {
+      const lane = this.#lanes.pop()!;
+      if (lane.streaming) this.#streams.stop(lane.index);
     }
-    while (this.#slots.length < count) {
-      this.#slots.push(new VideoDecoderSlot(document.body, this.#nextSlotIndex++, this.#onDecodedFrame));
-      this.#assignments.push(null);
-      this.#uploadedFrames.push(-1);
-    }
-    this.#compositor.setDecoderCount(count);
-    this.#uploadedFrames.fill(-1);
-    this.#dirty = true;
+    while (this.#lanes.length < count)
+      this.#lanes.push({
+        index: this.#lanes.length,
+        clipId: null,
+        streaming: false,
+        requested: 0,
+        lastRequested: -1,
+        firstRequested: null,
+        requestedCount: 0,
+        presented: false,
+        shown: null,
+        aspect: 16 / 9,
+      });
+    if (this.#compositor.available) this.#compositor.setDecoderCount(count);
   }
-  #poolSize(): number {
-    return this.#document?.clips.length && this.#compositor.available
-      ? decoderPoolSize(this.#document.layers.length)
-      : 0;
+  #placed(clipId: string): PlacedClip {
+    const placed = this.#layout.clips.find((item) => item.clip.id === clipId);
+    if (!placed) throw new Error('A required clip is missing from the timeline layout.');
+    return placed;
   }
-  #slotIndex(clipId: string): number {
-    const index = this.#assignments.indexOf(clipId);
-    if (index < 0 || !this.#slots[index]) throw new Error('Required clip is not assigned to a decoder.');
-    return index;
+  #laneOf(clipId: string): Lane | undefined {
+    return this.#lanes.find((lane) => lane.clipId === clipId);
   }
-  #slotFor(clipId: string): VideoDecoderSlot {
-    return this.#slots[this.#slotIndex(clipId)]!;
+  #shows(lane: Lane | undefined, layer: PreviewLayer): boolean {
+    return lane?.shown?.mediaId === layer.mediaId && lane.shown.sourceFrame === layer.sourceFrame;
   }
-  #setPlaybackRates(layers: readonly PreviewLayer[], frame: number): void {
-    for (const layer of layers) {
-      const placed = this.#layout.clips.find((item) => item.clip.id === layer.clipId)!;
-      this.#slotFor(layer.clipId).setRate(placed.retiming.rateAt(frame - placed.start));
-    }
+  #release(lane: Lane): void {
+    if (lane.streaming) this.#streams.stop(lane.index);
+    lane.streaming = false;
+    lane.clipId = null;
   }
-  async #prepareLayers(layers: readonly PreviewLayer[], signal: AbortSignal, mediaSignal = signal): Promise<void> {
-    if (!this.#isCurrent(signal)) return;
-    const next = allocateDecoders(
-      this.#assignments,
-      layers.map((layer) => layer.clipId),
+  /** Keep assigned decoders, reuse a free one already showing the first frame, else the lowest free one. */
+  #assignLanes(wanted: readonly { clip: VideoClip; sourceFrame: number }[]): Lane[] {
+    const ids = new Set(wanted.map(({ clip }) => clip.id));
+    for (const lane of this.#lanes) if (lane.clipId !== null && !ids.has(lane.clipId)) this.#release(lane);
+    const lanes = wanted.map(
+      ({ clip, sourceFrame }) =>
+        this.#laneOf(clip.id) ??
+        this.#claim(
+          clip,
+          this.#lanes.find(
+            (lane) =>
+              lane.clipId === null && lane.shown?.mediaId === clip.mediaId && lane.shown.sourceFrame === sourceFrame,
+          ),
+        ),
     );
-    next.forEach((id, index) => {
-      if (id !== this.#assignments[index]) this.#uploadedFrames[index] = -1;
+    return wanted.map(({ clip }, index) => {
+      const lane =
+        lanes[index] ??
+        this.#claim(
+          clip,
+          this.#lanes.find((item) => item.clipId === null),
+        );
+      if (!lane) throw new Error('Active clips exceed the decoder budget of two per track.');
+      return lane;
     });
-    this.#assignments = next;
-    const rate = this.#document!.frameRate;
+  }
+  #claim(clip: VideoClip, lane: Lane | undefined): Lane | undefined {
+    if (lane) {
+      lane.clipId = clip.id;
+      lane.presented = false;
+    }
+    return lane;
+  }
+  /** Request the source frames of the clip's next output frames, without repeats of a held frame. */
+  #requestFrames(lane: Lane, placed: PlacedClip, until: number): number[] {
+    const end = Math.min(until, placed.duration);
+    const frames: number[] = [];
+    for (; lane.requested < end; lane.requested++) {
+      const source = placed.retiming.sourceAt(lane.requested);
+      if (source === lane.lastRequested) continue;
+      frames.push(source);
+      lane.lastRequested = source;
+    }
+    lane.requestedCount += frames.length;
+    return frames;
+  }
+  #startStream(lane: Lane, placed: PlacedClip, local: number): void {
+    lane.streaming = true;
+    lane.requested = local;
+    lane.requestedCount = 0;
+    const first = placed.retiming.sourceAt(local);
+    lane.lastRequested = lane.shown?.mediaId === placed.clip.mediaId && lane.shown.sourceFrame === first ? first : -1;
+    const frames = this.#requestFrames(lane, placed, local + STREAM_WINDOW);
+    lane.firstRequested = frames[0] ?? null;
+    this.#streams.start(lane.index, this.#proxyUrl(placed.clip.mediaId), frames, lane.requested >= placed.duration);
+  }
+  #extendStream(lane: Lane, placed: PlacedClip, local: number): void {
+    if (lane.requested >= placed.duration || lane.requested - local > STREAM_WINDOW / 2) return;
+    const frames = this.#requestFrames(lane, placed, local + STREAM_WINDOW);
+    this.#streams.extend(lane.index, frames, lane.requested >= placed.duration);
+  }
+  /** Keep decoders streaming the active clips and, on tracks with one active clip, the next one. */
+  #schedule(frame: number, layers: readonly PreviewLayer[]): void {
+    const wanted: { placed: PlacedClip; local: number }[] = [];
+    for (const layer of this.#document!.layers) {
+      if (!layer.enabled) continue;
+      const active = layers.filter((item) => item.layerId === layer.id).map((item) => this.#placed(item.clipId));
+      wanted.push(...active.map((placed) => ({ placed, local: frame - placed.start })));
+      const next =
+        active.length < 2 &&
+        this.#layout.clips.find((placed) => placed.clip.layerId === layer.id && placed.start > frame);
+      if (next) wanted.push({ placed: next, local: 0 });
+    }
+    const lanes = this.#assignLanes(
+      wanted.map(({ placed, local }) => ({ clip: placed.clip, sourceFrame: placed.retiming.sourceAt(local) })),
+    );
+    wanted.forEach(({ placed, local }, index) => {
+      const lane = lanes[index]!;
+      if (lane.streaming) this.#extendStream(lane, placed, local);
+      else this.#startStream(lane, placed, local);
+    });
+  }
+  /** Upload the exact decoded frame for `layer`; false while it is not decoded yet. */
+  #present(lane: Lane, layer: PreviewLayer): boolean {
+    const frame = this.#streams.take(lane.index, layer.sourceFrame);
+    if (!frame) return false;
+    try {
+      this.#compositor.uploadFrame(lane.index, frame);
+      lane.aspect = frame.displayWidth / frame.displayHeight;
+    } finally {
+      frame.close();
+    }
+    lane.shown = { mediaId: layer.mediaId, sourceFrame: layer.sourceFrame };
+    lane.presented = true;
+    return true;
+  }
+  /** Decode and draw one exact paused frame, reusing textures that already show it. */
+  async #showFrame(frame: number, signal: AbortSignal): Promise<void> {
+    const layers = sampleTimeline(this.#document!, frame, this.#layout);
+    const lanes = this.#assignLanes(
+      layers.map((layer) => ({ clip: this.#placed(layer.clipId).clip, sourceFrame: layer.sourceFrame })),
+    );
     await Promise.all(
-      layers.map(async (layer) => {
-        const slot = this.#slotFor(layer.clipId);
-        await slot.load(this.#proxyUrl(layer.mediaId), rate, mediaSignal);
-        if (!this.#isCurrent(signal) || this.#assignments[this.#slots.indexOf(slot)] !== layer.clipId) return;
-        await slot.seek(layer.sourceFrame, mediaSignal);
+      layers.map(async (layer, index) => {
+        const lane = lanes[index]!;
+        if (this.#shows(lane, layer)) return;
+        lane.streaming = true;
+        this.#streams.start(lane.index, this.#proxyUrl(layer.mediaId), [layer.sourceFrame], true);
+        await this.#streams.ready(lane.index, layer.sourceFrame, 1, signal);
+        if (!this.#isCurrent(signal)) return;
+        this.#present(lane, layer);
+        lane.streaming = false;
+        this.#streams.stop(lane.index);
       }),
     );
-  }
-  #nextClips(frame: number): PlacedClip[] {
-    return this.#document!.layers.filter((layer) => layer.enabled)
-      .flatMap((layer) => {
-        const next = this.#layout.clips.find((placed) => placed.clip.layerId === layer.id && placed.start > frame);
-        return next ? [next] : [];
-      })
-      .sort((left, right) => left.start - right.start);
-  }
-  #preloadNext(frame: number): void {
-    if (!this.#document || this.#disposed) return;
-    const active = sampleTimeline(this.#document, frame, this.#layout);
-    const reserved = new Set(active.map((layer) => this.#slotIndex(layer.clipId)));
-    const candidates = this.#nextClips(frame);
-    const wanted = new Set(candidates.map((placed) => placed.clip.id));
-    for (const [slot, preload] of this.#preloads) {
-      if (wanted.has(preload.clipId)) continue;
-      preload.controller.abort();
-      slot.pause();
-      this.#preloads.delete(slot);
-    }
-    for (const placed of candidates) {
-      let index = this.#assignments.indexOf(placed.clip.id);
-      if (index < 0) index = this.#assignments.findIndex((id, slot) => id === null && !reserved.has(slot));
-      if (index < 0) index = this.#assignments.findIndex((_id, slot) => !reserved.has(slot));
-      if (index < 0) break;
-      reserved.add(index);
-      this.#startPreload(index, placed);
-    }
-  }
-  #startPreload(index: number, placed: PlacedClip): void {
-    const slot = this.#slots[index]!;
-    const clip = placed.clip;
-    const firstFrame = placed.retiming.sourceAt(0);
-    if (this.#preloads.get(slot)?.clipId === clip.id) return;
-    if (this.#assignments[index] === clip.id && slot.ready && slot.decodedFrame === firstFrame) return;
-    this.#preloads.get(slot)?.controller.abort();
-    slot.pause();
-    const controller = new AbortController();
-    const preload = { clipId: clip.id, controller };
-    this.#preloads.set(slot, preload);
-    this.#assignments[index] = clip.id;
-    this.#uploadedFrames[index] = -1;
-    const rate = this.#document!.frameRate;
-    void (async () => {
-      await slot.load(this.#proxyUrl(clip.mediaId), rate, controller.signal);
-      if (!controller.signal.aborted && this.#preloads.get(slot) === preload)
-        await slot.seek(firstFrame, controller.signal);
-      if (this.#preloads.get(slot) === preload) this.#preloads.delete(slot);
-    })().catch(() => {
-      // Preloading is speculative. A required load/seek reports the real error;
-      // the current recording must remain playable if a future source is absent.
-      if (controller.signal.aborted || this.#preloads.get(slot) !== preload) return;
-      this.#preloads.delete(slot);
-      slot.pause();
-      const currentIndex = this.#slots.indexOf(slot);
-      if (this.#assignments[currentIndex] === clip.id) {
-        this.#assignments[currentIndex] = null;
-        this.#uploadedFrames[currentIndex] = -1;
-      }
-    });
+    if (!this.#isCurrent(signal)) return;
+    // An appearance update during the decode can make other sources visible.
+    if (this.#drawFrame(frame)) return;
+    if (!this.#compositor.available) throw new Error('WebGL context is unavailable.');
+    await this.#showFrame(frame, signal);
   }
 
   /** Detail shader variants compile when a document first needs them, before any draw uses them. */
@@ -519,28 +473,23 @@ export class PreviewEngine {
     this.#frame = Math.max(0, Math.min(Math.round(initialFrame), this.#layout.duration - 1));
     this.#operationFrame = this.#frame;
     this.#lastDrawnFrame = -1;
-    this.#uploadedFrames.fill(-1);
     this.#dirty = true;
     this.#setStatus('loading', 'Loading preview');
     try {
-      this.#resizePool(this.#poolSize());
-      const ids = new Set(snapshot.clips.map((clip) => clip.id));
-      this.#assignments = this.#assignments.map((id) => (id !== null && ids.has(id) ? id : null));
-      this.#clearSurface();
+      this.#resizeLanes();
       await this.#music.configure(snapshot.music, signal);
       if (!this.#isCurrent(signal)) return;
       if (!this.#compositor.available) throw new Error('WebGL context is unavailable.');
       if (!this.#layout.duration) {
+        this.#clearSurface();
         this.#busy = false;
         this.#setStatus('empty', 'Add footage to the timeline');
         return;
       }
-      await this.#prepareLayers(sampleTimeline(snapshot, this.#frame, this.#layout), signal);
+      await this.#showFrame(this.#frame, signal);
       if (!this.#isCurrent(signal)) return;
-      this.#drawFrame(this.#frame);
       this.#busy = false;
       this.#setStatus('paused', 'Paused');
-      this.#preloadNext(this.#frame);
     } catch (error) {
       if (this.#isCurrent(signal)) this.#handleError(error);
     }
@@ -553,31 +502,29 @@ export class PreviewEngine {
     const signal = this.#beginOperation();
     const started = performance.now();
     this.#operationFrame = frame;
-    this.#clearSurface();
     this.#setStatus('seeking', `Seeking frame ${frame}`);
     try {
-      await this.#prepareLayers(sampleTimeline(this.#document, frame, this.#layout), signal);
+      await this.#showFrame(frame, signal);
       if (!this.#isCurrent(signal)) return;
-      this.#frame = frame;
-      this.#drawFrame(frame);
       this.#busy = false;
       this.#seekTimes.push(performance.now() - started);
       if (this.#seekTimes.length > 200) this.#seekTimes.shift();
       this.#setStatus('paused', 'Paused');
-      this.#preloadNext(frame);
     } catch (error) {
       if (this.#isCurrent(signal)) this.#handleError(error);
     }
+  }
+  /** Paused redraws reuse the exact textures, decoding only when a source is not shown yet. */
+  #redrawPaused(): void {
+    if (!this.#playing && !this.#busy && this.#status === 'paused' && !this.#drawFrame(this.#frame))
+      void this.seek(this.#frame);
   }
   /** Editor-only bypass of Colour and clip detail filters: keep source clocks, coverage and saved settings. */
   setUngraded(enabled: boolean): void {
     if (this.#disposed || !this.#document || this.#ungraded === enabled) return;
     this.#ungraded = enabled;
     this.#dirty = true;
-    if (!this.#playing && !this.#busy && this.#status === 'paused' && !this.#drawFrame(this.#frame))
-      this.#clearSurface();
-    // Playback redraws through the normal advance/readiness paths, never using
-    // a possibly stale paused frame. Publication retains its exact A/V checks.
+    this.#redrawPaused();
     this.#emit(true);
   }
   updateColour(layerId: string, settings: ColourSettings): void {
@@ -588,7 +535,7 @@ export class PreviewEngine {
     this.#prepareDetail();
     this.#dirty = true;
     this.#colourRequested = performance.now();
-    if (!this.#playing && !this.#busy && this.#status === 'paused') this.#drawFrame(this.#frame);
+    this.#redrawPaused();
   }
   /** No music configuration or retiming reload for opacity/colour/spatial/stacking edits. */
   updateProjectAppearance(document: ProjectDocument): void {
@@ -598,49 +545,18 @@ export class PreviewEngine {
       throw new Error(
         'Appearance updates must preserve project timing; use loadProject for source, placement, speed, transitions or music changes.',
       );
-    const frame = this.#busy ? this.#operationFrame : this.#frame;
-    const previous = sampleTimeline(this.#document, frame, this.#layout).map((layer) => layer.clipId);
     this.#document = snapshot;
     this.#prepareDetail();
     this.#layout = calculateLayout(snapshot);
-    const required = sampleTimeline(snapshot, frame, this.#layout).map((layer) => layer.clipId);
-    const changed = required.length !== previous.length || required.some((id) => !previous.includes(id));
-    this.#resizePool(this.#poolSize(), required);
+    this.#resizeLanes();
     this.#dirty = true;
     this.#colourRequested = performance.now();
-    if (changed) this.#cancelPreloads();
     if (!this.#layout.duration || !this.#compositor.available) {
       this.#clearSurface();
       return;
     }
-    this.#refreshAppearance(frame, required, changed);
-  }
-  #refreshAppearance(frame: number, required: readonly string[], changed: boolean): void {
-    if (this.#busy && !changed) return;
-    if (this.#busy) {
-      this.#controller.abort();
-      this.#busy = false;
-      if (this.#playing) void this.#alignPlayback(frame, false);
-      else void this.seek(frame);
-      return;
-    }
-    if (this.#playing && required.some((id) => !this.#playingClips.includes(id))) {
-      void this.#alignPlayback(frame, false);
-      return;
-    }
-    if (this.#playing) {
-      const removed = this.#playingClips.filter((id) => !required.includes(id));
-      removed.forEach((id) => this.#slots[this.#assignments.indexOf(id)]?.pause());
-      this.#playingClips = [...required];
-      if (!this.#drawFrame(frame)) this.#clearSurface();
-      this.#preloadNext(frame);
-      return;
-    }
-    if (!this.#drawFrame(frame)) {
-      void this.seek(frame);
-      return;
-    }
-    this.#preloadNext(frame);
+    // Playback schedules newly visible sources on its next frame.
+    this.#redrawPaused();
   }
   async play(): Promise<void> {
     if (!this.#document || !this.#layout.duration || this.#disposed || this.#playing || this.#busy) return;
@@ -656,10 +572,37 @@ export class PreviewEngine {
     try {
       await this.#music.resumeContext(signal);
       if (!this.#isCurrent(signal)) return;
-      this.#busy = false;
       this.#playing = true;
       this.#renderTimes.length = 0;
-      await this.#alignPlayback(this.#frame, false);
+      await this.#startPlayback(this.#frame);
+    } catch (error) {
+      if (this.#isCurrent(signal)) this.#handleError(error);
+    }
+  }
+  /** Prefill every active source, then start the clock (music output or wall clock) at `frame`. */
+  async #startPlayback(frame: number): Promise<void> {
+    const signal = this.#beginOperation();
+    this.#operationFrame = frame;
+    this.#setStatus('buffering', 'Starting playback');
+    try {
+      const layers = sampleTimeline(this.#document!, frame, this.#layout);
+      this.#schedule(frame, layers);
+      await Promise.all(
+        layers.map((layer) => {
+          const lane = this.#laneOf(layer.clipId)!;
+          if (lane.firstRequested === null) return undefined;
+          const count = Math.min(PREFILL_FRAMES, lane.requestedCount);
+          return this.#streams.ready(lane.index, lane.firstRequested, count, signal);
+        }),
+      );
+      if (!this.#isCurrent(signal) || !this.#playing) return;
+      await this.#music.start(frame, signal);
+      if (!this.#isCurrent(signal) || !this.#playing) return;
+      this.#clockFrame = frame;
+      this.#clockTime = performance.now();
+      this.#clockHeld = false;
+      this.#busy = false;
+      this.#advance(performance.now());
     } catch (error) {
       if (this.#isCurrent(signal)) this.#handleError(error);
     }
@@ -668,12 +611,9 @@ export class PreviewEngine {
     this.#music.pause();
     this.#playing = false;
     this.#controller.abort();
-    this.#catchUpController?.abort();
-    this.#catchUpController = null;
-    this.#cancelPreloads();
     this.#busy = false;
-    for (const slot of this.#slots) slot.pause();
-    this.#playingClips = [];
+    this.#stopStreams();
+    this.#endStall(performance.now());
     if (this.#document && this.#status !== 'empty' && this.#status !== 'error') this.#setStatus('paused', 'Paused');
   }
   #clearSurface(): void {
@@ -683,22 +623,7 @@ export class PreviewEngine {
   #drawFrame(frame: number): boolean {
     if (!this.#document || !this.#compositor.available) return false;
     const layers = sampleTimeline(this.#document, frame, this.#layout);
-    if (
-      layers.some((layer) => {
-        if (!this.#assignments.includes(layer.clipId)) return true;
-        const slot = this.#slotFor(layer.clipId);
-        return !slot.ready || slot.decodedFrame !== layer.sourceFrame;
-      })
-    )
-      return false;
-    for (const layer of layers) {
-      const index = this.#slotIndex(layer.clipId);
-      const slot = this.#slots[index]!;
-      if (this.#uploadedFrames[index] !== slot.decodedFrame) {
-        this.#compositor.uploadVideo(index, slot.video);
-        this.#uploadedFrames[index] = slot.decodedFrame;
-      }
-    }
+    if (layers.some((layer) => !this.#shows(this.#laneOf(layer.clipId), layer))) return false;
     const groups: CompositeGroup[] = [];
     for (const group of this.#document.layers) {
       const members = layers.filter((layer) => layer.layerId === group.id);
@@ -714,10 +639,11 @@ export class PreviewEngine {
             dimensions.height <= 0
           )
             throw new Error('Original media dimensions must be positive integers.');
+          const lane = this.#laneOf(layer.clipId)!;
           return {
-            slot: this.#slotIndex(layer.clipId),
+            slot: lane.index,
             settings: this.#ungraded ? NEUTRAL_COLOUR : layer.colour,
-            aspect: this.#slotFor(layer.clipId).aspect,
+            aspect: lane.aspect,
             spatial: layer.spatial,
             detail: this.#ungraded ? NEUTRAL_DETAIL : layer.detail,
             originalWidth: dimensions.width,
@@ -746,9 +672,8 @@ export class PreviewEngine {
   }
   #renderSurface(frame: number, layers: readonly PreviewLayer[], groups: readonly CompositeGroup[]): void {
     // A held source with identical evaluated appearance is the same image,
-    // even at a later project frame. Avoid queuing redundant expensive grades;
-    // readiness and the final real-output-clock publication checks still run.
-    // Include every composed value and source identity, not inverse source time.
+    // even at a later project frame: skip the redundant grade. Include every
+    // composed value and source identity, not inverse source time.
     const surfaceKey = JSON.stringify({
       width: this.canvas.width,
       height: this.canvas.height,
@@ -769,94 +694,19 @@ export class PreviewEngine {
       this.#lastDrawnFrame = frame;
     }
   }
-  async #alignPlayback(frame: number, boundary: boolean): Promise<void> {
-    if (this.#busy || !this.#document || !this.#playing) return;
-    const signal = this.#beginOperation();
-    this.#operationFrame = frame;
-    this.#clearSurface();
-    this.#setStatus('buffering', boundary ? 'Loading next clip' : 'Waiting for decoded frames');
-    if (boundary) this.#boundaryStalls++;
-    try {
-      let layers = sampleTimeline(this.#document, frame, this.#layout);
-      await this.#prepareLayers(layers, signal);
-      if (!this.#isCurrent(signal) || !this.#playing) return;
-      layers = sampleTimeline(this.#document, frame, this.#layout);
-      this.#drawFrame(frame);
-      this.#playingClips = layers.map((layer) => layer.clipId);
-      this.#setPlaybackRates(layers, frame);
-      await this.#music.start(frame, signal);
-      if (!this.#isCurrent(signal) || !this.#playing) return;
-      await Promise.all(this.#playingClips.map((id) => this.#slotFor(id).play()));
-      if (!this.#isCurrent(signal) || !this.#playing) return;
-      this.#clockFrame = frame;
-      this.#clockTime = performance.now();
-      this.#mismatchStart = 0;
-      // Promise completion is not an accepted A/V frame. Re-evaluate the current
-      // sample clock and decoded image before publishing the first Playing state.
-      this.#busy = false;
-      this.#advance(performance.now());
-      this.#preloadNext(frame);
-    } catch (error) {
-      if (this.#isCurrent(signal)) this.#handleError(error);
-    }
-  }
   readonly #tick = (now: number): void => {
     if (this.#disposed) return;
     this.#raf = requestAnimationFrame(this.#tick);
-    if (!this.#playing || !this.#document) {
-      this.#emit();
-      return;
-    }
+    this.#ticking = true;
     try {
-      if (this.#busy && this.#catchUpController) {
-        const frame = this.#expectedFrame(now);
-        if (
-          frame >= this.#layout.duration ||
-          (!sampleTimeline(this.#document, frame, this.#layout).length && this.#music.sync())
-        ) {
-          // Cancel only the now-unneeded video seek, not healthy music's epoch.
-          // Its late callback cannot turn a black conclusion back into footage.
-          this.#catchUpController.abort();
-          this.#catchUpController = null;
-          this.#busy = false;
-        }
-      }
-      if (this.#busy) {
-        this.#emit();
-        return;
-      }
-      this.#advance(now);
+      if (this.#playing && this.#document && !this.#busy) this.#advance(now);
     } catch (error) {
       this.#handleError(error);
+    } finally {
+      this.#emit();
+      this.#ticking = false;
     }
-    this.#emit();
   };
-  #acceptFrame(frame: number, publish = true): boolean {
-    if (!this.#drawFrame(frame)) return false;
-    this.#mismatchStart = 0;
-    if (publish && this.#status === 'buffering') this.#setStatus('playing', 'Playing');
-    return true;
-  }
-
-  #acceptNeighbour(expected: number, required: readonly string[], publish = true): boolean {
-    // A floored source map is many-to-one during slow motion. Its inverse is
-    // not the nearest displayed project frame. Test the actual one-frame
-    // neighbours against every source and its project-time grade instead.
-    for (const candidate of [expected - 1, expected + 1]) {
-      if (candidate < 0 || candidate >= this.#layout.duration) continue;
-      const layers = sampleTimeline(this.#document!, candidate, this.#layout);
-      if (layers.length !== required.length || layers.some((layer) => !required.includes(layer.clipId))) continue;
-      if (this.#acceptFrame(candidate, publish)) return true;
-    }
-    return false;
-  }
-
-  #canRetainFrame(expected: number, required: readonly string[]): boolean {
-    if (this.#status !== 'playing' || this.#dirty || Math.abs(this.#frame - expected) > 1) return false;
-    const drawn = sampleTimeline(this.#document!, this.#frame, this.#layout);
-    return drawn.length === required.length && drawn.every((layer) => required.includes(layer.clipId));
-  }
-
   #expectedFrame(now: number): number {
     // rAF may precede a clock anchor established in this display cycle.
     const elapsed = Math.max(0, now - this.#clockTime);
@@ -864,210 +714,64 @@ export class PreviewEngine {
       ? this.#music.projectFrame()
       : this.#clockFrame + secondsToFrames(elapsed / 1000, this.#document!.frameRate, 'floor');
   }
-
-  readonly #onDecodedFrame = (): void => {
-    if (this.#disposed || this.#busy || !this.#document) return;
-    try {
-      if (!this.#playing) {
-        // A paused appearance redraw can wait for a real decoded callback;
-        // toggling the grade must not initiate a load or seek to obtain it.
-        if (this.#status === 'paused' && this.#dirty && this.#drawFrame(this.#frame)) this.#emit(true);
-        return;
-      }
-      if (this.#status !== 'buffering') return;
-      // A real rVFC can resolve a mismatch between display ticks. Accept it
-      // against the CURRENT clock, not the earlier tick's requested frame, so
-      // a later mismatch cannot inherit an already-resolved grace period.
-      const expected = this.#expectedFrame(performance.now());
-      if (expected >= this.#layout.duration || !this.#music.sync()) return;
-      const required = sampleTimeline(this.#document, expected, this.#layout).map((layer) => layer.clipId);
-      if (required.length !== this.#playingClips.length || required.some((id) => !this.#playingClips.includes(id)))
-        return;
-      this.#operationFrame = expected;
-      if (this.#acceptFrame(expected) || this.#acceptNeighbour(expected, required)) this.#emit();
-    } catch (error) {
-      this.#handleError(error);
-    }
-  };
-
-  async #catchUpVideo(): Promise<void> {
-    if (this.#busy || !this.#playing || !this.#document) return;
-    // Keep the current music epoch and its owning signal. Replacing/aborting
-    // that signal would cancel healthy audio merely because video is late.
-    const signal = this.#controller.signal;
-    const timeout = AbortSignal.timeout(5_000);
-    const controller = new AbortController();
-    this.#catchUpController = controller;
-    const mediaSignal = AbortSignal.any([signal, timeout, controller.signal]);
-    this.#busy = true;
-    for (const id of this.#playingClips) this.#slotFor(id).pause();
-    try {
-      await this.#catchUpVideoLoop(signal, mediaSignal);
-    } catch (error) {
-      if (this.#isCurrent(signal) && !controller.signal.aborted)
-        this.#handleError(
-          timeout.aborted
-            ? new Error('Video catch-up did not deliver the current audio frame within 5 seconds.')
-            : error,
-        );
-    } finally {
-      if (this.#catchUpController === controller) this.#catchUpController = null;
-    }
-  }
-
-  async #catchUpVideoLoop(signal: AbortSignal, mediaSignal: AbortSignal): Promise<void> {
-    while (this.#isCurrent(signal) && this.#playing) {
-      mediaSignal.throwIfAborted();
-      const frame = this.#expectedFrame(performance.now());
-      if (frame >= this.#layout.duration) {
-        this.pause();
-        void this.seek(this.#layout.duration - 1);
-        return;
-      }
-      const layers = sampleTimeline(this.#document!, frame, this.#layout);
-      if (await this.#leaveVideoCatchUp(frame, layers)) return;
-      this.#operationFrame = frame;
-      await this.#prepareLayers(layers, signal, mediaSignal);
-      if (!this.#isCurrent(signal) || !this.#playing) return;
-      mediaSignal.throwIfAborted();
-      const current = this.#acceptCurrentVideo();
-      if (current === null) continue;
-      if (await this.#restartCaughtUpVideo(current, signal, mediaSignal)) return;
-    }
-  }
-
-  async #restartCaughtUpVideo(frame: number, signal: AbortSignal, mediaSignal: AbortSignal): Promise<boolean> {
-    this.#setPlaybackRates(sampleTimeline(this.#document!, frame, this.#layout), frame);
-    await waitForMedia(Promise.all(this.#playingClips.map((id) => this.#slotFor(id).play())), mediaSignal);
-    if (!this.#isCurrent(signal) || !this.#playing) return true;
-    mediaSignal.throwIfAborted();
-    const presented = this.#acceptCurrentVideo();
-    if (presented === null) {
-      for (const id of this.#playingClips) this.#slotFor(id).pause();
-      return false;
-    }
-    this.#busy = false;
-    this.#setStatus('playing', 'Playing');
-    this.#preloadNext(presented);
-    return true;
-  }
-
-  async #leaveVideoCatchUp(frame: number, layers: readonly PreviewLayer[]): Promise<boolean> {
-    const changed = !sameClips(
-      layers.map((layer) => layer.clipId),
-      this.#playingClips,
-    );
-    const synchronized = this.#music.sync();
-    if (synchronized && !layers.length) {
-      this.#busy = false;
-      this.#advance(performance.now());
-      return true;
-    }
-    if (synchronized && !changed) return false;
-    this.#busy = false;
-    await this.#alignPlayback(frame, changed);
-    return true;
-  }
-
-  #acceptCurrentVideo(): number | null {
-    // Seeking and play() are asynchronous; each boundary needs its own check
-    // against the advancing audio clock, with the same active clip set.
-    const frame = this.#expectedFrame(performance.now());
-    if (frame >= this.#layout.duration || !this.#music.sync()) return null;
-    const layers = sampleTimeline(this.#document!, frame, this.#layout);
-    const ids = layers.map((layer) => layer.clipId);
-    if (!sameClips(ids, this.#playingClips)) return null;
-    this.#operationFrame = frame;
-    return this.#acceptFrame(frame, false) || this.#acceptNeighbour(frame, ids, false) ? frame : null;
-  }
-
   #advance(now: number): void {
-    if (!this.#document) return;
-    const expected = this.#expectedFrame(now);
-    this.#operationFrame = expected;
-    if (expected >= this.#layout.duration) {
+    const document = this.#document!;
+    const frame = this.#clockHeld ? this.#clockFrame : this.#expectedFrame(now);
+    this.#operationFrame = frame;
+    if (frame >= this.#layout.duration) {
       this.pause();
       void this.seek(this.#layout.duration - 1);
       return;
     }
-    const layers = sampleTimeline(this.#document, expected, this.#layout);
     if (!this.#music.sync()) {
-      void this.#alignPlayback(expected, false);
+      // Music cannot follow video: restart both at the current frame.
+      this.#beginStall(false, now);
+      void this.#startPlayback(frame);
       return;
     }
-    const required = layers.map((layer) => layer.clipId);
-    if (!this.#handOver(layers, expected)) {
-      void this.#alignPlayback(expected, true);
-      return;
-    }
-    const removed = this.#playingClips.filter((id) => !required.includes(id));
-    removed.forEach((id) => this.#slotFor(id).pause());
-    this.#playingClips = required;
-    if (removed.length) this.#preloadNext(expected);
-    this.#setPlaybackRates(layers, expected);
-    if (this.#acceptFrame(expected)) return;
-    if (this.#acceptNeighbour(expected, required)) return;
-    // The already uploaded, accepted image remains within the same one-frame
-    // tolerance even if the next decoded callback cannot upload yet. Do not
-    // replace it with black or restart audio for that normal delivery latency.
-    if (this.#canRetainFrame(expected, required)) {
-      this.#mismatchStart = 0;
-      return;
-    }
-    // Empty project-frame gaps and disabled-track tails are valid black frames.
-    // Any active source can diagnose a clock mismatch; stack order grants no role.
-    const observed = layers[0];
-    if (!observed) return;
-    const placed = this.#layout.clips.find((item) => item.clip.id === observed.clipId)!;
-    const actual = placed.start + placed.retiming.outputAt(this.#slotFor(observed.clipId).decodedFrame);
-    const error = Math.abs(actual - expected);
-    if (actual >= 0) this.#maxClockError = Math.max(this.#maxClockError, error);
-    this.#clearSurface();
-    this.#setStatus('buffering', 'Waiting for decoded frames');
-    if (!this.#mismatchStart) this.#mismatchStart = now;
-    if (now - this.#mismatchStart > framesToSeconds(1, this.#document.frameRate) * 1000) {
-      if (this.#music.hasMusic) void this.#catchUpVideo();
-      else void this.#alignPlayback(expected, false);
-    }
-  }
-  /** Start preloaded entering clips in place; false when any needs a seek. */
-  #handOver(layers: readonly PreviewLayer[], expected: number): boolean {
-    const entering = layers.filter((layer) => !this.#playingClips.includes(layer.clipId));
-    if (!entering.length) return true;
-    const ready = entering.every((layer) => {
-      const index = this.#assignments.indexOf(layer.clipId);
-      const slot = this.#slots[index];
-      if (!slot?.ready || this.#preloads.has(slot)) return false;
-      const placed = this.#layout.clips.find((item) => item.clip.id === layer.clipId)!;
-      return [expected - 1, expected, expected + 1].some(
-        (frame) =>
-          frame >= placed.start &&
-          frame < placed.start + placed.retiming.duration &&
-          placed.retiming.sourceAt(frame - placed.start) === slot.decodedFrame,
+    const layers = sampleTimeline(document, frame, this.#layout);
+    this.#schedule(frame, layers);
+    const waiting = layers
+      .map((layer) => ({ layer, lane: this.#laneOf(layer.clipId)! }))
+      .filter(({ layer, lane }) => !this.#shows(lane, layer) && !this.#present(lane, layer));
+    if (waiting.length) {
+      // Music cannot wait for video; the wall clock can.
+      if (!this.#music.hasMusic) {
+        this.#clockFrame = frame;
+        this.#clockHeld = true;
+      }
+      this.#beginStall(
+        waiting.some(({ lane }) => !lane.presented),
+        now,
       );
-    });
-    if (!ready) return false;
-    for (const layer of entering) {
-      const slot = this.#slotFor(layer.clipId);
-      const placed = this.#layout.clips.find((item) => item.clip.id === layer.clipId)!;
-      slot.setRate(placed.retiming.rateAt(expected - placed.start));
-      this.#playingClips.push(layer.clipId);
-      void slot.play().catch((error: unknown) => {
-        if (this.#playing && this.#playingClips.includes(layer.clipId)) this.#handleError(error);
-      });
+      if (now - this.#stallStart > STALL_DEADLINE_MS) {
+        const { lane, layer } = waiting[0]!;
+        throw new Error(
+          `Video decoder ${lane.index + 1} did not deliver source frame ${layer.sourceFrame} within 5 seconds.`,
+        );
+      }
+      return;
     }
-    return true;
+    if (this.#clockHeld) {
+      this.#clockTime = now;
+      this.#clockHeld = false;
+    }
+    this.#drawFrame(frame);
+    this.#endStall(now);
+    // A draw can outlast a frame on a slow renderer: Playing promises an image
+    // within one frame of the clock, so a late image is reported as catching up.
+    if (this.#expectedFrame(performance.now()) > frame + 1) this.#setStatus('buffering', 'Catching up with the clock');
+    else this.#setStatus('playing', 'Playing');
   }
   #handleError(error: unknown): void {
     if (error instanceof DOMException && error.name === 'AbortError') return;
     if (this.#disposed) return;
     this.#controller.abort();
-    this.#cancelPreloads();
     this.#playing = false;
     this.#busy = false;
     this.#music.pause();
-    for (const slot of this.#slots) slot.pause();
-    this.#playingClips = [];
+    this.#stopStreams();
+    this.#endStall(performance.now());
     this.#clearSurface();
     this.#setStatus('error', error instanceof Error ? error.message : 'Preview failed.');
   }
@@ -1081,8 +785,8 @@ export class PreviewEngine {
   readonly #onContextLost = (event: Event): void => {
     event.preventDefault();
     this.pause();
-    this.#resizePool(0);
     this.#compositor.dispose();
+    this.#resizeLanes();
     this.#setStatus('error', 'WebGL context lost. Playback stopped.');
   };
   readonly #onContextRestored = (): void => {
@@ -1090,9 +794,8 @@ export class PreviewEngine {
     try {
       this.#compositor.dispose();
       this.#compositor = new Compositor(this.canvas);
-      this.#compositor.setDecoderCount(this.#poolSize());
-      this.#resizePool(this.#poolSize());
-      this.#uploadedFrames.fill(-1);
+      this.#prepareDetail();
+      this.#resizeLanes();
       this.#dirty = true;
       if (this.#layout.duration) void this.seek(this.#frame);
       else this.#setStatus('empty', 'Add footage to the timeline');
@@ -1108,9 +811,10 @@ export class PreviewEngine {
     cancelAnimationFrame(this.#raf);
     this.canvas.removeEventListener('webglcontextlost', this.#onContextLost);
     this.canvas.removeEventListener('webglcontextrestored', this.#onContextRestored);
-    this.#resizePool(0);
-    this.#music.dispose();
     this.#compositor.dispose();
+    this.#resizeLanes();
+    this.#streams.dispose();
+    this.#music.dispose();
     this.#status = 'disposed';
     this.#listeners.clear();
   }

@@ -178,7 +178,7 @@ test('docked source pinning preserves list geometry, preview position and non-de
   await hoverSource(page, 'pattern-b.mp4', 0.5);
   await expect(page.locator('.source-preview')).toHaveAttribute('data-source-frame', '60');
   await expect(page.locator('.source-range-editor')).toHaveCount(1);
-  await expect(page.locator('video[data-source-decoder]')).toHaveCount(1);
+  await expect(page.locator('canvas[data-source-decoder]')).toHaveCount(1);
   await page.getByRole('button', { name: 'Review source frame of pattern-b.mp4', exact: true }).press('i');
   expect(await page.evaluate(() => window.pascapLab!.project()!.clips[1]!.sourceIn)).toBe(15);
   await page.getByRole('tab', { name: 'Source preview', exact: true }).focus();
@@ -188,7 +188,7 @@ test('docked source pinning preserves list geometry, preview position and non-de
   await page.keyboard.press('ArrowRight');
   await expect(page.getByRole('tab', { name: 'Source preview', exact: true })).toBeFocused();
   await page.getByRole('button', { name: 'Close source review' }).click();
-  await expect(page.locator('video[data-source-decoder]')).toHaveCount(0);
+  await expect(page.locator('canvas[data-source-decoder]')).toHaveCount(0);
 });
 
 test('help/modal keyboard context preserves clips and timecode supports exact frame navigation', async ({ page }) => {

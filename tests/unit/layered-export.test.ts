@@ -407,7 +407,7 @@ describe('bounded retiming maps and native pipe ownership without FFmpeg', () =>
           ...request,
           retiming: { ...baseline, sourcePositionAt } as unknown as Retiming,
         }),
-      ).rejects.toThrow('sourceAt, sourcePositionAt, outputAt and rateAt');
+      ).rejects.toThrow('sourceAt, sourcePositionAt and outputAt');
     }
     await expect(retimeRawVideo({ ...request, retiming: partial as Retiming })).rejects.toThrow('sourcePositionAt');
     for (const invalid of [NaN, Infinity, -Infinity, 6, 20]) {
@@ -453,7 +453,6 @@ describe('bounded retiming maps and native pipe ownership without FFmpeg', () =>
       sourceAt: (output) => 7 + output,
       sourcePositionAt: (output) => (output >= 4 ? 19 : positions[output]!),
       outputAt: () => 0,
-      rateAt: () => 1,
     };
     await expect(
       retimeRawVideo({
@@ -506,7 +505,6 @@ describe('bounded retiming maps and native pipe ownership without FFmpeg', () =>
         return output >= this.duration ? 19 : this.sourceIn + output / 2;
       },
       outputAt: () => 0,
-      rateAt: () => 1,
     };
     const report = await retimeRawVideo({
       ffmpeg: process.execPath,
@@ -540,7 +538,7 @@ describe('bounded retiming maps and native pipe ownership without FFmpeg', () =>
       ];
       clip.speed = { mode: 'curve', keyframes };
       const map = compileRetiming(clip);
-      const startingRate = map.rateAt(0);
+      const startingPosition = map.sourcePositionAt(1);
       const expected = Array.from({ length: map.duration }, (_, output) => map.sourceAt(output));
       const destination = path.join(directory, 'mapped.rgb');
       const decode =
@@ -583,7 +581,7 @@ describe('bounded retiming maps and native pipe ownership without FFmpeg', () =>
         ),
       ).toBe(true);
       expect(mutated).toBe(true);
-      expect(map.rateAt(0)).toBeCloseTo(startingRate);
+      expect(map.sourcePositionAt(1)).toBe(startingPosition);
       expect(Array.from({ length: map.duration }, (_, output) => map.sourceAt(output))).toEqual(expected);
     });
   }
