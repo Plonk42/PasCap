@@ -43,6 +43,18 @@ export function Diagnostics({
           <span>buffer events</span>
         </div>
         <div>
+          <strong>{diagnostics?.boundaryStalls ?? 0}</strong>
+          <span>at clip boundaries</span>
+        </div>
+        <div>
+          <strong>{diagnostics ? diagnostics.stalls - diagnostics.boundaryStalls : 0}</strong>
+          <span>mid-clip</span>
+        </div>
+        <div>
+          <strong>{milliseconds(diagnostics?.stallMilliseconds ?? 0)}</strong>
+          <span>total stall time</span>
+        </div>
+        <div>
           <strong>{diagnostics?.droppedDecodedFrames ?? 0}</strong>
           <span>dropped frames</span>
         </div>

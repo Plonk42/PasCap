@@ -467,7 +467,12 @@ exact neutral poses retain the old opaque black letterboxing after grading.
 A nonempty one-video-track project uses **two reusable video elements/textures**; eight
 tracks use **16**, two slots per track, never one per stored clip.
 A required clip retains its decoder; only inactive slots may be reassigned.
-Next sources per enabled video track are speculatively preloaded in free slots. Source
+Next sources per enabled video track are speculatively preloaded in free slots. During
+playback, a clip that enters (cut, dissolve or another track) starts in place from its
+preloaded slot when that slot already shows a source frame within one project frame of the
+clock; music and the other decoders keep running. Otherwise the boundary buffers, seeks
+every active source and restarts music (**Diagnostics** counts these as stalls at clip
+boundaries, separately from mid-clip stalls, with the total stall time). Source
 review uses one separate muted/paused decoder, not another timeline slot.
 
 Resource changes invalidate uploaded texture identity and require a newly observed
