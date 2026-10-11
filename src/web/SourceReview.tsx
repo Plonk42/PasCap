@@ -11,7 +11,7 @@ import {
   type ReactNode,
   type Ref,
 } from 'react';
-import { VideoDecoderSlot } from '../preview/decoder.js';
+import { VideoStreams } from '../preview/video-streams.js';
 import {
   markMediaSelection,
   moveMediaSelectionEdge,
@@ -153,35 +153,39 @@ export function SourceReview({
 
   useLayoutEffect(() => {
     if (!visible || !host.current) return;
-    if (!HTMLVideoElement.prototype.requestVideoFrameCallback) {
-      setDecoderError('Source review requires requestVideoFrameCallback in a current browser.');
+    if (typeof VideoDecoder !== 'function') {
+      setDecoderError('Source review requires WebCodecs video decoding in a current browser.');
       return;
     }
-    let owner: SourceTransport | null = null;
-    const decoder = new VideoDecoderSlot(host.current, 2, () => owner?.observed());
-    // This is the visible source viewer, not another project-preview slot.
-    delete decoder.video.dataset['pascapDecoder'];
-    decoder.video.dataset['sourceDecoder'] = 'true';
-    decoder.video.style.cssText = '';
-    decoder.video.preload = 'metadata';
-    decoder.video.defaultMuted = true;
-    decoder.video.muted = true;
-    decoder.video.volume = 0;
-    decoder.video.disableRemotePlayback = true;
     setDecoderError('');
     if (!mediaReady(asset) || asset.prepared?.verification.frameCount !== asset.metadata.frameCount) {
       setDecoderError('Prepare a complete, verified recording proxy before reviewing it.');
-      return () => decoder.dispose();
+      return;
     }
-    owner = new SourceTransport(
-      decoder,
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    if (!context) {
+      setDecoderError('Source review cannot draw decoded frames in this browser.');
+      return;
+    }
+    canvas.dataset['sourceDecoder'] = 'true';
+    host.current.append(canvas);
+    const draw = (frame: VideoFrame): void => {
+      if (canvas.width !== frame.displayWidth || canvas.height !== frame.displayHeight) {
+        canvas.width = frame.displayWidth;
+        canvas.height = frame.displayHeight;
+      }
+      context.drawImage(frame, 0, 0, canvas.width, canvas.height);
+    };
+    const owner = new SourceTransport(
+      new VideoStreams(1),
+      draw,
       rate,
       asset.metadata.frameCount,
       latest.current.range,
       latest.current.frame,
       (state) => {
-        // Hide an obsolete/overshot image before the next paint, including while
-        // the exact final included frame is being reacquired after playback.
+        // Hide an obsolete image before the next paint while an exact frame is decoded.
         if (host.current) host.current.style.opacity = state.frame === null ? '0' : '1';
         setObservation({ key: resourceKey, state });
         if (state.frame !== null) latest.current.onFrame(state.frame);
@@ -190,9 +194,10 @@ export function SourceReview({
     transport.current = owner;
     setObservation({ key: resourceKey, state: owner.state });
     // Registered, identity-guarded proxy only. Never play an original or prepare implicitly.
-    void owner.load(`/api/media/${encodeURIComponent(asset.id)}/proxy`);
+    owner.load(`/api/media/${encodeURIComponent(asset.id)}/proxy`);
     return () => {
-      owner?.dispose();
+      owner.dispose();
+      canvas.remove();
       if (transport.current === owner) transport.current = null;
     };
   }, [resourceKey, visible]);
@@ -372,7 +377,7 @@ export function SourceReview({
               rangeDraft ||
               !visible ||
               disabled ||
-              (!playing && (observedFrame === null || !!error || currentObservation?.pendingPlay))
+              (!playing && (observedFrame === null || !!error))
             }
             onKeyDown={keyboard}
             onClick={() => {

@@ -15,8 +15,8 @@ import {
   type DetailSettings,
 } from '../shared/detail.js';
 import { compileSpatialMapping, NEUTRAL_SPATIAL_POSE, type SpatialPose } from '../shared/spatial.js';
+import { MAX_VIDEO_LAYERS } from '../shared/model.js';
 import type { PreviewLayer } from '../shared/timeline.js';
-import { MAX_DECODER_SLOTS } from './assignment.js';
 import {
   detailFragmentShader,
   fragmentShader,
@@ -28,6 +28,8 @@ import {
 } from './shaders.js';
 
 const DETAIL_UNIFORMS = ['detail0', 'detail1', 'detailStep0', 'detailStep1', 'hdr'];
+/** Two timeline video decoders per track: both dissolve sources, or the active and next clip. */
+export const MAX_VIDEO_DECODERS = 2 * MAX_VIDEO_LAYERS;
 
 type GradePath = 'full' | 'single' | 'scalar';
 
@@ -185,9 +187,9 @@ export class Compositor {
   get gpuTextureMiB(): number {
     return this.available ? this.#sizes.reduce((sum, [width, height]) => sum + width * height * 4, 0) / 1024 ** 2 : 0;
   }
-  /** One cached texture per reusable decoder, not per timeline clip. */
+  /** One cached texture per timeline video decoder, not per clip. */
   setDecoderCount(count: number): void {
-    if (this.#disposed || !Number.isInteger(count) || count < 0 || count > MAX_DECODER_SLOTS)
+    if (this.#disposed || !Number.isInteger(count) || count < 0 || count > MAX_VIDEO_DECODERS)
       throw new Error('Invalid compositor decoder count.');
     while (this.#textures.length > count) {
       this.gl.deleteTexture(this.#textures.pop()!);
@@ -274,16 +276,14 @@ export class Compositor {
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 255]));
     return texture;
   }
-  uploadVideo(slot: number, video: HTMLVideoElement): void {
-    if (this.#disposed || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA || video.seeking)
-      throw new Error('A decoded frame is not available for upload.');
+  uploadFrame(slot: number, frame: VideoFrame): void {
     const gl = this.gl;
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, this.#texture(slot));
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
     gl.pixelStorei(gl.UNPACK_COLORSPACE_CONVERSION_WEBGL, gl.BROWSER_DEFAULT_WEBGL);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, video);
-    this.#sizes[slot] = [video.videoWidth, video.videoHeight];
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, frame);
+    this.#sizes[slot] = [frame.displayWidth, frame.displayHeight];
   }
   uploadPixels(slot: 0 | 1, pixels: Uint8Array, width: number, height: number): void {
     const gl = this.gl;

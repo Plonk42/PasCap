@@ -475,14 +475,6 @@ export async function observeMusicPlayback(page: Page): Promise<void> {
         state,
         receipt: evidence.receipt,
         output: evidence.context?.getOutputTimestamp(),
-        videos: Array.from(document.querySelectorAll<HTMLVideoElement>('video[data-pascap-decoder]'), (video) => ({
-          slot: video.dataset['pascapDecoder'],
-          currentTime: video.currentTime,
-          rate: video.playbackRate,
-          paused: video.paused,
-          seeking: video.seeking,
-          ready: video.readyState,
-        })),
       });
     };
     window.pascapLab!.engine.subscribe(() => capture('state'));
