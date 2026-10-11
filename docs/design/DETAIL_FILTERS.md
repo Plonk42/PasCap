@@ -152,7 +152,8 @@ export ([service side](../../src/server/gpu-compositor.ts),
 compositor, which remains the parity reference.
 
 - **Launch**: `PASCAP_CHROME` or `google-chrome`/`chromium` from PATH, `--headless=new`,
-  a temporary profile and no DevTools port, trying ANGLE `gl` then `vulkan` with the GPU
+  a temporary profile and no DevTools port, trying ANGLE `vulkan` (which selects a
+  discrete GPU when present) then `gl` (the display's, often integrated, GPU) with the GPU
   blocklist ignored. The page reports its renderer; software renderers (SwiftShader,
   llvmpipe, lavapipe) are rejected because they are no faster than the CPU pool. A
   missing browser, rejected renderer, 30-second startup timeout or any later failure
@@ -165,7 +166,8 @@ compositor, which remains the parity reference.
   black into a 16-bit render target (`EXT_texture_norm16`, else RGBA32F) and posts the
   premultiplied RGBA16 result, which the service streams straight into the existing
   accumulator. Node gains no frame buffer; cancellation and failure stop the browser
-  and delete its profile.
+  and delete its profile. Profiles name the owning service process, so the next export
+  removes those left by a service that was killed (for example a `tsx watch` restart).
 - **Budget**: one browser process (with its own GPU/renderer helpers) per export, two
   source textures, one target-size render target and readback array in the page.
 - **Parity**: the shaders meet the GPU gates above against the CPU kernel; the native
@@ -175,7 +177,10 @@ compositor, which remains the parity reference.
 - **Measured** (synthetic UHD, HDR 0.27 + Sharpen 0.3, Intel UHD GT1 iGPU): group
   composition 2.77 s → 0.21 s per frame in isolation (0.33 s inside an export, mostly
   loopback transport); a 30-frame lossless layered render 98.5 s → 26.4 s, where the
-  FFmpeg passes and ≈ 3 s of browser startup now dominate.
+  FFmpeg passes and ≈ 3 s of browser startup now dominate. A discrete NVIDIA T1200
+  (Vulkan) composes the same frame in the same ≈ 0.21 s: loopback transport, not the
+  GPU, bounds it; its browser starts in ≈ 1 s instead of ≈ 3 s. Owner 4K test project
+  (1,509 frames, Intel): ≈ 13 min export, 0.28 s per composed frame.
 
 ## Editing
 

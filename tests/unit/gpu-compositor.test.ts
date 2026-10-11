@@ -138,7 +138,7 @@ describe('GPU compositor worker protocol', () => {
   it('rejects software renderers unless explicitly allowed for tests', async () => {
     const rejected = await startGpuCompositor(options('software'));
     expect(rejected.compositor).toBeNull();
-    expect(rejected.reason).toMatch(/^gl: software renderer .*SwiftShader.*; vulkan: software renderer/);
+    expect(rejected.reason).toMatch(/^vulkan: software renderer .*SwiftShader.*; gl: software renderer/);
     expect(await readdir(profiles)).toEqual([]);
     const allowed = await startGpuCompositor(options('software', { softwareRenderer: true }));
     expect(allowed.reason).toBeNull();
@@ -150,8 +150,21 @@ describe('GPU compositor worker protocol', () => {
     const missing = await startGpuCompositor(options('echo', { chrome: path.join(root, 'no-such-browser') }));
     expect(missing.reason).toMatch(/cannot start/);
     const silent = await startGpuCompositor(options('silent', { startupTimeoutMs: 400 }));
-    expect(silent.reason).toBe('gl: the page did not start in time; vulkan: the page did not start in time');
+    expect(silent.reason).toBe('vulkan: the page did not start in time; gl: the page did not start in time');
     expect(await readdir(profiles)).toEqual([]);
+  });
+
+  it('removes profiles left by a killed service, never a running one', async () => {
+    const stale = path.join(profiles, 'pascap-gpu-2147483646-abcdef');
+    const live = path.join(profiles, `pascap-gpu-${process.pid}-abcdef`);
+    const unrelated = path.join(profiles, 'pascap-gpu-spike-abcdef');
+    await Promise.all(
+      [stale, live, unrelated].map((directory) => mkdir(path.join(directory, 'Default'), { recursive: true })),
+    );
+    const started = await startGpuCompositor(options('echo'));
+    await started.compositor!.close();
+    expect((await readdir(profiles)).sort()).toEqual(['pascap-gpu-spike-abcdef', path.basename(live)].sort());
+    await Promise.all([live, unrelated].map((directory) => rm(directory, { recursive: true })));
   });
 
   it('fails a frame on page failure, browser exit or timeout, and stays failed', async () => {
@@ -212,10 +225,10 @@ describe('GPU compositor helpers', () => {
   });
 
   it('launches an isolated headless browser without a DevTools port', () => {
-    const args = browserArguments('gl', '/tmp/profile', 'http://127.0.0.1:1/#token');
+    const args = browserArguments('vulkan', '/tmp/profile', 'http://127.0.0.1:1/#token');
     expect(args).toContain('--headless=new');
     expect(args).toContain('--user-data-dir=/tmp/profile');
-    expect(args).toContain('--use-angle=gl');
+    expect(args).toContain('--use-angle=vulkan');
     expect(args).toContain('--ignore-gpu-blocklist');
     expect(args.some((arg) => arg.includes('remote-debugging'))).toBe(false);
     expect(args.at(-1)).toBe('http://127.0.0.1:1/#token');
