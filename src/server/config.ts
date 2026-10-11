@@ -8,6 +8,10 @@ export interface ServiceConfig {
   port: number;
   ffmpeg: string;
   ffprobe: string;
+  /** Browser for the export GPU compositor; null searches PATH for Chrome or Chromium. */
+  chrome: string | null;
+  /** Composite detail/HDR export groups on the GPU when a hardware renderer starts. */
+  gpuCompositing: boolean;
   allowedOrigins: Set<string>;
   allowedHosts: Set<string>;
 }
@@ -52,12 +56,16 @@ export function createConfig(overrides: Partial<ServiceConfig> = {}): ServiceCon
   const origins = [port, 5173].flatMap((p) => [`http://127.0.0.1:${p}`, `http://localhost:${p}`]);
   const mediaRoots =
     overrides.mediaRoots === undefined ? configuredMediaRoots() : validateMediaRoots(overrides.mediaRoots);
+  const gpu = process.env['PASCAP_GPU_COMPOSITING'] ?? 'auto';
+  if (gpu !== 'auto' && gpu !== 'off') throw new Error('PASCAP_GPU_COMPOSITING must be auto or off.');
   return {
     dataDir: path.resolve(process.env['PASCAP_DATA_DIR'] ?? '.pascap'),
     webDir: path.resolve('dist/web'),
     port,
     ffmpeg: process.env['PASCAP_FFMPEG'] ?? 'ffmpeg',
     ffprobe: process.env['PASCAP_FFPROBE'] ?? 'ffprobe',
+    chrome: process.env['PASCAP_CHROME'] || null,
+    gpuCompositing: gpu === 'auto',
     allowedOrigins: new Set(origins),
     allowedHosts: new Set(origins.map((origin) => new URL(origin).host)),
     ...overrides,

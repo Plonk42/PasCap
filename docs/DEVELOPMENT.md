@@ -69,6 +69,8 @@ This is not static hosting, LAN/SaaS deployment or a completed container recipe.
 | `PASCAP_PORT`                      | Unprivileged loopback service port, default 4318                                                                                                                                             |
 | `PASCAP_FFMPEG` / `PASCAP_FFPROBE` | Native executable paths, otherwise resolved from PATH                                                                                                                                        |
 | `PASCAP_MEASURE_URL`               | Editor URL/project used by the optional measurement helper                                                                                                                                   |
+| `PASCAP_CHROME`                    | Browser for the export GPU compositor, otherwise `google-chrome` or `chromium` from PATH                                                                                                     |
+| `PASCAP_GPU_COMPOSITING`           | `auto` (default) composites detail/HDR export groups on a hardware GPU when one starts; `off` always uses the CPU compositor                                                                 |
 
 For example, start with an explicit approved root (literal `~` is not expanded):
 
