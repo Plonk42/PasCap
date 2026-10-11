@@ -26,7 +26,7 @@ if (mode === 'silent') await forever();
 const anonymous = await fetch(url.origin + '/config');
 const config = await (await call('/config')).json();
 const renderer = mode === 'software' ? 'ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero)))' : 'Fake GPU';
-const hello = { protocol: 1, renderer, norm16: true, error: anonymous.status === 403 ? null : 'token not enforced' };
+const hello = { protocol: 2, renderer, norm16: true, error: anonymous.status === 403 ? null : 'token not enforced' };
 const reply = await (await call('/hello', { method: 'POST', body: JSON.stringify(hello) })).json();
 if (!reply.accept) await forever();
 for (;;) {
@@ -49,7 +49,16 @@ for (;;) {
   out[1] = header.sources.length;
   out[2] = header.sources[0].width;
   out[3] = bytes.length - 4 - length;
-  await call('/result', { method: 'POST', headers: { 'x-pascap-gpu-sequence': String(header.sequence) }, body: out });
+  // Two row bands, the upper one first: offsets are bytes in readback order.
+  const split = (config.height / 2) * config.width * 4;
+  const band = (start, end, offset) =>
+    call('/result', {
+      method: 'POST',
+      headers: { 'x-pascap-gpu-sequence': String(header.sequence), 'x-pascap-gpu-offset': String(offset * 2) },
+      body: out.subarray(start, end),
+    });
+  await band(split, out.length, split);
+  await band(0, split, mode === 'overlap' ? split : 0);
 }
 process.exit(0);
 `;
@@ -172,6 +181,7 @@ describe('GPU compositor worker protocol', () => {
       ['fail', /the GPU page failed: context lost/],
       ['crash', /the browser exited \(3\)/],
       ['hang', /the GPU did not return its frame in time/],
+      ['overlap', /unexpected GPU result band/],
     ] as const) {
       const { compositor } = await startGpuCompositor(options(mode, { frameTimeoutMs: 500 }));
       try {

@@ -5,12 +5,16 @@ import type { SpatialPose } from './spatial.js';
 /**
  * Loopback protocol between the export service and its headless-browser GPU compositor page.
  * GET /next returns a frame bundle: uint32 LE header length, UTF-8 JSON header, then each
- * source's fitted RGB8 content rows, bottom row first. POST /result returns the premultiplied
- * RGBA16 group as little-endian rows in WebGL readback order (bottom row first).
+ * source's fitted RGB8 content rows, bottom row first. POST /result returns row bands of the
+ * premultiplied RGBA16 group as little-endian rows in WebGL readback order (bottom row first),
+ * each with its byte offset in that order.
  */
-export const GPU_PROTOCOL_VERSION = 1;
+export const GPU_PROTOCOL_VERSION = 2;
 export const GPU_TOKEN_HEADER = 'x-pascap-gpu-token';
 export const GPU_SEQUENCE_HEADER = 'x-pascap-gpu-sequence';
+export const GPU_OFFSET_HEADER = 'x-pascap-gpu-offset';
+/** Concurrent result uploads stay within Chrome's six connections per host. */
+export const GPU_RESULT_BANDS = 4;
 
 export interface GpuWorkerConfig {
   protocol: number;
