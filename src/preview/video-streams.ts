@@ -134,7 +134,7 @@ export class VideoStreams {
     const lane = this.#lane(index);
     const generation = lane.generation;
     return new Promise((resolve, reject) => {
-      const finish = (error?: unknown): void => {
+      const finish = (error?: Error): void => {
         clearTimeout(timer);
         lane.listeners.delete(check);
         signal.removeEventListener('abort', abort);
@@ -150,7 +150,8 @@ export class VideoStreams {
         try {
           this.#advance(index, lane, sourceFrame, false);
         } catch (error) {
-          finish(error);
+          // #advance throws only the lane's or worker's Error.
+          finish(error as Error);
           return;
         }
         if (lane.queue.length >= count) finish();
