@@ -42,7 +42,6 @@ describe('continuous original-source retiming for spatial animation', () => {
         const position = 7 + (frame * 30) / duration;
         expect(map.sourcePositionAt(frame)).toBeCloseTo(position, 12);
         expect(map.sourceAt(frame)).toBe(Math.max(7, Math.min(36, Math.floor(position + 1e-8))));
-        expect(map.rateAt(frame)).toBe(30 / duration);
       }
       for (const source of [7, 8, 21, 36, 37])
         expect(map.outputAt(source)).toBe(Math.min(duration - 1, Math.floor((source - 7) / (30 / duration) + 1e-8)));
@@ -71,7 +70,6 @@ describe('continuous original-source retiming for spatial animation', () => {
       const source = 40 + (0.7 * Math.expm1(0.005 * time)) / 0.005;
       expect(map.sourcePositionAt(frame)).toBeCloseTo(source, 11);
       expect(map.sourceAt(frame)).toBe(Math.min(99, Math.floor(source + 1e-8)));
-      expect(map.rateAt(frame)).toBeCloseTo(((0.5 + source * 0.005) * total) / map.duration, 12);
     }
     for (const source of [40, 41, 65, 99]) {
       const time = Math.log((0.5 + source * 0.005) / 0.7) / 0.005;

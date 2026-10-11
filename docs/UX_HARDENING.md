@@ -293,8 +293,8 @@ offers **Reload editor**, guarded by saving pending edits first, plus a strict
 project download. A save failure prevents reload and retains the draft. Runtime
 preview failures still have their ordinary **Retry preview** action. Hidden
 Inspector panels stay mounted, retaining section state and normal one-time
-Enter/blur commits. Keyboard/focus/history contracts and the two-slots-per-track
-preview bound remain; eight tracks have 16 slots plus one separate source reviewer.
+Enter/blur commits. Keyboard/focus/history contracts and the two-decoders-per-track
+preview bound remain; eight tracks have 16 decoders plus one separate source-review decoder.
 
 ## Remaining gates
 

@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import type { ExportReceipt } from '../../src/server/export.js';
 import { applyCommand } from '../../src/shared/commands.js';
 import { createClip, createLayer, createProject, projectSchema } from '../../src/shared/model.js';
+import { sourceRateAt } from '../../src/shared/speed.js';
 import { calculateLayout, sampleTimeline } from '../../src/shared/timeline.js';
 import {
   closeOptions,
@@ -111,7 +112,6 @@ test('adds layered clips, adjusts row opacity, hides/shows and releases unused d
   await openOptions(page, 'Track options Video track 2');
   await page.getByRole('button', { name: 'Delete track Video track 2', exact: true }).click();
   await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().decoderCount === 2);
-  await expect(page.locator('video[data-pascap-decoder]')).toHaveCount(2);
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   expect(await page.evaluate(() => window.pascapLab!.project()!.layers.length)).toBe(2);
 });
@@ -274,26 +274,22 @@ test('collapses/expands Inspector sections and remembers the choice across reloa
   await expect(page.getByRole('combobox', { name: 'Speed mode', exact: true })).toBeHidden();
 });
 
-test('hover scrubs a single muted source decoder while the project playhead stays unchanged', async ({ page }) => {
+test('hover scrubs a single source decoder while the project playhead stays unchanged', async ({ page }) => {
   await seek(page, 20);
   await sourceAtPointer(page, 'pattern-a.mp4', 0.25);
   expect(await page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(20);
   await sourceAtPointer(page, 'pattern-a.mp4', 0.9);
   await sourceAtPointer(page, 'pattern-a.mp4', 0.1);
-  await expect(page.locator('video[data-source-decoder]')).toHaveCount(1);
+  await expect(page.locator('canvas[data-source-decoder]')).toHaveCount(1);
   const mediaId = await page
     .getByRole('article')
     .filter({ has: page.getByRole('button', { name: 'Review pattern-b.mp4', exact: true }) })
     .getAttribute('data-media-id');
   await sourceAtPointer(page, 'pattern-b.mp4', 0.5);
   await expect(page.locator('.source-preview')).toHaveAttribute('data-media-id', mediaId!);
-  expect(
-    await page
-      .locator('video[data-source-decoder]')
-      .evaluate((video) => (video as HTMLVideoElement).muted && (video as HTMLVideoElement).paused),
-  ).toBe(true);
+  await expect(page.locator('.source-preview')).toHaveAttribute('data-source-status', 'paused');
   await page.getByRole('button', { name: 'Close source review' }).click();
-  await expect(page.locator('video[data-source-decoder]')).toHaveCount(0);
+  await expect(page.locator('canvas[data-source-decoder]')).toHaveCount(0);
 });
 
 test('pre-trims media and carries the recoverable range into plus, reload and drag insertion', async ({ page }) => {
@@ -451,7 +447,7 @@ test('plays three simultaneous sources through row-wide rate/grade curves, a tra
       ],
     },
   });
-  // Each clip's own speed curve varies its decoder playback rate.
+  // Each clip's own speed curve selects its decoded source frames.
   const curves: Record<string, [number, number, 'linear' | 'smooth', number]> = {
     first: [0.5, 2, 'linear', 45],
     second: [2, 0.5, 'smooth', 45],
@@ -475,7 +471,11 @@ test('plays three simultaneous sources through row-wide rate/grade curves, a tra
   expect(during).toHaveLength(2);
   expect(during[0]?.colour).toEqual(during[1]?.colour);
   expect(during[0]?.opacity).toBe(during[1]?.opacity);
-  expect(layout.clips[1]!.retiming.rateAt(7)).not.toBeCloseTo(layout.clips[0]!.retiming.rateAt(dissolve.start + 7));
+  const rateOf = (id: string): number => {
+    const sample = during.find((layer) => layer.clipId === id)!;
+    return sourceRateAt(layout.clips.find((placed) => placed.clip.id === id)!.clip.speed, sample.sourcePosition);
+  };
+  expect(rateOf('second')).not.toBeCloseTo(rateOf('first'));
   const duration = calculateLayout(project).duration;
   project = applyCommand(project, {
     type: 'music',
@@ -503,21 +503,14 @@ test('plays three simultaneous sources through row-wide rate/grade curves, a tra
     const engine = window.pascapLab!.engine;
     await engine.seek(frame);
     await engine.play();
-    return {
-      state: engine.diagnostics(),
-      rates: Array.from(
-        document.querySelectorAll<HTMLVideoElement>('video[data-pascap-decoder]'),
-        (video) => video.playbackRate,
-      ),
-    };
+    return engine.diagnostics();
   }, dissolve.start + 7);
-  expect(aligned.state.status, aligned.state.message).toBe('playing');
-  expect(aligned.state.activeDecoders).toBe(3);
-  for (const sample of sampleTimeline(project, aligned.state.frame)) {
-    const slot = aligned.state.assignedClipIds.indexOf(sample.clipId);
-    const placed = layout.clips.find((item) => item.clip.id === sample.clipId)!;
+  expect(aligned.status, aligned.message).toBe('playing');
+  expect(aligned.activeDecoders).toBe(3);
+  for (const sample of sampleTimeline(project, aligned.frame)) {
+    const slot = aligned.assignedClipIds.indexOf(sample.clipId);
     expect(slot).toBeGreaterThanOrEqual(0);
-    expect(aligned.rates[slot]).toBeCloseTo(placed.retiming.rateAt(aligned.state.frame - placed.start), 6);
+    expect(aligned.decodedSourceFrames[slot]).toBe(sample.sourceFrame);
   }
   await page.evaluate(() => window.pascapLab!.engine.pause());
   for (let pass = 0; pass < 2; pass++) {
@@ -541,27 +534,12 @@ test('plays three simultaneous sources through row-wide rate/grade curves, a tra
     );
     const state = await page.evaluate(() => window.pascapLab!.engine.diagnostics());
     if (state.status !== 'paused') {
-      const decoders = await page.locator('video[data-pascap-decoder]').evaluateAll((elements) =>
-        elements.map((element) => {
-          const video = element as HTMLVideoElement;
-          return {
-            index: video.dataset.pascapDecoder,
-            currentTime: video.currentTime,
-            paused: video.paused,
-            ended: video.ended,
-            seeking: video.seeking,
-            readyState: video.readyState,
-            rate: video.playbackRate,
-            error: video.error?.message ?? null,
-          };
-        }),
-      );
       const required = sampleTimeline(project, state.requestedFrame, layout).map(({ clipId, sourceFrame }) => ({
         clipId,
         sourceFrame,
       }));
       await testInfo.attach('layered-playback-failure', {
-        body: JSON.stringify({ pass, state, required, decoders }),
+        body: JSON.stringify({ pass, state, required }),
         contentType: 'application/json',
       });
     }
@@ -569,7 +547,6 @@ test('plays three simultaneous sources through row-wide rate/grade curves, a tra
     expect(state.frame).toBe(duration - 1);
     expect(state.decoderCount).toBe(4);
     expect(state.audioClock).toBe(true);
-    await expect(page.locator('video[data-pascap-decoder]')).toHaveCount(4);
   }
 });
 

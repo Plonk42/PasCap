@@ -80,6 +80,10 @@ PasCap is a solo, pre-release project: optimize for fast iteration. Details are 
 
 - Shared integer-frame layout/retiming (`PlacedClip.retiming`) is authoritative for
   UI, preview and native export. Per-frame rendering stays outside React.
+- Preview and source review decode proxies only with WebCodecs `VideoDecoder` in
+  worker lanes delivering exact source frames under credit bounds; no `<video>`
+  elements, media-element time or seek heuristics. See
+  [WebCodecs preview](../docs/design/WEBCODECS_PREVIEW.md).
 - Speed is clip-only: strict constant `rate` or a 1–256-keyframe curve on original
   source frames (presets such as Ramp up replace its keyframes). A clip's duration
   depends only on its own speed and source range, never its track, start or Ripple
@@ -219,6 +223,7 @@ clarity −1–1, denoise 0–1 }`, neutral 0, with no keyframes or track channe
   [Temperature and Tint](../docs/design/TEMPERATURE_AND_TINT.md),
   [spatial transforms](../docs/design/SPATIAL_TRANSFORMS.md),
   [detail filters](../docs/design/DETAIL_FILTERS.md),
+  [WebCodecs preview](../docs/design/WEBCODECS_PREVIEW.md),
   [workspace/recovery](../docs/WORKSPACE_AND_RECOVERY.md) and
   [development](../docs/DEVELOPMENT.md). Guides describe current behaviour only;
   history belongs in Git and issues.

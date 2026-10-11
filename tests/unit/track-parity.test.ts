@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { decoderPoolSize } from '../../src/preview/assignment.js';
+import { MAX_VIDEO_DECODERS } from '../../src/preview/compositor.js';
 import { gradePixel, NEUTRAL_COLOUR } from '../../src/shared/colour.js';
 import { applyCommand, EditHistory, type EditCommand } from '../../src/shared/commands.js';
 import { compositePixel } from '../../src/shared/composition.js';
@@ -744,6 +744,6 @@ describe('uniform export planning and explicitly revised resource bounds', () =>
     });
     expect(3840 * 2160 * LAYERED_EXPORT_RESOURCES.rawBytesPerPixel).toBe(182_476_800);
     expect(2 * LAYERED_EXPORT_RESOURCES.lutBytes).toBe(6_591_000);
-    expect(decoderPoolSize(8)).toBe(16);
+    expect(MAX_VIDEO_DECODERS).toBe(16);
   });
 });

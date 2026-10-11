@@ -2,6 +2,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
+import { locateIndex, parseProxyIndex } from '../../src/preview/proxy-index.js';
 import { createApp } from '../../src/server/app.js';
 import { createConfig, type ServiceConfig } from '../../src/server/config.js';
 import { ServiceError } from '../../src/server/errors.js';
@@ -10,6 +11,7 @@ import type { JobQueue } from '../../src/server/jobs.js';
 import type { AddForEditingResult, ImportForEditingResult } from '../../src/server/library.js';
 import { runProcess } from '../../src/server/process.js';
 import type { MediaJob } from '../../src/shared/media.js';
+import { PROJECT_FPS } from '../../src/shared/timing.js';
 
 const enabled = process.env['PASCAP_MEDIA_TESTS'] === '1';
 const roots: string[] = [];
@@ -176,6 +178,16 @@ describe.skipIf(!enabled)('automatic video proxy imports · disposable native fi
       true,
     );
     const proxies = await Promise.all(ready.map((asset) => readFile(library.proxyPath(asset))));
+    // The preview's WebCodecs reader indexes the actual prepared proxy: one keyframe per 15-frame GOP.
+    for (const proxy of proxies) {
+      const head = new Uint8Array(proxy.buffer, proxy.byteOffset, proxy.byteLength);
+      expect(locateIndex(head.subarray(0, 65_536)).end).toBeLessThanOrEqual(proxy.byteLength);
+      const index = parseProxyIndex(head, PROJECT_FPS);
+      expect(index).toMatchObject({ width: 160, height: 90, frameCount: 12 });
+      expect(index.codec).toMatch(/^avc1\.[0-9a-f]{6}$/);
+      expect([...index.keyframes]).toEqual([1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+      expect(index.offsets[11]! + index.sizes[11]!).toBeLessThanOrEqual(proxy.byteLength);
+    }
     const cached = await library.importForEditing(sources);
     expect(cached).toMatchObject({ added: 0, existing: 2, jobs: [], queueErrors: [] });
     expect((await library.addForEditing(filenames[0]!)).job).toBeNull();

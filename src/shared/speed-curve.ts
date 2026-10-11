@@ -200,6 +200,5 @@ export function compileClipSpeedCurve(sourceIn: number, sourceOut: number, speed
       const time = segment.timeBegin + elapsed(segment, bounded);
       return Math.max(0, Math.min(duration - 1, Math.floor((time * duration) / total + 1e-8)));
     },
-    rateAt: (frame) => (curveRateAt(speed, sourceAtTime((finite(frame) * total) / duration)) * total) / duration,
   };
 }

@@ -10,7 +10,14 @@ import {
 import type { ExportProfile } from '../../src/shared/export.js';
 import type { MediaAsset, MediaJob } from '../../src/shared/media.js';
 import { createClip, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
-import { inspectorTab, layerKeyframes, openOptions, panelToggle, sharedPoint } from './editor-helpers.js';
+import {
+  expectDecoders,
+  inspectorTab,
+  layerKeyframes,
+  openOptions,
+  panelToggle,
+  sharedPoint,
+} from './editor-helpers.js';
 import { memoryProjects, type MemoryProjects } from './memory-projects.js';
 
 let assets: MediaAsset[];
@@ -548,7 +555,7 @@ test('a failed deferred preview keeps the editor usable and saves pending edits 
     revision: before.revision + 1,
   });
   expect(memory.saves).toBe(1);
-  await expect(page.locator('video[data-pascap-decoder]')).toHaveCount(2);
+  await expectDecoders(page, 2);
 });
 
 test('a failed deferred inspector is contained and never discards the rest of the editor', async ({ page }) => {
@@ -617,7 +624,7 @@ test('diagnostic code stays deferred until explicitly opened and does not change
   await expect(page.getByRole('region', { name: 'Diagnostics', exact: true })).toBeVisible();
   expect(requested).toHaveLength(1);
   expect(await current(page)).toEqual(before);
-  await expect(page.locator('video[data-pascap-decoder]')).toHaveCount(2);
+  await expectDecoders(page, 2);
   expect(submissions).toEqual([]);
   expect(memory.saves).toBe(0);
 });

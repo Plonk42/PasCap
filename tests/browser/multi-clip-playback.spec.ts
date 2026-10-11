@@ -14,7 +14,6 @@ interface StallEvidence {
   errors: string[];
   witnesses: { at: number; message: string; requested: number; frame: number; decoded: [string, number][] }[];
   samples: { requested: number; decoded: [string, number][] }[];
-  steps: Record<string, number>;
 }
 
 declare global {
@@ -209,23 +208,8 @@ for (const name of Object.keys(SCENARIOS)) {
           errors: [],
           witnesses: [],
           samples: [],
-          steps: {},
         };
         window.multiClipEvidence = evidence;
-        const requestFrame = HTMLVideoElement.prototype.requestVideoFrameCallback;
-        const last = new WeakMap<HTMLVideoElement, number>();
-        HTMLVideoElement.prototype.requestVideoFrameCallback = function (callback) {
-          return requestFrame.call(this, (now, metadata) => {
-            const frame = Math.round((metadata.mediaTime * 30_000) / 1_001);
-            const previous = last.get(this);
-            if (!this.paused && previous !== undefined) {
-              const key = String(Math.max(-1, Math.min(4, frame - previous)));
-              evidence.steps[key] = (evidence.steps[key] ?? 0) + 1;
-            }
-            last.set(this, frame);
-            callback(now, metadata);
-          });
-        };
         try {
           new PerformanceObserver((list) => {
             for (const entry of list.getEntries()) {
@@ -285,7 +269,7 @@ for (const name of Object.keys(SCENARIOS)) {
         };
       });
       const layout = calculateLayout(document);
-      // Required minus observed source frame per active clip, sampled every display frame while Playing.
+      // Required minus presented source frame per active clip, sampled every display frame while Playing.
       const lags = new Map<number, number>();
       for (const sample of result.evidence.samples)
         for (const layer of sampleTimeline(document, sample.requested, layout)) {
@@ -308,15 +292,13 @@ for (const name of Object.keys(SCENARIOS)) {
         stallMilliseconds: Math.round(result.state.stallMilliseconds),
         renderedFrames: result.state.renderedFrames,
         repeatedFrames: duration - result.state.renderedFrames,
+        decodedFrames: result.state.decodedFrames,
         droppedDecodedFrames: result.state.droppedDecodedFrames,
-        lateDecodedCallbacks: result.state.lateDecodedCallbacks,
-        maximumClockErrorFrames: result.state.maximumClockErrorFrames,
         musicStarts: result.musicStarts,
         musicUnderruns: result.underruns,
         longestTask: Math.round(result.evidence.longestTask),
         longTasks: result.evidence.longTasks,
         sourceLag: Object.fromEntries([...lags].sort((a, b) => a[0] - b[0])),
-        decoderFrameSteps: result.evidence.steps,
       };
       test.info().annotations.push({ type: 'multi-clip-stalls', description: JSON.stringify(counters) });
       console.log(`multi-clip-stalls ${JSON.stringify(counters)}`);

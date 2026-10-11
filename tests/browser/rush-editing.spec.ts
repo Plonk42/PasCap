@@ -21,6 +21,7 @@ import {
   sharedPoint,
 } from './editor-helpers.js';
 import { memoryProjects, type MemoryProjects } from './memory-projects.js';
+import { installVideoFrameGate } from './video-frame-gate.js';
 
 const PROJECT_ID = 'browser-rush-editing';
 let assets: MediaAsset[];
@@ -31,6 +32,7 @@ let unexpectedApi: string[];
 test.beforeEach(async ({ page, request }) => {
   unexpectedApi = [];
   audioAssets = [];
+  await installVideoFrameGate(page);
   // Read already prepared fixtures only. Missing fixtures fail; never prepare or register here.
   const response = await request.get('/api/media');
   expect(response.ok()).toBe(true);
@@ -274,11 +276,7 @@ async function decodedSource(page: Page, clipId: string, sourceFrame: number): P
     .poll(() =>
       page.evaluate((id) => {
         const state = window.pascapLab!.engine.diagnostics();
-        const index = state.assignedClipIds.indexOf(id);
-        const video = document.querySelectorAll<HTMLVideoElement>('video[data-pascap-decoder]')[index];
-        return video && !video.seeking && video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA
-          ? Math.floor((video.currentTime * 30000) / 1001 + 1e-7)
-          : null;
+        return state.status === 'paused' ? state.decodedSourceFrames[state.assignedClipIds.indexOf(id)] : null;
       }, clipId),
     )
     .toBe(sourceFrame);
@@ -356,7 +354,7 @@ test('three ranges from one rush keep the source pinned, independent, reloadable
   await page.getByRole('button', { name: 'Review pattern-a.mp4', exact: true }).click();
   await sourceFrame(page, 0);
   expect((await current(page)).clips).toEqual([]); // Review is not insertion.
-  const decoder = await page.locator('video[data-source-decoder]').elementHandle();
+  const decoder = await page.locator('canvas[data-source-decoder]').elementHandle();
   expect(decoder).not.toBeNull();
   const ids: string[] = [];
   for (const [sourceIn, sourceOut] of [
@@ -390,14 +388,9 @@ test('three ranges from one rush keep the source pinned, independent, reloadable
     await expect(page.locator('.source-preview')).toHaveAttribute('data-source-frame', String(sourceOut - 1));
     await expect(page.locator('.source-review')).toHaveAttribute('data-source-excerpt-count', String(ids.length));
     expect(
-      await page.locator('video[data-source-decoder]').evaluate((video, original) => video === original, decoder),
+      await page.locator('canvas[data-source-decoder]').evaluate((canvas, original) => canvas === original, decoder),
     ).toBe(true);
-    expect(
-      await page.locator('video[data-source-decoder]').evaluate((element) => {
-        const video = element as HTMLVideoElement;
-        return { muted: video.muted, defaultMuted: video.defaultMuted, volume: video.volume, paused: video.paused };
-      }),
-    ).toEqual({ muted: true, defaultMuted: true, volume: 0, paused: true });
+    await expect(page.locator('.source-preview')).toHaveAttribute('data-source-status', 'paused');
     await expect(page.locator('.timeline-cut-mark')).toHaveCount(0);
   }
   expect(new Set(ids).size).toBe(3);
@@ -468,8 +461,7 @@ test('three ranges from one rush keep the source pinned, independent, reloadable
   await expect(page.locator('.source-range-strip')).toHaveAttribute('data-source-out', '35');
   await expect(page.locator('.source-review')).toHaveAttribute('data-source-excerpt-count', '3');
   await expect(badge).toHaveText('3 clips');
-  await expect(page.locator('video[data-source-decoder]')).toHaveCount(1);
-  await expect(page.locator('video[data-pascap-decoder]')).toHaveCount(2);
+  await expect(page.locator('canvas[data-source-decoder]')).toHaveCount(1);
   expect(await page.evaluate(() => window.pascapLab!.engine.diagnostics().decoderCount)).toBe(2);
 });
 
@@ -1373,7 +1365,7 @@ test('an overlapping source Add clears stale success feedback but keeps the sour
   await page.getByRole('button', { name: 'Review pattern-a.mp4', exact: true }).click();
   await sourceRange(page, 10, 30);
   await sourceFrame(page, 29);
-  const decoder = await page.locator('video[data-source-decoder]').elementHandle();
+  const decoder = await page.locator('canvas[data-source-decoder]').elementHandle();
   const addedId = await addExcerpt(page);
   const added = await current(page);
   expect(added.clips.at(-1)).toEqual({ ...createClip(addedId, assets[0]!.id, 10, 30), layerId: 'upper', start: 80 });
@@ -1405,7 +1397,7 @@ test('an overlapping source Add clears stale success feedback but keeps the sour
   await expect(page.locator('.source-range-strip')).toHaveAttribute('data-source-out', '30');
   await expect(page.locator('.source-review')).toHaveAttribute('data-source-excerpt-count', String(excerptCount));
   expect(
-    await page.locator('video[data-source-decoder]').evaluate((video, original) => video === original, decoder),
+    await page.locator('canvas[data-source-decoder]').evaluate((canvas, original) => canvas === original, decoder),
   ).toBe(true);
   expect(await current(page)).toEqual(added);
   await flush(page);
@@ -1416,7 +1408,7 @@ test('an overlapping source Add clears stale success feedback but keeps the sour
   await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
 });
 
-test('source proxy Play/Pause advances observed frames and stops at exclusive OUT without project edits', async ({
+test('source proxy Play/Pause advances decoded frames and stops at exclusive OUT without project edits', async ({
   page,
 }) => {
   const before = await current(page);
@@ -1434,27 +1426,18 @@ test('source proxy Play/Pause advances observed frames and stops at exclusive OU
   const paused = Number(await page.locator('.source-preview').getAttribute('data-source-frame'));
   expect(paused).toBeGreaterThanOrEqual(12);
   expect(paused).toBeLessThan(72);
-  expect(
-    await page.locator('video[data-source-decoder]').evaluate((video: HTMLVideoElement) => ({
-      paused: video.paused,
-      muted: video.muted,
-      volume: video.volume,
-      loop: video.loop,
-    })),
-  ).toEqual({ paused: true, muted: true, volume: 0, loop: false });
   await page.getByRole('button', { name: 'Play source preview', exact: true }).press('Space');
   await expect(page.locator('.source-preview')).toHaveAttribute('data-source-status', 'playing');
   await expect(page.locator('.source-preview')).toHaveAttribute('data-source-status', 'paused');
   await expect(page.locator('.source-preview')).toHaveAttribute('data-source-frame', '71');
-  await expect(page.locator('video[data-source-decoder]')).toHaveCount(1);
-  expect(await page.locator('video[data-source-decoder]').evaluate((video: HTMLVideoElement) => video.paused)).toBe(
-    true,
-  );
+  await expect(page.locator('canvas[data-source-decoder]')).toHaveCount(1);
   await page.getByRole('button', { name: 'Play source preview', exact: true }).press('Enter');
   await expect(page.locator('.source-preview')).toHaveAttribute('data-source-status', 'playing');
-  const restarted = Number(await page.locator('.source-preview').getAttribute('data-source-frame'));
-  expect(restarted).toBeGreaterThanOrEqual(12);
-  expect(restarted).toBeLessThan(71);
+  const sourceFrameNow = async (): Promise<number> =>
+    Number(await page.locator('.source-preview').getAttribute('data-source-frame'));
+  // Restarting after OUT − 1 replaces the last image with IN or a later frame.
+  await expect.poll(sourceFrameNow).toBeLessThan(71);
+  expect(await sourceFrameNow()).toBeGreaterThanOrEqual(12);
   await page.getByRole('button', { name: 'Pause source preview', exact: true }).click();
   await expect(page.locator('.source-preview')).toHaveAttribute('data-source-status', 'paused');
   expect(await current(page)).toEqual(before);
@@ -1479,9 +1462,6 @@ for (const action of ['scrub', 'mark', 'apply', 'reset', 'trim'] as const) {
     if (action === 'trim')
       await page.getByRole('slider', { name: 'Trim source start', exact: true }).press('ArrowRight');
     await expect(page.locator('.source-preview')).toHaveAttribute('data-source-status', 'paused');
-    expect(await page.locator('video[data-source-decoder]').evaluate((video: HTMLVideoElement) => video.paused)).toBe(
-      true,
-    );
     expect(await current(page)).toEqual(before);
     await flush(page);
     expect(memory.saves).toBe(0);
@@ -1507,32 +1487,19 @@ test('a one-frame source range remains exact; an Escape-cancelled numeric draft 
 });
 
 for (const action of ['pause', 'scrub', 'tab', 'asset', 'project', 'close'] as const) {
-  test(`an actual source native play deferred across ${action} never restarts an obsolete viewer`, async ({ page }) => {
+  test(`a source playback withheld before its first frame across ${action} never restarts an obsolete viewer`, async ({
+    page,
+  }) => {
     await page.getByRole('button', { name: 'Review pattern-a.mp4', exact: true }).click();
     await sourceFrame(page, 20);
     await page.evaluate(() => {
-      const video = globalThis.document.querySelector<HTMLVideoElement>('video[data-source-decoder]')!;
-      const nativePlay = video.play.bind(video);
-      const scope = globalThis as unknown as { releaseSourcePlay: () => Promise<void>; oldSource: HTMLVideoElement };
-      scope.oldSource = video;
-      video.play = () => {
-        // Start the real native operation while its resource still exists, but
-        // gate completion across cancellation. Calling play on a disposed,
-        // src-less video can remain pending and is not an obsolete completion.
-        const playing = nativePlay();
-        const released = new Promise<void>((resolve) => {
-          scope.releaseSourcePlay = async () => resolve();
-        });
-        return playing.then(() => released);
-      };
+      window.videoFrameGate.hold = true;
     });
     await page.getByRole('button', { name: 'Play source preview', exact: true }).click();
     await expect(page.locator('.source-preview')).toHaveAttribute('data-source-status', 'starting');
-    await page.waitForFunction(
-      () => typeof (globalThis as unknown as { releaseSourcePlay?: unknown }).releaseSourcePlay === 'function',
-    );
+    await page.waitForFunction(() => window.videoFrameGate.heldFrames > 0);
     if (action === 'pause') await page.getByRole('button', { name: 'Pause source preview', exact: true }).click();
-    if (action === 'scrub') await sourceFrame(page, 55);
+    if (action === 'scrub') await page.getByRole('slider', { name: 'Source playhead', exact: true }).fill('55');
     if (action === 'tab') await page.getByRole('tab', { name: 'Timeline preview', exact: true }).click();
     if (action === 'asset') await page.getByRole('button', { name: 'Review pattern-b.mp4', exact: true }).click();
     if (action === 'project') {
@@ -1545,38 +1512,40 @@ for (const action of ['pause', 'scrub', 'tab', 'asset', 'project', 'close'] as c
     }
     if (action === 'close') await page.getByRole('button', { name: 'Close source review', exact: true }).click();
     if (action === 'tab' || action === 'project' || action === 'close')
-      await expect(page.locator('video[data-source-decoder]')).toHaveCount(0);
+      await expect(page.locator('canvas[data-source-decoder]')).toHaveCount(0);
     if (action === 'asset')
       await expect(page.locator('.source-preview')).toHaveAttribute('data-media-id', assets[1]!.id);
     await page.evaluate(async () => {
-      await (globalThis as unknown as { releaseSourcePlay: () => Promise<void> }).releaseSourcePlay().catch(() => {});
+      window.videoFrameGate.release();
       await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
     });
-    expect(await page.evaluate(() => (globalThis as unknown as { oldSource: HTMLVideoElement }).oldSource.paused)).toBe(
-      true,
-    );
-    if (action === 'pause' || action === 'scrub') {
+    if (action === 'pause') {
       await expect(page.locator('.source-preview')).toHaveAttribute('data-source-status', 'paused');
-      await expect(page.getByRole('button', { name: 'Play source preview', exact: true })).toBeEnabled();
+      await expect(page.locator('.source-preview')).toHaveAttribute('data-source-frame', '20');
     }
-    if (action === 'scrub') await expect(page.locator('.source-preview')).toHaveAttribute('data-source-frame', '55');
+    if (action === 'scrub') {
+      await expect(page.locator('.source-preview')).toHaveAttribute('data-source-status', 'paused');
+      await expect(page.locator('.source-preview')).toHaveAttribute('data-source-frame', '55');
+    }
+    if (action === 'pause' || action === 'scrub')
+      await expect(page.getByRole('button', { name: 'Play source preview', exact: true })).toBeEnabled();
     await flush(page);
     expect(memory.saves).toBe(0);
   });
 }
 
-test('source play failure stays explicit and Retry restores the one muted proxy decoder', async ({ page }) => {
+test('a source decoder failure stays explicit and Retry restores the one proxy decoder', async ({ page }) => {
   await page.getByRole('button', { name: 'Review pattern-a.mp4', exact: true }).click();
   await sourceFrame(page, 20);
-  await page.locator('video[data-source-decoder]').evaluate((video: HTMLVideoElement) => {
-    video.play = () => Promise.reject(new Error('Deliberate source play rejection'));
+  await page.evaluate(() => {
+    window.videoFrameGate.failNext = 'Deliberate source decoding failure';
   });
   await page.getByRole('button', { name: 'Play source preview', exact: true }).click();
-  await expect(page.locator('.source-preview [role="alert"]')).toContainText('Deliberate source play rejection');
+  await expect(page.locator('.source-preview [role="alert"]')).toContainText('Deliberate source decoding failure');
   await expect(page.getByRole('button', { name: 'Play source preview', exact: true })).toBeDisabled();
   await page.getByRole('button', { name: 'Retry source preview', exact: true }).click();
   await expect(page.locator('.source-preview')).toHaveAttribute('data-source-frame', '20');
-  await expect(page.locator('video[data-source-decoder]')).toHaveCount(1);
+  await expect(page.locator('canvas[data-source-decoder]')).toHaveCount(1);
   await page.getByRole('button', { name: 'Play source preview', exact: true }).click();
   await expect(page.locator('.source-preview')).toHaveAttribute('data-source-status', 'playing');
   await page.getByRole('button', { name: 'Pause source preview', exact: true }).click();
@@ -1584,21 +1553,22 @@ test('source play failure stays explicit and Retry restores the one muted proxy 
   expect(memory.saves).toBe(0);
 });
 
-test('a cancelled never-settling source play has a bounded failure and reachable Retry', async ({ page }) => {
+test('a source decoder that stops delivering has a bounded failure and reachable Retry', async ({ page }) => {
+  test.setTimeout(30_000);
   await page.getByRole('button', { name: 'Review pattern-a.mp4', exact: true }).click();
+  await sourceRange(page, 10, 110);
   await sourceFrame(page, 20);
-  await page.locator('video[data-source-decoder]').evaluate((video: HTMLVideoElement) => {
-    video.play = () => new Promise<void>(() => {});
-  });
   await page.getByRole('button', { name: 'Play source preview', exact: true }).click();
-  await expect(page.locator('.source-preview')).toHaveAttribute('data-source-status', 'starting');
-  await page.getByRole('button', { name: 'Pause source preview', exact: true }).click();
-  await expect(page.locator('.source-preview')).toHaveAttribute('data-source-status', 'paused');
-  await expect(page.locator('.source-preview [role="alert"]')).toContainText('start did not finish within 5 seconds.');
+  await expect(page.locator('.source-preview')).toHaveAttribute('data-source-status', 'playing');
+  await page.evaluate(() => {
+    window.videoFrameGate.hold = true;
+  });
+  await expect(page.locator('.source-preview [role="alert"]')).toContainText('within 5 seconds', { timeout: 15_000 });
+  await page.evaluate(() => window.videoFrameGate.release());
   await page.getByRole('button', { name: 'Retry source preview', exact: true }).click();
-  await expect(page.locator('.source-preview')).toHaveAttribute('data-source-frame', '20');
+  await expect(page.locator('.source-preview')).toHaveAttribute('data-source-status', 'paused');
   await expect(page.getByRole('button', { name: 'Play source preview', exact: true })).toBeEnabled();
-  await expect(page.locator('video[data-source-decoder]')).toHaveCount(1);
+  await expect(page.locator('canvas[data-source-decoder]')).toHaveCount(1);
   await flush(page);
   expect(memory.saves).toBe(0);
 });
@@ -1805,7 +1775,7 @@ test('removing recordings from the project bin confirms used footage and Undo re
 
   // A used recording asks first; cancelling changes nothing and returns focus.
   await page.getByRole('button', { name: 'Review pattern-a.mp4', exact: true }).click();
-  await expect(page.locator('video[data-source-decoder]')).toHaveCount(1);
+  await expect(page.locator('canvas[data-source-decoder]')).toHaveCount(1);
   const trash = page.getByRole('button', { name: 'Remove pattern-a.mp4 from project', exact: true });
   await trash.click();
   const dialog = page.getByRole('dialog', { name: 'Remove pattern-a.mp4 from this project?', exact: true });
@@ -1820,7 +1790,7 @@ test('removing recordings from the project bin confirms used footage and Undo re
   await dialog.getByRole('button', { name: 'Remove from project', exact: true }).click();
   await expect(card(0)).toHaveCount(0);
   await expect(page.locator('.timeline-clip')).toHaveCount(0);
-  await expect(page.locator('video[data-source-decoder]')).toHaveCount(0);
+  await expect(page.locator('canvas[data-source-decoder]')).toHaveCount(0);
   await expect(page.getByRole('tab', { name: 'Timeline preview', exact: true })).toHaveAttribute(
     'aria-selected',
     'true',

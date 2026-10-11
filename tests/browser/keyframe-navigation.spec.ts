@@ -546,10 +546,10 @@ for (const empty of [false, true]) {
             page.evaluate(() => {
               const state = window.pascapLab!.engine.diagnostics();
               const index = state.assignedClipIds.indexOf('second');
-              return { ready: state.decoderReady[index], sourceFrame: state.decodedSourceFrames[index] };
+              return { status: state.status, sourceFrame: state.decodedSourceFrames[index] };
             }),
           )
-          .toEqual({ ready: true, sourceFrame: 89 });
+          .toEqual({ status: 'paused', sourceFrame: 89 });
       }
       await expect(keys.locator('.keyframe-row[aria-current="true"]')).toHaveAttribute(
         'data-keyframe-frame',
@@ -873,10 +873,10 @@ test('successive outside-duration setting, row and list navigation keeps one tru
         page.evaluate(() => {
           const state = window.pascapLab!.engine.diagnostics();
           const index = state.assignedClipIds.indexOf('second');
-          return { ready: state.decoderReady[index], sourceFrame: state.decodedSourceFrames[index] };
+          return { status: state.status, sourceFrame: state.decodedSourceFrames[index] };
         }),
       )
-      .toEqual({ ready: true, sourceFrame: 89 });
+      .toEqual({ status: 'paused', sourceFrame: 89 });
   }
   await inspectorTab(page, 'Clip');
   await expect(await step(page, 'Exposure', 'Next')).toBeDisabled();

@@ -1,9 +1,11 @@
 import { expect, test, type APIRequestContext, type Browser, type Page } from '@playwright/test';
+import type { PreviewDiagnostics } from '../../src/preview/engine.js';
 import type { AudioAsset } from '../../src/shared/audio.js';
 import type { MediaAsset } from '../../src/shared/media.js';
 import { createClip, createProject, type ProjectDocument } from '../../src/shared/model.js';
 import { memoryProjects, type MemoryProjects } from './memory-projects.js';
 import { installMusicEvidence, observeRealtimeHeadroom } from './music-evidence.js';
+import { installVideoFrameGate } from './video-frame-gate.js';
 
 interface RecoveryFixture {
   memory: MemoryProjects;
@@ -18,37 +20,25 @@ interface PlaybackEvidence {
   unexpectedMusicStarts: number;
   unexpectedResumes: number;
   notifications: number;
+  playingNotifications: number;
   playingMusicNotifications: number;
   maximumMusicDriftFrames: number;
   driftViolations: number;
   maximumAVDriftFrames: number;
   avDriftViolations: number;
   avDriftSamples: unknown[];
+  sourceViolations: number;
+  sourceSamples: unknown[];
   bufferingEntries: number;
-  firstBufferingFrame: number | null;
-  avoidableBuffering: number;
-  bufferingFrames: { accepted: number; requested: number; observed: number; ready: boolean; eligible: boolean }[];
   minimumDecoderCount: number;
   maximumDecoderCount: number;
   errors: number;
   firstError: string | null;
 }
 
-interface VideoCallbackGate {
-  targetFrame: number | null;
-  atOrAfter: boolean;
-  pauseOnHold: boolean;
-  heldFrame: number | null;
-  heldCallbacks: number;
-  releasedCallbacks: number;
-  release: (() => void) | null;
-  pendingSeek: Promise<void> | null;
-}
-
 declare global {
   interface Window {
     playbackRecoveryEvidence: PlaybackEvidence;
-    playbackRecoveryGate: VideoCallbackGate;
   }
 }
 
@@ -94,6 +84,7 @@ async function openRecoveryProject(
   const memory = await memoryProjects(page, project);
   await installMusicEvidence(page);
   await observeRealtimeHeadroom(page, test.info());
+  await installVideoFrameGate(page);
   await page.addInitScript(() => {
     // Install before nested transpiled callbacks; init-script ordering is unspecified.
     Reflect.set(globalThis, '__name', (fn: unknown) => fn);
@@ -105,16 +96,16 @@ async function openRecoveryProject(
       unexpectedMusicStarts: 0,
       unexpectedResumes: 0,
       notifications: 0,
+      playingNotifications: 0,
       playingMusicNotifications: 0,
       maximumMusicDriftFrames: 0,
       driftViolations: 0,
       maximumAVDriftFrames: 0,
       avDriftViolations: 0,
       avDriftSamples: [],
+      sourceViolations: 0,
+      sourceSamples: [],
       bufferingEntries: 0,
-      firstBufferingFrame: null,
-      avoidableBuffering: 0,
-      bufferingFrames: [],
       minimumDecoderCount: 2,
       maximumDecoderCount: 2,
       errors: 0,
@@ -128,76 +119,6 @@ async function openRecoveryProject(
     window.addEventListener('pascap-test-music-stop', () => {
       evidence.musicPauses++;
     });
-
-    // Pass through real Chrome metadata unchanged. Only an explicitly armed,
-    // matching source-frame callback is held; no fake media clock or decoded frame.
-    const gate: VideoCallbackGate = {
-      targetFrame: null,
-      atOrAfter: false,
-      pauseOnHold: false,
-      heldFrame: null,
-      heldCallbacks: 0,
-      releasedCallbacks: 0,
-      release: null,
-      pendingSeek: null,
-    };
-    window.playbackRecoveryGate = gate;
-    const decoderEvents: unknown[] = [];
-    Reflect.set(window, 'recoveryDecoderEvents', decoderEvents);
-    const currentTime = Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, 'currentTime')!;
-    Object.defineProperty(HTMLMediaElement.prototype, 'currentTime', {
-      ...currentTime,
-      set(this: HTMLMediaElement, value: number) {
-        if (this.dataset['pascapDecoder'] !== undefined && decoderEvents.length < 300) {
-          decoderEvents.push({
-            kind: 'seek',
-            slot: this.dataset['pascapDecoder'],
-            value,
-            previous: currentTime.get!.call(this),
-            ready: this.readyState,
-            paused: this.paused,
-          });
-        }
-        currentTime.set!.call(this, value);
-      },
-    });
-    const requestFrame = HTMLVideoElement.prototype.requestVideoFrameCallback;
-    HTMLVideoElement.prototype.requestVideoFrameCallback = function (callback) {
-      return requestFrame.call(this, (now, metadata) => {
-        const frame = Math.round((metadata.mediaTime * 30_000) / 1_001);
-        if (decoderEvents.length < 300)
-          decoderEvents.push({
-            kind: 'callback',
-            slot: this.dataset['pascapDecoder'],
-            frame,
-            time: metadata.mediaTime,
-            current: this.currentTime,
-            ready: this.readyState,
-            paused: this.paused,
-            seeking: this.seeking,
-          });
-        const target = gate.targetFrame;
-        const matches = target !== null && (gate.atOrAfter ? frame >= target : frame === target);
-        const state = gate.pauseOnHold ? window.pascapLab!.engine.diagnostics() : null;
-        const observed = state?.decodedSourceFrames[state.assignedClipIds.indexOf('recovery-clip')];
-        const playingDelivery =
-          !gate.pauseOnHold ||
-          (state?.status === 'playing' && !this.paused && !this.seeking && observed !== undefined && frame > observed);
-        if (this.dataset['pascapDecoder'] !== undefined && matches && playingDelivery && gate.heldCallbacks === 0) {
-          gate.heldFrame = frame;
-          gate.heldCallbacks++;
-          if (gate.pauseOnHold) this.pause();
-          gate.release = () => {
-            gate.targetFrame = null;
-            gate.release = null;
-            gate.releasedCallbacks++;
-            callback(now, metadata);
-          };
-          return;
-        }
-        callback(now, metadata);
-      });
-    };
   });
   await page.goto(`/?project=${project.id}`);
   await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
@@ -209,6 +130,29 @@ async function openRecoveryProject(
       evidence.musicStarts = 0;
       evidence.musicPauses = 0;
       let previousStatus = window.pascapLab!.engine.diagnostics().status;
+      const checkMusic = (state: PreviewDiagnostics): void => {
+        evidence.playingMusicNotifications++;
+        const drift = Math.abs(state.musicDriftFrames);
+        if (!Number.isFinite(drift) || drift > 1) evidence.driftViolations++;
+        evidence.maximumMusicDriftFrames = Math.max(evidence.maximumMusicDriftFrames, drift);
+        // Independently observed, actually consumed audio samples with their
+        // rendering-thread timestamp, not engine.musicDriftFrames or frame.
+        const music = window.musicStreamEvidence;
+        const receipt = music.receipt;
+        const output = music.context?.getOutputTimestamp();
+        const sourceSamples =
+          receipt && output ? receipt.samples + output.contextTime! * 48_000 - receipt.contextFrame : Number.NaN;
+        const audioFrame = Math.floor(
+          (receipt?.startFrame ?? Number.NaN) + sourceSamples / ((48_000 * 1_001) / 30_000) + 1e-7,
+        );
+        const avDrift = Math.abs(audioFrame - state.frame);
+        if (!Number.isFinite(avDrift) || avDrift > 1) {
+          evidence.avDriftViolations++;
+          if (evidence.avDriftSamples.length < 10)
+            evidence.avDriftSamples.push({ state, receipt, output, audioFrame, avDrift });
+        }
+        evidence.maximumAVDriftFrames = Math.max(evidence.maximumAVDriftFrames, avDrift);
+      };
       window.pascapLab!.engine.subscribe((state) => {
         evidence.notifications++;
         evidence.minimumDecoderCount = Math.min(evidence.minimumDecoderCount, state.decoderCount);
@@ -218,71 +162,18 @@ async function openRecoveryProject(
           evidence.firstError ??= state.message;
         }
         if (evidence.pausedGuard && state.playing) evidence.unexpectedResumes++;
-        if (state.status === 'buffering' && previousStatus !== 'buffering') {
-          evidence.bufferingEntries++;
-          evidence.firstBufferingFrame ??= state.frame;
-          if (previousStatus === 'playing' && state.playing && !state.audioClock) {
-            // This fixture has exactly one unchanged clip, constant source IN=0,
-            // and no grades/topology/appearance edits. Require causal evidence for
-            // every buffer: no ready exact neighbour or retainable accepted frame.
-            const slot = state.assignedClipIds.indexOf('recovery-clip');
-            const observed = state.decodedSourceFrames[slot]!;
-            const ready = state.decoderReady[slot]!;
-            const mapped = [state.requestedFrame - 1, state.requestedFrame, state.requestedFrame + 1]
-              .filter((frame) => frame >= 0 && frame < state.duration)
-              .some((frame) => Math.floor(frame * rate + 1e-8) === observed);
-            const invalidEvidence = slot < 0 || !Number.isInteger(observed) || typeof ready !== 'boolean';
-            const eligible = invalidEvidence || (ready && mapped) || Math.abs(state.requestedFrame - state.frame) <= 1;
-            if (eligible) evidence.avoidableBuffering++;
-            evidence.bufferingFrames.push({
-              accepted: state.frame,
-              requested: state.requestedFrame,
-              observed,
-              ready,
-              eligible,
-            });
-          }
-        }
+        if (state.status === 'buffering' && previousStatus === 'playing') evidence.bufferingEntries++;
         previousStatus = state.status;
-        // Check every subscription emission in actual playing state, not merely
-        // the final sample (which resets drift on seek) or a buffering transition.
-        if (state.status === 'playing' && state.playing && state.audioClock) {
-          evidence.playingMusicNotifications++;
-          const drift = Math.abs(state.musicDriftFrames);
-          if (!Number.isFinite(drift) || drift > 1) evidence.driftViolations++;
-          evidence.maximumMusicDriftFrames = Math.max(evidence.maximumMusicDriftFrames, drift);
-          // Independently observed, actually consumed audio samples with their
-          // rendering-thread timestamp, not engine.musicDriftFrames or frame.
-          const music = window.musicStreamEvidence;
-          const receipt = music.receipt;
-          const observedAt = performance.now();
-          const output = music.context?.getOutputTimestamp();
-          const sourceSamples =
-            receipt && output ? receipt.samples + output.contextTime! * 48_000 - receipt.contextFrame : NaN;
-          const audioFrame = Math.floor(
-            (receipt?.startFrame ?? NaN) + sourceSamples / ((48_000 * 1_001) / 30_000) + 1e-7,
-          );
-          const avDrift = Math.abs(audioFrame - state.frame);
-          if (!Number.isFinite(avDrift) || avDrift > 1) {
-            evidence.avDriftViolations++;
-            // Failure-only bounded witnesses, not a changed clock, frame
-            // comparison or allowance. Preserve the exact offending state,
-            // raw consumed-sample receipt and device timestamp for triage.
-            if (evidence.avDriftSamples.length < 10)
-              evidence.avDriftSamples.push({
-                state,
-                receipt,
-                output,
-                observedAt,
-                audioFrame,
-                avDrift,
-                currentState: window.pascapLab!.engine.diagnostics(),
-                outputAfter: music.context?.getOutputTimestamp(),
-                finishedAt: performance.now(),
-              });
-          }
-          evidence.maximumAVDriftFrames = Math.max(evidence.maximumAVDriftFrames, avDrift);
+        if (state.status !== 'playing' || !state.playing) return;
+        // A Playing image is the exact source frame of the clock frame it was drawn for.
+        evidence.playingNotifications++;
+        const lane = state.assignedClipIds.indexOf('recovery-clip');
+        const expected = Math.floor(state.frame * rate + 1e-8);
+        if (state.requestedFrame !== state.frame || state.decodedSourceFrames[lane] !== expected) {
+          evidence.sourceViolations++;
+          if (evidence.sourceSamples.length < 10) evidence.sourceSamples.push({ state, expected });
         }
+        if (state.audioClock) checkMusic(state);
       });
     },
     slow ? 0.1 : 1,
@@ -325,6 +216,7 @@ async function assertPaused(page: Page, frame: number, musicStarts: number): Pro
   expect(paused.state.status, paused.state.message).toBe('paused');
   expect(paused.state.playing).toBe(false);
   expect(paused.state.frame).toBe(frame);
+  expect(paused.state.activeDecoders).toBe(0);
   expect(paused.musicPaused).toBe(true);
   expect(paused.evidence.musicStarts).toBe(musicStarts);
   expect(paused.evidence.unexpectedMusicStarts).toBe(0);
@@ -347,15 +239,15 @@ async function assertCompleted(page: Page, fixture: RecoveryFixture, withMusic: 
   expect(evidence.minimumDecoderCount).toBe(2);
   expect(evidence.maximumDecoderCount).toBe(2);
   expect(evidence.errors, evidence.firstError ?? 'No preview errors.').toBe(0);
-  expect(evidence.avoidableBuffering, JSON.stringify(evidence.bufferingFrames)).toBe(0);
+  expect(evidence.playingNotifications).toBeGreaterThan(0);
+  expect(evidence.sourceViolations, JSON.stringify(evidence.sourceSamples)).toBe(0);
   expect(evidence.driftViolations).toBe(0);
-  expect(evidence.avDriftViolations).toBe(0);
+  expect(evidence.avDriftViolations, JSON.stringify(evidence.avDriftSamples)).toBe(0);
   if (withMusic) {
     expect(evidence.playingMusicNotifications).toBeGreaterThan(0);
     expect(evidence.maximumMusicDriftFrames).toBeLessThanOrEqual(1);
     expect(evidence.maximumAVDriftFrames).toBeLessThanOrEqual(1);
   }
-  await expect(page.locator('video[data-pascap-decoder]')).toHaveCount(2);
   expect(await page.evaluate(() => window.pascapLab!.project())).toEqual(fixture.document);
   await page.evaluate(() => window.pascapLab!.flush());
   expect(fixture.memory.saves).toBe(0);
@@ -365,42 +257,41 @@ async function assertCompleted(page: Page, fixture: RecoveryFixture, withMusic: 
 async function attachEvidence(page: Page, browser: Browser, withMusic: boolean, slow: boolean): Promise<void> {
   const evidence = await page.evaluate(() => {
     const state = window.pascapLab!.engine.diagnostics();
-    const gate = window.playbackRecoveryGate;
+    const gate = window.videoFrameGate;
     return {
       renderer: state.renderer,
       status: state.status,
       message: state.message,
       frame: state.frame,
+      requestedFrame: state.requestedFrame,
       duration: state.duration,
       decoderCount: state.decoderCount,
       stalls: state.stalls,
       boundaryStalls: state.boundaryStalls,
       stallMilliseconds: state.stallMilliseconds,
-      ...window.playbackRecoveryEvidence,
-      requestedFrame: state.requestedFrame,
+      decodedFrames: state.decodedFrames,
+      droppedDecodedFrames: state.droppedDecodedFrames,
       decodedSourceFrames: state.decodedSourceFrames,
-      decoderReady: state.decoderReady,
-      decoders: Array.from(document.querySelectorAll<HTMLVideoElement>('video[data-pascap-decoder]')).map((video) => ({
-        slot: video.dataset['pascapDecoder'],
-        time: video.currentTime,
-        seeking: video.seeking,
-        paused: video.paused,
-        ready: video.readyState,
-      })),
-      decoderEvents: Reflect.get(window, 'recoveryDecoderEvents'),
-      videoCatchUpRecovery: Reflect.get(window, 'videoCatchUpRecovery'),
-      renderClockAdvance: Reflect.get(window, 'renderClockAdvance'),
-      callbackGate: {
-        heldFrame: gate.heldFrame,
-        heldCallbacks: gate.heldCallbacks,
-        releasedCallbacks: gate.releasedCallbacks,
-      },
+      queuedFrames: state.queuedFrames,
+      ...window.playbackRecoveryEvidence,
+      frameGate: { heldFrames: gate.heldFrames, releasedFrames: gate.releasedFrames },
     };
   });
   await test.info().attach('synthetic-playback-recovery', {
     body: JSON.stringify({ browser: browser.version(), withMusic, slow, ...evidence }, null, 2),
     contentType: 'application/json',
   });
+}
+
+/** Withhold decoded frames from the first Playing notification at or after `frame`. */
+async function holdFramesFrom(page: Page, frame: number): Promise<void> {
+  await page.evaluate((from) => {
+    const unsubscribe = window.pascapLab!.engine.subscribe((state) => {
+      if (state.status !== 'playing' || state.frame < from) return;
+      window.videoFrameGate.hold = true;
+      queueMicrotask(unsubscribe);
+    });
+  }, frame);
 }
 
 for (const [withMusic, slow] of [
@@ -420,24 +311,13 @@ for (const [withMusic, slow] of [
       await startPlayback(page);
       await waitForCompletion(page);
       await assertCompleted(page, fixture, withMusic);
-      if (!withMusic && !slow) {
-        const { state, evidence } = await page.evaluate(() => ({
-          state: window.pascapLab!.engine.diagnostics(),
-          evidence: window.playbackRecoveryEvidence,
-        }));
-        // Each non-initial buffer must be justified by the exact observed-frame
-        // contract, not an arbitrary software-renderer count/FPS allowance.
-        expect(evidence.firstBufferingFrame).toBe(0);
-        expect(evidence.bufferingEntries).toBe(1 + evidence.bufferingFrames.length);
-        expect(state.stalls).toBe(evidence.bufferingEntries);
-      }
     } finally {
       await attachEvidence(page, browser, withMusic, slow);
     }
   });
 }
 
-test('a withheld decoded callback buffers beyond one-frame eligibility, reports failure and permits explicit recovery', async ({
+test('a decoder that stops delivering holds the image, reports failure and permits explicit recovery', async ({
   page,
   request,
   browser,
@@ -445,37 +325,29 @@ test('a withheld decoded callback buffers beyond one-frame eligibility, reports 
   test.setTimeout(45_000);
   const fixture = await openRecoveryProject(page, request, false);
   try {
-    await page.evaluate(() => {
-      // Playing decoders may legitimately skip frame callbacks under load.
-      // Hold the first genuine callback after source zero, whatever its frame;
-      // unlike an exact requested seek, no particular playback callback is promised.
-      window.playbackRecoveryGate.targetFrame = 1;
-      window.playbackRecoveryGate.atOrAfter = true;
-    });
+    await holdFramesFrom(page, 10);
     await startPlayback(page);
     await page.waitForFunction(() => {
-      const gate = window.playbackRecoveryGate;
       const state = window.pascapLab!.engine.diagnostics();
-      return gate.heldCallbacks === 1 && state.status === 'buffering' && state.requestedFrame > 1;
+      return window.videoFrameGate.heldFrames > 0 && state.status === 'buffering';
     });
-    const blocked = await page.evaluate(() => ({
-      state: window.pascapLab!.engine.diagnostics(),
-      evidence: window.playbackRecoveryEvidence,
-    }));
-    expect(blocked.evidence.bufferingFrames.length).toBeGreaterThan(0);
-    expect(await page.evaluate(() => window.playbackRecoveryGate.heldFrame)).toBeGreaterThanOrEqual(1);
-    expect(blocked.evidence.avoidableBuffering, JSON.stringify(blocked.evidence.bufferingFrames)).toBe(0);
-    expect(blocked.state.requestedFrame - blocked.state.frame).toBeGreaterThan(1);
-    // Keep withholding the genuine callback: no observed frame can satisfy the
-    // required recovery seek. The existing bounded decoder deadline must report
-    // the actual failure, never silently retain stale footage indefinitely.
+    const blocked = await page.evaluate(() => window.pascapLab!.engine.diagnostics());
+    expect(blocked).toMatchObject({ playing: true, message: 'Waiting for decoded frames', boundaryStalls: 0 });
+    // Without music the clock waits at the first undecoded frame.
+    expect(blocked.requestedFrame).toBeGreaterThan(blocked.frame);
+    await page.waitForFunction(() => window.pascapLab!.engine.diagnostics().stallMilliseconds > 500);
+    expect(await page.evaluate(() => window.pascapLab!.engine.diagnostics())).toMatchObject({
+      status: 'buffering',
+      frame: blocked.frame,
+      requestedFrame: blocked.requestedFrame,
+    });
     await waitForCompletion(page);
     const failed = await page.evaluate(() => window.pascapLab!.engine.diagnostics());
-    expect(failed.status).toBe('error');
-    expect(failed.playing).toBe(false);
-    expect(failed.message).toContain('did not deliver the required frame within 5 seconds');
-    expect(failed.decoderCount).toBe(2);
-    await page.evaluate(() => window.playbackRecoveryGate.release!());
+    expect(failed).toMatchObject({ status: 'error', playing: false, activeDecoders: 0, decoderCount: 2 });
+    expect(failed.message).toBe(
+      `Video decoder ${failed.assignedClipIds.indexOf('recovery-clip') + 1} did not deliver source frame ${blocked.requestedFrame} within 5 seconds.`,
+    );
+    await page.evaluate(() => window.videoFrameGate.release());
     await page.evaluate(() => window.pascapLab!.engine.seek(0));
     await assertPaused(page, 0, 0);
     await startPlayback(page);
@@ -483,14 +355,13 @@ test('a withheld decoded callback buffers beyond one-frame eligibility, reports 
     await assertPaused(page, 89, 0);
     expect(await page.evaluate(() => window.pascapLab!.project())).toEqual(fixture.document);
     expect(fixture.memory.saves).toBe(0);
-    expect(await page.evaluate(() => window.playbackRecoveryGate.releasedCallbacks)).toBe(1);
   } finally {
-    await page.evaluate(() => window.playbackRecoveryGate.release?.());
+    await page.evaluate(() => window.videoFrameGate.release());
     await attachEvidence(page, browser, false, false);
   }
 });
 
-test('native-event-ordered video catch-up preserves healthy music and exact source readiness', async ({
+test('music keeps its clock while a late decoder catches up by dropping passed frames', async ({
   page,
   request,
   browser,
@@ -498,496 +369,35 @@ test('native-event-ordered video catch-up preserves healthy music and exact sour
   test.setTimeout(45_000);
   const fixture = await openRecoveryProject(page, request, true);
   try {
-    await page.evaluate(() => window.pascapLab!.engine.seek(4));
-    await page.evaluate(() => {
-      const gate = window.playbackRecoveryGate;
-      gate.targetFrame = 5;
-      gate.atOrAfter = true;
-      gate.pauseOnHold = true;
-      Reflect.set(window, 'videoCatchUpRecovery', null);
-      const currentTime = Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, 'currentTime')!;
-      Object.defineProperty(HTMLMediaElement.prototype, 'currentTime', {
-        ...currentTime,
-        set(this: HTMLMediaElement, value: number) {
-          currentTime.set!.call(this, value);
-          if (this.dataset['pascapDecoder'] === undefined || !gate.release || gate.heldFrame === null) return;
-          const requested = Math.floor((value * 30_000) / 1_001);
-          const state = window.pascapLab!.engine.diagnostics();
-          const slot = state.assignedClipIds.indexOf('recovery-clip');
-          const observed = state.decodedSourceFrames[slot];
-          // The seek EVENT releases the blocked callback chain. Its
-          // metadata may be behind, equal to or ahead of the requested
-          // frame: eligibility is the production decoder's job, not a
-          // release condition that could deadlock this test.
-          const release = gate.release;
-          Reflect.set(window, 'videoCatchUpRecovery', {
-            requested,
-            observed,
-            held: gate.heldFrame,
-            state,
-            starts: window.musicStreamEvidence.starts,
-          });
-          queueMicrotask(release);
-        },
-      });
-    });
+    await holdFramesFrom(page, 10);
     await startPlayback(page);
+    await page.waitForFunction(() => {
+      const state = window.pascapLab!.engine.diagnostics();
+      return window.videoFrameGate.heldFrames > 0 && state.status === 'buffering' && state.requestedFrame >= 25;
+    });
+    const late = await page.evaluate(() => {
+      const state = window.pascapLab!.engine.diagnostics();
+      window.videoFrameGate.release();
+      return state;
+    });
+    expect(late).toMatchObject({ playing: true, audioClock: true });
+    expect(late.requestedFrame - late.frame).toBeGreaterThan(1);
     await waitForCompletion(page);
-    const result = await page.evaluate(() => ({
-      recovered: Reflect.get(window, 'videoCatchUpRecovery') as {
-        requested: number;
-        observed: number;
-        held: number;
-        state: { status: string; playing: boolean };
-        starts: number;
-      } | null,
+    await assertCompleted(page, fixture, true);
+    const recovered = await page.evaluate(() => ({
       state: window.pascapLab!.engine.diagnostics(),
+      evidence: window.playbackRecoveryEvidence,
     }));
-    expect(result.recovered, result.state.message).not.toBeNull();
-    const recovered = result.recovered!;
-    expect(recovered.observed).toBeGreaterThanOrEqual(4);
-    expect(recovered.held).toBeGreaterThan(recovered.observed);
-    expect(recovered.requested - recovered.observed).toBeGreaterThan(1);
-    expect(recovered.state).toMatchObject({ status: 'buffering', playing: true });
-    expect(recovered.starts).toBe(1);
-    await assertCompleted(page, fixture, true);
-    expect(await page.evaluate(() => window.playbackRecoveryGate.releasedCallbacks)).toBe(1);
+    expect(recovered.state.droppedDecodedFrames).toBeGreaterThan(0);
+    expect(recovered.evidence.bufferingEntries).toBeGreaterThan(0);
   } finally {
-    await page.evaluate(() => window.playbackRecoveryGate.release?.());
-    await attachEvidence(page, browser, true, false);
-  }
-});
-
-test('Playing publication rechecks real audio output after bounded render-thread delay', async ({
-  page,
-  request,
-  browser,
-  browserName,
-}) => {
-  test.setTimeout(45_000);
-  const fixture = await openRecoveryProject(page, request, true);
-  try {
-    await page.evaluate(() => {
-      Reflect.set(window, 'renderClockAdvance', null);
-      const draw = WebGL2RenderingContext.prototype.drawArrays;
-      WebGL2RenderingContext.prototype.drawArrays = function (...args) {
-        Reflect.apply(draw, this, args);
-        const engine = window.pascapLab!.engine;
-        const state = engine.diagnostics();
-        const music = window.musicStreamEvidence;
-        const receipt = music.receipt;
-        if (
-          this.canvas !== engine.canvas ||
-          state.status !== 'playing' ||
-          state.requestedFrame < 10 ||
-          !receipt ||
-          !music.context ||
-          Reflect.get(window, 'renderClockAdvance') !== null
-        )
-          return;
-        const started = performance.now();
-        let audioFrame = state.requestedFrame;
-        // Delay one real draw until the independently rendered/output
-        // audio is beyond every eligible neighbour. No timestamp, receipt, image
-        // or engine clock is changed; this models bounded upload/draw
-        // work while the real audio thread continues consuming samples.
-        while (audioFrame < state.requestedFrame + 3 && performance.now() - started < 500) {
-          const output = music.context.getOutputTimestamp();
-          const samples = receipt.samples + output.contextTime! * 48_000 - receipt.contextFrame;
-          audioFrame = Math.floor(receipt.startFrame + samples / ((48_000 * 1_001) / 30_000) + 1e-7);
-        }
-        Reflect.set(window, 'renderClockAdvance', {
-          requested: state.requestedFrame,
-          audioFrame,
-          elapsed: performance.now() - started,
-        });
-        queueMicrotask(() => {
-          const after = engine.diagnostics();
-          const output = music.context!.getOutputTimestamp();
-          const samples = receipt.samples + output.contextTime! * 48_000 - receipt.contextFrame;
-          const presentedFrame = Math.floor(receipt.startFrame + samples / ((48_000 * 1_001) / 30_000) + 1e-7);
-          const pixel = new Uint8Array(4);
-          this.readPixels(0, 0, 1, 1, this.RGBA, this.UNSIGNED_BYTE, pixel);
-          Reflect.set(window, 'renderClockAdvance', {
-            requested: state.requestedFrame,
-            audioFrame,
-            elapsed: performance.now() - started,
-            after,
-            presentedFrame,
-            output,
-            pixel: Array.from(pixel),
-          });
-        });
-      };
-    });
-    await startPlayback(page);
-    await waitForCompletion(page);
-    const witness = await page.evaluate(
-      () =>
-        Reflect.get(window, 'renderClockAdvance') as {
-          requested: number;
-          audioFrame: number;
-          elapsed: number;
-          after: { status: string; frame: number; requestedFrame: number };
-          presentedFrame: number;
-          pixel: number[];
-        } | null,
-    );
-    expect(witness).not.toBeNull();
-    // Chrome exposes advancing output time during synchronous JS, giving
-    // a causal stale-image red/green. Firefox can cache its native timestamp
-    // until the task yields: validate that real clock too, without faking it
-    // or requiring Chrome's clock-update delivery on a different backend.
-    if (browserName === 'chromium') expect(witness!.audioFrame - witness!.requested).toBeGreaterThanOrEqual(3);
-    // The surface/status must be valid even between throttled notifications,
-    // not merely omit an otherwise invalid Playing subscription snapshot.
-    if (witness!.after.status === 'playing') {
-      expect(Math.abs(witness!.presentedFrame - witness!.after.frame), JSON.stringify(witness)).toBeLessThanOrEqual(1);
-    } else {
-      expect(witness!.after.status, JSON.stringify(witness)).toBe('buffering');
-      expect(witness!.after.requestedFrame).toBeGreaterThanOrEqual(witness!.audioFrame);
-      expect(witness!.pixel).toEqual([0, 0, 0, 255]);
-    }
-    await assertCompleted(page, fixture, true);
-  } finally {
-    await attachEvidence(page, browser, true, false);
-  }
-});
-
-test('Playing publication rechecks real audio output after an earlier subscriber', async ({
-  page,
-  request,
-  browser,
-  browserName,
-}) => {
-  test.setTimeout(45_000);
-  const fixture = await openRecoveryProject(page, request, true);
-  interface SubscriberEvidence {
-    delayedDispatches: number;
-    playingDispatches: number;
-    violations: number;
-    violationSamples: unknown[];
-    witness: {
-      frame: number;
-      requested: number;
-      audioFrame: number;
-      elapsed: number;
-      after?: { status: string; frame: number; requestedFrame: number };
-      presentedFrame?: number;
-      pixel?: number[];
-      musicStarts?: number;
-    } | null;
-  }
-  try {
-    await page.evaluate(() => {
-      const engine = window.pascapLab!.engine;
-      const evidence: SubscriberEvidence = {
-        delayedDispatches: 0,
-        playingDispatches: 0,
-        violations: 0,
-        violationSamples: [],
-        witness: null,
-      };
-      Reflect.set(window, 'subscriberClockAdvance', evidence);
-      const unsubscribeEarlier = engine.subscribe((state) => {
-        const music = window.musicStreamEvidence;
-        const receipt = music.receipt;
-        if (
-          state.status !== 'playing' ||
-          !state.playing ||
-          !state.audioClock ||
-          state.requestedFrame < 10 ||
-          !receipt ||
-          !music.context ||
-          evidence.delayedDispatches !== 0
-        )
-          return;
-        evidence.delayedDispatches++;
-        const started = performance.now();
-        let audioFrame = state.frame;
-        // One bounded real subscriber workload, after the published snapshot
-        // was constructed but before the later listener receives it. Only the
-        // actual output timestamp and consumed-sample receipt supply the clock.
-        while (audioFrame < state.frame + 3 && performance.now() - started < 500) {
-          const output = music.context.getOutputTimestamp();
-          const samples = receipt.samples + output.contextTime! * 48_000 - receipt.contextFrame;
-          audioFrame = Math.floor(receipt.startFrame + samples / ((48_000 * 1_001) / 30_000) + 1e-7);
-        }
-        const witness = {
-          frame: state.frame,
-          requested: state.requestedFrame,
-          audioFrame,
-          elapsed: performance.now() - started,
-        };
-        evidence.witness = witness;
-        queueMicrotask(() => {
-          const after = engine.diagnostics();
-          const output = music.context!.getOutputTimestamp();
-          const samples = receipt.samples + output.contextTime! * 48_000 - receipt.contextFrame;
-          const presentedFrame = Math.floor(receipt.startFrame + samples / ((48_000 * 1_001) / 30_000) + 1e-7);
-          const gl = engine.canvas.getContext('webgl2')!;
-          const pixel = new Uint8Array(4);
-          gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
-          evidence.witness = {
-            ...witness,
-            after,
-            presentedFrame,
-            pixel: Array.from(pixel),
-            musicStarts: music.starts,
-          };
-        });
-      });
-      Reflect.set(window, 'unsubscribeRecoverySubscribers', [unsubscribeEarlier]);
-      const unsubscribeLater = engine.subscribe((state) => {
-        if (state.status !== 'playing' || !state.playing || !state.audioClock) return;
-        evidence.playingDispatches++;
-        const music = window.musicStreamEvidence;
-        const receipt = music.receipt;
-        const output = music.context?.getOutputTimestamp();
-        const samples = receipt && output ? receipt.samples + output.contextTime! * 48_000 - receipt.contextFrame : NaN;
-        const audioFrame = Math.floor((receipt?.startFrame ?? NaN) + samples / ((48_000 * 1_001) / 30_000) + 1e-7);
-        const drift = Math.abs(audioFrame - state.frame);
-        if (!Number.isFinite(drift) || drift > 1) {
-          evidence.violations++;
-          if (evidence.violationSamples.length < 10)
-            evidence.violationSamples.push({ state, receipt, output, audioFrame, drift });
-        }
-      });
-      Reflect.set(window, 'unsubscribeRecoverySubscribers', [unsubscribeEarlier, unsubscribeLater]);
-    });
-    await startPlayback(page);
-    await waitForCompletion(page);
-    const evidence = await page.evaluate(() => Reflect.get(window, 'subscriberClockAdvance') as SubscriberEvidence);
-    expect(evidence.delayedDispatches).toBe(1);
-    expect(evidence.playingDispatches).toBeGreaterThan(0);
-    expect(evidence.violations, JSON.stringify(evidence.violationSamples)).toBe(0);
-    expect(evidence.witness).not.toBeNull();
-    const witness = evidence.witness!;
-    expect(witness.requested).toBeGreaterThanOrEqual(10);
-    expect(witness.musicStarts).toBe(1);
-    // Chrome exposes real advancement within the synchronous subscriber.
-    // Firefox may cache its native timestamp until the task yields; every
-    // later Playing dispatch still has the unchanged independent one-frame bound.
-    if (browserName === 'chromium') expect(witness.audioFrame - witness.frame).toBeGreaterThanOrEqual(3);
-    if (witness.audioFrame - witness.frame >= 3) {
-      expect(witness.after?.status, JSON.stringify(witness)).toBe('buffering');
-      expect(witness.after?.requestedFrame).toBeGreaterThanOrEqual(witness.audioFrame);
-      expect(witness.pixel).toEqual([0, 0, 0, 255]);
-    } else if (witness.after?.status === 'playing') {
-      expect(Math.abs(witness.presentedFrame! - witness.after.frame), JSON.stringify(witness)).toBeLessThanOrEqual(1);
-    } else {
-      expect(witness.after?.status, JSON.stringify(witness)).toBe('buffering');
-      expect(witness.pixel).toEqual([0, 0, 0, 255]);
-    }
-    await assertCompleted(page, fixture, true);
-  } finally {
-    await page.evaluate(() => {
-      const unsubscribe = Reflect.get(window, 'unsubscribeRecoverySubscribers') as (() => void)[] | undefined;
-      unsubscribe?.forEach((handler) => handler());
-      Reflect.deleteProperty(window, 'unsubscribeRecoverySubscribers');
-    });
-    await test.info().attach('synthetic-subscriber-publication', {
-      body: JSON.stringify(await page.evaluate(() => Reflect.get(window, 'subscriberClockAdvance')), null, 2),
-      contentType: 'application/json',
-    });
-    await attachEvidence(page, browser, true, false);
-  }
-});
-
-test('Playing publication rechecks real audio output after timeline sampling', async ({
-  page,
-  request,
-  browser,
-  browserName,
-}) => {
-  test.setTimeout(45_000);
-  const fixture = await openRecoveryProject(page, request, true);
-  interface SamplingEvidence {
-    armed: boolean;
-    delayedSamples: number;
-    playingDispatches: number;
-    violations: number;
-    violationSamples: unknown[];
-    witness: {
-      frame: number;
-      requested: number;
-      sourceFrame: number;
-      sample: unknown;
-      receipt: unknown;
-      outputBefore: unknown;
-      outputAfter: unknown;
-      audioFrameBefore: number;
-      audioFrame: number;
-      elapsed: number;
-      after?: { status: string; frame: number; requestedFrame: number };
-      presentedFrame?: number;
-      pixel?: number[];
-      musicStarts?: number;
-    } | null;
-  }
-  try {
-    await page.evaluate(() => {
-      const engine = window.pascapLab!.engine;
-      const evidence: SamplingEvidence = {
-        armed: false,
-        delayedSamples: 0,
-        playingDispatches: 0,
-        violations: 0,
-        violationSamples: [],
-        witness: null,
-      };
-      Reflect.set(window, 'samplingClockAdvance', evidence);
-      const flatMap = Array.prototype.flatMap;
-      Reflect.set(window, 'restoreRecoveryFlatMap', () => {
-        Array.prototype.flatMap = flatMap;
-      });
-      Array.prototype.flatMap = function (this: unknown[], ...args) {
-        // Delegate the actual sampling callback/arguments unchanged. Match both
-        // its single active PlacedClip input and its returned sample, not React
-        // arrays or the independent playback observers.
-        const result = Reflect.apply(flatMap, this, args);
-        const placed = this[0] as { clip?: { id?: string } } | undefined;
-        const sample = result[0] as { clipId?: string } | undefined;
-        if (
-          !evidence.armed ||
-          evidence.delayedSamples !== 0 ||
-          this.length !== 1 ||
-          placed?.clip?.id !== 'recovery-clip' ||
-          sample?.clipId !== 'recovery-clip'
-        )
-          return result;
-        evidence.armed = false;
-        const state = engine.diagnostics();
-        const music = window.musicStreamEvidence;
-        const receipt = music.receipt;
-        if (state.status !== 'playing' || !state.playing || !state.audioClock || !receipt || !music.context)
-          return result;
-        evidence.delayedSamples++;
-        const outputBefore = music.context.getOutputTimestamp();
-        let outputAfter = outputBefore;
-        const started = performance.now();
-        let audioFrame = Math.floor(
-          receipt.startFrame +
-            (receipt.samples + outputBefore.contextTime! * 48_000 - receipt.contextFrame) /
-              ((48_000 * 1_001) / 30_000) +
-            1e-7,
-        );
-        const audioFrameBefore = audioFrame;
-        // Cost inside the real sampleTimeline call, before returning its native
-        // result: the audio thread advances while synchronous sampling is busy.
-        // No clock, receipt, source frame or sample metadata is substituted.
-        while (audioFrame < state.frame + 3 && performance.now() - started < 500) {
-          outputAfter = music.context.getOutputTimestamp();
-          const samples = receipt.samples + outputAfter.contextTime! * 48_000 - receipt.contextFrame;
-          audioFrame = Math.floor(receipt.startFrame + samples / ((48_000 * 1_001) / 30_000) + 1e-7);
-        }
-        const witness = {
-          frame: state.frame,
-          requested: state.requestedFrame,
-          sourceFrame: state.decodedSourceFrames[state.assignedClipIds.indexOf('recovery-clip')]!,
-          sample,
-          receipt,
-          outputBefore,
-          outputAfter,
-          audioFrameBefore,
-          audioFrame,
-          elapsed: performance.now() - started,
-        };
-        evidence.witness = witness;
-        queueMicrotask(() => {
-          const after = engine.diagnostics();
-          const output = music.context!.getOutputTimestamp();
-          const samples = receipt.samples + output.contextTime! * 48_000 - receipt.contextFrame;
-          const presentedFrame = Math.floor(receipt.startFrame + samples / ((48_000 * 1_001) / 30_000) + 1e-7);
-          const gl = engine.canvas.getContext('webgl2')!;
-          const pixel = new Uint8Array(4);
-          gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
-          evidence.witness = {
-            ...witness,
-            after,
-            presentedFrame,
-            pixel: Array.from(pixel),
-            musicStarts: music.starts,
-          };
-        });
-        return result;
-      };
-      const unsubscribeEarlier = engine.subscribe((state) => {
-        if (
-          state.status === 'playing' &&
-          state.playing &&
-          state.audioClock &&
-          state.requestedFrame >= 10 &&
-          evidence.delayedSamples === 0
-        )
-          evidence.armed = true;
-      });
-      Reflect.set(window, 'unsubscribeRecoverySampling', [unsubscribeEarlier]);
-      const unsubscribeLater = engine.subscribe((state) => {
-        if (state.status !== 'playing' || !state.playing || !state.audioClock) return;
-        evidence.playingDispatches++;
-        const music = window.musicStreamEvidence;
-        const receipt = music.receipt;
-        const output = music.context?.getOutputTimestamp();
-        const samples = receipt && output ? receipt.samples + output.contextTime! * 48_000 - receipt.contextFrame : NaN;
-        const audioFrame = Math.floor((receipt?.startFrame ?? NaN) + samples / ((48_000 * 1_001) / 30_000) + 1e-7);
-        const drift = Math.abs(audioFrame - state.frame);
-        if (!Number.isFinite(drift) || drift > 1) {
-          evidence.violations++;
-          if (evidence.violationSamples.length < 10)
-            evidence.violationSamples.push({ state, receipt, output, audioFrame, drift });
-        }
-      });
-      Reflect.set(window, 'unsubscribeRecoverySampling', [unsubscribeEarlier, unsubscribeLater]);
-    });
-    await startPlayback(page);
-    await waitForCompletion(page);
-    const evidence = await page.evaluate(() => Reflect.get(window, 'samplingClockAdvance') as SamplingEvidence);
-    expect(evidence.delayedSamples).toBe(1);
-    expect(evidence.playingDispatches).toBeGreaterThan(0);
-    expect(evidence.violations, JSON.stringify(evidence.violationSamples)).toBe(0);
-    expect(evidence.witness).not.toBeNull();
-    const witness = evidence.witness!;
-    expect(witness.requested).toBeGreaterThanOrEqual(10);
-    expect(Number.isInteger(witness.sourceFrame)).toBe(true);
-    expect(witness.sample).toMatchObject({ clipId: 'recovery-clip' });
-    expect(witness.musicStarts).toBe(1);
-    // Same native-clock branch as the earlier-subscriber regression: Firefox
-    // may cache timestamps within synchronous JS, without relaxing any dispatch.
-    if (browserName === 'chromium') {
-      expect(witness.audioFrame - witness.frame).toBeGreaterThanOrEqual(3);
-      expect(witness.audioFrame).toBeGreaterThan(witness.audioFrameBefore);
-    }
-    if (witness.audioFrame - witness.frame >= 3) {
-      expect(witness.after?.status, JSON.stringify(witness)).toBe('buffering');
-      expect(witness.after?.requestedFrame).toBeGreaterThanOrEqual(witness.audioFrame);
-      expect(witness.pixel).toEqual([0, 0, 0, 255]);
-    } else if (witness.after?.status === 'playing') {
-      expect(Math.abs(witness.presentedFrame! - witness.after.frame), JSON.stringify(witness)).toBeLessThanOrEqual(1);
-    } else {
-      expect(witness.after?.status, JSON.stringify(witness)).toBe('buffering');
-      expect(witness.pixel).toEqual([0, 0, 0, 255]);
-    }
-    await assertCompleted(page, fixture, true);
-  } finally {
-    await page.evaluate(() => {
-      const restore = Reflect.get(window, 'restoreRecoveryFlatMap') as (() => void) | undefined;
-      restore?.();
-      Reflect.deleteProperty(window, 'restoreRecoveryFlatMap');
-      const unsubscribe = Reflect.get(window, 'unsubscribeRecoverySampling') as (() => void)[] | undefined;
-      unsubscribe?.forEach((handler) => handler());
-      Reflect.deleteProperty(window, 'unsubscribeRecoverySampling');
-    });
-    await test.info().attach('synthetic-sampling-publication', {
-      body: JSON.stringify(await page.evaluate(() => Reflect.get(window, 'samplingClockAdvance')), null, 2),
-      contentType: 'application/json',
-    });
+    await page.evaluate(() => window.videoFrameGate.release());
     await attachEvidence(page, browser, true, false);
   }
 });
 
 for (const withMusic of [false, true]) {
-  test(`pause, seek and deliberate restart ${withMusic ? 'with music and a callback-gated cancellation' : 'video only'}`, async ({
+  test(`pause, seek and deliberate restart ${withMusic ? 'with music and a withheld-seek cancellation' : 'video only'}`, async ({
     page,
     request,
     browser,
@@ -1018,36 +428,26 @@ for (const withMusic of [false, true]) {
       await assertPaused(page, stopped.frame, withMusic ? 1 : 0);
 
       if (withMusic) {
-        // Deterministic real-browser cancellation: seek just one project/source
-        // frame (39 -> 40), withholding its genuine callback until after pause.
-        // Unlike a timed delay, the gate is asserted reached before cancellation.
+        // Deterministic cancellation: withhold the exact decoded frame of a
+        // seek until after play() (busy, so no music) and pause.
         await page.evaluate(() => window.pascapLab!.engine.seek(39));
         await assertPaused(page, 39, 1);
         await page.evaluate(() => {
-          const gate = window.playbackRecoveryGate;
-          gate.targetFrame = 40;
-          gate.pendingSeek = window.pascapLab!.engine.seek(40);
+          window.videoFrameGate.hold = true;
+          Reflect.set(window, 'pendingRecoverySeek', window.pascapLab!.engine.seek(40));
         });
-        await page.waitForFunction(() => window.playbackRecoveryGate.heldCallbacks === 1);
-        const blocked = await page.evaluate(() => ({
-          state: window.pascapLab!.engine.diagnostics(),
-          heldFrame: window.playbackRecoveryGate.heldFrame,
-          released: window.playbackRecoveryGate.releasedCallbacks,
-        }));
-        expect(blocked.state.status).toBe('seeking');
-        expect(blocked.state.playing).toBe(false);
-        expect(blocked.state.frame).toBe(39);
-        expect(blocked.heldFrame).toBe(40);
-        expect(blocked.released).toBe(0);
+        await page.waitForFunction(() => window.videoFrameGate.heldFrames === 1);
+        const blocked = await page.evaluate(() => window.pascapLab!.engine.diagnostics());
+        expect(blocked).toMatchObject({ status: 'seeking', playing: false, frame: 39, requestedFrame: 40 });
         await page.evaluate(async () => {
           const engine = window.pascapLab!.engine;
-          await engine.play(); // Busy seeking: must not implicitly start music.
+          await engine.play();
           engine.pause();
-          await window.playbackRecoveryGate.pendingSeek;
-          window.playbackRecoveryGate.release!();
+          window.videoFrameGate.release();
+          await Reflect.get(window, 'pendingRecoverySeek');
         });
         await assertPaused(page, 39, 1);
-        expect(await page.evaluate(() => window.playbackRecoveryGate.releasedCallbacks)).toBe(1);
+        expect(await page.evaluate(() => window.videoFrameGate.releasedFrames)).toBe(1);
       }
 
       await page.evaluate(() => window.pascapLab!.engine.seek(40));

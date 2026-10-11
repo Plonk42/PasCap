@@ -232,7 +232,7 @@ The **Timeline preview** heading's native **Compare** button has the accessible
 name **Show ungraded preview**. Active mode shows **Ungraded** on the button and
 as a canvas badge. Pointer activation and focused Enter/Space work paused or during
 active playback, including normal decoder buffering. Buffering is not a pause:
-the requested comparison mode is drawn once normal exact source readiness resumes,
+the requested comparison mode is drawn once the required decoded frames arrive,
 without restarting music. Errors and completion are not active-playback evidence;
 regressions require a subsequent actual Playing draw in the requested mode with
 the same music epoch and unchanged one-frame A/V/source bounds;
@@ -241,7 +241,7 @@ there is no global comparison shortcut. **Source preview** is unaffected.
 The ungraded view is the composed preview without grading, not original-resolution
 footage or the selected clip in isolation. All evaluated colour settings are neutral
 across enabled video tracks, including track colour bases/keyframes and both dissolve
-sources, and every clip's Sharpen/Clarity/Denoise is bypassed. Exact observed source frames and retiming, spatial geometry/coverage, track Opacity,
+sources, and every clip's Sharpen/Clarity/Denoise is bypassed. Exact decoded source frames and retiming, spatial geometry/coverage, track Opacity,
 visibility, black fades, stacking and music are preserved.
 
 This mode belongs only to the editor's preview engine: toggling causes no seek,
@@ -511,17 +511,17 @@ No hidden write retry or original overwrite occurs; accepted registrations remai
 kept if a later source or queue admission fails.
 
 Hover X maps a prepared recording's review button across its complete source.
-Source preview has its own one muted proxy decoder, observed-frame checks,
-buffering/error/retry state and release on close/hidden/offscreen/project change.
+Source preview has its own one-decoder WebCodecs proxy worker drawing exact decoded
+frames, with buffering/error/retry state and release on close/hidden/offscreen/project change.
 It never moves the project playhead or prepares/plays an original implicitly.
 
 A round native **Play / Pause** button sits at the left of the source range strip below
 the image, the same transport bar as the range. Play uses the applied IN/OUT, not numeric
-drafts, starting at the observed frame if inside and before OUT − 1, otherwise IN.
-It stops and exact-seeks OUT − 1, without looping or audio; a one-frame range only
+drafts, starting at the displayed frame if inside and before OUT − 1, otherwise IN.
+It stops on OUT − 1, without looping or audio; a one-frame range only
 displays that frame. Scrub/trim/mark/numeric range edits pause first. Pending play cannot
 restart after cancellation, a source/project switch, close, hidden viewer or tab
-switch; start/stall failures are explicit after five seconds with Retry.
+switch; a frame missing for five seconds is an explicit failure with Retry.
 The track shows the five prepared snapshots across the whole original (or an
 explicit **Snapshots unavailable** state, never a preparation job), hatched omitted
 footage and timeline-style IN/OUT handles with 24 px pointer targets; the rest of
@@ -700,32 +700,23 @@ project. Missing/incompatible URL targets do not open a different project withou
 explanation. A service failure exposes **Retry connecting**; a preview failure
 exposes **Retry preview**, preserving the document and timeline position.
 
-Playback retains an already accepted image for normal one-frame decoder-callback
-latency rather than flashing black or restarting music. Exact source maps across
-all active clips and project-time appearance still govern drawing; a changed clip
-set or stale appearance cannot reuse that image. Genuine larger mismatches, missing
-sources and failed music synchronization remain explicit buffering/errors. Source
-wraps and renderer throughput can still interrupt playback; this is not gapless
-audio or intended-GPU/long-run qualification.
+Playback presents only exact decoded source frames for the clock frame
+([WebCodecs preview decoding](design/WEBCODECS_PREVIEW.md)). When a required frame
+is late, the previous image stays on screen and the status shows buffering: without
+music the clock waits, with music it continues and late frames are skipped. A frame
+still missing after five seconds stops playback with an explicit decoder error;
+failed music synchronization restarts music. A draw that outlasts a frame on a slow
+renderer reports **Catching up with the clock** rather than Playing. Renderer throughput can still
+interrupt playback; this is not gapless audio or intended-GPU/long-run qualification.
 
 When exact decoded sources and every evaluated composition value are unchanged,
 a held slow-motion image reuses the intact presented surface instead of repeating
-the same GPU grade. Readiness and actual output-clock checks still run at current
-project time. Source, colour, spatial pose, opacity, fade, dissolve, canvas size,
+the same GPU grade. Source, colour, spatial pose, opacity, fade, dissolve, canvas size,
 Compare or a cleared surface changes the identity and requires a new draw.
 Diagnostic pixel capture always redraws first: WebGL may discard its non-preserved
 drawing buffer after presenting the intact image. No extra image buffer or longer
-audio queue is introduced.
-
-Playing publication rechecks that same output-clock/source-set/appearance bound
-after diagnostics construction and before each subscriber, including initial
-subscription. Clip-set eligibility for the accepted frame and its one-frame
-neighbours is resolved before the final output-clock read; a successful dispatch
-does no timeline sampling after that read. Work in an earlier subscriber cannot pass an obsolete Playing
-snapshot to a later one. A nested notification, pause or seek supersedes the
-remaining dispatch; there is one bounded listener pass, not a publication retry
-loop. A stale video surface clears to explicit buffering without restarting
-healthy music. Crossing into an empty composition advances to black or completion.
+audio queue is introduced. Crossing into an empty composition advances to black
+or completion.
 
 Music uses **one AudioContext/worklet/output clock** with an aggregate **four ×
 128 KiB mixed Float32 blocks**, serial source reads, shared **64 KiB range scratch**,
@@ -828,7 +819,7 @@ Nonneutral uncovered pixels reveal lower tracks; exact neutral poses retain
 opaque black letterboxing after grading. Both dissolve sources use the
 same track value or overriding `opacity` curve at that project frame, with no second
 group multiplier. Black fades change $b_i$, not coverage.
-Preview reuses two slots per track (16 maximum) plus one source reviewer.
+Preview uses two decoders per track (16 maximum) plus one source-review decoder.
 Native limits are four
 raw buffers/22 bytes per pixel, two LUTs, three timeline representations and two
 retained clip files, with serial one-original/two-intermediate/one-encoder passes

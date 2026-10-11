@@ -7,7 +7,7 @@ import { fingerprintFile } from '../../src/server/files.js';
 import { runProcess } from '../../src/server/process.js';
 import { retimeRawVideo, type RawRetimingOptions } from '../../src/server/retime-process.js';
 import { createClip, createLayer, createProject, projectSchema, type VideoClip } from '../../src/shared/model.js';
-import { compileRetiming, sourceRateAt, type Retiming, type SpeedCurve } from '../../src/shared/speed.js';
+import { compileRetiming, type Retiming, type SpeedCurve } from '../../src/shared/speed.js';
 import { calculateLayout, sampleTimeline } from '../../src/shared/timeline.js';
 
 const enabled = process.env['PASCAP_MEDIA_TESTS'] === '1';
@@ -236,10 +236,6 @@ describe.skipIf(!enabled)('supplied clip retiming maps · native pipes and dispo
         });
         expect(report.largestReadChunkBytes).toBeLessThanOrEqual(12 * FRAME_BYTES);
         expect(frameBuffer).toHaveLength(FRAME_BYTES);
-        const capturedSpeed = captured.clips[0]!.speed;
-        // Curve maps normalise their clock once to the rounded duration: one constant factor.
-        const normalisation = map.rateAt(0) / sourceRateAt(capturedSpeed, map.sourcePositionAt(0));
-        expect(Math.abs(normalisation - 1)).toBeLessThanOrEqual(0.5 / map.duration);
         for (const [output, source] of expected.entries()) {
           expect(Number.isSafeInteger(source)).toBe(true);
           expect(source).toBeGreaterThanOrEqual(7);
@@ -250,9 +246,6 @@ describe.skipIf(!enabled)('supplied clip retiming maps · native pipes and dispo
           );
           const sample = sampleTimeline(captured, placed.start + output, layout)[0]!;
           expect(sample.sourceFrame).toBe(source);
-          expect(map.rateAt(output)).toBeCloseTo(
-            sourceRateAt(capturedSpeed, map.sourcePositionAt(output)) * normalisation,
-          );
         }
         await unchanged();
       } finally {
@@ -288,7 +281,7 @@ describe.skipIf(!enabled)('supplied clip retiming maps · native pipes and dispo
           ffmpeg: '/must-not-run-invalid-row-map',
           retiming: { ...baseline, sourceAt: null } as unknown as Retiming,
         }),
-      ).rejects.toThrow('sourceAt, sourcePositionAt, outputAt and rateAt');
+      ).rejects.toThrow('sourceAt, sourcePositionAt and outputAt');
       expect(await readdir(work)).toEqual([]);
       await unchanged();
     } finally {
@@ -314,7 +307,6 @@ describe.skipIf(!enabled)('supplied clip retiming maps · native pipes and dispo
           sourceAt: (output) => sources[output]!,
           sourcePositionAt: (output) => 7 + Math.max(0, Math.min(1, output / sources.length)) * 12,
           outputAt: () => 0,
-          rateAt: () => 1,
         };
         await expect(
           retimeRawVideo({ ...options(clip, work, 'partial.rgb', new AbortController().signal), retiming }),
