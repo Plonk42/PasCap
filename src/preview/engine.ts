@@ -588,11 +588,11 @@ export class PreviewEngine {
       const layers = sampleTimeline(this.#document!, frame, this.#layout);
       this.#schedule(frame, layers);
       await Promise.all(
-        layers.map((layer) => {
+        layers.flatMap((layer) => {
           const lane = this.#laneOf(layer.clipId)!;
-          if (lane.firstRequested === null) return undefined;
+          if (lane.firstRequested === null) return [];
           const count = Math.min(PREFILL_FRAMES, lane.requestedCount);
-          return this.#streams.ready(lane.index, lane.firstRequested, count, signal);
+          return [this.#streams.ready(lane.index, lane.firstRequested, count, signal)];
         }),
       );
       if (!this.#isCurrent(signal) || !this.#playing) return;
