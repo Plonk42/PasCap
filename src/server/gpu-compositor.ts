@@ -1,7 +1,7 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { constants } from 'node:fs';
-import { access, mkdtemp, readFile, rm } from 'node:fs/promises';
+import { access, mkdtemp, readdir, readFile, rm } from 'node:fs/promises';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
@@ -22,14 +22,20 @@ import { ServiceError } from './errors.js';
 import type { ContentBounds } from './layered-frame.js';
 
 export type GpuBackend = 'gl' | 'vulkan' | 'swiftshader';
-/** Hardware ANGLE backends, in order; the first non-software renderer wins. */
-export const GPU_BACKENDS: readonly GpuBackend[] = ['gl', 'vulkan'];
+/**
+ * Hardware ANGLE backends, in order; the first non-software renderer wins. ANGLE's Vulkan
+ * backend selects a discrete GPU when present, while GL follows the display's (often integrated) one.
+ */
+export const GPU_BACKENDS: readonly GpuBackend[] = ['vulkan', 'gl'];
 const BROWSERS = ['google-chrome', 'google-chrome-stable', 'chromium', 'chromium-browser'];
 const SOFTWARE_RENDERER = /swiftshader|llvmpipe|softpipe|lavapipe|software|basic render/i;
 export const GPU_STARTUP_TIMEOUT_MS = 30_000;
 export const GPU_FRAME_TIMEOUT_MS = 60_000;
 const IDLE_POLL_MS = 20_000;
 const JSON_LIMIT = 16_384;
+/** Browser profiles name their owning service process, so a killed service's leftovers are recognisable. */
+const PROFILE_PREFIX = 'pascap-gpu-';
+const PROFILE_OWNER = /^pascap-gpu-(\d+)-/;
 
 export interface GpuGroupSource {
   /** The export's target-size RGB8 frame; only its fitted content rectangle is sent. */
@@ -241,7 +247,7 @@ export class GpuCompositor {
 
   async #start(binary: string, backend: GpuBackend): Promise<void> {
     const { signal } = this.#options;
-    this.#profile = await mkdtemp(path.join(os.tmpdir(), 'pascap-gpu-'));
+    this.#profile = await mkdtemp(path.join(os.tmpdir(), `${PROFILE_PREFIX}${process.pid}-`));
     await new Promise<void>((resolve, reject) => {
       this.#server.once('error', reject);
       this.#server.listen(0, '127.0.0.1', () => resolve());
@@ -554,8 +560,30 @@ export class GpuCompositor {
   }
 }
 
+function running(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === 'EPERM';
+  }
+}
+
+/** Profiles left by a service that was killed before it could close its browser. */
+export async function removeStaleProfiles(): Promise<void> {
+  const directory = os.tmpdir();
+  const names = await readdir(directory).catch(() => []);
+  await Promise.all(
+    names.map(async (name) => {
+      const owner = PROFILE_OWNER.exec(name)?.[1];
+      if (owner && !running(Number(owner))) await rm(path.join(directory, name), { recursive: true, force: true });
+    }),
+  );
+}
+
 /** First usable hardware backend, or the reason the CPU compositor must be used instead. */
 export async function startGpuCompositor(options: GpuCompositorOptions): Promise<GpuStart> {
+  await removeStaleProfiles();
   const binary = await findBrowser(options.chrome);
   if (!binary) return { compositor: null, reason: 'no Chrome or Chromium browser found (set PASCAP_CHROME)' };
   let script: string;
