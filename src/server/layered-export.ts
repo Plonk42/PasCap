@@ -474,7 +474,8 @@ class SequentialLayeredRenderer {
     const asset = assets[index]!;
     const filename = `clip-${index}.nut`;
     await assertSourceIdentity(asset.sourcePath, asset.fingerprint, true);
-    this.update(0, `Retiming original layered clip ${clip.id}`);
+    const label = `Retiming original layered clip ${index + 1} / ${this.options.document.clips.length} (${asset.name})`;
+    this.update(0, label);
     if (++this.#clipFiles > LAYERED_EXPORT_RESOURCES.maxLosslessClipsOnDisk)
       throw new Error('Layered clip scratch bound exceeded.');
     this.#report.peakLosslessClipFiles = Math.max(this.#report.peakLosslessClipFiles, this.#clipFiles);
@@ -520,8 +521,7 @@ class SequentialLayeredRenderer {
         'pipe:1',
       ],
       encodeArgs: losslessEncoder(target, filename, false),
-      onProgress: (frames, total) =>
-        this.update(frames, `Retiming original layered clip ${clip.id}: ${frames} / ${total} frames`),
+      onProgress: (frames, total) => this.update(frames, `${label}: ${frames} / ${total} frames`),
     });
     if (report.outputFrames !== placed.duration || report.decodedFrames !== clip.sourceOut - clip.sourceIn)
       throw new ServiceError('Layered retiming did not emit/decode its exact captured frame counts.', 422);
