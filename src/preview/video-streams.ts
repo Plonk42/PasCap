@@ -32,7 +32,12 @@ export class VideoStreams {
   droppedFrames = 0;
 
   constructor(lanes: number) {
-    this.#lanes = Array.from({ length: lanes }, () => ({ generation: 0, queue: [], error: null, listeners: new Set() }));
+    this.#lanes = Array.from({ length: lanes }, () => ({
+      generation: 0,
+      queue: [],
+      error: null,
+      listeners: new Set(),
+    }));
     this.#worker = new Worker(readerUrl, { type: 'module', name: 'pascap-video-reader' });
     this.#worker.onmessage = this.#onMessage;
     this.#worker.onerror = () => {

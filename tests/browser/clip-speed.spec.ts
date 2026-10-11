@@ -364,10 +364,7 @@ test('native point arrows edit frames/rates without leaking clip shortcuts, whil
     .poll(() =>
       page.evaluate(() => {
         const state = window.pascapLab!.engine.diagnostics();
-        const video = Array.from(globalThis.document.querySelectorAll<HTMLVideoElement>('video[data-pascap-decoder]'))[
-          state.assignedClipIds.indexOf('one')
-        ]!;
-        return Math.floor((video.currentTime * 30000) / 1001 + 1e-7);
+        return state.decodedSourceFrames[state.assignedClipIds.indexOf('one')];
       }),
     )
     .toBe(61);
@@ -432,11 +429,9 @@ test('custom mapped preview uses exact decoded source frames with only two video
     await seek(page, frame);
     const captured = await page.evaluate(() => {
       const state = window.pascapLab!.engine.diagnostics();
-      const videos = Array.from(globalThis.document.querySelectorAll<HTMLVideoElement>('video[data-pascap-decoder]'));
-      const slot = state.assignedClipIds.indexOf('one');
       return {
-        frame: Math.floor((videos[slot]!.currentTime * 30000) / 1001 + 1e-7),
-        count: videos.length,
+        frame: state.decodedSourceFrames[state.assignedClipIds.indexOf('one')],
+        count: state.decoderCount,
         status: state.status,
       };
     });
@@ -462,10 +457,7 @@ test('a slow clip-key click previews that exact original image instead of the pr
     .poll(() =>
       page.evaluate(() => {
         const state = window.pascapLab!.engine.diagnostics();
-        const video = Array.from(globalThis.document.querySelectorAll<HTMLVideoElement>('video[data-pascap-decoder]'))[
-          state.assignedClipIds.indexOf('one')
-        ]!;
-        return { source: Math.floor((video.currentTime * 30000) / 1001 + 1e-7), status: state.status };
+        return { source: state.decodedSourceFrames[state.assignedClipIds.indexOf('one')], status: state.status };
       }),
     )
     .toEqual({ source: 60, status: 'paused' });

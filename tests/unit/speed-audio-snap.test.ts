@@ -85,10 +85,10 @@ describe('shared retiming and recoverable speed edits', () => {
       },
     };
     const map = compileRetiming(clip);
-    const before = [map.duration, map.sourceAt(30), map.rateAt(30)];
+    const before = [map.duration, map.sourceAt(30), map.sourcePositionAt(30)];
     clip.sourceOut = 60;
     clip.speed.keyframes[1]!.rate = 5;
-    expect([map.duration, map.sourceAt(30), map.rateAt(30)]).toEqual(before);
+    expect([map.duration, map.sourceAt(30), map.sourcePositionAt(30)]).toEqual(before);
   });
 });
 

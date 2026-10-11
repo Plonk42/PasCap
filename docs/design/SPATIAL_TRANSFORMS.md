@@ -155,7 +155,7 @@ one encoder and three native video children, two retained clip files and three
 timeline representations. No per-frame FFmpeg process or LUT file is introduced.
 Native/audio overhead and duration-dependent scratch remain additional;
 these bounds are not throughput or fixed-disk-space promises. Preview retains
-two decoder/texture slots per video track (16 for eight), plus one source-review decoder.
+two WebCodecs decoders/textures per video track (16 for eight), plus one source-review decoder.
 
 ## Clip → Transform controls
 

@@ -491,7 +491,10 @@ function gradedLayersProject(): ProjectDocument {
   lower.keyframes = [point(0, { exposure: -1, opacity: 0.6 }), point(50, { exposure: 1, opacity: 0.3 }, 'hold')];
   const upper = createLayer('upper', 'Upper');
   upper.opacity = 0.75;
-  upper.keyframes = [point(0, { exposure: 0.7, hue: 20, opacity: 0.35 }, 'smooth'), point(60, { opacity: 0.7 }, 'hold')];
+  upper.keyframes = [
+    point(0, { exposure: 0.7, hue: 20, opacity: 0.35 }, 'smooth'),
+    point(60, { opacity: 0.7 }, 'hold'),
+  ];
   const top = createClip('upper-clip', 'upper-video', 200, 275, upper.id);
   top.speed = { mode: 'constant', rate: 1.25 };
   project.layers.push(upper);
@@ -677,7 +680,11 @@ describe('playback on one clock', () => {
     ]);
     for (let frame = 31; frame <= 150; frame++) tick(anchor, frame);
     expect(streams().extensions.at(-1)!.complete).toBe(true);
-    expect(streams().extensions.flatMap((item) => item.frames).at(-1)).toBe(199);
+    expect(
+      streams()
+        .extensions.flatMap((item) => item.frames)
+        .at(-1),
+    ).toBe(199);
     expect(engine.diagnostics()).toMatchObject({ status: 'playing', frame: 150, stalls: 0 });
   });
 
@@ -713,7 +720,9 @@ describe('playback on one clock', () => {
     project.clips[0]!.sourceOut = 300;
     const { engine, anchor } = await playing(project, 8);
     state.autoDecode = false;
-    streams().lanes[laneOf(engine, 'clip')]!.queue.splice(0).forEach((frame) => frame.close());
+    streams()
+      .lanes[laneOf(engine, 'clip')]!.queue.splice(0)
+      .forEach((frame) => frame.close());
     tick(anchor, 1);
     expect(engine.diagnostics()).toMatchObject({ status: 'buffering', playing: true });
     tick(anchor, 140);
@@ -722,7 +731,7 @@ describe('playback on one clock', () => {
     expect(engine.diagnostics()).toMatchObject({
       status: 'error',
       playing: false,
-      message: 'Video decoder 1 did not deliver source frame 9 within 5 seconds.',
+      message: 'Video decoder 1 did not deliver source frame 163 within 5 seconds.',
       activeDecoders: 0,
     });
   });
@@ -765,7 +774,9 @@ describe('playback on one clock', () => {
 
     const late = await playing(cutProject(true), 15);
     state.autoDecode = false;
-    streams().lanes[1]!.queue.splice(0).forEach((frame) => frame.close());
+    streams()
+      .lanes[1]!.queue.splice(0)
+      .forEach((frame) => frame.close());
     for (let frame = 16; frame <= 20; frame++) tick(late.anchor, frame - 15);
     expect(late.engine.diagnostics()).toMatchObject({
       status: 'buffering',
@@ -1084,9 +1095,7 @@ describe('editor-only ungraded comparison', () => {
     engine.setUngraded(true);
     expectSurface(engine, project, frame, true);
     expect(compositor().visible).toEqual(
-      graded.map((group) =>
-        group.map((clip) => ({ ...clip, settings: NEUTRAL_COLOUR, detail: NEUTRAL_DETAIL })),
-      ),
+      graded.map((group) => group.map((clip) => ({ ...clip, settings: NEUTRAL_COLOUR, detail: NEUTRAL_DETAIL }))),
     );
     engine.setUngraded(false);
     expect(compositor().visible).toEqual(graded);

@@ -91,8 +91,7 @@ function checkEdits(view: DataView, track: Box): void {
   const version = view.getUint8(list.body);
   const entries = view.getUint32(list.body + 4);
   if (entries === 0) return;
-  const mediaTime =
-    version === 1 ? Number(view.getBigInt64(list.body + 8 + 8)) : view.getInt32(list.body + 8 + 4);
+  const mediaTime = version === 1 ? Number(view.getBigInt64(list.body + 8 + 8)) : view.getInt32(list.body + 8 + 4);
   if (entries !== 1 || mediaTime !== 0) throw unsupported('its edit list shifts frames');
 }
 

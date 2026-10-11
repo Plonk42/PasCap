@@ -423,9 +423,10 @@ synthetic checks do not establish intended-GPU or long-flight performance.
 
 Hover over a **prepared** recording in Media. Its review button's width maps mouse X
 to original frames 0 through `frameCount − 1`; a marker follows the mouse and the
-source viewer, docked in the centre's **Source preview** tab, shows the observed paused
-frame. Pin keeps that recording selected while hovering other recordings. It uses one muted decoder,
-does not change timeline position, and suppresses stale imagery while loading/seeking.
+source viewer, docked in the centre's **Source preview** tab, shows that exact decoded
+frame. Pin keeps that recording selected while hovering other recordings. It uses one
+WebCodecs proxy decoder in its own worker ([decoding](design/WEBCODECS_PREVIEW.md#source-review)),
+does not change timeline position, and never shows a superseded frame.
 The open project's bin contains explicitly imported recordings/music plus its timeline
 references, not all global registrations. New projects have empty membership;
 imports deliberately add to the selected bin and reuse the shared content-deduplicated
@@ -453,13 +454,13 @@ clicking or dragging elsewhere on the strip scrubs. Missing snapshots show
 **Snapshots unavailable** without changing the strip or starting preparation.
 
 The round source **Play / Pause** button sits at the left of that strip. It
-stays muted and uses the applied IN/OUT, not numeric drafts.
-It starts at the current observed frame when inside the range and before its last
-frame, otherwise IN; it stops and exact-seeks OUT − 1, without looping. A one-frame
+has no audio and uses the applied IN/OUT, not numeric drafts.
+It starts at the current displayed frame when inside the range and before its last
+frame, otherwise IN; it stops on OUT − 1, without looping. A one-frame
 range displays that frame without playing. Scrub/trim/mark/numeric range edits pause first.
-Pending play and observed callbacks cannot restart after close, hidden viewer,
+Pending play and late decoded frames cannot restart after close, hidden viewer,
 recording/project change or tab switch. Playback uses this same sole verified proxy
-decoder, with explicit start/stall failures after five seconds and Retry; no source
+decoder, with an explicit failure when a frame is missing for five seconds and Retry; no source
 audio/original playback, preparation, timeline/music seek or history/save is added.
 
 Plus, double-click and drag/drop (including a dragged multi-selection) copy the latest choice
@@ -497,10 +498,11 @@ applying its former drafts to another selection. Collapse or switching tabs neve
 disables processing or changes the rendered document. Options menus and automatic
 proxy admission remain unchanged.
 
-Preview uses two reusable decoder/texture slots per track, up to **16 for eight
-tracks**, supporting independent simultaneous dissolves. Unused slots are available
-for preloading. Source review adds at most one decoder while visible. No decoder or
-texture is allocated per stored clip.
+Preview uses two WebCodecs decoders and textures per track, up to **16 for eight
+tracks**, supporting independent simultaneous dissolves. Free decoders prefill the
+next clips. Each decoder holds at most six decoded frames. Source review adds one
+decoder while visible. No decoder or texture is allocated per stored clip. See
+[WebCodecs preview decoding](design/WEBCODECS_PREVIEW.md#requirements-and-resources).
 
 Up to **eight identified music tracks** share one AudioContext/AudioWorklet and
 one output timestamp clock with the unchanged one-project-frame A/V bound.

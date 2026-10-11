@@ -15,7 +15,7 @@ const PLAYBACK_DEADLINE_MS = 5_000;
 const PREFILL_FRAMES = 3;
 
 /**
- * An owned, muted proxy transport on one WebCodecs decoder. Every displayed
+ * An owned, video-only proxy transport on one WebCodecs decoder. Every displayed
  * image is the exact decoded source frame it reports; playback follows the
  * wall clock and holds it while a frame is not decoded yet.
  */
@@ -116,12 +116,12 @@ export class SourceTransport {
       });
   }
 
+  /** Pause on the displayed frame: playback always starts from, and keeps, a displayed frame. */
   pause(): void {
-    if (this.#disposed || (this.state.status !== 'playing' && this.state.status !== 'starting')) return;
-    const frame = this.state.frame;
+    const { status, frame } = this.state;
+    if (this.#disposed || frame === null || (status !== 'playing' && status !== 'starting')) return;
     this.#cancel();
-    if (frame === null) this.seek(this.state.requestedFrame);
-    else this.#publish({ ...this.state, status: 'paused', requestedFrame: frame });
+    this.#publish({ ...this.state, status: 'paused', requestedFrame: frame });
   }
 
   setRange(range: Readonly<MediaSelection>): void {
@@ -143,7 +143,8 @@ export class SourceTransport {
     }
     const signal = this.#cancel();
     this.#last = last;
-    this.#publish({ status: 'starting', requestedFrame: start, frame: start === shown ? start : null, error: '' });
+    // The shown image stays on the canvas until the start frame replaces it.
+    this.#publish({ status: 'starting', requestedFrame: start, frame: shown, error: '' });
     const first = start === shown ? start + 1 : start;
     const frames = Array.from({ length: last - first + 1 }, (_value, index) => first + index);
     this.frames.start(0, url, frames, true);

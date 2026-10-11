@@ -89,7 +89,7 @@ function message(cause: unknown): string {
   return cause instanceof Error ? cause.message : 'Cannot review this recording.';
 }
 
-/** One muted proxy decoder, independent of the project preview and transport. */
+/** One video-only proxy decoder, independent of the project preview and transport. */
 export function SourceReview({
   asset,
   frame,
@@ -128,11 +128,12 @@ export function SourceReview({
   useEffect(() => {
     let inView = true;
     let wasVisible = true;
+    // Hidden observations are ignored, and a newly visible transport publishes its own
+    // state on creation: hiding then showing within one render keeps the live transport.
     const change = (): void => {
       const next = inView && !document.hidden;
       if (next === wasVisible) return;
       wasVisible = next;
-      setObservation(null);
       setVisible(next);
     };
     const observer = new IntersectionObserver((entries) => {
@@ -372,13 +373,8 @@ export function SourceReview({
           <button
             className="play-button source-play-button"
             aria-label={playing ? 'Pause source preview' : 'Play source preview'}
-            title="Play the applied IN–OUT range, muted; stop at OUT − 1"
-            disabled={
-              rangeDraft ||
-              !visible ||
-              disabled ||
-              (!playing && (observedFrame === null || !!error))
-            }
+            title="Play the applied IN–OUT range without audio; stop at OUT − 1"
+            disabled={rangeDraft || !visible || disabled || (!playing && (observedFrame === null || !!error))}
             onKeyDown={keyboard}
             onClick={() => {
               if (playing) pause();

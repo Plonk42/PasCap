@@ -76,7 +76,8 @@ const platform: DecoderPlatform = {
   async fetch(url, init) {
     const range = (init.headers as Record<string, string>)['Range']!;
     requests.push(`${url} ${range}`);
-    if (url.endsWith('/missing')) return Response.json({ error: 'The proxy is not verified and ready.' }, { status: 409 });
+    if (url.endsWith('/missing'))
+      return Response.json({ error: 'The proxy is not verified and ready.' }, { status: 409 });
     if (url.endsWith('/whole')) return new Response(file.bytes, { status: 200 });
     const [start, end] = /bytes=(\d+)-(\d+)/.exec(range)!.slice(1).map(Number) as [number, number];
     return new Response(file.bytes.slice(start, Math.min(end + 1, file.bytes.length)), { status: 206 });
@@ -93,9 +94,7 @@ function reader(): VideoReader {
   return new VideoReader(platform, (message) => reports.push(message));
 }
 function delivered(lane = 0): number[] {
-  return reports.flatMap((report) =>
-    report.kind === 'frame' && report.lane === lane ? [report.sourceFrame] : [],
-  );
+  return reports.flatMap((report) => (report.kind === 'frame' && report.lane === lane ? [report.sourceFrame] : []));
 }
 function failures(): string[] {
   return reports.flatMap((report) => (report.kind === 'failed' ? [report.message] : []));
@@ -157,7 +156,14 @@ describe('WebCodecs video reader', () => {
 
   it('skips straight to the keyframe a later frame depends on', async () => {
     const video = reader();
-    video.receive({ kind: 'start', lane: 0, generation: 1, url: 'http://proxy/a', frames: [0, 16, 32], complete: true });
+    video.receive({
+      kind: 'start',
+      lane: 0,
+      generation: 1,
+      url: 'http://proxy/a',
+      frames: [0, 16, 32],
+      complete: true,
+    });
     await settle();
     expect(delivered()).toEqual([0, 16, 32]);
     expect(decoders[0]!.chunks.map((chunk) => chunk.timestamp)).toEqual([0, 15, 16, 30, 31, 32]);

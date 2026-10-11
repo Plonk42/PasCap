@@ -39,13 +39,9 @@ function captureRetiming(clip: VideoClip, supplied: Retiming | undefined): Retim
   if (
     typeof map.sourceAt !== 'function' ||
     typeof map.sourcePositionAt !== 'function' ||
-    typeof map.outputAt !== 'function' ||
-    typeof map.rateAt !== 'function'
+    typeof map.outputAt !== 'function'
   ) {
-    throw new ServiceError(
-      'The shared retiming map must expose sourceAt, sourcePositionAt, outputAt and rateAt queries.',
-      422,
-    );
+    throw new ServiceError('The shared retiming map must expose sourceAt, sourcePositionAt and outputAt queries.', 422);
   }
   // Capture the duration and query functions, never materialize a duration-sized map.
   const captured = Object.freeze({
@@ -53,7 +49,6 @@ function captureRetiming(clip: VideoClip, supplied: Retiming | undefined): Retim
     sourceAt: map.sourceAt.bind(map),
     sourcePositionAt: map.sourcePositionAt.bind(map),
     outputAt: map.outputAt.bind(map),
-    rateAt: map.rateAt.bind(map),
   });
   if (
     captured.sourcePositionAt(0) !== clip.sourceIn ||

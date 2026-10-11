@@ -62,7 +62,14 @@ describe('page video streams', () => {
     expect(FakeWorker.last.options).toEqual({ type: 'module', name: 'pascap-video-reader' });
     streams.start(1, '/api/media/a/proxy', [3, 4], true);
     expect(FakeWorker.last.commands).toEqual([
-      { kind: 'start', lane: 1, generation: 1, url: 'http://127.0.0.1:4318/api/media/a/proxy', frames: [3, 4], complete: true },
+      {
+        kind: 'start',
+        lane: 1,
+        generation: 1,
+        url: 'http://127.0.0.1:4318/api/media/a/proxy',
+        frames: [3, 4],
+        complete: true,
+      },
     ]);
     expect(() => streams.start(2, '/x', [0], true)).toThrow('outside the decoder budget');
     streams.dispose();
@@ -137,7 +144,9 @@ describe('page video streams', () => {
     await expect(aborted).rejects.toMatchObject({ name: 'AbortError' });
 
     const late = streams.ready(0, 4, 1, new AbortController().signal);
-    const expectation = expect(late).rejects.toThrow('Video decoder 1 did not deliver source frame 4 within 5 seconds.');
+    const expectation = expect(late).rejects.toThrow(
+      'Video decoder 1 did not deliver source frame 4 within 5 seconds.',
+    );
     await vi.advanceTimersByTimeAsync(5_000);
     await expectation;
     streams.dispose();

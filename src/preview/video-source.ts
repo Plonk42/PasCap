@@ -63,7 +63,8 @@ async function failedRequest(response: Response): Promise<Error> {
   let detail = '';
   try {
     const body: unknown = await response.json();
-    if (body && typeof body === 'object' && 'error' in body && typeof body.error === 'string') detail = `: ${body.error}`;
+    if (body && typeof body === 'object' && 'error' in body && typeof body.error === 'string')
+      detail = `: ${body.error}`;
   } catch {
     /* Keep the actual HTTP status rather than a guessed reason. */
   }
@@ -82,10 +83,7 @@ export class VideoReader {
   readonly #indexes = new Map<string, Promise<ProxyIndex>>();
   readonly #support = new Map<string, Promise<boolean>>();
 
-  constructor(
-    platform: DecoderPlatform,
-    report: (message: VideoReaderReport, transfer?: Transferable[]) => void,
-  ) {
+  constructor(platform: DecoderPlatform, report: (message: VideoReaderReport, transfer?: Transferable[]) => void) {
     this.#platform = platform;
     this.#report = report;
   }

@@ -40,7 +40,6 @@ export interface Retiming {
   /** Continuous original-source coordinate; exclusive OUT at/after duration. */
   sourcePositionAt: (outputFrame: number) => number;
   outputAt: (sourceFrame: number) => number;
-  rateAt: (outputFrame: number) => number;
 }
 
 export function sourceRateAt(speed: SpeedSettings, sourceFrame: number): number {
@@ -97,10 +96,6 @@ export function compileRetiming(clip: RetimedClip): Retiming {
         ),
       outputAt: (source) =>
         Math.max(0, Math.min(duration - 1, Math.floor((finiteFrame(source) - clip.sourceIn) / effective + 1e-8))),
-      rateAt: (frame) => {
-        finiteFrame(frame);
-        return effective;
-      },
     };
   } else {
     result = compileClipSpeedCurve(clip.sourceIn, clip.sourceOut, clip.speed);
@@ -120,7 +115,4 @@ export function sourceFrameAt(clip: RetimedClip, outputFrame: number): number {
 }
 export function outputFrameAt(clip: RetimedClip, sourceFrame: number): number {
   return compileRetiming(clip).outputAt(sourceFrame);
-}
-export function playbackRateAt(clip: RetimedClip, outputFrame: number): number {
-  return compileRetiming(clip).rateAt(outputFrame);
 }

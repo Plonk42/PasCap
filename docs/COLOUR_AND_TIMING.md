@@ -208,10 +208,11 @@ pending acceptance, not completed-test claims.
 
 The editor supports up to eight video tracks and arbitrary clips within schema
 limits. Display and composition follow the same saved bottom-to-top track array;
-no ID or first track has special editing privileges. Preview reuses two decoder/texture
-slots per track in a nonempty project, up to **16 for eight**, plus at most one
-separate source-review decoder. Resources
-are not allocated per stored clip; missing observed frames buffer explicitly.
+no ID or first track has special editing privileges. Preview uses two WebCodecs
+decoders/textures per track in a nonempty project, up to **16 for eight**, plus at
+most one separate source-review decoder. Resources
+are not allocated per stored clip; missing decoded frames buffer explicitly
+([WebCodecs preview decoding](design/WEBCODECS_PREVIEW.md)).
 
 Production export reads originals and uses exact shared retiming. The static fast
 path requires neutral HSL/identity curves, HDR 0, one enabled video track with Opacity 1, no track keyframes, exactly neutral

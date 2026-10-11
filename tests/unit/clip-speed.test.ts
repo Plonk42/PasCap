@@ -95,7 +95,7 @@ describe('precise bounded curve integration and immutable shared maps', () => {
       expect(flat.duration).toBe(constant.duration);
       for (const frame of [0, 1, Math.floor(flat.duration / 2), flat.duration - 1]) {
         expect(flat.sourceAt(frame)).toBe(constant.sourceAt(frame));
-        expect(flat.rateAt(frame)).toBeCloseTo(constant.rateAt(frame), 10);
+        expect(flat.sourcePositionAt(frame)).toBeCloseTo(constant.sourcePositionAt(frame), 8);
       }
     }
   });
@@ -108,7 +108,7 @@ describe('precise bounded curve integration and immutable shared maps', () => {
       const time = (output * total) / map.duration;
       const source = 100 * Math.expm1(time / 200);
       expect(map.sourceAt(output)).toBe(Math.floor(source + 1e-8));
-      expect(map.rateAt(output)).toBeCloseTo(((0.5 + (1.5 * source) / 300) * total) / map.duration, 10);
+      expect(map.sourcePositionAt(output)).toBeCloseTo(source, 8);
     }
     expect(map.outputAt(100)).toBe(Math.floor((200 * Math.log(2) * map.duration) / total + 1e-8));
   });
@@ -149,12 +149,12 @@ describe('precise bounded curve integration and immutable shared maps', () => {
   it('owns copied point values/times/easing so edits cannot mutate an export or cache entry', () => {
     const original = clip(curve(key(0, 0.5, 'smooth'), key(120, 2)));
     const map = compileRetiming(original);
-    const values = [map.duration, map.sourceAt(30), map.outputAt(60), map.rateAt(30)];
+    const values = [map.duration, map.sourceAt(30), map.outputAt(60), map.sourcePositionAt(30)];
     expect(compileRetiming(structuredClone(original))).toBe(map);
     original.speed.keyframes[0]!.rate = 8;
     original.speed.keyframes[1]!.frame = 200;
     original.speed.keyframes.reverse();
-    expect([map.duration, map.sourceAt(30), map.outputAt(60), map.rateAt(30)]).toEqual(values);
+    expect([map.duration, map.sourceAt(30), map.outputAt(60), map.sourcePositionAt(30)]).toEqual(values);
     expect(Object.isFrozen(map)).toBe(true);
   });
   it('clamps finite source/output queries but rejects nonfinite queries without duration-sized storage', () => {
@@ -163,7 +163,7 @@ describe('precise bounded curve integration and immutable shared maps', () => {
     expect(map.sourceAt(500)).toBe(119);
     expect(map.outputAt(-10)).toBe(0);
     expect(map.outputAt(500)).toBe(119);
-    for (const query of [map.sourceAt, map.outputAt, map.rateAt])
+    for (const query of [map.sourceAt, map.outputAt, map.sourcePositionAt])
       for (const value of [NaN, Infinity, -Infinity]) expect(() => query(value)).toThrow('finite');
     expect(() => compileRetiming(clip(curve(key(0, 0.1), key(2_147_483_647, 0.1)), 0, 2_147_483_647))).toThrow(
       'supported project frames',

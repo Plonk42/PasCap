@@ -167,11 +167,11 @@ export class PreviewEngine {
   #stallTotal = 0;
 
   constructor(readonly canvas: HTMLCanvasElement) {
-    if (typeof VideoDecoder !== 'function' || typeof VideoFrame !== 'function')
-      throw new Error('Timeline preview requires WebCodecs video decoding. Use a current Chrome or Firefox.');
     canvas.width = 1280;
     canvas.height = 720;
     try {
+      if (typeof VideoDecoder !== 'function' || typeof VideoFrame !== 'function')
+        throw new Error('Timeline preview requires WebCodecs video decoding. Use a current Chrome or Firefox.');
       this.#compositor = new Compositor(canvas);
     } catch (error) {
       this.#music.dispose();
@@ -272,8 +272,7 @@ export class PreviewEngine {
 
   /** Two decoders per track, and none without footage or WebGL. */
   #resizeLanes(): void {
-    const count =
-      this.#document?.clips.length && this.#compositor.available ? 2 * this.#document.layers.length : 0;
+    const count = this.#document?.clips.length && this.#compositor.available ? 2 * this.#document.layers.length : 0;
     while (this.#lanes.length > count) {
       const lane = this.#lanes.pop()!;
       if (lane.streaming) this.#streams.stop(lane.index);
@@ -325,7 +324,12 @@ export class PreviewEngine {
         ),
     );
     return wanted.map(({ clip }, index) => {
-      const lane = lanes[index] ?? this.#claim(clip, this.#lanes.find((item) => item.clipId === null));
+      const lane =
+        lanes[index] ??
+        this.#claim(
+          clip,
+          this.#lanes.find((item) => item.clipId === null),
+        );
       if (!lane) throw new Error('Active clips exceed the decoder budget of two per track.');
       return lane;
     });
@@ -358,12 +362,7 @@ export class PreviewEngine {
     lane.lastRequested = lane.shown?.mediaId === placed.clip.mediaId && lane.shown.sourceFrame === first ? first : -1;
     const frames = this.#requestFrames(lane, placed, local + STREAM_WINDOW);
     lane.firstRequested = frames[0] ?? null;
-    this.#streams.start(
-      lane.index,
-      this.#proxyUrl(placed.clip.mediaId),
-      frames,
-      lane.requested >= placed.duration,
-    );
+    this.#streams.start(lane.index, this.#proxyUrl(placed.clip.mediaId), frames, lane.requested >= placed.duration);
   }
   #extendStream(lane: Lane, placed: PlacedClip, local: number): void {
     if (lane.requested >= placed.duration || lane.requested - local > STREAM_WINDOW / 2) return;

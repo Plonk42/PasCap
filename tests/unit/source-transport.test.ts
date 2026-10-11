@@ -210,7 +210,7 @@ describe('owned source proxy transport', () => {
     expect(f.transport.state).toMatchObject({
       status: 'starting',
       requestedFrame: start,
-      frame: start === frame ? start : null,
+      frame,
     });
     expect(f.frames.starts.at(-1)!.frames.slice(0, 2)).toEqual(first);
     expect(f.frames.starts.at(-1)!.frames.at(-1)).toBe(39);
@@ -293,15 +293,18 @@ describe('owned source proxy transport', () => {
     f.transport.dispose();
   });
 
-  it('cancelling startup before its first frame reacquires a paused exact frame', async () => {
+  it('cancelling startup before its first frame keeps the displayed exact frame', async () => {
     const f = await loaded(5);
     f.frames.auto = false;
     f.transport.play();
-    expect(f.transport.state).toMatchObject({ status: 'starting', frame: null, requestedFrame: 10 });
+    expect(f.transport.state).toMatchObject({ status: 'starting', frame: 5, requestedFrame: 10 });
     f.transport.pause();
+    expect(f.transport.state).toMatchObject({ status: 'paused', frame: 5, requestedFrame: 5 });
     f.frames.decode();
     await settle();
-    expect(f.transport.state).toMatchObject({ status: 'paused', frame: 10 });
+    expect(f.transport.state).toMatchObject({ status: 'paused', frame: 5 });
+    expect(f.drawn).toEqual([5]);
+    expect(f.frames.starts).toHaveLength(2);
     f.transport.dispose();
   });
 

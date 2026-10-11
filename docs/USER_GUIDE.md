@@ -80,7 +80,7 @@ See [TIMELINE_EDITING.md](TIMELINE_EDITING.md) and [DEPLOYMENT.md](DEPLOYMENT.md
 
 Hover a ready recording to open **Source preview**; horizontal mouse position
 scrubs its full source range without moving the timeline playhead. **Pin** keeps
-that recording selected while you hover other recordings. Review opens paused and muted and
+that recording selected while you hover other recordings. Review opens paused, without audio, and
 uses a separate decoder; it never plays or prepares an original implicitly.
 
 Set source **IN/OUT** by dragging the handles, with focused source **I/O**, or with
@@ -95,7 +95,7 @@ a timeline clip. Its **IN / OUT** handles restore omitted footage as well as tri
 hatched parts are outside the selected range, and clicking elsewhere on the strip
 scrubs. Dragging previews the boundary frame; release applies, while Escape/capture
 loss/cancellation/window blur restores the prior choice. The round **Play / Pause**
-button left of the strip reviews the applied range, muted, from the current frame or IN.
+button left of the strip reviews the applied range, without audio, from the current frame or IN.
 It stops at the last included frame (OUT − 1), without looping; a one-frame range
 just displays that frame. Unapplied numeric drafts are not played or inserted.
 Scrubbing or changing the range pauses first. Closing, switching sources/projects

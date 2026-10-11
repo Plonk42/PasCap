@@ -10,7 +10,7 @@ import {
   type ProjectDocument,
 } from '../../src/shared/model.js';
 import { calculateLayout } from '../../src/shared/timeline.js';
-import { addMusicTrack, inspectorTab } from './editor-helpers.js';
+import { addMusicTrack, expectDecoders, inspectorTab } from './editor-helpers.js';
 import { memoryProjects, type MemoryProjects } from './memory-projects.js';
 import { installMusicEvidence, observeMusicPlayback, observeRealtimeHeadroom } from './music-evidence.js';
 
@@ -547,7 +547,7 @@ test('actual mixed PCM gain/fades/placement continues over the last clip fade in
   memory.seed(document);
   await page.reload();
   await ready(page, document);
-  await expect(page.locator('video[data-pascap-decoder]')).toHaveCount(2);
+  await expectDecoders(page, 2);
   await observeMusicPlayback(page);
   // Fade is anchored to the clip OUT, not stretched to the extended project OUT.
   const images = await page.evaluate(async () => {
@@ -665,7 +665,7 @@ test('actual mixed PCM gain/fades/placement continues over the last clip fade in
     expect(result.tail.stopAudioFrames).toHaveLength(1);
     expect(result.tail.stopAudioFrames[0]).toBeGreaterThanOrEqual(90);
     expect(result.tail.stopAudioFrames[0]).toBeLessThan(91);
-    await expect(page.locator('video[data-pascap-decoder]')).toHaveCount(2);
+    await expectDecoders(page, 2);
     const signal = result.stream.renderedSignal;
     for (const entry of signal) {
       const samplesPerFrame = (48_000 * 1001) / 30_000;

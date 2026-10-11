@@ -67,7 +67,7 @@ async function ready(page: Page, document: ProjectDocument): Promise<void> {
   await expect(page.getByRole('button', { name: 'Select track Video track 1', exact: true })).toBeEnabled();
 }
 
-/** Check the decoder's observed identity, never infer it from video.currentTime. */
+/** Check the decoded frame's identity in the preview texture. */
 async function previewAt(page: Page, document: ProjectDocument, frame: number): Promise<void> {
   const placed = calculateLayout(document).clips.find(({ clip }) => clip.id === CLIP)!;
   const source = placed.retiming.sourceAt(frame - placed.start);
@@ -80,12 +80,11 @@ async function previewAt(page: Page, document: ProjectDocument, frame: number): 
           status: state.status,
           frame: state.frame,
           source: state.decodedSourceFrames[slot],
-          ready: state.decoderReady[slot],
           playing: state.playing,
         };
       }, CLIP),
     )
-    .toEqual({ status: 'paused', frame, source, ready: true, playing: false });
+    .toEqual({ status: 'paused', frame, source, playing: false });
 }
 
 async function seek(page: Page, document: ProjectDocument, frame: number): Promise<void> {
