@@ -28,13 +28,7 @@ import { composeLayerFrame, fittedContent, validateLayerGroup, type LayerFrameSo
 import { CompositorPool } from './layered-pool.js';
 import { FFV1_SLICE_ARGUMENTS, NATIVE_THREADS } from './native-threads.js';
 import { runProcess } from './process.js';
-import {
-  runRawVideoPass,
-  writeRawFrame,
-  type RawFrameReader,
-  type RawPassReport,
-  type RawVideoPass,
-} from './raw-process.js';
+import { runRawVideoPass, writeRawFrame, type RawPassReport, type RawVideoPass } from './raw-process.js';
 import { retimeRawVideo, type RawRetimingReport } from './retime-process.js';
 import { atomicWrite } from './storage.js';
 
@@ -150,6 +144,12 @@ function trackReaders(
 
 function* frameIndices(count: number): Generator<number> {
   for (let index = 0; index < count; index++) yield index;
+}
+
+/** A pipelined promise may be abandoned when its pass fails; the pass still reports the failure. */
+function observed<T>(promise: Promise<T>): Promise<T> {
+  promise.catch(() => undefined);
+  return promise;
 }
 
 function usesDetailKernel(sources: readonly LayerFrameSource[]): boolean {
@@ -541,18 +541,16 @@ class SequentialLayeredRenderer {
     await rm(path.join(this.options.directory, filename));
     if (--this.#clipFiles < 0) throw new Error('Layered clip scratch ledger underflowed.');
   }
-  private async readSources(
+  private frameSources(
     clips: readonly ClipReader[],
-    readers: readonly RawFrameReader[],
+    inputs: readonly Buffer[],
     maps: readonly Retiming[],
     frame: number,
     samples: readonly PreviewLayer[],
-  ): Promise<LayerFrameSource[]> {
+  ): LayerFrameSource[] {
     const { document, assets, target } = this.options;
     if (samples.length !== clips.length) throw new Error('Layered span does not match the authoritative active clips.');
-    const sources: LayerFrameSource[] = [];
-    for (const [index, clip] of clips.entries()) {
-      await readers[index]!.requireFrame(this.#rgb[index]!); // NOSONAR -- at most two reusable intermediate frames.
+    return clips.map((clip, index) => {
       const sourceClip = document.clips[clip.index]!;
       const sample = samples.find((item) => item.clipId === sourceClip.id);
       if (sample?.sourceFrame !== maps[index]!.sourceAt(clip.offset + frame))
@@ -566,14 +564,13 @@ class SequentialLayeredRenderer {
       )
         throw new Error('Layered sample differs from the exact shared continuous source-position map.');
       const { width, height } = assets[clip.index]!.metadata;
-      sources.push({
+      return {
         sample,
-        rgb: this.#rgb[index]!,
+        rgb: inputs[index]!,
         original: { width, height },
         bounds: fittedContent({ width, height }, target),
-      });
-    }
-    return sources;
+      };
+    });
   }
   private async span(
     layerId: string,
@@ -616,17 +613,32 @@ class SequentialLayeredRenderer {
         pass.reader(losslessReader(clip.filename, clip.offset, span.duration, false), 'retimed clip decoder'),
       );
       const encoder = this.encoder(pass, filename, span.duration, final, 'premultiplied RGBA16 encoder');
+      // Overlap within the four raw buffers: a single source prefetches its next frame into the
+      // other RGB buffer, and each group is encoded from alternating RGBA16 buffers while the
+      // next one is composed. A dissolve needs both RGB buffers, so it reads after composing.
+      const prefetch = clips.length === 1;
+      const read = async (frame: number): Promise<Buffer[]> => {
+        const inputs = prefetch ? [this.#rgb[frame % 2]!] : clips.map((_, index) => this.#rgb[index]!);
+        await forEachSerial(readers, (reader, index) => reader.requireFrame(inputs[index]!));
+        return inputs;
+      };
+      let pending: Promise<Buffer[]> | null = null;
+      let writing: Promise<void> = Promise.resolve();
       await forEachSerial(frameIndices(span.duration), async (frame) => {
         pass.check();
-        this.#rgba[0].fill(0); // A standalone transparent group, never the lower composite.
+        const inputs = await (pending ?? read(frame));
+        pending = prefetch && frame + 1 < span.duration ? observed(read(frame + 1)) : null;
+        const output = this.#rgba[frame % 2]!;
+        output.fill(0); // A standalone transparent group, never the lower composite.
         const samples = sampleTimeline(document, span.start + frame, this.#layout).filter(
           (sample) => sample.layerId === layerId,
         );
-        const sources = await this.readSources(clips, readers, maps, frame, samples);
+        const sources = this.frameSources(clips, inputs, maps, frame, samples);
         const started = performance.now();
-        await this.composeGroup(sources);
+        await this.composeGroup(sources, output);
         this.#report.compositionMs += performance.now() - started;
-        await writeRawFrame(encoder, this.#rgba[0]);
+        await writing; // The previous group's buffer is the one the next frame reuses.
+        writing = observed(writeRawFrame(encoder, output));
         if (frame === 0 || (frame + 1) % progressStep === 0 || frame + 1 === span.duration) {
           this.update(
             (frame + 1) * cost,
@@ -634,6 +646,7 @@ class SequentialLayeredRenderer {
           );
         }
       });
+      await writing;
       encoder.end();
       await forEachSerial(readers, (reader, index) => reader.requireEnd(this.#rgb[index]!));
     });
@@ -771,12 +784,12 @@ class SequentialLayeredRenderer {
     return filename;
   }
   /** Detail/HDR groups go to the GPU worker when one runs; a GPU failure finishes on the CPU. */
-  private async composeGroup(sources: LayerFrameSource[]): Promise<void> {
+  private async composeGroup(sources: LayerFrameSource[], output: Buffer): Promise<void> {
     const { target, context } = this.options;
     const gpu = this.#gpu;
-    if (gpu && usesDetailKernel(sources) && validateLayerGroup(this.#rgba[0], target, sources) > 0) {
+    if (gpu && usesDetailKernel(sources) && validateLayerGroup(output, target, sources) > 0) {
       try {
-        await gpu.compose(this.#rgba[0], gpuSources(sources));
+        await gpu.compose(output, gpuSources(sources));
         this.#report.gpuFrames++;
         return;
       } catch (error) {
@@ -786,10 +799,10 @@ class SequentialLayeredRenderer {
         this.#gpu = null;
         await gpu.close();
         this.update(0, `GPU compositing stopped (${reason}); continuing on the CPU compositor`);
-        this.#rgba[0].fill(0);
+        output.fill(0);
       }
     }
-    await composeLayerFrame(this.#rgba[0], target, sources, this.#cache, context.signal, this.#pool);
+    await composeLayerFrame(output, target, sources, this.#cache, context.signal, this.#pool);
   }
   private async startGpu(): Promise<void> {
     const { gpu, document, plan, target, context } = this.options;

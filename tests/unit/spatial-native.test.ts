@@ -571,8 +571,9 @@ describe('layered renderer metadata and continuous retiming ownership with memor
       originalDecoderProcesses: 1,
       compositeFrames: 4,
     });
-    expect(fixture.ownedReadBuffers.size).toBe(1);
-    expect(fixture.ownedWriteBuffers.size).toBe(1);
+    // A single source alternates both RGB8 buffers (prefetch) and both RGBA16 buffers (encode overlap).
+    expect([...fixture.ownedReadBuffers].map((buffer) => buffer.length)).toEqual([8 * 6 * 3, 8 * 6 * 3]);
+    expect([...fixture.ownedWriteBuffers].map((buffer) => buffer.length)).toEqual([8 * 6 * 8, 8 * 6 * 8]);
     expect(RawVideoPass.prototype.reader).toHaveBeenCalledTimes(1);
     expect(RawVideoPass.prototype.encoder).toHaveBeenCalledTimes(1);
     expect(fixture.frames).toHaveLength(4);
