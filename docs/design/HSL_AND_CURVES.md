@@ -19,7 +19,7 @@ cyan, blue, purple and magenta. Each requires hue −30…30 degrees, saturation
 green and blue arrays, each 2…16 strict `{ x, y }` control nodes with finite coordinates
 in 0…1. Inputs strictly ascend, with first x=0 and last x=1. Endpoint outputs are
 editable; nonmonotonic outputs are valid. No control-node IDs or preset fields are saved.
-Neutral factories create independent nested objects/arrays. They are only creators,
+Neutral factories create independent nested objects/arrays, with each curve starting as three identity nodes (0, 0.5, 1). They are only creators,
 never repairs for missing saved fields. Projects 1…14 and their receipt snapshots
 are incompatible and preserved; recreate deliberately. Receipt format remains 1;
 registry, proxy and PCM formats are unchanged. No migration or automatic deletion.

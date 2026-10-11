@@ -65,15 +65,15 @@ test('curve endpoints, exact collisions, nonmonotonic values, maximum points and
   await output.fill('0.8');
   await output.press('Enter');
   await page.getByRole('button', { name: 'Add colour curve control node', exact: true }).click();
-  await expect(input).toHaveValue('0.5');
+  await expect(input).toHaveValue('0.25');
   await output.fill('0.123456789');
   await output.press('Enter');
   await input.fill('1');
   await input.press('Enter');
   await expect(input).toHaveValue('1');
-  expect((await current(page)).layers[0]!.colour.curves.master[1]!.x).toBe(0.5);
+  expect((await current(page)).layers[0]!.colour.curves.master[1]!.x).toBe(0.25);
   await input.press('Escape');
-  for (let i = 3; i < 16; i++)
+  for (let i = 4; i < 16; i++)
     await page.getByRole('button', { name: 'Add colour curve control node', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Add colour curve control node', exact: true })).toBeDisabled();
   expect((await current(page)).layers[0]!.colour.curves.master).toHaveLength(16);
@@ -82,6 +82,7 @@ test('curve endpoints, exact collisions, nonmonotonic values, maximum points and
     .poll(async () => (await current(page)).layers[0]!.colour.curves.master)
     .toEqual([
       { x: 0, y: 0 },
+      { x: 0.5, y: 0.5 },
       { x: 1, y: 1 },
     ]);
 });
@@ -99,8 +100,8 @@ test('releasing a curve drag far outside the plot commits a node clamped between
   await page.mouse.up();
   await expect.poll(() => memory.saves).toBe(2);
   const [, node] = (await current(page)).layers[0]!.colour.curves.master;
-  expect(node!.x).toBeGreaterThan(0.99);
-  expect(node!.x).toBeLessThan(1);
+  expect(node!.x).toBeGreaterThan(0.49);
+  expect(node!.x).toBeLessThan(0.5);
   expect(node!.y).toBe(0);
 });
 
