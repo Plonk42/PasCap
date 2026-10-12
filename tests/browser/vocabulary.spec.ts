@@ -49,7 +49,7 @@ for (const viewport of [
     const memory = await memoryProjects(page, project);
     await expandedInspectorPreferences(page);
     await page.goto('/?project=preview-lab');
-    await expect(page.getByRole('button', { name: 'Select track Video track 1', exact: true })).toBeEnabled();
+    await expect(page.getByRole('button', { name: 'Select track Track 1', exact: true })).toBeEnabled();
     const tracks = page.getByRole('complementary', { name: 'Video tracks', exact: true });
     await expect(tracks.locator('.layer-sidebar-heading')).toHaveText('Video tracks · 1 / 8');
     await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
@@ -59,11 +59,11 @@ for (const viewport of [
     await expect(page.getByRole('button', { name: 'Add video track', exact: true })).toHaveText('Track');
     await expect(page.locator('.media-usage-badge')).toHaveText('1 clip');
 
-    await openOptions(page, 'Track options Video track 1');
-    await expect(page.getByRole('textbox', { name: 'Rename track Video track 1', exact: true })).toBeVisible();
+    await openOptions(page, 'Track options Track 1');
+    await expect(page.getByRole('textbox', { name: 'Rename track Track 1', exact: true })).toBeVisible();
     await page.keyboard.press('Escape');
     await inspectorTab(page, 'Track');
-    await expect(page.getByRole('group', { name: 'Track keyframes Video track 1', exact: true })).toBeAttached();
+    await expect(page.getByRole('group', { name: 'Track keyframes Track 1', exact: true })).toBeAttached();
     await expect(page.getByRole('button', { name: 'Delete track keyframe 30', exact: true })).toBeAttached();
     await page.getByRole('button', { name: 'Colour animation help', exact: true }).focus();
     await page.keyboard.press('Enter');

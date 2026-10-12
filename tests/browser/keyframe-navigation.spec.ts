@@ -99,7 +99,7 @@ async function ready(page: Page, document: ProjectDocument): Promise<void> {
     { id: document.id, duration: calculateLayout(document).duration },
   );
   await inspectorTab(page, 'Track keyframes');
-  await expect(layerKeyframes(page, 'Video track 1')).toBeVisible();
+  await expect(layerKeyframes(page, 'Track 1')).toBeVisible();
 }
 
 async function fixture(page: Page, document: ProjectDocument): Promise<void> {
@@ -181,7 +181,7 @@ async function navigate(page: Page, label: string, direction: 'Previous' | 'Next
   await button.click();
 }
 
-async function goToPoint(page: Page, frame: number, name = 'Video track 1'): Promise<void> {
+async function goToPoint(page: Page, frame: number, name = 'Track 1'): Promise<void> {
   await settingTab(page, 'Exposure');
   const button = layerKeyframes(page, name).getByRole('button', { name: `Go to track keyframe ${frame}`, exact: true });
   await button.scrollIntoViewIfNeeded();
@@ -288,7 +288,7 @@ test('Colour section arrows visit the Opacity/scalar union and share chip inspec
     await next.scrollIntoViewIfNeeded();
     await next.click();
     await previewAt(page, Math.min(frame, 119));
-    await expect(layerKeyframes(page, 'Video track 1').locator('.keyframe-row[aria-current="true"]')).toHaveAttribute(
+    await expect(layerKeyframes(page, 'Track 1').locator('.keyframe-row[aria-current="true"]')).toHaveAttribute(
       'data-keyframe-frame',
       String(frame),
     );
@@ -298,7 +298,7 @@ test('Colour section arrows visit the Opacity/scalar union and share chip inspec
     await previous.scrollIntoViewIfNeeded();
     await previous.click();
     await previewAt(page, Math.min(frame, 119));
-    await expect(layerKeyframes(page, 'Video track 1').locator('.keyframe-row[aria-current="true"]')).toHaveAttribute(
+    await expect(layerKeyframes(page, 'Track 1').locator('.keyframe-row[aria-current="true"]')).toHaveAttribute(
       'data-keyframe-frame',
       String(frame),
     );
@@ -315,7 +315,7 @@ test('Colour section arrows visit the Opacity/scalar union and share chip inspec
   await next.scrollIntoViewIfNeeded();
   await next.click();
   await previewAt(page, 100);
-  await expect(layerKeyframes(page, 'Video track 1').locator('.layer-keyframe-chip')).toHaveCount(7);
+  await expect(layerKeyframes(page, 'Track 1').locator('.layer-keyframe-chip')).toHaveCount(7);
   await expect(diamond(page, 'Shadows')).toHaveAttribute('aria-pressed', 'true');
   await readOnly(page, document);
 });
@@ -522,7 +522,7 @@ for (const empty of [false, true]) {
     }
     await fixture(page, document);
     await goToPoint(page, 60);
-    const keys = layerKeyframes(page, 'Video track 1');
+    const keys = layerKeyframes(page, 'Track 1');
     const next = mainStep(page, 'Exposure', 'Next');
     const previous = mainStep(page, 'Exposure', 'Previous');
     const actualFrame = empty ? 0 : 119;
@@ -749,7 +749,7 @@ test('single opacity navigation on a selected empty row preserves Inspector cont
   document = applyCommand(document, {
     type: 'layer-add',
     layer: {
-      ...createLayer('upper', 'Video track 2', false),
+      ...createLayer('upper', 'Track 2', false),
       keyframes: [
         sharedPoint(20, { opacity: 0 }),
         sharedPoint(130, { opacity: 0.5 }),
@@ -764,17 +764,17 @@ test('single opacity navigation on a selected empty row preserves Inspector cont
   await page.getByRole('button', { name: 'Toggle Clip panel', exact: true }).click();
   await closeOptions(page);
   await expect(inspector(page)).toBeHidden();
-  await openOptions(page, 'Track options Video track 2');
-  const options = page.getByRole('group', { name: 'Track options Video track 2', exact: true });
+  await openOptions(page, 'Track options Track 2');
+  const options = page.getByRole('group', { name: 'Track options Track 2', exact: true });
   await expect(options.getByRole('slider')).toHaveCount(0);
   await expect(options.getByRole('button', { name: /Opacity keyframe/ })).toHaveCount(0);
   await closeOptions(page);
   await openOptions(page, 'Workspace options');
   await page.getByRole('button', { name: 'Toggle Clip panel', exact: true }).click();
   await closeOptions(page);
-  await page.getByRole('button', { name: 'Select track Video track 2', exact: true }).click();
+  await page.getByRole('button', { name: 'Select track Track 2', exact: true }).click();
   await expect(page.getByRole('tab', { name: 'Track', exact: true })).toHaveAttribute('aria-selected', 'true');
-  await goToPoint(page, 20, 'Video track 2');
+  await goToPoint(page, 20, 'Track 2');
   await previewAt(page, 20);
   const next = await step(page, 'Opacity', 'Next', 20);
   await next.scrollIntoViewIfNeeded();
@@ -787,10 +787,10 @@ test('single opacity navigation on a selected empty row preserves Inspector cont
   await closeOptions(page);
   await openTab(page, 'Clip');
   await expect(inspector(page).locator('[role="tabpanel"]:not([hidden])')).toContainText(
-    'Select a clip on Video track 2 to edit it.',
+    'Select a clip on Track 2 to edit it.',
   );
   await inspectorTab(page, 'Track keyframes');
-  await expect(layerKeyframes(page, 'Video track 2')).toBeVisible();
+  await expect(layerKeyframes(page, 'Track 2')).toBeVisible();
   await expect(page.locator('.layer-control.selected')).toHaveAttribute('data-layer-id', 'upper');
   await inspectorTab(page, 'Clip');
   const previous = await step(page, 'Opacity', 'Previous', 20);
@@ -802,28 +802,28 @@ test('single opacity navigation on a selected empty row preserves Inspector cont
   await previewAt(page, 119);
   await expect(next).toBeFocused();
   await inspectorTab(page, 'Track keyframes');
-  await expect(layerKeyframes(page, 'Video track 2').locator('.layer-keyframe-inspected')).toContainText(
+  await expect(layerKeyframes(page, 'Track 2').locator('.layer-keyframe-inspected')).toContainText(
     'Stored keyframe · timeline frame 130',
   );
   await closeOptions(page);
   await inspectorTab(page, 'Clip');
   await expect(await step(page, 'Opacity', 'Next')).toHaveAttribute('title', /Stored timeline frame 160;/);
   await inspectorTab(page, 'Track keyframes');
-  await layerKeyframes(page, 'Video track 2').getByRole('button', { name: 'Next track keyframe', exact: true }).click();
-  await expect(layerKeyframes(page, 'Video track 2').locator('.layer-keyframe-inspected')).toContainText(
+  await layerKeyframes(page, 'Track 2').getByRole('button', { name: 'Next track keyframe', exact: true }).click();
+  await expect(layerKeyframes(page, 'Track 2').locator('.layer-keyframe-inspected')).toContainText(
     'Stored keyframe · timeline frame 140',
   );
   await inspectorTab(page, 'Clip');
   await navigate(page, 'Opacity', 'Next');
   await inspectorTab(page, 'Track keyframes');
-  await expect(layerKeyframes(page, 'Video track 2').locator('.layer-keyframe-inspected')).toContainText(
+  await expect(layerKeyframes(page, 'Track 2').locator('.layer-keyframe-inspected')).toContainText(
     'Stored keyframe · timeline frame 160',
   );
   await inspectorTab(page, 'Clip');
   await expect(await step(page, 'Opacity', 'Next')).toBeDisabled();
   await navigate(page, 'Opacity', 'Previous');
   await inspectorTab(page, 'Track keyframes');
-  await expect(layerKeyframes(page, 'Video track 2').locator('.layer-keyframe-inspected')).toContainText(
+  await expect(layerKeyframes(page, 'Track 2').locator('.layer-keyframe-inspected')).toContainText(
     'Stored keyframe · timeline frame 130',
   );
   await readOnly(page, document);
@@ -845,8 +845,8 @@ test('successive outside-duration setting, row and list navigation keeps one tru
     .locator('[data-clip-id="second"] .timeline-clip-body')
     .evaluate((button) => (button as HTMLButtonElement).click());
   await previewAt(page, 60);
-  const keys = layerKeyframes(page, 'Video track 1');
-  await editLayerPoint(page, 'Video track 1', 120);
+  const keys = layerKeyframes(page, 'Track 1');
+  await editLayerPoint(page, 'Track 1', 120);
   for (const frame of [120, 180, 240]) {
     await inspectorTab(page, 'Clip');
     await navigate(page, 'Exposure', 'Next');
@@ -914,8 +914,8 @@ test('an empty timeline can inspect successive stored keys, without pretending t
     sharedPoint(90, { exposure: 2 }),
   ];
   await fixture(page, document);
-  const keys = layerKeyframes(page, 'Video track 1');
-  await editLayerPoint(page, 'Video track 1', 30);
+  const keys = layerKeyframes(page, 'Track 1');
+  await editLayerPoint(page, 'Track 1', 30);
   await goToPoint(page, 30);
   for (const frame of [30, 60, 90]) {
     await inspectorTab(page, 'Clip');
@@ -964,7 +964,7 @@ test('row and project switches discard the old stored cursor even when layer IDs
   document = applyCommand(document, {
     type: 'layer-add',
     layer: {
-      ...createLayer('upper', 'Video track 2', false),
+      ...createLayer('upper', 'Track 2', false),
       keyframes: [sharedPoint(30, { opacity: 0 }), sharedPoint(130, { opacity: 1 })],
     },
   });
@@ -972,19 +972,19 @@ test('row and project switches discard the old stored cursor even when layer IDs
   await seek(page, 100);
   await navigate(page, 'Exposure', 'Next');
   await previewAt(page, 119);
-  await page.getByRole('button', { name: 'Select track Video track 2', exact: true }).click();
+  await page.getByRole('button', { name: 'Select track Track 2', exact: true }).click();
   await inspectorTab(page, 'Track keyframes');
-  await expect(layerKeyframes(page, 'Video track 2').locator('.layer-keyframe-inspected')).toHaveCount(0);
+  await expect(layerKeyframes(page, 'Track 2').locator('.layer-keyframe-inspected')).toHaveCount(0);
   await inspectorTab(page, 'Clip');
   await expect(await step(page, 'Opacity', 'Next', 30)).toHaveAttribute('title', /Stored timeline frame 130;/);
   await expect(
-    layerKeyframes(page, 'Video track 2').getByRole('button', { name: 'Next Exposure keyframe', exact: true }),
+    layerKeyframes(page, 'Track 2').getByRole('button', { name: 'Next Exposure keyframe', exact: true }),
   ).toHaveCount(0);
   await expect(sectionStep(page, 'Colour', 'Next')).toBeEnabled();
   await navigate(page, 'Opacity', 'Next', 30);
-  await page.getByRole('button', { name: 'Select track Video track 1', exact: true }).click();
+  await page.getByRole('button', { name: 'Select track Track 1', exact: true }).click();
   await inspectorTab(page, 'Track keyframes');
-  await expect(layerKeyframes(page, 'Video track 1').locator('.layer-keyframe-inspected')).toHaveCount(0);
+  await expect(layerKeyframes(page, 'Track 1').locator('.layer-keyframe-inspected')).toHaveCount(0);
   await inspectorTab(page, 'Clip');
   await expect(await step(page, 'Exposure', 'Next')).toHaveAttribute('title', /Stored timeline frame 150;/);
   await navigate(page, 'Exposure', 'Next');
@@ -1002,7 +1002,7 @@ test('row and project switches discard the old stored cursor even when layer IDs
   await ready(page, other);
   await previewAt(page, 0);
   await inspectorTab(page, 'Track keyframes');
-  await expect(layerKeyframes(page, 'Video track 1').locator('.layer-keyframe-inspected')).toHaveCount(0);
+  await expect(layerKeyframes(page, 'Track 1').locator('.layer-keyframe-inspected')).toHaveCount(0);
   await inspectorTab(page, 'Clip');
   await expect(await step(page, 'Exposure', 'Previous', 20)).toBeDisabled();
   await expect(await step(page, 'Exposure', 'Next', 20)).toHaveAttribute('title', /Stored timeline frame 140;/);
@@ -1024,7 +1024,7 @@ test('manual seeking to the same clamped last frame, direct seeks and playback r
     sharedPoint(160, { exposure: 2 }),
   ]);
   await fixture(page, document);
-  const keys = layerKeyframes(page, 'Video track 1');
+  const keys = layerKeyframes(page, 'Track 1');
   await sectionStep(page, 'Colour', 'Next').scrollIntoViewIfNeeded();
   await sectionStep(page, 'Colour', 'Next').click();
   await previewAt(page, 10);
@@ -1081,8 +1081,8 @@ test('point moves and history retain input identity and the shared cursor, while
   await seek(page, 10);
   await navigate(page, 'Exposure', 'Next');
   await previewAt(page, 119);
-  const keys = layerKeyframes(page, 'Video track 1');
-  const row = await editLayerPoint(page, 'Video track 1', 150);
+  const keys = layerKeyframes(page, 'Track 1');
+  const row = await editLayerPoint(page, 'Track 1', 150);
   const time = row.getByRole('spinbutton', { name: 'Track keyframe frame 150', exact: true });
   const id = await time.getAttribute('id');
   await time.fill('175');

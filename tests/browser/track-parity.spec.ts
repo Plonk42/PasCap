@@ -104,7 +104,7 @@ test.afterEach(() =>
 function twoTracks(): ProjectDocument {
   const document = createProject(PROJECT_ID, 'Uniform video tracks · memory-only');
   document.media.videoIds = assets.map((asset) => asset.id);
-  document.layers.push(createLayer('upper', 'Video track 2'));
+  document.layers.push(createLayer('upper', 'Track 2'));
   document.clips = [
     createClip('bottom', assets[0]!.id, 0, 120),
     createClip('upper-clip', assets[1]!.id, 0, 120, 'upper'),
@@ -198,9 +198,9 @@ test('the initial track and every newly added track default to Ripple on with in
   for (const field of ['transitions', 'openingFade', 'closingFade']) expect(added).not.toHaveProperty(field);
   expect(added.layers.slice(0, 2)).toEqual(before.layers);
   expect(added.clips).toEqual(before.clips);
-  expect(added.layers[2]).toEqual(createLayer(added.layers[2]!.id, 'Video track 3'));
-  await openOptions(page, 'Track options Video track 3');
-  await expect(page.getByRole('checkbox', { name: 'Ripple on track Video track 3', exact: true })).toBeChecked();
+  expect(added.layers[2]).toEqual(createLayer(added.layers[2]!.id, 'Track 3'));
+  await openOptions(page, 'Track options Track 3');
+  await expect(page.getByRole('checkbox', { name: 'Ripple on track Track 3', exact: true })).toBeChecked();
   await expect(page.locator('.layer-control.selected')).toHaveAttribute('data-layer-id', added.layers[2]!.id);
   await undoOnce(page, before);
 });
@@ -524,8 +524,8 @@ test('a positioned gap disables non-cut boundary choices until explicit Ripple p
   ).toBeVisible();
   expect(await current(page)).toEqual(before);
   expect(memory.saves).toBe(0);
-  await openOptions(page, 'Track options Video track 2');
-  await page.getByRole('checkbox', { name: 'Ripple on track Video track 2', exact: true }).check();
+  await openOptions(page, 'Track options Track 2');
+  await page.getByRole('checkbox', { name: 'Ripple on track Track 2', exact: true }).check();
   await closeOptions(page);
   await boundary.click();
   for (const value of ['fade-through-black', 'cross-dissolve'])
@@ -556,7 +556,7 @@ test('a top-track opening black fade keeps opaque coverage instead of fading or 
     ['upper', 0, 1],
   ]);
   expect((await captureAt(page, 20)).sum).toBe(0);
-  await page.getByRole('button', { name: 'Hide track Video track 2', exact: true }).click();
+  await page.getByRole('button', { name: 'Hide track Track 2', exact: true }).click();
   expect((await captureAt(page, 20)).sum).toBeGreaterThan(0);
   const hidden = await current(page);
   expect(hidden.layers).toEqual(
@@ -573,8 +573,8 @@ test('Raise and Lower cross the old initial-layer boundary and display the new b
   const before = await current(page);
   const originalPixels = (await captureAt(page, 20)).sample;
   for (const [action, name] of [
-    ['Lower', 'Video track 2'],
-    ['Raise', 'Video track 1'],
+    ['Lower', 'Track 2'],
+    ['Raise', 'Track 1'],
   ] as const) {
     await openOptions(page, `Track options ${name}`);
     await page.getByRole('button', { name: `${action} track ${name}`, exact: true }).click();
@@ -599,8 +599,8 @@ test('the ordinary initial track can be removed; only deleting the last remainin
   page,
 }) => {
   const before = await current(page);
-  await openOptions(page, 'Track options Video track 1');
-  await page.getByRole('button', { name: 'Delete track Video track 1', exact: true }).click();
+  await openOptions(page, 'Track options Track 1');
+  await page.getByRole('button', { name: 'Delete track Track 1', exact: true }).click();
   const after = await current(page);
   await ready(page, after);
   expect(after.layers).toEqual([before.layers[1]]);
@@ -609,11 +609,11 @@ test('the ordinary initial track can be removed; only deleting the last remainin
   expect(after.music).toEqual(before.music);
   await expect(page.locator('[data-layer-id]')).toHaveCount(1);
   await expect(page.locator('[data-layer-lane="video-1"]')).toHaveCount(0);
-  await openOptions(page, 'Track options Video track 2');
-  const remove = page.getByRole('button', { name: 'Delete track Video track 2', exact: true });
+  await openOptions(page, 'Track options Track 2');
+  const remove = page.getByRole('button', { name: 'Delete track Track 2', exact: true });
   await expect(remove).toBeDisabled();
   await expect(remove).toHaveAccessibleDescription('Keep at least one video track. Delete its clips instead.');
-  await expect(page.getByRole('checkbox', { name: 'Ripple on track Video track 2', exact: true })).toBeEnabled();
+  await expect(page.getByRole('checkbox', { name: 'Ripple on track Track 2', exact: true })).toBeEnabled();
   await undoOnce(page, before);
 });
 
@@ -621,10 +621,10 @@ test('eight concurrent track dissolves use exactly sixteen decoders and releasin
   page,
 }) => {
   const document = twoTracks();
-  document.layers = [createLayer('video-1', 'Video track 1')];
+  document.layers = [createLayer('video-1', 'Track 1')];
   document.clips = [];
   for (let index = 0; index < 8; index++) {
-    const layer = index === 0 ? document.layers[0]! : createLayer(`row-${index + 1}`, `Video track ${index + 1}`);
+    const layer = index === 0 ? document.layers[0]! : createLayer(`row-${index + 1}`, `Track ${index + 1}`);
     if (index > 0) document.layers.push(layer);
     document.clips.push(createClip(`left-${index}`, assets[0]!.id, 0, 60, layer.id), {
       ...createClip(`right-${index}`, assets[1]!.id, 0, 60, layer.id),
@@ -647,8 +647,8 @@ test('eight concurrent track dissolves use exactly sixteen decoders and releasin
   for (const source of expected)
     expect(state.decodedSourceFrames[state.assignedClipIds.indexOf(source.clipId)]).toBe(source.sourceFrame);
   const decoders = (): Promise<number> => page.evaluate(() => window.pascapLab!.engine.diagnostics().decoderCount);
-  await openOptions(page, 'Track options Video track 8');
-  await page.getByRole('button', { name: 'Delete track Video track 8', exact: true }).click();
+  await openOptions(page, 'Track options Track 8');
+  await page.getByRole('button', { name: 'Delete track Track 8', exact: true }).click();
   const after = await current(page);
   await ready(page, after);
   expect(after.layers).toEqual(before.layers.slice(0, 7));

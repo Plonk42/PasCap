@@ -458,7 +458,7 @@ function layeredProject(layerCount = 1, dissolve = false): ProjectDocument {
   }
   for (let index = 1; index < layerCount; index++) {
     const id = `video-${index + 1}`;
-    project.layers.push(createLayer(id, `Video track ${index + 1}`, false));
+    project.layers.push(createLayer(id, `Track ${index + 1}`, false));
     project.clips.push({
       ...createClip(`overlay-${index}`, `overlay-media-${index}`, 200 + index * 100, 200 + index * 100 + duration),
       layerId: id,

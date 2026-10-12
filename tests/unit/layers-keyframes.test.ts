@@ -25,7 +25,7 @@ function layered() {
   });
   project = applyCommand(project, {
     type: 'layer-add',
-    layer: { ...createLayer('upper', 'Video track 2', false), opacity: 0.5 },
+    layer: { ...createLayer('upper', 'Track 2', false), opacity: 0.5 },
   });
   return applyCommand(project, {
     type: 'insert',

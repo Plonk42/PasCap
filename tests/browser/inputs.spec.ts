@@ -174,7 +174,7 @@ test('the shared list labels time/value/easing, retains reordered input focus, a
   });
   document = applyCommand(document, {
     type: 'layer-add',
-    layer: { ...createLayer('upper', 'Video track 2', false), keyframes: [sharedPoint(80, { opacity: 0.4 }, 'hold')] },
+    layer: { ...createLayer('upper', 'Track 2', false), keyframes: [sharedPoint(80, { opacity: 0.4 }, 'hold')] },
   });
   document = applyCommand(document, {
     type: 'insert',
@@ -183,14 +183,14 @@ test('the shared list labels time/value/easing, retains reordered input focus, a
   });
   await setProject(page, document);
   await inspectorTab(page, 'Track keyframes');
-  const keys = layerKeyframes(page, 'Video track 1');
+  const keys = layerKeyframes(page, 'Track 1');
   await keys.getByRole('button', { name: 'Next track keyframe', exact: true }).click();
   await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(20);
   await keys.getByRole('button', { name: 'Next track keyframe', exact: true }).click();
   await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(70);
   await keys.getByRole('button', { name: 'Previous track keyframe', exact: true }).click();
   await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(20);
-  const row = await editLayerPoint(page, 'Video track 1', 20);
+  const row = await editLayerPoint(page, 'Track 1', 20);
   await expect(keys.getByRole('list')).toHaveAccessibleName('Edit track keyframes');
   await expect(row.locator('.layer-keyframe-dependencies .layer-keyframe-chip')).toHaveText(['Opacity', 'Exposure']);
   const draft = row.getByRole('spinbutton', { name: 'Opacity keyframe value 20', exact: true });
@@ -226,7 +226,7 @@ test('the shared list labels time/value/easing, retains reordered input focus, a
   await page
     .locator('[data-clip-id="other-row"] .timeline-clip-body')
     .evaluate((button) => (button as HTMLButtonElement).click());
-  const otherKeys = layerKeyframes(page, 'Video track 2');
+  const otherKeys = layerKeyframes(page, 'Track 2');
   const otherValue = otherKeys.getByRole('spinbutton', { name: 'Opacity keyframe value 80', exact: true });
   await expect(otherKeys.getByRole('list', { name: 'Edit track keyframes', exact: true })).toBeVisible();
   await expect(otherValue).toHaveValue('40');
@@ -238,7 +238,7 @@ test('the shared list labels time/value/easing, retains reordered input focus, a
   await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
   await inspectorTab(page, 'Track keyframes');
   await expect(
-    layerKeyframes(page, 'Video track 1').getByRole('list', { name: 'Edit track keyframes', exact: true }),
+    layerKeyframes(page, 'Track 1').getByRole('list', { name: 'Edit track keyframes', exact: true }),
   ).toBeVisible();
 });
 
@@ -266,7 +266,7 @@ test('track keyframe navigation reaches project points and previews outside-dura
   expect(document.layers[0]?.keyframes.map((point) => point.frame)).toEqual([5, 35, 40, 110]);
   expect(calculateLayout(document).duration).toBeLessThan(110);
   await inspectorTab(page, 'Track keyframes');
-  const keys = layerKeyframes(page, 'Video track 1');
+  const keys = layerKeyframes(page, 'Track 1');
   for (const frame of [5, 35, 40, calculateLayout(document).duration - 1]) {
     await keys.getByRole('button', { name: 'Next track keyframe', exact: true }).click();
     await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(frame);
@@ -276,7 +276,7 @@ test('track keyframe navigation reaches project points and previews outside-dura
   await expect(keys.locator('.layer-keyframe-inspected')).toContainText(
     'Stored keyframe · timeline frame 110 · outside current duration',
   );
-  const outside = await editLayerPoint(page, 'Video track 1', 110);
+  const outside = await editLayerPoint(page, 'Track 1', 110);
   await expect(outside.locator('.keyframe-row-skipped')).toHaveText('Outside duration');
   await expect(outside.getByRole('button', { name: 'Go to track keyframe 110', exact: true })).toHaveAttribute(
     'title',
@@ -310,7 +310,7 @@ test('track keyframe navigation reaches project points and previews outside-dura
   await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(40);
   await expect(previous).toBeFocused();
   expect(await currentProject(page)).toEqual(document);
-  const row = await editLayerPoint(page, 'Video track 1', 35);
+  const row = await editLayerPoint(page, 'Track 1', 35);
   const value = row.getByRole('spinbutton', { name: 'Exposure keyframe value 35', exact: true });
   await value.fill('0.3');
   expect((await currentProject(page)).layers[0]?.keyframes).toEqual(document.layers[0]?.keyframes);
@@ -437,7 +437,7 @@ test('per-track fade/transition timing and positioned track key numbers use the 
   document = applyCommand(document, {
     type: 'layer-add',
     layer: {
-      ...createLayer('upper', 'Video track 2', false),
+      ...createLayer('upper', 'Track 2', false),
       keyframes: [sharedPoint(5, { opacity: 0.5 }, 'hold'), sharedPoint(10, { opacity: 0.8 }, 'smooth')],
     },
   });
@@ -453,7 +453,7 @@ test('per-track fade/transition timing and positioned track key numbers use the 
   await start.fill('80');
   expect((await currentProject(page)).clips[2]?.start).toBe(5);
   await start.press('Enter');
-  await editLayerPoint(page, 'Video track 2', 10);
+  await editLayerPoint(page, 'Track 2', 10);
   await commitNumber(page, 'Opacity keyframe value 10', '60');
   await commitNumber(page, 'Track keyframe frame 10', '25');
   const edited = await currentProject(page);
@@ -489,8 +489,8 @@ test('Colour resets target clip colour and row opacity or only participating Col
     },
   });
   await setProject(page, document);
-  const keys = layerKeyframes(page, 'Video track 1');
-  await editLayerPoint(page, 'Video track 1', 5);
+  const keys = layerKeyframes(page, 'Track 1');
+  await editLayerPoint(page, 'Track 1', 5);
   await keys.getByRole('button', { name: 'Go to track keyframe 5', exact: true }).click();
   await expect(page.getByRole('slider', { name: 'Exposure', exact: true })).toHaveValue('-0.5');
   await resetSetting(page, 'Exposure');

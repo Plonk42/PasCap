@@ -56,7 +56,7 @@ async function current(page: Page): Promise<ProjectDocument> {
 }
 async function installOverlay(page: Page, start = 20): Promise<void> {
   let document = await current(page);
-  document = applyCommand(document, { type: 'layer-add', layer: createLayer('upper', 'Video track 2', false) });
+  document = applyCommand(document, { type: 'layer-add', layer: createLayer('upper', 'Track 2', false) });
   document = applyCommand(document, {
     type: 'insert',
     clip: {
@@ -269,19 +269,19 @@ test('duplicate preserves static settings without copying row points, and overla
 test('layer rename drafts cancel or commit without affecting ranges/order, and restore with Undo', async ({ page }) => {
   await installOverlay(page);
   const before = await current(page);
-  await openOptions(page, 'Track options Video track 2');
-  const name = page.getByRole('textbox', { name: 'Rename track Video track 2', exact: true });
+  await openOptions(page, 'Track options Track 2');
+  const name = page.getByRole('textbox', { name: 'Rename track Track 2', exact: true });
   await name.fill('Scenic overlay');
   await name.press('Escape');
-  expect((await current(page)).layers[1]?.name).toBe('Video track 2');
-  await openOptions(page, 'Track options Video track 2');
+  expect((await current(page)).layers[1]?.name).toBe('Track 2');
+  await openOptions(page, 'Track options Track 2');
   await name.fill('Scenic overlay');
   await name.press('Enter');
   expect((await current(page)).layers[1]?.name).toBe('Scenic overlay');
   expect((await current(page)).clips).toEqual(before.clips);
   await closeOptions(page);
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
-  expect((await current(page)).layers[1]?.name).toBe('Video track 2');
+  expect((await current(page)).layers[1]?.name).toBe('Track 2');
 });
 
 test('partial proxy admission errors preserve import success and accepted jobs without repeating the request', async ({
