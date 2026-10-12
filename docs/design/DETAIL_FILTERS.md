@@ -178,20 +178,28 @@ at least as fast as the transport below, and remains the parity reference.
   through the worker (SwiftShader, accepted only in tests) under the unchanged canonical
   and full-resolution coverage gates. Transformed coverage edges are computed in float32,
   as in the preview.
-- **Why not every group**: median ms per synthetic UHD group frame, 10 frames after a warm-up,
-  CPU pool versus the worker, with the worker's renderer confirmed as the NVIDIA T1200
-  (Vulkan; its memory use and utilisation rose in `nvidia-smi` during the runs). All 16 threads
-  (pool of 8 workers): neutral 42 vs 175, Opacity/fade 56 vs 161, scalar colour 42 vs 196,
-  scalar dissolve 169 vs 288, HSL + curves 178 vs 204, spatial pose 203 vs 167, advanced
-  dissolve 188 vs 207, spatial dissolve 321 vs 212. Process pinned to four cores
-  (`taskset -c 0-3`, which also pins the browser): neutral 110 vs 161, scalar colour 108 vs 226,
-  scalar dissolve 284 vs 277, HSL + curves 436 vs 229, spatial pose 321 vs 197, advanced
-  dissolve 396 vs 280, spatial dissolve 689 vs 278. The worker is bounded by loopback transport
-  (about 160–290 ms at UHD), so it only wins where the CPU work is heavy and cores are few;
-  cheap groups would get slower. Repeat runs differed by up to about 2× in CPU medians and
-  up to about 40 ms in GPU ones, so read these as ranges, not exact ratios. They are
-  synthetic, isolated from the FFmpeg decode/encode load of a real export, and say nothing
-  about other hardware.
+- **Why not every group**: complete `final4k` exports of 60 synthetic UHD frames (decode, group
+  composition, x264 encode, verification) on a 16-thread host with the NVIDIA T1200 (Vulkan),
+  three repetitions with a rotated mode order, median wall seconds (min–max). Every GPU run
+  reported 60/60 worker frames on the T1200 and no fallback. "All on GPU" forces every group
+  frame through the worker; it is a measurement mode, not a product setting.
+
+  | Case              | CPU compositor      | As shipped (heavy groups on GPU) | All groups on GPU |
+  | ----------------- | ------------------- | -------------------------------- | ----------------- |
+  | neutral           | 33.5 (33.3–34.7)    | 33.2 (CPU)                       | 37.7 (37.4–37.9)  |
+  | scalar colour     | 30.3 (30.1–30.5)    | 30.6 (CPU)                       | 35.9 (35.7–36.0)  |
+  | Opacity and fades | 31.7 (31.7–31.8)    | 31.4 (CPU)                       | 35.8 (35.7–36.5)  |
+  | HSL + curves      | 41.3 (40.3–43.1)    | 36.4 (35.7–37.4)                 | 35.9 (35.8–37.3)  |
+  | spatial pose      | 37.1 (35.3–37.2)    | 35.4 (34.8–35.5)                 | 35.2 (34.9–36.0)  |
+  | spatial dissolve  | 55.0 (54.1–55.5)    | 50.1 (49.4–50.9)                 | 50.4 (49.3–50.9)  |
+  | detail + HDR      | 219.0 (216.9–223.7) | 39.1 (38.1–39.4)                 | 39.1 (38.7–39.8)  |
+
+  Composition alone is 13 s on the CPU for neutral and scalar-colour frames versus about 20 s
+  through the worker (loopback transport, about 170 ms per UHD frame), so cheap groups stay on
+  the CPU. The gain for HSL/curves, spatial poses and dissolves is 2–5 s per 60 frames on this
+  host; detail and HDR gain far more. Synthetic noise sources, one host and one GPU: with fewer
+  CPU cores the worker's advantage should grow, but that is not measured here.
+
 - **Measured** (synthetic UHD, HDR 0.27 + Sharpen 0.3, Intel UHD GT1 iGPU): group
   composition 2.77 s → 0.21 s per frame in isolation (0.33 s inside an export, mostly
   loopback transport); a 30-frame lossless layered render 98.5 s → 26.4 s, where the
