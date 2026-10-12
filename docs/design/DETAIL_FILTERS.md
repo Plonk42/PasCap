@@ -178,15 +178,20 @@ at least as fast as the transport below, and remains the parity reference.
   through the worker (SwiftShader, accepted only in tests) under the unchanged canonical
   and full-resolution coverage gates. Transformed coverage edges are computed in float32,
   as in the preview.
-- **Why not every group**: synthetic UHD group composition on the NVIDIA T1200 (Vulkan), CPU
-  pool of 8 workers on a 16-thread host versus the worker, ms per frame: neutral 78 vs 175,
-  Opacity/fade 89 vs 173, scalar colour 60 vs 220, scalar dissolve 116 vs 292, HSL + curves
-  212 vs 236, spatial pose 140 vs 230, spatial dissolve 298 vs 285. Pinned to four cores
-  (`taskset -c 0-3`): neutral 113 vs 171, scalar colour 127 vs 173, HSL + curves 450 vs 235,
-  spatial pose 301 vs 235, advanced dissolve 356 vs 290, spatial dissolve 721 vs 286. The
-  worker is bounded by loopback transport (≈ 170 ms at UHD), so it only wins where the CPU
-  work is heavy and cores are few; cheap groups would get slower. Measurements are synthetic
-  and say nothing about other hardware.
+- **Why not every group**: median ms per synthetic UHD group frame, 10 frames after a warm-up,
+  CPU pool versus the worker, with the worker's renderer confirmed as the NVIDIA T1200
+  (Vulkan; its memory use and utilisation rose in `nvidia-smi` during the runs). All 16 threads
+  (pool of 8 workers): neutral 42 vs 175, Opacity/fade 56 vs 161, scalar colour 42 vs 196,
+  scalar dissolve 169 vs 288, HSL + curves 178 vs 204, spatial pose 203 vs 167, advanced
+  dissolve 188 vs 207, spatial dissolve 321 vs 212. Process pinned to four cores
+  (`taskset -c 0-3`, which also pins the browser): neutral 110 vs 161, scalar colour 108 vs 226,
+  scalar dissolve 284 vs 277, HSL + curves 436 vs 229, spatial pose 321 vs 197, advanced
+  dissolve 396 vs 280, spatial dissolve 689 vs 278. The worker is bounded by loopback transport
+  (about 160–290 ms at UHD), so it only wins where the CPU work is heavy and cores are few;
+  cheap groups would get slower. Repeat runs differed by up to about 2× in CPU medians and
+  up to about 40 ms in GPU ones, so read these as ranges, not exact ratios. They are
+  synthetic, isolated from the FFmpeg decode/encode load of a real export, and say nothing
+  about other hardware.
 - **Measured** (synthetic UHD, HDR 0.27 + Sharpen 0.3, Intel UHD GT1 iGPU): group
   composition 2.77 s → 0.21 s per frame in isolation (0.33 s inside an export, mostly
   loopback transport); a 30-frame lossless layered render 98.5 s → 26.4 s, where the
