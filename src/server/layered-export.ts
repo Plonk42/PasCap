@@ -590,6 +590,7 @@ class SequentialLayeredRenderer {
       throw new Error('Invalid bounded layered span.');
     }
     const filename = `span-${String(this.#spanId++).padStart(5, '0')}.${final ? 'mp4' : 'nut'}`;
+    const trackName = document.layers.find((layer) => layer.id === layerId)!.name;
     const progressStep = Math.max(1, Math.floor(span.duration / 100));
     const cost = this.frameCost(
       layerId,
@@ -642,7 +643,7 @@ class SequentialLayeredRenderer {
         if (frame === 0 || (frame + 1) % progressStep === 0 || frame + 1 === span.duration) {
           this.update(
             (frame + 1) * cost,
-            `Rendering track group ${layerId}${this.#gpu && cost > 1 ? ' on the GPU' : ''}: project frame ${span.start + frame + 1} / ${this.#layout.duration}`,
+            `Rendering track “${trackName}”${this.#gpu && cost > 1 ? ' on the GPU' : ''}: project frame ${span.start + frame + 1} / ${this.#layout.duration}`,
           );
         }
       });

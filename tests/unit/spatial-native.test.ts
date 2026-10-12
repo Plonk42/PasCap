@@ -629,7 +629,7 @@ describe('layered renderer metadata and continuous retiming ownership with memor
         ...fixture.options,
         context: { ...fixture.options.context, update: (progress, message) => updates.push([progress, message]) },
       });
-      return updates.find(([, message]) => message.startsWith('Rendering track group'))![0];
+      return updates.find(([, message]) => message.startsWith('Rendering track “'))![0];
     };
     // Four retimed frames count one unit each; a composed frame counts 1 + 0.6 per kernel tap (8 Sharpen + 24 HDR).
     expect(await progressAtFirstComposedFrame(() => {})).toBeCloseTo(0.04 + (0.78 * 5) / 8, 12);
