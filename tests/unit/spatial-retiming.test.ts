@@ -3,6 +3,7 @@ import type { Interpolation } from '../../src/shared/keyframes.js';
 import { createClip } from '../../src/shared/model.js';
 import { evaluateSpatial, NEUTRAL_SPATIAL_POSE } from '../../src/shared/spatial.js';
 import { compileRetiming, type Retiming, type SpeedSettings } from '../../src/shared/speed.js';
+import { uniformKeyframe } from '../../src/shared/keyframes.js';
 
 const progress: Record<Interpolation, (u: number) => number> = {
   hold: () => 0,
@@ -147,8 +148,8 @@ describe('continuous original-source retiming for spatial animation', () => {
     const spatial = {
       base: { ...NEUTRAL_SPATIAL_POSE },
       keyframes: [
-        { frame: 0, interpolation: 'linear' as const, values: { ...NEUTRAL_SPATIAL_POSE, translateX: 0 } },
-        { frame: 100, interpolation: 'linear' as const, values: { ...NEUTRAL_SPATIAL_POSE, translateX: 1 } },
+        uniformKeyframe(0, { ...NEUTRAL_SPATIAL_POSE, translateX: 0 }, 'linear' as const),
+        uniformKeyframe(100, { ...NEUTRAL_SPATIAL_POSE, translateX: 1 }, 'linear' as const),
       ],
     };
     const before = structuredClone(spatial);

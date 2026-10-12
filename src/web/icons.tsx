@@ -46,7 +46,8 @@ export type IconName =
   | 'disk'
   | 'wand'
   | 'lock'
-  | 'ripple';
+  | 'ripple'
+  | 'default-key';
 const paths: Record<IconName, string> = {
   mountain: 'M3 19 9 6l5 9 3-6 4 10H3Zm6-13 2 4-2 2-2-2',
   folder: 'M3 7V5a1 1 0 0 1 1-1h5l2 3h9a1 1 0 0 1 1 1v11H3V7Zm0 3h18',
@@ -96,6 +97,7 @@ const paths: Record<IconName, string> = {
   wand: 'm3 21 12-12 2 2L5 23M15 9l2 2M17 2v4m-2-2h4M21 8v3m-1.5-1.5h3M10 3v2M9 4h2',
   lock: 'M5 11h14v10H5V11Zm3 0V8a4 4 0 0 1 8 0v3',
   ripple: 'M2 12h7m0 0-3-3m3 3-3 3M22 12h-7m0 0 3-3m-3 3 3 3M12 5v14',
+  'default-key': 'm12 2 10 10-10 10L2 12 12 2Zm-3.5 9a3.6 3.6 0 1 1 1 3.6M8.5 8v3h3',
 };
 export function Icon({ name, size = 18 }: Readonly<{ name: IconName; size?: number }>) {
   return (

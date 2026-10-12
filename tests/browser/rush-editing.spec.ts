@@ -254,7 +254,7 @@ function unchangedOthers(
   editedIds: readonly string[],
   transitions: Readonly<Record<string, readonly Transition[]>> = {},
 ): void {
-  expect(next.schemaVersion).toBe(15);
+  expect(next.schemaVersion).toBe(16);
   expect(next.media).toEqual(before.media);
   expect(next.layers).toEqual(
     before.layers.map((layer) => ({ ...layer, transitions: transitions[layer.id] ?? layer.transitions })),

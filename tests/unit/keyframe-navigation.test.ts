@@ -10,6 +10,8 @@ import {
   keyframeNeighbors,
   type LayerKeyframe,
   type LayerKeyValues,
+  layerKeyframe,
+  uniformKeyframe,
 } from '../../src/shared/keyframes.js';
 import {
   createClip,
@@ -34,7 +36,7 @@ import { Layers } from '../../src/web/Layers.js';
 import { SPATIAL_CONTROLS } from '../../src/web/spatial-editor.js';
 
 function point(frame: number, values: Partial<LayerKeyValues>): LayerKeyframe {
-  return { frame, interpolation: 'linear', values: { ...EMPTY_KEY_VALUES, ...values } };
+  return layerKeyframe(frame, { ...EMPTY_KEY_VALUES, ...values }, 'linear');
 }
 
 const interleaved = [0, 100, 200].flatMap((start) =>
@@ -290,7 +292,7 @@ describe('one editor-only stored-point cursor', () => {
     expect(history.canUndo).toBe(false);
     expect(history.canRedo).toBe(false);
     expect(projectSchema.parse(history.current)).toEqual(document);
-    expect(history.current.schemaVersion).toBe(15);
+    expect(history.current.schemaVersion).toBe(16);
   });
 
   it.each([-1, NaN, Infinity, 0.5, 2_147_483_648])(
@@ -446,11 +448,9 @@ describe('main diamonds with per-setting arrows and stored-channel navigation', 
 
   it('retains per-setting arrows beside main diamonds and on chips, with one section union and no sidebar duplicates', () => {
     const document = project(interleaved);
-    document.clips[0]!.spatial.keyframes = [0, 20].map((frame) => ({
-      frame,
-      interpolation: 'linear',
-      values: { ...document.clips[0]!.spatial.base },
-    }));
+    document.clips[0]!.spatial.keyframes = [0, 20].map((frame) =>
+      uniformKeyframe(frame, { ...document.clips[0]!.spatial.base }, 'linear'),
+    );
     const inspector = renderToStaticMarkup(
       createElement(
         KeyframeNavigationContext.Provider,

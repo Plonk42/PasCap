@@ -1,7 +1,7 @@
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
-import { EMPTY_KEY_VALUES, KEYFRAME_SETTINGS } from '../../src/shared/keyframes.js';
+import { EMPTY_KEY_VALUES, KEYFRAME_SETTINGS, layerKeyframe } from '../../src/shared/keyframes.js';
 import { createProject } from '../../src/shared/model.js';
 import { Inspector } from '../../src/web/Inspector.js';
 import { KeyframeNavigationContext } from '../../src/web/keyframe-navigation.js';
@@ -100,9 +100,7 @@ describe('dedicated Inspector keyframe controls', () => {
 
   it('renders only existing participants, including off-duration points, without adding diamonds or clip-speed modes', () => {
     const project = createProject('points', 'Points');
-    project.layers[0]!.keyframes = [
-      { frame: 200, interpolation: 'hold', values: { ...EMPTY_KEY_VALUES, exposure: 0.5, opacity: 0.4 } },
-    ];
+    project.layers[0]!.keyframes = [layerKeyframe(200, { ...EMPTY_KEY_VALUES, exposure: 0.5, opacity: 0.4 }, 'hold')];
     const markup = renderToStaticMarkup(
       createElement(
         KeyframeNavigationContext.Provider,

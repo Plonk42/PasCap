@@ -9,9 +9,9 @@ import { calculateLayout, sampleTimeline } from '../../src/shared/timeline.js';
 import { unsupportedProject } from './project-fixtures.js';
 
 describe('shared retiming and recoverable speed edits', () => {
-  it('requires explicit v15 static speed settings; earlier documents are not guessed', () => {
+  it('requires explicit v16 static speed settings; earlier documents are not guessed', () => {
     const project = createProject('flight', 'Flight');
-    expect(project.schemaVersion).toBe(15);
+    expect(project.schemaVersion).toBe(16);
     for (const schemaVersion of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14])
       expect(() => projectSchema.parse({ ...project, schemaVersion })).toThrow();
     expect(() => projectSchema.parse(unsupportedProject(4, 'old-flight', 'Unsupported flight'))).toThrow();

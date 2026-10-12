@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Interpolation } from '../../src/shared/keyframes.js';
-import { interpolatedProgress } from '../../src/shared/keyframes.js';
+import { interpolatedProgress, uniformKeyframe } from '../../src/shared/keyframes.js';
 import type { SpatialKeyframe, SpatialMapping, SpatialPose, SpatialSettings } from '../../src/shared/spatial.js';
 import {
   compileSpatialMapping,
@@ -27,7 +27,7 @@ function pose(changes: Partial<SpatialPose> = {}): SpatialPose {
 }
 
 function key(frame: number, values = pose(), interpolation: Interpolation = 'linear'): SpatialKeyframe {
-  return { frame, interpolation, values };
+  return uniformKeyframe(frame, values, interpolation);
 }
 
 function settings(keyframes: SpatialKeyframe[] = [], base = pose()): SpatialSettings {
@@ -249,14 +249,14 @@ describe('independent per-setting spatial keyframes', () => {
     number | null
   >;
   const sparse = (frame: number, values: Partial<Record<keyof SpatialPose, number>>, curve: Interpolation = 'linear') =>
-    ({ frame, interpolation: curve, values: { ...none, ...values } }) as SpatialKeyframe;
+    uniformKeyframe(frame, { ...none, ...values }, curve) as SpatialKeyframe;
 
   it('requires every field and at least one enabled setting, allowing null elsewhere', () => {
     expect(spatialKeyframeSchema.safeParse(sparse(0, { scale: 2 })).success).toBe(true);
     expect(spatialKeyframeSchema.safeParse(sparse(0, {})).success).toBe(false);
     const missing: Partial<typeof none> = { ...none, scale: 2 };
     delete missing.rotation;
-    expect(spatialKeyframeSchema.safeParse({ frame: 0, interpolation: 'linear', values: missing }).success).toBe(false);
+    expect(spatialKeyframeSchema.safeParse(uniformKeyframe(0, missing, 'linear')).success).toBe(false);
     expect(spatialKeyframeSchema.safeParse(sparse(0, { scale: 9 })).success).toBe(false);
     expect(spatialPoseSchema.safeParse({ ...pose(), scale: null }).success).toBe(false);
   });
@@ -290,6 +290,19 @@ describe('independent per-setting spatial keyframes', () => {
     ]);
     expect(evaluateSpatial(value, 5)).toMatchObject({ scale: 1, rotation: 0 });
     expect(evaluateSpatial(value, 10)).toMatchObject({ scale: 3, rotation: 90 });
+  });
+
+  it('uses each setting\u2019s own easing at a shared key', () => {
+    const first = sparse(0, { scale: 1, rotation: 0 });
+    const value = settings([
+      { ...first, easing: { ...first.easing, scale: 'hold', rotation: 'ease-out' } },
+      sparse(10, { scale: 3, rotation: 80 }),
+    ]);
+    expect(evaluateSpatial(value, 5)).toMatchObject({ scale: 1, rotation: 60 });
+    expect(spatialKeyframeSchema.safeParse({ ...first, easing: { ...first.easing, scale: null } }).success).toBe(false);
+    expect(spatialKeyframeSchema.safeParse({ ...first, easing: { ...first.easing, cropTop: 'linear' } }).success).toBe(
+      false,
+    );
   });
 
   it('reports animation by setting, including all-null base-only settings', () => {

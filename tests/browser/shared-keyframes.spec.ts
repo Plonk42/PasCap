@@ -275,7 +275,7 @@ test('the first hollow diamond creates one point; same-frame channels merge inde
   await baseRate.fill('1.25');
   await baseRate.press('Enter');
   const bases = await current(page);
-  expect(bases.schemaVersion).toBe(15);
+  expect(bases.schemaVersion).toBe(16);
   expect(bases.layers[0]!.opacity).toBe(0.7);
   expect(bases.clips.every((clip) => !('opacity' in clip))).toBe(true);
   expect(bases.layers[0]?.keyframes).toEqual([]);
@@ -317,7 +317,7 @@ test('the first hollow diamond creates one point; same-frame channels merge inde
   }
   await diamond(page, 'Saturation').click();
   const saturated = await current(page);
-  expect(saturated.layers[0]?.keyframes).toEqual([{ ...expected, values: { ...expected.values, saturation: 1 } }]);
+  expect(saturated.layers[0]?.keyframes).toEqual([sharedPoint(20, { exposure: 0.4, opacity: 0.7, saturation: 1 })]);
   await expect(page.locator('.layer-keyframe-controls')).toHaveCount(1);
   await expect(page.getByRole('checkbox', { name: 'Animate colour adjustments', exact: true })).toHaveCount(0);
   const row = await editLayerPoint(page, 'Track 1', 20);
@@ -333,9 +333,7 @@ test('the first hollow diamond creates one point; same-frame channels merge inde
 
   await inspectorTab(page, 'Track');
   await exposure.click();
-  expect((await current(page)).layers[0]?.keyframes).toEqual([
-    { ...expected, values: { ...expected.values, exposure: null, saturation: 1 } },
-  ]);
+  expect((await current(page)).layers[0]?.keyframes).toEqual([sharedPoint(20, { opacity: 0.7, saturation: 1 })]);
   await expect(marker).toBeVisible();
   await expect(marker).not.toHaveAttribute('title', /Exposure/);
   for (const label of ['Opacity']) {
@@ -911,7 +909,7 @@ test('numeric trim, mapped split, duplicate and overlay moves keep absolute row 
   await expect(page.getByRole('button', { name: 'Track keyframe 5 on Track 2', exact: true })).toHaveCount(1);
   await page.evaluate(() => window.pascapLab!.flush());
   const saved = memory.snapshot();
-  expect(saved.schemaVersion).toBe(15);
+  expect(saved.schemaVersion).toBe(16);
   expect(saved.layers).toEqual(document.layers);
   expect(saved.clips).toEqual(moved.clips);
   for (const layer of saved.layers)

@@ -14,7 +14,7 @@ HSL/curves remain static. See [Temperature and Tint](design/TEMPERATURE_AND_TINT
 See [track appearance](design/ROW_APPEARANCE.md).
 
 The media library describes complete recordings belonging to the open project's
-bin, not every globally registered source. Strict schema 15 requires unique
+bin, not every globally registered source. Strict schema 16 requires unique
 `media.videoIds` and `media.audioIds` arrays (10,000 IDs maximum each). Imports add
 membership even without timeline placement; clip/music references also remain
 visible. New projects start with both arrays empty. **Remove from project** (the
@@ -104,7 +104,7 @@ Import guidance, **without a POST**. Internal dragging of ready registered Media
 into Timeline remains unchanged. Uncertain registration results are not retried
 automatically; check Media/Activity before resubmitting.
 
-Strict schema 15 requires complete video track colour with Temperature/Tint/HDR and static HSL/curves, clip spatial settings, per-track Ripple, transitions and fades, and a required
+Strict schema 16 requires complete video track colour with Temperature/Tint/HDR and static HSL/curves, clip spatial settings, per-track Ripple, transitions and fades, and a required
 0–8 identified music track `music` array (`[]` without music); registry/proxy/PCM
 formats are unchanged. Only generated proxies/thumbnails, metadata,
 exports/receipts and scratch are created, not duplicate originals. Keep originals
@@ -322,7 +322,7 @@ new tracks. Without Opacity keyframes, every clip uses the track value; keyframe
 on every clip in the track, including both dissolve sources. There is no saved
 `clip.opacity`, second opacity channel or additional track multiplier.
 Keyframes survive clip trimming/removal and may remain beyond current duration.
-Each channel uses the keyframe's shared easing
+Each channel uses its own Easing at the keyframe
 toward its **next keyframe with that setting enabled**, holds before/after its own endpoints and
 uses its unkeyed value only when it has no keyed settings on the track: the saved track
 value for Opacity and track colour for colour.
@@ -337,11 +337,13 @@ between keyframes with that setting enabled until explicitly captured with the d
 creates implicit keyframes. Keyframes shows dependencies and an inner **Edit**
 disclosure. All visible easing selectors read **Easing**, including track,
 Transform and clip speed, retaining contextual accessible names and
-interpolation. Moving its Timeline frame moves all enabled settings and the existing easing
+interpolation. Moving its Timeline frame moves all enabled settings and their Easing
 in one Undo step, with collision validation. List input
 identity/focus and expansion survive a single-keyframe move and Undo.
 
 Each video track draws **one marker per stored keyframe**, with enabled settings in its title,
+(a [default keyframe](LAYERS_AND_KEYFRAMES.md#default-keyframes) is filled amber with a
+diamond-and-return-arrow icon instead of ◆),
 never per-clip duplicates; keyframes after the last clip keep their markers there
 without extending playback. **Click or Enter** selects the marker's track
 and seeks, opening Track → Colour, without editing. **Drag horizontally** to move the shared keyframe:
@@ -507,7 +509,7 @@ base/per-setting source-frame keyframes and per-track Ripple,
 transitions, opening/closing fades and numeric `opacity` in 0–1. New tracks start
 at 1 (100%); a missing saved field is invalid. Switching flushes autosave first,
 blocks on failed saves, and resets session selection/history; successful export
-snapshots are independent of the open project. Earlier v1–v14 projects and receipt
+snapshots are independent of the open project. Earlier v1–v15 projects and receipt
 snapshots remain incompatible and preserved, without migration/fabricated defaults.
 There is no automatic deletion. Track `opacity` is the required sole stored value;
 saved `clip.opacity` and old `clipOpacity`/`layerOpacity` keyframe fields are rejected,
@@ -525,7 +527,7 @@ are unchanged.
 The required `music` array holds **0–8 independent music tracks**, each with a unique
 required `id`, registered `mediaId`, source IN/OUT, start/duration, gain, fades and
 loop flag. No null/singular fallback, omitted-field default or old-format reader
-is accepted. Version-1 export receipts require a strict v15 snapshot and captured
+is accepted. Version-1 export receipts require a strict v16 snapshot and captured
 audio-source/instance-plan arrays; older snapshots/invalid arrays are rejected
 while the receipt and finished output remain preserved. Current PCM format is unchanged.
 
@@ -638,4 +640,4 @@ and both-runtime acceptance belong to
 [DEPLOYMENT.md](DEPLOYMENT.md). Actual-commit correctness results are available in
 [GitHub Actions](https://github.com/Plonk42/PasCap/actions).
 
-Video track Colour includes static **HSL ranges** and **Colour curves**, each in its own collapsible Track section after Colour. They affect every clip and both dissolve sources on the track, whether or not its nine scalar channels are keyed. Moves use the destination track's complete colour; clip edits never copy these settings. They are not speed curves or new animation channels. See [the schema-15 HSL/curves contract](design/HSL_AND_CURVES.md).
+Video track Colour includes static **HSL ranges** and **Colour curves**, each in its own collapsible Track section after Colour. They affect every clip and both dissolve sources on the track, whether or not its nine scalar channels are keyed. Moves use the destination track's complete colour; clip edits never copy these settings. They are not speed curves or new animation channels. See [the schema-16 HSL/curves contract](design/HSL_AND_CURVES.md).

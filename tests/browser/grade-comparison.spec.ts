@@ -155,7 +155,10 @@ function layeredProject(videos: readonly MediaAsset[]): ProjectDocument {
     // row base and could not expose an incomplete row-colour bypass.
     const staticChannel = index === 0 ? 'hue' : index === 2 ? 'exposure' : null;
     if (staticChannel) {
-      for (const point of layer.keyframes) point.values[staticChannel] = null;
+      for (const point of layer.keyframes) {
+        point.values[staticChannel] = null;
+        point.easing[staticChannel] = null;
+      }
     }
     const clips = [0, 1].map((member) => {
       const clip = createClip(
@@ -190,8 +193,12 @@ function neutralProject(document: ProjectDocument, id: string, title: string): P
     layer.colour = { ...NEUTRAL_COLOUR };
     layer.keyframes = layer.keyframes.flatMap((point) => {
       const values = { ...point.values };
-      for (const { key } of COLOUR_CONTROLS) values[key] = null;
-      return Object.values(values).some((value) => value !== null) ? [{ ...point, values }] : [];
+      const easing = { ...point.easing };
+      for (const { key } of COLOUR_CONTROLS) {
+        values[key] = null;
+        easing[key] = null;
+      }
+      return Object.values(values).some((value) => value !== null) ? [{ ...point, values, easing }] : [];
     });
   }
   return projectSchema.parse(neutral);
@@ -208,7 +215,8 @@ function nonColourContract(document: ProjectDocument) {
       ...layer,
       keyframes: layer.keyframes.flatMap((point) => {
         const values = Object.fromEntries(Object.entries(point.values).filter(([key]) => !colourKeys.has(key)));
-        return Object.values(values).some((value) => value !== null) ? [{ ...point, values }] : [];
+        const easing = Object.fromEntries(Object.entries(point.easing).filter(([key]) => !colourKeys.has(key)));
+        return Object.values(values).some((value) => value !== null) ? [{ ...point, values, easing }] : [];
       }),
     })),
   };

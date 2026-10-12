@@ -1,5 +1,6 @@
 import { useId, useState, type ReactNode } from 'react';
 import { applyCommand, type EditCommand } from '../shared/commands.js';
+import { continuingSettings } from '../shared/keyframes.js';
 import type { ProjectDocument, VideoClip } from '../shared/model.js';
 import {
   createSpatialSettings,
@@ -7,6 +8,7 @@ import {
   hasSpatialChannelKeys,
   hasSpatialEdits,
   NEUTRAL_SPATIAL_POSE,
+  SPATIAL_CHANNELS,
   spatialKeyChannels,
   type SpatialChannel,
   type SpatialKeyframe,
@@ -14,10 +16,10 @@ import {
 } from '../shared/spatial.js';
 import { previewClipSource } from './clip-speed-geometry.js';
 import { KeyframeSteps, keyframeCount } from './AnimationControls.js';
-import { EasingSelect } from './EasingSelect.js';
 import { HelpPopover } from './HelpPopover.js';
 import { Icon } from './icons.js';
 import { InspectorSection } from './InspectorSection.js';
+import { KeyframeEasing } from './KeyframeEasing.js';
 import { useKeyframeNavigation } from './keyframe-navigation.js';
 import './keyframe-navigation.css';
 import './layer-keyframes.css';
@@ -27,6 +29,7 @@ import {
   editSpatialPose,
   removeSpatialKey,
   replaceSpatialKey,
+  setSpatialEasing,
   SPATIAL_CONTROLS,
   spatialPlayhead,
   toggleSpatialChannel,
@@ -279,11 +282,7 @@ export function SpatialControls({
   const index = settings.keyframes.findIndex((key) => key.frame === selection.selected);
   const selected = settings.keyframes[index];
   // Easing only matters where an enabled setting continues to a later key.
-  const laterKeyExists =
-    selected !== undefined &&
-    spatialKeyChannels(selected).some((channel) =>
-      settings.keyframes.some((key) => key.frame > selected.frame && key.values[channel] !== null),
-    );
+  const continuing = selected ? continuingSettings(settings.keyframes, selected, SPATIAL_CHANNELS) : [];
   const [error, setError] = useState('');
   const validate = (produce: () => SpatialSettings): string | null => {
     try {
@@ -415,15 +414,19 @@ export function SpatialControls({
               onCommit={(value) => change(() => replaceSpatialKey(settings, selected.frame, { frame: value }))}
             />
           </label>
-          <label className="speed-field">
-            Easing
-            <EasingSelect
-              aria-label="Transform keyframe easing"
-              value={selected.interpolation}
-              disabled={unavailable || !laterKeyExists}
-              onChange={(interpolation) => change(() => replaceSpatialKey(settings, selected.frame, { interpolation }))}
+          <div className="speed-field spatial-easing" key={`${context}:${selection.identity}`}>
+            <KeyframeEasing
+              label="Transform keyframe easing"
+              settingLabel={(setting) => `Transform keyframe ${setting} easing`}
+              settings={SPATIAL_CONTROLS.filter((control) => selected.values[control.key] !== null)}
+              continuing={continuing}
+              easing={selected.easing}
+              disabled={unavailable || !continuing.length}
+              onChange={(channel, interpolation) =>
+                change(() => setSpatialEasing(settings, selected.frame, channel, interpolation))
+              }
             />
-          </label>
+          </div>
           <PoseFields
             values={selected.values as Record<SpatialChannel, number>}
             channels={spatialKeyChannels(selected)}

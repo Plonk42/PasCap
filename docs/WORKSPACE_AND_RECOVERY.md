@@ -1,6 +1,6 @@
 # Desktop workspace and recovery
 
-The workspace uses **strict schema 15 with complete required video track colour, independent clip spatial settings and clip-only speed, uniform video tracks, required per-track
+The workspace uses **strict schema 16 with complete required video track colour, independent clip spatial settings and clip-only speed, uniform video tracks, required per-track
 Ripple/transitions/fades, 0–8 independently identified music tracks, project-specific
 video/music bins and draggable shared project-time track keyframes**, with per-setting channel navigation. Layout preferences,
 stored-keyframe inspection and recovery feedback remain editor-only. Source protection,
@@ -340,7 +340,8 @@ off-trim/original-exclusive-OUT keyframes, using the closest mapped image. The
 clip-local stored-source cursor advances even when several previews coincide.
 Labels distinguish stored source time from actual displayed source time. Stored
 **Source frame**, **Easing** and eight pose fields edit the selected
-keyframe, not the real-playhead pose. The last easing selector is disabled without a
+keyframe, not the real-playhead pose. Its **Easing** sets every enabled setting's Easing
+(**Mixed** when they differ), with **Per setting** selects like a track keyframe's; it is disabled without a
 next keyframe. Time/value edits do not seek automatically; navigation does not save.
 This selection is distinct from the shared track inspection cursor below.
 
@@ -381,7 +382,8 @@ it never saves or creates an Undo step.
 
 Clicking joins/leaves **only that setting** at the current absolute project frame.
 The first enabled setting creates the shared keyframe, the last removal deletes it, and
-other enabled settings/easing are preserved. A keyed channel's main slider/number
+other enabled settings and their Easing are preserved; a joining setting takes the Easing
+the keyframe's settings agree on, else Linear. A keyed channel's main slider/number
 is read-only where that channel is absent, including keyframes belonging to other
 channels, and is shown dimmed with a lock cue. Click its hollow diamond to capture the displayed value first; there are no slider-created
 implicit keyframes. Without Opacity keyframes, the slider edits the track's saved `opacity`,
@@ -396,10 +398,12 @@ expansion preference. Each entry names the enabled settings;
 its inner **Edit** disclosure (open initially for three or fewer keyframes) provides
 **Timeline frame**, **Easing** and values for the enabled settings.
 A time edit moves all enabled settings
-and their existing easing together in **one Undo step**; colliding times/invalid
+and their Easing together in **one Undo step**; colliding times/invalid
 values are rejected without changing the committed document,
-never merged or overwritten. One easing is shared at a keyframe,
-but each channel interpolates toward its own **next keyframe with that setting enabled**, with
+never merged or overwritten. Each enabled setting has its own Easing:
+the **Easing** select sets them all (reading **Mixed** when they differ), and **Per setting**
+reveals one select per setting; each change is one Undo step. Each channel
+interpolates toward its own **next keyframe with that setting enabled**, with
 endpoint holds and unkeyed values only for entirely unanimated channels: track
 `opacity` for Opacity, track `colour` for colour. Keyframe
 input identity/focus and drafts survive time reordering and Undo;
@@ -411,7 +415,7 @@ resets, with one exact `NumberField` to the right of each slider; Opacity uses
 The local-draft/release-only slider contract above
 applies to all stored keyed settings too. Each accepted value or reset targets only
 that existing stored keyed setting in one Undo step;
-keyframe time, shared easing, other enabled settings, track `opacity` and clip settings stay unchanged.
+keyframe time, every Easing, other enabled settings, track `opacity` and clip settings stay unchanged.
 There is no implicit joining. Numeric drafts retain entered precision and apply
 on Enter/blur; Escape restores. Empty, nonfinite or out-of-range
 values retain inline errors without clamping.
@@ -500,7 +504,7 @@ uncertain write keeps selection and the actual error visible, with guidance to c
 Activity/project state before repeating the import; there is no automatic write retry.
 Late folder reads are aborted on navigation/dismissal. Manual music paths remain
 deliberate imports outside browser roots and never expand configured roots. No original is
-copied: strict schema 15 references registered originals in place, with only
+copied: strict schema 16 references registered originals in place, with only
 generated proxies/thumbnails, metadata, exports/receipts and scratch written locally.
 
 There is no upload endpoint, browser file picker, optional copy flow or true
@@ -659,7 +663,7 @@ saved document. It never deletes original recordings, shared registry entries,
 proxies/cache files, successful MP4s or receipts. This is not cache garbage
 collection; another project's membership and immutable export snapshots are unaffected.
 
-Only strict v15 projects and v15 project snapshots in version-1 export receipts are interpreted.
+Only strict v16 projects and v16 project snapshots in version-1 export receipts are interpreted.
 Every video track requires complete Colour, including `temperature`, `tint` and `hdr` bases
 and static HSL/curves; missing fields and clip colour/correction are invalid.
 Every clip requires constant or 1–256-keyframe custom-curve speed and complete spatial
@@ -683,7 +687,7 @@ eleven nullable fields, in control order: `opacity`, `temperature`,
 `shadows`, `hdr`. HSL/curves remain static. Track
 `opacity` is the sole valid stored value; saved `clip.opacity` and old
 `clipOpacity`/`layerOpacity` channels are invalid, not ignored or defaulted.
-Earlier v1–v14 projects/receipt snapshots are preserved, incompatible
+Earlier v1–v15 projects/receipt snapshots are preserved, incompatible
 and never migrated or rewritten with fallback/default local fields or old-format
 readers. **Create a new
 project** and import its media deliberately; there is no automatic deletion of
@@ -771,7 +775,7 @@ invalid release leaves the saved document and history unchanged.
 For an HTTP 409 or incompatible save response, **Review latest save** explains:
 
 1. **Keep editing this draft** — no saved document changes; the save error persists.
-2. **Download unsaved project** — download a strict v15 JSON snapshot with the current
+2. **Download unsaved project** — download a strict v16 JSON snapshot with the current
    local changes/expected revision before replacing them.
 3. **Discard local changes and reload** — explicitly replace local history/document
    with a newly read saved version. It performs no overwrite POST/PUT.

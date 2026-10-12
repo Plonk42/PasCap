@@ -1,5 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import path from 'node:path';
+import { joiningEasing, KEYFRAME_SETTINGS } from '../../src/shared/keyframes.js';
 import type { MediaAsset } from '../../src/shared/media.js';
 import { createClip, createLayer, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
 import { calculateLayout } from '../../src/shared/timeline.js';
@@ -159,7 +160,17 @@ function edited(document: ProjectDocument, setting: Setting, value: number, laye
   const expected = structuredClone(document);
   const row = expected.layers.find((layer) => layer.id === layerId)!;
   if (frame === undefined) row.colour[setting] = value;
-  else row.keyframes.find((point) => point.frame === frame)!.values[setting] = value;
+  else {
+    const point = row.keyframes.find((item) => item.frame === frame)!;
+    // A capture that enables the setting adopts the Easing the keyframe's settings agree on.
+    if (point.values[setting] === null)
+      point.easing[setting] = joiningEasing(
+        row.keyframes,
+        point,
+        KEYFRAME_SETTINGS.map((item) => item.key),
+      );
+    point.values[setting] = value;
+  }
   return expected;
 }
 
@@ -414,7 +425,7 @@ test('animated missing participants stay read-only until explicit capture; remov
     sharedPoint(30, { temperature: 0.5 }),
   ];
   await fixture(page, document);
-  expect(document.schemaVersion).toBe(15);
+  expect(document.schemaVersion).toBe(16);
   expect(Object.keys(document.layers[0]!.keyframes[0]!.values)).toHaveLength(11);
   await seek(page, 20);
   const temperature = controls(page, 'Temperature');
@@ -439,6 +450,7 @@ test('animated missing participants stay read-only until explicit capture; remov
   await expect(temperature.exact).toBeEnabled();
   await expect(diamond(page, 'Temperature')).toHaveAttribute('aria-pressed', 'true');
   const captured = edited(staticChange, 'temperature', 0, 'video-1', 20);
+  expect(captured.layers[0]!.keyframes.find((point) => point.frame === 20)!.easing.temperature).toBe('smooth');
   expect(await current(page)).toEqual(captured);
   await temperature.exact.fill('0.123456789');
   await temperature.exact.press('Enter');

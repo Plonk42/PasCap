@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import type { AudioAsset } from '../../src/shared/audio.js';
 import type { ExportPreflight } from '../../src/shared/export-space.js';
-import { EMPTY_KEY_VALUES } from '../../src/shared/keyframes.js';
+import { EMPTY_KEY_VALUES, layerKeyframe, uniformKeyframe } from '../../src/shared/keyframes.js';
 import type { MediaJob } from '../../src/shared/media.js';
 import { createClip, createProject } from '../../src/shared/model.js';
 import { api, ApiError, request, type ServiceHealth } from '../../src/web/api.js';
@@ -368,8 +368,8 @@ describe('registered API methods', () => {
     await expect(api.save(project, 0)).rejects.toMatchObject({ status: 200, kind: 'response' });
   });
 
-  it('uses complete schema-15 project mocks and rejects a version-8 response without changing it', async () => {
-    expect(project.schemaVersion).toBe(15);
+  it('uses complete schema-16 project mocks and rejects a version-8 response without changing it', async () => {
+    expect(project.schemaVersion).toBe(16);
     expect(project.layers[0]!.keyframes).toEqual([]);
     const unsupported = unsupportedProject(8, project.id, project.title);
     const before = JSON.stringify(unsupported);
@@ -380,11 +380,7 @@ describe('registered API methods', () => {
   });
 
   it('validates all eleven required nullable members in a shared row point, including zero participation', async () => {
-    const point = {
-      frame: 100,
-      interpolation: 'linear' as const,
-      values: { ...EMPTY_KEY_VALUES, exposure: 0, opacity: 0 },
-    };
+    const point = layerKeyframe(100, { ...EMPTY_KEY_VALUES, exposure: 0, opacity: 0 }, 'linear');
     const document = { ...project, layers: [{ ...project.layers[0]!, keyframes: [point] }] };
     fetchMock.mockResolvedValueOnce(jsonResponse({ document }));
     expect(await api.load(project.id)).toEqual({ document });
@@ -400,7 +396,7 @@ describe('registered API methods', () => {
   });
 
   it.each(['clip opacity', 'layerOpacity', 'clipOpacity', 'speed'])(
-    'rejects a removed %s in a v15 response without dropping it or retrying',
+    'rejects a removed %s in a v16 response without dropping it or retrying',
     async (removed) => {
       const layer = project.layers[0]!;
       const legacyLayer =
@@ -410,9 +406,8 @@ describe('registered API methods', () => {
               ...layer,
               keyframes: [
                 {
-                  frame: 0,
-                  interpolation: 'linear',
-                  values: { ...EMPTY_KEY_VALUES, opacity: 0.5, [removed]: null },
+                  ...uniformKeyframe(0, { ...EMPTY_KEY_VALUES, opacity: 0.5, [removed]: null }, 'linear'),
+                  reset: false,
                 },
               ],
             };

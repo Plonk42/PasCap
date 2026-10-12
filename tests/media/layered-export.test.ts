@@ -35,6 +35,7 @@ import {
   type Interpolation,
   type LayerKeyValues,
   type LayerKeyframe,
+  layerKeyframe,
 } from '../../src/shared/keyframes.js';
 import type { MediaAsset } from '../../src/shared/media.js';
 import {
@@ -66,7 +67,7 @@ function layer(id: string): VideoLayer {
   return createLayer(id, id, false);
 }
 function point(frame: number, values: Partial<LayerKeyValues>, interpolation: Interpolation = 'linear'): LayerKeyframe {
-  return { frame, interpolation, values: { ...EMPTY_KEY_VALUES, ...values } };
+  return layerKeyframe(frame, { ...EMPTY_KEY_VALUES, ...values }, interpolation);
 }
 
 async function rawRgb(config: ServiceConfig, filename: string, range = 'tv'): Promise<Buffer> {
@@ -129,7 +130,7 @@ function coverage(samples: PreviewLayer[]): number {
   return result;
 }
 
-describe.skipIf(!enabled)('schema-15 layered native export · disposable synthetic sources only', () => {
+describe.skipIf(!enabled)('schema-16 layered native export · disposable synthetic sources only', () => {
   let root: string;
   let config: ServiceConfig;
   let jobs: JobQueue;
