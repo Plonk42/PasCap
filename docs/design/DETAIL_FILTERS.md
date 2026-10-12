@@ -144,12 +144,14 @@ reference and the measurement helper reject nonneutral detail.
 
 ### GPU export worker
 
-When a hardware GPU is available, export renders every track group frame that uses
-the kernel (nonneutral detail or HDR on either source) with the **same WebGL
-programs as the preview**, in one headless Chrome page the service launches per
+When a hardware GPU is available, export renders every track group frame whose CPU path
+is per-pixel heavy with the **same WebGL programs as the preview**: nonneutral detail or
+HDR, nonneutral HSL ranges or colour curves, or a nonneutral evaluated spatial pose on
+either source. It uses one headless Chrome page the service launches per
 export ([service side](../../src/server/gpu-compositor.ts),
-[page](../../src/gpu-worker/main.ts)). Other group frames stay on the CPU
-compositor, which remains the parity reference.
+[page](../../src/gpu-worker/main.ts)). Neutral, scalar-colour and Opacity/fade-only
+frames stay on the CPU compositor, which is exact there (neutral frames stay bit-identical),
+at least as fast as the transport below, and remains the parity reference.
 
 - **Launch**: `PASCAP_CHROME` or `google-chrome`/`chromium` from PATH, `--headless=new`,
   a temporary profile and no DevTools port, trying ANGLE `vulkan` (which selects a
@@ -172,9 +174,19 @@ compositor, which remains the parity reference.
 - **Budget**: one browser process (with its own GPU/renderer helpers) per export, two
   source textures, one target-size render target and readback array in the page.
 - **Parity**: the shaders meet the GPU gates above against the CPU kernel; the native
-  720p detail/HDR parity cases also run through the worker (SwiftShader, accepted only
-  in tests) under the unchanged canonical and full-resolution coverage gates.
-  Transformed coverage edges are computed in float32, as in the preview.
+  720p detail/HDR, spatial, HSL/curves and dissolve/fade/Opacity parity cases also run
+  through the worker (SwiftShader, accepted only in tests) under the unchanged canonical
+  and full-resolution coverage gates. Transformed coverage edges are computed in float32,
+  as in the preview.
+- **Why not every group**: synthetic UHD group composition on the NVIDIA T1200 (Vulkan), CPU
+  pool of 8 workers on a 16-thread host versus the worker, ms per frame: neutral 78 vs 175,
+  Opacity/fade 89 vs 173, scalar colour 60 vs 220, scalar dissolve 116 vs 292, HSL + curves
+  212 vs 236, spatial pose 140 vs 230, spatial dissolve 298 vs 285. Pinned to four cores
+  (`taskset -c 0-3`): neutral 113 vs 171, scalar colour 127 vs 173, HSL + curves 450 vs 235,
+  spatial pose 301 vs 235, advanced dissolve 356 vs 290, spatial dissolve 721 vs 286. The
+  worker is bounded by loopback transport (≈ 170 ms at UHD), so it only wins where the CPU
+  work is heavy and cores are few; cheap groups would get slower. Measurements are synthetic
+  and say nothing about other hardware.
 - **Measured** (synthetic UHD, HDR 0.27 + Sharpen 0.3, Intel UHD GT1 iGPU): group
   composition 2.77 s → 0.21 s per frame in isolation (0.33 s inside an export, mostly
   loopback transport); a 30-frame lossless layered render 98.5 s → 26.4 s, where the
