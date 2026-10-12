@@ -154,7 +154,7 @@ PasCap is a solo, pre-release project: optimize for fast iteration. Details are 
   `PlacedClip.retiming.sourcePositionAt`; `sourceAt` remains recorded-image identity.
   Scale is 0.1–8, translation −2–2 output-width/height fractions, rotation
   −180°–180° clockwise with numeric, not shortest-arc interpolation. Crop fractions
-  are each below 1 (opposite crops summing to 1 or more cover nothing), without refit or moving the original-centre pivot;
+  are each in 0–1 (a crop of 1, or opposite crops summing to 1 or more, cover nothing), without refit or moving the original-centre pivot;
   use unrounded original-aspect contain fit and top-left half-open crop bounds.
   Exact neutral rendering preserves opaque black letterboxing after grading;
   nonneutral uncovered pixels are transparent. Clip → Transform is the second

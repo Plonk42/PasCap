@@ -31,8 +31,8 @@ the original's exclusive OUT (`frameCount`), including keyframes outside the tri
 
 | Field                       | Bounds and meaning                           | New-clip neutral value |
 | --------------------------- | -------------------------------------------- | ---------------------- |
-| `cropLeft` / `cropRight`    | Each in [0, 1), fractions of original width  | 0 / 0                  |
-| `cropTop` / `cropBottom`    | Each in [0, 1), fractions of original height | 0 / 0                  |
+| `cropLeft` / `cropRight`    | Each in [0, 1], fractions of original width  | 0 / 0                  |
+| `cropTop` / `cropBottom`    | Each in [0, 1], fractions of original height | 0 / 0                  |
 | `scale`                     | Uniform, aspect-preserving 0.1–8             | 1                      |
 | `translateX` / `translateY` | −2–2, fractions of full output width/height  | 0 / 0                  |
 | `rotation`                  | −180°–180°, clockwise                        | 0                      |
