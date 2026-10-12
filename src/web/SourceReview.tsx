@@ -25,6 +25,7 @@ import { mediaReady, sourceSeconds } from './display.js';
 import { Icon } from './icons.js';
 import { Popover } from './Popover.js';
 import { SourceTransport, type SourceTransportState } from './source-transport.js';
+import { useDelayedFlag } from './use-delayed-flag.js';
 import './rush-source.css';
 
 export interface RushExcerpt {
@@ -82,8 +83,6 @@ interface RangeDrag {
   width: number;
   headBefore: number;
 }
-
-const SEEK_INDICATOR_DELAY_MS = 250;
 
 function message(cause: unknown): string {
   return cause instanceof Error ? cause.message : 'Cannot review this recording.';
@@ -218,15 +217,8 @@ export function SourceReview({
   const observedFrame = currentObservation?.frame ?? null;
   const error = decoderError || currentObservation?.error || '';
   const buffering = observedFrame === null && !error;
-  const [slowSeek, setSlowSeek] = useState(false);
-  useEffect(() => {
-    setSlowSeek(false);
-    if (!buffering) return;
-    const timer = window.setTimeout(() => setSlowSeek(true), SEEK_INDICATOR_DELAY_MS);
-    return () => window.clearTimeout(timer);
-  }, [buffering]);
   // A fast seek keeps the previous image instead of blinking; a slow one hides it and says so.
-  const seekingShown = buffering && slowSeek;
+  const seekingShown = useDelayedFlag(buffering);
   const playing = currentObservation?.status === 'playing' || currentObservation?.status === 'starting';
   const steadyTransportLabel = playing ? 'Playing' : 'Paused';
   const transportLabel = currentObservation?.status === 'starting' ? 'Starting' : steadyTransportLabel;

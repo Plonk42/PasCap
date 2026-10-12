@@ -5,6 +5,7 @@ import { HelpPopover } from './HelpPopover.js';
 import { Icon } from './icons.js';
 import './preview-comparison.css';
 import { TimecodeField } from './TimecodeField.js';
+import { useDelayedFlag } from './use-delayed-flag.js';
 
 interface Props {
   canvas: RefObject<HTMLCanvasElement | null>;
@@ -107,7 +108,7 @@ export function PreviewPanel({
 }: Readonly<Props>) {
   const frame = diagnostics?.frame ?? 0;
   const status = diagnostics?.status ?? 'empty';
-  const waiting = ['loading', 'seeking', 'buffering'].includes(status);
+  const waiting = useDelayedFlag(['loading', 'seeking', 'buffering'].includes(status));
   const failed = !!startupError || status === 'error';
   const controlsUnavailable = !duration || drafting || loading || !!startupError;
   const label = { playing: 'Playing', paused: 'Paused' }[status as 'playing' | 'paused'] ?? status;

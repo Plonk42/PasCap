@@ -74,7 +74,9 @@ or dissolve can start from prefilled frames.
   source frames are requested once; a held image is reused.
 - Paused seeks start a one-frame stream per active clip, wait for that exact
   frame, upload it and stop. A lane already showing the exact recording and
-  source frame keeps its texture without decoding again.
+  source frame keeps its texture without decoding again. The previous image stays
+  meanwhile; the seeking or buffering overlay appears only after 250 ms of
+  continuous waiting, so ruler scrubbing does not blink.
 - Play prefills up to three frames per active clip, starts music when present
   and anchors the clock at the requested frame.
 - Every animation frame, the clock frame is sampled. Frames the clock has passed
