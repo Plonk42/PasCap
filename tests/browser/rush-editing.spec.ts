@@ -415,7 +415,7 @@ test('three ranges from one rush keep the source pinned, independent, reloadable
       'title',
       `Original source frames ${excerpt.sourceIn} → ${excerpt.sourceOut}, OUT exclusive`,
     );
-    await expect(row.locator('.source-excerpt-layer')).toHaveText('Video track 1');
+    await expect(row.locator('.source-excerpt-layer')).toHaveText('Track 1');
     await expect(row.getByRole('button', { name: `Show clip ${index + 1} on timeline`, exact: true })).toBeVisible();
   }
   await page.setViewportSize({ width: 1280, height: 720 });
@@ -751,7 +751,7 @@ test('I/O middle removal is transient then one edit, preserving absolute eleven-
     sharedPoint(1_000, { exposure: 0.6 }, 'smooth'),
   ];
   document.layers.push({
-    ...createLayer('upper', 'Video track 2', false),
+    ...createLayer('upper', 'Track 2', false),
     opacity: 0.75,
     keyframes: [sharedPoint(200, { opacity: 0.6, hue: 35 }, 'ease-in')],
   });
@@ -853,7 +853,7 @@ test('overlay middle cuts keep their gap and neighbours fixed; visible quick tri
 }) => {
   const document = sequence();
   document.layers.push({
-    ...createLayer('upper', 'Video track 2', false),
+    ...createLayer('upper', 'Track 2', false),
     opacity: 0.8,
     keyframes: [sharedPoint(10, { exposure: 0.2 }), sharedPoint(500, { hue: 25 }, 'hold')],
     transitions: [
@@ -869,7 +869,7 @@ test('overlay middle cuts keep their gap and neighbours fixed; visible quick tri
   await fixture(page, document);
   await selectClip(page, 'top');
   const before = await current(page);
-  await expect(page.getByRole('button', { name: 'Toggle Ripple on Video track 2', exact: true })).toHaveAttribute(
+  await expect(page.getByRole('button', { name: 'Toggle Ripple on Track 2', exact: true })).toHaveAttribute(
     'aria-pressed',
     'false',
   );
@@ -1350,7 +1350,7 @@ test('an overlapping source Add clears stale success feedback but keeps the sour
 }) => {
   const document = sequence();
   document.layers.push({
-    ...createLayer('upper', 'Video track 2', false),
+    ...createLayer('upper', 'Track 2', false),
     keyframes: [sharedPoint(10, { exposure: 0.25 }), sharedPoint(500, { hue: 20 }, 'hold')],
     transitions: [{ leftId: 'top', rightId: 'occupied', type: 'cut', duration: 0 }],
   });

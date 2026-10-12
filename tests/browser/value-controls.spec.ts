@@ -454,7 +454,7 @@ test('main and stored Opacity percentages reject invalid entries, cancel drafts 
       ? [sharedPoint(0, { opacity: 0.8, exposure: 0.2 }), sharedPoint(180, { opacity: 0.4 })]
       : [];
     await fixture(page, document);
-    const scope = stored ? await editLayerPoint(page, 'Video track 1', 0) : page;
+    const scope = stored ? await editLayerPoint(page, 'Track 1', 0) : page;
     const name = stored ? 'Opacity keyframe value 0' : 'Opacity';
     await showControl(page, name);
     const { slider, exact, widget } = controls(scope, name);
@@ -544,7 +544,7 @@ test('stored participants share the widgets, retain precise values and never joi
     sharedPoint(180, { contrast: 1, exposure: 0.5 }, 'hold'),
   ];
   await fixture(page, document);
-  const row = await editLayerPoint(page, 'Video track 1', 0);
+  const row = await editLayerPoint(page, 'Track 1', 0);
   for (const [setting, label, value] of [
     ['opacity', 'Opacity', 23.4567891],
     ['exposure', 'Exposure', 0.345678912],
@@ -563,7 +563,7 @@ test('stored participants share the widgets, retain precise values and never joi
   await expect(row.locator('.layer-keyframe-point-values').getByRole('slider')).toHaveCount(3);
   await expect(row.locator('.layer-keyframe-point-values').getByRole('spinbutton')).toHaveCount(3);
   await expect(row.getByRole('slider', { name: 'Saturation keyframe value 0', exact: true })).toHaveCount(0);
-  const outside = await editLayerPoint(page, 'Video track 1', 180);
+  const outside = await editLayerPoint(page, 'Track 1', 180);
   await preciseEdit(
     page,
     'Contrast keyframe value 180',
@@ -667,7 +667,7 @@ test('identical-valued clip and row context replacements preserve input identity
   await moveDrag(page, drag, 0.35);
   await expect(exact).toBeDisabled();
   await page
-    .getByRole('button', { name: 'Select track Video track 1', exact: true })
+    .getByRole('button', { name: 'Select track Track 1', exact: true })
     .evaluate((button: HTMLButtonElement) => button.click());
   await expect(widget).toHaveAttribute('data-pointer-draft', 'false');
   await expect(slider).toBeFocused();
@@ -784,7 +784,7 @@ test('common widgets fit 270px inspectors at the default and minimum viewports w
       if (tab === 'Track') {
         const hsl = inspector.getByRole('button', { name: 'HSL ranges section', exact: true });
         if ((await hsl.getAttribute('aria-expanded')) !== 'true') await hsl.click();
-        await editLayerPoint(page, 'Video track 1', 0);
+        await editLayerPoint(page, 'Track 1', 0);
       }
       const widgets = await inspector.locator('.value-control').evaluateAll((elements) =>
         elements

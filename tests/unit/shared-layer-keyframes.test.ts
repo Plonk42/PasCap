@@ -35,7 +35,7 @@ function point(frame: number, values: Partial<LayerKeyValues>, interpolation: In
   return { frame, interpolation, values: { ...EMPTY_KEY_VALUES, ...values } };
 }
 function row(keyframes: LayerKeyframe[] = []): VideoLayer {
-  return { ...createLayer(BASE_LAYER_ID, 'Video track 1'), keyframes };
+  return { ...createLayer(BASE_LAYER_ID, 'Track 1'), keyframes };
 }
 function sequence(keyframes: LayerKeyframe[] = [], lengths = [120, 100]): ProjectDocument {
   let project = createProject('shared', 'Shared row');
@@ -57,7 +57,7 @@ function overlay(
 ): ProjectDocument {
   const project = applyCommand(createProject('overlay', 'Overlay row'), {
     type: 'layer-add',
-    layer: { ...createLayer('upper', 'Video track 2', false), keyframes },
+    layer: { ...createLayer('upper', 'Track 2', false), keyframes },
   });
   return applyCommand(project, {
     type: 'insert',

@@ -112,7 +112,7 @@ describe('strict uniform schema-15 tracks', () => {
   it('uses Ripple ON for the initial track and every newly created track', () => {
     const initial = createProject('new', 'New');
     expect(initial.schemaVersion).toBe(15);
-    expect(initial.layers).toEqual([createLayer(BASE_LAYER_ID, 'Video track 1')]);
+    expect(initial.layers).toEqual([createLayer(BASE_LAYER_ID, 'Track 1')]);
     for (const id of [BASE_LAYER_ID, ...Array.from({ length: 8 }, (_, index) => `arbitrary-${index}`)]) {
       expect(createLayer(id, 'Track')).toEqual({
         id,

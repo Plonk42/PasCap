@@ -4,8 +4,8 @@ import { calculateLayout } from '../shared/timeline.js';
 
 export function nextLayerName(project: ProjectDocument): string {
   let number = 2;
-  while (project.layers.some((layer) => layer.name === `Video track ${number}`)) number++;
-  return `Video track ${number}`;
+  while (project.layers.some((layer) => layer.name === `Track ${number}`)) number++;
+  return `Track ${number}`;
 }
 
 /** Colour belongs to the track, so a different look means a new track; the clip keeps its start and order. */

@@ -825,9 +825,7 @@ test('changing a later boundary preserves independent excerpts while Colour appl
   await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
   await inspectorTab(page, 'Track');
   await page.getByRole('slider', { name: 'Exposure', exact: true }).fill('0.8');
-  await page
-    .getByRole('button', { name: 'Transition after pattern-b.mp4, clip 2 on Video track 1', exact: true })
-    .click();
+  await page.getByRole('button', { name: 'Transition after pattern-b.mp4, clip 2 on Track 1', exact: true }).click();
   await page.getByRole('combobox', { name: 'Transition type' }).selectOption('cross-dissolve');
   const project = projectSchema.parse(await page.evaluate(() => window.pascapLab!.project()));
   expect(project.layers[0]?.colour.exposure).toBe(0.8);

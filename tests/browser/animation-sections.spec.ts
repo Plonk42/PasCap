@@ -9,7 +9,7 @@ import { editLayerPoint, inspectorTab, layerKeyframes, settingTab, sharedPoint }
 import { memoryProjects, type MemoryProjects } from './memory-projects.js';
 
 type Section = 'Colour' | 'Speed' | 'Transform';
-const TRACK = 'Video track 1';
+const TRACK = 'Track 1';
 const CLIP = 'animated-clip';
 const colourSettings = KEYFRAME_SETTINGS;
 
@@ -64,7 +64,7 @@ async function ready(page: Page, document: ProjectDocument): Promise<void> {
       }),
     )
     .toEqual({ id: document.id, status: 'paused', duration: calculateLayout(document).duration });
-  await expect(page.getByRole('button', { name: 'Select track Video track 1', exact: true })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Select track Track 1', exact: true })).toBeEnabled();
 }
 
 /** Check the decoded frame's identity in the preview texture. */

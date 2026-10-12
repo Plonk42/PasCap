@@ -161,7 +161,7 @@ export function createProject(id: string, title: string): ProjectDocument {
     media: { videoIds: [], audioIds: [] },
     frameRate: { ...PROJECT_FPS },
     colourProfile: 'bt709-sdr',
-    layers: [createLayer(BASE_LAYER_ID, 'Video track 1')],
+    layers: [createLayer(BASE_LAYER_ID, 'Track 1')],
     clips: [],
     music: [],
     revision: 0,

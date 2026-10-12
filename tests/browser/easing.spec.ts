@@ -64,7 +64,7 @@ for (const context of ['shared', 'clip'] as const) {
     await page.setViewportSize({ width: 1280, height: 720 });
     await page.goto(`/?project=${document.id}`);
     await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
-    if (context === 'shared') await editLayerPoint(page, 'Video track 1', 10);
+    if (context === 'shared') await editLayerPoint(page, 'Track 1', 10);
     else await inspectorTab(page, 'Clip');
     const label = context === 'shared' ? 'Track keyframe easing 10' : 'Clip speed keyframe easing';
     const select = page.getByRole('combobox', { name: label, exact: true });
