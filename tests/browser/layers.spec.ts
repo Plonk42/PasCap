@@ -116,6 +116,41 @@ test('adds layered clips, adjusts row opacity, hides/shows and releases unused d
   expect(await page.evaluate(() => window.pascapLab!.project()!.layers.length)).toBe(2);
 });
 
+test('hiding one of two tracks keeps the other track visible, paused and playing', async ({ page }) => {
+  await seek(page, 10);
+  await addOverlay(page);
+  const capture = (): Promise<number[]> =>
+    page.evaluate(() => Array.from(window.pascapLab!.engine.capturePixels().slice(100_000, 100_012)));
+  const settled = (): Promise<unknown> =>
+    page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
+  const sum = (pixels: number[]): number => pixels.reduce((total, value) => total + value, 0);
+  await seek(page, 10);
+  const both = await capture();
+  // The opaque top track covers the lower one, so hiding the lower track must not change the image.
+  await page.getByRole('button', { name: 'Hide track Video track 1', exact: true }).click();
+  await settled();
+  expect(await capture()).toEqual(both);
+  expect(sum(both)).toBeGreaterThan(0);
+  await page.evaluate(() => window.pascapLab!.engine.play());
+  await page.waitForFunction(() => window.pascapLab!.engine.diagnostics().frame > 20);
+  await page.evaluate(() => window.pascapLab!.engine.pause());
+  await settled();
+  const playedFrame = await page.evaluate(() => window.pascapLab!.engine.diagnostics().frame);
+  await seek(page, playedFrame);
+  expect(sum(await capture())).toBeGreaterThan(0);
+  // Hiding the top track instead leaves the lower one.
+  await page.getByRole('button', { name: 'Show track Video track 1', exact: true }).click();
+  await page.getByRole('button', { name: 'Hide track Video track 2', exact: true }).click();
+  await settled();
+  await seek(page, 10);
+  const lowerOnly = await capture();
+  expect(sum(lowerOnly)).toBeGreaterThan(0);
+  expect(lowerOnly).not.toEqual(both);
+  await page.getByRole('button', { name: 'Show track Video track 2', exact: true }).click();
+  await settled();
+  expect(await capture()).toEqual(both);
+});
+
 test('reorders independently positioned video tracks without altering source ranges', async ({ page }) => {
   await addOverlay(page);
   await page.getByRole('button', { name: 'Add video track', exact: true }).click();
