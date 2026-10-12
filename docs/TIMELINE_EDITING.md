@@ -38,12 +38,12 @@ Multiple insertions of one recording have independent source ranges,
 clip speed and spatial settings.
 
 For several clips from one recording, set source IN/OUT and **Add clip**, then
-mark the next range and add again. Successful additions leave **Source preview** pinned
-to the same recording/frame, with the applied range unchanged and explicit success
+mark the next range and add again. Successful additions keep **Source preview** on
+the same recording/frame, with the applied range unchanged and explicit success
 feedback: **Clip added · mark another range**. The source is not unmounted/reloaded
 for each addition. Failed insertion keeps the review/range and never reports success.
 **Add clip** (labelled with the applied
-range length) and a compact **Show N clips** popover stay in the sticky source header, including on
+range length) and a compact **Show N clips** popover beside the recording name stay in the sticky source header, including on
 short laptop screens; opening the list does not resize source review. The popup
 shows original ranges/tracks; Escape closes just the popup and **Show** selects, seeks and horizontally
 reveals that clip. Library reuse badges count clips, not duplicate recording files.

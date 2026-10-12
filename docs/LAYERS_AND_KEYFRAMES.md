@@ -460,7 +460,8 @@ synthetic checks do not establish intended-GPU or long-flight performance.
 Hover over a **prepared** recording in Media. Its review button's width maps mouse X
 to original frames 0 through `frameCount − 1`; a marker follows the mouse and the
 source viewer, docked in the centre's **Source preview** tab, shows that exact decoded
-frame. Pin keeps that recording selected while hovering other recordings. It uses one
+frame. Clicking a recording chooses it: hovering others previews them, and leaving
+them returns to the chosen recording and frame. It uses one
 WebCodecs proxy decoder in its own worker ([decoding](design/WEBCODECS_PREVIEW.md#source-review)),
 does not change timeline position, and never shows a superseded frame.
 The open project's bin contains explicitly imported recordings/music plus its timeline

@@ -381,10 +381,6 @@ test('three ranges from one rush keep the source pinned, independent, reloadable
     });
     await ready(page, next);
     await expect(page.getByRole('region', { name: 'Source review', exact: true })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Pin source review', exact: true })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    );
     await expect(page.locator('.source-preview')).toHaveAttribute('data-source-frame', String(sourceOut - 1));
     await expect(page.locator('.source-review')).toHaveAttribute('data-source-excerpt-count', String(ids.length));
     expect(
@@ -1387,10 +1383,6 @@ test('an overlapping source Add clears stale success feedback but keeps the sour
   await expect(page.locator('.source-add-feedback')).toHaveText('');
   await expect(page.locator('.source-add-feedback')).not.toHaveAttribute('data-added-clip-id', /./);
   await expect(page.getByRole('region', { name: 'Source review', exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Pin source review', exact: true })).toHaveAttribute(
-    'aria-pressed',
-    'true',
-  );
   await expect(page.locator('.source-preview')).toHaveAttribute('data-media-id', assets[0]!.id);
   await expect(page.locator('.source-preview')).toHaveAttribute('data-source-frame', '29');
   await expect(page.locator('.source-range-strip')).toHaveAttribute('data-source-in', '10');

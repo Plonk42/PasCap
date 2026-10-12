@@ -534,8 +534,9 @@ cancellation and window blur restore a trim draft and its prior source frame.
 This source-only playback adds no timeline/music seek, history/save, decoder,
 original access or implicit preparation.
 
-Pin holds that source while hovering other recording cards. Explicit click/focus can select
-another prepared source. IN/OUT handles/numeric fields/I/O marks stay recoverable; Home/End
+Click/focus chooses a prepared source. Hovering another recording card previews it;
+leaving that card returns to the chosen source at its last frame (without a chosen
+source, the last hovered frame stays). IN/OUT handles/numeric fields/I/O marks stay recoverable; Home/End
 on a handle restores that edge. There are no Mark IN/OUT or Reset buttons and no
 static selected/omitted-frame summary: the strip and exact fields show the range,
 while inline text appears only for drag hints and invalid numeric drafts; Escape
@@ -543,10 +544,10 @@ restores unapplied numeric drafts.
 Applied choices are per-project browser-local state; unavailable storage leaves
 valid choices usable for the current session with a warning. All insertion paths
 copy the latest applied range and create independent clip instances. Changing a
-choice never alters existing clips. **Add clip** leaves the same source pinned
+choice never alters existing clips. **Add clip** leaves the same source chosen
 and open, at the same range/frame, with **Clip added · mark another range** feedback
 only after a successful insertion.
-The sticky source header keeps **Add clip** and a compact clip-count popup reachable
+The sticky source header keeps **Add clip** and a compact clip-count popup (beside the recording name) reachable
 even when range fields need scrolling on a short screen. The native nonmodal list
 does not resize the preview; Escape closes only the popup and outside-click **Add clip**
 leaves focus on that action. The list shows original IN/OUT and track names;
