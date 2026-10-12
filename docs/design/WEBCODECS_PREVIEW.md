@@ -107,7 +107,9 @@ every lane.
 
 Source preview uses its own reader worker with one lane, drawing into a canvas
 (`data-source-decoder`). Hover scrubbing and range handles request one exact
-frame each, superseding the previous request. **Play** streams from the observed
+frame each, superseding the previous request. While a requested frame decodes, the
+previous image stays; only after 250 ms without it is the image hidden behind
+**Seeking frame _N_…**, so fast scrubbing does not blink. **Play** streams from the observed
 frame, or IN, on a wall clock that holds while a frame is missing, stops on the
 last included frame (OUT − 1) and never loops or plays audio. A frame missing for
 five seconds fails with **Source playback did not deliver a frame within 5
