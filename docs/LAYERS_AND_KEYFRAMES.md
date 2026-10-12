@@ -568,9 +568,11 @@ current one is composed, and the encoder consumes each composed group from alter
 RGBA16 buffers while the next is composed. A dissolve needs both RGB8 buffers, so it
 reads after composing. The source-over pass stays serial; it has no spare buffer.
 
-Group frames using the detail/HDR kernel are composited instead by a GPU worker page
+Group frames with a per-pixel-heavy CPU path (the detail/HDR kernel, nonneutral HSL/curves or
+a nonneutral spatial pose) are composited instead by a GPU worker page
 in one headless Chrome process per export when a hardware renderer starts, with the
-same shaders as the preview; it streams RGBA16 results into the existing accumulator,
+same shaders as the preview; neutral, scalar-colour and Opacity/fade-only frames stay on
+the CPU. It streams RGBA16 results into the existing accumulator,
 adding no Node frame buffer, decoder or FFmpeg child. Without a hardware GPU, or after
 any GPU failure, the CPU compositor above is used. See
 [the GPU export worker](design/DETAIL_FILTERS.md#gpu-export-worker).

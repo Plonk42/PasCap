@@ -21,7 +21,12 @@ import {
 import { EMPTY_KEY_VALUES } from '../../src/shared/keyframes.js';
 import type { MediaAsset } from '../../src/shared/media.js';
 import { createClip, createLayer, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
-import { NEUTRAL_SPATIAL_POSE, type SpatialPose, type SpatialSettings } from '../../src/shared/spatial.js';
+import {
+  isNeutralSpatial,
+  NEUTRAL_SPATIAL_POSE,
+  type SpatialPose,
+  type SpatialSettings,
+} from '../../src/shared/spatial.js';
 import { calculateLayout, sampleTimeline, type PreviewLayer } from '../../src/shared/timeline.js';
 
 const enabled = process.env['PASCAP_MEDIA_TESTS'] === '1';
@@ -389,7 +394,13 @@ describe.skipIf(!enabled)('spatial transforms · real native FFmpeg, disposable 
     expect(report.compositePixels).toBe(report.compositeFrames * target.width * target.height);
   }
 
-  async function lossless(project: ProjectDocument, target: Target, directory: string, gpu = false): Promise<string> {
+  async function lossless(
+    project: ProjectDocument,
+    target: Target,
+    directory: string,
+    gpu = false,
+    gpuFrames = gpu ? calculateLayout(project).duration : 0,
+  ): Promise<string> {
     const result = await renderLayeredExport({
       document: project,
       plan: planLayeredExport(project),
@@ -403,7 +414,7 @@ describe.skipIf(!enabled)('spatial transforms · real native FFmpeg, disposable 
     });
     resourceBounds(result.report, target, project);
     expect(result.report.gpuFallback).toBeNull();
-    expect(result.report.gpuFrames).toBe(gpu ? calculateLayout(project).duration : 0);
+    expect(result.report.gpuFrames).toBe(gpuFrames);
     const [output] = result.chunks;
     expect(result.chunks).toEqual([{ filename: output!.filename, duration: calculateLayout(project).duration }]);
     expect(await readdir(directory)).toEqual([output!.filename]);
@@ -597,7 +608,7 @@ describe.skipIf(!enabled)('spatial transforms · real native FFmpeg, disposable 
     await staticParity(changes, asset, detail, hdr, false);
   });
 
-  it.each(staticCases.filter((item) => item.detail || item.hdr))(
+  it.each(staticCases)(
     '720p lossless native parity through the GPU worker: $name',
     async ({ changes, asset, detail, hdr }) => {
       await staticParity(changes, asset, detail, hdr, true);
@@ -801,6 +812,52 @@ describe.skipIf(!enabled)('spatial transforms · real native FFmpeg, disposable 
     120_000,
   );
 
+  it('720p GPU worker parity: animated held sources, differing dissolve poses, row opacity and black fades', async () => {
+    const project = compound();
+    const layout = calculateLayout(project);
+    // Only the upper row has nonneutral poses; the lower row's neutral scalar frames stay on the CPU.
+    const heavyFrames = Array.from({ length: layout.duration }, (_, frame) =>
+      sampleTimeline(project, frame, layout).some((sample) => !isNeutralSpatial(sample.spatial)),
+    ).filter(Boolean).length;
+    expect(heavyFrames).toBeGreaterThan(0);
+    const work = await mkdtemp(path.join(root, 'compound-gpu-'));
+    try {
+      const filename = await lossless(project, EXPORT_PROFILES.draft720, work, true, heavyFrames);
+      await parity(project, EXPORT_PROFILES.draft720, filename);
+      await unchanged();
+    } finally {
+      await rm(work, { recursive: true, force: true });
+    }
+  }, 120_000);
+
+  it('720p lossless native parity through the GPU worker: HSL ranges and a master curve', async () => {
+    const project = createProject('gpu-advanced-colour', 'Disposable one-frame advanced colour test');
+    project.layers[0]!.colour = {
+      ...NEUTRAL_COLOUR,
+      exposure: 0.2,
+      hsl: { ...NEUTRAL_COLOUR.hsl, red: { hue: 12, saturation: -0.3, lightness: 0.04 } },
+      curves: {
+        ...NEUTRAL_COLOUR.curves,
+        master: [
+          { x: 0, y: 0 },
+          { x: 0.3, y: 0.15 },
+          { x: 0.7, y: 0.85 },
+          { x: 1, y: 1 },
+        ],
+      },
+    };
+    project.clips = [createClip('pattern', assets[1]!.id, 1, 2)];
+    const captured = projectSchema.parse(project);
+    const work = await mkdtemp(path.join(root, 'advanced-gpu-'));
+    try {
+      const filename = await lossless(captured, EXPORT_PROFILES.draft720, work, true);
+      await parity(captured, EXPORT_PROFILES.draft720, filename);
+      await unchanged();
+    } finally {
+      await rm(work, { recursive: true, force: true });
+    }
+  });
+
   it('preserves exact neutral opaque/ungraded letterbox RGB and coverage over a lower row', async () => {
     const project = createProject('neutral-letterbox', 'Exact legacy neutral bytes');
     project.layers.push(createLayer('letterbox', 'Opaque neutral padding', true));
@@ -816,7 +873,7 @@ describe.skipIf(!enabled)('spatial transforms · real native FFmpeg, disposable 
     const target = EXPORT_PROFILES.draft720;
     const work = await mkdtemp(path.join(root, 'legacy-'));
     try {
-      const filename = await lossless(captured, target, work);
+      const filename = await lossless(captured, target, work, true, 0); // Neutral keys evaluate neutral: CPU.
       await exactFrames(filename, target, 1);
       const groups = await referenceSources(captured, 0, target);
       const top = groups[1]![0]!;
