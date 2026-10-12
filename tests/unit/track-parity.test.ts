@@ -9,7 +9,7 @@ import {
   planExport,
   planLayeredExport,
 } from '../../src/shared/export.js';
-import { EMPTY_KEY_VALUES, type LayerKeyframe } from '../../src/shared/keyframes.js';
+import { EMPTY_KEY_VALUES, type LayerKeyframe, layerKeyframe } from '../../src/shared/keyframes.js';
 import {
   BASE_LAYER_ID,
   createClip,
@@ -29,11 +29,8 @@ import { unsupportedProject } from './project-fixtures.js';
 const TRACK_IDS = ['ground', 'middle', 'sky'];
 const cases = TRACK_IDS.flatMap((layerId) => [false, true].map((ripple) => ({ layerId, ripple })));
 const cut = (leftId: string, rightId: string): Transition => ({ leftId, rightId, type: 'cut', duration: 0 });
-const point = (frame: number): LayerKeyframe => ({
-  frame,
-  interpolation: 'hold',
-  values: { ...EMPTY_KEY_VALUES, exposure: 0.123456789 },
-});
+const point = (frame: number): LayerKeyframe =>
+  layerKeyframe(frame, { ...EMPTY_KEY_VALUES, exposure: 0.123456789 }, 'hold');
 
 function fixture(selectedId = 'middle', ripple = false): ProjectDocument {
   const document = createProject('parity', 'Uniform tracks');
@@ -108,10 +105,10 @@ function rejected(document: ProjectDocument, command: EditCommand, message: stri
   expect(history.canRedo).toBe(false);
 }
 
-describe('strict uniform schema-15 tracks', () => {
+describe('strict uniform schema-16 tracks', () => {
   it('uses Ripple ON for the initial track and every newly created track', () => {
     const initial = createProject('new', 'New');
-    expect(initial.schemaVersion).toBe(15);
+    expect(initial.schemaVersion).toBe(16);
     expect(initial.layers).toEqual([createLayer(BASE_LAYER_ID, 'Track 1')]);
     for (const id of [BASE_LAYER_ID, ...Array.from({ length: 8 }, (_, index) => `arbitrary-${index}`)]) {
       expect(createLayer(id, 'Track')).toEqual({
@@ -143,7 +140,7 @@ describe('strict uniform schema-15 tracks', () => {
     }
     for (const extra of [{ transitions: [] }, { openingFade: 0 }, { closingFade: 0 }])
       expect(projectSchema.safeParse({ ...document, ...extra }).success).toBe(false);
-    for (const schemaVersion of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14])
+    for (const schemaVersion of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15])
       expect(projectSchema.safeParse({ ...document, schemaVersion }).success).toBe(false);
     expect(projectSchema.safeParse(unsupportedProject(5, 'old', 'Unsupported topology')).success).toBe(false);
     expect(document).not.toHaveProperty('transitions');

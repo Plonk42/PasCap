@@ -2,13 +2,14 @@ import { describe, expect, it } from 'vitest';
 import { clipSpeedPreset } from '../../src/shared/clip-speed.js';
 import { applyCommand, EditHistory, type EditCommand } from '../../src/shared/commands.js';
 import { needsLayeredExport, planExport, planLayeredExport } from '../../src/shared/export.js';
-import { EMPTY_KEY_VALUES } from '../../src/shared/keyframes.js';
+import { EMPTY_KEY_VALUES, layerKeyframe, uniformKeyframe } from '../../src/shared/keyframes.js';
 import { createClip, createLayer, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
 import { trimOnTimeline, validateSourceRanges } from '../../src/shared/source-range.js';
 import {
   createSpatialSettings,
   evaluateSpatial,
   NEUTRAL_SPATIAL_POSE,
+  SPATIAL_CHANNELS,
   type SpatialSettings,
 } from '../../src/shared/spatial.js';
 import { calculateLayout, sampleTimeline } from '../../src/shared/timeline.js';
@@ -17,8 +18,8 @@ function settings(): SpatialSettings {
   return {
     base: { ...NEUTRAL_SPATIAL_POSE, cropTop: 0.125, translateY: -0.25 },
     keyframes: [
-      { frame: 0, interpolation: 'smooth', values: { ...NEUTRAL_SPATIAL_POSE, rotation: -90 } },
-      { frame: 100, interpolation: 'hold', values: { ...NEUTRAL_SPATIAL_POSE, scale: 2, translateX: 0.5 } },
+      uniformKeyframe(0, { ...NEUTRAL_SPATIAL_POSE, rotation: -90 }, 'smooth'),
+      uniformKeyframe(100, { ...NEUTRAL_SPATIAL_POSE, scale: 2, translateX: 0.5 }, 'hold'),
     ],
   };
 }
@@ -27,9 +28,7 @@ function fixture(): ProjectDocument {
   const document = createProject('spatial-commands', 'Spatial commands');
   document.layers[0]!.ripple = false;
   document.layers[0]!.opacity = 0.75;
-  document.layers[0]!.keyframes = [
-    { frame: 10, interpolation: 'linear', values: { ...EMPTY_KEY_VALUES, exposure: 0.25, opacity: 0.5 } },
-  ];
+  document.layers[0]!.keyframes = [layerKeyframe(10, { ...EMPTY_KEY_VALUES, exposure: 0.25, opacity: 0.5 }, 'linear')];
   document.layers.push(createLayer('other', 'Other', false));
   document.clips = [{ ...createClip('clip', 'original', 20, 80), start: 10, spatial: settings() }];
   document.clips[0]!.speed = {
@@ -57,7 +56,7 @@ function fixture(): ProjectDocument {
   return projectSchema.parse(document);
 }
 
-describe('strict schema-15 spatial persistence', () => {
+describe('strict schema-16 spatial persistence', () => {
   it('creates independent explicit neutral settings and round-trips complete poses and off-trim keys', () => {
     const first = createClip('first', 'original', 0, 1);
     const second = createClip('second', 'original', 0, 1);
@@ -66,9 +65,9 @@ describe('strict schema-15 spatial persistence', () => {
     expect(first.spatial.base).not.toBe(second.spatial.base);
     expect(first.spatial.keyframes).not.toBe(second.spatial.keyframes);
     const document = fixture();
-    expect(document.schemaVersion).toBe(15);
+    expect(document.schemaVersion).toBe(16);
     expect(projectSchema.parse(JSON.parse(JSON.stringify(document)))).toEqual(document);
-    for (const schemaVersion of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14])
+    for (const schemaVersion of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15])
       expect(projectSchema.safeParse({ ...document, schemaVersion }).success).toBe(false);
   });
 
@@ -137,7 +136,20 @@ describe('strict schema-15 spatial persistence', () => {
     {
       name: 'missing key easing',
       change: (value) => {
-        Reflect.deleteProperty(value.keyframes[0]!, 'interpolation');
+        Reflect.deleteProperty(value.keyframes[0]!, 'easing');
+      },
+    },
+    {
+      name: 'a legacy shared key easing',
+      change: (value) => {
+        Object.assign(value.keyframes[0]!, { interpolation: 'linear' });
+      },
+    },
+    {
+      name: 'an enabled setting without its easing',
+      change: (value) => {
+        const key = value.keyframes[0]!;
+        key.easing[SPATIAL_CHANNELS.find((channel) => key.values[channel] !== null)!] = null;
       },
     },
     {
@@ -155,7 +167,8 @@ describe('strict schema-15 spatial persistence', () => {
     {
       name: 'invalid easing',
       change: (value) => {
-        Object.assign(value.keyframes[0]!, { interpolation: 'cubic' });
+        const key = value.keyframes[0]!;
+        Object.assign(key.easing, { [SPATIAL_CHANNELS.find((channel) => key.values[channel] !== null)!]: 'cubic' });
       },
     },
     {
@@ -185,11 +198,9 @@ describe('strict schema-15 spatial persistence', () => {
     {
       name: 'too many anchors',
       change: (value) => {
-        value.keyframes = Array.from({ length: 257 }, (_, frame) => ({
-          frame,
-          interpolation: 'linear',
-          values: { ...NEUTRAL_SPATIAL_POSE },
-        }));
+        value.keyframes = Array.from({ length: 257 }, (_, frame) =>
+          uniformKeyframe(frame, { ...NEUTRAL_SPATIAL_POSE }, 'linear'),
+        );
       },
     },
   ];
@@ -217,11 +228,9 @@ describe('strict schema-15 spatial persistence', () => {
     document.clips[0]!.spatial.keyframes[1]!.frame = 101;
     expect(projectSchema.safeParse(document).success).toBe(true);
     expect(() => validateSourceRanges(document, new Map([['original', 100]]))).toThrow('spatial keyframes exceed');
-    document.clips[0]!.spatial.keyframes = Array.from({ length: 256 }, (_, frame) => ({
-      frame,
-      interpolation: 'hold',
-      values: { ...NEUTRAL_SPATIAL_POSE },
-    }));
+    document.clips[0]!.spatial.keyframes = Array.from({ length: 256 }, (_, frame) =>
+      uniformKeyframe(frame, { ...NEUTRAL_SPATIAL_POSE }, 'hold'),
+    );
     expect(projectSchema.safeParse(document).success).toBe(true);
     expect(() => validateSourceRanges(document, new Map([['original', 255]]))).not.toThrow();
   });
@@ -383,7 +392,7 @@ describe('continuous placed-map spatial sampling and export dispatch', () => {
       if (kind === 'base') document.clips[0]!.spatial.base.translateX = Number.EPSILON;
       else
         document.clips[0]!.spatial.keyframes = [
-          { frame: kind === 'neutral-key' ? 20 : 100, interpolation: 'hold', values: { ...NEUTRAL_SPATIAL_POSE } },
+          uniformKeyframe(kind === 'neutral-key' ? 20 : 100, { ...NEUTRAL_SPATIAL_POSE }, 'hold'),
         ];
       const before = structuredClone(document);
       expect(needsLayeredExport(document)).toBe(true);

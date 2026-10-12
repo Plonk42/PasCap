@@ -15,6 +15,7 @@ import { NEUTRAL_SPATIAL_POSE, type SpatialPose } from '../../src/shared/spatial
 import type { PreviewLayer } from '../../src/shared/timeline.js';
 import * as timeline from '../../src/shared/timeline.js';
 import { framesToSeconds, PROJECT_FPS } from '../../src/shared/timing.js';
+import { uniformKeyframe } from '../../src/shared/keyframes.js';
 
 // These ownership tests exercise the renderer with in-memory pipes only, never native jobs or disk.
 vi.mock('node:fs/promises', async (importOriginal) => ({
@@ -588,8 +589,8 @@ describe('layered renderer metadata and continuous retiming ownership with memor
   it('changes animated geometry at continuous source positions even while retiming holds the same decoded frame', async () => {
     const fixture = setup();
     fixture.document.clips[0]!.spatial.keyframes = [
-      { frame: 7, interpolation: 'linear', values: { ...NEUTRAL_SPATIAL_POSE, scale: 0.8, translateX: -0.1 } },
-      { frame: 9, interpolation: 'hold', values: { ...NEUTRAL_SPATIAL_POSE, scale: 1.2, translateX: 0.2 } },
+      uniformKeyframe(7, { ...NEUTRAL_SPATIAL_POSE, scale: 0.8, translateX: -0.1 }, 'linear'),
+      uniformKeyframe(9, { ...NEUTRAL_SPATIAL_POSE, scale: 1.2, translateX: 0.2 }, 'hold'),
     ];
     fixture.options.plan = planLayeredExport(fixture.document);
     const before = structuredClone(fixture.document);

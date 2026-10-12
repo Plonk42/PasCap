@@ -2,7 +2,7 @@ import { Children, isValidElement, type ReactElement } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { COLOUR_CONTROLS } from '../../src/shared/colour.js';
 import { applyCommand, EditHistory } from '../../src/shared/commands.js';
-import { EMPTY_KEY_VALUES, KEYFRAME_SETTINGS } from '../../src/shared/keyframes.js';
+import { EMPTY_KEY_VALUES, KEYFRAME_SETTINGS, layerKeyframe } from '../../src/shared/keyframes.js';
 import { createClip, createProject } from '../../src/shared/model.js';
 import { validateNumberDraft } from '../../src/web/NumberField.js';
 import { RangeSettingControl } from '../../src/web/SettingValueControl.js';
@@ -360,7 +360,7 @@ describe('shared exact values and contextual validation', () => {
     const project = createProject('row', 'Row');
     const layer = project.layers[0]!;
     layer.opacity = 0.75;
-    layer.keyframes = [{ frame: 10, interpolation: 'smooth', values: { ...EMPTY_KEY_VALUES, opacity: 0.25 } }];
+    layer.keyframes = [layerKeyframe(10, { ...EMPTY_KEY_VALUES, opacity: 0.25 }, 'smooth')];
     const captured = begin(createValueControlState(context({ value: 0.25, min: 0, max: 1, step: 0.01 })));
     const moved = change(captured.state, 0.137123456789);
     expect(moved.commit).toBeNull();

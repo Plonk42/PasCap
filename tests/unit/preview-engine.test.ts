@@ -9,6 +9,8 @@ import {
   type Interpolation,
   type LayerKeyframe,
   type LayerKeyValues,
+  layerKeyframe,
+  uniformKeyframe,
 } from '../../src/shared/keyframes.js';
 import {
   createClip,
@@ -421,7 +423,7 @@ function expectSurface(engine: PreviewEngine, project: ProjectDocument, frame: n
   );
 }
 function point(frame: number, values: Partial<LayerKeyValues>, interpolation: Interpolation = 'linear'): LayerKeyframe {
-  return { frame, interpolation, values: { ...EMPTY_KEY_VALUES, ...values } };
+  return layerKeyframe(frame, { ...EMPTY_KEY_VALUES, ...values }, interpolation);
 }
 function musicTrack(duration = 600): MusicTrack {
   return {
@@ -967,8 +969,8 @@ describe('appearance without reloading timing', () => {
     project.clips[0]!.speed = { mode: 'constant', rate: 0.1 };
     const spatial = project.clips[0]!.spatial;
     spatial.keyframes = [
-      { frame: 0, interpolation: 'linear', values: { ...spatial.base } },
-      { frame: 6, interpolation: 'hold', values: { ...spatial.base, translateX: 0.6, rotation: 60 } },
+      uniformKeyframe(0, { ...spatial.base }, 'linear'),
+      uniformKeyframe(6, { ...spatial.base, translateX: 0.6, rotation: 60 }, 'hold'),
     ];
     const { engine, anchor } = await playing(project, 2);
     tick(anchor, 1);

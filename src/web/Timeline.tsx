@@ -1333,16 +1333,16 @@ export function Timeline(props: Readonly<Props>) {
                     layer.id === selectedLayerId &&
                     state.frame === keyframeNavigationFrame(keyframeNavigation.inspection, layer.id, frame);
                   return {
-                    className: `timeline-layer-key${current ? ' active' : ''}`,
+                    className: `timeline-layer-key${point.reset ? ' reset' : ''}${current ? ' active' : ''}`,
                     'data-layer-keyframe': state.frame,
                     'data-keyframe-layer': layer.id,
-                    'aria-label': `Track keyframe ${state.frame} on ${layer.name}`,
+                    'aria-label': `Track keyframe ${state.frame} on ${layer.name}${point.reset ? ' (default)' : ''}`,
                     'aria-pressed': current,
-                    title: `${layer.name} · ${formatTimecode(state.frame)} · ${settings} · Drag to move all animated settings; Arrow keys: 1 frame, Shift: 10. Alt bypasses snapping.`,
+                    title: `${layer.name} · ${formatTimecode(state.frame)} · ${point.reset ? 'Default keyframe: settings return to their defaults here' : settings} · Drag to move all animated settings; Arrow keys: 1 frame, Shift: 10. Alt bypasses snapping.`,
                     style: { top: rowTop(layer.id) + 48, left: leading + (state.at ?? origin) * scale },
                     children: (
                       <>
-                        ◆
+                        {point.reset ? <Icon name="default-key" size={14} /> : '◆'}
                         {state.moving && (
                           <span className="timeline-layer-key-time" aria-hidden="true">
                             {formatTimecode(state.frame)}

@@ -1,4 +1,4 @@
-# Video track Temperature and Tint · strict project schema 15
+# Video track Temperature and Tint · strict project schema 16
 
 Approved contract for [#68](https://github.com/Plonk42/PasCap/issues/68).
 These are normalized **SDR colour controls**, not Kelvin, HDR output, illuminant
@@ -20,8 +20,8 @@ base, ownership toggle or copy to clips is introduced.
 Shared video track keyframes require exactly **eleven nullable channels**, in control order:
 `opacity`, `temperature`, `tint`, `exposure`, `brightness`, `contrast`,
 `hue`, `saturation`, `highlights`, `shadows`, `hdr`. Temperature and Tint are keyed
-independently at absolute project frames, interpolate parameter values using the
-left keyframe's shared easing for that setting and hold endpoints. Keyframes without that enabled setting are
+independently at absolute project frames, interpolate parameter values using their own
+Easing at the left keyframe and hold endpoints. Keyframes without that enabled setting are
 skipped. No keyframes for a setting means the saved track base; removing its final keyframe reveals
 that unchanged base. HSL bands and master/RGB curves remain **static**, not new
 animation channels. Speed is clip-only, never a track channel.
@@ -79,14 +79,14 @@ native process; existing frame/pixel/resource and A/V gates remain unchanged.
 
 ## Strict preservation and validation
 
-Only **schema 15** projects and schema-15 snapshots in version-1 export receipts
+Only **schema 16** projects and schema-16 snapshots in version-1 export receipts
 are accepted. Missing Temperature/Tint bases or either nullable keyframe field,
-unknown fields and saved clip Colour/correction are invalid. Reject **v1–v14**
+unknown fields and saved clip Colour/correction are invalid. Reject **v1–v15**
 documents and receipt snapshots clearly; preserve their bytes and successful
-outputs. Recreate projects deliberately: no migrations, v14 acceptance,
+outputs. Recreate projects deliberately: no migrations, v15 acceptance,
 compatibility readers, injected defaults, fallback or automatic deletion.
 Receipt/report/registry/proxy/PCM format versions remain independent and unchanged;
-new reference/measurement metadata identifies schema 15, historical evidence does
+new reference/measurement metadata identifies schema 16, historical evidence does
 not change.
 
 Required disposable checks cover strict bounds/rejection/preservation, neutral

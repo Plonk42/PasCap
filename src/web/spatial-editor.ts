@@ -1,7 +1,9 @@
+import { joiningEasing, uniformKeyframe, withEasing, type Interpolation } from '../shared/keyframes.js';
 import type { ProjectDocument } from '../shared/model.js';
 import {
   evaluateSpatial,
   hasSpatialChannelKeys,
+  SPATIAL_CHANNELS,
   spatialSettingsSchema,
   type SpatialChannel,
   type SpatialKeyframe,
@@ -71,18 +73,38 @@ export function toggleSpatialChannel(
       base: settings.base,
       keyframes: empty
         ? settings.keyframes.filter((item) => item !== key)
-        : settings.keyframes.map((item) => (item === key ? { ...item, values } : item)),
+        : settings.keyframes.map((item) =>
+            item === key ? { ...item, values, easing: { ...item.easing, [channel]: null } } : item,
+          ),
     });
   }
   const value = evaluateSpatial(settings, position)[channel];
   const keyframes = key
     ? settings.keyframes.map((item) =>
-        item === key ? { ...item, values: { ...item.values, [channel]: value } } : item,
+        item === key
+          ? {
+              ...item,
+              values: { ...item.values, [channel]: value },
+              easing: { ...item.easing, [channel]: joiningEasing(settings.keyframes, item, SPATIAL_CHANNELS) },
+            }
+          : item,
       )
-    : [...settings.keyframes, { frame, interpolation: 'linear', values: { ...NO_VALUES, [channel]: value } }].sort(
+    : [...settings.keyframes, uniformKeyframe(frame, { ...NO_VALUES, [channel]: value }, 'linear')].sort(
         (a, b) => a.frame - b.frame,
       );
   return validatedSpatial({ base: settings.base, keyframes });
+}
+
+/** Sets one enabled setting's Easing at a key, or every enabled setting's when `channel` is null. */
+export function setSpatialEasing(
+  settings: SpatialSettings,
+  frame: number,
+  channel: SpatialChannel | null,
+  curve: Interpolation,
+): SpatialSettings {
+  const key = settings.keyframes.find((item) => item.frame === frame);
+  if (!key) throw new Error('This Transform keyframe no longer exists.');
+  return replaceSpatialKey(settings, frame, { easing: withEasing(key, channel, curve) });
 }
 
 export function replaceSpatialKey(

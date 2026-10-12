@@ -6,6 +6,7 @@ import {
   type Interpolation,
   type LayerKeyframe,
   type LayerKeyValues,
+  layerKeyframe,
 } from '../../src/shared/keyframes.js';
 import {
   BASE_LAYER_ID,
@@ -60,7 +61,7 @@ const SPEEDS: { name: string; speed: SpeedSettings }[] = [
 ];
 
 function point(frame: number, values: Partial<LayerKeyValues>, interpolation: Interpolation = 'linear'): LayerKeyframe {
-  return { frame, interpolation, values: { ...EMPTY_KEY_VALUES, ...values } };
+  return layerKeyframe(frame, { ...EMPTY_KEY_VALUES, ...values }, interpolation);
 }
 function row(id: string, keyframes: LayerKeyframe[]): VideoLayer {
   return { ...createLayer(id, id, false), keyframes };

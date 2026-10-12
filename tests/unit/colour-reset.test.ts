@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { NEUTRAL_COLOUR } from '../../src/shared/colour.js';
 import { applyCommand, EditHistory } from '../../src/shared/commands.js';
-import { EMPTY_KEY_VALUES } from '../../src/shared/keyframes.js';
+import { EMPTY_KEY_VALUES, layerKeyframe } from '../../src/shared/keyframes.js';
 import { createClip, createLayer, createProject } from '../../src/shared/model.js';
 import { colourResetCommands } from '../../src/web/colour-reset.js';
 
@@ -39,8 +39,8 @@ describe('Colour and row Opacity reset', () => {
     const layer = project.layers[0]!;
     layer.opacity = 0.6;
     layer.keyframes = [
-      { frame: 10, interpolation: 'ease-out', values: { ...EMPTY_KEY_VALUES, opacity: 0.2, contrast: 1.5 } },
-      { frame: 30, interpolation: 'hold', values: { ...EMPTY_KEY_VALUES, opacity: 0.7, hue: 15 } },
+      layerKeyframe(10, { ...EMPTY_KEY_VALUES, opacity: 0.2, contrast: 1.5 }, 'ease-out'),
+      layerKeyframe(30, { ...EMPTY_KEY_VALUES, opacity: 0.7, hue: 15 }, 'hold'),
     ];
     const before = structuredClone(project);
     const commands = colourResetCommands(layer, 10);

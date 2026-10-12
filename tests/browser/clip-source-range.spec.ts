@@ -6,6 +6,7 @@ import { calculateLayout } from '../../src/shared/timeline.js';
 import { formatTimecode } from '../../src/shared/timing.js';
 import { expandedInspectorPreferences, inspectorTab, sharedPoint } from './editor-helpers.js';
 import { memoryProjects, type MemoryProjects } from './memory-projects.js';
+import { uniformKeyframe } from '../../src/shared/keyframes.js';
 
 const PROJECT_ID = 'clip-source-range-memory';
 let assets: MediaAsset[];
@@ -67,8 +68,8 @@ function sequence(ripple = true, retimed = false): ProjectDocument {
   const first = { ...createClip('a', assets[0]!.id, 15, 105), start: 30 };
   if (retimed) first.speed = { mode: 'constant', rate: 0.5 };
   first.spatial.keyframes = [
-    { frame: 0, interpolation: 'linear', values: { ...first.spatial.base } },
-    { frame: 120, interpolation: 'smooth', values: { ...first.spatial.base, translateX: 0.1 } },
+    uniformKeyframe(0, { ...first.spatial.base }, 'linear'),
+    uniformKeyframe(120, { ...first.spatial.base, translateX: 0.1 }, 'smooth'),
   ];
   document.clips = [first, { ...createClip('b', assets[1]!.id, 30, 90), start: ripple ? (retimed ? 210 : 120) : 230 }];
   document.layers[0]!.transitions = [{ leftId: 'a', rightId: 'b', type: 'cut', duration: 0 }];

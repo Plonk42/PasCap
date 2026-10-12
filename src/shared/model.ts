@@ -100,7 +100,7 @@ export const musicTracksSchema = z
 
 const baseProjectSchema = z
   .object({
-    schemaVersion: z.literal(15),
+    schemaVersion: z.literal(16),
     id: idSchema,
     title: z.string().trim().min(1).max(200),
     media: z
@@ -155,7 +155,7 @@ export function createLayer(id: string, name: string, ripple = true): VideoLayer
 
 export function createProject(id: string, title: string): ProjectDocument {
   return projectSchema.parse({
-    schemaVersion: 15,
+    schemaVersion: 16,
     id,
     title,
     media: { videoIds: [], audioIds: [] },

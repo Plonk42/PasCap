@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { NEUTRAL_COLOUR, scalarColourValues } from '../../src/shared/colour.js';
 import { EditHistory } from '../../src/shared/commands.js';
-import { EMPTY_KEY_VALUES, type LayerKeyframe } from '../../src/shared/keyframes.js';
+import { EMPTY_KEY_VALUES, type LayerKeyframe, layerKeyframe } from '../../src/shared/keyframes.js';
 import { createClip, createProject } from '../../src/shared/model.js';
 import { calculateLayout } from '../../src/shared/timeline.js';
 import { slideTravel } from '../../src/web/keyframe-slide.js';
@@ -19,12 +19,12 @@ const keyframeFrameAtPointer = (
 function fixture() {
   const project = createProject('keyframe-drag', 'Shared points');
   project.clips = [createClip('first', 'video', 10, 110)];
-  const point: LayerKeyframe = {
-    frame: 20,
-    interpolation: 'ease-in',
-    values: { ...EMPTY_KEY_VALUES, ...scalarColourValues(NEUTRAL_COLOUR), opacity: 0.7 },
-  };
-  const other: LayerKeyframe = { frame: 80, interpolation: 'hold', values: { ...EMPTY_KEY_VALUES, exposure: 0.5 } };
+  const point: LayerKeyframe = layerKeyframe(
+    20,
+    { ...EMPTY_KEY_VALUES, ...scalarColourValues(NEUTRAL_COLOUR), opacity: 0.7 },
+    'ease-in',
+  );
+  const other: LayerKeyframe = layerKeyframe(80, { ...EMPTY_KEY_VALUES, exposure: 0.5 }, 'hold');
   project.layers[0]!.keyframes = [point, other];
   return { project, point, other };
 }

@@ -9,11 +9,13 @@ import {
   editSpatialPose,
   removeSpatialKey,
   replaceSpatialKey,
+  setSpatialEasing,
   SPATIAL_CONTROLS,
   spatialPlayhead,
   toggleSpatialChannel,
 } from '../../src/web/spatial-editor.js';
 import { createValueControlState, syncValueControlState, transitionValueControl } from '../../src/web/ValueControl.js';
+import { uniformKeyframe } from '../../src/shared/keyframes.js';
 
 const NO_VALUES = {
   cropLeft: null,
@@ -43,45 +45,31 @@ describe('per-setting clip Transform editor', () => {
     settings.base.scale = 1.5;
     settings.base.rotation = 20;
     settings.keyframes = [
-      {
-        frame: 0,
-        interpolation: 'linear',
-        values: { ...NO_VALUES, scale: 1 },
-      },
-      { frame: 10, interpolation: 'smooth', values: { ...NO_VALUES, scale: 3 } },
+      uniformKeyframe(0, { ...NO_VALUES, scale: 1 }, 'linear'),
+      uniformKeyframe(10, { ...NO_VALUES, scale: 3 }, 'smooth'),
     ];
     const before = structuredClone(settings);
     const scaled = toggleSpatialChannel(settings, 'scale', 4, 4.75);
     // Scale already had a key set at 4: it joins as a new key, capturing only that channel.
-    expect(scaled.keyframes[1]).toEqual({
-      frame: 4,
-      interpolation: 'linear',
-      values: { ...NO_VALUES, scale: evaluateSpatial(settings, 4.75).scale },
-    });
+    expect(scaled.keyframes[1]).toEqual(
+      uniformKeyframe(4, { ...NO_VALUES, scale: evaluateSpatial(settings, 4.75).scale }, 'linear'),
+    );
     // Rotation is unkeyed, so its capture holds the base value and adds no other channel.
     const rotated = toggleSpatialChannel(settings, 'rotation', 4, 4.75);
-    expect(rotated.keyframes[1]).toEqual({
-      frame: 4,
-      interpolation: 'linear',
-      values: { ...NO_VALUES, rotation: 20 },
-    });
+    expect(rotated.keyframes[1]).toEqual(uniformKeyframe(4, { ...NO_VALUES, rotation: 20 }, 'linear'));
     expect(rotated.base).toEqual(settings.base);
     expect(settings).toEqual(before);
-    // A second channel at the same frame joins the same key and keeps its easing.
-    const eased = replaceSpatialKey(rotated, 4, { interpolation: 'ease-in' });
+    // A second channel at the same frame joins the same key and adopts its agreed easing.
+    const eased = setSpatialEasing(rotated, 4, null, 'ease-in');
     const joined = toggleSpatialChannel(eased, 'translateX', 4, 4.75);
-    expect(joined.keyframes[1]).toEqual({
-      frame: 4,
-      interpolation: 'ease-in',
-      values: { ...NO_VALUES, rotation: 20, translateX: 0 },
-    });
+    expect(joined.keyframes[1]).toEqual(uniformKeyframe(4, { ...NO_VALUES, rotation: 20, translateX: 0 }, 'ease-in'));
   });
 
   it('removes only the toggled setting and the key itself once no setting remains', () => {
     let settings = toggleSpatialChannel(createSpatialSettings(), 'scale', 12, 12);
     settings = toggleSpatialChannel(settings, 'rotation', 12, 12);
     settings = toggleSpatialChannel(settings, 'scale', 12, 12);
-    expect(settings.keyframes).toEqual([{ frame: 12, interpolation: 'linear', values: { ...NO_VALUES, rotation: 0 } }]);
+    expect(settings.keyframes).toEqual([uniformKeyframe(12, { ...NO_VALUES, rotation: 0 }, 'linear')]);
     settings = toggleSpatialChannel(settings, 'rotation', 12, 12);
     expect(settings).toEqual(createSpatialSettings());
   });
@@ -117,10 +105,7 @@ describe('per-setting clip Transform editor', () => {
   it('moves a key and its easing atomically, rejects collisions, and retains off-trim keys', () => {
     let settings = toggleSpatialChannel(createSpatialSettings(), 'translateX', 0, 0);
     settings = toggleSpatialChannel(settings, 'translateX', 120, 120);
-    settings = replaceSpatialKey(settings, 0, {
-      interpolation: 'ease-in',
-      values: { ...NO_VALUES, translateX: 0.5 },
-    });
+    settings = replaceSpatialKey(settings, 0, uniformKeyframe(0, { ...NO_VALUES, translateX: 0.5 }, 'ease-in'));
     const moved = replaceSpatialKey(settings, 0, { frame: 90 });
     expect(moved.keyframes[0]).toEqual({ ...settings.keyframes[0], frame: 90 });
     expect(moved.base).toEqual(settings.base);
@@ -200,11 +185,9 @@ describe('per-setting clip Transform editor', () => {
 
   it('bounds explicit capture at 256 keys', () => {
     const settings = createSpatialSettings();
-    settings.keyframes = Array.from({ length: 256 }, (_, frame) => ({
-      frame,
-      interpolation: 'linear',
-      values: { ...NO_VALUES, scale: 1 },
-    }));
+    settings.keyframes = Array.from({ length: 256 }, (_, frame) =>
+      uniformKeyframe(frame, { ...NO_VALUES, scale: 1 }, 'linear'),
+    );
     expect(() => toggleSpatialChannel(settings, 'rotation', 256, 256)).toThrow();
     // Joining an existing key adds no key, so it stays within the limit.
     expect(toggleSpatialChannel(settings, 'rotation', 7, 7).keyframes).toHaveLength(256);

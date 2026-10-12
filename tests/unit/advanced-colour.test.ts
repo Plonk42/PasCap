@@ -23,7 +23,7 @@ import {
 import { applyCommand, EditHistory } from '../../src/shared/commands.js';
 import { colourAt } from '../../src/shared/composition.js';
 import { needsLayeredExport, planExport } from '../../src/shared/export.js';
-import { EMPTY_KEY_VALUES, KEYFRAME_SETTINGS } from '../../src/shared/keyframes.js';
+import { EMPTY_KEY_VALUES, KEYFRAME_SETTINGS, layerKeyframe } from '../../src/shared/keyframes.js';
 import { createClip, createLayer, createProject, projectSchema } from '../../src/shared/model.js';
 import { NEUTRAL_DETAIL } from '../../src/shared/detail.js';
 import { NEUTRAL_SPATIAL_POSE } from '../../src/shared/spatial.js';
@@ -35,7 +35,7 @@ function hueRgb(hue: number): RGB {
   return [value(0), value(-120), value(-240)];
 }
 
-describe('strict schema-15 static advanced row colour', () => {
+describe('strict schema-16 static advanced row colour', () => {
   it('creates deeply independent bands and curves for settings, rows and projects', () => {
     const a = createColourSettings(),
       b = createColourSettings();
@@ -51,7 +51,7 @@ describe('strict schema-15 static advanced row colour', () => {
   });
   it('requires every field and rejects old schemas, unknown entries and nonfinite data without repair', () => {
     const document = createProject('p', 'P');
-    for (let schemaVersion = 1; schemaVersion < 15; schemaVersion++)
+    for (let schemaVersion = 1; schemaVersion < 16; schemaVersion++)
       expect(projectSchema.safeParse({ ...document, schemaVersion }).success).toBe(false);
     for (const field of ['hsl', 'curves'] as const) {
       const value = { ...document.layers[0]!.colour };
@@ -212,9 +212,7 @@ describe('strict schema-15 static advanced row colour', () => {
     layer.colour.curves.master[0]!.y = 0.1;
     expect(needsLayeredExport(project)).toBe(true);
     expect(() => planExport(project)).toThrow('layered exporter');
-    layer.keyframes = [
-      { frame: 0, interpolation: 'linear', values: { ...EMPTY_KEY_VALUES, exposure: 1, opacity: 0.7 } },
-    ];
+    layer.keyframes = [layerKeyframe(0, { ...EMPTY_KEY_VALUES, exposure: 1, opacity: 0.7 }, 'linear')];
     expect(colourAt(layer, 2)).toMatchObject({ exposure: 1, hsl: layer.colour.hsl, curves: layer.colour.curves });
     const history = new EditHistory(project);
     const before = structuredClone(project);

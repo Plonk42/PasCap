@@ -7,6 +7,7 @@ import { previewClipSource } from '../../src/web/clip-speed-geometry.js';
 import { SPATIAL_CONTROLS } from '../../src/web/spatial-editor.js';
 import { clipAction, expandedInspectorPreferences } from './editor-helpers.js';
 import { memoryProjects, type MemoryProjects } from './memory-projects.js';
+import { uniformKeyframe } from '../../src/shared/keyframes.js';
 
 let memory: MemoryProjects;
 let assets: MediaAsset[];
@@ -165,8 +166,8 @@ test('each setting has its own diamond capturing only that setting at the displa
     clip.spatial.base.rotation = 20;
     const none = { cropLeft: null, cropRight: null, cropTop: null, cropBottom: null, translateX: null };
     clip.spatial.keyframes = [
-      { frame: 0, interpolation: 'linear', values: { ...none, translateY: null, rotation: null, scale: 1 } },
-      { frame: 100, interpolation: 'smooth', values: { ...none, translateY: null, rotation: null, scale: 3 } },
+      uniformKeyframe(0, { ...none, translateY: null, rotation: null, scale: 1 }, 'linear'),
+      uniformKeyframe(100, { ...none, translateY: null, rotation: null, scale: 3 }, 'smooth'),
     ];
   });
   await seek(page, 5);
@@ -188,20 +189,22 @@ test('each setting has its own diamond capturing only that setting at the displa
   await expect(poseFields.filter({ hasText: 'Scale' }).locator('.setting-locked-cue')).toHaveCount(0);
   await expect(capture(page, 'Rotation')).toHaveAttribute('aria-pressed', 'false');
   const captured = await current(page);
-  expect(captured.clips[0]!.spatial.keyframes.find((key) => key.frame === source)).toEqual({
-    frame: source,
-    interpolation: 'linear',
-    values: {
-      cropLeft: null,
-      cropRight: null,
-      cropTop: null,
-      cropBottom: null,
-      scale: evaluated.scale,
-      translateX: null,
-      translateY: null,
-      rotation: null,
-    },
-  });
+  expect(captured.clips[0]!.spatial.keyframes.find((key) => key.frame === source)).toEqual(
+    uniformKeyframe(
+      source,
+      {
+        cropLeft: null,
+        cropRight: null,
+        cropTop: null,
+        cropBottom: null,
+        scale: evaluated.scale,
+        translateX: null,
+        translateY: null,
+        rotation: null,
+      },
+      'linear',
+    ),
+  );
   expect(captured.clips[0]!.spatial.base).toEqual(before.clips[0]!.spatial.base);
   expect(captured.layers).toEqual(before.layers);
   await exact(page, 'Scale').fill('2.3456789');
@@ -237,9 +240,9 @@ test('per-setting Previous/Next visit only that setting\u2019s keys; the timelin
       translateY: null,
     };
     clip.spatial.keyframes = [
-      { frame: 10, interpolation: 'linear', values: { ...none, scale: 1, rotation: null } },
-      { frame: 40, interpolation: 'linear', values: { ...none, scale: null, rotation: 45 } },
-      { frame: 70, interpolation: 'linear', values: { ...none, scale: 2, rotation: null } },
+      uniformKeyframe(10, { ...none, scale: 1, rotation: null }, 'linear'),
+      uniformKeyframe(40, { ...none, scale: null, rotation: 45 }, 'linear'),
+      uniformKeyframe(70, { ...none, scale: 2, rotation: null }, 'linear'),
     ];
   });
   await seek(page, 0);
@@ -272,11 +275,13 @@ const transformMarker = (page: Page, source: number) =>
 async function seedScaleKeys(page: Page, frames: readonly number[]): Promise<ProjectDocument> {
   return seed(page, (document) => {
     const none = { cropLeft: null, cropRight: null, cropTop: null, cropBottom: null, translateX: null };
-    document.clips[0]!.spatial.keyframes = frames.map((frame, index) => ({
-      frame,
-      interpolation: index ? 'ease-in' : 'linear',
-      values: { ...none, translateY: null, rotation: null, scale: 1 + index },
-    }));
+    document.clips[0]!.spatial.keyframes = frames.map((frame, index) =>
+      uniformKeyframe(
+        frame,
+        { ...none, translateY: null, rotation: null, scale: 1 + index },
+        index ? 'ease-in' : 'linear',
+      ),
+    );
   });
 }
 
@@ -315,7 +320,7 @@ test('sliding a Transform marker previews without saving, commits one Undo and r
   expect(memory.saves).toBe(0);
   await page.mouse.up();
   const moved = await current(page);
-  expect(moved.clips[0]!.spatial.keyframes.map((item) => [item.frame, item.interpolation, item.values.scale])).toEqual([
+  expect(moved.clips[0]!.spatial.keyframes.map((item) => [item.frame, item.easing.scale, item.values.scale])).toEqual([
     [50, 'linear', 1],
     [80, 'ease-in', 2],
   ]);
@@ -523,11 +528,7 @@ test('stored full poses preserve base, frame input focus through move/Undo, reje
   const before = await seed(page, (document) => {
     const clip = document.clips[0]!;
     clip.spatial.base.scale = 1.5;
-    clip.spatial.keyframes = [0, 100].map((frame) => ({
-      frame,
-      interpolation: 'linear',
-      values: { ...NEUTRAL_SPATIAL_POSE },
-    }));
+    clip.spatial.keyframes = [0, 100].map((frame) => uniformKeyframe(frame, { ...NEUTRAL_SPATIAL_POSE }, 'linear'));
   });
   const time = page.getByRole('spinbutton', { name: 'Transform keyframe source frame', exact: true });
   await time.fill('40');
@@ -552,7 +553,7 @@ test('stored full poses preserve base, frame input focus through move/Undo, reje
   }
   const after = await current(page);
   expect(after.clips[0]!.spatial.base).toEqual(before.clips[0]!.spatial.base);
-  expect(after.clips[0]!.spatial.keyframes[0]!.interpolation).toBe('ease-in');
+  expect(new Set(Object.values(after.clips[0]!.spatial.keyframes[0]!.easing))).toEqual(new Set(['ease-in']));
   expect(after.layers).toEqual(before.layers);
 });
 
@@ -564,11 +565,9 @@ test('off-trim and exclusive OUT stored navigation uses the closest real mapped 
     clip.sourceIn = 30;
     clip.sourceOut = 90;
     clip.speed = { mode: 'constant', rate: 4 };
-    clip.spatial.keyframes = [0, 41, 90, 120].map((frame) => ({
-      frame,
-      interpolation: 'linear',
-      values: { ...NEUTRAL_SPATIAL_POSE },
-    }));
+    clip.spatial.keyframes = [0, 41, 90, 120].map((frame) =>
+      uniformKeyframe(frame, { ...NEUTRAL_SPATIAL_POSE }, 'linear'),
+    );
   });
   for (const frame of [0, 41, 90, 120]) {
     await page.getByRole('combobox', { name: 'Selected Transform keyframe', exact: true }).selectOption(String(frame));
@@ -592,7 +591,7 @@ test('last-key deletion reveals preserved base; whole Reset clears keys and base
   const before = await seed(page, (document) => {
     const clip = document.clips[0]!;
     clip.spatial.base.scale = 1.456789;
-    clip.spatial.keyframes = [{ frame: 0, interpolation: 'hold', values: { ...NEUTRAL_SPATIAL_POSE, scale: 2 } }];
+    clip.spatial.keyframes = [uniformKeyframe(0, { ...NEUTRAL_SPATIAL_POSE, scale: 2 }, 'hold')];
   });
   await page.getByRole('button', { name: 'Delete selected Transform keyframe', exact: true }).click();
   await expect(exact(page, 'Scale')).toHaveValue('1.456789');
@@ -656,7 +655,7 @@ test('Transform controls fit the 270px Inspector at the default and minimum view
   page,
 }) => {
   await seed(page, (document) => {
-    document.clips[0]!.spatial.keyframes = [{ frame: 0, interpolation: 'linear', values: { ...NEUTRAL_SPATIAL_POSE } }];
+    document.clips[0]!.spatial.keyframes = [uniformKeyframe(0, { ...NEUTRAL_SPATIAL_POSE }, 'linear')];
   });
   const divider = page.getByRole('slider', { name: 'Resize Clip panel', exact: true });
   await divider.focus();

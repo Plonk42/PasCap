@@ -3,7 +3,7 @@
 ## Scope and decisions
 
 Controls use native elements, the existing editor layout and strict project
-schema 15, including complete track Colour, clip-only speed, clip spatial settings and 0–8 independent music tracks. No UI framework or icon dependency is introduced. Exact
+schema 16, including complete track Colour, clip-only speed, clip spatial settings and 0–8 independent music tracks. No UI framework or icon dependency is introduced. Exact
 timing entry is retained: Clip Range uses timecode text fields and a
 full-original range bar; other frame/duration/fade fields retain numeric steppers.
 
@@ -35,7 +35,7 @@ neither needs replacing merely to make their implementation identical.
 
 This is the source of terminology for visible UI text, help, accessible names,
 test selectors and current-behaviour guides. Internal identifiers, persisted fields
-and technical paths stay unchanged; this glossary does not change schema 15.
+and technical paths stay unchanged; this glossary does not change schema 16.
 
 - **Recording**: the complete original file, video or music. Use **video recording**
   or **music recording** when the distinction matters; never bare “video” for a file.
@@ -71,13 +71,20 @@ and technical paths stay unchanged; this glossary does not change schema 15.
   on source taps before the grade, with the clip detail filters.
 - **Transform** is clip-owned crop, Scale, Translate X/Y and Rotation; its single
   diamond captures the full eight-value source-frame pose, not an enabled track setting.
+- **Default keyframe**: a track keyframe that returns every Colour setting and Opacity to its
+  default from its frame, holding until each setting's next keyframe, without changing
+  earlier frames. Toggle **Add default keyframe** in the Colour keyframe line; filled amber
+  marker and **Default** badge with the diamond-and-return-arrow icon.
 - **Keyframe line**: the first row of an expanded Colour, Speed or Transform section: **N keyframes**, one
   **Previous/Next** pair over the same set and **Reset**. It is hidden while the section is collapsed.
   There is no Animate toggle or stored preference; capture diamonds and per-setting arrows are always visible
   (Speed, a single setting, relies on its keyframe-line pair).
 - **Easing**: the visible label for track-keyframe, Transform and custom clip-speed
   selectors. Contextual accessible names remain, including
-  **Track keyframe easing N**; interpolation is unchanged.
+  **Track keyframe easing N**. Each enabled setting of a track or Transform keyframe has its
+  own Easing: the keyframe's select sets them all and reads **Mixed** when they differ;
+  **Per setting** reveals one compact select per setting (**<Setting> easing at track keyframe N**,
+  **Transform keyframe <Setting> easing**), shown automatically while they differ.
 
 ## Control patterns
 

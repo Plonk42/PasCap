@@ -9,13 +9,14 @@ import {
   type Interpolation,
   type LayerKeyframe,
   type LayerKeyValues,
+  layerKeyframe,
 } from '../../src/shared/keyframes.js';
 import { createClip, createLayer, createProject, projectSchema } from '../../src/shared/model.js';
 import { validateSourceRanges } from '../../src/shared/source-range.js';
 import { calculateLayout, sampleTimeline } from '../../src/shared/timeline.js';
 
 function point(frame: number, values: Partial<LayerKeyValues>, interpolation: Interpolation = 'linear'): LayerKeyframe {
-  return { frame, interpolation, values: { ...EMPTY_KEY_VALUES, ...values } };
+  return layerKeyframe(frame, { ...EMPTY_KEY_VALUES, ...values }, interpolation);
 }
 function layered() {
   let project = applyCommand(createProject('flight', 'Flight'), {
@@ -283,6 +284,7 @@ describe('project-frame shared row settings', () => {
       type: 'layer-key-easing',
       layerId: 'video-1',
       frame: 80,
+      setting: null,
       interpolation: 'smooth',
     });
     project = applyCommand(project, {
@@ -374,7 +376,7 @@ describe('project-frame shared row settings', () => {
       project.layers[1]!.keyframes[1],
       { ...project.layers[1]!.keyframes[0]!, frame: 30 },
     ]);
-    history.commit({ type: 'layer-key-easing', layerId: 'upper', frame: 30, interpolation: 'ease-out' });
+    history.commit({ type: 'layer-key-easing', layerId: 'upper', frame: 30, setting: null, interpolation: 'ease-out' });
     history.commit({ type: 'layer-key-value', layerId: 'upper', frame: 30, setting: 'exposure', value: -1 });
     expect(history.current.layers[1]!.keyframes[1]).toEqual(
       point(30, { opacity: 0.4, exposure: -1, saturation: 0.6 }, 'ease-out'),

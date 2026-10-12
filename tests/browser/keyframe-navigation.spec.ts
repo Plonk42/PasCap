@@ -1,6 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { applyCommand } from '../../src/shared/commands.js';
-import { KEYFRAME_SETTINGS, type LayerKeyframe } from '../../src/shared/keyframes.js';
+import { KEYFRAME_SETTINGS, type LayerKeyframe, uniformKeyframe } from '../../src/shared/keyframes.js';
 import type { MediaAsset } from '../../src/shared/media.js';
 import { createClip, createLayer, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
 import { calculateLayout } from '../../src/shared/timeline.js';
@@ -377,11 +377,7 @@ test('Transform section navigation retains off-trim and exclusive-OUT keys with 
 }) => {
   const document = sequence();
   const clip = document.clips[0]!;
-  clip.spatial.keyframes = [0, 20, 60, 90].map((frame) => ({
-    frame,
-    interpolation: 'linear',
-    values: { ...clip.spatial.base },
-  }));
+  clip.spatial.keyframes = [0, 20, 60, 90].map((frame) => uniformKeyframe(frame, { ...clip.spatial.base }, 'linear'));
   await fixture(page, document);
   await settingTab(page, 'Speed');
   const next = sectionStep(page, 'Transform', 'Next');

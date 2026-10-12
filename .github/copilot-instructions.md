@@ -111,7 +111,7 @@ PasCap is a solo, pre-release project: optimize for fast iteration. Details are 
   Navigation never edits,
   saves or creates history. See [speed/audio](../docs/SPEED_AND_AUDIO.md) and
   [spatial transforms](../docs/design/SPATIAL_TRANSFORMS.md).
-- Strict schema 15 requires complete row Colour with nine graded scalar fields,
+- Strict schema 16 requires complete row Colour with nine graded scalar fields,
   `hdr`, `colour.hsl` (eight complete named bands) and `colour.curves` (master/red/green/blue
   2–16-point arrays). HSL/curves remain static, not animation channels. All Colour
   is row-owned, keyed or not; clips have no colour/correction. Neutral creators
@@ -144,8 +144,8 @@ PasCap is a solo, pre-release project: optimize for fast iteration. Details are 
   retain that ownership, as do Temperature and Tint.
   See [row appearance](../docs/design/ROW_APPEARANCE.md).
 - Every clip requires strict `spatial: { base, keyframes }`: eight complete pose
-  values and 0–256 ascending original-source keys with required easing; each key
-  enables any of the eight settings (others null, at least one number) and each
+  values and 0–256 ascending original-source keys; each key
+  enables any of the eight settings (others null, at least one number) with its own Easing, and each
   setting interpolates between its own keys with endpoint holds. A setting without
   keys holds its base; deleting its last key reveals that base; Reset transform
   clears keys and restores the neutral base deliberately.
@@ -204,11 +204,18 @@ clarity −1–1, denoise 0–1 }`, neutral 0, with no keyframes or track channe
   $\mathrm{result} = C + \mathrm{lower}(1 - A)$, evaluating row Opacity for each
   source with no additional layer multiplier; $m_i$ is spatial source coverage,
   including opaque neutral letterboxing. Black fades never reduce that coverage.
-  Version-1 export receipts require strict v15 snapshots and captured audio-source/
+  Version-1 export receipts require strict v16 snapshots and captured audio-source/
   instance-plan arrays; receipt, registry/proxy/PCM and benchmark format versions
   remain independent and unchanged.
-  Reject and preserve incompatible v1–v14 projects/receipt snapshots; require recreation,
+  Reject and preserve incompatible v1–v15 projects/receipt snapshots; require recreation,
   without migrations, compatibility defaults or automatic deletion.
+- Owner-approved #135/#87: track and Transform keyframes store one Easing per enabled
+  setting (`easing` mirrors `values`); a joining setting adopts the Easing its keyframe's
+  settings agree on, else Linear. Track keyframes require boolean `reset`: a **default
+  keyframe** (`reset: true`, created with all eleven settings neutral and Hold Easing)
+  never reaches back, so a setting whose first keyframe it is keeps its unkeyed value before
+  it. Toggle **Add default keyframe** in the Colour keyframe line; amber filled marker. See
+  [layers/keyframes](../docs/LAYERS_AND_KEYFRAMES.md).
 - Music is a required 0–8 array of independently identified instances, never null
   or singular. Duration is the maximum of all video and music OUTs. After the last
   active video, preview/export is opaque black while music continues to its own OUT;

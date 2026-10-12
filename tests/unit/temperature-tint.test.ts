@@ -10,7 +10,7 @@ import {
   temperatureTintGains,
   type RGB,
 } from '../../src/shared/colour.js';
-import { EMPTY_KEY_VALUES, layerKeyframeSchema } from '../../src/shared/keyframes.js';
+import { EMPTY_KEY_VALUES, layerKeyframeSchema, uniformKeyframe } from '../../src/shared/keyframes.js';
 import { createLayer, createProject, projectSchema } from '../../src/shared/model.js';
 
 const luma: RGB = [0.2126, 0.7152, 0.0722];
@@ -26,8 +26,8 @@ describe('normalized linear Temperature and Tint', () => {
     expect(createLayer('empty', 'Empty').colour).toEqual(settings);
     expect(Object.keys(EMPTY_KEY_VALUES)).toHaveLength(11);
     const project = createProject('strict', 'Strict');
-    expect(project.schemaVersion).toBe(15);
-    for (let schemaVersion = 1; schemaVersion < 15; schemaVersion++)
+    expect(project.schemaVersion).toBe(16);
+    for (let schemaVersion = 1; schemaVersion < 16; schemaVersion++)
       expect(projectSchema.safeParse({ ...project, schemaVersion }).success).toBe(false);
     for (const channel of ['temperature', 'tint'] as const) {
       const incomplete = { ...settings };
@@ -35,7 +35,9 @@ describe('normalized linear Temperature and Tint', () => {
       expect(colourSchema.safeParse(incomplete).success).toBe(false);
       const values: Partial<typeof EMPTY_KEY_VALUES> = { ...EMPTY_KEY_VALUES, exposure: 0 };
       delete values[channel];
-      expect(layerKeyframeSchema.safeParse({ frame: 0, interpolation: 'linear', values }).success).toBe(false);
+      expect(layerKeyframeSchema.safeParse({ ...uniformKeyframe(0, values, 'linear'), reset: false }).success).toBe(
+        false,
+      );
       for (const value of [-1.000001, 1.000001, NaN, Infinity, -Infinity, null, undefined])
         expect(colourSchema.safeParse({ ...settings, [channel]: value }).success).toBe(false);
       for (const value of [-1, 0, 0.123456789, 1])

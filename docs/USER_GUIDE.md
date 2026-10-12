@@ -13,7 +13,7 @@ inherit the shared media registry. Importing the same original into another proj
 deliberately adds it to that project's bin and reuses eligible verified proxies.
 Removing a clip or music track does not remove the imported recording.
 
-Projects use **strict format v15**, with complete required video track colour and clip spatial base/per-setting
+Projects use **strict format v16**, with complete required video track colour and clip spatial base/per-setting
 source-frame keyframes and a required `music` array of 0–8 independent
 music tracks and unique required IDs (`[]` without music), every video track's Ripple, transitions and
 opening/closing fades and required numeric `opacity` in 0–1 (1 on new tracks),
@@ -24,10 +24,10 @@ Video track Colour requires Temperature/Tint/HDR bases and static
 HSL/curves; missing fields and saved clip colour/correction are invalid.
 Track `opacity` is the sole saved Opacity value; saved `clip.opacity` and old
 `clipOpacity`/`layerOpacity` keyframe channels are invalid, not ignored or defaulted.
-v1–v14 project documents and receipt snapshots
+v1–v15 project documents and receipt snapshots
 stay on disk but are incompatible: there is no migration, compatibility default,
 null fallback, old-format reader, automatic repair or deletion. Export receipts
-remain version 1 with a strict v15 snapshot and required audio-source/instance-plan arrays.
+remain version 1 with a strict v16 snapshot and required audio-source/instance-plan arrays.
 Create a new project and import its media deliberately. Finished videos remain
 untouched. **Delete project** requires confirmation and deletes only the saved
 project document, not originals, the shared registry/proxy cache or exports/receipts.
@@ -360,7 +360,7 @@ lower tracks; exact neutral poses retain the old opaque black letterbox.
   never add keyframes, and unkeyed settings stay editable. Capture requires the real
   playhead inside the selected clip. Each setting also has **Previous/Next** buttons
   that visit only its own keyframes.
-- Each setting interpolates between its own keyframes, using the **Easing** of the
+- Each setting interpolates between its own keyframes, using its own **Easing** at the
   keyframe on its left; a keyed setting overrides its base, holding before the first/after
   the last keyframe. Rotation interpolates
   numerically, not by shortest arc: +170° to −170° passes through 0°.
@@ -372,6 +372,10 @@ lower tracks; exact neutral poses retain the old opaque black letterbox.
   uses the closest mapped image rather than an unavailable or invented frame.
   Stored **Source frame**, **Easing** and the fields of its enabled settings edit that selected keyframe; time and
   value edits do not seek automatically. Easing is disabled when no enabled setting continues to a later keyframe.
+  **Easing** sets every setting of the keyframe at once; when they should differ, choose
+  **Per setting** and pick each one. Differing settings read **Mixed** and keep their
+  per-setting choices visible. A setting added to a keyframe takes the Easing its other
+  settings share, or Linear. The same applies to stored track keyframes in **Keyframes → Edit**.
 - Numeric Enter/blur applies exact values; Escape restores. Collisions,
   fractional/out-of-original frames and out-of-bounds values stay
   editable with errors, never silently clamp or overwrite. Slider movement is
@@ -447,9 +451,14 @@ shared keyframes are allowed per video track.
   read-only where it is not enabled, shown dimmed with a lock cue: click the hollow diamond first.
   Removing its final keyed setting reveals its existing unkeyed value, not a
   new default or the removed keyframe's value.
-- Each keyframe shares an easing, but every channel interpolates to its **own next
+- Each enabled setting has its own Easing at a keyframe, and every channel interpolates to its **own next
   keyframe with that setting enabled**, skipping unrelated settings; its endpoints hold outside
   that interval. A single keyframe therefore overrides that channel across the track.
+- To return the track to its default look at a frame, press **Add default keyframe** (the amber
+  diamond with a return arrow) in Colour's keyframe line. Every Colour setting and Opacity
+  returns to its default there and holds until its next keyframe; earlier frames keep their
+  values. Change its Easing to blend out of it instead of holding, or press the button again
+  at that frame to remove it. Its timeline marker is filled amber.
 - The per-channel native **Previous/Next** arrows beside main diamonds and on enabled setting chips in stored Keyframes rows visit only that
   channel's strictly earlier/later keyframes where it is nonnull, including zero-valued
   ones. They are disabled without a neighbour/project or during a document draft.
@@ -479,7 +488,7 @@ resets as the main controls, with one precise numeric field to the right of each
 slider as the sole numeric value display (Opacity uses 0–100%, neutral 100%, in
 both contexts; saved values remain 0–1). These controls edit only an existing keyed setting at that
 stored keyframe; they never implicitly enable a setting. Each accepted value/reset is
-one Undo step and leaves the keyframe's time, shared easing, other enabled settings and
+one Undo step and leaves the keyframe's time, every Easing, other enabled settings and
 saved track/clip settings unchanged. Invalid or out-of-bounds numeric drafts remain editable
 with errors.
 
@@ -677,7 +686,7 @@ in memory and automatic write retries stop. **Retry save** is offered only for
 recoverable transport/server errors. On a revision conflict, **Review latest save**
 offers keeping the draft, **Download unsaved project**, or explicitly discarding
 local changes and reloading. It never silently overwrites or rebases another save.
-Download before discarding; the v15 JSON snapshot is for manual recovery/examination,
+Download before discarding; the v16 JSON snapshot is for manual recovery/examination,
 not a supported JSON-import or migration flow. Unapplied input/pointer drafts are
 not committed project edits.
 
