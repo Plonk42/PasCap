@@ -83,6 +83,8 @@ interface RangeDrag {
   headBefore: number;
 }
 
+const SEEK_INDICATOR_DELAY_MS = 250;
+
 function message(cause: unknown): string {
   return cause instanceof Error ? cause.message : 'Cannot review this recording.';
 }
@@ -182,8 +184,6 @@ export function SourceReview({
       latest.current.range,
       latest.current.frame,
       (state) => {
-        // Hide an obsolete image before the next paint while an exact frame is decoded.
-        if (host.current) host.current.style.opacity = state.frame === null ? '0' : '1';
         setObservation({ key: resourceKey, state });
         if (state.frame !== null) latest.current.onFrame(state.frame);
       },
@@ -218,6 +218,15 @@ export function SourceReview({
   const observedFrame = currentObservation?.frame ?? null;
   const error = decoderError || currentObservation?.error || '';
   const buffering = observedFrame === null && !error;
+  const [slowSeek, setSlowSeek] = useState(false);
+  useEffect(() => {
+    setSlowSeek(false);
+    if (!buffering) return;
+    const timer = window.setTimeout(() => setSlowSeek(true), SEEK_INDICATOR_DELAY_MS);
+    return () => window.clearTimeout(timer);
+  }, [buffering]);
+  // A fast seek keeps the previous image instead of blinking; a slow one hides it and says so.
+  const seekingShown = buffering && slowSeek;
   const playing = currentObservation?.status === 'playing' || currentObservation?.status === 'starting';
   const steadyTransportLabel = playing ? 'Playing' : 'Paused';
   const transportLabel = currentObservation?.status === 'starting' ? 'Starting' : steadyTransportLabel;
@@ -313,7 +322,7 @@ export function SourceReview({
         <div
           className="source-video-host"
           ref={host}
-          style={{ opacity: observedFrame === null ? 0 : 1 }}
+          style={{ opacity: seekingShown || error ? 0 : 1 }}
           aria-hidden="true"
         />
         <button
@@ -322,7 +331,7 @@ export function SourceReview({
           title="Source review: I marks IN, O marks exclusive OUT"
           onKeyDown={keyboard}
         />
-        {buffering && (
+        {seekingShown && (
           <div className="source-preview-overlay">
             <span className="spinner" />
             Seeking frame {currentObservation?.requestedFrame ?? requestedFrame}…
