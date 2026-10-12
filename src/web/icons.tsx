@@ -25,7 +25,6 @@ export type IconName =
   | 'eye'
   | 'eye-off'
   | 'help'
-  | 'pin'
   | 'layout'
   | 'chevron-up'
   | 'chevron-down'
@@ -75,7 +74,6 @@ const paths: Record<IconName, string> = {
   eye: 'M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12Zm13 0a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z',
   'eye-off': 'm3 3 18 18M10 5h2c6 0 10 7 10 7s-1 2-3 4M6 6c-3 2-4 6-4 6s4 7 10 7c2 0 4-.8 5-2M9 9a4 4 0 0 0 6 6',
   help: 'M9 9a3 3 0 1 1 5 2c-1 1-2 1-2 3m0 3h.01M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0Z',
-  pin: 'm9 3 6 0-1 5 4 4v2H6v-2l4-4-1-5Zm3 11v7',
   layout: 'M3 4h18v16H3V4Zm5 0v16m8-16v16M8 15h8',
   'chevron-up': 'm6 15 6-6 6 6',
   'chevron-down': 'm6 9 6 6 6-6',

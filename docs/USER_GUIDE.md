@@ -79,8 +79,10 @@ See [TIMELINE_EDITING.md](TIMELINE_EDITING.md) and [DEPLOYMENT.md](DEPLOYMENT.md
 ## Review a recording and add clips
 
 Hover a ready recording to open **Source preview**; horizontal mouse position
-scrubs its full source range without moving the timeline playhead. **Pin** keeps
-that recording selected while you hover other recordings. Review opens paused, without audio, and
+scrubs its full source range without moving the timeline playhead. Clicking a
+recording keeps it in **Source preview**: hovering another recording previews that
+one, and moving the pointer off it returns to the clicked recording and frame.
+Review opens paused, without audio, and
 uses a separate decoder; it never plays or prepares an original implicitly.
 
 Set source **IN/OUT** by dragging the handles, with focused source **I/O**, or with
@@ -104,9 +106,9 @@ timeline or music and does not create Undo steps or saves. Failures expose Retry
 
 Choose **Add clip** (it shows the applied range length, for example **Add clip 3.00 s**),
 mark another range, then add again: each addition creates an independent clip and
-keeps the source pinned at the same frame/range. **Clip added · mark another range**
+keeps the same source open at the same frame/range. **Clip added · mark another range**
 confirms a successful addition.
-The sticky **Show N clips** button lists existing ranges; **Show** selects,
+The **Show N clips** button beside the recording name lists existing ranges; **Show** selects,
 seeks and reveals one on the timeline. Reuse badges count clips, not copied files.
 In Media, a hatched head/tail on a recording's thumbnail shows the omitted part of
 its applied range, like a miniature timeline.

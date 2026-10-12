@@ -44,8 +44,6 @@ interface Props {
   onFrame: (frame: number) => void;
   onRange: (range: MediaSelection) => void;
   onClose: () => void;
-  pinned: boolean;
-  onPin: () => void;
   onInsert: () => string | null;
   onRevealClip: (id: string) => void;
   targetLayer: string;
@@ -99,8 +97,6 @@ export function SourceReview({
   onFrame,
   onRange,
   onClose,
-  pinned,
-  onPin,
   onInsert,
   onRevealClip,
   targetLayer,
@@ -264,33 +260,24 @@ export function SourceReview({
     >
       <div className="source-review-heading">
         <div>
-          <strong title={asset.name}>{asset.name}</strong>
+          <div className="source-review-title">
+            <strong title={asset.name}>{asset.name}</strong>
+            {excerpts.length > 0 && (
+              <SourceExcerpts
+                key={`excerpts-${asset.id}`}
+                excerpts={excerpts}
+                rate={rate}
+                lastAddedId={lastAddedExcerpt?.id ?? null}
+                disabled={disabled}
+                onRevealClip={onRevealClip}
+                onKeyDown={keyboard}
+              />
+            )}
+          </div>
           <span>
             {asset.metadata.width} × {asset.metadata.height} · original source frames
           </span>
-          {excerpts.length > 0 && (
-            <SourceExcerpts
-              key={`excerpts-${asset.id}`}
-              excerpts={excerpts}
-              rate={rate}
-              lastAddedId={lastAddedExcerpt?.id ?? null}
-              disabled={disabled}
-              onRevealClip={onRevealClip}
-              onKeyDown={keyboard}
-            />
-          )}
         </div>
-        <button
-          className={`secondary-button small ${pinned ? 'active' : ''}`}
-          aria-label="Pin source review"
-          aria-pressed={pinned}
-          title="Keep this recording selected while moving over other recordings"
-          onKeyDown={keyboard}
-          onClick={onPin}
-        >
-          <Icon name="pin" size={14} />
-          <span className="source-pin-label">{pinned ? 'Pinned' : 'Pin'}</span>
-        </button>
         <button
           className="primary-button small"
           type="button"

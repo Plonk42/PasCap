@@ -227,7 +227,6 @@ export function App() {
   const [draggedMediaIds, setDraggedMediaIds] = useState<string[] | null>(null);
   const [viewerMode, setViewerMode] = useState<'timeline' | 'source'>('timeline');
   const [review, setReview] = useState<ReviewTarget | null>(null);
-  const [reviewPinned, setReviewPinned] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectedMusicId, setSelectedMusicId] = useState<string | null>(null);
   const [selectedLayerId, setSelectedLayerId] = useState(EMPTY_PROJECT.layers[0]!.id);
@@ -268,7 +267,9 @@ export function App() {
   const actionPending = useRef(false);
   const refreshSequence = useRef(0);
   const jobGeneration = useRef(0);
-  const pinned = useRef(false);
+  // The last clicked/focused recording; hovering another one only previews it temporarily.
+  const chosenReview = useRef<ReviewTarget | null>(null);
+  const hoveringReview = useRef(false);
   const exportAccepted = useRef(false);
   const timelineTab = useRef<HTMLButtonElement>(null);
   const projectsTrigger = useRef<HTMLButtonElement>(null);
@@ -487,11 +488,7 @@ export function App() {
         requestedFrame.current = calculateLayout(next).clips.find((item) => item.clip.id === first.id)!.start;
         commit(next);
         select(first.id);
-        if (keepReview) {
-          pinned.current = true;
-          setReviewPinned(true);
-          setViewerMode('source');
-        }
+        if (keepReview) setViewerMode('source');
         setError('');
         return first.id;
       } catch (cause) {
@@ -724,9 +721,9 @@ export function App() {
       }
       sourceRanges.current = choices;
       setRanges(choices);
-      pinned.current = false;
+      chosenReview.current = null;
+      hoveringReview.current = false;
       setReview(null);
-      setReviewPinned(false);
       setViewerMode('timeline');
       const first = calculateLayout(loaded).clips[0];
       if (first) select(first.clip.id);
@@ -768,9 +765,9 @@ export function App() {
     sourceRanges.current = {};
     setRanges({});
     setDraggedMediaIds(null);
-    pinned.current = false;
+    chosenReview.current = null;
+    hoveringReview.current = false;
     setReview(null);
-    setReviewPinned(false);
     setViewerMode('timeline');
     setSaveState({ state: 'saved', message: 'Local workspace', revision: 0, recovery: null });
     const url = new URL(location.href);
@@ -1373,18 +1370,24 @@ export function App() {
       )
       .catch((cause: unknown) => setError(message(cause, 'Preview could not be retried.')));
   };
-  const reviewSource = (next: ReviewTarget, pin: boolean): void => {
-    if (!pin && pinned.current) return;
+  const reviewSource = (next: ReviewTarget, choose: boolean): void => {
+    if (choose) chosenReview.current = next;
+    hoveringReview.current = !choose;
     setReview(next);
     setViewerMode('source');
-    if (pin) {
-      pinned.current = true;
-      setReviewPinned(true);
-    }
+  };
+  const endReviewHover = (): void => {
+    if (!hoveringReview.current) return;
+    hoveringReview.current = false;
+    if (chosenReview.current) setReview(chosenReview.current);
+  };
+  const reviewFrame = (next: ReviewTarget): void => {
+    setReview(next);
+    if (!hoveringReview.current && chosenReview.current?.mediaId === next.mediaId) chosenReview.current = next;
   };
   const closeReview = (): void => {
-    pinned.current = false;
-    setReviewPinned(false);
+    chosenReview.current = null;
+    hoveringReview.current = false;
     setReview(null);
     setViewerMode('timeline');
     timelineTab.current?.focus({ preventScroll: true });
@@ -1399,10 +1402,10 @@ export function App() {
     }
     setError('');
     setCutRange(null);
+    if (chosenReview.current && removal.videoIds.includes(chosenReview.current.mediaId)) chosenReview.current = null;
     if (review && removal.videoIds.includes(review.mediaId)) {
       // Release the removed recording's review decoder without moving keyboard focus.
-      pinned.current = false;
-      setReviewPinned(false);
+      hoveringReview.current = false;
       setReview(null);
       setViewerMode('timeline');
     }
@@ -1683,8 +1686,8 @@ export function App() {
               onImport={importFolder}
               onRegisterPaths={registerPaths}
               review={review}
-              reviewPinned={reviewPinned}
               onReview={reviewSource}
+              onReviewHoverEnd={endReviewHover}
               importRequest={importRequest}
               onImportVisibility={importVisibility}
               targetLayer={targetLayer}
@@ -1784,15 +1787,14 @@ export function App() {
                     range={resolveMediaSelection(reviewAsset.id, reviewAsset.metadata.frameCount, ranges)}
                     excerpts={reviewExcerpts}
                     disabled={!project || busy || draft !== null}
-                    pinned={reviewPinned}
-                    onPin={() => {
-                      pinned.current = !pinned.current;
-                      setReviewPinned(pinned.current);
-                    }}
-                    onFrame={(frame) => setReview({ mediaId: reviewAsset.id, frame })}
+                    onFrame={(frame) => reviewFrame({ mediaId: reviewAsset.id, frame })}
                     onRange={setSourceRange}
                     onClose={closeReview}
-                    onInsert={() => insert([reviewAsset.id], undefined, undefined, undefined, true)}
+                    onInsert={() => {
+                      chosenReview.current = review;
+                      hoveringReview.current = false;
+                      return insert([reviewAsset.id], undefined, undefined, undefined, true);
+                    }}
                     onRevealClip={revealClip}
                     targetLayer={targetLayer}
                   />

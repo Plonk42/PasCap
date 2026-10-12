@@ -46,8 +46,9 @@ interface Props {
   onImport: (directory: string) => Promise<ImportResult>;
   onRegisterPaths: (paths: readonly string[]) => Promise<ImportResult>;
   review: ReviewTarget | null;
-  reviewPinned: boolean;
-  onReview: (review: ReviewTarget, pin: boolean) => void;
+  /** `choose` remembers the recording to return to once hovering ends. */
+  onReview: (review: ReviewTarget, choose: boolean) => void;
+  onReviewHoverEnd: () => void;
   importRequest: number;
   onImportVisibility: (open: boolean) => void;
   targetLayer: string;
@@ -211,8 +212,8 @@ export function MediaLibrary({
   onImport,
   onRegisterPaths,
   review,
-  reviewPinned,
   onReview,
+  onReviewHoverEnd,
   importRequest,
   onImportVisibility,
   targetLayer,
@@ -287,18 +288,19 @@ export function MediaLibrary({
     };
   }, []);
 
-  const applyHover = (request: HoverRequest): void => {
-    if (request.projectId !== latestLibrary.current.projectId) return;
+  const applyHover = (request: HoverRequest, choose = false): boolean => {
+    if (request.projectId !== latestLibrary.current.projectId) return false;
     const asset = latestLibrary.current.assets.find((item) => item.id === request.mediaId);
-    if (!asset || !mediaReady(asset) || !request.element.isConnected) return;
+    if (!asset || !mediaReady(asset) || !request.element.isConnected) return false;
     const bounds = request.element.getBoundingClientRect();
-    if (bounds.width <= 0) return;
+    if (bounds.width <= 0) return false;
     const ratio = sourcePointerRatio(request.clientX, bounds.left, bounds.width);
-    onReview({ mediaId: asset.id, frame: sourceFrameAtRatio(ratio, asset.metadata.frameCount) }, false);
+    onReview({ mediaId: asset.id, frame: sourceFrameAtRatio(ratio, asset.metadata.frameCount) }, choose);
     setHover({ projectId: request.projectId, mediaId: asset.id, ratio });
+    return true;
   };
   const queueHover = (event: PointerEvent<HTMLButtonElement>, asset: MediaAsset): void => {
-    if (reviewPinned || !mediaReady(asset) || event.pointerType === 'touch' || event.buttons !== 0) return;
+    if (!mediaReady(asset) || event.pointerType === 'touch' || event.buttons !== 0) return;
     hoverRequest.current = { projectId, mediaId: asset.id, element: event.currentTarget, clientX: event.clientX };
     if (hoverAnimation.current !== null) return;
     hoverAnimation.current = requestAnimationFrame(() => {
@@ -309,12 +311,19 @@ export function MediaLibrary({
     });
   };
   const leaveHover = (mediaId: string): void => {
-    // Keep the final requested frame paused when moving from a row to its controls.
+    // Without a chosen recording, the final hovered frame stays paused.
     if (hoverRequest.current?.mediaId === mediaId) applyHover(hoverRequest.current);
     clearHover();
+    onReviewHoverEnd();
   };
   const activateReview = (asset: MediaAsset): void => {
     if (!mediaReady(asset)) return;
+    // A click before the next animation frame chooses the frame under the pointer.
+    const pending = hoverRequest.current;
+    if (pending?.mediaId === asset.id) {
+      hoverRequest.current = null;
+      if (applyHover(pending, true)) return;
+    }
     const range = resolveMediaSelection(asset.id, asset.metadata.frameCount, ranges);
     onReview(review?.mediaId === asset.id ? review : { mediaId: asset.id, frame: range.sourceIn }, true);
   };

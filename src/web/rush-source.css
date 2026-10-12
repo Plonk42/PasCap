@@ -24,6 +24,17 @@
   flex-shrink: 0;
 }
 
+.source-review.rush-source .source-review-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.source-review.rush-source .source-review-title > strong {
+  flex: 0 1 auto;
+}
+
 .source-review.rush-source .source-add-feedback {
   flex-shrink: 0;
   color: var(--muted);
@@ -199,12 +210,6 @@
     flex-direction: column;
     align-items: flex-start;
     gap: 0;
-  }
-}
-
-@container rush-source (width < 500px) {
-  .source-review.rush-source .source-pin-label {
-    display: none;
   }
 }
 

@@ -160,7 +160,7 @@ test('workspace keeps both side panels without document overflow at the default 
   expect(writes).toBe(0);
 });
 
-test('docked source pinning preserves list geometry, preview position and non-destructive selection', async ({
+test('docked source review returns to the clicked recording after hovering others, preserving geometry and selection', async ({
   page,
 }) => {
   await page.evaluate(() => window.pascapLab!.engine.seek(30));
@@ -170,11 +170,14 @@ test('docked source pinning preserves list geometry, preview position and non-de
   await expect(page.locator('.source-preview')).toHaveAttribute('data-source-frame', '30');
   expect(await row.boundingBox()).toEqual(before);
   expect(await page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(30);
-  await page.getByRole('button', { name: 'Pin source review' }).click();
+  await page.mouse.down();
+  await page.mouse.up();
   const firstId = await page.locator('.source-preview').getAttribute('data-media-id');
   await hoverSource(page, 'pattern-b.mp4', 0.9);
+  await expect(page.locator('.source-preview')).not.toHaveAttribute('data-media-id', firstId!);
+  await page.mouse.move(4, 4);
   await expect(page.locator('.source-preview')).toHaveAttribute('data-media-id', firstId!);
-  await page.getByRole('button', { name: 'Pin source review' }).click();
+  await expect(page.locator('.source-preview')).toHaveAttribute('data-source-frame', '30');
   await hoverSource(page, 'pattern-b.mp4', 0.5);
   await expect(page.locator('.source-preview')).toHaveAttribute('data-source-frame', '60');
   await expect(page.locator('.source-range-editor')).toHaveCount(1);
