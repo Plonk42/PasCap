@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { ScalarColourSetting } from './colour.js';
-import { COLOUR_CONTROLS, colourSchema } from './colour.js';
+import { COLOUR_CONTROLS, colourSchema, NEUTRAL_COLOUR } from './colour.js';
 
 export const interpolationSchema = z.enum(['hold', 'linear', 'ease-in', 'ease-out', 'smooth']);
 export type Interpolation = z.infer<typeof interpolationSchema>;
@@ -73,6 +73,8 @@ export const layerKeyframeSchema = z
     frame,
     values: layerKeyValuesSchema,
     easing: easingSchema(Object.keys(EMPTY_KEY_VALUES) as KeyframeSetting[]),
+    /** A default keyframe never extends its values to frames before it. */
+    reset: z.boolean(),
   })
   .strict()
   .refine((key) => Object.values(key.values).some((value) => value !== null), {
@@ -87,6 +89,21 @@ export function uniformKeyframe<V extends ChannelValues>(frame: number, values: 
     Object.entries(values).map(([setting, value]) => [setting, value === null ? null : curve]),
   ) as KeyEasing<V>;
   return { frame, values, easing };
+}
+
+/** An ordinary track keyframe whose enabled settings all use one Easing. */
+export function layerKeyframe(frame: number, values: LayerKeyValues, curve: Interpolation): LayerKeyframe {
+  return { ...uniformKeyframe(frame, values, curve), reset: false };
+}
+
+/** Every setting at its neutral creation value, holding until its next keyframe. */
+export function defaultKeyframe(frame: number): LayerKeyframe {
+  const values = {
+    ...EMPTY_KEY_VALUES,
+    opacity: 1,
+    ...Object.fromEntries(COLOUR_CONTROLS.map(({ key }) => [key, NEUTRAL_COLOUR[key]])),
+  };
+  return { ...uniformKeyframe(frame, values, 'hold'), reset: true };
 }
 
 /** Enabled settings of `key` that are keyed again later: only their Easing has an effect. */
@@ -204,11 +221,10 @@ export function evaluateLayerSetting(
   projectFrame: number,
   base: number,
 ): number {
-  const interval = keyInterval(
-    layer.keyframes.filter((key) => key.values[setting] !== null),
-    projectFrame,
-    (left) => left.easing[setting]!,
-  );
+  const keys = layer.keyframes.filter((key) => key.values[setting] !== null);
+  // Before a leading default keyframe the setting keeps its unkeyed value.
+  if (keys[0]?.reset && projectFrame < keys[0].frame) return base;
+  const interval = keyInterval(keys, projectFrame, (left) => left.easing[setting]!);
   if (!interval) return base;
   const left = interval.left.values[setting]!;
   return left + (interval.right.values[setting]! - left) * interval.progress;

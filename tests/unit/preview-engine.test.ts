@@ -9,6 +9,7 @@ import {
   type Interpolation,
   type LayerKeyframe,
   type LayerKeyValues,
+  layerKeyframe,
   uniformKeyframe,
 } from '../../src/shared/keyframes.js';
 import {
@@ -422,7 +423,7 @@ function expectSurface(engine: PreviewEngine, project: ProjectDocument, frame: n
   );
 }
 function point(frame: number, values: Partial<LayerKeyValues>, interpolation: Interpolation = 'linear'): LayerKeyframe {
-  return uniformKeyframe(frame, { ...EMPTY_KEY_VALUES, ...values }, interpolation);
+  return layerKeyframe(frame, { ...EMPTY_KEY_VALUES, ...values }, interpolation);
 }
 function musicTrack(duration = 600): MusicTrack {
   return {

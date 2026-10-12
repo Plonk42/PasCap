@@ -35,7 +35,7 @@ import {
   type Interpolation,
   type LayerKeyValues,
   type LayerKeyframe,
-  uniformKeyframe,
+  layerKeyframe,
 } from '../../src/shared/keyframes.js';
 import type { MediaAsset } from '../../src/shared/media.js';
 import {
@@ -67,7 +67,7 @@ function layer(id: string): VideoLayer {
   return createLayer(id, id, false);
 }
 function point(frame: number, values: Partial<LayerKeyValues>, interpolation: Interpolation = 'linear'): LayerKeyframe {
-  return uniformKeyframe(frame, { ...EMPTY_KEY_VALUES, ...values }, interpolation);
+  return layerKeyframe(frame, { ...EMPTY_KEY_VALUES, ...values }, interpolation);
 }
 
 async function rawRgb(config: ServiceConfig, filename: string, range = 'tv'): Promise<Buffer> {

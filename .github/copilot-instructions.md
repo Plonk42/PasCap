@@ -209,6 +209,13 @@ clarity −1–1, denoise 0–1 }`, neutral 0, with no keyframes or track channe
   remain independent and unchanged.
   Reject and preserve incompatible v1–v15 projects/receipt snapshots; require recreation,
   without migrations, compatibility defaults or automatic deletion.
+- Owner-approved #135/#87: track and Transform keyframes store one Easing per enabled
+  setting (`easing` mirrors `values`); a joining setting adopts the Easing its keyframe's
+  settings agree on, else Linear. Track keyframes require boolean `reset`: a **default
+  keyframe** (`reset: true`, created with all eleven settings neutral and Hold Easing)
+  never reaches back, so a setting whose first keyframe it is keeps its unkeyed value before
+  it. Toggle **Add default keyframe** in the Colour keyframe line; amber filled marker. See
+  [layers/keyframes](../docs/LAYERS_AND_KEYFRAMES.md).
 - Music is a required 0–8 array of independently identified instances, never null
   or singular. Duration is the maximum of all video and music OUTs. After the last
   active video, preview/export is opaque black while music continues to its own OUT;

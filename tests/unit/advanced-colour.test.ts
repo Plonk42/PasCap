@@ -23,7 +23,7 @@ import {
 import { applyCommand, EditHistory } from '../../src/shared/commands.js';
 import { colourAt } from '../../src/shared/composition.js';
 import { needsLayeredExport, planExport } from '../../src/shared/export.js';
-import { EMPTY_KEY_VALUES, KEYFRAME_SETTINGS, uniformKeyframe } from '../../src/shared/keyframes.js';
+import { EMPTY_KEY_VALUES, KEYFRAME_SETTINGS, layerKeyframe } from '../../src/shared/keyframes.js';
 import { createClip, createLayer, createProject, projectSchema } from '../../src/shared/model.js';
 import { NEUTRAL_DETAIL } from '../../src/shared/detail.js';
 import { NEUTRAL_SPATIAL_POSE } from '../../src/shared/spatial.js';
@@ -212,7 +212,7 @@ describe('strict schema-16 static advanced row colour', () => {
     layer.colour.curves.master[0]!.y = 0.1;
     expect(needsLayeredExport(project)).toBe(true);
     expect(() => planExport(project)).toThrow('layered exporter');
-    layer.keyframes = [uniformKeyframe(0, { ...EMPTY_KEY_VALUES, exposure: 1, opacity: 0.7 }, 'linear')];
+    layer.keyframes = [layerKeyframe(0, { ...EMPTY_KEY_VALUES, exposure: 1, opacity: 0.7 }, 'linear')];
     expect(colourAt(layer, 2)).toMatchObject({ exposure: 1, hsl: layer.colour.hsl, curves: layer.colour.curves });
     const history = new EditHistory(project);
     const before = structuredClone(project);

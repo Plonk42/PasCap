@@ -342,6 +342,8 @@ in one Undo step, with collision validation. List input
 identity/focus and expansion survive a single-keyframe move and Undo.
 
 Each video track draws **one marker per stored keyframe**, with enabled settings in its title,
+(a [default keyframe](LAYERS_AND_KEYFRAMES.md#default-keyframes) is filled amber with a
+diamond-and-return-arrow icon instead of ◆),
 never per-clip duplicates; keyframes after the last clip keep their markers there
 without extending playback. **Click or Enter** selects the marker's track
 and seeks, opening Track → Colour, without editing. **Drag horizontally** to move the shared keyframe:

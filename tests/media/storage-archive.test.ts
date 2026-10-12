@@ -7,7 +7,7 @@ import { createConfig } from '../../src/server/config.js';
 import { restoreExports } from '../../src/server/export-archive.js';
 import { JobQueue } from '../../src/server/jobs.js';
 import { ProjectStore } from '../../src/server/storage.js';
-import { EMPTY_KEY_VALUES, uniformKeyframe } from '../../src/shared/keyframes.js';
+import { EMPTY_KEY_VALUES, layerKeyframe, uniformKeyframe } from '../../src/shared/keyframes.js';
 import { createClip, createLayer, createProject } from '../../src/shared/model.js';
 import { unsupportedProject } from '../unit/project-fixtures.js';
 
@@ -35,8 +35,8 @@ describe.skipIf(!enabled)('schema-16 storage/archive integration · generated fi
     project.layers[0]!.colour.temperature = 0.75;
     project.layers[0]!.colour.tint = -0.65;
     project.layers[0]!.keyframes = [
-      uniformKeyframe(0, { ...EMPTY_KEY_VALUES, opacity: 0.8, temperature: -1 }, 'linear'),
-      uniformKeyframe(5000, { ...EMPTY_KEY_VALUES, exposure: 0.25, tint: 1 }, 'ease-out'),
+      layerKeyframe(0, { ...EMPTY_KEY_VALUES, opacity: 0.8, temperature: -1 }, 'linear'),
+      layerKeyframe(5000, { ...EMPTY_KEY_VALUES, exposure: 0.25, tint: 1 }, 'ease-out'),
     ];
     const saved = await store.save(project, 0);
     expect(saved.schemaVersion).toBe(16);
@@ -164,7 +164,12 @@ describe.skipIf(!enabled)('schema-16 storage/archive integration · generated fi
         layers: [
           {
             ...valid.layers[0]!,
-            keyframes: [uniformKeyframe(0, { ...EMPTY_KEY_VALUES, opacity: 0.5, layerOpacity: null }, 'linear')],
+            keyframes: [
+              {
+                ...uniformKeyframe(0, { ...EMPTY_KEY_VALUES, opacity: 0.5, layerOpacity: null }, 'linear'),
+                reset: false,
+              },
+            ],
           },
         ],
       },
@@ -183,7 +188,9 @@ describe.skipIf(!enabled)('schema-16 storage/archive integration · generated fi
         layers: [
           {
             ...valid.layers[0]!,
-            keyframes: [uniformKeyframe(0, { ...EMPTY_KEY_VALUES, opacity: 0.5, speed: null }, 'linear')],
+            keyframes: [
+              { ...uniformKeyframe(0, { ...EMPTY_KEY_VALUES, opacity: 0.5, speed: null }, 'linear'), reset: false },
+            ],
           },
         ],
       },
@@ -204,7 +211,7 @@ describe.skipIf(!enabled)('schema-16 storage/archive integration · generated fi
             layers: [
               {
                 ...valid.layers[0]!,
-                keyframes: [uniformKeyframe(0, values as Record<string, number | null>, 'linear')],
+                keyframes: [{ ...uniformKeyframe(0, values as Record<string, number | null>, 'linear'), reset: false }],
               },
             ],
           },
@@ -217,7 +224,9 @@ describe.skipIf(!enabled)('schema-16 storage/archive integration · generated fi
             layers: [
               {
                 ...valid.layers[0]!,
-                keyframes: [uniformKeyframe(0, { ...EMPTY_KEY_VALUES, [setting]: value }, 'linear')],
+                keyframes: [
+                  { ...uniformKeyframe(0, { ...EMPTY_KEY_VALUES, [setting]: value }, 'linear'), reset: false },
+                ],
               },
             ],
           })),
@@ -228,7 +237,9 @@ describe.skipIf(!enabled)('schema-16 storage/archive integration · generated fi
         layers: [
           {
             ...valid.layers[0]!,
-            keyframes: [uniformKeyframe(100, missingValues as Record<string, number | null>, 'linear')],
+            keyframes: [
+              { ...uniformKeyframe(100, missingValues as Record<string, number | null>, 'linear'), reset: false },
+            ],
           },
         ],
       },
@@ -245,7 +256,12 @@ describe.skipIf(!enabled)('schema-16 storage/archive integration · generated fi
         layers: [
           {
             ...valid.layers[0]!,
-            keyframes: [uniformKeyframe(0, { ...EMPTY_KEY_VALUES, opacity: 0.5, clipOpacity: null }, 'linear')],
+            keyframes: [
+              {
+                ...uniformKeyframe(0, { ...EMPTY_KEY_VALUES, opacity: 0.5, clipOpacity: null }, 'linear'),
+                reset: false,
+              },
+            ],
           },
         ],
       },
@@ -273,7 +289,7 @@ describe.skipIf(!enabled)('schema-16 storage/archive integration · generated fi
     snapshot.layers[0]!.colour.temperature = -0.85;
     snapshot.layers[0]!.colour.tint = 0.9;
     snapshot.layers[0]!.keyframes = [
-      uniformKeyframe(50, { ...EMPTY_KEY_VALUES, exposure: 0.1, temperature: 1, tint: -1 }, 'smooth'),
+      layerKeyframe(50, { ...EMPTY_KEY_VALUES, exposure: 0.1, temperature: 1, tint: -1 }, 'smooth'),
     ];
     async function archive(document: unknown, label: string) {
       const id = randomUUID();
@@ -345,7 +361,12 @@ describe.skipIf(!enabled)('schema-16 storage/archive integration · generated fi
               layers: [
                 {
                   ...snapshot.layers[0]!,
-                  keyframes: [uniformKeyframe(0, { ...EMPTY_KEY_VALUES, opacity: 0.5, [setting]: null }, 'linear')],
+                  keyframes: [
+                    {
+                      ...uniformKeyframe(0, { ...EMPTY_KEY_VALUES, opacity: 0.5, [setting]: null }, 'linear'),
+                      reset: false,
+                    },
+                  ],
                 },
               ],
             },

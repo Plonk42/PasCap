@@ -14,7 +14,7 @@ import {
   type KeyframeSetting,
   type LayerKeyframe,
   type LayerKeyValues,
-  uniformKeyframe,
+  layerKeyframe,
 } from '../../src/shared/keyframes.js';
 import {
   BASE_LAYER_ID,
@@ -33,7 +33,7 @@ import { unsupportedProject } from './project-fixtures.js';
 
 const curves: Interpolation[] = ['hold', 'linear', 'ease-in', 'ease-out', 'smooth'];
 function point(frame: number, values: Partial<LayerKeyValues>, interpolation: Interpolation = 'linear'): LayerKeyframe {
-  return uniformKeyframe(frame, { ...EMPTY_KEY_VALUES, ...values }, interpolation);
+  return layerKeyframe(frame, { ...EMPTY_KEY_VALUES, ...values }, interpolation);
 }
 function row(keyframes: LayerKeyframe[] = []): VideoLayer {
   return { ...createLayer(BASE_LAYER_ID, 'Track 1'), keyframes };
@@ -302,6 +302,51 @@ describe('strict schema-16 row points and independently participating settings',
     const before = project;
     expect(() => ease(0, 'hue', 'hold')).toThrow('not enabled');
     expect(project).toBe(before);
+  });
+
+  it('adds a default keyframe that holds defaults from its frame without reaching back', () => {
+    let project = createProject('default', 'Default keyframe');
+    const layer = project.layers[0]!;
+    layer.opacity = 0.8;
+    layer.colour.exposure = 0.5;
+    layer.colour.contrast = 1.4;
+    layer.keyframes = [point(10, { exposure: 1 })];
+    const toggle = (frame: number): void => {
+      project = applyCommand(project, { type: 'layer-key-default', layerId: BASE_LAYER_ID, frame });
+    };
+    toggle(50);
+    const reset = project.layers[0]!.keyframes[1]!;
+    expect(reset.reset).toBe(true);
+    expect(keySettings(reset)).toEqual(KEYFRAME_SETTINGS.map((setting) => setting.key));
+    expect(new Set(Object.values(reset.easing))).toEqual(new Set(['hold']));
+    expect(reset.values).toMatchObject({ opacity: 1, exposure: 0, contrast: 1, saturation: 1, hdr: 0 });
+    const keyed = project.layers[0]!;
+    // An animated setting eases into the default from its previous keyframe, then holds it.
+    expect(evaluateLayerSetting(keyed, 'exposure', 5, 0.5)).toBe(1);
+    expect(evaluateLayerSetting(keyed, 'exposure', 30, 0.5)).toBe(0.5);
+    expect(evaluateLayerSetting(keyed, 'exposure', 80, 0.5)).toBe(0);
+    // Unanimated settings keep their saved values until the default keyframe.
+    expect(colourAt(keyed, 49).contrast).toBe(1.4);
+    expect(colourAt(keyed, 50).contrast).toBe(1);
+    expect(opacityAt(keyed, 49)).toBe(0.8);
+    expect(opacityAt(keyed, 50)).toBe(1);
+    // It moves and loses settings like any keyframe, staying a default keyframe.
+    project = applyCommand(project, { type: 'layer-key-move', layerId: BASE_LAYER_ID, frame: 50, nextFrame: 60 });
+    project = applyCommand(project, {
+      type: 'layer-key-toggle',
+      layerId: BASE_LAYER_ID,
+      frame: 60,
+      setting: 'hue',
+      value: 0,
+    });
+    expect(project.layers[0]!.keyframes[1]).toMatchObject({ frame: 60, reset: true, values: { hue: null } });
+    const before = project;
+    expect(() => toggle(10)).toThrow('already exists');
+    expect(project).toBe(before);
+    toggle(60);
+    expect(project.layers[0]!.keyframes).toEqual([point(10, { exposure: 1 })]);
+    const { reset: _reset, ...withoutKind } = point(0, { exposure: 0 });
+    expect(layerKeyframeSchema.safeParse(withoutKind).success).toBe(false);
   });
 
   it('can independently toggle all eleven participants at one frame', () => {

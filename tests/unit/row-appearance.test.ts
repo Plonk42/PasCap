@@ -4,7 +4,7 @@ import { generateCube, gradePixel, NEUTRAL_COLOUR, type RGB } from '../../src/sh
 import { applyCommand, EditHistory, type EditCommand } from '../../src/shared/commands.js';
 import { colourAt } from '../../src/shared/composition.js';
 import { needsLayeredExport, planExport } from '../../src/shared/export.js';
-import { EMPTY_KEY_VALUES, uniformKeyframe } from '../../src/shared/keyframes.js';
+import { EMPTY_KEY_VALUES, layerKeyframe } from '../../src/shared/keyframes.js';
 import { createClip, createLayer, createProject, projectSchema } from '../../src/shared/model.js';
 import { sampleTimeline } from '../../src/shared/timeline.js';
 import { colourResetCommands } from '../../src/web/colour-reset.js';
@@ -84,9 +84,9 @@ describe('strict row-only Colour and Opacity', () => {
     row.colour.temperature = 0.3;
     row.colour.tint = -0.4;
     row.keyframes = [
-      uniformKeyframe(10, { ...EMPTY_KEY_VALUES, temperature: -0.5, tint: 0.6 }, 'linear'),
-      uniformKeyframe(20, { ...EMPTY_KEY_VALUES, exposure: 0.2 }, 'smooth'),
-      uniformKeyframe(30, { ...EMPTY_KEY_VALUES, temperature: 0.5 }, 'hold'),
+      layerKeyframe(10, { ...EMPTY_KEY_VALUES, temperature: -0.5, tint: 0.6 }, 'linear'),
+      layerKeyframe(20, { ...EMPTY_KEY_VALUES, exposure: 0.2 }, 'smooth'),
+      layerKeyframe(30, { ...EMPTY_KEY_VALUES, temperature: 0.5 }, 'hold'),
     ];
     for (const [frame, temperature] of [
       [0, -0.5],
@@ -156,7 +156,7 @@ describe('strict row-only Colour and Opacity', () => {
     let project = fixture();
     const destination = createLayer('destination', 'Destination');
     destination.colour.hue = 40;
-    destination.keyframes = [uniformKeyframe(0, { ...EMPTY_KEY_VALUES, saturation: 0.4 }, 'hold')];
+    destination.keyframes = [layerKeyframe(0, { ...EMPTY_KEY_VALUES, saturation: 0.4 }, 'hold')];
     project = applyCommand(project, { type: 'layer-add', layer: destination });
     const rows = structuredClone(project.layers);
     project = applyCommand(project, { type: 'place', clipId: 'a', layerId: destination.id, start: 0, index: 0 });
@@ -179,7 +179,7 @@ describe('strict row-only Colour and Opacity', () => {
   ])('preserves row bases, absolute points and source settings in $type without copying colour', (command) => {
     const project = fixture();
     project.layers[0]!.colour.brightness = 0.1;
-    project.layers[0]!.keyframes = [uniformKeyframe(100, { ...EMPTY_KEY_VALUES, hue: 20 }, 'hold')];
+    project.layers[0]!.keyframes = [layerKeyframe(100, { ...EMPTY_KEY_VALUES, hue: 20 }, 'hold')];
     const next = applyCommand(project, command);
     const a = next.clips.find((clip) => clip.id === 'a')!;
     const copy = next.clips.find((clip) => clip.id === 'copy')!;

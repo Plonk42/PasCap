@@ -290,6 +290,13 @@ function ColourSection({ layer, frame, resetKey, disabled, onEdit, id }: Readonl
     if (disabled || !canReset) return;
     onEdit(resetCommands);
   };
+  const pointAtFrame = layer.keyframes.find((key) => key.frame === frame);
+  const occupied = pointAtFrame !== undefined && !pointAtFrame.reset;
+  let defaultTitle =
+    'Add a default keyframe here: every Colour setting and Opacity returns to its default and holds until its next keyframe. Earlier frames keep their values.';
+  if (pointAtFrame?.reset) defaultTitle = 'Remove the default keyframe at the playhead';
+  else if (pointAtFrame)
+    defaultTitle = 'A keyframe already exists at the playhead; move to another frame for a default keyframe';
   return (
     <InspectorSection
       id="colour"
@@ -320,6 +327,20 @@ function ColourSection({ layer, frame, resetKey, disabled, onEdit, id }: Readonl
         >
           <Icon name="reset" size={13} />
           Reset
+        </button>
+        <button
+          type="button"
+          className="icon-button default-keyframe-button"
+          disabled={disabled}
+          aria-disabled={occupied || undefined}
+          aria-pressed={pointAtFrame?.reset === true}
+          aria-label={pointAtFrame?.reset ? 'Remove default keyframe' : 'Add default keyframe'}
+          title={defaultTitle}
+          onClick={() => {
+            if (!occupied) onEdit([{ type: 'layer-key-default', layerId: layer.id, frame }]);
+          }}
+        >
+          <Icon name="default-key" size={16} />
         </button>
       </TrackAnimationControls>
       <div className="colour-controls">

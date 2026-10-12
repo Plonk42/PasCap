@@ -1,11 +1,12 @@
 import type { ColourSettings } from './colour.js';
 import {
+  defaultKeyframe,
   EMPTY_KEY_VALUES,
   KEYFRAME_SETTINGS,
   joiningEasing,
   keySettings,
+  layerKeyframe,
   layerKeyframeSchema,
-  uniformKeyframe,
   upsertKey,
   withEasing,
   type Interpolation,
@@ -49,6 +50,8 @@ export type EditCommand =
   | { type: 'layer-key-value'; layerId: string; frame: number; setting: KeyframeSetting; value: number }
   | { type: 'layer-key-move'; layerId: string; frame: number; nextFrame: number }
   | { type: 'layer-key-remove'; layerId: string; frame: number }
+  /** Adds a default keyframe, or removes the one already at this frame. */
+  | { type: 'layer-key-default'; layerId: string; frame: number }
   | {
       type: 'layer-key-easing';
       layerId: string;
@@ -214,7 +217,15 @@ function duplicateClip(next: ProjectDocument, index: number, newClipId: string):
 
 type LayerKeyCommand = Extract<
   EditCommand,
-  { type: 'layer-key-toggle' | 'layer-key-value' | 'layer-key-move' | 'layer-key-remove' | 'layer-key-easing' }
+  {
+    type:
+      | 'layer-key-toggle'
+      | 'layer-key-value'
+      | 'layer-key-move'
+      | 'layer-key-remove'
+      | 'layer-key-easing'
+      | 'layer-key-default';
+  }
 >;
 type LayerValueCommand = Extract<LayerKeyCommand, { type: 'layer-key-toggle' | 'layer-key-value' }>;
 function editLayerValue(layer: VideoLayer, point: LayerKeyframe | undefined, command: LayerValueCommand): void {
@@ -229,7 +240,7 @@ function editLayerValue(layer: VideoLayer, point: LayerKeyframe | undefined, com
     return;
   }
   const participating = current !== undefined && current !== null;
-  const base = point ?? uniformKeyframe(command.frame, EMPTY_KEY_VALUES, 'linear');
+  const base = point ?? layerKeyframe(command.frame, EMPTY_KEY_VALUES, 'linear');
   const curve = point
     ? joiningEasing(
         layer.keyframes,
@@ -241,6 +252,7 @@ function editLayerValue(layer: VideoLayer, point: LayerKeyframe | undefined, com
     frame: command.frame,
     values: { ...base.values, [command.setting]: participating ? null : command.value },
     easing: { ...base.easing, [command.setting]: participating ? null : curve },
+    reset: base.reset,
   };
   layer.keyframes = keySettings(changed).length
     ? upsertKey(layer.keyframes, changed)
@@ -254,6 +266,14 @@ function editLayerKey(next: ProjectDocument, command: LayerKeyCommand): void {
   const point = layer.keyframes.find((key) => key.frame === command.frame);
   if (command.type === 'layer-key-toggle' || command.type === 'layer-key-value') {
     editLayerValue(layer, point, command);
+    return;
+  }
+  if (command.type === 'layer-key-default') {
+    if (point && !point.reset)
+      throw new Error('A keyframe already exists at this frame. Choose another frame for a default keyframe.');
+    layer.keyframes = point
+      ? layer.keyframes.filter((key) => key !== point)
+      : upsertKey(layer.keyframes, defaultKeyframe(command.frame));
     return;
   }
   if (!point) throw new Error('Track keyframe no longer exists.');
@@ -462,6 +482,7 @@ export function applyCommand(document: ProjectDocument, command: EditCommand): P
     case 'layer-key-move':
     case 'layer-key-remove':
     case 'layer-key-easing':
+    case 'layer-key-default':
       editLayerKey(next, command);
       break;
     case 'layer-add':

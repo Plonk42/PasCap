@@ -74,6 +74,50 @@ async function openMemoryProject(
   return { memory, unexpected };
 }
 
+async function seek(page: Page, frame: number): Promise<void> {
+  await page.evaluate((position) => window.pascapLab!.engine.seek(position), frame);
+  await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(frame);
+}
+
+test('a default keyframe returns settings to their defaults from its frame, in one Undo step', async ({
+  page,
+  request,
+}) => {
+  const { unexpected } = await openMemoryProject(page, request, 'easing-default-keyframe', (document) => {
+    document.layers[0]!.colour.contrast = 1.4;
+    document.layers[0]!.keyframes = [sharedPoint(10, { exposure: 0.6 })];
+  });
+  await inspectorTab(page, 'Track');
+  const contrast = page.getByRole('spinbutton', { name: 'Contrast', exact: true });
+  await seek(page, 60);
+  const before = await current(page);
+  const add = page.getByRole('button', { name: 'Add default keyframe', exact: true });
+  await expect(add).toHaveAttribute('aria-pressed', 'false');
+  await add.click();
+  const remove = page.getByRole('button', { name: 'Remove default keyframe', exact: true });
+  await expect(remove).toHaveAttribute('aria-pressed', 'true');
+  const added = await current(page);
+  expect(added.layers[0]!.keyframes[1]).toMatchObject({ frame: 60, reset: true, values: { contrast: 1, opacity: 1 } });
+  expect(new Set(Object.values(added.layers[0]!.keyframes[1]!.easing))).toEqual(new Set(['hold']));
+  const marker = page.getByRole('button', { name: 'Track keyframe 60 on Track 1 (default)', exact: true });
+  await expect(marker).toHaveClass(/\breset\b/);
+  await expect(contrast).toHaveValue('1');
+  // Earlier frames keep the saved Contrast.
+  await seek(page, 30);
+  await expect(contrast).toHaveValue('1.4');
+  // Another keyframe at the playhead blocks a default keyframe there.
+  await seek(page, 10);
+  await expect(add).toHaveAttribute('aria-disabled', 'true');
+  await add.focus();
+  await add.press('Enter');
+  expect(await current(page)).toEqual(added);
+  const undo = page.getByRole('button', { name: 'Undo', exact: true });
+  await undo.click();
+  expect(await current(page)).toEqual(before);
+  await expect(undo).toBeDisabled();
+  expect(unexpected).toEqual([]);
+});
+
 test('per-setting Easing appears only on request or when settings differ, each change one Undo step', async ({
   page,
   request,

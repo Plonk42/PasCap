@@ -71,6 +71,10 @@ and technical paths stay unchanged; this glossary does not change schema 16.
   on source taps before the grade, with the clip detail filters.
 - **Transform** is clip-owned crop, Scale, Translate X/Y and Rotation; its single
   diamond captures the full eight-value source-frame pose, not an enabled track setting.
+- **Default keyframe**: a track keyframe that returns every Colour setting and Opacity to its
+  default from its frame, holding until each setting's next keyframe, without changing
+  earlier frames. Toggle **Add default keyframe** in the Colour keyframe line; filled amber
+  marker and **Default** badge with the diamond-and-return-arrow icon.
 - **Keyframe line**: the first row of an expanded Colour, Speed or Transform section: **N keyframes**, one
   **Previous/Next** pair over the same set and **Reset**. It is hidden while the section is collapsed.
   There is no Animate toggle or stored preference; capture diamonds and per-setting arrows are always visible

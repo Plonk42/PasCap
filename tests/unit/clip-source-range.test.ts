@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { applyCommand } from '../../src/shared/commands.js';
-import { EMPTY_KEY_VALUES, uniformKeyframe } from '../../src/shared/keyframes.js';
+import { EMPTY_KEY_VALUES, layerKeyframe, uniformKeyframe } from '../../src/shared/keyframes.js';
 import { createClip, createProject, projectSchema } from '../../src/shared/model.js';
 import { NEUTRAL_SPATIAL_POSE } from '../../src/shared/spatial.js';
 import { calculateLayout } from '../../src/shared/timeline.js';
@@ -233,8 +233,8 @@ describe('atomic clip source-range plans', () => {
     project.layers[0]!.colour.temperature = 0.25;
     project.layers[0]!.opacity = 0.7;
     project.layers[0]!.keyframes = [
-      uniformKeyframe(10, { ...EMPTY_KEY_VALUES, exposure: 0.5 }, 'smooth'),
-      uniformKeyframe(1_000, { ...EMPTY_KEY_VALUES, opacity: 0.4 }, 'linear'),
+      layerKeyframe(10, { ...EMPTY_KEY_VALUES, exposure: 0.5 }, 'smooth'),
+      layerKeyframe(1_000, { ...EMPTY_KEY_VALUES, opacity: 0.4 }, 'linear'),
     ];
     const before = structuredClone(project);
     const plan = planClipSourceRange(project, clip, 'in', 200, 600, 75);

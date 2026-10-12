@@ -10,6 +10,7 @@ import {
   keyframeNeighbors,
   type LayerKeyframe,
   type LayerKeyValues,
+  layerKeyframe,
   uniformKeyframe,
 } from '../../src/shared/keyframes.js';
 import {
@@ -35,7 +36,7 @@ import { Layers } from '../../src/web/Layers.js';
 import { SPATIAL_CONTROLS } from '../../src/web/spatial-editor.js';
 
 function point(frame: number, values: Partial<LayerKeyValues>): LayerKeyframe {
-  return uniformKeyframe(frame, { ...EMPTY_KEY_VALUES, ...values }, 'linear');
+  return layerKeyframe(frame, { ...EMPTY_KEY_VALUES, ...values }, 'linear');
 }
 
 const interleaved = [0, 100, 200].flatMap((start) =>

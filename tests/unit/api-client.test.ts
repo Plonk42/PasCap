@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import type { AudioAsset } from '../../src/shared/audio.js';
 import type { ExportPreflight } from '../../src/shared/export-space.js';
-import { EMPTY_KEY_VALUES, uniformKeyframe } from '../../src/shared/keyframes.js';
+import { EMPTY_KEY_VALUES, layerKeyframe, uniformKeyframe } from '../../src/shared/keyframes.js';
 import type { MediaJob } from '../../src/shared/media.js';
 import { createClip, createProject } from '../../src/shared/model.js';
 import { api, ApiError, request, type ServiceHealth } from '../../src/web/api.js';
@@ -380,7 +380,7 @@ describe('registered API methods', () => {
   });
 
   it('validates all eleven required nullable members in a shared row point, including zero participation', async () => {
-    const point = uniformKeyframe(100, { ...EMPTY_KEY_VALUES, exposure: 0, opacity: 0 }, 'linear' as const);
+    const point = layerKeyframe(100, { ...EMPTY_KEY_VALUES, exposure: 0, opacity: 0 }, 'linear');
     const document = { ...project, layers: [{ ...project.layers[0]!, keyframes: [point] }] };
     fetchMock.mockResolvedValueOnce(jsonResponse({ document }));
     expect(await api.load(project.id)).toEqual({ document });
@@ -404,7 +404,12 @@ describe('registered API methods', () => {
           ? layer
           : {
               ...layer,
-              keyframes: [uniformKeyframe(0, { ...EMPTY_KEY_VALUES, opacity: 0.5, [removed]: null }, 'linear')],
+              keyframes: [
+                {
+                  ...uniformKeyframe(0, { ...EMPTY_KEY_VALUES, opacity: 0.5, [removed]: null }, 'linear'),
+                  reset: false,
+                },
+              ],
             };
       const response = {
         document: {

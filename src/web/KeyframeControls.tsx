@@ -163,6 +163,15 @@ function KeyframePointRow({
         >
           {formatTimecode(point.frame)}
         </button>
+        {point.reset && (
+          <span
+            className="keyframe-row-default"
+            title="Default keyframe: its settings return to their defaults here and hold until their next keyframes; earlier frames keep their own values."
+          >
+            <Icon name="default-key" size={14} />
+            Default
+          </span>
+        )}
         {point.frame >= duration && (
           <span
             className="keyframe-row-skipped"
@@ -182,17 +191,20 @@ function KeyframePointRow({
           <Icon name="trash" size={14} />
         </button>
       </div>
-      <div
-        className="layer-keyframe-dependencies"
-        title="Moving this keyframe moves all these settings together; each keeps its own Easing."
-      >
-        <ParticipantChips
-          point={point}
-          layer={project.layers.find((layer) => layer.id === layerId)!}
-          frame={point.frame}
-          disabled={disabled}
-        />
-      </div>
+      {/* A complete default keyframe's badge already says every setting is enabled. */}
+      {!(point.reset && settings.length === KEYFRAME_SETTINGS.length) && (
+        <div
+          className="layer-keyframe-dependencies"
+          title="Moving this keyframe moves all these settings together; each keeps its own Easing."
+        >
+          <ParticipantChips
+            point={point}
+            layer={project.layers.find((layer) => layer.id === layerId)!}
+            frame={point.frame}
+            disabled={disabled}
+          />
+        </div>
+      )}
       <details className="layer-keyframe-point-details" open={open}>
         <summary aria-label={`Edit track keyframe ${point.frame}`}>Edit</summary>
         <div className="layer-keyframe-point-fields">
@@ -370,6 +382,10 @@ export function KeyframeControls({
             </span>
             <span>
               <span aria-hidden="true">◆</span>Keyframe at playhead · editable
+            </span>
+            <span>
+              <Icon name="default-key" size={14} />
+              Default keyframe · settings return to their defaults
             </span>
           </div>
           <p className="editor-help-tip">Tip: drag a timeline keyframe to move all its settings.</p>

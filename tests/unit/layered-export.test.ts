@@ -33,6 +33,7 @@ import {
   type Interpolation,
   type LayerKeyframe,
   type LayerKeyValues,
+  layerKeyframe,
   uniformKeyframe,
 } from '../../src/shared/keyframes.js';
 import { mediaAssetSchema, type MediaAsset } from '../../src/shared/media.js';
@@ -70,7 +71,7 @@ function document(): ProjectDocument {
   return projectSchema.parse(project);
 }
 function point(frame: number, values: Partial<LayerKeyValues>, interpolation: Interpolation = 'linear'): LayerKeyframe {
-  return uniformKeyframe(frame, { ...EMPTY_KEY_VALUES, ...values }, interpolation);
+  return layerKeyframe(frame, { ...EMPTY_KEY_VALUES, ...values }, interpolation);
 }
 function layer(id = 'video-2'): VideoLayer {
   return createLayer(id, id, false);

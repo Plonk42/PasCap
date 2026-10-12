@@ -9,14 +9,14 @@ import {
   type Interpolation,
   type LayerKeyframe,
   type LayerKeyValues,
-  uniformKeyframe,
+  layerKeyframe,
 } from '../../src/shared/keyframes.js';
 import { createClip, createLayer, createProject, projectSchema } from '../../src/shared/model.js';
 import { validateSourceRanges } from '../../src/shared/source-range.js';
 import { calculateLayout, sampleTimeline } from '../../src/shared/timeline.js';
 
 function point(frame: number, values: Partial<LayerKeyValues>, interpolation: Interpolation = 'linear'): LayerKeyframe {
-  return uniformKeyframe(frame, { ...EMPTY_KEY_VALUES, ...values }, interpolation);
+  return layerKeyframe(frame, { ...EMPTY_KEY_VALUES, ...values }, interpolation);
 }
 function layered() {
   let project = applyCommand(createProject('flight', 'Flight'), {

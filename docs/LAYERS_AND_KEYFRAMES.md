@@ -107,14 +107,15 @@ original-source keyframes. All shared track keyframes use absolute integer
 clip on that track, including clips from different recordings and both sources
 in that track's dissolve. They do not restart at a clip's IN, start or boundary.
 
-Schema 16 requires `layers[].keyframes` as ordered `{ frame, values, easing }`
+Schema 16 requires `layers[].keyframes` as ordered `{ frame, values, easing, reset }`
 keyframes, with **at most 256 keyframes per track**. Frames are unique, strictly ascending,
 non-negative and at most 2,147,483,647. Every keyframe's `values` object (`LayerKeyValues`)
 requires **all eleven nullable fields** below: a number enables that setting; `null` leaves it disabled.
 Its `easing` object has the same eleven fields: each enabled setting has its own Easing
 (`hold`, `linear`, `ease-in`, `ease-out` or `smooth`) and each disabled setting `null`. Omitted/unknown
 fields, a mismatched Easing, the former shared `interpolation` field and all-null keyframes are
-invalid, not repaired with defaults.
+invalid, not repaired with defaults. The required boolean `reset` marks a **default keyframe**
+(below); ordinary keyframes have `false`.
 
 | Channel                     | Value          | Value when this channel has no track keyframes            |
 | --------------------------- | -------------- | --------------------------------------------------------- |
@@ -190,7 +191,30 @@ compiled into its own `PlacedClip.retiming`, used by layout, preview and native
 export; see [SPEED_AND_AUDIO.md](SPEED_AND_AUDIO.md) for its source-frame curves and
 repeat/drop sampling without optical flow.
 
-## Editing keyframes
+### Default keyframes
+
+A **default keyframe** returns the track to its default appearance at one frame without
+working out which settings changed. It is a stored track keyframe with `reset: true`,
+created with all eleven settings enabled at their neutral creation values (Opacity 1,
+Temperature/Tint/Exposure/Brightness/Hue/Highlights/Shadows/HDR 0, Contrast/Saturation 1)
+and every Easing **Hold**. It evaluates like any keyframe with one difference: it never
+reaches back. Before a default keyframe that is a setting's first keyframe, that setting
+keeps its unkeyed value (track `opacity` or track `colour`) instead of holding the
+keyframe's value. A setting keyed earlier eases into the default with its own Easing at the
+previous keyframe, then holds the default until its next keyframe. Static HSL/curves,
+clip Transform, speed, Detail and music are unaffected.
+
+For example, with saved Contrast 1.4 (unanimated), Exposure keyed to 1 at frame 10 and a
+default keyframe at 50: Contrast is 1.4 before frame 50 and 1 from it; Exposure is 1 at
+frame 10, 0.5 at 30 with Linear Easing, and 0 from 50.
+
+**Track → Colour**'s keyframe line has a toggle **Add default keyframe** (pressed:
+**Remove default keyframe**) with its own amber icon, a diamond around a return arrow. It
+adds a default keyframe at the real playhead, or removes the one there, in one Undo step;
+it is unavailable where an ordinary keyframe already exists (never merged or overwritten).
+On the timeline a default keyframe's marker is filled amber with the same icon, and its list
+entry carries a **Default** badge. Its values, per-setting Easing, time and enabled
+settings stay editable like any keyframe's; it remains a default keyframe throughout.
 
 Control names follow the [editor control vocabulary](design/EDITOR_CONTROLS.md#vocabulary).
 

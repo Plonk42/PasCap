@@ -18,7 +18,7 @@ import {
   needsLayeredExport,
   planLayeredExport,
 } from '../../src/shared/export.js';
-import { EMPTY_KEY_VALUES, uniformKeyframe } from '../../src/shared/keyframes.js';
+import { EMPTY_KEY_VALUES, layerKeyframe, uniformKeyframe } from '../../src/shared/keyframes.js';
 import type { MediaAsset } from '../../src/shared/media.js';
 import { createClip, createLayer, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
 import {
@@ -650,8 +650,8 @@ describe.skipIf(!enabled)('spatial transforms · real native FFmpeg, disposable 
     upper.openingFade = 1;
     upper.closingFade = 1;
     upper.keyframes = [
-      uniformKeyframe(0, { ...EMPTY_KEY_VALUES, opacity: 0.35, temperature: -0.8, tint: 0.6 }, 'linear'),
-      uniformKeyframe(3, { ...EMPTY_KEY_VALUES, opacity: 0.75, temperature: 0.9, tint: -0.7 }, 'hold'),
+      layerKeyframe(0, { ...EMPTY_KEY_VALUES, opacity: 0.35, temperature: -0.8, tint: 0.6 }, 'linear'),
+      layerKeyframe(3, { ...EMPTY_KEY_VALUES, opacity: 0.75, temperature: 0.9, tint: -0.7 }, 'hold'),
     ];
     project.layers.push(upper);
     const base = createClip('base', assets[0]!.id, 0, 4);

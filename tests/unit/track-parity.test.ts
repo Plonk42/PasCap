@@ -9,7 +9,7 @@ import {
   planExport,
   planLayeredExport,
 } from '../../src/shared/export.js';
-import { EMPTY_KEY_VALUES, type LayerKeyframe, uniformKeyframe } from '../../src/shared/keyframes.js';
+import { EMPTY_KEY_VALUES, type LayerKeyframe, layerKeyframe } from '../../src/shared/keyframes.js';
 import {
   BASE_LAYER_ID,
   createClip,
@@ -30,7 +30,7 @@ const TRACK_IDS = ['ground', 'middle', 'sky'];
 const cases = TRACK_IDS.flatMap((layerId) => [false, true].map((ripple) => ({ layerId, ripple })));
 const cut = (leftId: string, rightId: string): Transition => ({ leftId, rightId, type: 'cut', duration: 0 });
 const point = (frame: number): LayerKeyframe =>
-  uniformKeyframe(frame, { ...EMPTY_KEY_VALUES, exposure: 0.123456789 }, 'hold');
+  layerKeyframe(frame, { ...EMPTY_KEY_VALUES, exposure: 0.123456789 }, 'hold');
 
 function fixture(selectedId = 'middle', ripple = false): ProjectDocument {
   const document = createProject('parity', 'Uniform tracks');

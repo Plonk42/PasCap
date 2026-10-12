@@ -9,7 +9,7 @@ import { restoreExports } from '../../src/server/export-archive.js';
 import { JobQueue } from '../../src/server/jobs.js';
 import { audioAssetSchema } from '../../src/shared/audio.js';
 import { planExportMusic } from '../../src/shared/export.js';
-import { EMPTY_KEY_VALUES, uniformKeyframe } from '../../src/shared/keyframes.js';
+import { EMPTY_KEY_VALUES, layerKeyframe, uniformKeyframe } from '../../src/shared/keyframes.js';
 import { createClip, createProject, type ProjectDocument } from '../../src/shared/model.js';
 import { NEUTRAL_SPATIAL_POSE } from '../../src/shared/spatial.js';
 import { calculateLayout } from '../../src/shared/timeline.js';
@@ -145,9 +145,7 @@ describe('durable export receipts', () => {
         uniformKeyframe(100, { ...NEUTRAL_SPATIAL_POSE, translateX: 0.5 }, 'hold'),
       ],
     };
-    snapshot.layers[0]!.keyframes = [
-      uniformKeyframe(5, { ...EMPTY_KEY_VALUES, opacity: 0.5, exposure: 0.7 }, 'smooth'),
-    ];
+    snapshot.layers[0]!.keyframes = [layerKeyframe(5, { ...EMPTY_KEY_VALUES, opacity: 0.5, exposure: 0.7 }, 'smooth')];
     snapshot.music = Array.from({ length: 8 }, (_, index) => ({
       id: `music-${index}`,
       mediaId: index % 2 ? 'one-source' : 'other-source',

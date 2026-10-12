@@ -454,6 +454,11 @@ shared keyframes are allowed per video track.
 - Each enabled setting has its own Easing at a keyframe, and every channel interpolates to its **own next
   keyframe with that setting enabled**, skipping unrelated settings; its endpoints hold outside
   that interval. A single keyframe therefore overrides that channel across the track.
+- To return the track to its default look at a frame, press **Add default keyframe** (the amber
+  diamond with a return arrow) in Colour's keyframe line. Every Colour setting and Opacity
+  returns to its default there and holds until its next keyframe; earlier frames keep their
+  values. Change its Easing to blend out of it instead of holding, or press the button again
+  at that frame to remove it. Its timeline marker is filled amber.
 - The per-channel native **Previous/Next** arrows beside main diamonds and on enabled setting chips in stored Keyframes rows visit only that
   channel's strictly earlier/later keyframes where it is nonnull, including zero-valued
   ones. They are disabled without a neighbour/project or during a document draft.

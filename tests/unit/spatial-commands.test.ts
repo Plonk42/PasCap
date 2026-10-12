@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { clipSpeedPreset } from '../../src/shared/clip-speed.js';
 import { applyCommand, EditHistory, type EditCommand } from '../../src/shared/commands.js';
 import { needsLayeredExport, planExport, planLayeredExport } from '../../src/shared/export.js';
-import { EMPTY_KEY_VALUES, uniformKeyframe } from '../../src/shared/keyframes.js';
+import { EMPTY_KEY_VALUES, layerKeyframe, uniformKeyframe } from '../../src/shared/keyframes.js';
 import { createClip, createLayer, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
 import { trimOnTimeline, validateSourceRanges } from '../../src/shared/source-range.js';
 import {
@@ -28,9 +28,7 @@ function fixture(): ProjectDocument {
   const document = createProject('spatial-commands', 'Spatial commands');
   document.layers[0]!.ripple = false;
   document.layers[0]!.opacity = 0.75;
-  document.layers[0]!.keyframes = [
-    uniformKeyframe(10, { ...EMPTY_KEY_VALUES, exposure: 0.25, opacity: 0.5 }, 'linear'),
-  ];
+  document.layers[0]!.keyframes = [layerKeyframe(10, { ...EMPTY_KEY_VALUES, exposure: 0.25, opacity: 0.5 }, 'linear')];
   document.layers.push(createLayer('other', 'Other', false));
   document.clips = [{ ...createClip('clip', 'original', 20, 80), start: 10, spatial: settings() }];
   document.clips[0]!.speed = {

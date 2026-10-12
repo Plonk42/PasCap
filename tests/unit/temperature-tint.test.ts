@@ -35,7 +35,9 @@ describe('normalized linear Temperature and Tint', () => {
       expect(colourSchema.safeParse(incomplete).success).toBe(false);
       const values: Partial<typeof EMPTY_KEY_VALUES> = { ...EMPTY_KEY_VALUES, exposure: 0 };
       delete values[channel];
-      expect(layerKeyframeSchema.safeParse(uniformKeyframe(0, values, 'linear')).success).toBe(false);
+      expect(layerKeyframeSchema.safeParse({ ...uniformKeyframe(0, values, 'linear'), reset: false }).success).toBe(
+        false,
+      );
       for (const value of [-1.000001, 1.000001, NaN, Infinity, -Infinity, null, undefined])
         expect(colourSchema.safeParse({ ...settings, [channel]: value }).success).toBe(false);
       for (const value of [-1, 0, 0.123456789, 1])

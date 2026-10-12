@@ -4,7 +4,7 @@ import {
   type Interpolation,
   type LayerKeyframe,
   type LayerKeyValues,
-  uniformKeyframe,
+  layerKeyframe,
 } from '../../src/shared/keyframes.js';
 import type { MediaJob } from '../../src/shared/media.js';
 import { createClip, createLayer, createProject, type ProjectDocument } from '../../src/shared/model.js';
@@ -14,7 +14,7 @@ import { activityResultSummary, activitySummary, isActiveJob, orderActivityJobs 
 import { filterProjects } from '../../src/web/Projects.js';
 
 function point(frame: number, values: Partial<LayerKeyValues>, interpolation: Interpolation = 'linear'): LayerKeyframe {
-  return uniformKeyframe(frame, { ...EMPTY_KEY_VALUES, ...values }, interpolation);
+  return layerKeyframe(frame, { ...EMPTY_KEY_VALUES, ...values }, interpolation);
 }
 function job(id: string, overrides: Partial<MediaJob> = {}): MediaJob {
   return {

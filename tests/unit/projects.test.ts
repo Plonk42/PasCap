@@ -17,6 +17,7 @@ import {
   type Interpolation,
   type LayerKeyframe,
   type LayerKeyValues,
+  layerKeyframe,
   uniformKeyframe,
 } from '../../src/shared/keyframes.js';
 import { mediaAssetSchema, type MediaJob } from '../../src/shared/media.js';
@@ -39,7 +40,7 @@ const services: Awaited<ReturnType<typeof createApp>>[] = [];
 const queues: JobQueue[] = [];
 const headers = { host: '127.0.0.1:4318', 'x-pascap-client': 'preview-lab' };
 function point(frame: number, values: Partial<LayerKeyValues>, interpolation: Interpolation = 'linear'): LayerKeyframe {
-  return uniformKeyframe(frame, { ...EMPTY_KEY_VALUES, ...values }, interpolation);
+  return layerKeyframe(frame, { ...EMPTY_KEY_VALUES, ...values }, interpolation);
 }
 async function temp(): Promise<string> {
   const directory = await mkdtemp(path.join(os.tmpdir(), 'pascap-projects-'));

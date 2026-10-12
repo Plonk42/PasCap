@@ -4,7 +4,8 @@ Current strict schema **16** requires nine graded scalar bases in each video tra
 including Temperature/Tint (−1…1, neutral 0), plus `hdr` (0–1, neutral 0; a
 detail-stage look applied before grading, see [detail filters](design/DETAIL_FILTERS.md#hdr-look)),
 all eight HSL bands and all four
-colour curves. Shared keyframes require eleven nullable fields, each enabled one with its own Easing, in control order:
+colour curves. Shared keyframes require eleven nullable fields, each enabled one with its own Easing, and a
+boolean `reset` (default keyframe), in control order:
 `opacity`, `temperature`, `tint`, `exposure`, `brightness`, `contrast`,
 `hue`, `saturation`, `highlights`, `shadows`, `hdr`. HSL/curves remain static; speed is
 clip-only (constant or 1–256 source-frame keyframes).
