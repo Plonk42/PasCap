@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { interpolationSchema, keyInterval, orderedKeys } from './keyframes.js';
 
 // Zod numbers already reject NaN and infinities; no coercion or persisted defaults.
-const cropFraction = z.number().min(0).lt(1);
+const cropFraction = z.number().min(0).max(1);
 
 /**
  * Crop removes source coverage; it never refits or moves the original-centre pivot.

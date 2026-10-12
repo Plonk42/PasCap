@@ -349,7 +349,7 @@ Translate Y / Rotation °**, each with a native slider and exact number field.
 Scale preserves aspect and accepts **0.1–8**. Translation accepts **−2–2** as
 fractions of the whole output width/height, not source pixels. Rotation is
 clockwise, **−180°–180°**, around the original image centre. Crop fractions each
-stay below 1; opposite crops that meet or cross simply display nothing. Cropping never refits or
+stay within 0–1; a crop of 1, or opposite crops that meet or cross, display nothing. Cropping never refits or
 recentres the retained image. Uncovered pixels from nonneutral transforms reveal
 lower tracks; exact neutral poses retain the old opaque black letterbox.
 

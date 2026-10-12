@@ -105,7 +105,8 @@ describe('strict spatial settings', () => {
         }
       }
     }
-    expect(spatialPoseSchema.safeParse(pose({ cropLeft: 1 - Number.EPSILON })).success).toBe(true);
+    expect(spatialPoseSchema.safeParse(pose({ cropLeft: 1 })).success).toBe(true);
+    expect(spatialPoseSchema.safeParse(pose({ cropBottom: 1 })).success).toBe(true);
     expect(spatialPoseSchema.safeParse(pose({ cropTop: 0.4, cropBottom: 0.599 })).success).toBe(true);
     // Opposite edges meeting or crossing are valid: nothing is covered, with no repair.
     expect(spatialPoseSchema.safeParse(pose({ cropLeft: 0.4, cropRight: 0.6 })).success).toBe(true);
@@ -115,8 +116,8 @@ describe('strict spatial settings', () => {
   it('rejects individual bounds without clamping', () => {
     const invalid: Partial<SpatialPose>[] = [
       { cropLeft: -0.001 },
-      { cropRight: 1 },
-      { cropTop: 1 },
+      { cropRight: 1.001 },
+      { cropTop: 1.001 },
       { cropBottom: -0.001 },
       { scale: 0.099 },
       { scale: 8.001 },
@@ -303,6 +304,10 @@ describe('independent per-setting spatial keyframes', () => {
     for (const crops of [
       { cropLeft: 0.5, cropRight: 0.5 },
       { cropTop: 0.7, cropBottom: 0.6 },
+      { cropLeft: 1 },
+      { cropRight: 1 },
+      { cropTop: 1 },
+      { cropBottom: 1 },
     ]) {
       const mapping = compileSpatialMapping(pose(crops), 1920, 1080, 1280, 720);
       for (const [u, v] of [

@@ -137,8 +137,8 @@ describe('per-setting clip Transform editor', () => {
   });
 
   it.each([
-    ['cropLeft', 1],
-    ['cropRight', 1],
+    ['cropLeft', 1.01],
+    ['cropRight', 1.01],
     ['cropBottom', -0.1],
     ['scale', 0.09],
     ['translateX', -2.01],
