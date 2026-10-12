@@ -84,6 +84,8 @@ const SourceReview = lazy(() => import('./SourceReview.js').then((module) => ({ 
 const loadInspector = () => import('./Inspector.js').then((module) => ({ default: module.Inspector }));
 const loadDiagnostics = () => import('./Diagnostics.js').then((module) => ({ default: module.Diagnostics }));
 const EMPTY_PROJECT = createProject('preview-lab', 'Untitled');
+/** A seek still undecoded after this long is superseded, so a stuck decode cannot freeze scrubbing. */
+const SEEK_SUPERSEDE_MS = 500;
 const SAVE_LABEL: Record<SaveState['state'], string> = {
   saved: 'Saved locally',
   saving: 'Saving…',
@@ -250,6 +252,7 @@ export function App() {
   const [historyState, setHistoryState] = useState({ canUndo: false, canRedo: false });
   const canvas = useRef<HTMLCanvasElement>(null);
   const engine = useRef<PreviewEngine | null>(null);
+  const seeking = useRef<{ since: number | null; pending: number | null }>({ since: null, pending: null });
   const autosave = useRef<Autosave | null>(null);
   const history = useRef<EditHistory | null>(null);
   const current = useRef<ProjectDocument | null>(null);
@@ -498,6 +501,28 @@ export function App() {
     },
     [commit, select, validate],
   );
+  /** Latest-wins: a newer seek would abort an undecoded one, so fast scrubbing showed nothing. */
+  const seekEngine = useCallback((frame: number): void => {
+    const state = seeking.current;
+    if (state.since !== null && performance.now() - state.since < SEEK_SUPERSEDE_MS) {
+      state.pending = frame;
+      return;
+    }
+    const preview = engine.current;
+    state.pending = null;
+    if (!preview) return;
+    const since = performance.now();
+    state.since = since;
+    void preview.seek(frame).finally(() => {
+      if (state.since !== since) return;
+      state.since = null;
+      const next = state.pending;
+      state.pending = null;
+      // Another operation (play, load, draft preview) took over: its frame wins.
+      const { playing, requestedFrame } = preview.diagnostics();
+      if (next !== null && engine.current === preview && !playing && requestedFrame === frame) seekEngine(next);
+    });
+  }, []);
   const seek = useCallback((frame: number, preserveSourceInspection = false): void => {
     const document = current.current;
     if (!document || drafting.current) return;
@@ -506,11 +531,12 @@ export function App() {
     const duration = calculateLayout(document).duration;
     if (duration) {
       setViewerMode('timeline');
-      void engine.current?.seek(Math.max(0, Math.min(duration - 1, frame)));
+      seekEngine(Math.max(0, Math.min(duration - 1, frame)));
     }
   }, []);
   const togglePlayback = useCallback(() => {
     if (drafting.current) return;
+    seeking.current.pending = null;
     setKeyframeInspection(null);
     setSourceInspectionEpoch((epoch) => epoch + 1);
     setViewerMode('timeline');
