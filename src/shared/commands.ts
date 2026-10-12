@@ -2,10 +2,12 @@ import type { ColourSettings } from './colour.js';
 import {
   EMPTY_KEY_VALUES,
   KEYFRAME_SETTINGS,
-  interpolationSchema,
+  joiningEasing,
   keySettings,
   layerKeyframeSchema,
+  uniformKeyframe,
   upsertKey,
+  withEasing,
   type Interpolation,
   type KeyframeSetting,
   type LayerKeyframe,
@@ -47,7 +49,14 @@ export type EditCommand =
   | { type: 'layer-key-value'; layerId: string; frame: number; setting: KeyframeSetting; value: number }
   | { type: 'layer-key-move'; layerId: string; frame: number; nextFrame: number }
   | { type: 'layer-key-remove'; layerId: string; frame: number }
-  | { type: 'layer-key-easing'; layerId: string; frame: number; interpolation: Interpolation }
+  | {
+      type: 'layer-key-easing';
+      layerId: string;
+      frame: number;
+      /** Null sets every enabled setting of the keyframe. */
+      setting: KeyframeSetting | null;
+      interpolation: Interpolation;
+    }
   | { type: 'layer-add'; layer: VideoLayer }
   | { type: 'layer-update'; layer: VideoLayer }
   | { type: 'layer-remove'; layerId: string }
@@ -220,11 +229,19 @@ function editLayerValue(layer: VideoLayer, point: LayerKeyframe | undefined, com
     return;
   }
   const participating = current !== undefined && current !== null;
-  const values = {
-    ...(point ? point.values : EMPTY_KEY_VALUES),
-    [command.setting]: participating ? null : command.value,
+  const base = point ?? uniformKeyframe(command.frame, EMPTY_KEY_VALUES, 'linear');
+  const curve = point
+    ? joiningEasing(
+        layer.keyframes,
+        point,
+        KEYFRAME_SETTINGS.map((setting) => setting.key),
+      )
+    : 'linear';
+  const changed = {
+    frame: command.frame,
+    values: { ...base.values, [command.setting]: participating ? null : command.value },
+    easing: { ...base.easing, [command.setting]: participating ? null : curve },
   };
-  const changed = { frame: command.frame, interpolation: point ? point.interpolation : ('linear' as const), values };
   layer.keyframes = keySettings(changed).length
     ? upsertKey(layer.keyframes, changed)
     : layer.keyframes.filter((key) => key.frame !== command.frame);
@@ -254,7 +271,9 @@ function editLayerKey(next: ProjectDocument, command: LayerKeyCommand): void {
       layer.keyframes = layer.keyframes.filter((key) => key !== point);
       break;
     case 'layer-key-easing':
-      point.interpolation = interpolationSchema.parse(command.interpolation);
+      if (command.setting !== null && !KEYFRAME_SETTINGS.some((setting) => setting.key === command.setting))
+        throw new Error('Unknown keyframe setting.');
+      point.easing = withEasing(point, command.setting, command.interpolation);
       break;
   }
 }

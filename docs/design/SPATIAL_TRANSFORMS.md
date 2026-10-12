@@ -1,4 +1,4 @@
-# Clip spatial transforms · strict project schema 15
+# Clip spatial transforms · strict project schema 16
 
 Current contract for [#20](https://github.com/Plonk42/PasCap/issues/20) and
 [#90](https://github.com/Plonk42/PasCap/issues/90): static and keyframed crop, uniform
@@ -18,12 +18,13 @@ Implementation authorities: [pose/schema/mapping](../../src/shared/spatial.ts),
 
 ## Required data and ownership
 
-Every schema-15 clip requires `spatial: { base, keyframes }`. Both objects and all
+Every schema-16 clip requires `spatial: { base, keyframes }`. Both objects and all
 keyframes are strict: no unknown fields, optional legacy values, coercion, persisted
 defaults or load-time repair. `base` is one complete eight-value pose;
 `keyframes` is a required array of **0–256** keys. Each key requires
-`{ frame, interpolation, values }`: all eight fields are required in `values`, each a
+`{ frame, values, easing }`: all eight fields are required in `values`, each a
 number (the setting is keyed here) or `null` (it is not), with at least one number.
+`easing` has the same eight fields: an Easing for each keyed setting, `null` for the others.
 Frames are unique ascending integers in **0–2,147,483,647**, measured from the
 original recording's frame zero, never the clip IN or its project start.
 Registered-source validation additionally requires every keyframe to be at or before
@@ -52,9 +53,9 @@ With no keys for a setting, its `base` value holds for the whole clip. Once any 
 enables a setting, that setting's curve overrides its base everywhere, including
 endpoint holds before its first and after its last key; a single key holds its value
 throughout. Each setting interpolates between its own enabled keys, skipping keys that
-leave it `null`, so a key for Scale never interrupts Rotation. The left key's required
-`interpolation` (`hold`, `linear`, `ease-in`, `ease-out` or `smooth`) applies to each
-of its enabled settings toward that setting's next key. Interpolation is numeric
+leave it `null`, so a key for Scale never interrupts Rotation. Each setting's own Easing
+at its left key (`hold`, `linear`, `ease-in`, `ease-out` or `smooth`) applies toward that
+setting's next key, so Scale and Rotation of one key may ease differently. Interpolation is numeric
 setting-by-setting, not an affine-matrix or image
 crossfade. Rotation does **not** take a shortest arc: +170° to −170° travels
 through 0°. Removing a setting's last key reveals its unchanged saved base. **Reset
@@ -197,7 +198,11 @@ main fields and capture never use the stored selection as a fake playhead.
 
 The stored section edits only the selected key: **Source frame**, **Easing** and the
 fields of its enabled settings. Contextual accessible easing names remain unchanged.
-Easing is disabled when none of its enabled settings continues to a later key.
+Easing is disabled when none of its enabled settings continues to a later key. It sets every
+enabled setting's Easing and reads **Mixed** when they differ; **Per setting** reveals one
+select per continuing setting (**Transform keyframe Scale easing**, etc.), each change one Undo
+step. A newly captured key starts Linear; a setting joining a key takes the Easing its
+settings agree on, else Linear. Removing a setting removes its Easing.
 The trash action **Delete selected Transform keyframe** removes the whole key; deleting
 a setting's last key restores its saved base. **Reset transform** clears the whole spatial
 animation and restores the neutral base in one Undo step.
@@ -229,10 +234,10 @@ main capture never substitutes that stored time for the real displayed source fr
 
 ## Preservation
 
-Projects and version-1 export receipt snapshots must satisfy strict **schema 15**,
+Projects and version-1 export receipt snapshots must satisfy strict **schema 16**,
 including required clip spatial data and the unchanged identified music arrays.
 Required video track Colour includes Temperature/Tint/HDR and static HSL/curves, with eleven
-required nullable track keyframe fields. Incompatible v1–v14 projects/receipt snapshots
+required nullable track keyframe fields. Incompatible v1–v15 projects/receipt snapshots
 and completed videos remain untouched.
 Recreate projects deliberately; do not migrate, default-fill, rewrite or delete old
 data automatically. Registry/proxy/PCM and receipt/report format versions do not

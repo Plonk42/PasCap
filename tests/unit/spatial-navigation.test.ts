@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { EditHistory } from '../../src/shared/commands.js';
-import { EMPTY_KEY_VALUES } from '../../src/shared/keyframes.js';
+import { EMPTY_KEY_VALUES, uniformKeyframe } from '../../src/shared/keyframes.js';
 import { createClip, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
 import { NEUTRAL_SPATIAL_POSE } from '../../src/shared/spatial.js';
 import { calculateLayout } from '../../src/shared/timeline.js';
@@ -20,11 +20,9 @@ function fixture(frames: readonly number[] = [0, 2, 20, 30, 60, 90, 91, 120]): P
   const clip = createClip('clip', 'synthetic', 30, 90);
   clip.start = 17;
   clip.spatial.base.scale = 1.5;
-  clip.spatial.keyframes = frames.map((frame) => ({
-    frame,
-    interpolation: 'linear',
-    values: { ...NEUTRAL_SPATIAL_POSE, scale: 2 },
-  }));
+  clip.spatial.keyframes = frames.map((frame) =>
+    uniformKeyframe(frame, { ...NEUTRAL_SPATIAL_POSE, scale: 2 }, 'linear'),
+  );
   project.clips = [clip];
   return project;
 }
@@ -128,9 +126,7 @@ describe('clip-local Transform stored-source cursor', () => {
 
   it('clears while a central track inspection interrupts it, without substituting its stored time', () => {
     const project = fixture();
-    project.layers[0]!.keyframes = [
-      { frame: 100, interpolation: 'linear', values: { ...EMPTY_KEY_VALUES, opacity: 0 } },
-    ];
+    project.layers[0]!.keyframes = [uniformKeyframe(100, { ...EMPTY_KEY_VALUES, opacity: 0 }, 'linear')];
     const central = inspectKeyframe(project.id, project.layers[0]!, 100, 17, 77)!;
     const cursor = inspect(project, 2);
     expect(

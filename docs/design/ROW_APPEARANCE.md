@@ -1,4 +1,4 @@
-# Owner-approved video track-only Colour and Opacity · schema 15
+# Owner-approved video track-only Colour and Opacity · schema 16
 
 Required Colour includes nine graded scalar settings, including Temperature and Tint,
 the HDR look (applied before grading with the clip detail filters; see
@@ -24,13 +24,13 @@ intentionally colour greys; normalized linear gains precede Exposure, preserving
 neutral-white linear luminance before clipping only, not arbitrary/final images.
 Other scalar bounds and neutral values retain the existing SDR contract.
 No optional legacy field, additive parameter merge, migration or default-on-load exists.
-Schema 15 rejects versions 1–14 without rewriting or deleting their documents.
-Receipt format remains 1 with strict schema-15 snapshots; registry, proxies and
+Schema 16 rejects versions 1–15 without rewriting or deleting their documents.
+Receipt format remains 1 with strict schema-16 snapshots; registry, proxies and
 PCM formats are unchanged. Recreate incompatible projects deliberately.
 
 The nine shared scalar colour channels and HDR override **video track colour**, independently, in
 absolute project time. Skip keyframes without the relevant enabled setting, interpolate parameter values
-using the left keyframe's easing for that setting, and hold endpoints. Removing the last keyframe for a setting
+using that setting's own Easing at the left keyframe, and hold endpoints. Removing the last keyframe for a setting
 reveals the unchanged track base. HSL and curves remain static.
 Speed is clip-only and never a track channel. Opacity ownership,
 source-over composition, spatial coverage and black-fade coverage are unchanged.
@@ -97,7 +97,7 @@ There is no Animate toggle or stored preference.
 An animated channel without an enabled setting at the real playhead remains
 read-only until explicitly captured. Capture never uses
 an inspected stored time. Sliders never create keyframes. Track-keyframe selectors
-visibly read **Easing**, retaining contextual accessible names and shared interpolation.
+visibly read **Easing**, retaining contextual accessible names; each enabled setting has its own Easing.
 The static **HSL ranges** and **Colour curves** Track sections share video track ownership, with no new diamonds.
 Individual scalar resets target only the track base or current existing keyed setting;
 Colour Reset on an animated track targets only existing keyed colour/Opacity settings, preserving HSL/curves.

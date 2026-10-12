@@ -12,6 +12,21 @@
   min-width: 0;
 }
 
+.easing-choice.compact {
+  flex-direction: row;
+  align-items: center;
+}
+
+.easing-choice.compact > select {
+  flex: 1 1 auto;
+}
+
+.easing-choice.compact > .easing-graph {
+  flex: 0 0 32px;
+  width: 32px;
+  height: 20px;
+}
+
 .easing-graph {
   flex: 0 0 72px;
   width: 72px;

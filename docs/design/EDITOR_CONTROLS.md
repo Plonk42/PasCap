@@ -3,7 +3,7 @@
 ## Scope and decisions
 
 Controls use native elements, the existing editor layout and strict project
-schema 15, including complete track Colour, clip-only speed, clip spatial settings and 0–8 independent music tracks. No UI framework or icon dependency is introduced. Exact
+schema 16, including complete track Colour, clip-only speed, clip spatial settings and 0–8 independent music tracks. No UI framework or icon dependency is introduced. Exact
 timing entry is retained: Clip Range uses timecode text fields and a
 full-original range bar; other frame/duration/fade fields retain numeric steppers.
 
@@ -35,7 +35,7 @@ neither needs replacing merely to make their implementation identical.
 
 This is the source of terminology for visible UI text, help, accessible names,
 test selectors and current-behaviour guides. Internal identifiers, persisted fields
-and technical paths stay unchanged; this glossary does not change schema 15.
+and technical paths stay unchanged; this glossary does not change schema 16.
 
 - **Recording**: the complete original file, video or music. Use **video recording**
   or **music recording** when the distinction matters; never bare “video” for a file.
@@ -77,7 +77,10 @@ and technical paths stay unchanged; this glossary does not change schema 15.
   (Speed, a single setting, relies on its keyframe-line pair).
 - **Easing**: the visible label for track-keyframe, Transform and custom clip-speed
   selectors. Contextual accessible names remain, including
-  **Track keyframe easing N**; interpolation is unchanged.
+  **Track keyframe easing N**. Each enabled setting of a track or Transform keyframe has its
+  own Easing: the keyframe's select sets them all and reads **Mixed** when they differ;
+  **Per setting** reveals one compact select per setting (**<Setting> easing at track keyframe N**,
+  **Transform keyframe <Setting> easing**), shown automatically while they differ.
 
 ## Control patterns
 

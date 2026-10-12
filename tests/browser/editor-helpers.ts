@@ -4,6 +4,7 @@ import {
   type Interpolation,
   type LayerKeyframe,
   type LayerKeyValues,
+  uniformKeyframe,
 } from '../../src/shared/keyframes.js';
 import { jobSchema, type MediaJob } from '../../src/shared/media.js';
 import { forEachSerial } from '../../src/shared/serial.js';
@@ -98,7 +99,7 @@ export function sharedPoint(
   values: Partial<LayerKeyValues>,
   interpolation: Interpolation = 'linear',
 ): LayerKeyframe {
-  return { frame, interpolation, values: { ...EMPTY_KEY_VALUES, ...values } };
+  return uniformKeyframe(frame, { ...EMPTY_KEY_VALUES, ...values }, interpolation);
 }
 
 export function layerKeyframes(page: Page, name: string): Locator {

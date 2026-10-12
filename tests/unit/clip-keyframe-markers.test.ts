@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { EMPTY_KEY_VALUES } from '../../src/shared/keyframes.js';
+import { EMPTY_KEY_VALUES, uniformKeyframe } from '../../src/shared/keyframes.js';
 import { createClip, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
 import { NEUTRAL_SPATIAL_POSE } from '../../src/shared/spatial.js';
 import type { SpeedSettings } from '../../src/shared/speed.js';
@@ -16,11 +16,9 @@ function fixture(sourceIn = 10, sourceOut = 130, start = 17): ProjectDocument {
 }
 
 function transformKeys(project: ProjectDocument, frames: readonly number[]): void {
-  project.clips[0]!.spatial.keyframes = frames.map((frame) => ({
-    frame,
-    interpolation: 'linear',
-    values: { ...NEUTRAL_SPATIAL_POSE },
-  }));
+  project.clips[0]!.spatial.keyframes = frames.map((frame) =>
+    uniformKeyframe(frame, { ...NEUTRAL_SPATIAL_POSE }, 'linear'),
+  );
 }
 
 function markersFor(project: ProjectDocument) {
@@ -33,9 +31,7 @@ describe('clip-owned timeline keyframe markers', () => {
     const project = fixture();
     expect(markersFor(project).markers).toEqual([]);
     project.clips[0]!.spatial.base.scale = 2;
-    project.layers[0]!.keyframes = [
-      { frame: 30, interpolation: 'linear', values: { ...EMPTY_KEY_VALUES, exposure: 1 } },
-    ];
+    project.layers[0]!.keyframes = [uniformKeyframe(30, { ...EMPTY_KEY_VALUES, exposure: 1 }, 'linear')];
     expect(markersFor(project).markers).toEqual([]);
   });
 
@@ -128,9 +124,7 @@ describe('clip-owned timeline keyframe markers', () => {
         { frame: 120, rate: 1, interpolation: 'hold' },
       ],
     };
-    project.layers[0]!.keyframes = [
-      { frame: 30, interpolation: 'linear', values: { ...EMPTY_KEY_VALUES, opacity: 0.5 } },
-    ];
+    project.layers[0]!.keyframes = [uniformKeyframe(30, { ...EMPTY_KEY_VALUES, opacity: 0.5 }, 'linear')];
     const { markers } = markersFor(project);
     expect(markers).toHaveLength(4);
     for (const source of [30, 120]) {

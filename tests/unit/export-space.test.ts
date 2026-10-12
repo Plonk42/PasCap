@@ -18,7 +18,7 @@ import {
   formatStorageBytes,
   MIN_EXPORT_FREE_BYTES,
 } from '../../src/shared/export-space.js';
-import { EMPTY_KEY_VALUES } from '../../src/shared/keyframes.js';
+import { EMPTY_KEY_VALUES, uniformKeyframe } from '../../src/shared/keyframes.js';
 import type { MediaAsset } from '../../src/shared/media.js';
 import { createClip, createLayer, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
 import { framesToSeconds, PROJECT_FPS } from '../../src/shared/timing.js';
@@ -124,9 +124,7 @@ describe('duration-dependent planning allowance, not a codec guarantee', () => {
   });
   it('budgets three RGBA16 timeline representations for row animation, even a neutral key', () => {
     const document = documentWithClips();
-    document.layers[0]!.keyframes = [
-      { frame: 0, interpolation: 'linear', values: { ...EMPTY_KEY_VALUES, exposure: 0 } },
-    ];
+    document.layers[0]!.keyframes = [uniformKeyframe(0, { ...EMPTY_KEY_VALUES, exposure: 0 }, 'linear')];
     expect(estimateExportSpace(document, 'draft720').losslessBytes).toBe(1280 * 720 * (30 * 4 + 3 * 30 * 8));
   });
   it('keeps disabled tails in full timeline allowance but excludes their unrendered clip files', () => {

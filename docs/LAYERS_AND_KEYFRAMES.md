@@ -1,4 +1,4 @@
-# Video tracks, shared keyframes and source review · project v15
+# Video tracks, shared keyframes and source review · project v16
 
 Required video track Colour includes nine graded scalar fields, including **Temperature** and
 **Tint**, the **HDR** look (0–1, applied before grading with the clip
@@ -107,11 +107,14 @@ original-source keyframes. All shared track keyframes use absolute integer
 clip on that track, including clips from different recordings and both sources
 in that track's dissolve. They do not restart at a clip's IN, start or boundary.
 
-Schema 15 requires `layers[].keyframes` as ordered `{ frame, interpolation, values }`
+Schema 16 requires `layers[].keyframes` as ordered `{ frame, values, easing }`
 keyframes, with **at most 256 keyframes per track**. Frames are unique, strictly ascending,
 non-negative and at most 2,147,483,647. Every keyframe's `values` object (`LayerKeyValues`)
-requires **all eleven nullable fields** below: a number enables that setting; `null` leaves it disabled. Omitted/unknown
-fields and all-null keyframes are invalid, not repaired with defaults.
+requires **all eleven nullable fields** below: a number enables that setting; `null` leaves it disabled.
+Its `easing` object has the same eleven fields: each enabled setting has its own Easing
+(`hold`, `linear`, `ease-in`, `ease-out` or `smooth`) and each disabled setting `null`. Omitted/unknown
+fields, a mismatched Easing, the former shared `interpolation` field and all-null keyframes are
+invalid, not repaired with defaults.
 
 | Channel                     | Value          | Value when this channel has no track keyframes            |
 | --------------------------- | -------------- | --------------------------------------------------------- |
@@ -156,8 +159,9 @@ it; track keyframes never change clip durations.
 ## Independent channel interpolation
 
 Enabled settings are independent, including between the nine scalar colour parameters and HDR.
-Each keyframe's easing is shared by its enabled settings, but **each channel interpolates
+Each enabled setting has its own Easing at a keyframe, and **each channel interpolates
 to its own next keyframe with that setting enabled**, skipping keyframes where that channel is null.
+So Exposure can hold while Contrast eases in from the same keyframe.
 For example, Exposure at frames 10 and 30 interpolates across a Contrast-only keyframe
 at frame 20; that middle keyframe does not interrupt Exposure's interval.
 
@@ -166,7 +170,7 @@ value across the entire video track. A single keyed setting therefore overrides 
 channel everywhere. A channel with no keyed settings uses the values above,
 even if other channels on the track are animated.
 
-For normalized interval progress $u$, the **left keyframe with that setting enabled** supplies:
+For normalized interval progress $u$, that setting's Easing at the **left keyframe with that setting enabled** supplies:
 
 | Easing   | Progress                                            |
 | -------- | --------------------------------------------------- |
@@ -205,9 +209,11 @@ Colour, Speed and Transform always show their capture diamonds while the section
 - **◇ Hollow**, `aria-pressed=false`: setting not enabled at this project frame.
   It is still clickable, **not HTML-disabled merely because it is inactive**.
 - **◆ Filled**, `aria-pressed=true`: setting enabled at this frame. Clicking removes
-  only that setting; other enabled settings and the keyframe's easing remain unchanged.
-- The first enabled setting creates the track keyframe, capturing its displayed value.
-  Enabling another setting at that frame joins the same keyframe. Removing the last
+  only that setting and its Easing; other enabled settings and their Easing remain unchanged.
+- The first enabled setting creates the track keyframe, capturing its displayed value,
+  with Linear Easing. Enabling another setting at that frame joins the same keyframe and
+  takes the Easing its settings agree on (only those continuing to a later keyframe, else all),
+  or Linear when they differ. Removing the last
   enabled setting deletes the keyframe. Genuine invalid/draft interaction states can
   disable actions; hollow status itself cannot.
 
@@ -268,10 +274,16 @@ keyframe entry lists its enabled settings and has an inner **Edit**
 disclosure, open initially when the list has three or fewer keyframes. Its trash
 deletes that keyframe; the toolbar has no second delete action.
 Its Timeline frame field moves
-**every enabled setting and the keyframe's existing easing together in one Undo step**;
-the visibly labelled **Easing** affects all of them, each toward its own next
-keyframe with that setting enabled. Its contextual accessible name remains
-**Track keyframe easing N**, and interpolation is unchanged.
+**every enabled setting and its Easing together in one Undo step**.
+The visibly labelled **Easing** select (accessible name **Track keyframe easing N**) sets
+every enabled setting's Easing in one Undo step, each toward its own next keyframe with
+that setting enabled. It shows the Easing those settings share, counting only settings
+keyed again later when any are, or **Mixed** when they differ. Beside it, **Per setting**
+(shown only when two or more settings are listed and they agree) reveals one compact Easing
+select per setting, **<Setting> easing at track keyframe N**; while settings differ that list
+stays visible. Each choice changes only that setting, in one Undo step. Choosing in the main
+select makes them agree again and hides the list unless it was opened explicitly. The
+list's visibility is editor-only, never stored.
 The native easing selector shows a compact graph of the selected progress shape:
 time runs left to right and value progress bottom to top. Hold stays flat until
 the exact next keyframe, then jumps. The graph adds no focus stop; its text description
@@ -294,7 +306,7 @@ Dragging a Colour, Opacity or HSL slider (main or stored) previews the draft val
 
 Only existing non-null enabled settings get value editors. Each accepted value/reset
 changes that keyed setting at its stored frame in **one Undo step**, without changing
-keyframe time, shared easing, other enabled settings/keyframes, track `opacity` or clip settings,
+keyframe time, any Easing, other enabled settings/keyframes, track `opacity` or clip settings,
 and without requesting a seek. No slider, numeric edit or reset implicitly joins a channel.
 Numeric drafts preserve entered precision; empty, nonfinite, out-of-bounds and
 contextually invalid values remain editable with inline errors, never silently
@@ -605,7 +617,7 @@ not all sources or loop repetitions. It grows with duration and is additional to
 the unchanged video raw-buffer/child/LUT bounds above. Cancellation/failure removes
 only owned scratch, never originals, saved projects or successful outputs.
 
-Schema **v15 is strict**, including complete required video track `colour` with Temperature/Tint/HDR and static HSL/curves, no clip colour/correction fields, and clip `spatial` base/eight-value
+Schema **v16 is strict**, including complete required video track `colour` with Temperature/Tint/HDR and static HSL/curves, no clip colour/correction fields, and clip `spatial` base/eight-value
 source-frame keyframes and required unique `media.videoIds` / `media.audioIds`
 arrays, at most 10,000 IDs each, and all required per-track settings. Project-level
 transitions/fades, saved `clip.opacity` and old `clipOpacity`/`layerOpacity` keyframe
@@ -615,8 +627,8 @@ Keyframes require exactly the eleven nullable fields listed above, including `op
 The required `music` array contains 0–8 independent music tracks with unique required
 IDs and complete source IN/OUT/start/duration/gain/fades/loop fields; `[]` without
 music, never a null/singular value or default. Version-1 export receipts require
-a strict v15 snapshot plus captured audio-source/instance-plan arrays.
-Older v1–v14 project documents and export receipt snapshots remain unchanged/incompatible;
+a strict v16 snapshot plus captured audio-source/instance-plan arrays.
+Older v1–v15 project documents and export receipt snapshots remain unchanged/incompatible;
 there are no migrations, compatibility fallback/default fields or automatic deletion
 of projects, receipts or successful videos. Create a new project and deliberately
 import its media; registered media and currently verified ready proxies remain reusable.

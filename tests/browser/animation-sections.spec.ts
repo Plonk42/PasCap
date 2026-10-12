@@ -1,6 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import path from 'node:path';
-import { KEYFRAME_SETTINGS } from '../../src/shared/keyframes.js';
+import { KEYFRAME_SETTINGS, uniformKeyframe } from '../../src/shared/keyframes.js';
 import type { MediaAsset } from '../../src/shared/media.js';
 import { createClip, createLayer, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
 import { createSpatialSettings, evaluateSpatial, NEUTRAL_SPATIAL_POSE } from '../../src/shared/spatial.js';
@@ -136,8 +136,12 @@ async function easing(page: Page, name: string): Promise<void> {
   await select.scrollIntoViewIfNeeded();
   await expect(select).toBeVisible();
   await expect(select).toHaveJSProperty('tagName', 'SELECT');
-  await expect(select.locator('xpath=ancestor::label[1]')).toContainText('Easing');
-  await expect(select.locator('xpath=ancestor::label[1]')).not.toContainText('Interpolation');
+  // The visible label may wrap the select or point at it.
+  const labels = await select.evaluate((element) =>
+    [...(element as HTMLSelectElement).labels].map((label) => label.textContent),
+  );
+  expect(labels.join(' ')).toContain('Easing');
+  expect(labels.join(' ')).not.toContain('Interpolation');
 }
 
 for (const viewport of [
@@ -195,11 +199,9 @@ for (const viewport of [
         keyframes: [0, 30, 80, 120].map((frame) => ({ frame, rate: 1, interpolation: 'linear' })),
       };
       clip.spatial = createSpatialSettings();
-      clip.spatial.keyframes = [0, 20, 60, 100, 120].map((frame) => ({
-        frame,
-        interpolation: 'linear',
-        values: { ...NEUTRAL_SPATIAL_POSE, scale: 1 + frame / 300, translateX: frame / 1000 },
-      }));
+      clip.spatial.keyframes = [0, 20, 60, 100, 120].map((frame) =>
+        uniformKeyframe(frame, { ...NEUTRAL_SPATIAL_POSE, scale: 1 + frame / 300, translateX: frame / 1000 }, 'linear'),
+      );
       document.clips = [clip];
       memory = await memoryProjects(page, document);
       await page.addInitScript(() => {
@@ -254,7 +256,7 @@ for (const viewport of [
         document.clips[0]!.speed = { mode: 'constant', rate: 1 };
         document.clips[0]!.spatial = createSpatialSettings();
       });
-      expect(document.schemaVersion).toBe(15);
+      expect(document.schemaVersion).toBe(16);
       await inspectorTab(page, 'Track');
       await expect(inspector(page).getByRole('button', { name: /^Animate / })).toHaveCount(0);
       await expect(line(page, 'Colour')).toContainText('0 keyframes');
@@ -607,20 +609,24 @@ for (const viewport of [
       await transformDiamond(page).focus();
       await transformDiamond(page).press('Space');
       const expected = structuredClone(document);
-      expected.clips[0]!.spatial.keyframes.splice(3, 0, {
-        frame: placed.retiming.sourceAt(89),
-        interpolation: 'linear',
-        values: {
-          cropLeft: null,
-          cropRight: null,
-          cropTop: null,
-          cropBottom: null,
-          scale: evaluateSpatial(document.clips[0]!.spatial, placed.retiming.sourcePositionAt(89)).scale,
-          translateX: null,
-          translateY: null,
-          rotation: null,
-        },
-      });
+      expected.clips[0]!.spatial.keyframes.splice(
+        3,
+        0,
+        uniformKeyframe(
+          placed.retiming.sourceAt(89),
+          {
+            cropLeft: null,
+            cropRight: null,
+            cropTop: null,
+            cropBottom: null,
+            scale: evaluateSpatial(document.clips[0]!.spatial, placed.retiming.sourcePositionAt(89)).scale,
+            translateX: null,
+            translateY: null,
+            rotation: null,
+          },
+          'linear',
+        ),
+      );
       expect(await current(page)).toEqual(expected);
       await expect(transformDiamond(page)).toHaveAttribute('aria-pressed', 'true');
       await page.evaluate(() => window.pascapLab!.flush());

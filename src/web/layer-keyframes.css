@@ -178,8 +178,54 @@
   margin-top: 8px;
 }
 
-.layer-keyframe-controls .layer-keyframe-point-fields > label.keyframe-easing {
+.layer-keyframe-controls .layer-keyframe-point-fields > .keyframe-easing {
   grid-column: auto;
+}
+
+.keyframe-easing {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.keyframe-easing-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  min-width: 0;
+}
+
+.keyframe-easing-heading > .text-button {
+  padding: 0;
+  font-size: 11px;
+}
+
+.keyframe-easing-settings {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.keyframe-easing-settings > li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.keyframe-easing-settings > li > label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.easing-choice.compact .easing-graph > polyline {
+  stroke-width: 5;
 }
 
 .layer-keyframe-point-values {

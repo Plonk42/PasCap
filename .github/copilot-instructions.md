@@ -111,7 +111,7 @@ PasCap is a solo, pre-release project: optimize for fast iteration. Details are 
   Navigation never edits,
   saves or creates history. See [speed/audio](../docs/SPEED_AND_AUDIO.md) and
   [spatial transforms](../docs/design/SPATIAL_TRANSFORMS.md).
-- Strict schema 15 requires complete row Colour with nine graded scalar fields,
+- Strict schema 16 requires complete row Colour with nine graded scalar fields,
   `hdr`, `colour.hsl` (eight complete named bands) and `colour.curves` (master/red/green/blue
   2–16-point arrays). HSL/curves remain static, not animation channels. All Colour
   is row-owned, keyed or not; clips have no colour/correction. Neutral creators
@@ -144,8 +144,8 @@ PasCap is a solo, pre-release project: optimize for fast iteration. Details are 
   retain that ownership, as do Temperature and Tint.
   See [row appearance](../docs/design/ROW_APPEARANCE.md).
 - Every clip requires strict `spatial: { base, keyframes }`: eight complete pose
-  values and 0–256 ascending original-source keys with required easing; each key
-  enables any of the eight settings (others null, at least one number) and each
+  values and 0–256 ascending original-source keys; each key
+  enables any of the eight settings (others null, at least one number) with its own Easing, and each
   setting interpolates between its own keys with endpoint holds. A setting without
   keys holds its base; deleting its last key reveals that base; Reset transform
   clears keys and restores the neutral base deliberately.
@@ -204,10 +204,10 @@ clarity −1–1, denoise 0–1 }`, neutral 0, with no keyframes or track channe
   $\mathrm{result} = C + \mathrm{lower}(1 - A)$, evaluating row Opacity for each
   source with no additional layer multiplier; $m_i$ is spatial source coverage,
   including opaque neutral letterboxing. Black fades never reduce that coverage.
-  Version-1 export receipts require strict v15 snapshots and captured audio-source/
+  Version-1 export receipts require strict v16 snapshots and captured audio-source/
   instance-plan arrays; receipt, registry/proxy/PCM and benchmark format versions
   remain independent and unchanged.
-  Reject and preserve incompatible v1–v14 projects/receipt snapshots; require recreation,
+  Reject and preserve incompatible v1–v15 projects/receipt snapshots; require recreation,
   without migrations, compatibility defaults or automatic deletion.
 - Music is a required 0–8 array of independently identified instances, never null
   or singular. Duration is the maximum of all video and music OUTs. After the last

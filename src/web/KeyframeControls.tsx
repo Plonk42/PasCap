@@ -1,13 +1,19 @@
 import { useId, useState } from 'react';
 import { applyCommand, type EditCommand } from '../shared/commands.js';
-import { KEYFRAME_SETTINGS, keyframeNeighbors, keySettings, type LayerKeyframe } from '../shared/keyframes.js';
+import {
+  continuingSettings,
+  KEYFRAME_SETTINGS,
+  keyframeNeighbors,
+  keySettings,
+  type LayerKeyframe,
+} from '../shared/keyframes.js';
 import type { ProjectDocument, VideoLayer } from '../shared/model.js';
 import { formatTimecode } from '../shared/timing.js';
 import { ChannelKeyframeNavigation } from './AnimationControls.js';
 import './declutter.css';
-import { EasingSelect } from './EasingSelect.js';
 import { HelpPopover } from './HelpPopover.js';
 import { Icon } from './icons.js';
+import { KeyframeEasing } from './KeyframeEasing.js';
 import { keyframeNavigationFrame, keySeekHint, useKeyframeNavigation } from './keyframe-navigation.js';
 import './layer-keyframes.css';
 import { livePreview } from './live-preview.js';
@@ -178,7 +184,7 @@ function KeyframePointRow({
       </div>
       <div
         className="layer-keyframe-dependencies"
-        title="Moving this keyframe moves all these settings together; they also share its easing."
+        title="Moving this keyframe moves all these settings together; each keeps its own Easing."
       >
         <ParticipantChips
           point={point}
@@ -211,32 +217,30 @@ function KeyframePointRow({
               onCommit={(nextFrame) => onEdit({ type: 'layer-key-move', layerId, frame: point.frame, nextFrame })}
             />
           </label>
-          <label className="keyframe-easing" htmlFor={`${listId}-${row.id}-easing`}>
-            Easing
-            <EasingSelect
-              id={`${listId}-${row.id}-easing`}
-              aria-label={`Track keyframe easing ${point.frame}`}
-              aria-describedby={helpId}
-              title="Shared by these settings, to each setting's next keyframe"
-              disabled={disabled}
-              value={point.interpolation}
-              onChange={(interpolation) =>
-                onEdit({
-                  type: 'layer-key-easing',
-                  layerId,
-                  frame: point.frame,
-                  interpolation,
-                })
-              }
-            />
-          </label>
+          <KeyframeEasing
+            label={`Track keyframe easing ${point.frame}`}
+            settingLabel={(setting) => `${setting} easing at track keyframe ${point.frame}`}
+            describedBy={helpId}
+            title="Applies to every setting of this keyframe, toward each setting's next keyframe"
+            settings={settings}
+            continuing={continuingSettings(
+              keys,
+              point,
+              KEYFRAME_SETTINGS.map((setting) => setting.key),
+            )}
+            easing={point.easing}
+            disabled={disabled}
+            onChange={(setting, interpolation) =>
+              onEdit({ type: 'layer-key-easing', layerId, frame: point.frame, setting, interpolation })
+            }
+          />
           <div className="layer-keyframe-point-values">
             {settings.map((setting) => {
               const value = point.values[setting.key];
               if (value === null) return null;
               const id = `${listId}-${row.id}-${setting.key}`;
               const label = `${setting.label} keyframe value ${point.frame}`;
-              const hint = `${setting.label} at stored timeline frame ${point.frame} on ${project.layers.find((layer) => layer.id === layerId)?.name}. Edits change only this setting's keyframe value, not the playhead, shared easing or unanimated settings.`;
+              const hint = `${setting.label} at stored timeline frame ${point.frame} on ${project.layers.find((layer) => layer.id === layerId)?.name}. Edits change only this setting's keyframe value, not the playhead, Easing or unanimated settings.`;
               const command = (nextValue: number): EditCommand => ({
                 type: 'layer-key-value',
                 layerId,
@@ -354,7 +358,7 @@ export function KeyframeControls({
         <HelpPopover label="Animation" className="animation-help" guide="opt-in-to-shared-video-track-animation">
           <p id={helpId}>
             Each diamond adds a keyframe for that setting on the whole track, at the playhead. Settings keyed together
-            share one keyframe and its easing.
+            share one keyframe; each can have its own easing.
           </p>
           <div className="animation-legend">
             <span>

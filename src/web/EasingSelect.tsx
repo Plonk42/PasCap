@@ -21,34 +21,47 @@ export function easingGraphPoints(curve: Interpolation): string {
 }
 
 interface Props extends Omit<SelectHTMLAttributes<HTMLSelectElement>, 'value' | 'onChange' | 'children' | 'multiple'> {
-  value: Interpolation;
+  /** Null shows Mixed: the settings it applies to use different easings. */
+  value: Interpolation | null;
   onChange: (value: Interpolation) => void;
+  compact?: boolean;
 }
 
+const MIXED = 'Mixed: these settings use different easings. Choosing one applies it to all of them.';
+
 /** A native selector with supplementary feedback, not a custom option menu. */
-export function EasingSelect({ value, onChange, ...props }: Readonly<Props>) {
+export function EasingSelect({ value, onChange, compact = false, ...props }: Readonly<Props>) {
   const descriptionId = useId();
-  const shape = SHAPES.find((item) => item.value === value)!;
-  const description = `${shape.label}: ${shape.description} Graph: time runs left to right; value progress runs bottom to top.`;
+  const shape = SHAPES.find((item) => item.value === value);
+  const description = shape
+    ? `${shape.label}: ${shape.description} Graph: time runs left to right; value progress runs bottom to top.`
+    : MIXED;
   return (
-    <span className="easing-choice" data-easing={value}>
+    <span className={compact ? 'easing-choice compact' : 'easing-choice'} data-easing={value ?? 'mixed'}>
       <select
         {...props}
-        value={value}
+        value={value ?? ''}
         aria-describedby={[props['aria-describedby'], descriptionId].filter(Boolean).join(' ')}
         onChange={(event) => onChange(event.currentTarget.value as Interpolation)}
       >
+        {value === null && (
+          <option value="" disabled hidden>
+            Mixed
+          </option>
+        )}
         {SHAPES.map((item) => (
           <option key={item.value} value={item.value}>
             {item.label}
           </option>
         ))}
       </select>
-      <svg className="easing-graph" viewBox="0 0 96 56" aria-hidden="true" focusable="false">
-        <title>{description}</title>
-        <path className="easing-graph-axes" d="M6 6V50H90" />
-        <polyline points={easingGraphPoints(value)} />
-      </svg>
+      {value !== null && (
+        <svg className="easing-graph" viewBox="0 0 96 56" aria-hidden="true" focusable="false">
+          <title>{description}</title>
+          <path className="easing-graph-axes" d="M6 6V50H90" />
+          <polyline points={easingGraphPoints(value)} />
+        </svg>
+      )}
       <span id={descriptionId} className="easing-description">
         {description}
       </span>

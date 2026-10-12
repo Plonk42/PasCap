@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { interpolationSchema, keyInterval, orderedKeys } from './keyframes.js';
+import { EASING_MISMATCH, easingMatchesValues, easingSchema, keyInterval, orderedKeys } from './keyframes.js';
 
 // Zod numbers already reject NaN and infinities; no coercion or persisted defaults.
 const cropFraction = z.number().min(0).max(1);
@@ -51,10 +51,11 @@ export type SpatialKeyValues = z.infer<typeof spatialKeyValuesSchema>;
 export const spatialKeyframeSchema = z
   .object({
     frame: z.number().int().nonnegative().max(2_147_483_647),
-    interpolation: interpolationSchema,
     values: spatialKeyValuesSchema,
+    easing: easingSchema(SPATIAL_CHANNELS),
   })
-  .strict();
+  .strict()
+  .refine(easingMatchesValues, { message: EASING_MISMATCH });
 
 export type SpatialKeyframe = z.infer<typeof spatialKeyframeSchema>;
 
@@ -96,10 +97,11 @@ function evaluateChannel(
   sourcePosition: number,
   base: number,
 ): number {
-  // Each channel interpolates between its own enabled keys, using the left key's easing.
+  // Each channel interpolates between its own enabled keys, using its Easing at the left key.
   const interval = keyInterval(
     keys.filter((key) => key.values[channel] !== null),
     sourcePosition,
+    (left) => left.easing[channel]!,
   );
   if (!interval) return base;
   const { left, right, progress } = interval;

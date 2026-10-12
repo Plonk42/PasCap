@@ -14,6 +14,7 @@ import {
   type KeyframeSetting,
   type LayerKeyframe,
   type LayerKeyValues,
+  uniformKeyframe,
 } from '../../src/shared/keyframes.js';
 import {
   BASE_LAYER_ID,
@@ -32,7 +33,7 @@ import { unsupportedProject } from './project-fixtures.js';
 
 const curves: Interpolation[] = ['hold', 'linear', 'ease-in', 'ease-out', 'smooth'];
 function point(frame: number, values: Partial<LayerKeyValues>, interpolation: Interpolation = 'linear'): LayerKeyframe {
-  return { frame, interpolation, values: { ...EMPTY_KEY_VALUES, ...values } };
+  return uniformKeyframe(frame, { ...EMPTY_KEY_VALUES, ...values }, interpolation);
 }
 function row(keyframes: LayerKeyframe[] = []): VideoLayer {
   return { ...createLayer(BASE_LAYER_ID, 'Track 1'), keyframes };
@@ -71,7 +72,7 @@ function overlay(
   });
 }
 const colourKeys = (): LayerKeyframe[] => [point(0, { exposure: 1 }, 'hold'), point(100, { hue: 20 })];
-describe('strict schema-15 row points and independently participating settings', () => {
+describe('strict schema-16 row points and independently participating settings', () => {
   it('exports an ordered immutable eleven-setting catalogue and explicit all-null template', () => {
     const settings = [
       'opacity',
@@ -94,10 +95,10 @@ describe('strict schema-15 row points and independently participating settings',
     expect(KEYFRAME_SETTINGS.every(Object.isFrozen)).toBe(true);
   });
 
-  it('requires version 15, explicit media membership, row opacity and clip settings without legacy fields', () => {
+  it('requires version 16, explicit media membership, row opacity and clip settings without legacy fields', () => {
     const project = createProject('strict', 'Strict');
     const clip = createClip('one', 'source', 0, 20);
-    expect(project.schemaVersion).toBe(15);
+    expect(project.schemaVersion).toBe(16);
     expect(project.media).toEqual({ videoIds: [], audioIds: [] });
     expect(project.layers[0]).toEqual(row());
     expect(Object.keys(clip)).toEqual([
@@ -157,6 +158,20 @@ describe('strict schema-15 row points and independently participating settings',
     for (const frame of [-1, 0.5, NaN, Infinity, 2_147_483_648])
       expect(layerKeyframeSchema.safeParse(point(frame, { exposure: 0 })).success).toBe(false);
     expect(layerKeyframeSchema.safeParse({ ...point(0, { exposure: 0 }), interpolation: 'cubic' }).success).toBe(false);
+    // The former shared keyframe easing is rejected, and each enabled setting needs its own.
+    expect(layerKeyframeSchema.safeParse({ ...point(0, { exposure: 0 }), interpolation: 'linear' }).success).toBe(
+      false,
+    );
+    const { easing: _easing, ...withoutEasing } = point(0, { exposure: 0 });
+    expect(layerKeyframeSchema.safeParse({ ...withoutEasing, interpolation: 'linear' }).success).toBe(false);
+    const eased = point(0, { exposure: 0 });
+    expect(layerKeyframeSchema.safeParse({ ...eased, easing: { ...eased.easing, exposure: null } }).success).toBe(
+      false,
+    );
+    expect(layerKeyframeSchema.safeParse({ ...eased, easing: { ...eased.easing, hue: 'linear' } }).success).toBe(false);
+    expect(layerKeyframeSchema.safeParse({ ...eased, easing: { ...eased.easing, exposure: 'cubic' } }).success).toBe(
+      false,
+    );
     expect(layerKeyframeSchema.parse(point(0, { opacity: 0, exposure: 0 }))).toEqual(
       point(0, { opacity: 0, exposure: 0 }),
     );
@@ -207,6 +222,7 @@ describe('strict schema-15 row points and independently participating settings',
       type: 'layer-key-easing',
       layerId: BASE_LAYER_ID,
       frame: 20,
+      setting: null,
       interpolation: 'smooth',
     });
     project = applyCommand(project, {
@@ -239,6 +255,53 @@ describe('strict schema-15 row points and independently participating settings',
       value: 0.4,
     });
     expect(project.layers[0]!.keyframes).toEqual([]);
+  });
+
+  it('keeps a separate Easing per setting, defaulting a joining setting to the agreed one', () => {
+    let project = createProject('easing', 'Per-setting easing');
+    const toggle = (frame: number, setting: KeyframeSetting, value: number): void => {
+      project = applyCommand(project, { type: 'layer-key-toggle', layerId: BASE_LAYER_ID, frame, setting, value });
+    };
+    const ease = (frame: number, setting: KeyframeSetting | null, interpolation: Interpolation): void => {
+      project = applyCommand(project, {
+        type: 'layer-key-easing',
+        layerId: BASE_LAYER_ID,
+        frame,
+        setting,
+        interpolation,
+      });
+    };
+    toggle(0, 'exposure', 0);
+    toggle(0, 'contrast', 1);
+    toggle(20, 'exposure', 2);
+    toggle(20, 'contrast', 2);
+    ease(0, 'exposure', 'hold');
+    ease(0, 'contrast', 'ease-in');
+    const layer = project.layers[0]!;
+    expect(layer.keyframes[0]!.easing).toMatchObject({ exposure: 'hold', contrast: 'ease-in', hue: null });
+    // Exposure holds while Contrast eases in across the same interval.
+    expect(evaluateLayerSetting(layer, 'exposure', 10, 0)).toBe(0);
+    expect(evaluateLayerSetting(layer, 'contrast', 10, 1)).toBe(1.25);
+    expect(colourAt(layer, 10)).toMatchObject({ exposure: 0, contrast: 1.25 });
+    // Mixed settings give a joining setting Linear; agreed settings give it theirs.
+    toggle(0, 'hue', 10);
+    expect(project.layers[0]!.keyframes[0]!.easing.hue).toBe('linear');
+    ease(0, null, 'smooth');
+    expect(project.layers[0]!.keyframes[0]!.easing).toMatchObject({
+      exposure: 'smooth',
+      contrast: 'smooth',
+      hue: 'smooth',
+    });
+    toggle(0, 'saturation', 1);
+    expect(project.layers[0]!.keyframes[0]!.easing.saturation).toBe('smooth');
+    // A brand-new keyframe starts Linear, and removing a setting removes its easing.
+    toggle(40, 'exposure', 1);
+    expect(project.layers[0]!.keyframes.at(-1)!.easing.exposure).toBe('linear');
+    toggle(0, 'hue', 0);
+    expect(project.layers[0]!.keyframes[0]!.easing.hue).toBeNull();
+    const before = project;
+    expect(() => ease(0, 'hue', 'hold')).toThrow('not enabled');
+    expect(project).toBe(before);
   });
 
   it('can independently toggle all eleven participants at one frame', () => {
@@ -352,7 +415,7 @@ describe('strict schema-15 row points and independently participating settings',
     );
     expect(history.current).toEqual(document);
     expect(history.canRedo).toBe(true);
-    expect(history.redo().layers[0]!.keyframes.at(-1)!.interpolation).toBe('ease-in');
+    expect(history.redo().layers[0]!.keyframes.at(-1)!.easing.opacity).toBe('ease-in');
     const before = history.current;
     history.commit({ type: 'layer-key-remove', layerId: BASE_LAYER_ID, frame: 30 });
     expect(history.current.layers[0]!.keyframes).toHaveLength(1);

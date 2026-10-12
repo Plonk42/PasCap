@@ -18,7 +18,7 @@ import {
   needsLayeredExport,
   planLayeredExport,
 } from '../../src/shared/export.js';
-import { EMPTY_KEY_VALUES } from '../../src/shared/keyframes.js';
+import { EMPTY_KEY_VALUES, uniformKeyframe } from '../../src/shared/keyframes.js';
 import type { MediaAsset } from '../../src/shared/media.js';
 import { createClip, createLayer, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
 import {
@@ -63,7 +63,7 @@ function referencePose(settings: SpatialSettings, position: number): SpatialPose
       'ease-in': t * t,
       'ease-out': 2 * t - t * t,
       smooth: 3 * t * t - 2 * t * t * t,
-    }[left.interpolation];
+    }[left.easing[channel]!];
     result[channel] = left.values[channel]! * (1 - progress) + right.values[channel]! * progress;
   }
   return result;
@@ -650,16 +650,8 @@ describe.skipIf(!enabled)('spatial transforms · real native FFmpeg, disposable 
     upper.openingFade = 1;
     upper.closingFade = 1;
     upper.keyframes = [
-      {
-        frame: 0,
-        interpolation: 'linear',
-        values: { ...EMPTY_KEY_VALUES, opacity: 0.35, temperature: -0.8, tint: 0.6 },
-      },
-      {
-        frame: 3,
-        interpolation: 'hold',
-        values: { ...EMPTY_KEY_VALUES, opacity: 0.75, temperature: 0.9, tint: -0.7 },
-      },
+      uniformKeyframe(0, { ...EMPTY_KEY_VALUES, opacity: 0.35, temperature: -0.8, tint: 0.6 }, 'linear'),
+      uniformKeyframe(3, { ...EMPTY_KEY_VALUES, opacity: 0.75, temperature: 0.9, tint: -0.7 }, 'hold'),
     ];
     project.layers.push(upper);
     const base = createClip('base', assets[0]!.id, 0, 4);
@@ -679,10 +671,9 @@ describe.skipIf(!enabled)('spatial transforms · real native FFmpeg, disposable 
     left.spatial = {
       base: pose({ scale: 3 }),
       keyframes: [
-        {
-          frame: 1,
-          interpolation: 'linear',
-          values: pose({
+        uniformKeyframe(
+          1,
+          pose({
             cropLeft: 0.12,
             cropRight: 0.18,
             cropTop: 0.09,
@@ -692,11 +683,11 @@ describe.skipIf(!enabled)('spatial transforms · real native FFmpeg, disposable 
             translateX: -0.1,
             translateY: 0.08,
           }),
-        },
-        {
-          frame: 2,
-          interpolation: 'hold',
-          values: pose({
+          'linear',
+        ),
+        uniformKeyframe(
+          2,
+          pose({
             cropLeft: 0.23,
             cropRight: 0.07,
             cropTop: 0.17,
@@ -706,16 +697,16 @@ describe.skipIf(!enabled)('spatial transforms · real native FFmpeg, disposable 
             translateX: 0.16,
             translateY: -0.13,
           }),
-        },
+          'hold',
+        ),
       ],
     };
     right.spatial = {
       base: pose({ rotation: 90 }),
       keyframes: [
-        {
-          frame: 2,
-          interpolation: 'smooth',
-          values: pose({
+        uniformKeyframe(
+          2,
+          pose({
             cropLeft: 0.07,
             cropRight: 0.11,
             cropTop: 0.23,
@@ -725,11 +716,11 @@ describe.skipIf(!enabled)('spatial transforms · real native FFmpeg, disposable 
             translateX: 0.21,
             translateY: -0.17,
           }),
-        },
-        {
-          frame: 3,
-          interpolation: 'hold',
-          values: pose({
+          'smooth',
+        ),
+        uniformKeyframe(
+          3,
+          pose({
             cropLeft: 0.19,
             cropRight: 0.22,
             cropTop: 0.08,
@@ -739,7 +730,8 @@ describe.skipIf(!enabled)('spatial transforms · real native FFmpeg, disposable 
             translateX: -0.11,
             translateY: 0.14,
           }),
-        },
+          'hold',
+        ),
       ],
     };
     upper.transitions = [{ leftId: left.id, rightId: right.id, type: 'cross-dissolve', duration: 2 }];
@@ -864,10 +856,7 @@ describe.skipIf(!enabled)('spatial transforms · real native FFmpeg, disposable 
     const lower = createClip('lower', assets[0]!.id, 2, 3);
     const upper = createClip('neutral', assets[1]!.id, 1, 2, 'letterbox');
     // Neutral full-pose keys must enter layered export without changing identity.
-    upper.spatial.keyframes = [
-      { frame: 0, interpolation: 'smooth', values: pose() },
-      { frame: 4, interpolation: 'hold', values: pose() },
-    ];
+    upper.spatial.keyframes = [uniformKeyframe(0, pose(), 'smooth'), uniformKeyframe(4, pose(), 'hold')];
     project.clips = [lower, upper];
     const captured = projectSchema.parse(project);
     const target = EXPORT_PROFILES.draft720;

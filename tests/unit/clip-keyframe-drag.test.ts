@@ -4,16 +4,15 @@ import { NEUTRAL_SPATIAL_POSE } from '../../src/shared/spatial.js';
 import { calculateLayout } from '../../src/shared/timeline.js';
 import { clipKeyframeTarget, planClipKeyframeMove } from '../../src/web/clip-keyframe-drag.js';
 import { clipKeyframeMarkers } from '../../src/web/clip-keyframe-markers.js';
+import { uniformKeyframe } from '../../src/shared/keyframes.js';
 
 function fixture(frames: readonly number[], rate = 1): ProjectDocument {
   const project = createProject('drag', 'Drag');
   const clip = createClip('clip', 'synthetic', 10, 130);
   clip.speed = { mode: 'constant', rate };
-  clip.spatial.keyframes = frames.map((frame, index) => ({
-    frame,
-    interpolation: index ? 'ease-in' : 'linear',
-    values: { ...NEUTRAL_SPATIAL_POSE, scale: 1 + index },
-  }));
+  clip.spatial.keyframes = frames.map((frame, index) =>
+    uniformKeyframe(frame, { ...NEUTRAL_SPATIAL_POSE, scale: 1 + index }, index ? 'ease-in' : 'linear'),
+  );
   project.clips = [clip];
   return project;
 }
@@ -25,7 +24,7 @@ describe('Transform keyframe sliding', () => {
     expect(plan.error).toBe('');
     expect(plan.command?.type).toBe('spatial');
     const spatial = plan.command?.type === 'spatial' ? plan.command.spatial : null;
-    expect(spatial?.keyframes.map((key) => [key.frame, key.interpolation, key.values.scale])).toEqual([
+    expect(spatial?.keyframes.map((key) => [key.frame, key.easing.scale, key.values.scale])).toEqual([
       [30, 'linear', 1],
       [90, 'ease-in', 2],
     ]);

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { applyCommand } from '../../src/shared/commands.js';
-import { EMPTY_KEY_VALUES } from '../../src/shared/keyframes.js';
+import { EMPTY_KEY_VALUES, uniformKeyframe } from '../../src/shared/keyframes.js';
 import { createClip, createProject, projectSchema } from '../../src/shared/model.js';
 import { NEUTRAL_SPATIAL_POSE } from '../../src/shared/spatial.js';
 import { calculateLayout } from '../../src/shared/timeline.js';
@@ -227,14 +227,14 @@ describe('atomic clip source-range plans', () => {
     };
     clip.spatial.base.translateX = 0.25;
     clip.spatial.keyframes = [
-      { frame: 0, interpolation: 'linear', values: { ...NEUTRAL_SPATIAL_POSE, scale: 2 } },
-      { frame: 600, interpolation: 'smooth', values: { ...NEUTRAL_SPATIAL_POSE, rotation: 90 } },
+      uniformKeyframe(0, { ...NEUTRAL_SPATIAL_POSE, scale: 2 }, 'linear'),
+      uniformKeyframe(600, { ...NEUTRAL_SPATIAL_POSE, rotation: 90 }, 'smooth'),
     ];
     project.layers[0]!.colour.temperature = 0.25;
     project.layers[0]!.opacity = 0.7;
     project.layers[0]!.keyframes = [
-      { frame: 10, interpolation: 'smooth', values: { ...EMPTY_KEY_VALUES, exposure: 0.5 } },
-      { frame: 1_000, interpolation: 'linear', values: { ...EMPTY_KEY_VALUES, opacity: 0.4 } },
+      uniformKeyframe(10, { ...EMPTY_KEY_VALUES, exposure: 0.5 }, 'smooth'),
+      uniformKeyframe(1_000, { ...EMPTY_KEY_VALUES, opacity: 0.4 }, 'linear'),
     ];
     const before = structuredClone(project);
     const plan = planClipSourceRange(project, clip, 'in', 200, 600, 75);

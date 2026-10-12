@@ -7,7 +7,7 @@ import { createConfig } from '../../src/server/config.js';
 import { restoreExports } from '../../src/server/export-archive.js';
 import { JobQueue } from '../../src/server/jobs.js';
 import { ProjectStore } from '../../src/server/storage.js';
-import { EMPTY_KEY_VALUES } from '../../src/shared/keyframes.js';
+import { EMPTY_KEY_VALUES, uniformKeyframe } from '../../src/shared/keyframes.js';
 import { createClip, createLayer, createProject } from '../../src/shared/model.js';
 import { unsupportedProject } from '../unit/project-fixtures.js';
 
@@ -19,15 +19,15 @@ async function temp(): Promise<string> {
   return root;
 }
 
-describe.skipIf(!enabled)('schema-15 storage/archive integration · generated files only, no migrations', () => {
+describe.skipIf(!enabled)('schema-16 storage/archive integration · generated files only, no migrations', () => {
   afterEach(async () => {
     await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
   });
 
-  it('loads strict v15 row gains/eleven-channel points and preserves unsupported v1–v14', async () => {
+  it('loads strict v16 row gains/eleven-channel points and preserves unsupported v1–v15', async () => {
     const root = await temp();
     const store = new ProjectStore(root);
-    const project = createProject('strict-v15', 'Strict current document');
+    const project = createProject('strict-v16', 'Strict current document');
     project.media = { videoIds: ['generated-original', 'unplaced-original'], audioIds: ['unplaced-music'] };
     project.clips = [
       { ...createClip('current-clip', 'generated-original', 0, 4), speed: { mode: 'constant', rate: 0.5 } },
@@ -35,11 +35,11 @@ describe.skipIf(!enabled)('schema-15 storage/archive integration · generated fi
     project.layers[0]!.colour.temperature = 0.75;
     project.layers[0]!.colour.tint = -0.65;
     project.layers[0]!.keyframes = [
-      { frame: 0, interpolation: 'linear', values: { ...EMPTY_KEY_VALUES, opacity: 0.8, temperature: -1 } },
-      { frame: 5000, interpolation: 'ease-out', values: { ...EMPTY_KEY_VALUES, exposure: 0.25, tint: 1 } },
+      uniformKeyframe(0, { ...EMPTY_KEY_VALUES, opacity: 0.8, temperature: -1 }, 'linear'),
+      uniformKeyframe(5000, { ...EMPTY_KEY_VALUES, exposure: 0.25, tint: 1 }, 'ease-out'),
     ];
     const saved = await store.save(project, 0);
-    expect(saved.schemaVersion).toBe(15);
+    expect(saved.schemaVersion).toBe(16);
     expect(saved.media).toEqual(project.media);
     expect(saved.layers[0]!.colour).toMatchObject({ temperature: 0.75, tint: -0.65 });
     expect(saved.layers[0]!.keyframes).toEqual(project.layers[0]!.keyframes);
@@ -61,7 +61,7 @@ describe.skipIf(!enabled)('schema-15 storage/archive integration · generated fi
       const filename = path.join(root, 'projects', `${id}.json`);
       await writeFile(filename, bytes);
       old.push({ id, title, version, filename, bytes });
-      await expect(store.load(id)).rejects.toThrow(`schema version ${version}; this build requires version 15`);
+      await expect(store.load(id)).rejects.toThrow(`schema version ${version}; this build requires version 16`);
       await expect(store.rename(id, 'Must not rewrite an older file', 0)).rejects.toThrow(
         'existing file was not changed',
       );
@@ -83,7 +83,7 @@ describe.skipIf(!enabled)('schema-15 storage/archive integration · generated fi
         revision: 0,
         clipCount: 0,
         duration: 0,
-        error: expect.stringContaining(`requires version 15`),
+        error: expect.stringContaining(`requires version 16`),
       });
       expect(await readFile(entry.filename)).toEqual(entry.bytes);
     }
@@ -136,12 +136,12 @@ describe.skipIf(!enabled)('schema-15 storage/archive integration · generated fi
     expect(await readFile(filename)).toEqual(bytes);
   });
 
-  it('rejects missing/out-of-range v15 gains and removed appearance/speed fields without defaults', async () => {
+  it('rejects missing/out-of-range v16 gains and removed appearance/speed fields without defaults', async () => {
     const root = await temp();
     const store = new ProjectStore(root);
     const directory = path.join(root, 'projects');
     await mkdir(directory);
-    const valid = createProject('malformed-v15', 'Must remain strict');
+    const valid = createProject('malformed-v16', 'Must remain strict');
     valid.clips = [createClip('current', 'generated-original', 0, 4)];
     const missingMedia: Record<string, unknown> = { ...valid };
     delete missingMedia['media'];
@@ -164,13 +164,7 @@ describe.skipIf(!enabled)('schema-15 storage/archive integration · generated fi
         layers: [
           {
             ...valid.layers[0]!,
-            keyframes: [
-              {
-                frame: 0,
-                interpolation: 'linear',
-                values: { ...EMPTY_KEY_VALUES, opacity: 0.5, layerOpacity: null },
-              },
-            ],
+            keyframes: [uniformKeyframe(0, { ...EMPTY_KEY_VALUES, opacity: 0.5, layerOpacity: null }, 'linear')],
           },
         ],
       },
@@ -189,9 +183,7 @@ describe.skipIf(!enabled)('schema-15 storage/archive integration · generated fi
         layers: [
           {
             ...valid.layers[0]!,
-            keyframes: [
-              { frame: 0, interpolation: 'linear', values: { ...EMPTY_KEY_VALUES, opacity: 0.5, speed: null } },
-            ],
+            keyframes: [uniformKeyframe(0, { ...EMPTY_KEY_VALUES, opacity: 0.5, speed: null }, 'linear')],
           },
         ],
       },
@@ -207,7 +199,15 @@ describe.skipIf(!enabled)('schema-15 storage/archive integration · generated fi
           { ...valid, layers: [{ ...valid.layers[0]!, colour }] },
           { ...valid, clips: [{ ...valid.clips[0]!, [setting]: 0 }] },
           { ...valid, clips: [{ ...valid.clips[0]!, colour: { ...valid.layers[0]!.colour, [setting]: 0.5 } }] },
-          { ...valid, layers: [{ ...valid.layers[0]!, keyframes: [{ frame: 0, interpolation: 'linear', values }] }] },
+          {
+            ...valid,
+            layers: [
+              {
+                ...valid.layers[0]!,
+                keyframes: [uniformKeyframe(0, values as Record<string, number | null>, 'linear')],
+              },
+            ],
+          },
           ...[null, -1.001, 1.001, '0'].map((value) => ({
             ...valid,
             layers: [{ ...valid.layers[0]!, colour: { ...valid.layers[0]!.colour, [setting]: value } }],
@@ -217,13 +217,7 @@ describe.skipIf(!enabled)('schema-15 storage/archive integration · generated fi
             layers: [
               {
                 ...valid.layers[0]!,
-                keyframes: [
-                  {
-                    frame: 0,
-                    interpolation: 'linear',
-                    values: { ...EMPTY_KEY_VALUES, [setting]: value },
-                  },
-                ],
+                keyframes: [uniformKeyframe(0, { ...EMPTY_KEY_VALUES, [setting]: value }, 'linear')],
               },
             ],
           })),
@@ -231,7 +225,12 @@ describe.skipIf(!enabled)('schema-15 storage/archive integration · generated fi
       }),
       {
         ...valid,
-        layers: [{ ...valid.layers[0]!, keyframes: [{ frame: 100, interpolation: 'linear', values: missingValues }] }],
+        layers: [
+          {
+            ...valid.layers[0]!,
+            keyframes: [uniformKeyframe(100, missingValues as Record<string, number | null>, 'linear')],
+          },
+        ],
       },
       ...['opacity', 'ripple', 'transitions', 'openingFade', 'closingFade'].map((field) => {
         const row: Record<string, unknown> = { ...valid.layers[0]! };
@@ -246,13 +245,7 @@ describe.skipIf(!enabled)('schema-15 storage/archive integration · generated fi
         layers: [
           {
             ...valid.layers[0]!,
-            keyframes: [
-              {
-                frame: 0,
-                interpolation: 'linear',
-                values: { ...EMPTY_KEY_VALUES, opacity: 0.5, clipOpacity: null },
-              },
-            ],
+            keyframes: [uniformKeyframe(0, { ...EMPTY_KEY_VALUES, opacity: 0.5, clipOpacity: null }, 'linear')],
           },
         ],
       },
@@ -271,7 +264,7 @@ describe.skipIf(!enabled)('schema-15 storage/archive integration · generated fi
     expect((await store.list()).every((summary) => !summary.compatible)).toBe(true);
   });
 
-  it('restores only strict v15 snapshots in version-1 receipts and preserves earlier outputs/receipts byte-for-byte', async () => {
+  it('restores only strict v16 snapshots in version-1 receipts and preserves earlier outputs/receipts byte-for-byte', async () => {
     const root = await temp();
     const config = createConfig({ dataDir: root });
     const jobs = new JobQueue();
@@ -280,7 +273,7 @@ describe.skipIf(!enabled)('schema-15 storage/archive integration · generated fi
     snapshot.layers[0]!.colour.temperature = -0.85;
     snapshot.layers[0]!.colour.tint = 0.9;
     snapshot.layers[0]!.keyframes = [
-      { frame: 50, interpolation: 'smooth', values: { ...EMPTY_KEY_VALUES, exposure: 0.1, temperature: 1, tint: -1 } },
+      uniformKeyframe(50, { ...EMPTY_KEY_VALUES, exposure: 0.1, temperature: 1, tint: -1 }, 'smooth'),
     ];
     async function archive(document: unknown, label: string) {
       const id = randomUUID();
@@ -305,7 +298,7 @@ describe.skipIf(!enabled)('schema-15 storage/archive integration · generated fi
       return { id, folder, receipt, output };
     }
     try {
-      const current = await archive(snapshot, 'v15');
+      const current = await archive(snapshot, 'v16');
       const older = [];
       for (const version of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]) {
         const document = unsupportedProject(version, `old-${version}`, `Original ${version}`);
@@ -313,7 +306,7 @@ describe.skipIf(!enabled)('schema-15 storage/archive integration · generated fi
       }
       const missingRow: Record<string, unknown> = { ...snapshot.layers[0]! };
       delete missingRow['keyframes'];
-      const malformed = await archive({ ...snapshot, layers: [missingRow] }, 'Malformed v15');
+      const malformed = await archive({ ...snapshot, layers: [missingRow] }, 'Malformed v16');
       const missingTiming = [];
       for (const field of ['opacity', 'ripple', 'transitions', 'openingFade', 'closingFade']) {
         const row: Record<string, unknown> = { ...snapshot.layers[0]! };
@@ -352,13 +345,7 @@ describe.skipIf(!enabled)('schema-15 storage/archive integration · generated fi
               layers: [
                 {
                   ...snapshot.layers[0]!,
-                  keyframes: [
-                    {
-                      frame: 0,
-                      interpolation: 'linear',
-                      values: { ...EMPTY_KEY_VALUES, opacity: 0.5, [setting]: null },
-                    },
-                  ],
+                  keyframes: [uniformKeyframe(0, { ...EMPTY_KEY_VALUES, opacity: 0.5, [setting]: null }, 'linear')],
                 },
               ],
             },
@@ -377,7 +364,7 @@ describe.skipIf(!enabled)('schema-15 storage/archive integration · generated fi
       });
       for (const entry of older) {
         expect(warnings.find((warning) => warning.startsWith(`${entry.id}:`))).toContain(
-          `Unsupported export snapshot schema version ${entry.version}; this build requires version 15`,
+          `Unsupported export snapshot schema version ${entry.version}; this build requires version 16`,
         );
         expect(warnings.find((warning) => warning.startsWith(`${entry.id}:`))).toContain(
           'successful output were not changed',
