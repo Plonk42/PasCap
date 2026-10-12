@@ -163,7 +163,7 @@ export function Layers({
       <div className="layer-sidebar-surface" style={{ height: surfaceHeight }}>
         <div
           className="layer-sidebar-heading"
-          title="Video track 1 renders below video track 2, then video track 3 above video track 2. Every track has independent Ripple, transitions and fades."
+          title="Track 1 renders below track 2, then track 3 above track 2. Every track has independent Ripple, transitions and fades."
         >
           Video tracks · {project.layers.length} / 8
         </div>

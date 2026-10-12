@@ -1511,7 +1511,7 @@ describe.skipIf(!enabled)('schema-15 layered native export · disposable synthet
       let liveFiles: string[] = [];
       const targetMessage =
         stage === 'rgb-group'
-          ? `Rendering track group packed-track: project frame ${overlap.start + 1} / ${layout.duration}`
+          ? `Rendering track “Ripple track”: project frame ${overlap.start + 1} / ${layout.duration}`
           : `Compositing track packed-track: 1 / ${layout.duration} frames`;
       const spy = vi.spyOn(jobs, 'submit').mockImplementation((kind, label, task, settled = null) =>
         submit(

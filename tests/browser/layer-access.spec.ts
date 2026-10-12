@@ -46,8 +46,7 @@ test.beforeEach(async ({ page, request }) => {
   });
   const document = createProject('layer-access-memory', 'Layer access · memory-only');
   document.media.videoIds = assets.map((asset) => asset.id);
-  for (let index = 2; index <= 8; index++)
-    document.layers.push(createLayer(`row-${index}`, `Video track ${index}`, false));
+  for (let index = 2; index <= 8; index++) document.layers.push(createLayer(`row-${index}`, `Track ${index}`, false));
   document.layers[6]!.keyframes = [sharedPoint(10, { exposure: 0.2 })];
   document.clips = [
     createClip('base', assets[0]!.id, 0, 120),
@@ -102,7 +101,7 @@ test('native wheel scrolling over the timeline reaches hidden rows and music wit
   await wheelOver(page, viewport, 400);
   await expect.poll(() => viewport.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
   await wheelOver(page, viewport, 2000);
-  await expect(page.getByRole('button', { name: 'Timeline lane Video track 8', exact: true })).toBeInViewport();
+  await expect(page.getByRole('button', { name: 'Timeline lane Track 8', exact: true })).toBeInViewport();
   await expect(page.locator('.music-track-empty')).toBeInViewport();
   await alignedRows(page);
   expect(await current(page)).toEqual(before);
@@ -116,18 +115,18 @@ test('wheel scrolling over layer headers reaches all eight rows and keeps the cl
   const viewport = page.locator('.timeline-scroll');
   const headers = page.getByRole('complementary', { name: 'Video tracks', exact: true });
   await resetVertical(viewport);
-  await expect(page.getByRole('button', { name: 'Select track Video track 1', exact: true })).toBeInViewport();
+  await expect(page.getByRole('button', { name: 'Select track Track 1', exact: true })).toBeInViewport();
   await wheelOver(page, headers, 400);
   await expect.poll(() => viewport.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
   await alignedRows(page);
   await wheelOver(page, headers, 2000);
-  await expect(page.getByRole('button', { name: 'Select track Video track 8', exact: true })).toBeInViewport();
+  await expect(page.getByRole('button', { name: 'Select track Track 8', exact: true })).toBeInViewport();
   await expect
     .poll(() => headers.evaluate((element) => element.scrollTop))
     .toBe(await viewport.evaluate((element) => element.scrollTop));
   await wheelOver(page, headers, -2000);
   await expect.poll(() => viewport.evaluate((element) => element.scrollTop)).toBe(0);
-  await expect(page.getByRole('button', { name: 'Select track Video track 1', exact: true })).toBeInViewport();
+  await expect(page.getByRole('button', { name: 'Select track Track 1', exact: true })).toBeInViewport();
   expect(await current(page)).toEqual(before);
   expect(memory.saves).toBe(0);
 });
@@ -148,7 +147,7 @@ test('the native vertical scrollbar reveals the last composition row and synchro
   await page.mouse.down();
   await page.mouse.move(bounds.x + bounds.width - size.gutter / 2, bounds.y + size.height - 8, { steps: 5 });
   await page.mouse.up();
-  await expect(page.getByRole('button', { name: 'Select track Video track 8', exact: true })).toBeInViewport();
+  await expect(page.getByRole('button', { name: 'Select track Track 8', exact: true })).toBeInViewport();
   await expect(page.locator('.music-track-empty')).toBeInViewport();
   await alignedRows(page);
   expect(await current(page)).toEqual(before);
@@ -162,17 +161,17 @@ test('native keyboard focus reveals hidden headers, selects their own row, and s
   const frame = await page.evaluate(() => window.pascapLab!.engine.diagnostics().frame);
   const viewport = page.locator('.timeline-scroll');
   await resetVertical(viewport);
-  const last = page.getByRole('button', { name: 'Select track Video track 8', exact: true });
+  const last = page.getByRole('button', { name: 'Select track Track 8', exact: true });
   await last.focus();
   await expect(last).toBeFocused();
   await expect(last).toBeInViewport();
   await expect.poll(() => viewport.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
   await alignedRows(page);
   await page.keyboard.press('Tab');
-  await expect(page.getByRole('button', { name: 'Toggle Ripple on Video track 8', exact: true })).toBeFocused();
+  await expect(page.getByRole('button', { name: 'Toggle Ripple on Track 8', exact: true })).toBeFocused();
   await page.keyboard.press('Tab');
-  await expect(page.locator('summary[aria-label="Track options Video track 8"]')).toBeFocused();
-  const top = page.getByRole('button', { name: 'Select track Video track 1', exact: true });
+  await expect(page.locator('summary[aria-label="Track options Track 8"]')).toBeFocused();
+  const top = page.getByRole('button', { name: 'Select track Track 1', exact: true });
   await top.focus();
   await top.press('Enter');
   await expect(top).toHaveAttribute('aria-pressed', 'true');
@@ -244,13 +243,13 @@ for (const { width, height, timelineHeight } of [
     await expect.poll(() => headers.evaluate((element) => element.clientHeight)).toBe(viewportHeight);
     await resetVertical(viewport);
     await wheelOver(page, headers, 2000);
-    await expect(page.getByRole('button', { name: 'Select track Video track 8', exact: true })).toBeInViewport();
+    await expect(page.getByRole('button', { name: 'Select track Track 8', exact: true })).toBeInViewport();
     await expect(page.locator('.music-track-empty')).toBeInViewport();
     await expect(page.locator('.timeline-ruler')).toBeInViewport({ ratio: 1 });
     await alignedRows(page);
     await wheelOver(page, viewport, -2000);
     await expect.poll(() => viewport.evaluate((element) => element.scrollTop)).toBe(0);
-    await expect(page.getByRole('button', { name: 'Select track Video track 1', exact: true })).toBeInViewport();
+    await expect(page.getByRole('button', { name: 'Select track Track 1', exact: true })).toBeInViewport();
     await expect(page.locator('.timeline-ruler')).toBeInViewport({ ratio: 1 });
     await alignedRows(page);
     expect(await page.evaluate(() => globalThis.document.documentElement.scrollWidth <= innerWidth)).toBe(true);
@@ -261,30 +260,30 @@ for (const { width, height, timelineHeight } of [
 
 test('only composition ends restrict stacking while every nonfinal track can be deleted', async ({ page }) => {
   const before = await current(page);
-  await openOptions(page, 'Track options Video track 1');
-  await expect(page.getByRole('button', { name: 'Lower track Video track 1', exact: true })).toBeDisabled();
-  await expect(
-    page.getByRole('button', { name: 'Lower track Video track 1', exact: true }),
-  ).toHaveAccessibleDescription('This track is already the bottom video track.');
+  await openOptions(page, 'Track options Track 1');
+  await expect(page.getByRole('button', { name: 'Lower track Track 1', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Lower track Track 1', exact: true })).toHaveAccessibleDescription(
+    'This track is already the bottom video track.',
+  );
   for (const action of ['Raise', 'Delete'])
-    await expect(page.getByRole('button', { name: `${action} track Video track 1`, exact: true })).toBeEnabled();
+    await expect(page.getByRole('button', { name: `${action} track Track 1`, exact: true })).toBeEnabled();
   await page.keyboard.press('Escape');
-  await openOptions(page, 'Track options Video track 8');
-  await expect(page.getByRole('button', { name: 'Raise track Video track 8', exact: true })).toBeDisabled();
-  await expect(
-    page.getByRole('button', { name: 'Raise track Video track 8', exact: true }),
-  ).toHaveAccessibleDescription('This track is already the top video track.');
-  await expect(page.getByRole('button', { name: 'Lower track Video track 8', exact: true })).toBeEnabled();
-  await expect(page.getByRole('button', { name: 'Delete track Video track 8', exact: true })).toBeEnabled();
+  await openOptions(page, 'Track options Track 8');
+  await expect(page.getByRole('button', { name: 'Raise track Track 8', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Raise track Track 8', exact: true })).toHaveAccessibleDescription(
+    'This track is already the top video track.',
+  );
+  await expect(page.getByRole('button', { name: 'Lower track Track 8', exact: true })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Delete track Track 8', exact: true })).toBeEnabled();
   await page.keyboard.press('Escape');
-  await openOptions(page, 'Track options Video track 2');
-  await expect(page.getByRole('button', { name: 'Lower track Video track 2', exact: true })).toBeEnabled();
-  await expect(page.getByRole('button', { name: 'Raise track Video track 2', exact: true })).toBeEnabled();
-  await expect(page.getByRole('button', { name: 'Delete track Video track 2', exact: true })).toBeEnabled();
+  await openOptions(page, 'Track options Track 2');
+  await expect(page.getByRole('button', { name: 'Lower track Track 2', exact: true })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Raise track Track 2', exact: true })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Delete track Track 2', exact: true })).toBeEnabled();
   await page.keyboard.press('Escape');
-  await openOptions(page, 'Track options Video track 4');
+  await openOptions(page, 'Track options Track 4');
   for (const action of ['Raise', 'Lower', 'Delete'])
-    await expect(page.getByRole('button', { name: `${action} track Video track 4`, exact: true })).toBeEnabled();
+    await expect(page.getByRole('button', { name: `${action} track Track 4`, exact: true })).toBeEnabled();
   expect(await current(page)).toEqual(before);
   expect(memory.saves).toBe(0);
 });
@@ -294,35 +293,11 @@ test('overlay raise, lower and delete each keep other data unchanged and require
 }) => {
   const before = await current(page);
   for (const [action, order] of [
-    [
-      'Raise',
-      [
-        'Video track 1',
-        'Video track 2',
-        'Video track 3',
-        'Video track 5',
-        'Video track 4',
-        'Video track 6',
-        'Video track 7',
-        'Video track 8',
-      ],
-    ],
-    [
-      'Lower',
-      [
-        'Video track 1',
-        'Video track 2',
-        'Video track 4',
-        'Video track 3',
-        'Video track 5',
-        'Video track 6',
-        'Video track 7',
-        'Video track 8',
-      ],
-    ],
+    ['Raise', ['Track 1', 'Track 2', 'Track 3', 'Track 5', 'Track 4', 'Track 6', 'Track 7', 'Track 8']],
+    ['Lower', ['Track 1', 'Track 2', 'Track 4', 'Track 3', 'Track 5', 'Track 6', 'Track 7', 'Track 8']],
   ] as const) {
-    await openOptions(page, 'Track options Video track 4');
-    await page.getByRole('button', { name: `${action} track Video track 4`, exact: true }).click();
+    await openOptions(page, 'Track options Track 4');
+    await page.getByRole('button', { name: `${action} track Track 4`, exact: true }).click();
     const after = await current(page);
     expect(after.layers.map((layer) => layer.name)).toEqual(order);
     expect(after.clips).toEqual(before.clips);
@@ -336,8 +311,8 @@ test('overlay raise, lower and delete each keep other data unchanged and require
     await alignedRows(page);
   }
   await wheelOver(page, page.locator('.timeline-scroll'), 2000);
-  await openOptions(page, 'Track options Video track 4');
-  await page.getByRole('button', { name: 'Delete track Video track 4', exact: true }).click();
+  await openOptions(page, 'Track options Track 4');
+  await page.getByRole('button', { name: 'Delete track Track 4', exact: true }).click();
   const after = await current(page);
   expect(after.layers).toEqual(before.layers.filter((layer) => layer.id !== 'row-4'));
   expect(after.clips).toEqual(before.clips.filter((clip) => clip.layerId !== 'row-4'));
@@ -355,7 +330,7 @@ test('active shared-point capture still blocks layer mutations and Escape restor
   page,
 }) => {
   const before = await current(page);
-  const marker = page.getByRole('button', { name: 'Track keyframe 10 on Video track 7', exact: true });
+  const marker = page.getByRole('button', { name: 'Track keyframe 10 on Track 7', exact: true });
   await marker.scrollIntoViewIfNeeded();
   const bounds = (await marker.boundingBox())!;
   await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
@@ -364,7 +339,7 @@ test('active shared-point capture still blocks layer mutations and Escape restor
   await expect(page.locator('.timeline-surface')).toHaveClass(/keyframe-drafting/);
   for (const action of ['Raise', 'Lower', 'Delete']) {
     const button = page.getByRole('button', {
-      name: `${action} track Video track 7`,
+      name: `${action} track Track 7`,
       exact: true,
       includeHidden: true,
     });
@@ -392,18 +367,9 @@ test('displayed rows follow stored bottom-to-top composition order without chang
       .sort((a, b) => a.top - b.top)
       .map((row) => row.name),
   );
-  expect(headers).toEqual([
-    'Video track 1',
-    'Video track 2',
-    'Video track 3',
-    'Video track 4',
-    'Video track 5',
-    'Video track 6',
-    'Video track 7',
-    'Video track 8',
-  ]);
-  await expect(page.getByRole('button', { name: 'Select track Video track 1', exact: true })).toBeInViewport();
-  await expect(page.getByRole('button', { name: 'Timeline lane Video track 1', exact: true })).toBeInViewport();
+  expect(headers).toEqual(['Track 1', 'Track 2', 'Track 3', 'Track 4', 'Track 5', 'Track 6', 'Track 7', 'Track 8']);
+  await expect(page.getByRole('button', { name: 'Select track Track 1', exact: true })).toBeInViewport();
+  await expect(page.getByRole('button', { name: 'Timeline lane Track 1', exact: true })).toBeInViewport();
   await alignedRows(page);
   expect(await current(page)).toEqual(before);
   expect(memory.saves).toBe(0);
@@ -484,7 +450,7 @@ test('the visible ruler and playhead retain exact seeking after vertical and hor
   expect(await current(page)).toEqual(document);
   expect(memory.saves).toBe(0);
   await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
-  await expect(page.getByRole('button', { name: 'Select track Video track 1', exact: true })).toHaveAttribute(
+  await expect(page.getByRole('button', { name: 'Select track Track 1', exact: true })).toHaveAttribute(
     'aria-pressed',
     'true',
   );

@@ -17,7 +17,7 @@ Colour and Opacity. See [the advanced-colour contract](design/HSL_AND_CURVES.md)
 The document stores one to eight uniform video tracks **bottom-to-top for
 composition**. Timeline/sidebar tracks use that same array order: track 1 renders below
 track 2, track 3 above track 2, and so on. Raise/Lower change composition priority, not
-an editing role. The initial Video track 1 identity is conventional, not mandatory or
+an editing role. The initial Track 1 identity is conventional, not mandatory or
 privileged. Every track can be reordered or deleted, except the last remaining
 track; only actual top/bottom stack endpoints restrict Raise/Lower.
 

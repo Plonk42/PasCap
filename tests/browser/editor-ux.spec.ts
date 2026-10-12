@@ -287,7 +287,7 @@ test('animated visual feedback retains explicit capture, native navigation order
   await expect(mainPrevious).toHaveAttribute('aria-disabled', 'true');
   await expect(mainPrevious).toHaveAttribute('tabindex', '-1');
   await inspectorTab(page, 'Track keyframes');
-  const keys = layerKeyframes(page, 'Video track 1');
+  const keys = layerKeyframes(page, 'Track 1');
   const next = keys
     .locator('[data-keyframe-frame="10"] .layer-keyframe-chip')
     .getByRole('button', { name: 'Next Exposure keyframe', exact: true });

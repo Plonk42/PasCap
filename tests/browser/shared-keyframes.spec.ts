@@ -84,7 +84,7 @@ async function ready(page: Page, document: ProjectDocument): Promise<void> {
     return state?.status === 'paused' && state.duration === duration;
   }, calculateLayout(document).duration);
   await inspectorTab(page, 'Track keyframes');
-  await expect(layerKeyframes(page, 'Video track 1')).toBeVisible();
+  await expect(layerKeyframes(page, 'Track 1')).toBeVisible();
 }
 
 async function fixture(page: Page, document: ProjectDocument): Promise<void> {
@@ -124,7 +124,7 @@ for (const target of ['video-1', 'empty'] as const) {
     document = applyCommand(document, { type: 'fades', layerId: 'video-1', opening: 2, closing: 3 });
     document = applyCommand(document, { type: 'layer-add', layer: createLayer('empty', 'Empty row') });
     await fixture(page, document);
-    const layerName = target === 'empty' ? 'Empty row' : 'Video track 1';
+    const layerName = target === 'empty' ? 'Empty row' : 'Track 1';
     await page.getByRole('button', { name: `Select track ${layerName}`, exact: true }).click();
     await inspectorTab(page, 'Track');
     const opacity = page.getByRole('slider', { name: 'Opacity', exact: true });
@@ -232,8 +232,8 @@ test('setting tooltips and accessible descriptions explain the editable keyframe
       await expect(page.locator(`[id="${await field.getAttribute('id')}-name"]`)).toHaveAttribute('title', hint);
     }
     await expect(page.locator('#inspector-pane .layer-setting-kind').filter({ hasText: scope })).toHaveCount(2);
-    await openOptions(page, 'Track options Video track 1');
-    const options = page.getByRole('group', { name: 'Track options Video track 1', exact: true });
+    await openOptions(page, 'Track options Track 1');
+    const options = page.getByRole('group', { name: 'Track options Track 1', exact: true });
     await expect(options.getByRole('slider')).toHaveCount(0);
     await expect(options.getByRole('button', { name: /Opacity keyframe/ })).toHaveCount(0);
     await expect(options.getByRole('checkbox', { name: /Ripple/ })).toBeVisible();
@@ -320,14 +320,14 @@ test('the first hollow diamond creates one point; same-frame channels merge inde
   expect(saturated.layers[0]?.keyframes).toEqual([{ ...expected, values: { ...expected.values, saturation: 1 } }]);
   await expect(page.locator('.layer-keyframe-controls')).toHaveCount(1);
   await expect(page.getByRole('checkbox', { name: 'Animate colour adjustments', exact: true })).toHaveCount(0);
-  const row = await editLayerPoint(page, 'Video track 1', 20);
+  const row = await editLayerPoint(page, 'Track 1', 20);
   await expect(row.locator('.layer-keyframe-dependencies .layer-keyframe-chip')).toHaveText([
     'Opacity',
     'Exposure',
     'Saturation',
   ]);
   await expect(row.locator('.layer-keyframe-point-values').getByRole('spinbutton')).toHaveCount(3);
-  const marker = page.getByRole('button', { name: 'Track keyframe 20 on Video track 1', exact: true });
+  const marker = page.getByRole('button', { name: 'Track keyframe 20 on Track 1', exact: true });
   for (const label of ['Opacity', 'Exposure', 'Saturation'])
     await expect(marker).toHaveAttribute('title', new RegExp(label));
 
@@ -474,7 +474,7 @@ test('moving a shared point moves every participant with one Undo and preserves 
     layer: { ...document.layers[0]!, keyframes: [first, second] },
   });
   await fixture(page, document);
-  const row = await editLayerPoint(page, 'Video track 1', 10);
+  const row = await editLayerPoint(page, 'Track 1', 10);
   await expect(row.getByLabel('Edit track keyframe 10', { exact: true })).toHaveText('Edit');
   await expect(row.locator('.layer-keyframe-dependencies .layer-keyframe-chip')).toHaveText([
     'Opacity',
@@ -486,7 +486,7 @@ test('moving a shared point moves every participant with one Undo and preserves 
   await time.fill('50');
   expect(await current(page)).toEqual(document);
   await time.press('Enter');
-  const keys = layerKeyframes(page, 'Video track 1');
+  const keys = layerKeyframes(page, 'Track 1');
   const moved = keys.getByRole('spinbutton', { name: 'Track keyframe frame 50', exact: true });
   await expect(moved).toBeFocused();
   await expect(moved).toHaveAttribute('id', id!);
@@ -651,13 +651,13 @@ for (const rate of [0.25, 4]) {
     expect(captures[3]!.pixelSum).not.toBe(captures[0]!.pixelSum);
     await seek(page, 0);
     await inspectorTab(page, 'Track keyframes');
-    const keys = layerKeyframes(page, 'Video track 1');
+    const keys = layerKeyframes(page, 'Track 1');
     for (const frame of [1, 2, 3]) {
       await keys.getByRole('button', { name: 'Next track keyframe', exact: true }).click();
       await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(frame);
-      await expect(
-        page.getByRole('button', { name: `Track keyframe ${frame} on Video track 1`, exact: true }),
-      ).toHaveCount(1);
+      await expect(page.getByRole('button', { name: `Track keyframe ${frame} on Track 1`, exact: true })).toHaveCount(
+        1,
+      );
     }
     expect((await current(page)).layers[0]?.keyframes).toEqual(document.layers[0]?.keyframes);
     expect((await current(page)).clips.map((clip) => clip.speed)).toEqual([
@@ -681,13 +681,13 @@ test('a row marker opens the selected empty row independently of clips, and keyb
   document = applyCommand(document, {
     type: 'layer-add',
     layer: {
-      ...createLayer('upper', 'Video track 2', false),
+      ...createLayer('upper', 'Track 2', false),
       keyframes: [sharedPoint(20, { exposure: 1, opacity: 0.4 })],
     },
   });
   await fixture(page, document);
   await inspectorTab(page, 'Sequence');
-  const marker = page.getByRole('button', { name: 'Track keyframe 20 on Video track 2', exact: true });
+  const marker = page.getByRole('button', { name: 'Track keyframe 20 on Track 2', exact: true });
   await expect(marker).toHaveAttribute('data-layer-keyframe', '20');
   await expect(marker).toHaveAttribute('data-keyframe-layer', 'upper');
   await expect(marker.locator('xpath=ancestor::*[@data-clip-id]')).toHaveCount(0);
@@ -708,16 +708,16 @@ test('a row marker opens the selected empty row independently of clips, and keyb
   await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(20);
   await expect(page.getByRole('tab', { name: 'Track', exact: true })).toHaveAttribute('aria-selected', 'true');
   await inspectorTab(page, 'Track keyframes');
-  await expect(layerKeyframes(page, 'Video track 2')).toBeVisible();
-  await expect(layerKeyframes(page, 'Video track 1')).toHaveCount(0);
+  await expect(layerKeyframes(page, 'Track 2')).toBeVisible();
+  await expect(layerKeyframes(page, 'Track 1')).toHaveCount(0);
   await inspectorTab(page, 'Clip');
   await expect(page.locator('#inspector-pane [role="tabpanel"]:not([hidden])')).toContainText(
-    'Select a clip on Video track 2 to edit it.',
+    'Select a clip on Track 2 to edit it.',
   );
   await expect(page.getByRole('textbox', { name: 'Source IN frame', exact: true })).toHaveCount(0);
   await expect(page.locator('.layer-control.selected .layer-select')).toHaveAttribute(
     'aria-label',
-    'Select track Video track 2',
+    'Select track Track 2',
   );
   await inspectorTab(page, 'Track');
   await expect(page.getByRole('slider', { name: 'Saturation', exact: true })).toBeEnabled();
@@ -727,10 +727,10 @@ test('a row marker opens the selected empty row independently of clips, and keyb
   expect(edited.layers[0]).toEqual(document.layers[0]);
   expect(edited.clips).toEqual(document.clips);
   expect(edited.layers[1]?.keyframes).toEqual([sharedPoint(20, { exposure: 0.6, opacity: 0.4 })]);
-  await expect(layerKeyframes(page, 'Video track 2')).toBeVisible();
+  await expect(layerKeyframes(page, 'Track 2')).toBeVisible();
 
   // An empty row keeps its stored participants editable in the list.
-  const field = (await editLayerPoint(page, 'Video track 2', 20)).getByRole('spinbutton', {
+  const field = (await editLayerPoint(page, 'Track 2', 20)).getByRole('spinbutton', {
     name: 'Opacity keyframe value 20',
     exact: true,
   });
@@ -760,7 +760,7 @@ test('an overlapping clip-speed edit is rejected atomically, without a save or h
   document = applyCommand(document, {
     type: 'layer-add',
     layer: {
-      ...createLayer('upper', 'Video track 2', false),
+      ...createLayer('upper', 'Track 2', false),
       keyframes: [sharedPoint(0, { exposure: 0.2, opacity: 0.8 })],
     },
   });
@@ -840,7 +840,7 @@ test('numeric trim, mapped split, duplicate and overlay moves keep absolute row 
   document = applyCommand(document, {
     type: 'layer-add',
     layer: {
-      ...createLayer('upper', 'Video track 2', false),
+      ...createLayer('upper', 'Track 2', false),
       keyframes: [
         sharedPoint(5, { opacity: 0.5, exposure: 0.25 }),
         sharedPoint(90, { opacity: 0.9, exposure: 0.75 }, 'ease-out'),
@@ -908,7 +908,7 @@ test('numeric trim, mapped split, duplicate and overlay moves keep absolute row 
   const moved = await current(page);
   expect(moved.clips.find((clip) => clip.id === 'overlay')).toMatchObject({ start: 80, sourceIn: 10, sourceOut: 40 });
   expect(moved.layers).toEqual(document.layers);
-  await expect(page.getByRole('button', { name: 'Track keyframe 5 on Video track 2', exact: true })).toHaveCount(1);
+  await expect(page.getByRole('button', { name: 'Track keyframe 5 on Track 2', exact: true })).toHaveCount(1);
   await page.evaluate(() => window.pascapLab!.flush());
   const saved = memory.snapshot();
   expect(saved.schemaVersion).toBe(15);
@@ -928,5 +928,5 @@ test('numeric trim, mapped split, duplicate and overlay moves keep absolute row 
   await inspectorTab(page, 'Clip');
   await expect(sourceIn).toHaveValue('00:00:00:10');
   await expect(start).toHaveValue('80');
-  await expect(page.getByRole('button', { name: 'Track keyframe 5 on Video track 2', exact: true })).toHaveCount(1);
+  await expect(page.getByRole('button', { name: 'Track keyframe 5 on Track 2', exact: true })).toHaveCount(1);
 });

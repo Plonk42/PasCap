@@ -39,8 +39,8 @@ async function seek(page: Page, frame: number): Promise<void> {
 async function addOverlay(page: Page): Promise<string> {
   await page.getByRole('button', { name: 'Add video track', exact: true }).click();
   // Placement/trim regressions deliberately use a positioned track, not the new default.
-  await openOptions(page, 'Track options Video track 2');
-  const ripple = page.getByRole('checkbox', { name: 'Ripple on track Video track 2', exact: true });
+  await openOptions(page, 'Track options Track 2');
+  const ripple = page.getByRole('checkbox', { name: 'Ripple on track Track 2', exact: true });
   await expect(ripple).toBeChecked();
   await ripple.uncheck();
   await closeOptions(page);
@@ -76,8 +76,8 @@ test('adds layered clips, adjusts row opacity, hides/shows and releases unused d
   expect(project.layers).toHaveLength(2);
   expect(project.clips[1]).toMatchObject({ layerId: project.layers[1]!.id, start: 0, sourceIn: 0, sourceOut: 120 });
   await expect(page.locator('.timeline-clip')).toHaveCount(2);
-  await openOptions(page, 'Track options Video track 2');
-  await expect(page.getByRole('slider', { name: 'Opacity of track Video track 2', exact: true })).toHaveCount(0);
+  await openOptions(page, 'Track options Track 2');
+  await expect(page.getByRole('slider', { name: 'Opacity of track Track 2', exact: true })).toHaveCount(0);
   await closeOptions(page);
   await inspectorTab(page, 'Track');
   await page.getByRole('slider', { name: 'Opacity', exact: true }).fill('50');
@@ -88,13 +88,13 @@ test('adds layered clips, adjusts row opacity, hides/shows and releases unused d
   expect(project.layers[1]!.opacity).toBe(0.5);
   expect(project.layers[0]!.opacity).toBe(1);
   expect(project.clips.every((clip) => !('opacity' in clip))).toBe(true);
-  await page.getByRole('button', { name: 'Hide track Video track 2', exact: true }).click();
+  await page.getByRole('button', { name: 'Hide track Track 2', exact: true }).click();
   await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
   const hidden = await page.evaluate(() =>
     Array.from(window.pascapLab!.engine.capturePixels().slice(100_000, 100_012)),
   );
   expect(hidden).not.toEqual(half);
-  await page.getByRole('button', { name: 'Show track Video track 2', exact: true }).click();
+  await page.getByRole('button', { name: 'Show track Track 2', exact: true }).click();
   await inspectorTab(page, 'Clip');
   await page.getByRole('spinbutton', { name: 'Clip timeline start', exact: true }).fill('90');
   await page.getByRole('spinbutton', { name: 'Clip timeline start', exact: true }).press('Enter');
@@ -109,8 +109,8 @@ test('adds layered clips, adjusts row opacity, hides/shows and releases unused d
   expect(black).toBe(0);
   await seek(page, 100);
   expect(await page.evaluate(() => window.pascapLab!.engine.diagnostics().assignedClipIds)).toContain(topId);
-  await openOptions(page, 'Track options Video track 2');
-  await page.getByRole('button', { name: 'Delete track Video track 2', exact: true }).click();
+  await openOptions(page, 'Track options Track 2');
+  await page.getByRole('button', { name: 'Delete track Track 2', exact: true }).click();
   await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().decoderCount === 2);
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   expect(await page.evaluate(() => window.pascapLab!.project()!.layers.length)).toBe(2);
@@ -127,7 +127,7 @@ test('hiding one of two tracks keeps the other track visible, paused and playing
   await seek(page, 10);
   const both = await capture();
   // The opaque top track covers the lower one, so hiding the lower track must not change the image.
-  await page.getByRole('button', { name: 'Hide track Video track 1', exact: true }).click();
+  await page.getByRole('button', { name: 'Hide track Track 1', exact: true }).click();
   await settled();
   expect(await capture()).toEqual(both);
   expect(sum(both)).toBeGreaterThan(0);
@@ -139,14 +139,14 @@ test('hiding one of two tracks keeps the other track visible, paused and playing
   await seek(page, playedFrame);
   expect(sum(await capture())).toBeGreaterThan(0);
   // Hiding the top track instead leaves the lower one.
-  await page.getByRole('button', { name: 'Show track Video track 1', exact: true }).click();
-  await page.getByRole('button', { name: 'Hide track Video track 2', exact: true }).click();
+  await page.getByRole('button', { name: 'Show track Track 1', exact: true }).click();
+  await page.getByRole('button', { name: 'Hide track Track 2', exact: true }).click();
   await settled();
   await seek(page, 10);
   const lowerOnly = await capture();
   expect(sum(lowerOnly)).toBeGreaterThan(0);
   expect(lowerOnly).not.toEqual(both);
-  await page.getByRole('button', { name: 'Show track Video track 2', exact: true }).click();
+  await page.getByRole('button', { name: 'Show track Track 2', exact: true }).click();
   await settled();
   expect(await capture()).toEqual(both);
 });
@@ -154,24 +154,24 @@ test('hiding one of two tracks keeps the other track visible, paused and playing
 test('reorders independently positioned video tracks without altering source ranges', async ({ page }) => {
   await addOverlay(page);
   await page.getByRole('button', { name: 'Add video track', exact: true }).click();
-  await openOptions(page, 'Track options Video track 3');
-  await page.getByRole('checkbox', { name: 'Ripple on track Video track 3', exact: true }).uncheck();
+  await openOptions(page, 'Track options Track 3');
+  await page.getByRole('checkbox', { name: 'Ripple on track Track 3', exact: true }).uncheck();
   await closeOptions(page);
   await page.getByRole('button', { name: 'Add recording-03.mp4 to timeline', exact: true }).click();
   const before = projectSchema.parse(await page.evaluate(() => window.pascapLab!.project()));
-  await openOptions(page, 'Track options Video track 3');
-  await page.getByRole('button', { name: 'Lower track Video track 3', exact: true }).click();
+  await openOptions(page, 'Track options Track 3');
+  await page.getByRole('button', { name: 'Lower track Track 3', exact: true }).click();
   await closeOptions(page);
   const after = projectSchema.parse(await page.evaluate(() => window.pascapLab!.project()));
-  expect(after.layers.map((layer) => layer.name)).toEqual(['Video track 1', 'Video track 3', 'Video track 2']);
+  expect(after.layers.map((layer) => layer.name)).toEqual(['Track 1', 'Track 3', 'Track 2']);
   expect(after.clips).toEqual(before.clips);
-  await openOptions(page, 'Track options Video track 2');
-  await page.getByRole('button', { name: 'Delete track Video track 2', exact: true }).click();
+  await openOptions(page, 'Track options Track 2');
+  await page.getByRole('button', { name: 'Delete track Track 2', exact: true }).click();
   await page.getByRole('button', { name: 'Add video track', exact: true }).click();
   expect(await page.evaluate(() => window.pascapLab!.project()!.layers.map((layer) => layer.name))).toEqual([
-    'Video track 1',
-    'Video track 3',
-    'Video track 2',
+    'Track 1',
+    'Track 3',
+    'Track 2',
   ]);
 });
 
@@ -467,7 +467,7 @@ test('plays three simultaneous sources through row-wide rate/grade curves, a tra
   });
   project = applyCommand(project, {
     type: 'layer-add',
-    layer: createLayer('upper', 'Video track 2', false),
+    layer: createLayer('upper', 'Track 2', false),
   });
   const clip = { ...createClip('upper-clip', blue, 0, 80), layerId: 'upper', start: 5 };
   project.layers.find((layer) => layer.id === 'upper')!.opacity = 0.8;
@@ -600,18 +600,16 @@ test('edits shared values outside the source excerpt and duration without moving
   project = applyCommand(project, { type: 'trim', clipId: original.id, sourceIn: 30, sourceOut: 90 });
   await page.evaluate((document) => window.pascapLab!.setDocument(document), project);
   await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
-  const row = await editLayerPoint(page, 'Video track 1', 5);
+  const row = await editLayerPoint(page, 'Track 1', 5);
   await row.getByRole('spinbutton', { name: 'Opacity keyframe value 5', exact: true }).fill('80');
   const opacityFrame = row.getByRole('spinbutton', { name: 'Track keyframe frame 5', exact: true });
   await opacityFrame.fill('8');
   expect(await page.evaluate(() => window.pascapLab!.project()!.layers[0]!.keyframes[0]!.frame)).toBe(5);
   await opacityFrame.press('Enter');
-  const outside = await editLayerPoint(page, 'Video track 1', 110);
+  const outside = await editLayerPoint(page, 'Track 1', 110);
   await expect(outside.locator('.keyframe-row-skipped')).toHaveText('Outside duration');
   await outside.getByRole('spinbutton', { name: 'Exposure keyframe value 110', exact: true }).fill('3');
-  await layerKeyframes(page, 'Video track 1')
-    .getByRole('button', { name: 'Go to track keyframe 8', exact: true })
-    .click();
+  await layerKeyframes(page, 'Track 1').getByRole('button', { name: 'Go to track keyframe 8', exact: true }).click();
   await page.getByRole('slider', { name: 'Exposure', exact: true }).fill('0.7');
   const edited = projectSchema.parse(await page.evaluate(() => window.pascapLab!.project()));
   expect(edited.layers[0]?.keyframes).toEqual([
@@ -732,7 +730,7 @@ test('cross-layer dragging uses scrolled lane coordinates and inserts before the
   for (let index = 2; index <= 5; index++)
     project = applyCommand(project, {
       type: 'layer-add',
-      layer: createLayer(`layer-${index}`, `Video track ${index}`, false),
+      layer: createLayer(`layer-${index}`, `Track ${index}`, false),
     });
   project = applyCommand(project, { type: 'insert', clip: createClip('a', red, 0, 30), index: 0 });
   project = applyCommand(project, {
@@ -786,7 +784,7 @@ test('cross-layer dragging uses scrolled lane coordinates and inserts before the
   });
   await expect(page.locator('.layer-control.selected .layer-select')).toHaveAttribute(
     'aria-label',
-    'Select track Video track 1',
+    'Select track Track 1',
   );
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   expect(
@@ -795,13 +793,13 @@ test('cross-layer dragging uses scrolled lane coordinates and inserts before the
 });
 
 test('the track header Ripple toggle mirrors Layer options and switches in one Undo step', async ({ page }) => {
-  const toggle = page.getByRole('button', { name: 'Toggle Ripple on Video track 1', exact: true });
+  const toggle = page.getByRole('button', { name: 'Toggle Ripple on Track 1', exact: true });
   await expect(toggle).toHaveAttribute('aria-pressed', 'true');
   await toggle.click();
   await expect(toggle).toHaveAttribute('aria-pressed', 'false');
   expect(await page.evaluate(() => window.pascapLab!.project()!.layers[0]!.ripple)).toBe(false);
-  await openOptions(page, 'Track options Video track 1');
-  await expect(page.getByRole('checkbox', { name: 'Ripple on track Video track 1', exact: true })).not.toBeChecked();
+  await openOptions(page, 'Track options Track 1');
+  await expect(page.getByRole('checkbox', { name: 'Ripple on track Track 1', exact: true })).not.toBeChecked();
   await closeOptions(page);
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   await expect(toggle).toHaveAttribute('aria-pressed', 'true');
