@@ -13,6 +13,8 @@ interface Props {
   duration: number;
   drafting: boolean;
   onTogglePlayback: () => void;
+  /** Play covers only the selected timeline range. */
+  rangeSelected: boolean;
   onToggleUngraded: () => void;
   onSeek: (frame: number) => void;
   onRetry: () => void;
@@ -94,6 +96,7 @@ export function PreviewPanel({
   duration,
   drafting,
   onTogglePlayback,
+  rangeSelected,
   onToggleUngraded,
   onSeek,
   onRetry,
@@ -199,9 +202,9 @@ export function PreviewPanel({
             <Icon name="back" size={16} />
           </button>
           <button
-            className="play-button"
+            className={`play-button ${rangeSelected ? 'range-play' : ''}`}
             aria-label={diagnostics?.playing ? 'Pause preview' : 'Play preview'}
-            title="Play or pause (Space)"
+            title={rangeSelected ? 'Play the selected range or pause (Space)' : 'Play or pause (Space)'}
             disabled={controlsUnavailable}
             onClick={onTogglePlayback}
           >

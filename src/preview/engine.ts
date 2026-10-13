@@ -148,6 +148,8 @@ export class PreviewEngine {
   #status: PreviewStatus = 'empty';
   #message = 'Add footage to the timeline';
   #frame = 0;
+  /** Exclusive project frame where the current playback stops. */
+  #playEnd = 0;
   #clockFrame = 0;
   #clockTime = 0;
   /** Without music, the clock stops at a frame the decoders have not delivered. */
@@ -558,10 +560,14 @@ export class PreviewEngine {
     // Playback schedules newly visible sources on its next frame.
     this.#redrawPaused();
   }
-  async play(): Promise<void> {
+  /** With a range (OUT exclusive), start inside it, or at IN, and stop on its last frame. */
+  async play(range?: { inFrame: number; outFrame: number }): Promise<void> {
     if (!this.#document || !this.#layout.duration || this.#disposed || this.#playing || this.#busy) return;
-    if (this.#frame >= this.#layout.duration - 1) {
-      const reset = this.seek(0);
+    const duration = this.#layout.duration;
+    const start = range ? Math.max(0, Math.min(range.inFrame, duration - 1)) : 0;
+    const end = range ? Math.max(start + 1, Math.min(range.outFrame, duration)) : duration;
+    if (this.#frame < start || this.#frame >= end - 1) {
+      const reset = this.seek(start);
       const signal = this.#controller.signal;
       await reset;
       if (!this.#isCurrent(signal)) return;
@@ -569,6 +575,7 @@ export class PreviewEngine {
     if (this.#status === 'error') return;
     const signal = this.#beginOperation();
     this.#operationFrame = this.#frame;
+    this.#playEnd = end;
     try {
       await this.#music.resumeContext(signal);
       if (!this.#isCurrent(signal)) return;
@@ -718,9 +725,10 @@ export class PreviewEngine {
     const document = this.#document!;
     const frame = this.#clockHeld ? this.#clockFrame : this.#expectedFrame(now);
     this.#operationFrame = frame;
-    if (frame >= this.#layout.duration) {
+    const end = Math.min(this.#playEnd, this.#layout.duration);
+    if (frame >= end) {
       this.pause();
-      void this.seek(this.#layout.duration - 1);
+      void this.seek(end - 1);
       return;
     }
     if (!this.#music.sync()) {

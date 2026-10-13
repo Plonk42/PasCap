@@ -5,7 +5,7 @@ const GROUPS = [
   {
     title: 'Preview',
     items: [
-      ['Space', 'Play / pause'],
+      ['Space', 'Play / pause; only the selected range when one is selected'],
       ['← / →', 'Previous / next frame'],
       ['Shift + ← / →', 'Step ten frames'],
       ['Home / End', 'Go to start / end'],

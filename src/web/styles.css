@@ -737,6 +737,11 @@ svg {
   color: #d5ecdc;
 }
 
+.play-button.range-play {
+  border-color: #efb497;
+  box-shadow: 0 0 0 2px #d89b7466;
+}
+
 .timecode {
   display: flex;
   align-items: center;
