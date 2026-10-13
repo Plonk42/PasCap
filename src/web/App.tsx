@@ -2,6 +2,7 @@ import {
   lazy,
   Suspense,
   useCallback,
+  useDeferredValue,
   useEffect,
   useMemo,
   useRef,
@@ -234,6 +235,7 @@ export function App() {
   const [selectedLayerId, setSelectedLayerId] = useState(EMPTY_PROJECT.layers[0]!.id);
   const [keyframeInspection, setKeyframeInspection] = useState<KeyframeInspection | null>(null);
   const [sourceInspectionEpoch, setSourceInspectionEpoch] = useState(0);
+  const [scrubbing, setScrubbing] = useState(false);
   const [ranges, setRanges] = useState<MediaSelections>({});
   const [boundaryId, setBoundaryId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -1185,6 +1187,13 @@ export function App() {
       followPlayhead,
     ],
   );
+  // While the ruler is scrubbed, the Inspector catches up whenever the pointer rests instead of slowing every frame.
+  const playheadFrame = diagnostics?.frame ?? 0;
+  const deferredFrame = useDeferredValue(playheadFrame);
+  const deferredNavigation = useDeferredValue(keyframeNavigation);
+  const inspectorFrame = scrubbing ? deferredFrame : playheadFrame;
+  const inspectorNavigation = scrubbing ? deferredNavigation : keyframeNavigation;
+  const pausePreview = useCallback(() => engine.current?.pause(), []);
   const openProject = async (id: string): Promise<boolean> =>
     (
       await act(async () => {
@@ -1350,8 +1359,16 @@ export function App() {
     });
     return result.ok && result.value;
   };
-  const importAudio = (path: string): Promise<boolean> => importMusic(() => api.importAudio(path));
-  const importSelectedAudio = (path: string): Promise<boolean> => importMusic(() => api.importSelectedAudio(path));
+  const latestImportMusic = useRef(importMusic);
+  latestImportMusic.current = importMusic;
+  const importAudio = useCallback(
+    (path: string): Promise<boolean> => latestImportMusic.current(() => api.importAudio(path)),
+    [],
+  );
+  const importSelectedAudio = useCallback(
+    (path: string): Promise<boolean> => latestImportMusic.current(() => api.importSelectedAudio(path)),
+    [],
+  );
   const importVisibility = useCallback((open: boolean): void => {
     setImportOpen(open);
     if (open) setActionError('');
@@ -1486,9 +1503,45 @@ export function App() {
   };
   const targetLayer = visible.layers.find((layer) => layer.id === selectedLayerId)?.name ?? visible.layers[0]!.name;
   const videoIds = project ? projectVideoIds(project) : new Set<string>();
-  const audioIds = project ? projectAudioIds(project) : new Set<string>();
   const projectAssets = assets.filter((asset) => videoIds.has(asset.id));
-  const projectAudio = audioAssets.filter((asset) => audioIds.has(asset.id));
+  const projectAudio = useMemo(() => {
+    const ids = project ? projectAudioIds(project) : new Set<string>();
+    return audioAssets.filter((asset) => ids.has(asset.id));
+  }, [audioAssets, project]);
+  const musicBusy = busy || !project || connection.state !== 'ready';
+  const musicDrafting = draft !== null || !project;
+  const musicControls = useMemo(
+    () => (
+      <MusicControls
+        key={project?.id ?? 'empty'}
+        project={visible}
+        assets={projectAudio}
+        busy={musicBusy}
+        drafting={musicDrafting}
+        selectedMusicId={selectedMusicId}
+        onSelectMusic={selectMusic}
+        error={actionError}
+        onBrowseVisibility={musicImportVisibility}
+        onEdit={edit}
+        onImport={importAudio}
+        onBrowseImport={importSelectedAudio}
+      />
+    ),
+    [
+      project?.id,
+      visible,
+      projectAudio,
+      musicBusy,
+      musicDrafting,
+      selectedMusicId,
+      selectMusic,
+      actionError,
+      musicImportVisibility,
+      edit,
+      importAudio,
+      importSelectedAudio,
+    ],
+  );
   const dockStyle = {
     '--media-width': `${workspace.layout.mediaOpen ? workspace.sizes.media : 0}px`,
     '--inspector-width': `${workspace.layout.inspectorOpen ? workspace.sizes.inspector : 0}px`,
@@ -1909,38 +1962,27 @@ export function App() {
               }
             >
               {(Inspector) => (
-                <Inspector
-                  project={visible}
-                  assets={assets}
-                  selectedClipId={selectedId}
-                  selectedLayerId={selectedLayerId}
-                  boundaryId={boundaryId}
-                  frame={diagnostics?.frame ?? 0}
-                  drafting={draft !== null || !project}
-                  section={inspectorMode}
-                  onSection={setInspectorMode}
-                  sectionRequest={sectionRequest}
-                  onSelectBoundary={setBoundaryId}
-                  onEdit={edit}
-                  onPreview={previewDraft}
-                  onSeek={seek}
-                  onPause={() => engine.current?.pause()}
-                >
-                  <MusicControls
-                    key={project?.id ?? 'empty'}
+                <KeyframeNavigationContext.Provider value={inspectorNavigation}>
+                  <Inspector
                     project={visible}
-                    assets={projectAudio}
-                    busy={busy || !project || connection.state !== 'ready'}
+                    assets={assets}
+                    selectedClipId={selectedId}
+                    selectedLayerId={selectedLayerId}
+                    boundaryId={boundaryId}
+                    frame={inspectorFrame}
                     drafting={draft !== null || !project}
-                    selectedMusicId={selectedMusicId}
-                    onSelectMusic={selectMusic}
-                    error={actionError}
-                    onBrowseVisibility={musicImportVisibility}
+                    section={inspectorMode}
+                    onSection={setInspectorMode}
+                    sectionRequest={sectionRequest}
+                    onSelectBoundary={setBoundaryId}
                     onEdit={edit}
-                    onImport={importAudio}
-                    onBrowseImport={importSelectedAudio}
-                  />
-                </Inspector>
+                    onPreview={previewDraft}
+                    onSeek={seek}
+                    onPause={pausePreview}
+                  >
+                    {musicControls}
+                  </Inspector>
+                </KeyframeNavigationContext.Provider>
               )}
             </DeferredPanel>
           </div>
@@ -1993,6 +2035,7 @@ export function App() {
             onMarkCut={markCut}
             onCutMarked={cutMarked}
             onClearCut={() => setCutRange(null)}
+            onScrub={setScrubbing}
             revealRequest={revealRequest}
             fitRequest={fitRequest}
             draggedMediaIds={draggedMediaIds}

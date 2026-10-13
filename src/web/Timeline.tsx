@@ -94,6 +94,8 @@ interface Props {
   onMarkCut: (edge: TrimEdge) => void;
   onCutMarked: () => void;
   onClearCut: () => void;
+  /** Ruler/playhead drag starts (true) and ends (false). */
+  onScrub?: (active: boolean) => void;
   revealRequest: number;
 }
 interface TrimDrag {
@@ -406,6 +408,7 @@ export function Timeline(props: Readonly<Props>) {
     draggedMediaIds,
     ranges,
     onDuplicate,
+    onScrub,
   } = props;
   const [snapping, setSnapping] = useState(true);
   const [clipMenu, setClipMenu] = useState<ClipMenuAnchor | null>(null);
@@ -854,8 +857,10 @@ export function Timeline(props: Readonly<Props>) {
     event.preventDefault();
     event.stopPropagation();
     event.currentTarget.setPointerCapture(event.pointerId);
+    onScrub?.(true);
     seekAt(event);
   };
+  const endSeek = (): void => onScrub?.(false);
   const moveSeek = (event: PointerEvent): void => {
     if (!event.currentTarget.hasPointerCapture(event.pointerId) || !layout.duration) return;
     event.stopPropagation();
@@ -1116,6 +1121,7 @@ export function Timeline(props: Readonly<Props>) {
               className="timeline-ruler"
               onPointerDown={beginSeek}
               onPointerMove={moveSeek}
+              onLostPointerCapture={endSeek}
               aria-label="Timeline ruler"
               title="Time ruler · click or drag to seek; separators mark time, not keyframes"
             >
@@ -1130,7 +1136,12 @@ export function Timeline(props: Readonly<Props>) {
               ))}
               {layout.duration > 0 && (
                 <div className="timeline-ruler-playhead" style={{ left: leading + frame * scale }}>
-                  <button aria-label="Drag playhead" onPointerDown={beginSeek} onPointerMove={moveSeek} />
+                  <button
+                    aria-label="Drag playhead"
+                    onPointerDown={beginSeek}
+                    onPointerMove={moveSeek}
+                    onLostPointerCapture={endSeek}
+                  />
                   {(draft || gestureActive) && (
                     <span className="playhead-readout">{formatTimecode(frame)} · draft</span>
                   )}
