@@ -61,6 +61,9 @@ clip detail filters before grading; see [detail filters](design/DETAIL_FILTERS.m
   track 3 above track 2, and so on, with no primary/overlay role. The thin ruler remains
   pinned above scrolling video tracks with TIME ticks/separators, playhead handle and click/drag seeking;
   distinct Cut/Fade/Dissolve buttons open boundary transitions, not keyframes.
+  While dragging the ruler or playhead, the preview shows each decoded frame as soon as it is
+  ready (the newest pointer position wins, never aborting an undecoded seek); the Inspector's
+  playhead values catch up whenever the pointer rests, even before release, and exactly on release.
 
 Viewer and Inspector tabs use native buttons with consistent padding, borders and
 selected appearance, retaining arrow/Home/End navigation. Keyframes keeps its

@@ -1,4 +1,4 @@
-import { useEffect, useId, type KeyboardEvent, type ReactNode } from 'react';
+import { memo, useEffect, useId, type KeyboardEvent, type ReactNode } from 'react';
 import { COLOUR_CONTROLS, NEUTRAL_COLOUR } from '../shared/colour.js';
 import { applyCommand, type EditCommand } from '../shared/commands.js';
 import { colourAt } from '../shared/composition.js';
@@ -626,7 +626,9 @@ function SourceRangeSection({
   );
 }
 
-export function Inspector({
+export const Inspector = memo(InspectorPanel);
+
+function InspectorPanel({
   project,
   assets,
   selectedClipId,
