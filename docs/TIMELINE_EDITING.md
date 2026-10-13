@@ -213,6 +213,9 @@ toolbar covering the lanes. Each track header has one **Ripple** toggle icon
   edge autoscroll follow the other timeline gestures; Escape, pointer cancellation,
   lost capture or window blur restore the previous range and playhead. A plain
   click seeks and clears the range; the playhead handle scrubs.
+- While a range is selected, preview **Play / Space** plays only that range: from
+  the playhead when it is inside the range before its last frame, otherwise from
+  IN, stopping on the last included frame (OUT − 1) so the section can be replayed.
 - **Cut range / Shift+Delete** is enabled only when a range and a clip are both
   selected and the range overlaps that clip; otherwise its tooltip names the reason
   (no range, no clip, or range outside the clip). It removes the overlapping part
