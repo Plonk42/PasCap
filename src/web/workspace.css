@@ -261,7 +261,11 @@ body {
 }
 
 .product-workspace .transport-note {
+  /* Fixed width for the longest status ("Empty timeline"), so the play button never shifts. */
+  flex: 0 0 88px;
   min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
   display: flex;
   gap: 5px;
   align-items: center;
