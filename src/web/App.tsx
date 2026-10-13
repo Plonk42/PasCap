@@ -221,6 +221,7 @@ export function App() {
   const [timeRange, setTimeRange] = useState<TimelineRange | null>(null);
   const playRange = useRef(timeRange);
   playRange.current = timeRange;
+  const playAfterSeek = useRef(false);
   const [inspectorMode, setInspectorMode] = useState<InspectorMode>(() => {
     const saved = readPreference('pascap-inspector-tab');
     return saved === 'track' || saved === 'audio' ? saved : 'clip';
@@ -529,6 +530,7 @@ export function App() {
   const seek = useCallback((frame: number, preserveSourceInspection = false): void => {
     const document = current.current;
     if (!document || drafting.current) return;
+    playAfterSeek.current = false;
     setKeyframeInspection(null);
     if (!preserveSourceInspection) setSourceInspectionEpoch((epoch) => epoch + 1);
     const duration = calculateLayout(document).duration;
@@ -543,8 +545,13 @@ export function App() {
     setKeyframeInspection(null);
     setSourceInspectionEpoch((epoch) => epoch + 1);
     setViewerMode('timeline');
-    if (engine.current?.diagnostics().playing) engine.current.pause();
-    else void engine.current?.play(playRange.current ?? undefined);
+    const preview = engine.current;
+    if (!preview) return;
+    const state = preview.diagnostics();
+    if (state.playing) preview.pause();
+    // The engine ignores play() while seeking, e.g. while a finished playback settles on its last frame.
+    else if (state.status === 'seeking') playAfterSeek.current = !playAfterSeek.current;
+    else void preview.play(playRange.current ?? undefined);
   }, []);
   const toggleUngraded = useCallback(() => {
     if (drafting.current) return;
@@ -812,7 +819,15 @@ export function App() {
         preview = new module.PreviewEngine(canvas.current);
         engine.current = preview;
         lastPreview.current = '';
-        unsubscribe = preview.subscribe(setDiagnostics);
+        unsubscribe = preview.subscribe((state) => {
+          setDiagnostics(state);
+          if (!playAfterSeek.current || state.status === 'seeking') return;
+          playAfterSeek.current = false;
+          if (state.status === 'paused')
+            queueMicrotask(() => {
+              void engine.current?.play(playRange.current ?? undefined);
+            });
+        });
         window.pascapLab = {
           engine: preview,
           project: () => current.current,

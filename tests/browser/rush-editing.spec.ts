@@ -1198,6 +1198,40 @@ test('Play covers only the selected range: from IN or inside it, stopping on its
   await page.getByRole('button', { name: 'Pause preview', exact: true }).click();
 });
 
+test('Play pressed while playback settles on its last frame restarts from the range IN, or the timeline start', async ({
+  page,
+}) => {
+  // Withhold the decode of the settling last frame, so Play arrives while that seek is still pending.
+  const replayWhileSettling = async (last: number, other: number): Promise<number> => {
+    await seek(page, other);
+    await page.evaluate((frame) => {
+      const replayed: number[] = [];
+      Object.assign(globalThis, { replayed });
+      window.pascapLab!.engine.subscribe((diagnostics) => {
+        if (diagnostics.playing) replayed.push(diagnostics.frame);
+      });
+      window.videoFrameGate.hold = true;
+      void window.pascapLab!.engine.seek(frame);
+    }, last);
+    await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().status)).toBe('seeking');
+    await page.getByRole('button', { name: 'Play preview', exact: true }).click();
+    await page.evaluate(() => window.videoFrameGate.release());
+    const replayed = (): Promise<number[]> =>
+      page.evaluate(() => (globalThis as unknown as { replayed: number[] }).replayed);
+    await expect.poll(async () => (await replayed()).length, { timeout: 15_000 }).toBeGreaterThan(0);
+    await page.evaluate(() => window.pascapLab!.engine.pause());
+    return Math.min(...(await replayed()));
+  };
+  await markRange(page, 20, 31);
+  const range = await replayWhileSettling(30, 25);
+  expect(range).toBeGreaterThanOrEqual(20);
+  expect(range).toBeLessThan(25);
+
+  await page.getByRole('button', { name: 'Clear selected range', exact: true }).click();
+  const duration = calculateLayout(await current(page)).duration;
+  expect(await replayWhileSettling(duration - 1, duration - 20)).toBeLessThan(5);
+});
+
 test('clear, Escape, timing, Undo and project switching invalidate only the transient range; clip selection keeps it', async ({
   page,
 }) => {
