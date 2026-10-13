@@ -219,6 +219,8 @@ export function App() {
   const [fitRequest, setFitRequest] = useState(0);
   const [revealRequest, setRevealRequest] = useState(0);
   const [timeRange, setTimeRange] = useState<TimelineRange | null>(null);
+  const playRange = useRef(timeRange);
+  playRange.current = timeRange;
   const [inspectorMode, setInspectorMode] = useState<InspectorMode>(() => {
     const saved = readPreference('pascap-inspector-tab');
     return saved === 'track' || saved === 'audio' ? saved : 'clip';
@@ -542,7 +544,7 @@ export function App() {
     setSourceInspectionEpoch((epoch) => epoch + 1);
     setViewerMode('timeline');
     if (engine.current?.diagnostics().playing) engine.current.pause();
-    else void engine.current?.play();
+    else void engine.current?.play(playRange.current ?? undefined);
   }, []);
   const toggleUngraded = useCallback(() => {
     if (drafting.current) return;
@@ -1811,6 +1813,7 @@ export function App() {
                 duration={layout.duration}
                 drafting={draft !== null}
                 onTogglePlayback={togglePlayback}
+                rangeSelected={timeRange !== null}
                 onToggleUngraded={toggleUngraded}
                 onSeek={seek}
                 onRetry={retryPreview}

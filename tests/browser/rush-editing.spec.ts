@@ -1154,6 +1154,50 @@ test('missing, outside and empty ranges are rejected; click and Escape restore; 
   await expect(page.locator('.source-add-feedback')).not.toHaveAttribute('data-added-clip-id', /./);
 });
 
+test('Play covers only the selected range: from IN or inside it, stopping on its last frame', async ({ page }) => {
+  const before = await current(page);
+  const play = page.getByRole('button', { name: 'Play preview', exact: true });
+  const played = async (): Promise<{ first: number; last: number }> => {
+    await page.evaluate(() => {
+      const frames: number[] = [];
+      Object.assign(globalThis, { rangeFrames: frames });
+      window.pascapLab!.engine.subscribe((state) => {
+        if (state.playing) frames.push(state.frame);
+      });
+    });
+    await play.click();
+    const frames = (): Promise<number[]> =>
+      page.evaluate(() => (globalThis as unknown as { rangeFrames: number[] }).rangeFrames);
+    await expect.poll(async () => (await frames()).length, { timeout: 15_000 }).toBeGreaterThan(0);
+    await expect
+      .poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics()), { timeout: 15_000 })
+      .toMatchObject({ playing: false, status: 'paused', frame: 30 });
+    const seen = await frames();
+    return { first: Math.min(...seen), last: Math.max(...seen) };
+  };
+  await markRange(page, 20, 31);
+  await expect(play).toHaveAttribute('title', 'Play the selected range or pause (Space)');
+  // The drag left the playhead on the last frame, so Play restarts at IN.
+  const fromIn = await played();
+  expect(fromIn.first).toBeGreaterThanOrEqual(20);
+  expect(fromIn.first).toBeLessThan(25);
+  expect(fromIn.last).toBeLessThanOrEqual(30);
+  await seek(page, 25);
+  const inside = await played();
+  expect(inside.first).toBeGreaterThanOrEqual(25);
+  await seek(page, 60);
+  expect((await played()).first).toBeLessThan(25);
+  await expect(rulerRange(page)).toHaveAttribute('data-range-out', '31');
+  expect(await current(page)).toEqual(before);
+
+  await page.getByRole('button', { name: 'Clear selected range', exact: true }).click();
+  await expect(play).toHaveAttribute('title', 'Play or pause (Space)');
+  await seek(page, 20);
+  await play.click();
+  await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBeGreaterThan(31);
+  await page.getByRole('button', { name: 'Pause preview', exact: true }).click();
+});
+
 test('clear, Escape, timing, Undo and project switching invalidate only the transient range; clip selection keeps it', async ({
   page,
 }) => {
