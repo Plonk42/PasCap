@@ -44,14 +44,16 @@ describe('editor shortcut mapping', () => {
   it.each([
     ['q', 'trim-in'],
     ['w', 'trim-out'],
-    ['i', 'mark-in'],
-    ['o', 'mark-out'],
   ])('maps rush edit %s without interfering with modifiers', (key, type) => {
     expect(editorShortcut({ ...base, key })).toEqual({ type });
     expect(editorShortcut({ ...base, key, ctrlKey: true })).toBeNull();
     expect(editorShortcut({ ...base, key, altKey: true })).toBeNull();
   });
-  it('distinguishes cutting a marked part from deleting an entire excerpt', () => {
+  it('has no timeline I / O mark shortcuts; the time ruler selects the range', () => {
+    expect(editorShortcut({ ...base, key: 'i' })).toBeNull();
+    expect(editorShortcut({ ...base, key: 'o' })).toBeNull();
+  });
+  it('distinguishes cutting a selected range from deleting an entire clip', () => {
     expect(editorShortcut({ ...base, key: 'Delete', shiftKey: true })).toEqual({ type: 'remove-range' });
     expect(editorShortcut({ ...base, key: 'Backspace', shiftKey: true })).toEqual({ type: 'remove-range' });
     expect(editorShortcut({ ...base, key: 'Delete' })).toEqual({ type: 'remove' });

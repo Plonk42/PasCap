@@ -216,13 +216,26 @@ async function shortcut(page: Page, key: string): Promise<void> {
   await page.keyboard.press(key);
 }
 
-async function markRange(page: Page, inFrame: number, outFrame: number, buttons = false): Promise<void> {
-  await seek(page, inFrame);
-  if (buttons) await page.getByRole('button', { name: 'Mark cut IN', exact: true }).click();
-  else await shortcut(page, 'i');
-  await seek(page, outFrame - 1);
-  if (buttons) await page.getByRole('button', { name: 'Mark cut OUT', exact: true }).click();
-  else await shortcut(page, 'o');
+function rulerRange(page: Page) {
+  return page.locator('.timeline-ruler-range');
+}
+
+/** Real pointer drag on the lower ruler half (below the playhead handle); Alt bypasses snapping. */
+async function markRange(page: Page, inFrame: number, outFrame: number, reverse = false): Promise<void> {
+  const box = (await page.getByLabel('Timeline ruler', { exact: true }).boundingBox())!;
+  const origin = await frameOrigin(page);
+  const scale = Number(await page.locator('.timeline-surface').getAttribute('data-pixels-per-frame'));
+  const y = box.y + box.height - 6;
+  const [from, to] = reverse ? [outFrame, inFrame] : [inFrame, outFrame];
+  await page.keyboard.down('Alt');
+  await page.mouse.move(origin + from * scale, y);
+  await page.mouse.down();
+  await page.mouse.move(origin + ((from + to) / 2) * scale, y, { steps: 2 });
+  await page.mouse.move(origin + to * scale, y);
+  await page.mouse.up();
+  await page.keyboard.up('Alt');
+  await expect(rulerRange(page)).toHaveAttribute('data-range-in', String(inFrame));
+  await expect(rulerRange(page)).toHaveAttribute('data-range-out', String(outFrame));
 }
 
 async function expectCutOverlay(page: Page, inFrame: number, outFrame: number): Promise<void> {
@@ -387,7 +400,7 @@ test('three ranges from one rush keep the source pinned, independent, reloadable
       await page.locator('canvas[data-source-decoder]').evaluate((canvas, original) => canvas === original, decoder),
     ).toBe(true);
     await expect(page.locator('.source-preview')).toHaveAttribute('data-source-status', 'paused');
-    await expect(page.locator('.timeline-cut-mark')).toHaveCount(0);
+    await expect(page.locator('.timeline-ruler-range')).toHaveCount(0);
   }
   expect(new Set(ids).size).toBe(3);
   const added = await current(page);
@@ -777,22 +790,21 @@ test('I/O middle removal is transient then one edit, preserving absolute eleven-
   const before = await current(page);
   const saves = memory.saves;
 
-  // Valid marks can still produce a transition-invalid result. Keep both marks and the whole history atomically.
-  await markRange(page, 0, 89, true);
-  await expect(page.getByRole('button', { name: 'Cut marked range', exact: true })).toBeEnabled();
-  await page.getByRole('button', { name: 'Cut marked range', exact: true }).click();
+  // A valid range can still produce a transition-invalid result. Keep the range and the whole history atomically.
+  await markRange(page, 0, 89);
+  await expect(page.getByRole('button', { name: 'Cut selected range', exact: true })).toBeEnabled();
+  await page.getByRole('button', { name: 'Cut selected range', exact: true }).click();
   await expect(page.locator('.error-banner')).toContainText('Fade/transition regions overlap or exceed clip a.');
   await expectCutOverlay(page, 0, 89);
   expect(await current(page)).toEqual(before);
   await flush(page);
   expect(memory.saves).toBe(saves);
   await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
-  await page.getByRole('button', { name: 'Clear cut marks', exact: true }).click();
+  await page.getByRole('button', { name: 'Clear selected range', exact: true }).click();
   await page.getByRole('button', { name: 'Dismiss error', exact: true }).click();
 
   await markRange(page, 20, 40);
   await expectCutOverlay(page, 20, 40);
-  await expect(page.locator('.timeline-cut-mark')).toHaveCount(2);
   expect(await current(page)).toEqual(before);
   await flush(page);
   expect(memory.saves).toBe(saves);
@@ -821,9 +833,9 @@ test('I/O middle removal is transient then one edit, preserving absolute eleven-
   unchangedOthers(before, next, ['a'], { 'video-1': cutTransitions });
   expect([next.layers[0]!.openingFade, next.layers[0]!.closingFade]).toEqual([8, 4]);
   await expect(clip(page, right.id).locator('.timeline-clip-body')).toHaveAttribute('aria-pressed', 'true');
-  await expect(page.locator('.timeline-cut-mark')).toHaveCount(0);
+  await expect(page.locator('.timeline-ruler-range')).toHaveCount(0);
   await expect(page.locator('.timeline-cut-selection')).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Cut marked range', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Cut selected range', exact: true })).toBeDisabled();
   await flush(page);
   expect(memory.saves).toBe(saves + 1);
   expect(memory.snapshot()).toEqual({ ...next, revision: before.revision + 1 });
@@ -876,9 +888,9 @@ test('overlay middle cuts keep their gap and neighbours fixed; visible quick tri
     Number.parseFloat((element as HTMLElement).style.top),
   );
   expect(overlayTop - firstTrackTop).toBe(88);
-  await markRange(page, 60, 80, true);
+  await markRange(page, 60, 80);
   await expectCutOverlay(page, 60, 80);
-  await page.getByRole('button', { name: 'Cut marked range', exact: true }).click();
+  await page.getByRole('button', { name: 'Cut selected range', exact: true }).click();
   const cut = await current(page);
   const right = cut.clips.find((item) => !before.clips.some((original) => original.id === item.id))!;
   expect(cut.clips.find((item) => item.id === 'top')).toEqual({
@@ -959,9 +971,9 @@ test('prefix, suffix and whole Ripple track cuts retain only necessary IDs and u
     await fixture(page, document);
     const before = await current(page);
     const saves = memory.saves;
-    await markRange(page, scenario.inFrame, scenario.outFrame, true);
+    await markRange(page, scenario.inFrame, scenario.outFrame, scenario.name === 'suffix');
     await expectCutOverlay(page, scenario.inFrame, scenario.outFrame);
-    await page.getByRole('button', { name: 'Cut marked range', exact: true }).click();
+    await page.getByRole('button', { name: 'Cut selected range', exact: true }).click();
     const next = await current(page);
     expect(
       next.clips.every((item) => before.clips.some((original) => original.id === item.id)),
@@ -1024,49 +1036,81 @@ test('prefix, suffix and whole Ripple track cuts retain only necessary IDs and u
   await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
 });
 
-test('partial, reversed and outside marks are rejected; input and source shortcuts cannot leak timeline edits', async ({
+test('missing, outside and empty ranges are rejected; click and Escape restore; input and source shortcuts cannot leak timeline edits', async ({
   page,
 }) => {
   const before = await current(page);
+  const cut = page.getByRole('button', { name: 'Cut selected range', exact: true });
+  const ruler = page.getByLabel('Timeline ruler', { exact: true });
+  const scale = Number(await page.locator('.timeline-surface').getAttribute('data-pixels-per-frame'));
+  const rulerX = async (frame: number): Promise<number> => (await frameOrigin(page)) + frame * scale;
+  const rulerY = async (): Promise<number> => {
+    const box = (await ruler.boundingBox())!;
+    return box.y + box.height - 6;
+  };
+  const playhead = (): Promise<number> => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame);
+  await expect(cut).toBeDisabled();
+  await expect(cut).toHaveAttribute('title', 'Drag on the time ruler to select a range to cut.');
+  for (const name of ['Mark cut IN', 'Mark cut OUT'])
+    await expect(page.getByRole('button', { name, exact: true })).toHaveCount(0);
   await seek(page, 20);
   await shortcut(page, 'i');
-  await expect(page.locator('.timeline-cut-mark')).toHaveCount(1);
-  await expect(page.getByRole('button', { name: 'Cut marked range', exact: true })).toBeDisabled();
-  await expect(page.getByRole('button', { name: 'Cut marked range', exact: true })).toHaveAttribute(
-    'title',
-    'Set both IN and OUT marks before removing a range.',
-  );
-  await seek(page, 10);
   await shortcut(page, 'o');
+  await expect(rulerRange(page)).toHaveCount(0);
+
+  // Clip a (0–90) is selected; a range over clip b only cannot cut a.
+  await markRange(page, 100, 140, true);
+  await expect.poll(playhead).toBe(100);
   await expect(page.locator('.timeline-cut-selection')).toHaveCount(0);
-  await expect(page.locator('.timeline-cut-mark')).toHaveCount(2);
-  await expect(page.getByRole('button', { name: 'Cut marked range', exact: true })).toBeDisabled();
-  await expect(page.getByRole('button', { name: 'Cut marked range', exact: true })).toHaveAttribute(
-    'title',
-    'Cut OUT must be after IN (exclusive).',
-  );
+  await expect(cut).toBeDisabled();
+  await expect(cut).toHaveAttribute('title', 'The selected range is outside the selected clip.');
   await shortcut(page, 'Shift+Delete');
-  await expect(page.locator('.error-banner')).toContainText('Cut OUT must be after IN (exclusive).');
+  await expect(page.locator('.error-banner')).toContainText('The selected range is outside the selected clip.');
   expect(await current(page)).toEqual(before);
-  await seek(page, 100);
-  for (const name of [
-    'Mark cut IN',
-    'Mark cut OUT',
-    'Split at playhead',
-    'Trim start to playhead',
-    'Trim end to playhead',
-  ]) {
-    await expect(page.getByRole('button', { name, exact: true })).toBeDisabled();
-  }
-  await shortcut(page, 'i');
-  await expect(page.locator('.error-banner')).toContainText(
-    'Place the playhead inside the selected clip to mark a cut.',
-  );
-  expect(await current(page)).toEqual(before);
-  await page.getByRole('button', { name: 'Clear cut marks', exact: true }).click();
   await page.getByRole('button', { name: 'Dismiss error', exact: true }).click();
+  // The range is independent of the clip: selecting the overlapped clip enables Cut range.
+  await selectClip(page, 'b');
+  await expectCutOverlay(page, 100, 140);
+  await expect(cut).toBeEnabled();
+  await selectClip(page, 'a');
+  await expect(page.locator('.timeline-cut-selection')).toHaveCount(0);
+  await expect(rulerRange(page)).toHaveAttribute('data-range-in', '100');
+
+  // A plain click seeks and clears the range.
+  await page.mouse.click(await rulerX(50), await rulerY());
+  await expect(rulerRange(page)).toHaveCount(0);
+  await expect.poll(playhead).toBe(50);
+  await expect(cut).toHaveAttribute('title', 'Drag on the time ruler to select a range to cut.');
+
+  // Dragging back to the starting frame selects nothing.
+  await page.keyboard.down('Alt');
+  await page.mouse.move(await rulerX(60), await rulerY());
+  await page.mouse.down();
+  await page.mouse.move(await rulerX(75), await rulerY(), { steps: 3 });
+  await expect(rulerRange(page)).toHaveAttribute('data-range-out', '75');
+  await expect(page.locator('.timeline-ruler-range-readout')).toHaveText('00:00:02:00 – 00:00:02:15');
+  await page.mouse.move(await rulerX(60), await rulerY(), { steps: 3 });
+  await page.mouse.up();
+  await page.keyboard.up('Alt');
+  await expect(rulerRange(page)).toHaveCount(0);
+
+  // Escape cancels a drag, restoring the previous range and playhead without an edit.
   await markRange(page, 20, 31);
   await expectCutOverlay(page, 20, 31);
+  await expect(page.locator('.timeline-ruler-range-readout')).toHaveCount(0);
+  await page.keyboard.down('Alt');
+  await page.mouse.move(await rulerX(60), await rulerY());
+  await page.mouse.down();
+  await page.mouse.move(await rulerX(80), await rulerY(), { steps: 3 });
+  await expectCutOverlay(page, 60, 80);
+  await expect.poll(playhead).toBe(79);
+  await page.keyboard.press('Escape');
+  await page.mouse.up();
+  await page.keyboard.up('Alt');
+  await expectCutOverlay(page, 20, 31);
+  await expect.poll(playhead).toBe(30);
+  expect(await current(page)).toEqual(before);
+  await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
   const keys = ['i', 'o', 'q', 'w', 's', 'Shift+Delete'];
   const input = page.getByRole('textbox', { name: 'Source IN frame', exact: true });
   await input.fill('00:00:00:15');
@@ -1110,30 +1154,31 @@ test('partial, reversed and outside marks are rejected; input and source shortcu
   await expect(page.locator('.source-add-feedback')).not.toHaveAttribute('data-added-clip-id', /./);
 });
 
-test('selection, clear, Escape, timing, Undo and project switching invalidate only transient cut marks', async ({
+test('clear, Escape, timing, Undo and project switching invalidate only the transient range; clip selection keeps it', async ({
   page,
 }) => {
   const before = await current(page);
   await markRange(page, 10, 20);
   await selectClip(page, 'b');
-  await expect(page.locator('.timeline-cut-mark')).toHaveCount(0);
+  await expect(rulerRange(page)).toHaveAttribute('data-range-in', '10');
+  await expect(page.locator('.timeline-cut-selection')).toHaveCount(0);
   await selectClip(page, 'a');
-  await markRange(page, 10, 20);
-  await page.getByRole('button', { name: 'Clear cut marks', exact: true }).click();
-  await expect(page.locator('.timeline-cut-mark')).toHaveCount(0);
+  await expectCutOverlay(page, 10, 20);
+  await page.getByRole('button', { name: 'Clear selected range', exact: true }).click();
+  await expect(rulerRange(page)).toHaveCount(0);
   await markRange(page, 10, 20);
   await shortcut(page, 'Escape');
-  await expect(page.locator('.timeline-cut-mark')).toHaveCount(0);
+  await expect(rulerRange(page)).toHaveCount(0);
   await markRange(page, 10, 20);
   const input = page.getByRole('textbox', { name: 'Source IN frame', exact: true });
   await input.fill('20');
   await input.press('Enter');
-  await expect(page.locator('.timeline-cut-mark')).toHaveCount(0);
+  await expect(rulerRange(page)).toHaveCount(0);
   await ready(page, await current(page));
   await markRange(page, 10, 20);
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   expect(await current(page)).toEqual(before);
-  await expect(page.locator('.timeline-cut-mark')).toHaveCount(0);
+  await expect(rulerRange(page)).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
   await ready(page, before);
   await page.getByRole('button', { name: 'Review pattern-a.mp4', exact: true }).click();
@@ -1148,7 +1193,7 @@ test('selection, clear, Escape, timing, Undo and project switching invalidate on
   await page.getByRole('button', { name: `Open ${other.title}`, exact: true }).click();
   await ready(page, other);
   expect(await current(page)).toEqual(other);
-  await expect(page.locator('.timeline-cut-mark')).toHaveCount(0);
+  await expect(rulerRange(page)).toHaveCount(0);
   await expect(page.locator('.source-review')).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
   await page.getByRole('button', { name: 'Review pattern-a.mp4', exact: true }).click();
@@ -1161,7 +1206,7 @@ test('selection, clear, Escape, timing, Undo and project switching invalidate on
   expect(await current(page)).toEqual(memory.snapshot());
   expect(memory.snapshot().clips).toEqual(before.clips);
   expect(memory.snapshot().layers).toEqual(before.layers);
-  await expect(page.locator('.timeline-cut-mark')).toHaveCount(0);
+  await expect(rulerRange(page)).toHaveCount(0);
   await page.getByRole('button', { name: 'Review pattern-a.mp4', exact: true }).click();
   await expect(page.locator('.source-range-strip')).toHaveAttribute('data-source-in', '12');
   await expect(page.locator('.source-range-strip')).toHaveAttribute('data-source-out', '24');

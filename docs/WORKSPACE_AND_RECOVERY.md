@@ -53,15 +53,16 @@ clip detail filters before grading; see [detail filters](design/DETAIL_FILTERS.m
   a browser-local preference that survives reloads.
 - Bottom: frame-scaled multi-track timeline, playhead timecode, highlighted active
   insertion track, one marker per stored track keyframe, dimmed hidden clips and Activity.
-  The responsive toolbar keeps Split, Trim start/end, Delete and IN/OUT/Cut range
+  The responsive toolbar keeps Split, Trim start/end, Delete and Cut range
   directly visible; Duplicate is in the clip's right-click menu (Ctrl+D), and start
   nudging beside Clip → Placement's start field. Zoom keeps its slider and Fit,
   with Zoom out / Zoom in buttons beside them.
   Video tracks display the saved bottom-to-top composition array: track 1 renders below track 2,
   track 3 above track 2, and so on, with no primary/overlay role. The thin ruler remains
-  pinned above scrolling video tracks with TIME ticks/separators, playhead handle and click/drag seeking;
+  pinned above scrolling video tracks with TIME ticks/separators and a playhead handle:
+  a click seeks, a drag selects a range to cut and the handle scrubs;
   distinct Cut/Fade/Dissolve buttons open boundary transitions, not keyframes.
-  While dragging the ruler or playhead, the preview shows each decoded frame as soon as it is
+  While dragging a ruler range or the playhead, the preview shows each decoded frame as soon as it is
   ready (the newest pointer position wins, never aborting an undecoded seek); the Inspector's
   playhead values catch up whenever the pointer rests, even before release, and exactly on release.
 
@@ -156,7 +157,7 @@ opening/closing/transition fades darken only that track's RGB, preserving covera
 Empty tracks retain dormant fades; adding footage validates them again.
 
 Keyboard help is available via the **header help button** or `?`
-outside form/modal/source controls. Space, S, Q/W, I/O, Shift+Delete, Escape,
+outside form/modal/source controls. Space, S, Q/W, Shift+Delete, Escape,
 Ctrl+D, Delete/Backspace, Undo/Redo,
 arrows, Shift+arrows, Alt+arrows, Alt+Shift+arrows, Home/End and F
 are mapped explicitly. Native button Space remains button activation. Editing
@@ -560,11 +561,13 @@ Other insertion paths, explicit Show, timeline selection and edits return to Tim
 Source remains available through its tab. Changing recordings leaves exactly one
 range editor/decoder, without stale duplicate controls.
 
-Timeline IN/OUT marks select an unwanted part of one clip, with OUT after the
-displayed frame. **Cut range** removes it in one Undo step, retaining independent
-left/right clips where needed. **Split** selects the new right piece; **Q/W**
-keep the displayed frame while shrinking the head/tail. Marks are temporary,
-cleared by selection/timing/history/project changes, never project/autosave fields.
+Dragging on the time ruler selects a project-frame range (OUT exclusive); with a
+clip selected, **Cut range** removes the part of that clip it covers in one Undo
+step, retaining independent left/right clips where needed. Without a range or a
+clip, or with a range outside the clip, Cut range is disabled with the reason.
+**Split** selects the new right piece; **Q/W** keep the displayed frame while
+shrinking the head/tail. The range is temporary, kept across clip selection and
+cleared by a ruler click, Escape, timing/history/project changes, never a project/autosave field.
 Ripple-on edits close gaps/re-sequence later clips on that track from its first
 anchor; off keeps other clips at independent starts. Left handle/keyboard trims
 keep the sequence start while on, retain timeline OUT while off, and reject an

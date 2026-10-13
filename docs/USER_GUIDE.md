@@ -134,8 +134,9 @@ above track 2, and so on. There is no primary/overlay role or special first-trac
 Raise/Lower change composition priority; any track can be reordered or deleted
 except the last remaining video track. Scroll over the tracks or track headers to
 reach all video and music tracks. The time ruler and its playhead handle remain
-visible while scrolling; its ticks follow horizontal scroll, and clicking/dragging
-it seeks without editing a track. Track options explains unavailable actions at
+visible while scrolling; its ticks follow horizontal scroll. Clicking it seeks,
+dragging it selects a range to cut and dragging the playhead handle scrubs, without
+editing a track. Track options explains unavailable actions at
 stack endpoints or on the last remaining track. It contains only rename, Ripple,
 Raise/Lower and Delete; visibility stays in the sidebar and Opacity in **Track → Colour**.
 
@@ -165,9 +166,11 @@ original exclusive OUT. Source review keeps its independent numeric IN/OUT pair 
 - **Split / S** splits at the playhead and selects the new right piece.
 - **Trim start / Q** removes the head before the displayed frame; **Trim end / W**
   removes the tail after it. Both keep that frame; handles can recover omitted footage.
-- To remove a middle section, select a clip, seek the first unwanted frame and
-  mark timeline **IN / I**, then the last unwanted frame and **OUT / O**.
-  The hatched range is removed by **Cut range / Shift+Delete**, in **one Undo step**.
+- To remove a middle section, **drag on the time ruler** across the unwanted frames
+  (the preview shows the edge you drag) and select the clip. The hatched part of
+  the selected clip is removed by **Cut range / Shift+Delete**, in **one Undo step**;
+  without a range or a clip, or with a range outside the clip, its tooltip says why.
+  A click on the ruler or Escape clears the range.
   Ripple-on cuts close the gap on that track; off keeps the removed gap and fixed neighbours.
 - **Duplicate** (right-click the clip) or **Ctrl+D** makes an independent clip. Timeline
   Delete removes a clip, not its original or project-bin membership.
@@ -663,13 +666,13 @@ storage/render breakdowns remain their existing expandable controls, not help bu
 | ------------------------------------------- | ---------------------------------------------------------------------------- |
 | Timeline play/seek                          | Space; ←/→ one frame; Shift+←/→ ten; Home/End; F to fit                      |
 | Split / quick trim                          | S / Q / W                                                                    |
-| Unwanted timeline range                     | I / O; Shift+Delete cuts; Escape clears marks                                |
+| Unwanted timeline range                     | Drag on the ruler; Shift+Delete cuts; Escape clears the range                |
 | Clip actions                                | Ctrl+D duplicate (or right-click the clip); Delete/Backspace remove          |
 | Session history                             | Ctrl+Z; Ctrl+Shift+Z or Ctrl+Y redo                                          |
 | Positioned clip / first Ripple anchor nudge | Alt+←/→ one frame; Alt+Shift+←/→ ten; later Ripple starts require Ripple off |
 | Focused trim handle                         | Arrows one source frame; Shift ten; left Home/right End restore              |
 | Focused track keyframe marker               | Arrows one project frame; Shift ten; Enter selects/seeks                     |
-| Focused source review                       | I/O marks source range, not the timeline's unwanted range                    |
+| Focused source review                       | I/O marks the source range, not the timeline range                           |
 | Shortcut guide                              | ? outside form/modal/source controls                                         |
 
 Keyboard actions respect focused inputs, buttons, source controls, dialogs and

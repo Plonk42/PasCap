@@ -1,5 +1,5 @@
 import type { ProjectDocument } from '../shared/model.js';
-import { sourceRangeForCut, type ClipCutRange } from '../shared/rush-editing.js';
+import { sourceRangeForCut, type TimelineRange } from '../shared/rush-editing.js';
 import type { PlacedClip } from '../shared/timeline.js';
 import { formatTimecode } from '../shared/timing.js';
 import { Icon } from './icons.js';
@@ -10,63 +10,75 @@ interface Props {
   selected: PlacedClip | undefined;
   frame: number;
   disabled: boolean;
-  cutRange: ClipCutRange | null;
+  timeRange: TimelineRange | null;
   onSplit: () => void;
   onDelete: () => void;
   onQuickTrim: (edge: 'in' | 'out') => void;
-  onMarkCut: (edge: 'in' | 'out') => void;
-  onCutMarked: () => void;
-  onClearCut: () => void;
+  onCutRange: () => void;
+  onClearRange: () => void;
 }
 
-function markedCutError(project: ProjectDocument, marks: ClipCutRange | null): string {
-  if (!marks) return 'Mark IN and OUT within one clip to remove an unwanted part.';
+function cutRangeError(project: ProjectDocument, selected: PlacedClip | undefined, range: TimelineRange | null) {
+  if (!range) return 'Drag on the time ruler to select a range to cut.';
+  if (!selected) return 'Select a clip to cut the selected range from it.';
   try {
-    sourceRangeForCut(project, marks);
+    sourceRangeForCut(project, selected.clip.id, range);
     return '';
   } catch (cause) {
-    return cause instanceof Error ? cause.message : 'Choose valid IN and OUT marks.';
+    return cause instanceof Error ? cause.message : 'Select a valid range.';
   }
 }
 
-function markIsSet(marks: ClipCutRange | null, edge: 'inFrame' | 'outFrame'): boolean {
-  return marks !== null && marks[edge] !== null;
+export function rangeLabel(range: TimelineRange): string {
+  return `${formatTimecode(range.inFrame)} – ${formatTimecode(range.outFrame)}`;
 }
 
-export function TimelineCutMarks({
-  marks,
+/** The part of the selected clip that Cut range would remove. */
+export function TimelineCutOverlay({
+  range,
   selected,
   top,
   leading,
   scale,
 }: Readonly<{
-  marks: ClipCutRange | null;
+  range: TimelineRange | null;
   selected: PlacedClip | undefined;
   top: number;
   leading: number;
   scale: number;
 }>) {
-  if (!marks) return null;
-  if (marks.clipId !== selected?.clip.id) return null;
+  if (!range || !selected) return null;
+  const inFrame = Math.max(range.inFrame, selected.start);
+  const outFrame = Math.min(range.outFrame, selected.end);
+  if (outFrame <= inFrame) return null;
   return (
-    <>
-      {marks.inFrame !== null && marks.outFrame !== null && marks.outFrame > marks.inFrame && (
-        <div
-          className="timeline-cut-selection"
-          data-cut-in={marks.inFrame}
-          data-cut-out={marks.outFrame}
-          style={{ top, left: leading + marks.inFrame * scale, width: (marks.outFrame - marks.inFrame) * scale }}
-        />
-      )}
-      {(['in', 'out'] as const).map((edge) => {
-        const position = edge === 'in' ? marks.inFrame : marks.outFrame;
-        return position === null ? null : (
-          <div className="timeline-cut-mark" key={edge} style={{ top: top - 3, left: leading + position * scale }}>
-            <span>{edge.toUpperCase()}</span>
-          </div>
-        );
-      })}
-    </>
+    <div
+      className="timeline-cut-selection"
+      data-cut-in={inFrame}
+      data-cut-out={outFrame}
+      style={{ top, left: leading + inFrame * scale, width: (outFrame - inFrame) * scale }}
+    />
+  );
+}
+
+/** Highlighted band on the time ruler; the readout is shown while dragging. */
+export function RulerRange({
+  range,
+  drafting,
+  leading,
+  scale,
+}: Readonly<{ range: TimelineRange | null; drafting: boolean; leading: number; scale: number }>) {
+  if (!range) return null;
+  return (
+    <div
+      className={`timeline-ruler-range ${drafting ? 'drafting' : ''}`}
+      data-range-in={range.inFrame}
+      data-range-out={range.outFrame}
+      title={`Selected range ${rangeLabel(range)} (OUT exclusive)`}
+      style={{ left: leading + range.inFrame * scale, width: (range.outFrame - range.inFrame) * scale }}
+    >
+      {drafting && <span className="timeline-ruler-range-readout">{rangeLabel(range)}</span>}
+    </div>
   );
 }
 
@@ -76,13 +88,12 @@ export function RushEditBar({
   selected,
   frame,
   disabled,
-  cutRange,
+  timeRange,
   onSplit,
   onDelete,
   onQuickTrim,
-  onMarkCut,
-  onCutMarked,
-  onClearCut,
+  onCutRange,
+  onClearRange,
 }: Readonly<Props>) {
   const inClip = !!selected && frame >= selected.start && frame < selected.end;
   const sourceFrame = inClip ? selected.retiming.sourceAt(frame - selected.start) : null;
@@ -90,10 +101,7 @@ export function RushEditBar({
     sourceFrame !== null && selected !== undefined && frame > selected.start && sourceFrame > selected.clip.sourceIn;
   const canTrimIn = sourceFrame !== null && selected !== undefined && sourceFrame > selected.clip.sourceIn;
   const canTrimOut = sourceFrame !== null && selected !== undefined && sourceFrame + 1 < selected.clip.sourceOut;
-  const marks = cutRange?.clipId === selected?.clip.id ? cutRange : null;
-  const hasIn = markIsSet(marks, 'inFrame');
-  const hasOut = markIsSet(marks, 'outFrame');
-  const error = markedCutError(project, marks);
+  const error = cutRangeError(project, selected, timeRange);
 
   return (
     <div className="rush-edit-bar" aria-label="Clip editing actions">
@@ -143,64 +151,37 @@ export function RushEditBar({
           <Icon name="trash" size={15} />
         </button>
       </fieldset>
-      <fieldset className="rush-cut-actions" data-marked={hasIn || hasOut}>
-        <legend className="declutter-sr-only">Remove a marked range</legend>
-        <button
-          type="button"
-          className={`secondary-button small ${hasIn ? 'active' : ''}`}
-          aria-label="Mark cut IN"
-          aria-pressed={hasIn}
-          title="Start the unwanted part here · I"
-          disabled={disabled || !inClip}
-          onClick={() => onMarkCut('in')}
-        >
-          IN
-        </button>
-        <button
-          type="button"
-          className={`secondary-button small ${hasOut ? 'active' : ''}`}
-          aria-label="Mark cut OUT"
-          aria-pressed={hasOut}
-          title="End the unwanted part after this frame (OUT exclusive) · O"
-          disabled={disabled || !inClip}
-          onClick={() => onMarkCut('out')}
-        >
-          OUT
-        </button>
+      <fieldset className="rush-cut-actions" data-marked={timeRange !== null}>
+        <legend className="declutter-sr-only">Remove a selected range</legend>
         <button
           type="button"
           className="secondary-button small rush-cut-button"
-          aria-label="Cut marked range"
+          aria-label="Cut selected range"
           title={
             error ||
-            'Remove the marked part in one Undo step; this track’s Ripple setting controls gap closure · Shift+Delete'
+            'Remove the selected range from the selected clip in one Undo step; this track’s Ripple setting controls gap closure · Shift+Delete'
           }
           disabled={disabled || !!error}
-          onClick={onCutMarked}
+          onClick={onCutRange}
         >
           <Icon name="cut" size={15} />
           <span className="timeline-action-label">Cut range</span>
         </button>
-        {marks && (
+        {timeRange && (
           <button
             type="button"
             className="icon-button"
-            aria-label="Clear cut marks"
-            title="Clear temporary marks · Escape"
-            onClick={onClearCut}
+            aria-label="Clear selected range"
+            title="Clear the selected time range · Escape"
+            onClick={onClearRange}
           >
             <Icon name="x" size={13} />
           </button>
         )}
       </fieldset>
-      {marks && (
-        <output
-          className="rush-cut-readout declutter-sr-only"
-          aria-live="polite"
-          title={error || 'Timeline marks; OUT exclusive'}
-        >
-          {marks.inFrame === null ? 'IN —' : `IN ${formatTimecode(marks.inFrame)}`} →{' '}
-          {marks.outFrame === null ? 'OUT —' : `OUT ${formatTimecode(marks.outFrame)}`}
+      {timeRange && (
+        <output className="rush-cut-readout declutter-sr-only" aria-live="polite" title={error || 'OUT exclusive'}>
+          Selected range {rangeLabel(timeRange)}
         </output>
       )}
     </div>

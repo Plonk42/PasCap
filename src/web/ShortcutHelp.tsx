@@ -16,9 +16,9 @@ const GROUPS = [
     items: [
       ['S', 'Split the selected clip at the playhead'],
       ['Q / W', 'Trim the clip start / end to the playhead'],
-      ['I / O', 'Mark the start / end of a part to cut'],
-      ['Shift + Delete', 'Cut the marked part'],
-      ['Esc', 'Clear cut marks or cancel a drag'],
+      ['Drag on the time ruler', 'Select a range to cut; click seeks'],
+      ['Shift + Delete', 'Cut the selected range from the selected clip'],
+      ['Esc', 'Clear the selected range or cancel a drag'],
       ['Ctrl + D', 'Duplicate the selected clip'],
       ['Alt + ← / →', 'Move the selected clip one frame'],
       ['Alt + Shift + ← / →', 'Move the selected clip ten frames'],

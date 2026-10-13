@@ -19,10 +19,10 @@ import {
   type VideoLayer,
 } from '../../src/shared/model.js';
 import {
-  removeMarkedRange,
+  removeSelectedRange,
   sourceRangeForCut,
   trimAtPlayhead,
-  type ClipCutRange,
+  type TimelineRange,
 } from '../../src/shared/rush-editing.js';
 import { trimOnTimeline, validateSourceRanges } from '../../src/shared/source-range.js';
 import { compileRetiming, type SpeedSettings } from '../../src/shared/speed.js';
@@ -228,38 +228,57 @@ function withDissolves(): ProjectDocument {
   });
 }
 
-describe('project marks on one selected rush excerpt', () => {
-  it('returns the exact coordinated command without persisting or mutating marks', () => {
+describe('time-ruler range on one selected clip', () => {
+  it('returns the exact coordinated command without persisting or mutating the range', () => {
     const document = primaryProject();
     const before = structuredClone(document);
     const selected = placed(document, 'rush');
-    const range: ClipCutRange = { clipId: 'rush', inFrame: selected.start + 40, outFrame: selected.start + 70 };
-    expect(sourceRangeForCut(document, range)).toEqual({ sourceIn: 140, sourceOut: 170 });
-    expect(removeMarkedRange(document, range, 'right')).toEqual(removal('rush', 140, 170));
+    const range: TimelineRange = { inFrame: selected.start + 40, outFrame: selected.start + 70 };
+    expect(sourceRangeForCut(document, 'rush', range)).toEqual({ sourceIn: 140, sourceOut: 170 });
+    expect(removeSelectedRange(document, 'rush', range, 'right')).toEqual(removal('rush', 140, 170));
     expect(document).toEqual(before);
-    expect(document).not.toHaveProperty('cutRange');
+    expect(document).not.toHaveProperty('timeRange');
   });
 
   it.each(SPEEDS)('accepts both placed boundaries with the complete exclusive OUT: $name', ({ speed }) => {
     const document = primaryProject(speed);
     const selected = placed(document, 'rush');
-    const full = { clipId: 'rush', inFrame: selected.start, outFrame: selected.end };
-    expect(sourceRangeForCut(document, full)).toEqual({ sourceIn: 100, sourceOut: 220 });
-    expect(sourceRangeForCut(document, { ...full, inFrame: selected.end - 1 })).toEqual({
+    const full = { inFrame: selected.start, outFrame: selected.end };
+    expect(sourceRangeForCut(document, 'rush', full)).toEqual({ sourceIn: 100, sourceOut: 220 });
+    expect(sourceRangeForCut(document, 'rush', { ...full, inFrame: selected.end - 1 })).toEqual({
       sourceIn: selected.retiming.sourceAt(selected.duration - 1),
       sourceOut: 220,
     });
     expect(
-      singleCommit(document, removeMarkedRange(document, full, 'unused')).clips.some((clip) => clip.id === 'rush'),
+      singleCommit(document, removeSelectedRange(document, 'rush', full, 'unused')).clips.some(
+        (clip) => clip.id === 'rush',
+      ),
     ).toBe(false);
   });
 
-  it('treats UI head + 1 as exclusive OUT, distinct from quick source-frame trimming', () => {
+  it('removes only the part of a wider range that overlaps the selected clip', () => {
+    const document = primaryProject();
+    const selected = placed(document, 'rush');
+    expect(sourceRangeForCut(document, 'rush', { inFrame: 0, outFrame: selected.start + 20 })).toEqual({
+      sourceIn: 100,
+      sourceOut: 120,
+    });
+    expect(sourceRangeForCut(document, 'rush', { inFrame: selected.end - 20, outFrame: selected.end + 50 })).toEqual({
+      sourceIn: 200,
+      sourceOut: 220,
+    });
+    expect(sourceRangeForCut(document, 'rush', { inFrame: 0, outFrame: selected.end + 50 })).toEqual({
+      sourceIn: 100,
+      sourceOut: 220,
+    });
+  });
+
+  it('treats an exclusive OUT one frame after the playhead apart from quick source-frame trimming', () => {
     const document = primaryProject({ mode: 'constant', rate: 2 });
     const selected = placed(document, 'rush');
     const head = selected.start + 5;
     expect(selected.retiming.sourceAt(5)).toBe(110);
-    expect(sourceRangeForCut(document, { clipId: 'rush', inFrame: selected.start + 2, outFrame: head + 1 })).toEqual({
+    expect(sourceRangeForCut(document, 'rush', { inFrame: selected.start + 2, outFrame: head + 1 })).toEqual({
       sourceIn: 104,
       sourceOut: 112,
     });
@@ -272,32 +291,28 @@ describe('project marks on one selected rush excerpt', () => {
   });
 
   it.each([
-    { inFrame: null, outFrame: 100, error: 'both IN and OUT' },
-    { inFrame: 100, outFrame: null, error: 'both IN and OUT' },
-    { inFrame: null, outFrame: null, error: 'both IN and OUT' },
     { inFrame: 60.5, outFrame: 100, error: 'integer project frames' },
     { inFrame: 60, outFrame: 100.5, error: 'integer project frames' },
     { inFrame: NaN, outFrame: 100, error: 'integer project frames' },
     { inFrame: 60, outFrame: Infinity, error: 'integer project frames' },
     { inFrame: Number.MAX_SAFE_INTEGER + 1, outFrame: 100, error: 'integer project frames' },
-    { inFrame: 100, outFrame: 90, error: 'OUT must be after IN' },
-    { inFrame: 100, outFrame: 100, error: 'OUT must be after IN' },
-    { inFrame: 180, outFrame: 180, error: 'OUT must be after IN' },
-    { inFrame: 59, outFrame: 100, error: 'IN mark must be within the selected clip' },
-    { inFrame: 181, outFrame: 190, error: 'IN mark must be within the selected clip' },
-    { inFrame: 60, outFrame: 181, error: 'OUT mark must be within the selected clip' },
-    { inFrame: 60, outFrame: 59, error: 'OUT mark must be within the selected clip' },
-  ])('rejects invalid transient marks $inFrame..$outFrame', ({ inFrame, outFrame, error }) => {
+    { inFrame: 100, outFrame: 90, error: 'end after it starts' },
+    { inFrame: 100, outFrame: 100, error: 'end after it starts' },
+    { inFrame: 60, outFrame: 59, error: 'end after it starts' },
+    { inFrame: 0, outFrame: 60, error: 'outside the selected clip' },
+    { inFrame: 180, outFrame: 190, error: 'outside the selected clip' },
+    { inFrame: 181, outFrame: 190, error: 'outside the selected clip' },
+  ])('rejects invalid transient ranges $inFrame..$outFrame', ({ inFrame, outFrame, error }) => {
     const document = primaryProject();
     const before = structuredClone(document);
-    const range = { clipId: 'rush', inFrame, outFrame };
-    expect(() => sourceRangeForCut(document, range)).toThrow(error);
-    expect(() => removeMarkedRange(document, range, 'right')).toThrow(error);
+    const range = { inFrame, outFrame };
+    expect(() => sourceRangeForCut(document, 'rush', range)).toThrow(error);
+    expect(() => removeSelectedRange(document, 'rush', range, 'right')).toThrow(error);
     expect(document).toEqual(before);
   });
 
   it('rejects a missing selection rather than selecting another active clip', () => {
-    expect(() => sourceRangeForCut(primaryProject(), { clipId: 'missing', inFrame: 60, outFrame: 100 })).toThrow(
+    expect(() => sourceRangeForCut(primaryProject(), 'missing', { inFrame: 60, outFrame: 100 })).toThrow(
       'selected clip no longer exists',
     );
   });
@@ -307,15 +322,16 @@ describe('project marks on one selected rush excerpt', () => {
     const selected = placed(document, 'rush');
     expect(selected.retiming.sourceAt(0)).toBe(selected.retiming.sourceAt(1));
     expect(() =>
-      sourceRangeForCut(document, { clipId: 'rush', inFrame: selected.start, outFrame: selected.start + 1 }),
+      sourceRangeForCut(document, 'rush', { inFrame: selected.start, outFrame: selected.start + 1 }),
     ).toThrow('no original source frame');
-    expect(
-      sourceRangeForCut(document, { clipId: 'rush', inFrame: selected.start, outFrame: selected.start + 2 }),
-    ).toEqual({ sourceIn: 100, sourceOut: 101 });
+    expect(sourceRangeForCut(document, 'rush', { inFrame: selected.start, outFrame: selected.start + 2 })).toEqual({
+      sourceIn: 100,
+      sourceOut: 101,
+    });
     expect(() =>
-      sourceRangeForCut(document, { clipId: 'rush', inFrame: selected.end - 2, outFrame: selected.end - 1 }),
+      sourceRangeForCut(document, 'rush', { inFrame: selected.end - 2, outFrame: selected.end - 1 }),
     ).toThrow('no original source frame');
-    expect(sourceRangeForCut(document, { clipId: 'rush', inFrame: selected.end - 2, outFrame: selected.end })).toEqual({
+    expect(sourceRangeForCut(document, 'rush', { inFrame: selected.end - 2, outFrame: selected.end })).toEqual({
       sourceIn: 219,
       sourceOut: 220,
     });
@@ -328,7 +344,7 @@ describe('atomic source removal on the primary ripple row', () => {
     const original = placed(document, 'rush').clip;
     const next = singleCommit(
       document,
-      removeMarkedRange(document, { clipId: 'rush', inFrame: 100, outFrame: 130 }, 'right'),
+      removeSelectedRange(document, 'rush', { inFrame: 100, outFrame: 130 }, 'right'),
     );
     expect(next.clips.map((clip) => clip.id)).toEqual(['before', 'upper-other', 'rush', 'right', 'after', 'last']);
     expect(layerClips(next, BASE_LAYER_ID).map((clip) => [clip.id, clip.sourceIn, clip.sourceOut, clip.start])).toEqual(
@@ -814,7 +830,7 @@ describe('quick trims retain the displayed original frame', () => {
       const document = primaryProject();
       for (const edge of ['in', 'out'] as const)
         expect(() => trimAtPlayhead(document, 'rush', frame, edge)).toThrow('inside the selected clip');
-      expect(sourceRangeForCut(document, { clipId: 'rush', inFrame: 60, outFrame: 180 })).toEqual({
+      expect(sourceRangeForCut(document, 'rush', { inFrame: 60, outFrame: 180 })).toEqual({
         sourceIn: 100,
         sourceOut: 220,
       });

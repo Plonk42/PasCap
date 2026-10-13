@@ -436,7 +436,10 @@ test('the visible ruler and playhead retain exact seeking after vertical and hor
   await page.mouse.down();
   await page.mouse.move(x + 100 * scale, y, { steps: 5 });
   await page.mouse.up();
-  await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(100);
+  // Dragging the ruler selects a range and previews its last frame; the handle scrubs.
+  await expect(page.locator('.timeline-ruler-range')).toHaveAttribute('data-range-in', '80');
+  await expect(page.locator('.timeline-ruler-range')).toHaveAttribute('data-range-out', '100');
+  await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(99);
   const handle = page.getByRole('button', { name: 'Drag playhead', exact: true });
   await expect(handle).toBeInViewport();
   // The preview transport owns the playhead timecode; the ruler shows only the line and handle.

@@ -13,8 +13,6 @@ export type EditorShortcut =
         | 'end'
         | 'trim-in'
         | 'trim-out'
-        | 'mark-in'
-        | 'mark-out'
         | 'remove-range'
         | 'clear-range';
     }
@@ -48,8 +46,6 @@ export function editorShortcut(event: ShortcutEvent, nativeSpace = false): Edito
     s: 'split',
     q: 'trim-in',
     w: 'trim-out',
-    i: 'mark-in',
-    o: 'mark-out',
     escape: 'clear-range',
     f: 'fit',
     home: 'start',
