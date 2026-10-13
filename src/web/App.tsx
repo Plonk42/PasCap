@@ -32,7 +32,7 @@ import {
   type MediaRemoval,
   type ProjectSummary,
 } from '../shared/projects.js';
-import { removeMarkedRange, trimAtPlayhead, type ClipCutRange } from '../shared/rush-editing.js';
+import { removeSelectedRange, trimAtPlayhead, type TimelineRange } from '../shared/rush-editing.js';
 import { forEachSerial } from '../shared/serial.js';
 import { validateSourceRanges } from '../shared/source-range.js';
 import { calculateLayout, layerClips } from '../shared/timeline.js';
@@ -218,7 +218,7 @@ export function App() {
   const [musicImportOpen, setMusicImportOpen] = useState(false);
   const [fitRequest, setFitRequest] = useState(0);
   const [revealRequest, setRevealRequest] = useState(0);
-  const [cutRange, setCutRange] = useState<ClipCutRange | null>(null);
+  const [timeRange, setTimeRange] = useState<TimelineRange | null>(null);
   const [inspectorMode, setInspectorMode] = useState<InspectorMode>(() => {
     const saved = readPreference('pascap-inspector-tab');
     return saved === 'track' || saved === 'audio' ? saved : 'clip';
@@ -289,7 +289,6 @@ export function App() {
   }, []);
 
   const select = useCallback((id: string) => {
-    if (selection.current !== id) setCutRange(null);
     selection.current = id;
     setSelectedId(id);
     setViewerMode('timeline');
@@ -346,7 +345,7 @@ export function App() {
       const previous = current.current;
       if (!previous || timingKey(previous) !== timingKey(next)) {
         engine.current?.pause();
-        setCutRange(null);
+        setTimeRange(null);
       }
       current.current = next;
       setProject(next);
@@ -438,7 +437,7 @@ export function App() {
       if (!history.current || drafting.current) return;
       try {
         publish(history.current[direction]());
-        setCutRange(null);
+        setTimeRange(null);
         setError('');
         setViewerMode('timeline');
       } catch (cause) {
@@ -593,45 +592,33 @@ export function App() {
     },
     [edit],
   );
-  const markCut = useCallback((edge: 'in' | 'out'): void => {
-    if (!current.current || !selection.current || drafting.current) return;
-    const placed = calculateLayout(current.current).clips.find((item) => item.clip.id === selection.current);
-    const frame = engine.current?.diagnostics().frame ?? 0;
-    if (!placed || frame < placed.start || frame >= placed.end) {
-      setError('Place the playhead inside the selected clip to mark a cut.');
-      return;
-    }
-    engine.current?.pause();
-    setViewerMode('timeline');
-    setError('');
-    setCutRange((previous) => {
-      const marks =
-        previous?.clipId === placed.clip.id ? previous : { clipId: placed.clip.id, inFrame: null, outFrame: null };
-      return { ...marks, [edge === 'in' ? 'inFrame' : 'outFrame']: edge === 'in' ? frame : frame + 1 };
-    });
-  }, []);
-  const cutMarked = useCallback((): void => {
-    if (!current.current || !cutRange || drafting.current) return;
+  const cutRange = useCallback((): void => {
     const before = current.current;
+    const clipId = selection.current;
+    if (!before || !clipId || !timeRange || drafting.current) return;
     const newClipId = crypto.randomUUID();
     try {
-      const next = applyCommand(before, removeMarkedRange(before, cutRange, newClipId));
-      const previousIndex = before.clips.findIndex((clip) => clip.id === cutRange.clipId);
+      const next = applyCommand(before, removeSelectedRange(before, clipId, timeRange, newClipId));
+      const start = calculateLayout(before).clips.find((item) => item.clip.id === clipId)?.start ?? 0;
+      const previousIndex = before.clips.findIndex((clip) => clip.id === clipId);
       const retained =
         next.clips.find((clip) => clip.id === newClipId) ??
-        next.clips.find((clip) => clip.id === cutRange.clipId) ??
+        next.clips.find((clip) => clip.id === clipId) ??
         next.clips[previousIndex] ??
         next.clips.at(-1);
-      requestedFrame.current = Math.min(cutRange.inFrame ?? 0, Math.max(0, calculateLayout(next).duration - 1));
+      requestedFrame.current = Math.min(
+        Math.max(timeRange.inFrame, start),
+        Math.max(0, calculateLayout(next).duration - 1),
+      );
       commit(next);
       if (retained) select(retained.id);
-      setCutRange(null);
+      setTimeRange(null);
       setError('');
       setViewerMode('timeline');
     } catch (cause) {
-      setError(message(cause, 'Set valid cut marks inside the selected clip.'));
+      setError(message(cause, 'Select a time range that overlaps the selected clip.'));
     }
-  }, [commit, cutRange, select]);
+  }, [commit, timeRange, select]);
   const remove = useCallback(() => {
     if (selection.current && !drafting.current) edit({ type: 'delete', clipId: selection.current });
   }, [edit]);
@@ -709,7 +696,7 @@ export function App() {
       drafting.current = false;
       setImportRequest(0);
       setDraggedMediaIds(null);
-      setCutRange(null);
+      setTimeRange(null);
       setRevealRequest(0);
       setHistoryState({ canUndo: false, canRedo: false });
       setBoundaryId(null);
@@ -780,7 +767,7 @@ export function App() {
     setDraft(null);
     drafting.current = false;
     setImportRequest(0);
-    setCutRange(null);
+    setTimeRange(null);
     setRevealRequest(0);
     setHistoryState({ canUndo: false, canRedo: false });
     setBoundaryId(null);
@@ -1005,17 +992,11 @@ export function App() {
         case 'trim-out':
           quickTrim('out');
           break;
-        case 'mark-in':
-          markCut('in');
-          break;
-        case 'mark-out':
-          markCut('out');
-          break;
         case 'remove-range':
-          cutMarked();
+          cutRange();
           break;
         case 'clear-range':
-          setCutRange(null);
+          setTimeRange(null);
           break;
         case 'duplicate':
           duplicate();
@@ -1046,7 +1027,7 @@ export function App() {
       window.removeEventListener('beforeunload', beforeUnload);
       window.removeEventListener('keydown', keyboard);
     };
-  }, [remove, seek, split, duplicate, nudge, togglePlayback, undoRedo, quickTrim, markCut, cutMarked]);
+  }, [remove, seek, split, duplicate, nudge, togglePlayback, undoRedo, quickTrim, cutRange]);
 
   const act = async <T,>(
     action: () => Promise<T>,
@@ -1119,7 +1100,6 @@ export function App() {
         selection.current = null;
         setSelectedId(null);
         setBoundaryId(null);
-        setCutRange(null);
       }
     },
     [select],
@@ -1444,7 +1424,7 @@ export function App() {
       return false;
     }
     setError('');
-    setCutRange(null);
+    setTimeRange(null);
     if (chosenReview.current && removal.videoIds.includes(chosenReview.current.mediaId)) chosenReview.current = null;
     if (review && removal.videoIds.includes(review.mediaId)) {
       // Release the removed recording's review decoder without moving keyboard focus.
@@ -2031,10 +2011,9 @@ export function App() {
             onDelete={remove}
             onDuplicate={duplicate}
             onQuickTrim={quickTrim}
-            cutRange={cutRange}
-            onMarkCut={markCut}
-            onCutMarked={cutMarked}
-            onClearCut={() => setCutRange(null)}
+            timeRange={timeRange}
+            onTimeRange={setTimeRange}
+            onCutRange={cutRange}
             onScrub={setScrubbing}
             revealRequest={revealRequest}
             fitRequest={fitRequest}

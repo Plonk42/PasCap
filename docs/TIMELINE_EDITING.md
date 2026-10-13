@@ -192,7 +192,7 @@ Enter or when focus leaves both fields; Escape restores.
 ## Cutting an unwanted part
 
 The timeline's visible clip-edit controls expose **Split**, **Trim start**, **Trim end**,
-Delete and **IN / OUT / Cut range** in the existing responsive toolbar, not another
+Delete and **Cut range** in the existing responsive toolbar, not another
 toolbar covering the lanes. Each track header has one **Ripple** toggle icon
 (`aria-pressed`) showing and switching that track's own setting in one Undo step.
 
@@ -206,10 +206,17 @@ toolbar covering the lanes. Each track header has one **Ripple** toggle icon
   Ripple-off left trims retain their old OUT.
   These are shrinking operations. Handles or Restore full recording recover omitted
   footage. Repeating an unchanged endpoint trim adds no history entry.
-- With one clip selected, seek the first unwanted timeline frame and **IN / I**,
-  then seek the last unwanted frame and **OUT / O**. OUT is stored as playhead + 1,
-  exclusive. A hatched overlay, IN/OUT markers and timecode readout show the range.
-  **Cut range / Shift+Delete** removes it atomically in **one Undo step**.
+- **Drag on the time ruler** to select a project-frame range (OUT exclusive): a
+  highlighted band on the ruler, with a timecode readout while dragging and a hatched
+  overlay on the part of the selected clip it covers. The preview follows the moving
+  edge (its first or last removed frame). Snapping (eight pixels, Alt bypasses) and
+  edge autoscroll follow the other timeline gestures; Escape, pointer cancellation,
+  lost capture or window blur restore the previous range and playhead. A plain
+  click seeks and clears the range; the playhead handle scrubs.
+- **Cut range / Shift+Delete** is enabled only when a range and a clip are both
+  selected and the range overlaps that clip; otherwise its tooltip names the reason
+  (no range, no clip, or range outside the clip). It removes the overlapping part
+  of the clip atomically in **one Undo step**.
 - Middle removal keeps a left clip with the original ID and a right clip with
   a fresh ID. Prefix/suffix removal keeps only the retained clip; a whole-range
   removal deletes it. Retained pieces share the original media but have independent
@@ -224,13 +231,13 @@ toolbar covering the lanes. Each track header has one **Ripple** toggle icon
   retained right piece starts at the original output position of the
   retained source IN. Each piece retimes/rounds independently, like a split;
   invalid overlap/quantisation is rejected. Ripple assembly is available on any track.
-- Missing/reversed/outside marks and slow-motion ranges containing no original
-  source frame cannot remove footage. Mark controls require the playhead within
-  the selected clip; errors preserve document/history and valid existing marks.
-- Marks are transient editor state, not autosaved/rendered fields. Clear/Escape,
-  changing the selected clip/empty track, timing edits, Undo/Redo and project changes
-  clear them. Source-review I/O controls are a separate context and never edit these
-  marks or the timeline. Form/modal/slider/popover keyboard guards still apply.
+- Ranges outside the selected clip and slow-motion ranges containing no original
+  source frame cannot remove footage; errors preserve document/history and the range.
+- The range is transient editor state, not an autosaved/rendered field, and does not
+  belong to a clip: selecting another clip or track keeps it. Clear/Escape, a ruler
+  click, timing edits, Undo/Redo and project changes clear it. Source-review I/O
+  controls are a separate context and never edit it or the timeline.
+  Form/modal/slider/popover keyboard guards still apply.
 
 Music, other tracks and track keyframes do not follow a track's Ripple edits. Their absolute
 project times remain fixed; track animation may therefore evaluate different footage
@@ -242,8 +249,8 @@ One to eight uniform tracks display in saved **bottom-to-top composition order**
 track 1 renders below track 2, track 3 above track 2, and so on. There is no primary/overlay
 editing role or required first-track ID. Tracks and track headers have synchronized native vertical scrolling.
 The ruler, playhead handle and timecode remain pinned above scrolling tracks. Ticks
-follow horizontal scroll; a ruler click/drag still maps to the exact timeline
-frame. Scrolling creates no seek/history/save, and a drop on the ruler cannot
+follow horizontal scroll; ruler clicks, range drags and the playhead handle still map
+to the exact timeline frame. Scrolling creates no seek/history/save, and a drop on the ruler cannot
 target a track hidden underneath it.
 
 Every new video track starts with **Ripple on**. **Track options → Ripple** enables a
@@ -429,7 +436,8 @@ single-keyframe movement and Undo preserve the cursor and list input identity.
 Navigation/inspection creates no history entry or save and adds no persisted fields.
 
 The thin strip above video tracks is the **time ruler**. Its separators/ticks denote
-TIME; clicking/dragging seeks. The distinct **Cut / Fade / Dissolve** boundary
+TIME; a click seeks, a drag selects a range to cut and the playhead handle scrubs.
+The distinct **Cut / Fade / Dissolve** boundary
 buttons open that boundary in Track → Transitions, not keyframe controls. Full keyframe
 semantics are in [LAYERS_AND_KEYFRAMES.md](LAYERS_AND_KEYFRAMES.md).
 
@@ -491,7 +499,8 @@ dissolves use the source-over contract above. See
 ## Snapping, projects and music
 
 **Snap** uses an eight-pixel tolerance converted to project frames at the current
-zoom. Ruler/playhead scrubbing snaps to video/music boundaries; trim handles also
+zoom. Ruler clicks and playhead scrubbing snap to video/music boundaries; ruler range
+edges also snap to the playhead captured at pointer down. Trim handles also
 snap to the original, stationary playhead. Shared-keyframe and clip source-keyframe
 (Transform and Speed) drags use boundaries and
 the stationary playhead captured at pointer down, with their captured zoom throughout

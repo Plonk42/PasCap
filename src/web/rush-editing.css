@@ -47,23 +47,27 @@
   z-index: 7;
 }
 
-.timeline-cut-mark {
+.timeline-ruler-range {
   position: absolute;
-  width: 1px;
-  height: 72px;
-  background: #efb497;
+  top: 16px;
+  bottom: 0;
   pointer-events: none;
-  z-index: 7;
+  border-inline: 1px solid #efb497;
+  background: #d89b7499;
 }
 
-.timeline-cut-mark > span {
+.timeline-ruler-range-readout {
   position: absolute;
-  top: -15px;
-  padding: 1px 4px;
+  left: 50%;
+  top: calc(100% + 3px);
+  transform: translateX(-50%);
+  padding: 1px 5px;
   border-radius: 3px;
   background: #e9bea5;
   color: #2c2019;
   font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .timeline-clip .clip-excerpt-badge {

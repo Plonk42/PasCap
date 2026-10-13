@@ -26,7 +26,7 @@ import {
 } from '../../src/shared/export.js';
 import type { MediaAsset } from '../../src/shared/media.js';
 import { createClip, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
-import { removeMarkedRange } from '../../src/shared/rush-editing.js';
+import { removeSelectedRange } from '../../src/shared/rush-editing.js';
 import { forEachSerial } from '../../src/shared/serial.js';
 import { compileRetiming, type SpeedSettings } from '../../src/shared/speed.js';
 import { calculateLayout, sampleTimeline } from '../../src/shared/timeline.js';
@@ -614,10 +614,7 @@ describe.skipIf(!enabled)('production native export · opt-in disposable media o
     before.clips.push(createClip('two', assets[1]!.id, 2, 10));
     before.clips[1]!.start = 12;
     before.layers[0]!.transitions = [{ leftId: 'one', rightId: 'two', type: 'cut', duration: 0 }];
-    const project = applyCommand(
-      before,
-      removeMarkedRange(before, { clipId: 'one', inFrame: 3, outFrame: 6 }, 'one-right'),
-    );
+    const project = applyCommand(before, removeSelectedRange(before, 'one', { inFrame: 3, outFrame: 6 }, 'one-right'));
     expect(project.clips).toEqual([
       { ...before.clips[0]!, sourceOut: 6 },
       { ...before.clips[0]!, id: 'one-right', sourceIn: 12, start: 3 },

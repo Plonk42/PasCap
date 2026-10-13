@@ -371,23 +371,27 @@ for (const { width, height } of [
     await page.evaluate((next) => window.pascapLab!.setDocument(next), document);
     await page.setViewportSize({ width, height });
     await seek(page, 30);
-    await page.getByRole('button', { name: 'Mark cut IN', exact: true }).click();
-    await seek(page, 40);
-    await page.getByRole('button', { name: 'Mark cut OUT', exact: true }).click();
-    await expect(page.getByRole('button', { name: 'Mark cut IN', exact: true })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    );
+    const ruler = (await page.getByLabel('Timeline ruler', { exact: true }).boundingBox())!;
+    const origin = await page
+      .locator('.timeline-surface')
+      .evaluate((element) => element.getBoundingClientRect().left + Number(element.getAttribute('data-leading')));
+    const scale = Number(await page.locator('.timeline-surface').getAttribute('data-pixels-per-frame'));
+    const rulerY = ruler.y + ruler.height - 6;
+    await page.keyboard.down('Alt');
+    await page.mouse.move(origin + 30 * scale, rulerY);
+    await page.mouse.down();
+    await page.mouse.move(origin + 41 * scale, rulerY, { steps: 3 });
+    await page.mouse.up();
+    await page.keyboard.up('Alt');
+    await expect(page.locator('.timeline-ruler-range')).toHaveAttribute('data-range-out', '41');
     await expect(page.locator('.timeline-cut-selection')).toBeVisible();
     for (const name of [
       'Split at playhead',
       'Trim start to playhead',
       'Trim end to playhead',
       'Delete selected clip',
-      'Mark cut IN',
-      'Mark cut OUT',
-      'Cut marked range',
-      'Clear cut marks',
+      'Cut selected range',
+      'Clear selected range',
       'Toggle snapping',
       'Add video track',
     ]) {

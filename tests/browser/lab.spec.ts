@@ -106,7 +106,9 @@ test('removes fixed A/B slots, promotional text and default technical clutter', 
   await expect(page).toHaveTitle('PasCap');
 });
 
-test('seeks by clicking and dragging the timeline ruler without a duplicate position slider', async ({ page }) => {
+test('seeks by clicking the ruler, scrubs with the playhead handle and selects a range by dragging the ruler', async ({
+  page,
+}) => {
   await expect(page.getByRole('slider', { name: 'Timeline position', exact: true })).toHaveCount(0);
   await expect(page.getByRole('slider', { name: 'Timeline zoom', exact: true })).toBeVisible();
   const surface = page.locator('.timeline-surface');
@@ -116,34 +118,40 @@ test('seeks by clicking and dragging the timeline ruler without a duplicate posi
   const leading = Number(await surface.getAttribute('data-leading'));
   const scrollLeft = await page.locator('.timeline-scroll').evaluate((element) => element.scrollLeft);
   const xAt = (frame: number): number => box.x + leading + frame * scale;
-  const y = box.y + box.height / 2;
+  const y = box.y + box.height - 6;
+  const state = () =>
+    page.evaluate(() => {
+      const diagnostics = window.pascapLab!.engine.diagnostics();
+      return { status: diagnostics.status, frame: diagnostics.frame };
+    });
 
   await page.mouse.click(xAt(30), y);
-  await expect
-    .poll(() =>
-      page.evaluate(() => {
-        const state = window.pascapLab!.engine.diagnostics();
-        return { status: state.status, frame: state.frame };
-      }),
-    )
-    .toEqual({ status: 'paused', frame: 30 });
-  await page.mouse.move(xAt(30), y);
+  await expect.poll(state).toEqual({ status: 'paused', frame: 30 });
+  const handle = (await page.getByRole('button', { name: 'Drag playhead', exact: true }).boundingBox())!;
+  await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2);
   await page.mouse.down();
-  await page.mouse.move(xAt(90), y, { steps: 6 });
+  await page.mouse.move(xAt(90), handle.y + handle.height / 2, { steps: 6 });
   await page.mouse.up();
-  await expect
-    .poll(() =>
-      page.evaluate(() => {
-        const state = window.pascapLab!.engine.diagnostics();
-        return { status: state.status, frame: state.frame };
-      }),
-    )
-    .toEqual({ status: 'paused', frame: 90 });
+  await expect.poll(state).toEqual({ status: 'paused', frame: 90 });
+  await expect(page.locator('.timeline-ruler-range')).toHaveCount(0);
   const playheadLeft = Number.parseFloat(
     await page.locator('.timeline-playhead').evaluate((element) => (element as HTMLElement).style.left),
   );
   expect(playheadLeft).toBeCloseTo(leading + 90 * scale);
   expect(await page.locator('.timeline-scroll').evaluate((element) => element.scrollLeft)).toBe(scrollLeft);
+
+  await page.keyboard.down('Alt');
+  await page.mouse.move(xAt(40), y);
+  await page.mouse.down();
+  await page.mouse.move(xAt(70), y, { steps: 6 });
+  await page.mouse.up();
+  await page.keyboard.up('Alt');
+  await expect(page.locator('.timeline-ruler-range')).toHaveAttribute('data-range-in', '40');
+  await expect(page.locator('.timeline-ruler-range')).toHaveAttribute('data-range-out', '70');
+  await expect.poll(state).toEqual({ status: 'paused', frame: 69 });
+  await page.mouse.click(xAt(90), y);
+  await expect.poll(state).toEqual({ status: 'paused', frame: 90 });
+  await expect(page.locator('.timeline-ruler-range')).toHaveCount(0);
 
   await page.getByRole('button', { name: 'Next frame', exact: true }).focus();
   await page.keyboard.press('ArrowRight');

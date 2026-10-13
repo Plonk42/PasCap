@@ -76,7 +76,7 @@ vertical scrollbars and keyboard focus reveal stay synchronized. Horizontal time
 scroll is independent and scrolling never changes the project or playhead. The time
 ruler stays pinned above the tracks, with horizontally aligned ticks and a visible
 playhead handle (timecode only during drafts; the preview transport shows it otherwise);
-click/drag seeking uses the same integer-frame geometry.
+click seeking, range dragging and handle scrubbing use the same integer-frame geometry.
 Dropping on the ruler never targets a track concealed underneath it.
 Unavailable Raise/Lower/Delete actions have contextual accessible reasons for the
 actual stack endpoint, last remaining track or active interaction state.
@@ -418,7 +418,8 @@ reaches all retained off-trim/original-OUT keyframes through independent clip-lo
 cursors; main capture always uses the real displayed project/source frame.
 
 The thin strip above video tracks is the **time ruler**: separators/ticks denote
-TIME, and click/drag seeks the playhead. The separate **Cut / Fade / Dissolve**
+TIME; a click seeks the playhead, a drag selects a range to cut and the playhead
+handle scrubs. The separate **Cut / Fade / Dissolve**
 buttons explicitly open Track → Transitions for their own track's boundary.
 Neither ruler ticks nor those transition buttons are keyframe markers.
 

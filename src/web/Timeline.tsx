@@ -15,7 +15,7 @@ import { KEYFRAME_SETTINGS, keySettings } from '../shared/keyframes.js';
 import { resolveMediaSelection, type MediaSelections } from '../shared/media-selection.js';
 import type { MediaAsset } from '../shared/media.js';
 import { createClip, createLayer, MAX_VIDEO_LAYERS, type ProjectDocument, type VideoClip } from '../shared/model.js';
-import type { ClipCutRange } from '../shared/rush-editing.js';
+import type { TimelineRange } from '../shared/rush-editing.js';
 import { snapFrame, snapPoints } from '../shared/snap.js';
 import { trimOnTimeline, type TrimEdge } from '../shared/source-range.js';
 import { spatialKeyChannels } from '../shared/spatial.js';
@@ -51,7 +51,8 @@ import './layers.css';
 import { Layers } from './Layers.js';
 import { createMusicInstance, videoTimelineDuration } from './music-ui.js';
 import { MusicTimeline, type MusicTimelineGesture } from './MusicTimeline.js';
-import { RushEditBar, TimelineCutMarks } from './RushEditBar.js';
+import { RulerRange, RushEditBar, TimelineCutOverlay } from './RushEditBar.js';
+import { useRulerRange } from './ruler-range.js';
 import { trackKeyframeKind } from './timeline-keyframes.js';
 import { planTimelineDrop, type DropPlan, type TimelinePayload } from './timeline-placement.js';
 import { TIMELINE_RULER_HEIGHT, timelineLayerAt, timelineRows } from './timeline-rows.js';
@@ -90,11 +91,10 @@ interface Props {
   ranges: MediaSelections;
   onDuplicate: () => void;
   onQuickTrim: (edge: TrimEdge) => void;
-  cutRange: ClipCutRange | null;
-  onMarkCut: (edge: TrimEdge) => void;
-  onCutMarked: () => void;
-  onClearCut: () => void;
-  /** Ruler/playhead drag starts (true) and ends (false). */
+  timeRange: TimelineRange | null;
+  onTimeRange: (range: TimelineRange | null) => void;
+  onCutRange: () => void;
+  /** Ruler range or playhead drag starts (true) and ends (false). */
   onScrub?: (active: boolean) => void;
   revealRequest: number;
 }
@@ -988,6 +988,21 @@ export function Timeline(props: Readonly<Props>) {
       clearMove();
     }
   };
+  const rulerRange = useRulerRange({
+    project,
+    duration: layout.duration,
+    frame,
+    leading,
+    scale,
+    snapping,
+    disabled: interactionBlocked || drag.current !== null,
+    surface,
+    viewport: scroll,
+    onPause,
+    onSeek,
+    onScrub,
+    onRange: props.onTimeRange,
+  });
 
   const interactionStatus = musicGesture
     ? musicGesture.error || `Music track · ${formatTimecode(musicGesture.start)} · release to apply · Esc cancels`
@@ -1008,13 +1023,12 @@ export function Timeline(props: Readonly<Props>) {
           selected={selected}
           frame={frame}
           disabled={interactionBlocked}
-          cutRange={props.cutRange}
+          timeRange={props.timeRange}
           onSplit={onSplit}
           onDelete={onDelete}
           onQuickTrim={props.onQuickTrim}
-          onMarkCut={props.onMarkCut}
-          onCutMarked={props.onCutMarked}
-          onClearCut={props.onClearCut}
+          onCutRange={props.onCutRange}
+          onClearRange={() => props.onTimeRange(null)}
         />
         <button
           className={`secondary-button small timeline-view-action ${snapping ? 'active' : ''}`}
@@ -1119,11 +1133,9 @@ export function Timeline(props: Readonly<Props>) {
           >
             <div
               className="timeline-ruler"
-              onPointerDown={beginSeek}
-              onPointerMove={moveSeek}
-              onLostPointerCapture={endSeek}
+              {...rulerRange.handlers}
               aria-label="Timeline ruler"
-              title="Time ruler · click or drag to seek; separators mark time, not keyframes"
+              title="Time ruler · click to seek, drag to select a range to cut; drag the playhead handle to scrub"
             >
               {ticks.map((second) => (
                 <span
@@ -1134,6 +1146,12 @@ export function Timeline(props: Readonly<Props>) {
                   {durationLabel(second)}
                 </span>
               ))}
+              <RulerRange
+                range={rulerRange.draft ? rulerRange.draft.range : props.timeRange}
+                drafting={rulerRange.draft !== null}
+                leading={leading}
+                scale={scale}
+              />
               {layout.duration > 0 && (
                 <div className="timeline-ruler-playhead" style={{ left: leading + frame * scale }}>
                   <button
@@ -1322,8 +1340,8 @@ export function Timeline(props: Readonly<Props>) {
                 </div>
               );
             })}
-            <TimelineCutMarks
-              marks={props.cutRange}
+            <TimelineCutOverlay
+              range={rulerRange.draft ? rulerRange.draft.range : props.timeRange}
               selected={selected}
               top={rowTop(selected?.clip.layerId ?? project.layers[0]!.id)}
               leading={leading}
@@ -1429,6 +1447,9 @@ export function Timeline(props: Readonly<Props>) {
             )}
             {snapGuide !== null && draft && (
               <div className="snap-guide" style={{ left: leading + snapGuide * scale }} />
+            )}
+            {typeof rulerRange.draft?.guide === 'number' && (
+              <div className="snap-guide" style={{ left: leading + rulerRange.draft.guide * scale }} />
             )}
             {(
               [
