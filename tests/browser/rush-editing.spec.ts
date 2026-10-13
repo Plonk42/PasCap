@@ -1097,7 +1097,7 @@ test('missing, outside and empty ranges are rejected; click and Escape restore; 
   // Escape cancels a drag, restoring the previous range and playhead without an edit.
   await markRange(page, 20, 31);
   await expectCutOverlay(page, 20, 31);
-  await expect(page.locator('.timeline-ruler-range-readout')).toHaveCount(0);
+  await expect(page.locator('.timeline-ruler-range-readout')).toHaveText('00:00:00:20 – 00:00:01:01');
   await page.keyboard.down('Alt');
   await page.mouse.move(await rulerX(60), await rulerY());
   await page.mouse.down();
