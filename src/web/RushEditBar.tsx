@@ -61,7 +61,7 @@ export function TimelineCutOverlay({
   );
 }
 
-/** Highlighted band on the time ruler; the readout is shown while dragging. */
+/** Highlighted band on the time ruler, with its IN – OUT readout while it stays selected. */
 export function RulerRange({
   range,
   drafting,
@@ -77,7 +77,7 @@ export function RulerRange({
       title={`Selected range ${rangeLabel(range)} (OUT exclusive)`}
       style={{ left: leading + range.inFrame * scale, width: (range.outFrame - range.inFrame) * scale }}
     >
-      {drafting && <span className="timeline-ruler-range-readout">{rangeLabel(range)}</span>}
+      <span className="timeline-ruler-range-readout">{rangeLabel(range)}</span>
     </div>
   );
 }
