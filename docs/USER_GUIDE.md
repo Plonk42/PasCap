@@ -190,7 +190,8 @@ drag to reorder, or turn Ripple off in Track options to set an independent start
 an existing bookmark the button deletes it instead. Bookmarks are small lilac outlines
 of the playhead in
 the lower half of the time ruler: click one to go there, drag it or use ←/→
-(Shift: ten frames) to move it, and press Delete to remove it. Trims, moves, music
+(Shift: ten frames) to move it, and press Delete to remove it. The arrows beside
+**Bookmark**, or **Shift+↑ / Shift+↓**, jump to the previous / next bookmark. Trims, moves, music
 placement, keyframe drags and ruler scrubbing snap to bookmarks like they snap to
 clip edges; **Alt** bypasses. Each add, move or delete is one Undo step. Bookmarks
 are saved with the project but never rendered or exported. Details:
@@ -674,19 +675,19 @@ the project. A deliberate click away from a number still applies a valid draft
 once, as usual. Settings, each keyframe's nested **Edit**, music placement and
 storage/render breakdowns remain their existing expandable controls, not help buttons.
 
-| Context                                     | Shortcut                                                                     |
-| ------------------------------------------- | ---------------------------------------------------------------------------- |
-| Timeline play/seek                          | Space; ←/→ one frame; Shift+←/→ ten; Home/End; F to fit                      |
-| Split / quick trim                          | S / Q / W                                                                    |
-| Unwanted timeline range                     | Drag on the ruler; Shift+Delete cuts; Escape clears the range                |
-| Bookmarks                                   | M adds at the playhead; focused bookmark: arrows move, Delete removes        |
-| Clip actions                                | Ctrl+D duplicate (or right-click the clip); Delete/Backspace remove          |
-| Session history                             | Ctrl+Z; Ctrl+Shift+Z or Ctrl+Y redo                                          |
-| Positioned clip / first Ripple anchor nudge | Alt+←/→ one frame; Alt+Shift+←/→ ten; later Ripple starts require Ripple off |
-| Focused trim handle                         | Arrows one source frame; Shift ten; left Home/right End restore              |
-| Focused track keyframe marker               | Arrows one project frame; Shift ten; Enter selects/seeks                     |
-| Focused source review                       | I/O marks the source range, not the timeline range                           |
-| Shortcut guide                              | ? outside form/modal/source controls                                         |
+| Context                                     | Shortcut                                                                              |
+| ------------------------------------------- | ------------------------------------------------------------------------------------- |
+| Timeline play/seek                          | Space; ←/→ one frame; Shift+←/→ ten; Home/End; F to fit                               |
+| Split / quick trim                          | S / Q / W                                                                             |
+| Unwanted timeline range                     | Drag on the ruler; Shift+Delete cuts; Escape clears the range                         |
+| Bookmarks                                   | M adds at the playhead; Shift+↑/↓ previous/next; focused: arrows move, Delete removes |
+| Clip actions                                | Ctrl+D duplicate (or right-click the clip); Delete/Backspace remove                   |
+| Session history                             | Ctrl+Z; Ctrl+Shift+Z or Ctrl+Y redo                                                   |
+| Positioned clip / first Ripple anchor nudge | Alt+←/→ one frame; Alt+Shift+←/→ ten; later Ripple starts require Ripple off          |
+| Focused trim handle                         | Arrows one source frame; Shift ten; left Home/right End restore                       |
+| Focused track keyframe marker               | Arrows one project frame; Shift ten; Enter selects/seeks                              |
+| Focused source review                       | I/O marks the source range, not the timeline range                                    |
+| Shortcut guide                              | ? outside form/modal/source controls                                                  |
 
 Keyboard actions respect focused inputs, buttons, source controls, dialogs and
 dividers. Click the preview timecode for an exact frame or **HH:MM:SS:FF** at 30 fps

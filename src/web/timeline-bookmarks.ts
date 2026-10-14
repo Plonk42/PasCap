@@ -12,6 +12,23 @@ export function bookmarkTargets(project: ProjectDocument): KeyframeSlideTarget[]
   return project.bookmarks.map((origin) => ({ scope: BOOKMARK_SCOPE, origin }));
 }
 
+/** Frame to seek for the nearest bookmark strictly before (-1) or after (1) the playhead; bookmarks past the end preview the last frame. */
+export function adjacentBookmark(
+  bookmarks: readonly number[],
+  frame: number,
+  duration: number,
+  direction: -1 | 1,
+): number | null {
+  if (!duration) return null;
+  let target: number | null = null;
+  for (const bookmark of bookmarks) {
+    const reachable = Math.min(bookmark, duration - 1);
+    if (direction < 0 && reachable < frame) target = reachable;
+    if (direction > 0 && reachable > frame) return reachable;
+  }
+  return target;
+}
+
 export function planBookmarkMove(project: ProjectDocument, frame: number, nextFrame: number): KeyframeMove {
   const command: EditCommand = { type: 'bookmark-move', frame, nextFrame };
   try {

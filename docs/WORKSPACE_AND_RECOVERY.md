@@ -54,7 +54,7 @@ clip detail filters before grading; see [detail filters](design/DETAIL_FILTERS.m
 - Bottom: frame-scaled multi-track timeline, playhead timecode, highlighted active
   insertion track, one marker per stored track keyframe, dimmed hidden clips and Activity.
   The responsive toolbar keeps Split, Trim start/end, Delete and Cut range
-  directly visible, then **Bookmark** (add at the playhead, or delete the one there); Duplicate is in the clip's right-click menu (Ctrl+D), and start
+  directly visible, then **Bookmark** (add at the playhead, or delete the one there) between Previous/Next bookmark; Duplicate is in the clip's right-click menu (Ctrl+D), and start
   nudging beside Clip → Placement's start field. Zoom keeps its slider and Fit,
   with Zoom out / Zoom in buttons beside them.
   Video tracks display the saved bottom-to-top composition array: track 1 renders below track 2,
@@ -158,7 +158,7 @@ opening/closing/transition fades darken only that track's RGB, preserving covera
 Empty tracks retain dormant fades; adding footage validates them again.
 
 Keyboard help is available via the **header help button** or `?`
-outside form/modal/source controls. Space, S, Q/W, M (add bookmark), Shift+Delete, Escape,
+outside form/modal/source controls. Space, S, Q/W, M (add bookmark), Shift+↑/↓ (previous/next bookmark), Shift+Delete, Escape,
 Ctrl+D, Delete/Backspace, Undo/Redo,
 arrows, Shift+arrows, Alt+arrows, Alt+Shift+arrows, Home/End and F
 are mapped explicitly. Native button Space remains button activation. Editing

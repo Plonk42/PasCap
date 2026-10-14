@@ -53,7 +53,7 @@ import { createMusicInstance, videoTimelineDuration } from './music-ui.js';
 import { MusicTimeline, type MusicTimelineGesture } from './MusicTimeline.js';
 import { RulerRange, RushEditBar, TimelineCutOverlay } from './RushEditBar.js';
 import { useRulerRange } from './ruler-range.js';
-import { bookmarkKind, bookmarkTargets } from './timeline-bookmarks.js';
+import { adjacentBookmark, bookmarkKind, bookmarkTargets } from './timeline-bookmarks.js';
 import './timeline-bookmarks.css';
 import { trackKeyframeKind } from './timeline-keyframes.js';
 import { planTimelineDrop, type DropPlan, type TimelinePayload } from './timeline-placement.js';
@@ -324,7 +324,7 @@ function TimelineMusicLanes(
   ));
 }
 
-/** Adds a bookmark at the playhead, or deletes the one already there. */
+/** Adds a bookmark at the playhead, or deletes the one already there, between Previous/Next bookmark. */
 function BookmarkButton(
   props: Readonly<{
     project: ProjectDocument;
@@ -332,24 +332,49 @@ function BookmarkButton(
     duration: number;
     disabled: boolean;
     onEdit: (command: EditCommand) => void;
+    onSeek: (frame: number) => void;
   }>,
 ) {
   const present = props.project.bookmarks.includes(props.frame);
   let title = 'Add a bookmark at the playhead; edits snap to it · M';
   if (!props.duration) title = 'Add footage or music before adding a bookmark.';
   else if (present) title = `Delete the bookmark at ${formatTimecode(props.frame)}`;
+  const previous = adjacentBookmark(props.project.bookmarks, props.frame, props.duration, -1);
+  const next = adjacentBookmark(props.project.bookmarks, props.frame, props.duration, 1);
   return (
-    <button
-      type="button"
-      className={`secondary-button small timeline-view-action timeline-bookmark-action ${present ? 'active' : ''}`}
-      aria-label={present ? 'Delete bookmark at playhead' : 'Add bookmark at playhead'}
-      title={title}
-      disabled={props.disabled || !props.duration}
-      onClick={() => props.onEdit({ type: present ? 'bookmark-remove' : 'bookmark-add', frame: props.frame })}
-    >
-      <Icon name={present ? 'trash' : 'bookmark'} size={15} />
-      <span className="timeline-action-label">Bookmark</span>
-    </button>
+    <span className="timeline-bookmark-actions">
+      <button
+        type="button"
+        className="icon-button"
+        aria-label="Previous bookmark"
+        title={previous === null ? 'No bookmark before the playhead' : 'Go to the previous bookmark · Shift+↑'}
+        disabled={props.disabled || previous === null}
+        onClick={() => previous !== null && props.onSeek(previous)}
+      >
+        <Icon name="back" size={14} />
+      </button>
+      <button
+        type="button"
+        className={`secondary-button small timeline-view-action timeline-bookmark-action ${present ? 'active' : ''}`}
+        aria-label={present ? 'Delete bookmark at playhead' : 'Add bookmark at playhead'}
+        title={title}
+        disabled={props.disabled || !props.duration}
+        onClick={() => props.onEdit({ type: present ? 'bookmark-remove' : 'bookmark-add', frame: props.frame })}
+      >
+        <Icon name={present ? 'trash' : 'bookmark'} size={15} />
+        <span className="timeline-action-label">Bookmark</span>
+      </button>
+      <button
+        type="button"
+        className="icon-button"
+        aria-label="Next bookmark"
+        title={next === null ? 'No bookmark after the playhead' : 'Go to the next bookmark · Shift+↓'}
+        disabled={props.disabled || next === null}
+        onClick={() => next !== null && props.onSeek(next)}
+      >
+        <Icon name="forward" size={14} />
+      </button>
+    </span>
   );
 }
 
@@ -1093,6 +1118,7 @@ export function Timeline(props: Readonly<Props>) {
           duration={layout.duration}
           disabled={interactionBlocked}
           onEdit={onEdit}
+          onSeek={onSeek}
         />
         <button
           className={`secondary-button small timeline-view-action ${snapping ? 'active' : ''}`}

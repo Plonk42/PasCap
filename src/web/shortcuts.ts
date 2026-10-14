@@ -15,7 +15,9 @@ export type EditorShortcut =
         | 'trim-out'
         | 'remove-range'
         | 'clear-range'
-        | 'bookmark';
+        | 'bookmark'
+        | 'bookmark-previous'
+        | 'bookmark-next';
     }
   | { type: 'step' | 'nudge'; delta: number };
 type ShortcutEvent = Pick<KeyboardEvent, 'key' | 'code' | 'ctrlKey' | 'metaKey' | 'altKey' | 'shiftKey' | 'repeat'>;
@@ -40,6 +42,8 @@ export function editorShortcut(event: ShortcutEvent, nativeSpace = false): Edito
   if (event.ctrlKey || event.metaKey) return modifiedShortcut(event);
   if (['arrowleft', 'arrowright'].includes(key)) return arrowShortcut(event);
   if (event.altKey) return null;
+  if (event.shiftKey && ['arrowup', 'arrowdown'].includes(key))
+    return { type: key === 'arrowup' ? 'bookmark-previous' : 'bookmark-next' };
   if (key === '?') return { type: 'help' };
   if (event.code === 'Space') return nativeSpace || event.repeat ? null : { type: 'play' };
   if (event.shiftKey && ['delete', 'backspace'].includes(key)) return { type: 'remove-range' };

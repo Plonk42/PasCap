@@ -152,6 +152,32 @@ test('M and the toolbar add and delete bookmarks at the playhead; duplicates are
   await expect(page.locator('[data-bookmark]')).toHaveCount(2);
 });
 
+test('Previous/Next bookmark buttons and Shift+Up/Down move the playhead between bookmarks without editing', async ({
+  page,
+}) => {
+  await fixture(page, [40, 130, 5_000]);
+  const frame = (): Promise<number> => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame);
+  const previous = page.getByRole('button', { name: 'Previous bookmark', exact: true });
+  const next = page.getByRole('button', { name: 'Next bookmark', exact: true });
+  await seek(page, 10);
+  await expect(previous).toBeDisabled();
+  await next.click();
+  await expect.poll(frame).toBe(40);
+  await next.click();
+  await expect.poll(frame).toBe(130);
+  await page.getByRole('region', { name: 'Video timeline', exact: true }).focus();
+  // A bookmark after the last frame previews that last frame, then there is nothing further.
+  await page.keyboard.press('Shift+ArrowDown');
+  await expect.poll(frame).toBe(209);
+  await expect(next).toBeDisabled();
+  await page.keyboard.press('Shift+ArrowUp');
+  await expect.poll(frame).toBe(130);
+  await previous.click();
+  await expect.poll(frame).toBe(40);
+  expect(await bookmarks(page)).toEqual([40, 130, 5_000]);
+  await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
+});
+
 test('bookmarks slide with snapping, arrows and Delete; occupied frames and Escape restore', async ({ page }) => {
   await fixture(page, [40, 130]);
   // Snaps to clip a's OUT at 90, never back to its own origin.
