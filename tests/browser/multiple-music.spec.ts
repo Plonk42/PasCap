@@ -46,6 +46,7 @@ test.beforeEach(async ({ page, request }) => {
     '/api/media': { assets: [video] },
     '/api/audio': { assets: [song] },
     '/api/jobs': { jobs: [] },
+    '/api/footage/roots': { roots: [] },
   };
   await page.route('**/api/**', async (route) => {
     const pathname = new URL(route.request().url()).pathname;
@@ -170,10 +171,11 @@ test('import is bin-only; add, duplicate recording, select, edit and trash retai
   const add = page.locator('[aria-label="Add music track"]');
   await expect(add).toBeDisabled();
   await expect(add).toHaveAccessibleDescription(/Import a music recording first/);
-  await page
-    .getByRole('textbox', { name: 'Music recording path', exact: true })
-    .fill('/disposable/synthetic-music.wav');
-  await page.getByRole('button', { name: 'Import audio', exact: true }).click();
+  await page.getByRole('button', { name: 'Import music', exact: true }).click();
+  // Without any media location, the typed-path form is already open.
+  await page.getByRole('textbox', { name: 'File or folder path', exact: true }).fill('/disposable/synthetic-music.wav');
+  await page.getByRole('button', { name: 'Import path', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: 'Import media', exact: true })).toHaveCount(0);
   await expect(page.locator(`[data-music-media-id="${song.id}"]`)).toBeVisible();
   await expect(page.getByRole('combobox', { name: 'Music recording', exact: true })).toHaveCount(0);
   await flush(page);

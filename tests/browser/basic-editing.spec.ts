@@ -316,15 +316,18 @@ test('partial proxy admission errors preserve import success and accepted jobs w
     });
   });
   await page.route('**/api/jobs', (route) => route.fulfill({ json: { jobs: [job] } }));
-  await page.getByRole('button', { name: 'Import folder', exact: true }).click();
-  await page.getByText('Import a whole folder by path', { exact: true }).click();
-  await page.getByRole('textbox', { name: 'Absolute folder path on this machine' }).fill('/tmp/disposable-source');
-  await page.getByRole('button', { name: 'Register recordings' }).click();
-  await expect(page.getByRole('region', { name: 'Import results' })).toContainText('Recordings were kept');
-  await expect(page.getByRole('region', { name: 'Import results' })).toContainText(
-    '1 editing proxies queued automatically',
-  );
-  await page.getByRole('button', { name: 'Done', exact: true }).click();
+  await page.getByRole('button', { name: 'Import media', exact: true }).first().click();
+  await page.getByText('Other location', { exact: true }).click();
+  await page.getByRole('textbox', { name: 'File or folder path' }).fill('/tmp/disposable-source');
+  await page.getByRole('button', { name: 'Import path' }).click();
+  const report = page.getByRole('region', { name: 'Import results' });
+  await expect(report).toContainText('Imported 1 video recording');
+  await expect(report).toContainText('Preparing 1 editing proxy');
+  await expect(report).toContainText('Not queued: pattern-a.mp4: Queue persistence unavailable');
+  await page
+    .getByRole('dialog', { name: 'Import media', exact: true })
+    .getByRole('button', { name: 'Close', exact: true })
+    .click();
   await page.getByRole('button', { name: 'Open activity' }).click();
   await expect(page.getByRole('region', { name: 'Active jobs' })).toContainText('pattern-a.mp4');
   expect(calls).toBe(1);

@@ -68,15 +68,20 @@ preview is allowed; export still requires at least one video clip.
 
 ## Importing recordings from the filesystem
 
-Create/open a project, then choose **Import → Browse recordings**. Its default is
-a service-side browser, not an operating-system file picker. Choose an approved root,
-open a folder, select **MP4, MOV or M4V** recordings and explicitly confirm path
-registration. Imports reference those original absolute paths and belong to the
-current project's bin; they are not inserted into the timeline automatically.
+Create/open a project, then choose **Import** in the Media panel. The **Import media**
+dialog is a service-side browser, not an operating-system file picker, laid out like
+one: approved **Locations** on the left, then a breadcrumb, **All / Video / Music**
+filter and one folder's folders and recordings with type and size. Check **MP4, MOV
+or M4V** video and music recordings (Shift-click selects a range; selection survives
+folder changes) and choose **Import**, or double-click one recording to import it
+alone. Imports reference those original absolute paths and belong to the current
+project's bin; they are not inserted into the timeline automatically. A complete
+import closes the dialog; rejected or unqueued recordings keep it open with a report
+and stay selected. The dialog reopens on the last folder.
 
 Browsing lists **one folder's metadata only**: no media-byte reads, probing,
 registration, writes or preparation jobs. Folders appear first with naturally
-sorted names. At most **2,000 entries** are shown; an explicit truncation warning
+sorted names. At most **2,000 entries** of each kind are listed; an explicit warning
 means choose a narrower folder, not that all recordings were discovered. The cache
 branch is excluded and symlinks are rejected. Missing/unreadable approved roots
 remain visible as unavailable instead of preventing service startup.
@@ -88,12 +93,14 @@ to approved roots. Existing read-only fingerprint/probe checks report individual
 failures. Confirming registration queues eligible proxies through the same
 one-heavy-worker queue; ready/in-flight work is reused, and failed/cancelled/
 interrupted preparation requires explicit **Prepare**. Merely opening folders or
-selecting files never starts that work. Use Audio for standalone music.
+selecting files never starts that work. Music follows the same dialog; see
+[music](SPEED_AND_AUDIO.md#music).
 
-The separate **absolute-folder-path form** preserves the existing deliberate
-recursive import. It can register and autoqueue a whole folder, including one
-outside browser roots, so choose a narrow folder and submit only when that work is
-intended. This action never silently adds an approved root. See
+**Other location** (bottom of Locations) imports a typed path, including outside
+browser roots: a video or music recording, or a folder through the existing
+recursive import. A folder can register and autoqueue many recordings, so choose a
+narrow one and submit only when that work is intended. This action never silently
+adds an approved root. See
 [../README.md](../README.md#footage-service-api) for the browsing/registration API
 and [DEPLOYMENT.md](DEPLOYMENT.md) for service-side paths and planned mounts.
 

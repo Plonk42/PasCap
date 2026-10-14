@@ -306,18 +306,6 @@ svg {
   flex-direction: column;
 }
 
-.import-form {
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-  padding: 0 13px 12px;
-  font-size: 10px;
-}
-
-.import-form input {
-  font-size: 10px;
-}
-
 .library-search {
   display: flex;
   align-items: center;
@@ -1594,17 +1582,6 @@ progress {
 
 .music-controls h3 {
   margin-bottom: 9px;
-}
-
-.music-import {
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-}
-
-.music-import input {
-  min-width: 0;
-  font-size: 10px;
 }
 
 .music-controls .range-fields {

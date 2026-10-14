@@ -396,23 +396,22 @@ test('automatic proxy import reports accepted jobs and rejected files without du
       },
     });
   });
-  await page.getByRole('button', { name: 'Import folder', exact: true }).click();
-  await page.getByText('Import a whole folder by path', { exact: true }).click();
-  await page.getByRole('textbox', { name: 'Absolute folder path on this machine' }).fill('/tmp/disposable-flight');
-  await page.getByRole('button', { name: 'Register recordings' }).click();
-  await expect(page.getByRole('region', { name: 'Import results' })).toContainText('1 recordings registered');
-  await expect(page.getByRole('region', { name: 'Import results' })).toContainText(
-    '1 editing proxies queued automatically',
-  );
-  await expect(page.getByRole('region', { name: 'Import results' })).toContainText('2 unrelated files ignored');
-  await page.getByText('Rejected files', { exact: true }).click();
-  await expect(page.getByRole('region', { name: 'Import results' })).toContainText(
-    'unsupported.mp4: HDR is not supported',
-  );
+  const trigger = page.getByRole('button', { name: 'Import media', exact: true }).first();
+  await trigger.click();
+  await page.getByText('Other location', { exact: true }).click();
+  await page.getByRole('textbox', { name: 'File or folder path' }).fill('/tmp/disposable-flight');
+  await page.getByRole('button', { name: 'Import path' }).click();
+  const report = page.getByRole('region', { name: 'Import results' });
+  await expect(report).toContainText('Imported 1 video recording');
+  await expect(report).toContainText('Preparing 1 editing proxy');
+  await expect(report).toContainText('unsupported.mp4: HDR is not supported');
   expect(imports).toBe(1);
   expect(preparations).toBe(0);
-  await page.getByRole('button', { name: 'Done', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Import folder', exact: true })).toBeFocused();
+  await page
+    .getByRole('dialog', { name: 'Import media', exact: true })
+    .getByRole('button', { name: 'Close', exact: true })
+    .click();
+  await expect(trigger).toBeFocused();
 });
 
 test('an accepted export remains in Activity when status refresh fails, without repeating its POST', async ({

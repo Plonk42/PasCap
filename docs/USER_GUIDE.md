@@ -40,27 +40,32 @@ footage, and back up originals and saved project/export data separately.
 
 ## Import and prepare recordings
 
-1. Choose **Import → Browse recordings**. Its default is a service-side browser of approved roots,
-   not your browser's operating-system file picker. Open a folder, select recordings
-   and explicitly confirm registration into the open project.
+1. Choose **Import** in the Media panel. The **Import media** dialog browses the
+   service's approved locations (listed on its left), not your browser's
+   operating-system file picker. Open a folder, check video and music recordings
+   (Shift-click selects a range; **Video** / **Music** narrow the list) and choose
+   **Import**, or double-click one recording to import just that one.
 2. Browsing and selection alone start **no preparation**. Each listing reads one
    folder's metadata, not video bytes; it does not probe, register or write anything.
-   Folders sort first. A 2,000-entry truncation warning means choose a narrower folder.
+   Folders sort first. A warning that a folder has too many entries means choose a
+   narrower folder.
 3. Registration references original paths without copying footage. Eligible editing
    proxies queue automatically; **Activity** shows queued/running jobs and progress.
    Only **Ready** recordings can be inserted or hover-reviewed. Preparation is serial;
    ready assets and queued/running work are reused rather than encoded twice.
-4. Read the import summary: accepted registrations remain kept if another file is
-   rejected or queue admission fails. Check Media/Activity before repeating an
-   uncertain request. Failed, cancelled or interrupted preparation needs explicit
-   **Prepare**; **Prepare selected** confirms a manual multi-recording batch.
+4. A complete import closes the dialog. Otherwise its report lists what was not
+   imported or queued, and those recordings stay selected: accepted registrations are
+   kept. Check Media/Activity before repeating an uncertain request. Failed, cancelled
+   or interrupted preparation needs explicit **Prepare**; **Prepare selected**
+   confirms a manual multi-recording batch.
 5. To take a recording out of this project, use its trash button (or the trash on
    the selection header). If clips use it, PasCap asks first and removes them
    too; Undo restores everything. The original file and prepared media are kept.
 
-The separate **absolute-folder-path form** recursively imports the whole chosen
-folder and can queue substantial work. Use it deliberately, with a narrow folder.
-It may target a folder outside approved browser roots, but does not add a root.
+**Other location**, at the bottom of the locations, imports a path you type: a video
+or music recording, or a folder, which recursively imports every video recording in
+it and can queue substantial work. Use it deliberately, with a narrow folder.
+It may target a path outside approved locations, but does not add a location.
 Startup, library reads and hovering never prepare old unprepared recordings.
 
 Approved roots default to the service user's Videos folder. `PASCAP_MEDIA_ROOTS`
@@ -536,9 +541,9 @@ Retiming: [SPEED_AND_AUDIO.md](SPEED_AND_AUDIO.md).
 
 ## Add music and export
 
-Source-video audio is not used. In **Audio → Music**, choose **Browse music recordings**
-and confirm with **Import selected music**, or enter your own standalone local file
-in **Music recording path** and choose **Import audio**. Wait for preparation,
+Source-video audio is not used. Import music like video: **Import** in the Media
+panel, or **Import music** in **Audio → Music**, which opens the same dialog showing
+only music. Wait for preparation,
 then choose **Add music track** and pick the file, or drag it from **Media → Music**
 onto the music lane. Importing alone never places music. The trash on the file in
 **Media → Music** removes that recording (and, after confirmation, its music

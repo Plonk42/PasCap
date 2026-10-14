@@ -92,8 +92,7 @@ for (const viewport of [
     await page.getByRole('spinbutton', { name: 'Source IN', exact: true }).press('Escape');
     await page.getByRole('button', { name: 'Close source review', exact: true }).click();
     await inspectorTab(page, 'Audio');
-    await expect(page.getByRole('button', { name: 'Browse music recordings', exact: true })).toBeVisible();
-    await expect(page.getByRole('textbox', { name: 'Music recording path', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Import music', exact: true })).toBeVisible();
 
     // Include mounted help and accessible names, not implementation classes or persisted fields.
     const wording = await page
