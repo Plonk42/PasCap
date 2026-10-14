@@ -60,7 +60,7 @@ clip detail filters before grading; see [detail filters](design/DETAIL_FILTERS.m
   Video tracks display the saved bottom-to-top composition array: track 1 renders below track 2,
   track 3 above track 2, and so on, with no primary/overlay role. The thin ruler remains
   pinned above scrolling video tracks with TIME ticks/separators, a playhead handle and
-  lilac [bookmark](TIMELINE_EDITING.md#bookmarks) ribbons in its lower half:
+  lilac outlined ghost-playhead [bookmarks](TIMELINE_EDITING.md#bookmarks) in its lower half:
   a click seeks, a drag selects a range to cut and the handle scrubs;
   distinct Cut/Fade/Dissolve buttons open boundary transitions, not keyframes.
   While dragging a ruler range or the playhead, the preview shows each decoded frame as soon as it is
