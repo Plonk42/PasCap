@@ -17,7 +17,7 @@ The intended discrete-GPU and long real-flight checks remain deferred.
 Main **Track → Colour** edits nine scalar video track colour values, HDR and sole Opacity, including
 on empty tracks. Static and keyed Colour share this track ownership on every clip.
 Different treatments require different tracks; there is no per-clip grade or scope
-toggle. Sources are graded once; Ungraded neutralizes track Colour and clip Detail only.
+toggle. Sources are graded once; the Original preview neutralizes track Colour and clip Detail only.
 See [track appearance](design/ROW_APPEARANCE.md) for reset, context and storage details.
 **Temperature / Tint** precede Exposure, use normalized −1…1 values and Reset to
 0, and retain native sliders/exact fields in main and stored editors. Main
@@ -233,27 +233,30 @@ The preview timecode accepts nominal 30 fps NDF **HH:MM:SS:FF** or an integer
 timeline frame; it is not rounded wall-clock seconds. Out-of-range/invalid input
 stays editable with an error and never seeks. Escape returns to the current display.
 
-### Preview colour comparison
+### Preview original image
 
-The **Timeline preview** heading's native **Compare** button has the accessible
-name **Show ungraded preview**. Active mode shows **Ungraded** on the button and
-as a canvas badge. Pointer activation and focused Enter/Space work paused or during
-active playback, including normal decoder buffering. Buffering is not a pause:
-the requested comparison mode is drawn once the required decoded frames arrive,
+The **Timeline preview** heading's native **Original** button has the accessible
+name **Show original preview**. The image is original (Colour and Detail bypassed,
+with the **Original** badge) only while the button is held: pointer down until
+release (the pointer is captured, so releasing outside the button counts), or
+Enter/Space held on the focused button. Pointer release or cancel, key release,
+losing button focus or window blur restore the graded preview. It works paused or
+during active playback, including normal decoder buffering. Buffering is not a pause:
+the requested mode is drawn once the required decoded frames arrive,
 without restarting music. Errors and completion are not active-playback evidence;
 regressions require a subsequent actual Playing draw in the requested mode with
 the same music epoch and unchanged one-frame A/V/source bounds;
-there is no global comparison shortcut. **Source preview** is unaffected.
+there is no global shortcut. **Source preview** is unaffected.
 
-The ungraded view is the composed preview without grading, not original-resolution
-footage or the selected clip in isolation. All evaluated colour settings are neutral
+The original view is the composed preview without grading, not the untouched
+recording, original-resolution footage or the selected clip in isolation. All evaluated colour settings are neutral
 across enabled video tracks, including track colour bases/keyframes and both dissolve
 sources, and every clip's Sharpen/Clarity/Denoise is bypassed. Exact decoded source frames and retiming, spatial geometry/coverage, track Opacity,
 visibility, black fades, stacking and music are preserved.
 
-This mode belongs only to the editor's preview engine: toggling causes no seek,
+This mode belongs only to the editor's preview engine: holding causes no seek,
 save/history entry, export, schema, proxy or original change, or new decoder.
-Same-project seeks, appearance updates and timing reloads retain it; changing project
+Same-project seeks, appearance updates and timing reloads keep it while held; changing project
 or reloading the editor with a fresh engine restores normal graded preview.
 
 ## Numbers, titles and animation
@@ -730,7 +733,7 @@ interrupt playback; this is not gapless audio or intended-GPU/long-run qualifica
 When exact decoded sources and every evaluated composition value are unchanged,
 a held slow-motion image reuses the intact presented surface instead of repeating
 the same GPU grade. Source, colour, spatial pose, opacity, fade, dissolve, canvas size,
-Compare or a cleared surface changes the identity and requires a new draw.
+Original or a cleared surface changes the identity and requires a new draw.
 Diagnostic pixel capture always redraws first: WebGL may discard its non-preserved
 drawing buffer after presenting the intact image. No extra image buffer or longer
 audio queue is introduced. Crossing into an empty composition advances to black

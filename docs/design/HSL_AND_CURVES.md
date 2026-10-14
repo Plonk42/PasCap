@@ -29,7 +29,7 @@ Exposure → Contrast → Brightness → Shadows/Highlights → Hue/Saturation �
 linear clipping/BT.709 encoding → encoded HSL → master curve → separate RGB curves →
 black-fade brightness → grouped coverage and source-over. This is not HDR output,
 scene-linear HSL, automatic white balance, a speed curve or a per-clip correction.
-Compare/Ungraded bypasses **all** colour stages, retaining
+The Original preview bypasses **all** colour stages, retaining
 geometry, timing, visibility, Opacity, black fades and music.
 
 ## HSL mathematics
@@ -102,7 +102,7 @@ tracks use the scalar path. Curves use at most four binary subdivisions
 to locate one of their fifteen intervals. Zero-coverage sources are not graded.
 The engine reuses an intact surface only when exact decoded source identities and
 every evaluated composition value are unchanged. It retains one bounded identity
-token, not another image buffer. Project-time animation, new sources and Compare
+token, not another image buffer. Project-time animation, new sources and the Original preview
 force the appropriate redraw; any clear invalidates reuse. Readiness and the final
 actual-output-clock A/V checks still run, including for held slow-motion images.
 Diagnostic pixel capture always redraws: retaining the presented image does not

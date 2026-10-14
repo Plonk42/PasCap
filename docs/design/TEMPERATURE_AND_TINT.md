@@ -72,7 +72,7 @@ diagnostic reference and GPU shaders must use **this same math and stage order**
 not separate gain approximations. Existing native LUT interpolation, RGBA16 and
 H.264/YUV quantisation remain measured approximations, not different transforms.
 Neutral HSL/identity curves retain scalar LUT paths; nonneutral advanced settings
-require exact complete grading through composited export. Compare/Ungraded bypasses
+require exact complete grading through composited export. The Original preview bypasses
 Temperature/Tint and every other colour stage, never Opacity, geometry or fades.
 These appearance-only controls add no decoder, full-frame buffer, LUT array or
 native process; existing frame/pixel/resource and A/V gates remain unchanged.

@@ -363,15 +363,30 @@ const test = browserTest.extend<{ comparison: ComparisonFixture }>({
 });
 
 function compareButton(page: Page): Locator {
-  return page.locator('.preview-heading').getByRole('button', { name: 'Show ungraded preview', exact: true });
+  return page.locator('.preview-heading').getByRole('button', { name: 'Show original preview', exact: true });
+}
+
+/** Native pointer press on the button; the image stays original until `releasePointer`. */
+async function pressPointer(page: Page): Promise<void> {
+  await compareButton(page).hover();
+  await page.mouse.down();
+}
+
+async function releasePointer(page: Page): Promise<void> {
+  await page.mouse.up();
+}
+
+/** Engine-level bypass for tests about what persists while the image is original, not the gesture. */
+async function setBypass(page: Page, ungraded: boolean): Promise<void> {
+  await page.evaluate((ungraded) => window.pascapLab!.engine.setUngraded(ungraded), ungraded);
 }
 
 async function expectMode(page: Page, ungraded: boolean): Promise<void> {
   const button = compareButton(page);
   await expect(button).toHaveAttribute('aria-pressed', String(ungraded));
-  await expect(button).toHaveText(ungraded ? 'Ungraded' : 'Compare');
+  await expect(button).toHaveText('Original');
   expect(await button.evaluate((element) => element.tagName)).toBe('BUTTON');
-  const badge = page.locator('.canvas-stage').getByText('Ungraded · colour bypassed', { exact: true });
+  const badge = page.locator('.canvas-stage').getByText('Original · Colour and Detail bypassed', { exact: true });
   if (ungraded) await expect(badge).toBeVisible();
   else await expect(badge).toBeHidden();
   expect(await page.evaluate(() => window.pascapLab!.engine.diagnostics().ungraded)).toBe(ungraded);
@@ -510,7 +525,7 @@ async function expectPristine(page: Page, fixture: ComparisonFixture, document: 
   await expect(page.getByRole('button', { name: 'Redo', exact: true })).toBeDisabled();
 }
 
-test('native click, Space and Enter compare the exact paused frame without seeking, saving or adding history', async ({
+test('holding the pointer, Space or Enter shows the exact paused frame without seeking, saving or adding history', async ({
   page,
   comparison,
 }) => {
@@ -526,7 +541,7 @@ test('native click, Space and Enter compare the exact paused frame without seeki
   expect(await pausedIdentity(page)).toEqual(original);
 
   const button = compareButton(page);
-  await button.click();
+  await pressPointer(page);
   await expectMode(page, true);
   await expect(button).toBeFocused();
   const ungraded = await capture(page, 'ungraded');
@@ -538,18 +553,48 @@ test('native click, Space and Enter compare the exact paused frame without seeki
   expect(await pausedIdentity(page)).toEqual(original);
   await expectPristine(page, comparison, comparison.single);
 
-  await button.press('Space');
+  await releasePointer(page);
   await expectMode(page, false);
-  expect(await capture(page, 'space-restored')).toEqual(graded);
-  expect(await pixelDifference(page, 'graded', 'space-restored')).toEqual({ maximum: 0, changed: 0, alphaChanges: 0 });
-  await button.press('Enter');
+  expect(await capture(page, 'pointer-restored')).toEqual(graded);
+  expect(await pixelDifference(page, 'graded', 'pointer-restored')).toEqual({
+    maximum: 0,
+    changed: 0,
+    alphaChanges: 0,
+  });
+
+  // The pointer is captured, so releasing outside the button still restores the grade.
+  await pressPointer(page);
   await expectMode(page, true);
-  expect(await capture(page, 'enter-bypass')).toEqual(ungraded);
-  await expect(button).toBeFocused();
-  await button.click();
+  await page.mouse.move(5, 5);
+  await expectMode(page, true);
+  await releasePointer(page);
   await expectMode(page, false);
-  await capture(page, 'click-restored');
-  expect((await pixelDifference(page, 'graded', 'click-restored')).maximum).toBe(0);
+
+  // Window blur ends the hold, so a missed pointerup cannot leave the image original.
+  await pressPointer(page);
+  await expectMode(page, true);
+  await page.evaluate(() => window.dispatchEvent(new Event('blur')));
+  await expectMode(page, false);
+  await releasePointer(page);
+
+  for (const key of ['Space', 'Enter']) {
+    await button.focus();
+    await page.keyboard.down(key);
+    await expectMode(page, true);
+    expect(await capture(page, `${key}-bypass`)).toEqual(ungraded);
+    await page.keyboard.up(key);
+    await expectMode(page, false);
+    expect(await capture(page, `${key}-restored`)).toEqual(graded);
+  }
+  await expect(button).toBeFocused();
+
+  // Losing focus while a key is held also restores the grade.
+  await page.keyboard.down('Space');
+  await expectMode(page, true);
+  await button.blur();
+  await expectMode(page, false);
+  await page.keyboard.up('Space');
+  await expectMode(page, false);
 
   // Comparison has no global C/U binding; native Space on its button must not
   // leak into the editor's global playback shortcut either.
@@ -638,14 +683,14 @@ test('bypasses row colour across dissolves, retaining coverage, black fades and 
     expect(samples.some((sample) => sample.brightness < 1)).toBe(true);
     await seek(page, layered, frame);
     const graded = await capture(page, `graded-${frame}`);
-    await compareButton(page).click();
+    await pressPointer(page);
     await expectMode(page, true);
     const bypass = await capture(page, `bypass-${frame}`);
     expect(bypass.rgbSum).toBeGreaterThan(0);
     expect(bypass.opaque).toBe(true);
     expect(bypass.checksum).not.toBe(graded.checksum);
     expect((await pixelDifference(page, `graded-${frame}`, `bypass-${frame}`)).changed).toBeGreaterThan(1000);
-    await compareButton(page).click();
+    await releasePointer(page);
     await expectMode(page, false);
     await capture(page, `restored-${frame}`);
     expect((await pixelDifference(page, `graded-${frame}`, `restored-${frame}`)).maximum).toBe(0);
@@ -678,15 +723,14 @@ test('bypasses row colour across dissolves, retaining coverage, black fades and 
   });
 });
 
-test('a colour edit while bypassed saves once, returns the new grade and has a separate Undo', async ({
+test('a colour edit while original saves once, returns the new grade and has a separate Undo', async ({
   page,
   comparison,
 }) => {
   await openFixture(page, comparison.single);
   await seek(page, comparison.single, 30);
   const graded = await capture(page, 'before-edit');
-  await compareButton(page).click();
-  await expectMode(page, true);
+  await setBypass(page, true);
   const bypass = await capture(page, 'bypass-before-edit');
   const identity = await pausedIdentity(page);
   comparison.guard.permittedSaves = 1;
@@ -709,12 +753,12 @@ test('a colour edit while bypassed saves once, returns the new grade and has a s
   await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeEnabled();
   await expect(page.getByRole('button', { name: 'Redo', exact: true })).toBeDisabled();
 
-  await compareButton(page).click();
+  await setBypass(page, false);
   await expectMode(page, false);
   const newGrade = await capture(page, 'after-edit');
   expect(newGrade.checksum).not.toBe(graded.checksum);
   expect((await pixelDifference(page, 'before-edit', 'after-edit')).changed).toBeGreaterThan(1000);
-  await compareButton(page).click();
+  await setBypass(page, true);
   await expectMode(page, true);
   comparison.guard.permittedSaves = 1;
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
@@ -728,19 +772,19 @@ test('a colour edit while bypassed saves once, returns the new grade and has a s
   expect(await capture(page, 'bypass-after-undo')).toEqual(bypass);
   await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
   await expect(page.getByRole('button', { name: 'Redo', exact: true })).toBeEnabled();
-  await compareButton(page).click();
+  await setBypass(page, false);
   await expectMode(page, false);
   await capture(page, 'grade-after-undo');
   expect((await pixelDifference(page, 'before-edit', 'grade-after-undo')).maximum).toBe(0);
   expect(comparison.memory.saves).toBe(2);
 });
 
-test('comparison survives seek and timing reload, but clears on project switches and browser reload', async ({
+test('original survives seek and timing reload, but clears on project switches and browser reload', async ({
   page,
   comparison,
 }) => {
   await openFixture(page, comparison.single);
-  await compareButton(page).click();
+  await setBypass(page, true);
   await expectMode(page, true);
   await page.getByRole('button', { name: 'Next frame', exact: true }).click();
   await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(1);
@@ -779,7 +823,7 @@ test('comparison survives seek and timing reload, but clears on project switches
   await openFromPicker(page, trimmed);
   await expectMode(page, false);
   expect(await page.evaluate(() => window.pascapLab!.project())).toEqual(trimmed);
-  await compareButton(page).click();
+  await setBypass(page, true);
   await expectMode(page, true);
   await page.reload();
   await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
@@ -828,14 +872,12 @@ for (const { width, height } of [
         return hit !== null && element.contains(hit);
       }),
     ).toBe(true);
-    await button.click();
+    await pressPointer(page);
     await expectMode(page, true);
     await expect(button).toBeInViewport({ ratio: 1 });
-    await expect(page.locator('.canvas-stage').getByText('Ungraded · colour bypassed', { exact: true })).toBeInViewport(
-      {
-        ratio: 1,
-      },
-    );
+    await expect(
+      page.locator('.canvas-stage').getByText('Original · Colour and Detail bypassed', { exact: true }),
+    ).toBeInViewport({ ratio: 1 });
     await expect
       .poll(() =>
         page.evaluate(() => {
@@ -849,7 +891,7 @@ for (const { width, height } of [
         }),
       )
       .toBe(true);
-    await button.press('Space');
+    await releasePointer(page);
     await expectMode(page, false);
     await expectPristine(page, comparison, comparison.single);
   });
@@ -896,22 +938,28 @@ test('comparison during music playback preserves the real worklet epoch and stri
     };
     window.gradeComparisonPlayback = evidence;
     const button = document.querySelector<HTMLButtonElement>('.preview-comparison-toggle')!;
-    button.addEventListener(
-      'click',
-      (event) => {
-        const state = engine.diagnostics();
-        evidence.activations.push({
-          frame: state.frame,
-          timestamp: event.timeStamp,
-          detail: event.detail,
-          playing: state.playing,
-          status: state.status,
-          trusted: event.isTrusted,
-          ungraded: !state.ungraded,
-        });
-      },
-      { capture: true },
-    );
+    // Record each trusted press (original) and release (graded) before the editor handles it.
+    const record = (event: Event, ungraded: boolean) => {
+      const state = engine.diagnostics();
+      evidence.activations.push({
+        frame: state.frame,
+        timestamp: event.timeStamp,
+        detail: 0,
+        playing: state.playing,
+        status: state.status,
+        trusted: event.isTrusted,
+        ungraded,
+      });
+    };
+    for (const type of ['pointerdown', 'pointerup', 'keydown', 'keyup'])
+      button.addEventListener(
+        type,
+        (event) => {
+          if (event instanceof KeyboardEvent && (event.repeat || (event.key !== ' ' && event.key !== 'Enter'))) return;
+          record(event, type.endsWith('down'));
+        },
+        { capture: true },
+      );
     let rendered = window.pascapLab!.engine.diagnostics().renderedFrames;
     window.pascapLab!.engine.subscribe((state) => {
       if (state.status === 'error' && evidence.violations.length < 10) evidence.violations.push(state.message);
@@ -990,58 +1038,62 @@ test('comparison during music playback preserves the real worklet epoch and stri
   expect(initial.starts).toBe(1);
   expect(initial.generation).toBeDefined();
   try {
-    const activations = [
-      ['click', true],
-      ['Space', false],
-      ['Enter', true],
-      ['click', false],
-    ] as const;
-    for (const [activation, ungraded] of activations) {
-      if (activation === 'click') await compareButton(page).click();
-      else await compareButton(page).press(activation);
-      const ready = await page.waitForFunction(
-        ({ ungraded, duration }) => {
-          const state = window.pascapLab!.engine.diagnostics();
-          const activation = window.gradeComparisonPlayback.activations.at(-1);
-          const button = document.querySelector<HTMLButtonElement>('.preview-comparison-toggle')!;
-          const badge = document.querySelector('.preview-comparison-overlay');
-          const modeReady =
-            button.getAttribute('aria-pressed') === String(ungraded) &&
-            button.textContent === (ungraded ? 'Ungraded' : 'Compare') &&
-            button.tagName === 'BUTTON' &&
-            Boolean(badge) === ungraded &&
-            state.ungraded === ungraded;
-          if (activation?.checkpoint && modeReady) return activation;
-          // Completion is only an explicit failure escape, never a substitute
-          // for a trusted activation followed by a real Playing draw.
-          return state.status === 'error' || (!state.playing && state.frame === duration - 1)
-            ? { ...activation, checkpoint: null }
-            : null;
-        },
-        { ungraded, duration },
-      );
-      const observed = (await ready.jsonValue())!;
-      await ready.dispose();
-      expect(observed.trusted).toBe(true);
-      expect(observed.playing).toBe(true);
-      // Native input and the preceding Playing observation are different tasks.
-      // Decoder buffering may begin between them; the retained post-activation
-      // Playing draw below must still satisfy every source/audio/epoch bound.
-      expect(['playing', 'buffering']).toContain(observed.status);
-      expect(observed.ungraded).toBe(ungraded);
-      expect(observed.detail).toBe(activation === 'click' ? 1 : 0);
-      expect(observed.frame).toBeLessThan(duration - 1);
-      expect(observed.checkpoint, 'Each native activation must produce a Playing draw before completion.').toBeTruthy();
-      const checkpoint = observed.checkpoint!;
-      expect(checkpoint.state.status, checkpoint.state.message).toBe('playing');
-      expect(checkpoint.state.playing).toBe(true);
-      expect(checkpoint.state.frame).toBeGreaterThanOrEqual(observed.frame! + 2);
-      expect(checkpoint.state.frame).toBeLessThan(duration - 1);
-      expect(checkpoint.state.ungraded).toBe(ungraded);
-      expect(checkpoint.starts).toBe(initial.starts);
-      expect(checkpoint.pauses).toBe(initial.pauses);
-      expect(checkpoint.active).toBe(true);
-      expect(checkpoint.generation).toBe(initial.generation);
+    // Three press/release gestures (six mode changes) fit the 40 s fixture on software rendering.
+    for (const gesture of ['pointer', 'Space', 'Enter'] as const) {
+      for (const ungraded of [true, false]) {
+        if (gesture === 'pointer') {
+          if (ungraded) await pressPointer(page);
+          else await releasePointer(page);
+        } else {
+          if (ungraded) await compareButton(page).focus();
+          await page.keyboard[ungraded ? 'down' : 'up'](gesture);
+        }
+        const ready = await page.waitForFunction(
+          ({ ungraded, duration }) => {
+            const state = window.pascapLab!.engine.diagnostics();
+            const activation = window.gradeComparisonPlayback.activations.at(-1);
+            const button = document.querySelector<HTMLButtonElement>('.preview-comparison-toggle')!;
+            const badge = document.querySelector('.preview-comparison-overlay');
+            const modeReady =
+              button.getAttribute('aria-pressed') === String(ungraded) &&
+              button.textContent === 'Original' &&
+              button.tagName === 'BUTTON' &&
+              Boolean(badge) === ungraded &&
+              state.ungraded === ungraded;
+            if (activation?.checkpoint && modeReady) return activation;
+            // Completion is only an explicit failure escape, never a substitute
+            // for a trusted activation followed by a real Playing draw.
+            return state.status === 'error' || (!state.playing && state.frame === duration - 1)
+              ? { ...activation, checkpoint: null }
+              : null;
+          },
+          { ungraded, duration },
+        );
+        const observed = (await ready.jsonValue())!;
+        await ready.dispose();
+        expect(observed.trusted).toBe(true);
+        expect(observed.playing).toBe(true);
+        // Native input and the preceding Playing observation are different tasks.
+        // Decoder buffering may begin between them; the retained post-activation
+        // Playing draw below must still satisfy every source/audio/epoch bound.
+        expect(['playing', 'buffering']).toContain(observed.status);
+        expect(observed.ungraded).toBe(ungraded);
+        expect(observed.frame).toBeLessThan(duration - 1);
+        expect(
+          observed.checkpoint,
+          'Each native activation must produce a Playing draw before completion.',
+        ).toBeTruthy();
+        const checkpoint = observed.checkpoint!;
+        expect(checkpoint.state.status, checkpoint.state.message).toBe('playing');
+        expect(checkpoint.state.playing).toBe(true);
+        expect(checkpoint.state.frame).toBeGreaterThanOrEqual(observed.frame! + 2);
+        expect(checkpoint.state.frame).toBeLessThan(duration - 1);
+        expect(checkpoint.state.ungraded).toBe(ungraded);
+        expect(checkpoint.starts).toBe(initial.starts);
+        expect(checkpoint.pauses).toBe(initial.pauses);
+        expect(checkpoint.active).toBe(true);
+        expect(checkpoint.generation).toBe(initial.generation);
+      }
     }
     // Buffering itself is permitted: software-renderer stall counts are not a
     // correctness gate. Actual accepted source frames and the audio epoch are.
@@ -1068,7 +1120,7 @@ test('comparison during music playback preserves the real worklet epoch and stri
       sourceFrames[duration - 1],
     );
     expect(result.observations.violations).toEqual([]);
-    expect(result.observations.activations).toHaveLength(4);
+    expect(result.observations.activations).toHaveLength(6);
     expect(result.observations.notifications).toBeGreaterThan(2);
     expect(result.observations.gradedDraws).toBeGreaterThan(0);
     expect(result.observations.ungradedDraws).toBeGreaterThan(0);

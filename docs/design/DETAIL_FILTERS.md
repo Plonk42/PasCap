@@ -19,7 +19,7 @@ Implementation authorities: [settings and kernel](../../src/shared/detail.ts),
 | Settings                | All three: **Sharpen**, **Clarity** and **Denoise**                                                                       |
 | Ownership and animation | Clip-owned and static; no keyframes and no track channels                                                                 |
 | Pipeline position       | On source pixels **before** the Colour grade, around the inverse-mapped source point (so they follow the track Transform) |
-| Compare                 | **Show ungraded preview** bypasses Colour **and** Detail; geometry, Opacity, fades and music remain                       |
+| Original                | Holding **Show original preview** bypasses Colour **and** Detail; geometry, Opacity, fades and music remain               |
 | Radius                  | A fraction of the image height, so the 720p preview predicts 720p and UHD exports                                         |
 | Denoise kind            | Spatial, edge-preserving (bilateral); no temporal or neighbouring-frame access                                            |
 
@@ -111,7 +111,7 @@ both sources' amounts); no texture, buffer, decoder,
 LUT or native process is added. The diagnostic two-clip reference and measurement
 helper reject HDR. **Track → Colour** lists HDR last, with the common slider/exact
 field, capture diamond and Previous/Next arrows, live slider preview and one Undo
-per release. Compare bypasses it with the rest of Colour.
+per release. The Original preview bypasses it with the rest of Colour.
 
 ## Pipeline order
 
@@ -119,7 +119,7 @@ Inverse track Transform mapping → **Detail and HDR** on source taps → track 
 … curves) → black fades → Opacity/spatial coverage and grouped source-over. Detail
 is not graded twice, does not change coverage and leaves the exact-neutral opaque
 letterbox path in place: with a neutral pose the filter runs at each fitted pixel
-centre, whose centre tap equals the byte-indexed sample. Compare (Ungraded) bypasses
+centre, whose centre tap equals the byte-indexed sample. The Original preview bypasses
 Colour and Detail, never geometry, Opacity, fades, stacking or music.
 
 ## Preview, export and resources
@@ -129,7 +129,7 @@ The kernel lives only in three separate detail variants of the fixed programs, c
 when a loaded or edited project first contains nonneutral detail, nonzero track HDR or
 HDR keyframes (including a live HDR slider draft), before any draw uses them; uniforms
 are one `vec4` and one `vec2` per source plus the shared HDR `vec2`. Groups whose
-sources are all neutral with HDR 0 (and Compare) keep the unchanged programs: software rasterizers can pay for
+sources are all neutral with HDR 0 (and the Original preview) keep the unchanged programs: software rasterizers can pay for
 texture taps behind an untaken uniform branch. No texture, framebuffer, decoder or
 pass is added; sources are still graded once.
 

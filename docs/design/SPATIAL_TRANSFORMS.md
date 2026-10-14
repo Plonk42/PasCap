@@ -136,7 +136,7 @@ $$
 Both dissolve sources use the same evaluated track pose and Opacity; their masks differ
 only through their own recordings' aspect. No second track/group opacity multiplier
 exists. Black fades change RGB, not coverage. Spatial RGB resampling precedes grading.
-Ungraded comparison bypasses Colour and clip Detail only, preserving geometry/coverage.
+The Original preview bypasses Colour and clip Detail only, preserving geometry/coverage.
 
 ## Preview, native export and resource boundaries
 

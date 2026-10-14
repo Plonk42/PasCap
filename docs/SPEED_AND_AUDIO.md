@@ -7,7 +7,7 @@ can be keyed independently in video track animation, which is appearance-only an
 never changes timing. See [Temperature and Tint](design/TEMPERATURE_AND_TINT.md).
 Static track HSL and master/RGB colour curves follow scalar grading and precede
 black fades/coverage. They remain active with scalar keyframes, add no animation
-channels and are unrelated to speed curves. Compare/Ungraded bypasses all Colour
+channels and are unrelated to speed curves. The Original preview bypasses all Colour
 without changing retiming, geometry, Opacity or music. Required data/resources:
 [HSL_AND_CURVES.md](design/HSL_AND_CURVES.md). The keyable track HDR look is
 likewise appearance-only; see [detail filters](design/DETAIL_FILTERS.md#hdr-look).

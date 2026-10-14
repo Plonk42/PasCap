@@ -57,7 +57,7 @@ $$G_i=\mathrm{grade}(RGB_i, rowColour(t)).$$
 
 There is one ordered SDR grade, not a composed or double-grade transform. An exactly
 neutral track grade returns its input unchanged. Grading precedes black fades,
-dissolve group sums and track Opacity/coverage. Ungraded preview neutralizes all video track Colour and clip Detail,
+dissolve group sums and track Opacity/coverage. The Original preview neutralizes all video track Colour and clip Detail,
 preserving observed frames, retiming, geometry, Opacity, fades, stacking and music.
 Appearance edits do not restart unchanged media or alter timing.
 Texture, decoder and full-frame buffer counts stay unchanged. Exact neutral spatial
