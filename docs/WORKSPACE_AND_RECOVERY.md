@@ -53,8 +53,8 @@ clip detail filters before grading; see [detail filters](design/DETAIL_FILTERS.m
   a browser-local preference that survives reloads.
 - Bottom: frame-scaled multi-track timeline, playhead timecode, highlighted active
   insertion track, one marker per stored track keyframe, dimmed hidden clips and Activity.
-  The responsive toolbar keeps Split, Trim start/end, Delete and Cut range
-  directly visible, then **Bookmark** (add at the playhead, or delete the one there) between Previous/Next bookmark; Duplicate is in the clip's right-click menu (Ctrl+D), and start
+  The responsive toolbar starts with **Bookmark** (add at the playhead, or delete the one there) between Previous/Next bookmark and **Snap**, then keeps Split, Trim start/end, Delete and Cut range
+  directly visible; Duplicate is in the clip's right-click menu (Ctrl+D), and start
   nudging beside Clip → Placement's start field. Zoom keeps its slider and Fit,
   with Zoom out / Zoom in buttons beside them.
   Video tracks display the saved bottom-to-top composition array: track 1 renders below track 2,
