@@ -594,7 +594,7 @@ describe('exact paused frames', () => {
       aspect: 16 / 9,
       originalWidth: 4031,
       originalHeight: 3017,
-      spatial: project.clips[0]!.spatial.base,
+      spatial: project.layers[0]!.transform.base,
     });
     await engine.loadProject(project, proxyUrl, () => ({ width: 0, height: 3017 }));
     expect(engine.diagnostics()).toMatchObject({
@@ -963,20 +963,20 @@ describe('appearance without reloading timing', () => {
     expect(compositor().uploadFrame).toHaveBeenCalledOnce();
   });
 
-  it('samples continuous spatial animation on held decoded frames', async () => {
+  it('samples project-time track Transform animation on held decoded frames', async () => {
     const project = singleProject(true);
     project.clips[0]!.sourceOut = 6;
     project.clips[0]!.speed = { mode: 'constant', rate: 0.1 };
-    const spatial = project.clips[0]!.spatial;
+    const spatial = project.layers[0]!.transform;
     spatial.keyframes = [
-      uniformKeyframe(0, { ...spatial.base }, 'linear'),
-      uniformKeyframe(6, { ...spatial.base, translateX: 0.6, rotation: 60 }, 'hold'),
+      { ...uniformKeyframe(0, { ...spatial.base }, 'linear'), reset: false },
+      { ...uniformKeyframe(6, { ...spatial.base, translateX: 0.6, rotation: 60 }, 'hold'), reset: false },
     ];
     const { engine, anchor } = await playing(project, 2);
     tick(anchor, 1);
     const map = calculateLayout(project).clips[0]!.retiming;
     expect(map.sourceAt(2)).toBe(map.sourceAt(3));
-    expect(compositor().visible![0]![0]!.spatial).toEqual(evaluateSpatial(spatial, map.sourcePositionAt(3)));
+    expect(compositor().visible![0]![0]!.spatial).toEqual(evaluateSpatial(spatial, 3));
     expect(engine.diagnostics()).toMatchObject({ status: 'playing', frame: 3 });
     expect(compositor().uploadFrame).toHaveBeenCalledOnce();
   });

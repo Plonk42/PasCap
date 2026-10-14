@@ -814,8 +814,8 @@ test('common widgets fit 270px inspectors at the default and minimum viewports w
             };
           }),
       );
-      // Clip: speed rate, eight Transform and three Detail values; Track: eleven Colour/Opacity, three HSL and three stored values.
-      expect(widgets.length, `${width}px ${tab}`).toBe(tab === 'Clip' ? 12 : tab === 'Track' ? 17 : 1);
+      // Clip: speed rate and three Detail values; Track: eleven Colour/Opacity, three HSL, eight Transform and three stored values.
+      expect(widgets.length, `${width}px ${tab}`).toBe(tab === 'Clip' ? 4 : tab === 'Track' ? 25 : 1);
       for (const widget of widgets) {
         expect(widget.inputs, `${width}px ${widget.name}`).toBe(2);
         expect(widget.outputs).toBe(0);

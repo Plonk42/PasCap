@@ -244,7 +244,7 @@ export function sampleTimeline(
         layerId: layer.id,
         sourceFrame,
         sourcePosition,
-        spatial: evaluateSpatial(placed.clip.spatial, sourcePosition),
+        spatial: evaluateSpatial(layer.transform, frame),
         detail: placed.clip.detail,
         colour: colourAt(layer, frame),
         weight: blendWeight * brightness,

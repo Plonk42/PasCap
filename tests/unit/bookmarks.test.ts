@@ -13,7 +13,7 @@ function project() {
   return projectSchema.parse(document);
 }
 
-describe('strict schema-17 project bookmarks', () => {
+describe('strict schema-18 project bookmarks', () => {
   it('starts empty and requires unique ascending integer frames, without defaults', () => {
     const document = project();
     expect(document.bookmarks).toEqual([]);

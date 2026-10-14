@@ -26,8 +26,8 @@ describe('normalized linear Temperature and Tint', () => {
     expect(createLayer('empty', 'Empty').colour).toEqual(settings);
     expect(Object.keys(EMPTY_KEY_VALUES)).toHaveLength(11);
     const project = createProject('strict', 'Strict');
-    expect(project.schemaVersion).toBe(17);
-    for (let schemaVersion = 1; schemaVersion < 17; schemaVersion++)
+    expect(project.schemaVersion).toBe(18);
+    for (let schemaVersion = 1; schemaVersion < 18; schemaVersion++)
       expect(projectSchema.safeParse({ ...project, schemaVersion }).success).toBe(false);
     for (const channel of ['temperature', 'tint'] as const) {
       const incomplete = { ...settings };

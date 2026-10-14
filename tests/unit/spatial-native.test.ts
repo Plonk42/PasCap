@@ -481,7 +481,7 @@ describe('layered renderer metadata and continuous retiming ownership with memor
     const document = createProject('spatial-native', 'Spatial native');
     const clip = createClip('clip', 'source', 7, 9);
     clip.speed = { mode: 'constant', rate: 0.5 };
-    clip.spatial.base = { ...NEUTRAL_SPATIAL_POSE, scale: 1.37, translateY: 0.07 };
+    document.layers[0]!.transform.base = { ...NEUTRAL_SPATIAL_POSE, scale: 1.37, translateY: 0.07 };
     document.clips = [clip];
     const asset = mediaAssetSchema.parse({
       id: 'source',
@@ -506,7 +506,7 @@ describe('layered renderer metadata and continuous retiming ownership with memor
       error: null,
       prepared: null,
     });
-    const source = patternedSource(target, asset.metadata, sample(clip.spatial.base));
+    const source = patternedSource(target, asset.metadata, sample(document.layers[0]!.transform.base));
     const frames: Buffer[] = [];
     const ownedReadBuffers = new Set<Buffer>();
     const ownedWriteBuffers = new Set<Buffer>();
@@ -586,11 +586,11 @@ describe('layered renderer metadata and continuous retiming ownership with memor
     expect(fixture.document).toEqual(before);
   });
 
-  it('changes animated geometry at continuous source positions even while retiming holds the same decoded frame', async () => {
+  it('changes animated track geometry at project time even while retiming holds the same decoded frame', async () => {
     const fixture = setup();
-    fixture.document.clips[0]!.spatial.keyframes = [
-      uniformKeyframe(7, { ...NEUTRAL_SPATIAL_POSE, scale: 0.8, translateX: -0.1 }, 'linear'),
-      uniformKeyframe(9, { ...NEUTRAL_SPATIAL_POSE, scale: 1.2, translateX: 0.2 }, 'hold'),
+    fixture.document.layers[0]!.transform.keyframes = [
+      { ...uniformKeyframe(0, { ...NEUTRAL_SPATIAL_POSE, scale: 0.8, translateX: -0.1 }, 'linear'), reset: false },
+      { ...uniformKeyframe(2, { ...NEUTRAL_SPATIAL_POSE, scale: 1.2, translateX: 0.2 }, 'hold'), reset: false },
     ];
     fixture.options.plan = planLayeredExport(fixture.document);
     const before = structuredClone(fixture.document);

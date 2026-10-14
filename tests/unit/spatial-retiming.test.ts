@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { Interpolation } from '../../src/shared/keyframes.js';
-import { createClip } from '../../src/shared/model.js';
-import { evaluateSpatial, NEUTRAL_SPATIAL_POSE } from '../../src/shared/spatial.js';
+import { createClip, createProject } from '../../src/shared/model.js';
+import { NEUTRAL_SPATIAL_POSE } from '../../src/shared/spatial.js';
 import { compileRetiming, type Retiming, type SpeedSettings } from '../../src/shared/speed.js';
 import { uniformKeyframe } from '../../src/shared/keyframes.js';
+import { sampleTimeline } from '../../src/shared/timeline.js';
 
 const progress: Record<Interpolation, (u: number) => number> = {
   hold: () => 0,
@@ -136,7 +137,7 @@ describe('continuous original-source retiming for spatial animation', () => {
     expectContinuousBounds(map, 0, 1000);
   });
 
-  it('evaluates distinct smooth spatial poses on held decoded images for every speed compiler', () => {
+  it('evaluates distinct track Transform poses on held decoded images for every speed compiler', () => {
     const constant = base({ mode: 'constant', rate: 0.25 });
     const custom = base({
       mode: 'curve',
@@ -145,27 +146,20 @@ describe('continuous original-source retiming for spatial animation', () => {
         { frame: 100, rate: 0.5, interpolation: 'hold' },
       ],
     });
-    const spatial = {
-      base: { ...NEUTRAL_SPATIAL_POSE },
-      keyframes: [
-        uniformKeyframe(0, { ...NEUTRAL_SPATIAL_POSE, translateX: 0 }, 'linear' as const),
-        uniformKeyframe(100, { ...NEUTRAL_SPATIAL_POSE, translateX: 1 }, 'linear' as const),
-      ],
-    };
-    const before = structuredClone(spatial);
-    const maps = [compileRetiming(constant), compileRetiming(custom)];
-    for (const map of maps) {
-      expect(map.sourceAt(1)).toBe(7);
-      expect(map.sourceAt(2)).toBe(7);
-      const first = map.sourcePositionAt(1);
-      const second = map.sourcePositionAt(2);
-      expect(second).toBeGreaterThan(first);
-      expect(second).toBeLessThan(8);
-      expect(evaluateSpatial(spatial, first).translateX).toBeCloseTo(first / 100, 12);
-      expect(evaluateSpatial(spatial, second).translateX).toBeCloseTo(second / 100, 12);
-      expect(evaluateSpatial(spatial, second).translateX).toBeGreaterThan(evaluateSpatial(spatial, first).translateX);
-      expectContinuousBounds(map, 7, 37);
+    for (const clip of [constant, custom]) {
+      const project = createProject('held-transform', 'Held Transform');
+      project.clips = [clip];
+      project.layers[0]!.transform.keyframes = [
+        { ...uniformKeyframe(0, { ...NEUTRAL_SPATIAL_POSE, translateX: 0 }, 'linear'), reset: false },
+        { ...uniformKeyframe(100, { ...NEUTRAL_SPATIAL_POSE, translateX: 1 }, 'linear'), reset: false },
+      ];
+      const [first, second] = [1, 2].map((frame) => sampleTimeline(project, frame)[0]!);
+      expect(first!.sourceFrame).toBe(7);
+      expect(second!.sourceFrame).toBe(7);
+      // Project time, like Colour: a held image still moves on every output frame.
+      expect(first!.spatial.translateX).toBeCloseTo(0.01, 12);
+      expect(second!.spatial.translateX).toBeCloseTo(0.02, 12);
+      expectContinuousBounds(compileRetiming(clip), 7, 37);
     }
-    expect(spatial).toEqual(before);
   });
 });

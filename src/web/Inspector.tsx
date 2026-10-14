@@ -732,15 +732,6 @@ function InspectorPanel({
                 onSeek={onSeek}
                 onPause={onPause}
               />
-              <TransformSection
-                project={project}
-                clip={clip ?? null}
-                sourceFrameCount={asset?.metadata.frameCount ?? 0}
-                frame={frame}
-                disabled={drafting}
-                onEdit={onEdit}
-                onSeek={onSeek}
-              />
               <DetailSection
                 key={`detail:${project.id}:${clip.id}`}
                 project={project}
@@ -902,6 +893,14 @@ function InspectorPanel({
                 onEdit={onEdit}
                 onPause={onPause}
                 onPreview={onPreview}
+              />
+              <TransformSection
+                project={project}
+                layer={layer}
+                frame={frame}
+                disabled={drafting}
+                onEdit={onEdit}
+                onSeek={onSeek}
               />
               <InspectorSection
                 id="keyframes"

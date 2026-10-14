@@ -94,12 +94,13 @@ export const LAYERED_EXPORT_RESOURCES = Object.freeze({
 export function needsLayeredExport(document: ProjectDocument): boolean {
   if (
     document.layers.length !== 1 ||
-    document.clips.some((clip) => hasSpatialEdits(clip.spatial) || !isNeutralDetail(clip.detail)) ||
+    document.clips.some((clip) => !isNeutralDetail(clip.detail)) ||
     document.layers.some(
       (layer) =>
         !layer.enabled ||
         layer.opacity !== 1 ||
         layer.keyframes.length > 0 ||
+        hasSpatialEdits(layer.transform) ||
         layer.colour.hdr !== 0 ||
         !isNeutralAdvancedColour(layer.colour),
     )

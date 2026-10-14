@@ -16,9 +16,9 @@ import './keyframe-navigation.css';
 import './layer-keyframes.css';
 import { LockedCue, RateValueControl, ResetLabel, resetBlocked } from './SettingValueControl.js';
 import {
+  clipSpeedKeyframes,
   inspectSpatialKeyframe,
   reconcileSpatialInspection,
-  speedFrames,
   type SpatialInspection,
 } from './spatial-navigation.js';
 import type { DraftPreview } from './Timeline.js';
@@ -160,14 +160,13 @@ export function SpeedControls({
   const inputContext = `${resetKey ?? project.id}:${clip?.id ?? 'none'}`;
   const [selection, setSelection] = useState<SpatialInspection | null>(null);
   const context = `${project.id}:${clip?.id}:${navigation.sourceEpoch ?? 0}:speed`;
+  const stored = clipSpeedKeyframes(project, clip);
   const inspection = reconcileSpatialInspection(
     selection,
     context,
-    project,
-    clip,
+    stored,
     frame,
     (navigation.playing ?? false) || navigation.inspection !== null,
-    speedFrames,
   );
   if (inspection !== selection) setSelection(inspection);
   const keys = clip?.speed.mode === 'curve' ? clip.speed.keyframes : [];
@@ -199,7 +198,7 @@ export function SpeedControls({
   };
   const selectStored = (sourceKey: number): SpatialInspection | null => {
     if (unavailable) return null;
-    const selected = inspectSpatialKeyframe(context, project, clip, sourceKey, frame, speedFrames);
+    const selected = inspectSpatialKeyframe(context, stored, sourceKey, frame);
     if (!selected) return null;
     navigation.onFollowPlayhead();
     setSelection(selected);
