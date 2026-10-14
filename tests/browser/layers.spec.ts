@@ -67,6 +67,22 @@ test('numeric GPU compositing matches source-over opacity and keyed group semant
   expect(comparison.maxError8Bit).toBeLessThan(2);
 });
 
+test('adds a recording from Media to a new track in one undoable step', async ({ page }) => {
+  await seek(page, 0);
+  await page.getByRole('button', { name: 'Add pattern-b.mp4 to a new track', exact: true }).click();
+  await page.waitForFunction(() => window.pascapLab!.project()!.layers.length === 2);
+  const project = projectSchema.parse(await page.evaluate(() => window.pascapLab!.project()));
+  expect(project.clips[1]).toMatchObject({ layerId: project.layers[1]!.id, start: 0, sourceIn: 0, sourceOut: 120 });
+  expect(project.clips.filter((clip) => clip.layerId === project.layers[0]!.id)).toHaveLength(1);
+  await expect(page.getByRole('button', { name: 'Select track Track 2', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await page.waitForFunction(() => window.pascapLab!.project()!.layers.length === 1);
+  expect(await page.evaluate(() => window.pascapLab!.project()!.clips.length)).toBe(1);
+});
+
 test('adds layered clips, adjusts row opacity, hides/shows and releases unused decoders on undo/delete', async ({
   page,
 }) => {

@@ -24,7 +24,15 @@ import {
   type MediaSelections,
 } from '../shared/media-selection.js';
 import type { MediaAsset, MediaJob } from '../shared/media.js';
-import { createClip, createProject, projectSchema, type ProjectDocument } from '../shared/model.js';
+import {
+  createClip,
+  createLayer,
+  createProject,
+  MAX_VIDEO_LAYERS,
+  projectSchema,
+  type ProjectDocument,
+  type VideoLayer,
+} from '../shared/model.js';
 import {
   projectAudioIds,
   projectVideoIds,
@@ -53,6 +61,7 @@ import {
 import { clipStartRestriction } from './layer-actions.js';
 import { registerLivePreview } from './live-preview.js';
 import { MediaLibrary, type ReviewTarget } from './MediaLibrary.js';
+import { nextLayerName } from './move-to-track.js';
 import type { ImportActions, ImportKind, ImportResult } from './ImportDialog.js';
 import { MusicControls } from './MusicControls.js';
 import { Popover } from './Popover.js';
@@ -452,11 +461,23 @@ export function App() {
     [publish],
   );
   const insert = useCallback(
-    (mediaIds: string[], index?: number, layerId?: string, start?: number, keepReview = false): string | null => {
+    (
+      mediaIds: string[],
+      index?: number,
+      layerId?: string,
+      start?: number,
+      keepReview = false,
+      newLayer?: VideoLayer,
+    ): string | null => {
       if (!current.current || drafting.current || !mediaIds.length) return null;
       try {
         let next = current.current;
-        const targetLayer = layerId ?? selectedLayer.current;
+        if (newLayer) {
+          if (next.layers.length >= MAX_VIDEO_LAYERS)
+            throw new Error(`A project can have at most ${MAX_VIDEO_LAYERS} video tracks.`);
+          next = applyCommand(next, { type: 'layer-add', layer: newLayer });
+        }
+        const targetLayer = newLayer?.id ?? layerId ?? selectedLayer.current;
         const layer = next.layers.find((layer) => layer.id === targetLayer);
         if (!layer) throw new Error('Choose a video track before inserting.');
         const instances = mediaIds.map((id) => {
@@ -506,6 +527,14 @@ export function App() {
       }
     },
     [commit, select, validate],
+  );
+  const insertOnNewTrack = useCallback(
+    (mediaIds: string[]): void => {
+      if (!current.current) return;
+      const layer = createLayer(crypto.randomUUID(), nextLayerName(current.current));
+      insert(mediaIds, undefined, undefined, undefined, false, layer);
+    },
+    [insert],
   );
   /** Latest-wins: a newer seek would abort an undecoded one, so fast scrubbing showed nothing. */
   const seekEngine = useCallback((frame: number): void => {
@@ -1792,6 +1821,7 @@ export function App() {
               ranges={ranges}
               busy={busy || !project || connection.state !== 'ready' || draft !== null}
               onInsert={insert}
+              onInsertOnNewTrack={insertOnNewTrack}
               onDragMedia={setDraggedMediaIds}
               onPrepare={prepare}
               onPrepareMusic={prepareAudio}

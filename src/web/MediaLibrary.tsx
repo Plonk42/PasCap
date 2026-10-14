@@ -7,7 +7,7 @@ import {
   type MediaSelections,
 } from '../shared/media-selection.js';
 import type { MediaAsset } from '../shared/media.js';
-import type { ProjectDocument } from '../shared/model.js';
+import { MAX_VIDEO_LAYERS, type ProjectDocument } from '../shared/model.js';
 import { mediaRemovalUsage } from '../shared/projects.js';
 import { durationLabel, MEDIA_DRAG_TYPE, mediaReady, shortName } from './display.js';
 import { Icon } from './icons.js';
@@ -26,6 +26,7 @@ interface Props {
   ranges: MediaSelections;
   busy: boolean;
   onInsert: (mediaIds: string[]) => void;
+  onInsertOnNewTrack: (mediaIds: string[]) => void;
   onDragMedia: (mediaIds: string[] | null) => void;
   onPrepare: (mediaIds: string[]) => Promise<void>;
   onPrepareMusic: (id: string) => Promise<void>;
@@ -87,44 +88,72 @@ function MediaAction({
   hasProject,
   trimmed,
   targetLayer,
+  trackLimit,
   busy,
   onInsert,
+  onInsertOnNewTrack,
   onPrepare,
 }: Readonly<{
   asset: MediaAsset;
   hasProject: boolean;
   trimmed: boolean;
   targetLayer: string;
+  trackLimit: boolean;
   busy: boolean;
   onInsert: Props['onInsert'];
+  onInsertOnNewTrack: Props['onInsertOnNewTrack'];
   onPrepare: Props['onPrepare'];
 }>) {
+  const rangeLabel = trimmed ? 'selected range' : 'full recording';
   if (mediaReady(asset))
     return (
-      <button
-        className="icon-button add-media"
-        aria-label={`Add ${asset.name} to timeline`}
-        title={`Add ${trimmed ? 'selected range' : 'full recording'} to ${targetLayer}`}
-        disabled={!hasProject || busy}
-        onClick={() => onInsert([asset.id])}
-      >
-        <Icon name="plus" size={16} />
-      </button>
+      <>
+        <button
+          className="icon-button add-media"
+          aria-label={`Add ${asset.name} to timeline`}
+          title={`Add ${rangeLabel} to ${targetLayer}`}
+          disabled={!hasProject || busy}
+          onClick={() => onInsert([asset.id])}
+        >
+          <Icon name="plus" size={16} />
+        </button>
+        <button
+          className="icon-button add-media-new-track"
+          aria-label={`Add ${asset.name} to a new track`}
+          title={
+            trackLimit
+              ? `A project can have at most ${MAX_VIDEO_LAYERS} video tracks`
+              : `Add ${rangeLabel} to a new track`
+          }
+          disabled={!hasProject || busy || trackLimit}
+          onClick={() => onInsertOnNewTrack([asset.id])}
+        >
+          <Icon name="layers" size={15} />
+        </button>
+      </>
     );
   if (asset.status === 'queued' || asset.status === 'preparing')
-    return <span className="media-action-space" aria-hidden="true" />;
+    return (
+      <>
+        <span className="media-action-space" aria-hidden="true" />
+        <span className="media-action-space" aria-hidden="true" />
+      </>
+    );
   return (
-    <button
-      className="icon-button prepare-media"
-      aria-label={`Prepare ${asset.name}`}
-      title={asset.error ?? 'Prepare'}
-      disabled={busy}
-      onClick={() => {
-        void onPrepare([asset.id]);
-      }}
-    >
-      <Icon name={asset.status === 'error' ? 'reset' : 'wand'} size={15} />
-    </button>
+    <>
+      <button
+        className="icon-button prepare-media"
+        aria-label={`Prepare ${asset.name}`}
+        title={asset.error ?? 'Prepare'}
+        disabled={busy}
+        onClick={() => {
+          void onPrepare([asset.id]);
+        }}
+      >
+        <Icon name={asset.status === 'error' ? 'reset' : 'wand'} size={15} />
+      </button>
+      <span className="media-action-space" aria-hidden="true" />
+    </>
   );
 }
 
@@ -135,6 +164,7 @@ export function MediaLibrary({
   ranges,
   busy,
   onInsert,
+  onInsertOnNewTrack,
   onDragMedia,
   onPrepare,
   onPrepareMusic,
@@ -658,8 +688,10 @@ export function MediaLibrary({
                 hasProject={project !== null}
                 trimmed={trimmed}
                 targetLayer={targetLayer}
+                trackLimit={(project?.layers.length ?? 0) >= MAX_VIDEO_LAYERS}
                 busy={busy}
                 onInsert={onInsert}
+                onInsertOnNewTrack={onInsertOnNewTrack}
                 onPrepare={onPrepare}
               />
               <button

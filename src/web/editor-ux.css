@@ -303,7 +303,7 @@
   background: transparent;
 }
 
-.product-workspace .media-item .add-media {
+.product-workspace .media-item :is(.add-media, .add-media-new-track) {
   opacity: 1;
   color: var(--accent);
 }

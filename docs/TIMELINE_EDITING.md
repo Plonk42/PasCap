@@ -282,6 +282,9 @@ and undoable, and never move music, other tracks or absolute track keyframes.
   ready recording consecutively as one history operation.
   Batch cursor positions use each new clip's retimed end. Every path
   copies current source-review ranges, never arbitrary source paths or track keyframes.
+- The layers icon beside a Media card's plus (**Add … to a new track**) creates a video track
+  and inserts the recording there in one Undo step, at the playhead, selecting the new track.
+  It is disabled at eight tracks.
 - Existing clip drags reorder a Ripple-on track or change independent placement/track,
   without duplicating media/ranges. The pointer retains the offset where the clip
   was grabbed; selection cannot move the timeline origin underneath it. One shared
