@@ -43,7 +43,7 @@ export type EditCommand =
   | { type: 'duplicate'; clipId: string; newClipId: string }
   | { type: 'colour'; layerId: string; colour: ColourSettings }
   | { type: 'speed'; clipId: string; speed: SpeedSettings }
-  | { type: 'spatial'; clipId: string; spatial: SpatialSettings }
+  | { type: 'transform'; layerId: string; transform: SpatialSettings }
   | { type: 'detail'; clipId: string; detail: DetailSettings }
   | { type: 'music'; music: MusicTrack[] }
   | { type: 'opacity'; layerId: string; opacity: number }
@@ -491,8 +491,8 @@ export function applyCommand(document: ProjectDocument, command: EditCommand): P
     case 'speed':
       next.clips[index] = { ...next.clips[index]!, speed: { ...command.speed } };
       break;
-    case 'spatial':
-      next.clips[index] = { ...next.clips[index]!, spatial: spatialSettingsSchema.parse(command.spatial) };
+    case 'transform':
+      requiredLayer(next, command.layerId).transform = spatialSettingsSchema.parse(command.transform);
       // Appearance-only replacement must not normalize or rewrite stored timing.
       return projectSchema.parse(next);
     case 'detail':

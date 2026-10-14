@@ -1,8 +1,9 @@
 import { joiningEasing, uniformKeyframe, withEasing, type Interpolation } from '../shared/keyframes.js';
-import type { ProjectDocument } from '../shared/model.js';
 import {
+  defaultSpatialKeyframe,
   evaluateSpatial,
   hasSpatialChannelKeys,
+  NEUTRAL_SPATIAL_POSE,
   SPATIAL_CHANNELS,
   spatialSettingsSchema,
   type SpatialChannel,
@@ -10,7 +11,6 @@ import {
   type SpatialKeyValues,
   type SpatialSettings,
 } from '../shared/spatial.js';
-import { calculateLayout } from '../shared/timeline.js';
 
 export const SPATIAL_CONTROLS: readonly {
   key: SpatialChannel;
@@ -36,14 +36,6 @@ function validatedSpatial(value: unknown): SpatialSettings {
   return result.data;
 }
 
-/** Real displayed integer source identity and continuous appearance sampling stay distinct. */
-export function spatialPlayhead(project: ProjectDocument, clipId: string, frame: number) {
-  const placed = calculateLayout(project).clips.find((item) => item.clip.id === clipId);
-  if (!placed || frame < placed.start || frame >= placed.end) return null;
-  const local = frame - placed.start;
-  return { frame: placed.retiming.sourceAt(local), position: placed.retiming.sourcePositionAt(local) };
-}
-
 const NO_VALUES: Readonly<SpatialKeyValues> = Object.freeze({
   cropLeft: null,
   cropRight: null,
@@ -56,14 +48,13 @@ const NO_VALUES: Readonly<SpatialKeyValues> = Object.freeze({
 });
 
 /**
- * One channel joins or leaves the key at a source frame, capturing its continuously
- * evaluated value. Other channels at that key and the saved base stay unchanged.
+ * One channel joins or leaves the key at a timeline frame, capturing its evaluated
+ * value there. Other channels at that key and the saved base stay unchanged.
  */
 export function toggleSpatialChannel(
   settings: SpatialSettings,
   channel: SpatialChannel,
   frame: number,
-  position: number,
 ): SpatialSettings {
   const key = settings.keyframes.find((item) => item.frame === frame);
   if (key && key.values[channel] !== null) {
@@ -78,7 +69,7 @@ export function toggleSpatialChannel(
           ),
     });
   }
-  const value = evaluateSpatial(settings, position)[channel];
+  const value = evaluateSpatial(settings, frame)[channel];
   const keyframes = key
     ? settings.keyframes.map((item) =>
         item === key
@@ -89,10 +80,41 @@ export function toggleSpatialChannel(
             }
           : item,
       )
-    : [...settings.keyframes, uniformKeyframe(frame, { ...NO_VALUES, [channel]: value }, 'linear')].sort(
-        (a, b) => a.frame - b.frame,
-      );
+    : [
+        ...settings.keyframes,
+        { ...uniformKeyframe(frame, { ...NO_VALUES, [channel]: value }, 'linear'), reset: false },
+      ].sort((a, b) => a.frame - b.frame);
   return validatedSpatial({ base: settings.base, keyframes });
+}
+
+/** Adds a default keyframe, or removes the one already at this frame; never replaces another keyframe. */
+export function toggleDefaultSpatialKey(settings: SpatialSettings, frame: number): SpatialSettings {
+  const key = settings.keyframes.find((item) => item.frame === frame);
+  if (key && !key.reset)
+    throw new Error('A Transform keyframe already exists at this frame. Choose another frame for a default keyframe.');
+  return validatedSpatial({
+    base: settings.base,
+    keyframes: key
+      ? settings.keyframes.filter((item) => item !== key)
+      : [...settings.keyframes, defaultSpatialKeyframe(frame)].sort((a, b) => a.frame - b.frame),
+  });
+}
+
+/**
+ * Like Colour Reset: once animated, only the settings enabled at this frame's keyframe
+ * return to neutral; otherwise the whole base does. Null when nothing would change.
+ */
+export function resetSpatial(settings: SpatialSettings, frame: number): SpatialSettings | null {
+  if (!settings.keyframes.length) {
+    if (SPATIAL_CHANNELS.every((channel) => settings.base[channel] === NEUTRAL_SPATIAL_POSE[channel])) return null;
+    return validatedSpatial({ base: { ...NEUTRAL_SPATIAL_POSE }, keyframes: [] });
+  }
+  const key = settings.keyframes.find((item) => item.frame === frame);
+  if (!key) return null;
+  const values = { ...key.values };
+  for (const channel of SPATIAL_CHANNELS) if (values[channel] !== null) values[channel] = NEUTRAL_SPATIAL_POSE[channel];
+  if (SPATIAL_CHANNELS.every((channel) => values[channel] === key.values[channel])) return null;
+  return replaceSpatialKey(settings, frame, { values });
 }
 
 /** Sets one enabled setting's Easing at a key, or every enabled setting's when `channel` is null. */
@@ -118,7 +140,7 @@ export function replaceSpatialKey(
     changes.frame !== undefined &&
     settings.keyframes.some((key) => key.frame !== frame && key.frame === changes.frame)
   )
-    throw new Error('A Transform keyframe already exists at this source frame. Choose another frame.');
+    throw new Error('A Transform keyframe already exists at this timeline frame. Choose another frame.');
   return validatedSpatial({
     base: settings.base,
     keyframes: settings.keyframes
@@ -141,6 +163,6 @@ export function editSpatialPose(
   if (!hasSpatialChannelKeys(settings, channel))
     return validatedSpatial({ ...settings, base: { ...settings.base, [channel]: value } });
   const point = settings.keyframes.find((item) => item.frame === frame && item.values[channel] !== null);
-  if (!point) throw new Error('Animated · add a keyframe for this setting at the displayed source frame to edit.');
+  if (!point) throw new Error('Animated · add a keyframe for this setting at the playhead to edit.');
   return replaceSpatialKey(settings, point.frame, { values: { ...point.values, [channel]: value } });
 }

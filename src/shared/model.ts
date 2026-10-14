@@ -30,7 +30,6 @@ export const clipSchema = z
     sourceIn: frameSchema,
     sourceOut: frameSchema.positive(),
     speed: speedSchema,
-    spatial: spatialSettingsSchema,
     detail: detailSchema,
   })
   .strict()
@@ -62,6 +61,7 @@ export const layerSchema = z
       .array(layerKeyframeSchema)
       .max(256)
       .refine(orderedKeys, { message: 'Track keyframes must have unique ascending project frames.' }),
+    transform: spatialSettingsSchema,
     ripple: z.boolean(),
     transitions: z.array(transitionSchema).max(999),
     openingFade: frameSchema,
@@ -108,7 +108,7 @@ export const bookmarksSchema = z
 
 const baseProjectSchema = z
   .object({
-    schemaVersion: z.literal(17),
+    schemaVersion: z.literal(18),
     id: idSchema,
     title: z.string().trim().min(1).max(200),
     media: z
@@ -155,6 +155,7 @@ export function createLayer(id: string, name: string, ripple = true): VideoLayer
     opacity: 1,
     colour: createColourSettings(),
     keyframes: [],
+    transform: createSpatialSettings(),
     ripple,
     transitions: [],
     openingFade: 0,
@@ -164,7 +165,7 @@ export function createLayer(id: string, name: string, ripple = true): VideoLayer
 
 export function createProject(id: string, title: string): ProjectDocument {
   return projectSchema.parse({
-    schemaVersion: 17,
+    schemaVersion: 18,
     id,
     title,
     media: { videoIds: [], audioIds: [] },
@@ -193,7 +194,6 @@ export function createClip(
     sourceIn,
     sourceOut,
     speed: { ...NORMAL_SPEED },
-    spatial: createSpatialSettings(),
     detail: createDetailSettings(),
   });
 }

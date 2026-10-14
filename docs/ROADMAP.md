@@ -10,11 +10,11 @@ deadline; hardware/real-media work requires explicit owner consent.
 
 ## Current baseline
 
-The local schema-17 contract covers no-copy footage import, projects, source
+The local schema-18 contract covers no-copy footage import, projects, source
 clips, multi-track timelines, colour/opacity track keyframes, music and verified
 720p/4K export, with clip-only constant speed or precise source-frame speed curves.
-Clip-owned crop/scale/translation/rotation and per-setting source-frame animation
-are specified by [#20's current contract](design/SPATIAL_TRANSFORMS.md), without
+Video track-owned crop/scale/translation/rotation and per-setting project-frame
+animation are specified by [#131's current contract](design/SPATIAL_TRANSFORMS.md), without
 claiming qualification or changing milestone status. Static clip Sharpen, Clarity
 and Denoise and the keyable track HDR look follow [#123's contract](design/DETAIL_FILTERS.md), likewise without a
 qualification claim.
@@ -36,12 +36,12 @@ warms; positive Tint adds magenta. The shared normalized linear-gain formula run
 before Exposure and intentionally colours greys; neutral-white luminance is
 preserved before clipping only. Static track
 [HSL ranges and master/RGB curves](design/HSL_AND_CURVES.md)
-follow scalar grading without adding animation channels. v1–v16 projects
+follow scalar grading without adding animation channels. v1–v17 projects
 and receipt snapshots are preserved/incompatible and require recreation, without
 migration, defaults, null/old-format readers or automatic deletion;
-registry/proxy/current PCM formats remain unchanged. Schema 17 requires a 0–8
+registry/proxy/current PCM formats remain unchanged. Schema 18 requires a 0–8
 identified music track array (`[]` without music); version-1 export receipts
-require strict v17 snapshots and captured audio-source/instance-plan arrays.
+require strict v18 snapshots and captured audio-source/instance-plan arrays.
 Music can extend duration to maximum video/music OUT: closing video fades finish
 at clip OUT, then black while music continues/fades at its own end. One mixed
 output clock and final-only linear-sum clamp retain bounded resources; see
@@ -57,9 +57,9 @@ heading help. Inspector tabs are **Clip / Track / Audio**, split by ownership: t
 **Track → Keyframes** section, directly shows the whole-track keyframe list and combines
 animation/timing help in its toolbar. Nested keyframe details retain drafts and input
 identity; there is no outer list disclosure or per-track list expansion preference.
-Track also holds Colour, Transitions and Fades. Clip keeps
-source/clip settings and playhead Speed/Transform controls; its Expand all/Collapse all
-affects only the four Clip sections (**Speed**, **Transform**, **Range** and **Placement**),
+Track also holds Colour, Transform, Transitions and Fades. Clip keeps
+source/clip settings and playhead Speed controls; its Expand all/Collapse all
+affects only the four Clip sections (**Speed**, **Detail**, **Range** and **Placement**),
 leaving Track, Audio, nested disclosures and help
 unchanged. Stored keyed settings reuse the main value
 controls with precise numeric editing. Clip/track selection and keyframe navigation

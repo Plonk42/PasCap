@@ -1185,7 +1185,7 @@ export function App() {
   );
   const followPlayhead = useCallback((): void => setKeyframeInspection(null), []);
   const openInspectorSection = useCallback((section: InspectorSectionTarget): void => {
-    setInspectorMode(section === 'colour' ? 'track' : 'clip');
+    setInspectorMode(section === 'speed' ? 'clip' : 'track');
     const workspace = latestWorkspace.current;
     if (!workspace.layout.inspectorOpen)
       workspace.update({ inspectorOpen: true, ...(workspace.viewport.width < 980 ? { mediaOpen: false } : {}) }, false);

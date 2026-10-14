@@ -111,7 +111,7 @@ function fakeLibrary(): MediaLibrary {
   return library;
 }
 
-describe('schema-17 production dispatch and read-only validation', () => {
+describe('schema-18 production dispatch and read-only validation', () => {
   it('keeps static constant/curve speed on the cheap path and dispatches shared track points with their placed map', () => {
     const project = document();
     expect(needsLayeredExport(project)).toBe(false);
@@ -136,11 +136,11 @@ describe('schema-17 production dispatch and read-only validation', () => {
     const placed = calculateLayout(project).clips[0]!;
     expect(planLayeredExport(project).duration).toBe(compileRetiming(project.clips[0]!).duration);
     expect(placed.retiming.duration).toBe(planLayeredExport(project).duration);
-    expect(exportRequestSchema.parse({ document: project, profile: 'draft720' }).document.schemaVersion).toBe(17);
+    expect(exportRequestSchema.parse({ document: project, profile: 'draft720' }).document.schemaVersion).toBe(18);
     expect(
       exportRequestSchema.safeParse({ document: { ...project, schemaVersion: 2 }, profile: 'draft720' }).success,
     ).toBe(false);
-    for (const version of [1, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16])
+    for (const version of [1, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17])
       expect(
         exportRequestSchema.safeParse({
           document: unsupportedProject(version, 'old', 'Unsupported export'),
@@ -180,44 +180,47 @@ describe('schema-17 production dispatch and read-only validation', () => {
       expect(planLayeredExport(project).kind).toBe('layered');
     }
   });
-  it('validates spatial anchors against registered originals and freezes the complete captured settings', () => {
+  it('freezes the complete captured track Transform, including keyframes after the original', () => {
     const project = document();
-    project.clips[0]!.spatial.keyframes = [
-      uniformKeyframe(0, { ...NEUTRAL_SPATIAL_POSE }, 'smooth'),
-      uniformKeyframe(100, { ...NEUTRAL_SPATIAL_POSE, scale: 2 }, 'hold'),
+    project.layers[0]!.transform.keyframes = [
+      { ...uniformKeyframe(0, { ...NEUTRAL_SPATIAL_POSE }, 'smooth'), reset: false },
+      { ...uniformKeyframe(5000, { ...NEUTRAL_SPATIAL_POSE, scale: 2 }, 'hold'), reset: false },
     ];
     const library = fakeLibrary();
     const snapshot = validateExport(project, library);
-    expect(snapshot.clips[0]!.spatial).toEqual(project.clips[0]!.spatial);
-    expect(Object.isFrozen(snapshot.clips[0]!.spatial)).toBe(true);
-    expect(Object.isFrozen(snapshot.clips[0]!.spatial.base)).toBe(true);
-    expect(Object.isFrozen(snapshot.clips[0]!.spatial.keyframes)).toBe(true);
-    expect(Object.isFrozen(snapshot.clips[0]!.spatial.keyframes[1]!.values)).toBe(true);
-    project.clips[0]!.spatial.keyframes[1]!.frame = 101;
-    expect(() => validateExport(project, library)).toThrow('spatial keyframes exceed');
-    expect(snapshot.clips[0]!.spatial.keyframes[1]!.frame).toBe(100);
+    const transform = snapshot.layers[0]!.transform;
+    expect(transform).toEqual(project.layers[0]!.transform);
+    expect(Object.isFrozen(transform)).toBe(true);
+    expect(Object.isFrozen(transform.base)).toBe(true);
+    expect(Object.isFrozen(transform.keyframes)).toBe(true);
+    expect(Object.isFrozen(transform.keyframes[1]!.values)).toBe(true);
+    project.layers[0]!.transform.keyframes[1]!.frame = 6000;
+    expect(transform.keyframes[1]!.frame).toBe(5000);
     expect(library.jobs.list()).toEqual([]);
   });
   it.each(['base', 'neutral-key'] as const)(
-    'rejects %s spatial references before native work or source reads',
+    'rejects %s Transform references before native work or source reads',
     async (kind) => {
       const project = document();
       project.clips.push(createClip('right', 'video', 20, 32));
       project.layers[0]!.transitions = [{ leftId: 'left', rightId: 'right', type: 'cut', duration: 0 }];
-      if (kind === 'base') project.clips[0]!.spatial.base.rotation = 1;
-      else project.clips[0]!.spatial.keyframes = [uniformKeyframe(100, { ...NEUTRAL_SPATIAL_POSE }, 'hold')];
+      if (kind === 'base') project.layers[0]!.transform.base.rotation = 1;
+      else
+        project.layers[0]!.transform.keyframes = [
+          { ...uniformKeyframe(100, { ...NEUTRAL_SPATIAL_POSE }, 'hold'), reset: false },
+        ];
       const library = fakeLibrary();
       const before = structuredClone(project);
-      expect(() => validateReference(project, library)).toThrow('spatial');
+      expect(() => validateReference(project, library)).toThrow('Transform');
       await expect(
         renderReference(project, library, { id: 'unused', signal: new AbortController().signal, update: () => {} }),
-      ).rejects.toThrow('spatial');
+      ).rejects.toThrow('Transform');
       expect(library.get).not.toHaveBeenCalled();
       expect(library.jobs.list()).toEqual([]);
       expect(project).toEqual(before);
     },
   );
-  it('requires explicit v17 media/row/static clip fields, permits eight rows and refuses a ninth or same-row overlap', () => {
+  it('requires explicit v18 media/row/static clip fields, permits eight rows and refuses a ninth or same-row overlap', () => {
     const project = document();
     for (let index = 2; index <= 8; index++) project.layers.push(layer(`video-${index}`));
     expect(projectSchema.safeParse(project).success).toBe(true);
@@ -289,12 +292,12 @@ describe('schema-17 production dispatch and read-only validation', () => {
     expect(Object.isFrozen(snapshot.layers[0]!.keyframes[0]!.values)).toBe(true);
     expect(Object.isFrozen(snapshot.layers[0]!.colour)).toBe(true);
   });
-  it('strictly loads v17 but lists/rejects unsupported versions unchanged, including overwrite attempts', async () => {
+  it('strictly loads v18 but lists/rejects unsupported versions unchanged, including overwrite attempts', async () => {
     const directory = await temp();
     const store = new ProjectStore(directory);
     const saved = await store.save(document(), 0);
     expect(await store.load(saved.id)).toEqual(saved);
-    for (const version of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]) {
+    for (const version of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]) {
       const id = `old-v${version}`;
       const title = `Original v${version} document`;
       const unsupported = unsupportedProject(version, id, title);
@@ -307,7 +310,7 @@ describe('schema-17 production dispatch and read-only validation', () => {
         title,
         error: expect.stringContaining(`schema version ${version}`),
       });
-      await expect(store.load(id)).rejects.toThrow('requires version 17');
+      await expect(store.load(id)).rejects.toThrow('requires version 18');
       await expect(store.rename(id, 'No migration', 0)).rejects.toThrow('existing file was not changed');
       await expect(store.save(createProject(id, 'No migration'), 0)).rejects.toThrow('existing file was not changed');
       expect(await readFile(filename, 'utf8')).toBe(bytes);

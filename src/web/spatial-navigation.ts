@@ -1,7 +1,8 @@
-import type { ProjectDocument, VideoClip } from '../shared/model.js';
+import type { ProjectDocument, VideoClip, VideoLayer } from '../shared/model.js';
 import { previewClipSource } from './clip-speed-geometry.js';
+import { previewFrameFor } from './keyframe-navigation.js';
 
-/** Clip-local stored source time, never a replacement for the actual playhead. */
+/** Section-local stored keyframe time, never a replacement for the actual playhead. */
 export interface SpatialInspection {
   context: string;
   frame: number;
@@ -10,35 +11,39 @@ export interface SpatialInspection {
   expectedFrame: number;
 }
 
-/** Which clip-owned keyframes a section navigates. */
-export type ClipKeyFrames = (clip: VideoClip) => readonly number[];
-const transformFrames: ClipKeyFrames = (clip) => clip.spatial.keyframes.map((key) => key.frame);
-export const speedFrames: ClipKeyFrames = (clip) =>
-  clip.speed.mode === 'curve' ? clip.speed.keyframes.map((key) => key.frame) : [];
+/** The stored keyframe times a section navigates and the timeline frame each previews. */
+export interface StoredKeyframes {
+  frames: readonly number[];
+  expectedFrame: (frame: number) => number;
+}
 
-function spatialFrames(project: ProjectDocument, clip: VideoClip | null, framesOf: ClipKeyFrames): number[] {
-  if (!clip || !project.clips.some((item) => item.id === clip.id && item.layerId === clip.layerId)) return [];
-  return [...framesOf(clip)];
+/** Clip speed keyframes, in original source frames, previewing their nearest mapped image. */
+export function clipSpeedKeyframes(project: ProjectDocument, clip: VideoClip | null): StoredKeyframes {
+  const current = project.clips.find((item) => item.id === clip?.id && item.layerId === clip.layerId);
+  if (current?.speed.mode !== 'curve') return { frames: [], expectedFrame: () => 0 };
+  return {
+    frames: current.speed.keyframes.map((key) => key.frame),
+    expectedFrame: (frame) => previewClipSource(project, current.id, frame),
+  };
+}
+
+/** Track Transform keyframes, in timeline frames, previewing the nearest available frame. */
+export function trackTransformKeyframes(layer: VideoLayer, duration: number): StoredKeyframes {
+  return {
+    frames: layer.transform.keyframes.map((key) => key.frame),
+    expectedFrame: (frame) => previewFrameFor(frame, duration),
+  };
 }
 
 /** Selection alone does not seek; callers can publish expectedFrame through the source-only route. */
 export function inspectSpatialKeyframe(
   context: string,
-  project: ProjectDocument,
-  clip: VideoClip | null,
+  keys: StoredKeyframes,
   frame: number,
   observedFrame: number,
-  framesOf: ClipKeyFrames = transformFrames,
 ): SpatialInspection | null {
-  const frames = spatialFrames(project, clip, framesOf);
-  if (!clip || !frames.includes(frame)) return null;
-  return {
-    context,
-    frame,
-    frames,
-    observedFrame,
-    expectedFrame: previewClipSource(project, clip.id, frame),
-  };
+  if (!keys.frames.includes(frame)) return null;
+  return { context, frame, frames: [...keys.frames], observedFrame, expectedFrame: keys.expectedFrame(frame) };
 }
 
 function retainedSpatialFrame(inspection: SpatialInspection, frames: readonly number[]): number | null {
@@ -63,28 +68,25 @@ function acceptsObservation(inspection: SpatialInspection, observedFrame: number
   );
 }
 
-/** Follow one moved source key/Undo, but clear on deletion, playback or track inspection (`interrupted`) or a foreign context. */
+/** Follow one moved key/Undo, but clear on deletion, playback or track inspection (`interrupted`) or a foreign context. */
 export function reconcileSpatialInspection(
   inspection: SpatialInspection | null,
   context: string,
-  project: ProjectDocument,
-  clip: VideoClip | null,
+  keys: StoredKeyframes,
   observedFrame: number,
   interrupted: boolean,
-  framesOf: ClipKeyFrames = transformFrames,
 ): SpatialInspection | null {
   if (inspection?.context !== context || interrupted) return null;
-  const frames = spatialFrames(project, clip, framesOf);
-  const frame = retainedSpatialFrame(inspection, frames);
-  if (frame === null || !clip) return null;
-  const expectedFrame = previewClipSource(project, clip.id, frame);
+  const frame = retainedSpatialFrame(inspection, keys.frames);
+  if (frame === null) return null;
+  const expectedFrame = keys.expectedFrame(frame);
   if (!acceptsObservation(inspection, observedFrame, expectedFrame)) return null;
   if (
     frame === inspection.frame &&
     observedFrame === inspection.observedFrame &&
     expectedFrame === inspection.expectedFrame &&
-    sameFrames(frames, inspection.frames)
+    sameFrames(keys.frames, inspection.frames)
   )
     return inspection;
-  return { ...inspection, frame, frames, observedFrame, expectedFrame };
+  return { ...inspection, frame, frames: [...keys.frames], observedFrame, expectedFrame };
 }

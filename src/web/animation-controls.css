@@ -69,3 +69,12 @@
   opacity: 0.4;
   cursor: not-allowed;
 }
+/* Transform's default keyframe takes the blue of its ▼ markers. */
+.section-keyframe-line > .icon-button.transform-default-keyframe-button {
+  color: #c4e9ff;
+}
+.section-keyframe-line > .icon-button.transform-default-keyframe-button[aria-pressed='true'] {
+  color: #10202b;
+  background: #c4e9ff;
+  border-color: #9fd2f2;
+}

@@ -17,7 +17,7 @@ import {
 import type { MediaAsset } from '../shared/media.js';
 import type { ProjectDocument } from '../shared/model.js';
 import { forEachSerial } from '../shared/serial.js';
-import { isNeutralSpatial } from '../shared/spatial.js';
+import { hasSpatialEdits, isNeutralSpatial } from '../shared/spatial.js';
 import type { Retiming } from '../shared/speed.js';
 import { calculateLayout, sampleTimeline, type PlacedClip, type PreviewLayer } from '../shared/timeline.js';
 import { framesToSeconds } from '../shared/timing.js';
@@ -447,12 +447,8 @@ class SequentialLayeredRenderer {
       layer.colour.hdr > 0 ||
       layer.keyframes.some((key) => (key.values.hdr ?? 0) > 0) ||
       !isNeutralAdvancedColour(layer.colour) ||
-      clipIndexes.some((index) => {
-        const clip = this.options.document.clips[index]!;
-        return (
-          !isNeutralDetail(clip.detail) || clip.spatial.keyframes.length > 0 || !isNeutralSpatial(clip.spatial.base)
-        );
-      })
+      hasSpatialEdits(layer.transform) ||
+      clipIndexes.some((index) => !isNeutralDetail(this.options.document.clips[index]!.detail))
     );
   }
   private update(frames: number, message: string): void {

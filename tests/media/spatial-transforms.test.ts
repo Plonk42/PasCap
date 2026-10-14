@@ -45,6 +45,7 @@ function referencePose(settings: SpatialSettings, position: number): SpatialPose
   for (const channel of Object.keys(result) as (keyof SpatialPose)[]) {
     const keys = settings.keyframes.filter((key) => key.values[channel] !== null);
     if (!keys.length) continue;
+    if (keys[0]!.reset && position < keys[0]!.frame) continue;
     if (position <= keys[0]!.frame) {
       result[channel] = keys[0]!.values[channel]!;
       continue;
@@ -341,7 +342,8 @@ describe.skipIf(!enabled)('spatial transforms · real native FFmpeg, disposable 
       expect(sample.sourcePosition).toBe(placed.retiming.sourcePositionAt(frame - placed.start));
       expect(sample.sourceFrame).toBeGreaterThanOrEqual(clip.sourceIn);
       expect(sample.sourceFrame).toBeLessThan(clip.sourceOut);
-      const spatial = referencePose(clip.spatial, sample.sourcePosition);
+      const layer = project.layers.find((row) => row.id === sample.layerId)!;
+      const spatial = referencePose(layer.transform, frame);
       for (const channel of Object.keys(spatial) as (keyof SpatialPose)[])
         expect(sample.spatial[channel]).toBeCloseTo(spatial[channel], 12);
       const bounds = referenceBounds(asset.metadata, target);
@@ -624,7 +626,7 @@ describe.skipIf(!enabled)('spatial transforms · real native FFmpeg, disposable 
   ): Promise<void> {
     const project = createProject('static-spatial', 'Disposable one-frame spatial test');
     const clip = createClip('pattern', assets[asset]!.id, 1, 2);
-    clip.spatial.base = pose(changes);
+    project.layers[0]!.transform.base = pose(changes);
     if (detail) clip.detail = detail;
     if (hdr) project.layers[0]!.colour.hdr = hdr;
     project.clips = [clip];
@@ -668,70 +670,44 @@ describe.skipIf(!enabled)('spatial transforms · real native FFmpeg, disposable 
       saturation: 0.8,
       brightness: 0.03,
     };
-    left.spatial = {
+    // Both dissolve sources share the track pose, animated in project time over held images.
+    upper.transform = {
       base: pose({ scale: 3 }),
       keyframes: [
-        uniformKeyframe(
-          1,
-          pose({
-            cropLeft: 0.12,
-            cropRight: 0.18,
-            cropTop: 0.09,
-            cropBottom: 0.21,
-            scale: 0.83,
-            rotation: 21,
-            translateX: -0.1,
-            translateY: 0.08,
-          }),
-          'linear',
-        ),
-        uniformKeyframe(
-          2,
-          pose({
-            cropLeft: 0.23,
-            cropRight: 0.07,
-            cropTop: 0.17,
-            cropBottom: 0.11,
-            scale: 1.17,
-            rotation: -17,
-            translateX: 0.16,
-            translateY: -0.13,
-          }),
-          'hold',
-        ),
-      ],
-    };
-    right.spatial = {
-      base: pose({ rotation: 90 }),
-      keyframes: [
-        uniformKeyframe(
-          2,
-          pose({
-            cropLeft: 0.07,
-            cropRight: 0.11,
-            cropTop: 0.23,
-            cropBottom: 0.06,
-            scale: 0.71,
-            rotation: -31,
-            translateX: 0.21,
-            translateY: -0.17,
-          }),
-          'smooth',
-        ),
-        uniformKeyframe(
-          3,
-          pose({
-            cropLeft: 0.19,
-            cropRight: 0.22,
-            cropTop: 0.08,
-            cropBottom: 0.16,
-            scale: 1.09,
-            rotation: 26,
-            translateX: -0.11,
-            translateY: 0.14,
-          }),
-          'hold',
-        ),
+        {
+          ...uniformKeyframe(
+            1,
+            pose({
+              cropLeft: 0.12,
+              cropRight: 0.18,
+              cropTop: 0.09,
+              cropBottom: 0.21,
+              scale: 0.83,
+              rotation: 21,
+              translateX: -0.1,
+              translateY: 0.08,
+            }),
+            'smooth',
+          ),
+          reset: false,
+        },
+        {
+          ...uniformKeyframe(
+            3,
+            pose({
+              cropLeft: 0.19,
+              cropRight: 0.22,
+              cropTop: 0.08,
+              cropBottom: 0.16,
+              scale: 1.09,
+              rotation: -17,
+              translateX: 0.16,
+              translateY: -0.13,
+            }),
+            'hold',
+          ),
+          reset: false,
+        },
       ],
     };
     upper.transitions = [{ leftId: left.id, rightId: right.id, type: 'cross-dissolve', duration: 2 }];
@@ -740,7 +716,7 @@ describe.skipIf(!enabled)('spatial transforms · real native FFmpeg, disposable 
   }
 
   it.each(['draft720', 'final4k'] as const)(
-    'actual %s export and lossless masks: animated held sources, differing dissolve poses, row opacity and black fades',
+    'actual %s export and lossless masks: animated held sources, a shared dissolve track pose, row opacity and black fades',
     async (profile) => {
       const project = compound();
       const captured = structuredClone(project);
@@ -765,7 +741,7 @@ describe.skipIf(!enabled)('spatial transforms · real native FFmpeg, disposable 
       expect(a.spatial).not.toEqual(b.spatial);
       const dissolve = sampleTimeline(project, 2).filter((sample) => sample.layerId === 'upper');
       expect(dissolve.map((sample) => sample.blendWeight)).toEqual([0.5, 0.5]);
-      expect(dissolve[0]!.spatial).not.toEqual(dissolve[1]!.spatial);
+      expect(dissolve[0]!.spatial).toEqual(dissolve[1]!.spatial);
       expect(dissolve[0]!.colour).toEqual(dissolve[1]!.colour);
       expect(sampleTimeline(project, 0).find((sample) => sample.clipId === 'left')!.brightness).toBe(0);
       expect(sampleTimeline(project, 3).find((sample) => sample.clipId === 'right')!.brightness).toBe(0);
@@ -804,7 +780,7 @@ describe.skipIf(!enabled)('spatial transforms · real native FFmpeg, disposable 
     120_000,
   );
 
-  it('720p GPU worker parity: animated held sources, differing dissolve poses, row opacity and black fades', async () => {
+  it('720p GPU worker parity: animated held sources, a shared dissolve track pose, row opacity and black fades', async () => {
     const project = compound();
     const layout = calculateLayout(project);
     // Only the upper row has nonneutral poses; the lower row's neutral scalar frames stay on the CPU.
@@ -856,7 +832,10 @@ describe.skipIf(!enabled)('spatial transforms · real native FFmpeg, disposable 
     const lower = createClip('lower', assets[0]!.id, 2, 3);
     const upper = createClip('neutral', assets[1]!.id, 1, 2, 'letterbox');
     // Neutral full-pose keys must enter layered export without changing identity.
-    upper.spatial.keyframes = [uniformKeyframe(0, pose(), 'smooth'), uniformKeyframe(4, pose(), 'hold')];
+    project.layers[1]!.transform.keyframes = [
+      { ...uniformKeyframe(0, pose(), 'smooth'), reset: false },
+      { ...uniformKeyframe(4, pose(), 'hold'), reset: true },
+    ];
     project.clips = [lower, upper];
     const captured = projectSchema.parse(project);
     const target = EXPORT_PROFILES.draft720;

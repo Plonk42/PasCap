@@ -10,6 +10,7 @@ import {
   planLayeredExport,
 } from '../../src/shared/export.js';
 import { EMPTY_KEY_VALUES, type LayerKeyframe, layerKeyframe } from '../../src/shared/keyframes.js';
+import { createSpatialSettings } from '../../src/shared/spatial.js';
 import {
   BASE_LAYER_ID,
   createClip,
@@ -105,10 +106,10 @@ function rejected(document: ProjectDocument, command: EditCommand, message: stri
   expect(history.canRedo).toBe(false);
 }
 
-describe('strict uniform schema-17 tracks', () => {
+describe('strict uniform schema-18 tracks', () => {
   it('uses Ripple ON for the initial track and every newly created track', () => {
     const initial = createProject('new', 'New');
-    expect(initial.schemaVersion).toBe(17);
+    expect(initial.schemaVersion).toBe(18);
     expect(initial.layers).toEqual([createLayer(BASE_LAYER_ID, 'Track 1')]);
     for (const id of [BASE_LAYER_ID, ...Array.from({ length: 8 }, (_, index) => `arbitrary-${index}`)]) {
       expect(createLayer(id, 'Track')).toEqual({
@@ -118,6 +119,7 @@ describe('strict uniform schema-17 tracks', () => {
         opacity: 1,
         colour: { ...NEUTRAL_COLOUR },
         keyframes: [],
+        transform: createSpatialSettings(),
         ripple: true,
         transitions: [],
         openingFade: 0,
@@ -132,7 +134,15 @@ describe('strict uniform schema-17 tracks', () => {
   it('requires every new track field, rejects old global fields and never injects fallbacks', () => {
     const document = fixture();
     expect(projectSchema.parse(document)).toEqual(document);
-    for (const field of ['colour', 'opacity', 'ripple', 'transitions', 'openingFade', 'closingFade'] as const) {
+    for (const field of [
+      'colour',
+      'opacity',
+      'transform',
+      'ripple',
+      'transitions',
+      'openingFade',
+      'closingFade',
+    ] as const) {
       const { [field]: _missing, ...incomplete } = document.layers[0]!;
       expect(projectSchema.safeParse({ ...document, layers: [incomplete, ...document.layers.slice(1)] }).success).toBe(
         false,
@@ -140,7 +150,7 @@ describe('strict uniform schema-17 tracks', () => {
     }
     for (const extra of [{ transitions: [] }, { openingFade: 0 }, { closingFade: 0 }])
       expect(projectSchema.safeParse({ ...document, ...extra }).success).toBe(false);
-    for (const schemaVersion of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16])
+    for (const schemaVersion of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17])
       expect(projectSchema.safeParse({ ...document, schemaVersion }).success).toBe(false);
     expect(projectSchema.safeParse(unsupportedProject(5, 'old', 'Unsupported topology')).success).toBe(false);
     expect(document).not.toHaveProperty('transitions');
