@@ -649,9 +649,8 @@ for (const rate of [0.25, 4]) {
     expect(captures[3]!.pixelSum).not.toBe(captures[0]!.pixelSum);
     await seek(page, 0);
     await inspectorTab(page, 'Track keyframes');
-    const keys = layerKeyframes(page, 'Track 1');
     for (const frame of [1, 2, 3]) {
-      await keys.getByRole('button', { name: 'Next track keyframe', exact: true }).click();
+      await page.getByRole('button', { name: 'Next Colour keyframe', exact: true }).click();
       await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(frame);
       await expect(page.getByRole('button', { name: `Track keyframe ${frame} on Track 1`, exact: true })).toHaveCount(
         1,

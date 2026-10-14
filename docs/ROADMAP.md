@@ -53,11 +53,12 @@ sequence there, and turning it off retains actual placements. Video tracks displ
 bottom-to-top composition order without primary/overlay roles. The UI provides a
 pinned ruler, synchronized native track access, accessible action bounds and contextual
 heading help. Inspector tabs are **Clip / Track / Audio**, split by ownership: the
-[whole-track keyframe list](https://github.com/Plonk42/PasCap/issues/26) is the
-**Track → Keyframes** section, directly shows the whole-track keyframe list and combines
-animation/timing help in its toolbar. Nested keyframe details retain drafts and input
+[whole-track keyframe list](https://github.com/Plonk42/PasCap/issues/26) sits at the
+end of **Track → Colour**, under a small **Keyframes** heading with animation/timing help
+beside it. Nested keyframe details retain drafts and input
 identity; there is no outer list disclosure or per-track list expansion preference.
-Track also holds Colour, Transform, Transitions and Fades. Clip keeps
+Track also holds HSL ranges, Colour curves, Transform (ending with its own keyframe list),
+Transitions and Fades. Clip keeps
 source/clip settings and playhead Speed controls; its Expand all/Collapse all
 affects only the four Clip sections (**Speed**, **Detail**, **Range** and **Placement**),
 leaving Track, Audio, nested disclosures and help

@@ -73,12 +73,11 @@ for (const viewport of [
     await expect(page.getByRole('button', { name: 'Colour curve control node 1', exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Delete colour curve control node', exact: true })).toBeDisabled();
     await page.getByRole('button', { name: 'Keyframe Scale', exact: true }).click();
-    await expect(page.getByRole('combobox', { name: 'Selected Transform keyframe', exact: true })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Preview selected Transform keyframe', exact: true })).toHaveText(
-      'Preview stored keyframe',
-    );
+    const transformKeys = page.getByRole('group', { name: 'Transform keyframes Track 1', exact: true });
+    await expect(transformKeys.getByRole('list', { name: 'Edit Transform keyframes', exact: true })).toBeVisible();
+    await expect(transformKeys.locator('.keyframe-panel-title')).toHaveText('Keyframes');
     await page.getByRole('button', { name: 'Undo', exact: true }).click();
-    await expect(page.getByRole('combobox', { name: 'Selected Transform keyframe', exact: true })).toHaveCount(0);
+    await expect(transformKeys).toHaveCount(0);
 
     await inspectorTab(page, 'Clip');
     await expect(page.getByRole('button', { name: 'Range section', exact: true })).toBeVisible();

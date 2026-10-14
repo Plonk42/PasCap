@@ -259,7 +259,7 @@ original exclusive OUT, previewing the nearest mapped image.
 Speed keeps a clip-local stored-source selection separate from track
 inspection, so several stored keyframes can be visited even when they preview
 the same first/last image. Transform visits all its track keyframes, including those
-after the duration, with its own track-local selection. Enabled setting chips in stored Keyframes rows retain
+after the duration, with its own track-local selection. Enabled setting chips in stored Colour keyframe rows retain
 their per-channel arrows too. All main and stored per-channel arrows visit only
 strictly earlier/later keyframes where that setting is nonnull, including zero,
 using the shared central off-duration inspection cursor. Main capture always
@@ -398,21 +398,24 @@ lower tracks; exact neutral poses retain the old opaque black letterbox.
 - **Add default Transform keyframe** in the keyframe line adds a default keyframe at the
   playhead (neutral pose, Hold), or removes the one there, exactly like the Colour default
   keyframe: it returns the pose to neutral from its frame without changing earlier frames.
-- **Selected Transform keyframe**, the keyframe line's **Previous/Next** pair and
-  **Preview stored keyframe** reach all keyframes, including those after the duration.
-  The stored timeline frame is shown separately from the playhead; preview uses the
-  nearest available frame. Stored **Timeline frame**, **Easing** and the fields of its enabled settings edit that selected keyframe; time and
+- At the end of the section, below the eight settings, a **Keyframes** list shows one row per
+  Transform keyframe: its timecode (click to seek the nearest available frame), **Default** and
+  **Outside duration** badges where they apply, a trash and its enabled settings. The keyframe
+  line's **Previous/Next** pair and the timecodes reach all keyframes, including those after the
+  duration; the current row is marked, and the stored timeline frame is shown separately from
+  the playhead. A row's **Edit** holds **Timeline frame**, **Easing** and a slider/field per
+  enabled setting, which edit that keyframe; time and
   value edits do not seek automatically. Easing is disabled when no enabled setting continues to a later keyframe.
   **Easing** sets every setting of the keyframe at once; when they should differ, choose
   **Per setting** and pick each one. Differing settings read **Mixed** and keep their
   per-setting choices visible. A setting added to a keyframe takes the Easing its other
-  settings share, or Linear. The same applies to stored track keyframes in **Keyframes → Edit**.
+  settings share, or Linear. The same applies to stored track keyframes in Colour's keyframe list.
 - Numeric Enter/blur applies exact values; Escape restores. Collisions,
   fractional frames and out-of-bounds values stay
   editable with errors, never silently clamp or overwrite. Escape, cancellation,
   capture loss or window blur cancels a slider drag without saving; keyboard adjustments
   are individual validated edits.
-- The trash action removes only the selected keyframe. Removing a setting's last
+- A row's trash removes that whole keyframe. Removing a setting's last
   keyframe reveals its unchanged base. **Reset transform** works like Colour's Reset:
   without keyframes it restores the neutral base; with keyframes it resets the enabled
   settings of the keyframe at the playhead, in one Undo step.
@@ -461,10 +464,10 @@ drag or ←/→ (Shift for ten) moves them one project frame, one Undo step per 
 
 ### Opt in to shared video track animation
 
-The **Track → Keyframes** section
+The stored **Keyframes** list at the end of **Track → Colour**
 belongs to the selected **whole video track**, even an empty one, not to a clip.
-It contains the keyframe count, enabled-setting chips, whole-track Previous/Next navigation
-and a directly visible shared keyframe list. The toolbar's **Animation help** combines
+It shows enabled-setting chips and one row per shared keyframe; Colour's keyframe line
+counts and visits the same keyframes. **Animation help** beside its heading combines
 animation and keyframe-timing guidance. **Clip** keeps source/clip settings and playhead
 Speed controls; **Track → Colour** keeps Opacity and Colour controls and **Track → Transform** the pose.
 All shared track keyframes use absolute project frames and affect every clip on that track.
@@ -494,7 +497,7 @@ shared keyframes are allowed per video track.
   returns to its default there and holds until its next keyframe; earlier frames keep their
   values. Change its Easing to blend out of it instead of holding, or press the button again
   at that frame to remove it. Its timeline marker is filled amber.
-- The per-channel native **Previous/Next** arrows beside main diamonds and on enabled setting chips in stored Keyframes rows visit only that
+- The per-channel native **Previous/Next** arrows beside main diamonds and on enabled setting chips in stored Colour keyframe rows visit only that
   channel's strictly earlier/later keyframes where it is nonnull, including zero-valued
   ones. They are disabled without a neighbour/project or during a document draft.
   Section-header arrows retain their unions above.
@@ -510,8 +513,8 @@ move **all enabled settings, values and easing together**; valid release is one 
 step. With Snap on, pointer movement snaps within eight pixels at the captured zoom
 to captured clip/music/transition boundaries and playhead; **Alt** bypasses it.
 Focused marker **←/→** moves one project frame, **Shift+←/→** ten, without snapping
-or also stepping the playhead/nudging a clip. **Keyframes → Edit**
-on each keyframe provides exact time/value editing with Enter/blur to apply
+or also stepping the playhead/nudging a clip. The **Edit** disclosure
+on each row of Colour's keyframe list provides exact time/value editing with Enter/blur to apply
 and Escape to restore.
 
 The shared list has no outer disclosure or per-track list expansion preference.
@@ -644,7 +647,7 @@ control conventions and vocabulary.
 
 **Expand all / Collapse all** is an icon button on the Inspector tab bar for the
 visible tab: Clip's **Speed**, **Detail**, **Range** and **Placement**; Track's
-**Colour**, **HSL ranges**, **Colour curves**, **Transform**, **Keyframes**, **Transitions** and **Fades**; Audio's **Music**. Other
+**Colour**, **HSL ranges**, **Colour curves**, **Transform**, **Transitions** and **Fades**; Audio's **Music**. Other
 tabs, nested disclosures and help remain unchanged.
 
 The header directly exposes keyboard help. **Workspace options** holds the
@@ -667,7 +670,7 @@ a pair on Enter or when focus leaves both fields; Escape restores unapplied draf
 Clip shows the selected clip/video track first; section readouts and dots
 indicate adjusted settings without expanding everything. Animated channels use
 an amber curve/diamond: dashed between keyframes, filled when the setting is enabled
-at the playhead. **Animation help** in the Keyframes toolbar explains scope,
+at the playhead. **Animation help** beside Colour's **Keyframes** heading explains scope,
 capture and keyframe timing; there is no separate Keyframe timing help button.
 All eleven track settings retain their unkeyed values, explicit capture and stored-keyframe editing.
 Search/filter clear actions,

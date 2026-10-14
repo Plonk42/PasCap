@@ -177,7 +177,7 @@ test('Track and Audio bulk expansion change only their own sections', async ({ p
   const before = await current(page);
   const sections = (ids: string[]) =>
     page.evaluate((list) => list.map((id) => localStorage.getItem(`pascap-section-${id}`)), ids);
-  const trackIds = ['colour', 'hsl', 'curves', 'transform', 'keyframes', 'transition', 'fades'];
+  const trackIds = ['colour', 'hsl', 'curves', 'transform', 'transition', 'fades'];
   const otherIds = ['speed', 'source', 'layer-opacity', 'music'];
   const open = trackIds.map(() => 'open');
   const closed = trackIds.map(() => 'closed');
@@ -192,7 +192,7 @@ test('Track and Audio bulk expansion change only their own sections', async ({ p
   await collapse.focus();
   await collapse.press('Enter');
   await expect(page.getByRole('button', { name: 'Expand all Track sections', exact: true })).toBeFocused();
-  for (const title of ['Colour', 'HSL ranges', 'Colour curves', 'Transform', 'Keyframes', 'Transitions', 'Fades'])
+  for (const title of ['Colour', 'HSL ranges', 'Colour curves', 'Transform', 'Transitions', 'Fades'])
     await expect(page.getByRole('button', { name: `${title} section`, exact: true })).toHaveAttribute(
       'aria-expanded',
       'false',

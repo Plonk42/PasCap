@@ -108,9 +108,7 @@ test('three accessible tabs preserve selection across clips, populated/empty tra
   await page.getByRole('button', { name: 'Select track Empty row', exact: true }).click();
   await expect(layerKeyframes(page, 'Empty row')).toBeVisible();
   await expect(page.getByRole('tab', { name: 'Track', exact: true })).toHaveAttribute('aria-selected', 'true');
-  await expect(
-    layerKeyframes(page, 'Empty row').getByRole('button', { name: 'Next track keyframe', exact: true }),
-  ).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Next Colour keyframe', exact: true })).toBeEnabled();
   const other = createProject('other-inspector', 'Other context');
   other.layers[0]!.name = 'Other row';
   memory.seed(other);

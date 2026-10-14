@@ -13,7 +13,7 @@ full-original range bar; other frame/duration/fade fields retain numeric stepper
 | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Colour / Opacity              | Native slider and exact field in main/stored editors; Temperature, Tint, Saturation, Hue and Opacity have coloured tracks; main sliders grouped under Opacity, Colour, Light and Effects headings | Opacity UI 0–100%, neutral 100%; stored track/keyframe values remain 0–1                                                                                                                         |
 | Speed                         | Clip constant rate or 1–256 source-frame keyframes; Keyframe Speed circle                                                                                                                         | Bounded slider/exact-value pattern; retain presets and curve graph                                                                                                                               |
-| Transform                     | Eight track pose sliders/exact fields, each with its own blue triangle and Previous/Next, stored keyframe selector/navigation, default keyframe toggle                                            | Works exactly like Colour: explicit per-setting project-frame capture; distinguish stored time from preview                                                                                      |
+| Transform                     | Eight track pose sliders/exact fields, each with its own blue triangle and Previous/Next, stored keyframe list, default keyframe toggle                                                           | Works exactly like Colour: explicit per-setting project-frame capture; distinguish stored time from preview                                                                                      |
 | Detail                        | Clip Sharpen, Clarity and Denoise sliders/exact fields with **Reset detail**                                                                                                                      | Static, no keyframes; live image preview while dragging; one Undo per release                                                                                                                    |
 | Audio                         | Music track / Recording selects, Add music track, selected-track trash and gain slider                                                                                                            | Independent identified tracks; exact gain draft; import never implicitly places                                                                                                                  |
 | Clip Range                    | One full-original hatched range bar with draggable IN/OUT; exact text fields below its ends                                                                                                       | Display 30 fps NDF timecode; accept whole original frames or timecode                                                                                                                            |
@@ -21,7 +21,7 @@ full-original range bar; other frame/duration/fade fields retain numeric stepper
 | Slider gestures               | Transient local pointer draft; Colour/Opacity/HSL/Transform also preview it in the image                                                                                                          | One validated edit on release; cancellation restores control and preview; keyboard edits stay individual                                                                                         |
 | Keyframe / music deletion     | Trash action with accessible name                                                                                                                                                                 | Delete the identified keyframe/track; × only closes/dismisses                                                                                                                                    |
 | Inspector / viewer tabs       | Consistent native-button appearance                                                                                                                                                               | Retain existing keyboard navigation and mounted drafts                                                                                                                                           |
-| Keyframes                     | Tab owns its title; toolbar owns navigation/help                                                                                                                                                  | Keep its accessible name; no repeated visible toolbar title                                                                                                                                      |
+| Keyframes                     | Colour and Transform each end with a stored keyframe list under a small **Keyframes** heading; keyframe lines own navigation; Animation help beside Colour's heading                              | Keep accessible names Track keyframes / Transform keyframes; no separate count, navigation or section                                                                                            |
 | Import actions                | **Import** (Media) and **Import music** (Audio) open one **Import media** dialog: Locations, breadcrumb, All/Video/Music filter, checkbox list and **Import N**                                   | Deliberate import; double-click imports one recording; no implicit music placement                                                                                                               |
 | Track options / Timeline      | Visibility, Ripple, stacking and frequent clip actions already have native controls/icons                                                                                                         | Keep their locations; Duplicate and **Move to new track** are in the clip context menu; zoom has slider, Fit and Zoom out/in buttons                                                             |
 | Help / disclosures / options  | Question-mark help and top-layer options are already consistent                                                                                                                                   | Keep those components and browser preferences                                                                                                                                                    |
@@ -93,7 +93,7 @@ and technical paths stay unchanged; this glossary does not change schema 18.
   **Track keyframe easing N**. Each enabled setting of a track or Transform keyframe has its
   own Easing: the keyframe's select sets them all and reads **Mixed** when they differ;
   **Per setting** reveals one compact select per setting (**<Setting> easing at track keyframe N**,
-  **Transform keyframe <Setting> easing**), shown automatically while they differ.
+  **<Setting> easing at Transform keyframe N**), shown automatically while they differ.
 
 ## Control patterns
 
@@ -132,7 +132,7 @@ and technical paths stay unchanged; this glossary does not change schema 18.
   stored-source cursor independent of central track inspection; successive stored
   keyframes remain reachable even when their first/last preview image is the same.
   Main capture always uses the real displayed project/source frame,
-  never the inspected stored time. Enabled setting chips in stored Keyframes rows
+  never the inspected stored time. Enabled setting chips in stored Colour keyframe rows
   retain their per-channel native arrows. All main and stored per-channel arrows
   visit strictly earlier/later keyframes where that channel is nonnull (zero is
   enabled), sharing the central off-duration inspection cursor with section
@@ -175,12 +175,13 @@ and technical paths stay unchanged; this glossary does not change schema 18.
 
 Keep Media for recording discovery/import; the centre's Timeline/Source preview
 tabs for viewing; Clip for speed/Detail/source range/placement; Track for Colour,
-Opacity, HSL ranges, Colour curves, Transform, shared Keyframes, transitions and fades; Audio for music. Track options owns
+Opacity, HSL ranges, Colour curves, Transform, transitions and fades (Colour and Transform each ending
+with their stored keyframe list); Audio for music. Track options owns
 rename, Ripple, stacking and deletion. No tab relocation is justified by the audit.
 Keep frequent split/trim/delete/cut actions directly in Timeline, not in another
 toolbar. Detailed controls and diagnostics remain contextual/collapsible.
 
-Transform is a Track section (after Colour curves, before Keyframes), collapsed by default and included
+Transform is a Track section (after Colour curves, before Transitions), collapsed by default and included
 in Expand all/Collapse all. It works exactly like Colour, including on an empty track.
 **Transform animation** heading help remains reachable
 while collapsed. **Crop left/right/top/bottom / Scale / Translate X/Y / Rotation °**
@@ -188,10 +189,11 @@ pair native sliders with exact fields and live slider preview. Main values edit 
 or that setting's key at the playhead; a keyed setting without a key
 there stays read-only until its own blue triangle (hollow ▽ / filled ▼, as on the timeline marker, never the Colour diamond) captures it.
 Every setting has its own triangle and **Previous/Next** buttons like Colour, plus the single **Previous/Next** pair in the keyframe line,
-which also holds **Reset transform** and **Add default Transform keyframe**. Stored **Timeline frame / Easing**
-and the selected key's enabled-setting fields target the selected
-keyframe; the selector and **Preview stored keyframe** seek the nearest available frame, with separate
-stored/playhead labels. Trash removes one keyframe, revealing the saved
+which also holds **Reset transform** and **Add default Transform keyframe**. Below the settings, a
+**Keyframes** list shows one row per Transform keyframe like Colour's: **Go to Transform keyframe N**
+seeks the nearest available frame and marks the row current, a hint separates stored time from the
+playhead, and each row's **Edit** holds **Timeline frame / Easing** and its enabled-setting fields.
+A row's trash removes that keyframe, revealing the saved
 base of settings left unkeyed; **Reset transform** behaves like Colour's Reset (neutral base
 without keyframes, else the enabled settings of the key at the playhead). There is no graph/canvas gizmo. Exact
 invalid drafts and sliders follow the common validation/cancellation

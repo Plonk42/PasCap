@@ -161,7 +161,7 @@ decoders/textures per video track (16 for eight), plus one source-review decoder
 
 ## Track → Transform controls
 
-**Transform** is a Track section after **Colour curves** and before **Keyframes**,
+**Transform** is a Track section after **Colour curves** and before **Transitions**,
 collapsed for new preferences and included in Track's **Expand all / Collapse all**.
 **Transform animation** heading help stays reachable while collapsed. It works on an
 empty track, like Colour.
@@ -188,16 +188,26 @@ button (hollow ▽ / filled ▼, **Keyframe Scale**, etc.) and per-setting **Pre
   setting's name resets only that setting.
 - **Add default Transform keyframe** adds a default keyframe at the playhead, or removes
   the one there, in one Undo step; it is unavailable where an ordinary keyframe exists.
-- **Selected Transform keyframe**, **Preview stored keyframe** and the header and
-  per-setting Previous/Next reach every stored key, including keys after the duration,
-  previewing the nearest available frame. A section-local stored cursor keeps stepping
-  through keys that preview the same last frame; it is cleared by a manual seek,
-  playback or track inspection. Stored time stays distinct from the playhead
-  (**Stored timeline frame N · playhead frame P**); capture always uses the playhead.
-- The stored section edits the selected key: **Timeline frame**, **Easing** (sets every
-  enabled setting, reads **Mixed** when they differ; **Per setting** reveals one select per
-  continuing setting) and its enabled settings' values. A default keyframe shows a
-  **Default** badge. **Delete selected Transform keyframe** removes the whole key.
+- Below the eight settings, when the track has Transform keyframes, a small **Keyframes**
+  heading introduces the list (fieldset **Transform keyframes** plus the track name, list
+  **Edit Transform keyframes**), one row per key, like Colour's. Each row has a timecode
+  button **Go to Transform keyframe N**, a light-blue **Default** badge for a default
+  keyframe, an **Outside duration** badge, a trash **Delete Transform keyframe N** (removes
+  the whole key; deleting the last reveals the saved base) and blue enabled-setting chips
+  without arrows.
+- The row timecodes and the keyframe line's and per-setting Previous/Next reach every stored
+  key, including keys after the duration, previewing the nearest available frame. A
+  section-local stored cursor keeps stepping through keys that preview the same last frame;
+  it is cleared by a manual seek, playback or track inspection. The row of the inspected key,
+  or of the key at the playhead, is marked current. Stored time stays distinct from the
+  playhead (**Stored timeline frame N · playhead frame P** above the list, adding that
+  preview uses the nearest available frame after the duration); capture always uses the playhead.
+- Each row's **Edit** disclosure (open initially for three or fewer keys) edits that key:
+  **Timeline frame** (**Transform keyframe frame N**), **Easing** (**Transform keyframe
+  easing N**; sets every enabled setting, reads **Mixed** when they differ; **Per setting**
+  reveals one select per continuing setting, **<Setting> easing at Transform keyframe N**;
+  disabled when no enabled setting continues to a later key) and a slider with an exact
+  field and Reset icon per enabled setting (**Scale keyframe value N**, etc.).
 - Numeric drafts keep full precision, apply on Enter/blur and restore on Escape; invalid
   values and occupied frames stay editable with inline errors, never clamped or merged.
 

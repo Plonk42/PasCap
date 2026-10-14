@@ -12,7 +12,7 @@ import {
 import { calculateLayout } from '../../src/shared/timeline.js';
 import { formatTimecode } from '../../src/shared/timing.js';
 import { SPATIAL_CONTROLS } from '../../src/web/spatial-editor.js';
-import { expandedInspectorPreferences } from './editor-helpers.js';
+import { currentKeyframeRow, expandedInspectorPreferences, transformKeyframes } from './editor-helpers.js';
 import { memoryProjects, type MemoryProjects } from './memory-projects.js';
 
 let memory: MemoryProjects;
@@ -110,9 +110,14 @@ async function seek(page: Page, frame: number): Promise<void> {
 }
 const transform = (document: ProjectDocument, index = 0) => document.layers[index]!.transform;
 const capture = (page: Page, label: string) => page.getByRole('button', { name: `Keyframe ${label}`, exact: true });
-const exact = (page: Page, label: string, stored = false) =>
-  page.getByRole('spinbutton', { name: `${stored ? 'Stored Transform' : 'Transform'} ${label}`, exact: true });
-const selected = (page: Page) => page.getByRole('combobox', { name: 'Selected Transform keyframe', exact: true });
+const exact = (page: Page, label: string, storedFrame?: number) =>
+  page.getByRole('spinbutton', {
+    name: storedFrame === undefined ? `Transform ${label}` : `${label} keyframe value ${storedFrame}`,
+    exact: true,
+  });
+async function expectSelected(page: Page, frame: number): Promise<void> {
+  await expect(currentKeyframeRow(transformKeyframes(page))).toHaveAttribute('data-keyframe-frame', String(frame));
+}
 
 test('Transform lives in Track and all eight exact fields edit only the track base with no implicit keys', async ({
   page,
@@ -256,13 +261,13 @@ test('per-setting Previous/Next visit only that setting’s keys; the timeline m
   // No clip-owned Transform lane remains inside clips.
   await expect(page.locator('[data-clip-keyframe="transform"]')).toHaveCount(0);
   await page.getByRole('button', { name: 'Next Scale keyframe', exact: true }).click();
-  await expect(selected(page)).toHaveValue('10');
+  await expectSelected(page, 10);
   await page.getByRole('button', { name: 'Next Scale keyframe', exact: true }).click();
   // Frame 40 enables only Rotation, so Scale skips straight to its next key.
-  await expect(selected(page)).toHaveValue('70');
+  await expectSelected(page, 70);
   await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(70);
   await page.getByRole('button', { name: 'Previous Rotation keyframe', exact: true }).click();
-  await expect(selected(page)).toHaveValue('40');
+  await expectSelected(page, 40);
   await expect(page.getByRole('button', { name: 'Next Rotation keyframe', exact: true })).toHaveAttribute(
     'aria-disabled',
     'true',
@@ -300,7 +305,7 @@ test('a Transform marker click opens Track → Transform, even from the Clip tab
   await expect(page.getByRole('button', { name: 'Transform section', exact: true })).toBeInViewport();
   await expect(page.getByRole('slider', { name: 'Transform Crop left', exact: true })).toBeInViewport();
   await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(40);
-  await expect(selected(page)).toHaveValue('40');
+  await expectSelected(page, 40);
   expect(await current(page)).toEqual(before);
 });
 
@@ -395,7 +400,7 @@ test('a default Transform keyframe returns every setting to neutral from its fra
   const remove = page.getByRole('button', { name: 'Remove default Transform keyframe', exact: true });
   await expect(remove).toHaveAttribute('aria-pressed', 'true');
   await expect(transformMarker(page, 60)).toHaveClass(/reset/);
-  await expect(page.getByRole('region', { name: 'Stored Transform keyframe', exact: true })).toContainText('Default');
+  await expect(transformKeyframes(page)).toContainText('Default');
   // Rotation keeps its saved base before the default keyframe; Scale, keyed earlier, eases into it.
   expect(evaluateSpatial(transform(added), 10)).toMatchObject({ rotation: 30, scale: 2 });
   expect(evaluateSpatial(transform(added), 35)).toMatchObject({ rotation: 30, scale: 1.5 });
@@ -447,11 +452,12 @@ test('stored keyframes keep frame input focus through move/Undo, reject collisio
     transform(document).base.scale = 1.5;
     transform(document).keyframes = [0, 100].map((frame) => key(frame, { ...NEUTRAL_SPATIAL_POSE }, 'linear'));
   });
-  const time = page.getByRole('spinbutton', { name: 'Transform keyframe timeline frame', exact: true });
+  const time = page.getByRole('spinbutton', { name: 'Transform keyframe frame 0', exact: true });
   await time.fill('40');
   await time.press('Enter');
-  await expect(time).toBeFocused();
-  await expect(time).toHaveValue('40');
+  const moved = page.getByRole('spinbutton', { name: 'Transform keyframe frame 40', exact: true });
+  await expect(moved).toBeFocused();
+  await expect(moved).toHaveValue('40');
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   await expect(time).toHaveValue('0');
   await time.fill('100');
@@ -460,9 +466,9 @@ test('stored keyframes keep frame input focus through move/Undo, reject collisio
   await expect(time).toHaveValue('100');
   expect(await current(page)).toEqual(before);
   await time.press('Escape');
-  await page.getByRole('combobox', { name: 'Transform keyframe easing', exact: true }).selectOption('ease-in');
+  await page.getByRole('combobox', { name: 'Transform keyframe easing 0', exact: true }).selectOption('ease-in');
   for (const control of SPATIAL_CONTROLS) {
-    const field = exact(page, control.label, true);
+    const field = exact(page, control.label, 0);
     const value = control.key === 'scale' ? 1.23456789 : 0.123456789;
     await field.fill(String(value));
     await field.press('Enter');
@@ -481,23 +487,19 @@ test('stored navigation reaches keyframes after the duration through the nearest
     transform(document).keyframes = [0, 41, 119, 300].map((frame) => key(frame, { ...NEUTRAL_SPATIAL_POSE }, 'linear'));
   });
   expect(calculateLayout(before).duration).toBe(120);
+  const list = transformKeyframes(page);
   for (const frame of [0, 41, 119, 300]) {
-    await selected(page).selectOption(String(frame));
-    await page.getByRole('button', { name: 'Preview selected Transform keyframe', exact: true }).click();
+    await list.getByRole('button', { name: `Go to Transform keyframe ${frame}`, exact: true }).click();
     const output = Math.min(frame, 119);
     await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(output);
-    await expect(page.getByRole('region', { name: 'Stored Transform keyframe', exact: true })).toContainText(
-      `Stored timeline frame ${frame} · playhead frame ${output}`,
-    );
+    await expectSelected(page, frame);
   }
-  await expect(page.getByRole('region', { name: 'Stored Transform keyframe', exact: true })).toContainText(
-    'outside duration',
-  );
+  await expect(list).toContainText('Stored timeline frame 300 · playhead frame 119 · outside duration');
   // Two stored keyframes preview the same last frame; the cursor still steps between them.
   await page.getByRole('button', { name: 'Previous Transform keyframe', exact: true }).click();
-  await expect(selected(page)).toHaveValue('119');
+  await expectSelected(page, 119);
   await page.getByRole('button', { name: 'Next Transform keyframe', exact: true }).click();
-  await expect(selected(page)).toHaveValue('300');
+  await expectSelected(page, 300);
   expect(await current(page)).toEqual(before);
   expect(memory.saves).toBe(0);
   await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
@@ -508,7 +510,7 @@ test('last-key deletion reveals the preserved base', async ({ page }) => {
     transform(document).base.scale = 1.456789;
     transform(document).keyframes = [key(0, { scale: 2 }, 'hold')];
   });
-  await page.getByRole('button', { name: 'Delete selected Transform keyframe', exact: true }).click();
+  await page.getByRole('button', { name: 'Delete Transform keyframe 0', exact: true }).click();
   await expect(exact(page, 'Scale')).toHaveValue('1.456789');
   expect(transform(await current(page)).base).toEqual(transform(before).base);
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
@@ -582,7 +584,7 @@ test('Transform controls fit the 270px Inspector at the default and minimum view
     await expect(divider).toHaveAttribute('aria-valuenow', '270');
     const editor = page.getByRole('region', { name: 'Track Transform editor', exact: true });
     await expect(editor).toBeVisible();
-    for (const stored of [false, true]) {
+    for (const stored of [undefined, 0]) {
       for (const control of SPATIAL_CONTROLS) {
         const field = exact(page, control.label, stored);
         await field.scrollIntoViewIfNeeded();

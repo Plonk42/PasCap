@@ -97,7 +97,7 @@ convert only at the UI boundary. Required
 Main capture diamonds are always visible; each retains adjacent per-setting **Previous/Next** buttons because not every
 setting is enabled at every shared keyframe. One keyframe-line Previous/Next pair (with the keyframe count) visits
 the union of Opacity, nine scalar colour and HDR keys.
-Enabled setting chips in stored Keyframes rows retain their per-channel arrows.
+Enabled setting chips in stored Colour keyframe rows retain their per-channel arrows.
 All main and stored per-channel arrows visit strictly earlier/later keyframes
 where that channel is nonnull (zero is enabled), using the shared central
 stored-keyframe cursor, including off-duration inspection.

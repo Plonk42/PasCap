@@ -346,16 +346,17 @@ toward its **next keyframe with that setting enabled**, holds before/after its o
 uses its unkeyed value only when it has no keyed settings on the track: the saved track
 value for Opacity and track colour for colour.
 
-The selected video track, including an empty one, has one **Track → Keyframes** section
-(list accessible name **Track keyframes**) with its directly visible shared keyframe list. Clip keeps
+The selected video track, including an empty one, has its directly visible shared keyframe list
+(accessible name **Track keyframes**) at the end of **Track → Colour**, under a small
+**Keyframes** heading. Clip keeps
 the playhead Speed controls; Track keeps Colour, Opacity and Transform. Track Transform
-keyframes are a separate project-frame list in **Track → Transform**, with their own markers
+keyframes are a separate project-frame list at the end of **Track → Transform**, with their own markers
 (see [spatial transforms](design/SPATIAL_TRANSFORMS.md)).
 Colour, Speed and Transform always show their capture diamonds while the section is expanded, Colour and Transform with adjacent per-setting **Previous/Next** buttons; there is no Animate toggle and no stored preference. Each expanded section has one keyframe line with the **number of keyframes**, one **Previous/Next** pair over the same set and **Reset**. The line is hidden while the section is collapsed; the title row and its help stay reachable. Rendering, retained keyframes and read-only constraints never depend on what is shown. Each diamond is clickable hollow/inactive or filled/active with
 `aria-pressed`; inactive is not HTML-disabled. Toggling affects only that channel;
 the first enabled setting creates/last removes the keyframe. Animated values are read-only
 between keyframes with that setting enabled until explicitly captured with the diamond; no slider
-creates implicit keyframes. Keyframes shows dependencies and an inner **Edit**
+creates implicit keyframes. The stored list shows dependencies and an inner **Edit**
 disclosure. All visible easing selectors read **Easing**, including track,
 Transform and clip speed, retaining contextual accessible names and
 interpolation. Moving its Timeline frame moves all enabled settings and their Easing
@@ -424,7 +425,7 @@ displayed project/source frame for main values or capture. Timeline speed marker
 still omit off-trim keyframes and retain the exclusive-OUT boundary marker.
 
 Per-channel native **Previous/Next** arrows remain beside each main Opacity and colour diamond, because not every setting is enabled at every shared keyframe.
-Enabled setting chips in stored Keyframes rows retain their arrows too.
+Enabled setting chips in stored Colour keyframe rows retain their arrows too.
 All these per-channel arrows are disabled without the relevant neighbour, an opened
 project, or during any document-preview draft. They seek
 strictly earlier/later keyframes where that channel is not `null` (zero included),

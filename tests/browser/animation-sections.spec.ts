@@ -5,7 +5,16 @@ import type { MediaAsset } from '../../src/shared/media.js';
 import { createClip, createLayer, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
 import { createSpatialSettings, evaluateSpatial, NEUTRAL_SPATIAL_POSE } from '../../src/shared/spatial.js';
 import { calculateLayout, type PlacedClip } from '../../src/shared/timeline.js';
-import { editLayerPoint, inspectorTab, layerKeyframes, settingTab, sharedPoint } from './editor-helpers.js';
+import {
+  currentKeyframeRow,
+  editLayerPoint,
+  editTransformKeyframe,
+  inspectorTab,
+  layerKeyframes,
+  settingTab,
+  sharedPoint,
+  transformKeyframes,
+} from './editor-helpers.js';
 import { memoryProjects, type MemoryProjects } from './memory-projects.js';
 
 type Section = 'Colour' | 'Speed' | 'Transform';
@@ -215,7 +224,7 @@ for (const viewport of [
       document.clips = [clip];
       memory = await memoryProjects(page, document);
       await page.addInitScript(() => {
-        for (const section of ['source', 'layer-opacity', 'speed', 'transform', 'colour', 'keyframes']) {
+        for (const section of ['source', 'layer-opacity', 'speed', 'transform', 'colour']) {
           const key = `pascap-section-${section}`;
           if (localStorage.getItem(key) === null) localStorage.setItem(key, 'open');
         }
@@ -576,48 +585,48 @@ for (const viewport of [
       await expect(speedSelect.locator('option:checked')).toContainText('source 80');
 
       await inspectorTab(page, 'Track');
-      const transformSelect = page.getByRole('combobox', { name: 'Selected Transform keyframe', exact: true });
-      await transformSelect.selectOption('110');
+      const transformList = transformKeyframes(page, TRACK);
+      await transformList.getByRole('button', { name: 'Go to Transform keyframe 110', exact: true }).click();
       await previewAt(page, document, 89);
       await page.getByRole('button', { name: 'Go to timecode', exact: true }).click();
       await timecode.fill('89');
       await timecode.press('Enter');
       // Following the playhead again, Next steps from frame 89, not from the stored 110.
       await navigation(page, 'Transform', 'Next').click();
-      await expect(transformSelect).toHaveValue('90');
+      await expect(currentKeyframeRow(transformList)).toHaveAttribute('data-keyframe-frame', '90');
       await previewAt(page, document, 89);
       await unchanged(page, document);
     });
 
-    test('Transform header and selector reach keyframes after the duration; each setting captures only itself', async ({
+    test('Transform header and list reach keyframes after the duration; each setting captures only itself', async ({
       page,
     }) => {
       const document = await current(page);
       await inspectorTab(page, 'Track');
-      const select = page.getByRole('combobox', { name: 'Selected Transform keyframe', exact: true });
-      await expect(select.locator('option')).toHaveCount(5);
-      await expect(select.locator('option[value="50"]')).not.toContainText('outside duration');
-      await expect(select.locator('option[value="90"]')).toContainText('outside duration');
-      await expect(select.locator('option[value="110"]')).toContainText('outside duration');
+      const list = transformKeyframes(page, TRACK);
+      const row = (frame: number) => list.locator(`.keyframe-row[data-keyframe-frame="${frame}"]`);
+      await expect(list.locator('.keyframe-row')).toHaveCount(5);
+      await expect(row(50)).not.toContainText('Outside duration');
+      await expect(row(90)).toContainText('Outside duration');
+      await expect(row(110)).toContainText('Outside duration');
       await expect(transformDiamonds(page)).toHaveCount(8);
       await expect(transformDiamond(page)).toHaveCount(1);
       for (const frame of [10, 50, 90, 110]) {
         await navigation(page, 'Transform', 'Next').click();
         const preview = Math.min(frame, 89);
         await previewAt(page, document, preview);
-        await expect(select).toHaveValue(String(frame));
-        await expect(page.getByRole('region', { name: 'Stored Transform keyframe', exact: true })).toContainText(
-          `Stored timeline frame ${frame} · playhead frame ${preview}`,
-        );
+        await expect(currentKeyframeRow(list)).toHaveAttribute('data-keyframe-frame', String(frame));
+        if (frame !== preview)
+          await expect(list).toContainText(`Stored timeline frame ${frame} · playhead frame ${preview}`);
       }
       await expect(navigation(page, 'Transform', 'Next')).toBeDisabled();
       for (const frame of [90, 50, 10, 0]) {
         await navigation(page, 'Transform', 'Previous').click();
         await previewAt(page, document, Math.min(frame, 89));
-        await expect(select).toHaveValue(String(frame));
+        await expect(currentKeyframeRow(list)).toHaveAttribute('data-keyframe-frame', String(frame));
       }
       await expect(navigation(page, 'Transform', 'Previous')).toBeDisabled();
-      await select.selectOption('110');
+      await list.getByRole('button', { name: 'Go to Transform keyframe 110', exact: true }).click();
       await previewAt(page, document, 89);
       await expect(page.getByRole('spinbutton', { name: 'Transform Scale', exact: true })).toBeDisabled();
       await expect(transformDiamond(page)).toHaveAttribute('aria-pressed', 'false');
@@ -747,7 +756,8 @@ for (const viewport of [
       await key.press('Space');
       await previewAt(page, document, 50);
       await inspectorTab(page, 'Track');
-      const field = page.getByRole('spinbutton', { name: 'Transform keyframe timeline frame', exact: true });
+      await editTransformKeyframe(page, 50, TRACK);
+      const field = page.getByRole('spinbutton', { name: 'Transform keyframe frame 50', exact: true });
       const stored = await field.inputValue();
       await field.focus();
       await field.press('Control+a');
@@ -766,7 +776,8 @@ for (const viewport of [
       });
       await editLayerPoint(page, TRACK, 0);
       await easing(page, 'Track keyframe easing 0');
-      await easing(page, 'Transform keyframe easing');
+      await editTransformKeyframe(page, 0, TRACK);
+      await easing(page, 'Transform keyframe easing 0');
       await inspectorTab(page, 'Clip');
       await easing(page, 'Clip speed keyframe easing');
       const selector = page.getByRole('combobox', { name: 'Selected clip speed keyframe', exact: true });

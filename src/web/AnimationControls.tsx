@@ -11,6 +11,8 @@ export function KeyframeSteps({
   disabled,
   previous,
   next,
+  previousTitle,
+  nextTitle,
   onPrevious,
   onNext,
 }: Readonly<{
@@ -18,6 +20,8 @@ export function KeyframeSteps({
   disabled: boolean;
   previous: boolean;
   next: boolean;
+  previousTitle?: string;
+  nextTitle?: string;
   onPrevious: () => void;
   onNext: () => void;
 }>) {
@@ -27,6 +31,7 @@ export function KeyframeSteps({
         type="button"
         className="icon-button"
         aria-label={`Previous ${label} keyframe`}
+        title={previousTitle}
         disabled={disabled || !previous}
         onClick={onPrevious}
       >
@@ -36,6 +41,7 @@ export function KeyframeSteps({
         type="button"
         className="icon-button"
         aria-label={`Next ${label} keyframe`}
+        title={nextTitle}
         disabled={disabled || !next}
         onClick={onNext}
       >
@@ -89,6 +95,8 @@ export function TrackAnimationControls({
       disabled={disabled || navigation.disabled}
       previous={!!previous}
       next={!!next}
+      previousTitle={previous ? keySeekHint(previous.frame, navigation.duration) : `No previous ${label} keyframe`}
+      nextTitle={next ? keySeekHint(next.frame, navigation.duration) : `No next ${label} keyframe`}
       onPrevious={() => {
         if (previous) navigation.onSeekKeyframe(layer.id, previous.frame);
       }}
