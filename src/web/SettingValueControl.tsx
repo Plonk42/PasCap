@@ -3,7 +3,10 @@ import { COLOUR_CONTROLS, NEUTRAL_COLOUR } from '../shared/colour.js';
 import { KEYFRAME_SETTINGS, type KeyframeSetting } from '../shared/keyframes.js';
 import { Icon } from './icons.js';
 import type { NumberFieldProps } from './NumberField.js';
-import { ValueControl, type ValueControlProps } from './ValueControl.js';
+import { ValueControl, type SliderTone, type ValueControlProps } from './ValueControl.js';
+
+const isToned = (setting: KeyframeSetting): setting is SliderTone =>
+  setting === 'temperature' || setting === 'tint' || setting === 'saturation';
 
 interface RangeSettingProps {
   setting: KeyframeSetting;
@@ -151,6 +154,7 @@ export function RangeSettingControl({
         resetKey={fieldContext}
         {...(fieldValidation === undefined ? {} : { validate: (next: number) => fieldValidation(next / scale) })}
         unit={setting === 'opacity' ? '%' : (colour?.unit ?? '')}
+        {...(isToned(setting) ? { tone: setting } : {})}
         onCommit={(next) => onCommit(next / scale)}
         {...(onDraft === undefined ? {} : { onDraft: (next) => onDraft(next === null ? null : next / scale) })}
       />

@@ -24,7 +24,7 @@
 
 .product-workspace .value-control > input[type='range'][aria-label]::-webkit-slider-runnable-track {
   height: 3px;
-  background: #496852;
+  background: var(--value-track, #496852);
   border-radius: 3px;
 }
 
@@ -35,11 +35,12 @@
   margin-top: -3.5px;
   background: var(--accent);
   border-radius: 50%;
+  box-shadow: var(--value-thumb-ring, none);
 }
 
 .product-workspace .value-control > input[type='range'][aria-label]::-moz-range-track {
   height: 3px;
-  background: #496852;
+  background: var(--value-track, #496852);
   border-radius: 3px;
 }
 
@@ -49,6 +50,24 @@
   background: var(--accent);
   border-radius: 50%;
   border: 0;
+  box-shadow: var(--value-thumb-ring, none);
+}
+
+/* Coloured tracks show which way a setting moves the image; Tint's magenta end is its positive side. */
+.value-control[data-tone] {
+  --value-thumb-ring: 0 0 0 1.5px #101812;
+}
+
+.value-control[data-tone='temperature'] {
+  --value-track: linear-gradient(90deg, #4a86d8, #8e959a 50%, #e0b440);
+}
+
+.value-control[data-tone='tint'] {
+  --value-track: linear-gradient(90deg, #4caf5a, #8e959a 50%, #c75cc2);
+}
+
+.value-control[data-tone='saturation'] {
+  --value-track: linear-gradient(90deg, #8e959a, #bf6f62 50%, #f2402a);
 }
 
 .value-control > input[type='range']:focus-visible {
@@ -119,6 +138,45 @@
 
 .setting-locked-cue.transform {
   color: #c4e9ff;
+}
+
+/* Dense setting rows: the name line is only as tall as its text. Keyframe buttons keep their
+   pointer targets and overhang it by up to 8 px, into spacing at least that large. */
+.product-workspace .inspector-panel .colour-control:has(> .value-control) {
+  position: relative;
+  display: grid;
+  gap: 0;
+}
+
+.product-workspace .inspector-panel .colour-control > span:first-child {
+  min-height: 16px;
+  margin-bottom: 4px;
+  line-height: 16px;
+}
+
+.product-workspace .inspector-panel .colour-control > span:first-child:has(> .colour-control-actions) {
+  margin-bottom: 9px;
+}
+
+.product-workspace .inspector-panel .colour-control > span:first-child > .colour-control-actions {
+  margin-block: -8px;
+}
+
+.product-workspace .inspector-panel .colour-control .value-control .number-field-input {
+  padding-block: 4px;
+}
+
+/* A locked row's cue sits on its dimmed, inert slider instead of adding a line. */
+.product-workspace .inspector-panel .colour-control > span:first-child > .setting-locked-cue {
+  position: absolute;
+  top: 30px;
+  left: calc((100% - 92px) / 2);
+  max-width: calc(100% - 92px);
+  padding: 0 5px;
+  transform: translateX(-50%);
+  border-radius: 3px;
+  background: var(--surface);
+  pointer-events: none;
 }
 
 /* The reset icon sits in the free space after a setting's name; negative margins keep row height unchanged. */
