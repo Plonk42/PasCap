@@ -377,8 +377,10 @@ export function KeyframeControls({
               <span aria-hidden="true">◇</span>Not animated · click to capture
             </span>
             <span>
-              <Icon name="curve" size={14} />
-              Track curve · capture before editing
+              <span aria-hidden="true" className="animation-legend-animated">
+                ◇
+              </span>{' '}
+              Animated (dashed) · capture before editing
             </span>
             <span>
               <span aria-hidden="true">◆</span>Keyframe at playhead · editable

@@ -160,10 +160,9 @@ function settingState(layer: VideoLayer, setting: KeyframeSetting, frame: number
   return { keyed, active, baseAvailable, editable: validFrame && (keyed ? active : baseAvailable) };
 }
 
-function SettingScope({ keyed, scope }: Readonly<{ keyed: boolean; scope: string }>) {
+function SettingScope({ scope }: Readonly<{ scope: string }>) {
   return (
     <small className="layer-setting-kind" title={scope}>
-      {keyed && <Icon name="curve" size={12} />}
       <span className="declutter-sr-only">{scope}</span>
     </small>
   );
@@ -203,7 +202,7 @@ function OpacityControl({
         onCommit={commit}
         onDraft={(value) => livePreview(value === null ? null : command(value))}
         hint={hint}
-        scope={<SettingScope keyed={state.keyed} scope={scope} />}
+        scope={<SettingScope scope={scope} />}
         locked={state.keyed && !state.active && <LockedCue />}
         exact={{ resetKey: `${resetKey}:opacity:${state.keyed ? 'key' : 'layer'}` }}
         actions={
@@ -253,7 +252,7 @@ function ColourControl({
         onCommit={commit}
         onDraft={(value) => livePreview(value === null ? null : command(value))}
         hint={hint}
-        scope={<SettingScope keyed={state.keyed} scope={scope} />}
+        scope={<SettingScope scope={scope} />}
         locked={state.keyed && !state.active && <LockedCue />}
         exact={{ resetKey: `${resetKey}:${control.key}:${state.keyed ? 'key' : 'layer'}` }}
         actions={
