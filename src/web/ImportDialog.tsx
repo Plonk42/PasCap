@@ -171,6 +171,7 @@ export function ImportDialog({ initialKind, busy, error, actions, onClose }: Rea
   const pending = useRef(false);
   const mounted = useRef(false);
   const anchor = useRef<string | null>(null);
+  const shiftHeld = useRef(false);
   const restored = useRef(false);
   const root = roots.find((item) => item.id === rootId);
   const blocked = busy || importing;
@@ -178,8 +179,21 @@ export function ImportDialog({ initialKind, busy, error, actions, onClose }: Rea
 
   useEffect(() => {
     mounted.current = true;
+    // A click on a row's label reaches its checkbox as a synthetic click without Shift.
+    const track = (event: KeyboardEvent): void => {
+      shiftHeld.current = event.shiftKey;
+    };
+    const release = (): void => {
+      shiftHeld.current = false;
+    };
+    globalThis.addEventListener('keydown', track);
+    globalThis.addEventListener('keyup', track);
+    globalThis.addEventListener('blur', release);
     return () => {
       mounted.current = false;
+      globalThis.removeEventListener('keydown', track);
+      globalThis.removeEventListener('keyup', track);
+      globalThis.removeEventListener('blur', release);
     };
   }, []);
   useEffect(() => {
@@ -560,7 +574,10 @@ export function ImportDialog({ initialKind, busy, error, actions, onClose }: Rea
                         checked={selected.has(entry.path)}
                         disabled={blocked}
                         onChange={(event) =>
-                          toggleFile(entry as FileEntry, (event.nativeEvent as MouseEvent).shiftKey === true)
+                          toggleFile(
+                            entry as FileEntry,
+                            shiftHeld.current || (event.nativeEvent as MouseEvent).shiftKey === true,
+                          )
                         }
                       />
                       <Icon name={entry.kind === 'video' ? 'video' : 'music'} size={16} />
