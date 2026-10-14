@@ -18,6 +18,7 @@ import {
   frameSchema,
   idSchema,
   layerSchema,
+  MAX_BOOKMARKS,
   projectSchema,
   transitionSchema,
   type MusicTrack,
@@ -66,7 +67,10 @@ export type EditCommand =
   | { type: 'layer-order'; layerIds: string[] }
   | { type: 'place'; clipId: string; layerId: string; start: number; index: number }
   | { type: 'transition'; transition: Transition }
-  | { type: 'fades'; layerId: string; opening: number; closing: number };
+  | { type: 'fades'; layerId: string; opening: number; closing: number }
+  | { type: 'bookmark-add'; frame: number }
+  | { type: 'bookmark-move'; frame: number; nextFrame: number }
+  | { type: 'bookmark-remove'; frame: number };
 
 function repairBoundaries(clips: VideoClip[], previous: Transition[]): Transition[] {
   return clips.slice(0, -1).map((clip, index) => {
@@ -419,6 +423,29 @@ function normalizePlacements(next: ProjectDocument, command: EditCommand): void 
   }
 }
 
+type BookmarkCommand = Extract<EditCommand, { type: 'bookmark-add' | 'bookmark-move' | 'bookmark-remove' }>;
+/** Bookmarks never merge: an occupied frame rejects the whole edit. */
+function editBookmark(next: ProjectDocument, command: BookmarkCommand): void {
+  frameSchema.parse(command.frame);
+  const exists = next.bookmarks.includes(command.frame);
+  if (command.type === 'bookmark-add') {
+    if (exists) throw new Error('A bookmark already exists at this frame.');
+    if (next.bookmarks.length >= MAX_BOOKMARKS)
+      throw new Error(`A project holds at most ${MAX_BOOKMARKS.toLocaleString('en')} bookmarks.`);
+    next.bookmarks = [...next.bookmarks, command.frame].sort((left, right) => left - right);
+    return;
+  }
+  if (!exists) throw new Error('Bookmark no longer exists.');
+  const others = next.bookmarks.filter((frame) => frame !== command.frame);
+  if (command.type === 'bookmark-remove') {
+    next.bookmarks = others;
+    return;
+  }
+  frameSchema.parse(command.nextFrame);
+  if (others.includes(command.nextFrame)) throw new Error('A bookmark already exists at the destination frame.');
+  next.bookmarks = [...others, command.nextFrame].sort((left, right) => left - right);
+}
+
 export function applyCommand(document: ProjectDocument, command: EditCommand): ProjectDocument {
   const next = projectSchema.parse(document);
   // Keep the snapshot attached to the untouched committed document. In-place
@@ -503,6 +530,12 @@ export function applyCommand(document: ProjectDocument, command: EditCommand): P
       layer.closingFade = command.closing;
       break;
     }
+    case 'bookmark-add':
+    case 'bookmark-move':
+    case 'bookmark-remove':
+      editBookmark(next, command);
+      // Editing aids only: never normalize or rewrite stored timing.
+      return projectSchema.parse(next);
     default:
       throw new Error('Unknown edit command.');
   }

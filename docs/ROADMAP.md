@@ -10,7 +10,7 @@ deadline; hardware/real-media work requires explicit owner consent.
 
 ## Current baseline
 
-The local schema-16 contract covers no-copy footage import, projects, source
+The local schema-17 contract covers no-copy footage import, projects, source
 clips, multi-track timelines, colour/opacity track keyframes, music and verified
 720p/4K export, with clip-only constant speed or precise source-frame speed curves.
 Clip-owned crop/scale/translation/rotation and per-setting source-frame animation
@@ -36,12 +36,12 @@ warms; positive Tint adds magenta. The shared normalized linear-gain formula run
 before Exposure and intentionally colours greys; neutral-white luminance is
 preserved before clipping only. Static track
 [HSL ranges and master/RGB curves](design/HSL_AND_CURVES.md)
-follow scalar grading without adding animation channels. v1–v15 projects
+follow scalar grading without adding animation channels. v1–v16 projects
 and receipt snapshots are preserved/incompatible and require recreation, without
 migration, defaults, null/old-format readers or automatic deletion;
-registry/proxy/current PCM formats remain unchanged. Schema 16 requires a 0–8
+registry/proxy/current PCM formats remain unchanged. Schema 17 requires a 0–8
 identified music track array (`[]` without music); version-1 export receipts
-require strict v16 snapshots and captured audio-source/instance-plan arrays.
+require strict v17 snapshots and captured audio-source/instance-plan arrays.
 Music can extend duration to maximum video/music OUT: closing video fades finish
 at clip OUT, then black while music continues/fades at its own end. One mixed
 output clock and final-only linear-sum clamp retain bounded resources; see

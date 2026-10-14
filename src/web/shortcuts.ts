@@ -14,7 +14,8 @@ export type EditorShortcut =
         | 'trim-in'
         | 'trim-out'
         | 'remove-range'
-        | 'clear-range';
+        | 'clear-range'
+        | 'bookmark';
     }
   | { type: 'step' | 'nudge'; delta: number };
 type ShortcutEvent = Pick<KeyboardEvent, 'key' | 'code' | 'ctrlKey' | 'metaKey' | 'altKey' | 'shiftKey' | 'repeat'>;
@@ -46,6 +47,7 @@ export function editorShortcut(event: ShortcutEvent, nativeSpace = false): Edito
     s: 'split',
     q: 'trim-in',
     w: 'trim-out',
+    m: 'bookmark',
     escape: 'clear-range',
     f: 'fit',
     home: 'start',

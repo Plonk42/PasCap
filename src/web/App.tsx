@@ -631,6 +631,14 @@ export function App() {
   const remove = useCallback(() => {
     if (selection.current && !drafting.current) edit({ type: 'delete', clipId: selection.current });
   }, [edit]);
+  const addBookmark = useCallback(() => {
+    if (!current.current || drafting.current) return;
+    if (!calculateLayout(current.current).duration) {
+      setError('Add footage or music before adding a bookmark.');
+      return;
+    }
+    edit({ type: 'bookmark-add', frame: engine.current?.diagnostics().frame ?? 0 });
+  }, [edit]);
   const duplicate = useCallback(() => {
     if (!selection.current || !current.current || drafting.current) return;
     const newClipId = crypto.randomUUID();
@@ -1015,6 +1023,9 @@ export function App() {
         case 'clear-range':
           setTimeRange(null);
           break;
+        case 'bookmark':
+          addBookmark();
+          break;
         case 'duplicate':
           duplicate();
           break;
@@ -1044,7 +1055,7 @@ export function App() {
       window.removeEventListener('beforeunload', beforeUnload);
       window.removeEventListener('keydown', keyboard);
     };
-  }, [remove, seek, split, duplicate, nudge, togglePlayback, undoRedo, quickTrim, cutRange]);
+  }, [remove, seek, split, duplicate, nudge, togglePlayback, undoRedo, quickTrim, cutRange, addBookmark]);
 
   const act = async <T,>(
     action: () => Promise<T>,

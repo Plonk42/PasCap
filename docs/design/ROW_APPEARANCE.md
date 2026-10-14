@@ -1,4 +1,4 @@
-# Owner-approved video track-only Colour and Opacity · schema 16
+# Owner-approved video track-only Colour and Opacity · schema 17
 
 Required Colour includes nine graded scalar settings, including Temperature and Tint,
 the HDR look (applied before grading with the clip detail filters; see
@@ -24,8 +24,8 @@ intentionally colour greys; normalized linear gains precede Exposure, preserving
 neutral-white linear luminance before clipping only, not arbitrary/final images.
 Other scalar bounds and neutral values retain the existing SDR contract.
 No optional legacy field, additive parameter merge, migration or default-on-load exists.
-Schema 16 rejects versions 1–15 without rewriting or deleting their documents.
-Receipt format remains 1 with strict schema-16 snapshots; registry, proxies and
+Schema 17 rejects versions 1–16 without rewriting or deleting their documents.
+Receipt format remains 1 with strict schema-17 snapshots; registry, proxies and
 PCM formats are unchanged. Recreate incompatible projects deliberately.
 
 The nine shared scalar colour channels and HDR override **video track colour**, independently, in
