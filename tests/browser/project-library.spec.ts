@@ -225,8 +225,8 @@ test('a failed or stale deletion keeps the confirmation and current project with
   await expect(page.getByRole('button', { name: `Delete ${initialTitle}`, exact: true })).toBeFocused();
 });
 
-for (const oldVersion of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16])
-  test(`unavailable schema-${oldVersion} projects can be explicitly deleted without being opened or migrated to schema 17`, async ({
+for (const oldVersion of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17])
+  test(`unavailable schema-${oldVersion} projects can be explicitly deleted without being opened or migrated to schema 18`, async ({
     page,
   }) => {
     let deleted = false;
@@ -249,7 +249,7 @@ for (const oldVersion of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
                   duration: 0,
                   updatedAt: '2026-10-03T10:00:00Z',
                   compatible: false,
-                  error: `Unsupported project schema version ${oldVersion}; this build requires version 17.`,
+                  error: `Unsupported project schema version ${oldVersion}; this build requires version 18.`,
                 },
               ],
         },
@@ -268,7 +268,7 @@ for (const oldVersion of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
     await page.getByRole('button', { name: 'Open projects', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Open Old dual-opacity project', exact: true })).toBeDisabled();
     await expect(
-      page.getByText(`Unsupported project schema version ${oldVersion}; this build requires version 17.`, {
+      page.getByText(`Unsupported project schema version ${oldVersion}; this build requires version 18.`, {
         exact: true,
       }),
     ).toBeVisible();

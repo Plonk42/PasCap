@@ -13,8 +13,8 @@ inherit the shared media registry. Importing the same original into another proj
 deliberately adds it to that project's bin and reuses eligible verified proxies.
 Removing a clip or music track does not remove the imported recording.
 
-Projects use **strict format v17**, with complete required video track colour and clip spatial base/per-setting
-source-frame keyframes, a required `bookmarks` array of project frames (`[]` on new projects), a required `music` array of 0–8 independent
+Projects use **strict format v18**, with complete required video track colour and track
+Transform (base plus per-setting project-frame keyframes), a required `bookmarks` array of project frames (`[]` on new projects), a required `music` array of 0–8 independent
 music tracks and unique required IDs (`[]` without music), every video track's Ripple, transitions and
 opening/closing fades and required numeric `opacity` in 0–1 (1 on new tracks),
 with eleven nullable animation channels, in control order: `opacity`,
@@ -24,10 +24,10 @@ Video track Colour requires Temperature/Tint/HDR bases and static
 HSL/curves; missing fields and saved clip colour/correction are invalid.
 Track `opacity` is the sole saved Opacity value; saved `clip.opacity` and old
 `clipOpacity`/`layerOpacity` keyframe channels are invalid, not ignored or defaulted.
-v1–v16 project documents and receipt snapshots
+v1–v17 project documents and receipt snapshots
 stay on disk but are incompatible: there is no migration, compatibility default,
 null fallback, old-format reader, automatic repair or deletion. Export receipts
-remain version 1 with a strict v17 snapshot and required audio-source/instance-plan arrays.
+remain version 1 with a strict v18 snapshot and required audio-source/instance-plan arrays.
 Create a new project and import its media deliberately. Finished videos remain
 untouched. **Delete project** requires confirmation and deletes only the saved
 project document, not originals, the shared registry/proxy cache or exports/receipts.
@@ -215,9 +215,9 @@ frozen last image. Details: [TIMELINE_EDITING.md](TIMELINE_EDITING.md).
 
 ## Colour, speed and shared video track keyframes
 
-Each clip has independent constant or custom-curve speed and spatial settings; speed
+Each clip has independent constant or custom-curve speed; speed
 is clip-only, never a track setting.
-All static and keyed Colour belongs to its video track, not the clip.
+All static and keyed Colour and Transform belong to the video track, not the clip.
 **Opacity** is one setting for the selected **whole video track**, not a clip.
 Find its single native slider/exact numeric field in **Track → Colour**, with its
 capture diamond and adjacent per-setting Previous/Next buttons, alongside Temperature, Tint, Exposure,
@@ -255,10 +255,10 @@ keyframe line's pair is enough. Each section's keyframe line counts the keyframe
 colour or HDR keyframe. Speed visits **all retained custom
 speed source keyframes of the selected clip**, including off-trim keyframes and the
 original exclusive OUT, previewing the nearest mapped image.
-Transform likewise visits all retained source keyframes. Speed and
-Transform each keep a clip-local stored-source selection separate from track
+Speed keeps a clip-local stored-source selection separate from track
 inspection, so several stored keyframes can be visited even when they preview
-the same first/last image. Enabled setting chips in stored Keyframes rows retain
+the same first/last image. Transform visits all its track keyframes, including those
+after the duration, with its own track-local selection. Enabled setting chips in stored Keyframes rows retain
 their per-channel arrows too. All main and stored per-channel arrows visit only
 strictly earlier/later keyframes where that setting is nonnull, including zero,
 using the shared central off-duration inspection cursor. Main capture always
@@ -364,63 +364,65 @@ Speed keyframes belong only to the selected clip, not to every clip in its video
 
 Details: [SPEED_AND_AUDIO.md](SPEED_AND_AUDIO.md#precise-clip-curve-editor).
 
-### Crop, scale, translate and rotate a clip
+### Crop, scale, translate and rotate a track
 
-Select a clip and open **Clip → Transform** (collapsed initially). Its eight
+Select a video track (or one of its clips) and open **Track → Transform** (collapsed
+initially, after Colour curves). Transform works exactly like Colour: it belongs to the
+whole track, applies to every clip on it (both sources of a dissolve too) and works on
+an empty track. Its eight
 controls are **Crop left / Crop right / Crop top / Crop bottom / Scale / Translate X /
 Translate Y / Rotation °**, each with a native slider and exact number field.
 Scale preserves aspect and accepts **0.1–8**. Translation accepts **−2–2** as
 fractions of the whole output width/height, not source pixels. Rotation is
-clockwise, **−180°–180°**, around the original image centre. Crop fractions each
+clockwise, **−180°–180°**, around each image's centre. Crop fractions each
 stay within 0–1; a crop of 1, or opposite crops that meet or cross, display nothing. Cropping never refits or
 recentres the retained image. Uncovered pixels from nonneutral transforms reveal
 lower tracks; exact neutral poses retain the old opaque black letterbox.
 
-- Without keyframes, values edit this clip's saved base. Click's own blue triangle (for example **Keyframe Scale**) to capture that
-  setting's evaluated value at the real displayed integer source frame; other settings
+- Without keyframes, values edit the track's saved base. Click a setting's own blue triangle (for example **Keyframe Scale**) to capture that
+  setting's evaluated value at the playhead; other settings
   stay unkeyed, or join the same keyframe with their own triangle. A keyed setting
-  is read-only at a source frame without its keyframe until captured; sliders
-  never add keyframes, and unkeyed settings stay editable. Capture requires the real
-  playhead inside the selected clip. Each setting also has **Previous/Next** buttons
-  that visit only its own keyframes.
+  is read-only at a frame without its keyframe until captured; sliders
+  never add keyframes, and unkeyed settings stay editable. Each setting also has
+  **Previous/Next** buttons that visit only its own keyframes. Dragging a slider
+  previews the result live; release commits one Undo step.
 - Each setting interpolates between its own keyframes, using its own **Easing** at the
   keyframe on its left; a keyed setting overrides its base, holding before the first/after
   the last keyframe. Rotation interpolates
   numerically, not by shortest arc: +170° to −170° passes through 0°.
-- **Selected Transform keyframe**, the header's **Previous/Next** pair and
-  **Preview stored keyframe** reach all retained keyframes, including outside the
-  trim and at the original exclusive OUT. The clip-local stored-source selection
-  is separate from track inspection and can advance even when previews coincide. The stored
-  source time is shown separately from the actual preview's source frame; preview
-  uses the closest mapped image rather than an unavailable or invented frame.
-  Stored **Source frame**, **Easing** and the fields of its enabled settings edit that selected keyframe; time and
+- **Add default Transform keyframe** in the keyframe line adds a default keyframe at the
+  playhead (neutral pose, Hold), or removes the one there, exactly like the Colour default
+  keyframe: it returns the pose to neutral from its frame without changing earlier frames.
+- **Selected Transform keyframe**, the keyframe line's **Previous/Next** pair and
+  **Preview stored keyframe** reach all keyframes, including those after the duration.
+  The stored timeline frame is shown separately from the playhead; preview uses the
+  nearest available frame. Stored **Timeline frame**, **Easing** and the fields of its enabled settings edit that selected keyframe; time and
   value edits do not seek automatically. Easing is disabled when no enabled setting continues to a later keyframe.
   **Easing** sets every setting of the keyframe at once; when they should differ, choose
   **Per setting** and pick each one. Differing settings read **Mixed** and keep their
   per-setting choices visible. A setting added to a keyframe takes the Easing its other
   settings share, or Linear. The same applies to stored track keyframes in **Keyframes → Edit**.
 - Numeric Enter/blur applies exact values; Escape restores. Collisions,
-  fractional/out-of-original frames and out-of-bounds values stay
-  editable with errors, never silently clamp or overwrite. Slider movement is
-  local only; valid release changes the image in one Undo. Escape, cancellation,
-  capture loss or window blur cancels it without saving; keyboard adjustments
+  fractional frames and out-of-bounds values stay
+  editable with errors, never silently clamp or overwrite. Escape, cancellation,
+  capture loss or window blur cancels a slider drag without saving; keyboard adjustments
   are individual validated edits.
 - The trash action removes only the selected keyframe. Removing a setting's last
-  keyframe reveals its unchanged base. **Reset transform** deliberately restores the
-  neutral base and clears all spatial keyframes in one Undo.
+  keyframe reveals its unchanged base. **Reset transform** works like Colour's Reset:
+  without keyframes it restores the neutral base; with keyframes it resets the enabled
+  settings of the keyframe at the playhead, in one Undo step.
 
-Up to **256** keyframes belong to each clip, separately from the video
-track's keyframes. Trims/restoration, moves and Ripple retain original-source anchors;
-splits, cuts and duplicates retain independent deep copies, including off-trim
-keyframes. Retiming drives geometry continuously even while a recorded image is held;
-there is no optical flow. Transform edits do not change timing, track Opacity,
+Up to **256** Transform keyframes belong to each video track, separately from its
+Colour keyframes, at absolute timeline frames. Trims, moves, splits, cuts, duplicates
+and Ripple never copy or shift them; a clip moved to another track adopts that track's
+Transform. Transform edits do not change timing, Opacity,
 music, originals or proxies. Native Export supports these transforms through the
 composited path; the diagnostic two-clip reference does not.
 Details: [spatial transforms](design/SPATIAL_TRANSFORMS.md).
 
 ### Sharpen, clarity and denoise a clip
 
-Select a clip and open **Clip → Detail** (collapsed initially, after Transform).
+Select a clip and open **Clip → Detail** (collapsed initially, after Speed).
 **Sharpen** (0–1) crisps fine edges, **Clarity** (−1–1) adds midtone local contrast
 or, below zero, softens it, and **Denoise** (0–1) smooths grain while keeping strong
 edges. Each has a native slider and an exact field; 0 leaves the clip untouched.
@@ -435,17 +437,22 @@ hides them together with Colour. Any detail setting renders through the composit
 exporter and makes it slower, especially in 4K. Details:
 [detail filters](design/DETAIL_FILTERS.md).
 
-### Seek clip source keyframes from the timeline
+### Seek keyframes from the timeline
 
-Inside each clip rectangle, boxed blue **▼** Transform and boxed salmon **◆**
-custom-speed lanes distinguish source keyframes from shared project-time track markers.
+Inside each clip rectangle, a boxed salmon **◆** lane shows custom-speed source
+keyframes, distinct from shared project-time track markers.
 Positions follow authoritative retiming. Off-trim keyframes are omitted. An
 exclusive-OUT boundary marker seeks the final available frame. Click or focus a
-marker and press Enter/Space to select its clip, seek the nearest mapped image and open Clip → Transform (Clip → Speed for a ◆ key).
-Drag a marker, or press ←/→ on it (Shift for ten), to move that key to another original source frame; its easing (and a Transform key's enabled settings) stay, a valid release is one Undo step, and Escape or an occupied frame restores it. Moving a ◆ speed key retimes its clip, so the clip's duration can change; timing conflicts reject the move. Clicking edits nothing, and keyboard
-events do not also run timeline shortcuts. Unlike the markers, stored Speed and
-Transform navigation reaches all retained off-trim/original-OUT keyframes,
+marker and press Enter/Space to select its clip, seek the nearest mapped image and open Clip → Speed.
+Drag a marker, or press ←/→ on it (Shift for ten), to move that key to another original source frame; its easing stays, a valid release is one Undo step, and Escape or an occupied frame restores it. Moving a speed key retimes its clip, so the clip's duration can change; timing conflicts reject the move. Clicking edits nothing, and keyboard
+events do not also run timeline shortcuts. Unlike the markers, stored Speed
+navigation reaches all retained off-trim/original-OUT keyframes,
 separately from the real frame used for capture.
+
+Track Transform keyframes are boxed blue **▼** markers at the top of their track row
+(a default keyframe shows the default-keyframe icon), at their project frames like
+Colour markers. Click or Enter selects the track, seeks and opens **Track → Transform**;
+drag or ←/→ (Shift for ten) moves them one project frame, one Undo step per release.
 
 ### Opt in to shared video track animation
 
@@ -454,7 +461,7 @@ belongs to the selected **whole video track**, even an empty one, not to a clip.
 It contains the keyframe count, enabled-setting chips, whole-track Previous/Next navigation
 and a directly visible shared keyframe list. The toolbar's **Animation help** combines
 animation and keyframe-timing guidance. **Clip** keeps source/clip settings and playhead
-Speed/Transform controls; **Track → Colour** keeps Opacity and Colour controls.
+Speed controls; **Track → Colour** keeps Opacity and Colour controls and **Track → Transform** the pose.
 All shared track keyframes use absolute project frames and affect every clip on that track.
 Eleven settings can be keyed independently:
 Opacity (`opacity`), the nine scalar colour controls, including
@@ -615,8 +622,8 @@ resources and pending acceptance; this guide does not claim those tests passed.
 
 ## Workspace and keyboard
 
-Use **Clip** for the selected clip's **Speed**, **Transform**, **Detail**, **Range** and **Placement**;
-**Track** for everything the whole video track owns (Colour and Opacity, keyframes,
+Use **Clip** for the selected clip's **Speed**, **Detail**, **Range** and **Placement**;
+**Track** for everything the whole video track owns (Colour and Opacity, Transform, keyframes,
 transitions and fades); and **Audio** for music. Each tab names its scope at the top.
 Selecting a clip or a populated/empty video track preserves the chosen tab and updates
 its track context safely. Switching tabs hides rather than unmounts content, retaining
@@ -631,8 +638,8 @@ and tooltips. See the [editor control catalogue](design/EDITOR_CONTROLS.md#vocab
 control conventions and vocabulary.
 
 **Expand all / Collapse all** is an icon button on the Inspector tab bar for the
-visible tab: Clip's **Speed**, **Transform**, **Detail**, **Range** and **Placement**; Track's
-**Colour**, **Keyframes**, **Transitions** and **Fades**; Audio's **Music**. Other
+visible tab: Clip's **Speed**, **Detail**, **Range** and **Placement**; Track's
+**Colour**, **HSL ranges**, **Colour curves**, **Transform**, **Keyframes**, **Transitions** and **Fades**; Audio's **Music**. Other
 tabs, nested disclosures and help remain unchanged.
 
 The header directly exposes keyboard help. **Workspace options** holds the
@@ -645,7 +652,7 @@ Enter/blur, Escape restores, and invalid text remains editable. Numeric values r
 full entered precision, independent of slider steps, without clamping or rounding.
 Colour/Opacity/Transform, playback rates and gain use a native slider with one adjacent exact
 numeric field in both main and stored controls, not read-only outputs or number-only
-layouts. Dragging a Colour, Opacity or HSL slider (main or stored) previews the draft value in the image, coalesced to the display rate, without any document, history, autosave or Inspector change, and without restarting music. Release commits one validated edit and one Undo step. Escape, pointer cancellation, lost capture, window blur or an invalid value restores the control and the preview. Other sliders (Transform, speed, gain) keep their release-only image update. Each keyboard slider
+layouts. Dragging a Colour, Opacity, HSL or Transform slider (main or stored) previews the draft value in the image, coalesced to the display rate, without any document, history, autosave or Inspector change, and without restarting music. Release commits one validated edit and one Undo step. Escape, pointer cancellation, lost capture, window blur or an invalid value restores the control and the preview. Other sliders (speed, gain) keep their release-only image update. Each keyboard slider
 adjustment is an individual validated edit. **Clip → Range** uses the full-original
 bar and exact timecode text fields described above. Other integer source/timeline
 frames, durations and fades retain exact native numeric steppers and timecode
@@ -710,7 +717,7 @@ in memory and automatic write retries stop. **Retry save** is offered only for
 recoverable transport/server errors. On a revision conflict, **Review latest save**
 offers keeping the draft, **Download unsaved project**, or explicitly discarding
 local changes and reloading. It never silently overwrites or rebases another save.
-Download before discarding; the v17 JSON snapshot is for manual recovery/examination,
+Download before discarding; the v18 JSON snapshot is for manual recovery/examination,
 not a supported JSON-import or migration flow. Unapplied input/pointer drafts are
 not committed project edits.
 

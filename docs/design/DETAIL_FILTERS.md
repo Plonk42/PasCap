@@ -1,4 +1,4 @@
-# Clip Sharpen, Clarity and Denoise, and track HDR · strict project schema 17
+# Clip Sharpen, Clarity and Denoise, and track HDR · strict project schema 18
 
 Current contract for [#123](https://github.com/Plonk42/PasCap/issues/123): three
 static, clip-owned detail filters applied identically in preview and native export,
@@ -14,18 +14,18 @@ Implementation authorities: [settings and kernel](../../src/shared/detail.ts),
 
 ## Owner decisions
 
-| Question                | Decision                                                                                                        |
-| ----------------------- | --------------------------------------------------------------------------------------------------------------- |
-| Settings                | All three: **Sharpen**, **Clarity** and **Denoise**                                                             |
-| Ownership and animation | Clip-owned and static, like a Transform base; no keyframes and no track channels                                |
-| Pipeline position       | On source pixels **before** the Colour grade, around the inverse-mapped source point (so they follow Transform) |
-| Compare                 | **Show ungraded preview** bypasses Colour **and** Detail; geometry, Opacity, fades and music remain             |
-| Radius                  | A fraction of the image height, so the 720p preview predicts 720p and UHD exports                               |
-| Denoise kind            | Spatial, edge-preserving (bilateral); no temporal or neighbouring-frame access                                  |
+| Question                | Decision                                                                                                                  |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| Settings                | All three: **Sharpen**, **Clarity** and **Denoise**                                                                       |
+| Ownership and animation | Clip-owned and static; no keyframes and no track channels                                                                 |
+| Pipeline position       | On source pixels **before** the Colour grade, around the inverse-mapped source point (so they follow the track Transform) |
+| Compare                 | **Show ungraded preview** bypasses Colour **and** Detail; geometry, Opacity, fades and music remain                       |
+| Radius                  | A fraction of the image height, so the 720p preview predicts 720p and UHD exports                                         |
+| Denoise kind            | Spatial, edge-preserving (bilateral); no temporal or neighbouring-frame access                                            |
 
 ## Required data
 
-Every schema-17 clip requires `detail: { sharpen, clarity, denoise }`, strict, with no
+Every schema-18 clip requires `detail: { sharpen, clarity, denoise }`, strict, with no
 unknown fields, coercion, persisted defaults or load-time repair.
 
 | Field     | Bounds | Neutral (new clips) | Meaning                                                     |
@@ -37,7 +37,7 @@ unknown fields, coercion, persisted defaults or load-time repair.
 Neutral values are creation values only, never defaults for missing saved data.
 Split, marked cuts and duplicate copy the clip's detail into each retained piece;
 trims, moves (including to another track) and Ripple leave it unchanged. Detail never
-changes timing, placement, speed, track Colour/Opacity or music. Projects 1–16 and
+changes timing, placement, speed, track Colour/Opacity or music. Projects 1–17 and
 their receipt snapshots are rejected and preserved, without migration; recreate them.
 
 ## Kernel
@@ -88,7 +88,7 @@ local detail, preserving true black, mid-grey and white on flat areas.
   eleventh nullable track keyframe channel `hdr`, after `shadows`. It is keyframed,
   interpolated, held and reset exactly like the other scalar Colour settings, at
   absolute project time; both dissolve sources and every clip on the track use the
-  same evaluated value. Missing fields are invalid; schemas 1–16 are rejected and preserved.
+  same evaluated value. Missing fields are invalid; schemas 1–17 are rejected and preserved.
 - **Not a grade stage**: it is excluded from the per-pixel grade, its LUTs and LUT
   identity, so animating HDR reuses one scalar LUT. It runs in this kernel, on source
   taps after Denoise, with the evaluated amount $h$.
@@ -115,7 +115,7 @@ per release. Compare bypasses it with the rest of Colour.
 
 ## Pipeline order
 
-Inverse spatial mapping → **Detail and HDR** on source taps → track Colour grade (Temperature/Tint
+Inverse track Transform mapping → **Detail and HDR** on source taps → track Colour grade (Temperature/Tint
 … curves) → black fades → Opacity/spatial coverage and grouped source-over. Detail
 is not graded twice, does not change coverage and leaves the exact-neutral opaque
 letterbox path in place: with a neutral pose the filter runs at each fitted pixel
@@ -146,7 +146,7 @@ reference and the measurement helper reject nonneutral detail.
 
 When a hardware GPU is available, export renders every track group frame whose CPU path
 is per-pixel heavy with the **same WebGL programs as the preview**: nonneutral detail or
-HDR, nonneutral HSL ranges or colour curves, or a nonneutral evaluated spatial pose on
+HDR, nonneutral HSL ranges or colour curves, or a nonneutral evaluated track Transform pose on
 either source. It uses one headless Chrome page the service launches per
 export ([service side](../../src/server/gpu-compositor.ts),
 [page](../../src/gpu-worker/main.ts)). Neutral, scalar-colour and Opacity/fade-only
@@ -214,7 +214,7 @@ at least as fast as the transport below, and remains the parity reference.
 
 ## Editing
 
-**Detail** is the third Clip section (after Speed and Transform, before Range and
+**Detail** is the second Clip section (after Speed, before Range and
 Placement), collapsed by default and included in **Expand all / Collapse all**.
 **Sharpen**, **Clarity** and **Denoise** each pair a native slider with an exact field
 (step 0.01). Dragging a slider previews the draft value live in the image, coalesced

@@ -1,7 +1,7 @@
 import type { PlacedClip } from '../shared/timeline.js';
 
 export interface ClipKeyframeMarker {
-  type: 'transform' | 'speed';
+  type: 'speed';
   sourceFrame: number;
   outputFrame: number;
   timelineFrame: number;
@@ -19,28 +19,24 @@ function markerSeekFrame(placed: PlacedClip, sourceFrame: number): number {
   return placed.start + (afterDistance < beforeDistance ? after : before);
 }
 
-/** Clip-owned keys only; retained off-trim anchors stay exclusively in inspectors.
+/** Clip-owned speed keys only; retained off-trim anchors stay exclusively in the inspector.
  * outputAt is a FLOOR inverse, not a continuous coordinate. OUT alone denotes
  * the right boundary, while its preview must stay on the final available output.
- * Work/storage is bounded by the two existing 256-key lists, never clip duration.
+ * Work/storage is bounded by the 256-key list, never clip duration.
  */
 export function clipKeyframeMarkers(placed: PlacedClip): ClipKeyframeMarker[] {
-  const markers = (type: ClipKeyframeMarker['type'], keys: readonly { frame: number }[]): ClipKeyframeMarker[] =>
-    keys
-      .filter((point) => point.frame >= placed.clip.sourceIn && point.frame <= placed.clip.sourceOut)
-      .map((point) => {
-        const outputFrame =
-          point.frame === placed.clip.sourceOut ? placed.duration : placed.retiming.outputAt(point.frame);
-        return {
-          type,
-          sourceFrame: point.frame,
-          outputFrame,
-          timelineFrame: placed.start + outputFrame,
-          seekFrame: markerSeekFrame(placed, point.frame),
-        };
-      });
-  return [
-    ...markers('transform', placed.clip.spatial.keyframes),
-    ...markers('speed', placed.clip.speed.mode === 'curve' ? placed.clip.speed.keyframes : []),
-  ];
+  const keys = placed.clip.speed.mode === 'curve' ? placed.clip.speed.keyframes : [];
+  return keys
+    .filter((point) => point.frame >= placed.clip.sourceIn && point.frame <= placed.clip.sourceOut)
+    .map((point) => {
+      const outputFrame =
+        point.frame === placed.clip.sourceOut ? placed.duration : placed.retiming.outputAt(point.frame);
+      return {
+        type: 'speed',
+        sourceFrame: point.frame,
+        outputFrame,
+        timelineFrame: placed.start + outputFrame,
+        seekFrame: markerSeekFrame(placed, point.frame),
+      };
+    });
 }

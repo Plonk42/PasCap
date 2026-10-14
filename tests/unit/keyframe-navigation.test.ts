@@ -292,7 +292,7 @@ describe('one editor-only stored-point cursor', () => {
     expect(history.canUndo).toBe(false);
     expect(history.canRedo).toBe(false);
     expect(projectSchema.parse(history.current)).toEqual(document);
-    expect(history.current.schemaVersion).toBe(17);
+    expect(history.current.schemaVersion).toBe(18);
   });
 
   it.each([-1, NaN, Infinity, 0.5, 2_147_483_648])(
@@ -448,9 +448,10 @@ describe('main diamonds with per-setting arrows and stored-channel navigation', 
 
   it('retains per-setting arrows beside main diamonds and on chips, with one section union and no sidebar duplicates', () => {
     const document = project(interleaved);
-    document.clips[0]!.spatial.keyframes = [0, 20].map((frame) =>
-      uniformKeyframe(frame, { ...document.clips[0]!.spatial.base }, 'linear'),
-    );
+    document.layers[0]!.transform.keyframes = [0, 20].map((frame) => ({
+      ...uniformKeyframe(frame, { ...document.layers[0]!.transform.base }, 'linear'),
+      reset: false,
+    }));
     const inspector = renderToStaticMarkup(
       createElement(
         KeyframeNavigationContext.Provider,

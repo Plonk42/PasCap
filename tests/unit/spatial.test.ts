@@ -5,6 +5,7 @@ import type { SpatialKeyframe, SpatialMapping, SpatialPose, SpatialSettings } fr
 import {
   compileSpatialMapping,
   createSpatialSettings,
+  defaultSpatialKeyframe,
   evaluateSpatial,
   hasSpatialChannelKeys,
   hasSpatialEdits,
@@ -27,7 +28,7 @@ function pose(changes: Partial<SpatialPose> = {}): SpatialPose {
 }
 
 function key(frame: number, values = pose(), interpolation: Interpolation = 'linear'): SpatialKeyframe {
-  return uniformKeyframe(frame, values, interpolation);
+  return { ...uniformKeyframe(frame, values, interpolation), reset: false };
 }
 
 function settings(keyframes: SpatialKeyframe[] = [], base = pose()): SpatialSettings {
@@ -151,7 +152,7 @@ describe('strict spatial settings', () => {
   });
 });
 
-describe('full-pose source-time spatial animation', () => {
+describe('full-pose project-time Transform animation', () => {
   const left = pose({
     cropLeft: 0.1,
     cropRight: 0.2,
@@ -249,16 +250,44 @@ describe('independent per-setting spatial keyframes', () => {
     number | null
   >;
   const sparse = (frame: number, values: Partial<Record<keyof SpatialPose, number>>, curve: Interpolation = 'linear') =>
-    uniformKeyframe(frame, { ...none, ...values }, curve) as SpatialKeyframe;
+    ({ ...uniformKeyframe(frame, { ...none, ...values }, curve), reset: false }) as SpatialKeyframe;
 
   it('requires every field and at least one enabled setting, allowing null elsewhere', () => {
     expect(spatialKeyframeSchema.safeParse(sparse(0, { scale: 2 })).success).toBe(true);
     expect(spatialKeyframeSchema.safeParse(sparse(0, {})).success).toBe(false);
     const missing: Partial<typeof none> = { ...none, scale: 2 };
     delete missing.rotation;
-    expect(spatialKeyframeSchema.safeParse(uniformKeyframe(0, missing, 'linear')).success).toBe(false);
+    expect(spatialKeyframeSchema.safeParse({ ...uniformKeyframe(0, missing, 'linear'), reset: false }).success).toBe(
+      false,
+    );
+    const { reset: _reset, ...withoutReset } = sparse(0, { scale: 2 });
+    expect(spatialKeyframeSchema.safeParse(withoutReset).success).toBe(false);
     expect(spatialKeyframeSchema.safeParse(sparse(0, { scale: 9 })).success).toBe(false);
     expect(spatialPoseSchema.safeParse({ ...pose(), scale: null }).success).toBe(false);
+  });
+
+  it('never lets a leading default keyframe reach back, but eases into a later one', () => {
+    const value = settings(
+      [sparse(10, { scale: 3 }), defaultSpatialKeyframe(30), sparse(50, { rotation: 45 })],
+      pose({ scale: 2, rotation: 10, translateX: 0.25 }),
+    );
+    expect(spatialKeyframeSchema.parse(defaultSpatialKeyframe(30))).toMatchObject({
+      values: pose(),
+      reset: true,
+      easing: Object.fromEntries(channels.map((channel) => [channel, 'hold'])),
+    });
+    // Scale is keyed before the default keyframe: it eases into the neutral value, then holds it.
+    expect(evaluateSpatial(value, 0).scale).toBe(3);
+    expect(evaluateSpatial(value, 20).scale).toBe(2);
+    expect(evaluateSpatial(value, 30).scale).toBe(1);
+    expect(evaluateSpatial(value, 99).scale).toBe(1);
+    // The default keyframe is TranslateX's first key: earlier frames keep the saved base.
+    expect(evaluateSpatial(value, 29).translateX).toBe(0.25);
+    expect(evaluateSpatial(value, 30).translateX).toBe(0);
+    // Rotation: base before the default keyframe, held default, then its next key.
+    expect(evaluateSpatial(value, 0).rotation).toBe(10);
+    expect(evaluateSpatial(value, 40).rotation).toBe(0);
+    expect(evaluateSpatial(value, 50).rotation).toBe(45);
   });
 
   it('interpolates each setting between its own keys, skipping keys that leave it out', () => {

@@ -14,7 +14,7 @@ HSL/curves remain static. See [Temperature and Tint](design/TEMPERATURE_AND_TINT
 See [track appearance](design/ROW_APPEARANCE.md).
 
 The media library describes complete recordings belonging to the open project's
-bin, not every globally registered source. Strict schema 17 requires unique
+bin, not every globally registered source. Strict schema 18 requires unique
 `media.videoIds` and `media.audioIds` arrays (10,000 IDs maximum each). Imports add
 membership even without timeline placement; clip/music references also remain
 visible. New projects start with both arrays empty. **Remove from project** (the
@@ -29,13 +29,13 @@ deliberately reuses the global content-deduplicated registry/proxy cache; switch
 projects never automatically adopts that global library. An insertion creates
 a unique clip-instance ID and copies the latest media-review IN/OUT, or
 `sourceIn = 0`, `sourceOut = registered frameCount` without a choice. New clips have
-normal constant speed, a complete neutral spatial base
-with no spatial keyframes and neutral Sharpen/Clarity/Denoise, with no saved opacity field.
-They use the destination track's `opacity` value or its overriding Opacity keyframes.
-New clips start without custom speed or spatial keyframes; existing track curves immediately apply at their project placement.
+normal constant speed and neutral Sharpen/Clarity/Denoise, with no saved opacity or
+transform field. They use the destination track's `opacity` value or its overriding Opacity
+keyframes, and its Transform.
+New clips start without custom speed keyframes; existing track curves immediately apply at their project placement.
 The original and full proxy remain unchanged; no extra crop file is generated.
-Multiple insertions of one recording have independent source ranges,
-clip speed and spatial settings.
+Multiple insertions of one recording have independent source ranges and
+clip speed.
 
 For several clips from one recording, set source IN/OUT and **Add clip**, then
 mark the next range and add again. Successful additions keep **Source preview** on
@@ -54,10 +54,9 @@ Output duration/source sampling uses each authoritative **`PlacedClip.retiming`*
 the clip's own compiled speed map, not the raw source-range length at non-1× speed.
 A clip's duration depends only on its own speed and source range, never its track,
 start or Ripple position. See [SPEED_AND_AUDIO.md](SPEED_AND_AUDIO.md).
-Clip spatial animation uses the same map's continuous `sourcePositionAt` for
-geometry and integer `sourceAt` for the recorded image. Transform edits do not
-change placement or duration; slow motion can move geometry on a held image
-without optical flow. See [spatial transforms](design/SPATIAL_TRANSFORMS.md).
+Transform belongs to the video track, like Colour, and evaluates at project time;
+Transform edits do not change placement or duration. See
+[spatial transforms](design/SPATIAL_TRANSFORMS.md).
 
 Project duration is the maximum of all retimed clip ends (including hidden
 tracks) and every independent music track's start + duration. Music can extend
@@ -111,7 +110,7 @@ Import guidance, **without a POST**. Internal dragging of ready registered Media
 into Timeline remains unchanged. Uncertain registration results are not retried
 automatically; check Media/Activity before resubmitting.
 
-Strict schema 17 requires complete video track colour with Temperature/Tint/HDR and static HSL/curves, clip spatial settings, per-track Ripple, transitions and fades, and a required
+Strict schema 18 requires complete video track colour with Temperature/Tint/HDR and static HSL/curves, track Transform, per-track Ripple, transitions and fades, and a required
 0–8 identified music track `music` array (`[]` without music); registry/proxy/PCM
 formats are unchanged. Only generated proxies/thumbnails, metadata,
 exports/receipts and scratch are created, not duplicate originals. Keep originals
@@ -160,9 +159,6 @@ original-source range controls have the separate contract below.
   transition validation as handles.
 - Trim/restoration never copies or shifts track keyframes. Original-source speed
   keyframes are retained, including outside the new trim.
-  Clip spatial keyframes also retain original-source positions, including outside the
-  new trim and at the original exclusive OUT; restoring a range restores access
-  to those unchanged anchors, not a rewritten animation.
 
 The selected clip's left/right trim edges are keyboard sliders. Arrow keys
 move by one original source frame; Shift moves by ten. Home at the left edge requests
@@ -185,7 +181,7 @@ Both fields and bar handles use ordinary source-range trim: the selected clip's
 placement stays fixed in either Ripple mode; Ripple re-sequences its suffix
 normally. They do not use the timeline left handle's retained-OUT rule above.
 Source bounds, at least one retained frame, retiming and transition/fade validation
-remain authoritative; original speed/spatial anchors and track keyframes stay unchanged.
+remain authoritative; original speed anchors and track keyframes stay unchanged.
 
 Dragging previews the complete validated document, including layout
 and paused preview, without history/autosave. A final valid release commits one
@@ -233,8 +229,8 @@ toolbar covering the lanes. Each track header has one **Ripple** toggle icon
 - Middle removal keeps a left clip with the original ID and a right clip with
   a fresh ID. Prefix/suffix removal keeps only the retained clip; a whole-range
   removal deletes it. Retained pieces share the original media but have independent
-  ranges/settings, including original-source speed keyframes and deep-copied spatial
-  base/per-setting keyframes. Off-trim and original exclusive-OUT anchors remain stored.
+  ranges/settings, including original-source speed keyframes. Off-trim and original
+  exclusive-OUT speed anchors remain stored.
   No proxy is cut.
 - With Ripple on, the track closes the removed gap and recalculates later starts
   without changing their order, original-source ranges, durations or settings. The new
@@ -304,21 +300,21 @@ and undoable, and never move music, other tracks or absolute track keyframes.
   that track. Each piece retimes/rounds independently,
   so total duration can change. Invalid edits never enter history.
 - **Duplicate** (right-click the clip, or its Menu key) / **Ctrl+D** copies the complete clip range,
-  constant/custom speed, detail filters and deep-copied spatial base/keyframes into
+  constant/custom speed and detail filters into
   an independent ID; it does not
-  copy or change track Colour/Opacity. Ripple-on duplicates insert after the original with
+  copy or change track Colour/Opacity/Transform. Ripple-on duplicates insert after the original with
   new cut boundaries. Ripple-off duplicates start immediately
   after the original's end with the same duration;
   occupied placement is rejected atomically.
 - **Move to new track** (the same menu) creates a video track and moves the clip there in one Undo step,
-  keeping its start and order; the new track has neutral Colour and Opacity 1, since Colour is track-owned. It is
+  keeping its start and order; the new track has neutral Colour and Transform and Opacity 1, since they are track-owned. It is
   unavailable when the clip is alone on its track or eight tracks exist.
 - **Trim/cut/move/split/duplicate never copy or shift track keyframes.** Track Ripple
-  leaves their project times fixed. Moving between tracks leaves both tracks' keyframes
-  and saved Opacity values intact, using the destination track value or curve;
-  source ranges, clip speed and spatial settings remain independent.
-  Splits/cuts/duplicates copy complete spatial poses, keyframe arrays and detail filters independently;
-  trims/moves/Ripple never shift, rescale or discard their original-source anchors.
+  leaves their project times fixed. Moving between tracks leaves both tracks' keyframes,
+  Transform and saved Opacity values intact, using the destination track value or curve;
+  source ranges and clip speed remain independent.
+  Splits/cuts/duplicates copy detail filters independently;
+  trims/moves/Ripple never shift, rescale or discard speed's original-source anchors.
 - **Alt+Left/Right** nudges a positioned clip or the first Ripple anchor one frame;
   adding Shift nudges ten. Clip → Placement has one-frame nudge buttons beside
   **Timeline start frame**, which is available on every track. Later Ripple
@@ -349,7 +345,9 @@ value for Opacity and track colour for colour.
 
 The selected video track, including an empty one, has one **Track → Keyframes** section
 (list accessible name **Track keyframes**) with its directly visible shared keyframe list. Clip keeps
-the playhead Speed and Transform controls; Track keeps Colour and Opacity.
+the playhead Speed controls; Track keeps Colour, Opacity and Transform. Track Transform
+keyframes are a separate project-frame list in **Track → Transform**, with their own markers
+(see [spatial transforms](design/SPATIAL_TRANSFORMS.md)).
 Colour, Speed and Transform always show their capture diamonds while the section is expanded, Colour and Transform with adjacent per-setting **Previous/Next** buttons; there is no Animate toggle and no stored preference. Each expanded section has one keyframe line with the **number of keyframes**, one **Previous/Next** pair over the same set and **Reset**. The line is hidden while the section is collapsed; the title row and its help stay reachable. Rendering, retained keyframes and read-only constraints never depend on what is shown. Each diamond is clickable hollow/inactive or filled/active with
 `aria-pressed`; inactive is not HTML-disabled. Toggling affects only that channel;
 the first enabled setting creates/last removes the keyframe. Animated values are read-only
@@ -393,15 +391,20 @@ duration and stays list-editable, but does not extend the sequence merely for th
 keyframe. Moving it copies/shifts no other keyframes, track values, clip settings/source ranges or music,
 and retimes no clip.
 
-### Clip source-keyframe markers
+### Clip speed-keyframe markers and track Transform markers
 
-Inside each timeline clip rectangle, Transform keyframes use a boxed blue **▼** button lane
-and custom-speed keyframes a separate boxed salmon **◆** lane. Marker output positions
-come from authoritative `PlacedClip.retiming`.
+Inside each timeline clip rectangle, custom-speed keyframes use a boxed salmon **◆** lane.
+Marker output positions come from authoritative `PlacedClip.retiming`.
 Off-trim keyframes are omitted; exclusive OUT has a boundary marker that seeks the
 final available frame.
-Click, Enter or Space selects the clip, seeks the nearest mapped image and opens Clip → Transform (Clip → Speed for the ◆ lane); a click edits nothing. Both kinds also slide: drag one horizontally, or press ←/→ (one original source frame, Shift ten), keeping its easing (and a Transform key's enabled settings). A drag previews without history/save; a valid release is one Undo step, while Escape, cancellation, blur or an occupied/invalid frame restores. Moving a speed keyframe retimes its clip, so its duration and Ripple suffix can change; overlap/fade/transition conflicts reject the release. Keyboard handling is isolated from timeline
-shortcuts. These are not the draggable shared project-time track markers above.
+Click, Enter or Space selects the clip, seeks the nearest mapped image and opens Clip → Speed; a click edits nothing. They also slide: drag one horizontally, or press ←/→ (one original source frame, Shift ten), keeping its easing. A drag previews without history/save; a valid release is one Undo step, while Escape, cancellation, blur or an occupied/invalid frame restores. Moving a speed keyframe retimes its clip, so its duration and Ripple suffix can change; overlap/fade/transition conflicts reject the release. Keyboard handling is isolated from timeline
+shortcuts.
+
+Track Transform keyframes are boxed blue **▼** markers at the top of their track row,
+one per stored keyframe at its project frame (a default keyframe is filled light blue with
+the default-keyframe icon). They behave like the Colour markers above: click or Enter
+selects the track, seeks and opens Track → Transform; drag or Left/Right moves the whole
+Transform keyframe in one Undo step, never merging into an occupied frame.
 
 ### Channel navigation and off-duration inspection
 
@@ -409,12 +412,12 @@ Each section's keyframe line has one native **Previous/Next** pair, beside the k
 Colour visits the union of Opacity, nine scalar and HDR keyframes. Speed visits all
 retained custom speed source keyframes of the selected clip, including off-trim
 keyframes and original exclusive OUT, previewing the nearest mapped image through
-authoritative retiming. Transform likewise
-visits all retained source keyframes, including off-trim/original OUT.
-Speed and Transform each keep an independent clip-local stored-source cursor,
+authoritative retiming. Transform visits all track Transform keyframes, including
+those after the duration, with its own track-local cursor.
+Speed keeps an independent clip-local stored-source cursor,
 separate from track inspection, so successive keyframes remain reachable when
 several preview the same first/last image. Stored time never replaces the real
-displayed project/source frame for main values or capture. Timeline source markers
+displayed project/source frame for main values or capture. Timeline speed markers
 still omit off-trim keyframes and retain the exclusive-OUT boundary marker.
 
 Per-channel native **Previous/Next** arrows remain beside each main Opacity and colour diamond, because not every setting is enabled at every shared keyframe.
@@ -504,8 +507,7 @@ All track opacity/colour channels use project time, so coverage and grading can 
 even on held source frames. Appearance-only edits update rendering without reloading
 unchanged timing/music. Source/speed/placement edits pause and reload
 the placed map; shared track keyframe edits never change timing.
-Opacity and spatial changes remain appearance-only; continuous spatial geometry
-can change on a held recorded image. Black fades preserve coverage and grouped
+Opacity and Transform changes remain appearance-only. Black fades preserve coverage and grouped
 dissolves use the source-over contract above. See
 [LAYERS_AND_KEYFRAMES.md](LAYERS_AND_KEYFRAMES.md).
 
@@ -515,10 +517,10 @@ dissolves use the source-over contract above. See
 zoom. Ruler clicks and playhead scrubbing snap to video/music boundaries and
 [bookmarks](#bookmarks); ruler range
 edges also snap to the playhead captured at pointer down. Trim handles also
-snap to the original, stationary playhead. Shared-keyframe and clip source-keyframe
-(Transform and Speed) drags use boundaries, bookmarks and
+snap to the original, stationary playhead. Shared Colour and Transform keyframe and clip
+speed-keyframe drags use boundaries, bookmarks and
 the stationary playhead captured at pointer down, with their captured zoom throughout
-autoscroll; a source keyframe snapped to its clip's end lands on its exclusive OUT. Ripple-off moves match either leading or trailing edge to other clip/music/
+autoscroll; a speed keyframe snapped to its clip's end lands on its exclusive OUT. Ripple-off moves match either leading or trailing edge to other clip/music/
 transition boundaries, bookmarks, frame zero or the captured
 stationary playhead; their own old edges/transition regions are excluded. Holding
 Alt bypasses these magnets. A trailing-edge snap starts the clip its own duration
@@ -530,7 +532,7 @@ toggle persists for the current timeline session, not the renderable document.
 ### Bookmarks
 
 A **bookmark** marks one project-time frame, for example a beat or an event in the
-footage, as an extra snap point. Bookmarks belong to the project: strict schema 17
+footage, as an extra snap point. Bookmarks belong to the project: strict schema 18
 requires `bookmarks`, an array of at most 1,000 unique ascending integer project
 frames (0–2,147,483,647), `[]` on new projects; a missing or malformed array is
 invalid, never defaulted. They are editing aids only: they never retime clips,
@@ -554,19 +556,19 @@ music or keyframes and are never rendered or exported.
   ghost and commits nothing; Escape, pointer cancellation, lost capture or window
   blur restores. Delete or Backspace on a focused bookmark removes it.
 - Every gesture that snaps to clip boundaries also snaps to bookmarks within the
-  same eight pixels: trims, clip moves and drops, music placement/trim, shared and
-  clip source-keyframe drags, ruler clicks/ranges and playhead scrubbing. Snapping
+  same eight pixels: trims, clip moves and drops, music placement/trim, track and
+  clip speed-keyframe drags, ruler clicks/ranges and playhead scrubbing. Snapping
   to existing boundaries is unchanged.
 
 Adding, moving and deleting are each one Undo step and autosave like other edits.
 Bookmarks are project-wide: not per track, named, coloured or ranged.
 
-Projects are named separate **version-17** documents with complete required video track colour, clip spatial
-base/per-setting source-frame keyframes, project bookmarks and per-track Ripple,
+Projects are named separate **version-18** documents with complete required video track colour, track
+Transform base/per-setting project-frame keyframes, project bookmarks and per-track Ripple,
 transitions, opening/closing fades and numeric `opacity` in 0–1. New tracks start
 at 1 (100%); a missing saved field is invalid. Switching flushes autosave first,
 blocks on failed saves, and resets session selection/history; successful export
-snapshots are independent of the open project. Earlier v1–v16 projects and receipt
+snapshots are independent of the open project. Earlier v1–v17 projects and receipt
 snapshots remain incompatible and preserved, without migration/fabricated defaults.
 There is no automatic deletion. Track `opacity` is the required sole stored value;
 saved `clip.opacity` and old `clipOpacity`/`layerOpacity` keyframe fields are rejected,
@@ -584,7 +586,7 @@ are unchanged.
 The required `music` array holds **0–8 independent music tracks**, each with a unique
 required `id`, registered `mediaId`, source IN/OUT, start/duration, gain, fades and
 loop flag. No null/singular fallback, omitted-field default or old-format reader
-is accepted. Version-1 export receipts require a strict v17 snapshot and captured
+is accepted. Version-1 export receipts require a strict v18 snapshot and captured
 audio-source/instance-plan arrays; older snapshots/invalid arrays are rejected
 while the receipt and finished output remain preserved. Current PCM format is unchanged.
 
@@ -658,15 +660,15 @@ Panels are resizable/collapsible with browser-local layout persistence; source
 review occupies a docked viewer tab rather than covering the workspace. Main and
 stored Colour/Opacity/Transform values, playback rates and gain share native sliders with
 adjacent exact `NumberField` controls, not read-only outputs or number-only layouts.
-Dragging a Colour, Opacity or HSL slider (main or stored) previews the draft value in the image, coalesced to the display rate, without any document, history, autosave or Inspector change, and without restarting music. Release commits one validated edit and one Undo step. Escape, pointer cancellation, lost capture, window blur or an invalid value restores the control and the preview. Other sliders (Transform, speed, gain) keep their release-only image update. Each keyboard slider
+Dragging a Colour, Opacity, HSL or Transform slider (main or stored) previews the draft value in the image, coalesced to the display rate, without any document, history, autosave or Inspector change, and without restarting music. Release commits one validated edit and one Undo step. Escape, pointer cancellation, lost capture, window blur or an invalid value restores the control and the preview. Other sliders (speed, gain) keep their release-only image update. Each keyboard slider
 adjustment is an individual validated edit. Numeric fields retain full entered
 precision, commit on Enter/blur, keep invalid drafts editable and restore on Escape.
 **Clip → Range** uses the full-original bar and exact timecode text fields above.
 Other integer source/placement frames, durations and fades retain exact native
 numeric steppers and existing timecode feedback, without arbitrary timing sliders.
 Source-review IN/OUT fields apply as a pair on Enter or when focus leaves both; Escape restores.
-**Clip / Track / Audio** separates clip-owned source/placement/speed/Transform/Detail,
-track-owned Colour/keyframes/transitions/fades, and music. The header directly exposes
+**Clip / Track / Audio** separates clip-owned source/placement/speed/Detail,
+track-owned Colour/Transform/keyframes/transitions/fades, and music. The header directly exposes
 help; **Workspace options**
 holds the Media/Clip panel toggles, layout reset and Diagnostics. **Track options**
 holds only rename/Ripple/stacking/deletion; a clip's right-click menu holds Duplicate,
@@ -676,8 +678,8 @@ Diagnostic counters, shader tests and the two-clip native comparison tool remain
 hidden behind Diagnostics. **Export** uses the bounded native multi-clip
 renderer, with profiles for 720p drafts and 4K finals. The diagnostic two-clip
 reference remains limited to two normal-speed clips on one enabled,
-zero-origin contiguous video track with Opacity 1, HDR 0 and neutral spatial bases and detail filters without
-spatial keyframes, without music/extra tracks/shared track keyframes
+zero-origin contiguous video track with Opacity 1, HDR 0 and a neutral track Transform
+without keyframes and neutral detail filters, without music/extra tracks/shared track keyframes
 and at most 3,600 project frames.
 Clip sections collapse independently and retain expansion across reloads; collapsing
 a section never disables its processing.
@@ -697,4 +699,4 @@ and both-runtime acceptance belong to
 [DEPLOYMENT.md](DEPLOYMENT.md). Actual-commit correctness results are available in
 [GitHub Actions](https://github.com/Plonk42/PasCap/actions).
 
-Video track Colour includes static **HSL ranges** and **Colour curves**, each in its own collapsible Track section after Colour. They affect every clip and both dissolve sources on the track, whether or not its nine scalar channels are keyed. Moves use the destination track's complete colour; clip edits never copy these settings. They are not speed curves or new animation channels. See [the schema-17 HSL/curves contract](design/HSL_AND_CURVES.md).
+Video track Colour includes static **HSL ranges** and **Colour curves**, each in its own collapsible Track section after Colour. They affect every clip and both dissolve sources on the track, whether or not its nine scalar channels are keyed. Moves use the destination track's complete colour; clip edits never copy these settings. They are not speed curves or new animation channels. See [the schema-18 HSL/curves contract](design/HSL_AND_CURVES.md).

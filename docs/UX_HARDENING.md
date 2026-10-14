@@ -22,16 +22,18 @@ This guide is not a delivery ledger or a fresh validation result.
 - Each expanded section's keyframe line shows the keyframe count, one **Previous/Next** pair and Reset.
   Colour visits Opacity/scalar colour keyframes; Speed visits
   all retained custom speed source keyframes of the selected clip (its single
-  **Keyframe Speed** diamond has no extra per-setting arrows). Speed and Transform stored
+  **Keyframe Speed** diamond has no extra per-setting arrows). Speed stored
   navigation includes off-trim/original-exclusive-OUT keyframes, previewing the
-  nearest mapped image with independent clip-local stored-source cursors, separate
-  from central track inspection. Successive stored keyframes stay reachable even
-  when they preview the same first/last image. Enabled setting chips in stored
+  nearest mapped image with a clip-local stored-source cursor; Transform visits its
+  stored track keyframes, including those after the duration, with a track-local
+  cursor previewing the nearest available frame. Both are separate from central
+  track inspection. Successive stored keyframes stay reachable even
+  when they preview the same image. Enabled setting chips in stored
   Keyframes rows retain their per-channel arrows. All main and stored per-channel
   arrows visit strictly earlier/later keyframes where that channel is nonnull
   (zero is enabled), sharing the central off-duration inspection cursor.
   Main capture uses the real displayed frame; navigation never edits or saves.
-  Timeline source markers still
+  Timeline speed markers still
   omit off-trim keyframes, with exclusive OUT represented by a boundary marker.
 - **Track → Colour** contains the single **Opacity** slider/diamond/navigation
   alongside the colour sliders, initially **100%**. Without Opacity keyframes it edits
@@ -60,8 +62,8 @@ This guide is not a delivery ledger or a fresh validation result.
   uncertainty, errors/recheck and disclosed location/assumptions. Snapshot and
   native processing details remain available in **Rendering details**.
 
-Schema 17 requires complete video track Colour with Temperature/Tint/HDR and static HSL/curves,
-clip spatial base/per-setting source-frame keyframes and uses a
+Schema 18 requires complete video track Colour with Temperature/Tint/HDR and static HSL/curves,
+video track Transform base/per-setting project-frame keyframes and uses a
 required 0–8 `music` array with unique required music track IDs and
 uniform video tracks with required Ripple/transitions/fades and
 numeric `VideoLayer.opacity` in 0–1 (1 on new tracks), plus eleven nullable keyframe
@@ -82,26 +84,27 @@ $w_i$ dissolve weight and $m_i$ spatial pixel coverage. Exact neutral poses
 preserve opaque black letterboxing after grading; nonneutral uncovered pixels
 reveal lower footage. Each source uses the same evaluated track Opacity at that
 project frame, from the track value or its overriding curve.
-v1–v16 project/receipt snapshots remain unchanged/incompatible
+v1–v17 project/receipt snapshots remain unchanged/incompatible
 and require recreation, without migration, defaults or automatic deletion.
 Track `opacity` is the required sole stored value, not obsolete; saved `clip.opacity`
 and old `clipOpacity`/`layerOpacity` keyframe channels are invalid.
 Registry/proxy/current PCM formats do not change. Version-1 export receipts require
-strict v17 snapshots and captured audio-source/instance-plan arrays, rejecting
+strict v18 snapshots and captured audio-source/instance-plan arrays, rejecting
 invalid arrays/older snapshots without rewriting successful exports. No null
 fallback or old-format reader is permitted. Source-copy prohibition,
 track keyframes, source choices, media preparation, Activity and both export
 profiles retain their contracts. The editor targets desktop Linux; the 640 px
 width floor is not a mobile-support claim.
 
-**Clip → Transform** is the second Clip section, collapsed for new
-preferences and included in Clip's bulk expansion. Native sliders/exact fields
-and per-setting source-frame diamonds retain explicit capture, read-only keyed
-main values without a keyframe at the real displayed source frame, release-only
-drafts and editable invalid numbers. Stored-keyframe navigation distinguishes stored
-source time from the closest actually mapped preview, including off-trim and
-original exclusive-OUT keyframes. This is clip-local, not another track channel.
-See [the spatial contract](design/SPATIAL_TRANSFORMS.md); no fresh UI acceptance
+**Track → Transform** follows Track's Colour curves section, collapsed for new
+preferences and included in Track's bulk expansion; it works on empty tracks.
+Native sliders/exact fields and per-setting project-frame triangles retain explicit
+capture, read-only keyed main values without that setting's keyframe at the real
+playhead, live slider preview with one Undo per release and editable invalid
+numbers. Stored-keyframe navigation distinguishes stored project time from the
+nearest available preview frame, including keyframes after the duration. Transform
+is track-owned, like Colour, with its own keyframes rather than shared track channels.
+See [the Transform contract](design/SPATIAL_TRANSFORMS.md); no fresh UI acceptance
 or throughput result is implied.
 
 **Audio → Music** uses native **Music track / Recording** selectors, an **Add music
@@ -236,7 +239,7 @@ two 65³ Float32 LUTs add **6,591,000 bytes**, excluding native/audio memory.
 One original decoder, two intermediate readers, one encoder and three video children
 per serial pass bound concurrency, not duration-dependent disk use. The static
 fast path requires one enabled, unanimated, zero-origin contiguous track
-with track Opacity 1 and HDR 0, exactly neutral spatial bases and no spatial keyframes; spatial
+with track Opacity 1 and HDR 0, an exactly neutral track Transform base and no Transform keyframes; Transform
 edits/keyframes (even neutral keyframes) or unsupported placement/coverage use generalized
 composited export, with unchanged raw-buffer/LUT/process budgets.
 

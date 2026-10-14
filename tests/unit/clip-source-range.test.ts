@@ -215,7 +215,7 @@ describe('atomic clip source-range plans', () => {
     },
   );
 
-  it('preserves row points, appearance, original speed/spatial anchors and independent nested data', () => {
+  it('preserves row points, appearance, track Transform, original speed anchors and independent nested data', () => {
     const project = rangeProject();
     const clip = project.clips[0]!;
     clip.speed = {
@@ -225,10 +225,10 @@ describe('atomic clip source-range plans', () => {
         { frame: 600, rate: 2, interpolation: 'linear' },
       ],
     };
-    clip.spatial.base.translateX = 0.25;
-    clip.spatial.keyframes = [
-      uniformKeyframe(0, { ...NEUTRAL_SPATIAL_POSE, scale: 2 }, 'linear'),
-      uniformKeyframe(600, { ...NEUTRAL_SPATIAL_POSE, rotation: 90 }, 'smooth'),
+    project.layers[0]!.transform.base.translateX = 0.25;
+    project.layers[0]!.transform.keyframes = [
+      { ...uniformKeyframe(0, { ...NEUTRAL_SPATIAL_POSE, scale: 2 }, 'linear'), reset: false },
+      { ...uniformKeyframe(600, { ...NEUTRAL_SPATIAL_POSE, rotation: 90 }, 'smooth'), reset: false },
     ];
     project.layers[0]!.colour.temperature = 0.25;
     project.layers[0]!.opacity = 0.7;
@@ -241,9 +241,9 @@ describe('atomic clip source-range plans', () => {
     expect(plan.error).toBe('');
     expect(plan.document.layers).toEqual(before.layers);
     expect(plan.document.clips[0]!.speed).toEqual(before.clips[0]!.speed);
-    expect(plan.document.clips[0]!.spatial).toEqual(before.clips[0]!.spatial);
-    expect(plan.document.clips[0]!.spatial).not.toBe(clip.spatial);
-    expect(plan.document.clips[0]!.spatial.keyframes[0]!.values).not.toBe(clip.spatial.keyframes[0]!.values);
+    expect(plan.document.layers[0]!.transform.keyframes[0]!.values).not.toBe(
+      project.layers[0]!.transform.keyframes[0]!.values,
+    );
     expect(plan.document.layers[0]!.keyframes[0]!.values).not.toBe(project.layers[0]!.keyframes[0]!.values);
     expect(project).toEqual(before);
   });

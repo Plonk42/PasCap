@@ -224,7 +224,8 @@ test('unkeyed settings keep diamonds with visible guarded per-setting arrows and
 }) => {
   const document = await current(page);
   expect(KEYFRAME_SETTINGS).toHaveLength(11);
-  await expect(inspector(page).getByRole('button', { name: /^Keyframe / })).toHaveCount(11);
+  // Eleven Colour/Opacity diamonds plus the eight track Transform capture buttons.
+  await expect(inspector(page).getByRole('button', { name: /^Keyframe / })).toHaveCount(11 + 8);
   for (const { label } of KEYFRAME_SETTINGS) {
     await settingTab(page, label);
     const toggle = diamond(page, label);
@@ -244,7 +245,7 @@ test('unkeyed settings keep diamonds with visible guarded per-setting arrows and
   }
   await expect(inspector(page).locator('.layer-keyframe-chip')).toHaveCount(0);
   for (const label of ['Colour', 'Speed', 'Transform'] as const) {
-    await settingTab(page, label === 'Colour' ? 'Exposure' : 'Speed');
+    await settingTab(page, label);
     for (const direction of ['Previous', 'Next'] as const) {
       const button = sectionStep(page, label, direction);
       await expect(button).toBeVisible();
@@ -372,21 +373,25 @@ test('Speed section navigation visits only the clip speed keys, including off-tr
   await readOnly(page, document);
 });
 
-test('Transform section navigation retains off-trim and exclusive-OUT keys with truthful clamped previews', async ({
+test('Transform section navigation retains keyframes after the duration with truthful clamped previews', async ({
   page,
 }) => {
   const document = sequence();
-  const clip = document.clips[0]!;
-  clip.spatial.keyframes = [0, 20, 60, 90].map((frame) => uniformKeyframe(frame, { ...clip.spatial.base }, 'linear'));
+  const track = document.layers[0]!.transform;
+  track.keyframes = [0, 20, 130, 150].map((frame) => ({
+    ...uniformKeyframe(frame, { ...track.base }, 'linear'),
+    reset: false,
+  }));
+  expect(calculateLayout(document).duration).toBe(120);
   await fixture(page, document);
-  await settingTab(page, 'Speed');
+  await settingTab(page, 'Transform');
   const next = sectionStep(page, 'Transform', 'Next');
   const previous = sectionStep(page, 'Transform', 'Previous');
   await expect(previous).toBeDisabled();
   for (const [frame, preview] of [
     [20, 20],
-    [60, 59],
-    [90, 59],
+    [130, 119],
+    [150, 119],
   ] as const) {
     await next.scrollIntoViewIfNeeded();
     await next.click();
@@ -395,12 +400,12 @@ test('Transform section navigation retains off-trim and exclusive-OUT keys with 
       inspector(page).getByRole('combobox', { name: 'Selected Transform keyframe', exact: true }),
     ).toHaveValue(String(frame));
     await expect(inspector(page).getByRole('region', { name: 'Stored Transform keyframe', exact: true })).toContainText(
-      `Stored source frame ${frame}`,
+      `Stored timeline frame ${frame}`,
     );
   }
   await expect(next).toBeDisabled();
   for (const [frame, preview] of [
-    [60, 59],
+    [130, 119],
     [20, 20],
     [0, 0],
   ] as const) {
@@ -691,10 +696,11 @@ test('all eleven setting buttons remain present and disabled throughout a native
     }
   }
   for (const label of ['Colour', 'Speed', 'Transform'] as const) {
-    await settingTab(page, label === 'Colour' ? 'Exposure' : 'Speed');
+    await settingTab(page, label);
     for (const direction of ['Previous', 'Next'] as const)
       await expect(sectionStep(page, label, direction)).toBeDisabled();
   }
+  await settingTab(page, 'Speed');
   await expect(page.getByRole('button', { name: 'Keyframe Speed', exact: true })).toBeDisabled();
   await page.keyboard.press('Escape');
   await page.mouse.up();
@@ -1172,7 +1178,7 @@ test('all navigation groups fit the 270px inspector at the default and minimum v
       }
     }
     for (const label of ['Colour', 'Speed', 'Transform'] as const) {
-      await settingTab(page, label === 'Colour' ? 'Exposure' : 'Speed');
+      await settingTab(page, label);
       for (const direction of ['Previous', 'Next'] as const) {
         const button = sectionStep(page, label, direction);
         await button.scrollIntoViewIfNeeded();

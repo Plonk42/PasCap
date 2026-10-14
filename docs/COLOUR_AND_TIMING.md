@@ -1,4 +1,4 @@
-# PasCap colour and timing contract · project v17
+# PasCap colour and timing contract · project v18
 
 This specification is shared by the CPU reference, WebGL2 shader and native
 scalar LUT or exact advanced-colour export. It is elementary SDR grading, not
@@ -58,8 +58,8 @@ See [track appearance](design/ROW_APPEARANCE.md) for ownership, UI and strict st
   grading on fractional sampled RGB before premultiplied RGBA16 and final H.264;
   narrow valid knees never pass through a LUT, including the preceding scalar stage.
   No endpoint-LUT/image crossfade substitutes for parameter animation. Scaling to
-  the fitted target image occurs before grading. Exact neutral spatial poses retain
-  the old opaque black padding after grading. Nonneutral spatial poses inverse-map
+  the fitted target image occurs before grading. Exact neutral track Transform poses retain
+  the old opaque black padding after grading. Nonneutral poses inverse-map
   and resample source RGB before grading, with transparent coverage outside the
   transformed/cropped original; crop does not refit the image.
   Quantisation, interpolation and 4:2:0 encoding are
@@ -68,10 +68,11 @@ See [track appearance](design/ROW_APPEARANCE.md) for ownership, UI and strict st
 
 ## Opacity and animation
 
-Shared video track opacity and colour keyframes use integer **project frames** and
-override each keyed channel across every clip on that track. Clip-instance
-custom speed and spatial keyframes instead use integer **original-source frames**; unkeyed track colour
-uses `layer.colour`. Clip speed and spatial settings remain per clip; speed is never a track channel. **Opacity** is one track-owned
+Shared video track opacity and colour keyframes, and track Transform keyframes, use
+integer **project frames** and override each keyed channel across every clip on that
+track. Clip-instance custom speed keyframes instead use integer **original-source
+frames**; unkeyed track colour uses `layer.colour` and unkeyed Transform settings
+`layer.transform.base`. Clip speed remains per clip and is never a track channel. **Opacity** is one track-owned
 setting: `VideoLayer.opacity` is a required number in 0–1, initially 1 on a new
 track. Without keyed Opacity settings, every source uses that track value; otherwise
 the track's sole `opacity` channel overrides it, including both dissolve sources.
@@ -81,11 +82,11 @@ nullable keyframe fields are `opacity`, `temperature`, `tint`, `exposure`, `brig
 Hold/linear/ease-in/ease-out/smooth interpolation is that setting's own Easing at the left keyframe
 with that setting enabled; endpoints hold outside the
 keyed interval. Colour evaluates all nine scalar parameter values before applying the
-equations above; evaluated HDR feeds the detail kernel before grading instead. Trim/split never copy or shift track keyframes; they retain clip-speed
-and spatial anchors, including those outside the clip range and at the registered
-original's exclusive OUT. Spatial poses evaluate continuously through the placed
-retiming map, not at the floored recorded-image frame; see
-[spatial transforms](design/SPATIAL_TRANSFORMS.md).
+equations above; evaluated HDR feeds the detail kernel before grading instead. Trim/split never copy or shift track keyframes or Transform; they retain clip-speed
+anchors, including those outside the clip range and at the registered
+original's exclusive OUT. Transform poses evaluate at absolute project time, like
+Colour, and apply to every source on the track; see
+[track Transform](design/SPATIAL_TRANSFORMS.md).
 
 The single **Opacity** slider is in **Track → Colour**, beside the colour sliders,
 and starts at **100%**. It edits track `opacity` without keyframes and works on an empty
@@ -97,7 +98,8 @@ controls coverage during composition after the SDR colour math above.
 For each enabled video track, source-over uses premultiplied encoded RGB/coverage.
 Let $w_i$ be dissolve weight, $o_i$ evaluated Opacity, $b_i$ black-fade brightness
 and $G_i$ graded RGB, with $m_i$ spatial coverage at the output pixel. Evaluate the
-track's Opacity for each source at the same project frame. Group RGB and coverage are
+track's Opacity and Transform for each source at the same project frame; each source
+keeps its own coverage mask. Group RGB and coverage are
 $C = \sum_i G_i b_i o_i w_i m_i$ and $A = \sum_i o_i w_i m_i$.
 Source-over is $\mathrm{result} = C + \mathrm{lower}(1 - A)$, with no additional track multiplier.
 Every track's dissolve is one group, preventing unintended double attenuation;
@@ -131,8 +133,8 @@ resets to normal graded preview. Export continues to use the saved grading contr
 
 ## Timing
 
-- Project placements, track keyframes and output durations use integer **project frames**;
-  source bounds and clip-speed/spatial anchors use integer **original-source frames**.
+- Project placements, track (including Transform) keyframes and output durations use integer **project frames**;
+  source bounds and clip-speed anchors use integer **original-source frames**.
   Rate: exactly `30000/1001`.
   Seconds exist only at media API / FFmpeg boundaries. Source OUT is exclusive.
 - Cuts consume zero frames. With Ripple on, a track sequences from its first
@@ -160,8 +162,8 @@ resets to normal graded preview. Export continues to use the saved grading contr
   a black transition's centre. It is intentional, deterministic and testable.
 - Incoming/outgoing transition and opening/closing regions must not overlap
   within a clip. Invalid durations/edits are rejected, never silently clamped.
-- Splits deep-copy static settings/clip-speed/spatial anchors, preserve exterior boundaries
-  and add a cut; shared track keyframes stay at their project frames. Pieces recompile
+- Splits deep-copy static settings/clip-speed anchors, preserve exterior boundaries
+  and add a cut; shared track and Transform keyframes stay at their project frames. Pieces recompile
   and round independently. Ripple-on tracks re-sequence; off tracks retain
   unrelated placements. Reordering tracks changes composition, not clip timing.
   Reordering preserves only unchanged adjacent ID pairs; new pairs become cuts.
@@ -185,7 +187,7 @@ resets to normal graded preview. Export continues to use the saved grading contr
 
 ## Music sampling and mixing
 
-Strict schema 17 requires a 0–8 `music` array of independent uniquely identified
+Strict schema 18 requires a 0–8 `music` array of independent uniquely identified
 music tracks, `[]` without music. Each has source IN/OUT, start/duration, gain, fades
 and loop; source-video audio remains disabled. At 48 kHz, source/placement/duration/
 fade positions round independently to integer samples using the rational frame
@@ -215,8 +217,8 @@ are not allocated per stored clip; missing decoded frames buffer explicitly
 ([WebCodecs preview decoding](design/WEBCODECS_PREVIEW.md)).
 
 Production export reads originals and uses exact shared retiming. The static fast
-path requires neutral HSL/identity curves, HDR 0, one enabled video track with Opacity 1, no track keyframes, exactly neutral
-spatial bases without spatial keyframes, zero origin
+path requires neutral HSL/identity curves, HDR 0, one enabled video track with Opacity 1, no track keyframes, an exactly neutral
+track Transform base without Transform keyframes, zero origin
 and no internal gaps, covering full project duration; supported track fades/dissolves retain bounded chunks.
 Other valid timelines use generalized sequential RGBA16 group and source-over
 passes without regrading, then one final H.264 encode,
@@ -227,27 +229,27 @@ export requires at least one retained video clip. Resource and numeric limits ar
 
 The diagnostic reference accepts **exactly two normal-speed (constant 1×) clips on one
 enabled, zero-origin contiguous video track with Opacity 1 and static scalar track Colour**,
-neutral HSL and identity curves, HDR 0, exactly neutral spatial
-bases without spatial keyframes, without music, extra tracks or track keyframes,
+neutral HSL and identity curves, HDR 0, an exactly neutral track Transform
+base without Transform keyframes, without music, extra tracks or track keyframes,
 and is limited to 3,600 project frames. It refuses unsupported
 documents regardless of Ripple or track ID.
-It requires a strict schema-17 project snapshot, including explicit project media
+It requires a strict schema-18 project snapshot, including explicit project media
 membership; its reference receipt format remains independently version 1. New
-measurement reports must identify their v17 project snapshot without overwriting
+measurement reports must identify their v18 project snapshot without overwriting
 historical reports; the report identifier is separate from the project schema.
 Project identifiers such as `preview-lab`/`preview-lab-v6` are not schema versions
 and are not renamed by this contract.
-v1–v16 project documents and receipt snapshots are incompatible and preserved;
+v1–v17 project documents and receipt snapshots are incompatible and preserved;
 recreate projects deliberately, with no migration, compatibility defaults or
-old-format/null fallback readers or automatic deletion. Strict v17 requires
+old-format/null fallback readers or automatic deletion. Strict v18 requires
 complete video track `colour`, including Temperature/Tint/HDR bases and static HSL/curves,
-all eleven nullable keyframe fields, constant or custom-curve clip speed, clip `spatial` base/per-setting keyframes and track `opacity`; saved `clip.colour`, `clip.correction`, `clip.opacity` and
+all eleven nullable keyframe fields, constant or custom-curve clip speed, track `transform` base/per-setting keyframes and track `opacity`; saved `clip.colour`, `clip.correction`, `clip.opacity`, `clip.spatial` and
 old `clipOpacity`/`layerOpacity` keyframe fields are rejected, not defaulted.
-Production export receipts also remain version 1, with strict v17 snapshots and
+Production export receipts also remain version 1, with strict v18 snapshots and
 required `musicSources` captured-original/`settings.audio` identified-plan arrays;
 older snapshots or invalid arrays are rejected without rewriting receipts/MP4s.
 Registry/proxy/current PCM formats and source guards are unchanged.
-Source ranges and every retained clip keyframe position are validated against registered
+Source ranges and every retained clip speed keyframe position are validated against registered
 original frame counts, including hidden track references.
 
 Video track colour also requires static eight-band HSL and master/red/green/blue curves.

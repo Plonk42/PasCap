@@ -1,9 +1,8 @@
 import { useId, useState, type ReactNode } from 'react';
 import { applyCommand, type EditCommand } from '../shared/commands.js';
-import { continuingSettings } from '../shared/keyframes.js';
-import type { ProjectDocument, VideoClip } from '../shared/model.js';
+import { continuingSettings, isKeyframeFrame } from '../shared/keyframes.js';
+import type { ProjectDocument, VideoLayer } from '../shared/model.js';
 import {
-  createSpatialSettings,
   evaluateSpatial,
   hasSpatialChannelKeys,
   hasSpatialEdits,
@@ -14,34 +13,41 @@ import {
   type SpatialKeyframe,
   type SpatialSettings,
 } from '../shared/spatial.js';
-import { previewClipSource } from './clip-speed-geometry.js';
+import { formatTimecode } from '../shared/timing.js';
 import { KeyframeSteps, keyframeCount } from './AnimationControls.js';
 import { HelpPopover } from './HelpPopover.js';
 import { Icon } from './icons.js';
 import { InspectorSection } from './InspectorSection.js';
 import { KeyframeEasing } from './KeyframeEasing.js';
-import { useKeyframeNavigation } from './keyframe-navigation.js';
+import { keySeekHint, useKeyframeNavigation } from './keyframe-navigation.js';
 import './keyframe-navigation.css';
 import './layer-keyframes.css';
+import { livePreview } from './live-preview.js';
 import { NumberField } from './NumberField.js';
 import './spatial-editor.css';
 import {
   editSpatialPose,
   removeSpatialKey,
   replaceSpatialKey,
+  resetSpatial,
   setSpatialEasing,
   SPATIAL_CONTROLS,
-  spatialPlayhead,
+  toggleDefaultSpatialKey,
   toggleSpatialChannel,
 } from './spatial-editor.js';
-import { inspectSpatialKeyframe, reconcileSpatialInspection, type SpatialInspection } from './spatial-navigation.js';
+import {
+  inspectSpatialKeyframe,
+  reconcileSpatialInspection,
+  trackTransformKeyframes,
+  type SpatialInspection,
+} from './spatial-navigation.js';
 import { LockedCue, ResetLabel, resetBlocked } from './SettingValueControl.js';
 import { ValueControl } from './ValueControl.js';
 
 interface Props {
   project: ProjectDocument;
-  clip: VideoClip;
-  sourceFrameCount: number;
+  layer: VideoLayer;
+  /** The real playhead: main values and capture always use it. */
   frame: number;
   disabled: boolean;
   onEdit: (command: EditCommand) => void;
@@ -97,12 +103,14 @@ interface ChannelKeys {
   onSeek: (key: SpatialKeyframe) => void;
 }
 
-/** One channel's diamond and Previous/Next, matching the Colour setting controls. */
+/** One channel's capture triangle and Previous/Next, matching the Colour setting controls. */
 function SpatialChannelKeys({
   label,
+  frame,
+  duration,
   keys,
   disabled,
-}: Readonly<{ label: string; keys: ChannelKeys; disabled: boolean }>) {
+}: Readonly<{ label: string; frame: number; duration: number; keys: ChannelKeys; disabled: boolean }>) {
   const { keyed, active, previous, next } = keys;
   return (
     <span className="keyframe-setting-navigation" data-animated={keyed}>
@@ -113,8 +121,8 @@ function SpatialChannelKeys({
         aria-pressed={active}
         title={
           active
-            ? `Remove ${label} from the Transform keyframe at the displayed source frame. Other settings at this keyframe stay unchanged.`
-            : `Keyframe ${label} at the displayed source frame. Capture the displayed value for this clip.`
+            ? `Remove ${label} from the Transform keyframe at timeline frame ${frame}. Other settings at this keyframe stay unchanged.`
+            : `Keyframe ${label} at timeline frame ${frame}. Capture the displayed value for the whole video track.`
         }
         disabled={disabled || keys.captureDisabled}
         onClick={keys.onToggle}
@@ -126,7 +134,7 @@ function SpatialChannelKeys({
           type="button"
           className="icon-button"
           aria-label={`Previous ${label} keyframe`}
-          title={previous ? `Go to source frame ${previous.frame}.` : `No previous ${label} keyframe`}
+          title={previous ? keySeekHint(previous.frame, duration) : `No previous ${label} keyframe`}
           aria-disabled={disabled || !previous}
           tabIndex={disabled || !previous ? -1 : 0}
           onClick={() => {
@@ -139,7 +147,7 @@ function SpatialChannelKeys({
           type="button"
           className="icon-button"
           aria-label={`Next ${label} keyframe`}
-          title={next ? `Go to source frame ${next.frame}.` : `No next ${label} keyframe`}
+          title={next ? keySeekHint(next.frame, duration) : `No next ${label} keyframe`}
           aria-disabled={disabled || !next}
           tabIndex={disabled || !next ? -1 : 0}
           onClick={() => {
@@ -153,7 +161,7 @@ function SpatialChannelKeys({
   );
 }
 
-/** Eight settings with the Colour pattern: a diamond and arrows each, read-only until captured. */
+/** Eight settings with the Colour pattern: a capture button and arrows each, read-only until captured. */
 function PoseFields({
   values,
   prefix,
@@ -162,8 +170,11 @@ function PoseFields({
   readOnly,
   channels,
   keysFor,
+  frame,
+  duration,
   validate,
   onCommit,
+  onDraft,
   onReset,
 }: Readonly<{
   values: Readonly<Record<SpatialChannel, number>>;
@@ -174,8 +185,11 @@ function PoseFields({
   readOnly?: (channel: SpatialChannel) => boolean;
   channels?: readonly SpatialChannel[];
   keysFor?: ((channel: SpatialChannel) => ChannelKeys) | undefined;
+  frame: number;
+  duration: number;
   validate: (key: SpatialChannel, value: number) => string | null;
   onCommit: (key: SpatialChannel, value: number) => void;
+  onDraft: (key: SpatialChannel, value: number | null) => void;
   onReset?: (key: SpatialChannel) => void;
 }>) {
   const id = useId();
@@ -211,7 +225,13 @@ function PoseFields({
               {readOnly?.(control.key) && <LockedCue glyph="▽" className="transform" />}
               {keys && (
                 <span className="colour-control-actions">
-                  <SpatialChannelKeys label={control.label} keys={keys} disabled={disabled} />
+                  <SpatialChannelKeys
+                    label={control.label}
+                    frame={frame}
+                    duration={duration}
+                    keys={keys}
+                    disabled={disabled}
+                  />
                 </span>
               )}
             </span>
@@ -226,6 +246,7 @@ function PoseFields({
               resetKey={`${context}:${control.key}`}
               validate={(value) => validate(control.key, value)}
               onCommit={(value) => onCommit(control.key, value)}
+              onDraft={(value) => onDraft(control.key, value)}
             />
           </div>
         );
@@ -236,36 +257,44 @@ function PoseFields({
 
 export function TransformHelp() {
   return (
-    <HelpPopover label="Transform animation" guide="crop-scale-translate-and-rotate-a-clip">
-      <p>Crop, scale, move and rotate this clip. A setting animates once you add a keyframe for it (▽).</p>
-      <p className="editor-help-tip">Tip: Reset transform restores the original framing.</p>
+    <HelpPopover label="Transform animation" guide="crop-scale-translate-and-rotate-a-track">
+      <p>
+        Crop, scale, move and rotate every clip on this track. A setting animates once you add a keyframe for it (▽).
+      </p>
+      <p className="editor-help-tip">Tip: to frame one clip differently, put it on its own track.</p>
     </HelpPopover>
   );
 }
 
+function storedLabel(key: SpatialKeyframe, index: number, duration: number): string {
+  let label = `Keyframe ${index + 1} · ${formatTimecode(key.frame)}`;
+  if (key.reset) label += ' · default';
+  if (key.frame >= duration) label += ' · outside duration';
+  return label;
+}
+
 export function SpatialControls({
   project,
-  clip,
-  sourceFrameCount,
+  layer,
   frame,
   disabled,
   onEdit,
-  onSeek,
   selectedFrame,
   onSelectStored,
   steps,
-}: Readonly<Props>) {
+}: Readonly<Omit<Props, 'onSeek'>>) {
   const navigation = useKeyframeNavigation();
   const unavailable = disabled || navigation.disabled;
-  const context = `${project.id}:${clip.id}`;
-  const settings = clip.spatial;
-  const playhead = spatialPlayhead(project, clip.id, frame);
-  const atDisplayed = settings.keyframes.find((key) => key.frame === playhead?.frame);
-  const evaluated = evaluateSpatial(settings, playhead?.position ?? clip.sourceIn);
+  const duration = navigation.duration;
+  const context = `${project.id}:${layer.id}`;
+  const settings = layer.transform;
+  const valid = isKeyframeFrame(frame);
+  const atFrame = settings.keyframes.find((key) => key.frame === frame);
+  const evaluated = evaluateSpatial(settings, valid ? frame : 0);
   const pose = Object.fromEntries(
-    SPATIAL_CONTROLS.map(({ key }) => [key, atDisplayed?.values[key] ?? evaluated[key]]),
+    SPATIAL_CONTROLS.map(({ key }) => [key, atFrame?.values[key] ?? evaluated[key]]),
   ) as Record<SpatialChannel, number>;
-  const channelActive = (channel: SpatialChannel): boolean => atDisplayed?.values[channel] != null;
+  const channelActive = (channel: SpatialChannel): boolean => atFrame?.values[channel] != null;
   const readOnly = (channel: SpatialChannel): boolean =>
     hasSpatialChannelKeys(settings, channel) && !channelActive(channel);
   const selection = useSpatialSelection(settings);
@@ -284,9 +313,10 @@ export function SpatialControls({
   // Easing only matters where an enabled setting continues to a later key.
   const continuing = selected ? continuingSettings(settings.keyframes, selected, SPATIAL_CHANNELS) : [];
   const [error, setError] = useState('');
+  const command = (transform: SpatialSettings): EditCommand => ({ type: 'transform', layerId: layer.id, transform });
   const validate = (produce: () => SpatialSettings): string | null => {
     try {
-      applyCommand(project, { type: 'spatial', clipId: clip.id, spatial: produce() });
+      applyCommand(project, command(produce()));
       return null;
     } catch (cause) {
       return cause instanceof Error ? cause.message : 'This Transform is invalid.';
@@ -295,12 +325,23 @@ export function SpatialControls({
   const change = (produce: () => SpatialSettings): void => {
     if (unavailable) return;
     try {
-      const spatial = produce();
-      applyCommand(project, { type: 'spatial', clipId: clip.id, spatial });
-      onEdit({ type: 'spatial', clipId: clip.id, spatial });
+      const next = command(produce());
+      applyCommand(project, next);
+      onEdit(next);
       setError('');
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'This Transform is invalid.');
+    }
+  };
+  const draft = (produce: () => SpatialSettings, value: number | null): void => {
+    if (value === null) {
+      livePreview(null);
+      return;
+    }
+    try {
+      livePreview(command(produce()));
+    } catch {
+      livePreview(null);
     }
   };
   const seek = (next: number): void => {
@@ -308,10 +349,9 @@ export function SpatialControls({
     if (unavailable || !point) return;
     selection.select(point.frame);
     onSelectStored?.(point.frame);
-    (navigation.onSeekSourceKeyframe ?? onSeek)(previewClipSource(project, clip.id, point.frame));
   };
-  // Per-channel arrows step from the inspected stored frame, else the displayed source frame.
-  const cursor = selectedFrame ?? playhead?.frame ?? clip.sourceIn;
+  // Per-channel arrows step from the inspected stored frame, else the playhead.
+  const cursor = selectedFrame ?? frame;
   const keysFor = (channel: SpatialChannel): ChannelKeys => {
     const keyed = settings.keyframes.filter((key) => key.values[channel] !== null);
     return {
@@ -319,15 +359,26 @@ export function SpatialControls({
       active: channelActive(channel),
       previous: [...keyed].reverse().find((key) => key.frame < cursor),
       next: keyed.find((key) => key.frame > cursor),
-      captureDisabled: unavailable || playhead === null || (!atDisplayed && settings.keyframes.length >= 256),
+      captureDisabled: unavailable || !valid || (!atFrame && settings.keyframes.length >= 256),
       onToggle: () => {
-        if (playhead) change(() => toggleSpatialChannel(settings, channel, playhead.frame, playhead.position));
+        if (valid) change(() => toggleSpatialChannel(settings, channel, frame));
       },
       onSeek: (key) => seek(settings.keyframes.indexOf(key)),
     };
   };
+  const reset = valid ? resetSpatial(settings, frame) : null;
+  const occupied = atFrame !== undefined && !atFrame.reset;
+  let defaultTitle =
+    'Add a default Transform keyframe here: every Transform setting returns to its default and holds until its next keyframe. Earlier frames keep their values.';
+  if (atFrame?.reset) defaultTitle = 'Remove the default Transform keyframe at the playhead';
+  else if (atFrame)
+    defaultTitle = 'A Transform keyframe already exists at the playhead; move to another frame for a default keyframe';
+  const poseAt = (key: SpatialChannel, value: number) => () =>
+    editSpatialPose(settings, valid ? frame : null, key, value);
+  const storedAt = (key: SpatialChannel, value: number) => () =>
+    replaceSpatialKey(settings, selected!.frame, { values: { ...selected!.values, [key]: value } });
   return (
-    <section className="spatial-editor" aria-label="Clip Transform editor">
+    <section className="spatial-editor" aria-label="Track Transform editor">
       <div className="spatial-tools section-keyframe-line">
         <span className="section-keyframe-count">{keyframeCount(settings.keyframes.length)}</span>
         {steps}
@@ -335,25 +386,47 @@ export function SpatialControls({
           type="button"
           className="text-button"
           aria-label="Reset transform"
-          disabled={unavailable || !hasSpatialEdits(settings)}
-          onClick={() => change(createSpatialSettings)}
+          title={
+            settings.keyframes.length
+              ? 'Reset only the enabled Transform settings at this keyframe. Other settings and keyframes stay unchanged.'
+              : 'Reset this track’s Transform.'
+          }
+          disabled={unavailable || reset === null}
+          onClick={() => {
+            if (reset) change(() => reset);
+          }}
         >
           <Icon name="reset" size={13} />
           Reset
+        </button>
+        <button
+          type="button"
+          className="icon-button default-keyframe-button transform-default-keyframe-button"
+          disabled={unavailable || !valid}
+          aria-disabled={occupied || undefined}
+          aria-pressed={atFrame?.reset === true}
+          aria-label={atFrame?.reset ? 'Remove default Transform keyframe' : 'Add default Transform keyframe'}
+          title={defaultTitle}
+          onClick={() => {
+            if (!occupied) change(() => toggleDefaultSpatialKey(settings, frame));
+          }}
+        >
+          <Icon name="default-key" size={16} />
         </button>
       </div>
       <PoseFields
         values={pose}
         prefix="Transform"
-        context={`${context}:main:${settings.keyframes.length ? playhead?.frame : 'base'}`}
+        context={`${context}:main:${settings.keyframes.length ? frame : 'base'}`}
         disabled={unavailable}
         readOnly={readOnly}
         keysFor={keysFor}
-        validate={(key, value) => validate(() => editSpatialPose(settings, playhead?.frame ?? null, key, value))}
-        onCommit={(key, value) => change(() => editSpatialPose(settings, playhead?.frame ?? null, key, value))}
-        onReset={(key) =>
-          change(() => editSpatialPose(settings, playhead?.frame ?? null, key, NEUTRAL_SPATIAL_POSE[key]))
-        }
+        frame={frame}
+        duration={duration}
+        validate={(key, value) => validate(poseAt(key, value))}
+        onCommit={(key, value) => change(poseAt(key, value))}
+        onDraft={(key, value) => draft(poseAt(key, value ?? 0), value)}
+        onReset={(key) => change(poseAt(key, NEUTRAL_SPATIAL_POSE[key]))}
       />
       {selected && (
         <section className="spatial-stored" aria-label="Stored Transform keyframe">
@@ -368,8 +441,7 @@ export function SpatialControls({
             >
               {settings.keyframes.map((key, at) => (
                 <option key={key.frame} value={key.frame}>
-                  Keyframe {at + 1} · source {key.frame}
-                  {key.frame < clip.sourceIn || key.frame >= clip.sourceOut ? ' · outside clip' : ''}
+                  {storedLabel(key, at, duration)}
                 </option>
               ))}
             </select>
@@ -383,12 +455,18 @@ export function SpatialControls({
               <Icon name="trash" size={14} />
             </button>
           </div>
+          {selected.reset && (
+            <span
+              className="keyframe-row-default transform-default"
+              title="Default keyframe: its settings return to their defaults here and hold until their next keyframes; earlier frames keep their own values."
+            >
+              <Icon name="default-key" size={14} />
+              Default
+            </span>
+          )}
           <p className="control-hint">
-            Stored source frame {selected.frame} ·{' '}
-            {playhead ? `actual displayed source frame ${playhead.frame}` : 'no displayed source frame'}
-            {selected.frame < clip.sourceIn || selected.frame >= clip.sourceOut
-              ? ' · outside clip; preview uses the nearest available image'
-              : ''}
+            Stored timeline frame {selected.frame} · playhead frame {frame}
+            {selected.frame >= duration ? ' · outside duration; preview uses the nearest available frame' : ''}
           </p>
           <button
             type="button"
@@ -400,13 +478,13 @@ export function SpatialControls({
             Preview stored keyframe
           </button>
           <label className="speed-field">
-            Source frame
+            Timeline frame
             <NumberField
-              aria-label="Transform keyframe source frame"
+              aria-label="Transform keyframe timeline frame"
               value={selected.frame}
               integer
               min={0}
-              max={sourceFrameCount}
+              max={2_147_483_647}
               step={1}
               disabled={unavailable}
               resetKey={`${context}:stored:${selection.identity}:frame`}
@@ -433,16 +511,11 @@ export function SpatialControls({
             prefix="Stored Transform"
             context={`${context}:stored:${selection.identity}`}
             disabled={unavailable}
-            validate={(key, value) =>
-              validate(() =>
-                replaceSpatialKey(settings, selected.frame, { values: { ...selected.values, [key]: value } }),
-              )
-            }
-            onCommit={(key, value) =>
-              change(() =>
-                replaceSpatialKey(settings, selected.frame, { values: { ...selected.values, [key]: value } }),
-              )
-            }
+            frame={frame}
+            duration={duration}
+            validate={(key, value) => validate(storedAt(key, value))}
+            onCommit={(key, value) => change(storedAt(key, value))}
+            onDraft={(key, value) => draft(storedAt(key, value ?? 0), value)}
           />
         </section>
       )}
@@ -455,67 +528,63 @@ export function SpatialControls({
   );
 }
 
-export function TransformSection(props: Readonly<Omit<Props, 'clip'> & { clip: VideoClip | null }>) {
+export function TransformSection(props: Readonly<Omit<Props, 'selectedFrame' | 'onSelectStored' | 'steps'>>) {
   const navigation = useKeyframeNavigation();
   const [selection, setSelection] = useState<SpatialInspection | null>(null);
-  const context = `${props.project.id}:${props.clip?.id}:${navigation.sourceEpoch ?? 0}`;
-  const keys = props.clip?.spatial.keyframes ?? [];
-  const playhead = props.clip ? spatialPlayhead(props.project, props.clip.id, props.frame) : null;
+  const context = `${props.project.id}:${props.layer.id}:${navigation.sourceEpoch ?? 0}:transform`;
+  const keys = props.layer.transform.keyframes;
+  const stored = trackTransformKeyframes(props.layer, navigation.duration);
   const inspection = reconcileSpatialInspection(
     selection,
     context,
-    props.project,
-    props.clip,
+    stored,
     props.frame,
     (navigation.playing ?? false) || navigation.inspection !== null,
   );
   if (inspection !== selection) setSelection(inspection);
   const inspected = inspection?.frame ?? null;
-  const at = inspected ?? playhead?.frame ?? props.clip?.sourceIn ?? 0;
+  const at = inspected ?? props.frame;
   const previous = [...keys].reverse().find((key) => key.frame < at);
   const next = keys.find((key) => key.frame > at);
-  const selectStored = (frame: number): SpatialInspection | null => {
-    if (props.disabled || navigation.disabled) return null;
-    const selected = inspectSpatialKeyframe(context, props.project, props.clip, frame, props.frame);
-    if (!selected) return null;
+  const unavailable = props.disabled || navigation.disabled;
+  const seek = (frame: number): void => {
+    if (unavailable) return;
+    const selected = inspectSpatialKeyframe(context, stored, frame, props.frame);
+    if (!selected) return;
     navigation.onFollowPlayhead();
     setSelection(selected);
-    return selected;
+    (navigation.onSeekSourceKeyframe ?? props.onSeek)(selected.expectedFrame);
   };
-  const seek = (key: typeof previous) => {
-    if (!key) return;
-    const selected = selectStored(key.frame);
-    if (selected) (navigation.onSeekSourceKeyframe ?? props.onSeek)(selected.expectedFrame);
-  };
+  // Landing on a keyframe (timeline marker, seek) selects it in the stored editor.
+  const playheadKey = keys.some((key) => key.frame === props.frame) ? props.frame : null;
   return (
     <InspectorSection
       id="transform"
       title="Transform"
       icon="layers"
-      modified={props.clip !== null && hasSpatialEdits(props.clip.spatial)}
+      modified={hasSpatialEdits(props.layer.transform)}
       help={<TransformHelp />}
     >
-      {props.clip ? (
-        <SpatialControls
-          {...props}
-          selectedFrame={inspected}
-          steps={
-            <KeyframeSteps
-              label="Transform"
-              disabled={props.disabled || navigation.disabled}
-              previous={!!previous}
-              next={!!next}
-              onPrevious={() => seek(previous)}
-              onNext={() => seek(next)}
-            />
-          }
-          onSelectStored={selectStored}
-          clip={props.clip}
-          key={`${props.project.id}:${props.clip.id}`}
-        />
-      ) : (
-        <p className="control-hint">Select a clip to edit its Transform.</p>
-      )}
+      <SpatialControls
+        {...props}
+        selectedFrame={inspected ?? playheadKey}
+        steps={
+          <KeyframeSteps
+            label="Transform"
+            disabled={unavailable}
+            previous={!!previous}
+            next={!!next}
+            onPrevious={() => {
+              if (previous) seek(previous.frame);
+            }}
+            onNext={() => {
+              if (next) seek(next.frame);
+            }}
+          />
+        }
+        onSelectStored={seek}
+        key={`${props.project.id}:${props.layer.id}`}
+      />
     </InspectorSection>
   );
 }

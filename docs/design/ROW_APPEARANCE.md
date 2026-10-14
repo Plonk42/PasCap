@@ -1,4 +1,4 @@
-# Owner-approved video track-only Colour and Opacity · schema 17
+# Owner-approved video track-only Colour and Opacity · schema 18
 
 Required Colour includes nine graded scalar settings, including Temperature and Tint,
 the HDR look (applied before grading with the clip detail filters; see
@@ -24,8 +24,8 @@ intentionally colour greys; normalized linear gains precede Exposure, preserving
 neutral-white linear luminance before clipping only, not arbitrary/final images.
 Other scalar bounds and neutral values retain the existing SDR contract.
 No optional legacy field, additive parameter merge, migration or default-on-load exists.
-Schema 17 rejects versions 1–16 without rewriting or deleting their documents.
-Receipt format remains 1 with strict schema-17 snapshots; registry, proxies and
+Schema 18 rejects versions 1–17 without rewriting or deleting their documents.
+Receipt format remains 1 with strict schema-18 snapshots; registry, proxies and
 PCM formats are unchanged. Recreate incompatible projects deliberately.
 
 The nine shared scalar colour channels and HDR override **video track colour**, independently, in
@@ -42,10 +42,11 @@ For example, clips A and B on one video track both use Exposure 0.5 without keyf
 An Exposure curve applies the same evaluated value to both at any project frame,
 including a dissolve. The first diamond captures the evaluated track value.
 
-Trim, restore, split, cut and duplicate preserve source ranges, independent speed
-and spatial anchors without copying colour. Track bases, Opacity and absolute keyframes
-remain untouched. Moving or inserting a clip immediately adopts destination video track
-Colour, keyframes and Opacity without changing either track's settings or keyframes.
+Trim, restore, split, cut and duplicate preserve source ranges and independent speed
+anchors without copying colour or Transform, which is track-owned like Colour. Track
+bases, Opacity, Transform and absolute keyframes remain untouched. Moving or inserting
+a clip immediately adopts destination video track Colour, Transform, keyframes and
+Opacity without changing either track's settings or keyframes.
 
 ## Rendering
 
@@ -64,7 +65,7 @@ poses retain their existing opaque black letterbox path.
 
 With neutral HSL and identity curves, static export generates a 65³ scalar LUT
 from the video track's Colour alone; nonneutral scalar colour with HDR 0 retains this cheap path.
-Track keyframes, nonzero HDR, spatial edits or nonneutral HSL/curves require composited export. Scalar-only
+Track keyframes, nonzero HDR, Transform edits/keyframes or nonneutral HSL/curves require composited export. Scalar-only
 composited grades use evaluated track parameters and at most two reused LUT arrays.
 Advanced grades evaluate the complete scalar/HSL/curve transform exactly on the
 fractional sampled RGB. Source/frame compilation determines neutral stages once,
@@ -99,6 +100,8 @@ read-only until explicitly captured. Capture never uses
 an inspected stored time. Sliders never create keyframes. Track-keyframe selectors
 visibly read **Easing**, retaining contextual accessible names; each enabled setting has its own Easing.
 The static **HSL ranges** and **Colour curves** Track sections share video track ownership, with no new diamonds.
+**Track → Transform** shares the same ownership, with its own project-frame keyframes;
+see [track Transform](SPATIAL_TRANSFORMS.md).
 Individual scalar resets target only the track base or current existing keyed setting;
 Colour Reset on an animated track targets only existing keyed colour/Opacity settings, preserving HSL/curves.
 No reset overwrites another keyframe or the saved base beneath a keyed channel.

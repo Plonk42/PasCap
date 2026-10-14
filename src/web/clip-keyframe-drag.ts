@@ -4,9 +4,8 @@ import type { ProjectDocument, VideoClip } from '../shared/model.js';
 import { calculateLayout, type PlacedClip } from '../shared/timeline.js';
 import { clipKeyframeMarkers, type ClipKeyframeMarker } from './clip-keyframe-markers.js';
 import type { KeyframeSlideKind, KeyframeSlideTarget } from './keyframe-slide.js';
-import { replaceSpatialKey } from './spatial-editor.js';
 
-type ClipKeyCommand = Extract<EditCommand, { type: 'spatial' | 'speed' }>;
+type ClipKeyCommand = Extract<EditCommand, { type: 'speed' }>;
 export type ClipKeyframeType = ClipKeyframeMarker['type'];
 export interface ClipKeyframeDragPlan {
   frame: number;
@@ -15,23 +14,21 @@ export interface ClipKeyframeDragPlan {
   error: string;
 }
 
-const LABELS: Record<ClipKeyframeType, string> = { transform: 'Transform', speed: 'Speed' };
+const LABELS: Record<ClipKeyframeType, string> = { speed: 'Speed' };
 
-function moveCommand(clip: VideoClip, type: ClipKeyframeType, origin: number, frame: number): ClipKeyCommand {
-  if (type === 'transform')
-    return { type: 'spatial', clipId: clip.id, spatial: replaceSpatialKey(clip.spatial, origin, { frame }) };
+function moveCommand(clip: VideoClip, origin: number, frame: number): ClipKeyCommand {
   if (clip.speed.mode !== 'curve') throw new Error('This clip has no speed keyframes.');
   return { type: 'speed', clipId: clip.id, speed: updateClipSpeedKey(clip.speed, origin, { frame }) };
 }
 
-/** Moves one clip key to another original source frame, keeping its value(s) and easing. */
+/** Moves one clip speed key to another original source frame, keeping its rate and easing. */
 export function planClipKeyframeMove(
   project: ProjectDocument,
   clipId: string,
   origin: number,
   nextFrame: number,
   frameCount: number,
-  type: ClipKeyframeType = 'transform',
+  type: ClipKeyframeType = 'speed',
 ): ClipKeyframeDragPlan {
   const fail = (error: string): ClipKeyframeDragPlan => ({ frame: nextFrame, document: project, command: null, error });
   const clip = project.clips.find((item) => item.id === clipId);
@@ -39,14 +36,13 @@ export function planClipKeyframeMove(
   if (nextFrame < 0 || nextFrame > frameCount)
     return fail(`A ${LABELS[type]} keyframe must stay within source frames 0–${frameCount}.`);
   if (
-    type === 'speed' &&
     nextFrame !== origin &&
     clip.speed.mode === 'curve' &&
     clip.speed.keyframes.some((key) => key.frame === nextFrame)
   )
     return fail('A clip speed keyframe already exists at this source frame. Choose another frame.');
   try {
-    const command = moveCommand(clip, type, origin, nextFrame);
+    const command = moveCommand(clip, origin, nextFrame);
     return {
       frame: nextFrame,
       document: applyCommand(project, command),

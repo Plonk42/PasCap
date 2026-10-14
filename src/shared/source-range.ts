@@ -47,9 +47,6 @@ export function validateSourceRanges(project: ProjectDocument, frameCounts: Read
     if (clip.speed.mode === 'curve' && clip.speed.keyframes.some((key) => key.frame > count)) {
       throw new Error('Clip speed keyframes exceed the registered recording. The edit was not committed.');
     }
-    if (clip.spatial.keyframes.some((key) => key.frame > count)) {
-      throw new Error('Clip spatial keyframes exceed the registered recording. The edit was not committed.');
-    }
   }
 }
 

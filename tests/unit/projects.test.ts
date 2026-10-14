@@ -79,7 +79,7 @@ afterEach(async () => {
 });
 
 describe('multiple-project store', () => {
-  it.each([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16])(
+  it.each([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17])(
     'rejects schema-%s documents on load, rename and overwrite while preserving their complete bytes',
     async (schemaVersion) => {
       const directory = await temp();
@@ -90,10 +90,10 @@ describe('multiple-project store', () => {
       const filename = path.join(directory, 'projects', `${id}.json`);
       await atomicWrite(filename, bytes);
       await expect(store.load(id)).rejects.toThrow(`Unsupported project schema version ${schemaVersion}`);
-      await expect(store.rename(id, 'No migration', 0)).rejects.toThrow('requires version 17');
+      await expect(store.rename(id, 'No migration', 0)).rejects.toThrow('requires version 18');
       await expect(store.save(createProject(id, 'No overwrite'), 0)).rejects.toThrow('existing file was not changed');
       expect(await store.list()).toEqual([
-        expect.objectContaining({ id, compatible: false, error: expect.stringContaining('requires version 17') }),
+        expect.objectContaining({ id, compatible: false, error: expect.stringContaining('requires version 18') }),
       ]);
       expect(await readFile(filename, 'utf8')).toBe(bytes);
     },
@@ -131,38 +131,41 @@ describe('multiple-project store', () => {
     }
     expect(await store.load(saved.id)).toEqual(saved);
   });
-  it('round-trips explicit spatial poses/anchors and preserves v8 files against load, rename and overwrite', async () => {
+  it('round-trips explicit track Transform poses/keyframes and preserves v8 files against load, rename and overwrite', async () => {
     const directory = await temp();
     const store = new ProjectStore(directory);
     const document = createProject('spatial-saved', 'Spatial saved');
     document.clips = [createClip('excerpt', 'registered-video', 20, 80)];
-    document.clips[0]!.spatial = {
+    document.layers[0]!.transform = {
       base: { ...NEUTRAL_SPATIAL_POSE, scale: 1.23456789, cropLeft: 0.2 },
       keyframes: [
-        uniformKeyframe(0, { ...NEUTRAL_SPATIAL_POSE, rotation: -170 }, 'smooth'),
-        uniformKeyframe(100, { ...NEUTRAL_SPATIAL_POSE, rotation: 170 }, 'hold'),
+        { ...uniformKeyframe(0, { ...NEUTRAL_SPATIAL_POSE, rotation: -170 }, 'smooth'), reset: false },
+        { ...uniformKeyframe(100, { ...NEUTRAL_SPATIAL_POSE, rotation: 170 }, 'hold'), reset: true },
       ],
     };
     const saved = await store.save(document, 0);
     expect(await store.load(document.id)).toEqual(saved);
     const filename = path.join(directory, 'projects', `${document.id}.json`);
     const bytes = await readFile(filename, 'utf8');
-    for (const spatial of [
+    for (const transform of [
       undefined,
       { ...createSpatialSettings(), extra: true },
       { base: { ...NEUTRAL_SPATIAL_POSE, scale: Infinity }, keyframes: [] },
     ]) {
-      const invalid = { ...saved, clips: [{ ...saved.clips[0]!, spatial }] };
+      const invalid = { ...saved, layers: [{ ...saved.layers[0]!, transform }] };
       await expect(store.save(invalid as ProjectDocument, 1)).rejects.toThrow();
       expect(await readFile(filename, 'utf8')).toBe(bytes);
     }
+    const legacy = { ...saved, clips: [{ ...saved.clips[0]!, spatial: createSpatialSettings() }] };
+    await expect(store.save(legacy as ProjectDocument, 1)).rejects.toThrow();
+    expect(await readFile(filename, 'utf8')).toBe(bytes);
     const oldId = 'preserved-v8';
     const old = { ...structuredClone(document), id: oldId, schemaVersion: 8 };
-    Reflect.deleteProperty(old.clips[0]!, 'spatial');
+    Reflect.deleteProperty(old.layers[0]!, 'transform');
     const oldBytes = JSON.stringify(old);
     const oldPath = path.join(directory, 'projects', `${oldId}.json`);
     await writeFile(oldPath, oldBytes);
-    await expect(store.load(oldId)).rejects.toThrow('requires version 17');
+    await expect(store.load(oldId)).rejects.toThrow('requires version 18');
     await expect(store.rename(oldId, 'No overwrite', 0)).rejects.toThrow('existing file was not changed');
     await expect(store.save(createProject(oldId, 'No overwrite'), 0)).rejects.toThrow('existing file was not changed');
     expect((await store.list()).find((summary) => summary.id === oldId)!.compatible).toBe(false);
@@ -204,7 +207,7 @@ describe('multiple-project store', () => {
     const obsolete = JSON.stringify({ ...document, id: 'preserved-v7', schemaVersion: 7, music: null });
     const obsoletePath = path.join(directory, 'projects', 'preserved-v7.json');
     await writeFile(obsoletePath, obsolete);
-    await expect(store.load('preserved-v7')).rejects.toThrow('version 17');
+    await expect(store.load('preserved-v7')).rejects.toThrow('version 18');
     expect((await store.list()).find((item) => item.id === 'preserved-v7')!.compatible).toBe(false);
     expect(await readFile(obsoletePath, 'utf8')).toBe(obsolete);
     expect(await store.load(document.id)).toEqual(saved);
@@ -219,7 +222,7 @@ describe('multiple-project store', () => {
     expect(first.id).not.toBe(second.id);
     expect(first.title).toBe('First flight');
     expect(first.revision).toBe(1);
-    expect(first.schemaVersion).toBe(17);
+    expect(first.schemaVersion).toBe(18);
     expect(first.layers[0]!.keyframes).toEqual([]);
     const clip = { ...createClip('clip-a', 'registered-video', 0, 120), speed: { mode: 'constant' as const, rate: 2 } };
     const saved = await store.save({ ...first, clips: [clip] }, 1);
@@ -245,7 +248,7 @@ describe('multiple-project store', () => {
     expect((await readdir(path.join(directory, 'projects'))).some((name) => name.endsWith('.tmp'))).toBe(false);
   });
 
-  it('round-trips 256 strict row points and rejects malformed v17 data without changing confirmed bytes', async () => {
+  it('round-trips 256 strict row points and rejects malformed v18 data without changing confirmed bytes', async () => {
     const directory = await temp();
     const store = new ProjectStore(directory);
     const document = createProject('strict-row', 'Shared row');
@@ -256,7 +259,7 @@ describe('multiple-project store', () => {
     );
     document.layers[0]!.keyframes[0] = point(0, { ...scalarColourValues(NEUTRAL_COLOUR), opacity: 0 }, 'smooth');
     const saved = await store.save(document, 0);
-    expect(saved.schemaVersion).toBe(17);
+    expect(saved.schemaVersion).toBe(18);
     expect(saved.layers[0]!.keyframes).toHaveLength(256);
     expect(Object.keys(saved.layers[0]!.keyframes[0]!.values)).toEqual(KEYFRAME_SETTINGS.map((setting) => setting.key));
     expect(saved.layers[0]!.keyframes.at(-1)!.frame).toBeGreaterThan(saved.clips[0]!.sourceOut);
@@ -650,8 +653,8 @@ describe('multiple-project HTTP API', () => {
     const first = projectSchema.parse(firstResponse.json().document);
     const second = projectSchema.parse(secondResponse.json().document);
     expect(first.revision).toBe(1);
-    expect(first.schemaVersion).toBe(17);
-    expect(second.schemaVersion).toBe(17);
+    expect(first.schemaVersion).toBe(18);
+    expect(second.schemaVersion).toBe(18);
     expect(second.id).not.toBe(first.id);
     expect((await service.app.inject({ url: '/api/projects', headers })).json().projects).toHaveLength(2);
     expect((await service.app.inject({ url: `/api/projects/${first.id}`, headers })).json().document).toEqual(first);
@@ -752,7 +755,7 @@ describe('multiple-project HTTP API', () => {
     expect((await service.app.inject({ url: '/api/projects', headers })).json().projects[0].compatible).toBe(false);
     const load = await service.app.inject({ url: '/api/projects/old', headers });
     expect(load.statusCode).toBe(422);
-    expect(load.json().error).toContain('version 17');
+    expect(load.json().error).toContain('version 18');
     expect(
       (
         await service.app.inject({
@@ -777,7 +780,7 @@ describe('multiple-project HTTP API', () => {
     ).toBe(400);
   });
 
-  it('exposes an unsupported-version input as unavailable and refuses load, rename or v17 overwrite', async () => {
+  it('exposes an unsupported-version input as unavailable and refuses load, rename or v18 overwrite', async () => {
     const directory = await temp();
     const unsupported = unsupportedProject(3, 'legacy-v3', 'Original v3');
     const bytes = `${JSON.stringify(unsupported, null, 2)}\n`;
@@ -800,7 +803,7 @@ describe('multiple-project HTTP API', () => {
     const loaded = await service.app.inject({ url: '/api/projects/legacy-v3', headers });
     expect(loaded.statusCode).toBe(422);
     expect(loaded.json().error).toContain('schema version 3');
-    expect(loaded.json().error).toContain('requires version 17');
+    expect(loaded.json().error).toContain('requires version 18');
     expect(
       (
         await service.app.inject({
@@ -916,35 +919,23 @@ describe('multiple-project HTTP API', () => {
     expect(current.music).toEqual(document.music);
     const confirmedPath = path.join(dataDir, 'projects', 'preview-lab.json');
     const confirmedBytes = await readFile(confirmedPath);
-    const spatialWithinOriginal = structuredClone(current);
-    spatialWithinOriginal.clips[0]!.sourceIn = 20;
-    spatialWithinOriginal.clips[0]!.sourceOut = 100;
-    spatialWithinOriginal.clips[0]!.spatial.keyframes = [
-      uniformKeyframe(0, { ...NEUTRAL_SPATIAL_POSE }, 'linear'),
-      uniformKeyframe(120, { ...NEUTRAL_SPATIAL_POSE, scale: 2 }, 'hold'),
+    const transformAfterDuration = structuredClone(current);
+    transformAfterDuration.layers[0]!.transform.keyframes = [
+      { ...uniformKeyframe(0, { ...NEUTRAL_SPATIAL_POSE }, 'linear'), reset: false },
+      { ...uniformKeyframe(5000, { ...NEUTRAL_SPATIAL_POSE, scale: 2 }, 'hold'), reset: false },
     ];
     const acceptedSpatial = await service.app.inject({
       method: 'PUT',
       url: '/api/projects/spatial-bounds',
       headers,
-      payload: { document: { ...spatialWithinOriginal, id: 'spatial-bounds', revision: 0 }, expectedRevision: 0 },
+      payload: { document: { ...transformAfterDuration, id: 'spatial-bounds', revision: 0 }, expectedRevision: 0 },
     });
+    // Track Transform keyframes use project frames: none is bounded by a recording.
     expect(acceptedSpatial.statusCode).toBe(200);
-    expect(projectSchema.parse(acceptedSpatial.json().document).clips[0]!.spatial).toEqual(
-      spatialWithinOriginal.clips[0]!.spatial,
+    expect(projectSchema.parse(acceptedSpatial.json().document).layers[0]!.transform).toEqual(
+      transformAfterDuration.layers[0]!.transform,
     );
     expect(await service.projects.load('spatial-bounds')).toEqual(projectSchema.parse(acceptedSpatial.json().document));
-    // Schema accepts these off-trim anchors; the save boundary checks the registered original.
-    const spatialBeyondOriginal = structuredClone(spatialWithinOriginal);
-    spatialBeyondOriginal.clips[0]!.spatial.keyframes[1]!.frame = 121;
-    const rejectedSpatial = await service.app.inject({
-      method: 'PUT',
-      url: '/api/projects/preview-lab',
-      headers,
-      payload: { document: spatialBeyondOriginal, expectedRevision: 1 },
-    });
-    expect(rejectedSpatial.statusCode).toBe(422);
-    expect(rejectedSpatial.json().error).toContain('spatial keyframes exceed');
     expect(await readFile(confirmedPath)).toEqual(confirmedBytes);
     const videoTooLong = { ...current, clips: [createClip('clip-a', video.id, 0, 121)] };
     const musicTooLong = { ...current, music: [current.music[0]!, { ...current.music[1]!, sourceOut: 60 }] };

@@ -187,7 +187,7 @@ describe('strict row-only Colour and Opacity', () => {
       expect(clip).not.toHaveProperty('colour');
       expect(clip).not.toHaveProperty('correction');
       expect(clip.speed).toEqual(project.clips[0]!.speed);
-      expect(clip.spatial).toEqual(project.clips[0]!.spatial);
+      expect(clip).not.toHaveProperty('spatial');
       expect(clip.mediaId).toBe(project.clips[0]!.mediaId);
     }
     expect(next.layers[0]!.opacity).toBe(project.layers[0]!.opacity);
@@ -217,7 +217,7 @@ describe('strict row-only Colour and Opacity', () => {
 
   it('requires complete row colour and rejects both clip fields and every older schema', () => {
     const project = fixture();
-    for (let schemaVersion = 1; schemaVersion < 17; schemaVersion++)
+    for (let schemaVersion = 1; schemaVersion < 18; schemaVersion++)
       expect(projectSchema.safeParse({ ...project, schemaVersion }).success).toBe(false);
     const { colour: _row, ...missingRow } = project.layers[0]!;
     for (const invalid of [

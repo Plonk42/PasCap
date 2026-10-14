@@ -15,10 +15,12 @@ function fixture(sourceIn = 10, sourceOut = 130, start = 17): ProjectDocument {
   return project;
 }
 
-function transformKeys(project: ProjectDocument, frames: readonly number[]): void {
-  project.clips[0]!.spatial.keyframes = frames.map((frame) =>
-    uniformKeyframe(frame, { ...NEUTRAL_SPATIAL_POSE }, 'linear'),
-  );
+/** A flat custom curve: the same retiming as constant `rate`, with stored keys at `frames`. */
+function speedKeys(project: ProjectDocument, frames: readonly number[], rate = 1): void {
+  project.clips[0]!.speed = {
+    mode: 'curve',
+    keyframes: frames.map((frame) => ({ frame, rate, interpolation: 'hold' })),
+  };
 }
 
 function markersFor(project: ProjectDocument) {
@@ -26,45 +28,35 @@ function markersFor(project: ProjectDocument) {
   return { placed, markers: clipKeyframeMarkers(placed) };
 }
 
-describe('clip-owned timeline keyframe markers', () => {
-  it('creates no synthetic keys for neutral constant speed, static poses or shared track keys', () => {
+describe('clip-owned timeline speed keyframe markers', () => {
+  it('creates no synthetic keys for constant speed, track Transform or shared track keys', () => {
     const project = fixture();
     expect(markersFor(project).markers).toEqual([]);
-    project.clips[0]!.spatial.base.scale = 2;
+    project.layers[0]!.transform.base.scale = 2;
+    project.layers[0]!.transform.keyframes = [
+      { ...uniformKeyframe(30, { ...NEUTRAL_SPATIAL_POSE }, 'linear'), reset: false },
+    ];
     project.layers[0]!.keyframes = [layerKeyframe(30, { ...EMPTY_KEY_VALUES, exposure: 1 }, 'linear')];
     expect(markersFor(project).markers).toEqual([]);
   });
 
   it('maps original frames relative to source IN and actual placement at neutral speed without mutating data', () => {
     const project = fixture();
-    transformKeys(project, [10, 30, 129, 130]);
+    speedKeys(project, [10, 30, 129, 130]);
     const before = structuredClone(project);
     const { markers } = markersFor(project);
     expect(markers).toEqual([
-      { type: 'transform', sourceFrame: 10, outputFrame: 0, timelineFrame: 17, seekFrame: 17 },
-      { type: 'transform', sourceFrame: 30, outputFrame: 20, timelineFrame: 37, seekFrame: 37 },
-      {
-        type: 'transform',
-        sourceFrame: 129,
-        outputFrame: 119,
-        timelineFrame: 136,
-        seekFrame: 136,
-      },
-      {
-        type: 'transform',
-        sourceFrame: 130,
-        outputFrame: 120,
-        timelineFrame: 137,
-        seekFrame: 136,
-      },
+      { type: 'speed', sourceFrame: 10, outputFrame: 0, timelineFrame: 17, seekFrame: 17 },
+      { type: 'speed', sourceFrame: 30, outputFrame: 20, timelineFrame: 37, seekFrame: 37 },
+      { type: 'speed', sourceFrame: 129, outputFrame: 119, timelineFrame: 136, seekFrame: 136 },
+      { type: 'speed', sourceFrame: 130, outputFrame: 120, timelineFrame: 137, seekFrame: 136 },
     ]);
     expect(project).toEqual(before);
   });
 
-  it.each([0.1, 0.3, 0.5, 1.125, 2, 8])('uses the rounded constant %sx clock, not raw source length', (rate) => {
+  it.each([0.1, 0.3, 0.5, 1.125, 2, 8])('uses the rounded flat %sx clock, not raw source length', (rate) => {
     const project = fixture();
-    project.clips[0]!.speed = { mode: 'constant', rate };
-    transformKeys(project, [10, 11, 40, 129, 130]);
+    speedKeys(project, [10, 11, 40, 129, 130], rate);
     const { placed, markers } = markersFor(project);
     const duration = Math.max(1, Math.round(120 / rate));
     expect(placed.duration).toBe(duration);
@@ -91,7 +83,6 @@ describe('clip-owned timeline keyframe markers', () => {
   ] satisfies SpeedSettings[])('maps a source-time $mode through the placed floor inverse', (speed) => {
     const project = fixture(0, 120, 12);
     project.clips[0]!.speed = speed;
-    transformKeys(project, [30]);
     const { placed, markers } = markersFor(project);
     // Independently integrate dt = ds / (0.5 + s / 80), normalised to the rounded duration.
     const total = 80 * Math.log(4);
@@ -99,8 +90,9 @@ describe('clip-owned timeline keyframe markers', () => {
     expect(placed.duration).toBe(111);
     expect(continuous).toBeGreaterThan(44);
     expect(continuous).toBeLessThan(45);
-    expect(markers[0]).toMatchObject({
-      type: 'transform',
+    expect(markers.map((marker) => marker.sourceFrame)).toEqual([0, 30, 120]);
+    expect(markers[1]).toMatchObject({
+      type: 'speed',
       sourceFrame: 30,
       outputFrame: 44,
       timelineFrame: 56,
@@ -109,35 +101,11 @@ describe('clip-owned timeline keyframe markers', () => {
     expect(placed.retiming.outputAt(30)).toBe(44);
     expect(placed.retiming.sourceAt(44)).toBe(29);
     expect(placed.retiming.sourceAt(45)).toBe(30);
-    expect(markers.filter((marker) => marker.type === 'speed').map((marker) => marker.sourceFrame)).toEqual(
-      speed.mode === 'curve' ? [0, 30, 120] : [],
-    );
-  });
-
-  it('retains overlapping Transform and Speed keys independently, without copying track diamonds', () => {
-    const project = fixture(0, 120);
-    transformKeys(project, [30, 120]);
-    project.clips[0]!.speed = {
-      mode: 'curve',
-      keyframes: [
-        { frame: 30, rate: 1, interpolation: 'linear' },
-        { frame: 120, rate: 1, interpolation: 'hold' },
-      ],
-    };
-    project.layers[0]!.keyframes = [layerKeyframe(30, { ...EMPTY_KEY_VALUES, opacity: 0.5 }, 'linear')];
-    const { markers } = markersFor(project);
-    expect(markers).toHaveLength(4);
-    for (const source of [30, 120]) {
-      const coincident = markers.filter((marker) => marker.sourceFrame === source);
-      expect(coincident.map((marker) => marker.type)).toEqual(['transform', 'speed']);
-      expect(coincident[0]!.timelineFrame).toBe(coincident[1]!.timelineFrame);
-      expect(coincident[0]!.seekFrame).toBe(coincident[1]!.seekFrame);
-    }
   });
 
   it('uses each contextual Ripple placement, not a saved suffix start or another clip’s map', () => {
     const project = fixture(0, 60, 20);
-    transformKeys(project, [30]);
+    speedKeys(project, [30]);
     const second = structuredClone(project.clips[0]!);
     second.id = 'second';
     second.start = 999;
@@ -155,41 +123,26 @@ describe('clip-owned timeline keyframe markers', () => {
     expect(secondMarker.seekFrame).toBe(previewClipSource(project, 'second', 30));
   });
 
-  it('omits retained off-trim keys of both types instead of clamping copies to either clip edge', () => {
+  it('omits retained off-trim keys instead of clamping copies to either clip edge', () => {
     const project = fixture(30, 90);
-    transformKeys(project, [0, 29, 30, 60, 90, 91, 120]);
-    project.clips[0]!.speed = {
-      mode: 'curve',
-      keyframes: [0, 29, 30, 60, 90, 91, 120].map((frame) => ({ frame, rate: 1, interpolation: 'linear' })),
-    };
+    speedKeys(project, [0, 29, 30, 60, 90, 91, 120]);
     const before = structuredClone(project);
     const { markers } = markersFor(project);
-    for (const type of ['transform', 'speed'])
-      expect(markers.filter((marker) => marker.type === type).map((marker) => marker.sourceFrame)).toEqual([
-        30, 60, 90,
-      ]);
+    expect(markers.map((marker) => marker.sourceFrame)).toEqual([30, 60, 90]);
     expect(project).toEqual(before);
   });
 
   it('places original exclusive OUT at the right edge but seeks the last held output, not the inverse', () => {
     const project = fixture(0, 120, 7);
-    transformKeys(project, [120]);
-    project.clips[0]!.speed = {
-      mode: 'curve',
-      keyframes: [
-        { frame: 0, rate: 0.25, interpolation: 'hold' },
-        { frame: 120, rate: 0.25, interpolation: 'hold' },
-      ],
-    };
+    speedKeys(project, [0, 120], 0.25);
     const { placed, markers } = markersFor(project);
     expect(placed.duration).toBe(480);
-    for (const marker of markers.filter((point) => point.sourceFrame === 120)) {
-      expect(marker.outputFrame).toBe(480);
-      expect(marker.timelineFrame).toBe(placed.end);
-      expect(marker.seekFrame).toBe(486);
-      expect(marker.seekFrame).toBe(placed.end - 1);
-      expect(placed.retiming.sourceAt(marker.seekFrame - placed.start)).toBe(119);
-    }
+    const marker = markers.find((point) => point.sourceFrame === 120)!;
+    expect(marker.outputFrame).toBe(480);
+    expect(marker.timelineFrame).toBe(placed.end);
+    expect(marker.seekFrame).toBe(486);
+    expect(marker.seekFrame).toBe(placed.end - 1);
+    expect(placed.retiming.sourceAt(marker.seekFrame - placed.start)).toBe(119);
   });
 
   it.each([
@@ -200,8 +153,7 @@ describe('clip-owned timeline keyframe markers', () => {
     { source: 3, rate: 4, output: 0, seek: 1, displayed: 4 },
   ])('previews the closest mapped image for source $source at $rate×, preferring the earlier tie', (test) => {
     const project = fixture(0, 120, 7);
-    transformKeys(project, [test.source]);
-    project.clips[0]!.speed = { mode: 'constant', rate: test.rate };
+    speedKeys(project, [test.source], test.rate);
     const { placed, markers } = markersFor(project);
     expect(markers[0]!.outputFrame).toBe(test.output);
     expect(markers[0]!.seekFrame).toBe(7 + test.seek);
@@ -210,8 +162,7 @@ describe('clip-owned timeline keyframe markers', () => {
 
   it('keeps distinct skipped keys even when their mapped diamond positions coincide', () => {
     const project = fixture(0, 120);
-    project.clips[0]!.speed = { mode: 'constant', rate: 4 };
-    transformKeys(project, [1, 2, 3]);
+    speedKeys(project, [1, 2, 3], 4);
     const { markers } = markersFor(project);
     expect(markers.map((marker) => marker.sourceFrame)).toEqual([1, 2, 3]);
     expect(markers.map((marker) => marker.outputFrame)).toEqual([0, 0, 0]);
@@ -220,34 +171,26 @@ describe('clip-owned timeline keyframe markers', () => {
 
   it('bounds one-frame preview targets even with a fast clip rate and an OUT boundary', () => {
     const project = fixture(7, 10, 5);
-    transformKeys(project, [7, 8, 9, 10]);
-    project.clips[0]!.speed = { mode: 'constant', rate: 8 };
+    speedKeys(project, [7, 8, 9, 10], 8);
     const { placed, markers } = markersFor(project);
     expect(placed.duration).toBe(1);
     expect(markers.map((marker) => marker.outputFrame)).toEqual([0, 0, 0, 1]);
     expect(markers.every((marker) => marker.seekFrame === 5)).toBe(true);
   });
 
-  it('retains both complete 256-key lists without truncating, deduplicating or inventing track keys', () => {
+  it('retains a complete 256-key list without truncating, deduplicating or inventing track keys', () => {
     const project = fixture(0, 255, 0);
     const frames = Array.from({ length: 256 }, (_, index) => index);
-    transformKeys(project, frames);
-    project.clips[0]!.speed = {
-      mode: 'curve',
-      keyframes: frames.map((frame) => ({ frame, rate: 1, interpolation: 'hold' })),
-    };
+    speedKeys(project, frames);
     expect(projectSchema.safeParse(project).success).toBe(true);
     const { markers } = markersFor(project);
-    expect(markers).toHaveLength(512);
-    for (const type of ['transform', 'speed'])
-      expect(markers.filter((marker) => marker.type === type).map((marker) => marker.sourceFrame)).toEqual(frames);
-    expect(new Set(markers.map((marker) => `${marker.type}-${marker.sourceFrame}`)).size).toBe(512);
+    expect(markers.map((marker) => marker.sourceFrame)).toEqual(frames);
     expect(markers.every((marker) => marker.seekFrame >= 0 && marker.seekFrame < 255)).toBe(true);
   });
 
   it('does not allocate per-output-frame data for the maximum supported duration', () => {
     const project = fixture(0, 2_147_483_647, 0);
-    transformKeys(project, [0, 2_147_483_647]);
+    speedKeys(project, [0, 2_147_483_647]);
     const { placed, markers } = markersFor(project);
     expect(placed.duration).toBe(2_147_483_647);
     expect(markers).toHaveLength(2);

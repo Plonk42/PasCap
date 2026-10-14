@@ -103,19 +103,19 @@ PasCap is a solo, pre-release project: optimize for fast iteration. Details are 
   single setting has no extra per-setting arrows beside its diamond. Clip source navigation
   previews the nearest image mapped by authoritative retiming, using an independent
   clip-local stored-source cursor, not central track inspection or a clamped
-  playhead as stored time. Transform likewise visits all retained source
-  keyframes with its own clip-local cursor. Successive stored keyframes remain
-  reachable when previews coincide; main values/capture always use the real
-  displayed project/source frame. Timeline source markers still omit off-trim
+  playhead as stored time. Transform visits all retained track Transform keyframes,
+  including those after the duration, with its own track-local cursor. Successive stored
+  keyframes remain reachable when previews coincide; main values/capture always use the
+  real displayed project/source frame. Timeline speed markers still omit off-trim
   keyframes; exclusive OUT has a boundary marker seeking the last available image.
   Navigation never edits,
   saves or creates history. See [speed/audio](../docs/SPEED_AND_AUDIO.md) and
   [spatial transforms](../docs/design/SPATIAL_TRANSFORMS.md).
-- Strict schema 17 (#143) requires project `bookmarks`: 0–1,000 unique ascending project
+- Strict schema 18 (#143) requires project `bookmarks`: 0–1,000 unique ascending project
   frames, `[]` on new projects. They are extra `snapPoints()` for every snapping gesture,
   slide through `useKeyframeSlide` (a dragged bookmark never snaps to itself) and never
   retime, render or export. See [timeline](../docs/TIMELINE_EDITING.md).
-- Strict schema 17 requires complete row Colour with nine graded scalar fields,
+- Strict schema 18 requires complete row Colour with nine graded scalar fields,
   `hdr`, `colour.hsl` (eight complete named bands) and `colour.curves` (master/red/green/blue
   2–16-point arrays). HSL/curves remain static, not animation channels. All Colour
   is row-owned, keyed or not; clips have no colour/correction. Neutral creators
@@ -147,24 +147,28 @@ PasCap is a solo, pre-release project: optimize for fast iteration. Details are 
   row bases and absolute points, without per-clip colour copies. HSL and curves
   retain that ownership, as do Temperature and Tint.
   See [row appearance](../docs/design/ROW_APPEARANCE.md).
-- Every clip requires strict `spatial: { base, keyframes }`: eight complete pose
-  values and 0–256 ascending original-source keys; each key
-  enables any of the eight settings (others null, at least one number) with its own Easing, and each
-  setting interpolates between its own keys with endpoint holds. A setting without
-  keys holds its base; deleting its last key reveals that base; Reset transform
-  clears keys and restores the neutral base deliberately.
-  Retain/deep-copy original anchors through trims, cuts, splits and duplication,
-  including off-trim keys and original exclusive OUT. Evaluate geometry with
-  `PlacedClip.retiming.sourcePositionAt`; `sourceAt` remains recorded-image identity.
+- Owner-approved #131 (schema 18): Transform is **track-owned, exactly like Colour**.
+  Every video track requires strict `transform: { base, keyframes }`; clips have no
+  `spatial` field. Eight complete pose values and 0–256 ascending absolute project-frame
+  keys `{ frame, values, easing, reset }`; each key enables any of the eight settings
+  (others null, at least one number) with its own Easing, and each setting interpolates
+  between its own keys with endpoint holds. A setting without keys holds its base;
+  deleting its last key reveals that base. A Transform default keyframe (`reset: true`,
+  neutral pose, Hold) never reaches back, like a Colour default keyframe. Reset transform
+  behaves like Colour Reset: unanimated it restores the neutral base, animated it
+  neutralizes the enabled settings of the key at the playhead. The pose applies to
+  every source on the track (both dissolve sources, per source, no extra resampling
+  pass); clip edits never copy or shift it and moves adopt the destination pose.
   Scale is 0.1–8, translation −2–2 output-width/height fractions, rotation
   −180°–180° clockwise with numeric, not shortest-arc interpolation. Crop fractions
   are each in 0–1 (a crop of 1, or opposite crops summing to 1 or more, cover nothing), without refit or moving the original-centre pivot;
   use unrounded original-aspect contain fit and top-left half-open crop bounds.
   Exact neutral rendering preserves opaque black letterboxing after grading;
-  nonneutral uncovered pixels are transparent. Clip → Transform is the second
-  section, collapsed by default, with a source-frame capture diamond and Previous/Next per setting,
-  read-only animated main values without that setting's key at the real displayed source frame,
-  stored-key navigation/exact fields and release-only value sliders. Any spatial
+  nonneutral uncovered pixels are transparent. Track → Transform follows Colour
+  curves, collapsed by default, with a capture triangle and Previous/Next per setting,
+  read-only animated main values without that setting's key at the real playhead,
+  **Add default Transform keyframe**, stored-key navigation/exact fields and live
+  slider preview; blue ▼ markers sit at the top of the track row. Any spatial
   edit/key requires layered export; native 22 bytes/pixel, two LUTs and process
   bounds remain unchanged. See [spatial transforms](../docs/design/SPATIAL_TRANSFORMS.md).
 - Owner-approved #123: every clip requires strict static `detail: { sharpen 0–1,
@@ -208,17 +212,18 @@ clarity −1–1, denoise 0–1 }`, neutral 0, with no keyframes or track channe
   $\mathrm{result} = C + \mathrm{lower}(1 - A)$, evaluating row Opacity for each
   source with no additional layer multiplier; $m_i$ is spatial source coverage,
   including opaque neutral letterboxing. Black fades never reduce that coverage.
-  Version-1 export receipts require strict v17 snapshots and captured audio-source/
+  Version-1 export receipts require strict v18 snapshots and captured audio-source/
   instance-plan arrays; receipt, registry/proxy/PCM and benchmark format versions
   remain independent and unchanged.
-  Reject and preserve incompatible v1–v16 projects/receipt snapshots; require recreation,
+  Reject and preserve incompatible v1–v17 projects/receipt snapshots; require recreation,
   without migrations, compatibility defaults or automatic deletion.
 - Owner-approved #135/#87: track and Transform keyframes store one Easing per enabled
   setting (`easing` mirrors `values`); a joining setting adopts the Easing its keyframe's
   settings agree on, else Linear. Track keyframes require boolean `reset`: a **default
   keyframe** (`reset: true`, created with all eleven settings neutral and Hold Easing)
   never reaches back, so a setting whose first keyframe it is keeps its unkeyed value before
-  it. Toggle **Add default keyframe** in the Colour keyframe line; amber filled marker. See
+  it. Toggle **Add default keyframe** in the Colour keyframe line; amber filled marker.
+  Transform keyframes carry the same `reset` flag (own toggle in the Transform line). See
   [layers/keyframes](../docs/LAYERS_AND_KEYFRAMES.md).
 - Music is a required 0–8 array of independently identified instances, never null
   or singular. Duration is the maximum of all video and music OUTs. After the last

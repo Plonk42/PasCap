@@ -16,9 +16,8 @@
   flex-wrap: nowrap;
 }
 
-/* Clip keys are boxed buttons the size of the Colour track markers, which overlap the clip's bottom edge by
- * 19px: blue Transform ▼ boxes overlap its top edge by 19px (the clip label sits below), slightly shorter
- * salmon Speed ◆ boxes sit between the label and the Colour markers.
+/* Speed keys are salmon ◆ boxes slightly shorter than the Colour track markers (which overlap the clip's
+ * bottom edge by 19px), between the clip label and those markers.
  */
 .timeline-clip-key {
   position: absolute;
@@ -35,17 +34,6 @@
   cursor: ew-resize;
   touch-action: none;
   pointer-events: auto;
-}
-
-.timeline-clip-key.transform {
-  background: #1b3446ee;
-  border-color: #5d93b8;
-  color: #c4e9ff;
-}
-
-.timeline-clip-key.transform:is(:hover, :focus-visible):not(:disabled) {
-  background: #264b66;
-  border-color: #9fd2f2;
 }
 
 .timeline-clip-key.speed {
@@ -85,7 +73,7 @@
   outline-color: var(--error);
 }
 
-.product-workspace .timeline-clip:has(.timeline-clip-key.transform) .timeline-clip-label {
+.product-workspace .timeline-clip.transform-animated .timeline-clip-label {
   top: 19px;
 }
 

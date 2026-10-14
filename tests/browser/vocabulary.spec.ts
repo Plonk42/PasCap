@@ -72,9 +72,6 @@ for (const viewport of [
     await page.getByRole('button', { name: 'Colour curves section', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Colour curve control node 1', exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Delete colour curve control node', exact: true })).toBeDisabled();
-
-    await inspectorTab(page, 'Clip');
-    await expect(page.getByRole('button', { name: 'Range section', exact: true })).toBeVisible();
     await page.getByRole('button', { name: 'Keyframe Scale', exact: true }).click();
     await expect(page.getByRole('combobox', { name: 'Selected Transform keyframe', exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Preview selected Transform keyframe', exact: true })).toHaveText(
@@ -82,6 +79,9 @@ for (const viewport of [
     );
     await page.getByRole('button', { name: 'Undo', exact: true }).click();
     await expect(page.getByRole('combobox', { name: 'Selected Transform keyframe', exact: true })).toHaveCount(0);
+
+    await inspectorTab(page, 'Clip');
+    await expect(page.getByRole('button', { name: 'Range section', exact: true })).toBeVisible();
 
     await page.getByRole('button', { name: 'Review pattern-a.mp4', exact: true }).click();
     await expect(page.getByRole('button', { name: /^Add clip \d+\.\d{2} s to timeline$/ })).toBeVisible();
@@ -106,7 +106,7 @@ for (const viewport of [
       ]);
     expect(wording.join('\n')).not.toMatch(/\b(?:rush|excerpts?|rows?|layers?|participants?|points?)\b/i);
     expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
-    expect(memory.snapshot().clips[0]!.spatial.keyframes).toEqual([]);
+    expect(memory.snapshot().layers[0]!.transform.keyframes).toEqual([]);
     expect(unexpected).toEqual([]);
   });
 }

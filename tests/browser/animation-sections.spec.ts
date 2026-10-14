@@ -47,9 +47,15 @@ function transformDiamonds(page: Page): Locator {
   return inspector(page).locator('.spatial-pose-fields .keyframe-toggle');
 }
 
-function marker(page: Page, type: 'transform' | 'speed', source: number): Locator {
-  return page.locator(`[data-clip-id="${CLIP}"] [data-clip-keyframe="${type}"][data-source-frame="${source}"]`);
+function marker(page: Page, type: 'transform' | 'speed', frame: number): Locator {
+  // Track Transform markers sit at timeline frames; clip speed markers at original source frames.
+  return type === 'transform'
+    ? page.locator(`[data-transform-layer="video-1"][data-transform-keyframe="${frame}"]`)
+    : page.locator(`[data-clip-id="${CLIP}"] [data-clip-keyframe="speed"][data-source-frame="${frame}"]`);
 }
+
+/** Track Transform keyframes at timeline frames; 90 and 110 lie after the 90-frame duration. */
+const TRANSFORM_FRAMES = [0, 10, 50, 90, 110];
 
 async function current(page: Page): Promise<ProjectDocument> {
   return projectSchema.parse(await page.evaluate(() => window.pascapLab!.project()));
@@ -198,10 +204,14 @@ for (const viewport of [
         mode: 'curve',
         keyframes: [0, 30, 80, 120].map((frame) => ({ frame, rate: 1, interpolation: 'linear' })),
       };
-      clip.spatial = createSpatialSettings();
-      clip.spatial.keyframes = [0, 20, 60, 100, 120].map((frame) =>
-        uniformKeyframe(frame, { ...NEUTRAL_SPATIAL_POSE, scale: 1 + frame / 300, translateX: frame / 1000 }, 'linear'),
-      );
+      document.layers[0]!.transform.keyframes = TRANSFORM_FRAMES.map((frame) => ({
+        ...uniformKeyframe(
+          frame,
+          { ...NEUTRAL_SPATIAL_POSE, scale: 1 + frame / 300, translateX: frame / 1000 },
+          'linear',
+        ),
+        reset: false,
+      }));
       document.clips = [clip];
       memory = await memoryProjects(page, document);
       await page.addInitScript(() => {
@@ -254,9 +264,9 @@ for (const viewport of [
       const document = await fixture(page, (document) => {
         document.layers[0]!.keyframes = [];
         document.clips[0]!.speed = { mode: 'constant', rate: 1 };
-        document.clips[0]!.spatial = createSpatialSettings();
+        document.layers[0]!.transform = createSpatialSettings();
       });
-      expect(document.schemaVersion).toBe(17);
+      expect(document.schemaVersion).toBe(18);
       await inspectorTab(page, 'Track');
       await expect(inspector(page).getByRole('button', { name: /^Animate / })).toHaveCount(0);
       await expect(line(page, 'Colour')).toContainText('0 keyframes');
@@ -282,17 +292,18 @@ for (const viewport of [
         }
       }
       await testInfo.attach('unanimated-colour', { body: await page.screenshot(), contentType: 'image/png' });
+      await expect(line(page, 'Transform')).toContainText('0 keyframes');
+      for (const direction of ['Previous', 'Next'] as const)
+        await expect(navigation(page, 'Transform', direction)).toBeDisabled();
+      await expect(transformDiamonds(page)).toHaveCount(8);
+      await expect(page.getByRole('spinbutton', { name: 'Transform Scale', exact: true })).toBeEnabled();
       await inspectorTab(page, 'Clip');
       await expect(inspector(page).getByRole('button', { name: /^Animate / })).toHaveCount(0);
-      for (const section of ['Speed', 'Transform'] as const) {
-        await expect(line(page, section)).toContainText('0 keyframes');
-        for (const direction of ['Previous', 'Next'] as const)
-          await expect(navigation(page, section, direction)).toBeDisabled();
-      }
+      await expect(line(page, 'Speed')).toContainText('0 keyframes');
+      for (const direction of ['Previous', 'Next'] as const)
+        await expect(navigation(page, 'Speed', direction)).toBeDisabled();
       await expect(diamond(page, 'Speed')).toBeVisible();
-      await expect(transformDiamonds(page)).toHaveCount(8);
       await expect(page.getByRole('spinbutton', { name: 'Clip speed rate', exact: true })).toBeEnabled();
-      await expect(page.getByRole('spinbutton', { name: 'Transform Scale', exact: true })).toBeEnabled();
       expect(await animatePreferences(page)).toEqual([]);
       expect(await page.evaluate(() => globalThis.document.documentElement.scrollWidth <= innerWidth)).toBe(true);
       await unchanged(page, document);
@@ -315,19 +326,20 @@ for (const viewport of [
       await expect(page.getByRole('spinbutton', { name: 'Exposure', exact: true })).toBeDisabled();
       await expect(page.getByRole('slider', { name: 'Opacity', exact: true })).toBeDisabled();
       await expect(layerKeyframes(page, TRACK).locator('.keyframe-row')).toHaveCount(2);
-      await inspectorTab(page, 'Clip');
-      // Every retained custom clip key (4) and every Transform key (5) is counted, off-trim included.
-      await expect(line(page, 'Speed')).toContainText('4 keyframes');
+      // Every stored Transform keyframe (5) is counted, including those after the duration.
       await expect(line(page, 'Transform')).toContainText('5 keyframes');
-      await expect(page.getByRole('spinbutton', { name: 'Clip speed rate', exact: true })).toBeDisabled();
-      await expect(page.getByRole('spinbutton', { name: 'Clip speed rate', exact: true })).toHaveValue('1');
-      await expect(diamond(page, 'Speed')).toHaveAttribute('aria-pressed', 'false');
       await expect(transformDiamonds(page)).toHaveCount(8);
-      const pose = evaluateSpatial(document.clips[0]!.spatial, 25);
+      const pose = evaluateSpatial(document.layers[0]!.transform, 15);
       await expect(page.getByRole('spinbutton', { name: 'Transform Scale', exact: true })).toHaveValue(
         String(pose.scale),
       );
       await expect(page.getByRole('spinbutton', { name: 'Transform Scale', exact: true })).toBeDisabled();
+      await inspectorTab(page, 'Clip');
+      // Every retained custom clip key (4) is counted, off-trim included.
+      await expect(line(page, 'Speed')).toContainText('4 keyframes');
+      await expect(page.getByRole('spinbutton', { name: 'Clip speed rate', exact: true })).toBeDisabled();
+      await expect(page.getByRole('spinbutton', { name: 'Clip speed rate', exact: true })).toHaveValue('1');
+      await expect(diamond(page, 'Speed')).toHaveAttribute('aria-pressed', 'false');
       expect(await pixels(page)).toEqual(graded);
       await previewAt(page, document, 15);
       await testInfo.attach('locked-with-keys', { body: await page.screenshot(), contentType: 'image/png' });
@@ -335,9 +347,9 @@ for (const viewport of [
       await seek(page, document, 20);
       await expect(page.getByRole('spinbutton', { name: 'Clip speed rate', exact: true })).toBeEnabled();
       await expect(diamond(page, 'Speed')).toHaveAttribute('aria-pressed', 'true');
+      await inspectorTab(page, 'Track');
       await seek(page, document, 10);
       await expect(page.getByRole('spinbutton', { name: 'Transform Scale', exact: true })).toBeEnabled();
-      await inspectorTab(page, 'Track');
       await seek(page, document, 40);
       await expect(page.getByRole('spinbutton', { name: 'Exposure', exact: true })).toBeEnabled();
       await seek(page, document, 0);
@@ -349,8 +361,8 @@ for (const viewport of [
       await expect(colour).toBeVisible();
       await colour.click();
       await expect(line(page, 'Colour')).toBeVisible();
-      await inspectorTab(page, 'Clip');
-      for (const section of ['Speed', 'Transform'] as const) {
+      for (const section of ['Transform', 'Speed'] as const) {
+        if (section === 'Speed') await inspectorTab(page, 'Clip');
         const toggle = page.getByRole('button', { name: `${section} section`, exact: true });
         await toggle.click();
         await expect(line(page, section)).toBeHidden();
@@ -542,7 +554,9 @@ for (const viewport of [
       await unchanged(page, document);
     });
 
-    test('manual same-frame seek clears the two clip-local cursors without changing stored keys', async ({ page }) => {
+    test('manual same-frame seek clears the Speed and Transform cursors without changing stored keys', async ({
+      page,
+    }) => {
       const document = await fixture(page, (document) => {
         const speed = document.clips[0]!.speed;
         if (speed.mode !== 'curve') throw new Error('Expected synthetic custom speed curve');
@@ -561,47 +575,49 @@ for (const viewport of [
       await previewAt(page, document, 70);
       await expect(speedSelect.locator('option:checked')).toContainText('source 80');
 
+      await inspectorTab(page, 'Track');
       const transformSelect = page.getByRole('combobox', { name: 'Selected Transform keyframe', exact: true });
-      await transformSelect.selectOption('120');
+      await transformSelect.selectOption('110');
       await previewAt(page, document, 89);
       await page.getByRole('button', { name: 'Go to timecode', exact: true }).click();
       await timecode.fill('89');
       await timecode.press('Enter');
+      // Following the playhead again, Next steps from frame 89, not from the stored 110.
       await navigation(page, 'Transform', 'Next').click();
-      await expect(transformSelect).toHaveValue('100');
+      await expect(transformSelect).toHaveValue('90');
       await previewAt(page, document, 89);
       await unchanged(page, document);
     });
 
-    test('Transform header and selector reach off-trim/original OUT keys; each setting diamond captures only that actual setting', async ({
+    test('Transform header and selector reach keyframes after the duration; each setting captures only itself', async ({
       page,
     }) => {
       const document = await current(page);
-      const placed = calculateLayout(document).clips[0]!;
-      await inspectorTab(page, 'Clip');
+      await inspectorTab(page, 'Track');
       const select = page.getByRole('combobox', { name: 'Selected Transform keyframe', exact: true });
       await expect(select.locator('option')).toHaveCount(5);
-      await expect(select.locator('option[value="0"]')).toContainText('outside clip');
-      await expect(select.locator('option[value="120"]')).toContainText('outside clip');
+      await expect(select.locator('option[value="50"]')).not.toContainText('outside duration');
+      await expect(select.locator('option[value="90"]')).toContainText('outside duration');
+      await expect(select.locator('option[value="110"]')).toContainText('outside duration');
       await expect(transformDiamonds(page)).toHaveCount(8);
       await expect(transformDiamond(page)).toHaveCount(1);
-      for (const source of [20, 60, 100, 120]) {
+      for (const frame of [10, 50, 90, 110]) {
         await navigation(page, 'Transform', 'Next').click();
-        await previewAt(page, document, nearestOutput(placed, source));
-        await expect(select).toHaveValue(String(source));
-        const actual = placed.retiming.sourceAt(nearestOutput(placed, source) - placed.start);
+        const preview = Math.min(frame, 89);
+        await previewAt(page, document, preview);
+        await expect(select).toHaveValue(String(frame));
         await expect(page.getByRole('region', { name: 'Stored Transform keyframe', exact: true })).toContainText(
-          `Stored source frame ${source} · actual displayed source frame ${actual}`,
+          `Stored timeline frame ${frame} · playhead frame ${preview}`,
         );
       }
       await expect(navigation(page, 'Transform', 'Next')).toBeDisabled();
-      for (const source of [100, 60, 20, 0]) {
+      for (const frame of [90, 50, 10, 0]) {
         await navigation(page, 'Transform', 'Previous').click();
-        await previewAt(page, document, nearestOutput(placed, source));
-        await expect(select).toHaveValue(String(source));
+        await previewAt(page, document, Math.min(frame, 89));
+        await expect(select).toHaveValue(String(frame));
       }
       await expect(navigation(page, 'Transform', 'Previous')).toBeDisabled();
-      await select.selectOption('120');
+      await select.selectOption('110');
       await previewAt(page, document, 89);
       await expect(page.getByRole('spinbutton', { name: 'Transform Scale', exact: true })).toBeDisabled();
       await expect(transformDiamond(page)).toHaveAttribute('aria-pressed', 'false');
@@ -609,24 +625,23 @@ for (const viewport of [
       await transformDiamond(page).focus();
       await transformDiamond(page).press('Space');
       const expected = structuredClone(document);
-      expected.clips[0]!.spatial.keyframes.splice(
-        3,
-        0,
-        uniformKeyframe(
-          placed.retiming.sourceAt(89),
+      expected.layers[0]!.transform.keyframes.splice(3, 0, {
+        ...uniformKeyframe(
+          89,
           {
             cropLeft: null,
             cropRight: null,
             cropTop: null,
             cropBottom: null,
-            scale: evaluateSpatial(document.clips[0]!.spatial, placed.retiming.sourcePositionAt(89)).scale,
+            scale: evaluateSpatial(document.layers[0]!.transform, 89).scale,
             translateX: null,
             translateY: null,
             rotation: null,
           },
           'linear',
         ),
-      );
+        reset: false,
+      });
       expect(await current(page)).toEqual(expected);
       await expect(transformDiamond(page)).toHaveAttribute('aria-pressed', 'true');
       await page.evaluate(() => window.pascapLab!.flush());
@@ -636,50 +651,52 @@ for (const viewport of [
       await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
     });
 
-    test('distinct source lanes use placed-map positions, omit off-trim keys and select/seek through click, Space and Enter', async ({
+    test('speed lanes use placed-map positions, Transform markers sit on the track, and both select/seek through click, Space and Enter', async ({
       page,
     }, testInfo) => {
       const document = await fixture(page, (document) => {
         document.layers.push(createLayer('empty-track', 'Empty track'));
       });
       const placed = calculateLayout(document).clips[0]!;
-      await expect(page.locator(`[data-clip-id="${CLIP}"] [data-clip-keyframe="transform"]`)).toHaveCount(3);
+      await expect(page.locator(`[data-clip-id="${CLIP}"] [data-clip-keyframe="transform"]`)).toHaveCount(0);
       await expect(page.locator(`[data-clip-id="${CLIP}"] [data-clip-keyframe="speed"]`)).toHaveCount(2);
-      const keys = [
-        { type: 'transform', sources: [20, 60, 100] },
-        { type: 'speed', sources: [30, 80] },
-      ] as const;
-      for (const { type, sources } of keys) {
-        for (const source of sources) {
-          const key = marker(page, type, source);
-          const output = source === placed.clip.sourceOut ? placed.duration : placed.retiming.outputAt(source);
-          await expect(key).toHaveClass(new RegExp(`\\b${type}\\b`));
-          await expect(key).toHaveAttribute('draggable', 'false');
-          await expect(key).toHaveAttribute('data-timeline-frame', String(placed.start + output));
-          await expect(key).toHaveAttribute('data-seek-frame', String(nearestOutput(placed, source)));
-          expect(
-            await key.evaluate((element) =>
-              (element as HTMLElement).style.getPropertyValue('--clip-keyframe-position'),
-            ),
-          ).toBe(`${(output / placed.duration) * 100}%`);
-          await expect(key).toHaveAttribute('title', /Drag to move; Arrow keys: 1 source frame, Shift: 10$/);
-          if (type === 'speed') await expect(key).toHaveAttribute('title', / · 1× · /);
-          const bounds = await key.evaluate((element) => {
-            const clip = element.closest('.timeline-clip')!.getBoundingClientRect();
-            const marker = element.getBoundingClientRect();
-            return { x: marker.x - clip.x, width: marker.width, clipWidth: clip.width };
-          });
-          const expectedX = Math.max(
-            0,
-            Math.min(bounds.clipWidth - bounds.width, (output / placed.duration) * bounds.clipWidth - bounds.width / 2),
-          );
-          expect(bounds.x).toBeCloseTo(expectedX, 1);
-        }
+      // One marker per stored track Transform keyframe, including those after the duration.
+      await expect(page.locator('[data-transform-layer="video-1"]')).toHaveCount(TRANSFORM_FRAMES.length);
+      const scale = Number(await page.locator('.timeline-surface').getAttribute('data-pixels-per-frame'));
+      const left = async (frame: number) => (await marker(page, 'transform', frame).boundingBox())!.x;
+      expect((await left(50)) - (await left(10))).toBeCloseTo(40 * scale, 0);
+      for (const frame of TRANSFORM_FRAMES)
+        await expect(marker(page, 'transform', frame)).toHaveAttribute(
+          'title',
+          /Drag to move; Arrow keys: 1 frame, Shift: 10\. Alt bypasses snapping\.$/,
+        );
+      for (const source of [30, 80]) {
+        const key = marker(page, 'speed', source);
+        const output = source === placed.clip.sourceOut ? placed.duration : placed.retiming.outputAt(source);
+        await expect(key).toHaveClass(/\bspeed\b/);
+        await expect(key).toHaveAttribute('draggable', 'false');
+        await expect(key).toHaveAttribute('data-timeline-frame', String(placed.start + output));
+        await expect(key).toHaveAttribute('data-seek-frame', String(nearestOutput(placed, source)));
+        expect(
+          await key.evaluate((element) => (element as HTMLElement).style.getPropertyValue('--clip-keyframe-position')),
+        ).toBe(`${(output / placed.duration) * 100}%`);
+        await expect(key).toHaveAttribute('title', /Drag to move; Arrow keys: 1 source frame, Shift: 10$/);
+        await expect(key).toHaveAttribute('title', / · 1× · /);
+        const bounds = await key.evaluate((element) => {
+          const clip = element.closest('.timeline-clip')!.getBoundingClientRect();
+          const marker = element.getBoundingClientRect();
+          return { x: marker.x - clip.x, width: marker.width, clipWidth: clip.width };
+        });
+        const expectedX = Math.max(
+          0,
+          Math.min(bounds.clipWidth - bounds.width, (output / placed.duration) * bounds.clipWidth - bounds.width / 2),
+        );
+        expect(bounds.x).toBeCloseTo(expectedX, 1);
       }
-      const appearance = await page.locator('.timeline-clip-key').evaluateAll((elements) =>
+      const appearance = await page.locator('.timeline-clip-key, .timeline-transform-key').evaluateAll((elements) =>
         elements.map((element) => ({
-          type: element.getAttribute('data-clip-keyframe'),
-          top: getComputedStyle(element).top,
+          type: element.hasAttribute('data-transform-keyframe') ? 'transform' : 'speed',
+          top: element.getBoundingClientRect().top,
           colour: getComputedStyle(element).color,
           border: getComputedStyle(element).borderTopStyle,
           borderColour: getComputedStyle(element).borderTopColor,
@@ -688,26 +705,26 @@ for (const viewport of [
       );
       const transform = appearance.find(({ type }) => type === 'transform')!;
       const speed = appearance.find(({ type }) => type === 'speed')!;
-      expect(transform.top).not.toBe(speed.top);
+      expect(transform.top).toBeLessThan(speed.top);
       expect(transform.colour).not.toBe(speed.colour);
       expect(transform.borderColour).not.toBe(speed.borderColour);
       // Both are boxed buttons of the same family as the Colour track markers.
       expect([transform.border, speed.border]).toEqual(['solid', 'solid']);
       expect(speed.width).toBe(transform.width);
       for (const activation of [
-        { type: 'transform', source: 20, key: null },
-        { type: 'speed', source: 80, key: 'Space' },
-        { type: 'transform', source: 100, key: 'Enter' },
+        { type: 'transform', frame: 10, preview: 10, key: null },
+        { type: 'speed', frame: 80, preview: nearestOutput(placed, 80), key: 'Space' },
+        { type: 'transform', frame: 50, preview: 50, key: 'Enter' },
       ] as const) {
         await page.getByRole('button', { name: 'Select track Empty track', exact: true }).click();
         await expect(page.locator(`[data-clip-id="${CLIP}"]`)).not.toHaveClass(/selected/);
-        const key = marker(page, activation.type, activation.source);
+        const key = marker(page, activation.type, activation.frame);
         if (activation.key) {
           await key.focus();
           await key.press(activation.key);
         } else await key.click();
         await expect(page.locator(`[data-clip-id="${CLIP}"]`)).toHaveClass(/selected/);
-        await previewAt(page, document, nearestOutput(placed, activation.source));
+        await previewAt(page, document, activation.preview);
         await expect(key).toBeFocused();
         await expect(page.locator('.timeline-drop-preview')).toHaveCount(0);
       }
@@ -719,7 +736,7 @@ for (const viewport of [
       page,
     }) => {
       const document = await current(page);
-      const key = marker(page, 'transform', 60);
+      const key = marker(page, 'transform', 50);
       await key.focus();
       await key.press('Enter');
       await previewAt(page, document, 50);
@@ -729,8 +746,8 @@ for (const viewport of [
       await expect(key).toBeFocused();
       await key.press('Space');
       await previewAt(page, document, 50);
-      await inspectorTab(page, 'Clip');
-      const field = page.getByRole('spinbutton', { name: 'Transform keyframe source frame', exact: true });
+      await inspectorTab(page, 'Track');
+      const field = page.getByRole('spinbutton', { name: 'Transform keyframe timeline frame', exact: true });
       const stored = await field.inputValue();
       await field.focus();
       await field.press('Control+a');
@@ -749,8 +766,8 @@ for (const viewport of [
       });
       await editLayerPoint(page, TRACK, 0);
       await easing(page, 'Track keyframe easing 0');
-      await inspectorTab(page, 'Clip');
       await easing(page, 'Transform keyframe easing');
+      await inspectorTab(page, 'Clip');
       await easing(page, 'Clip speed keyframe easing');
       const selector = page.getByRole('combobox', { name: 'Selected clip speed keyframe', exact: true });
       await expect(selector.locator('option')).toHaveCount(4);
@@ -777,14 +794,14 @@ for (const viewport of [
         'data-drafting',
         'true',
       );
-      for (const section of ['Speed', 'Transform'] as const)
-        await expect(navigation(page, section, 'Next')).toBeDisabled();
+      await expect(navigation(page, 'Speed', 'Next')).toBeDisabled();
       await expect(diamond(page, 'Speed')).toBeDisabled();
       await expect(marker(page, 'speed', 80)).toBeDisabled();
-      await expect(transformDiamond(page)).toBeDisabled();
-      await expect(marker(page, 'transform', 60)).toBeDisabled();
+      await expect(marker(page, 'transform', 50)).toBeDisabled();
       // A synthetic tab click cannot end or move the captured real pointer gesture.
       await settingTab(page, 'Exposure');
+      await expect(navigation(page, 'Transform', 'Next')).toBeDisabled();
+      await expect(transformDiamond(page)).toBeDisabled();
       await expect(navigation(page, 'Colour', 'Next')).toBeDisabled();
       await expect(diamond(page, 'Exposure')).toBeDisabled();
       for (const direction of ['Previous', 'Next'] as const)

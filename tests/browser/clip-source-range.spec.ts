@@ -67,9 +67,10 @@ function sequence(ripple = true, retimed = false): ProjectDocument {
   document.layers[0]!.keyframes = [sharedPoint(12, { exposure: 0.25 }), sharedPoint(500, { tint: 0.1 }, 'hold')];
   const first = { ...createClip('a', assets[0]!.id, 15, 105), start: 30 };
   if (retimed) first.speed = { mode: 'constant', rate: 0.5 };
-  first.spatial.keyframes = [
-    uniformKeyframe(0, { ...first.spatial.base }, 'linear'),
-    uniformKeyframe(120, { ...first.spatial.base, translateX: 0.1 }, 'smooth'),
+  const track = document.layers[0]!.transform;
+  track.keyframes = [
+    { ...uniformKeyframe(0, { ...track.base }, 'linear'), reset: false },
+    { ...uniformKeyframe(120, { ...track.base, translateX: 0.1 }, 'smooth'), reset: false },
   ];
   document.clips = [first, { ...createClip('b', assets[1]!.id, 30, 90), start: ripple ? (retimed ? 210 : 120) : 230 }];
   document.layers[0]!.transitions = [{ leftId: 'a', rightId: 'b', type: 'cut', duration: 0 }];
@@ -236,7 +237,6 @@ for (const ripple of [true, false]) {
     expect(next.clips[1]!.start).toBe(ripple ? 180 : 230);
     expect(next.layers).toEqual(before.layers);
     expect(next.clips[0]!.speed).toEqual(before.clips[0]!.speed);
-    expect(next.clips[0]!.spatial).toEqual(before.clips[0]!.spatial);
     await expect(page.locator('.clip-source-bar')).toHaveAttribute('data-range-draft', 'false');
     await flush(page);
     expect(memory.saves).toBe(1);

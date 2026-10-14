@@ -1,5 +1,12 @@
 import { z } from 'zod';
-import { EASING_MISMATCH, easingMatchesValues, easingSchema, keyInterval, orderedKeys } from './keyframes.js';
+import {
+  EASING_MISMATCH,
+  easingMatchesValues,
+  easingSchema,
+  keyInterval,
+  orderedKeys,
+  uniformKeyframe,
+} from './keyframes.js';
 
 // Zod numbers already reject NaN and infinities; no coercion or persisted defaults.
 const cropFraction = z.number().min(0).max(1);
@@ -53,6 +60,8 @@ export const spatialKeyframeSchema = z
     frame: z.number().int().nonnegative().max(2_147_483_647),
     values: spatialKeyValuesSchema,
     easing: easingSchema(SPATIAL_CHANNELS),
+    /** A default keyframe never extends its values to frames before it. */
+    reset: z.boolean(),
   })
   .strict()
   .refine(easingMatchesValues, { message: EASING_MISMATCH });
@@ -65,7 +74,7 @@ export const spatialSettingsSchema = z
     keyframes: z
       .array(spatialKeyframeSchema)
       .max(256)
-      .refine(orderedKeys, { message: 'Spatial keyframes must have unique ascending original-source frames.' }),
+      .refine(orderedKeys, { message: 'Transform keyframes must have unique ascending project frames.' }),
   })
   .strict();
 
@@ -87,6 +96,11 @@ export function createSpatialSettings(): SpatialSettings {
   return { base: { ...NEUTRAL_SPATIAL_POSE }, keyframes: [] };
 }
 
+/** Every setting at its neutral creation value, holding until its next keyframe. */
+export function defaultSpatialKeyframe(frame: number): SpatialKeyframe {
+  return { ...uniformKeyframe(frame, { ...NEUTRAL_SPATIAL_POSE }, 'hold'), reset: true };
+}
+
 function requireFinite(value: number, label: string): void {
   if (!Number.isFinite(value)) throw new Error(`${label} must be finite.`);
 }
@@ -94,15 +108,14 @@ function requireFinite(value: number, label: string): void {
 function evaluateChannel(
   keys: readonly SpatialKeyframe[],
   channel: SpatialChannel,
-  sourcePosition: number,
+  frame: number,
   base: number,
 ): number {
   // Each channel interpolates between its own enabled keys, using its Easing at the left key.
-  const interval = keyInterval(
-    keys.filter((key) => key.values[channel] !== null),
-    sourcePosition,
-    (left) => left.easing[channel]!,
-  );
+  const enabled = keys.filter((key) => key.values[channel] !== null);
+  // Before a leading default keyframe the setting keeps its unkeyed value.
+  if (enabled[0]?.reset && frame < enabled[0].frame) return base;
+  const interval = keyInterval(enabled, frame, (left) => left.easing[channel]!);
   if (!interval) return base;
   const { left, right, progress } = interval;
   const from = left.values[channel]!;
@@ -114,14 +127,14 @@ function evaluateChannel(
   return from * (1 - progress) + to * progress;
 }
 
-/** Continuous original-source position, not a rounded frame or trim-relative time. */
-export function evaluateSpatial(settings: SpatialSettings, sourcePosition: number): SpatialPose {
-  requireFinite(sourcePosition, 'Spatial source position');
+/** The track's pose at an absolute project frame, like its Colour. */
+export function evaluateSpatial(settings: SpatialSettings, projectFrame: number): SpatialPose {
+  requireFinite(projectFrame, 'Transform project frame');
   const validated = spatialSettingsSchema.parse(settings);
   const pose = { ...validated.base };
   if (!validated.keyframes.length) return pose;
   for (const channel of SPATIAL_CHANNELS)
-    pose[channel] = evaluateChannel(validated.keyframes, channel, sourcePosition, validated.base[channel]);
+    pose[channel] = evaluateChannel(validated.keyframes, channel, projectFrame, validated.base[channel]);
   return pose;
 }
 
