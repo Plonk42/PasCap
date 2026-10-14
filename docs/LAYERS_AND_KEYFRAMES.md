@@ -412,7 +412,7 @@ music are copied or shifted, and no clip is retimed. There is no cross-track key
 
 ### Clip speed-keyframe lanes and track Transform markers
 
-Inside each clip rectangle, custom speed keyframes use a boxed salmon **◆** lane. Their positions use
+Inside each clip rectangle, custom speed keyframes use a boxed salmon **●** lane. Their positions use
 authoritative clip retiming; off-trim
 keyframes are omitted. An exclusive-OUT keyframe has a boundary marker that seeks
 the final available frame.

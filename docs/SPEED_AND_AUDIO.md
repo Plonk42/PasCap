@@ -148,7 +148,8 @@ stored preference. While expanded, its keyframe line shows **N keyframes**, one
 native **Previous/Next** pair and **Reset** (constant 1×, removing the keyframes);
 the line is hidden while collapsed. Below it come the source → output duration
 overview, the **Speed mode** select (**Constant speed / Custom curve**), the
-constant **0.25×–4×** presets (constant mode only) and the main **Speed ×** row.
+constant **0.25×–4×** presets (constant mode only) and the main **Speed ×** row; in
+curve mode that row sits between the curve presets and the graph.
 
 Previous/Next visits **all retained clip speed keyframes**, including off-trim
 keyframes and the original exclusive OUT, previewing the nearest mapped image
@@ -163,14 +164,15 @@ pair is its only keyframe navigation: unlike Colour and Transform, whose setting
 share keyframes, there are no second per-setting arrows beside its diamond.
 
 In the **Speed ×** row, double-clicking the name resets the editable rate to 1×.
-The capture diamond **Keyframe Speed** (◇ hollow / ◆ filled, `aria-pressed`)
+The capture circle **Keyframe Speed** (○ hollow / ● filled, `aria-pressed`, salmon like
+the timeline speed markers)
 captures the rate at the **actually displayed source frame** with Linear easing
 (a constant clip becomes a one-keyframe curve), or removes the keyframe there;
 removing the last keyframe keeps its rate as constant speed. A capture retimes the
 clip, so preview then seeks to the new keyframe's mapped image. Capture never uses
 an inspected stored time. The slider/exact field (**Clip speed rate**) edits the
 constant rate in constant mode. In curve mode it is read-only, dimmed with the lock
-cue **Add a keyframe ◇ to edit**, unless a keyframe exists at the displayed source
+cue **Add a keyframe ○ to edit**, unless a keyframe exists at the displayed source
 frame; it then edits that keyframe's rate and preview follows the keyframe.
 Sliders never create keyframes. Each accepted edit is one Undo step; timing
 conflicts remain inline errors.
@@ -183,7 +185,8 @@ Details: [LAYERS_AND_KEYFRAMES.md](LAYERS_AND_KEYFRAMES.md).
 ### Precise clip-curve editor
 
 With a clip selected, open **Clip → Speed** and choose **Custom curve**, or capture a
-keyframe with the diamond. The curve editor shows the presets above, then the graph:
+keyframe with the diamond. The curve editor shows the presets above, then the
+**Speed ×** row and the graph:
 source time horizontally and a logarithmic **0.1×–8×** speed axis
 vertically. A vertical line identifies the actually displayed source frame. Click
 the background or a keyframe to preview. The original exclusive-OUT keyframe previews the last
@@ -232,7 +235,7 @@ changing track keyframes or other clips.
 ### Timeline clip-speed markers
 
 Inside each clip rectangle, custom-speed source keyframes appear as a boxed salmon
-**◆** lane, distinct from the boxed blue **▼** track Transform markers at the top of
+**●** lane, distinct from the boxed blue **▼** track Transform markers at the top of
 the track row; each title lists the keyframe's rate. Positions follow authoritative retiming. Off-trim keyframes are
 omitted. Exclusive OUT has a boundary marker that seeks the final available frame.
 Click, Enter or Space selects the clip, seeks its nearest mapped image and opens

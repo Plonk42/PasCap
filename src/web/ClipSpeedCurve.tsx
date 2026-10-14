@@ -1,4 +1,4 @@
-import { useId, useState, type KeyboardEvent } from 'react';
+import { useId, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { CLIP_SPEED_PRESETS, clipSpeedPreset, removeClipSpeedKey, updateClipSpeedKey } from '../shared/clip-speed.js';
 import { applyCommand, type EditCommand } from '../shared/commands.js';
 import type { Interpolation } from '../shared/keyframes.js';
@@ -29,6 +29,8 @@ interface Props {
   onPreview: (draft: DraftPreview | null, restoreFrame?: number) => void;
   inspectedFrame?: number | null;
   onSelectStored?: (frame: number) => void;
+  /** The main Speed row, shown between the presets and the graph. */
+  rate?: ReactNode;
 }
 interface PointIdentity {
   frame: number;
@@ -129,6 +131,7 @@ export function ClipSpeedCurve({
   onPreview,
   inspectedFrame,
   onSelectStored,
+  rate,
 }: Readonly<Props>) {
   const helpId = useId();
   const context = `${project.id}:${clip.id}`;
@@ -242,6 +245,7 @@ export function ClipSpeedCurve({
       data-drafting={drag.active}
     >
       <CurvePresets clip={clip} speed={current} disabled={unavailable} onChange={change} />
+      {rate}
       <div className="clip-speed-chart">
         <div className="clip-speed-axis" aria-hidden="true">
           <span>8×</span>
@@ -273,7 +277,7 @@ export function ClipSpeedCurve({
             className="clip-speed-seek"
             aria-label="Seek within clip speed curve"
             aria-describedby={helpId}
-            title="Click the curve background to seek, then keyframe Speed ◇"
+            title="Click the curve background to seek, then keyframe Speed ○"
             disabled={unavailable}
             onClick={(event) => {
               const box = event.currentTarget.getBoundingClientRect();

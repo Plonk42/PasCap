@@ -22,7 +22,7 @@ This guide is not a delivery ledger or a fresh validation result.
 - Each expanded section's keyframe line shows the keyframe count, one **Previous/Next** pair and Reset.
   Colour visits Opacity/scalar colour keyframes; Speed visits
   all retained custom speed source keyframes of the selected clip (its single
-  **Keyframe Speed** diamond has no extra per-setting arrows). Speed stored
+  **Keyframe Speed** circle has no extra per-setting arrows). Speed stored
   navigation includes off-trim/original-exclusive-OUT keyframes, previewing the
   nearest mapped image with a clip-local stored-source cursor; Transform visits its
   stored track keyframes, including those after the duration, with a track-local

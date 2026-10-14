@@ -59,6 +59,46 @@
   clip-path: polygon(0 0, 100% 0, 50% 100%);
 }
 
+.keyframe-toggle.transform-keyframe-toggle > [aria-hidden='true'] {
+  width: 11px;
+  height: 10px;
+  font-size: 0;
+  background: currentColor;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 11 10'%3E%3Cpath d='M1 1h9L5.5 9z' fill='none' stroke='black' stroke-width='1.5' stroke-linejoin='round'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+}
+
+.keyframe-toggle.transform-keyframe-toggle.active > [aria-hidden='true'] {
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 11 10'%3E%3Cpath d='M1 1h9L5.5 9z' stroke='black' stroke-width='1.5' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+/* Speed keyframes are circles, distinct from the Colour diamond and Transform triangle. */
+.keyframe-toggle.speed-keyframe-toggle > [aria-hidden='true'],
+.keyframe-glyph.circle {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  transform: none;
+}
+
+/* Speed keyframes use the timeline marker's salmon, not the amber of track keyframes. */
+.keyframe-toggle.speed-keyframe-toggle,
+.keyframe-setting-navigation[data-animated='true'] > .keyframe-toggle.speed-keyframe-toggle:not(.active) {
+  border-color: #b9735f;
+  color: #ffc7bb;
+}
+
+.keyframe-toggle.speed-keyframe-toggle:not(:disabled):is(:hover, :focus-visible) {
+  border-color: #f2a996;
+  color: #ffc7bb;
+}
+
+.keyframe-toggle.speed-keyframe-toggle.active {
+  border-color: #b9735f;
+  background: #43271f;
+  color: #ffc7bb;
+}
+
 /* Transform keyframes use the timeline marker's blue triangle, not the Colour diamond. */
 .keyframe-toggle.transform-keyframe-toggle {
   font-size: 15px;

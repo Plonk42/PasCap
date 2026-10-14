@@ -534,8 +534,7 @@ test('bulk expansion includes Transform in Track while heading help and tab navi
   page,
 }) => {
   const before = await current(page);
-  // HSL ranges and Colour curves start collapsed, so the Track tab starts mixed.
-  await page.getByRole('button', { name: 'Expand all Track sections', exact: true }).click();
+  // HSL ranges and Colour curves start collapsed: a mixed tab offers Collapse all first.
   await page.getByRole('button', { name: 'Collapse all Track sections', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Transform section', exact: true })).toHaveAttribute(
     'aria-expanded',
