@@ -84,11 +84,13 @@ async function alignedRows(page: Page, count = 8): Promise<void> {
           const id = header.dataset['layerId'];
           const lane = globalThis.document.querySelector<HTMLElement>(`[data-layer-lane="${id}"]`);
           if (!lane) throw new Error('Each layer header must have its matching timeline lane.');
-          return Math.round((header.getBoundingClientRect().top - lane.getBoundingClientRect().top) * 100) / 100;
+          const head = header.getBoundingClientRect();
+          const box = lane.getBoundingClientRect();
+          return [head.top - box.top, head.height - box.height].map((delta) => Math.round(delta * 100) / 100);
         });
       }),
     )
-    .toEqual(Array(count).fill(5));
+    .toEqual(Array(count).fill([0, 0]));
 }
 
 test('native wheel scrolling over the timeline reaches hidden rows and music without seeking, editing or saving', async ({

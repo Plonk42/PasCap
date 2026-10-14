@@ -887,7 +887,7 @@ test('overlay middle cuts keep their gap and neighbours fixed; visible quick tri
   const overlayTop = await clip(page, 'top').evaluate((element) =>
     Number.parseFloat((element as HTMLElement).style.top),
   );
-  expect(overlayTop - firstTrackTop).toBe(88);
+  expect(overlayTop - firstTrackTop).toBe(78);
   await markRange(page, 60, 80);
   await expectCutOverlay(page, 60, 80);
   await page.getByRole('button', { name: 'Cut selected range', exact: true }).click();

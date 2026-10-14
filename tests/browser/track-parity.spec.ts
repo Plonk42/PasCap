@@ -588,7 +588,7 @@ test('Raise and Lower cross the old initial-layer boundary and display the new b
     const laneTops = await page
       .locator('[data-layer-lane]')
       .evaluateAll((rows) => rows.map((row) => Number.parseFloat((row as HTMLElement).style.top)));
-    expect(laneTops).toEqual([53, 141]);
+    expect(laneTops).toEqual([31, 109]);
     expect((await captureAt(page, 20)).sample).not.toEqual(originalPixels);
     await undoOnce(page, before);
     expect((await captureAt(page, 20)).sample).toEqual(originalPixels);

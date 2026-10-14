@@ -1332,7 +1332,6 @@ svg {
 
 .timeline-empty {
   position: absolute;
-  top: 55px;
   inset-inline: 30px;
   display: flex;
   gap: 10px;

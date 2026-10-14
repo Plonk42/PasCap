@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { createLayer, createProject } from '../../src/shared/model.js';
-import { TIMELINE_RULER_HEIGHT, timelineLayerAt, timelineRows } from '../../src/web/timeline-rows.js';
+import {
+  LANE_HEIGHT,
+  LANE_OFFSET,
+  musicLanesTop,
+  TIMELINE_RULER_HEIGHT,
+  timelineLayerAt,
+  timelineRows,
+} from '../../src/web/timeline-rows.js';
 
 function layers(count: number) {
   const project = createProject('row-geometry', 'Row geometry');
@@ -14,20 +21,22 @@ describe('uniform bottom-to-top editor row geometry', () => {
     const before = structuredClone(source);
     const rows = timelineRows(source);
     expect(rows.map((row) => row.index)).toEqual(Array.from({ length: count }, (_, index) => index));
-    expect(rows.map((row) => row.top)).toEqual(Array.from({ length: count }, (_, index) => 58 + index * 88));
+    expect(rows.map((row) => row.top)).toEqual(Array.from({ length: count }, (_, index) => 36 + index * 78));
+    expect(rows[0]!.top - LANE_OFFSET).toBe(TIMELINE_RULER_HEIGHT);
+    expect(musicLanesTop(count)).toBe(rows.at(-1)!.top - LANE_OFFSET + LANE_HEIGHT);
     expect(source).toEqual(before);
     for (const row of rows) expect(row.layer).toBe(source[row.index]);
   });
 
-  it('uses drawn lane bounds for primary, every overlay, gaps and the music region', () => {
+  it('uses drawn lane bounds for every contiguous row, the ruler and the music region', () => {
     const rows = timelineRows(layers(8));
     for (const row of rows) {
       expect(timelineLayerAt(rows, row.top - 5)).toBe(row.layer.id);
       expect(timelineLayerAt(rows, row.top + 72)).toBe(row.layer.id);
-      expect(timelineLayerAt(rows, row.top + 73)).toBeNull();
-      expect(timelineLayerAt(rows, row.top + 82)).toBeNull();
+      expect(timelineLayerAt(rows, row.top - 6)).toBe(rows[row.index - 1]?.layer.id ?? null);
+      expect(timelineLayerAt(rows, row.top + 73)).toBe(rows[row.index + 1]?.layer.id ?? null);
     }
-    for (const y of [-1, 0, TIMELINE_RULER_HEIGHT, 52, 759, 814, NaN, Infinity])
+    for (const y of [-1, 0, TIMELINE_RULER_HEIGHT - 1, musicLanesTop(8), 700, NaN, Infinity])
       expect(timelineLayerAt(rows, y)).toBeNull();
   });
 

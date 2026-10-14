@@ -697,7 +697,7 @@ test('a row marker opens the selected empty row independently of clips, and keyb
   );
   const firstTrack = (await page.locator('[data-layer-lane="video-1"]').boundingBox())!;
   const overlay = (await page.locator('[data-layer-lane="upper"]').boundingBox())!;
-  expect(overlay.y - firstTrack.y).toBe(88);
+  expect(overlay.y - firstTrack.y).toBe(78);
   const ruler = page.getByLabel('Timeline ruler', { exact: true });
   await expect(ruler).toHaveAttribute('title', /timeline|seek|ruler/i);
   expect((await ruler.boundingBox())!.y).toBeLessThan(firstTrack.y);

@@ -14,7 +14,7 @@ import { applyCommand, type EditCommand } from '../shared/commands.js';
 import { KEYFRAME_SETTINGS, keySettings } from '../shared/keyframes.js';
 import { resolveMediaSelection, type MediaSelections } from '../shared/media-selection.js';
 import type { MediaAsset } from '../shared/media.js';
-import { createClip, createLayer, MAX_VIDEO_LAYERS, type ProjectDocument, type VideoClip } from '../shared/model.js';
+import { createClip, createLayer, type ProjectDocument, type VideoClip } from '../shared/model.js';
 import type { TimelineRange } from '../shared/rush-editing.js';
 import { snapFrame, snapPoints } from '../shared/snap.js';
 import { trimOnTimeline, type TrimEdge } from '../shared/source-range.js';
@@ -57,7 +57,14 @@ import { adjacentBookmark, bookmarkKind, bookmarkTargets } from './timeline-book
 import './timeline-bookmarks.css';
 import { trackKeyframeKind } from './timeline-keyframes.js';
 import { planTimelineDrop, type DropPlan, type TimelinePayload } from './timeline-placement.js';
-import { TIMELINE_RULER_HEIGHT, timelineLayerAt, timelineRows } from './timeline-rows.js';
+import {
+  LANE_HEIGHT,
+  LANE_OFFSET,
+  musicLanesTop,
+  TIMELINE_RULER_HEIGHT,
+  timelineLayerAt,
+  timelineRows,
+} from './timeline-rows.js';
 
 export interface DraftPreview {
   document: ProjectDocument;
@@ -689,7 +696,7 @@ export function Timeline(props: Readonly<Props>) {
   const rows = timelineRows(project.layers);
   const rowTop = (layerId: string): number => rows.find((row) => row.layer.id === layerId)!.top;
   const selectedRowTop = rows.find((row) => row.layer.id === selectedLayerId)?.top;
-  const musicTop = 55 + project.layers.length * 88;
+  const musicTop = musicLanesTop(project.layers.length);
   const surfaceHeight = musicTop + timelineMusicHeight(project);
   const seconds = framesToSeconds(Math.max(layout.duration, baseLayout.duration), project.frameRate);
   let tickStep = 10;
@@ -729,9 +736,10 @@ export function Timeline(props: Readonly<Props>) {
       musicGesture
     )
       return;
-    const top = selectedRowTop;
-    if (top < element.scrollTop + 34) element.scrollTop = Math.max(0, top - 40);
-    else if (top + 78 > element.scrollTop + element.clientHeight) element.scrollTop = top + 88 - element.clientHeight;
+    const top = selectedRowTop - LANE_OFFSET;
+    if (top < element.scrollTop + TIMELINE_RULER_HEIGHT) element.scrollTop = Math.max(0, top - TIMELINE_RULER_HEIGHT);
+    else if (top + LANE_HEIGHT > element.scrollTop + element.clientHeight)
+      element.scrollTop = top + LANE_HEIGHT - element.clientHeight;
   }, [selectedLayerId, selectedClipId, props.revealRequest, selectedRowTop, viewportHeight]);
   useEffect(() => {
     const element = scroll.current;
@@ -1131,20 +1139,6 @@ export function Timeline(props: Readonly<Props>) {
           <Icon name="magnet" size={15} />
           <span className="timeline-action-label">Snap</span>
         </button>
-        <button
-          className="secondary-button small timeline-view-action"
-          aria-label="Add video track"
-          title="Add a video track with Ripple on, independent transitions and fades"
-          disabled={interactionBlocked || project.layers.length >= MAX_VIDEO_LAYERS}
-          onClick={() => {
-            const id = crypto.randomUUID();
-            onEdit({ type: 'layer-add', layer: createLayer(id, nextLayerName(project)) });
-            onSelectLayer(id);
-          }}
-        >
-          <Icon name="plus" size={15} />
-          <span className="timeline-action-label">Track</span>
-        </button>
         <div className="timeline-zoom">
           <label htmlFor="timeline-zoom">Zoom</label>
           <button
@@ -1197,6 +1191,11 @@ export function Timeline(props: Readonly<Props>) {
           onScroll={scrollLayers}
           onSelect={onSelectLayer}
           onEdit={onEdit}
+          onAdd={() => {
+            const id = crypto.randomUUID();
+            onEdit({ type: 'layer-add', layer: createLayer(id, nextLayerName(project)) });
+            onSelectLayer(id);
+          }}
         />
         <div
           className="timeline-scroll"
@@ -1292,7 +1291,7 @@ export function Timeline(props: Readonly<Props>) {
                 data-layer-lane={layer.id}
                 aria-label={`Timeline lane ${layer.name}`}
                 disabled={interactionBlocked}
-                style={{ top: rowTop(layer.id) - 5 }}
+                style={{ top: rowTop(layer.id) - LANE_OFFSET }}
                 onClick={() => onSelectLayer(layer.id)}
               >
                 {layer.id === selectedLayerId && !layout.clips.some((item) => item.clip.layerId === layer.id) && (
@@ -1305,14 +1304,14 @@ export function Timeline(props: Readonly<Props>) {
                 className="available-source"
                 aria-label="Available original recording"
                 style={{
-                  top: rowTop(selected.clip.layerId) - 5,
+                  top: rowTop(selected.clip.layerId) - LANE_OFFSET,
                   left: leading + (selected.start - availableHead) * scale,
                   width: clipDuration({ ...selected.clip, sourceIn: 0, sourceOut: source.metadata.frameCount }) * scale,
                 }}
               />
             )}
             {!geometry.clips.length && (
-              <div className="timeline-empty">
+              <div className="timeline-empty" style={{ top: rows[0]!.top + 1 }}>
                 <Icon name="plus" size={18} />
                 {timelineEmptyMessage(project)}
               </div>
