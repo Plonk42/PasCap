@@ -271,7 +271,16 @@ function ColourControl({
   );
 }
 
-function ColourSection({ layer, frame, resetKey, disabled, onEdit, id }: Readonly<LayerControlProps & { id: string }>) {
+function ColourSection({
+  project,
+  layer,
+  frame,
+  duration,
+  resetKey,
+  disabled,
+  onEdit,
+  id,
+}: Readonly<LayerControlProps & { project: ProjectDocument; duration: number; id: string }>) {
   const colour = colourAt(layer, frame);
   const opacity = evaluateLayerSetting(layer, 'opacity', frame, layer.opacity);
   const animated =
@@ -356,6 +365,14 @@ function ColourSection({ layer, frame, resetKey, disabled, onEdit, id }: Readonl
           />
         ))}
       </div>
+      <KeyframeControls
+        project={project}
+        layer={layer}
+        frame={frame}
+        duration={duration}
+        disabled={disabled}
+        onEdit={onEdit}
+      />
     </InspectorSection>
   );
 }
@@ -917,8 +934,10 @@ function InspectorPanel({
                 <span>{trackScope(trackClips.length)}</span>
               </div>
               <ColourSection
+                project={project}
                 layer={layer}
                 frame={frame}
+                duration={layout.duration}
                 resetKey={`${inputContext}:${frame}`}
                 disabled={drafting}
                 onEdit={onEdit}
@@ -952,22 +971,6 @@ function InspectorPanel({
                 onEdit={onEdit}
                 onSeek={onSeek}
               />
-              <InspectorSection
-                id="keyframes"
-                title="Keyframes"
-                icon="curve"
-                badge={layer.keyframes.length || undefined}
-                modified={layer.keyframes.length > 0}
-              >
-                <KeyframeControls
-                  project={project}
-                  layer={layer}
-                  frame={frame}
-                  duration={layout.duration}
-                  disabled={drafting}
-                  onEdit={onEdit}
-                />
-              </InspectorSection>
               <SequenceControls
                 project={project}
                 layer={layer}

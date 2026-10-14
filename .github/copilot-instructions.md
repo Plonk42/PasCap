@@ -97,7 +97,8 @@ PasCap is a solo, pre-release project: optimize for fast iteration. Details are 
   enabled-setting chip arrows. All per-channel arrows visit strictly earlier/later keyframes where that
   channel is nonnull (zero is enabled), sharing the central off-duration inspection cursor. Each expanded
   section has one keyframe line (count, one Previous/Next pair over the same set, Reset), hidden
-  while collapsed. The pair: Colour visits Opacity/nine scalar
+  while collapsed. Colour and Transform each end with their own stored keyframe list (same
+  row pattern via `StoredKeyframeRow`); there is no separate Keyframes section. The pair: Colour visits Opacity/nine scalar
   colour/HDR keyframes; Speed visits **all retained custom speed source keyframes of the
   selected clip**, including off-trim keyframes and original exclusive OUT; Speed's
   single setting has no extra per-setting arrows beside its diamond. Clip source navigation

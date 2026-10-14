@@ -31,7 +31,7 @@ export async function closeOptions(page: Page): Promise<void> {
 }
 
 type InspectorTab = 'Clip' | 'Track' | 'Audio';
-// Keyframes and Sequence are sections of the Track tab; specs name the content they need.
+// Track keyframes (inside Colour) and Sequence live in the Track tab; specs name the content they need.
 const TAB_FOR: Record<InspectorTab | 'Track keyframes' | 'Sequence', InspectorTab> = {
   Clip: 'Clip',
   Track: 'Track',
@@ -104,6 +104,25 @@ export function sharedPoint(
 
 export function layerKeyframes(page: Page, name: string): Locator {
   return page.getByRole('group', { name: `Track keyframes ${name}`, exact: true });
+}
+
+/** Track → Transform's stored keyframe list, one row per keyframe. */
+export function transformKeyframes(page: Page, name = 'Track 1'): Locator {
+  return page.getByRole('group', { name: `Transform keyframes ${name}`, exact: true });
+}
+
+/** The row a stored keyframe list marks as current (inspected, or at the playhead). */
+export function currentKeyframeRow(list: Locator): Locator {
+  return list.locator('.keyframe-row[aria-current="true"]');
+}
+
+/** Open one stored Transform keyframe's Edit fields (long lists start collapsed). */
+export async function editTransformKeyframe(page: Page, frame: number, name = 'Track 1'): Promise<Locator> {
+  await inspectorTab(page, 'Track');
+  const row = transformKeyframes(page, name).locator(`[data-keyframe-frame="${frame}"]`);
+  if ((await row.locator('.layer-keyframe-point-details').getAttribute('open')) === null)
+    await row.getByLabel(`Edit Transform keyframe ${frame}`, { exact: true }).click();
+  return row;
 }
 
 /** Shared points are directly visible; open only the selected point's nested details. */

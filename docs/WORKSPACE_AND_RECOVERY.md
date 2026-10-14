@@ -45,8 +45,9 @@ clip detail filters before grading; see [detail filters](design/DETAIL_FILTERS.m
   Clip ("Clip N of M · track") contains the selected clip's **Speed**,
   **Detail**, **Range** and **Placement**; an empty video track shows one line instead.
   Track ("Applies to all N clips on this track") contains Colour with the single
-  track-owned Opacity control, **HSL ranges**, **Colour curves**, **Transform**, Keyframes (the whole-keyframe list, enabled-setting chips,
-  Animation help and keyframe navigation), Transitions and Fades;
+  track-owned Opacity control and, at its end, the whole-keyframe list (enabled-setting chips
+  and Animation help), **HSL ranges**, **Colour curves**, **Transform** (ending with its own
+  keyframe list), Transitions and Fades;
   Audio owns selected-track music controls (**Music track / Recording / Add music
   track / Delete selected music track**).
   Empty-track selection retains Track context and dormant fades. The chosen tab is
@@ -68,8 +69,8 @@ clip detail filters before grading; see [detail filters](design/DETAIL_FILTERS.m
   playhead values catch up whenever the pointer rests, even before release, and exactly on release.
 
 Viewer and Inspector tabs use native buttons with consistent padding, borders and
-selected appearance, retaining arrow/Home/End navigation. Keyframes keeps its
-accessible name without repeating its visible tab title in the toolbar.
+selected appearance, retaining arrow/Home/End navigation. Colour's and Transform's keyframe
+lists keep their accessible names under a small visible **Keyframes** heading.
 The Inspector tab bar stays pinned while its content scrolls; keyboard focus and
 scroll-into-view reveal controls below that bar rather than beneath it.
 Control vocabulary and button/icon conventions follow the
@@ -131,7 +132,7 @@ raise/lower and delete; visibility remains a separate sidebar control.
 The Colour keyframe line's Previous/Next pair visits the union of Opacity,
 nine scalar and HDR keyframes. Per-channel Opacity
 Previous/Next buttons remain beside the main diamond, alongside
-the existing arrows on enabled setting chips in stored Keyframes rows.
+the existing arrows on enabled setting chips in stored Colour keyframe rows.
 Main and stored sliders/exact fields use **0–100%**, neutral **100%**.
 Required track `opacity` and keyframe values remain **0–1**; UI conversion changes no schema.
 Without Opacity keyframes, either value control edits track `opacity`, including on an empty
@@ -181,7 +182,7 @@ Selecting a clip or track keeps the chosen tab; explicit Cut/Fade/Dissolve bound
 buttons open Track with that boundary expanded.
 **Expand all / Collapse all** is an icon button on the Inspector tab bar that changes
 only the visible tab's sections, including temporarily absent ones: Clip's **Speed**,
-**Detail**, **Range** and **Placement**; Track's **Colour**, **HSL ranges**, **Colour curves**, **Transform**, **Keyframes**,
+**Detail**, **Range** and **Placement**; Track's **Colour**, **HSL ranges**, **Colour curves**, **Transform**,
 **Transitions** and **Fades**; Audio's **Music**. It is hidden while Clip has no
 selected clip or Track no selected track. A tab with any section open offers Collapse all; only an all-collapsed tab offers Expand all. Individual toggles
 and the existing section preferences remain authoritative. Other tabs'
@@ -203,13 +204,13 @@ its valid/invalid drafts and section preferences.
 Each help body is at most two short sentences plus one tip, written as user guidance;
 exact behaviour stays in [the user guide](USER_GUIDE.md), reached from a **Learn more**
 link (opening in a new tab) on every help except startup details.
-Shared-keyframe timing guidance is combined with **Animation help** in the Keyframes
-toolbar; there is no separate Keyframe timing help button. Audio timing sits beside
+Shared-keyframe timing guidance is combined with **Animation help** beside Colour's
+**Keyframes** heading; there is no separate Keyframe timing help button. Audio timing sits beside
 **Placement & fades**, and startup details beside **Preview needs attention**.
 These title-bar help targets remain available without expanding their settings;
 collapsing content does not hide its heading help. Hiding the owning tab/pane
-still dismisses help. **Animation help** shares the Keyframes toolbar with
-whole-track keyframe navigation.
+still dismisses help. **Animation help** sits inside the expanded Colour section, above
+its stored keyframe list.
 Hovering the question-mark target or keyboard focus previews help without moving
 focus or applying a draft; empty space across a section does not activate help.
 The pointer can move into the text without closing it. Click, Enter or Space pins
@@ -345,15 +346,20 @@ real playhead; otherwise it is read-only, while unkeyed settings still edit thei
 captures that setting's evaluated value; sliders never create keyframes.
 **Add default Transform keyframe** adds or removes a default keyframe at the playhead.
 
-**Selected Transform keyframe**, the keyframe line's **Previous/Next** pair and
-**Preview stored keyframe** reach all Transform keyframes, including those after the
-duration, using the nearest available frame. The track-local cursor advances even when
-several previews coincide. Labels distinguish the stored timeline frame from the playhead.
-Stored **Timeline frame**, **Easing** and the enabled pose fields edit the selected
-keyframe, not the real-playhead pose. Its **Easing** sets every enabled setting's Easing
-(**Mixed** when they differ), with **Per setting** selects like a track keyframe's; it is disabled without a
-next keyframe. Time/value edits do not seek automatically; navigation does not save.
-This selection is distinct from the shared Colour inspection cursor below.
+At the end of the section, below the pose settings, a small **Keyframes** heading introduces
+the Transform keyframe list (**Transform keyframes** plus the track name), shown only when
+the track has Transform keyframes. Each row has **Go to Transform keyframe N**, which seeks the
+nearest available frame, **Default** and **Outside duration** badges, a trash (**Delete
+Transform keyframe N**), blue enabled-setting chips and an **Edit** disclosure (open initially
+for three or fewer keyframes) with **Timeline frame**, **Easing** and a slider/exact field per
+enabled setting. Its **Easing** sets every enabled setting's Easing (**Mixed** when they
+differ), with **Per setting** selects like a track keyframe's; it is disabled when no enabled
+setting continues to a later keyframe. The keyframe line's **Previous/Next** pair and the row
+timecode buttons share a track-local cursor that advances even when several previews
+coincide; the inspected row is marked current and a hint distinguishes the stored timeline
+frame from the playhead. List fields edit their stored keyframe, not the real-playhead pose.
+Time/value edits do not seek automatically; navigation does not save.
+This cursor is distinct from the shared Colour inspection cursor below.
 
 Deleting the last keyframe reveals the unchanged base; **Reset transform** behaves like
 Colour's Reset (neutral base without keyframes, else the enabled settings of the keyframe
@@ -367,11 +373,11 @@ Full schema, geometry and animation details: [spatial transforms](design/SPATIAL
 
 ### Shared video track animation
 
-The **Track → Keyframes** section (list accessible name **Track keyframes**) belongs to
-the selected **entire video track**, not the selected clip. It remains available on
-an empty track and contains the shared
-keyframe list directly, count, whole-track Previous/Next navigation and enabled-setting chips.
-Its question-mark **Animation help** button uses the common hover/pin/dismiss
+The stored **Keyframes** list at the end of **Track → Colour** (fieldset accessible name
+**Track keyframes** plus the track name) belongs to the selected **entire video track**, not
+the selected clip. It remains available on an empty track and shows the enabled-setting chips
+of the current or inspected keyframe; Colour's keyframe line counts and visits the same keyframes.
+The question-mark **Animation help** beside its heading uses the common hover/pin/dismiss
 contract above; explanatory text does not replace the shared keyframe editor.
 **Clip** keeps source/clip settings and Speed controls; **Track → Colour**
 keeps track Colour/Opacity playhead value/diamond controls and **Track → Transform** the pose.
@@ -380,7 +386,7 @@ expose a main diamond with adjacent per-setting **Previous/Next** buttons: **◇
 versus **◆ filled/active**, with `aria-pressed`. A hollow diamond remains clickable; inactivity
 does not set HTML `disabled`. Actual invalid/draft states can disable actions.
 
-Per-channel native **Previous/Next** arrows remain beside main diamonds and on enabled setting chips in stored Keyframes rows. They are
+Per-channel native **Previous/Next** arrows remain beside main diamonds and on enabled setting chips in stored Colour keyframe rows. They are
 disabled without the corresponding neighbour, an opened project, or during any
 document-preview draft. They visit strictly
 earlier/later keyframes where that setting is not `null`, including zero, and skip
@@ -404,8 +410,9 @@ setting reveals the unchanged track value. Unkeyed colour edits the track base,
 including on empty tracks. Removing the final keyed colour setting reveals its unchanged
 track base. Speed is clip-only and never a track setting.
 
-**Keyframes** exposes one shared list without an outer disclosure or per-track list
-expansion preference. Each entry names the enabled settings;
+The list has no outer disclosure or per-track list expansion preference. Each entry has a
+timecode button (**Go to track keyframe N**), **Default** and **Outside duration** badges where
+they apply, a trash (**Delete track keyframe N**) and its enabled-setting chips;
 its inner **Edit** disclosure (open initially for three or fewer keyframes) provides
 **Timeline frame**, **Easing** and values for the enabled settings.
 A time edit moves all enabled settings
@@ -433,7 +440,7 @@ values retain inline errors without clamping.
 
 Keyframes outside current duration remain stored/list-editable. A central editor-only
 inspection cursor is shared by main per-setting arrows, stored-setting chip arrows,
-section navigation to track keyframes, track, shared marker and list navigation, advancing through several
+section navigation to track keyframes, shared marker and list navigation, advancing through several
 off-duration keyframes even when their previews clamp to the same last
 available frame. Labels identify stored time separately from actual preview; a
 timeline without video or music duration has no preview frame; music-only regions
@@ -464,7 +471,7 @@ an exact alternative, with the same atomic move validation.
 
 Colour **Reset** on an animated track
 changes only enabled colour values at the current keyframe; double-clicking a setting's
-name resets only that setting, including unanimated track colour bases. Stored-keyframe resets in Keyframes target that
+name resets only that setting, including unanimated track colour bases. Stored-keyframe resets in Colour's keyframe list target that
 keyframe's existing enabled setting, not a different value at the playhead.
 Trim/move/split/duplicate do not copy or shift track keyframes. The contract is in
 [LAYERS_AND_KEYFRAMES.md](LAYERS_AND_KEYFRAMES.md).

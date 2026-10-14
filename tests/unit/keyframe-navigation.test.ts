@@ -505,7 +505,12 @@ describe('main diamonds with per-setting arrows and stored-channel navigation', 
       expect(controls[1]).toContain(`aria-label="Previous ${label} keyframe"`);
       expect(controls[2]).toContain(`aria-label="Next ${label} keyframe"`);
     }
-    const chips = [...inspector.matchAll(/<span class="layer-keyframe-chip"[\s\S]*?<\/button><\/span><\/span>/g)];
+    // Colour's stored list ends before Transform's, whose plain chips have no arrows.
+    const colourList = inspector.slice(
+      inspector.indexOf('aria-label="Track keyframes'),
+      inspector.indexOf('aria-label="Transform keyframes'),
+    );
+    const chips = [...colourList.matchAll(/<span class="layer-keyframe-chip"[\s\S]*?<\/button><\/span><\/span>/g)];
     expect(chips).toHaveLength(interleaved.length);
     for (const [markup] of chips) expect(buttons(markup)).toHaveLength(2);
     const sections = [...inspector.matchAll(/<div class="[^"]*section-keyframe-line">[\s\S]*?<\/div>/g)];

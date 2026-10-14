@@ -29,7 +29,7 @@ This guide is not a delivery ledger or a fresh validation result.
   cursor previewing the nearest available frame. Both are separate from central
   track inspection. Successive stored keyframes stay reachable even
   when they preview the same image. Enabled setting chips in stored
-  Keyframes rows retain their per-channel arrows. All main and stored per-channel
+  Colour keyframe rows retain their per-channel arrows. All main and stored per-channel
   arrows visit strictly earlier/later keyframes where that channel is nonnull
   (zero is enabled), sharing the central off-duration inspection cursor.
   Main capture uses the real displayed frame; navigation never edits or saves.

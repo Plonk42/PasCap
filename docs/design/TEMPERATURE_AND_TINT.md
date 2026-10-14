@@ -31,7 +31,7 @@ applies them before Exposure). Main and stored
 keyed settings use native sliders (step 0.01) with coloured tracks (Temperature
 blue → yellow, Tint green → magenta), adjacent exact numeric fields,
 and reset to 0 by double-clicking the name. Main capture diamonds are always visible, with adjacent per-setting **Previous/Next** buttons because not every setting is enabled at every shared keyframe. Its single keyframe-line Previous/Next pair (with the keyframe count) visits the union of Opacity, all nine scalar colour and HDR keys.
-Enabled setting chips in stored Keyframes rows retain
+Enabled setting chips in stored Colour keyframe rows retain
 their per-channel arrows. All main and stored per-channel arrows visit strictly
 earlier/later keyframes where that channel is nonnull (zero is enabled), sharing
 the central off-duration inspection cursor.

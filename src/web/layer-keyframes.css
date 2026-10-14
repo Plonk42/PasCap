@@ -125,6 +125,32 @@
   border-bottom: 1px solid var(--line);
 }
 
+/* Colour and Transform end with their stored keyframe list, below a hairline. */
+.product-workspace .inspector-panel .layer-keyframe-controls.section-keyframes {
+  padding: 10px 0 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 0;
+}
+
+.inspector-panel .colour-controls + .section-keyframes {
+  margin: 0 14px 13px;
+}
+
+.stored-keyframes-heading {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.stored-keyframes-heading > .keyframe-panel-title {
+  flex: 0 1 auto;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
 .layer-keyframe-heading,
 .layer-setting-heading {
   display: flex;
@@ -213,9 +239,14 @@
 }
 
 .keyframe-row-default.transform-default {
-  justify-self: start;
   color: #10202b;
   background: #c4e9ff;
+}
+
+.transform-keyframe-chips > .layer-keyframe-chip {
+  border-color: #3e6680;
+  background: #1b3446;
+  color: #c4e9ff;
 }
 
 .layer-keyframe-chip {
@@ -265,6 +296,10 @@
 
 .layer-keyframe-controls .layer-keyframe-point-fields > .keyframe-easing {
   grid-column: auto;
+}
+
+.layer-keyframe-point-fields > .spatial-pose-fields {
+  grid-column: 1 / -1;
 }
 
 .keyframe-easing {

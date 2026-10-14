@@ -1,12 +1,6 @@
-import { useId, useState } from 'react';
+import { useId, useState, type ReactNode } from 'react';
 import { applyCommand, type EditCommand } from '../shared/commands.js';
-import {
-  continuingSettings,
-  KEYFRAME_SETTINGS,
-  keyframeNeighbors,
-  keySettings,
-  type LayerKeyframe,
-} from '../shared/keyframes.js';
+import { continuingSettings, KEYFRAME_SETTINGS, keySettings, type LayerKeyframe } from '../shared/keyframes.js';
 import type { ProjectDocument, VideoLayer } from '../shared/model.js';
 import { formatTimecode } from '../shared/timing.js';
 import { ChannelKeyframeNavigation } from './AnimationControls.js';
@@ -29,13 +23,13 @@ export interface KeyframeControlsProps {
   onEdit: (command: EditCommand) => void;
 }
 
-interface PointRow {
+export interface StoredRow {
   frame: number;
   id: number;
 }
 interface PanelIdentity {
   context: string;
-  rows: PointRow[];
+  rows: StoredRow[];
   nextId: number;
 }
 
@@ -68,7 +62,7 @@ function ParticipantChips({
   );
 }
 
-function reconcileRows(identity: PanelIdentity, context: string, keys: readonly LayerKeyframe[]) {
+function reconcileRows(identity: PanelIdentity, context: string, keys: readonly { frame: number }[]) {
   if (identity.context !== context)
     return { rows: keys.map((key, id) => ({ frame: key.frame, id })), nextId: keys.length };
   const previous = new Map(identity.rows.map((row) => [row.frame, row]));
@@ -87,7 +81,8 @@ function reconcileRows(identity: PanelIdentity, context: string, keys: readonly 
   return { rows, nextId };
 }
 
-function usePointIdentity(context: string, keys: readonly LayerKeyframe[]) {
+/** Stable row identities for a stored keyframe list, so a time edit and its Undo keep fields mounted. */
+export function useStoredKeyframeRows(context: string, keys: readonly { frame: number }[]): StoredRow[] {
   const [state, setState] = useState<PanelIdentity>(() => ({
     context,
     rows: keys.map((key, id) => ({ frame: key.frame, id })),
@@ -100,7 +95,100 @@ function usePointIdentity(context: string, keys: readonly LayerKeyframe[]) {
     current = { context, ...reconcileRows(state, context, keys) };
     setState(current);
   }
-  return current;
+  return current.rows;
+}
+
+/** One stored keyframe in a section's list: seek, badges, delete, enabled settings and its Edit fields. */
+export function StoredKeyframeRow({
+  noun,
+  frame,
+  duration,
+  current,
+  isDefault,
+  defaultClassName = '',
+  initiallyOpen,
+  disabled,
+  deleteTitle,
+  chips,
+  onSeek,
+  onDelete,
+  children,
+}: Readonly<{
+  noun: string;
+  frame: number;
+  duration: number;
+  current: boolean;
+  isDefault: boolean;
+  defaultClassName?: string;
+  initiallyOpen: boolean;
+  disabled: boolean;
+  deleteTitle: string;
+  chips: ReactNode;
+  onSeek: () => void;
+  onDelete: () => void;
+  children: ReactNode;
+}>) {
+  // Short lists start expanded; afterwards the user's toggle owns the disclosure.
+  const [open] = useState(initiallyOpen);
+  return (
+    <li
+      className={`keyframe-row${current ? ' current' : ''}`}
+      data-keyframe-frame={frame}
+      aria-current={current ? 'true' : undefined}
+    >
+      <div className="keyframe-row-header">
+        <button
+          type="button"
+          className="text-button"
+          aria-label={`Go to ${noun} keyframe ${frame}`}
+          title={keySeekHint(frame, duration)}
+          disabled={disabled}
+          onClick={onSeek}
+        >
+          {formatTimecode(frame)}
+        </button>
+        {isDefault && (
+          <span
+            className={`keyframe-row-default ${defaultClassName}`.trim()}
+            title="Default keyframe: its settings return to their defaults here and hold until their next keyframes; earlier frames keep their own values."
+          >
+            <Icon name="default-key" size={14} />
+            Default
+          </span>
+        )}
+        {frame >= duration && (
+          <span
+            className="keyframe-row-skipped"
+            title="Outside the current timeline; this stored keyframe remains editable."
+          >
+            Outside duration
+          </span>
+        )}
+        <button
+          type="button"
+          className="icon-button"
+          aria-label={`Delete ${noun} keyframe ${frame}`}
+          title={deleteTitle}
+          disabled={disabled}
+          onClick={onDelete}
+        >
+          <Icon name="trash" size={14} />
+        </button>
+      </div>
+      {chips && (
+        <div
+          className="layer-keyframe-dependencies"
+          title="Moving this keyframe moves all these settings together; each keeps its own Easing."
+        >
+          {chips}
+        </div>
+      )}
+      <details className="layer-keyframe-point-details" open={open}>
+        <summary aria-label={`Edit ${noun} keyframe ${frame}`}>Edit</summary>
+        <div className="layer-keyframe-point-fields">{children}</div>
+      </details>
+    </li>
+  );
 }
 
 function playheadLabel(frame: number, duration: number, atHead: boolean): string {
@@ -114,7 +202,7 @@ interface PointRowProps {
   project: ProjectDocument;
   point: LayerKeyframe;
   keys: readonly LayerKeyframe[];
-  row: PointRow;
+  row: StoredRow;
   layerId: string;
   context: string;
   listId: string;
@@ -144,158 +232,126 @@ function KeyframePointRow({
   onSeek,
 }: Readonly<PointRowProps>) {
   const settings = participatingSettings(point);
-  // Short lists start expanded; afterwards the user's toggle owns the disclosure.
-  const [open] = useState(initiallyOpen);
   return (
-    <li
-      className={`keyframe-row${current ? ' current' : ''}`}
-      data-keyframe-frame={point.frame}
-      aria-current={current ? 'true' : undefined}
-    >
-      <div className="keyframe-row-header">
-        <button
-          type="button"
-          className="text-button"
-          aria-label={`Go to track keyframe ${point.frame}`}
-          title={keySeekHint(point.frame, duration)}
-          disabled={disabled}
-          onClick={() => onSeek(point)}
-        >
-          {formatTimecode(point.frame)}
-        </button>
-        {point.reset && (
-          <span
-            className="keyframe-row-default"
-            title="Default keyframe: its settings return to their defaults here and hold until their next keyframes; earlier frames keep their own values."
-          >
-            <Icon name="default-key" size={14} />
-            Default
-          </span>
-        )}
-        {point.frame >= duration && (
-          <span
-            className="keyframe-row-skipped"
-            title="Outside the current timeline; this stored keyframe remains editable."
-          >
-            Outside duration
-          </span>
-        )}
-        <button
-          type="button"
-          className="icon-button"
-          aria-label={`Delete track keyframe ${point.frame}`}
-          title="Remove this whole shared keyframe and all its animated settings"
-          disabled={disabled}
-          onClick={() => onEdit({ type: 'layer-key-remove', layerId, frame: point.frame })}
-        >
-          <Icon name="trash" size={14} />
-        </button>
-      </div>
-      {/* A complete default keyframe's badge already says every setting is enabled. */}
-      {!(point.reset && settings.length === KEYFRAME_SETTINGS.length) && (
-        <div
-          className="layer-keyframe-dependencies"
-          title="Moving this keyframe moves all these settings together; each keeps its own Easing."
-        >
+    <StoredKeyframeRow
+      noun="track"
+      frame={point.frame}
+      duration={duration}
+      current={current}
+      isDefault={point.reset}
+      initiallyOpen={initiallyOpen}
+      disabled={disabled}
+      deleteTitle="Remove this whole shared keyframe and all its animated settings"
+      chips={
+        // A complete default keyframe's badge already says every setting is enabled.
+        !(point.reset && settings.length === KEYFRAME_SETTINGS.length) && (
           <ParticipantChips
             point={point}
             layer={project.layers.find((layer) => layer.id === layerId)!}
             frame={point.frame}
             disabled={disabled}
           />
-        </div>
-      )}
-      <details className="layer-keyframe-point-details" open={open}>
-        <summary aria-label={`Edit track keyframe ${point.frame}`}>Edit</summary>
-        <div className="layer-keyframe-point-fields">
-          <label htmlFor={`${listId}-${row.id}-frame`}>
-            Timeline frame
-            <NumberField
-              id={`${listId}-${row.id}-frame`}
-              aria-label={`Track keyframe frame ${point.frame}`}
-              aria-describedby={helpId}
-              min={0}
-              max={2_147_483_647}
-              integer
-              step={1}
-              value={point.frame}
-              disabled={disabled}
-              resetKey={`${context}:${row.id}:frame`}
-              validate={(value) =>
-                keys.some((other) => other.frame !== point.frame && other.frame === value)
-                  ? `Frame ${value} already has a shared keyframe. Choose a different frame.`
-                  : null
-              }
-              onCommit={(nextFrame) => onEdit({ type: 'layer-key-move', layerId, frame: point.frame, nextFrame })}
-            />
-          </label>
-          <KeyframeEasing
-            label={`Track keyframe easing ${point.frame}`}
-            settingLabel={(setting) => `${setting} easing at track keyframe ${point.frame}`}
-            describedBy={helpId}
-            title="Applies to every setting of this keyframe, toward each setting's next keyframe"
-            settings={settings}
-            continuing={continuingSettings(
-              keys,
-              point,
-              KEYFRAME_SETTINGS.map((setting) => setting.key),
-            )}
-            easing={point.easing}
-            disabled={disabled}
-            onChange={(setting, interpolation) =>
-              onEdit({ type: 'layer-key-easing', layerId, frame: point.frame, setting, interpolation })
+        )
+      }
+      onSeek={() => onSeek(point)}
+      onDelete={() => onEdit({ type: 'layer-key-remove', layerId, frame: point.frame })}
+    >
+      <label htmlFor={`${listId}-${row.id}-frame`}>
+        Timeline frame
+        <NumberField
+          id={`${listId}-${row.id}-frame`}
+          aria-label={`Track keyframe frame ${point.frame}`}
+          aria-describedby={helpId}
+          min={0}
+          max={2_147_483_647}
+          integer
+          step={1}
+          value={point.frame}
+          disabled={disabled}
+          resetKey={`${context}:${row.id}:frame`}
+          validate={(value) =>
+            keys.some((other) => other.frame !== point.frame && other.frame === value)
+              ? `Frame ${value} already has a shared keyframe. Choose a different frame.`
+              : null
+          }
+          onCommit={(nextFrame) => onEdit({ type: 'layer-key-move', layerId, frame: point.frame, nextFrame })}
+        />
+      </label>
+      <KeyframeEasing
+        label={`Track keyframe easing ${point.frame}`}
+        settingLabel={(setting) => `${setting} easing at track keyframe ${point.frame}`}
+        describedBy={helpId}
+        title="Applies to every setting of this keyframe, toward each setting's next keyframe"
+        settings={settings}
+        continuing={continuingSettings(
+          keys,
+          point,
+          KEYFRAME_SETTINGS.map((setting) => setting.key),
+        )}
+        easing={point.easing}
+        disabled={disabled}
+        onChange={(setting, interpolation) =>
+          onEdit({ type: 'layer-key-easing', layerId, frame: point.frame, setting, interpolation })
+        }
+      />
+      <div className="layer-keyframe-point-values">
+        {settings.map((setting) => {
+          const value = point.values[setting.key];
+          if (value === null) return null;
+          const id = `${listId}-${row.id}-${setting.key}`;
+          const label = `${setting.label} keyframe value ${point.frame}`;
+          const hint = `${setting.label} at stored timeline frame ${point.frame} on ${project.layers.find((layer) => layer.id === layerId)?.name}. Edits change only this setting's keyframe value, not the playhead, Easing or unanimated settings.`;
+          const command = (nextValue: number): EditCommand => ({
+            type: 'layer-key-value',
+            layerId,
+            frame: point.frame,
+            setting: setting.key,
+            value: nextValue,
+          });
+          const validate = (nextValue: number): string | null => {
+            try {
+              applyCommand(project, command(nextValue));
+              return null;
+            } catch (cause) {
+              return cause instanceof Error ? cause.message : 'This value conflicts with the track timing.';
             }
-          />
-          <div className="layer-keyframe-point-values">
-            {settings.map((setting) => {
-              const value = point.values[setting.key];
-              if (value === null) return null;
-              const id = `${listId}-${row.id}-${setting.key}`;
-              const label = `${setting.label} keyframe value ${point.frame}`;
-              const hint = `${setting.label} at stored timeline frame ${point.frame} on ${project.layers.find((layer) => layer.id === layerId)?.name}. Edits change only this setting's keyframe value, not the playhead, Easing or unanimated settings.`;
-              const command = (nextValue: number): EditCommand => ({
-                type: 'layer-key-value',
-                layerId,
-                frame: point.frame,
-                setting: setting.key,
-                value: nextValue,
-              });
-              const validate = (nextValue: number): string | null => {
-                try {
-                  applyCommand(project, command(nextValue));
-                  return null;
-                } catch (cause) {
-                  return cause instanceof Error ? cause.message : 'This value conflicts with the track timing.';
-                }
-              };
-              const onCommit = (nextValue: number): void => {
-                if (!disabled) onEdit(command(nextValue));
-              };
-              const resetKey = `${context}:${row.id}:${setting.key}`;
-              return (
-                <div className="keyframe-value colour-control" key={setting.key}>
-                  <RangeSettingControl
-                    setting={setting.key}
-                    id={id}
-                    label={label}
-                    value={value}
-                    disabled={disabled}
-                    hint={hint}
-                    exact={{ resetKey, validate }}
-                    onCommit={onCommit}
-                    onDraft={(next) => livePreview(next === null ? null : command(next))}
-                  />
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </details>
-    </li>
+          };
+          const onCommit = (nextValue: number): void => {
+            if (!disabled) onEdit(command(nextValue));
+          };
+          const resetKey = `${context}:${row.id}:${setting.key}`;
+          return (
+            <div className="keyframe-value colour-control" key={setting.key}>
+              <RangeSettingControl
+                setting={setting.key}
+                id={id}
+                label={label}
+                value={value}
+                disabled={disabled}
+                hint={hint}
+                exact={{ resetKey, validate }}
+                onCommit={onCommit}
+                onDraft={(next) => livePreview(next === null ? null : command(next))}
+              />
+            </div>
+          );
+        })}
+      </div>
+    </StoredKeyframeRow>
   );
 }
 
-/** One project-time point list for the whole row, never one list per setting or clip. */
+/** The heading of a section's stored keyframe list. */
+export function StoredKeyframesHeading({ children }: Readonly<{ children?: ReactNode }>) {
+  return (
+    <div className="keyframe-toolbar stored-keyframes-heading">
+      <span className="keyframe-panel-title">Keyframes</span>
+      {children}
+    </div>
+  );
+}
+
+/** Colour's stored keyframes: one project-time list for the whole track, never one per setting or clip. */
 export function KeyframeControls({
   project,
   layer,
@@ -311,7 +367,7 @@ export function KeyframeControls({
   const helpId = `${listId}-help`;
   const keys = layer.keyframes;
   const context = `${projectId}:${layer.id}`;
-  const current = usePointIdentity(context, keys);
+  const rows = useStoredKeyframeRows(context, keys);
 
   const pointAtFrame = keys.find((key) => key.frame === frame);
   const previewAvailable = Number.isInteger(frame) && frame >= 0 && frame < duration;
@@ -325,48 +381,17 @@ export function KeyframeControls({
   const inspectedAway =
     inspectedPoint && (!previewAvailable || inspectedPoint.frame !== frame) ? inspectedPoint : undefined;
   const navigationFrame = keyframeNavigationFrame(inspection, layer.id, frame);
-  const { previous, next } = keyframeNeighbors(keys, navigationFrame);
   const seekPoint = (point: LayerKeyframe): void => {
     if (!unavailable) navigation.onSeekKeyframe(layer.id, point.frame);
   };
 
   return (
     <fieldset
-      className="keyframe-controls declutter-keyframes layer-keyframe-controls"
+      className="keyframe-controls declutter-keyframes layer-keyframe-controls section-keyframes"
       aria-label={`Track keyframes ${layer.name}`}
     >
       <legend className="declutter-sr-only">Track keyframes</legend>
-      <div className="keyframe-toolbar">
-        <strong className="keyframe-panel-title declutter-sr-only">Track keyframes</strong>
-        <span className="keyframe-count">
-          {keys.length} {keys.length === 1 ? 'keyframe' : 'keyframes'}
-        </span>
-        <div className="keyframe-navigation">
-          <button
-            type="button"
-            className="icon-button"
-            aria-label="Previous track keyframe"
-            title={previous ? keySeekHint(previous.frame, duration) : 'No previous shared keyframe'}
-            disabled={unavailable || !previous}
-            onClick={() => {
-              if (previous) seekPoint(previous);
-            }}
-          >
-            <Icon name="back" size={14} />
-          </button>
-          <button
-            type="button"
-            className="icon-button"
-            aria-label="Next track keyframe"
-            title={next ? keySeekHint(next.frame, duration) : 'No next shared keyframe'}
-            disabled={unavailable || !next}
-            onClick={() => {
-              if (next) seekPoint(next);
-            }}
-          >
-            <Icon name="forward" size={14} />
-          </button>
-        </div>
+      <StoredKeyframesHeading>
         <HelpPopover label="Animation" className="animation-help" guide="opt-in-to-shared-video-track-animation">
           <p id={helpId}>
             Each diamond adds a keyframe for that setting on the whole track, at the playhead. Settings keyed together
@@ -392,7 +417,7 @@ export function KeyframeControls({
           </div>
           <p className="editor-help-tip">Tip: drag a timeline keyframe to move all its settings.</p>
         </HelpPopover>
-      </div>
+      </StoredKeyframesHeading>
 
       <div className="layer-keyframe-current">
         <span className="layer-keyframe-position declutter-sr-only">
@@ -437,11 +462,11 @@ export function KeyframeControls({
         <ol className="keyframe-list keyframe-entries" aria-label="Edit track keyframes">
           {keys.map((key, index) => (
             <KeyframePointRow
-              key={current.rows[index]!.id}
+              key={rows[index]!.id}
               project={project}
               point={key}
               keys={keys}
-              row={current.rows[index]!}
+              row={rows[index]!}
               layerId={layer.id}
               context={context}
               listId={listId}

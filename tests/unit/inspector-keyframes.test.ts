@@ -55,7 +55,13 @@ describe('dedicated Inspector keyframe controls', () => {
     expect(clipPanel).not.toContain('aria-label="Placement section"');
     expect(clipPanel).not.toContain('aria-label="Opacity"');
     expect(trackPanel).toContain('aria-label="Track keyframes Track 1"');
-    expect(trackPanel).toContain('aria-label="Keyframes section"');
+    expect(trackPanel).not.toContain('aria-label="Keyframes section"');
+    // Colour's stored keyframe list sits inside the Colour section, before HSL ranges.
+    const colourSection = trackPanel.slice(
+      trackPanel.indexOf('aria-label="Colour section"'),
+      trackPanel.indexOf('aria-label="HSL ranges section"'),
+    );
+    expect(colourSection).toContain('aria-label="Track keyframes Track 1"');
     expect(trackPanel).toContain('aria-label="Fades section"');
     const opacity = [...trackPanel.matchAll(/<input[^>]*aria-label="Opacity"[^>]*>/g)].map((match) => match[0]);
     expect(opacity).toHaveLength(2);

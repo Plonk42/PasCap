@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import type { AudioAsset } from '../../src/shared/audio.js';
 import { NEUTRAL_COLOUR } from '../../src/shared/colour.js';
 import { applyCommand } from '../../src/shared/commands.js';
@@ -44,6 +44,11 @@ test.beforeEach(async ({ page, request }) => {
   await page.goto('/?project=preview-lab');
   await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
 });
+
+/** Colour's keyframe line visits every stored track keyframe. */
+function colourStep(page: Page, direction: 'Previous' | 'Next'): Locator {
+  return page.getByRole('button', { name: `${direction} Colour keyframe`, exact: true });
+}
 
 async function currentProject(page: Page): Promise<ProjectDocument> {
   return projectSchema.parse(await page.evaluate(() => window.pascapLab!.project()));
@@ -184,11 +189,11 @@ test('the shared list labels time/value/easing, retains reordered input focus, a
   await setProject(page, document);
   await inspectorTab(page, 'Track keyframes');
   const keys = layerKeyframes(page, 'Track 1');
-  await keys.getByRole('button', { name: 'Next track keyframe', exact: true }).click();
+  await colourStep(page, 'Next').click();
   await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(20);
-  await keys.getByRole('button', { name: 'Next track keyframe', exact: true }).click();
+  await colourStep(page, 'Next').click();
   await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(70);
-  await keys.getByRole('button', { name: 'Previous track keyframe', exact: true }).click();
+  await colourStep(page, 'Previous').click();
   await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(20);
   const row = await editLayerPoint(page, 'Track 1', 20);
   await expect(keys.getByRole('list')).toHaveAccessibleName('Edit track keyframes');
@@ -268,11 +273,11 @@ test('track keyframe navigation reaches project points and previews outside-dura
   await inspectorTab(page, 'Track keyframes');
   const keys = layerKeyframes(page, 'Track 1');
   for (const frame of [5, 35, 40, calculateLayout(document).duration - 1]) {
-    await keys.getByRole('button', { name: 'Next track keyframe', exact: true }).click();
+    await colourStep(page, 'Next').click();
     await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(frame);
   }
-  await expect(keys.getByRole('button', { name: 'Next track keyframe', exact: true })).toBeDisabled();
-  await expect(keys.getByRole('button', { name: 'Previous track keyframe', exact: true })).toBeEnabled();
+  await expect(colourStep(page, 'Next')).toBeDisabled();
+  await expect(colourStep(page, 'Previous')).toBeEnabled();
   await expect(keys.locator('.layer-keyframe-inspected')).toContainText(
     'Stored keyframe · timeline frame 110 · outside current duration',
   );
@@ -283,7 +288,7 @@ test('track keyframe navigation reaches project points and previews outside-dura
     `Stored timeline frame 110; preview the nearest available frame ${calculateLayout(document).duration - 1}. The keyframe stays in place.`,
   );
   await expect(keys.locator('.keyframe-row-skipped')).toHaveCount(1);
-  await keys.getByRole('button', { name: 'Previous track keyframe', exact: true }).click();
+  await colourStep(page, 'Previous').click();
   await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(40);
   await inspectorTab(page, 'Track');
   const main = page.locator('.keyframe-setting-navigation').filter({

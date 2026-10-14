@@ -225,13 +225,13 @@ settings stay editable like any keyframe's; it remains a default keyframe throug
 
 Control names follow the [editor control vocabulary](design/EDITOR_CONTROLS.md#vocabulary).
 
-The **Track → Keyframes** section (list accessible name **Track keyframes** plus
-the track name) contains
-**one directly visible whole-track keyframe list** for the selected video track, including an
-empty track without a selected clip. It shows keyframe
-count, whole-track Previous/Next navigation, **Animation help** and enabled-setting chips
-for the current or inspected stored keyframe. The toolbar's Animation help includes
-keyframe-timing guidance, with no separate Keyframe timing help button.
+**Track → Colour** ends, below its grouped sliders, with **one directly visible whole-track
+keyframe list** for the selected video track, including an empty track without a selected
+clip. It sits under a small **Keyframes** heading with the **Animation help** question-mark
+button beside it (fieldset accessible name **Track keyframes** plus the track name, list
+**Edit track keyframes**) and shows enabled-setting chips for the current or inspected stored
+keyframe. Colour's keyframe line provides its count and the only section Previous/Next pair.
+Animation help includes keyframe-timing guidance, with no separate Keyframe timing help button.
 **Clip** keeps source/clip settings and Speed controls; **Track → Colour**
 keeps track Colour/Opacity controls and **Track → Transform** the pose, evaluated at the real playhead.
 
@@ -249,7 +249,8 @@ Colour, Speed and Transform always show their capture diamonds while the section
   disable actions; hollow status itself cannot.
 
 Each section's keyframe line has one native **Previous/Next** pair, beside the count of the keyframes it visits.
-Colour visits the union of Opacity, nine scalar colour and HDR keyframes. Speed visits all
+Colour visits the union of Opacity, nine scalar colour and HDR keyframes, exactly the rows of
+its stored list, with seek-hint tooltips. Speed visits all
 retained custom speed source keyframes of the selected clip, including off-trim
 keyframes and the original exclusive OUT, previewing the nearest mapped image through
 authoritative `PlacedClip.retiming`. Transform visits all track Transform keyframes,
@@ -260,7 +261,7 @@ nearest first/last preview image is the same. Stored source time remains distinc
 from the actual displayed source frame; capture always uses the latter.
 
 Per-channel native **Previous/Next** arrows remain beside each main Opacity and colour diamond, because not every setting is enabled at every shared keyframe.
-Enabled setting chips in stored Keyframes rows retain their arrows too.
+Enabled setting chips in stored Colour keyframe rows retain their arrows too.
 All these per-channel arrows visit **strictly earlier/later** keyframes where
 `values[setting] !== null`; zero is an enabled value, and keyframes belonging only to
 other channels are skipped. There is no wrap or revisit of the current keyframe.
@@ -284,7 +285,7 @@ only keyframes with `opacity` enabled; the Colour header visits the colour/Opaci
 **Clip → Placement** contains placement controls only. There is no duplicate
 opacity control or navigation in Placement or the sidebar;
 **Track options** is limited to rename, Ripple, ordering and deletion. Stored keyed Opacity
-settings remain editable in the shared Keyframes list.
+settings remain editable in Colour's stored keyframe list.
 Unkeyed colour controls edit the selected track; sharing the Colour section
 does not make Opacity per-clip or part of the SDR RGB grading transform. Opacity
 controls composition coverage after grading.
@@ -302,12 +303,14 @@ On an empty track, Opacity and colour remain editable without keyframes and thei
 diamonds can create animation; Clip settings, including
 Speed, need a selected clip.
 
-In **Keyframes**, the shared list has no outer disclosure or per-track list expansion
-preference. Its toolbar reads "N keyframes" and the section badge repeats the count;
-the chips of a keyframe at the playhead follow an **At playhead:** caption. Each shared
-keyframe entry lists its enabled settings and has an inner **Edit**
-disclosure, open initially when the list has three or fewer keyframes. Its trash
-deletes that keyframe; the toolbar has no second delete action.
+Colour's **Keyframes** list has no outer disclosure, per-track list expansion preference,
+count or navigation of its own; the keyframe line above counts and visits its keyframes.
+The chips of a keyframe at the playhead follow an **At playhead:** caption; an inspected
+stored keyframe away from the playhead shows a dashed **Stored keyframe · timeline frame N**
+panel with **Follow playhead**. Each shared keyframe entry has a timecode button
+(**Go to track keyframe N**), **Default** and **Outside duration** badges where they apply,
+a trash (**Delete track keyframe N**), its enabled-setting chips and an inner **Edit**
+disclosure, open initially when the list has three or fewer keyframes.
 Its Timeline frame field moves
 **every enabled setting and its Easing together in one Undo step**.
 The visibly labelled **Easing** select (accessible name **Track keyframe easing N**) sets
@@ -349,7 +352,7 @@ clamped or rounded.
 
 All stored keyframes, including those outside current duration or on an empty track,
 remain editable in this list. Main per-setting arrows, stored-setting chip arrows,
-section navigation to track keyframes, track Previous/Next, shared marker navigation and list time buttons
+section navigation to track keyframes, shared marker navigation and list time buttons
 share **one editor-only stored-keyframe inspection cursor**.
 Successive navigation advances from that stored time, so several off-duration
 keyframes can be inspected even when every seek clamps to the same last preview frame.
@@ -367,7 +370,7 @@ the cursor is not a saved project field or an Undo operation.
 Speed is clip-only, in **Clip → Speed** (**Constant speed / Custom curve**, with
 presets such as Ramp up); track keyframes never contain or override it. Colour
 resets target only enabled colour values at the current keyframe; individual
-resets can edit unanimated track-base channels. In Keyframes, each reset instead
+resets can edit unanimated track-base channels. In the stored list, each reset instead
 targets its existing stored keyed setting, even when that keyframe is outside duration.
 
 ## Timeline markers and ruler
@@ -532,15 +535,16 @@ The inspector uses **Clip / Track / Audio** tabs, split by ownership. **Clip**
 holds the selected clip's **Speed**, **Detail**, **Range** and **Placement** (placement only) under a "Clip N of M · track" header; on an empty video track it shows only
 "Select a clip on … to edit it." **Track** holds everything the whole video track owns
 under an "Applies to all N clips on this track" header: Colour (including the sole
-track Opacity control), HSL ranges, Colour curves, Transform, Keyframes (the shared keyframe list with
-Animation help, enabled-setting chips and whole-track navigation), Transitions (every
+track Opacity control and, at its end, the shared keyframe list with Animation help and
+enabled-setting chips), HSL ranges, Colour curves, Transform (ending with its own keyframe
+list), Transitions (every
 boundary of the track, left to right, with the selected one expanded) and Fades.
 Music belongs to Audio, with detailed **Placement & fades**.
 Sections retain their expansion in local browser storage.
 New defaults collapse **Speed**, **Detail**, **Range**, **Placement**, **HSL ranges**,
 **Colour curves** and **Transform**, while the other Track sections stay open. Existing section preferences are not reset. **Expand all / Collapse all**
 affects only the visible tab's sections: Clip's **Speed**, **Detail**, **Range** and
-**Placement**; Track's **Colour**, **HSL ranges**, **Colour curves**, **Transform**, **Keyframes**, **Transitions** and **Fades**; Audio's
+**Placement**; Track's **Colour**, **HSL ranges**, **Colour curves**, **Transform**, **Transitions** and **Fades**; Audio's
 **Music**. Other tabs, nested keyframe disclosures and
 help remain unchanged; the shared list has no expansion preference.
 Hidden tab/section content stays mounted, retaining valid/invalid drafts within

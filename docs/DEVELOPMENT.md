@@ -490,7 +490,7 @@ a track-local stored-keyframe cursor whose preview uses the nearest available fr
 Speed uses a clip-local stored-source cursor; both are independent of central track
 inspection, so successive stored keyframes remain reachable even when their nearest
 preview image is the same. Stored time stays distinct from actual preview.
-Enabled setting chips in stored Keyframes rows carry per-channel native arrows
+Enabled setting chips in stored Colour keyframe rows carry per-channel native arrows
 too. All main and stored per-channel arrows visit strictly earlier/later keyframes
 where that channel is nonnull (zero is enabled), sharing the central off-duration
 inspection cursor with section navigation to track keyframes and track/list

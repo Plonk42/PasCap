@@ -7,6 +7,7 @@ import { calculateLayout } from '../../src/shared/timeline.js';
 import { clipKeyframeMarkers } from '../../src/web/clip-keyframe-markers.js';
 import {
   closeOptions,
+  currentKeyframeRow,
   editLayerPoint,
   expandedInspectorPreferences,
   layerKeyframes,
@@ -14,6 +15,7 @@ import {
   inspectorTab as openTab,
   settingTab,
   sharedPoint,
+  transformKeyframes,
 } from './editor-helpers.js';
 import { memoryProjects, type MemoryProjects } from './memory-projects.js';
 
@@ -396,12 +398,8 @@ test('Transform section navigation retains keyframes after the duration with tru
     await next.scrollIntoViewIfNeeded();
     await next.click();
     await previewAt(page, preview);
-    await expect(
-      inspector(page).getByRole('combobox', { name: 'Selected Transform keyframe', exact: true }),
-    ).toHaveValue(String(frame));
-    await expect(inspector(page).getByRole('region', { name: 'Stored Transform keyframe', exact: true })).toContainText(
-      `Stored timeline frame ${frame}`,
-    );
+    await expect(currentKeyframeRow(transformKeyframes(page))).toHaveAttribute('data-keyframe-frame', String(frame));
+    if (frame !== preview) await expect(transformKeyframes(page)).toContainText(`Stored timeline frame ${frame}`);
   }
   await expect(next).toBeDisabled();
   for (const [frame, preview] of [
@@ -412,9 +410,7 @@ test('Transform section navigation retains keyframes after the duration with tru
     await previous.scrollIntoViewIfNeeded();
     await previous.click();
     await previewAt(page, preview);
-    await expect(
-      inspector(page).getByRole('combobox', { name: 'Selected Transform keyframe', exact: true }),
-    ).toHaveValue(String(frame));
+    await expect(currentKeyframeRow(transformKeyframes(page))).toHaveAttribute('data-keyframe-frame', String(frame));
   }
   await expect(previous).toBeDisabled();
   await readOnly(page, document);
@@ -811,7 +807,7 @@ test('single opacity navigation on a selected empty row preserves Inspector cont
   await inspectorTab(page, 'Clip');
   await expect(await step(page, 'Opacity', 'Next')).toHaveAttribute('title', /Stored timeline frame 160;/);
   await inspectorTab(page, 'Track keyframes');
-  await layerKeyframes(page, 'Track 2').getByRole('button', { name: 'Next track keyframe', exact: true }).click();
+  await sectionStep(page, 'Colour', 'Next').click();
   await expect(layerKeyframes(page, 'Track 2').locator('.layer-keyframe-inspected')).toContainText(
     'Stored keyframe · timeline frame 140',
   );
@@ -883,10 +879,10 @@ test('successive outside-duration setting, row and list navigation keeps one tru
   await inspectorTab(page, 'Clip');
   await expect(await step(page, 'Exposure', 'Next')).toBeDisabled();
   await inspectorTab(page, 'Track keyframes');
-  await keys.getByRole('button', { name: 'Previous track keyframe', exact: true }).click();
+  await sectionStep(page, 'Colour', 'Previous').click();
   await expect(keys.locator('.layer-keyframe-inspected')).toContainText('Stored keyframe · timeline frame 180');
   await keys.getByRole('button', { name: 'Go to track keyframe 120', exact: true }).click();
-  await keys.getByRole('button', { name: 'Next track keyframe', exact: true }).click();
+  await sectionStep(page, 'Colour', 'Next').click();
   await expect(keys.locator('.layer-keyframe-inspected')).toContainText('Stored keyframe · timeline frame 130');
   await inspectorTab(page, 'Clip');
   await navigate(page, 'Exposure', 'Next');
@@ -943,7 +939,7 @@ test('an empty timeline can inspect successive stored keys, without pretending t
   await expect(await step(page, 'Exposure', 'Next')).toBeDisabled();
   await navigate(page, 'Exposure', 'Previous');
   await inspectorTab(page, 'Track keyframes');
-  await keys.getByRole('button', { name: 'Previous track keyframe', exact: true }).click();
+  await sectionStep(page, 'Colour', 'Previous').click();
   await expect(keys.locator('.layer-keyframe-inspected')).toContainText('Stored keyframe · timeline frame 45');
   await inspectorTab(page, 'Clip');
   await navigate(page, 'Exposure', 'Next');
@@ -1109,10 +1105,7 @@ test('point moves and history retain input identity and the shared cursor, while
   await inspectorTab(page, 'Clip');
   await expect(await step(page, 'Exposure', 'Next')).toHaveAttribute('title', /Stored timeline frame 180;/);
   await inspectorTab(page, 'Track keyframes');
-  await expect(keys.getByRole('button', { name: 'Next track keyframe', exact: true })).toHaveAttribute(
-    'title',
-    /Stored timeline frame 160;/,
-  );
+  await expect(sectionStep(page, 'Colour', 'Next')).toHaveAttribute('title', /Stored timeline frame 160;/);
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   await expect(keys.locator('.layer-keyframe-inspected')).toHaveCount(0);
   await inspectorTab(page, 'Clip');
