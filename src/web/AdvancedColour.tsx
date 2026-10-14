@@ -37,8 +37,8 @@ interface Props {
 }
 const HSL_CONTROLS = [
   { key: 'hue', label: 'Hue °', min: -30, max: 30, step: 0.1 },
-  { key: 'saturation', label: 'Saturation offset', min: -1, max: 1, step: 0.01 },
-  { key: 'lightness', label: 'Lightness offset', min: -0.5, max: 0.5, step: 0.005 },
+  { key: 'saturation', label: 'Saturation', min: -1, max: 1, step: 0.01 },
+  { key: 'lightness', label: 'Lightness', min: -0.5, max: 0.5, step: 0.005 },
 ] as const;
 
 const clamp = (value: number, low: number, high: number): number => Math.min(high, Math.max(low, value));
