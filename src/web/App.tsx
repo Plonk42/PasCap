@@ -584,9 +584,9 @@ export function App() {
     else if (state.status === 'seeking') playAfterSeek.current = !playAfterSeek.current;
     else void preview.play(playRange.current ?? undefined);
   }, []);
-  const toggleUngraded = useCallback(() => {
-    if (drafting.current) return;
-    engine.current?.setUngraded(!engine.current.diagnostics().ungraded);
+  const holdOriginal = useCallback((active: boolean) => {
+    if (active && drafting.current) return;
+    engine.current?.setUngraded(active);
   }, []);
   const revealClip = (id: string): void => {
     if (drafting.current || !current.current) return;
@@ -1894,7 +1894,7 @@ export function App() {
                 drafting={draft !== null}
                 onTogglePlayback={togglePlayback}
                 rangeSelected={timeRange !== null}
-                onToggleUngraded={toggleUngraded}
+                onHoldOriginal={holdOriginal}
                 onSeek={seek}
                 onRetry={retryPreview}
                 onMedia={openMedia}

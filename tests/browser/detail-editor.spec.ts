@@ -106,7 +106,7 @@ test('a Detail slider drag previews live without a document, history or save cha
   await expect.poll(() => checksum(page)).toBe(plain);
 });
 
-test('exact fields reject invalid drafts, names reset one setting, Reset detail and Compare bypass the filters', async ({
+test('exact fields reject invalid drafts, names reset one setting, Reset detail and Original bypass the filters', async ({
   page,
 }) => {
   await openEditor(page, true);
@@ -137,9 +137,11 @@ test('exact fields reject invalid drafts, names reset one setting, Reset detail 
     });
   const filtered = await checksum(page);
   expect(filtered).not.toBe(plain);
-  await page.getByRole('button', { name: 'Show ungraded preview' }).click();
+  const original = page.getByRole('button', { name: 'Show original preview' });
+  await original.hover();
+  await page.mouse.down();
   await expect.poll(() => checksum(page)).toBe(plain);
-  await page.getByRole('button', { name: 'Show ungraded preview' }).click();
+  await page.mouse.up();
   await expect.poll(() => checksum(page)).toBe(filtered);
 
   await resetSetting(page, 'Clip Clarity');

@@ -45,7 +45,9 @@ export function DetailSection({ project, clip, disabled, onEdit }: Readonly<Prop
             Sharpen fine edges, add or soften midtone contrast with Clarity, or smooth grain with Denoise on this clip.
             The preview shows the result as you drag.
           </p>
-          <p className="editor-help-tip">Tip: Compare shows the clip without Colour and Detail.</p>
+          <p className="editor-help-tip">
+            Tip: hold Original above the preview to see the clip without Colour and Detail.
+          </p>
         </HelpPopover>
       }
     >

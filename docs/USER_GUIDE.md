@@ -290,7 +290,7 @@ cancelled edits apply nothing. Numeric entry retains its precision.
 The **HSL ranges** and **Colour curves** sections, below Colour in Track, also belong to the video track, but remain
 static, with no animation diamonds. Colour curves pass smoothly through their control
 nodes without overshooting them. They follow scalar grading, so HSL's grey
-protection does not undo Temperature/Tint colouring. Ungraded comparison bypasses
+protection does not undo Temperature/Tint colouring. The Original preview bypasses
 all these Colour stages, retaining Opacity and geometry. Exact processing:
 [Temperature/Tint](design/TEMPERATURE_AND_TINT.md) and
 [HSL/curves](design/HSL_AND_CURVES.md).
@@ -301,24 +301,26 @@ all these Colour stages, retaining Opacity and geometry. Exact processing:
 boosting local detail, like a tone-mapped look; **0** is off and **1** is the strongest.
 It is an SDR effect, not HDR output, and can be keyframed like the other Colour
 settings. Nonzero or keyed HDR makes export use the slower composited path.
-Ungraded comparison bypasses it. Details: [detail filters](design/DETAIL_FILTERS.md#hdr-look).
+The Original preview bypasses it. Details: [detail filters](design/DETAIL_FILTERS.md#hdr-look).
 
-### Compare graded and ungraded preview
+### Show the original image
 
-The **Timeline preview** heading has a native **Compare** button, accessible as
-**Show ungraded preview**. When active, it reads **Ungraded** and the canvas shows
-an **Ungraded** badge. Click or use the focused button's Enter/Space to toggle while
-paused or playing; there is no global shortcut. **Source preview** is unchanged.
+The **Timeline preview** heading has a native **Original** button, accessible as
+**Show original preview**. The preview shows the image without Colour and Detail
+(with an **Original** badge) only while you hold it: press and hold the pointer, or
+hold Enter/Space on the focused button, while paused or playing. Releasing the
+pointer (anywhere), the key, moving focus away or leaving the window restores the
+graded preview. There is no global shortcut. **Source preview** is unchanged.
 
-Ungraded means the **composed timeline preview without grading**, not an
-original-resolution view or an isolated selected clip. It neutralizes all evaluated
+Original means the **composed timeline preview without grading**, not the untouched
+recording, an original-resolution view or an isolated selected clip. It neutralizes all evaluated
 colour settings across enabled video tracks, including track colour bases/keyframes and both
 dissolve sources, and every clip's Sharpen, Clarity and Denoise. Exact observed source frames, retiming, track Opacity,
-spatial geometry/coverage, visibility, black fades, stacking and music remain unchanged.
+spatial geometry/coverage (Transform), visibility, black fades, stacking and music remain unchanged.
 
-Comparison is editor-only: toggling never seeks, saves, enters Undo history, changes
+This is editor-only: holding never seeks, saves, enters Undo history, changes
 exports, schema, proxies or originals, or adds decoders. Same-project seeks,
-appearance edits and timing reloads retain the mode; changing project or reloading
+appearance edits and timing reloads keep the engine's mode while it is held; changing project or reloading
 the editor with a fresh preview engine resets to normal graded preview.
 
 ### Precise clip speed curves
@@ -432,7 +434,7 @@ step, and Escape cancels. Double-click a setting's name to reset it, or use
 follow it to another track and are copied by Split, Cut range and Duplicate.
 
 The filters work on the recording before the track's Colour, scaled to the image
-height, so the 720p preview shows what both export profiles produce. **Compare**
+height, so the 720p preview shows what both export profiles produce. **Original**
 hides them together with Colour. Any detail setting renders through the composited
 exporter and makes it slower, especially in 4K. Details:
 [detail filters](design/DETAIL_FILTERS.md).

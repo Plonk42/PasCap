@@ -306,7 +306,7 @@ function ColourSection({ layer, frame, resetKey, disabled, onEdit, id }: Readonl
       help={
         <HelpPopover label="Colour animation" guide="colour-speed-and-shared-video-track-keyframes">
           <p>These settings grade every clip on this track. To grade one clip differently, put it on its own track.</p>
-          <p className="editor-help-tip">Tip: Compare shows the ungraded image.</p>
+          <p className="editor-help-tip">Tip: hold Original above the preview to see the image without Colour.</p>
         </HelpPopover>
       }
     >

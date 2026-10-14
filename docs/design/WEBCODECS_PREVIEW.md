@@ -96,7 +96,7 @@ or dissolve can start from prefilled frames.
   outlasts a frame on a slow renderer, the status is **Catching up with the clock**
   instead, without counting a decoder stall; the next frame is drawn at the clock.
   While playing, status snapshots are published only by the display tick right
-  after it draws, so a Compare toggle or new subscriber never receives an image
+  after it draws, so holding Original or a new subscriber never receives an image
   drawn before the clock moved on.
 - Pause, seek, timing edits, project changes and disposal stop the affected
   streams; their in-flight frames are discarded by generation.

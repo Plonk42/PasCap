@@ -1,4 +1,4 @@
-import type { RefObject } from 'react';
+import { useCallback, useEffect, useRef, type KeyboardEvent, type PointerEvent, type RefObject } from 'react';
 import type { PreviewDiagnostics } from '../preview/engine.js';
 import { formatTimecode } from '../shared/timing.js';
 import { HelpPopover } from './HelpPopover.js';
@@ -15,7 +15,8 @@ interface Props {
   onTogglePlayback: () => void;
   /** Play covers only the selected timeline range. */
   rangeSelected: boolean;
-  onToggleUngraded: () => void;
+  /** Shows the image without Colour and Detail for as long as `active` stays true. */
+  onHoldOriginal: (active: boolean) => void;
   onSeek: (frame: number) => void;
   onRetry: () => void;
   onMedia: () => void;
@@ -97,7 +98,7 @@ export function PreviewPanel({
   drafting,
   onTogglePlayback,
   rangeSelected,
-  onToggleUngraded,
+  onHoldOriginal,
   onSeek,
   onRetry,
   onMedia,
@@ -116,6 +117,30 @@ export function PreviewPanel({
   const controlsUnavailable = !duration || drafting || loading || !!startupError;
   const label = { playing: 'Playing', paused: 'Paused' }[status as 'playing' | 'paused'] ?? status;
   const caption = previewCaption(loading, diagnostics, startupError);
+  const holding = useRef(false);
+  const hold = useCallback(
+    (active: boolean) => {
+      if (holding.current === active) return;
+      holding.current = active;
+      onHoldOriginal(active);
+    },
+    [onHoldOriginal],
+  );
+  useEffect(() => {
+    const release = () => hold(false);
+    window.addEventListener('blur', release);
+    return () => window.removeEventListener('blur', release);
+  }, [hold]);
+  const pressPointer = (event: PointerEvent<HTMLButtonElement>) => {
+    if (event.button !== 0) return;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    hold(true);
+  };
+  const keyHold = (event: KeyboardEvent<HTMLButtonElement>, active: boolean) => {
+    if (event.key !== ' ' && event.key !== 'Enter') return;
+    event.preventDefault();
+    if (!event.repeat) hold(active);
+  };
   return (
     <section className="preview-panel" aria-label="Preview">
       <div className="preview-heading preview-comparison-heading">
@@ -127,14 +152,20 @@ export function PreviewPanel({
           <button
             type="button"
             className="preview-comparison-toggle"
-            aria-label="Show ungraded preview"
+            aria-label="Show original preview"
             aria-pressed={diagnostics?.ungraded ?? false}
-            title="Preview only: bypass all colour adjustments on every video track, keeping opacity, fades and transitions. Saved grades and exports are unchanged."
+            title="Hold to show the image without Colour and Detail on every video track, keeping geometry, Opacity, fades and transitions. Preview only; saved edits and exports are unchanged."
             disabled={controlsUnavailable || failed || !diagnostics || status === 'disposed'}
-            onClick={onToggleUngraded}
+            onPointerDown={pressPointer}
+            onPointerUp={() => hold(false)}
+            onPointerCancel={() => hold(false)}
+            onLostPointerCapture={() => hold(false)}
+            onKeyDown={(event) => keyHold(event, true)}
+            onKeyUp={(event) => keyHold(event, false)}
+            onBlur={() => hold(false)}
           >
             <Icon name="colour" size={14} />
-            {diagnostics?.ungraded ? 'Ungraded' : 'Compare'}
+            Original
           </button>
         </div>
       </div>
@@ -175,7 +206,9 @@ export function PreviewPanel({
             {diagnostics?.message}
           </div>
         )}
-        {diagnostics?.ungraded && <span className="preview-comparison-overlay">Ungraded · colour bypassed</span>}
+        {diagnostics?.ungraded && (
+          <span className="preview-comparison-overlay">Original · Colour and Detail bypassed</span>
+        )}
       </div>
       <div className="transport">
         <span className="transport-note">

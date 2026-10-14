@@ -110,25 +110,25 @@ poses preserve $m_i=1$ over the canvas and ungraded black letterbox RGB.
 Enabled video track groups blend bottom-to-top over opaque black, with no implicit linear-
 light blend or extra tone map. See [LAYERS_AND_KEYFRAMES.md](LAYERS_AND_KEYFRAMES.md).
 
-### Editor-only ungraded comparison
+### Editor-only original preview
 
-Timeline preview comparison replaces **all evaluated colour settings** with the
+Holding the preview's **Original** button replaces **all evaluated colour settings** with the
 shared `NEUTRAL_COLOUR` value for every enabled video track and both sources in each
 dissolve, bypassing track colour bases and evaluated track colour keyframes alike. Future
 colour controls added to `NEUTRAL_COLOUR` are automatically bypassed, without a
-separate per-control comparison list. Stored grades and keyframes are unchanged.
+separate per-control list. Stored grades and keyframes are unchanged.
 
 Only grading is neutralized: exact observed source frames and `PlacedClip.retiming`,
 spatial geometry/coverage, track Opacity, visibility, dissolve weights, black fades, stacking
-and music retain their normal contract. Ungraded is still the composed preview,
-not an original-resolution or isolated-selected-clip view; Source preview is unchanged.
+and music retain their normal contract. Original is still the composed preview,
+not the untouched recording, an original-resolution or isolated-selected-clip view; Source preview is unchanged.
 
-The Timeline preview heading's native **Compare** button is accessible as **Show
-ungraded preview**; active mode reads **Ungraded** with a matching canvas badge.
-It works paused or playing via pointer or focused Enter/Space, with no global shortcut.
-Toggling is editor-only: no seek, save/history entry, export, schema, proxy or original
+The native **Original** button is accessible as **Show original preview**; the image is original
+with a matching canvas badge only while the pointer or focused Enter/Space is held, and the graded
+preview returns on release, focus loss or window blur. It works paused or playing, with no global shortcut.
+Holding is editor-only: no seek, save/history entry, export, schema, proxy or original
 change, or additional decoder. Same-project seeks, appearance updates and timing
-reloads preserve the mode; changing project or reloading with a fresh preview engine
+reloads preserve the mode while it is held; changing project or reloading with a fresh preview engine
 resets to normal graded preview. Export continues to use the saved grading contract.
 
 ## Timing
@@ -257,7 +257,7 @@ The order is decoded linear Temperature/Tint gains before Exposure and the
 remaining scalar SDR stages, encoded BT.709 HSL, master curve, individual RGB
 curves, black-fade brightness and group coverage/source-over. HSL/curves add no
 channels to the eleven nullable track fields. HSL protects greys in its incoming
-RGB, not greys already coloured by Temperature/Tint. Compare/Ungraded bypasses
+RGB, not greys already coloured by Temperature/Tint. The Original preview bypasses
 the entire colour transform, not geometry or coverage. Precise advanced bounds,
 circular weighting, smooth monotone cubic curves and resource budgets are in
 [HSL_AND_CURVES.md](design/HSL_AND_CURVES.md).
