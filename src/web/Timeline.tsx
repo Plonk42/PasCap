@@ -1237,10 +1237,17 @@ export function Timeline(props: Readonly<Props>) {
                   'aria-label': `Bookmark at ${formatTimecode(state.frame)}`,
                   title: `Bookmark · ${formatTimecode(state.frame)} · Click to go here; drag to move, Arrow keys: 1 frame, Shift: 10; Delete removes. Alt bypasses snapping.`,
                   style: { left: leading + (state.at ?? state.frame) * scale },
-                  children: state.moving && (
-                    <span className="timeline-bookmark-time" aria-hidden="true">
-                      {formatTimecode(state.frame)}
-                    </span>
+                  children: (
+                    <>
+                      <svg className="timeline-bookmark-shape" viewBox="0 0 10 12" aria-hidden="true">
+                        <path d="M1 1h8v5.6L5 11 1 6.6Z" />
+                      </svg>
+                      {state.moving && (
+                        <span className="timeline-bookmark-time" aria-hidden="true">
+                          {formatTimecode(state.frame)}
+                        </span>
+                      )}
+                    </>
                   ),
                 })}
               />
@@ -1248,7 +1255,7 @@ export function Timeline(props: Readonly<Props>) {
             {visible.bookmarks.map((bookmark) => (
               <div
                 key={`bookmark-line-${bookmark}`}
-                className="timeline-bookmark-line"
+                className={`timeline-bookmark-line${bookmarks.draft?.frame === bookmark ? ' active' : ''}`}
                 style={{ left: leading + bookmark * scale }}
               />
             ))}
