@@ -72,7 +72,7 @@ function overlay(
   });
 }
 const colourKeys = (): LayerKeyframe[] => [point(0, { exposure: 1 }, 'hold'), point(100, { hue: 20 })];
-describe('strict schema-16 row points and independently participating settings', () => {
+describe('strict schema-17 row points and independently participating settings', () => {
   it('exports an ordered immutable eleven-setting catalogue and explicit all-null template', () => {
     const settings = [
       'opacity',
@@ -95,10 +95,10 @@ describe('strict schema-16 row points and independently participating settings',
     expect(KEYFRAME_SETTINGS.every(Object.isFrozen)).toBe(true);
   });
 
-  it('requires version 16, explicit media membership, row opacity and clip settings without legacy fields', () => {
+  it('requires version 17, explicit media membership, row opacity and clip settings without legacy fields', () => {
     const project = createProject('strict', 'Strict');
     const clip = createClip('one', 'source', 0, 20);
-    expect(project.schemaVersion).toBe(16);
+    expect(project.schemaVersion).toBe(17);
     expect(project.media).toEqual({ videoIds: [], audioIds: [] });
     expect(project.layers[0]).toEqual(row());
     expect(Object.keys(clip)).toEqual([

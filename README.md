@@ -134,17 +134,17 @@ Missing mounts and symlinks fail explicitly. In the eventual container package,
 originals will be read-only bind mounts and application data will be a separate
 persistent writable mount. See [deployment design](docs/DEPLOYMENT.md).
 
-**Project format:** strict schema **v16**, with required complete video track `colour`, including `temperature`, `tint` and `hdr`, no clip colour/correction field, clip `spatial` base and
+**Project format:** strict schema **v17**, with required complete video track `colour`, including `temperature`, `tint` and `hdr`, no clip colour/correction field, clip `spatial` base and
 0–256 full-pose source-frame keyframes, required `music` array (0–8
-music tracks, unique required IDs; `[]` without music), per-track Ripple,
+music tracks, unique required IDs; `[]` without music), required project `bookmarks` (unique ascending frames; `[]` on new projects), per-track Ripple,
 transitions, fades and numeric `VideoLayer.opacity` (0–1; new tracks start at 1),
 and exactly eleven nullable keyframe channels: `opacity`, `temperature`,
 `tint`, `exposure`, `brightness`, `contrast`, `hue`, `saturation`, `highlights`,
 `shadows`, `hdr`. HSL/curves remain static. Track `opacity` is required and valid; saved `clip.opacity` and old
 `clipOpacity`/`layerOpacity` channels are rejected, not ignored or defaulted.
-v1–v15 projects and receipt snapshots remain unchanged
+v1–v16 projects and receipt snapshots remain unchanged
 on disk but are incompatible: recreate projects and import media deliberately.
-Export receipts remain version 1 with a strict v16 snapshot and required captured
+Export receipts remain version 1 with a strict v17 snapshot and required captured
 audio-source/instance-plan arrays. Registry/proxy/current PCM cache formats and
 source protections do not change. There are no migrations, null fallbacks,
 compatibility readers, default-filled legacy fields or automatic deletions.
@@ -186,11 +186,11 @@ real-workload qualification, and local Docker/Podman packaging. See
 - [Timing and colour contract](docs/COLOUR_AND_TIMING.md)
 - [Tracks and keyframes](docs/LAYERS_AND_KEYFRAMES.md)
 - [Speed, audio and export](docs/SPEED_AND_AUDIO.md)
-- [Video track appearance/schema-16 contract](docs/design/ROW_APPEARANCE.md)
-- [Temperature and Tint/schema-16 contract](docs/design/TEMPERATURE_AND_TINT.md)
-- [Spatial transforms/schema-16 contract](docs/design/SPATIAL_TRANSFORMS.md)
-- [Clip detail filters and HDR/schema-16 contract](docs/design/DETAIL_FILTERS.md)
-- [Multiple music/schema-16 contract](docs/design/MULTIPLE_MUSIC.md) — required behaviour; implementation/validation acceptance remains pending, not a test or release claim.
+- [Video track appearance/schema-17 contract](docs/design/ROW_APPEARANCE.md)
+- [Temperature and Tint/schema-17 contract](docs/design/TEMPERATURE_AND_TINT.md)
+- [Spatial transforms/schema-17 contract](docs/design/SPATIAL_TRANSFORMS.md)
+- [Clip detail filters and HDR/schema-17 contract](docs/design/DETAIL_FILTERS.md)
+- [Multiple music/schema-17 contract](docs/design/MULTIPLE_MUSIC.md) — required behaviour; implementation/validation acceptance remains pending, not a test or release claim.
 - [Deployment target](docs/DEPLOYMENT.md)
 - [Historical feasibility study](docs/FEASIBILITY_REPORT.md)
 

@@ -11,6 +11,7 @@ import { PROJECT_FPS } from './timing.js';
 export const BASE_LAYER_ID = 'video-1';
 export const MAX_VIDEO_LAYERS = 8;
 export const MAX_MUSIC_TRACKS = 8;
+export const MAX_BOOKMARKS = 1_000;
 
 export const idSchema = z.string().regex(/^[a-zA-Z0-9_-]{1,100}$/);
 export const frameSchema = z.number().int().nonnegative().max(2_147_483_647);
@@ -97,10 +98,17 @@ export const musicTracksSchema = z
   .refine((tracks) => new Set(tracks.map((track) => track.id)).size === tracks.length, {
     message: 'Music instance IDs must be unique.',
   });
+/** Project-time snap points; editing aids only, never rendered or exported. */
+export const bookmarksSchema = z
+  .array(frameSchema)
+  .max(MAX_BOOKMARKS)
+  .refine((frames) => frames.every((frame, index) => index === 0 || frame > frames[index - 1]!), {
+    message: 'Bookmarks must be unique ascending project frames.',
+  });
 
 const baseProjectSchema = z
   .object({
-    schemaVersion: z.literal(16),
+    schemaVersion: z.literal(17),
     id: idSchema,
     title: z.string().trim().min(1).max(200),
     media: z
@@ -120,6 +128,7 @@ const baseProjectSchema = z
     layers: z.array(layerSchema).min(1).max(MAX_VIDEO_LAYERS),
     clips: z.array(clipSchema).max(1_000),
     music: musicTracksSchema,
+    bookmarks: bookmarksSchema,
     revision: frameSchema,
   })
   .strict();
@@ -155,7 +164,7 @@ export function createLayer(id: string, name: string, ripple = true): VideoLayer
 
 export function createProject(id: string, title: string): ProjectDocument {
   return projectSchema.parse({
-    schemaVersion: 16,
+    schemaVersion: 17,
     id,
     title,
     media: { videoIds: [], audioIds: [] },
@@ -164,6 +173,7 @@ export function createProject(id: string, title: string): ProjectDocument {
     layers: [createLayer(BASE_LAYER_ID, 'Track 1')],
     clips: [],
     music: [],
+    bookmarks: [],
     revision: 0,
   });
 }

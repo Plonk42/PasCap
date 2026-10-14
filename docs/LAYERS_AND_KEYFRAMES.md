@@ -1,4 +1,4 @@
-# Video tracks, shared keyframes and source review · project v16
+# Video tracks, shared keyframes and source review · project v17
 
 Required video track Colour includes nine graded scalar fields, including **Temperature** and
 **Tint**, the **HDR** look (0–1, applied before grading with the clip
@@ -107,7 +107,7 @@ original-source keyframes. All shared track keyframes use absolute integer
 clip on that track, including clips from different recordings and both sources
 in that track's dissolve. They do not restart at a clip's IN, start or boundary.
 
-Schema 16 requires `layers[].keyframes` as ordered `{ frame, values, easing, reset }`
+Schema 17 requires `layers[].keyframes` as ordered `{ frame, values, easing, reset }`
 keyframes, with **at most 256 keyframes per track**. Frames are unique, strictly ascending,
 non-negative and at most 2,147,483,647. Every keyframe's `values` object (`LayerKeyValues`)
 requires **all eleven nullable fields** below: a number enables that setting; `null` leaves it disabled.
@@ -643,7 +643,7 @@ not all sources or loop repetitions. It grows with duration and is additional to
 the unchanged video raw-buffer/child/LUT bounds above. Cancellation/failure removes
 only owned scratch, never originals, saved projects or successful outputs.
 
-Schema **v16 is strict**, including complete required video track `colour` with Temperature/Tint/HDR and static HSL/curves, no clip colour/correction fields, and clip `spatial` base/eight-value
+Schema **v17 is strict**, including complete required video track `colour` with Temperature/Tint/HDR and static HSL/curves, no clip colour/correction fields, and clip `spatial` base/eight-value
 source-frame keyframes and required unique `media.videoIds` / `media.audioIds`
 arrays, at most 10,000 IDs each, and all required per-track settings. Project-level
 transitions/fades, saved `clip.opacity` and old `clipOpacity`/`layerOpacity` keyframe
@@ -653,8 +653,8 @@ Keyframes require exactly the eleven nullable fields listed above, including `op
 The required `music` array contains 0–8 independent music tracks with unique required
 IDs and complete source IN/OUT/start/duration/gain/fades/loop fields; `[]` without
 music, never a null/singular value or default. Version-1 export receipts require
-a strict v16 snapshot plus captured audio-source/instance-plan arrays.
-Older v1–v15 project documents and export receipt snapshots remain unchanged/incompatible;
+a strict v17 snapshot plus captured audio-source/instance-plan arrays.
+Older v1–v16 project documents and export receipt snapshots remain unchanged/incompatible;
 there are no migrations, compatibility fallback/default fields or automatic deletion
 of projects, receipts or successful videos. Create a new project and deliberately
 import its media; registered media and currently verified ready proxies remain reusable.

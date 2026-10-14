@@ -6,7 +6,12 @@ export function snapPoints(project: ProjectDocument): number[] {
   const points = layout.clips.flatMap((clip) => [clip.start, clip.end]);
   for (const track of project.music) points.push(track.start, track.start + track.duration);
   return [
-    ...new Set([0, ...points, ...layout.transitions.flatMap((region) => [region.start, region.boundary, region.end])]),
+    ...new Set([
+      0,
+      ...points,
+      ...layout.transitions.flatMap((region) => [region.start, region.boundary, region.end]),
+      ...project.bookmarks,
+    ]),
   ].sort((a, b) => a - b);
 }
 export function snapFrame(frame: number, points: readonly number[], tolerance: number): number {

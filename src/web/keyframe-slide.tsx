@@ -52,6 +52,10 @@ export interface KeyframeSlideKind<T extends KeyframeSlideTarget> {
   /** Seeks to the key stored at `frame`; `open` also opens its Inspector section. */
   reveal(document: ProjectDocument, target: T, frame: number, open: boolean): void;
   selector(target: T, frame: number): string;
+  /** Snap targets other than the playhead; defaults to `snapPoints(project)`. */
+  snapTargets?(project: ProjectDocument, target: T): number[];
+  /** Delete/Backspace on a focused marker, when the type supports it. */
+  remove?(target: T): EditCommand;
 }
 
 interface Options<T extends KeyframeSlideTarget> {
@@ -154,10 +158,11 @@ export function useKeyframeSlide<T extends KeyframeSlideTarget>(options: Options
     if (session.current && session.current.project !== options.project) cancel();
   }, [options.project, cancel]);
 
-  const focusMarker = (target: T, frame: number): void => {
+  const focusMarker = (target: T, frame: number | null): void => {
     requestAnimationFrame(() => {
       const viewport = latest.current.viewport.current;
-      const marker = viewport?.querySelector<HTMLButtonElement>(latest.current.kind.selector(target, frame));
+      const marker =
+        frame === null ? null : viewport?.querySelector<HTMLButtonElement>(latest.current.kind.selector(target, frame));
       if (marker) marker.focus({ preventScroll: true });
       else viewport?.closest<HTMLElement>('.timeline-panel')?.focus({ preventScroll: true });
     });
@@ -231,7 +236,7 @@ export function useKeyframeSlide<T extends KeyframeSlideTarget>(options: Options
       playhead: frame,
       moved: false,
       alt: event.altKey,
-      targets: [...new Set([...snapPoints(project), frame])],
+      targets: [...new Set([...(kind.snapTargets?.(project, target) ?? snapPoints(project)), frame])],
       plan,
     };
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -275,7 +280,14 @@ export function useKeyframeSlide<T extends KeyframeSlideTarget>(options: Options
     const shortcut = editorShortcut(event)?.type;
     if (shortcut !== 'undo' && shortcut !== 'redo') event.stopPropagation();
     const { disabled, project, kind, onEdit, onError } = latest.current;
-    if (disabled || session.current || !['ArrowLeft', 'ArrowRight'].includes(event.key)) return;
+    if (disabled || session.current) return;
+    if (kind.remove && ['Delete', 'Backspace'].includes(event.key)) {
+      event.preventDefault();
+      onEdit(kind.remove(target));
+      focusMarker(target, null);
+      return;
+    }
+    if (!['ArrowLeft', 'ArrowRight'].includes(event.key)) return;
     event.preventDefault();
     const plan = kind.step(project, target, (event.key === 'ArrowLeft' ? -1 : 1) * (event.shiftKey ? 10 : 1));
     if (plan.error) {

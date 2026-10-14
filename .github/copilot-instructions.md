@@ -111,7 +111,11 @@ PasCap is a solo, pre-release project: optimize for fast iteration. Details are 
   Navigation never edits,
   saves or creates history. See [speed/audio](../docs/SPEED_AND_AUDIO.md) and
   [spatial transforms](../docs/design/SPATIAL_TRANSFORMS.md).
-- Strict schema 16 requires complete row Colour with nine graded scalar fields,
+- Strict schema 17 (#143) requires project `bookmarks`: 0–1,000 unique ascending project
+  frames, `[]` on new projects. They are extra `snapPoints()` for every snapping gesture,
+  slide through `useKeyframeSlide` (a dragged bookmark never snaps to itself) and never
+  retime, render or export. See [timeline](../docs/TIMELINE_EDITING.md).
+- Strict schema 17 requires complete row Colour with nine graded scalar fields,
   `hdr`, `colour.hsl` (eight complete named bands) and `colour.curves` (master/red/green/blue
   2–16-point arrays). HSL/curves remain static, not animation channels. All Colour
   is row-owned, keyed or not; clips have no colour/correction. Neutral creators
@@ -204,10 +208,10 @@ clarity −1–1, denoise 0–1 }`, neutral 0, with no keyframes or track channe
   $\mathrm{result} = C + \mathrm{lower}(1 - A)$, evaluating row Opacity for each
   source with no additional layer multiplier; $m_i$ is spatial source coverage,
   including opaque neutral letterboxing. Black fades never reduce that coverage.
-  Version-1 export receipts require strict v16 snapshots and captured audio-source/
+  Version-1 export receipts require strict v17 snapshots and captured audio-source/
   instance-plan arrays; receipt, registry/proxy/PCM and benchmark format versions
   remain independent and unchanged.
-  Reject and preserve incompatible v1–v15 projects/receipt snapshots; require recreation,
+  Reject and preserve incompatible v1–v16 projects/receipt snapshots; require recreation,
   without migrations, compatibility defaults or automatic deletion.
 - Owner-approved #135/#87: track and Transform keyframes store one Easing per enabled
   setting (`easing` mirrors `values`); a joining setting adopts the Easing its keyframe's

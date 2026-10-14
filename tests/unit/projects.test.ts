@@ -79,7 +79,7 @@ afterEach(async () => {
 });
 
 describe('multiple-project store', () => {
-  it.each([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14])(
+  it.each([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16])(
     'rejects schema-%s documents on load, rename and overwrite while preserving their complete bytes',
     async (schemaVersion) => {
       const directory = await temp();
@@ -90,10 +90,10 @@ describe('multiple-project store', () => {
       const filename = path.join(directory, 'projects', `${id}.json`);
       await atomicWrite(filename, bytes);
       await expect(store.load(id)).rejects.toThrow(`Unsupported project schema version ${schemaVersion}`);
-      await expect(store.rename(id, 'No migration', 0)).rejects.toThrow('requires version 16');
+      await expect(store.rename(id, 'No migration', 0)).rejects.toThrow('requires version 17');
       await expect(store.save(createProject(id, 'No overwrite'), 0)).rejects.toThrow('existing file was not changed');
       expect(await store.list()).toEqual([
-        expect.objectContaining({ id, compatible: false, error: expect.stringContaining('requires version 16') }),
+        expect.objectContaining({ id, compatible: false, error: expect.stringContaining('requires version 17') }),
       ]);
       expect(await readFile(filename, 'utf8')).toBe(bytes);
     },
@@ -162,7 +162,7 @@ describe('multiple-project store', () => {
     const oldBytes = JSON.stringify(old);
     const oldPath = path.join(directory, 'projects', `${oldId}.json`);
     await writeFile(oldPath, oldBytes);
-    await expect(store.load(oldId)).rejects.toThrow('requires version 16');
+    await expect(store.load(oldId)).rejects.toThrow('requires version 17');
     await expect(store.rename(oldId, 'No overwrite', 0)).rejects.toThrow('existing file was not changed');
     await expect(store.save(createProject(oldId, 'No overwrite'), 0)).rejects.toThrow('existing file was not changed');
     expect((await store.list()).find((summary) => summary.id === oldId)!.compatible).toBe(false);
@@ -204,7 +204,7 @@ describe('multiple-project store', () => {
     const obsolete = JSON.stringify({ ...document, id: 'preserved-v7', schemaVersion: 7, music: null });
     const obsoletePath = path.join(directory, 'projects', 'preserved-v7.json');
     await writeFile(obsoletePath, obsolete);
-    await expect(store.load('preserved-v7')).rejects.toThrow('version 16');
+    await expect(store.load('preserved-v7')).rejects.toThrow('version 17');
     expect((await store.list()).find((item) => item.id === 'preserved-v7')!.compatible).toBe(false);
     expect(await readFile(obsoletePath, 'utf8')).toBe(obsolete);
     expect(await store.load(document.id)).toEqual(saved);
@@ -219,7 +219,7 @@ describe('multiple-project store', () => {
     expect(first.id).not.toBe(second.id);
     expect(first.title).toBe('First flight');
     expect(first.revision).toBe(1);
-    expect(first.schemaVersion).toBe(16);
+    expect(first.schemaVersion).toBe(17);
     expect(first.layers[0]!.keyframes).toEqual([]);
     const clip = { ...createClip('clip-a', 'registered-video', 0, 120), speed: { mode: 'constant' as const, rate: 2 } };
     const saved = await store.save({ ...first, clips: [clip] }, 1);
@@ -245,7 +245,7 @@ describe('multiple-project store', () => {
     expect((await readdir(path.join(directory, 'projects'))).some((name) => name.endsWith('.tmp'))).toBe(false);
   });
 
-  it('round-trips 256 strict row points and rejects malformed v16 data without changing confirmed bytes', async () => {
+  it('round-trips 256 strict row points and rejects malformed v17 data without changing confirmed bytes', async () => {
     const directory = await temp();
     const store = new ProjectStore(directory);
     const document = createProject('strict-row', 'Shared row');
@@ -256,7 +256,7 @@ describe('multiple-project store', () => {
     );
     document.layers[0]!.keyframes[0] = point(0, { ...scalarColourValues(NEUTRAL_COLOUR), opacity: 0 }, 'smooth');
     const saved = await store.save(document, 0);
-    expect(saved.schemaVersion).toBe(16);
+    expect(saved.schemaVersion).toBe(17);
     expect(saved.layers[0]!.keyframes).toHaveLength(256);
     expect(Object.keys(saved.layers[0]!.keyframes[0]!.values)).toEqual(KEYFRAME_SETTINGS.map((setting) => setting.key));
     expect(saved.layers[0]!.keyframes.at(-1)!.frame).toBeGreaterThan(saved.clips[0]!.sourceOut);
@@ -650,8 +650,8 @@ describe('multiple-project HTTP API', () => {
     const first = projectSchema.parse(firstResponse.json().document);
     const second = projectSchema.parse(secondResponse.json().document);
     expect(first.revision).toBe(1);
-    expect(first.schemaVersion).toBe(16);
-    expect(second.schemaVersion).toBe(16);
+    expect(first.schemaVersion).toBe(17);
+    expect(second.schemaVersion).toBe(17);
     expect(second.id).not.toBe(first.id);
     expect((await service.app.inject({ url: '/api/projects', headers })).json().projects).toHaveLength(2);
     expect((await service.app.inject({ url: `/api/projects/${first.id}`, headers })).json().document).toEqual(first);
@@ -752,7 +752,7 @@ describe('multiple-project HTTP API', () => {
     expect((await service.app.inject({ url: '/api/projects', headers })).json().projects[0].compatible).toBe(false);
     const load = await service.app.inject({ url: '/api/projects/old', headers });
     expect(load.statusCode).toBe(422);
-    expect(load.json().error).toContain('version 16');
+    expect(load.json().error).toContain('version 17');
     expect(
       (
         await service.app.inject({
@@ -777,7 +777,7 @@ describe('multiple-project HTTP API', () => {
     ).toBe(400);
   });
 
-  it('exposes an unsupported-version input as unavailable and refuses load, rename or v16 overwrite', async () => {
+  it('exposes an unsupported-version input as unavailable and refuses load, rename or v17 overwrite', async () => {
     const directory = await temp();
     const unsupported = unsupportedProject(3, 'legacy-v3', 'Original v3');
     const bytes = `${JSON.stringify(unsupported, null, 2)}\n`;
@@ -800,7 +800,7 @@ describe('multiple-project HTTP API', () => {
     const loaded = await service.app.inject({ url: '/api/projects/legacy-v3', headers });
     expect(loaded.statusCode).toBe(422);
     expect(loaded.json().error).toContain('schema version 3');
-    expect(loaded.json().error).toContain('requires version 16');
+    expect(loaded.json().error).toContain('requires version 17');
     expect(
       (
         await service.app.inject({

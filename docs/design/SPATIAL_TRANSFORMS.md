@@ -1,4 +1,4 @@
-# Clip spatial transforms · strict project schema 16
+# Clip spatial transforms · strict project schema 17
 
 Current contract for [#20](https://github.com/Plonk42/PasCap/issues/20) and
 [#90](https://github.com/Plonk42/PasCap/issues/90): static and keyframed crop, uniform
@@ -18,7 +18,7 @@ Implementation authorities: [pose/schema/mapping](../../src/shared/spatial.ts),
 
 ## Required data and ownership
 
-Every schema-16 clip requires `spatial: { base, keyframes }`. Both objects and all
+Every schema-17 clip requires `spatial: { base, keyframes }`. Both objects and all
 keyframes are strict: no unknown fields, optional legacy values, coercion, persisted
 defaults or load-time repair. `base` is one complete eight-value pose;
 `keyframes` is a required array of **0–256** keys. Each key requires
@@ -234,10 +234,10 @@ main capture never substitutes that stored time for the real displayed source fr
 
 ## Preservation
 
-Projects and version-1 export receipt snapshots must satisfy strict **schema 16**,
+Projects and version-1 export receipt snapshots must satisfy strict **schema 17**,
 including required clip spatial data and the unchanged identified music arrays.
 Required video track Colour includes Temperature/Tint/HDR and static HSL/curves, with eleven
-required nullable track keyframe fields. Incompatible v1–v15 projects/receipt snapshots
+required nullable track keyframe fields. Incompatible v1–v16 projects/receipt snapshots
 and completed videos remain untouched.
 Recreate projects deliberately; do not migrate, default-fill, rewrite or delete old
 data automatically. Registry/proxy/PCM and receipt/report format versions do not

@@ -3,7 +3,7 @@
 ## Scope and decisions
 
 Controls use native elements, the existing editor layout and strict project
-schema 16, including complete track Colour, clip-only speed, clip spatial settings and 0–8 independent music tracks. No UI framework or icon dependency is introduced. Exact
+schema 17, including complete track Colour, clip-only speed, clip spatial settings and 0–8 independent music tracks. No UI framework or icon dependency is introduced. Exact
 timing entry is retained: Clip Range uses timecode text fields and a
 full-original range bar; other frame/duration/fade fields retain numeric steppers.
 
@@ -26,6 +26,7 @@ full-original range bar; other frame/duration/fade fields retain numeric stepper
 | Track options / Timeline      | Visibility, Ripple, stacking and frequent clip actions already have native controls/icons                                           | Keep their locations; Duplicate and **Move to new track** are in the clip context menu; zoom has slider, Fit and Zoom out/in buttons                                                             |
 | Help / disclosures / options  | Question-mark help and top-layer options are already consistent                                                                     | Keep those components and browser preferences                                                                                                                                                    |
 | Timeline range / ruler        | Drag on the time ruler selects a project-frame range; a click seeks; the playhead handle scrubs                                     | **Cut range** needs a range and a selected clip it overlaps, else its tooltip names the reason; Play (ringed in the range colour) replays only the range; no timeline IN/OUT buttons or I/O keys |
+| Bookmarks                     | Toolbar **Bookmark** (or **M**) adds at the playhead, becoming a trash **Delete bookmark at playhead** on one; lilac ruler ribbons  | Project-time snap points; markers slide like keyframes (`useKeyframeSlide`), Delete removes; duplicates rejected, never merged; never rendered                                                   |
 
 The icon module already supplies a broad SVG set; it does not need replacing.
 The browser preference identifier for Placement remains unchanged deliberately.
@@ -36,7 +37,7 @@ neither needs replacing merely to make their implementation identical.
 
 This is the source of terminology for visible UI text, help, accessible names,
 test selectors and current-behaviour guides. Internal identifiers, persisted fields
-and technical paths stay unchanged; this glossary does not change schema 16.
+and technical paths stay unchanged; this glossary does not change schema 17.
 
 - **Recording**: the complete original file, video or music. Use **video recording**
   or **music recording** when the distinction matters; never bare “video” for a file.
@@ -56,6 +57,8 @@ and technical paths stay unchanged; this glossary does not change schema 16.
 - **Range**: the selected IN/OUT portion of a recording, whether reviewed or used by
   a clip. Qualify its context when necessary, without introducing another object name.
   Do not use rush, excerpt, row, layer, point or participant as object synonyms.
+- **Bookmark**: a project-wide timeline frame marked as a snap point; not a keyframe,
+  range or export chapter.
 - **Source IN / OUT**: original-frame boundaries; OUT is exclusive. **Timeline
   frame**: absolute project position. **Duration** and **fades** use output frames.
 - **Opacity**, **Speed**, **Colour** and **Ripple** retain their established names.

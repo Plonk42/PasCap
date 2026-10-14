@@ -53,6 +53,8 @@ import { createMusicInstance, videoTimelineDuration } from './music-ui.js';
 import { MusicTimeline, type MusicTimelineGesture } from './MusicTimeline.js';
 import { RulerRange, RushEditBar, TimelineCutOverlay } from './RushEditBar.js';
 import { useRulerRange } from './ruler-range.js';
+import { bookmarkKind, bookmarkTargets } from './timeline-bookmarks.js';
+import './timeline-bookmarks.css';
 import { trackKeyframeKind } from './timeline-keyframes.js';
 import { planTimelineDrop, type DropPlan, type TimelinePayload } from './timeline-placement.js';
 import { TIMELINE_RULER_HEIGHT, timelineLayerAt, timelineRows } from './timeline-rows.js';
@@ -157,11 +159,14 @@ function clipKeyDraft(
 function timelineInteractionMessage(
   keyframe: KeyframeSlideDraft<KeyframeSlideTarget> | null,
   clipKeyframe: { type: string; draft: KeyframeSlideDraft<ClipKeyframeTarget> } | null,
+  bookmark: KeyframeSlideDraft<KeyframeSlideTarget> | null,
   error: string,
   plan: DropPlan | null,
   draft: ProjectDocument | null,
   selected: VideoClip | undefined,
 ): string {
+  if (bookmark)
+    return bookmark.error || `Bookmark · ${formatTimecode(bookmark.frame)} · release to apply · Esc cancels`;
   if (clipKeyframe)
     return (
       clipKeyframe.draft.error ||
@@ -317,6 +322,35 @@ function TimelineMusicLanes(
       />
     </div>
   ));
+}
+
+/** Adds a bookmark at the playhead, or deletes the one already there. */
+function BookmarkButton(
+  props: Readonly<{
+    project: ProjectDocument;
+    frame: number;
+    duration: number;
+    disabled: boolean;
+    onEdit: (command: EditCommand) => void;
+  }>,
+) {
+  const present = props.project.bookmarks.includes(props.frame);
+  let title = 'Add a bookmark at the playhead; edits snap to it · M';
+  if (!props.duration) title = 'Add footage or music before adding a bookmark.';
+  else if (present) title = `Delete the bookmark at ${formatTimecode(props.frame)}`;
+  return (
+    <button
+      type="button"
+      className={`secondary-button small timeline-view-action timeline-bookmark-action ${present ? 'active' : ''}`}
+      aria-label={present ? 'Delete bookmark at playhead' : 'Add bookmark at playhead'}
+      title={title}
+      disabled={props.disabled || !props.duration}
+      onClick={() => props.onEdit({ type: present ? 'bookmark-remove' : 'bookmark-add', frame: props.frame })}
+    >
+      <Icon name={present ? 'trash' : 'bookmark'} size={15} />
+      <span className="timeline-action-label">Bookmark</span>
+    </button>
+  );
 }
 
 type ClipMarkerProps = Readonly<{
@@ -495,6 +529,21 @@ export function Timeline(props: Readonly<Props>) {
     onError,
   });
   const gestureActive = keyframes.active || clipKeys.active || speedKeys.active;
+  const bookmarks = useKeyframeSlide({
+    kind: bookmarkKind(onSeek),
+    project,
+    frame,
+    scale,
+    width: baselineWidth,
+    disabled: keyframeNavigation.disabled || musicGesture !== null || gestureActive,
+    snapping,
+    viewport: scroll,
+    onPause,
+    onPreview,
+    onEdit,
+    onError,
+  });
+  const slideActive = gestureActive || bookmarks.active;
 
   // Extra recoverable head space exists only during a trim. Shift the scroll by
   // the identical amount before paint, so neither selection nor gesture start
@@ -554,6 +603,7 @@ export function Timeline(props: Readonly<Props>) {
     keyframes.draft?.document ??
     clipKeys.draft?.document ??
     speedKeys.draft?.document ??
+    bookmarks.draft?.document ??
     draft ??
     musicGesture?.document ??
     project;
@@ -576,7 +626,11 @@ export function Timeline(props: Readonly<Props>) {
   const trailing = Math.max(96, unusedTail * scale + 24);
   const musicEnd = timelineMusicExtent(project, musicGesture);
   // Stored points after video or music OUT stay reachable, without extending the playable duration.
-  const lastKeyframe = Math.max(0, ...project.layers.flatMap((layer) => layer.keyframes.map((point) => point.frame)));
+  const lastKeyframe = Math.max(
+    0,
+    ...project.layers.flatMap((layer) => layer.keyframes.map((point) => point.frame)),
+    project.bookmarks.at(-1) ?? 0,
+  );
   const width = Math.max(
     viewportWidth,
     leading +
@@ -585,6 +639,7 @@ export function Timeline(props: Readonly<Props>) {
         musicEnd,
         (dropPlan?.start ?? 0) + (dropPlan?.duration ?? 0),
         keyframes.draft?.frame ?? 0,
+        bookmarks.draft?.frame ?? 0,
         lastKeyframe,
       ) *
         scale +
@@ -593,10 +648,11 @@ export function Timeline(props: Readonly<Props>) {
     movement.current?.width ?? 0,
     keyframes.draft?.width ?? 0,
     speedKeys.draft?.width ?? 0,
+    bookmarks.draft?.width ?? 0,
     musicGesture?.width ?? 0,
   );
   const interactionBlocked =
-    musicGesture !== null || timelineInteractionBlocked(draft, gestureActive, keyframeNavigation.disabled);
+    musicGesture !== null || timelineInteractionBlocked(draft, slideActive, keyframeNavigation.disabled);
   const clipMarkerBlocked = (): boolean =>
     interactionBlocked ||
     drag.current !== null ||
@@ -616,7 +672,7 @@ export function Timeline(props: Readonly<Props>) {
   if (pixelsPerSecond >= 60) tickStep = 1;
   const ticks = Array.from({ length: Math.ceil(seconds / tickStep) + 1 }, (_, index) => index * tickStep);
   const fitTimeline = (): void => {
-    if (layout.duration && !drag.current && !gestureActive && !musicGesture)
+    if (layout.duration && !drag.current && !slideActive && !musicGesture)
       setPixelsPerSecond(
         Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, (viewportWidth - leading - 64) / framesToSeconds(layout.duration))),
       );
@@ -644,7 +700,7 @@ export function Timeline(props: Readonly<Props>) {
       selectedRowTop === undefined ||
       drag.current ||
       movingClip.current ||
-      gestureActive ||
+      slideActive ||
       musicGesture
     )
       return;
@@ -654,7 +710,7 @@ export function Timeline(props: Readonly<Props>) {
   }, [selectedLayerId, selectedClipId, props.revealRequest, selectedRowTop, viewportHeight]);
   useEffect(() => {
     const element = scroll.current;
-    if (!element || drag.current || movingClip.current || movement.current || gestureActive || musicGesture) return;
+    if (!element || drag.current || movingClip.current || movement.current || slideActive || musicGesture) return;
     const placed = calculateLayout(project).clips.find((item) => item.clip.id === selectedClipId);
     if (!placed) return;
     const left = 32 + placed.start * scale;
@@ -673,7 +729,7 @@ export function Timeline(props: Readonly<Props>) {
       musicGesture ||
       drag.current ||
       movingClip.current ||
-      gestureActive
+      slideActive
     )
       return;
     const top = musicTop + index * 70;
@@ -1009,6 +1065,7 @@ export function Timeline(props: Readonly<Props>) {
     : timelineInteractionMessage(
         keyframes.draft,
         clipKeyDraft(clipKeys.draft, speedKeys.draft),
+        bookmarks.draft,
         dragError,
         dropPlan,
         draft,
@@ -1029,6 +1086,13 @@ export function Timeline(props: Readonly<Props>) {
           onQuickTrim={props.onQuickTrim}
           onCutRange={props.onCutRange}
           onClearRange={() => props.onTimeRange(null)}
+        />
+        <BookmarkButton
+          project={project}
+          frame={frame}
+          duration={layout.duration}
+          disabled={interactionBlocked}
+          onEdit={onEdit}
         />
         <button
           className={`secondary-button small timeline-view-action ${snapping ? 'active' : ''}`}
@@ -1126,7 +1190,7 @@ export function Timeline(props: Readonly<Props>) {
         >
           <div
             ref={surface}
-            className={`${timelineSurfaceClassName(dragError, draft, gestureActive)} ${musicGesture ? 'music-drafting' : ''}`}
+            className={`${timelineSurfaceClassName(dragError, draft, slideActive)} ${musicGesture ? 'music-drafting' : ''}`}
             style={{ width, height: surfaceHeight }}
             data-pixels-per-frame={scale}
             data-leading={leading}
@@ -1160,12 +1224,34 @@ export function Timeline(props: Readonly<Props>) {
                     onPointerMove={moveSeek}
                     onLostPointerCapture={endSeek}
                   />
-                  {(draft || gestureActive) && (
-                    <span className="playhead-readout">{formatTimecode(frame)} · draft</span>
-                  )}
+                  {(draft || slideActive) && <span className="playhead-readout">{formatTimecode(frame)} · draft</span>}
                 </div>
               )}
+              <KeyframeMarkers
+                slide={bookmarks}
+                targets={bookmarkTargets(visible)}
+                blocked={() => interactionBlocked}
+                view={(_target, state) => ({
+                  className: 'timeline-bookmark',
+                  'data-bookmark': state.frame,
+                  'aria-label': `Bookmark at ${formatTimecode(state.frame)}`,
+                  title: `Bookmark · ${formatTimecode(state.frame)} · Click to go here; drag to move, Arrow keys: 1 frame, Shift: 10; Delete removes. Alt bypasses snapping.`,
+                  style: { left: leading + (state.at ?? state.frame) * scale },
+                  children: state.moving && (
+                    <span className="timeline-bookmark-time" aria-hidden="true">
+                      {formatTimecode(state.frame)}
+                    </span>
+                  ),
+                })}
+              />
             </div>
+            {visible.bookmarks.map((bookmark) => (
+              <div
+                key={`bookmark-line-${bookmark}`}
+                className="timeline-bookmark-line"
+                style={{ left: leading + bookmark * scale }}
+              />
+            ))}
             {project.layers.map((layer) => (
               <button
                 className={`timeline-lane ${layer.id === selectedLayerId ? 'selected' : ''} ${layer.enabled ? '' : 'hidden-layer'}`}
@@ -1456,6 +1542,7 @@ export function Timeline(props: Readonly<Props>) {
                 ['track', keyframes.draft?.guide],
                 ['transform', clipKeys.draft?.guide],
                 ['speed', speedKeys.draft?.guide],
+                ['bookmark', bookmarks.draft?.guide],
               ] as const
             ).map(
               ([type, guide]) =>
@@ -1502,6 +1589,7 @@ export function Timeline(props: Readonly<Props>) {
               keyframes.draft?.error ||
               clipKeys.draft?.error ||
               speedKeys.draft?.error ||
+              bookmarks.draft?.error ||
               musicGesture?.error
                 ? 'trim-error'
                 : ''

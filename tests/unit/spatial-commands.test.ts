@@ -56,7 +56,7 @@ function fixture(): ProjectDocument {
   return projectSchema.parse(document);
 }
 
-describe('strict schema-16 spatial persistence', () => {
+describe('strict schema-17 spatial persistence', () => {
   it('creates independent explicit neutral settings and round-trips complete poses and off-trim keys', () => {
     const first = createClip('first', 'original', 0, 1);
     const second = createClip('second', 'original', 0, 1);
@@ -65,9 +65,9 @@ describe('strict schema-16 spatial persistence', () => {
     expect(first.spatial.base).not.toBe(second.spatial.base);
     expect(first.spatial.keyframes).not.toBe(second.spatial.keyframes);
     const document = fixture();
-    expect(document.schemaVersion).toBe(16);
+    expect(document.schemaVersion).toBe(17);
     expect(projectSchema.parse(JSON.parse(JSON.stringify(document)))).toEqual(document);
-    for (const schemaVersion of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15])
+    for (const schemaVersion of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16])
       expect(projectSchema.safeParse({ ...document, schemaVersion }).success).toBe(false);
   });
 
