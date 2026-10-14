@@ -61,7 +61,10 @@ last video clip OUTs, not at music/project OUT; no active video means opaque bla
 while music continues/fades at its own end, never a frozen last image. Music-only
 preview is black; export still requires at least one retained video clip.
 
-**+ Video track** creates/selects a track. Sidebar controls select and hide/show;
+**+ Track** (**Add video track**), in the pinned **Video tracks · N / 8** heading
+above the track headers, creates/selects a track. Each track header shares its lane's
+exact row box; lanes are contiguous below the ruler, with music lanes directly after
+the last video track. Sidebar controls select and hide/show;
 **Track options** contains only rename, Ripple, raise/lower and delete. Track
 names apply on Enter/blur, Escape restores, and a rename is one Undo step. Selecting
 an empty video track retains both its **Track** context (Colour, Opacity, keyframes) and the target for Media

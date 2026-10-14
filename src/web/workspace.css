@@ -496,8 +496,7 @@ body {
 }
 
 .product-workspace .layer-sidebar-heading {
-  height: 32px;
-  padding: 7px 10px;
+  padding: 0 4px 0 10px;
   font-size: 11px;
 }
 
@@ -749,10 +748,11 @@ body {
   z-index: 8;
 }
 
+/* Inside the ghost: above it, the first track's label would sit under the sticky ruler. */
 .timeline-drop-preview > span {
   position: absolute;
-  top: -24px;
-  left: 0;
+  top: 2px;
+  left: 2px;
   padding: 3px 7px;
   background: #d3edc9;
   color: #1b2c20;
@@ -952,6 +952,10 @@ kbd {
 
   .product-workspace .layer-sidebar {
     width: 150px;
+  }
+
+  .layer-sidebar-heading .layer-add-label {
+    display: none;
   }
 
   .save-recovery-banner {

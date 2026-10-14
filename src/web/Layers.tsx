@@ -1,11 +1,11 @@
 import { useId, useLayoutEffect, useRef, useState } from 'react';
 import type { EditCommand } from '../shared/commands.js';
-import type { ProjectDocument, VideoLayer } from '../shared/model.js';
+import { MAX_VIDEO_LAYERS, type ProjectDocument, type VideoLayer } from '../shared/model.js';
 import { HelpPopover } from './HelpPopover.js';
 import { Icon } from './icons.js';
 import { layerActionRestrictions } from './layer-actions.js';
 import { Popover } from './Popover.js';
-import { timelineRows } from './timeline-rows.js';
+import { LANE_HEIGHT, LANE_OFFSET, timelineRows } from './timeline-rows.js';
 
 function layerNameError(draft: string): string | null {
   const name = draft.trim();
@@ -121,6 +121,7 @@ export function Layers({
   onScroll,
   onSelect,
   onEdit,
+  onAdd,
 }: Readonly<{
   project: ProjectDocument;
   selectedId: string;
@@ -131,6 +132,7 @@ export function Layers({
   onScroll: (top: number) => void;
   onSelect: (id: string) => void;
   onEdit: (command: EditCommand) => void;
+  onAdd: () => void;
 }>) {
   const viewport = useRef<HTMLElement>(null);
   const synchronizedScroll = useRef<number | null>(null);
@@ -146,6 +148,7 @@ export function Layers({
     [ids[index], ids[index + delta]] = [ids[index + delta]!, ids[index]!];
     onEdit({ type: 'layer-order', layerIds: ids });
   };
+  const full = project.layers.length >= MAX_VIDEO_LAYERS;
   return (
     <aside
       ref={viewport}
@@ -161,11 +164,27 @@ export function Layers({
       }}
     >
       <div className="layer-sidebar-surface" style={{ height: surfaceHeight }}>
-        <div
-          className="layer-sidebar-heading"
-          title="Track 1 renders below track 2, then track 3 above track 2. Every track has independent Ripple, transitions and fades."
-        >
-          Video tracks · {project.layers.length} / 8
+        <div className="layer-sidebar-heading">
+          <span
+            className="layer-sidebar-title"
+            title="Track 1 renders below track 2, then track 3 above track 2. Every track has independent Ripple, transitions and fades."
+          >
+            Video tracks · {project.layers.length} / {MAX_VIDEO_LAYERS}
+          </span>
+          <button
+            className="text-button layer-add"
+            aria-label="Add video track"
+            title={
+              full
+                ? `A project can contain at most ${MAX_VIDEO_LAYERS} video tracks. Delete a track before adding another.`
+                : 'Add a video track with Ripple on, independent transitions and fades'
+            }
+            disabled={disabled || full}
+            onClick={onAdd}
+          >
+            <Icon name="plus" size={14} />
+            <span className="layer-add-label">Track</span>
+          </button>
         </div>
         {timelineRows(project.layers).map(({ layer, index, top }) => {
           const restrictions = layerActionRestrictions(index, project.layers.length, disabled);
@@ -175,7 +194,7 @@ export function Layers({
               key={layer.id}
               className={`layer-control ${layer.id === selectedId ? 'selected' : ''}`}
               data-layer-id={layer.id}
-              style={{ top }}
+              style={{ top: top - LANE_OFFSET, height: LANE_HEIGHT }}
             >
               <div className="layer-control-main">
                 <button
