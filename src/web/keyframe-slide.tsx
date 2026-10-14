@@ -131,8 +131,11 @@ export function useKeyframeSlide<T extends KeyframeSlideTarget>(options: Options
     animation.current = 0;
     const { viewport, onPreview } = latest.current;
     if (restoreScroll && viewport.current) viewport.current.scrollLeft = active.startScroll;
-    setDraft(null);
-    onPreview(null, restoreFrame);
+    // A click never started a draft, so there is no preview to restore.
+    if (active.moved) {
+      setDraft(null);
+      onPreview(null, restoreFrame);
+    }
     if (active.element.hasPointerCapture(active.pointerId)) active.element.releasePointerCapture(active.pointerId);
     return active;
   }, []);
@@ -173,12 +176,14 @@ export function useKeyframeSlide<T extends KeyframeSlideTarget>(options: Options
     if (!active || !viewport.current) return;
     const scrollLeft = viewport.current.scrollLeft;
     if (!active.moved && Math.abs(active.pointerX - active.startX + scrollLeft - active.startScroll) < 3) return;
+    const started = !active.moved;
     active.moved = true;
     const travel = slideTravel(active.startX, active.pointerX, active.startScroll, scrollLeft, active.scale);
     const free = kind.at(active.target, travel);
     const at = snapping && !active.alt ? snapFrame(free, active.targets, 8 / active.scale) : free;
     const plan = { ...kind.planAt(active.project, active.target, at), at, guide: at === free ? null : at };
     if (
+      !started &&
       plan.frame === active.plan.frame &&
       plan.at === active.plan.at &&
       plan.error === active.plan.error &&
@@ -210,7 +215,7 @@ export function useKeyframeSlide<T extends KeyframeSlideTarget>(options: Options
     animation.current = requestAnimationFrame(autoScroll);
   };
   const begin = (event: PointerEvent<HTMLButtonElement>, target: T): void => {
-    const { viewport, disabled, project, scale, width, frame, kind, onPause, onPreview } = latest.current;
+    const { viewport, disabled, project, scale, width, frame, kind, onPause } = latest.current;
     if (disabled || session.current || event.button !== 0 || !viewport.current) return;
     event.preventDefault();
     event.stopPropagation();
@@ -242,8 +247,6 @@ export function useKeyframeSlide<T extends KeyframeSlideTarget>(options: Options
     event.currentTarget.setPointerCapture(event.pointerId);
     onPause();
     kind.select(target);
-    setDraft({ ...plan, target, width });
-    onPreview({ document: project, frame });
     animation.current = requestAnimationFrame(autoScroll);
   };
   const move = (event: PointerEvent<HTMLButtonElement>): void => {
@@ -322,7 +325,8 @@ export function useKeyframeSlide<T extends KeyframeSlideTarget>(options: Options
     };
   };
 
-  return { draft, active: session.current !== null, begin, move, finish, cancel, keyboard, activate, marker };
+  // A press that has not moved yet is not a gesture: the editor stays enabled until the drag starts.
+  return { draft, active: draft !== null, begin, move, finish, cancel, keyboard, activate, marker };
 }
 
 export type KeyframeSlide<T extends KeyframeSlideTarget> = ReturnType<typeof useKeyframeSlide<T>>;

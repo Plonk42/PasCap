@@ -141,7 +141,14 @@ test('M and the toolbar add and delete bookmarks at the playhead; duplicates are
   await expect.poll(() => bookmarks(page)).toEqual([60, 120]);
   const before = await current(page);
   await seek(page, 0);
-  await marker(page, 60).click();
+  // Pressing without moving is not a drag: nothing in the editor is disabled, even briefly.
+  const box = (await marker(page, 60).boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await expect(page.locator('.timeline-surface')).not.toHaveClass(/keyframe-drafting/);
+  await expect(page.getByRole('button', { name: 'Toggle snapping', exact: true })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeEnabled();
+  await page.mouse.up();
   await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(60);
   expect(await current(page)).toEqual(before);
 
