@@ -26,7 +26,8 @@ skipped. No keyframes for a setting means the saved track base; removing its fin
 that unchanged base. HSL bands and master/RGB curves remain **static**, not new
 animation channels. Speed is clip-only, never a track channel.
 
-**Track → Colour** places Temperature and Tint before Exposure. Main and stored
+**Track → Colour** shows Temperature and Tint first in its Colour group (the grade still
+applies them before Exposure). Main and stored
 keyed settings use native sliders (step 0.01) with coloured tracks (Temperature
 blue → yellow, Tint green → magenta), adjacent exact numeric fields,
 and reset to 0 by double-clicking the name. Main capture diamonds are always visible, with adjacent per-setting **Previous/Next** buttons because not every setting is enabled at every shared keyframe. Its single keyframe-line Previous/Next pair (with the keyframe count) visits the union of Opacity, all nine scalar colour and HDR keys.

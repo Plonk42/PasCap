@@ -68,7 +68,8 @@ quantisation remain measured approximations under the unchanged error gates.
 
 ## Editing, resets and resource ownership
 
-Track → Colour contains nine scalar sliders (Temperature/Tint before Exposure),
+Track → Colour contains nine scalar sliders, HDR and the sole Opacity control, grouped
+as in [track appearance](ROW_APPEARANCE.md#inspector-and-history).
 HDR and sole Opacity control. The separate, initially collapsed Track sections
 **HSL ranges** and **Colour curves** (after Colour) choose their band/channel with a row of coloured
 square swatches (a radio group: **HSL range** with eight band-centre colours, **Colour curve channel**

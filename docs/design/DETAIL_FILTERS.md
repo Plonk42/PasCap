@@ -109,7 +109,7 @@ Any nonzero HDR base or HDR keyframe requires composited export (keyframes alrea
 In preview, HDR uses the detail program variants below (one extra `vec2` uniform for
 both sources' amounts); no texture, buffer, decoder,
 LUT or native process is added. The diagnostic two-clip reference and measurement
-helper reject HDR. **Track → Colour** lists HDR last, with the common slider/exact
+helper reject HDR. **Track → Colour** lists HDR last, in its Effects group, with the common slider/exact
 field, capture diamond and Previous/Next arrows, live slider preview and one Undo
 per release. The Original preview bypasses it with the rest of Colour.
 

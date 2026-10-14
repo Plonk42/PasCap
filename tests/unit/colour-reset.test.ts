@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { NEUTRAL_COLOUR } from '../../src/shared/colour.js';
 import { applyCommand, EditHistory } from '../../src/shared/commands.js';
-import { EMPTY_KEY_VALUES, layerKeyframe } from '../../src/shared/keyframes.js';
+import { EMPTY_KEY_VALUES, KEYFRAME_SETTINGS, layerKeyframe } from '../../src/shared/keyframes.js';
 import { createClip, createLayer, createProject } from '../../src/shared/model.js';
-import { colourResetCommands } from '../../src/web/colour-reset.js';
+import { COLOUR_GROUPS, colourGroupResetCommands, colourResetCommands } from '../../src/web/colour-reset.js';
 
 describe('Colour and row Opacity reset', () => {
   it('resets row Colour and sole row Opacity as one transaction without touching another row or clip', () => {
@@ -64,5 +64,50 @@ describe('Colour and row Opacity reset', () => {
     expect(colourResetCommands(layer, 0)).toEqual([]);
     layer.opacity = 0;
     expect(colourResetCommands(layer, 0)).toEqual([{ type: 'opacity', layerId: layer.id, opacity: 1 }]);
+  });
+});
+
+describe('Colour group reset', () => {
+  it('groups every Opacity and scalar Colour setting exactly once', () => {
+    expect(COLOUR_GROUPS.map((group) => group.name)).toEqual(['Opacity', 'Colour', 'Light', 'Effects']);
+    expect(new Set(COLOUR_GROUPS.flatMap((group) => group.settings))).toEqual(
+      new Set(KEYFRAME_SETTINGS.map((setting) => setting.key)),
+    );
+    expect(COLOUR_GROUPS.flatMap((group) => group.settings)).toHaveLength(KEYFRAME_SETTINGS.length);
+  });
+
+  it('resets only the group’s editable settings in one transaction, leaving locked and other settings', () => {
+    const project = createProject('group', 'Group');
+    const layer = project.layers[0]!;
+    layer.opacity = 0.4;
+    Object.assign(layer.colour, { exposure: 1, contrast: 1.5, shadows: 0.3, hue: 20 });
+    layer.colour.hsl.red.hue = 10;
+    layer.keyframes = [
+      layerKeyframe(10, { ...EMPTY_KEY_VALUES, brightness: 0.2, highlights: -0.4 }, 'ease-out'),
+      layerKeyframe(30, { ...EMPTY_KEY_VALUES, brightness: 0.1, highlights: 0.5 }, 'linear'),
+    ];
+    const light = COLOUR_GROUPS.find((group) => group.name === 'Light')!.settings;
+    const before = structuredClone(project);
+    const next = colourGroupResetCommands(layer, 10, light).reduce(applyCommand, project);
+    const reset = next.layers[0]!;
+    expect(reset.colour).toEqual({ ...before.layers[0]!.colour, exposure: 0, contrast: 1, shadows: 0 });
+    expect(reset.keyframes[0]!.values).toEqual({
+      ...before.layers[0]!.keyframes[0]!.values,
+      brightness: 0,
+      highlights: 0,
+    });
+    expect(reset.keyframes[0]!.easing).toEqual(before.layers[0]!.keyframes[0]!.easing);
+    expect(reset.keyframes[1]).toEqual(before.layers[0]!.keyframes[1]);
+    expect(reset.opacity).toBe(0.4);
+    // Between keyframes the keyed settings are locked; only the unkeyed ones reset.
+    expect(colourGroupResetCommands(layer, 20, light)).toEqual([
+      { type: 'colour', layerId: layer.id, colour: { ...layer.colour, exposure: 0, contrast: 1, shadows: 0 } },
+    ]);
+    expect(colourGroupResetCommands(reset, 10, light)).toEqual([]);
+    expect(colourGroupResetCommands(layer, 0, ['opacity'])).toEqual([
+      { type: 'opacity', layerId: layer.id, opacity: 1 },
+    ]);
+    expect(colourGroupResetCommands(layer, -1, light)).toEqual([]);
+    expect(project).toEqual(before);
   });
 });
