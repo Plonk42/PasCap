@@ -73,7 +73,9 @@ need no issue or Project card.
 - Record actual prerequisites as native blocked-by relationships when supported.
   Preserve existing parents; add a native sub-issue only when that decomposition is
   appropriate and authorized, never for sprint membership. Mere topical similarity
-  is not a dependency.
+  is not a dependency: record it with the native **relates to** relationship
+  (GraphQL `addRelatesTo`, verify with `Issue.relatesTo`) to the open issues that
+  overlap or caused it, and the closed ones that explain its origin when useful.
 - Inspect Project selection but **do not** assign an Iteration or selected-work field
   without explicit selection approval. Do not apply legacy `iteration` or
   `iteration:current` labels to new issues or parent them to #15. Preserve existing
@@ -91,9 +93,10 @@ Use a concise, actionable title and these sections, adapting to the matching for
   compatibility migration or owner-media qualification is implied.
 - **Acceptance criteria:** observable checklist. Distinguish proposed acceptance from
   verified delivery; include relevant regressions without running media work to log it.
-- **Dependencies, milestone and Project context:** known issue links, proposed outcome,
-  real blockers and native Project iteration/selected-work context, when applicable.
-  New proposals remain unselected; a tracker issue is not required.
+- **Dependencies, milestone and Project context:** known issue links (mention each as
+  `#N` and also set the native relationship), proposed outcome, real blockers and
+  native Project iteration/selected-work context, when applicable. New proposals
+  remain unselected; a tracker issue is not required.
 - **State and approval:** proposal vs explicitly approved work; chosen progress state.
 - **Priority rationale:** concise reason for the selected priority.
 - **Next action:** the smallest specific next design, investigation or delivery step;
@@ -118,7 +121,8 @@ credentials, licensed recordings/music or generated diagnostic reports.
 4. If a write times out or its result is uncertain, read/search current state before
    retrying; never blindly create a second issue, comment or Project item.
 5. Read back the issue and Project item. Verify category/priority/status cardinality,
-   area, milestone, next action, native relationships and Project Status. Report any
+   area, milestone, next action, native relationships (blocked-by, parent, relates to;
+   a `relates to` link is symmetric) and Project Status. Report any
    partial failure honestly with a recovery action; do not close/delete the issue.
 6. Return the issue link, whether created or reused, selected labels/milestone,
    Project result and next action. Do not change source files, commit, push, start
