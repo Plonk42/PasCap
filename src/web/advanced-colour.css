@@ -9,17 +9,32 @@
   flex-wrap: wrap;
   margin: 8px 0;
 }
-.advanced-colour-tools label {
-  flex: 1;
-  min-width: 0;
+.colour-swatches {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  gap: 6px;
+  margin: 8px 0;
+  padding: 4px;
 }
-.advanced-colour-tools select {
-  flex: 1;
-  min-width: 0;
-  text-transform: capitalize;
+.colour-swatch {
+  flex: 0 1 26px;
+  min-width: 18px;
+  aspect-ratio: 1;
+  padding: 0;
+  border: 1px solid #0008;
+  border-radius: 5px;
+  background: var(--swatch);
+}
+.colour-swatch:hover:not(:disabled) {
+  filter: brightness(1.15);
+  transform: scale(1.08);
+}
+.colour-swatch[aria-checked='true'] {
+  box-shadow:
+    0 0 0 2px #101512,
+    0 0 0 4px #f4f7f5;
+}
+.colour-swatch:focus-visible {
+  outline-offset: 5px;
 }
 .advanced-hsl-control {
   margin: 8px 0;
@@ -42,15 +57,23 @@
   height: 100%;
   overflow: visible;
   fill: none;
-  stroke: #acd8b8;
   stroke-width: 2;
+  pointer-events: none;
 }
 .colour-curve-plot .colour-curve-grid {
   stroke: #37463f;
   stroke-width: 0.5;
 }
-.colour-curve-plot.invalid svg {
+.colour-curve-plot .colour-curve-other {
+  stroke-width: 1;
+  opacity: 0.55;
+}
+.colour-curve-plot .colour-curve-selected {
+  stroke: var(--curve);
+}
+.colour-curve-plot.invalid .colour-curve-selected {
   stroke: #ed7777;
+  stroke-dasharray: 4 3;
 }
 .colour-curve-point {
   position: absolute;
@@ -61,7 +84,7 @@
   padding: 0;
   border-radius: 50%;
   border: 5px solid #101a17;
-  background: #8fbfa0;
+  background: var(--curve);
   touch-action: none;
 }
 .colour-curve-point[aria-pressed='true'] {

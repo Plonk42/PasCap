@@ -35,7 +35,7 @@ const openSection = (page: Page, title: 'HSL ranges' | 'Colour curves') =>
   page.getByRole('button', { name: `${title} section`, exact: true }).click();
 
 test('static HSL exact entry, invalid drafts, keyboard, range reset and Undo', async ({ page }) => {
-  await expect(page.getByRole('combobox', { name: 'HSL range' })).toBeHidden();
+  await expect(page.getByRole('radiogroup', { name: 'HSL range' })).toBeHidden();
   await expect(page.getByRole('slider', { name: 'Opacity', exact: true })).toBeVisible();
   await openSection(page, 'HSL ranges');
   // Each HSL slider track follows the selected range's own hue (cyan's centre is 180°).
@@ -45,7 +45,16 @@ test('static HSL exact entry, invalid drafts, keyboard, range reset and Undo', a
       .locator('..')
       .evaluate((element) => (element as HTMLElement).style.getPropertyValue('--value-track'));
   expect(await track('HSL hue')).toContain('hsl(-30 ');
-  await page.getByRole('combobox', { name: 'HSL range' }).selectOption('cyan');
+  const ranges = page.getByRole('radiogroup', { name: 'HSL range' });
+  await expect(ranges.getByRole('radio')).toHaveCount(8);
+  await expect(ranges.getByRole('radio', { name: 'red', exact: true })).toBeChecked();
+  await ranges.getByRole('radio', { name: 'green', exact: true }).click();
+  await ranges.getByRole('radio', { name: 'green', exact: true }).press('ArrowRight');
+  const cyan = ranges.getByRole('radio', { name: 'cyan', exact: true });
+  await expect(cyan).toBeChecked();
+  await expect(cyan).toBeFocused();
+  await expect(cyan).toHaveAttribute('title', 'Cyan range');
+  await expect(ranges.getByRole('radio', { name: 'green', exact: true })).not.toBeChecked();
   expect(await track('HSL hue')).toContain('hsl(150 ');
   expect(await track('HSL saturation')).toContain('hsl(180 90% 50%)');
   expect(await track('HSL lightness')).toContain('hsl(180 70% 88%)');
@@ -95,6 +104,38 @@ test('curve endpoints, exact collisions, nonmonotonic values, maximum points and
       { x: 0.5, y: 0.5 },
       { x: 1, y: 1 },
     ]);
+});
+
+test('all four curves share one graph and the channel swatches choose the editable curve', async ({ page }) => {
+  await openSection(page, 'Colour curves');
+  const channels = page.getByRole('radiogroup', { name: 'Colour curve channel' });
+  const plot = page.locator('.colour-curve-plot');
+  const timecode = await page.getByRole('button', { name: 'Go to timecode' }).textContent();
+  await expect(channels.getByRole('radio', { name: 'master', exact: true })).toBeChecked();
+  await expect(plot.locator('path.colour-curve-other')).toHaveCount(3);
+  await channels.getByRole('radio', { name: 'red', exact: true }).click();
+  await expect(plot.locator('path.colour-curve-selected')).toHaveAttribute('data-channel', 'red');
+  await expect(plot.locator('path.colour-curve-other[data-channel="master"]')).toHaveCount(1);
+  const output = page.getByRole('spinbutton', { name: 'Colour curve output', exact: true });
+  await output.fill('0.2');
+  await output.press('Enter');
+  await expect.poll(async () => (await current(page)).layers[0]!.colour.curves.red[0]!.y).toBe(0.2);
+  expect((await current(page)).layers[0]!.colour.curves.master[0]!.y).toBe(0);
+  const red = await plot.locator('path.colour-curve-selected').getAttribute('d');
+  await channels.getByRole('radio', { name: 'red', exact: true }).press('ArrowRight');
+  const green = channels.getByRole('radio', { name: 'green', exact: true });
+  await expect(green).toBeChecked();
+  await expect(green).toBeFocused();
+  // The edited red curve stays drawn, without nodes, while green is editable.
+  await expect(plot.locator('path.colour-curve-other[data-channel="red"]')).toHaveAttribute('d', red!);
+  await expect(plot.getByRole('button', { name: /^Colour curve control node/ })).toHaveCount(3);
+  await expect(page.getByRole('button', { name: 'Reset green curve', exact: true })).toBeVisible();
+  await green.press('End');
+  await expect(channels.getByRole('radio', { name: 'blue', exact: true })).toBeChecked();
+  await channels.getByRole('radio', { name: 'blue', exact: true }).press('ArrowRight');
+  await expect(channels.getByRole('radio', { name: 'master', exact: true })).toBeFocused();
+  // Swatch arrows never step the playhead.
+  await expect(page.getByRole('button', { name: 'Go to timecode' })).toHaveText(timecode!);
 });
 
 test('releasing a curve drag far outside the plot commits a node clamped between its neighbours', async ({ page }) => {

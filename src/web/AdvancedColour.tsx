@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent } from 'react';
 import {
   colourCurveSchema,
   colourCurveSlopes,
@@ -49,6 +49,71 @@ function hslTrack(band: HslBand, key: (typeof HSL_CONTROLS)[number]['key']): str
     return `linear-gradient(90deg, hsl(${centre - 30} 75% 52%), hsl(${centre} 75% 52%), hsl(${centre + 30} 75% 52%))`;
   if (key === 'saturation') return `linear-gradient(90deg, #6e6e6e, hsl(${centre} 45% 50%), hsl(${centre} 90% 50%))`;
   return `linear-gradient(90deg, hsl(${centre} 70% 12%), hsl(${centre} 70% 50%), hsl(${centre} 70% 88%))`;
+}
+
+const bandColour = (band: HslBand): string => `hsl(${HSL_CENTRES[HSL_BANDS.indexOf(band)]!} 75% 52%)`;
+const CURVE_COLOURS: Readonly<Record<CurveChannel, string>> = {
+  master: '#dfe5e1',
+  red: '#ef5d5d',
+  green: '#55c46d',
+  blue: '#5b8ff2',
+};
+const capitalise = (name: string): string => name.charAt(0).toUpperCase() + name.slice(1);
+const SWATCH_STEPS: Readonly<Record<string, (at: number, last: number) => number>> = {
+  ArrowLeft: (at) => at - 1,
+  ArrowUp: (at) => at - 1,
+  ArrowRight: (at) => at + 1,
+  ArrowDown: (at) => at + 1,
+  Home: () => 0,
+  End: (_, last) => last,
+};
+
+/** A single-choice row of coloured square buttons with radio-group keyboard behaviour. */
+function SwatchGroup<T extends string>({
+  label,
+  noun,
+  options,
+  value,
+  disabled,
+  onChange,
+}: Readonly<{
+  label: string;
+  noun: string;
+  options: readonly { value: T; colour: string }[];
+  value: T;
+  disabled: boolean;
+  onChange: (value: T) => void;
+}>) {
+  const keyboard = (event: KeyboardEvent<HTMLButtonElement>, at: number): void => {
+    const step = SWATCH_STEPS[event.key];
+    if (!step || event.altKey || event.ctrlKey || event.metaKey) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const next = (step(at, options.length - 1) + options.length) % options.length;
+    onChange(options[next]!.value);
+    const target = event.currentTarget.parentElement?.children[next];
+    if (target instanceof HTMLElement) target.focus();
+  };
+  return (
+    <div role="radiogroup" aria-label={label} className="colour-swatches">
+      {options.map((option, at) => (
+        <button
+          key={option.value}
+          type="button"
+          role="radio"
+          className="colour-swatch"
+          aria-label={option.value}
+          aria-checked={option.value === value}
+          title={`${capitalise(option.value)} ${noun}`}
+          tabIndex={option.value === value ? 0 : -1}
+          disabled={disabled}
+          style={{ '--swatch': option.colour } as CSSProperties}
+          onClick={() => onChange(option.value)}
+          onKeyDown={(event) => keyboard(event, at)}
+        />
+      ))}
+    </div>
+  );
 }
 
 const clamp = (value: number, low: number, high: number): number => Math.min(high, Math.max(low, value));
@@ -324,10 +389,27 @@ function CurveEditor({
   };
   return (
     <section className="colour-curve-editor" aria-label={`${channel} colour curve editor`} data-dirty={draft !== null}>
-      <div className={`colour-curve-plot${draft && error ? ' invalid' : ''}`}>
-        <svg viewBox="0 0 100 100" preserveAspectRatio="none" role="img" aria-label={`${channel} encoded colour curve`}>
+      <div
+        className={`colour-curve-plot${draft && error ? ' invalid' : ''}`}
+        style={{ '--curve': CURVE_COLOURS[channel] } as CSSProperties}
+      >
+        <svg
+          viewBox="0 0 100 100"
+          preserveAspectRatio="none"
+          role="img"
+          aria-label={`Encoded colour curves, ${channel} editable`}
+        >
           <path d="M0 100L100 0M25 0V100M50 0V100M75 0V100M0 25H100M0 50H100M0 75H100" className="colour-curve-grid" />
-          <path d={curvePath(shown)} />
+          {CURVE_CHANNELS.filter((other) => other !== channel).map((other) => (
+            <path
+              key={other}
+              d={curvePath(layer.colour.curves[other])}
+              className="colour-curve-other"
+              stroke={CURVE_COLOURS[other]}
+              data-channel={other}
+            />
+          ))}
+          <path d={curvePath(shown)} className="colour-curve-selected" data-channel={channel} />
         </svg>
         {shown.map((point, at) => (
           <button
@@ -436,23 +518,14 @@ export function HslRangesSection(props: Readonly<Props>) {
       }
     >
       <div className="advanced-colour">
-        <div className="advanced-colour-tools">
-          <label>
-            <span>Range</span>
-            <select
-              aria-label="HSL range"
-              value={band}
-              disabled={disabled}
-              onChange={(event) => setBand(event.currentTarget.value as HslBand)}
-            >
-              {HSL_BANDS.map((name) => (
-                <option key={name} value={name}>
-                  {name}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
+        <SwatchGroup
+          label="HSL range"
+          noun="range"
+          options={HSL_BANDS.map((name) => ({ value: name, colour: bandColour(name) }))}
+          value={band}
+          disabled={disabled}
+          onChange={setBand}
+        />
         {HSL_CONTROLS.map((control) => {
           const withValue = (value: number): ColourSettings => ({
             ...layer.colour,
@@ -537,23 +610,14 @@ export function ColourCurvesSection(props: Readonly<Props>) {
       }
     >
       <div className="advanced-colour">
-        <div className="advanced-colour-tools">
-          <label>
-            <span>Channel</span>
-            <select
-              aria-label="Colour curve channel"
-              disabled={disabled}
-              value={channel}
-              onChange={(event) => setChannel(event.currentTarget.value as CurveChannel)}
-            >
-              {CURVE_CHANNELS.map((name) => (
-                <option key={name} value={name}>
-                  {name}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
+        <SwatchGroup
+          label="Colour curve channel"
+          noun="curve"
+          options={CURVE_CHANNELS.map((name) => ({ value: name, colour: CURVE_COLOURS[name] }))}
+          value={channel}
+          disabled={disabled}
+          onChange={setChannel}
+        />
         <CurveEditor key={`${project.id}:${layer.id}:${channel}`} {...props} channel={channel} />
         <div className="advanced-colour-tools">
           <button

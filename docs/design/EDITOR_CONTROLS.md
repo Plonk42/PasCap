@@ -153,6 +153,11 @@ and technical paths stay unchanged; this glossary does not change schema 18.
   own colour: Hue from 30° below to 30° above its centre, Saturation grey → that colour, Lightness dark → that
   colour → light. Other sliders keep the plain track. The gradient is presentational and dims with a locked or
   disabled slider.
+- Colour swatches: **HSL range** and **Colour curve channel** are rows of coloured square buttons in a radio
+  group (accessible name of the range/channel, tooltip such as **Cyan range**), not dropdowns. The selected
+  swatch has a white ring; focus adds the usual outline; arrows, Home and End move the selection without
+  reaching timeline shortcuts. HSL swatches use each range's centre hue, as its slider tracks do. Colour
+  curves draw all four curves on one graph, only the selected channel with nodes and edits.
 - Tabs: native buttons with one selected appearance and existing arrow/Home/End
   behavior. Disclosures keep mounted drafts; options use the existing Popover.
 - Buttons: primary for the main confirmed action, secondary for supporting actions,
