@@ -99,12 +99,14 @@ async function begin(page: Page, frame = 20, layerId = 'video-1') {
   const scale = Number(await page.locator('.timeline-surface').getAttribute('data-pixels-per-frame'));
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await page.mouse.down();
-  await expect(page.locator('.timeline-surface')).toHaveClass(/keyframe-drafting/);
+  // A press alone is not a drag: the draft starts only after the 3-pixel threshold.
+  await expect(page.locator('.timeline-surface')).not.toHaveClass(/keyframe-drafting/);
   return { x: box.x + box.width / 2, y: box.y + box.height / 2, scale, frame, target };
 }
 async function move(page: Page, start: Awaited<ReturnType<typeof begin>>, frame: number, alt = false): Promise<void> {
   if (alt) await page.keyboard.down('Alt');
   await page.mouse.move(start.x + (frame - start.frame) * start.scale, start.y, { steps: 6 });
+  await expect(page.locator('.timeline-surface')).toHaveClass(/keyframe-drafting/);
 }
 async function seek(page: Page, frame: number): Promise<void> {
   await page.evaluate((position) => window.pascapLab!.engine.seek(position), frame);
