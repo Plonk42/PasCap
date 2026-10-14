@@ -513,7 +513,8 @@ test('main and off-duration stored resets edit only existing participants; exact
   const row = await editLayerPoint(page, 'Track 1', 180);
   await expect(row.locator('.layer-keyframe-point-values').getByRole('slider')).toHaveCount(3);
   await expect(row.getByRole('slider', { name: 'Exposure keyframe value 180', exact: true })).toHaveCount(0);
-  await expect(controls(row, 'Opacity keyframe value 180').widget).not.toHaveAttribute('data-tone');
+  await expect(controls(row, 'Opacity keyframe value 180').widget).toHaveAttribute('data-tone', 'opacity');
+  await expect(controls(page, 'Exposure').widget).not.toHaveAttribute('data-tone');
   for (const { setting, label, precise } of channels) {
     const name = `${label} keyframe value 180`;
     const { slider, exact, widget } = controls(row, name);

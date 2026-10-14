@@ -7,6 +7,7 @@ import {
   CURVE_CHANNELS,
   evaluateColourCurve,
   HSL_BANDS,
+  HSL_CENTRES,
   isIdentityCurve,
   isNeutralHsl,
   type ColourCurvePoint,
@@ -40,6 +41,15 @@ const HSL_CONTROLS = [
   { key: 'saturation', label: 'Saturation', min: -1, max: 1, step: 0.01 },
   { key: 'lightness', label: 'Lightness', min: -0.5, max: 0.5, step: 0.005 },
 ] as const;
+
+/** Each HSL slider's track shows its axis in the selected range's own colour. */
+function hslTrack(band: HslBand, key: (typeof HSL_CONTROLS)[number]['key']): string {
+  const centre = HSL_CENTRES[HSL_BANDS.indexOf(band)]!;
+  if (key === 'hue')
+    return `linear-gradient(90deg, hsl(${centre - 30} 75% 52%), hsl(${centre} 75% 52%), hsl(${centre + 30} 75% 52%))`;
+  if (key === 'saturation') return `linear-gradient(90deg, #6e6e6e, hsl(${centre} 45% 50%), hsl(${centre} 90% 50%))`;
+  return `linear-gradient(90deg, hsl(${centre} 70% 12%), hsl(${centre} 70% 50%), hsl(${centre} 70% 88%))`;
+}
 
 const clamp = (value: number, low: number, high: number): number => Math.min(high, Math.max(low, value));
 
@@ -465,6 +475,7 @@ export function HslRangesSection(props: Readonly<Props>) {
                 min={control.min}
                 max={control.max}
                 step={control.step}
+                track={hslTrack(band, control.key)}
                 resetKey={context}
                 disabled={disabled}
                 onCommit={(value) => commit(withValue(value))}

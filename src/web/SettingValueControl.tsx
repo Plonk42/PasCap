@@ -6,7 +6,11 @@ import type { NumberFieldProps } from './NumberField.js';
 import { ValueControl, type SliderTone, type ValueControlProps } from './ValueControl.js';
 
 const isToned = (setting: KeyframeSetting): setting is SliderTone =>
-  setting === 'temperature' || setting === 'tint' || setting === 'saturation';
+  setting === 'temperature' ||
+  setting === 'tint' ||
+  setting === 'saturation' ||
+  setting === 'hue' ||
+  setting === 'opacity';
 
 interface RangeSettingProps {
   setting: KeyframeSetting;

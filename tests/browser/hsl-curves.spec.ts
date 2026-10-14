@@ -38,7 +38,17 @@ test('static HSL exact entry, invalid drafts, keyboard, range reset and Undo', a
   await expect(page.getByRole('combobox', { name: 'HSL range' })).toBeHidden();
   await expect(page.getByRole('slider', { name: 'Opacity', exact: true })).toBeVisible();
   await openSection(page, 'HSL ranges');
+  // Each HSL slider track follows the selected range's own hue (cyan's centre is 180°).
+  const track = (name: string) =>
+    page
+      .getByRole('slider', { name, exact: true })
+      .locator('..')
+      .evaluate((element) => (element as HTMLElement).style.getPropertyValue('--value-track'));
+  expect(await track('HSL hue')).toContain('hsl(-30 ');
   await page.getByRole('combobox', { name: 'HSL range' }).selectOption('cyan');
+  expect(await track('HSL hue')).toContain('hsl(150 ');
+  expect(await track('HSL saturation')).toContain('hsl(180 90% 50%)');
+  expect(await track('HSL lightness')).toContain('hsl(180 70% 88%)');
   const field = page.getByRole('spinbutton', { name: 'HSL hue', exact: true });
   await field.fill('12.3456789');
   await field.press('Enter');
