@@ -1099,18 +1099,6 @@ export function Timeline(props: Readonly<Props>) {
     <section className="timeline-panel panel" id="timeline-pane" tabIndex={-1} aria-label="Video timeline">
       <div className="timeline-toolbar">
         <h2 className="declutter-sr-only">Timeline</h2>
-        <RushEditBar
-          project={project}
-          selected={selected}
-          frame={frame}
-          disabled={interactionBlocked}
-          timeRange={props.timeRange}
-          onSplit={onSplit}
-          onDelete={onDelete}
-          onQuickTrim={props.onQuickTrim}
-          onCutRange={props.onCutRange}
-          onClearRange={() => props.onTimeRange(null)}
-        />
         <BookmarkButton
           project={project}
           frame={frame}
@@ -1130,6 +1118,18 @@ export function Timeline(props: Readonly<Props>) {
           <Icon name="magnet" size={15} />
           <span className="timeline-action-label">Snap</span>
         </button>
+        <RushEditBar
+          project={project}
+          selected={selected}
+          frame={frame}
+          disabled={interactionBlocked}
+          timeRange={props.timeRange}
+          onSplit={onSplit}
+          onDelete={onDelete}
+          onQuickTrim={props.onQuickTrim}
+          onCutRange={props.onCutRange}
+          onClearRange={() => props.onTimeRange(null)}
+        />
         <div className="timeline-zoom">
           <label htmlFor="timeline-zoom">Zoom</label>
           <button
