@@ -20,8 +20,9 @@ function markerSeekFrame(placed: PlacedClip, sourceFrame: number): number {
 }
 
 /** Clip-owned speed keys only; retained off-trim anchors stay exclusively in the inspector.
- * outputAt is a FLOOR inverse, not a continuous coordinate. OUT alone denotes
- * the right boundary, while its preview must stay on the final available output.
+ * A key sits on the output frame its click previews (the closest image of its source frame), so it lines
+ * up with the playhead there; the floor inverse can be a frame earlier, still showing the previous image.
+ * OUT alone denotes the right boundary, while its preview must stay on the final available output.
  * Work/storage is bounded by the 256-key list, never clip duration.
  */
 export function clipKeyframeMarkers(placed: PlacedClip): ClipKeyframeMarker[] {
@@ -29,14 +30,14 @@ export function clipKeyframeMarkers(placed: PlacedClip): ClipKeyframeMarker[] {
   return keys
     .filter((point) => point.frame >= placed.clip.sourceIn && point.frame <= placed.clip.sourceOut)
     .map((point) => {
-      const outputFrame =
-        point.frame === placed.clip.sourceOut ? placed.duration : placed.retiming.outputAt(point.frame);
+      const seekFrame = markerSeekFrame(placed, point.frame);
+      const outputFrame = point.frame === placed.clip.sourceOut ? placed.duration : seekFrame - placed.start;
       return {
         type: 'speed',
         sourceFrame: point.frame,
         outputFrame,
         timelineFrame: placed.start + outputFrame,
-        seekFrame: markerSeekFrame(placed, point.frame),
+        seekFrame,
       };
     });
 }
