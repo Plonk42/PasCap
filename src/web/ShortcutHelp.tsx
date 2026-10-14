@@ -26,6 +26,8 @@ const GROUPS = [
       ['F', 'Fit the timeline'],
       ['Drag a clip edge', 'Trim; ← / → on a focused edge trims one frame'],
       ['Drag a ◆ marker', 'Move a keyframe; ← / → on a focused marker moves one frame'],
+      ['M', 'Add a bookmark at the playhead; edits snap to it'],
+      ['Delete on a focused bookmark', 'Delete it; drag or ← / → moves it'],
       ['Alt while dragging', 'Ignore snapping'],
     ],
   },

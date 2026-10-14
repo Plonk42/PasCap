@@ -14,7 +14,7 @@ HSL/curves remain static. See [Temperature and Tint](design/TEMPERATURE_AND_TINT
 See [track appearance](design/ROW_APPEARANCE.md).
 
 The media library describes complete recordings belonging to the open project's
-bin, not every globally registered source. Strict schema 16 requires unique
+bin, not every globally registered source. Strict schema 17 requires unique
 `media.videoIds` and `media.audioIds` arrays (10,000 IDs maximum each). Imports add
 membership even without timeline placement; clip/music references also remain
 visible. New projects start with both arrays empty. **Remove from project** (the
@@ -104,7 +104,7 @@ Import guidance, **without a POST**. Internal dragging of ready registered Media
 into Timeline remains unchanged. Uncertain registration results are not retried
 automatically; check Media/Activity before resubmitting.
 
-Strict schema 16 requires complete video track colour with Temperature/Tint/HDR and static HSL/curves, clip spatial settings, per-track Ripple, transitions and fades, and a required
+Strict schema 17 requires complete video track colour with Temperature/Tint/HDR and static HSL/curves, clip spatial settings, per-track Ripple, transitions and fades, and a required
 0–8 identified music track `music` array (`[]` without music); registry/proxy/PCM
 formats are unchanged. Only generated proxies/thumbnails, metadata,
 exports/receipts and scratch are created, not duplicate originals. Keep originals
@@ -324,7 +324,7 @@ and undoable, and never move music, other tracks or absolute track keyframes.
 
 ## Track keyframes, time ruler and transitions
 
-Schema-15 shared track keyframes belong to the **whole video track**, not individual clips. One ordered
+Shared track keyframes belong to the **whole video track**, not individual clips. One ordered
 keyframe at a project frame has eleven required nullable channels: **Opacity**
 (`opacity`), nine scalar colour settings and **HDR** (`hdr`), enabled independently.
 In control order: `opacity`, `temperature`, `tint`, `exposure`,
@@ -505,13 +505,14 @@ dissolves use the source-over contract above. See
 ## Snapping, projects and music
 
 **Snap** uses an eight-pixel tolerance converted to project frames at the current
-zoom. Ruler clicks and playhead scrubbing snap to video/music boundaries; ruler range
+zoom. Ruler clicks and playhead scrubbing snap to video/music boundaries and
+[bookmarks](#bookmarks); ruler range
 edges also snap to the playhead captured at pointer down. Trim handles also
 snap to the original, stationary playhead. Shared-keyframe and clip source-keyframe
-(Transform and Speed) drags use boundaries and
+(Transform and Speed) drags use boundaries, bookmarks and
 the stationary playhead captured at pointer down, with their captured zoom throughout
 autoscroll; a source keyframe snapped to its clip's end lands on its exclusive OUT. Ripple-off moves match either leading or trailing edge to other clip/music/
-transition boundaries, frame zero or the captured
+transition boundaries, bookmarks, frame zero or the captured
 stationary playhead; their own old edges/transition regions are excluded. Holding
 Alt bypasses these magnets. A trailing-edge snap starts the clip its own duration
 before the magnet. Ripple-on
@@ -519,12 +520,42 @@ insertion remains boundary-based even with Snap off or Alt held; only an explici
 move of its retained first clip changes the anchor. The
 toggle persists for the current timeline session, not the renderable document.
 
-Projects are named separate **version-15** documents with complete required video track colour, clip spatial
-base/per-setting source-frame keyframes and per-track Ripple,
+### Bookmarks
+
+A **bookmark** marks one project-time frame, for example a beat or an event in the
+footage, as an extra snap point. Bookmarks belong to the project: strict schema 17
+requires `bookmarks`, an array of at most 1,000 unique ascending integer project
+frames (0–2,147,483,647), `[]` on new projects; a missing or malformed array is
+invalid, never defaulted. They are editing aids only: they never retime clips,
+music or keyframes and are never rendered or exported.
+
+- **Bookmark** in the timeline toolbar, or **M**, adds a bookmark at the playhead.
+  When the playhead is on a bookmark, the toolbar button becomes **Delete bookmark
+  at playhead** (trash icon). **M** on an existing bookmark is rejected with an
+  error, never merged. Without footage or music there is no playhead to mark.
+- Bookmarks are lilac ribbons in the lower half of the time ruler, with a faint
+  dashed line through the tracks. Click, Enter or Space seeks to one without editing.
+- A bookmark slides like the other timeline markers (`useKeyframeSlide`): drag it
+  (3-pixel threshold, snapping to clip/music/transition boundaries, other bookmarks
+  and the playhead, never its own origin; Alt bypasses; edge autoscroll), or press
+  ←/→ on a focused bookmark (one frame, Shift ten). Drafts preview without
+  history/save; a valid release is one Undo step. An occupied frame shows a red
+  ghost and commits nothing; Escape, pointer cancellation, lost capture or window
+  blur restores. Delete or Backspace on a focused bookmark removes it.
+- Every gesture that snaps to clip boundaries also snaps to bookmarks within the
+  same eight pixels: trims, clip moves and drops, music placement/trim, shared and
+  clip source-keyframe drags, ruler clicks/ranges and playhead scrubbing. Snapping
+  to existing boundaries is unchanged.
+
+Adding, moving and deleting are each one Undo step and autosave like other edits.
+Bookmarks are project-wide: not per track, named, coloured or ranged.
+
+Projects are named separate **version-17** documents with complete required video track colour, clip spatial
+base/per-setting source-frame keyframes, project bookmarks and per-track Ripple,
 transitions, opening/closing fades and numeric `opacity` in 0–1. New tracks start
 at 1 (100%); a missing saved field is invalid. Switching flushes autosave first,
 blocks on failed saves, and resets session selection/history; successful export
-snapshots are independent of the open project. Earlier v1–v15 projects and receipt
+snapshots are independent of the open project. Earlier v1–v16 projects and receipt
 snapshots remain incompatible and preserved, without migration/fabricated defaults.
 There is no automatic deletion. Track `opacity` is the required sole stored value;
 saved `clip.opacity` and old `clipOpacity`/`layerOpacity` keyframe fields are rejected,
@@ -542,7 +573,7 @@ are unchanged.
 The required `music` array holds **0–8 independent music tracks**, each with a unique
 required `id`, registered `mediaId`, source IN/OUT, start/duration, gain, fades and
 loop flag. No null/singular fallback, omitted-field default or old-format reader
-is accepted. Version-1 export receipts require a strict v16 snapshot and captured
+is accepted. Version-1 export receipts require a strict v17 snapshot and captured
 audio-source/instance-plan arrays; older snapshots/invalid arrays are rejected
 while the receipt and finished output remain preserved. Current PCM format is unchanged.
 
@@ -655,4 +686,4 @@ and both-runtime acceptance belong to
 [DEPLOYMENT.md](DEPLOYMENT.md). Actual-commit correctness results are available in
 [GitHub Actions](https://github.com/Plonk42/PasCap/actions).
 
-Video track Colour includes static **HSL ranges** and **Colour curves**, each in its own collapsible Track section after Colour. They affect every clip and both dissolve sources on the track, whether or not its nine scalar channels are keyed. Moves use the destination track's complete colour; clip edits never copy these settings. They are not speed curves or new animation channels. See [the schema-16 HSL/curves contract](design/HSL_AND_CURVES.md).
+Video track Colour includes static **HSL ranges** and **Colour curves**, each in its own collapsible Track section after Colour. They affect every clip and both dissolve sources on the track, whether or not its nine scalar channels are keyed. Moves use the destination track's complete colour; clip edits never copy these settings. They are not speed curves or new animation channels. See [the schema-17 HSL/curves contract](design/HSL_AND_CURVES.md).

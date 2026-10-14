@@ -111,7 +111,7 @@ function fakeLibrary(): MediaLibrary {
   return library;
 }
 
-describe('schema-16 production dispatch and read-only validation', () => {
+describe('schema-17 production dispatch and read-only validation', () => {
   it('keeps static constant/curve speed on the cheap path and dispatches shared track points with their placed map', () => {
     const project = document();
     expect(needsLayeredExport(project)).toBe(false);
@@ -136,11 +136,11 @@ describe('schema-16 production dispatch and read-only validation', () => {
     const placed = calculateLayout(project).clips[0]!;
     expect(planLayeredExport(project).duration).toBe(compileRetiming(project.clips[0]!).duration);
     expect(placed.retiming.duration).toBe(planLayeredExport(project).duration);
-    expect(exportRequestSchema.parse({ document: project, profile: 'draft720' }).document.schemaVersion).toBe(16);
+    expect(exportRequestSchema.parse({ document: project, profile: 'draft720' }).document.schemaVersion).toBe(17);
     expect(
       exportRequestSchema.safeParse({ document: { ...project, schemaVersion: 2 }, profile: 'draft720' }).success,
     ).toBe(false);
-    for (const version of [1, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15])
+    for (const version of [1, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16])
       expect(
         exportRequestSchema.safeParse({
           document: unsupportedProject(version, 'old', 'Unsupported export'),
@@ -217,7 +217,7 @@ describe('schema-16 production dispatch and read-only validation', () => {
       expect(project).toEqual(before);
     },
   );
-  it('requires explicit v16 media/row/static clip fields, permits eight rows and refuses a ninth or same-row overlap', () => {
+  it('requires explicit v17 media/row/static clip fields, permits eight rows and refuses a ninth or same-row overlap', () => {
     const project = document();
     for (let index = 2; index <= 8; index++) project.layers.push(layer(`video-${index}`));
     expect(projectSchema.safeParse(project).success).toBe(true);
@@ -289,12 +289,12 @@ describe('schema-16 production dispatch and read-only validation', () => {
     expect(Object.isFrozen(snapshot.layers[0]!.keyframes[0]!.values)).toBe(true);
     expect(Object.isFrozen(snapshot.layers[0]!.colour)).toBe(true);
   });
-  it('strictly loads v16 but lists/rejects unsupported versions unchanged, including overwrite attempts', async () => {
+  it('strictly loads v17 but lists/rejects unsupported versions unchanged, including overwrite attempts', async () => {
     const directory = await temp();
     const store = new ProjectStore(directory);
     const saved = await store.save(document(), 0);
     expect(await store.load(saved.id)).toEqual(saved);
-    for (const version of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]) {
+    for (const version of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]) {
       const id = `old-v${version}`;
       const title = `Original v${version} document`;
       const unsupported = unsupportedProject(version, id, title);
@@ -307,7 +307,7 @@ describe('schema-16 production dispatch and read-only validation', () => {
         title,
         error: expect.stringContaining(`schema version ${version}`),
       });
-      await expect(store.load(id)).rejects.toThrow('requires version 16');
+      await expect(store.load(id)).rejects.toThrow('requires version 17');
       await expect(store.rename(id, 'No migration', 0)).rejects.toThrow('existing file was not changed');
       await expect(store.save(createProject(id, 'No migration'), 0)).rejects.toThrow('existing file was not changed');
       expect(await readFile(filename, 'utf8')).toBe(bytes);

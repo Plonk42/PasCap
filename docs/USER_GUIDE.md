@@ -13,8 +13,8 @@ inherit the shared media registry. Importing the same original into another proj
 deliberately adds it to that project's bin and reuses eligible verified proxies.
 Removing a clip or music track does not remove the imported recording.
 
-Projects use **strict format v16**, with complete required video track colour and clip spatial base/per-setting
-source-frame keyframes and a required `music` array of 0–8 independent
+Projects use **strict format v17**, with complete required video track colour and clip spatial base/per-setting
+source-frame keyframes, a required `bookmarks` array of project frames (`[]` on new projects), a required `music` array of 0–8 independent
 music tracks and unique required IDs (`[]` without music), every video track's Ripple, transitions and
 opening/closing fades and required numeric `opacity` in 0–1 (1 on new tracks),
 with eleven nullable animation channels, in control order: `opacity`,
@@ -24,10 +24,10 @@ Video track Colour requires Temperature/Tint/HDR bases and static
 HSL/curves; missing fields and saved clip colour/correction are invalid.
 Track `opacity` is the sole saved Opacity value; saved `clip.opacity` and old
 `clipOpacity`/`layerOpacity` keyframe channels are invalid, not ignored or defaulted.
-v1–v15 project documents and receipt snapshots
+v1–v16 project documents and receipt snapshots
 stay on disk but are incompatible: there is no migration, compatibility default,
 null fallback, old-format reader, automatic repair or deletion. Export receipts
-remain version 1 with a strict v16 snapshot and required audio-source/instance-plan arrays.
+remain version 1 with a strict v17 snapshot and required audio-source/instance-plan arrays.
 Create a new project and import its media deliberately. Finished videos remain
 untouched. **Delete project** requires confirmation and deletes only the saved
 project document, not originals, the shared registry/proxy cache or exports/receipts.
@@ -184,6 +184,16 @@ preview transiently, commit once on valid release, and cancel with Escape.
 **Timeline start frame** and nudge controls work on independently positioned clips
 or the **first Ripple anchor only**. Later Ripple clips expose an accessible reason:
 drag to reorder, or turn Ripple off in Track options to set an independent start.
+
+**Bookmarks** mark times of interest, such as a beat, so edits snap to them. Press
+**M** or choose **Bookmark** in the timeline toolbar to add one at the playhead; on
+an existing bookmark the button deletes it instead. Bookmarks are lilac ribbons in
+the lower half of the time ruler: click one to go there, drag it or use ←/→
+(Shift: ten frames) to move it, and press Delete to remove it. Trims, moves, music
+placement, keyframe drags and ruler scrubbing snap to bookmarks like they snap to
+clip edges; **Alt** bypasses. Each add, move or delete is one Undo step. Bookmarks
+are saved with the project but never rendered or exported. Details:
+[bookmarks](TIMELINE_EDITING.md#bookmarks).
 
 Boundary **Cut / Fade / Dissolve** and **Fades** belong to the selected
 track in **Track**; clicking a boundary button opens that tab with the boundary expanded.
@@ -668,6 +678,7 @@ storage/render breakdowns remain their existing expandable controls, not help bu
 | Timeline play/seek                          | Space; ←/→ one frame; Shift+←/→ ten; Home/End; F to fit                      |
 | Split / quick trim                          | S / Q / W                                                                    |
 | Unwanted timeline range                     | Drag on the ruler; Shift+Delete cuts; Escape clears the range                |
+| Bookmarks                                   | M adds at the playhead; focused bookmark: arrows move, Delete removes        |
 | Clip actions                                | Ctrl+D duplicate (or right-click the clip); Delete/Backspace remove          |
 | Session history                             | Ctrl+Z; Ctrl+Shift+Z or Ctrl+Y redo                                          |
 | Positioned clip / first Ripple anchor nudge | Alt+←/→ one frame; Alt+Shift+←/→ ten; later Ripple starts require Ripple off |
@@ -692,7 +703,7 @@ in memory and automatic write retries stop. **Retry save** is offered only for
 recoverable transport/server errors. On a revision conflict, **Review latest save**
 offers keeping the draft, **Download unsaved project**, or explicitly discarding
 local changes and reloading. It never silently overwrites or rebases another save.
-Download before discarding; the v16 JSON snapshot is for manual recovery/examination,
+Download before discarding; the v17 JSON snapshot is for manual recovery/examination,
 not a supported JSON-import or migration flow. Unapplied input/pointer drafts are
 not committed project edits.
 
