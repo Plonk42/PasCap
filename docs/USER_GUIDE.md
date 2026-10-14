@@ -288,7 +288,9 @@ movement stays local until release; valid edits make one Undo step, invalid or
 cancelled edits apply nothing. Numeric entry retains its precision.
 
 The **HSL ranges** and **Colour curves** sections, below Colour in Track, also belong to the video track, but remain
-static, with no animation diamonds. Colour curves pass smoothly through their control
+static, with no animation diamonds. Pick a range or curve channel with its coloured
+square; Colour curves shows all four curves together, editing only the selected one.
+Colour curves pass smoothly through their control
 nodes without overshooting them. They follow scalar grading, so HSL's grey
 protection does not undo Temperature/Tint colouring. The Original preview bypasses
 all these Colour stages, retaining Opacity and geometry. Exact processing:
