@@ -11,7 +11,7 @@ full-original range bar; other frame/duration/fade fields retain numeric stepper
 
 | Area                          | Control                                                                                                                                                                                         | Contract                                                                                                                                                                                         |
 | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Colour / Opacity              | Native slider and exact field in main/stored editors; Temperature, Tint and Saturation have coloured tracks                                                                                     | Opacity UI 0–100%, neutral 100%; stored track/keyframe values remain 0–1                                                                                                                         |
+| Colour / Opacity              | Native slider and exact field in main/stored editors; Temperature, Tint, Saturation, Hue and Opacity have coloured tracks                                                                       | Opacity UI 0–100%, neutral 100%; stored track/keyframe values remain 0–1                                                                                                                         |
 | Speed                         | Clip constant rate or 1–256 source-frame keyframes; Keyframe Speed circle                                                                                                                       | Bounded slider/exact-value pattern; retain presets and curve graph                                                                                                                               |
 | Transform                     | Eight track pose sliders/exact fields, each with its own blue triangle and Previous/Next, stored keyframe selector/navigation, default keyframe toggle                                          | Works exactly like Colour: explicit per-setting project-frame capture; distinguish stored time from preview                                                                                      |
 | Detail                        | Clip Sharpen, Clarity and Denoise sliders/exact fields with **Reset detail**                                                                                                                    | Static, no keyframes; live image preview while dragging; one Undo per release                                                                                                                    |
@@ -148,8 +148,11 @@ and technical paths stay unchanged; this glossary does not change schema 18.
   and per-setting Previous/Next on one line, shown as three equal buttons ‹ ◇ ›. Tab order stays diamond, Previous,
   Next, slider, field. Inside the exact field the unit follows the value and the native stepper sits at the right.
 - Coloured slider tracks show a setting's direction: **Temperature** runs blue → yellow, **Tint** green → magenta
-  (its positive side) and **Saturation** grey → red, in main and stored keyframe editors. Other sliders
-  keep the plain track. The gradient is presentational and dims with a locked or disabled slider.
+  (its positive side), **Saturation** grey → red, **Hue** around the full colour wheel and **Opacity** from a
+  checkerboard to solid, in main and stored keyframe editors. **HSL ranges** sliders follow the selected range's
+  own colour: Hue from 30° below to 30° above its centre, Saturation grey → that colour, Lightness dark → that
+  colour → light. Other sliders keep the plain track. The gradient is presentational and dims with a locked or
+  disabled slider.
 - Tabs: native buttons with one selected appearance and existing arrow/Home/End
   behavior. Disclosures keep mounted drafts; options use the existing Popover.
 - Buttons: primary for the main confirmed action, secondary for supporting actions,

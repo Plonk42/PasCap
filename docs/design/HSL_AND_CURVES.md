@@ -72,7 +72,8 @@ Track → Colour contains nine scalar sliders (Temperature/Tint before Exposure)
 HDR and sole Opacity control. The separate, initially collapsed Track sections
 **HSL ranges** and **Colour curves** (after Colour) contain native band/channel selectors, exact
 numeric fields and a compact SVG curve graph. HSL uses native sliders and exact
-fields, with no diamonds. The curve footer is one row: exact Input and Output fields for the selected control
+fields, with no diamonds; their tracks are drawn in the selected range's own colour
+(see [the control catalogue](EDITOR_CONTROLS.md#control-patterns)). The curve footer is one row: exact Input and Output fields for the selected control
 node, then Add and Delete, followed by Reset channel / Reset all. There is no node select or Previous/Next:
 choose a node by clicking or focusing its graph point. Curve endpoint inputs are locked (their field is
 disabled); outputs remain editable.
