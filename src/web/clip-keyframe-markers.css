@@ -22,6 +22,8 @@
 .timeline-clip-key {
   position: absolute;
   top: 0;
+  display: grid;
+  place-items: center;
   left: clamp(0px, calc(var(--clip-keyframe-position) - 10px), max(0px, calc(100% - 20px)));
   width: min(20px, 100%);
   height: 22px;
