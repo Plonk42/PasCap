@@ -61,13 +61,11 @@ describe('clip-owned timeline speed keyframe markers', () => {
     const duration = Math.max(1, Math.round(120 / rate));
     expect(placed.duration).toBe(duration);
     for (const marker of markers) {
-      const expected =
-        marker.sourceFrame === 130
-          ? duration
-          : Math.min(duration - 1, Math.floor(((marker.sourceFrame - 10) * duration) / 120 + 1e-8));
+      const seek = previewClipSource(project, 'clip', marker.sourceFrame);
+      const expected = marker.sourceFrame === 130 ? duration : seek - 17;
       expect(marker.outputFrame).toBe(expected);
       expect(marker.timelineFrame).toBe(17 + expected);
-      expect(marker.seekFrame).toBe(previewClipSource(project, 'clip', marker.sourceFrame));
+      expect(marker.seekFrame).toBe(seek);
     }
   });
 
@@ -80,7 +78,7 @@ describe('clip-owned timeline speed keyframe markers', () => {
         { frame: 120, rate: 2, interpolation: 'hold' },
       ],
     },
-  ] satisfies SpeedSettings[])('maps a source-time $mode through the placed floor inverse', (speed) => {
+  ] satisfies SpeedSettings[])('places a source-time $mode key on the output frame showing its image', (speed) => {
     const project = fixture(0, 120, 12);
     project.clips[0]!.speed = speed;
     const { placed, markers } = markersFor(project);
@@ -94,10 +92,11 @@ describe('clip-owned timeline speed keyframe markers', () => {
     expect(markers[1]).toMatchObject({
       type: 'speed',
       sourceFrame: 30,
-      outputFrame: 44,
-      timelineFrame: 56,
+      outputFrame: 45,
+      timelineFrame: 57,
       seekFrame: 57,
     });
+    // The floor inverse lands one frame earlier, still showing source 29.
     expect(placed.retiming.outputAt(30)).toBe(44);
     expect(placed.retiming.sourceAt(44)).toBe(29);
     expect(placed.retiming.sourceAt(45)).toBe(30);
@@ -146,11 +145,11 @@ describe('clip-owned timeline speed keyframe markers', () => {
   });
 
   it.each([
-    { source: 1, rate: 0.3, output: 3, seek: 4, displayed: 1 },
+    { source: 1, rate: 0.3, output: 4, seek: 4, displayed: 1 },
     { source: 30, rate: 0.25, output: 120, seek: 120, displayed: 30 },
     { source: 1, rate: 4, output: 0, seek: 0, displayed: 0 },
     { source: 2, rate: 4, output: 0, seek: 0, displayed: 0 },
-    { source: 3, rate: 4, output: 0, seek: 1, displayed: 4 },
+    { source: 3, rate: 4, output: 1, seek: 1, displayed: 4 },
   ])('previews the closest mapped image for source $source at $rate×, preferring the earlier tie', (test) => {
     const project = fixture(0, 120, 7);
     speedKeys(project, [test.source], test.rate);
@@ -160,12 +159,12 @@ describe('clip-owned timeline speed keyframe markers', () => {
     expect(placed.retiming.sourceAt(test.seek)).toBe(test.displayed);
   });
 
-  it('keeps distinct skipped keys even when their mapped diamond positions coincide', () => {
+  it('keeps distinct skipped keys even when their mapped marker positions coincide', () => {
     const project = fixture(0, 120);
     speedKeys(project, [1, 2, 3], 4);
     const { markers } = markersFor(project);
     expect(markers.map((marker) => marker.sourceFrame)).toEqual([1, 2, 3]);
-    expect(markers.map((marker) => marker.outputFrame)).toEqual([0, 0, 0]);
+    expect(markers.map((marker) => marker.outputFrame)).toEqual([0, 0, 1]);
     expect(markers.map((marker) => marker.seekFrame)).toEqual([17, 17, 18]);
   });
 

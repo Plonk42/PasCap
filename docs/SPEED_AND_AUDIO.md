@@ -236,7 +236,8 @@ changing track keyframes or other clips.
 
 Inside each clip rectangle, custom-speed source keyframes appear as a boxed salmon
 **●** lane, distinct from the boxed blue **▼** track Transform markers at the top of
-the track row; each title lists the keyframe's rate. Positions follow authoritative retiming. Off-trim keyframes are
+the track row; each title lists the keyframe's rate. Positions follow authoritative retiming: each marker
+sits on the output frame showing its source image, where a click puts the playhead. Off-trim keyframes are
 omitted. Exclusive OUT has a boundary marker that seeks the final available frame.
 Click, Enter or Space selects the clip, seeks its nearest mapped image and opens
 Clip → Speed; a click edits nothing.
