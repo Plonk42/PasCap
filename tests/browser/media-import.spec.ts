@@ -273,6 +273,12 @@ test('Shift-click selects and deselects a range of recordings, with the Import b
   await expect(box('G.mp4')).not.toBeChecked();
   await expect(box('F.mp4')).toBeChecked();
   await expect(dialog.getByRole('button', { name: 'Import selected recordings' })).toBeInViewport({ ratio: 1 });
+
+  // Clicking the file name (the row label) range-selects too.
+  await dialog.getByText('H.mp4', { exact: true }).click();
+  await dialog.getByText('J.mp4', { exact: true }).click({ modifiers: ['Shift'] });
+  await expect(summary).toHaveText('8 video recordings selected');
+  await expect(box('I.mp4')).toBeChecked();
 });
 
 test('partial registration and queue failures keep accepted sources, report the rest and keep rejected recordings selected', async ({
