@@ -220,9 +220,10 @@ is clip-only, never a track setting.
 All static and keyed Colour and Transform belong to the video track, not the clip.
 **Opacity** is one setting for the selected **whole video track**, not a clip.
 Find its single native slider/exact numeric field in **Track → Colour**, with its
-capture diamond and adjacent per-setting Previous/Next buttons, alongside Temperature, Tint, Exposure,
-Brightness, Contrast, Hue, Saturation,
-Highlights, Shadows and HDR.
+capture diamond and adjacent per-setting Previous/Next buttons. Colour groups its sliders
+under small headings, each with a **Reset** icon that resets the group's editable settings in
+one Undo step: **Opacity**; **Colour** (Temperature, Tint, Hue, Saturation); **Light**
+(Exposure, Brightness, Contrast, Highlights, Shadows); **Effects** (HDR).
 Main and stored sliders/exact fields use **0–100%**, neutral **100%**.
 Saved track `opacity` and keyframe values remain **0–1**; this is UI conversion only, not a schema change.
 Without Opacity keyframes, either value control edits the track's saved `opacity` and works even
@@ -270,7 +271,7 @@ and interpolation remain unchanged.
 
 ### Temperature and Tint
 
-In **Track → Colour**, **Temperature** and **Tint** precede Exposure. Both use
+In **Track → Colour**, **Temperature** and **Tint** open the Colour group. Both use
 normalized **−1…1**, neutral **0**, not Kelvin or automatic white balance.
 Positive Temperature warms, negative cools; positive Tint adds magenta, negative
 adds green. Nonzero settings intentionally colour greys. The common gain formula

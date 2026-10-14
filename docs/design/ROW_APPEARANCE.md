@@ -84,7 +84,14 @@ Control vocabulary follows the [editor control catalogue](EDITOR_CONTROLS.md#voc
 
 **Track → Colour** has eleven main widgets: nine graded scalar video track colour controls,
 HDR and sole Opacity. All use existing slider/exact-field/reset controls and work on an empty
-track. Main and stored Opacity sliders/exact fields use **0–100%**, neutral **100%**;
+track. They sit in four static groups, each a labelled fieldset with a small heading:
+**Opacity**; **Colour** (Temperature, Tint, Hue, Saturation); **Light** (Exposure,
+Brightness, Contrast, Highlights, Shadows); **Effects** (HDR). This visible order differs from
+the storage and keyframe channel order, which is unchanged. Each heading's Reset icon
+(**Reset the Light group**, etc.) resets the group's editable settings in one Undo step, as
+their own Reset icons would: an unkeyed setting's track value, a keyed setting's keyframe at
+the playhead; read-only animated settings stay unchanged. It is dimmed at the defaults.
+Main and stored Opacity sliders/exact fields use **0–100%**, neutral **100%**;
 convert only at the UI boundary. Required
 `VideoLayer.opacity` and `opacity` keyframe values remain **0–1**, without a schema change.
 Main capture diamonds are always visible; each retains adjacent per-setting **Previous/Next** buttons because not every

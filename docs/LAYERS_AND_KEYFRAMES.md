@@ -271,7 +271,11 @@ changes no document, history or autosave state.
 
 **Track → Colour** contains the single **Opacity** native slider/exact
 `NumberField` alongside the colour controls, with its diamond and adjacent
-per-setting Previous/Next buttons.
+per-setting Previous/Next buttons. The main sliders sit under four static headings,
+each with a one-Undo group Reset: **Opacity**; **Colour** (Temperature, Tint, Hue,
+Saturation); **Light** (Exposure, Brightness, Contrast, Highlights, Shadows); **Effects**
+(HDR). This visible order differs from the unchanged channel order above
+([track appearance](design/ROW_APPEARANCE.md#inspector-and-history)).
 Main and stored sliders/exact fields use **0–100%**, neutral **100%**.
 Required track `opacity` and keyframe values stay **0–1**, with UI-only conversion and no schema change.
 Without Opacity keyframes, either value control edits the selected track's `opacity`,

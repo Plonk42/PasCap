@@ -288,6 +288,35 @@
   cursor: default;
 }
 
+/* Track → Colour groups: a small heading with its group reset, separated by a hairline. */
+.colour-group {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.colour-group + .colour-group {
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.colour-group-heading {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin: 0 0 1px;
+  padding: 0;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
 .clip-speed-rate-field {
   display: grid;
   min-width: 0;

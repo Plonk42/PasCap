@@ -338,6 +338,41 @@ test('empty rows expose all eleven editable row appearance widgets and no clip c
   expect((await current(page)).layers[0]!.colour).toEqual(document.layers[0]!.colour);
 });
 
+test('Track Colour groups its sliders under labelled headings, each with a one-step group Reset', async ({ page }) => {
+  const document = await current(page);
+  Object.assign(document.layers[0]!.colour, { exposure: 0.5, shadows: -0.2, hue: 30 });
+  await fixture(page, document);
+  await inspectorTab(page, 'Track');
+  const groups = {
+    Opacity: ['Opacity'],
+    Colour: ['Temperature', 'Tint', 'Hue', 'Saturation'],
+    Light: ['Exposure', 'Brightness', 'Contrast', 'Highlights', 'Shadows'],
+    Effects: ['HDR'],
+  };
+  const colourControls = page.locator('.inspector-panel .colour-controls');
+  await expect(colourControls.getByRole('group')).toHaveCount(4);
+  for (const [name, sliders] of Object.entries(groups)) {
+    const group = colourControls.getByRole('group', { name, exact: true });
+    expect(
+      await group.getByRole('slider').evaluateAll((items) => items.map((item) => item.getAttribute('aria-label'))),
+    ).toEqual(sliders);
+  }
+  const resetEffects = page.getByRole('button', { name: 'Reset the Effects group', exact: true });
+  await expect(resetEffects).toHaveAttribute('aria-disabled', 'true');
+  await expect(resetEffects).toHaveAttribute('title', 'Already at their default values.');
+  const before = await checkpoint(page);
+  await page.getByRole('button', { name: 'Reset the Light group', exact: true }).click();
+  await committed(
+    page,
+    before,
+    applyCommand(before.document, {
+      type: 'colour',
+      layerId: 'video-1',
+      colour: { ...before.document.layers[0]!.colour, exposure: 0, shadows: 0 },
+    }),
+  );
+});
+
 test('all main colour, Opacity, constant-rate and Gain sliders draft locally and release as exactly one edit', async ({
   page,
 }) => {

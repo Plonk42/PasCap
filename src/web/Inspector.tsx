@@ -9,7 +9,7 @@ import { calculateLayout, type TimelineLayout } from '../shared/timeline.js';
 import { ColourCurvesSection, HslRangesSection } from './AdvancedColour.js';
 import { TrackAnimationControls } from './AnimationControls.js';
 import { ClipSourceRange } from './ClipSourceRange.js';
-import { colourResetCommands } from './colour-reset.js';
+import { COLOUR_GROUPS, colourGroupResetCommands, colourResetCommands } from './colour-reset.js';
 import { DetailSection } from './DetailControls.js';
 import { shortName, sourceSeconds } from './display.js';
 import { HelpPopover } from './HelpPopover.js';
@@ -28,7 +28,7 @@ import { clipStartRestriction } from './layer-actions.js';
 import { NumberField } from './NumberField.js';
 import { settingPresentation } from './setting-scope.js';
 import { livePreview } from './live-preview.js';
-import { LockedCue, RangeSettingControl } from './SettingValueControl.js';
+import { LockedCue, RangeSettingControl, ResetButton } from './SettingValueControl.js';
 import { TransformSection } from './SpatialControls.js';
 import { SpeedControls } from './SpeedControls.js';
 import { planTimelineDrop } from './timeline-placement.js';
@@ -343,29 +343,76 @@ function ColourSection({ layer, frame, resetKey, disabled, onEdit, id }: Readonl
         </button>
       </TrackAnimationControls>
       <div className="colour-controls">
-        <OpacityControl
-          layer={layer}
-          frame={frame}
-          resetKey={resetKey}
-          disabled={disabled}
-          onEdit={onEdit}
-          id={`${id}-opacity`}
-        />
-        {COLOUR_CONTROLS.map((control) => (
-          <ColourControl
-            key={control.key}
+        {COLOUR_GROUPS.map((group) => (
+          <ColourGroup
+            key={group.name}
+            group={group}
             layer={layer}
             frame={frame}
             resetKey={resetKey}
             disabled={disabled}
             onEdit={onEdit}
-            control={control}
-            value={colour[control.key]}
-            id={`${id}-${control.key}`}
+            id={id}
           />
         ))}
       </div>
     </InspectorSection>
+  );
+}
+
+function ColourGroup({
+  group,
+  layer,
+  frame,
+  resetKey,
+  disabled,
+  onEdit,
+  id,
+}: Readonly<LayerControlProps & { group: (typeof COLOUR_GROUPS)[number]; id: string }>) {
+  const colour = colourAt(layer, frame);
+  const headingId = `${id}-group-${group.name.toLowerCase()}`;
+  const neutral = group.settings.every((setting) =>
+    setting === 'opacity'
+      ? evaluateLayerSetting(layer, 'opacity', frame, layer.opacity) === 1
+      : colour[setting] === NEUTRAL_COLOUR[setting],
+  );
+  const commands = colourGroupResetCommands(layer, frame, group.settings);
+  let blocked: string | null = null;
+  if (disabled) blocked = 'These settings cannot be edited right now.';
+  else if (neutral) blocked = 'Already at their default values.';
+  else if (commands.length === 0) blocked = 'Add keyframes to edit these settings before resetting them.';
+  return (
+    <fieldset className="colour-group" aria-labelledby={headingId}>
+      <legend className="colour-group-heading">
+        <span id={headingId}>{group.name}</span>
+        <ResetButton name={`the ${group.name} group`} blocked={blocked} onReset={() => onEdit(commands)} />
+      </legend>
+      {group.settings.map((setting) =>
+        setting === 'opacity' ? (
+          <OpacityControl
+            key={setting}
+            layer={layer}
+            frame={frame}
+            resetKey={resetKey}
+            disabled={disabled}
+            onEdit={onEdit}
+            id={`${id}-opacity`}
+          />
+        ) : (
+          <ColourControl
+            key={setting}
+            layer={layer}
+            frame={frame}
+            resetKey={resetKey}
+            disabled={disabled}
+            onEdit={onEdit}
+            control={COLOUR_CONTROLS.find((item) => item.key === setting)!}
+            value={colour[setting]}
+            id={`${id}-${setting}`}
+          />
+        ),
+      )}
+    </fieldset>
   );
 }
 
