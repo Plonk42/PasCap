@@ -668,11 +668,15 @@ function InspectorPanel({
     const { section: target } = sectionRequest;
     setOpen(target, true);
     const title = target.charAt(0).toUpperCase() + target.slice(1);
-    const frameId = requestAnimationFrame(() =>
-      globalThis.document
-        .querySelector<HTMLElement>(`.inspector-panel [aria-label="${title} section"]`)
-        ?.scrollIntoView({ block: 'nearest' }),
-    );
+    // Wait for the tab switch and expansion to lay out, then bring the whole section to the top.
+    let frameId = requestAnimationFrame(() => {
+      frameId = requestAnimationFrame(() =>
+        globalThis.document
+          .querySelector<HTMLElement>(`.inspector-panel [aria-label="${title} section"]`)
+          ?.closest('.inspector-section')
+          ?.scrollIntoView({ block: 'start' }),
+      );
+    });
     return () => cancelAnimationFrame(frameId);
   }, [sectionRequest]);
   const sourceFrame =

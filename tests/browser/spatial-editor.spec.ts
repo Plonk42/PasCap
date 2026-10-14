@@ -296,6 +296,9 @@ test('a Transform marker click opens Track → Transform, even from the Clip tab
     'aria-expanded',
     'true',
   );
+  // The section is scrolled to the top of the Inspector, its first setting visible below the heading.
+  await expect(page.getByRole('button', { name: 'Transform section', exact: true })).toBeInViewport();
+  await expect(page.getByRole('slider', { name: 'Transform Crop left', exact: true })).toBeInViewport();
   await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(40);
   await expect(selected(page)).toHaveValue('40');
   expect(await current(page)).toEqual(before);
