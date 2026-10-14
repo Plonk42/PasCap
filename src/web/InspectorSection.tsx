@@ -61,13 +61,13 @@ export function useInspectorExpansion() {
     setSections((previous) => ({ ...previous, [id]: open }));
     persist(id, open);
   };
-  const allOpen = (tab: InspectorMode): boolean => TAB_SECTIONS[tab].every((id) => sections[id]);
+  const anyOpen = (tab: InspectorMode): boolean => TAB_SECTIONS[tab].some((id) => sections[id]);
   const toggleAll = (tab: InspectorMode): void => {
-    const open = !allOpen(tab);
+    const open = !anyOpen(tab);
     setSections((previous) => ({ ...previous, ...Object.fromEntries(TAB_SECTIONS[tab].map((id) => [id, open])) }));
     TAB_SECTIONS[tab].forEach((id) => persist(id, open));
   };
-  return { sections, setOpen, allOpen, toggleAll, storageWarning };
+  return { sections, setOpen, anyOpen, toggleAll, storageWarning };
 }
 
 export function InspectorExpansionControls({
@@ -76,8 +76,8 @@ export function InspectorExpansionControls({
   hidden,
 }: Readonly<{ expansion: ReturnType<typeof useInspectorExpansion>; tab: InspectorMode; hidden: boolean }>) {
   if (hidden) return null;
-  const allOpen = expansion.allOpen(tab);
-  const label = `${allOpen ? 'Collapse' : 'Expand'} all ${TAB_TITLES[tab]} sections`;
+  const anyOpen = expansion.anyOpen(tab);
+  const label = `${anyOpen ? 'Collapse' : 'Expand'} all ${TAB_TITLES[tab]} sections`;
   return (
     <>
       <button
@@ -87,7 +87,7 @@ export function InspectorExpansionControls({
         title={label}
         onClick={() => expansion.toggleAll(tab)}
       >
-        <Icon name={allOpen ? 'collapse-all' : 'expand-all'} size={16} />
+        <Icon name={anyOpen ? 'collapse-all' : 'expand-all'} size={16} />
       </button>
       {expansion.storageWarning && (
         <output className="control-hint">

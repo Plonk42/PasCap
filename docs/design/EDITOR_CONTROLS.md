@@ -12,7 +12,7 @@ full-original range bar; other frame/duration/fade fields retain numeric stepper
 | Area                          | Control                                                                                                                                                                                         | Contract                                                                                                                                                                                         |
 | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Colour / Opacity              | Native slider and exact field in main/stored editors; Temperature, Tint and Saturation have coloured tracks                                                                                     | Opacity UI 0–100%, neutral 100%; stored track/keyframe values remain 0–1                                                                                                                         |
-| Speed                         | Clip constant rate or 1–256 source-frame keyframes; Keyframe Speed diamond                                                                                                                      | Bounded slider/exact-value pattern; retain presets and curve graph                                                                                                                               |
+| Speed                         | Clip constant rate or 1–256 source-frame keyframes; Keyframe Speed circle                                                                                                                       | Bounded slider/exact-value pattern; retain presets and curve graph                                                                                                                               |
 | Transform                     | Eight track pose sliders/exact fields, each with its own blue triangle and Previous/Next, stored keyframe selector/navigation, default keyframe toggle                                          | Works exactly like Colour: explicit per-setting project-frame capture; distinguish stored time from preview                                                                                      |
 | Detail                        | Clip Sharpen, Clarity and Denoise sliders/exact fields with **Reset detail**                                                                                                                    | Static, no keyframes; live image preview while dragging; one Undo per release                                                                                                                    |
 | Audio                         | Music track / Recording selects, Add music track, selected-track trash and gain slider                                                                                                          | Independent identified tracks; exact gain draft; import never implicitly places                                                                                                                  |
@@ -121,7 +121,7 @@ and technical paths stay unchanged; this glossary does not change schema 18.
 - Boolean settings: native checkbox. Main scalar Colour/Opacity controls expose a capture diamond with
   `aria-pressed` and adjacent per-setting **Previous/Next** buttons, since a shared
   keyframe need not enable every setting. Colour's keyframe-line Previous/Next pair visits the union of Opacity, nine scalar and HDR keyframes.
-  Clip **Speed ×** has one **Keyframe Speed** diamond capturing or removing a keyframe at the
+  Clip **Speed ×** has one **Keyframe Speed** circle capturing or removing a keyframe at the
   actually displayed source frame, without extra per-setting arrows; in curve mode its rate is
   read-only without a keyframe there. Speed's pair visits all retained
   custom speed source keyframes of the selected clip, including off-trim keyframes
@@ -185,7 +185,7 @@ invalid drafts and sliders follow the common validation/cancellation
 pattern. See [SPATIAL_TRANSFORMS.md](SPATIAL_TRANSFORMS.md).
 
 Inside each timeline clip rectangle, boxed salmon
-**◆** custom-speed buttons, below the label and above the Colour markers, show source keyframes at authoritative retimed output positions.
+**●** custom-speed buttons, below the label and above the Colour markers, show source keyframes at authoritative retimed output positions.
 Off-trim keyframes are omitted; exclusive OUT has a boundary marker that seeks the
 final available frame. Click, Enter or Space selects the clip, seeks its nearest
 mapped image and opens Clip → Speed; a click edits nothing. Speed keys also slide by drag or ←/→ (one source frame, Shift ten): previewed, one Undo step on a valid release, restored by Escape or an occupied frame; moving a speed key retimes its clip.

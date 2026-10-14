@@ -45,7 +45,7 @@ export function SpeedHelp({ helpId }: Readonly<{ helpId: string }>) {
   return (
     <HelpPopover label="Speed timing" guide="precise-clip-speed-curves">
       <p id={helpId}>
-        1× is recorded speed: below 1× is slow motion, above is faster. A keyframe ◇ changes the speed over the length
+        1× is recorded speed: below 1× is slow motion, above is faster. A keyframe ○ changes the speed over the length
         of this clip.
       </p>
       <p className="editor-help-tip">Tip: presets such as Ramp up replace this clip’s speed keyframes.</p>
@@ -94,7 +94,7 @@ function SpeedRate({
         >
           Speed ×
         </ResetLabel>
-        {locked && <LockedCue />}
+        {locked && <LockedCue glyph="○" />}
         <span className="colour-control-actions">
           <span className="keyframe-setting-navigation" data-animated={speed.mode === 'curve'}>
             <button
@@ -114,7 +114,7 @@ function SpeedRate({
                 else change(addClipSpeedKey(speed, sourceFrame), sourceFrame);
               }}
             >
-              <span aria-hidden="true">{active ? '◆' : '◇'}</span>
+              <span aria-hidden="true">{active ? '●' : '○'}</span>
             </button>
           </span>
         </span>
@@ -212,6 +212,17 @@ export function SpeedControls({
   const speed = clip?.speed;
   const rate = clip && speed ? sourceRateAt(speed, sourceFrame ?? clip.sourceIn) : 1;
   const modified = !!speed && (speed.mode === 'curve' || speed.rate !== 1);
+  const rateControl = clip && (
+    <SpeedRate
+      clip={clip}
+      sourceFrame={sourceFrame}
+      disabled={unavailable}
+      helpId={helpId}
+      inputContext={inputContext}
+      change={change}
+      validate={validate}
+    />
+  );
 
   return (
     <InspectorSection
@@ -279,15 +290,7 @@ export function SpeedControls({
               ))}
             </div>
           )}
-          <SpeedRate
-            clip={clip}
-            sourceFrame={sourceFrame}
-            disabled={unavailable}
-            helpId={helpId}
-            inputContext={inputContext}
-            change={change}
-            validate={validate}
-          />
+          {(speed.mode !== 'curve' || sourceFrameCount === null) && rateControl}
           {error && (
             <p className="control-hint" role="alert">
               {error}
@@ -311,6 +314,7 @@ export function SpeedControls({
               onSelectStored={(sourceKey) => {
                 selectStored(sourceKey);
               }}
+              rate={rateControl}
             />
           )}
         </section>

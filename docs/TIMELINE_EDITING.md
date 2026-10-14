@@ -396,7 +396,7 @@ and retimes no clip.
 
 ### Clip speed-keyframe markers and track Transform markers
 
-Inside each timeline clip rectangle, custom-speed keyframes use a boxed salmon **◆** lane.
+Inside each timeline clip rectangle, custom-speed keyframes use a boxed salmon **●** lane.
 Marker output positions come from authoritative `PlacedClip.retiming`.
 Off-trim keyframes are omitted; exclusive OUT has a boundary marker that seeks the
 final available frame.

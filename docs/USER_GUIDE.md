@@ -331,7 +331,7 @@ one **Previous/Next** pair and **Reset** (constant 1×, removing the keyframes).
 In the **Speed ×** row, double-click the name to reset the editable rate to 1×.
 Speed keyframes belong only to the selected clip, not to every clip in its video track.
 
-- The **Keyframe Speed** diamond (◇/◆) captures the rate at the displayed source
+- The **Keyframe Speed** circle (○/●) captures the rate at the displayed source
   frame with Linear easing, turning a constant clip into a one-keyframe curve, or
   removes the keyframe there. A capture retimes the clip, so preview follows the new
   keyframe. Removing the last keyframe keeps its rate as constant speed.
@@ -441,7 +441,7 @@ exporter and makes it slower, especially in 4K. Details:
 
 ### Seek keyframes from the timeline
 
-Inside each clip rectangle, a boxed salmon **◆** lane shows custom-speed source
+Inside each clip rectangle, a boxed salmon **●** lane shows custom-speed source
 keyframes, distinct from shared project-time track markers.
 Positions follow authoritative retiming. Off-trim keyframes are omitted. An
 exclusive-OUT boundary marker seeks the final available frame. Click or focus a

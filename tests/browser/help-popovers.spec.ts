@@ -134,7 +134,7 @@ test('bulk Clip expansion preserves other tabs, mixed state and preferences with
     'true',
   );
   await page.getByRole('button', { name: 'Fades section', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Expand all Track sections', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Collapse all Track sections', exact: true })).toBeVisible();
   await inspectorTab(page, 'Audio');
   await expect(page.getByRole('button', { name: 'Music section', exact: true })).toHaveAttribute(
     'aria-expanded',
@@ -157,7 +157,7 @@ test('bulk Clip expansion preserves other tabs, mixed state and preferences with
     ),
   ).toEqual(['open', 'open', 'open', 'open', 'open', 'open', 'closed', 'closed']);
   await page.getByRole('button', { name: 'Range section', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Expand all Clip sections', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Collapse all Clip sections', exact: true })).toBeVisible();
   await page.reload();
   await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
   await expect(page.getByRole('button', { name: 'Range section', exact: true })).toHaveAttribute(
@@ -183,7 +183,9 @@ test('Track and Audio bulk expansion change only their own sections', async ({ p
   const closed = trackIds.map(() => 'closed');
   const others = await sections(otherIds);
   await inspectorTab(page, 'Track');
-  // HSL ranges and Colour curves start collapsed, so the Track tab starts mixed.
+  // HSL ranges and Colour curves start collapsed: a mixed tab offers Collapse all first.
+  await page.getByRole('button', { name: 'Collapse all Track sections', exact: true }).click();
+  expect(await sections(trackIds)).toEqual(closed);
   await page.getByRole('button', { name: 'Expand all Track sections', exact: true }).click();
   expect(await sections(trackIds)).toEqual(open);
   const collapse = page.getByRole('button', { name: 'Collapse all Track sections', exact: true });
@@ -435,7 +437,7 @@ const HELP_CONTEXTS = [
   },
   { label: 'Placement timing', tab: 'Clip', text: 'Tip: Opacity is in Track → Colour.' },
   { label: 'Colour animation', tab: 'Track', text: 'These settings grade every clip on this track.' },
-  { label: 'Speed timing', tab: 'Clip', text: 'A keyframe ◇ changes the speed over the length of this clip.' },
+  { label: 'Speed timing', tab: 'Clip', text: 'A keyframe ○ changes the speed over the length of this clip.' },
   {
     label: 'Animation',
     tab: 'Track keyframes',
@@ -597,7 +599,7 @@ test('numeric fields retain their descriptions even while the linked help popove
     /Type a frame number or HH:MM:SS:FF in the fields/,
   );
   await expect(page.getByRole('spinbutton', { name: 'Clip speed rate', exact: true })).toHaveAccessibleDescription(
-    /A keyframe ◇ changes the speed over the length of this clip/,
+    /A keyframe ○ changes the speed over the length of this clip/,
   );
   await inspectorTab(page, 'Sequence');
   await expect(page.getByRole('spinbutton', { name: 'Opening fade', exact: true })).toHaveAccessibleDescription(

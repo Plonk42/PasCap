@@ -213,7 +213,7 @@ Transform. Markers slide through the shared `useKeyframeSlide`: drag (snapping t
 boundaries, bookmarks and the playhead; Alt bypasses) or ←/→ (one frame, Shift ten);
 drafts preview without history/save, a valid release is one Undo step, and Escape,
 cancellation, blur or an occupied frame restores. Clips have no Transform lane; their
-salmon **◆** custom-speed lane is unchanged.
+salmon **●** custom-speed lane is unchanged.
 
 ## Preservation
 

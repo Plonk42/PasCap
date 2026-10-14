@@ -183,7 +183,7 @@ buttons open Track with that boundary expanded.
 only the visible tab's sections, including temporarily absent ones: Clip's **Speed**,
 **Detail**, **Range** and **Placement**; Track's **Colour**, **HSL ranges**, **Colour curves**, **Transform**, **Keyframes**,
 **Transitions** and **Fades**; Audio's **Music**. It is hidden while Clip has no
-selected clip or Track no selected track. A mixed state offers Expand all. Individual toggles
+selected clip or Track no selected track. A tab with any section open offers Collapse all; only an all-collapsed tab offers Expand all. Individual toggles
 and the existing section preferences remain authoritative. Other tabs'
 sections, each keyframe's nested **Edit**, other nested details and help are unchanged.
 Bulk expansion is presentation-only and leaves mounted drafts, processing, history
@@ -327,7 +327,7 @@ and unchanged interpolation.
 ### Clip speed
 
 **Clip → Speed** is clip-owned: **Speed mode** (**Constant speed / Custom curve**),
-constant 0.25×–4× presets and the **Speed ×** row. Its **Keyframe Speed** diamond
+constant 0.25×–4× presets and the **Speed ×** row. Its **Keyframe Speed** circle
 captures or removes a Linear keyframe at the actually displayed source frame,
 then preview follows the retimed keyframe; the rate is read-only in curve mode
 without a keyframe there. Reset returns the clip to constant 1×. Curve presets
@@ -472,7 +472,7 @@ Trim/move/split/duplicate do not copy or shift track keyframes. The contract is 
 ### Clip speed-keyframe lanes and track Transform markers
 
 Inside each timeline clip rectangle, a boxed salmon
-**◆** custom-speed lane shows source keyframes at authoritative retimed output
+**●** custom-speed lane shows source keyframes at authoritative retimed output
 positions. Off-trim keyframes are omitted; exclusive
 OUT has a boundary marker that seeks the final available frame. Click, Enter or Space selects the clip,
 seeks its nearest mapped image and opens Clip → Speed; a click edits nothing. They also slide by drag or ←/→ (one original source frame, Shift ten), keeping easing: drafts preview only, a valid release is one Undo step, and Escape, cancellation, blur or an occupied frame restores. Moving a speed keyframe retimes its clip, so its duration and Ripple suffix can change; timing conflicts reject the release.
