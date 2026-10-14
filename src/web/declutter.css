@@ -373,15 +373,6 @@
   grid-row: 2;
 }
 
-.declutter-import-copy,
-.declutter-import-report .control-hint {
-  font-size: 12px;
-}
-
-.declutter-import-report .import-queue-warning {
-  color: #eed09a;
-}
-
 .declutter-layers .layer-control {
   display: flex;
   flex-direction: column;

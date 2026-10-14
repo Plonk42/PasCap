@@ -1,15 +1,4 @@
-import {
-  lazy,
-  Suspense,
-  useCallback,
-  useEffect,
-  useId,
-  useMemo,
-  useRef,
-  useState,
-  type MouseEvent,
-  type PointerEvent,
-} from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type MouseEvent, type PointerEvent } from 'react';
 import type { AudioAsset } from '../shared/audio.js';
 import {
   resolveMediaSelection,
@@ -26,7 +15,6 @@ import './media-review.css';
 import './media-import.css';
 import { MediaMusicList, musicMatchesFilter } from './MediaMusicList.js';
 import './rush-source.css';
-import { Modal } from './Modal.js';
 import { Popover } from './Popover.js';
 import { readPreference, writePreference } from './preferences.js';
 import { RemoveMediaDialog } from './RemoveMediaDialog.js';
@@ -43,30 +31,19 @@ interface Props {
   onPrepareMusic: (id: string) => Promise<void>;
   onRemove: (mediaIds: string[]) => boolean;
   onRemoveMusic: (ids: string[]) => boolean;
-  onImport: (directory: string) => Promise<ImportResult>;
-  onRegisterPaths: (paths: readonly string[]) => Promise<ImportResult>;
+  onImport: () => void;
+  /** Changes after a successful import, so new media is not hidden by a search or filter. */
+  importRevision: number;
   review: ReviewTarget | null;
   /** `choose` remembers the recording to return to once hovering ends. */
   onReview: (review: ReviewTarget, choose: boolean) => void;
   onReviewHoverEnd: () => void;
-  importRequest: number;
-  onImportVisibility: (open: boolean) => void;
   targetLayer: string;
-  error: string;
 }
 
 export interface ReviewTarget {
   mediaId: string;
   frame: number;
-}
-export interface ImportResult {
-  ok: boolean;
-  added: number;
-  existing: number;
-  queued: number;
-  ignored: number;
-  rejected: string[];
-  queueErrors: string[];
 }
 interface HoverRequest {
   projectId: string | null;
@@ -100,55 +77,9 @@ const FILTER_LABEL: Record<string, string> = {
   unprepared: 'Not prepared',
   used: 'In timeline',
 };
-const FootageBrowser = lazy(() => import('./FootageBrowser.js').then((module) => ({ default: module.FootageBrowser })));
 
 function externalFiles(transfer: DataTransfer): boolean {
   return Array.from(transfer.types).includes('Files') && !Array.from(transfer.types).includes(MEDIA_DRAG_TYPE);
-}
-
-function importSucceeded(result: ImportResult | null): boolean {
-  if (!result) return false;
-  // A queue problem must not turn successfully registered recordings into a failed import.
-  return result.ok || result.added > 0 || result.existing > 0 || result.queued > 0;
-}
-
-function ImportReport({ result }: Readonly<{ result: ImportResult }>) {
-  return (
-    <section className="import-report declutter-import-report" aria-label="Import results" aria-live="polite">
-      <strong>
-        {result.added} recordings registered · {result.existing} already registered
-      </strong>
-      <p>{result.queued} editing proxies queued automatically</p>
-      <p className="control-hint">
-        {result.ignored} unrelated files ignored · {result.rejected.length} files rejected
-      </p>
-      {result.queueErrors.length > 0 && (
-        <>
-          <p className="control-hint import-queue-warning">
-            Recordings were kept. {result.queueErrors.length} proxies could not be queued; use Prepare to retry.
-          </p>
-          <details>
-            <summary>Proxy queue issues</summary>
-            <ul>
-              {result.queueErrors.map((issue, index) => (
-                <li key={`${index}:${issue}`}>{issue}</li>
-              ))}
-            </ul>
-          </details>
-        </>
-      )}
-      {result.rejected.length > 0 && (
-        <details>
-          <summary>Rejected files</summary>
-          <ul>
-            {result.rejected.map((issue, index) => (
-              <li key={`${index}:${issue}`}>{issue}</li>
-            ))}
-          </ul>
-        </details>
-      )}
-    </section>
-  );
 }
 
 function MediaAction({
@@ -210,14 +141,11 @@ export function MediaLibrary({
   onRemove,
   onRemoveMusic,
   onImport,
-  onRegisterPaths,
+  importRevision,
   review,
   onReview,
   onReviewHoverEnd,
-  importRequest,
-  onImportVisibility,
   targetLayer,
-  error,
 }: Readonly<Props>) {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all');
@@ -229,11 +157,7 @@ export function MediaLibrary({
   const rangeIdPrefix = useId();
   const selectAll = useRef<HTMLInputElement>(null);
   const [lastSelected, setLastSelected] = useState<string | null>(null);
-  const [showImport, setShowImport] = useState(false);
-  const [folder, setFolder] = useState(() => readPreference('pascap-last-import') ?? '');
-  const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [dropError, setDropError] = useState('');
-  const importAccepted = importSucceeded(importResult);
   const [confirmPrepare, setConfirmPrepare] = useState(false);
   const [removing, setRemoving] = useState<readonly string[] | null>(null);
   const [hover, setHover] = useState<HoverMarker | null>(null);
@@ -262,23 +186,17 @@ export function MediaLibrary({
     };
   }, [clearHover, projectId]);
   useEffect(() => {
-    if (importRequest > 0) {
-      setImportResult(null);
-      setShowImport(true);
-    }
-  }, [importRequest]);
-  useEffect(() => {
-    onImportVisibility(showImport);
-  }, [showImport, onImportVisibility]);
+    if (importRevision === 0) return;
+    setSearch('');
+    setFilter('all');
+  }, [importRevision]);
   useEffect(() => {
     const preventNavigation = (event: globalThis.DragEvent): void => {
       if (!event.dataTransfer || !externalFiles(event.dataTransfer)) return;
       event.preventDefault();
       event.dataTransfer.dropEffect = 'none';
       // A refused desktop drop may never dispatch "drop"; explain it during dragover too.
-      setDropError(
-        'Filesystem drops are disabled. Use Import → Browse recordings to reference originals without copying.',
-      );
+      setDropError('Dropping files is not supported. Use Import to add recordings; originals stay in place.');
     };
     window.addEventListener('dragover', preventNavigation);
     window.addEventListener('drop', preventNavigation);
@@ -408,10 +326,6 @@ export function MediaLibrary({
     setLastSelected(null);
     setConfirmPrepare(false);
   };
-  const openImport = (): void => {
-    setImportResult(null);
-    setShowImport(true);
-  };
   const remove = (ids: readonly string[]): void => {
     const first = visible.findIndex((asset) => ids.includes(asset.id));
     const remaining = (asset: MediaAsset): boolean => !ids.includes(asset.id);
@@ -447,13 +361,13 @@ export function MediaLibrary({
         <div className="library-heading-actions">
           <button
             className="secondary-button small"
-            aria-label="Import folder"
-            title="Browse original recordings or register a folder in place; no recordings are copied"
+            aria-label="Import media"
+            title="Import video and music recordings; originals stay in place"
             disabled={busy}
-            onClick={openImport}
+            onClick={onImport}
           >
-            <Icon name="folder" size={15} />
-            Import…
+            <Icon name="plus" size={15} />
+            Import
           </button>
           <Popover label="Media options" className="media-options">
             <div className="library-tools">
@@ -763,11 +677,11 @@ export function MediaLibrary({
         {!visible.length && !visibleMusic.length && (
           <div className="empty-library">
             <Icon name="folder" size={30} />
-            <strong>{assets.length || music.length ? 'No matching recordings' : 'Your media library is empty'}</strong>
+            <strong>{assets.length || music.length ? 'No matching media' : 'Your media library is empty'}</strong>
             <p>
               {assets.length || music.length
                 ? 'Try another search or filter.'
-                : 'Browse recordings or import a folder. Originals stay in place; only editing proxies are generated.'}
+                : 'Import video and music recordings. Originals stay in place; PasCap prepares light editing copies.'}
             </p>
             {assets.length ? (
               <button
@@ -780,8 +694,9 @@ export function MediaLibrary({
                 Clear media filters
               </button>
             ) : (
-              <button className="secondary-button small" disabled={busy} onClick={openImport}>
-                Import folder
+              <button className="primary-button small" disabled={busy} onClick={onImport}>
+                <Icon name="plus" size={14} />
+                Import media
               </button>
             )}
           </div>
@@ -803,73 +718,6 @@ export function MediaLibrary({
           onCancel={() => setRemoving(null)}
           onConfirm={() => remove(removing)}
         />
-      )}
-      {showImport && (
-        <Modal
-          className="import-dialog"
-          labelledBy="import-title"
-          busy={busy}
-          error={importAccepted ? '' : error}
-          onClose={() => setShowImport(false)}
-          footer={
-            <button className="secondary-button" disabled={busy} onClick={() => setShowImport(false)}>
-              {importAccepted ? 'Done' : 'Cancel'}
-            </button>
-          }
-        >
-          <div className="activity-dialog-heading">
-            <h2 id="import-title">Import recordings</h2>
-            <span className="privacy-badge">No-copy import</span>
-          </div>
-          <p className="control-hint declutter-import-copy">
-            Select original recordings accessible to the PasCap service. They stay local and unchanged: only the
-            selected paths are registered and proxies are queued automatically.
-          </p>
-          <Suspense fallback={<output>Opening recording browser…</output>}>
-            <FootageBrowser
-              busy={busy}
-              onRegister={onRegisterPaths}
-              onResult={(result) => {
-                setImportResult(result);
-                if (result.added + result.existing > 0) {
-                  setSearch('');
-                  setFilter('all');
-                }
-              }}
-            />
-          </Suspense>
-          <details className="import-path-details">
-            <summary>Import a whole folder by path</summary>
-            <p className="control-hint">
-              Register all recordings in this folder and its subfolders without copying originals. In a container, use
-              its mounted folder path.
-            </p>
-            <form
-              className="import-form"
-              onSubmit={(event) => {
-                event.preventDefault();
-                setImportResult(null);
-                void onImport(folder.trim()).then((result) => {
-                  setImportResult(result);
-                  if (importSucceeded(result)) writePreference('pascap-last-import', folder.trim());
-                });
-              }}
-            >
-              <label htmlFor="source-folder">Absolute folder path on this machine</label>
-              <input
-                id="source-folder"
-                placeholder="/home/you/Videos/Flight"
-                value={folder}
-                disabled={busy}
-                onChange={(event) => setFolder(event.target.value)}
-              />
-              <button className="primary-button" type="submit" disabled={busy || !folder.trim()}>
-                {busy ? 'Checking recordings…' : 'Register recordings'}
-              </button>
-            </form>
-          </details>
-          {importResult && <ImportReport result={importResult} />}
-        </Modal>
       )}
     </aside>
   );

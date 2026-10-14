@@ -265,18 +265,21 @@ without sharing edits. A missing array/ID, null/singular music, unknown fields o
 duplicate IDs are errors, never defaulted or migrated. Detailed bounds and pending
 acceptance are in [MULTIPLE_MUSIC.md](design/MULTIPLE_MUSIC.md).
 
-**Audio → Music → Browse music recordings** opens a keyboard-accessible native modal
-beside the manual **Music recording path / Import audio** form. Choose one radio-selected
-file inside a configured `PASCAP_MEDIA_ROOTS` location, then explicitly **Import
-selected music**. Root/folder navigation, search, Refresh and Cancel are metadata-only;
-they never import or alter the project. Both media browsers share the service user's
-Videos default; `[]` disables browsing, not deliberate manual paths outside those roots.
+Music is imported like video, through the shared **Import media** dialog: **Import** in
+the Media panel, or **Import music** beside **Add music track** in **Audio → Music**,
+which opens it showing only music. Check one or more recordings inside a configured
+`PASCAP_MEDIA_ROOTS` location (or double-click one), then **Import**; **Other location**
+imports a typed path outside those locations. Location/folder navigation, filter,
+Refresh and Cancel are metadata-only; they never import or alter the project. Both
+media kinds share the service user's Videos default; `[]` disables browsing, not
+deliberate typed paths. Each music recording is registered on its own, serially.
 WAV, MP3, M4A, AAC, FLAC, OGG, OPUS, AIFF, AIF and WMA extensions are discovery
 candidates, not proof of supported contents. The existing probe is authoritative.
 An accepted import adds only the importing project's audio-bin membership and returns
 its preparation job; choosing/placing music is still a separate action. Failed or
-uncertain registration stays open with selection/error intact and no automatic retry;
-check Activity/project state before repeating it. Originals are never uploaded or copied.
+uncertain registration keeps the dialog open with the failed selection and error intact
+and no automatic retry; check Activity/project state before repeating it. Originals are
+never uploaded or copied.
 
 Reimporting an unchanged source at the same absolute path reuses its music entry.
 Importing a different location creates a **new music entry**, even when a move or

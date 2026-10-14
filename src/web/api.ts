@@ -203,6 +203,14 @@ export const api = {
   },
   registerPaths: (paths: readonly string[]) =>
     request('/api/media/register-paths', importResultSchema, 'POST', { paths }, { timeoutMs: IMPORT_TIMEOUT_MS }),
+  registerMedia: (path: string) =>
+    request(
+      '/api/media/register',
+      z.object({ asset: mediaAssetSchema, job: jobSchema.nullable() }).strict(),
+      'POST',
+      { path },
+      { timeoutMs: IMPORT_TIMEOUT_MS },
+    ),
   prepare: (id: string) => request(`/api/media/${id}/prepare`, z.object({ job: jobSchema }), 'POST', {}),
   cancel: (id: string) => request(`/api/jobs/${id}/cancel`, z.object({ job: jobSchema }), 'POST', {}),
   projects: (options?: RequestOptions) =>

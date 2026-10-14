@@ -84,7 +84,7 @@ function PreviewActions({
         Browse Media
       </button>
       <button className="secondary-button" onClick={onImport}>
-        Import folder
+        Import media
       </button>
     </>
   );

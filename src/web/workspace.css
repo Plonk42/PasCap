@@ -567,8 +567,7 @@ body {
 .product-workspace .speed-settings > select,
 .product-workspace .speed-field select,
 .product-workspace .transition-fields label,
-.product-workspace .transition-fields select,
-.product-workspace .music-import input {
+.product-workspace .transition-fields select {
   font-size: 13px;
 }
 
@@ -887,15 +886,6 @@ kbd {
   background: #2e4534;
   border: 1px solid #4e6954;
   border-radius: 4px;
-}
-
-.product-workspace .import-form {
-  padding: 0;
-  font-size: 13px;
-}
-
-.product-workspace .import-form input {
-  font-size: 13px;
 }
 
 .import-report {

@@ -479,13 +479,20 @@ and never supplies a fake frame for main capture.
 
 ## Source review and import
 
-**Import → Browse recordings** opens the default service-side browser for approved footage roots. Choose a
-root/folder, select MP4/MOV/M4V recordings and explicitly confirm registration of
-their original absolute paths into the current project's bin. Browsing/selection
-alone starts no work: one-folder metadata reads do not read media bytes, probe,
-register, write or queue preparation. Folders are first with natural-name sorting;
-the 2,000-entry limit has explicit truncation guidance to choose a narrower folder.
-The cache branch is excluded and symlink/path checks remain enforced.
+**Import** (Media panel header, empty Media panel or empty preview) and **Audio →
+Music → Import music** open one native **Import media** modal, a service-side browser
+laid out like a desktop file dialog: approved **Locations** on the left (unavailable
+ones disabled with their error), then Up, a clickable breadcrumb and Refresh, an
+**All / Video / Music** filter (Import music opens on Music) and a filter field above
+one folder's folders and recordings with type and size. Checkboxes select MP4/MOV/M4V
+and music recordings, including Shift ranges and a header select-all; selection
+survives folder and filter changes and clears when the location changes. The footer
+summarises the selection beside **Cancel** and **Import N**; double-clicking a
+recording imports just that one. The dialog reopens on the last folder (a browser
+preference). Browsing/selection alone starts no work: one-folder metadata reads do not
+read media bytes, probe, register, write or queue preparation. Folders are first with
+natural-name sorting; the 2,000-entry limit per kind has explicit guidance to choose a
+narrower folder. The cache branch is excluded and symlink/path checks remain enforced.
 
 `PASCAP_MEDIA_ROOTS` accepts a JSON array of at most 32 unique absolute paths;
 the default is the service user's `~/Videos`, and `[]` disables both footage and music browsing.
@@ -494,23 +501,18 @@ Selected-path requests accept at most 5,000 video paths inside approved roots.
 Read-only fingerprint/probe checks and the existing queue report accepted/rejected
 sources and queue errors; ready/in-flight preparation is reused.
 
-The separate absolute-folder-path form remains an explicit **recursive whole-folder
-import**, including outside browser roots. It can queue substantial work and never
-silently extends root configuration. Standalone music uses **Audio → Music → Browse
-music recordings** beside the retained manual **Music recording path / Import audio** form.
-The native modal selects one audio candidate with radios, supports root/folder,
-Up/Root, search and metadata-only Refresh, and exposes unavailable roots, truncation
-and access warnings. Browsing, selecting and Cancel/Escape never register, prepare,
-edit or save; dismissal restores focus to **Browse music recordings**. Root changes clear
-selection, while folder/filter changes retain the one selected file until replaced.
-Only **Import selected music** submits its root-scoped path. Cancel/Escape and duplicate
-submissions are blocked while registration and the project-bin update are processing.
-Success adds audio membership to the importing project and displays the accepted job,
-without selecting music or changing placement; the modal then closes. Failure or an
-uncertain write keeps selection and the actual error visible, with guidance to check
-Activity/project state before repeating the import; there is no automatic write retry.
-Late folder reads are aborted on navigation/dismissal. Manual music paths remain
-deliberate imports outside browser roots and never expand configured roots. No original is
+**Import** registers the selected video recordings as one root-scoped batch, then each
+music recording serially. Cancel/Escape and duplicate submissions are blocked while
+registration and the project-bin update are processing. A complete import adds
+membership to the importing project, without selecting music or changing placement,
+and closes the modal, restoring focus to its trigger. Otherwise a report lists what
+was not imported or queued, rejected or failed recordings stay selected and the actual
+error stays visible, with guidance to check Activity/project state before repeating;
+there is no automatic write retry. Late folder reads are aborted on navigation/dismissal.
+**Other location** (below the locations) imports a typed path, including outside
+browser roots: a music or video recording, or a folder as an explicit **recursive
+whole-folder import** that can queue substantial work. It never silently extends root
+configuration. No original is
 copied: strict schema 17 references registered originals in place, with only
 generated proxies/thumbnails, metadata, exports/receipts and scratch written locally.
 

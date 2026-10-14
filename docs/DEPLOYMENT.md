@@ -20,8 +20,9 @@ is tracked in [#9 — networking](https://github.com/Plonk42/PasCap/issues/9),
 
 ## No-copy source access today
 
-**Import → Browse recordings** opens the default service-side recording browser. Choose an approved root,
-open a folder, select MP4/MOV/M4V recordings and explicitly confirm registration.
+**Import** (Media panel) opens one service-side **Import media** browser for video and
+music recordings. Choose an approved location, open a folder, select MP4/MOV/M4V and
+music recordings and explicitly confirm the import.
 Browsing and selection alone do not import or queue preparation. Paths belong to
 the service's filesystem, not a browser file picker or a desktop drop payload.
 
@@ -40,7 +41,8 @@ than failing startup. JSON paths must be absolute; a literal `~` is not expanded
 | `GET /api/audio/roots`                                                     | The same approved-root IDs, paths and availability/error information for music                                                                                                         |
 | `GET /api/audio/browse?rootId=root-0&directory=%2Fmedia%2Ffootage%2FMusic` | Metadata-only one-folder audio candidates and subfolders, with the same containment, symlink, cache-exclusion and truncation guards                                                    |
 | `POST /api/audio/register-selected`                                        | JSON `{"path":"/media/footage/Music/track.wav"}` for one explicitly confirmed audio candidate inside approved roots; existing standalone-audio probe/preparation remains authoritative |
-| `POST /api/audio/register`                                                 | Retained deliberate manual audio-path import; browser roots do not restrict this action or expand automatically                                                                        |
+| `POST /api/audio/register`                                                 | Deliberate typed audio-path import; browser roots do not restrict this action or expand automatically                                                                                  |
+| `POST /api/media/register` / `POST /api/media/import`                      | Deliberate typed video-file path / recursive folder import, also outside browser roots                                                                                                 |
 
 Use the root IDs returned by the service. Browsing uses directory/file metadata
 only: no media-byte reads, probing, recursive discovery, registration, cache writes
@@ -51,15 +53,16 @@ containment is enforced and symlinks are rejected. Registration retains the
 existing read-only fingerprint/probe checks, partial errors and one-heavy-worker
 preparation queue; ready/in-flight preparation is reused.
 
-The separate absolute-folder-path form deliberately invokes the existing recursive
-folder import, including folders outside browser roots. It can register/autoqueue
+The dialog lists one folder from both metadata listings (`/api/footage` and
+`/api/audio/browse`) together. Its **Other location** field deliberately imports a
+typed path, including outside browser roots: a music recording, a video recording, or a
+folder through the existing recursive folder import, which can register/autoqueue
 the whole folder and therefore start substantial work; submit it only explicitly.
 It does **not** silently add a root. Approved roots constrain browsing and the
-selected-path route, not every existing deliberate manual import action. Standalone
-music uses **Audio → Music → Browse music recordings**, a native single-selection modal
-beside the manual **Music recording path** form. Music browsing/selection/Cancel never POST; only explicit
-confirmation registers/prepares and adds the importing project's audio membership.
-Failed/uncertain writes retain the selection and error without automatic retry.
+selected-path routes, not every deliberate typed import. Browsing/selection/Cancel
+never POST; only explicit confirmation registers/prepares and adds the importing
+project's membership. Failed/uncertain writes retain the selection and error
+without automatic retry.
 WAV/MP3/M4A/AAC/FLAC/OGG/OPUS/AIFF/AIF/WMA extensions are discovery candidates;
 actual streams are checked on registration. Originals remain untouched/in place.
 Manual video imports may be outside the approved browser roots, but the HTTP API

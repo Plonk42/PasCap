@@ -78,14 +78,11 @@ test('reimporting prepared media associates it only with the current project and
     });
   });
   const id = await create(page);
-  await page.locator('button[aria-label="Import folder"]').click();
-  await page.getByText('Import a whole folder by path', { exact: true }).click();
-  await page
-    .getByRole('textbox', { name: 'Absolute folder path on this machine' })
-    .fill('/memory-only/already-prepared');
-  await page.getByRole('button', { name: 'Register recordings', exact: true }).click();
-  await expect(page.getByRole('region', { name: 'Import results' })).toContainText('1 already registered');
-  await page.getByRole('button', { name: 'Done', exact: true }).click();
+  await page.locator('button[aria-label="Import media"]').first().click();
+  await page.getByText('Other location', { exact: true }).click();
+  await page.getByRole('textbox', { name: 'File or folder path' }).fill('/memory-only/already-prepared');
+  await page.getByRole('button', { name: 'Import path', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: 'Import media', exact: true })).toHaveCount(0);
   await page.evaluate(() => window.pascapLab!.flush());
   expect(memory.snapshot(id).media.videoIds).toEqual([reused.id]);
   expect(memory.snapshot(id).clips).toEqual([]);
@@ -118,10 +115,13 @@ test('audio imports persist in the new project bin without assigning a music tra
   await page.route('**/api/audio/register', (route) => route.fulfill({ status: 202, json: { asset: music, job } }));
   const id = await create(page);
   await page.getByRole('tab', { name: 'Audio', exact: true }).click();
-  const filename = page.getByRole('textbox', { name: 'Music recording path', exact: true });
-  if (!(await filename.isVisible())) await page.getByRole('button', { name: 'Music section', exact: true }).click();
-  await filename.fill('/memory-only/music.wav');
-  await page.getByRole('button', { name: 'Import audio', exact: true }).click();
+  const trigger = page.getByRole('button', { name: 'Import music', exact: true });
+  if (!(await trigger.isVisible())) await page.getByRole('button', { name: 'Music section', exact: true }).click();
+  await trigger.click();
+  await page.getByText('Other location', { exact: true }).click();
+  await page.getByRole('textbox', { name: 'File or folder path', exact: true }).fill('/memory-only/music.wav');
+  await page.getByRole('button', { name: 'Import path', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: 'Import media', exact: true })).toHaveCount(0);
   await expect(page.locator(`[data-music-media-id="${music.id}"]`)).toHaveCount(1);
   await page.evaluate(() => window.pascapLab!.flush());
   expect(memory.snapshot(id).media.audioIds).toEqual([music.id]);
@@ -188,10 +188,10 @@ test('deleting the current dirty project closes it, clears preview/history/prefe
     .click();
   await page
     .getByRole('region', { name: 'Preview', exact: true })
-    .getByRole('button', { name: 'Import folder', exact: true })
+    .getByRole('button', { name: 'Import media', exact: true })
     .click();
   await expect(page.getByRole('dialog', { name: 'Projects', exact: true })).toBeVisible();
-  await expect(page.getByRole('dialog', { name: 'Import recordings', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('dialog', { name: 'Import media', exact: true })).toHaveCount(0);
   await page.getByRole('textbox', { name: 'New project title', exact: true }).fill('After deletion');
   await page.getByRole('button', { name: 'Create project', exact: true }).click();
   await expect(title).toHaveValue('After deletion');

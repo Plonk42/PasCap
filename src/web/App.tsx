@@ -52,7 +52,8 @@ import {
 } from './keyframe-navigation.js';
 import { clipStartRestriction } from './layer-actions.js';
 import { registerLivePreview } from './live-preview.js';
-import { MediaLibrary, type ImportResult, type ReviewTarget } from './MediaLibrary.js';
+import { MediaLibrary, type ReviewTarget } from './MediaLibrary.js';
+import type { ImportActions, ImportKind, ImportResult } from './ImportDialog.js';
 import { MusicControls } from './MusicControls.js';
 import { Popover } from './Popover.js';
 import { readPreference, writePreference } from './preferences.js';
@@ -83,6 +84,7 @@ const ExportDialog = lazy(() => import('./ExportDialog.js').then((module) => ({ 
 const SaveRecovery = lazy(() => import('./SaveRecovery.js').then((module) => ({ default: module.SaveRecovery })));
 const ShortcutHelp = lazy(() => import('./ShortcutHelp.js').then((module) => ({ default: module.ShortcutHelp })));
 const SourceReview = lazy(() => import('./SourceReview.js').then((module) => ({ default: module.SourceReview })));
+const ImportDialog = lazy(() => import('./ImportDialog.js').then((module) => ({ default: module.ImportDialog })));
 const loadInspector = () => import('./Inspector.js').then((module) => ({ default: module.Inspector }));
 const loadDiagnostics = () => import('./Diagnostics.js').then((module) => ({ default: module.Diagnostics }));
 const EMPTY_PROJECT = createProject('preview-lab', 'Untitled');
@@ -214,9 +216,8 @@ export function App() {
   const [connectionAttempt, setConnectionAttempt] = useState(0);
   const [actionError, setActionError] = useState('');
   const [activityError, setActivityError] = useState('');
-  const [importRequest, setImportRequest] = useState(0);
-  const [importOpen, setImportOpen] = useState(false);
-  const [musicImportOpen, setMusicImportOpen] = useState(false);
+  const [importKind, setImportKind] = useState<ImportKind | null>(null);
+  const [importRevision, setImportRevision] = useState(0);
   const [fitRequest, setFitRequest] = useState(0);
   const [revealRequest, setRevealRequest] = useState(0);
   const [timeRange, setTimeRange] = useState<TimelineRange | null>(null);
@@ -726,7 +727,7 @@ export function App() {
       setProject(loaded);
       setDraft(null);
       drafting.current = false;
-      setImportRequest(0);
+      setImportKind(null);
       setDraggedMediaIds(null);
       setTimeRange(null);
       setRevealRequest(0);
@@ -798,7 +799,7 @@ export function App() {
     setProject(null);
     setDraft(null);
     drafting.current = false;
-    setImportRequest(0);
+    setImportKind(null);
     setTimeRange(null);
     setRevealRequest(0);
     setHistoryState({ canUndo: false, canRedo: false });
@@ -1317,12 +1318,21 @@ export function App() {
     }
   };
   const importOriginals = async (operation: () => ReturnType<typeof api.importFolder>): Promise<ImportResult> => {
+    const failed: ImportResult = {
+      ok: false,
+      added: 0,
+      existing: 0,
+      queued: 0,
+      rejected: [],
+      rejectedPaths: [],
+      queueErrors: [],
+    };
     if (!current.current) {
       setActionError('Create or open a project before importing recordings.');
-      return { ok: false, added: 0, existing: 0, queued: 0, ignored: 0, rejected: [], queueErrors: [] };
+      return failed;
     }
     const result = await act(operation);
-    if (!result.ok) return { ok: false, added: 0, existing: 0, queued: 0, ignored: 0, rejected: [], queueErrors: [] };
+    if (!result.ok) return failed;
     const imported = result.value;
     for (const job of imported.jobs) receiveJob(job);
     const merged = new Map(latestAssets.current.map((asset) => [asset.id, asset]));
@@ -1343,16 +1353,13 @@ export function App() {
       added: imported.added,
       existing: imported.existing,
       queued: imported.jobs.length,
-      ignored: imported.ignored,
       rejected: imported.errors.map((issue) => `${issue.path.split('/').at(-1)}: ${issue.message}`),
+      rejectedPaths: imported.errors.map((issue) => issue.path),
       queueErrors: imported.queueErrors.map(
         (issue) => `${merged.get(issue.mediaId)?.name ?? issue.mediaId}: ${issue.message}`,
       ),
     };
   };
-  const importFolder = (directory: string): Promise<ImportResult> => importOriginals(() => api.importFolder(directory));
-  const registerPaths = (paths: readonly string[]): Promise<ImportResult> =>
-    importOriginals(() => api.registerPaths(paths));
   const importMusic = async (operation: () => ReturnType<typeof api.importAudio>): Promise<boolean> => {
     const importingProjectId = current.current?.id;
     if (!importingProjectId) {
@@ -1386,38 +1393,45 @@ export function App() {
     });
     return result.ok && result.value;
   };
-  const latestImportMusic = useRef(importMusic);
-  latestImportMusic.current = importMusic;
-  const importAudio = useCallback(
-    (path: string): Promise<boolean> => latestImportMusic.current(() => api.importAudio(path)),
-    [],
-  );
-  const importSelectedAudio = useCallback(
-    (path: string): Promise<boolean> => latestImportMusic.current(() => api.importSelectedAudio(path)),
-    [],
-  );
-  const importVisibility = useCallback((open: boolean): void => {
-    setImportOpen(open);
-    if (open) setActionError('');
-  }, []);
-  const musicImportVisibility = useCallback((open: boolean): void => {
-    setMusicImportOpen(open);
-    if (open) setActionError('');
-  }, []);
+  const importActions: ImportActions = {
+    registerVideos: (paths) => importOriginals(() => api.registerPaths(paths)),
+    registerMusic: (path) => importMusic(() => api.importSelectedAudio(path)),
+    importFolder: (directory) => importOriginals(() => api.importFolder(directory)),
+    importVideoPath: (path) =>
+      importOriginals(async () => {
+        const { asset, job } = await api.registerMedia(path);
+        return {
+          assets: [asset],
+          errors: [],
+          ignored: 0,
+          added: 1,
+          existing: 0,
+          jobs: job ? [job] : [],
+          queueErrors: [],
+        };
+      }),
+    importMusicPath: (path) => importMusic(() => api.importAudio(path)),
+  };
   const openMedia = (): void => {
     workspace.update({ mediaOpen: true, ...(workspace.viewport.width < 980 ? { inspectorOpen: false } : {}) });
     requestAnimationFrame(() =>
       document.querySelector<HTMLInputElement>('[aria-label="Search media"]')?.focus({ preventScroll: true }),
     );
   };
-  const requestImport = (): void => {
+  const requestImport = (kind: ImportKind = 'all'): void => {
     if (!current.current) {
       openProjects();
       return;
     }
-    openMedia();
     setActionError('');
-    setImportRequest((value) => value + 1);
+    setImportKind(kind);
+  };
+  const latestRequestImport = useRef(requestImport);
+  latestRequestImport.current = requestImport;
+  const importMusicFiles = useCallback(() => latestRequestImport.current('audio'), []);
+  const closeImport = (imported: boolean): void => {
+    setImportKind(null);
+    if (imported) setImportRevision((value) => value + 1);
   };
   const retryPreview = (): void => {
     if (!engine.current) {
@@ -1547,11 +1561,8 @@ export function App() {
         drafting={musicDrafting}
         selectedMusicId={selectedMusicId}
         onSelectMusic={selectMusic}
-        error={actionError}
-        onBrowseVisibility={musicImportVisibility}
+        onImport={importMusicFiles}
         onEdit={edit}
-        onImport={importAudio}
-        onBrowseImport={importSelectedAudio}
       />
     ),
     [
@@ -1562,11 +1573,8 @@ export function App() {
       musicDrafting,
       selectedMusicId,
       selectMusic,
-      actionError,
-      musicImportVisibility,
+      importMusicFiles,
       edit,
-      importAudio,
-      importSelectedAudio,
     ],
   );
   const dockStyle = {
@@ -1576,7 +1584,7 @@ export function App() {
     '--media-divider': workspace.layout.mediaOpen ? '8px' : '0px',
     '--inspector-divider': workspace.layout.inspectorOpen ? '8px' : '0px',
   } as CSSProperties;
-  const modalErrorVisible = showProjects || showExport || showRecovery || importOpen || musicImportOpen;
+  const modalErrorVisible = showProjects || showExport || showRecovery || importKind !== null;
 
   return (
     <KeyframeNavigationContext.Provider value={keyframeNavigation}>
@@ -1789,15 +1797,12 @@ export function App() {
               onPrepareMusic={prepareAudio}
               onRemove={(videoIds) => removeMedia({ videoIds, audioIds: [] })}
               onRemoveMusic={(audioIds) => removeMedia({ videoIds: [], audioIds })}
-              onImport={importFolder}
-              onRegisterPaths={registerPaths}
+              onImport={() => requestImport()}
+              importRevision={importRevision}
               review={review}
               onReview={reviewSource}
               onReviewHoverEnd={endReviewHover}
-              importRequest={importRequest}
-              onImportVisibility={importVisibility}
               targetLayer={targetLayer}
-              error={actionError}
             />
           </div>
           {workspace.layout.mediaOpen && (
@@ -1863,7 +1868,7 @@ export function App() {
                 onSeek={seek}
                 onRetry={retryPreview}
                 onMedia={openMedia}
-                onImport={requestImport}
+                onImport={() => requestImport()}
                 loading={previewIsLoading(connection, previewReady, previewStartupError)}
                 startupError={previewStartupError}
                 onReload={reloadEditor}
@@ -2113,6 +2118,15 @@ export function App() {
             />
           )}
           {showHelp && <ShortcutHelp onClose={() => setShowHelp(false)} />}
+          {importKind !== null && project && (
+            <ImportDialog
+              initialKind={importKind}
+              busy={busy || connection.state !== 'ready'}
+              error={actionError}
+              actions={importActions}
+              onClose={closeImport}
+            />
+          )}
           {showRecovery && (
             <SaveRecovery
               title={project?.title ?? 'Untitled'}

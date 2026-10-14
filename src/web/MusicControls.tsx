@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { useId, useState, type ReactNode } from 'react';
 import type { AudioAsset } from '../shared/audio.js';
 import { applyCommand, type EditCommand } from '../shared/commands.js';
 import { MAX_MUSIC_TRACKS, type MusicTrack, type ProjectDocument } from '../shared/model.js';
@@ -7,8 +7,6 @@ import { Disclosure } from './Disclosure.js';
 import { durationLabel, sourceSeconds } from './display.js';
 import { HelpPopover } from './HelpPopover.js';
 import { Icon } from './icons.js';
-import './media-import.css';
-import { Modal } from './Modal.js';
 import { createMusicInstance, musicInstanceEdit, videoTimelineDuration } from './music-ui.js';
 import { NumberField } from './NumberField.js';
 import { Popover } from './Popover.js';
@@ -22,14 +20,9 @@ interface Props {
   drafting: boolean;
   selectedMusicId: string | null;
   onSelectMusic: (id: string) => void;
-  error: string;
-  onImport: (path: string) => Promise<boolean>;
-  onBrowseImport: (path: string) => Promise<boolean>;
-  onBrowseVisibility: (open: boolean) => void;
+  onImport: () => void;
   onEdit: (command: EditCommand) => void;
 }
-
-const MusicBrowser = lazy(() => import('./MusicBrowser.js').then((module) => ({ default: module.MusicBrowser })));
 
 function MusicTiming({ helpId, children }: Readonly<{ helpId: string; children: ReactNode }>) {
   const [open, setOpen] = useState(false);
@@ -64,57 +57,11 @@ export function MusicControls({
   drafting,
   selectedMusicId,
   onSelectMusic,
-  error,
   onImport,
-  onBrowseImport,
-  onBrowseVisibility,
   onEdit,
 }: Readonly<Props>) {
   const helpId = useId();
-  const [filename, setFilename] = useState('');
-  const [showBrowser, setShowBrowser] = useState(false);
-  const [importing, setImporting] = useState(false);
-  const [importError, setImportError] = useState('');
-  const browseTrigger = useRef<HTMLButtonElement>(null);
-  const pending = useRef(false);
-  const mounted = useRef(false);
-  const blocked = busy || drafting || importing;
-  useEffect(() => {
-    mounted.current = true;
-    return () => {
-      mounted.current = false;
-    };
-  }, []);
-  useEffect(() => {
-    onBrowseVisibility(showBrowser);
-    return () => {
-      if (showBrowser) onBrowseVisibility(false);
-    };
-  }, [showBrowser, onBrowseVisibility]);
-  const importMusic = async (path: string, fromBrowser: boolean): Promise<void> => {
-    if (blocked || pending.current || !path.trim()) return;
-    pending.current = true;
-    setImporting(true);
-    setImportError('');
-    try {
-      const accepted = await (fromBrowser ? onBrowseImport(path) : onImport(path));
-      if (!mounted.current) return;
-      if (accepted) {
-        if (fromBrowser) setShowBrowser(false);
-      } else
-        setImportError(
-          'Music import was not confirmed. Check Activity and the current project’s music bin before importing again. Your selection is kept.',
-        );
-    } catch (cause) {
-      if (mounted.current)
-        setImportError(
-          `${cause instanceof Error ? cause.message : 'Music import was not confirmed.'} Check Activity and the current project’s music bin before repeating the import.`,
-        );
-    } finally {
-      pending.current = false;
-      if (mounted.current) setImporting(false);
-    }
-  };
+  const blocked = busy || drafting;
   const music = project.music.find((track) => track.id === selectedMusicId) ?? project.music[0];
   const videoDuration = videoTimelineDuration(project);
   const available = assets.some((asset) => asset.id === music?.mediaId);
@@ -134,79 +81,6 @@ export function MusicControls({
   };
   return (
     <section className="music-controls declutter-music" aria-label="Music settings">
-      <button
-        ref={browseTrigger}
-        type="button"
-        className="secondary-button small music-browse-trigger"
-        disabled={blocked}
-        onClick={() => {
-          setImportError('');
-          setShowBrowser(true);
-        }}
-      >
-        <Icon name="folder" size={14} />
-        Browse music recordings
-      </button>
-      <form
-        className="music-import"
-        onSubmit={(event) => {
-          event.preventDefault();
-          void importMusic(filename, false);
-        }}
-      >
-        <input
-          aria-label="Music recording path"
-          placeholder="Local audio recording path"
-          value={filename}
-          disabled={blocked}
-          onChange={(event) => setFilename(event.target.value)}
-        />
-        <button type="submit" className="secondary-button small" disabled={blocked || !filename.trim()}>
-          <Icon name="plus" size={14} />
-          Import audio
-        </button>
-      </form>
-      {!showBrowser && importError && !error && (
-        <p className="footage-error" role="alert">
-          {importError}
-        </p>
-      )}
-      {showBrowser && (
-        <Modal
-          className="music-browser-dialog"
-          labelledBy={`${helpId}-browse-title`}
-          describedBy={`${helpId}-browse-description`}
-          busy={blocked}
-          error={[error, importError].filter(Boolean).join('\n')}
-          restoreFocusTo={browseTrigger}
-          onClose={() => {
-            if (!pending.current) setShowBrowser(false);
-          }}
-          footer={
-            <button
-              type="button"
-              className="secondary-button"
-              disabled={blocked}
-              onClick={() => {
-                if (!pending.current) setShowBrowser(false);
-              }}
-            >
-              Cancel
-            </button>
-          }
-        >
-          <div className="activity-dialog-heading">
-            <h2 id={`${helpId}-browse-title`}>Browse music recordings</h2>
-          </div>
-          <p className="control-hint" id={`${helpId}-browse-description`}>
-            Choose one original music recording accessible to the PasCap service. Browsing and selection do not import,
-            copy or prepare it.
-          </p>
-          <Suspense fallback={<output className="footage-loading">Opening music browser…</output>}>
-            <MusicBrowser busy={blocked} onImport={(path) => importMusic(path, true)} />
-          </Suspense>
-        </Modal>
-      )}
       <div className="music-instance-picker">
         <label className="speed-field">
           <span>
@@ -261,57 +135,69 @@ export function MusicControls({
           </select>
         </label>
       )}
-      {addReason || blocked ? (
+      <div className="music-add-row">
+        {addReason || blocked ? (
+          <button
+            type="button"
+            className="secondary-button small music-add"
+            aria-label="Add music track"
+            aria-describedby={addReason ? `${helpId}-add-reason` : undefined}
+            title={addReason || undefined}
+            disabled
+          >
+            <Icon name="plus" size={14} />
+            Add music track
+            {addReason && (
+              <span className="declutter-sr-only" id={`${helpId}-add-reason`}>
+                {addReason}
+              </span>
+            )}
+          </button>
+        ) : (
+          <Popover
+            label="Add music track"
+            className="music-add"
+            trigger={
+              <>
+                <Icon name="plus" size={14} />
+                Add music track
+              </>
+            }
+          >
+            {(close) => (
+              <ul className="music-add-list" aria-label="Ready music recordings">
+                {ready.map((asset) => (
+                  <li key={asset.id}>
+                    <button
+                      type="button"
+                      className="text-button"
+                      aria-label={`Add ${asset.name} as a music track`}
+                      onClick={() => {
+                        close();
+                        addMusic(asset);
+                      }}
+                    >
+                      <Icon name="music" size={14} />
+                      <span>{asset.name}</span>
+                      <small>{durationLabel(asset.metadata.durationSeconds)}</small>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Popover>
+        )}
         <button
           type="button"
-          className="secondary-button small music-add"
-          aria-label="Add music track"
-          aria-describedby={addReason ? `${helpId}-add-reason` : undefined}
-          title={addReason || undefined}
-          disabled
+          className="secondary-button small"
+          title="Import music recordings into this project; originals stay in place"
+          disabled={blocked}
+          onClick={onImport}
         >
-          <Icon name="plus" size={14} />
-          Add music track
-          {addReason && (
-            <span className="declutter-sr-only" id={`${helpId}-add-reason`}>
-              {addReason}
-            </span>
-          )}
+          <Icon name="folder" size={14} />
+          Import music
         </button>
-      ) : (
-        <Popover
-          label="Add music track"
-          className="music-add"
-          trigger={
-            <>
-              <Icon name="plus" size={14} />
-              Add music track
-            </>
-          }
-        >
-          {(close) => (
-            <ul className="music-add-list" aria-label="Ready music recordings">
-              {ready.map((asset) => (
-                <li key={asset.id}>
-                  <button
-                    type="button"
-                    className="text-button"
-                    aria-label={`Add ${asset.name} as a music track`}
-                    onClick={() => {
-                      close();
-                      addMusic(asset);
-                    }}
-                  >
-                    <Icon name="music" size={14} />
-                    <span>{asset.name}</span>
-                    <small>{durationLabel(asset.metadata.durationSeconds)}</small>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Popover>
-      )}
+      </div>
       {project.music.map((track) => (
         <MusicInstanceControls
           key={track.id}

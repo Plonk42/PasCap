@@ -2,7 +2,7 @@
   display: flex;
   align-items: flex-end;
   gap: 6px;
-  margin-block: 12px 8px;
+  margin-block: 0 8px;
 }
 
 .music-controls .music-instance-picker .speed-field {
@@ -19,7 +19,11 @@
   margin-bottom: 10px;
 }
 
-.music-controls .music-add {
+.music-controls .music-add-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
   margin-bottom: 12px;
 }
 

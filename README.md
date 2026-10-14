@@ -60,9 +60,9 @@ directory, and do not expose the unauthenticated service to a network.
 ### First edit
 
 1. Create a project from **Projects**.
-2. Use **Import → Browse recordings**, select originals and register them. Browsing alone starts no media work. Alternatively, explicitly register a whole folder by path.
+2. Choose **Import** in the Media panel, check video and music recordings in the approved locations and choose **Import** (or double-click one). Browsing alone starts no media work. **Other location** imports a typed file or folder path.
 3. Wait for proxy preparation in **Activity**. Review a recording, mark source IN/OUT, and choose **Add clip** or drag prepared media onto a video track.
-4. Trim, reorder, grade and animate the edit; import standalone music in **Audio**, then use **Add music track** (or drag it from Media → Music onto the music lane) and **Music track** to place/select independent tracks.
+4. Trim, reorder, grade and animate the edit; once music is imported, use **Add music track** in **Audio** (or drag it from Media → Music onto the music lane) and **Music track** to place/select independent tracks.
 5. Choose **Export** and a draft/final preset, review its storage check, then start. Export reads the original recordings, not the proxies.
 
 Video tracks follow composition order: track 1 is below track 2 in the image, track 3 is above
