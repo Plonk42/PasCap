@@ -73,6 +73,16 @@
   font-size: 9px;
 }
 
+.layer-control .layer-ripple-toggle.active,
+.layer-control .layer-ripple-toggle.active:hover:not(:disabled) {
+  background: #e1ba75;
+  color: #2a2110;
+}
+
+.layer-control .layer-ripple-toggle:not(.active) {
+  box-shadow: inset 0 0 0 1px #4d6454;
+}
+
 .layer-buttons {
   display: flex;
   gap: 2px;
