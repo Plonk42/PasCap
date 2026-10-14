@@ -3,11 +3,15 @@ import { NumberField, validateNumberDraft, type NumberFieldProps, type NumberVal
 import { SLIDER_INSTRUCTIONS_ID } from './SharedInstructions.js';
 import './value-control.css';
 
+export type SliderTone = 'temperature' | 'tint' | 'saturation';
+
 export interface ValueControlProps extends Omit<NumberFieldProps, 'min' | 'max' | 'step'> {
   min: number;
   max: number;
   step: number;
   unit?: string;
+  /** Colours the slider track along the setting's axis; purely presentational. */
+  tone?: SliderTone;
   /** The valid value being dragged, or null when no pointer gesture is previewing. Never a commit. */
   onDraft?: (value: number | null) => void;
 }
@@ -279,6 +283,7 @@ export function ValueControl(props: Readonly<ValueControlProps>) {
       data-dirty={state.pointer?.cancelled === false || state.draft !== props.value}
       data-pointer-draft={state.pointer !== null && !state.pointer.cancelled}
       data-unit={Boolean(props.unit)}
+      data-tone={props.tone}
       style={props.unit ? ({ '--value-unit-space': `${props.unit.length + 0.5}ch` } as CSSProperties) : undefined}
       onKeyDownCapture={(event) => {
         if (event.key === 'Escape' && !event.nativeEvent.isComposing && state.error) dispatch({ type: 'restore' });
