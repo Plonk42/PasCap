@@ -126,6 +126,12 @@
   text-align: center;
 }
 
+.animation-legend > span > .animation-legend-animated {
+  border: 1px dashed #9b8358;
+  border-radius: 3px;
+  line-height: 14px;
+}
+
 .layer-keyframe-current {
   position: relative;
 }
