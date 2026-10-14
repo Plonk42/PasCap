@@ -3,7 +3,7 @@ import { applyCommand, EditHistory } from '../../src/shared/commands.js';
 import { createClip, createProject, MAX_BOOKMARKS, projectSchema } from '../../src/shared/model.js';
 import { snapFrame, snapPoints } from '../../src/shared/snap.js';
 import { editorShortcut } from '../../src/web/shortcuts.js';
-import { bookmarkKind, bookmarkTargets, planBookmarkMove } from '../../src/web/timeline-bookmarks.js';
+import { adjacentBookmark, bookmarkKind, bookmarkTargets, planBookmarkMove } from '../../src/web/timeline-bookmarks.js';
 import { placementSnapPoints } from '../../src/web/timeline-placement.js';
 
 function project() {
@@ -97,5 +97,23 @@ describe('bookmark snapping', () => {
     expect(editorShortcut({ ...key, key: 'M', shiftKey: true })).toEqual({ type: 'bookmark' });
     expect(editorShortcut({ ...key, key: 'm', altKey: true })).toBeNull();
     expect(editorShortcut({ ...key, key: 'm', ctrlKey: true })).toBeNull();
+  });
+
+  it('navigates to the nearest bookmark strictly before or after the playhead, reaching the last frame', () => {
+    const bookmarks = [10, 40, 40_000];
+    expect(adjacentBookmark(bookmarks, 25, 90, -1)).toBe(10);
+    expect(adjacentBookmark(bookmarks, 25, 90, 1)).toBe(40);
+    expect(adjacentBookmark(bookmarks, 40, 90, -1)).toBe(10);
+    expect(adjacentBookmark(bookmarks, 10, 90, -1)).toBeNull();
+    expect(adjacentBookmark(bookmarks, 40, 90, 1)).toBe(89);
+    expect(adjacentBookmark(bookmarks, 89, 90, 1)).toBeNull();
+    expect(adjacentBookmark(bookmarks, 89, 90, -1)).toBe(40);
+    expect(adjacentBookmark([], 5, 90, 1)).toBeNull();
+    expect(adjacentBookmark(bookmarks, 0, 0, 1)).toBeNull();
+    const arrow = { code: '', ctrlKey: false, metaKey: false, altKey: false, shiftKey: true, repeat: false };
+    expect(editorShortcut({ ...arrow, key: 'ArrowUp' })).toEqual({ type: 'bookmark-previous' });
+    expect(editorShortcut({ ...arrow, key: 'ArrowDown' })).toEqual({ type: 'bookmark-next' });
+    expect(editorShortcut({ ...arrow, key: 'ArrowDown', shiftKey: false })).toBeNull();
+    expect(editorShortcut({ ...arrow, key: 'ArrowUp', altKey: true })).toBeNull();
   });
 });

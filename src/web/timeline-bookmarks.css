@@ -1,3 +1,9 @@
+.timeline-bookmark-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
 .timeline-bookmark {
   position: absolute;
   bottom: 0;

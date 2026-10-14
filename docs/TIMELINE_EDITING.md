@@ -533,6 +533,9 @@ music or keyframes and are never rendered or exported.
   When the playhead is on a bookmark, the toolbar button becomes **Delete bookmark
   at playhead** (trash icon). **M** on an existing bookmark is rejected with an
   error, never merged. Without footage or music there is no playhead to mark.
+- **Previous / Next bookmark** beside the toolbar button, or **Shift+↑ / Shift+↓**,
+  move the playhead to the nearest bookmark strictly before or after it, without
+  editing; a bookmark after the last frame previews that last frame.
 - Bookmarks are small lilac outlines of the playhead shape (“ghost playheads”) in the
   lower half of the time ruler, filled on hover, focus or drag, with a faint dashed
   line through the tracks (stronger while dragged). Click, Enter or Space seeks to one without editing.

@@ -60,6 +60,7 @@ import { PreviewPanel } from './PreviewPanel.js';
 import { ProjectTitle } from './ProjectTitle.js';
 import { editorShortcut } from './shortcuts.js';
 import { planTimelineDrop } from './timeline-placement.js';
+import { adjacentBookmark } from './timeline-bookmarks.js';
 import { Timeline, type DraftPreview } from './Timeline.js';
 import { DEFAULT_LAYOUT, defaultTimelineHeight, useWorkspace, WorkspaceResizer } from './workspace.js';
 
@@ -639,6 +640,20 @@ export function App() {
     }
     edit({ type: 'bookmark-add', frame: engine.current?.diagnostics().frame ?? 0 });
   }, [edit]);
+  const goToBookmark = useCallback(
+    (direction: -1 | 1) => {
+      if (!current.current || drafting.current) return;
+      const document = current.current;
+      const target = adjacentBookmark(
+        document.bookmarks,
+        engine.current?.diagnostics().frame ?? 0,
+        calculateLayout(document).duration,
+        direction,
+      );
+      if (target !== null) seek(target);
+    },
+    [seek],
+  );
   const duplicate = useCallback(() => {
     if (!selection.current || !current.current || drafting.current) return;
     const newClipId = crypto.randomUUID();
@@ -1026,6 +1041,10 @@ export function App() {
         case 'bookmark':
           addBookmark();
           break;
+        case 'bookmark-previous':
+        case 'bookmark-next':
+          goToBookmark(shortcut.type === 'bookmark-next' ? 1 : -1);
+          break;
         case 'duplicate':
           duplicate();
           break;
@@ -1055,7 +1074,7 @@ export function App() {
       window.removeEventListener('beforeunload', beforeUnload);
       window.removeEventListener('keydown', keyboard);
     };
-  }, [remove, seek, split, duplicate, nudge, togglePlayback, undoRedo, quickTrim, cutRange, addBookmark]);
+  }, [remove, seek, split, duplicate, nudge, togglePlayback, undoRedo, quickTrim, cutRange, addBookmark, goToBookmark]);
 
   const act = async <T,>(
     action: () => Promise<T>,
