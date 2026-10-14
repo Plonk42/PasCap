@@ -411,7 +411,11 @@ function clipMarkerView(props: ClipMarkerProps, marker: ClipKeyframeMarker, sour
     'aria-label': `Speed keyframe source ${sourceFrame} on clip ${props.placed.clip.id}, ${props.name}`,
     title: `Speed · source frame ${sourceFrame}${titleSuffix} · timeline frame ${marker.timelineFrame} (${formatTimecode(marker.timelineFrame)}) · Preview source ${displayedSource} at timeline frame ${marker.seekFrame} · Drag to move; Arrow keys: 1 source frame, Shift: 10`,
     style: { '--clip-keyframe-position': `${(output / props.placed.duration) * 100}%` } as CSSProperties,
-    children: <span aria-hidden="true">◆</span>,
+    children: (
+      <span aria-hidden="true" className="keyframe-glyph diamond">
+        ◆
+      </span>
+    ),
   };
 }
 
@@ -1480,7 +1484,13 @@ export function Timeline(props: Readonly<Props>) {
                     style: { top: rowTop(layer.id) + 48, left: leading + (state.at ?? origin) * scale },
                     children: (
                       <>
-                        {point.reset ? <Icon name="default-key" size={14} /> : '◆'}
+                        {point.reset ? (
+                          <Icon name="default-key" size={14} />
+                        ) : (
+                          <span aria-hidden="true" className="keyframe-glyph diamond">
+                            ◆
+                          </span>
+                        )}
                         {state.moving && (
                           <span className="timeline-layer-key-time" aria-hidden="true">
                             {formatTimecode(state.frame)}
@@ -1513,7 +1523,13 @@ export function Timeline(props: Readonly<Props>) {
                     style: { top: rowTop(layer.id) - 3, left: leading + (state.at ?? origin) * scale },
                     children: (
                       <>
-                        {point.reset ? <Icon name="default-key" size={14} /> : <span aria-hidden="true">▼</span>}
+                        {point.reset ? (
+                          <Icon name="default-key" size={14} />
+                        ) : (
+                          <span aria-hidden="true" className="keyframe-glyph triangle">
+                            ▼
+                          </span>
+                        )}
                         {state.moving && (
                           <span className="timeline-layer-key-time" aria-hidden="true">
                             {formatTimecode(state.frame)}

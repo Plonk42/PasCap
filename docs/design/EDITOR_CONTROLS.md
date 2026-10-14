@@ -137,18 +137,18 @@ and technical paths stay unchanged; this glossary does not change schema 18.
   visit strictly earlier/later keyframes where that channel is nonnull (zero is
   enabled), sharing the central off-duration inspection cursor with section
   navigation to track keyframes and track/list navigation. A read-only animated main value is visibly locked without hover: dimmed slider and
-  field plus a lock cue (**Add a keyframe ◇ to edit**) laid over the inert slider. Interacting with it never creates a keyframe or edit.
+  field plus a lock cue (**Add a keyframe ◇ to edit**) at the right of the setting's name. Interacting with it never creates a keyframe or edit.
   Every slider setting (Colour, Opacity, HSL, Transform, Detail, Speed rates, stored keyframe values, music gain) has a compact
   **Reset** icon button beside its name, labelled **Reset <setting>**: it restores only that setting's neutral value in one Undo step, is
   dimmed with an explanatory tooltip and `aria-disabled` at its default or when the value is read-only/locked, and adds no row or
   width. Double-clicking the name does the same; sections keep one Reset in their keyframe line (Colour, Speed, Transform) and HSL/curves name theirs
   **Reset red** / **Reset all**.
 - Setting rows (Colour, Opacity, Transform, Speed, Detail and stored keyframe values) use two compact lines:
-  the name, its Reset icon and, on the right, the capture diamond and per-setting Previous/Next; then the slider
-  and its exact field. The name line is only as tall as its text: the keyframe buttons keep their pointer
-  targets and overhang into the spacing around it, never over another control.
+  the name with its Reset icon (and any lock cue at the right), then the slider, exact field, capture diamond
+  and per-setting Previous/Next on one line, shown as three equal buttons ‹ ◇ ›. Tab order stays diamond, Previous,
+  Next, slider, field. Inside the exact field the unit follows the value and the native stepper sits at the right.
 - Coloured slider tracks show a setting's direction: **Temperature** runs blue → yellow, **Tint** green → magenta
-  (its positive side) and **Saturation** grey → full colour, in main and stored keyframe editors. Other sliders
+  (its positive side) and **Saturation** grey → red, in main and stored keyframe editors. Other sliders
   keep the plain track. The gradient is presentational and dims with a locked or disabled slider.
 - Tabs: native buttons with one selected appearance and existing arrow/Home/End
   behavior. Disclosures keep mounted drafts; options use the existing Popover.

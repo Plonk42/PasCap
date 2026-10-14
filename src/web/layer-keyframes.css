@@ -32,6 +32,33 @@
   opacity: 0.4;
 }
 
+/* The ◇/◆/▼ glyphs sit off-centre in common fonts; draw them so they centre in any font. The text stays. */
+.keyframe-toggle:not(.transform-keyframe-toggle) > [aria-hidden='true'],
+.keyframe-glyph.diamond {
+  width: 8px;
+  height: 8px;
+  border: 1.5px solid currentColor;
+  border-radius: 1px;
+  font-size: 0;
+  transform: rotate(45deg);
+}
+
+.keyframe-toggle.active:not(.transform-keyframe-toggle) > [aria-hidden='true'],
+.keyframe-glyph {
+  background: currentColor;
+}
+
+.keyframe-glyph {
+  display: block;
+  font-size: 0;
+}
+
+.keyframe-glyph.triangle {
+  width: 10px;
+  height: 7px;
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+}
+
 /* Transform keyframes use the timeline marker's blue triangle, not the Colour diamond. */
 .keyframe-toggle.transform-keyframe-toggle {
   font-size: 15px;
@@ -322,6 +349,8 @@
 .timeline-layer-key {
   position: absolute;
   z-index: 6;
+  display: grid;
+  place-items: center;
   width: 20px;
   height: 22px;
   padding: 0;
