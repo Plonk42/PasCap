@@ -2,7 +2,14 @@ import { describe, expect, it } from 'vitest';
 import { applyCommand, EditHistory, type EditCommand } from '../../src/shared/commands.js';
 import { needsLayeredExport, planExport, planLayeredExport } from '../../src/shared/export.js';
 import { EMPTY_KEY_VALUES, layerKeyframe, uniformKeyframe } from '../../src/shared/keyframes.js';
-import { createClip, createLayer, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
+import {
+  createClip,
+  createLayer,
+  createProject,
+  PROJECT_SCHEMA_VERSION,
+  projectSchema,
+  type ProjectDocument,
+} from '../../src/shared/model.js';
 import { trimOnTimeline } from '../../src/shared/source-range.js';
 import {
   createSpatialSettings,
@@ -14,6 +21,7 @@ import {
   type SpatialSettings,
 } from '../../src/shared/spatial.js';
 import { calculateLayout, sampleTimeline } from '../../src/shared/timeline.js';
+import { EARLIER_SCHEMA_VERSIONS } from './project-fixtures.js';
 
 function key(frame: number, values: SpatialPose, curve: 'smooth' | 'hold' | 'linear'): SpatialKeyframe {
   return { ...uniformKeyframe(frame, values, curve), reset: false };
@@ -66,7 +74,7 @@ function withTransform(document: ProjectDocument, transform: unknown): unknown {
   return { ...document, layers: [{ ...document.layers[0]!, transform }, ...document.layers.slice(1)] };
 }
 
-describe('strict schema-22 track Transform persistence', () => {
+describe('strict current-schema track Transform persistence', () => {
   it('creates independent explicit neutral track settings and round-trips complete poses and keys', () => {
     const first = createLayer('first', 'First');
     const second = createLayer('second', 'Second');
@@ -76,9 +84,9 @@ describe('strict schema-22 track Transform persistence', () => {
     expect(first.transform.keyframes).not.toBe(second.transform.keyframes);
     expect(createClip('clip', 'original', 0, 1)).not.toHaveProperty('spatial');
     const document = fixture();
-    expect(document.schemaVersion).toBe(22);
+    expect(document.schemaVersion).toBe(PROJECT_SCHEMA_VERSION);
     expect(projectSchema.parse(JSON.parse(JSON.stringify(document)))).toEqual(document);
-    for (const schemaVersion of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21])
+    for (const schemaVersion of EARLIER_SCHEMA_VERSIONS)
       expect(projectSchema.safeParse({ ...document, schemaVersion }).success).toBe(false);
   });
 

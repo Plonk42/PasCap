@@ -13,7 +13,7 @@ inherit the shared media registry. Importing the same original into another proj
 deliberately adds it to that project's bin and reuses eligible verified proxies.
 Removing a clip or music track does not remove the imported recording.
 
-Projects use **strict format v22**, with complete required video track colour and track
+Projects use **a strict current format**, with complete required video track colour and track
 Transform (base plus per-setting project-frame keyframes), a required `bookmarks` array of project frames (`[]` on new projects), a required `music` array of 0–8 independent
 music tracks and unique required IDs (`[]` without music), every video track's Ripple, transitions and
 opening/closing fades and required numeric `opacity` in 0–1 (1 on new tracks),
@@ -25,10 +25,10 @@ Video track Colour requires Temperature/Tint/Vibrance/Whites/Blacks/HDR bases an
 HSL/curves; missing fields and saved clip colour/correction are invalid.
 Track `opacity` is the sole saved Opacity value; saved `clip.opacity` and old
 `clipOpacity`/`layerOpacity` keyframe channels are invalid, not ignored or defaulted.
-v1–v21 project documents and receipt snapshots
+Project documents and receipt snapshots with an earlier schema version
 stay on disk but are incompatible: there is no migration, compatibility default,
 null fallback, old-format reader, automatic repair or deletion. Export receipts
-remain version 1 with a strict v22 snapshot and required audio-source/instance-plan arrays.
+remain version 1 with a strict current-schema snapshot and required audio-source/instance-plan arrays.
 Create a new project and import its media deliberately. Finished videos remain
 untouched. **Delete project** requires confirmation and deletes only the saved
 project document, not originals, the shared registry/proxy cache or exports/receipts.
@@ -766,7 +766,7 @@ in memory and automatic write retries stop. **Retry save** is offered only for
 recoverable transport/server errors. On a revision conflict, **Review latest save**
 offers keeping the draft, **Download unsaved project**, or explicitly discarding
 local changes and reloading. It never silently overwrites or rebases another save.
-Download before discarding; the v22 JSON snapshot is for manual recovery/examination,
+Download before discarding; the JSON snapshot is for manual recovery/examination,
 not a supported JSON-import or migration flow. Unapplied input/pointer drafts are
 not committed project edits.
 

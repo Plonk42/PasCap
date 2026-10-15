@@ -6,6 +6,7 @@ import {
   createClip,
   createLayer,
   createProject,
+  PROJECT_SCHEMA_VERSION,
   projectSchema,
   type ProjectDocument,
   type Transition,
@@ -267,7 +268,7 @@ function unchangedOthers(
   editedIds: readonly string[],
   transitions: Readonly<Record<string, readonly Transition[]>> = {},
 ): void {
-  expect(next.schemaVersion).toBe(22);
+  expect(next.schemaVersion).toBe(PROJECT_SCHEMA_VERSION);
   expect(next.media).toEqual(before.media);
   expect(next.layers).toEqual(
     before.layers.map((layer) => ({ ...layer, transitions: transitions[layer.id] ?? layer.transitions })),

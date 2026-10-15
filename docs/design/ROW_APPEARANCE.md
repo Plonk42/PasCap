@@ -1,4 +1,4 @@
-# Owner-approved video track-only Colour and Opacity · schema 22
+# Owner-approved video track-only Colour and Opacity
 
 Required Colour includes twelve graded scalar settings, including Temperature, Tint, Vibrance, Whites and Blacks,
 the HDR look (applied before grading with the clip detail filters; see
@@ -24,8 +24,8 @@ intentionally colour greys; normalized linear gains precede Exposure, preserving
 neutral-white linear luminance before clipping only, not arbitrary/final images.
 Other scalar bounds and neutral values retain the existing SDR contract.
 No optional legacy field, additive parameter merge, migration or default-on-load exists.
-Schema 22 rejects versions 1–21 without rewriting or deleting their documents.
-Receipt format remains 1 with strict schema-22 snapshots; proxy and PCM formats are
+The current schema rejects earlier schema versions without rewriting or deleting their documents.
+Receipt format remains 1 with strict current-schema snapshots; proxy and PCM formats are
 unchanged, and the registries are version 2 (full-content checksums). Recreate
 incompatible projects deliberately.
 

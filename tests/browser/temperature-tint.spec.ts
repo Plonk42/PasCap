@@ -2,7 +2,14 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 import path from 'node:path';
 import { joiningEasing, KEYFRAME_SETTINGS } from '../../src/shared/keyframes.js';
 import type { MediaAsset } from '../../src/shared/media.js';
-import { createClip, createLayer, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
+import {
+  createClip,
+  createLayer,
+  createProject,
+  PROJECT_SCHEMA_VERSION,
+  projectSchema,
+  type ProjectDocument,
+} from '../../src/shared/model.js';
 import { calculateLayout } from '../../src/shared/timeline.js';
 import {
   editLayerPoint,
@@ -426,7 +433,7 @@ test('animated missing participants stay read-only until explicit capture; remov
     sharedPoint(30, { temperature: 0.5 }),
   ];
   await fixture(page, document);
-  expect(document.schemaVersion).toBe(22);
+  expect(document.schemaVersion).toBe(PROJECT_SCHEMA_VERSION);
   expect(Object.keys(document.layers[0]!.keyframes[0]!.values)).toHaveLength(14);
   await seek(page, 20);
   const temperature = controls(page, 'Temperature');

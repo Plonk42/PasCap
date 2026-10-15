@@ -23,22 +23,22 @@ fields, filenames and URLs retain their technical spelling.
 
 ## Processing and editing contracts
 
-| Document                                                         | Authority/scope                                                                                                                                                                  |
-| ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [COLOUR_AND_TIMING.md](COLOUR_AND_TIMING.md)                     | SDR grading, fade/dissolve/rational-frame equations and preview/reference scope                                                                                                  |
-| [LAYERS_AND_KEYFRAMES.md](LAYERS_AND_KEYFRAMES.md)               | Uniform schema-22 video tracks, track Colour/Opacity/fourteen-channel keyframes, track Transform, per-track Ripple/transitions/fades, spatial coverage and music resource bounds |
-| [SPEED_AND_AUDIO.md](SPEED_AND_AUDIO.md)                         | Clip-only constant/source-frame keyframe speed, curve presets, precise editing, sliding timeline markers, shared retiming and music/export audio                                 |
-| [TIMELINE_EDITING.md](TIMELINE_EDITING.md)                       | No-copy import, source ranges, per-track Ripple/independent placement, recoverable trims, marked cuts, history and snapping                                                      |
-| [WORKSPACE_AND_RECOVERY.md](WORKSPACE_AND_RECOVERY.md)           | Layout, field/keyboard contexts, project bins, serial saves/conflicts, Activity and failure recovery                                                                             |
-| [UX_HARDENING.md](UX_HARDENING.md)                               | Visual controls, deterministic raw-reader ownership, relink identity evidence, export-space assumptions/disk-full recovery and deferred loading                                  |
-| [design/MULTIPLE_MUSIC.md](design/MULTIPLE_MUSIC.md)             | Strict schema-22 identified music arrays, corrected project duration/black tails, final-only summed clipping, one bounded clock and serial native mixing                         |
-| [design/ROW_APPEARANCE.md](design/ROW_APPEARANCE.md)             | Required video track-only static/keyed Colour and Opacity, shared ownership, resets and destination-track adoption                                                               |
-| [design/TEMPERATURE_AND_TINT.md](design/TEMPERATURE_AND_TINT.md) | Required normalized track Temperature/Tint, exact pre-exposure linear gains, independent capture and strict schema-22 preservation                                               |
-| [design/HSL_AND_CURVES.md](design/HSL_AND_CURVES.md)             | Required static track HSL bands and master/RGB curves, SDR order, bounded GPU/native evaluation and exact editor gestures                                                        |
-| [design/SPATIAL_TRANSFORMS.md](design/SPATIAL_TRANSFORMS.md)     | Required video track Transform base/per-setting project-frame keyframes, crop/affine geometry, neutral letterboxing, per-pixel coverage and Transform controls                   |
-| [design/DETAIL_FILTERS.md](design/DETAIL_FILTERS.md)             | Required static clip Sharpen/Clarity/Denoise and keyable track HDR look, shared source-tap kernel before grading, preview/native parity gates and Detail controls                |
-| [design/WEBCODECS_PREVIEW.md](design/WEBCODECS_PREVIEW.md)       | WebCodecs proxy decoding in workers: proxy index contract, credit-bounded exact frames, decoder lanes, buffering and source review                                               |
-| [design/SOURCE_RELINK.md](design/SOURCE_RELINK.md)               | Verified relinking of moved video/music originals: full-content checksums, version-2 registries, ID-keyed caches and the Relink flow                                             |
+| Document                                                         | Authority/scope                                                                                                                                                        |
+| ---------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [COLOUR_AND_TIMING.md](COLOUR_AND_TIMING.md)                     | SDR grading, fade/dissolve/rational-frame equations and preview/reference scope                                                                                        |
+| [LAYERS_AND_KEYFRAMES.md](LAYERS_AND_KEYFRAMES.md)               | Uniform video tracks, track Colour/Opacity/fourteen-channel keyframes, track Transform, per-track Ripple/transitions/fades, spatial coverage and music resource bounds |
+| [SPEED_AND_AUDIO.md](SPEED_AND_AUDIO.md)                         | Clip-only constant/source-frame keyframe speed, curve presets, precise editing, sliding timeline markers, shared retiming and music/export audio                       |
+| [TIMELINE_EDITING.md](TIMELINE_EDITING.md)                       | No-copy import, source ranges, per-track Ripple/independent placement, recoverable trims, marked cuts, history and snapping                                            |
+| [WORKSPACE_AND_RECOVERY.md](WORKSPACE_AND_RECOVERY.md)           | Layout, field/keyboard contexts, project bins, serial saves/conflicts, Activity and failure recovery                                                                   |
+| [UX_HARDENING.md](UX_HARDENING.md)                               | Visual controls, deterministic raw-reader ownership, relink identity evidence, export-space assumptions/disk-full recovery and deferred loading                        |
+| [design/MULTIPLE_MUSIC.md](design/MULTIPLE_MUSIC.md)             | Strict identified music arrays, corrected project duration/black tails, final-only summed clipping, one bounded clock and serial native mixing                         |
+| [design/ROW_APPEARANCE.md](design/ROW_APPEARANCE.md)             | Required video track-only static/keyed Colour and Opacity, shared ownership, resets and destination-track adoption                                                     |
+| [design/TEMPERATURE_AND_TINT.md](design/TEMPERATURE_AND_TINT.md) | Required normalized track Temperature/Tint, exact pre-exposure linear gains, independent capture and strict current-schema preservation                                |
+| [design/HSL_AND_CURVES.md](design/HSL_AND_CURVES.md)             | Required static track HSL bands and master/RGB curves, SDR order, bounded GPU/native evaluation and exact editor gestures                                              |
+| [design/SPATIAL_TRANSFORMS.md](design/SPATIAL_TRANSFORMS.md)     | Required video track Transform base/per-setting project-frame keyframes, crop/affine geometry, neutral letterboxing, per-pixel coverage and Transform controls         |
+| [design/DETAIL_FILTERS.md](design/DETAIL_FILTERS.md)             | Required static clip Sharpen/Clarity/Denoise and keyable track HDR look, shared source-tap kernel before grading, preview/native parity gates and Detail controls      |
+| [design/WEBCODECS_PREVIEW.md](design/WEBCODECS_PREVIEW.md)       | WebCodecs proxy decoding in workers: proxy index contract, credit-bounded exact frames, decoder lanes, buffering and source review                                     |
+| [design/SOURCE_RELINK.md](design/SOURCE_RELINK.md)               | Verified relinking of moved video/music originals: full-content checksums, version-2 registries, ID-keyed caches and the Relink flow                                   |
 
 Use the final approved [#67](https://github.com/Plonk42/PasCap/issues/67) contract:
 one required numeric video track `opacity`, initially 1 (100%) on new tracks, with the sole
@@ -53,7 +53,7 @@ Saved `clip.opacity`
 and old `clipOpacity`/`layerOpacity` channels are rejected, not the valid track value.
 Colour animation remains track-wide, while clip-only speed (constant or keyframed)
 curves use source frames; every clip also requires a boolean `reverse`.
-Schema 22 requires complete video track-owned Colour and Opacity with identical static/keyed scope,
+The current schema requires complete video track-owned Colour and Opacity with identical static/keyed scope,
 and rejects saved `clip.colour` and `clip.correction`. It also requires video track `transform: { base, keyframes }`: a complete
 eight-value pose and 0–256 per-setting project-frame keyframes with required easing
 and a default-keyframe `reset` flag; saved `clip.spatial` is rejected. Like Colour,
@@ -70,13 +70,13 @@ moves the white point; required track Blacks (−1…1, neutral 0) is the keyabl
 it that moves the black point. HSL/curves remain required static settings, not extra channels.
 Required track HDR (0–1, neutral 0) is a keyable SDR local tone-mapping look
 applied in the clip detail kernel before grading.
-Schema 22 requires `music: MusicTrack[]`, 0–8 independent uniquely
+Projects require `music: MusicTrack[]`, 0–8 independent uniquely
 identified music tracks (`[]` without music). Project duration is maximum video clip
 OUT or music start + duration: music can extend it, with video closing fades at
 clip OUT then black while music continues/fades at its own end. Clip speed,
-track Colour and sole Opacity are unchanged. Version-1 export receipts require strict v22
+track Colour and sole Opacity are unchanged. Version-1 export receipts require strict current-schema
 snapshots and captured audio-source/instance-plan arrays; preserve incompatible
-v1–v21 documents/receipts/MP4s, recreate deliberately, and never migrate/default
+documents/receipts/MP4s with an earlier schema version, recreate deliberately, and never migrate/default
 or use null/older readers. Proxy/current PCM formats remain unchanged; the registries
 are version 2 (full-content checksums).
 The #35 contract has pending implementation/validation acceptance; no passed
@@ -111,9 +111,9 @@ and Git history retain earlier evidence, not current acceptance claims.
   original plan and chronology.
 - [Historical track-parity design record](design/TRACK_PARITY.md) records the approved #25
   choices: uniform tracks, default-on continuous Ripple with pack-on-enable,
-  track-local transitions/fades, schema 6 and concurrent-dissolve resources.
-  Its two-opacity/persistence descriptions are historical, superseded by the strict
-  v8 track-owned Opacity value and sole `opacity` channel above. Its video-only duration
+  track-local transitions/fades and concurrent-dissolve resources.
+  Its two-opacity/persistence descriptions are historical, superseded by the current
+  track-owned Opacity value and sole `opacity` channel above. Its video-only duration
   assumption is superseded by the multiple-music contract; acceptance evidence
   stays on the issue. Historical reports and recorded evidence remain unchanged.
 

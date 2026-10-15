@@ -18,7 +18,13 @@ import {
   planLayeredExport,
 } from '../../src/shared/export.js';
 import { mediaAssetSchema, type MediaAsset } from '../../src/shared/media.js';
-import { createClip, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
+import {
+  createClip,
+  createProject,
+  PROJECT_SCHEMA_VERSION,
+  projectSchema,
+  type ProjectDocument,
+} from '../../src/shared/model.js';
 import { compileRetiming, type SpeedSettings } from '../../src/shared/speed.js';
 import { calculateLayout, sampleTimeline } from '../../src/shared/timeline.js';
 import { framesToSeconds, PROJECT_FPS } from '../../src/shared/timing.js';
@@ -111,12 +117,14 @@ function audioAsset() {
 }
 
 describe('strict production export request and immutable validation', () => {
-  it('offers exactly 720p and UHD profiles, accepts no-music v22 and rejects empty/legacy/unknown requests', () => {
+  it('offers exactly 720p and UHD profiles, accepts current-schema documents without music and rejects empty/legacy/unknown requests', () => {
     expect(EXPORT_PROFILES.draft720).toMatchObject({ width: 1280, height: 720 });
     expect(EXPORT_PROFILES.final4k).toMatchObject({ width: 3840, height: 2160 });
     const document = documentWithClips();
     expect(exportRequestSchema.parse({ document, profile: 'draft720' }).document.music).toEqual([]);
-    expect(exportRequestSchema.parse({ document, profile: 'draft720' }).document.schemaVersion).toBe(22);
+    expect(exportRequestSchema.parse({ document, profile: 'draft720' }).document.schemaVersion).toBe(
+      PROJECT_SCHEMA_VERSION,
+    );
     for (const request of [
       { document: createProject('empty', 'Empty'), profile: 'draft720' },
       {

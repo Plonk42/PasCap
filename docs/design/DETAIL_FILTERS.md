@@ -1,4 +1,4 @@
-# Clip Sharpen, Clarity and Denoise, and track HDR · strict project schema 22
+# Clip Sharpen, Clarity and Denoise, and track HDR
 
 Current contract for [#123](https://github.com/Plonk42/PasCap/issues/123): three
 static, clip-owned detail filters applied identically in preview and native export,
@@ -25,7 +25,7 @@ Implementation authorities: [settings and kernel](../../src/shared/detail.ts),
 
 ## Required data
 
-Every schema-22 clip requires `detail: { sharpen, clarity, denoise }`, strict, with no
+Every clip requires `detail: { sharpen, clarity, denoise }`, strict, with no
 unknown fields, coercion, persisted defaults or load-time repair.
 
 | Field     | Bounds | Neutral (new clips) | Meaning                                                     |
@@ -37,8 +37,8 @@ unknown fields, coercion, persisted defaults or load-time repair.
 Neutral values are creation values only, never defaults for missing saved data.
 Split, marked cuts and duplicate copy the clip's detail into each retained piece;
 trims, moves (including to another track) and Ripple leave it unchanged. Detail never
-changes timing, placement, speed, track Colour/Opacity or music. Projects 1–21 and
-their receipt snapshots are rejected and preserved, without migration; recreate them.
+changes timing, placement, speed, track Colour/Opacity or music. Projects with an earlier
+schema version and their receipt snapshots are rejected and preserved, without migration; recreate them.
 
 ## Kernel
 
@@ -88,7 +88,7 @@ local detail, preserving true black, mid-grey and white on flat areas.
   fourteenth nullable track keyframe channel `hdr`, after `blacks`. It is keyframed,
   interpolated, held and reset exactly like the other scalar Colour settings, at
   absolute project time; both dissolve sources and every clip on the track use the
-  same evaluated value. Missing fields are invalid; schemas 1–21 are rejected and preserved.
+  same evaluated value. Missing fields are invalid; earlier schema versions are rejected and preserved.
 - **Not a grade stage**: it is excluded from the per-pixel grade, its LUTs and LUT
   identity, so animating HDR reuses one scalar LUT. It runs in this kernel, on source
   taps after Denoise, with the evaluated amount $h$.

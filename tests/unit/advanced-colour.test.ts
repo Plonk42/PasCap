@@ -28,6 +28,7 @@ import { createClip, createLayer, createProject, projectSchema } from '../../src
 import { NEUTRAL_DETAIL } from '../../src/shared/detail.js';
 import { NEUTRAL_SPATIAL_POSE } from '../../src/shared/spatial.js';
 import { colourResetCommands } from '../../src/web/colour-reset.js';
+import { EARLIER_SCHEMA_VERSIONS } from './project-fixtures.js';
 
 function hueRgb(hue: number): RGB {
   const value = (offset: number): number =>
@@ -35,7 +36,7 @@ function hueRgb(hue: number): RGB {
   return [value(0), value(-120), value(-240)];
 }
 
-describe('strict schema-22 static advanced row colour', () => {
+describe('strict current-schema static advanced row colour', () => {
   it('creates deeply independent bands and curves for settings, rows and projects', () => {
     const a = createColourSettings(),
       b = createColourSettings();
@@ -51,7 +52,7 @@ describe('strict schema-22 static advanced row colour', () => {
   });
   it('requires every field and rejects old schemas, unknown entries and nonfinite data without repair', () => {
     const document = createProject('p', 'P');
-    for (let schemaVersion = 1; schemaVersion < 22; schemaVersion++)
+    for (const schemaVersion of EARLIER_SCHEMA_VERSIONS)
       expect(projectSchema.safeParse({ ...document, schemaVersion }).success).toBe(false);
     for (const field of ['hsl', 'curves'] as const) {
       const value = { ...document.layers[0]!.colour };

@@ -1,6 +1,6 @@
 # Desktop workspace and recovery
 
-The workspace uses **strict schema 22 with complete required video track colour and Transform, clip-only speed and reverse, uniform video tracks, required per-track
+The workspace uses **the strict current schema with complete required video track colour and Transform, clip-only speed and reverse, uniform video tracks, required per-track
 Ripple/transitions/fades, 0–8 independently identified music tracks, project-specific
 video/music bins and draggable shared project-time track keyframes**, with per-setting channel navigation. Layout preferences,
 stored-keyframe inspection and recovery feedback remain editor-only. Source protection,
@@ -536,7 +536,7 @@ there is no automatic write retry. Late folder reads are aborted on navigation/d
 browser roots: a music or video recording, or a folder as an explicit **recursive
 whole-folder import** that can queue substantial work. It never silently extends root
 configuration. No original is
-copied: strict schema 22 references registered originals in place, with only
+copied: the strict current schema references registered originals in place, with only
 generated proxies/thumbnails, metadata, exports/receipts and scratch written locally.
 
 There is no upload endpoint, browser file picker, optional copy flow or true
@@ -698,7 +698,7 @@ saved document. It never deletes original recordings, shared registry entries,
 proxies/cache files, successful MP4s or receipts. This is not cache garbage
 collection; another project's membership and immutable export snapshots are unaffected.
 
-Only strict v22 projects and v22 project snapshots in version-1 export receipts are interpreted.
+Only strict current-schema projects and project snapshots in version-1 export receipts are interpreted.
 Every video track requires complete Colour, including `temperature`, `tint`, `vibrance`, `whites`, `blacks` and `hdr` bases
 and static HSL/curves; missing fields and clip colour/correction are invalid.
 Every clip requires constant or 1–256-keyframe custom-curve speed and a boolean `reverse`; every video track
@@ -721,7 +721,7 @@ fourteen nullable fields, in control order: `opacity`, `temperature`,
 `shadows`, `whites`, `blacks`, `hdr`. HSL/curves remain static. Track
 `opacity` is the sole valid stored value; saved `clip.opacity` and old
 `clipOpacity`/`layerOpacity` channels are invalid, not ignored or defaulted.
-Earlier v1–v21 projects/receipt snapshots are preserved, incompatible
+Projects/receipt snapshots with an earlier schema version are preserved, incompatible
 and never migrated or rewritten with fallback/default local fields or old-format
 readers. **Create a new
 project** and import its media deliberately; there is no automatic deletion of
@@ -729,7 +729,7 @@ projects, receipts or finished videos. Proxy/current PCM formats are unchanged; 
 registries are version 2 (`videos.json`, `music.json`, with full-content checksums).
 Registered recordings and currently
 verified ready proxies are reusable.
-The live v3 sample appearing incompatible is expected. No sample preparation or
+The live sample appearing incompatible is expected. No sample preparation or
 additional real-media import/render is needed to exercise this with disposable tests.
 
 Startup validates the loopback service with at most five serial, abortable health
@@ -817,7 +817,7 @@ invalid release leaves the saved document and history unchanged.
 For an HTTP 409 or incompatible save response, **Review latest save** explains:
 
 1. **Keep editing this draft** — no saved document changes; the save error persists.
-2. **Download unsaved project** — download a strict v22 JSON snapshot with the current
+2. **Download unsaved project** — download a strict current-schema JSON snapshot with the current
    local changes/expected revision before replacing them.
 3. **Discard local changes and reload** — explicitly replace local history/document
    with a newly read saved version. It performs no overwrite POST/PUT.

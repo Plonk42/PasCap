@@ -11,7 +11,7 @@ import {
 import { applyCommand, EditHistory } from '../../src/shared/commands.js';
 import { needsLayeredExport, planExport } from '../../src/shared/export.js';
 import { interpolatedProgress, type Interpolation } from '../../src/shared/keyframes.js';
-import { createClip, createProject, projectSchema } from '../../src/shared/model.js';
+import { createClip, createProject, PROJECT_SCHEMA_VERSION, projectSchema } from '../../src/shared/model.js';
 import { trimByOutputFrames, validateSourceRanges } from '../../src/shared/source-range.js';
 import {
   compileRetiming,
@@ -38,7 +38,7 @@ describe('strict clip-instance speed curves', () => {
     const document = createProject('curve', 'Curve');
     document.clips = [clip(curve(key(0, 1), key(120, 2)))];
     expect(projectSchema.parse(document)).toEqual(document);
-    expect(document.schemaVersion).toBe(22);
+    expect(document.schemaVersion).toBe(PROJECT_SCHEMA_VERSION);
     expect(speedSchema.parse({ mode: 'constant', rate: 1 })).toEqual({ mode: 'constant', rate: 1 });
     expect(() => speedSchema.parse({ mode: 'curve' })).toThrow();
   });

@@ -1,4 +1,4 @@
-# Track Transform · strict project schema 22
+# Track Transform
 
 Current contract for [#131](https://github.com/Plonk42/PasCap/issues/131), which made
 Transform (crop, uniform scale, translation and rotation) **track-owned, like Colour**,
@@ -38,7 +38,7 @@ moving a clip to another track adopts that track's Transform.
 
 ## Required data and ownership
 
-Every schema-22 video track requires `transform: { base, keyframes }`; clips have no
+Every video track requires `transform: { base, keyframes }`; clips have no
 `spatial` field, and a saved one is invalid. Both objects and all keyframes are strict:
 no unknown fields, optional legacy values, coercion, persisted defaults or load-time
 repair. `base` is one complete eight-value pose; `keyframes` is a required array of
@@ -228,8 +228,8 @@ salmon **●** custom-speed lane is unchanged.
 
 ## Preservation
 
-Projects and version-1 export receipt snapshots must satisfy strict **schema 22**.
-Incompatible v1–v21 projects/receipt snapshots and completed videos remain untouched.
+Projects and version-1 export receipt snapshots must satisfy the strict **current schema**.
+Projects/receipt snapshots with an earlier schema version and completed videos remain untouched.
 Recreate projects deliberately; do not migrate, default-fill, rewrite or delete old
 data automatically. Proxy/PCM and receipt/report format versions do not change; the
 registries are version 2 (full-content checksums).

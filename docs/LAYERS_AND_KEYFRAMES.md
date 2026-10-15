@@ -1,4 +1,4 @@
-# Video tracks, shared keyframes and source review · project v22
+# Video tracks, shared keyframes and source review
 
 Required video track Colour includes twelve graded scalar fields, including **Temperature**,
 **Tint**, **Vibrance**, **Whites** and **Blacks**, the **HDR** look (0–1, applied before grading with the clip
@@ -110,7 +110,7 @@ separate project-frame keyframe list. All shared track keyframes use absolute in
 clip on that track, including clips from different recordings and both sources
 in that track's dissolve. They do not restart at a clip's IN, start or boundary.
 
-Schema 22 requires `layers[].keyframes` as ordered `{ frame, values, easing, reset }`
+Each track requires `layers[].keyframes` as ordered `{ frame, values, easing, reset }`
 keyframes, with **at most 256 keyframes per track**. Frames are unique, strictly ascending,
 non-negative and at most 2,147,483,647. Every keyframe's `values` object (`LayerKeyValues`)
 requires **all fourteen nullable fields** below: a number enables that setting; `null` leaves it disabled.
@@ -667,7 +667,7 @@ not all sources or loop repetitions. It grows with duration and is additional to
 the unchanged video raw-buffer/child/LUT bounds above. Cancellation/failure removes
 only owned scratch, never originals, saved projects or successful outputs.
 
-Schema **v22 is strict**, including complete required video track `colour` with Temperature/Tint/Vibrance/Whites/Blacks/HDR and static HSL/curves, no clip colour/correction/spatial fields, a required boolean clip `reverse`, and track `transform` base/eight-value
+The current schema **is strict**, including complete required video track `colour` with Temperature/Tint/Vibrance/Whites/Blacks/HDR and static HSL/curves, no clip colour/correction/spatial fields, a required boolean clip `reverse`, and track `transform` base/eight-value
 project-frame keyframes and required unique `media.videoIds` / `media.audioIds`
 arrays, at most 10,000 IDs each, and all required per-track settings. Project-level
 transitions/fades, saved `clip.opacity` and old `clipOpacity`/`layerOpacity` keyframe
@@ -677,15 +677,15 @@ Keyframes require exactly the fourteen nullable fields listed above, including `
 The required `music` array contains 0–8 independent music tracks with unique required
 IDs and complete source IN/OUT/start/duration/gain/fades/loop fields; `[]` without
 music, never a null/singular value or default. Version-1 export receipts require
-a strict v22 snapshot plus captured audio-source/instance-plan arrays.
-Older v1–v21 project documents and export receipt snapshots remain unchanged/incompatible;
+a strict current-schema snapshot plus captured audio-source/instance-plan arrays.
+Project documents and export receipt snapshots with an earlier schema version remain unchanged/incompatible;
 there are no migrations, compatibility fallback/default fields or automatic deletion
 of projects, receipts or successful videos. Create a new project and deliberately
 import its media; registered media and currently verified ready proxies remain reusable.
 Proxy/current PCM formats and source identity checks are unchanged; the registries are
 version 2 (full-content checksums).
 Confirmed project deletion removes only its saved document, preserving originals,
-the shared registry/proxy cache and exports/receipts. The live v3 sample appearing
+the shared registry/proxy cache and exports/receipts. The live sample appearing
 incompatible is expected, not a reason to rewrite it.
 
 Workspace layout, field commits and recovery controls are specified in

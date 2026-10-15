@@ -3,7 +3,7 @@ import path from 'node:path';
 import { z } from 'zod';
 import { audioAssetSchema } from '../shared/audio.js';
 import { defaultExportName, exportOutputNameSchema, exportProfileSchema, planExportMusic } from '../shared/export.js';
-import { idSchema, MAX_MUSIC_TRACKS, projectSchema } from '../shared/model.js';
+import { idSchema, MAX_MUSIC_TRACKS, PROJECT_SCHEMA_VERSION, projectSchema } from '../shared/model.js';
 import { forEachSerial } from '../shared/serial.js';
 import { calculateLayout } from '../shared/timeline.js';
 import type { ServiceConfig } from './config.js';
@@ -109,11 +109,11 @@ function parseReceipt(raw: unknown): z.infer<typeof receiptSchema> | null {
     typeof snapshot === 'object' && snapshot !== null && 'schemaVersion' in snapshot
       ? snapshot.schemaVersion
       : undefined;
-  if (rawVersion !== 22) {
+  if (rawVersion !== PROJECT_SCHEMA_VERSION) {
     const version =
       typeof rawVersion === 'string' || typeof rawVersion === 'number' ? String(rawVersion) : 'missing or invalid';
     throw new Error(
-      `Unsupported export snapshot schema version ${version}; this build requires version 22. The existing receipt and successful output were not changed.`,
+      `Unsupported export snapshot schema version ${version}; this build requires version ${PROJECT_SCHEMA_VERSION}. The existing receipt and successful output were not changed.`,
     );
   }
   const parsed = receiptSchema.safeParse(raw);

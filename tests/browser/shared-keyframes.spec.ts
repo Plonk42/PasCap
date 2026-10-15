@@ -3,7 +3,14 @@ import { COLOUR_CONTROLS } from '../../src/shared/colour.js';
 import { applyCommand } from '../../src/shared/commands.js';
 import { EMPTY_KEY_VALUES } from '../../src/shared/keyframes.js';
 import type { MediaAsset } from '../../src/shared/media.js';
-import { createClip, createLayer, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
+import {
+  createClip,
+  createLayer,
+  createProject,
+  PROJECT_SCHEMA_VERSION,
+  projectSchema,
+  type ProjectDocument,
+} from '../../src/shared/model.js';
 import { sourceRateAt } from '../../src/shared/speed.js';
 import { calculateLayout, sampleTimeline } from '../../src/shared/timeline.js';
 import {
@@ -275,7 +282,7 @@ test('the first hollow diamond creates one point; same-frame channels merge inde
   await baseRate.fill('1.25');
   await baseRate.press('Enter');
   const bases = await current(page);
-  expect(bases.schemaVersion).toBe(22);
+  expect(bases.schemaVersion).toBe(PROJECT_SCHEMA_VERSION);
   expect(bases.layers[0]!.opacity).toBe(0.7);
   expect(bases.clips.every((clip) => !('opacity' in clip))).toBe(true);
   expect(bases.layers[0]?.keyframes).toEqual([]);
@@ -908,7 +915,7 @@ test('numeric trim, mapped split, duplicate and overlay moves keep absolute row 
   await expect(page.getByRole('button', { name: 'Track keyframe 5 on Track 2', exact: true })).toHaveCount(1);
   await page.evaluate(() => window.pascapLab!.flush());
   const saved = memory.snapshot();
-  expect(saved.schemaVersion).toBe(22);
+  expect(saved.schemaVersion).toBe(PROJECT_SCHEMA_VERSION);
   expect(saved.layers).toEqual(document.layers);
   expect(saved.clips).toEqual(moved.clips);
   for (const layer of saved.layers)

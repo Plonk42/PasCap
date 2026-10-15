@@ -22,6 +22,7 @@ import {
   createClip,
   createLayer,
   createProject,
+  PROJECT_SCHEMA_VERSION,
   projectSchema,
   type ProjectDocument,
   type VideoLayer,
@@ -72,7 +73,7 @@ function overlay(
   });
 }
 const colourKeys = (): LayerKeyframe[] => [point(0, { exposure: 1 }, 'hold'), point(100, { hue: 20 })];
-describe('strict schema-22 row points and independently participating settings', () => {
+describe('strict current-schema row points and independently participating settings', () => {
   it('exports an ordered immutable fourteen-setting catalogue and explicit all-null template', () => {
     const settings = [
       'opacity',
@@ -98,10 +99,10 @@ describe('strict schema-22 row points and independently participating settings',
     expect(KEYFRAME_SETTINGS.every(Object.isFrozen)).toBe(true);
   });
 
-  it('requires version 22, explicit media membership, row opacity and clip settings without legacy fields', () => {
+  it('requires the current schema version, explicit media membership, row opacity and clip settings without legacy fields', () => {
     const project = createProject('strict', 'Strict');
     const clip = createClip('one', 'source', 0, 20);
-    expect(project.schemaVersion).toBe(22);
+    expect(project.schemaVersion).toBe(PROJECT_SCHEMA_VERSION);
     expect(project.media).toEqual({ videoIds: [], audioIds: [] });
     expect(project.layers[0]).toEqual(row());
     expect(Object.keys(clip)).toEqual([

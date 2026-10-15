@@ -1,4 +1,4 @@
-# Speed and audio contract · project v22
+# Speed and audio contract
 
 Twelve video track-owned scalar Colour controls include Temperature/Tint (−1…1, neutral 0),
 whose normalized linear gains precede Exposure. Positive Temperature warms;
@@ -14,7 +14,7 @@ likewise appearance-only; see [detail filters](design/DETAIL_FILTERS.md#hdr-look
 
 ## Clip speed
 
-Speed belongs only to the clip and is positive, **0.1×–8×**. Strict schema 22
+Speed belongs only to the clip and is positive, **0.1×–8×**. The project
 requires each clip's `speed` to be `{ mode: 'constant', rate }` or
 `{ mode: 'curve', keyframes }`; there is no track Speed setting, ramp mode or
 project-wide speed field. A clip's duration and sampled frames depend only on its
@@ -297,7 +297,7 @@ frame for main capture.
 
 ## Music
 
-Strict schema 22 requires `music: MusicTrack[]`, with **0–8 independent music tracks**
+Projects require `music: MusicTrack[]`, with **0–8 independent music tracks**
 and unique required track `id` values; `[]` means no music. Each music track
 requires `mediaId`, `sourceIn`, `sourceOut`, `start`, `duration`, `gainDb`, `fadeIn`,
 `fadeOut` and `loop`. Several music tracks can use the same registered recording
@@ -425,7 +425,7 @@ preview caches remain unchanged but are not current playback input. Missing curr
 PCM caches appear as an explicit **Prepare** action on the file in Media → Music;
 startup/library reads never prepare, rewrite or delete them. Prepare deliberately
 to create the current cache, retaining originals and older generated files. Project
-schema is 19; the music and video registries are version 2 (`music.json`,
+documents follow the current schema; the music and video registries are version 2 (`music.json`,
 `videos.json`, with full-content checksums), while video-proxy and PCM cache formats
 are unchanged. Native export
 still reads original audio, not the preview transport.
@@ -449,7 +449,7 @@ cancellation cleans only owned scratch/partials and preserves completed outputs.
 
 ## Versioning
 
-Project schema **v22** requires explicit `media.videoIds` and `media.audioIds` arrays,
+The current project schema requires explicit `media.videoIds` and `media.audioIds` arrays,
 unique and limited to 10,000 IDs each, plus complete video track colour with Temperature/Tint/Vibrance/Whites/Blacks/HDR
 and static HSL/curves, clip constant or 1–256-keyframe custom-curve
 speed and a boolean `reverse`, required video track `transform: { base, keyframes }` with eight-value base and
@@ -470,7 +470,7 @@ Track `opacity` is valid and required; saved `clip.opacity` and old
 New projects have empty video/music bins. Standalone audio imports belong
 to the open project's bin; every music track's references also count as membership.
 Global registered music/proxies are reusable on deliberate import, never automatically
-inherited by a new project. Earlier v1–v21 projects and export receipt snapshots remain unchanged
+inherited by a new project. Projects and export receipt snapshots with an earlier schema version remain unchanged
 and incompatible. There is no migration, compatibility reader, null fallback, default-field
 injection or automatic deletion; recreate projects and import their media to reuse
 registered assets/verified ready proxies. Confirmed project deletion affects only
@@ -480,7 +480,7 @@ Video-proxy/current PCM formats, source guards and native video budgets are unch
 native composition uses the sole Opacity contract without a track multiplier.
 Preview uses the current explicitly prepared PCM cache described above.
 
-Export receipts remain **version 1** with a strict **v22** snapshot, required
+Export receipts remain **version 1** with a strict current-schema snapshot, required
 `musicSources` captured unique-original array and `settings.audio` identified
 instance-plan array (`[]` for each without music). Plans preserve independent
 timing/gain/fades/loop; several may refer to the same captured original. The plan

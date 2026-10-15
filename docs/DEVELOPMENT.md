@@ -1,6 +1,6 @@
 # Development
 
-Current strict schema **22** requires twelve graded scalar bases in each video track's `colour`,
+The current strict schema requires twelve graded scalar bases in each video track's `colour`,
 including Temperature/Tint, Vibrance, Whites and Blacks (−1…1, neutral 0), plus `hdr` (0–1, neutral 0; a
 detail-stage look applied before grading, see [detail filters](design/DETAIL_FILTERS.md#hdr-look)),
 all eight HSL bands and all four
@@ -9,7 +9,7 @@ boolean `reset` (default keyframe), in control order:
 `opacity`, `temperature`, `tint`, `exposure`, `brightness`, `contrast`,
 `hue`, `saturation`, `vibrance`, `highlights`, `shadows`, `whites`, `blacks`, `hdr`. HSL/curves remain static; speed is
 clip-only (constant or 1–256 source-frame keyframes), and every clip requires a boolean `reverse`.
-Reject/preserve v1–v21 documents and receipt snapshots; no load defaults,
+Reject/preserve documents and receipt snapshots with an earlier schema version; no load defaults,
 migrations, legacy acceptance or automatic deletion. CPU/reference/native/GPU
 must use the same [Temperature/Tint gain math](design/TEMPERATURE_AND_TINT.md)
 before Exposure, including intentionally coloured greys and pre-clipping
@@ -22,7 +22,9 @@ scalar LUT paths. At most two native 65³ Float32 buffers (6,591,000 bytes) rema
 available, without an extra decoder, texture, full-frame buffer or child process.
 Exact advanced grading remains the costliest export path, especially at UHD. See
 [HSL_AND_CURVES.md](design/HSL_AND_CURVES.md). New reference/measurement metadata
-identifies strict schema 22; historical reports remain unchanged.
+identifies the current schema; historical reports remain unchanged.
+The current schema number is `PROJECT_SCHEMA_VERSION` in [the model](../src/shared/model.ts);
+bump it for every incompatible change. Guides say “current schema” rather than repeating the number.
 
 Local Linux setup and contributing. Editing: [USER_GUIDE.md](USER_GUIDE.md). Service
 paths and **future, not implemented** containers: [DEPLOYMENT.md](DEPLOYMENT.md).
@@ -296,7 +298,7 @@ originals in `.pascap/browser-footage/synthetic-sources/` are outside that cache
 `browse-camera-*` means generated patterns, not real recordings. The
 [fixture factory](../scripts/fixtures.ts) uses `preview-lab-v6` outside the browser
 cache and `preview-lab` inside it. These are project identifiers, not schema
-versions; newly generated documents must satisfy strict v22, including complete video track
+versions; newly generated documents must satisfy the strict current schema, including complete video track
 colour with Temperature/Tint/Vibrance/Whites/Blacks/HDR, all fourteen nullable channels and track Transform
 base/per-setting keyframes. Bin resets never imply
 a global-library fallback.
@@ -382,7 +384,7 @@ stall count nor a software-renderer FPS threshold qualifies hardware.
 **Do not run these in CI or without the owner's explicit approval for real jobs.**
 The [sample helper](../scripts/prepare-samples.ts) targets **DJI_0468.MP4 and DJI_0469.MP4
 only**: pass an **explicit folder after `--`**, never rely on a personal-path default.
-It reuses ready proxies but may prepare missing ones; creates only an absent v22
+It reuses ready proxies but may prepare missing ones; creates only an absent current-schema
 sample, never overwrites or migrates existing edits.
 
 The [measurement helper](../scripts/measure-preview.ts) accepts exactly **two
@@ -390,7 +392,7 @@ forward 1× clips on one enabled, zero-origin contiguous video track with Opacit
 extra tracks, Transform edits/keyframes or shared track keyframes
 (even neutral keyframes). `PASCAP_MEASURE_URL` selects that project.
 Measurement uses static scalar track Colour (including Temperature/Tint) with HDR 0, neutral
-HSL and identity curves; metadata must identify the strict v22 snapshot independently of the
+HSL and identity curves; metadata must identify the strict current-schema snapshot independently of the
 report format/identifier; historical reports and receipt snapshots stay untouched.
 `npm run measure -- --skip-playback --reference` skips playback benchmarking but
 **renders a native reference**; `--headed --reference` adds repeated playback. The edit
@@ -442,7 +444,7 @@ of Ripple or track ID.
 Processing: [track keyframes](LAYERS_AND_KEYFRAMES.md), [retiming/audio](SPEED_AND_AUDIO.md)
 and [grading equations](COLOUR_AND_TIMING.md#colour).
 
-Strict schema 22 requires each video track's `transform: { base, keyframes }`: eight
+Each video track requires `transform: { base, keyframes }`: eight
 complete pose values and 0–256 per-setting project-frame keyframes with required
 easing and `reset` (default keyframe); clips have no `spatial` field. Shared
 [spatial mapping](../src/shared/spatial.ts) uses unrounded original-aspect contain
@@ -550,7 +552,7 @@ independent numeric IN/OUT pair (Enter/blur applies, Escape restores) is unchang
 - Never modify/copy/delete owner's originals or commit private paths/device IDs,
   saved project IDs, real media/cache or reports. Preserve fingerprints, symlink
   rejection, cache exclusion and HTTP guards.
-- Keep **strict schema 22**: required project `bookmarks` (at most 1,000 unique ascending
+- Keep **the strict current schema**: required project `bookmarks` (at most 1,000 unique ascending
   frames, editing aids only) and complete required video track `colour`, including
   Temperature/Tint/Vibrance/Whites/Blacks/HDR and static HSL/curves; reject saved `clip.colour`
   and `clip.correction`. Grade sources once with evaluated track Colour, retaining
@@ -570,7 +572,7 @@ independent numeric IN/OUT pair (Enter/blur applies, Escape restores) is unchang
   transitions/fades, compatibility fields/defaults/migration or mandatory first-track
   ID. Require a 0–8 `music` array with unique instance IDs and complete independent
   settings, plus captured audio-source/instance-plan arrays in current receipts.
-  Reject and preserve incompatible v1–v21 projects/receipt snapshots and finished videos,
+  Reject and preserve projects/receipt snapshots with an earlier schema version and finished videos,
   without automatic deletion; recreate projects deliberately. Proxy formats,
   source protections and native resource budgets remain unchanged; the registries are
   version 2 (full-content checksums).

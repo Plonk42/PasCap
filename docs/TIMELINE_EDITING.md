@@ -14,7 +14,7 @@ HSL/curves remain static. See [Temperature and Tint](design/TEMPERATURE_AND_TINT
 See [track appearance](design/ROW_APPEARANCE.md).
 
 The media library describes complete recordings belonging to the open project's
-bin, not every globally registered source. Strict schema 22 requires unique
+bin, not every globally registered source. Projects require unique
 `media.videoIds` and `media.audioIds` arrays (10,000 IDs maximum each). Imports add
 membership even without timeline placement; clip/music references also remain
 visible. New projects start with both arrays empty. **Remove from project** (the
@@ -125,7 +125,7 @@ Import guidance, **without a POST**. Internal dragging of ready registered Media
 into Timeline remains unchanged. Uncertain registration results are not retried
 automatically; check Media/Activity before resubmitting.
 
-Strict schema 22 requires complete video track colour with Temperature/Tint/Vibrance/Whites/Blacks/HDR and static HSL/curves, track Transform, a boolean clip `reverse`, per-track Ripple, transitions and fades, and a required
+The strict current schema requires complete video track colour with Temperature/Tint/Vibrance/Whites/Blacks/HDR and static HSL/curves, track Transform, a boolean clip `reverse`, per-track Ripple, transitions and fades, and a required
 0–8 identified music track `music` array (`[]` without music); proxy/PCM formats are
 unchanged and the registries are version 2 (full-content checksums). Only generated
 proxies/thumbnails, metadata,
@@ -579,7 +579,7 @@ toggle persists for the current timeline session, not the renderable document.
 ### Bookmarks
 
 A **bookmark** marks one project-time frame, for example a beat or an event in the
-footage, as an extra snap point. Bookmarks belong to the project: strict schema 22
+footage, as an extra snap point. Bookmarks belong to the project, which
 requires `bookmarks`, an array of at most 1,000 unique ascending integer project
 frames (0–2,147,483,647), `[]` on new projects; a missing or malformed array is
 invalid, never defaulted. They are editing aids only: they never retime clips,
@@ -610,13 +610,13 @@ music or keyframes and are never rendered or exported.
 Adding, moving and deleting are each one Undo step and autosave like other edits.
 Bookmarks are project-wide: not per track, named, coloured or ranged.
 
-Projects are named separate **version-22** documents with complete required video track colour, track
+Projects are named separate **current-schema** documents with complete required video track colour, track
 Transform base/per-setting project-frame keyframes, a boolean clip `reverse`, project bookmarks and per-track Ripple,
 transitions, opening/closing fades and numeric `opacity` in 0–1. New tracks start
 at 1 (100%); a missing saved field is invalid. Switching flushes autosave first,
 blocks on failed saves, and resets session selection/history; successful export
-snapshots are independent of the open project. Earlier v1–v21 projects and receipt
-snapshots remain incompatible and preserved, without migration/fabricated defaults.
+snapshots are independent of the open project. Projects and receipt snapshots with an
+earlier schema version remain incompatible and preserved, without migration/fabricated defaults.
 There is no automatic deletion. Track `opacity` is the required sole stored value;
 saved `clip.opacity` and old `clipOpacity`/`layerOpacity` keyframe fields are rejected,
 not ignored or defaulted. Keyframes require exactly fourteen nullable channels: `opacity`,
@@ -627,13 +627,13 @@ to reuse registered sources/verified ready proxies. Confirmed project deletion r
 document, never originals, the shared registry/proxy cache or successful exports/
 receipts. Removing a clip is not removing that recording from the import bin;
 use **Remove from project** for that. The
-existing live v3 sample appearing incompatible is expected. Proxy formats are
+existing live sample appearing incompatible is expected. Proxy formats are
 unchanged; the registries are version 2 (full-content checksums).
 
 The required `music` array holds **0–8 independent music tracks**, each with a unique
 required `id`, registered `mediaId`, source IN/OUT, start/duration, gain, fades and
 loop flag. No null/singular fallback, omitted-field default or old-format reader
-is accepted. Version-1 export receipts require a strict v22 snapshot and captured
+is accepted. Version-1 export receipts require a strict current-schema snapshot and captured
 audio-source/instance-plan arrays; older snapshots/invalid arrays are rejected
 while the receipt and finished output remain preserved. Current PCM format is unchanged.
 
@@ -746,4 +746,4 @@ and both-runtime acceptance belong to
 [DEPLOYMENT.md](DEPLOYMENT.md). Actual-commit correctness results are available in
 [GitHub Actions](https://github.com/Plonk42/PasCap/actions).
 
-Video track Colour includes static **HSL ranges** and **Colour curves**, each in its own collapsible Track section after Colour. They affect every clip and both dissolve sources on the track, whether or not its twelve scalar channels are keyed. Moves use the destination track's complete colour; clip edits never copy these settings. They are not speed curves or new animation channels. See [the schema-22 HSL/curves contract](design/HSL_AND_CURVES.md).
+Video track Colour includes static **HSL ranges** and **Colour curves**, each in its own collapsible Track section after Colour. They affect every clip and both dissolve sources on the track, whether or not its twelve scalar channels are keyed. Moves use the destination track's complete colour; clip edits never copy these settings. They are not speed curves or new animation channels. See [the HSL/curves contract](design/HSL_AND_CURVES.md).

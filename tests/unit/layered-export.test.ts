@@ -41,6 +41,7 @@ import {
   createClip,
   createLayer,
   createProject,
+  PROJECT_SCHEMA_VERSION,
   projectSchema,
   type ProjectDocument,
   type VideoLayer,
@@ -50,7 +51,7 @@ import { NEUTRAL_SPATIAL_POSE } from '../../src/shared/spatial.js';
 import { compileRetiming, type Retiming } from '../../src/shared/speed.js';
 import { calculateLayout, type PreviewLayer } from '../../src/shared/timeline.js';
 import { framesToSeconds, PROJECT_FPS } from '../../src/shared/timing.js';
-import { unsupportedProject } from './project-fixtures.js';
+import { EARLIER_SCHEMA_VERSIONS, unsupportedProject } from './project-fixtures.js';
 
 const temporary: string[] = [];
 const queues: JobQueue[] = [];
@@ -112,7 +113,7 @@ function fakeLibrary(): MediaLibrary {
   return library;
 }
 
-describe('schema-22 production dispatch and read-only validation', () => {
+describe('current-schema production dispatch and read-only validation', () => {
   it('keeps static constant/curve speed on the cheap path and dispatches shared track points with their placed map', () => {
     const project = document();
     expect(needsLayeredExport(project)).toBe(false);
@@ -137,11 +138,13 @@ describe('schema-22 production dispatch and read-only validation', () => {
     const placed = calculateLayout(project).clips[0]!;
     expect(planLayeredExport(project).duration).toBe(compileRetiming(project.clips[0]!).duration);
     expect(placed.retiming.duration).toBe(planLayeredExport(project).duration);
-    expect(exportRequestSchema.parse({ document: project, profile: 'draft720' }).document.schemaVersion).toBe(22);
+    expect(exportRequestSchema.parse({ document: project, profile: 'draft720' }).document.schemaVersion).toBe(
+      PROJECT_SCHEMA_VERSION,
+    );
     expect(
       exportRequestSchema.safeParse({ document: { ...project, schemaVersion: 2 }, profile: 'draft720' }).success,
     ).toBe(false);
-    for (const version of [1, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21])
+    for (const version of EARLIER_SCHEMA_VERSIONS.filter((earlier) => earlier !== 2))
       expect(
         exportRequestSchema.safeParse({
           document: unsupportedProject(version, 'old', 'Unsupported export'),
@@ -221,7 +224,7 @@ describe('schema-22 production dispatch and read-only validation', () => {
       expect(project).toEqual(before);
     },
   );
-  it('requires explicit v22 media/row/static clip fields, permits eight rows and refuses a ninth or same-row overlap', () => {
+  it('requires explicit current-schema media/row/static clip fields, permits eight rows and refuses a ninth or same-row overlap', () => {
     const project = document();
     for (let index = 2; index <= 8; index++) project.layers.push(layer(`video-${index}`));
     expect(projectSchema.safeParse(project).success).toBe(true);
@@ -293,12 +296,12 @@ describe('schema-22 production dispatch and read-only validation', () => {
     expect(Object.isFrozen(snapshot.layers[0]!.keyframes[0]!.values)).toBe(true);
     expect(Object.isFrozen(snapshot.layers[0]!.colour)).toBe(true);
   });
-  it('strictly loads v22 but lists/rejects unsupported versions unchanged, including overwrite attempts', async () => {
+  it('strictly loads the current schema but lists/rejects unsupported versions unchanged, including overwrite attempts', async () => {
     const directory = await temp();
     const store = new ProjectStore(directory);
     const saved = await store.save(document(), 0);
     expect(await store.load(saved.id)).toEqual(saved);
-    for (const version of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21]) {
+    for (const version of EARLIER_SCHEMA_VERSIONS) {
       const id = `old-v${version}`;
       const title = `Original v${version} document`;
       const unsupported = unsupportedProject(version, id, title);
@@ -311,7 +314,7 @@ describe('schema-22 production dispatch and read-only validation', () => {
         title,
         error: expect.stringContaining(`schema version ${version}`),
       });
-      await expect(store.load(id)).rejects.toThrow('requires version 22');
+      await expect(store.load(id)).rejects.toThrow(`requires version ${PROJECT_SCHEMA_VERSION}`);
       await expect(store.rename(id, 'No migration', 0)).rejects.toThrow('existing file was not changed');
       await expect(store.save(createProject(id, 'No migration'), 0)).rejects.toThrow('existing file was not changed');
       expect(await readFile(filename, 'utf8')).toBe(bytes);

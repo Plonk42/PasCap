@@ -5,6 +5,7 @@ import type { MediaAsset } from '../../src/shared/media.js';
 import {
   createClip,
   createProject,
+  PROJECT_SCHEMA_VERSION,
   projectSchema,
   type ProjectDocument,
   type VideoClip,
@@ -207,7 +208,7 @@ for (const context of ['shared', 'clip'] as const) {
       /Graph: time runs left to right; value progress runs bottom to top/,
     );
     const before = await current(page);
-    expect(before.schemaVersion).toBe(22);
+    expect(before.schemaVersion).toBe(PROJECT_SCHEMA_VERSION);
     expect(before.layers[0]!.opacity).toBe(1);
     expect(before.clips[0]).not.toHaveProperty('opacity');
     expect(Object.keys(before.layers[0]!.keyframes[0]!.values)).toHaveLength(14);
