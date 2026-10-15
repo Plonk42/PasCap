@@ -10,6 +10,7 @@ import type { SourceFingerprint } from '../shared/media.js';
 import { frameSchema, idSchema, projectSchema } from '../shared/model.js';
 import { validateSourceRanges } from '../shared/source-range.js';
 import { AudioLibrary } from './audio.js';
+import { BrowsePreviews } from './browse-previews.js';
 import { createConfig, type ServiceConfig } from './config.js';
 import { errorMessage, isNotFound, ServiceError } from './errors.js';
 import { restoreExports } from './export-archive.js';
@@ -28,6 +29,7 @@ const registerSchema = z.object({ path: z.string().min(1).max(4096) }).strict();
 const footageQuerySchema = z
   .object({ rootId: z.string().min(1).max(128), directory: z.string().min(1).max(4096).optional() })
   .strict();
+const previewQuerySchema = z.object({ path: z.string().min(1).max(4096) }).strict();
 const registerPathsSchema = z
   .object({ paths: z.array(z.string().min(1).max(4096)).min(1).max(MAX_FOOTAGE_FILES) })
   .strict();
@@ -121,6 +123,7 @@ export async function createApp(config = createConfig()) {
   const jobs = new JobQueue();
   const library = new MediaLibrary(config, jobs);
   const footage = new FootageBrowser(config);
+  const previews = new BrowsePreviews(config);
   const audio = new AudioLibrary(config, jobs);
   const projects = new ProjectStore(config.dataDir);
   await ensurePrivateDirectory(config.dataDir);
@@ -162,6 +165,19 @@ export async function createApp(config = createConfig()) {
   app.get('/api/footage', async (request) => {
     const query = footageQuerySchema.parse(request.query);
     return footage.browse(query.rootId, query.directory);
+  });
+  app.get('/api/footage/preview', async (request, reply) => {
+    const filename = footage.validateVideoPath(previewQuerySchema.parse(request.query).path);
+    reply.header('Cache-Control', 'private, no-cache');
+    const tag = `"${await previews.tag(filename)}"`;
+    if (request.headers['if-none-match'] === tag) return reply.code(304).header('ETag', tag).send();
+    // A closed tab or navigation away cancels the read.
+    const controller = new AbortController();
+    reply.raw.once('close', () => {
+      if (!reply.raw.writableFinished) controller.abort();
+    });
+    const preview = await previews.get(filename, controller.signal);
+    return reply.type('image/jpeg').header('ETag', `"${preview.tag}"`).send(preview.image);
   });
   app.post('/api/media/register-paths', async (request, reply) => {
     const paths = footage.validatePaths(registerPathsSchema.parse(request.body).paths);

@@ -201,6 +201,29 @@ export const api = {
     if (directory !== undefined) query.set('directory', directory);
     return request(`/api/footage?${query}`, footageDirectorySchema, 'GET', undefined, options);
   },
+  /** A small JPEG of a browsed recording; the original itself is never sent. */
+  footagePreview: async (path: string, signal: AbortSignal): Promise<Blob> => {
+    let response: Response;
+    try {
+      response = await fetch(`/api/footage/preview?${new URLSearchParams({ path })}`, { signal });
+    } catch {
+      throw new ApiError(
+        signal.aborted ? 'Request cancelled.' : 'Cannot reach the local PasCap service.',
+        0,
+        'network',
+      );
+    }
+    if (!response.ok) {
+      const error = errorSchema.safeParse(await response.json().catch(() => null));
+      throw new ApiError(
+        error.success ? error.data.error : `Preview unavailable (HTTP ${response.status}).`,
+        response.status,
+      );
+    }
+    const image = await response.blob();
+    if (image.type !== 'image/jpeg') throw responseFailure(response.status, true);
+    return image;
+  },
   registerPaths: (paths: readonly string[]) =>
     request('/api/media/register-paths', importResultSchema, 'POST', { paths }, { timeoutMs: IMPORT_TIMEOUT_MS }),
   registerMedia: (path: string) =>

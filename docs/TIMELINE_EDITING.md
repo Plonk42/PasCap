@@ -78,12 +78,27 @@ project's bin; they are not inserted into the timeline automatically. A complete
 import closes the dialog; rejected or unqueued recordings keep it open with a report
 and stay selected. The dialog reopens on the last folder.
 
-Browsing lists **one folder's metadata only**: no media-byte reads, probing,
-registration, writes or preparation jobs. Folders appear first with naturally
+Browsing lists **one folder's metadata only**: no probing, registration, writes
+next to the originals or preparation jobs. Folders appear first with naturally
 sorted names. At most **2,000 entries** of each kind are listed; an explicit warning
 means choose a narrower folder, not that all recordings were discovered. The cache
 branch is excluded and symlinks are rejected. Missing/unreadable approved roots
 remain visible as unavailable instead of preventing service startup.
+
+Video rows show a **preview**: a small picture of the keyframe nearest the
+recording's middle, read by the service only once the row scrolls into view.
+It is the one deliberate exception to metadata-only browsing, and it is bounded:
+the service reads the container index and that keyframe (plus FFmpeg's start-of-file
+probe and read-ahead of about a dozen keyframes), never the whole recording, and sends
+the browser a JPEG of at most 320 × 180, never the original. At most two previews
+are read at once (the dialog also requests at most two, so imports keep their
+connection), sixteen more may wait, and each read stops after 20 seconds. Closing
+the dialog, changing folder or unmounting a row cancels its read. Previews are
+cached by path and file identity in the data directory's `browse-previews/`
+(at most 4,000, least recently shown evicted first), never next to the originals;
+no recording is registered or prepared. A file that cannot be decoded shows a
+crossed-eye placeholder whose tooltip gives the reason; **Refresh** retries it.
+Music rows keep their icon.
 
 `PASCAP_MEDIA_ROOTS` is a JSON array of at most 32 unique absolute roots, defaulting
 only to the service user's `~/Videos`; `[]` disables the browser. Selected-path

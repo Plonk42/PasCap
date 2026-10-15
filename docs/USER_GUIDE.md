@@ -46,9 +46,11 @@ footage, and back up originals and saved project/export data separately.
    (Shift-click selects a range; **Video** / **Music** narrow the list) and choose
    **Import**, or double-click one recording to import just that one.
 2. Browsing and selection alone start **no preparation**. Each listing reads one
-   folder's metadata, not video bytes; it does not probe, register or write anything.
-   Folders sort first. A warning that a folder has too many entries means choose a
-   narrower folder.
+   folder's metadata; it does not probe, register or write anything next to your
+   recordings. Video rows show a small picture from the middle of the recording
+   once they scroll into view (a crossed eye means no picture could be read; hover
+   it for the reason). Folders sort first. A warning that a folder has too many
+   entries means choose a narrower folder.
 3. Registration references original paths without copying footage. Eligible editing
    proxies queue automatically; **Activity** shows queued/running jobs and progress.
    Only **Ready** recordings can be inserted or hover-reviewed. Preparation is serial;
