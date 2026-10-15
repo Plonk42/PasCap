@@ -10,7 +10,13 @@ import type { MediaJob } from '../../src/shared/media.js';
 import { createClip, createLayer, createProject, type ProjectDocument } from '../../src/shared/model.js';
 import type { ProjectSummary } from '../../src/shared/projects.js';
 import { summarizeExport } from '../../src/web/ExportDialog.js';
-import { activityResultSummary, activitySummary, isActiveJob, orderActivityJobs } from '../../src/web/Jobs.js';
+import {
+  activityResultSummary,
+  activitySummary,
+  formatJobDuration,
+  isActiveJob,
+  orderActivityJobs,
+} from '../../src/web/Jobs.js';
 import { filterProjects } from '../../src/web/Projects.js';
 
 function point(frame: number, values: Partial<LayerKeyValues>, interpolation: Interpolation = 'linear'): LayerKeyframe {
@@ -179,6 +185,15 @@ describe('activity ordering and summaries', () => {
         isActiveJob(job(state, { state: state as MediaJob['state'] })),
       ),
     ).toEqual([true, true, false, false, false]);
+  });
+
+  it('formats the time between creation and completion', () => {
+    const created = '2026-10-03T10:00:00Z';
+    expect(formatJobDuration(created, '2026-10-03T10:00:45Z')).toBe('45 s');
+    expect(formatJobDuration(created, '2026-10-03T10:03:05Z')).toBe('3 min 05 s');
+    expect(formatJobDuration(created, '2026-10-03T11:02:20Z')).toBe('1 h 02 min');
+    expect(formatJobDuration(created, '2026-10-03T09:59:00Z')).toBeNull();
+    expect(formatJobDuration('unknown', '2026-10-03T10:00:00Z')).toBeNull();
   });
 });
 

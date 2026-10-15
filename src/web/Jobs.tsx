@@ -92,6 +92,19 @@ function JobTime({ label, value }: Readonly<{ label: string; value: string }>) {
   );
 }
 
+/** Whole seconds as `45 s`, `3 min 05 s` or `1 h 02 min`; null when either time is unusable or reversed. */
+export function formatJobDuration(createdAt: string, finishedAt: string): string | null {
+  const elapsed = Date.parse(finishedAt) - Date.parse(createdAt);
+  if (!Number.isFinite(elapsed) || elapsed < 0) return null;
+  const seconds = Math.round(elapsed / 1000);
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const rest = seconds % 60;
+  if (hours) return `${hours} h ${String(minutes).padStart(2, '0')} min`;
+  if (minutes) return `${minutes} min ${String(rest).padStart(2, '0')} s`;
+  return `${rest} s`;
+}
+
 export function Jobs({ jobs, onCancel, open, onOpen, onClose, busy, error, onRefresh }: Readonly<JobsProps>) {
   const id = useId();
   const trigger = useRef<HTMLButtonElement>(null);
@@ -210,6 +223,9 @@ export function Jobs({ jobs, onCancel, open, onOpen, onClose, busy, error, onRef
       <div className="activity-job-times">
         <JobTime label="Created" value={job.createdAt} />
         {job.finishedAt && <JobTime label={STATE_LABELS[job.state]} value={job.finishedAt} />}
+        {job.finishedAt && formatJobDuration(job.createdAt, job.finishedAt) && (
+          <span>Duration {formatJobDuration(job.createdAt, job.finishedAt)}</span>
+        )}
       </div>
       <div className="activity-job-actions">
         {isActiveJob(job) && (
