@@ -119,7 +119,7 @@ export const bookmarksSchema = z
 
 const baseProjectSchema = z
   .object({
-    schemaVersion: z.literal(20),
+    schemaVersion: z.literal(21),
     id: idSchema,
     title: z.string().trim().min(1).max(200),
     media: z
@@ -176,7 +176,7 @@ export function createLayer(id: string, name: string, ripple = true): VideoLayer
 
 export function createProject(id: string, title: string): ProjectDocument {
   return projectSchema.parse({
-    schemaVersion: 20,
+    schemaVersion: 21,
     id,
     title,
     media: { videoIds: [], audioIds: [] },

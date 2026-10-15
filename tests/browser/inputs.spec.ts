@@ -67,7 +67,9 @@ async function commitNumber(page: Page, name: string, value: string): Promise<vo
   else if (name.startsWith('Music')) await inspectorTab(page, 'Audio');
   else if (/Opening|Closing|Transition/.test(name)) await inspectorTab(page, 'Sequence');
   else if (
-    /^(Opacity|Temperature|Tint|Exposure|Brightness|Contrast|Hue|Saturation|Highlights|Shadows|Whites)$/.test(name)
+    /^(Opacity|Temperature|Tint|Exposure|Brightness|Contrast|Hue|Saturation|Highlights|Shadows|Whites|Blacks)$/.test(
+      name,
+    )
   )
     await inspectorTab(page, 'Track');
   else await inspectorTab(page, 'Clip');

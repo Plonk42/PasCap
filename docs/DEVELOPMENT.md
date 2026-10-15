@@ -1,15 +1,15 @@
 # Development
 
-Current strict schema **20** requires ten graded scalar bases in each video track's `colour`,
-including Temperature/Tint and Whites (−1…1, neutral 0), plus `hdr` (0–1, neutral 0; a
+Current strict schema **21** requires eleven graded scalar bases in each video track's `colour`,
+including Temperature/Tint, Whites and Blacks (−1…1, neutral 0), plus `hdr` (0–1, neutral 0; a
 detail-stage look applied before grading, see [detail filters](design/DETAIL_FILTERS.md#hdr-look)),
 all eight HSL bands and all four
-colour curves. Shared keyframes require twelve nullable fields, each enabled one with its own Easing, and a
+colour curves. Shared keyframes require thirteen nullable fields, each enabled one with its own Easing, and a
 boolean `reset` (default keyframe), in control order:
 `opacity`, `temperature`, `tint`, `exposure`, `brightness`, `contrast`,
-`hue`, `saturation`, `highlights`, `shadows`, `whites`, `hdr`. HSL/curves remain static; speed is
+`hue`, `saturation`, `highlights`, `shadows`, `whites`, `blacks`, `hdr`. HSL/curves remain static; speed is
 clip-only (constant or 1–256 source-frame keyframes), and every clip requires a boolean `reverse`.
-Reject/preserve v1–v19 documents and receipt snapshots; no load defaults,
+Reject/preserve v1–v20 documents and receipt snapshots; no load defaults,
 migrations, legacy acceptance or automatic deletion. CPU/reference/native/GPU
 must use the same [Temperature/Tint gain math](design/TEMPERATURE_AND_TINT.md)
 before Exposure, including intentionally coloured greys and pre-clipping
@@ -22,7 +22,7 @@ scalar LUT paths. At most two native 65³ Float32 buffers (6,591,000 bytes) rema
 available, without an extra decoder, texture, full-frame buffer or child process.
 Exact advanced grading remains the costliest export path, especially at UHD. See
 [HSL_AND_CURVES.md](design/HSL_AND_CURVES.md). New reference/measurement metadata
-identifies strict schema 20; historical reports remain unchanged.
+identifies strict schema 21; historical reports remain unchanged.
 
 Local Linux setup and contributing. Editing: [USER_GUIDE.md](USER_GUIDE.md). Service
 paths and **future, not implemented** containers: [DEPLOYMENT.md](DEPLOYMENT.md).
@@ -296,8 +296,8 @@ originals in `.pascap/browser-footage/synthetic-sources/` are outside that cache
 `browse-camera-*` means generated patterns, not real recordings. The
 [fixture factory](../scripts/fixtures.ts) uses `preview-lab-v6` outside the browser
 cache and `preview-lab` inside it. These are project identifiers, not schema
-versions; newly generated documents must satisfy strict v20, including complete video track
-colour with Temperature/Tint/Whites/HDR, all twelve nullable channels and track Transform
+versions; newly generated documents must satisfy strict v21, including complete video track
+colour with Temperature/Tint/Whites/Blacks/HDR, all thirteen nullable channels and track Transform
 base/per-setting keyframes. Bin resets never imply
 a global-library fallback.
 Neither suite invokes real-source sample preparation or needs private footage/music.
@@ -382,7 +382,7 @@ stall count nor a software-renderer FPS threshold qualifies hardware.
 **Do not run these in CI or without the owner's explicit approval for real jobs.**
 The [sample helper](../scripts/prepare-samples.ts) targets **DJI_0468.MP4 and DJI_0469.MP4
 only**: pass an **explicit folder after `--`**, never rely on a personal-path default.
-It reuses ready proxies but may prepare missing ones; creates only an absent v20
+It reuses ready proxies but may prepare missing ones; creates only an absent v21
 sample, never overwrites or migrates existing edits.
 
 The [measurement helper](../scripts/measure-preview.ts) accepts exactly **two
@@ -390,7 +390,7 @@ forward 1× clips on one enabled, zero-origin contiguous video track with Opacit
 extra tracks, Transform edits/keyframes or shared track keyframes
 (even neutral keyframes). `PASCAP_MEASURE_URL` selects that project.
 Measurement uses static scalar track Colour (including Temperature/Tint) with HDR 0, neutral
-HSL and identity curves; metadata must identify the strict v20 snapshot independently of the
+HSL and identity curves; metadata must identify the strict v21 snapshot independently of the
 report format/identifier; historical reports and receipt snapshots stay untouched.
 `npm run measure -- --skip-playback --reference` skips playback benchmarking but
 **renders a native reference**; `--headed --reference` adds repeated playback. The edit
@@ -442,7 +442,7 @@ of Ripple or track ID.
 Processing: [track keyframes](LAYERS_AND_KEYFRAMES.md), [retiming/audio](SPEED_AND_AUDIO.md)
 and [grading equations](COLOUR_AND_TIMING.md#colour).
 
-Strict schema 20 requires each video track's `transform: { base, keyframes }`: eight
+Strict schema 21 requires each video track's `transform: { base, keyframes }`: eight
 complete pose values and 0–256 per-setting project-frame keyframes with required
 easing and `reset` (default keyframe); clips have no `spatial` field. Shared
 [spatial mapping](../src/shared/spatial.ts) uses unrounded original-aspect contain
@@ -483,7 +483,7 @@ Track options contains rename, Ripple, ordering and deletion, with visibility se
 
 Colour, Speed and Transform always show their capture diamonds while the section is expanded, Colour and Transform with adjacent per-setting **Previous/Next** buttons; there is no Animate toggle and no stored preference. Each expanded section has one keyframe line with the **number of keyframes**, one **Previous/Next** pair over the same set and **Reset**. The line is hidden while the section is collapsed; the title row and its help stay reachable. Rendering, retained keyframes and read-only constraints never depend on what is shown. The per-setting buttons remain alongside the stored enabled-setting chip arrows because not every setting is enabled at every shared keyframe.
 Each keyframe line has one Previous/Next pair: Colour visits the union of
-Opacity, ten scalar and HDR keyframes; Speed visits all retained custom speed source
+Opacity, eleven scalar and HDR keyframes; Speed visits all retained custom speed source
 keyframes of the selected clip, including off-trim keyframes and original exclusive
 OUT, previewing the nearest mapped image through authoritative retiming. Transform
 visits all its stored track keyframes, including those after the duration, through
@@ -550,27 +550,27 @@ independent numeric IN/OUT pair (Enter/blur applies, Escape restores) is unchang
 - Never modify/copy/delete owner's originals or commit private paths/device IDs,
   saved project IDs, real media/cache or reports. Preserve fingerprints, symlink
   rejection, cache exclusion and HTTP guards.
-- Keep **strict schema 20**: required project `bookmarks` (at most 1,000 unique ascending
+- Keep **strict schema 21**: required project `bookmarks` (at most 1,000 unique ascending
   frames, editing aids only) and complete required video track `colour`, including
-  Temperature/Tint/Whites/HDR and static HSL/curves; reject saved `clip.colour`
+  Temperature/Tint/Whites/Blacks/HDR and static HSL/curves; reject saved `clip.colour`
   and `clip.correction`. Grade sources once with evaluated track Colour, retaining
   two LUT buffers and existing raw/process budgets. Main Colour controls and keyframes
   have identical track scope and work empty. Required track `transform` (base and
   project-frame keyframes) has the same scope; reject saved `clip.spatial`. See
   [track appearance](design/ROW_APPEARANCE.md). Required static clip `detail` and boolean `reverse`,
-  required unique video/audio membership, all twelve nullable
+  required unique video/audio membership, all thirteen nullable
   channels and per-track `ripple`, `transitions`, `openingFade`, `closingFade` and
   numeric `opacity` in 0–1. A new track starts at 1; a missing saved field is invalid.
   The channels are `opacity` (sole UI **Opacity**), `temperature`, `tint`,
   `exposure`, `brightness`, `contrast`, `hue`, `saturation`, `highlights`, `shadows`,
-  `whites`, `hdr`.
+  `whites`, `blacks`, `hdr`.
   Missing bases/channels are invalid; neutral values are creation values only.
   Track `opacity` is the sole valid stored value; reject saved `clip.opacity`
   and old `clipOpacity`/`layerOpacity` channels. No project-level
   transitions/fades, compatibility fields/defaults/migration or mandatory first-track
   ID. Require a 0–8 `music` array with unique instance IDs and complete independent
   settings, plus captured audio-source/instance-plan arrays in current receipts.
-  Reject and preserve incompatible v1–v19 projects/receipt snapshots and finished videos,
+  Reject and preserve incompatible v1–v20 projects/receipt snapshots and finished videos,
   without automatic deletion; recreate projects deliberately. Proxy formats,
   source protections and native resource budgets remain unchanged; the registries are
   version 2 (full-content checksums).

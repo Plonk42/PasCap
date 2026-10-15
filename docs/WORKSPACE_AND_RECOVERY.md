@@ -1,6 +1,6 @@
 # Desktop workspace and recovery
 
-The workspace uses **strict schema 20 with complete required video track colour and Transform, clip-only speed and reverse, uniform video tracks, required per-track
+The workspace uses **strict schema 21 with complete required video track colour and Transform, clip-only speed and reverse, uniform video tracks, required per-track
 Ripple/transitions/fades, 0–8 independently identified music tracks, project-specific
 video/music bins and draggable shared project-time track keyframes**, with per-setting channel navigation. Layout preferences,
 stored-keyframe inspection and recovery feedback remain editor-only. Source protection,
@@ -14,7 +14,7 @@ The intended discrete-GPU and long real-flight checks remain deferred.
 
 ## Layout and navigation
 
-Main **Track → Colour** edits ten scalar video track colour values, HDR and sole Opacity, including
+Main **Track → Colour** edits eleven scalar video track colour values, HDR and sole Opacity, including
 on empty tracks. Static and keyed Colour share this track ownership on every clip.
 Different treatments require different tracks; there is no per-clip grade or scope
 toggle. Sources are graded once; the Original preview neutralizes track Colour and clip Detail only.
@@ -132,7 +132,7 @@ raise/lower and delete; visibility remains a separate sidebar control.
 **Track → Colour** contains the single **Opacity** native slider/exact
 `NumberField` alongside the colour controls, with its diamond.
 The Colour keyframe line's Previous/Next pair visits the union of Opacity,
-ten scalar and HDR keyframes. Per-channel Opacity
+eleven scalar and HDR keyframes. Per-channel Opacity
 Previous/Next buttons remain beside the main diamond, alongside
 the existing arrows on enabled setting chips in stored Colour keyframe rows.
 Main and stored sliders/exact fields use **0–100%**, neutral **100%**.
@@ -385,7 +385,7 @@ The question-mark **Animation help** beside its heading uses the common hover/pi
 contract above; explanatory text does not replace the shared keyframe editor.
 **Clip** keeps source/clip settings and Speed controls; **Track → Colour**
 keeps track Colour/Opacity playhead value/diamond controls and **Track → Transform** the pose.
-All twelve settings (Opacity, ten scalar colour parameters and HDR)
+All thirteen settings (Opacity, eleven scalar colour parameters and HDR)
 expose a main diamond with adjacent per-setting **Previous/Next** buttons: **◇ hollow/inactive**
 versus **◆ filled/active**, with `aria-pressed`. A hollow diamond remains clickable; inactivity
 does not set HTML `disabled`. Actual invalid/draft states can disable actions.
@@ -536,7 +536,7 @@ there is no automatic write retry. Late folder reads are aborted on navigation/d
 browser roots: a music or video recording, or a folder as an explicit **recursive
 whole-folder import** that can queue substantial work. It never silently extends root
 configuration. No original is
-copied: strict schema 20 references registered originals in place, with only
+copied: strict schema 21 references registered originals in place, with only
 generated proxies/thumbnails, metadata, exports/receipts and scratch written locally.
 
 There is no upload endpoint, browser file picker, optional copy flow or true
@@ -698,8 +698,8 @@ saved document. It never deletes original recordings, shared registry entries,
 proxies/cache files, successful MP4s or receipts. This is not cache garbage
 collection; another project's membership and immutable export snapshots are unaffected.
 
-Only strict v20 projects and v20 project snapshots in version-1 export receipts are interpreted.
-Every video track requires complete Colour, including `temperature`, `tint`, `whites` and `hdr` bases
+Only strict v21 projects and v21 project snapshots in version-1 export receipts are interpreted.
+Every video track requires complete Colour, including `temperature`, `tint`, `whites`, `blacks` and `hdr` bases
 and static HSL/curves; missing fields and clip colour/correction are invalid.
 Every clip requires constant or 1–256-keyframe custom-curve speed and a boolean `reverse`; every video track
 requires complete Transform base/per-setting project-frame keyframes with easing and
@@ -716,12 +716,12 @@ Every video track requires `ripple`, `transitions`, `openingFade` and `closingFa
 project-level transitions/fades and a mandatory first-track identity are absent.
 Every video track also requires numeric `opacity` in 0–1. A new track starts at 1 (100%);
 a missing saved value is invalid, not default-filled. Every keyframe requires exactly
-twelve nullable fields, in control order: `opacity`, `temperature`,
+thirteen nullable fields, in control order: `opacity`, `temperature`,
 `tint`, `exposure`, `brightness`, `contrast`, `hue`, `saturation`, `highlights`,
-`shadows`, `whites`, `hdr`. HSL/curves remain static. Track
+`shadows`, `whites`, `blacks`, `hdr`. HSL/curves remain static. Track
 `opacity` is the sole valid stored value; saved `clip.opacity` and old
 `clipOpacity`/`layerOpacity` channels are invalid, not ignored or defaulted.
-Earlier v1–v19 projects/receipt snapshots are preserved, incompatible
+Earlier v1–v20 projects/receipt snapshots are preserved, incompatible
 and never migrated or rewritten with fallback/default local fields or old-format
 readers. **Create a new
 project** and import its media deliberately; there is no automatic deletion of
@@ -817,7 +817,7 @@ invalid release leaves the saved document and history unchanged.
 For an HTTP 409 or incompatible save response, **Review latest save** explains:
 
 1. **Keep editing this draft** — no saved document changes; the save error persists.
-2. **Download unsaved project** — download a strict v20 JSON snapshot with the current
+2. **Download unsaved project** — download a strict v21 JSON snapshot with the current
    local changes/expected revision before replacing them.
 3. **Discard local changes and reload** — explicitly replace local history/document
    with a newly read saved version. It performs no overwrite POST/PUT.
