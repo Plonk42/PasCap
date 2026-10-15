@@ -36,7 +36,7 @@ import { FFV1_SLICE_ARGUMENTS, NATIVE_THREADS } from './native-threads.js';
 import { inspectStreams, probeVideo } from './probe.js';
 import { runProcess } from './process.js';
 import { nativeFadeFilters } from './reference.js';
-import { retimeRawVideo, type RawRetimingReport } from './retime-process.js';
+import { excerptFilter, excerptInputArgs, retimeRawVideo, type RawRetimingReport } from './retime-process.js';
 import { atomicWrite } from './storage.js';
 
 export type AudioResolver = (id: string) => AudioAsset | Promise<AudioAsset>;
@@ -305,7 +305,6 @@ async function retimeClip(
   const row = inputs.snapshot.layers.find((layer) => layer.id === clip.layerId)!;
   await atomicWrite(path.join(directory, lut), generateCube(row.colour, EXPORT_RESOURCES.lutSize));
   const decodeFilter =
-    `trim=start_frame=${clip.sourceIn}:end_frame=${clip.sourceOut},setpts=PTS-STARTPTS,` +
     `scale=${target.width}:${target.height}:force_original_aspect_ratio=decrease:force_divisible_by=2:flags=bicubic:` +
     `in_color_matrix=bt709:out_color_matrix=bt709:in_range=${asset.metadata.colourRange}:out_range=pc,` +
     `format=gbrp,lut3d=file=${lut}:interp=tetrahedral,` +
@@ -323,7 +322,7 @@ async function retimeClip(
     clip,
     frameBytes: target.width * target.height * 3,
     signal: context.signal,
-    decodeArgs: [
+    decodeArgs: (excerpt) => [
       ...BASE_ARGS,
       '-xerror',
       '-err_detect',
@@ -331,6 +330,7 @@ async function retimeClip(
       '-threads',
       NATIVE_THREADS,
       '-noautorotate',
+      ...excerptInputArgs(excerpt),
       '-i',
       asset.sourcePath,
       '-map',
@@ -341,9 +341,9 @@ async function retimeClip(
       '-filter_threads',
       NATIVE_THREADS,
       '-vf',
-      decodeFilter,
+      excerptFilter(excerpt, decodeFilter),
       '-frames:v',
-      String(clip.sourceOut - clip.sourceIn),
+      String(excerpt.sourceOut - excerpt.sourceIn),
       '-fps_mode',
       'passthrough',
       '-c:v',

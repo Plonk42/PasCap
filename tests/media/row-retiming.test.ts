@@ -1,16 +1,26 @@
 import { mkdtemp, readdir, readFile, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { createConfig, type ServiceConfig } from '../../src/server/config.js';
 import { fingerprintFile } from '../../src/server/files.js';
 import { runProcess } from '../../src/server/process.js';
-import { retimeRawVideo, type RawRetimingOptions } from '../../src/server/retime-process.js';
+import {
+  excerptFilter,
+  excerptInputArgs,
+  retimeRawVideo,
+  type RawRetimingOptions,
+} from '../../src/server/retime-process.js';
 import { createClip, createLayer, createProject, projectSchema, type VideoClip } from '../../src/shared/model.js';
 import { compileRetiming, type Retiming, type SpeedCurve } from '../../src/shared/speed.js';
 import { calculateLayout, sampleTimeline } from '../../src/shared/timeline.js';
 
 const enabled = process.env['PASCAP_MEDIA_TESTS'] === '1';
+// Three 16×8 RGB frames per reversed decoder chunk, so short clips exercise several seeked chunks.
+vi.mock('../../src/shared/export.js', async (original) => {
+  const actual = await original<typeof import('../../src/shared/export.js')>();
+  return { ...actual, EXPORT_RESOURCES: { ...actual.EXPORT_RESOURCES, reverseChunkBytes: 3 * 16 * 8 * 3 } };
+});
 const WIDTH = 16;
 const HEIGHT = 8;
 const FRAME_BYTES = WIDTH * HEIGHT * 3;
@@ -24,11 +34,11 @@ describe.skipIf(!enabled)('supplied clip retiming maps · native pipes and dispo
   let originalBytes: Buffer;
   let originalRgb: Buffer;
   let fingerprint: Awaited<ReturnType<typeof fingerprintFile>>;
-  beforeAll(async () => {
-    root = await mkdtemp(path.join(os.tmpdir(), 'pascap-row-retiming-media-'));
-    config = createConfig({ dataDir: path.join(root, 'unused-cache') });
-    sourcePath = path.join(root, 'generated-frame-codes.mp4');
-    await runProcess(config.ffmpeg, [
+  /** Six-frame GOPs with B-frames, so reversed chunk seeks land mid-GOP and between reordered frames. */
+  let reorderedPath: string;
+  let reorderedRgb: Buffer;
+  const encode = (filename: string, gop: readonly string[]): Promise<Buffer> =>
+    runProcess(config.ffmpeg, [
       ...BASE,
       '-f',
       'lavfi',
@@ -49,8 +59,7 @@ describe.skipIf(!enabled)('supplied clip retiming maps · native pipes and dispo
       '2',
       '-filter_threads',
       '2',
-      '-bf',
-      '0',
+      ...gop,
       '-color_primaries',
       'bt709',
       '-color_trc',
@@ -61,16 +70,15 @@ describe.skipIf(!enabled)('supplied clip retiming maps · native pipes and dispo
       'tv',
       '-video_track_timescale',
       '30000',
-      sourcePath,
+      filename,
     ]);
-    originalBytes = await readFile(sourcePath);
-    fingerprint = await fingerprintFile(sourcePath);
-    originalRgb = await runProcess(config.ffmpeg, [
+  const decodeAll = (filename: string): Promise<Buffer> =>
+    runProcess(config.ffmpeg, [
       ...BASE,
       '-threads',
       '2',
       '-i',
-      sourcePath,
+      filename,
       '-map',
       '0:v:0',
       '-an',
@@ -92,20 +100,50 @@ describe.skipIf(!enabled)('supplied clip retiming maps · native pipes and dispo
       'rawvideo',
       'pipe:1',
     ]);
+  beforeAll(async () => {
+    root = await mkdtemp(path.join(os.tmpdir(), 'pascap-row-retiming-media-'));
+    config = createConfig({ dataDir: path.join(root, 'unused-cache') });
+    sourcePath = path.join(root, 'generated-frame-codes.mp4');
+    await encode(sourcePath, ['-bf', '0']);
+    originalBytes = await readFile(sourcePath);
+    fingerprint = await fingerprintFile(sourcePath);
+    originalRgb = await decodeAll(sourcePath);
     expect(originalRgb).toHaveLength(20 * FRAME_BYTES);
+    reorderedPath = path.join(root, 'generated-reordered-frame-codes.mp4');
+    await encode(reorderedPath, ['-bf', '2', '-g', '6', '-keyint_min', '6', '-sc_threshold', '0']);
+    reorderedRgb = await decodeAll(reorderedPath);
+    expect(reorderedRgb).toHaveLength(20 * FRAME_BYTES);
+    const types = await runProcess(config.ffprobe, [
+      '-v',
+      'error',
+      '-select_streams',
+      'v:0',
+      '-show_entries',
+      'frame=pict_type',
+      '-of',
+      'csv=p=0',
+      reorderedPath,
+    ]);
+    expect(types.toString('utf8')).toContain('B');
   });
   afterAll(async () => {
     if (root) await rm(root, { recursive: true, force: true });
   });
 
-  function options(clip: VideoClip, cwd: string, filename: string, signal: AbortSignal): RawRetimingOptions {
+  function options(
+    clip: VideoClip,
+    cwd: string,
+    filename: string,
+    signal: AbortSignal,
+    source = sourcePath,
+  ): RawRetimingOptions {
     return {
       ffmpeg: config.ffmpeg,
       cwd,
       clip,
       frameBytes: FRAME_BYTES,
       signal,
-      decodeArgs: [
+      decodeArgs: (excerpt) => [
         ...BASE,
         '-xerror',
         '-err_detect',
@@ -113,8 +151,9 @@ describe.skipIf(!enabled)('supplied clip retiming maps · native pipes and dispo
         '-threads',
         '2',
         '-noautorotate',
+        ...excerptInputArgs(excerpt),
         '-i',
-        sourcePath,
+        source,
         '-map',
         '0:v:0',
         '-an',
@@ -123,9 +162,9 @@ describe.skipIf(!enabled)('supplied clip retiming maps · native pipes and dispo
         '-filter_threads',
         '2',
         '-vf',
-        `trim=start_frame=${clip.sourceIn}:end_frame=${clip.sourceOut},setpts=PTS-STARTPTS,${RGB_FILTER}`,
+        excerptFilter(excerpt, RGB_FILTER),
         '-frames:v',
-        String(clip.sourceOut - clip.sourceIn),
+        String(excerpt.sourceOut - excerpt.sourceIn),
         '-fps_mode',
         'passthrough',
         '-c:v',
@@ -246,6 +285,61 @@ describe.skipIf(!enabled)('supplied clip retiming maps · native pipes and dispo
           );
           const sample = sampleTimeline(captured, placed.start + output, layout)[0]!;
           expect(sample.sourceFrame).toBe(source);
+        }
+        await unchanged();
+      } finally {
+        await rm(work, { recursive: true, force: true });
+      }
+    },
+  );
+
+  it.each(
+    [false, true].flatMap((reordered) =>
+      [
+        { name: '1×', speed: { mode: 'constant', rate: 1 } as const, sourceIn: 0 },
+        { name: '0.6× from a seek', speed: { mode: 'constant', rate: 0.6 } as const, sourceIn: 3 },
+        {
+          name: 'a slow-motion curve',
+          speed: {
+            mode: 'curve',
+            keyframes: [
+              { frame: 5, rate: 2, interpolation: 'linear' },
+              { frame: 10, rate: 0.3, interpolation: 'smooth' },
+              { frame: 15, rate: 1.5, interpolation: 'hold' },
+            ],
+          } as SpeedCurve,
+          sourceIn: 2,
+        },
+      ].map((item) => ({ ...item, reordered, gop: reordered ? 'B-frame GOP 6' : 'P-only' })),
+    ),
+  )(
+    'reverses $name ($gop) in seeked three-frame chunks with exact frame identity',
+    async ({ speed, sourceIn, reordered }) => {
+      const work = await mkdtemp(path.join(root, 'reversed-'));
+      const [source, rgb] = reordered ? [reorderedPath, reorderedRgb] : [sourcePath, originalRgb];
+      try {
+        const clip: VideoClip = {
+          ...createClip('reversed-clip', 'generated-original', sourceIn, 19),
+          speed,
+          reverse: true,
+        };
+        const map = compileRetiming(clip);
+        const expected = Array.from({ length: map.duration }, (_, output) => map.sourceAt(output));
+        expect(expected[0]).toBe(18);
+        const report = await retimeRawVideo(options(clip, work, 'reversed.rgb', new AbortController().signal, source));
+        const actual = await readFile(path.join(work, 'reversed.rgb'));
+        expect(actual).toHaveLength(map.duration * FRAME_BYTES);
+        expect(report).toMatchObject({
+          decodedFrames: 19 - sourceIn,
+          outputFrames: map.duration,
+          rawFrameBuffers: 1,
+          decoderProcesses: Math.ceil((19 - sourceIn) / 3),
+        });
+        for (const [output, source] of expected.entries()) {
+          if (output > 0) expect(source).toBeLessThanOrEqual(expected[output - 1]!);
+          expect(actual.subarray(output * FRAME_BYTES, (output + 1) * FRAME_BYTES)).toEqual(
+            rgb.subarray(source * FRAME_BYTES, (source + 1) * FRAME_BYTES),
+          );
         }
         await unchanged();
       } finally {

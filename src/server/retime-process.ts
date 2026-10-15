@@ -1,13 +1,23 @@
 import type { Writable } from 'node:stream';
+import { EXPORT_RESOURCES } from '../shared/export.js';
 import { clipSchema, type VideoClip } from '../shared/model.js';
+import { whileSerial } from '../shared/serial.js';
 import { compileRetiming, type Retiming } from '../shared/speed.js';
+import { framesToSeconds } from '../shared/timing.js';
 import { ServiceError } from './errors.js';
-import { runRawVideoPass, writeRawFrame, type RawFrameReader } from './raw-process.js';
+import { runRawVideoPass, writeRawFrame, type RawFrameReader, type RawVideoPass } from './raw-process.js';
 
+/** One original excerpt a decoder emits as raw frames; reversed, last frame first. */
+export interface SourceExcerpt {
+  sourceIn: number;
+  sourceOut: number;
+  reverse: boolean;
+}
 export interface RawRetimingOptions {
   ffmpeg: string;
   cwd: string;
-  decodeArgs: readonly string[];
+  /** Decoder arguments emitting exactly `excerpt`; see excerptInputArgs/excerptFilter. */
+  decodeArgs: (excerpt: Readonly<SourceExcerpt>) => readonly string[];
   encodeArgs: readonly string[];
   clip: VideoClip;
   /** Authoritative placed map for row keys; omission compiles the clip's constant/ramp/custom base. */
@@ -24,6 +34,29 @@ export interface RawRetimingReport {
   frameBytes: number;
   rawFrameBuffers: number;
   largestReadChunkBytes: number;
+  /** Serial original decoders: one forward, one per chunk reversed. */
+  decoderProcesses: number;
+}
+
+/**
+ * Forward excerpts decode from the file start (no seek). Reversed chunks seek:
+ * registered originals have verified PTS n/fps from 0, so a seek strictly between
+ * the preceding and first PTS lets accurate_seek drop exactly the earlier frames.
+ */
+export function excerptInputArgs(excerpt: Readonly<SourceExcerpt>): string[] {
+  if (!excerpt.reverse || excerpt.sourceIn === 0) return [];
+  return ['-ss', (framesToSeconds(excerpt.sourceIn) - framesToSeconds(1) / 4).toFixed(12)];
+}
+/** Select the excerpt before `filter`; reversed chunks end with FFmpeg's bounded `reverse` buffer. */
+export function excerptFilter(excerpt: Readonly<SourceExcerpt>, filter: string): string {
+  const frames = excerpt.sourceOut - excerpt.sourceIn;
+  return excerpt.reverse
+    ? `trim=end_frame=${frames},setpts=PTS-STARTPTS,${filter},reverse`
+    : `trim=start_frame=${excerpt.sourceIn}:end_frame=${excerpt.sourceOut},setpts=PTS-STARTPTS,${filter}`;
+}
+/** Frames per reversed decoder chunk: the native reverse buffer stays within EXPORT_RESOURCES.reverseChunkBytes. */
+export function reverseChunkFrames(frameBytes: number): number {
+  return Math.max(1, Math.floor(EXPORT_RESOURCES.reverseChunkBytes / frameBytes));
 }
 
 function captureRetiming(clip: VideoClip, supplied: Retiming | undefined): Retiming {
@@ -50,10 +83,8 @@ function captureRetiming(clip: VideoClip, supplied: Retiming | undefined): Retim
     sourcePositionAt: map.sourcePositionAt.bind(map),
     outputAt: map.outputAt.bind(map),
   });
-  if (
-    captured.sourcePositionAt(0) !== clip.sourceIn ||
-    captured.sourcePositionAt(captured.duration) !== clip.sourceOut
-  ) {
+  const [first, last] = clip.reverse ? [clip.sourceOut, clip.sourceIn] : [clip.sourceIn, clip.sourceOut];
+  if (captured.sourcePositionAt(0) !== first || captured.sourcePositionAt(captured.duration) !== last) {
     throw new ServiceError(
       'The shared retiming map continuous source positions must match the selected source endpoints.',
       422,
@@ -62,55 +93,78 @@ function captureRetiming(clip: VideoClip, supplied: Retiming | undefined): Retim
   return captured;
 }
 
-async function pumpMappedFrames(
-  options: RawRetimingOptions,
-  retiming: Retiming,
-  reader: RawFrameReader,
-  encoder: Writable,
-  check: () => void,
-): Promise<{ decoded: number; written: number }> {
-  const frame = options.frameBuffer ?? Buffer.allocUnsafe(options.frameBytes);
-  let decoded = 0;
-  let written = 0;
-  let previousSource = options.clip.sourceIn - 1;
-  let previousPosition = options.clip.sourceIn;
-  const progressStep = Math.max(1, Math.floor(retiming.duration / 500));
-  for (let output = 0; output < retiming.duration; output++) {
-    check();
+/** Discrete and continuous positions must stay in range and move only in the clip's direction. */
+class MapCheck {
+  #source: number;
+  #position: number;
+  readonly #sign: 1 | -1;
+  constructor(private readonly clip: VideoClip) {
+    this.#sign = clip.reverse ? -1 : 1;
+    this.#source = clip.reverse ? clip.sourceOut : clip.sourceIn - 1;
+    this.#position = clip.reverse ? clip.sourceOut : clip.sourceIn;
+  }
+  source(retiming: Retiming, output: number): number {
+    const { sourceIn, sourceOut } = this.clip;
     const source = retiming.sourceAt(output);
     if (
       !Number.isSafeInteger(source) ||
-      source < options.clip.sourceIn ||
-      source >= options.clip.sourceOut ||
-      source < previousSource
+      source < sourceIn ||
+      source >= sourceOut ||
+      (source - this.#source) * this.#sign < 0
     ) {
       throw new ServiceError('The shared retiming map is not a monotonic, in-range discrete source-frame map.', 422);
     }
-    previousSource = source;
+    this.#source = source;
     const position = retiming.sourcePositionAt(output);
     if (
       !Number.isFinite(position) ||
-      position < options.clip.sourceIn ||
-      position > options.clip.sourceOut ||
-      position < previousPosition
+      position < sourceIn ||
+      position > sourceOut ||
+      (position - this.#position) * this.#sign < 0
     ) {
       throw new ServiceError(
         'The shared retiming map is not a finite, monotonic, in-range continuous source-position map.',
         422,
       );
     }
-    previousPosition = position;
+    this.#position = position;
+    return source;
+  }
+}
+
+interface Pump {
+  frame: Buffer;
+  encoder: Writable;
+  written: number;
+}
+function reportProgress(options: RawRetimingOptions, retiming: Retiming, written: number): void {
+  const progressStep = Math.max(1, Math.floor(retiming.duration / 500));
+  if (written === 1 || written % progressStep === 0 || written === retiming.duration)
+    options.onProgress?.(written, retiming.duration);
+}
+
+async function pumpMappedFrames(
+  options: RawRetimingOptions,
+  retiming: Retiming,
+  reader: RawFrameReader,
+  pump: Pump,
+  check: () => void,
+): Promise<number> {
+  const { frame } = pump;
+  const map = new MapCheck(options.clip);
+  let decoded = 0;
+  for (let output = 0; output < retiming.duration; output++) {
+    check();
+    const source = map.source(retiming, output);
     while (options.clip.sourceIn + decoded <= source) {
       await reader.requireFrame(frame); // NOSONAR -- serial reads are the one-frame memory contract.
       decoded++;
       check();
     }
-    await writeRawFrame(encoder, frame); // NOSONAR -- serial writes enforce backpressure before reusing the frame buffer.
-    written++;
-    if (written === 1 || written % progressStep === 0 || written === retiming.duration)
-      options.onProgress?.(written, retiming.duration);
+    await writeRawFrame(pump.encoder, frame); // NOSONAR -- serial writes enforce backpressure before reusing the frame buffer.
+    reportProgress(options, retiming, ++pump.written);
   }
-  encoder.end();
+  pump.encoder.end();
   // Consume discarded frames at the exclusive OUT too; never hide decode errors.
   while (decoded < options.clip.sourceOut - options.clip.sourceIn) {
     check();
@@ -119,13 +173,64 @@ async function pumpMappedFrames(
   }
   if (await reader.readInto(frame))
     throw new ServiceError('Original decoder emitted frames outside the selected source range.', 422);
-  return { decoded, written };
+  return decoded;
+}
+
+/**
+ * Reversed clips decode serial chunks from OUT down to IN. Each chunk decoder
+ * emits its frames last first, buffering at most reverseChunkFrames output
+ * frames natively; Node still holds one frame.
+ */
+async function pumpReversedFrames(
+  options: RawRetimingOptions,
+  retiming: Retiming,
+  pass: RawVideoPass,
+  pump: Pump,
+): Promise<{ decoded: number; decoders: number }> {
+  const { frame } = pump;
+  const { sourceIn, sourceOut } = options.clip;
+  const chunk = reverseChunkFrames(options.frameBytes);
+  const map = new MapCheck(options.clip);
+  let reader: RawFrameReader | null = null;
+  let decoders = 0;
+  let low = sourceOut; // Lowest frame of the current chunk.
+  let held = sourceOut; // Frame in `frame`; sourceOut means none yet.
+  const nextChunk = async (): Promise<RawFrameReader> => {
+    if (reader) await pass.endReader(reader, frame);
+    const high = low;
+    low = Math.max(sourceIn, high - chunk);
+    decoders++;
+    return pass.reader(options.decodeArgs({ sourceIn: low, sourceOut: high, reverse: true }), 'Original decoder');
+  };
+  const nextImage = async (): Promise<void> => {
+    if (held === low) reader = await nextChunk();
+    await reader!.requireFrame(frame);
+    held--;
+    pass.check();
+  };
+  let output = 0;
+  await whileSerial(
+    () => output < retiming.duration,
+    async () => {
+      pass.check();
+      const source = map.source(retiming, output);
+      await whileSerial(() => held > source, nextImage);
+      await writeRawFrame(pump.encoder, frame);
+      reportProgress(options, retiming, ++pump.written);
+      output++;
+    },
+  );
+  pump.encoder.end();
+  // Consume every remaining chunk down to IN too; never hide decode errors.
+  await whileSerial(() => held > sourceIn, nextImage);
+  if (reader) await pass.endReader(reader, frame);
+  return { decoded: sourceOut - held, decoders };
 }
 
 /**
  * Native decoder -> exact shared sourceAt map -> native FFV1 encoder.
  * No whole-file/whole-excerpt buffers, no setpts speed approximation, no optical flow.
- * Both children are reaped before this resolves/rejects, including start/pipe errors.
+ * Every child is reaped before this resolves/rejects, including start/pipe errors.
  */
 export async function retimeRawVideo(request: RawRetimingOptions): Promise<RawRetimingReport> {
   const options = { ...request, clip: clipSchema.parse(request.clip) };
@@ -138,17 +243,29 @@ export async function retimeRawVideo(request: RawRetimingOptions): Promise<RawRe
   Object.freeze(options.clip);
   if (options.signal.aborted) throw new ServiceError('Job cancelled.', 499);
   const retiming = captureRetiming(options.clip, options.retiming);
-  let counts = { decoded: 0, written: 0 };
+  let decoded = 0;
+  let decoders = 1;
+  let written = 0;
   const report = await runRawVideoPass(options, async (pass) => {
-    const reader = pass.reader(options.decodeArgs, 'Original decoder');
-    const encoder = pass.encoder(options.encodeArgs, 'lossless retiming encoder');
-    counts = await pumpMappedFrames(options, retiming, reader, encoder, pass.check);
+    const frame = options.frameBuffer ?? Buffer.allocUnsafe(options.frameBytes);
+    if (options.clip.reverse) {
+      const pump = { frame, encoder: pass.encoder(options.encodeArgs, 'lossless retiming encoder'), written: 0 };
+      ({ decoded, decoders } = await pumpReversedFrames(options, retiming, pass, pump));
+      written = pump.written;
+      return;
+    }
+    const { sourceIn, sourceOut } = options.clip;
+    const reader = pass.reader(options.decodeArgs({ sourceIn, sourceOut, reverse: false }), 'Original decoder');
+    const pump = { frame, encoder: pass.encoder(options.encodeArgs, 'lossless retiming encoder'), written: 0 };
+    decoded = await pumpMappedFrames(options, retiming, reader, pump, pass.check);
+    written = pump.written;
   });
   return {
-    decodedFrames: counts.decoded,
-    outputFrames: counts.written,
+    decodedFrames: decoded,
+    outputFrames: written,
     frameBytes: options.frameBytes,
     rawFrameBuffers: 1,
     largestReadChunkBytes: report.largestReadChunkBytes,
+    decoderProcesses: decoders,
   };
 }

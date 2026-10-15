@@ -103,7 +103,7 @@ export class SourceTransport {
     }
     const signal = this.#cancel();
     this.#publish({ status: 'buffering', requestedFrame: frame, frame: null, error: '' });
-    this.frames.start(0, url, [frame], true);
+    this.frames.start(0, url, [frame], true, false);
     void this.frames
       .ready(0, frame, 1, signal)
       .then(() => {
@@ -147,7 +147,7 @@ export class SourceTransport {
     this.#publish({ status: 'starting', requestedFrame: start, frame: shown, error: '' });
     const first = start === shown ? start + 1 : start;
     const frames = Array.from({ length: last - first + 1 }, (_value, index) => first + index);
-    this.frames.start(0, url, frames, true);
+    this.frames.start(0, url, frames, true, false);
     void this.frames
       .ready(0, first, Math.min(PREFILL_FRAMES, frames.length), signal)
       .then(() => {

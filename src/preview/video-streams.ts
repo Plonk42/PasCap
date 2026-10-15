@@ -9,6 +9,7 @@ interface Decoded {
 }
 interface Lane {
   generation: number;
+  reverse: boolean;
   queue: Decoded[];
   error: Error | null;
   readonly listeners: Set<() => void>;
@@ -34,6 +35,7 @@ export class VideoStreams {
   constructor(lanes: number) {
     this.#lanes = Array.from({ length: lanes }, () => ({
       generation: 0,
+      reverse: false,
       queue: [],
       error: null,
       listeners: new Set(),
@@ -79,14 +81,16 @@ export class VideoStreams {
     }
   };
   /**
-   * Close frames the clock has passed and, when `take`, the exact frame's queue
-   * entry; return one credit per removed frame with the new minimum.
+   * Close frames the clock has passed (below the needed frame, above it when
+   * reversed) and, when `take`, the exact frame's queue entry; return one credit
+   * per removed frame with the needed frame.
    */
   #advance(index: number, lane: Lane, sourceFrame: number, take: boolean): VideoFrame | null {
     if (this.#failure) throw this.#failure;
     if (lane.error) throw lane.error;
     let credits = 0;
-    while (lane.queue.length && lane.queue[0]!.sourceFrame < sourceFrame) {
+    const passed = (frame: number): boolean => (lane.reverse ? frame > sourceFrame : frame < sourceFrame);
+    while (lane.queue.length && passed(lane.queue[0]!.sourceFrame)) {
       lane.queue.shift()!.frame.close();
       this.droppedFrames++;
       credits++;
@@ -99,19 +103,22 @@ export class VideoStreams {
       credits++;
     }
     if (credits)
-      this.#command({ kind: 'credit', lane: index, generation: lane.generation, count: credits, minimum: sourceFrame });
+      this.#command({ kind: 'credit', lane: index, generation: lane.generation, count: credits, needed: sourceFrame });
     return take ? (head?.frame ?? null) : null;
   }
 
-  start(index: number, url: string, frames: number[], complete: boolean): void {
+  /** `frames` follow the playback direction: descending when `reverse`. */
+  start(index: number, url: string, frames: number[], complete: boolean, reverse: boolean): void {
     const lane = this.#lane(index);
     this.#reset(lane);
+    lane.reverse = reverse;
     this.#command({
       kind: 'start',
       lane: index,
       generation: lane.generation,
       url: new URL(url, location.href).href,
       frames,
+      reverse,
       complete,
     });
   }

@@ -1,6 +1,6 @@
 # Development
 
-Current strict schema **18** requires nine graded scalar bases in each video track's `colour`,
+Current strict schema **19** requires nine graded scalar bases in each video track's `colour`,
 including Temperature/Tint (−1…1, neutral 0), plus `hdr` (0–1, neutral 0; a
 detail-stage look applied before grading, see [detail filters](design/DETAIL_FILTERS.md#hdr-look)),
 all eight HSL bands and all four
@@ -8,8 +8,8 @@ colour curves. Shared keyframes require eleven nullable fields, each enabled one
 boolean `reset` (default keyframe), in control order:
 `opacity`, `temperature`, `tint`, `exposure`, `brightness`, `contrast`,
 `hue`, `saturation`, `highlights`, `shadows`, `hdr`. HSL/curves remain static; speed is
-clip-only (constant or 1–256 source-frame keyframes).
-Reject/preserve v1–v17 documents and receipt snapshots; no load defaults,
+clip-only (constant or 1–256 source-frame keyframes), and every clip requires a boolean `reverse`.
+Reject/preserve v1–v18 documents and receipt snapshots; no load defaults,
 migrations, legacy acceptance or automatic deletion. CPU/reference/native/GPU
 must use the same [Temperature/Tint gain math](design/TEMPERATURE_AND_TINT.md)
 before Exposure, including intentionally coloured greys and pre-clipping
@@ -22,7 +22,7 @@ scalar LUT paths. At most two native 65³ Float32 buffers (6,591,000 bytes) rema
 available, without an extra decoder, texture, full-frame buffer or child process.
 Exact advanced grading remains the costliest export path, especially at UHD. See
 [HSL_AND_CURVES.md](design/HSL_AND_CURVES.md). New reference/measurement metadata
-identifies strict schema 18; historical reports remain unchanged.
+identifies strict schema 19; historical reports remain unchanged.
 
 Local Linux setup and contributing. Editing: [USER_GUIDE.md](USER_GUIDE.md). Service
 paths and **future, not implemented** containers: [DEPLOYMENT.md](DEPLOYMENT.md).
@@ -296,7 +296,7 @@ originals in `.pascap/browser-footage/synthetic-sources/` are outside that cache
 `browse-camera-*` means generated patterns, not real recordings. The
 [fixture factory](../scripts/fixtures.ts) uses `preview-lab-v6` outside the browser
 cache and `preview-lab` inside it. These are project identifiers, not schema
-versions; newly generated documents must satisfy strict v18, including complete video track
+versions; newly generated documents must satisfy strict v19, including complete video track
 colour with Temperature/Tint/HDR, all eleven nullable channels and track Transform
 base/per-setting keyframes. Bin resets never imply
 a global-library fallback.
@@ -382,15 +382,15 @@ stall count nor a software-renderer FPS threshold qualifies hardware.
 **Do not run these in CI or without the owner's explicit approval for real jobs.**
 The [sample helper](../scripts/prepare-samples.ts) targets **DJI_0468.MP4 and DJI_0469.MP4
 only**: pass an **explicit folder after `--`**, never rely on a personal-path default.
-It reuses ready proxies but may prepare missing ones; creates only an absent v18
+It reuses ready proxies but may prepare missing ones; creates only an absent v19
 sample, never overwrites or migrates existing edits.
 
 The [measurement helper](../scripts/measure-preview.ts) accepts exactly **two
-1× clips on one enabled, zero-origin contiguous video track with Opacity 1**, no music,
+forward 1× clips on one enabled, zero-origin contiguous video track with Opacity 1**, no music,
 extra tracks, Transform edits/keyframes or shared track keyframes
 (even neutral keyframes). `PASCAP_MEASURE_URL` selects that project.
 Measurement uses static scalar track Colour (including Temperature/Tint) with HDR 0, neutral
-HSL and identity curves; metadata must identify the strict v18 snapshot independently of the
+HSL and identity curves; metadata must identify the strict v19 snapshot independently of the
 report format/identifier; historical reports and receipt snapshots stay untouched.
 `npm run measure -- --skip-playback --reference` skips playback benchmarking but
 **renders a native reference**; `--headed --reference` adds repeated playback. The edit
@@ -442,7 +442,7 @@ of Ripple or track ID.
 Processing: [track keyframes](LAYERS_AND_KEYFRAMES.md), [retiming/audio](SPEED_AND_AUDIO.md)
 and [grading equations](COLOUR_AND_TIMING.md#colour).
 
-Strict schema 18 requires each video track's `transform: { base, keyframes }`: eight
+Strict schema 19 requires each video track's `transform: { base, keyframes }`: eight
 complete pose values and 0–256 per-setting project-frame keyframes with required
 easing and `reset` (default keyframe); clips have no `spatial` field. Shared
 [spatial mapping](../src/shared/spatial.ts) uses unrounded original-aspect contain
@@ -550,14 +550,14 @@ independent numeric IN/OUT pair (Enter/blur applies, Escape restores) is unchang
 - Never modify/copy/delete owner's originals or commit private paths/device IDs,
   saved project IDs, real media/cache or reports. Preserve fingerprints, symlink
   rejection, cache exclusion and HTTP guards.
-- Keep **strict schema 18**: required project `bookmarks` (at most 1,000 unique ascending
+- Keep **strict schema 19**: required project `bookmarks` (at most 1,000 unique ascending
   frames, editing aids only) and complete required video track `colour`, including
   Temperature/Tint/HDR and static HSL/curves; reject saved `clip.colour`
   and `clip.correction`. Grade sources once with evaluated track Colour, retaining
   two LUT buffers and existing raw/process budgets. Main Colour controls and keyframes
   have identical track scope and work empty. Required track `transform` (base and
   project-frame keyframes) has the same scope; reject saved `clip.spatial`. See
-  [track appearance](design/ROW_APPEARANCE.md). Required static clip `detail`,
+  [track appearance](design/ROW_APPEARANCE.md). Required static clip `detail` and boolean `reverse`,
   required unique video/audio membership, all eleven nullable
   channels and per-track `ripple`, `transitions`, `openingFade`, `closingFade` and
   numeric `opacity` in 0–1. A new track starts at 1; a missing saved field is invalid.
@@ -570,7 +570,7 @@ independent numeric IN/OUT pair (Enter/blur applies, Escape restores) is unchang
   transitions/fades, compatibility fields/defaults/migration or mandatory first-track
   ID. Require a 0–8 `music` array with unique instance IDs and complete independent
   settings, plus captured audio-source/instance-plan arrays in current receipts.
-  Reject and preserve incompatible v1–v17 projects/receipt snapshots and finished videos,
+  Reject and preserve incompatible v1–v18 projects/receipt snapshots and finished videos,
   without automatic deletion; recreate projects deliberately. Proxy formats,
   source protections and native resource budgets remain unchanged; the registries are
   version 2 (full-content checksums).

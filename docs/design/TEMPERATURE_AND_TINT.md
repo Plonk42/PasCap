@@ -1,4 +1,4 @@
-# Video track Temperature and Tint · strict project schema 18
+# Video track Temperature and Tint · strict project schema 19
 
 Approved contract for [#68](https://github.com/Plonk42/PasCap/issues/68).
 These are normalized **SDR colour controls**, not Kelvin, HDR output, illuminant
@@ -81,15 +81,15 @@ native process; existing frame/pixel/resource and A/V gates remain unchanged.
 
 ## Strict preservation and validation
 
-Only **schema 18** projects and schema-18 snapshots in version-1 export receipts
+Only **schema 19** projects and schema-19 snapshots in version-1 export receipts
 are accepted. Missing Temperature/Tint bases or either nullable keyframe field,
-unknown fields and saved clip Colour/correction are invalid. Reject **v1–v17**
+unknown fields and saved clip Colour/correction are invalid. Reject **v1–v18**
 documents and receipt snapshots clearly; preserve their bytes and successful
-outputs. Recreate projects deliberately: no migrations, v17 acceptance,
+outputs. Recreate projects deliberately: no migrations, v18 acceptance,
 compatibility readers, injected defaults, fallback or automatic deletion.
 Receipt/report/proxy/PCM format versions remain independent and unchanged (the
 registries are version 2, with full-content checksums);
-new reference/measurement metadata identifies schema 18, historical evidence does
+new reference/measurement metadata identifies schema 19, historical evidence does
 not change.
 
 Required disposable checks cover strict bounds/rejection/preservation, neutral

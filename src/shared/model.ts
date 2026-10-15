@@ -30,6 +30,7 @@ export const clipSchema = z
     sourceIn: frameSchema,
     sourceOut: frameSchema.positive(),
     speed: speedSchema,
+    reverse: z.boolean(),
     detail: detailSchema,
   })
   .strict()
@@ -118,7 +119,7 @@ export const bookmarksSchema = z
 
 const baseProjectSchema = z
   .object({
-    schemaVersion: z.literal(18),
+    schemaVersion: z.literal(19),
     id: idSchema,
     title: z.string().trim().min(1).max(200),
     media: z
@@ -175,7 +176,7 @@ export function createLayer(id: string, name: string, ripple = true): VideoLayer
 
 export function createProject(id: string, title: string): ProjectDocument {
   return projectSchema.parse({
-    schemaVersion: 18,
+    schemaVersion: 19,
     id,
     title,
     media: { videoIds: [], audioIds: [] },
@@ -204,6 +205,7 @@ export function createClip(
     sourceIn,
     sourceOut,
     speed: { ...NORMAL_SPEED },
+    reverse: false,
     detail: createDetailSettings(),
   });
 }

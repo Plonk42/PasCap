@@ -17,14 +17,14 @@ import { hasSpatialEdits } from '../src/shared/spatial.js';
 import { calculateLayout, layerClips } from '../src/shared/timeline.js';
 import { framesToSeconds } from '../src/shared/timing.js';
 
-const reportId = 'preview-v18';
+const reportId = 'preview-v19';
 const measurementProfile = {
   id: 'original-two-excerpts-v6',
   // Diagnostic profile format is independent of the project document schema.
   schemaVersion: 6,
-  projectSchemaVersion: 18,
+  projectSchemaVersion: 19,
   description:
-    'Strict schema-18 original two-excerpt row-colour/Temperature/Tint/HSL/curves/seek/transition/native-reference diagnostic: one enabled zero-origin contiguous track, unit row-owned Opacity, static row Colour without HDR, neutral track Transform and detail filters without Transform keys, constant 1× speed, no shared project-frame layer points and an empty music array.',
+    'Strict schema-19 original two-excerpt row-colour/Temperature/Tint/HSL/curves/seek/transition/native-reference diagnostic: one enabled zero-origin contiguous track, unit row-owned Opacity, static row Colour without HDR, neutral track Transform and detail filters without Transform keys, constant forward 1× speed, no shared project-frame layer points and an empty music array.',
 } as const;
 const url = process.env['PASCAP_MEASURE_URL'] ?? 'http://127.0.0.1:5173';
 const browser = await chromium.launch({
@@ -36,7 +36,7 @@ const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
 // tsx/esbuild preserves nested function names using this helper. Evaluated functions
 // are serialised into the page and cannot otherwise access the Node-side helper.
 await page.addInitScript('globalThis.__name = (fn) => fn;');
-// Keep historical report identifiers/output files separate from new schema-18 measurements.
+// Keep historical report identifiers/output files separate from new schema-19 measurements.
 const directory = path.resolve('.pascap/measurements', reportId);
 await mkdir(directory, { recursive: true });
 try {
@@ -54,15 +54,15 @@ try {
   // This is the original two-clip colour/seek comparison, not the production
   // layered renderer. Reject shared layer points/opacity rather than measure a false baseline.
   if (
-    original.schemaVersion !== 18 ||
+    original.schemaVersion !== 19 ||
     original.clips.length !== 2 ||
     original.music.length !== 0 ||
     hasSpatialEdits(original.layers[0]!.transform) ||
     needsLayeredExport(original) ||
-    original.clips.some((clip) => clip.speed.mode !== 'constant' || clip.speed.rate !== 1)
+    original.clips.some((clip) => clip.reverse || clip.speed.mode !== 'constant' || clip.speed.rate !== 1)
   )
     throw new Error(
-      'This schema-18 diagnostic expects two normal-speed excerpts on one enabled, opaque, zero-origin contiguous track, with static row Colour without HDR, neutral track Transform and detail filters and no Transform keys, music, extra layers or shared project-frame layer points. Choose a compatible project with PASCAP_MEASURE_URL; no saved document will be changed.',
+      'This schema-19 diagnostic expects two normal-speed forward excerpts on one enabled, opaque, zero-origin contiguous track, with static row Colour without HDR, neutral track Transform and detail filters and no Transform keys, music, extra layers or shared project-frame layer points. Choose a compatible project with PASCAP_MEASURE_URL; no saved document will be changed.',
     );
   const layout = calculateLayout(original);
   const clips = layerClips(original, original.layers[0]!.id);

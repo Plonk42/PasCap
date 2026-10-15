@@ -48,7 +48,9 @@ export function SpeedHelp({ helpId }: Readonly<{ helpId: string }>) {
         1× is recorded speed: below 1× is slow motion, above is faster. A keyframe ○ changes the speed over the length
         of this clip.
       </p>
-      <p className="editor-help-tip">Tip: presets such as Ramp up replace this clip’s speed keyframes.</p>
+      <p className="editor-help-tip">
+        Tip: Reverse plays the clip backwards; presets such as Ramp up replace its speed keyframes.
+      </p>
     </HelpPopover>
   );
 }
@@ -171,8 +173,10 @@ export function SpeedControls({
   if (inspection !== selection) setSelection(inspection);
   const keys = clip?.speed.mode === 'curve' ? clip.speed.keyframes : [];
   const cursor = inspection?.frame ?? sourceFrame ?? clip?.sourceIn ?? 0;
-  const previous = [...keys].reverse().find((key) => key.frame < cursor);
-  const next = keys.find((key) => key.frame > cursor);
+  // Previous/Next follow the timeline: a reversed clip reaches higher source frames first.
+  const lower = [...keys].reverse().find((key) => key.frame < cursor);
+  const higher = keys.find((key) => key.frame > cursor);
+  const [previous, next] = clip?.reverse ? [higher, lower] : [lower, higher];
   const [error, setError] = useState('');
   const validate = (speed: SpeedSettings): string | null => {
     if (!clip) return 'Select a clip to edit its speed.';
@@ -212,6 +216,10 @@ export function SpeedControls({
   const speed = clip?.speed;
   const rate = clip && speed ? sourceRateAt(speed, sourceFrame ?? clip.sourceIn) : 1;
   const modified = !!speed && (speed.mode === 'curve' || speed.rate !== 1);
+  const reverse = (checked: boolean): void => {
+    if (!clip || unavailable) return;
+    onEdit({ type: 'reverse', clipId: clip.id, reverse: checked });
+  };
   const rateControl = clip && (
     <SpeedRate
       clip={clip}
@@ -229,8 +237,8 @@ export function SpeedControls({
       id="speed"
       title="Speed"
       icon="speed"
-      badge={`${rate.toFixed(2)}×`}
-      modified={modified}
+      badge={`${rate.toFixed(2)}×${clip?.reverse ? ' ◂' : ''}`}
+      modified={modified || !!clip?.reverse}
       help={<SpeedHelp helpId={helpId} />}
     >
       {clip && speed ? (
@@ -275,6 +283,18 @@ export function SpeedControls({
             <option value="constant">Constant speed</option>
             <option value="curve">Custom curve</option>
           </select>
+          <label
+            className="speed-reverse"
+            title="Play this clip from its last frame back to its first. Its duration and speed keyframes are unchanged."
+          >
+            <input
+              type="checkbox"
+              checked={clip.reverse}
+              disabled={unavailable}
+              onChange={(event) => reverse(event.currentTarget.checked)}
+            />
+            <span>Reverse</span>
+          </label>
           {speed.mode === 'constant' && (
             <div className="speed-presets">
               {[0.25, 0.5, 1, 2, 4].map((preset) => (

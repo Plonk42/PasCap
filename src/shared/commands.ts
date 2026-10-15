@@ -43,6 +43,7 @@ export type EditCommand =
   | { type: 'duplicate'; clipId: string; newClipId: string }
   | { type: 'colour'; layerId: string; colour: ColourSettings }
   | { type: 'speed'; clipId: string; speed: SpeedSettings }
+  | { type: 'reverse'; clipId: string; reverse: boolean }
   | { type: 'transform'; layerId: string; transform: SpatialSettings }
   | { type: 'detail'; clipId: string; detail: DetailSettings }
   | { type: 'music'; music: MusicTrack[] }
@@ -132,6 +133,7 @@ function reorderClips(next: ProjectDocument, ids: string[]): void {
   );
 }
 
+/** `sourceFrame` is the source boundary; a reversed clip keeps its higher frames first. */
 function splitClip(next: ProjectDocument, index: number, command: Extract<EditCommand, { type: 'split' }>): void {
   const original = next.clips[index]!;
   if (
@@ -142,14 +144,17 @@ function splitClip(next: ProjectDocument, index: number, command: Extract<EditCo
     throw new Error('Split must be strictly inside a clip.');
   const placed = calculateLayout(next).clips.find((item) => item.clip.id === original.id)!;
   const layer = next.layers.find((item) => item.id === original.layerId)!;
-  const leftDuration = clipDuration({ ...original, sourceOut: command.sourceFrame });
+  const lower = { sourceIn: original.sourceIn, sourceOut: command.sourceFrame };
+  const upper = { sourceIn: command.sourceFrame, sourceOut: original.sourceOut };
+  const [first, second] = original.reverse ? [upper, lower] : [lower, upper];
+  const leftDuration = clipDuration({ ...original, ...first });
   const right = {
     ...original,
+    ...second,
     id: command.newClipId,
-    sourceIn: command.sourceFrame,
     start: placed.start + leftDuration,
   };
-  next.clips[index] = { ...original, sourceOut: command.sourceFrame, start: placed.start };
+  next.clips[index] = { ...original, ...first, start: placed.start };
   layer.transitions = layer.transitions.map((t) => (t.leftId === original.id ? { ...t, leftId: right.id } : t));
   next.clips.splice(index + 1, 0, right);
   repairLayerBoundaries(next, [layer.id]);
@@ -164,14 +169,24 @@ function validateRemoval(clip: VideoClip, sourceIn: number, sourceOut: number): 
     throw new Error('The removed source range must stay within the selected clip.');
 }
 
-function retainedRightStart(project: ProjectDocument, clip: VideoClip, sourceIn: number): number {
+/** Where the retained piece after the removal starts: the first output frame of its first image.
+ * Reversed, outputAt is the last frame showing a source frame, so the next one shows the frame below. */
+function retainedRightStart(
+  project: ProjectDocument,
+  clip: VideoClip,
+  removed: { sourceIn: number; sourceOut: number },
+): number {
   const placed = calculateLayout(project).clips.find((item) => item.clip.id === clip.id)!;
-  return placed.start + placed.retiming.outputAt(sourceIn);
+  return (
+    placed.start +
+    (clip.reverse ? placed.retiming.outputAt(removed.sourceIn) + 1 : placed.retiming.outputAt(removed.sourceOut))
+  );
 }
 
 /** Remove only original-source frames from one excerpt. Positioned cut boundaries
  * use its pre-edit contextual map; Ripple rejoins retained pieces at its anchor.
- * Other tracks, music and absolute row points stay put.
+ * Other tracks, music and absolute row points stay put. A reversed clip keeps
+ * its higher source frames as the left piece.
  * Retained durations are recompiled/rounded like mapped splits, not overridden
  * to force the old OUT. Final schema validation rejects any resulting conflict.
  */
@@ -183,29 +198,26 @@ function removeSourceRange(
   const original = next.clips[index]!;
   const layer = requiredLayer(next, original.layerId);
   validateRemoval(original, command.sourceIn, command.sourceOut);
-  if (command.sourceIn === original.sourceIn && command.sourceOut === original.sourceOut) {
+  const lower =
+    command.sourceIn === original.sourceIn ? null : { sourceIn: original.sourceIn, sourceOut: command.sourceIn };
+  const upper =
+    command.sourceOut === original.sourceOut ? null : { sourceIn: command.sourceOut, sourceOut: original.sourceOut };
+  const [left, right] = original.reverse ? [upper, lower] : [lower, upper];
+  const rightStart = (): number => retainedRightStart(next, original, command);
+  if (!left && !right) {
     next.clips.splice(index, 1);
-  } else if (command.sourceIn === original.sourceIn) {
-    next.clips[index] = {
-      ...original,
-      sourceIn: command.sourceOut,
-      start: retainedRightStart(next, original, command.sourceOut),
-    };
-  } else if (command.sourceOut === original.sourceOut) {
-    next.clips[index] = { ...original, sourceOut: command.sourceIn };
+  } else if (!left) {
+    next.clips[index] = { ...original, ...right!, start: rightStart() };
+  } else if (!right) {
+    next.clips[index] = { ...original, ...left };
   } else {
     if (!idSchema.safeParse(command.newClipId).success) throw new Error('The new clip needs a valid clip-instance ID.');
     if (next.clips.some((clip) => clip.id === command.newClipId)) throw new Error('The new clip ID must be unused.');
-    const right = {
-      ...original,
-      id: command.newClipId,
-      sourceIn: command.sourceOut,
-      start: retainedRightStart(next, original, command.sourceOut),
-    };
-    next.clips[index] = { ...original, sourceOut: command.sourceIn };
-    next.clips.splice(index + 1, 0, right);
+    const piece = { ...original, ...right, id: command.newClipId, start: rightStart() };
+    next.clips[index] = { ...original, ...left };
+    next.clips.splice(index + 1, 0, piece);
     layer.transitions = layer.transitions.map((transition) =>
-      transition.leftId === original.id ? { ...transition, leftId: right.id } : transition,
+      transition.leftId === original.id ? { ...transition, leftId: piece.id } : transition,
     );
   }
   repairLayerBoundaries(next, [layer.id]);
@@ -490,6 +502,11 @@ export function applyCommand(document: ProjectDocument, command: EditCommand): P
     case 'speed':
       next.clips[index] = { ...next.clips[index]!, speed: { ...command.speed } };
       break;
+    case 'reverse':
+      if (typeof command.reverse !== 'boolean') throw new Error('Reverse must be on or off.');
+      // Direction never changes duration or placement.
+      next.clips[index] = { ...next.clips[index]!, reverse: command.reverse };
+      return projectSchema.parse(next);
     case 'transform':
       requiredLayer(next, command.layerId).transform = spatialSettingsSchema.parse(command.transform);
       // Appearance-only replacement must not normalize or rewrite stored timing.

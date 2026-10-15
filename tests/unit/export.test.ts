@@ -111,12 +111,12 @@ function audioAsset() {
 }
 
 describe('strict production export request and immutable validation', () => {
-  it('offers exactly 720p and UHD profiles, accepts no-music v18 and rejects empty/legacy/unknown requests', () => {
+  it('offers exactly 720p and UHD profiles, accepts no-music v19 and rejects empty/legacy/unknown requests', () => {
     expect(EXPORT_PROFILES.draft720).toMatchObject({ width: 1280, height: 720 });
     expect(EXPORT_PROFILES.final4k).toMatchObject({ width: 3840, height: 2160 });
     const document = documentWithClips();
     expect(exportRequestSchema.parse({ document, profile: 'draft720' }).document.music).toEqual([]);
-    expect(exportRequestSchema.parse({ document, profile: 'draft720' }).document.schemaVersion).toBe(18);
+    expect(exportRequestSchema.parse({ document, profile: 'draft720' }).document.schemaVersion).toBe(19);
     for (const request of [
       { document: createProject('empty', 'Empty'), profile: 'draft720' },
       {
@@ -459,7 +459,7 @@ describe('bounded raw-stream discrete retimer (no FFmpeg needed)', () => {
       const report = await retimeRawVideo({
         ffmpeg: process.execPath,
         cwd: directory,
-        decodeArgs: ['-e', decode],
+        decodeArgs: () => ['-e', decode],
         encodeArgs: ['-e', encode],
         clip,
         frameBytes: 6,
@@ -496,7 +496,7 @@ describe('bounded raw-stream discrete retimer (no FFmpeg needed)', () => {
       await retimeRawVideo({
         ffmpeg: process.execPath,
         cwd: directory,
-        decodeArgs: ['-e', decode],
+        decodeArgs: () => ['-e', decode],
         encodeArgs: ['-e', encode],
         clip,
         frameBytes: 6,
@@ -520,7 +520,7 @@ describe('bounded raw-stream discrete retimer (no FFmpeg needed)', () => {
       retimeRawVideo({
         ffmpeg: process.execPath,
         cwd: directory,
-        decodeArgs: ['-e', 'process.stdout.write(Buffer.alloc(11));'],
+        decodeArgs: () => ['-e', 'process.stdout.write(Buffer.alloc(11));'],
         encodeArgs: ['-e', 'process.stdin.resume();setInterval(()=>{},1000);'],
         clip: createClip('raw', 'video', 0, 2),
         frameBytes: 6,
@@ -534,7 +534,7 @@ describe('bounded raw-stream discrete retimer (no FFmpeg needed)', () => {
       retimeRawVideo({
         ffmpeg: process.execPath,
         cwd: directory,
-        decodeArgs: ['-e', 'setInterval(()=>{},1000);'],
+        decodeArgs: () => ['-e', 'setInterval(()=>{},1000);'],
         encodeArgs: ['-e', 'process.stderr.write("intentional encoder failure");process.exit(23);'],
         clip: createClip('raw', 'video', 0, 2),
         frameBytes: 6,
@@ -549,7 +549,7 @@ describe('bounded raw-stream discrete retimer (no FFmpeg needed)', () => {
       retimeRawVideo({
         ffmpeg: '/does-not-exist',
         cwd: await temp(),
-        decodeArgs: [],
+        decodeArgs: () => [],
         encodeArgs: [],
         clip: createClip('raw', 'video', 0, 2),
         frameBytes: 6,
@@ -566,7 +566,7 @@ describe('bounded raw-stream discrete retimer (no FFmpeg needed)', () => {
       retimeRawVideo({
         ffmpeg: process.execPath,
         cwd: directory,
-        decodeArgs: [
+        decodeArgs: () => [
           '-e',
           'process.on("SIGTERM",()=>{});process.stdout.write(Buffer.alloc(6));setInterval(()=>{},1000);',
         ],

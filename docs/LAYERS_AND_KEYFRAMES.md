@@ -1,4 +1,4 @@
-# Video tracks, shared keyframes and source review · project v18
+# Video tracks, shared keyframes and source review · project v19
 
 Required video track Colour includes nine graded scalar fields, including **Temperature** and
 **Tint**, the **HDR** look (0–1, applied before grading with the clip
@@ -110,7 +110,7 @@ separate project-frame keyframe list. All shared track keyframes use absolute in
 clip on that track, including clips from different recordings and both sources
 in that track's dissolve. They do not restart at a clip's IN, start or boundary.
 
-Schema 18 requires `layers[].keyframes` as ordered `{ frame, values, easing, reset }`
+Schema 19 requires `layers[].keyframes` as ordered `{ frame, values, easing, reset }`
 keyframes, with **at most 256 keyframes per track**. Frames are unique, strictly ascending,
 non-negative and at most 2,147,483,647. Every keyframe's `values` object (`LayerKeyValues`)
 requires **all eleven nullable fields** below: a number enables that setting; `null` leaves it disabled.
@@ -138,7 +138,7 @@ The exact eleven required value fields are `opacity`, `temperature`, `tint`, `ex
 `brightness`, `contrast`, `hue`, `saturation`, `highlights`, `shadows` and `hdr`; every
 track channel is appearance-only and never changes timing.
 Clip documents contain independent **constant or custom-keyframed**
-speed and static `detail` (Sharpen, Clarity,
+speed, a required boolean `reverse` and static `detail` (Sharpen, Clarity,
 Denoise), with no colour/correction, `opacity` or `spatial` field.
 Shared track animation has no per-property track keyframe arrays. Clip speed
 keyframes use original-source frames in their separate clip-owned settings; they
@@ -576,6 +576,8 @@ with the unchanged cache format, about 11.52 MB per minute. See
 [MULTIPLE_MUSIC.md](design/MULTIPLE_MUSIC.md) for independent editing and pending acceptance.
 
 Export reads one original at a time through the shared backpressured frame mapper.
+A [reversed clip](SPEED_AND_AUDIO.md#reverse) uses serial seeked decoder chunks whose
+native `reverse` filter holds at most 256 MiB of output RGB frames; Node still holds one.
 The plain static single-track path retains at most two lossless clips, two
 intermediate decoders and one reusable RGB frame (24.9 MB UHD), plus native memory.
 
@@ -662,7 +664,7 @@ not all sources or loop repetitions. It grows with duration and is additional to
 the unchanged video raw-buffer/child/LUT bounds above. Cancellation/failure removes
 only owned scratch, never originals, saved projects or successful outputs.
 
-Schema **v18 is strict**, including complete required video track `colour` with Temperature/Tint/HDR and static HSL/curves, no clip colour/correction/spatial fields, and track `transform` base/eight-value
+Schema **v19 is strict**, including complete required video track `colour` with Temperature/Tint/HDR and static HSL/curves, no clip colour/correction/spatial fields, a required boolean clip `reverse`, and track `transform` base/eight-value
 project-frame keyframes and required unique `media.videoIds` / `media.audioIds`
 arrays, at most 10,000 IDs each, and all required per-track settings. Project-level
 transitions/fades, saved `clip.opacity` and old `clipOpacity`/`layerOpacity` keyframe
@@ -672,8 +674,8 @@ Keyframes require exactly the eleven nullable fields listed above, including `op
 The required `music` array contains 0–8 independent music tracks with unique required
 IDs and complete source IN/OUT/start/duration/gain/fades/loop fields; `[]` without
 music, never a null/singular value or default. Version-1 export receipts require
-a strict v18 snapshot plus captured audio-source/instance-plan arrays.
-Older v1–v17 project documents and export receipt snapshots remain unchanged/incompatible;
+a strict v19 snapshot plus captured audio-source/instance-plan arrays.
+Older v1–v18 project documents and export receipt snapshots remain unchanged/incompatible;
 there are no migrations, compatibility fallback/default fields or automatic deletion
 of projects, receipts or successful videos. Create a new project and deliberately
 import its media; registered media and currently verified ready proxies remain reusable.

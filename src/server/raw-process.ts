@@ -110,6 +110,7 @@ export class RawVideoPass {
   readonly #active = new Map<ChildProcess, 'reader' | 'encoder'>();
   readonly #exits: Promise<void>[] = [];
   readonly #readers: RawFrameReader[] = [];
+  readonly #readerExits = new Map<RawFrameReader, Promise<void>>();
   readonly #report: RawPassReport = {
     peakReaders: 0,
     peakEncoders: 0,
@@ -130,7 +131,11 @@ export class RawVideoPass {
     if (this.options.signal.aborted) throw new ServiceError('Job cancelled.', 499);
     if (this.#failure) throw this.#failure;
   };
-  private child(args: readonly string[], label: string, role: 'reader' | 'encoder'): ChildProcess {
+  private child(
+    args: readonly string[],
+    label: string,
+    role: 'reader' | 'encoder',
+  ): { child: ChildProcess; exit: Promise<void> } {
     this.check();
     const count = [...this.#active.values()].filter((value) => value === role).length;
     if (count >= (role === 'reader' ? 2 : 1))
@@ -153,30 +158,36 @@ export class RawVideoPass {
     });
     child.stderr!.on('error', (error: Error) => this.fail(error));
     child.once('error', (error) => this.fail(new ServiceError(`Cannot start ${label}: ${error.message}`, 503)));
-    this.#exits.push(
-      new Promise((resolve) =>
-        child.once('close', (code) => {
-          this.#active.delete(child);
-          if (code !== 0) {
-            const error = new ServiceError(`${label} exited ${code}: ${stderr.trim()}`, 422);
-            if (!this.#stopping) this.fail(error);
-            else if (code !== null && stderr.trim() && isPipeError(this.#failure)) this.#failure = error;
-          }
-          resolve();
-        }),
-      ),
+    const exit = new Promise<void>((resolve) =>
+      child.once('close', (code) => {
+        this.#active.delete(child);
+        if (code !== 0) {
+          const error = new ServiceError(`${label} exited ${code}: ${stderr.trim()}`, 422);
+          if (!this.#stopping) this.fail(error);
+          else if (code !== null && stderr.trim() && isPipeError(this.#failure)) this.#failure = error;
+        }
+        resolve();
+      }),
     );
-    return child;
+    this.#exits.push(exit);
+    return { child, exit };
   }
   reader(args: readonly string[], label: string): RawFrameReader {
-    const child = this.child(args, label, 'reader');
+    const { child, exit } = this.child(args, label, 'reader');
     child.stdout!.on('error', (error: Error) => this.fail(error));
     const reader = RawFrameReader.create(child.stdout!, label, this.check);
     this.#readers.push(reader);
+    this.#readerExits.set(reader, exit);
     return reader;
   }
+  /** Require a reader's end and its process exit, so a successor stays within the reader bound. */
+  async endReader(reader: RawFrameReader, frame: Buffer): Promise<void> {
+    await reader.requireEnd(frame);
+    await this.#readerExits.get(reader);
+    this.check();
+  }
   encoder(args: readonly string[], label: string): Writable {
-    const child = this.child(args, label, 'encoder');
+    const { child } = this.child(args, label, 'encoder');
     child.stdin!.on('error', (error: Error) => this.fail(error));
     return child.stdin!;
   }

@@ -170,68 +170,97 @@ function startForRightEdge(clip: VideoClip, right: number): number | null {
   return start >= 0 ? start : null;
 }
 
-function minimumPositionedIn(clip: VideoClip, right: number): number {
+/**
+ * The source endpoint under the timeline's left edge (IN, or OUT when reversed),
+ * as a distance: 0 restores the whole recoverable head, larger values shrink.
+ */
+interface LeftEdge {
+  at: (distance: number) => VideoClip;
+  current: number;
+  shrunk: number;
+}
+function leftEdge(clip: VideoClip, sourceFrameCount: number): LeftEdge {
+  return clip.reverse
+    ? {
+        at: (distance) => ({ ...clip, sourceOut: sourceFrameCount - distance }),
+        current: sourceFrameCount - clip.sourceOut,
+        shrunk: sourceFrameCount - clip.sourceIn - 1,
+      }
+    : { at: (distance) => ({ ...clip, sourceIn: distance }), current: clip.sourceIn, shrunk: clip.sourceOut - 1 };
+}
+const placeTrim = (clip: VideoClip, start: number): Extract<EditCommand, { type: 'trim-place' }> => ({
+  type: 'trim-place',
+  clipId: clip.id,
+  sourceIn: clip.sourceIn,
+  sourceOut: clip.sourceOut,
+  start,
+});
+
+function minimumPositionedDistance(edge: LeftEdge, right: number): number {
   // Clamp restoration at project frame zero.
   let low = 0;
-  let high = clip.sourceOut - 1;
+  let high = edge.shrunk;
   while (low < high) {
     const middle = Math.floor((low + high) / 2);
-    if (safeDuration({ ...clip, sourceIn: middle }) > right) low = middle + 1;
+    if (safeDuration(edge.at(middle)) > right) low = middle + 1;
     else high = middle;
   }
   return low;
 }
 
 function sourcePositionedTrim(
-  clip: VideoClip,
+  edge: LeftEdge,
   right: number,
-  sourceIn: number,
+  distance: number,
 ): Extract<EditCommand, { type: 'trim-place' }> {
-  sourceIn = Math.max(minimumPositionedIn(clip, right), sourceIn);
-  const start = startForRightEdge({ ...clip, sourceIn }, right);
+  const trimmed = edge.at(Math.max(minimumPositionedDistance(edge, right), Math.min(edge.shrunk, distance)));
+  const start = startForRightEdge(trimmed, right);
   if (start === null)
     throw new Error('This source-frame trim cannot keep the positioned clip OUT at an integer project frame.');
-  return { type: 'trim-place', clipId: clip.id, sourceIn, sourceOut: clip.sourceOut, start };
+  return placeTrim(trimmed, start);
 }
 
 interface LeftTrim {
-  sourceIn: number;
+  distance: number;
   start: number;
 }
-function betterLeftTrim(candidate: LeftTrim, best: LeftTrim | null, preferred: number, currentIn: number): boolean {
+function betterLeftTrim(candidate: LeftTrim, best: LeftTrim | null, preferred: number, current: number): boolean {
   if (!best) return true;
   const error = Math.abs(candidate.start - preferred);
   const bestError = Math.abs(best.start - preferred);
   return (
     error < bestError ||
-    (error === bestError && Math.abs(candidate.sourceIn - currentIn) < Math.abs(best.sourceIn - currentIn))
+    (error === bestError && Math.abs(candidate.distance - current) < Math.abs(best.distance - current))
   );
 }
 
 function outputPositionedTrim(
   clip: VideoClip,
+  edge: LeftEdge,
   right: number,
   delta: number,
 ): Extract<EditCommand, { type: 'trim-place' }> {
-  const minimumIn = minimumPositionedIn(clip, right);
+  const minimum = minimumPositionedDistance(edge, right);
   const preferred = Math.max(0, Math.min(right - 1, clip.start + delta));
   const target = right - preferred;
-  const endpoint = nearestEndpoint(minimumIn, clip.sourceOut - 1, clip.sourceIn, target, false, (sourceIn) =>
-    safeDuration({ ...clip, sourceIn }),
+  const endpoint = nearestEndpoint(minimum, edge.shrunk, edge.current, target, false, (distance) =>
+    safeDuration(edge.at(distance)),
   );
   let best: LeftTrim | null = null;
-  for (const sourceIn of new Set([endpoint, endpoint - 1, endpoint + 1])) {
-    if (sourceIn < minimumIn || sourceIn >= clip.sourceOut) continue;
-    const start = startForRightEdge({ ...clip, sourceIn }, right);
-    if (start !== null && betterLeftTrim({ sourceIn, start }, best, preferred, clip.sourceIn))
-      best = { sourceIn, start };
+  for (const distance of new Set([endpoint, endpoint - 1, endpoint + 1])) {
+    if (distance < minimum || distance > edge.shrunk) continue;
+    const start = startForRightEdge(edge.at(distance), right);
+    if (start !== null && betterLeftTrim({ distance, start }, best, preferred, edge.current))
+      best = { distance, start };
   }
   if (!best) throw new Error('This output-frame trim cannot keep the positioned clip OUT at an integer project frame.');
-  return { type: 'trim-place', clipId: clip.id, sourceIn: best.sourceIn, sourceOut: clip.sourceOut, start: best.start };
+  return placeTrim(edge.at(best.distance), best.start);
 }
 
-/** Timeline handle/keyboard trim. Ripple-off IN retains the old right edge;
- * Ripple-on IN retains its sequence start. Numeric IN/OUT edits continue to use
+/** Timeline handle/keyboard trim. `edge` is the timeline edge (left 'in', right
+ * 'out') and a positive `delta` moves it right; a reversed clip shows source OUT
+ * at its left edge. Ripple-off left trims retain the old right edge; Ripple-on
+ * left trims retain their sequence start. Numeric IN/OUT edits continue to use
  * the ordinary trim command, which never changes stored placement.
  * Region/overlap validation and history are left to applyCommand by the caller.
  */
@@ -247,14 +276,17 @@ export function trimOnTimeline(
   if (!placed) throw new Error('Clip no longer exists.');
   const clip = { ...placed.clip, start: placed.start };
   const layer = project.layers.find((item) => item.id === clip.layerId)!;
-  const sourceCommand = trimByFrames(clip, edge, delta, sourceFrameCount);
+  const flip = (value: TrimEdge): TrimEdge => (value === 'in' ? 'out' : 'in');
+  const sourceEdge = clip.reverse ? flip(edge) : edge;
+  const sourceCommand = trimByFrames(clip, sourceEdge, clip.reverse ? -delta : delta, sourceFrameCount);
   if (unit !== 'output' && unit !== 'source') throw new Error('Trim unit must be output or source frames.');
   if (edge !== 'in' || layer.ripple) {
     if (unit === 'source') return sourceCommand;
     const target = Math.max(1, placed.duration + (edge === 'in' ? -delta : delta));
-    return trimToDuration(clip, edge, sourceFrameCount, target, safeDuration);
+    return trimToDuration(clip, sourceEdge, sourceFrameCount, target, safeDuration);
   }
   if (delta === 0) return { ...sourceCommand, type: 'trim-place', start: placed.start };
-  if (unit === 'source') return sourcePositionedTrim(clip, placed.end, sourceCommand.sourceIn);
-  return outputPositionedTrim(clip, placed.end, delta);
+  const left = leftEdge(clip, sourceFrameCount);
+  if (unit === 'source') return sourcePositionedTrim(left, placed.end, left.current + delta);
+  return outputPositionedTrim(clip, left, placed.end, delta);
 }

@@ -1,4 +1,4 @@
-# PasCap colour and timing contract · project v18
+# PasCap colour and timing contract · project v19
 
 This specification is shared by the CPU reference, WebGL2 shader and native
 scalar LUT or exact advanced-colour export. It is elementary SDR grading, not
@@ -187,7 +187,7 @@ resets to normal graded preview. Export continues to use the saved grading contr
 
 ## Music sampling and mixing
 
-Strict schema 18 requires a 0–8 `music` array of independent uniquely identified
+Strict schema 19 requires a 0–8 `music` array of independent uniquely identified
 music tracks, `[]` without music. Each has source IN/OUT, start/duration, gain, fades
 and loop; source-video audio remains disabled. At 48 kHz, source/placement/duration/
 fade positions round independently to integer samples using the rational frame
@@ -233,19 +233,19 @@ neutral HSL and identity curves, HDR 0, an exactly neutral track Transform
 base without Transform keyframes, without music, extra tracks or track keyframes,
 and is limited to 3,600 project frames. It refuses unsupported
 documents regardless of Ripple or track ID.
-It requires a strict schema-18 project snapshot, including explicit project media
+It requires a strict schema-19 project snapshot, including explicit project media
 membership; its reference receipt format remains independently version 1. New
-measurement reports must identify their v18 project snapshot without overwriting
+measurement reports must identify their v19 project snapshot without overwriting
 historical reports; the report identifier is separate from the project schema.
 Project identifiers such as `preview-lab`/`preview-lab-v6` are not schema versions
 and are not renamed by this contract.
-v1–v17 project documents and receipt snapshots are incompatible and preserved;
+v1–v18 project documents and receipt snapshots are incompatible and preserved;
 recreate projects deliberately, with no migration, compatibility defaults or
-old-format/null fallback readers or automatic deletion. Strict v18 requires
+old-format/null fallback readers or automatic deletion. Strict v19 requires
 complete video track `colour`, including Temperature/Tint/HDR bases and static HSL/curves,
-all eleven nullable keyframe fields, constant or custom-curve clip speed, track `transform` base/per-setting keyframes and track `opacity`; saved `clip.colour`, `clip.correction`, `clip.opacity`, `clip.spatial` and
+all eleven nullable keyframe fields, constant or custom-curve clip speed, boolean clip `reverse`, track `transform` base/per-setting keyframes and track `opacity`; saved `clip.colour`, `clip.correction`, `clip.opacity`, `clip.spatial` and
 old `clipOpacity`/`layerOpacity` keyframe fields are rejected, not defaulted.
-Production export receipts also remain version 1, with strict v18 snapshots and
+Production export receipts also remain version 1, with strict v19 snapshots and
 required `musicSources` captured-original/`settings.audio` identified-plan arrays;
 older snapshots or invalid arrays are rejected without rewriting receipts/MP4s.
 Proxy/current PCM formats and source guards are unchanged; the registries are
