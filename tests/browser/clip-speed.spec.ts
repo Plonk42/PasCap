@@ -490,7 +490,8 @@ test('Reverse is one Undo step and seeks and plays exact decoded frames backward
     await expect.poll(shown).toEqual({ frame, source: placed.retiming.sourceAt(frame), status: 'paused' });
   }
   expect(placed.retiming.sourceAt(0)).toBe(119);
-  await seek(page, 60);
+  // The whole 120-frame clip: software renderers may publish only a few playing snapshots per second.
+  await seek(page, 0);
   await page.evaluate(() => {
     const samples: [number, number][] = [];
     Reflect.set(window, 'reverseSamples', samples);
