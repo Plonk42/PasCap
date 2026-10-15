@@ -219,6 +219,11 @@ float encode709(float v) {
   return v < beta ? 4.5 * v : alpha * pow(v, 0.45) - (alpha - 1.0);
 }
 ${detail ? detailFunction : ''}
+float shadowGain(float y, float shadows) {
+  if (y <= 0.0) return 1.0 + shadows;
+  float encoded = encode709(y);
+  return decode709(encoded + shadows * encoded * (1.0 - encoded) * (1.0 - encoded)) / y;
+}
 vec3 scalarGrade(vec3 code, vec4 tone, vec3 extra, vec3 correction) {
   if (all(equal(correction, vec3(1.0))) && all(equal(tone, vec4(0.0, 0.0, 1.0, 1.0))) &&
       all(equal(extra, vec3(0.0)))) return code;
@@ -226,7 +231,8 @@ vec3 scalarGrade(vec3 code, vec4 tone, vec3 extra, vec3 correction) {
   rgb *= correction;
   rgb = (rgb * exp2(tone.x) - 0.18) * tone.z + 0.18 + tone.y;
   float maskY = clamp(dot(rgb, luma), 0.0, 1.0);
-  rgb += 0.25 * (extra.z * pow(1.0 - maskY, 2.0) + extra.y * maskY * maskY);
+  if (extra.z != 0.0) rgb *= shadowGain(maskY, extra.z);
+  rgb += 0.25 * extra.y * maskY * maskY;
   float y = dot(rgb, luma);
   float cb = (rgb.b - y) / 1.8556;
   float cr = (rgb.r - y) / 1.5748;

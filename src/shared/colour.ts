@@ -164,10 +164,12 @@ function compileScalarGrade(
     const baseGreen = (linearGreen * greenGain * exposure - 0.18) * contrast + 0.18 + brightness;
     const baseBlue = (linearBlue * blueGain * exposure - 0.18) * contrast + 0.18 + brightness;
     const y = clamp01(0.2126 * baseRed + 0.7152 * baseGreen + 0.0722 * baseBlue);
-    const tone = 0.25 * (shadows * (1 - y) ** 2 + highlights * y ** 2);
-    const toneRed = baseRed + tone;
-    const toneBlue = baseBlue + tone;
-    const luminance = 0.2126 * toneRed + 0.7152 * (baseGreen + tone) + 0.0722 * toneBlue;
+    const gain = shadows === 0 ? 1 : shadowGain(y, shadows);
+    const tone = 0.25 * highlights * y ** 2;
+    const toneRed = baseRed * gain + tone;
+    const toneGreen = baseGreen * gain + tone;
+    const toneBlue = baseBlue * gain + tone;
+    const luminance = 0.2126 * toneRed + 0.7152 * toneGreen + 0.0722 * toneBlue;
     const cb = (toneBlue - luminance) / 1.8556;
     const cr = (toneRed - luminance) / 1.5748;
     const u = saturation * (cb * cos - cr * sin);
@@ -179,6 +181,13 @@ function compileScalarGrade(
     out[1] = encode709(clamp01(green));
     out[2] = encode709(clamp01(blue));
   };
+}
+
+/** Shadows tone curve on encoded luminance, applied as a linear RGB gain: black stays black, chroma ratios stay. */
+function shadowGain(y: number, shadows: number): number {
+  if (y <= 0) return 1 + shadows;
+  const encoded = encode709(y);
+  return decode709(encoded + shadows * encoded * (1 - encoded) ** 2) / y;
 }
 
 export function isNeutralColour(settings: ColourSettings): boolean {

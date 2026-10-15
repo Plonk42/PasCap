@@ -37,8 +37,11 @@ See [track appearance](design/ROW_APPEARANCE.md) for ownership, UI and strict st
 - Contrast: `(RGB − 0.18) × contrast + 0.18` (linear middle-grey pivot).
 - Brightness: add its linear offset equally to all channels.
 - Compute `Y = clamp(dot(RGB, [0.2126, 0.7152, 0.0722]), 0, 1)`.
-  Shadows weight `(1 − Y)^2`, highlights weight `Y^2`. Add
-  `0.25 × (shadows × (1 − Y)^2 + highlights × Y^2)` to each channel.
+  Shadows: with encoded luminance `V = OETF(Y)` and `V' = V + shadows × V × (1 − V)^2`,
+  multiply every channel by `EOTF(V') / Y` (`1 + shadows` at `Y = 0`). This tone
+  curve keeps black and white, acts mostly below perceptual mid grey and, as a gain,
+  keeps chroma ratios: dark colours brighten without turning grey. It is monotonic
+  for shadows in −1…1. Highlights: then add `0.25 × highlights × Y^2` to each channel.
 - Recompute unclipped linear luminance. Define
   `Cb = (B − Y) / 1.8556`, `Cr = (R − Y) / 1.5748`.
   Rotate `(Cb, Cr)` by hue in radians, then multiply by saturation.
