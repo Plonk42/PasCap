@@ -156,8 +156,7 @@ function compileScalarGrade(
   const [redGain, greenGain, blueGain] = temperatureTintGains(settings);
   const exposure = 2 ** settings.exposure;
   const { contrast, brightness, saturation, shadows, highlights } = settings;
-  const midtones = contrast !== 1 || brightness !== 0;
-  const tonal = midtones || shadows !== 0;
+  const tonal = contrast !== 1 || brightness !== 0 || shadows !== 0 || highlights !== 0;
   const blackGain = (2 - contrast) * (1 + 2 * brightness) * (1 + shadows);
   const angle = (settings.hue * Math.PI) / 180;
   const cos = Math.cos(angle);
@@ -168,17 +167,11 @@ function compileScalarGrade(
     const baseBlue = linearBlue * blueGain * exposure;
     const y = clamp01(0.2126 * baseRed + 0.7152 * baseGreen + 0.0722 * baseBlue);
     let gain = 1;
-    let masked = y;
-    if (tonal) {
-      const encoded = midtones ? midtoneCurve(encode709(y), contrast, brightness) : encode709(y);
-      if (midtones) masked = decode709(encoded);
-      const toned = shadows === 0 ? masked : decode709(shadowCurve(encoded, shadows));
-      gain = y > 0 ? toned / y : blackGain;
-    }
-    const tone = 0.25 * highlights * masked ** 2;
-    const toneRed = baseRed * gain + tone;
-    const toneGreen = baseGreen * gain + tone;
-    const toneBlue = baseBlue * gain + tone;
+    if (tonal && y > 0) gain = decode709(toneCurve(encode709(y), contrast, brightness, shadows, highlights)) / y;
+    else if (tonal) gain = blackGain;
+    const toneRed = baseRed * gain;
+    const toneGreen = baseGreen * gain;
+    const toneBlue = baseBlue * gain;
     const luminance = 0.2126 * toneRed + 0.7152 * toneGreen + 0.0722 * toneBlue;
     const cb = (toneBlue - luminance) / 1.8556;
     const cr = (toneRed - luminance) / 1.5748;
@@ -193,13 +186,14 @@ function compileScalarGrade(
   };
 }
 
-// Tone curves on encoded luminance, applied as a linear RGB gain: black and white stay, chroma ratios stay.
-function midtoneCurve(encoded: number, contrast: number, brightness: number): number {
-  const contrasted = encoded + (contrast - 1) * encoded * (1 - encoded) * (2 * encoded - 1);
-  return contrasted + 2 * brightness * contrasted * (1 - contrasted);
-}
-function shadowCurve(encoded: number, shadows: number): number {
-  return encoded + shadows * encoded * (1 - encoded) ** 2;
+/** Negative Highlights also dims pure white by this much (encoded), as there is no separate Whites setting. */
+export const HIGHLIGHTS_WHITE = 0.15;
+/** Contrast, Brightness, Shadows then Highlights on encoded luminance, applied as a linear RGB gain. */
+function toneCurve(v: number, contrast: number, brightness: number, shadows: number, highlights: number): number {
+  v += (contrast - 1) * v * (1 - v) * (2 * v - 1);
+  v += 2 * brightness * v * (1 - v);
+  v += shadows * v * (1 - v) ** 2;
+  return v + highlights * v * v * (1 - v) + Math.min(highlights, 0) * HIGHLIGHTS_WHITE * v ** 3;
 }
 
 export function isNeutralColour(settings: ColourSettings): boolean {

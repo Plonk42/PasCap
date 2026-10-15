@@ -10,6 +10,7 @@ import {
   HDR_TAPS,
   SHARPEN_GAIN,
 } from '../shared/detail.js';
+import { HIGHLIGHTS_WHITE } from '../shared/colour.js';
 
 export const vertexShader = `#version 300 es
 precision highp float;
@@ -219,9 +220,11 @@ float encode709(float v) {
   return v < beta ? 4.5 * v : alpha * pow(v, 0.45) - (alpha - 1.0);
 }
 ${detail ? detailFunction : ''}
-float midtoneCurve(float v, float contrast, float brightness) {
-  v += (contrast - 1.0) * v * (1.0 - v) * (2.0 * v - 1.0);
-  return v + 2.0 * brightness * v * (1.0 - v);
+float toneCurve(float v, vec4 tone, vec3 extra) {
+  v += (tone.z - 1.0) * v * (1.0 - v) * (2.0 * v - 1.0);
+  v += 2.0 * tone.y * v * (1.0 - v);
+  v += extra.z * v * (1.0 - v) * (1.0 - v);
+  return v + extra.y * v * v * (1.0 - v) + min(extra.y, 0.0) * ${glslFloat(HIGHLIGHTS_WHITE)} * v * v * v;
 }
 vec3 scalarGrade(vec3 code, vec4 tone, vec3 extra, vec3 correction) {
   if (all(equal(correction, vec3(1.0))) && all(equal(tone, vec4(0.0, 0.0, 1.0, 1.0))) &&
@@ -230,18 +233,9 @@ vec3 scalarGrade(vec3 code, vec4 tone, vec3 extra, vec3 correction) {
   rgb *= correction;
   rgb *= exp2(tone.x);
   float baseY = clamp(dot(rgb, luma), 0.0, 1.0);
-  float maskY = baseY;
-  bool midtones = tone.y != 0.0 || tone.z != 1.0;
-  if (midtones || extra.z != 0.0) {
-    float encoded = encode709(baseY);
-    if (midtones) {
-      encoded = midtoneCurve(encoded, tone.z, tone.y);
-      maskY = decode709(encoded);
-    }
-    float toned = decode709(encoded + extra.z * encoded * (1.0 - encoded) * (1.0 - encoded));
-    rgb *= baseY > 0.0 ? toned / baseY : (2.0 - tone.z) * (1.0 + 2.0 * tone.y) * (1.0 + extra.z);
-  }
-  rgb += 0.25 * extra.y * maskY * maskY;
+  if (tone.y != 0.0 || tone.z != 1.0 || extra.z != 0.0 || extra.y != 0.0)
+    rgb *= baseY > 0.0 ? decode709(toneCurve(encode709(baseY), tone, extra)) / baseY
+                       : (2.0 - tone.z) * (1.0 + 2.0 * tone.y) * (1.0 + extra.z);
   float y = dot(rgb, luma);
   float cb = (rgb.b - y) / 1.8556;
   float cr = (rgb.r - y) / 1.5748;

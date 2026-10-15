@@ -6,6 +6,7 @@ import {
   encode709,
   generateCube,
   gradePixel,
+  HIGHLIGHTS_WHITE,
   NEUTRAL_COLOUR,
   type RGB,
 } from '../../src/shared/colour.js';
@@ -37,16 +38,18 @@ describe('authoritative colour transform', () => {
     expect(grey(0.5, -0.5)).toBeCloseTo(0.25, 10);
   });
   it.each([
-    { contrast: 0 },
-    { contrast: 2 },
-    { brightness: 0.5 },
-    { brightness: -0.5 },
-    { contrast: 2, brightness: -0.5, shadows: -1 },
-    { contrast: 0, brightness: 0.5, shadows: 1 },
-  ])('tone curves %o keep black, white, colour ratios and tone order', (tone) => {
+    { tone: { contrast: 0 }, white: 1 },
+    { tone: { contrast: 2 }, white: 1 },
+    { tone: { brightness: 0.5 }, white: 1 },
+    { tone: { brightness: -0.5 }, white: 1 },
+    { tone: { highlights: 1 }, white: 1 },
+    { tone: { highlights: -1 }, white: 1 - HIGHLIGHTS_WHITE },
+    { tone: { contrast: 2, brightness: -0.5, shadows: -1, highlights: -1 }, white: 1 - HIGHLIGHTS_WHITE },
+    { tone: { contrast: 0, brightness: 0.5, shadows: 1, highlights: 1 }, white: 1 },
+  ])('tone curves $tone keep black, white, colour ratios and tone order', ({ tone, white }) => {
     const settings = { ...NEUTRAL_COLOUR, ...tone };
     expect(gradePixel([0, 0, 0], settings)).toEqual([0, 0, 0]);
-    expect(gradePixel([1, 1, 1], settings)[0]).toBeCloseTo(1, 10);
+    expect(gradePixel([1, 1, 1], settings)[0]).toBeCloseTo(white, 10);
     const dark: RGB = [0.03, 0.05, 0.1];
     const linear = dark.map(decode709);
     const graded = gradePixel(dark, settings).map(decode709);
@@ -59,8 +62,12 @@ describe('authoritative colour transform', () => {
       previous = value;
     }
   });
-  it('highlights use a fixed squared luminance mask', () => {
-    expect(gradePixel([1, 1, 1], { ...NEUTRAL_COLOUR, highlights: -1 })[0]).toBeCloseTo(encode709(0.75), 10);
+  it('highlights mirror shadows on bright tones and only dim white when lowered', () => {
+    const grey = (v: number, highlights: number) => gradePixel([v, v, v], { ...NEUTRAL_COLOUR, highlights })[0];
+    expect(grey(2 / 3, 1)).toBeCloseTo(2 / 3 + 4 / 27, 10);
+    expect(grey(2 / 3, -1)).toBeCloseTo(2 / 3 - 4 / 27 - (HIGHLIGHTS_WHITE * 8) / 27, 10);
+    expect(grey(1, 1)).toBeCloseTo(1, 10);
+    expect(grey(1, -1)).toBeCloseTo(1 - HIGHLIGHTS_WHITE, 10);
   });
   it('shadows lift dark tones by a luminance gain, keeping black, white and colour ratios', () => {
     const lift = { ...NEUTRAL_COLOUR, shadows: 1 };
