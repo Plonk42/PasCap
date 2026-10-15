@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
 import type { AudioAsset } from '../../src/shared/audio.js';
 import type { FootageDirectory, FootageRoot } from '../../src/shared/footage.js';
 import type { MediaAsset, MediaJob } from '../../src/shared/media.js';
@@ -43,6 +43,12 @@ async function mockMissing(page: Page, video: MediaAsset, music: AudioAsset) {
     relinked.add(id);
     await route.fulfill({ status: 202, json: { job: relinkJob(id) } });
   });
+  await page.route('**/api/relink-folder', async (route) => {
+    const { directory } = route.request().postDataJSON() as { directory: string };
+    bodies.push({ url: '/api/relink-folder', path: directory });
+    relinked.add(video.id).add(music.id);
+    await route.fulfill({ status: 202, json: { job: relinkJob('folder') } });
+  });
   await page.route('**/api/footage/roots', (route) => route.fulfill({ json: { roots: [root] } }));
   await page.route(/\/api\/footage\?/, (route) => {
     const listing: FootageDirectory = {
@@ -76,10 +82,7 @@ async function mockMissing(page: Page, video: MediaAsset, music: AudioAsset) {
   return bodies;
 }
 
-test('a missing original is flagged and relinked to a chosen moved copy, for video and music', async ({
-  page,
-  request,
-}) => {
+async function missingProject(page: Page, request: APIRequestContext) {
   const video = ((await (await request.get('/api/media')).json()) as { assets: MediaAsset[] }).assets.find(
     (asset) => asset.name === 'pattern-a.mp4',
   )!;
@@ -94,6 +97,14 @@ test('a missing original is flagged and relinked to a chosen moved copy, for vid
   });
   const bodies = await mockMissing(page, video, music);
   await page.goto('/?project=relink-browser');
+  return { video, music, bodies };
+}
+
+test('a missing original is flagged and relinked to a chosen moved copy, for video and music', async ({
+  page,
+  request,
+}) => {
+  const { video, music, bodies } = await missingProject(page, request);
 
   const card = page.locator(`[data-media-id="${video.id}"]`);
   await expect(card.getByLabel(`${video.name}: Original missing`)).toBeVisible();
@@ -122,9 +133,48 @@ test('a missing original is flagged and relinked to a chosen moved copy, for vid
   await song.getByRole('button', { name: `Relink ${music.name}` }).click();
   const musicDialog = page.getByRole('dialog', { name: `Relink ${music.name}` });
   await musicDialog.getByText('Other location').click();
-  await musicDialog.getByRole('textbox', { name: 'File path' }).fill('/elsewhere/test-music.wav');
+  await musicDialog.getByRole('textbox', { name: 'File or folder path' }).fill('/elsewhere/test-music.wav');
   await musicDialog.getByRole('button', { name: 'Relink path' }).click();
   await expect(musicDialog).toBeHidden();
   expect(bodies.at(-1)).toEqual({ url: `/api/audio/${music.id}/relink`, path: '/elsewhere/test-music.wav' });
   await expect(song.getByRole('button', { name: `Relink ${music.name}` })).toHaveCount(0);
+});
+
+test('Relink folder searches the open folder for every missing recording in one request', async ({ page, request }) => {
+  const { video, music, bodies } = await missingProject(page, request);
+  const bar = page.locator('.media-missing-bar');
+  await expect(bar).toContainText('2 originals are missing');
+  await bar.getByRole('button', { name: 'Relink folder…' }).click();
+
+  const dialog = page.getByRole('dialog', { name: 'Relink missing recordings' });
+  await expect(dialog).toContainText('searches the open folder and its subfolders');
+  // Files orient the user but cannot be chosen: the whole folder is searched.
+  await expect(dialog.getByRole('checkbox', { name: `Select ${video.name}` })).toBeDisabled();
+  await dialog.getByRole('button', { name: 'Search this folder for missing recordings' }).click();
+
+  await expect(dialog).toBeHidden();
+  expect(bodies).toEqual([{ url: '/api/relink-folder', path: '/drive' }]);
+  await expect(page.getByRole('region', { name: 'Activity' })).toBeVisible();
+  await expect(bar).toBeHidden();
+  await expect(page.locator(`[data-media-id="${video.id}"]`).getByLabel(`${video.name}: Original missing`)).toHaveCount(
+    0,
+  );
+  await expect(
+    page.locator(`[data-music-media-id="${music.id}"]`).getByRole('button', { name: /^Relink/ }),
+  ).toHaveCount(0);
+});
+
+test('a typed folder in a recording relink searches that folder', async ({ page, request }) => {
+  const { video, bodies } = await missingProject(page, request);
+  await page
+    .locator(`[data-media-id="${video.id}"]`)
+    .getByRole('button', { name: `Relink ${video.name}` })
+    .click();
+  const dialog = page.getByRole('dialog', { name: `Relink ${video.name}` });
+  await expect(dialog.getByRole('button', { name: 'Search this folder for missing recordings' })).toBeEnabled();
+  await dialog.getByText('Other location').click();
+  await dialog.getByRole('textbox', { name: 'File or folder path' }).fill('/media/new-drive');
+  await dialog.getByRole('button', { name: 'Relink path' }).click();
+  await expect(dialog).toBeHidden();
+  expect(bodies).toEqual([{ url: '/api/relink-folder', path: '/media/new-drive' }]);
 });

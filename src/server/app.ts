@@ -19,6 +19,7 @@ import { preflightExport, startExport } from './export.js';
 import { assertNoSymlinks, assertSourceIdentity, parseByteRange } from './files.js';
 import { FootageBrowser } from './footage.js';
 import { JobQueue } from './jobs.js';
+import { submitFolderRelink } from './relink.js';
 import { MediaLibrary, MediaQueueError } from './library.js';
 import { startReference } from './reference.js';
 import { ensurePrivateDirectory, ProjectStore } from './storage.js';
@@ -255,6 +256,11 @@ export async function createApp(config = createConfig()) {
   app.post('/api/audio/:id/relink', async (request, reply) => {
     const { path: filename } = registerSchema.parse(request.body);
     const job = await audio.relink(idParams.parse(request.params).id, footage.validateManualPath(filename));
+    return reply.code(202).send({ job });
+  });
+  app.post('/api/relink-folder', async (request, reply) => {
+    const directory = footage.validateManualPath(importSchema.parse(request.body).directory);
+    const job = await submitFolderRelink(jobs, config.dataDir, [library, audio], directory);
     return reply.code(202).send({ job });
   });
   app.route({

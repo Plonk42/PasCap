@@ -33,7 +33,7 @@ interface Props {
   onPrepareMusic: (id: string) => Promise<void>;
   /** Recordings and music whose original is not at its registered path. */
   missing: ReadonlySet<string>;
-  onRelink: (target: RelinkTarget) => void;
+  onRelink: (target: RelinkTarget | null) => void;
   onRemove: (mediaIds: string[]) => boolean;
   onRemoveMusic: (ids: string[]) => boolean;
   onImport: () => void;
@@ -85,6 +85,28 @@ const FILTER_LABEL: Record<string, string> = {
 
 function externalFiles(transfer: DataTransfer): boolean {
   return Array.from(transfer.types).includes('Files') && !Array.from(transfer.types).includes(MEDIA_DRAG_TYPE);
+}
+
+function MissingOriginals({ count, busy, onRelink }: Readonly<{ count: number; busy: boolean; onRelink: () => void }>) {
+  if (!count) return null;
+  return (
+    <div className="media-missing-bar">
+      <Icon name="warning" size={14} />
+      <span>
+        {count} {count === 1 ? 'original is' : 'originals are'} missing
+      </span>
+      <button
+        type="button"
+        className="secondary-button small"
+        title="Search the folder your recordings were moved to and relink every one found"
+        disabled={busy}
+        onClick={onRelink}
+      >
+        <Icon name="link" size={14} />
+        Relink folder…
+      </button>
+    </div>
+  );
 }
 
 function cardStatus(asset: MediaAsset, lost: boolean, readyLabel: string) {
@@ -605,6 +627,11 @@ export function MediaLibrary({
           </button>
         </div>
       )}
+      <MissingOriginals
+        count={[...assets, ...music].filter((asset) => missing.has(asset.id)).length}
+        busy={busy}
+        onRelink={() => onRelink(null)}
+      />
       <div className={`media-items ${view}`} onScroll={clearHover}>
         {visible.map((asset) => {
           const count = asset.metadata.frameCount;

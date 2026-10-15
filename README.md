@@ -212,7 +212,8 @@ The no-copy browsing/registration API is documented in
 It lists metadata and accepts selected original paths, never video upload bodies.
 `GET /api/media` and `GET /api/audio` also list `missing` originals, and
 `POST /api/media/:id/relink` / `POST /api/audio/:id/relink` (`{ path }`, 202 `{ job }`)
-queue a verified relink.
+queue a verified relink; `POST /api/relink-folder` (`{ directory }`) relinks every
+missing recording found in a folder.
 
 ## License
 

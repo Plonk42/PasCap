@@ -37,8 +37,8 @@ interface Props {
   busy: boolean;
   error: string;
   actions: ImportActions;
-  /** Pick one moved copy of a registered recording instead of importing. */
-  relink?: { target: RelinkTarget; onRelink: (path: string) => Promise<boolean> };
+  /** Find moved originals instead of importing: one recording's copy, or every missing one in a folder. */
+  relink?: RelinkMode;
   onClose: (imported: boolean) => void;
 }
 
@@ -47,6 +47,12 @@ export interface RelinkTarget {
   id: string;
   name: string;
   sourcePath: string;
+}
+interface RelinkMode {
+  /** Null searches a folder for every missing recording. */
+  target: RelinkTarget | null;
+  onRelink: (path: string) => Promise<boolean>;
+  onRelinkFolder: (directory: string) => Promise<boolean>;
 }
 
 interface Entry {
@@ -118,10 +124,14 @@ function mediaSummary(videos: number, music: number): string {
     .join(' and ');
 }
 
-function dialogText(relink: RelinkTarget | undefined, chosen: readonly FileEntry[], summary: string) {
+const FOLDER_SEARCH =
+  'PasCap searches the open folder and its subfolders for every missing recording, accepts only byte-identical copies and keeps clips, proxies and settings.';
+
+function dialogText(relink: RelinkMode | undefined, chosen: readonly FileEntry[], summary: string) {
   if (!relink)
     return {
       title: 'Import media',
+      note: '',
       selection: summary ? `${summary} selected` : 'Select recordings, or double-click one to import it',
       action: chosen.length ? `Import ${chosen.length}` : 'Import',
       actionBusy: 'Importing…',
@@ -132,19 +142,33 @@ function dialogText(relink: RelinkTarget | undefined, chosen: readonly FileEntry
       pathHint:
         'A video or music recording, or a folder: a folder imports every video recording in it and its subfolders.',
     };
-  const kind = relink.kind === 'video' ? 'video' : 'music';
+  const target = relink.target;
+  if (!target)
+    return {
+      title: 'Relink missing recordings',
+      note: `Open the folder your recordings were moved to. ${FOLDER_SEARCH}`,
+      selection: 'Open the folder, then search it',
+      action: 'Search this folder',
+      actionBusy: 'Searching…',
+      actionName: 'Search this folder for missing recordings',
+      pathLabel: 'Folder path',
+      placeholder: '/media/footage',
+      pathAction: 'Search path',
+      pathHint: 'A folder to search, with its subfolders, anywhere on this machine.',
+    };
   return {
-    title: `Relink ${relink.name}`,
+    title: `Relink ${target.name}`,
+    note: `Was at ${target.sourcePath}. Choose its moved copy, or search a whole folder: ${FOLDER_SEARCH}`,
     selection: chosen[0]
       ? `New location: ${chosen[0].path}`
-      : `Choose the moved copy of ${relink.name}, or double-click it`,
+      : `Choose the moved copy of ${target.name}, or double-click it`,
     action: 'Relink',
     actionBusy: 'Relinking…',
     actionName: 'Relink to the selected recording',
-    pathLabel: 'File path',
-    placeholder: `/media/footage/${relink.name}`,
+    pathLabel: 'File or folder path',
+    placeholder: `/media/footage/${target.name}`,
     pathAction: 'Relink path',
-    pathHint: `The moved ${kind} recording, anywhere on this machine.`,
+    pathHint: 'The moved recording, or a folder to search for every missing one, anywhere on this machine.',
   };
 }
 
@@ -435,12 +459,26 @@ export function ImportDialog({ initialKind, busy, error, actions, relink, onClos
       }
       return [];
     });
-  const submitFiles = (items: readonly FileEntry[]): Promise<void> =>
-    relink ? relinkTo(items[0]!.path) : importFiles(items);
-  const submitPath = (): Promise<void> => (relink ? relinkTo(manualPath.trim()) : importPath());
+  const folderMode = relink?.target === null;
+  const searchFolder = (directory: string): Promise<void> =>
+    whileBusy(async () => {
+      await relink?.onRelinkFolder(directory);
+    });
+  const submitFiles = (items: readonly FileEntry[]): Promise<void> => {
+    if (!relink) return importFiles(items);
+    return relink.target ? relinkTo(items[0]!.path) : Promise.resolve();
+  };
+  const submitPath = (): Promise<void> => {
+    const path = manualPath.trim();
+    if (!relink) return importPath();
+    const file = relink.target !== null && (isVideoFilename(path) || isAudioFilename(path));
+    return file ? relinkTo(path) : searchFolder(path);
+  };
+  const submitPrimary = (): Promise<void> =>
+    folderMode ? searchFolder(listing?.directory ?? '') : submitFiles(chosen);
 
   const chosenVideos = chosen.filter((entry) => entry.kind === 'video').length;
-  const text = dialogText(relink?.target, chosen, mediaSummary(chosenVideos, chosen.length - chosenVideos));
+  const text = dialogText(relink, chosen, mediaSummary(chosenVideos, chosen.length - chosenVideos));
   const availableRoots = roots.filter((item) => item.available);
   const chooseFile: (file: FileEntry, shift: boolean) => void = relink ? pick : toggleFile;
   return (
@@ -458,13 +496,26 @@ export function ImportDialog({ initialKind, busy, error, actions, relink, onClos
           <button type="button" className="secondary-button" disabled={blocked} onClick={() => onClose(false)}>
             {report ? 'Close' : 'Cancel'}
           </button>
+          {relink?.target && (
+            <button
+              type="button"
+              className="secondary-button"
+              aria-label="Search this folder for missing recordings"
+              disabled={blocked || !listing}
+              onClick={() => {
+                void searchFolder(listing!.directory);
+              }}
+            >
+              Search this folder
+            </button>
+          )}
           <button
             type="button"
             className="primary-button"
             aria-label={text.actionName}
-            disabled={blocked || !chosen.length}
+            disabled={blocked || (folderMode ? !listing : !chosen.length)}
             onClick={() => {
-              void submitFiles(chosen);
+              void submitPrimary();
             }}
           >
             {importing ? text.actionBusy : text.action}
@@ -478,12 +529,7 @@ export function ImportDialog({ initialKind, busy, error, actions, relink, onClos
           Originals stay in place
         </span>
       </div>
-      {relink && (
-        <p className="import-relink-note">
-          Was at <span title={relink.target.sourcePath}>{relink.target.sourcePath}</span>. Choose its moved copy: PasCap
-          checks every byte before using it, and keeps the clips, proxy and settings.
-        </p>
-      )}
+      {text.note && <p className="import-relink-note">{text.note}</p>}
       <div className="import-browser" aria-busy={loading || importing}>
         <nav className="import-places" aria-label="Media locations">
           <h3>Locations</h3>
@@ -660,7 +706,7 @@ export function ImportDialog({ initialKind, busy, error, actions, relink, onClos
                         type="checkbox"
                         aria-label={`Select ${entry.name}`}
                         checked={selected.has(entry.path)}
-                        disabled={blocked}
+                        disabled={blocked || folderMode}
                         onChange={(event) =>
                           chooseFile(
                             entry as FileEntry,

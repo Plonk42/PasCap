@@ -14,6 +14,28 @@
   overflow-wrap: anywhere;
 }
 
+.media-missing-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  font-size: 12px;
+  border-bottom: 1px solid var(--line);
+  color: #efaa98;
+}
+
+.media-missing-bar span {
+  flex: 1;
+  min-width: 0;
+}
+
+.media-missing-bar button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+
 .footage-error {
   color: var(--error);
   font-size: 12px;

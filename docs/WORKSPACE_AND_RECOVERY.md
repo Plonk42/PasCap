@@ -786,7 +786,10 @@ errors, even with a ready proxy. The editor does not guess another path, silentl
 reassociate a source or bypass fingerprints. Media marks such recordings **Original
 missing**; **Relink** opens the Import media dialog for the moved copy, and a serial
 Activity job accepts it only if every byte matches, keeping the ID, caches, clips and
-music tracks ([relinking](design/SOURCE_RELINK.md)). Recordings never prepared cannot
+music tracks ([relinking](design/SOURCE_RELINK.md)). When a whole folder moved,
+**Relink folder…** above the Media list (or **Search this folder** in the dialog)
+relinks every missing recording found in the chosen folder and its subfolders in one
+job. Recordings never prepared cannot
 be relinked and must be imported again.
 Previously copied source files from the removed implementation are **not deleted
 or migrated automatically**. Preserve registered source paths and bytes still in

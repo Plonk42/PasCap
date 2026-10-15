@@ -44,7 +44,7 @@ export function MediaMusicList({
   busy: boolean;
   missing: ReadonlySet<string>;
   onPrepare: (id: string) => Promise<void>;
-  onRelink: (target: RelinkTarget) => void;
+  onRelink: (target: RelinkTarget | null) => void;
   onRemove: (ids: string[]) => boolean;
 }>) {
   const [removing, setRemoving] = useState<string | null>(null);

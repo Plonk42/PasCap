@@ -11,7 +11,7 @@ export interface JobContext {
 interface Entry {
   job: MediaJob;
   controller: AbortController;
-  task: (context: JobContext) => Promise<void>;
+  task: (context: JobContext) => Promise<unknown>;
   settled: ((job: MediaJob) => Promise<void>) | null;
   done: Promise<void>;
   finish: () => void;
@@ -108,7 +108,7 @@ export class JobQueue {
     try {
       if (current.controller.signal.aborted) throw new ServiceError('Job cancelled.', 499);
       current.job.state = 'running';
-      await current.task({
+      const result = await current.task({
         id: current.job.id,
         signal: current.controller.signal,
         update: (progress, message) => {
@@ -118,7 +118,7 @@ export class JobQueue {
       });
       current.job.state = 'completed';
       current.job.progress = 1;
-      current.job.message = 'Complete';
+      current.job.message = typeof result === 'string' ? result : 'Complete';
     } catch (error) {
       current.job.state = current.controller.signal.aborted ? 'cancelled' : 'failed';
       current.job.message = errorMessage(error);
