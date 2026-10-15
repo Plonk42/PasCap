@@ -235,6 +235,12 @@ test('seeks before, inside and after every transition and cancels obsolete scrub
 });
 
 test('playback and colour updates run outside React, shortcuts ignore text inputs', async ({ page }) => {
+  // Quarter speed keeps playback running (~20 s) through the slow UI steps of a software-rendered runner.
+  let project = projectSchema.parse(await page.evaluate(() => window.pascapLab!.project()));
+  for (const clip of project.clips)
+    project = applyCommand(project, { type: 'speed', clipId: clip.id, speed: { mode: 'constant', rate: 0.25 } });
+  await page.evaluate((document) => window.pascapLab!.setDocument(document), project);
+  await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
   await page.evaluate(() => window.pascapLab!.engine.seek(10));
   await page.getByRole('textbox', { name: 'Search media' }).focus();
   await page.keyboard.press('Space');
