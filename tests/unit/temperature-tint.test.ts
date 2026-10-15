@@ -86,9 +86,12 @@ describe('normalized linear Temperature and Tint', () => {
     const input: RGB = [0.2, 0.3, 0.4];
     const raw = [Math.pow(2, 0.7 / 2 - 0.6 / 4), Math.pow(2, 0.6 / 4), Math.pow(2, -0.7 / 2 - 0.6 / 4)];
     const whiteY = raw.reduce((sum, gain, channel) => sum + luma[channel]! * gain, 0);
-    const expected = input.map((code, channel) =>
-      encode709((((decode709(code) * raw[channel]!) / whiteY) * Math.pow(2, 0.4) - 0.18) * 1.2 + 0.18 + 0.02),
-    );
+    const linear = input.map((code, channel) => ((decode709(code) * raw[channel]!) / whiteY) * Math.pow(2, 0.4));
+    const y = linear.reduce((sum, value, channel) => sum + luma[channel]! * value, 0);
+    const encoded = encode709(y);
+    const contrasted = encoded + 0.2 * encoded * (1 - encoded) * (2 * encoded - 1);
+    const gain = decode709(contrasted + 0.04 * contrasted * (1 - contrasted)) / y;
+    const expected = linear.map((value) => encode709(value * gain));
     gradePixel(input, settings).forEach((value, channel) => expect(value).toBeCloseTo(expected[channel]!, 12));
     expect(isNeutralAdvancedColour(settings)).toBe(true);
   });

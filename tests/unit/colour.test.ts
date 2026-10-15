@@ -25,12 +25,39 @@ describe('authoritative colour transform', () => {
     expect(result[0]).toBeCloseTo(encode709(2 * decode709(0.3)), 10);
     expect(result[0]).not.toBeCloseTo(0.6, 2);
   });
-  it('contrast pivots at 18% linear light', () => {
-    const pivot = encode709(0.18);
-    expect(gradePixel([pivot, pivot, pivot], { ...NEUTRAL_COLOUR, contrast: 2 })[0]).toBeCloseTo(pivot, 10);
+  it('contrast is an S-curve on encoded luminance pivoting at 0.5', () => {
+    const grey = (v: number, contrast: number) => gradePixel([v, v, v], { ...NEUTRAL_COLOUR, contrast })[0];
+    expect(grey(0.5, 2)).toBeCloseTo(0.5, 10);
+    expect(grey(0.25, 2)).toBeCloseTo(0.25 - 0.25 * 0.75 * 0.5, 10);
+    expect(grey(0.25, 0)).toBeCloseTo(0.25 + 0.25 * 0.75 * 0.5, 10);
   });
-  it('brightness is a linear offset', () => {
-    expect(gradePixel([0, 0, 0], { ...NEUTRAL_COLOUR, brightness: 0.1 })[0]).toBeCloseTo(encode709(0.1), 10);
+  it('brightness is a midtone curve on encoded luminance', () => {
+    const grey = (v: number, brightness: number) => gradePixel([v, v, v], { ...NEUTRAL_COLOUR, brightness })[0];
+    expect(grey(0.5, 0.5)).toBeCloseTo(0.75, 10);
+    expect(grey(0.5, -0.5)).toBeCloseTo(0.25, 10);
+  });
+  it.each([
+    { contrast: 0 },
+    { contrast: 2 },
+    { brightness: 0.5 },
+    { brightness: -0.5 },
+    { contrast: 2, brightness: -0.5, shadows: -1 },
+    { contrast: 0, brightness: 0.5, shadows: 1 },
+  ])('tone curves %o keep black, white, colour ratios and tone order', (tone) => {
+    const settings = { ...NEUTRAL_COLOUR, ...tone };
+    expect(gradePixel([0, 0, 0], settings)).toEqual([0, 0, 0]);
+    expect(gradePixel([1, 1, 1], settings)[0]).toBeCloseTo(1, 10);
+    const dark: RGB = [0.03, 0.05, 0.1];
+    const linear = dark.map(decode709);
+    const graded = gradePixel(dark, settings).map(decode709);
+    expect(graded[2]! / graded[0]!).toBeCloseTo(linear[2]! / linear[0]!, 6);
+    expect(graded[1]! / graded[0]!).toBeCloseTo(linear[1]! / linear[0]!, 6);
+    let previous = 0;
+    for (let index = 1; index <= 200; index++) {
+      const value = gradePixel([index / 200, index / 200, index / 200], settings)[0];
+      expect(value).toBeGreaterThanOrEqual(previous - 1e-12);
+      previous = value;
+    }
   });
   it('highlights use a fixed squared luminance mask', () => {
     expect(gradePixel([1, 1, 1], { ...NEUTRAL_COLOUR, highlights: -1 })[0]).toBeCloseTo(encode709(0.75), 10);

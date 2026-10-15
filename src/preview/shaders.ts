@@ -219,19 +219,28 @@ float encode709(float v) {
   return v < beta ? 4.5 * v : alpha * pow(v, 0.45) - (alpha - 1.0);
 }
 ${detail ? detailFunction : ''}
-float shadowGain(float y, float shadows) {
-  if (y <= 0.0) return 1.0 + shadows;
-  float encoded = encode709(y);
-  return decode709(encoded + shadows * encoded * (1.0 - encoded) * (1.0 - encoded)) / y;
+float midtoneCurve(float v, float contrast, float brightness) {
+  v += (contrast - 1.0) * v * (1.0 - v) * (2.0 * v - 1.0);
+  return v + 2.0 * brightness * v * (1.0 - v);
 }
 vec3 scalarGrade(vec3 code, vec4 tone, vec3 extra, vec3 correction) {
   if (all(equal(correction, vec3(1.0))) && all(equal(tone, vec4(0.0, 0.0, 1.0, 1.0))) &&
       all(equal(extra, vec3(0.0)))) return code;
   vec3 rgb = vec3(decode709(code.r), decode709(code.g), decode709(code.b));
   rgb *= correction;
-  rgb = (rgb * exp2(tone.x) - 0.18) * tone.z + 0.18 + tone.y;
-  float maskY = clamp(dot(rgb, luma), 0.0, 1.0);
-  if (extra.z != 0.0) rgb *= shadowGain(maskY, extra.z);
+  rgb *= exp2(tone.x);
+  float baseY = clamp(dot(rgb, luma), 0.0, 1.0);
+  float maskY = baseY;
+  bool midtones = tone.y != 0.0 || tone.z != 1.0;
+  if (midtones || extra.z != 0.0) {
+    float encoded = encode709(baseY);
+    if (midtones) {
+      encoded = midtoneCurve(encoded, tone.z, tone.y);
+      maskY = decode709(encoded);
+    }
+    float toned = decode709(encoded + extra.z * encoded * (1.0 - encoded) * (1.0 - encoded));
+    rgb *= baseY > 0.0 ? toned / baseY : (2.0 - tone.z) * (1.0 + 2.0 * tone.y) * (1.0 + extra.z);
+  }
   rgb += 0.25 * extra.y * maskY * maskY;
   float y = dot(rgb, luma);
   float cb = (rgb.b - y) / 1.8556;
