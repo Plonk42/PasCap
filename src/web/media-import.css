@@ -246,9 +246,41 @@
 
 .import-row {
   display: grid;
-  grid-template-columns: 22px 22px minmax(0, 1fr) 56px 72px;
+  grid-template-columns: 22px 64px minmax(0, 1fr) 56px 72px;
   align-items: center;
-  column-gap: 4px;
+  column-gap: 6px;
+}
+
+.import-entries .import-row > :nth-child(2) {
+  justify-self: center;
+}
+
+/* Fixed 16:9 box: the row height never jumps when a preview arrives or fails. */
+.import-preview {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 36px;
+  overflow: hidden;
+  border-radius: 3px;
+  background: rgb(0 0 0 / 35%);
+  color: var(--muted);
+}
+
+.import-preview img {
+  width: 64px;
+  height: 36px;
+  object-fit: contain;
+}
+
+.import-preview[data-state='waiting'] svg {
+  opacity: 0.45;
+}
+
+.import-preview[data-state='failed'] {
+  outline: 1px dashed var(--line);
+  outline-offset: -1px;
+  background: transparent;
 }
 
 .import-row > :nth-child(3) {

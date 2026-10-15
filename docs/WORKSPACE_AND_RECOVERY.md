@@ -504,8 +504,13 @@ and music recordings, including Shift ranges and a header select-all; selection
 survives folder and filter changes and clears when the location changes. The footer
 summarises the selection beside **Cancel** and **Import N**; double-clicking a
 recording imports just that one. The dialog reopens on the last folder (a browser
-preference). Browsing/selection alone starts no work: one-folder metadata reads do not
-read media bytes, probe, register, write or queue preparation. Folders are first with
+preference). Browsing/selection alone starts no work: one-folder metadata reads do
+not probe, register, write next to originals or queue preparation. Each video row
+shows a small preview of the keyframe nearest the recording's middle once it scrolls
+into view, behind a fixed 16:9 placeholder; an undecodable file gets an explicit
+crossed-eye placeholder with its reason. Previews are bounded, cancellable,
+read-only and cached in the data directory
+([details](TIMELINE_EDITING.md#importing-recordings-from-the-filesystem)). Folders are first with
 natural-name sorting; the 2,000-entry limit per kind has explicit guidance to choose a
 narrower folder. The cache branch is excluded and symlink/path checks remain enforced.
 

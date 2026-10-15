@@ -92,6 +92,10 @@ async function mockBrowsing(
     };
     return route.fulfill({ json: audio });
   });
+  // Mocked paths do not exist on the test service; a test needing pictures routes them itself.
+  await page.route(/\/api\/footage\/preview\?/, (route) =>
+    route.fulfill({ status: 404, json: { error: 'No preview in this mocked folder.' } }).catch(() => {}),
+  );
 }
 
 function postCount(page: Page): () => number {
@@ -249,6 +253,69 @@ test('one folder view lists folders, video and music recordings; filters and sel
   await page.evaluate(() => window.pascapLab!.flush());
   expect(memory.snapshot().media).toEqual({ videoIds: [ready.id], audioIds: [song.id] });
   expect(memory.snapshot().music).toEqual([]);
+});
+
+test('video rows show previews of visible recordings only, two at a time, with explicit failures and no import', async ({
+  page,
+  request,
+}) => {
+  // A real preview of the synthetic original, read by the test service itself.
+  const real = await request.get(`/api/footage/preview?${new URLSearchParams({ path: originalPath })}`);
+  expect(real.status()).toBe(200);
+  expect(real.headers()['content-type']).toBe('image/jpeg');
+  const jpeg = await real.body();
+  const names = Array.from({ length: 80 }, (_, index) => `DJI_${String(index).padStart(4, '0')}.MP4`);
+  await mockBrowsing(
+    page,
+    directory(names.map((name) => ({ kind: 'video', name, path: `/approved/${name}`, size: 2 * 1024 ** 3 }))),
+    [root],
+    () => [{ kind: 'audio', name: 'Theme.mp3', path: '/approved/Theme.mp3', size: 1024 }],
+  );
+  const requested: string[] = [];
+  let active = 0;
+  let busiest = 0;
+  let hold = (): void => {};
+  await page.route(/\/api\/footage\/preview\?/, async (route) => {
+    const path = new URL(route.request().url()).searchParams.get('path')!;
+    requested.push(path);
+    busiest = Math.max(busiest, ++active);
+    if (path.endsWith('DJI_0079.MP4')) await new Promise<void>((resolve) => (hold = resolve));
+    else await new Promise((resolve) => setTimeout(resolve, 50));
+    active--;
+    const failure = { status: 422, json: { error: 'No preview: this file could not be decoded as video.' } };
+    await route
+      .fulfill(path.endsWith('DJI_0001.MP4') ? failure : { contentType: 'image/jpeg', body: jpeg })
+      .catch(() => {});
+  });
+  const posts = postCount(page);
+  const dialog = await openImport(page);
+  const row = (name: string) => dialog.locator('.import-row', { hasText: name });
+
+  await expect(row('DJI_0000.MP4').locator('.import-preview img')).toHaveJSProperty('naturalWidth', 320);
+  await expect(row('DJI_0001.MP4').getByRole('img', { name: 'No preview for DJI_0001.MP4' })).toHaveAttribute(
+    'title',
+    'No preview: this file could not be decoded as video.',
+  );
+  await expect(row('Theme.mp3').locator('.import-preview')).toHaveCount(0);
+  await expect.poll(() => requested.length).toBeGreaterThan(3);
+  await expect(row('DJI_0060.MP4').locator('.import-preview')).toHaveAttribute('data-state', 'waiting');
+  expect(requested).not.toContain('/approved/DJI_0060.MP4');
+  expect(requested.length).toBeLessThan(40);
+
+  // Scrolling reaches the rest; previews never block selection.
+  await row('DJI_0079.MP4').scrollIntoViewIfNeeded();
+  await expect.poll(() => requested).toContain('/approved/DJI_0079.MP4');
+  await dialog.getByRole('checkbox', { name: 'Select DJI_0079.MP4' }).check();
+  await expect(dialog.locator('.import-selection')).toHaveText('1 video recording selected');
+  expect(busiest).toBeLessThanOrEqual(2);
+
+  // Closing the dialog cancels the read still in progress.
+  const cancelled = page.waitForEvent('requestfailed', (failed) => failed.url().includes('DJI_0079.MP4'));
+  await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await cancelled;
+  hold();
+  expect(posts()).toBe(0);
+  expect(memory.snapshot().media.videoIds).toEqual([]);
 });
 
 test('Shift-click selects and deselects a range of recordings, with the Import button always visible', async ({

@@ -80,7 +80,7 @@ PASCAP_MEDIA_ROOTS='["/home/you/Videos","/mnt/footage"]' npm run dev
 ```
 
 Generated data is not an original-footage backup; keep it outside footage. It holds
-registries, proxies/thumbnails, projects, exports/receipts, measurements and scratch.
+registries, proxies/thumbnails, Import dialog previews, projects, exports/receipts, measurements and scratch.
 Original paths remain identity-checked even with ready proxies; no implicit relink/
 migration exists. Preserve registered bytes/paths, including previously copied sources.
 The browsing/registration API table and mount/security contract live in

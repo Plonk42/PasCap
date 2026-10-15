@@ -165,12 +165,15 @@ export class FootageBrowser {
   validatePaths(paths: readonly string[]): string[] {
     if (paths.length === 0 || paths.length > MAX_FOOTAGE_FILES)
       throw new ServiceError(`Select between 1 and ${MAX_FOOTAGE_FILES} recording paths.`, 400);
-    return paths.map((filename) => {
-      const selected = this.#scopedPath(filename);
-      if (!isVideoFilename(path.basename(selected)))
-        throw new ServiceError('Select recording paths ending in .mp4, .mov or .m4v.', 400);
-      return selected;
-    });
+    return paths.map((filename) => this.validateVideoPath(filename));
+  }
+
+  /** One root-scoped video path; existence, regular-file and symlink checks belong to its reader. */
+  validateVideoPath(filename: string): string {
+    const selected = this.#scopedPath(filename);
+    if (!isVideoFilename(path.basename(selected)))
+      throw new ServiceError('Select recording paths ending in .mp4, .mov or .m4v.', 400);
+    return selected;
   }
 
   /** Browser-selected audio is root-scoped; registration owns existence, symlink and probe checks. */

@@ -3,6 +3,7 @@ import { isAudioFilename, isVideoFilename, MAX_FOOTAGE_FILES, type FootageRoot }
 import { forEachSerial } from '../shared/serial.js';
 import { api } from './api.js';
 import { Icon } from './icons.js';
+import { PreviewLoader, previewKey, type PreviewState } from './import-previews.js';
 import './media-import.css';
 import { Modal } from './Modal.js';
 import { readPreference, writePreference } from './preferences.js';
@@ -130,6 +131,30 @@ function savedLocation(): { root: string; directory: string | undefined } | null
   }
 }
 
+/** A video row's picture, read on the service once the row scrolls into view. */
+function RecordingPreview({ loader, entry }: Readonly<{ loader: PreviewLoader; entry: FileEntry }>) {
+  const element = useRef<HTMLSpanElement>(null);
+  const [state, setState] = useState<PreviewState>({ status: 'waiting' });
+  const key = previewKey(entry);
+  useEffect(() => loader.watch(element.current!, key, entry.path, setState), [loader, key, entry.path]);
+  return (
+    <span
+      ref={element}
+      className="import-preview"
+      data-state={state.status}
+      {...(state.status === 'failed'
+        ? { role: 'img', 'aria-label': `No preview for ${entry.name}`, title: state.reason }
+        : {})}
+    >
+      {state.status === 'ready' ? (
+        <img src={state.url} alt="" draggable={false} />
+      ) : (
+        <Icon name={state.status === 'failed' ? 'eye-off' : 'video'} size={16} />
+      )}
+    </span>
+  );
+}
+
 function ImportReport({ report }: Readonly<{ report: Report }>) {
   const imported = mediaSummary(report.videos, report.music);
   return (
@@ -168,6 +193,7 @@ export function ImportDialog({ initialKind, busy, error, actions, onClose }: Rea
   const [importing, setImporting] = useState(false);
   const [report, setReport] = useState<Report | null>(null);
   const [manualPath, setManualPath] = useState('');
+  const [previews] = useState(() => new PreviewLoader(api.footagePreview));
   const pending = useRef(false);
   const mounted = useRef(false);
   const anchor = useRef<string | null>(null);
@@ -196,6 +222,7 @@ export function ImportDialog({ initialKind, busy, error, actions, onClose }: Rea
       globalThis.removeEventListener('blur', release);
     };
   }, []);
+  useEffect(() => () => previews.dispose(), [previews]);
   useEffect(() => {
     const controller = new AbortController();
     setLoadingRoots(true);
@@ -482,7 +509,10 @@ export function ImportDialog({ initialKind, busy, error, actions, onClose }: Rea
               aria-label="Refresh folder"
               title="Refresh"
               disabled={blocked || loading}
-              onClick={() => setRefresh((value) => value + 1)}
+              onClick={() => {
+                previews.forgetFailures();
+                setRefresh((value) => value + 1);
+              }}
             >
               <Icon name="reset" size={15} />
             </button>
@@ -580,7 +610,11 @@ export function ImportDialog({ initialKind, busy, error, actions, onClose }: Rea
                           )
                         }
                       />
-                      <Icon name={entry.kind === 'video' ? 'video' : 'music'} size={16} />
+                      {entry.kind === 'video' ? (
+                        <RecordingPreview loader={previews} entry={entry as FileEntry} />
+                      ) : (
+                        <Icon name="music" size={16} />
+                      )}
                       <span>{entry.name}</span>
                       <span>{KIND_LABEL[entry.kind]}</span>
                       <small>{fileSize(entry.size ?? 0)}</small>
