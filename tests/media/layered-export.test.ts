@@ -139,7 +139,7 @@ function coverage(samples: PreviewLayer[]): number {
   return result;
 }
 
-describe.skipIf(!enabled)('schema-20 layered native export · disposable synthetic sources only', () => {
+describe.skipIf(!enabled)('schema-21 layered native export · disposable synthetic sources only', () => {
   let root: string;
   let config: ServiceConfig;
   let jobs: JobQueue;
@@ -898,6 +898,7 @@ describe.skipIf(!enabled)('schema-20 layered native export · disposable synthet
           highlights: 0.1,
           shadows: 0.2,
           whites: -0.4,
+          blacks: -0.2,
         },
         'smooth',
       ),
@@ -915,7 +916,7 @@ describe.skipIf(!enabled)('schema-20 layered native export · disposable synthet
         'ease-out',
       ),
       point(12, { opacity: 0.4, brightness: 0.06, contrast: 1.25, shadows: -0.1, tint: -0.7 }),
-      point(18, { opacity: 0.9, shadows: 0.15, highlights: 0.2, whites: 0.3 }, 'hold'),
+      point(18, { opacity: 0.9, shadows: 0.15, highlights: 0.2, whites: 0.3, blacks: 0.15 }, 'hold'),
     ];
     project.layers[1]!.keyframes = [
       point(0, { opacity: 0.2, hue: 40, highlights: -0.3, tint: -0.5 }, 'ease-in'),

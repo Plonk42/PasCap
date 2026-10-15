@@ -1,6 +1,6 @@
-# Owner-approved video track-only Colour and Opacity · schema 20
+# Owner-approved video track-only Colour and Opacity · schema 21
 
-Required Colour includes ten graded scalar settings, including Temperature, Tint and Whites,
+Required Colour includes eleven graded scalar settings, including Temperature, Tint, Whites and Blacks,
 the HDR look (applied before grading with the clip detail filters; see
 [detail filters](DETAIL_FILTERS.md#hdr-look)),
 eight static HSL bands and four master/RGB colour curves. HSL/curves share video track
@@ -12,7 +12,7 @@ order: [Temperature/Tint](TEMPERATURE_AND_TINT.md) and
 ## Ownership and strict storage
 
 Each video track requires complete `VideoLayer.colour`, neutral on creation,
-alongside its sole required `opacity`, initially 1. Colour contains the ten
+alongside its sole required `opacity`, initially 1. Colour contains the eleven
 graded scalar channels, `hdr`, plus required HSL and curves. Clips have no colour or correction
 field: both `clip.colour` and `clip.correction` are invalid.
 The owner-approved scope is identical with or without animation: every clip on
@@ -24,20 +24,20 @@ intentionally colour greys; normalized linear gains precede Exposure, preserving
 neutral-white linear luminance before clipping only, not arbitrary/final images.
 Other scalar bounds and neutral values retain the existing SDR contract.
 No optional legacy field, additive parameter merge, migration or default-on-load exists.
-Schema 20 rejects versions 1–19 without rewriting or deleting their documents.
-Receipt format remains 1 with strict schema-20 snapshots; proxy and PCM formats are
+Schema 21 rejects versions 1–20 without rewriting or deleting their documents.
+Receipt format remains 1 with strict schema-21 snapshots; proxy and PCM formats are
 unchanged, and the registries are version 2 (full-content checksums). Recreate
 incompatible projects deliberately.
 
-The ten shared scalar colour channels and HDR override **video track colour**, independently, in
+The eleven shared scalar colour channels and HDR override **video track colour**, independently, in
 absolute project time. Skip keyframes without the relevant enabled setting, interpolate parameter values
 using that setting's own Easing at the left keyframe, and hold endpoints. Removing the last keyframe for a setting
 reveals the unchanged track base. HSL and curves remain static.
 Speed is clip-only and never a track channel. Opacity ownership,
 source-over composition, spatial coverage and black-fade coverage are unchanged.
-Every keyframe requires all twelve nullable fields, in control order: `opacity`,
+Every keyframe requires all thirteen nullable fields, in control order: `opacity`,
 `temperature`, `tint`, `exposure`, `brightness`, `contrast`, `hue`,
-`saturation`, `highlights`, `shadows`, `whites`, `hdr`. Missing fields are invalid, never defaulted.
+`saturation`, `highlights`, `shadows`, `whites`, `blacks`, `hdr`. Missing fields are invalid, never defaulted.
 
 For example, clips A and B on one video track both use Exposure 0.5 without keyframes.
 An Exposure curve applies the same evaluated value to both at any project frame,
@@ -83,11 +83,11 @@ and identity curves and HDR 0, without independent clip grades.
 
 Control vocabulary follows the [editor control catalogue](EDITOR_CONTROLS.md#vocabulary).
 
-**Track → Colour** has twelve main widgets: ten graded scalar video track colour controls,
+**Track → Colour** has thirteen main widgets: eleven graded scalar video track colour controls,
 HDR and sole Opacity. All use existing slider/exact-field/reset controls and work on an empty
 track. They sit in four static groups, each a labelled fieldset with a small heading:
 **Opacity**; **Colour** (Temperature, Tint, Hue, Saturation); **Light** (Exposure,
-Brightness, Contrast, Highlights, Shadows, Whites); **Effects** (HDR). This visible order differs from
+Brightness, Contrast, Highlights, Shadows, Whites, Blacks); **Effects** (HDR). This visible order differs from
 the storage and keyframe channel order, which is unchanged. Each heading's Reset icon
 (**Reset the Light group**, etc.) resets the group's editable settings in one Undo step, as
 their own Reset icons would: an unkeyed setting's track value, a keyed setting's keyframe at
@@ -97,7 +97,7 @@ convert only at the UI boundary. Required
 `VideoLayer.opacity` and `opacity` keyframe values remain **0–1**, without a schema change.
 Main capture diamonds are always visible; each retains adjacent per-setting **Previous/Next** buttons because not every
 setting is enabled at every shared keyframe. One keyframe-line Previous/Next pair (with the keyframe count) visits
-the union of Opacity, ten scalar colour and HDR keys.
+the union of Opacity, eleven scalar colour and HDR keys.
 Enabled setting chips in stored Colour keyframe rows retain their per-channel arrows.
 All main and stored per-channel arrows visit strictly earlier/later keyframes
 where that channel is nonnull (zero is enabled), using the shared central

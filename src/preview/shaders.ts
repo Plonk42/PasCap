@@ -10,7 +10,7 @@ import {
   HDR_TAPS,
   SHARPEN_GAIN,
 } from '../shared/detail.js';
-import { HIGHLIGHTS_WHITE, WHITES_RANGE } from '../shared/colour.js';
+import { BLACKS_RANGE, HIGHLIGHTS_WHITE, WHITES_RANGE } from '../shared/colour.js';
 
 export const vertexShader = `#version 300 es
 precision highp float;
@@ -187,8 +187,8 @@ uniform vec4 tone0;
 uniform vec4 tone1;
 uniform vec4 extra0;
 uniform vec4 extra1;
-uniform vec3 correction0;
-uniform vec3 correction1;
+uniform vec4 correction0;
+uniform vec4 correction1;
 uniform vec2 coverage;
 uniform vec2 brightness;
 uniform vec2 imageAspect;
@@ -227,16 +227,26 @@ float toneCurve(float v, vec4 tone, vec4 extra) {
   v += extra.y * v * v * (1.0 - v) + min(extra.y, 0.0) * ${glslFloat(HIGHLIGHTS_WHITE)} * v * v * v;
   return v + extra.w * ${glslFloat(WHITES_RANGE)} * v * v * v * v;
 }
-vec3 scalarGrade(vec3 code, vec4 tone, vec4 extra, vec3 correction) {
-  if (all(equal(correction, vec3(1.0))) && all(equal(tone, vec4(0.0, 0.0, 1.0, 1.0))) &&
+float blacksCurve(float v, float blacks) {
+  float shadow = (1.0 - v) * (1.0 - v);
+  return v + blacks * ${glslFloat(BLACKS_RANGE)} * shadow * shadow;
+}
+// correction: Temperature/Tint linear gains in xyz, Blacks in w.
+vec3 scalarGrade(vec3 code, vec4 tone, vec4 extra, vec4 correction) {
+  if (all(equal(correction, vec4(1.0, 1.0, 1.0, 0.0))) && all(equal(tone, vec4(0.0, 0.0, 1.0, 1.0))) &&
       all(equal(extra, vec4(0.0)))) return code;
   vec3 rgb = vec3(decode709(code.r), decode709(code.g), decode709(code.b));
-  rgb *= correction;
+  rgb *= correction.xyz;
   rgb *= exp2(tone.x);
   float baseY = clamp(dot(rgb, luma), 0.0, 1.0);
-  if (tone.y != 0.0 || tone.z != 1.0 || extra.yzw != vec3(0.0))
-    rgb *= baseY > 0.0 ? decode709(toneCurve(encode709(baseY), tone, extra)) / baseY
-                       : (2.0 - tone.z) * (1.0 + 2.0 * tone.y) * (1.0 + extra.z);
+  float blacks = correction.w;
+  if (tone.y != 0.0 || tone.z != 1.0 || extra.yzw != vec3(0.0) || blacks != 0.0) {
+    float toned = toneCurve(encode709(baseY), tone, extra);
+    if (blacks < 0.0) toned = max(0.0, blacksCurve(toned, blacks));
+    float blackGain = blacks < 0.0 ? 0.0 : (2.0 - tone.z) * (1.0 + 2.0 * tone.y) * (1.0 + extra.z);
+    rgb *= baseY > 0.0 ? decode709(toned) / baseY : blackGain;
+    if (blacks > 0.0) rgb += decode709(blacksCurve(toned, blacks)) - decode709(toned);
+  }
   float y = dot(rgb, luma);
   float cb = (rgb.b - y) / 1.8556;
   float cr = (rgb.r - y) / 1.5748;

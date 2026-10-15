@@ -1,14 +1,14 @@
-# Video tracks, shared keyframes and source review · project v20
+# Video tracks, shared keyframes and source review · project v21
 
-Required video track Colour includes ten graded scalar fields, including **Temperature**,
-**Tint** and **Whites**, the **HDR** look (0–1, applied before grading with the clip
+Required video track Colour includes eleven graded scalar fields, including **Temperature**,
+**Tint**, **Whites** and **Blacks**, the **HDR** look (0–1, applied before grading with the clip
 [detail filters](design/DETAIL_FILTERS.md#hdr-look)), plus static **HSL ranges** and **Colour curves**. Temperature/Tint use
 −1…1, neutral 0; positive values warm/add magenta respectively and intentionally
 colour greys. Their normalized linear gains run before Exposure. See
 [Temperature and Tint](design/TEMPERATURE_AND_TINT.md).
 Eight named HSL bands and four encoded curves stay active when scalar channels
 are animated, without adding keyframe channels or clip fields. Band/all-HSL and
-channel/all-curves resets preserve the ten scalar bases, track keyframes and Opacity;
+channel/all-curves resets preserve the eleven scalar bases, track keyframes and Opacity;
 Reset on an animated track preserves advanced settings. Unanimated Reset restores complete track
 Colour and Opacity. See [the advanced-colour contract](design/HSL_AND_CURVES.md).
 
@@ -110,11 +110,11 @@ separate project-frame keyframe list. All shared track keyframes use absolute in
 clip on that track, including clips from different recordings and both sources
 in that track's dissolve. They do not restart at a clip's IN, start or boundary.
 
-Schema 20 requires `layers[].keyframes` as ordered `{ frame, values, easing, reset }`
+Schema 21 requires `layers[].keyframes` as ordered `{ frame, values, easing, reset }`
 keyframes, with **at most 256 keyframes per track**. Frames are unique, strictly ascending,
 non-negative and at most 2,147,483,647. Every keyframe's `values` object (`LayerKeyValues`)
-requires **all twelve nullable fields** below: a number enables that setting; `null` leaves it disabled.
-Its `easing` object has the same twelve fields: each enabled setting has its own Easing
+requires **all thirteen nullable fields** below: a number enables that setting; `null` leaves it disabled.
+Its `easing` object has the same thirteen fields: each enabled setting has its own Easing
 (`hold`, `linear`, `ease-in`, `ease-out` or `smooth`) and each disabled setting `null`. Omitted/unknown
 fields, a mismatched Easing, the former shared `interpolation` field and all-null keyframes are
 invalid, not repaired with defaults. The required boolean `reset` marks a **default keyframe**
@@ -133,10 +133,11 @@ invalid, not repaired with defaults. The required boolean `reset` marks a **defa
 | Highlights (`highlights`)   | −1 to +1       | The track's saved colour value                            |
 | Shadows (`shadows`)         | −1 to +1       | The track's saved colour value                            |
 | Whites (`whites`)           | −1 to +1       | The track's saved colour value, initially 0               |
+| Blacks (`blacks`)           | −1 to +1       | The track's saved colour value, initially 0               |
 | HDR (`hdr`)                 | 0 to 1         | The track's saved colour value, initially 0               |
 
-The exact twelve required value fields are `opacity`, `temperature`, `tint`, `exposure`,
-`brightness`, `contrast`, `hue`, `saturation`, `highlights`, `shadows`, `whites` and `hdr`; every
+The exact thirteen required value fields are `opacity`, `temperature`, `tint`, `exposure`,
+`brightness`, `contrast`, `hue`, `saturation`, `highlights`, `shadows`, `whites`, `blacks` and `hdr`; every
 track channel is appearance-only and never changes timing.
 Clip documents contain independent **constant or custom-keyframed**
 speed, a required boolean `reverse` and static `detail` (Sharpen, Clarity,
@@ -165,7 +166,7 @@ it; track keyframes never change clip durations.
 
 ## Independent channel interpolation
 
-Enabled settings are independent, including between the ten scalar colour parameters and HDR.
+Enabled settings are independent, including between the eleven scalar colour parameters and HDR.
 Each enabled setting has its own Easing at a keyframe, and **each channel interpolates
 to its own next keyframe with that setting enabled**, skipping keyframes where that channel is null.
 So Exposure can hold while Contrast eases in from the same keyframe.
@@ -201,8 +202,8 @@ repeat/drop sampling without optical flow.
 
 A **default keyframe** returns the track to its default appearance at one frame without
 working out which settings changed. It is a stored track keyframe with `reset: true`,
-created with all twelve settings enabled at their neutral creation values (Opacity 1,
-Temperature/Tint/Exposure/Brightness/Hue/Highlights/Shadows/Whites/HDR 0, Contrast/Saturation 1)
+created with all thirteen settings enabled at their neutral creation values (Opacity 1,
+Temperature/Tint/Exposure/Brightness/Hue/Highlights/Shadows/Whites/Blacks/HDR 0, Contrast/Saturation 1)
 and every Easing **Hold**. It evaluates like any keyframe with one difference: it never
 reaches back. Before a default keyframe that is a setting's first keyframe, that setting
 keeps its unkeyed value (track `opacity` or track `colour`) instead of holding the
@@ -250,7 +251,7 @@ Colour, Speed and Transform always show their capture diamonds while the section
   disable actions; hollow status itself cannot.
 
 Each section's keyframe line has one native **Previous/Next** pair, beside the count of the keyframes it visits.
-Colour visits the union of Opacity, ten scalar colour and HDR keyframes, exactly the rows of
+Colour visits the union of Opacity, eleven scalar colour and HDR keyframes, exactly the rows of
 its stored list, with seek-hint tooltips. Speed visits all
 retained custom speed source keyframes of the selected clip, including off-trim
 keyframes and the original exclusive OUT, previewing the nearest mapped image through
@@ -275,7 +276,7 @@ changes no document, history or autosave state.
 `NumberField` alongside the colour controls, with its diamond and adjacent
 per-setting Previous/Next buttons. The main sliders sit under four static headings,
 each with a one-Undo group Reset: **Opacity**; **Colour** (Temperature, Tint, Hue,
-Saturation); **Light** (Exposure, Brightness, Contrast, Highlights, Shadows, Whites); **Effects**
+Saturation); **Light** (Exposure, Brightness, Contrast, Highlights, Shadows, Whites, Blacks); **Effects**
 (HDR). This visible order differs from the unchanged channel order above
 ([track appearance](design/ROW_APPEARANCE.md#inspector-and-history)).
 Main and stored sliders/exact fields use **0–100%**, neutral **100%**.
@@ -608,7 +609,7 @@ uses the layout's captured `PlacedClip.retiming`; grade/opacity sampling uses
 absolute project time, including repeated source images, as does the track Transform
 pose. Inverse mapping and
 bilinear RGB resampling precede grading. Nonneutral HSL/curves use exact complete
-CPU grading (ten scalar controls, HSL, master/RGB curves), not a LUT; neutral
+CPU grading (eleven scalar controls, HSL, master/RGB curves), not a LUT; neutral
 advanced settings retain scalar LUT grading. Exact grading uses tiny RGB triples
 and remains the costliest path, especially at UHD; no transformed image/mask buffer or
 per-frame native process is added. The 22 bytes/pixel, two-LUT and process bounds
@@ -665,18 +666,18 @@ not all sources or loop repetitions. It grows with duration and is additional to
 the unchanged video raw-buffer/child/LUT bounds above. Cancellation/failure removes
 only owned scratch, never originals, saved projects or successful outputs.
 
-Schema **v20 is strict**, including complete required video track `colour` with Temperature/Tint/Whites/HDR and static HSL/curves, no clip colour/correction/spatial fields, a required boolean clip `reverse`, and track `transform` base/eight-value
+Schema **v21 is strict**, including complete required video track `colour` with Temperature/Tint/Whites/Blacks/HDR and static HSL/curves, no clip colour/correction/spatial fields, a required boolean clip `reverse`, and track `transform` base/eight-value
 project-frame keyframes and required unique `media.videoIds` / `media.audioIds`
 arrays, at most 10,000 IDs each, and all required per-track settings. Project-level
 transitions/fades, saved `clip.opacity` and old `clipOpacity`/`layerOpacity` keyframe
 channels are not accepted. `VideoLayer.opacity` is the required sole stored track
 value, a number in 0–1; 1 is a new-track initial value, not a missing-field default.
-Keyframes require exactly the twelve nullable fields listed above, including `opacity`, `temperature`, `tint`, `whites` and `hdr`.
+Keyframes require exactly the thirteen nullable fields listed above, including `opacity`, `temperature`, `tint`, `whites`, `blacks` and `hdr`.
 The required `music` array contains 0–8 independent music tracks with unique required
 IDs and complete source IN/OUT/start/duration/gain/fades/loop fields; `[]` without
 music, never a null/singular value or default. Version-1 export receipts require
-a strict v20 snapshot plus captured audio-source/instance-plan arrays.
-Older v1–v19 project documents and export receipt snapshots remain unchanged/incompatible;
+a strict v21 snapshot plus captured audio-source/instance-plan arrays.
+Older v1–v20 project documents and export receipt snapshots remain unchanged/incompatible;
 there are no migrations, compatibility fallback/default fields or automatic deletion
 of projects, receipts or successful videos. Create a new project and deliberately
 import its media; registered media and currently verified ready proxies remain reusable.

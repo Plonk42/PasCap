@@ -378,7 +378,7 @@ export class Compositor {
     for (const [index, source] of sources.entries()) {
       const settings = source.settings;
       const gains = temperatureTintGains(settings);
-      gl.uniform3f(this.#location(`correction${index}`), gains[0], gains[1], gains[2]);
+      gl.uniform4f(this.#location(`correction${index}`), gains[0], gains[1], gains[2], settings.blacks);
       if (this.#advanced) {
         HSL_BANDS.forEach((band, at) => {
           const value = settings.hsl[band];
@@ -565,6 +565,7 @@ function comparisonColour(test: number, random: () => number): ColourSettings {
     highlights: random() * 0.6 - 0.3,
     shadows: random() * 0.6 - 0.3,
     whites: random() * 0.6 - 0.3,
+    blacks: random() * 0.6 - 0.3,
   };
 }
 

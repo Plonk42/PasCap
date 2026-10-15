@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  BLACKS_RANGE,
   COLOUR_CONTROLS,
   colourSchema,
   decode709,
@@ -47,6 +48,7 @@ describe('authoritative colour transform', () => {
     { tone: { highlights: -1 }, white: 1 - HIGHLIGHTS_WHITE },
     { tone: { whites: 1 }, white: 1 },
     { tone: { whites: -1 }, white: 1 - WHITES_RANGE },
+    { tone: { blacks: -0.1 }, white: 1 },
     {
       tone: { contrast: 2, brightness: -0.5, shadows: -1, highlights: -1, whites: -1 },
       white: 1 - HIGHLIGHTS_WHITE - WHITES_RANGE * (1 - HIGHLIGHTS_WHITE) ** 4,
@@ -82,6 +84,28 @@ describe('authoritative colour transform', () => {
     expect(grey(0.8, 1)).toBeCloseTo(0.8 + WHITES_RANGE * 0.8 ** 4, 10);
     expect(grey(0.9, 1)).toBe(1);
     expect(Math.abs(grey(0.5, -1) - 0.5)).toBeLessThan(0.02);
+  });
+  it('blacks crushes near-black tones when lowered and lifts black like a matte when raised', () => {
+    const grey = (v: number, blacks: number) => gradePixel([v, v, v], { ...NEUTRAL_COLOUR, blacks })[0];
+    expect(grey(0, 1)).toBeCloseTo(BLACKS_RANGE, 10);
+    expect(grey(0.5, 1)).toBeCloseTo(0.5 + BLACKS_RANGE * 0.5 ** 4, 10);
+    expect(grey(0.1, -1)).toBe(0);
+    expect(grey(0.5, -1)).toBeCloseTo(0.5 - BLACKS_RANGE * 0.5 ** 4, 10);
+    expect(grey(1, 1)).toBeCloseTo(1, 10);
+    expect(grey(1, -1)).toBeCloseTo(1, 10);
+    let previous = 0;
+    for (let index = 0; index <= 200; index++) {
+      const value = grey(index / 200, 1);
+      expect(value).toBeGreaterThanOrEqual(previous - 1e-12);
+      previous = value;
+    }
+    // Fully lowered Blacks is a luminance gain, so tones it does not crush keep their colour ratios.
+    const mid: RGB = [0.2, 0.3, 0.5];
+    const linear = mid.map(decode709);
+    const crushed = gradePixel(mid, { ...NEUTRAL_COLOUR, blacks: -1 }).map(decode709);
+    expect(crushed[0]).toBeGreaterThan(0);
+    expect(crushed[2]! / crushed[0]!).toBeCloseTo(linear[2]! / linear[0]!, 6);
+    expect(crushed[1]! / crushed[0]!).toBeCloseTo(linear[1]! / linear[0]!, 6);
   });
   it('shadows lift dark tones by a luminance gain, keeping black, white and colour ratios', () => {
     const lift = { ...NEUTRAL_COLOUR, shadows: 1 };

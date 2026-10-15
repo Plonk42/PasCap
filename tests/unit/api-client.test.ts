@@ -389,8 +389,8 @@ describe('registered API methods', () => {
     await expect(api.save(project, 0)).rejects.toMatchObject({ status: 200, kind: 'response' });
   });
 
-  it('uses complete schema-20 project mocks and rejects a version-8 response without changing it', async () => {
-    expect(project.schemaVersion).toBe(20);
+  it('uses complete schema-21 project mocks and rejects a version-8 response without changing it', async () => {
+    expect(project.schemaVersion).toBe(21);
     expect(project.layers[0]!.keyframes).toEqual([]);
     const unsupported = unsupportedProject(8, project.id, project.title);
     const before = JSON.stringify(unsupported);
@@ -400,7 +400,7 @@ describe('registered API methods', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
-  it('validates all twelve required nullable members in a shared row point, including zero participation', async () => {
+  it('validates all thirteen required nullable members in a shared row point, including zero participation', async () => {
     const point = layerKeyframe(100, { ...EMPTY_KEY_VALUES, exposure: 0, opacity: 0 }, 'linear');
     const document = { ...project, layers: [{ ...project.layers[0]!, keyframes: [point] }] };
     fetchMock.mockResolvedValueOnce(jsonResponse({ document }));
@@ -417,7 +417,7 @@ describe('registered API methods', () => {
   });
 
   it.each(['clip opacity', 'layerOpacity', 'clipOpacity', 'speed'])(
-    'rejects a removed %s in a v20 response without dropping it or retrying',
+    'rejects a removed %s in a v21 response without dropping it or retrying',
     async (removed) => {
       const layer = project.layers[0]!;
       const legacyLayer =
