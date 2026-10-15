@@ -386,7 +386,7 @@
   grid-row: 2;
 }
 
-.declutter-media .grid :is(.media-action-space, .prepare-media) + .media-action-space {
+.declutter-media .grid :is(.media-action-space, .prepare-media, .relink-media) + .media-action-space {
   grid-column: 4;
 }
 

@@ -237,6 +237,7 @@ describe.skipIf(!enabled)('schema-18 layered native export · disposable synthet
       name: 'short-selected-music.wav',
       sourcePath: musicPath,
       fingerprint: await fingerprintFile(musicPath),
+      content: null,
       metadata: {
         codec: 'pcm_s16le',
         sampleRate: 48000,
@@ -1479,7 +1480,8 @@ describe.skipIf(!enabled)('schema-18 layered native export · disposable synthet
     expect(result.receipt.settings.audio[0]!.videoSamples).toBe(exportAudioSample(13));
     expect(result.receipt.verification.audio).toMatchObject({ codec: 'aac', sampleRate: 48000, channels: 2 });
     expect(result.receipt.verification.audio!.durationErrorSeconds).toBeLessThanOrEqual(framesToSeconds(1));
-    expect(result.receipt.musicSources).toEqual([music]);
+    const { content: _content, ...captured } = music;
+    expect(result.receipt.musicSources).toEqual([captured]);
     expect(await fingerprintFile(music.sourcePath)).toEqual(music.fingerprint);
     await unchanged();
   });

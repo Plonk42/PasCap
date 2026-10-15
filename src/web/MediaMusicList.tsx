@@ -4,6 +4,7 @@ import type { ProjectDocument } from '../shared/model.js';
 import { mediaRemovalUsage } from '../shared/projects.js';
 import { durationLabel, MUSIC_DRAG_TYPE } from './display.js';
 import { Icon } from './icons.js';
+import type { RelinkTarget } from './ImportDialog.js';
 import './music-ui.css';
 import { RemoveMediaDialog } from './RemoveMediaDialog.js';
 
@@ -33,13 +34,17 @@ export function MediaMusicList({
   music,
   project,
   busy,
+  missing,
   onPrepare,
+  onRelink,
   onRemove,
 }: Readonly<{
   music: readonly AudioAsset[];
   project: ProjectDocument | null;
   busy: boolean;
+  missing: ReadonlySet<string>;
   onPrepare: (id: string) => Promise<void>;
+  onRelink: (target: RelinkTarget) => void;
   onRemove: (ids: string[]) => boolean;
 }>) {
   const [removing, setRemoving] = useState<string | null>(null);
@@ -69,6 +74,8 @@ export function MediaMusicList({
       </h3>
       {music.map((asset) => {
         const used = tracks(asset.id);
+        const lost = missing.has(asset.id);
+        const status = lost ? 'Original missing' : STATUS[asset.status];
         return (
           <article
             key={asset.id}
@@ -94,10 +101,23 @@ export function MediaMusicList({
                     {used} {used === 1 ? 'music track' : 'music tracks'}
                   </span>
                 )}
-                {asset.status !== 'ready' && <span className="media-status-text">{STATUS[asset.status]}</span>}
+                {(asset.status !== 'ready' || lost) && <span className="media-status-text">{status}</span>}
               </span>
             </span>
-            {(asset.status === 'registered' || asset.status === 'error') && (
+            {lost && (
+              <button
+                className="icon-button relink-media"
+                aria-label={`Relink ${asset.name}`}
+                title={`Original missing at ${asset.sourcePath}. Relink it to its moved copy`}
+                disabled={busy}
+                onClick={() =>
+                  onRelink({ kind: 'audio', id: asset.id, name: asset.name, sourcePath: asset.sourcePath })
+                }
+              >
+                <Icon name="link" size={15} />
+              </button>
+            )}
+            {!lost && (asset.status === 'registered' || asset.status === 'error') && (
               <button
                 className="icon-button prepare-media"
                 aria-label={`Prepare ${asset.name}`}

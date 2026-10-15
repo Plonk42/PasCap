@@ -17,7 +17,7 @@ import { framesToSeconds } from '../../src/shared/timing.js';
 import { unsupportedProject } from './project-fixtures.js';
 
 function audioAsset(id: string) {
-  return audioAssetSchema.parse({
+  return audioAssetSchema.omit({ content: true }).parse({
     id,
     name: 'song.wav',
     sourcePath: '/synthetic/song.wav',

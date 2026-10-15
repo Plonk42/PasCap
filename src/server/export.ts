@@ -79,7 +79,7 @@ export interface ExportReceipt {
   outputName: string;
   sources: { id: string; sourcePath: string; fingerprint: MediaAsset['fingerprint']; metadata: VideoMetadata }[];
   /** Unique registered originals; instance identities/placements are in settings.audio. */
-  musicSources: AudioAsset[];
+  musicSources: Omit<AudioAsset, 'content'>[];
   settings: {
     target: ExportProfileSettings;
     codec: 'h264';
@@ -1038,7 +1038,7 @@ async function renderCapturedExport(
         fingerprint: asset.fingerprint,
         metadata: asset.metadata,
       })),
-      musicSources,
+      musicSources: musicSources.map(({ content: _content, ...source }) => source),
       timeline: inputs.plan,
       retiming,
       verification,

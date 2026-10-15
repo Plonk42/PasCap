@@ -120,8 +120,10 @@ no import flow duplicates your original footage.
 
 The ignored local data directory defaults to `.pascap/`. It stores project/registry
 metadata, generated proxies/thumbnails, exports/receipts and scratch—not a backup
-of your originals. Keep source recordings at their registered paths; explicit
-relinking is a tracked next step. Deleting a project does not delete original
+of your originals. Keep source recordings at their registered paths. If one moves, its
+Media card shows **Original missing**; **Relink** points it at the moved copy, which
+is accepted only if every byte matches, keeping clips, proxy and settings
+([relinking](docs/design/SOURCE_RELINK.md)). Deleting a project does not delete original
 recordings, shared proxies or successful exports.
 
 | Environment variable              | Purpose                                                                                                                                 |
@@ -146,8 +148,10 @@ and exactly eleven nullable keyframe channels: `opacity`, `temperature`,
 v1–v17 projects and receipt snapshots remain unchanged
 on disk but are incompatible: recreate projects and import media deliberately.
 Export receipts remain version 1 with a strict v18 snapshot and required captured
-audio-source/instance-plan arrays. Registry/proxy/current PCM cache formats and
-source protections do not change. There are no migrations, null fallbacks,
+audio-source/instance-plan arrays. Proxy/current PCM cache formats and source
+protections do not change; the video and music registries are version 2
+(`videos.json`, `music.json`, with full-content checksums), so import recordings again.
+There are no migrations, null fallbacks,
 compatibility readers, default-filled legacy fields or automatic deletions.
 Unsaved in-memory changes are not guaranteed to survive forced
 shutdown. See [workspace and recovery](docs/WORKSPACE_AND_RECOVERY.md).
@@ -206,6 +210,9 @@ are not part of the current editor.
 The no-copy browsing/registration API is documented in
 [deployment and source access](docs/DEPLOYMENT.md#no-copy-source-access-today).
 It lists metadata and accepts selected original paths, never video upload bodies.
+`GET /api/media` and `GET /api/audio` also list `missing` originals, and
+`POST /api/media/:id/relink` / `POST /api/audio/:id/relink` (`{ path }`, 202 `{ job }`)
+queue a verified relink.
 
 ## License
 

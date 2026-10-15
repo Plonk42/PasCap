@@ -37,8 +37,8 @@ test.beforeEach(async ({ page, request }) => {
     const method = route.request().method();
     const reads: Record<string, unknown> = {
       '/api/health': { name: 'PasCap', milestone: 'editing-and-export', frameRate: '30000/1001', workerConcurrency: 1 },
-      '/api/media': { assets },
-      '/api/audio': { assets: [] },
+      '/api/media': { assets, missing: [] },
+      '/api/audio': { assets: [], missing: [] },
       '/api/jobs': { jobs: [] },
     };
     if (method === 'GET' && reads[pathname] !== undefined) {

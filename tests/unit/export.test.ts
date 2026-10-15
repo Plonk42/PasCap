@@ -62,6 +62,7 @@ function videoAsset(overrides: Partial<MediaAsset['metadata']> = {}): MediaAsset
     name: 'original.mp4',
     sourcePath: '/unread-original.mp4',
     fingerprint,
+    content: null,
     status: 'registered',
     error: null,
     prepared: null,
@@ -95,6 +96,7 @@ function audioAsset() {
     name: 'sine.wav',
     sourcePath: '/unread-sine.wav',
     fingerprint,
+    content: null,
     metadata: {
       codec: 'pcm_s16le',
       sampleRate: 48000,

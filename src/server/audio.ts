@@ -11,17 +11,26 @@ import { forEachSerial, whileSerial } from '../shared/serial.js';
 import { parseRate, PROJECT_FPS } from '../shared/timing.js';
 import type { ServiceConfig } from './config.js';
 import { errorMessage, isNotFound, ServiceError } from './errors.js';
-import { assertCacheOutsideSource, assertNoSymlinks, assertSourceIdentity, fingerprintFile } from './files.js';
+import {
+  assertCacheOutsideSource,
+  assertNoSymlinks,
+  assertSourceIdentity,
+  fingerprintFile,
+  hashFile,
+  verifyMovedOriginal,
+} from './files.js';
 import { JobQueue, type JobContext } from './jobs.js';
 import { runProcess } from './process.js';
 import { atomicWrite, ensurePrivateDirectory, SerialWriter } from './storage.js';
 
 export const AUDIO_PROFILE = 'pcm16-48k-stereo-mono-unity-v3' as const;
+/** Registry v2; the earlier audio.json is no longer read. */
+export const MUSIC_REGISTRY = 'music.json';
 const SAMPLE_RATE = 48_000;
 const CHANNELS = 2;
 const MAX_PEAKS = 2048;
 const registrySchema = z
-  .object({ version: z.literal(1), assets: z.array(audioAssetSchema) })
+  .object({ version: z.literal(2), assets: z.array(audioAssetSchema) })
   .strict()
   .refine((registry) => new Set(registry.assets.map((asset) => asset.id)).size === registry.assets.length, {
     message: 'Audio IDs must be unique.',
@@ -190,6 +199,7 @@ export class AudioLibrary {
   readonly #writer = new SerialWriter();
   readonly #operations = new SerialWriter();
   readonly #preparing = new Map<string, string>();
+  readonly #relinking = new Map<string, string>();
   constructor(
     readonly config: ServiceConfig,
     readonly jobs: JobQueue,
@@ -197,7 +207,7 @@ export class AudioLibrary {
 
   async initialise(): Promise<void> {
     await this.#operations.run(async () => {
-      const filename = path.join(this.config.dataDir, 'audio.json');
+      const filename = path.join(this.config.dataDir, MUSIC_REGISTRY);
       let saved: z.infer<typeof registrySchema>;
       let changed = false;
       try {
@@ -210,7 +220,7 @@ export class AudioLibrary {
             `Cannot read the audio registry: ${errorMessage(error)} Restore the registry or choose a new cache directory; the existing file was not changed.`,
             422,
           );
-        saved = { version: 1, assets: [] };
+        saved = { version: 2, assets: [] };
         changed = true;
       }
       for (const asset of saved.assets) {
@@ -245,14 +255,25 @@ export class AudioLibrary {
     });
     return assets;
   }
+  /** Music whose original is not at its registered path (metadata check only). */
+  async missing(): Promise<string[]> {
+    const missing: string[] = [];
+    await forEachSerial([...this.#assets.values()], async (asset) => {
+      try {
+        await assertSourceIdentity(asset.sourcePath, asset.fingerprint);
+      } catch {
+        missing.push(asset.id);
+      }
+    });
+    return missing;
+  }
   get(id: string): AudioAsset {
     const asset = this.#assets.get(idSchema.parse(id));
     if (!asset) throw new ServiceError('Registered music not found.', 404);
     return audioAssetSchema.parse(asset);
   }
   assetDir(asset: AudioAsset): string {
-    const registered = this.get(asset.id);
-    return path.join(this.config.dataDir, 'audio-assets', registered.fingerprint.digest, AUDIO_PROFILE);
+    return path.join(this.config.dataDir, 'audio-assets', idSchema.parse(asset.id), AUDIO_PROFILE);
   }
   playbackPath(asset: AudioAsset): string {
     return path.join(this.assetDir(asset), 'playback.pcm');
@@ -275,8 +296,8 @@ export class AudioLibrary {
   async #save(): Promise<void> {
     await this.#writer.run(() =>
       atomicWrite(
-        path.join(this.config.dataDir, 'audio.json'),
-        `${JSON.stringify({ version: 1, assets: this.list() }, null, 2)}\n`,
+        path.join(this.config.dataDir, MUSIC_REGISTRY),
+        `${JSON.stringify({ version: 2, assets: this.list() }, null, 2)}\n`,
       ),
     );
   }
@@ -304,6 +325,7 @@ export class AudioLibrary {
             name: path.basename(sourcePath),
             sourcePath,
             fingerprint,
+            content: null,
             metadata,
             status: 'registered',
             error: null,
@@ -328,6 +350,8 @@ export class AudioLibrary {
   async #enqueue(id: string): Promise<MediaJob> {
     const active = this.#preparing.get(id);
     if (active) return this.jobs.get(active);
+    if (this.#relinking.has(id))
+      throw new ServiceError('This music is being relinked. Prepare it once the relink finishes.', 409);
     const snapshot = this.get(id);
     assertCacheOutsideSource(path.dirname(snapshot.sourcePath), this.config.dataDir);
     await assertSourceIdentity(snapshot.sourcePath, snapshot.fingerprint, true);
@@ -350,6 +374,12 @@ export class AudioLibrary {
         assertNotCancelled(context.signal);
         current.status = 'preparing';
         await this.#save();
+        if (current.content === null) {
+          context.update(0.01, 'Checksumming the original');
+          const content = await hashFile(snapshot.sourcePath, context.signal);
+          await assertSourceIdentity(snapshot.sourcePath, snapshot.fingerprint, true);
+          current.content = content;
+        }
         const waveform = await this.#prepareAsset(snapshot, context);
         assertNotCancelled(context.signal);
         current.waveform = waveform;
@@ -373,6 +403,51 @@ export class AudioLibrary {
     );
     this.#preparing.set(id, job.id);
     return job;
+  }
+  /** Points music at a verified byte-identical copy; its ID, cache and music tracks stay. */
+  async relink(id: string, filename: string): Promise<MediaJob> {
+    const sourcePath = path.resolve(sourcePathSchema.parse(filename));
+    return this.#operations.run(() => {
+      const asset = this.get(id);
+      const content = asset.content;
+      if (content === null)
+        throw new ServiceError(
+          `${asset.name} was never prepared, so PasCap has no checksum to verify a moved copy against. Import the music from its new location instead.`,
+          409,
+        );
+      if (this.#relinking.has(id) || this.#preparing.has(id))
+        throw new ServiceError(`${asset.name} is busy. Relink it once its current job finishes.`, 409);
+      assertCacheOutsideSource(path.dirname(sourcePath), this.config.dataDir);
+      const job = this.jobs.submit(
+        'relink',
+        asset.name,
+        async (context) => {
+          context.update(0.01, `Checking every byte of ${sourcePath}`);
+          const fingerprint = await verifyMovedOriginal(sourcePath, content, context.signal, (fraction) =>
+            context.update(0.01 + fraction * 0.97, `Checking every byte of ${sourcePath}`),
+          );
+          assertNotCancelled(context.signal);
+          await this.#operations.run(async () => {
+            const current = this.#assets.get(id)!;
+            const previous = { name: current.name, sourcePath: current.sourcePath, fingerprint: current.fingerprint };
+            Object.assign(current, { name: path.basename(sourcePath), sourcePath, fingerprint });
+            try {
+              await this.#save();
+            } catch (error) {
+              Object.assign(current, previous);
+              throw error;
+            }
+          });
+          context.update(1, `Relinked to ${sourcePath}`);
+        },
+        () => {
+          this.#relinking.delete(id);
+          return Promise.resolve();
+        },
+      );
+      this.#relinking.set(id, job.id);
+      return Promise.resolve(job);
+    });
   }
   async #cachedWaveform(asset: AudioAsset, context: JobContext): Promise<number[] | null> {
     try {

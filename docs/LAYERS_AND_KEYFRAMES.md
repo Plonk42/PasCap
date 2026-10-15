@@ -677,7 +677,8 @@ Older v1–v17 project documents and export receipt snapshots remain unchanged/i
 there are no migrations, compatibility fallback/default fields or automatic deletion
 of projects, receipts or successful videos. Create a new project and deliberately
 import its media; registered media and currently verified ready proxies remain reusable.
-Registry/proxy/current PCM formats and source identity checks are unchanged.
+Proxy/current PCM formats and source identity checks are unchanged; the registries are
+version 2 (full-content checksums).
 Confirmed project deletion removes only its saved document, preserving originals,
 the shared registry/proxy cache and exports/receipts. The live v3 sample appearing
 incompatible is expected, not a reason to rewrite it.

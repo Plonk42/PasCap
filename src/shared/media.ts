@@ -11,6 +11,14 @@ export const fingerprintSchema = z
     inode: z.number().int().nonnegative(),
   })
   .strict();
+/** SHA-256 of every byte of an original, independent of its path and filesystem. */
+export const contentSchema = z
+  .object({
+    algorithm: z.literal('sha256-full-v1'),
+    digest: z.string().regex(/^[a-f0-9]{64}$/),
+    size: z.number().int().nonnegative(),
+  })
+  .strict();
 export const metadataSchema = z
   .object({
     width: z.number().int().positive(),
@@ -51,22 +59,25 @@ export const mediaAssetSchema = z
     name: z.string(),
     sourcePath: z.string(),
     fingerprint: fingerprintSchema,
+    /** Recorded by the first preparation; null until then. Required to relink a moved original. */
+    content: contentSchema.nullable(),
     metadata: metadataSchema,
     status: z.enum(['registered', 'queued', 'preparing', 'ready', 'error']),
     error: z.string().nullable(),
     prepared: preparedSchema.nullable(),
   })
   .strict();
-export const registrySchema = z.object({ version: z.literal(1), assets: z.array(mediaAssetSchema) }).strict();
+export const registrySchema = z.object({ version: z.literal(2), assets: z.array(mediaAssetSchema) }).strict();
 export type MediaAsset = z.infer<typeof mediaAssetSchema>;
 export type SourceFingerprint = z.infer<typeof fingerprintSchema>;
+export type SourceContent = z.infer<typeof contentSchema>;
 export type VideoMetadata = z.infer<typeof metadataSchema>;
 export type ProxyVerification = z.infer<typeof proxyVerificationSchema>;
 
 export const jobSchema = z
   .object({
     id: idSchema,
-    kind: z.enum(['prepare', 'reference', 'audio', 'export']),
+    kind: z.enum(['prepare', 'reference', 'audio', 'export', 'relink']),
     label: z.string(),
     state: z.enum(['queued', 'running', 'completed', 'failed', 'cancelled']),
     progress: z.number().min(0).max(1),
