@@ -429,7 +429,7 @@ test('per-track fade/transition timing and positioned track key numbers use the 
   await commitNumber(page, 'Closing fade', '9');
   const transition = page.getByRole('spinbutton', { name: 'Transition duration', exact: true });
   await transition.fill('24');
-  expect((await currentProject(page)).layers[0]!.transitions[0]?.duration).toBe(18);
+  expect((await currentProject(page)).layers[0]!.transitions[0]).toMatchObject({ duration: 18 });
   await transition.press('Enter');
   const opening = page.getByRole('spinbutton', { name: 'Opening fade', exact: true });
   await opening.fill('80');

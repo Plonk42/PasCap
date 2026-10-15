@@ -838,7 +838,7 @@ test('changing a later boundary preserves independent excerpts while Colour appl
   const project = projectSchema.parse(await page.evaluate(() => window.pascapLab!.project()));
   expect(project.layers[0]?.colour.exposure).toBe(0.8);
   expect(project.clips.every((clip) => !('colour' in clip) && !('correction' in clip))).toBe(true);
-  expect(project.layers[0]!.transitions[0]?.duration).toBe(18);
+  expect(project.layers[0]!.transitions[0]).toMatchObject({ duration: 18 });
   expect(project.layers[0]!.transitions[1]).toMatchObject({ type: 'cross-dissolve', duration: 30 });
   const region = calculateLayout(project).transitions[1]!;
   const state = await page.evaluate(

@@ -20,7 +20,7 @@ import { snapFrame, snapPoints } from '../shared/snap.js';
 import { trimOnTimeline, type TrimEdge } from '../shared/source-range.js';
 import { spatialKeyChannels } from '../shared/spatial.js';
 import { clipDuration } from '../shared/speed.js';
-import { calculateLayout, type PlacedClip } from '../shared/timeline.js';
+import { calculateLayout, transitionOffset, type PlacedClip } from '../shared/timeline.js';
 import { formatTimecode, framesToSeconds, secondsToFrames } from '../shared/timing.js';
 import { clipKeyframeMarkers, type ClipKeyframeMarker } from './clip-keyframe-markers.js';
 import { clipKeyframeKind, clipKeyframeSlideTarget, type ClipKeyframeTarget } from './clip-keyframe-drag.js';
@@ -1541,16 +1541,35 @@ export function Timeline(props: Readonly<Props>) {
                 }}
               />
             ))}
+            {geometry.transitions.flatMap((region) =>
+              region.slot
+                ? [
+                    <div
+                      key={`slot-${region.transition.leftId}-${region.transition.rightId}`}
+                      className="timeline-transition-slot"
+                      aria-hidden="true"
+                      style={{
+                        top: rowTop(region.layerId),
+                        left: leading + region.slot.start * scale,
+                        width: (region.slot.end - region.slot.start) * scale,
+                      }}
+                    />,
+                  ]
+                : [],
+            )}
             {geometry.transitions.map((region, index) => {
               const left =
                 assets.find(
                   (asset) => asset.id === project.clips.find((clip) => clip.id === region.transition.leftId)?.mediaId,
                 )?.name ?? `Clip ${index + 1}`;
               const position =
-                region.transition.type === 'cross-dissolve' ? (region.start + region.end) / 2 : region.boundary;
-              const label = { cut: 'Cut', 'cross-dissolve': 'Dissolve', 'fade-through-black': 'Fade' }[
-                region.transition.type
-              ];
+                transitionOffset(region.transition) === 0 ? region.boundary : (region.start + region.end) / 2;
+              const label = {
+                cut: 'Cut',
+                'cross-dissolve': 'Dissolve',
+                'fade-through-black': 'Fade',
+                'fade-black-pause': 'Pause',
+              }[region.transition.type];
               const layerName = project.layers.find((layer) => layer.id === region.layerId)!.name;
               return (
                 <button

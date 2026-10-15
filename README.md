@@ -24,7 +24,7 @@ deployment targets.
 - Track-owned crop, uniform scale, translation and rotation, with per-setting project-frame keyframes.
 - Draggable timeline keyframes and setting-specific Previous/Next navigation.
 - Direct panel/help controls, compact visual animation states and grouped editing tools.
-- Track-local cuts, fade-through-black, cross-dissolves and opening/closing fades.
+- Track-local cuts, fade-through-black (optionally with a black pause between clips), cross-dissolves and opening/closing fades.
 - Up to eight independent music tracks with waveforms, gain, fades and explicit range looping; overlapping sources sum linearly with one final hard clamp.
 - Native original-based H.264 SDR exports at **1280×720** or **3840×2160**, with progress, cancellation and verification receipts.
 - Export-space preflight, disclosed planning assumptions and safe disk-full recovery.

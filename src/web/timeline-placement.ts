@@ -1,7 +1,7 @@
 import { applyCommand, type EditCommand } from '../shared/commands.js';
 import type { ProjectDocument, VideoClip } from '../shared/model.js';
 import { clipDuration } from '../shared/speed.js';
-import { calculateLayout, layerClips } from '../shared/timeline.js';
+import { calculateLayout, layerClips, transitionOffset } from '../shared/timeline.js';
 
 export type TimelinePayload =
   { kind: 'clip'; clipId: string; grabFrame: number } | { kind: 'media'; clips: readonly VideoClip[] };
@@ -91,8 +91,7 @@ function rippleSlots(
     );
   let cursor = anchor;
   const placed = ordered.map((clip, index) => {
-    const incoming = transitions[index - 1];
-    if (incoming?.type === 'cross-dissolve') cursor -= incoming.duration;
+    cursor += transitionOffset(transitions[index - 1]);
     const start = cursor;
     cursor += clipDuration(clip);
     return { clip, start, end: cursor };
@@ -103,11 +102,11 @@ function rippleSlots(
       left &&
       layer.transitions.find(
         (transition) =>
-          transition.leftId === left.clip.id && transition.rightId === firstId && transition.type === 'cross-dissolve',
+          transition.leftId === left.clip.id && transition.rightId === firstId && transitionOffset(transition) !== 0,
       );
     return {
       index: order < ordered.length ? clips.findIndex((clip) => clip.id === ordered[order]!.id) : clips.length,
-      start: left ? left.end - (incoming?.duration ?? 0) : anchor,
+      start: left ? left.end + transitionOffset(incoming) : anchor,
     };
   });
 }

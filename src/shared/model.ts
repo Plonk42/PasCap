@@ -48,6 +48,16 @@ export const transitionSchema = z.discriminatedUnion('type', [
   z
     .object({ leftId: idSchema, rightId: idSchema, type: z.literal('cross-dissolve'), duration: frameSchema.min(1) })
     .strict(),
+  // Fade out over `fade` frames, hold black for its own `pause` timeslot between the clips, fade in.
+  z
+    .object({
+      leftId: idSchema,
+      rightId: idSchema,
+      type: z.literal('fade-black-pause'),
+      fade: frameSchema.min(1),
+      pause: frameSchema.min(1),
+    })
+    .strict(),
 ]);
 export const layerSchema = z
   .object({

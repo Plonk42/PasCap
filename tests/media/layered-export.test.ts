@@ -47,7 +47,13 @@ import {
   type VideoLayer,
 } from '../../src/shared/model.js';
 import { compileRetiming } from '../../src/shared/speed.js';
-import { calculateLayout, sampleTimeline, type PreviewLayer, type TimelineLayout } from '../../src/shared/timeline.js';
+import {
+  calculateLayout,
+  sampleSlots,
+  sampleTimeline,
+  type PreviewLayer,
+  type TimelineLayout,
+} from '../../src/shared/timeline.js';
 import { framesToSeconds } from '../../src/shared/timing.js';
 import { observedJobBytes } from './scratch-observation.js';
 
@@ -106,7 +112,10 @@ function pixelError(
   originals: Map<string, Buffer>,
   layout: TimelineLayout,
 ): number {
-  const samples = sampleTimeline(project, frame, layout);
+  const order = new Map(project.layers.map((row, index) => [row.id, index]));
+  const samples = [...sampleTimeline(project, frame, layout), ...sampleSlots(project, frame, layout)].sort(
+    (left, right) => order.get(left.layerId)! - order.get(right.layerId)!,
+  );
   let error = 0;
   for (let pixel = 0; pixel < PIXELS; pixel++) {
     const expected = compositePixel(samples, (sample) => {
@@ -1256,6 +1265,28 @@ describe.skipIf(!enabled)('schema-18 layered native export · disposable synthet
       expect(base.brightness).toBe(0);
       expect(base.blendWeight).toBe(1);
       expect(base.opacity).toBe(1);
+    }
+  });
+
+  it('renders a black pause timeslot as track-owned coverage over lower footage', async () => {
+    const project = createProject('native-pause', 'Black pause between overlay clips');
+    project.layers.push({ ...layer('video-2'), opacity: 0.5 });
+    project.clips = [
+      createClip('base', assets[0]!.id, 0, 12),
+      { ...createClip('up-a', assets[1]!.id, 2, 6), layerId: 'video-2', start: 1 },
+      { ...createClip('up-b', assets[2]!.id, 8, 12), layerId: 'video-2', start: 8 },
+    ];
+    project.layers[1]!.transitions = [{ leftId: 'up-a', rightId: 'up-b', type: 'fade-black-pause', fade: 2, pause: 3 }];
+    const layout = calculateLayout(projectSchema.parse(project));
+    expect(layout.transitions[0]!.slot).toEqual({ start: 5, end: 8 });
+    const result = await complete(project);
+    bounds(result.receipt);
+    await parity(project, result.filename);
+    for (const frame of [5, 6, 7]) {
+      expect(sampleTimeline(project, frame).map((sample) => sample.layerId)).toEqual(['video-1']);
+      expect(sampleSlots(project, frame)).toEqual([
+        expect.objectContaining({ layerId: 'video-2', brightness: 0, opacity: 0.5 }),
+      ]);
     }
   });
 

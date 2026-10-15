@@ -30,7 +30,7 @@ import {
 import { detailSchema, type DetailSettings } from './detail.js';
 import { spatialSettingsSchema, type SpatialSettings } from './spatial.js';
 import { clipDuration, type SpeedSettings } from './speed.js';
-import { calculateLayout, layerClips, type TimelineLayout } from './timeline.js';
+import { calculateLayout, layerClips, transitionOffset, type TimelineLayout } from './timeline.js';
 
 export type EditCommand =
   | { type: 'insert'; clip: VideoClip; index: number }
@@ -383,14 +383,13 @@ function setTransition(next: ProjectDocument, value: Transition, before: Timelin
   );
   if (boundary < 0) throw new Error('Transition is not between adjacent clips.');
   const previous = layer.transitions[boundary]!;
-  if (transition.type !== 'cut' && previous.type !== 'cross-dissolve' && right.start !== left.end)
+  if (transition.type !== 'cut' && transitionOffset(previous) === 0 && right.start !== left.end)
     throw new Error(
       'Non-cut transitions require touching clips or an existing dissolve; close the gap explicitly first.',
     );
   layer.transitions[boundary] = transition;
-  if (!layer.ripple && (transition.type === 'cross-dissolve' || previous.type === 'cross-dissolve')) {
-    next.clips.find((clip) => clip.id === right.clip.id)!.start =
-      left.end - (transition.type === 'cross-dissolve' ? transition.duration : 0);
+  if (!layer.ripple && (transitionOffset(transition) !== 0 || transitionOffset(previous) !== 0)) {
+    next.clips.find((clip) => clip.id === right.clip.id)!.start = left.end + transitionOffset(transition);
   }
 }
 
