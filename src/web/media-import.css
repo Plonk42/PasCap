@@ -42,6 +42,18 @@
   white-space: nowrap;
 }
 
+.import-relink-note {
+  margin: 0 0 10px;
+  color: #adccba;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.import-relink-note span {
+  color: #e6efe8;
+  font-family: ui-monospace, monospace;
+}
+
 .import-browser {
   display: grid;
   grid-template-columns: 184px minmax(0, 1fr);

@@ -33,8 +33,8 @@ for (const viewport of [
           frameRate: '30000/1001',
           workerConcurrency: 1,
         },
-        '/api/media': { assets: [recording] },
-        '/api/audio': { assets: [] },
+        '/api/media': { assets: [recording], missing: [] },
+        '/api/audio': { assets: [], missing: [] },
         '/api/jobs': { jobs: [] },
       };
       if (route.request().method() === 'GET' && payloads[pathname]) {

@@ -248,7 +248,8 @@ old `clipOpacity`/`layerOpacity` keyframe fields are rejected, not defaulted.
 Production export receipts also remain version 1, with strict v18 snapshots and
 required `musicSources` captured-original/`settings.audio` identified-plan arrays;
 older snapshots or invalid arrays are rejected without rewriting receipts/MP4s.
-Registry/proxy/current PCM formats and source guards are unchanged.
+Proxy/current PCM formats and source guards are unchanged; the registries are
+version 2 (full-content checksums).
 Source ranges and every retained clip speed keyframe position are validated against registered
 original frame counts, including hidden track references.
 

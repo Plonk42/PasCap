@@ -25,8 +25,9 @@ neutral-white linear luminance before clipping only, not arbitrary/final images.
 Other scalar bounds and neutral values retain the existing SDR contract.
 No optional legacy field, additive parameter merge, migration or default-on-load exists.
 Schema 18 rejects versions 1–17 without rewriting or deleting their documents.
-Receipt format remains 1 with strict schema-18 snapshots; registry, proxies and
-PCM formats are unchanged. Recreate incompatible projects deliberately.
+Receipt format remains 1 with strict schema-18 snapshots; proxy and PCM formats are
+unchanged, and the registries are version 2 (full-content checksums). Recreate
+incompatible projects deliberately.
 
 The nine shared scalar colour channels and HDR override **video track colour**, independently, in
 absolute project time. Skip keyframes without the relevant enabled setting, interpolate parameter values

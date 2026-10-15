@@ -37,7 +37,16 @@ interface Props {
   busy: boolean;
   error: string;
   actions: ImportActions;
+  /** Pick one moved copy of a registered recording instead of importing. */
+  relink?: { target: RelinkTarget; onRelink: (path: string) => Promise<boolean> };
   onClose: (imported: boolean) => void;
+}
+
+export interface RelinkTarget {
+  kind: 'video' | 'audio';
+  id: string;
+  name: string;
+  sourcePath: string;
 }
 
 interface Entry {
@@ -109,6 +118,36 @@ function mediaSummary(videos: number, music: number): string {
     .join(' and ');
 }
 
+function dialogText(relink: RelinkTarget | undefined, chosen: readonly FileEntry[], summary: string) {
+  if (!relink)
+    return {
+      title: 'Import media',
+      selection: summary ? `${summary} selected` : 'Select recordings, or double-click one to import it',
+      action: chosen.length ? `Import ${chosen.length}` : 'Import',
+      actionBusy: 'Importing…',
+      actionName: 'Import selected recordings',
+      pathLabel: 'File or folder path',
+      placeholder: '/media/footage/Flight',
+      pathAction: 'Import path',
+      pathHint:
+        'A video or music recording, or a folder: a folder imports every video recording in it and its subfolders.',
+    };
+  const kind = relink.kind === 'video' ? 'video' : 'music';
+  return {
+    title: `Relink ${relink.name}`,
+    selection: chosen[0]
+      ? `New location: ${chosen[0].path}`
+      : `Choose the moved copy of ${relink.name}, or double-click it`,
+    action: 'Relink',
+    actionBusy: 'Relinking…',
+    actionName: 'Relink to the selected recording',
+    pathLabel: 'File path',
+    placeholder: `/media/footage/${relink.name}`,
+    pathAction: 'Relink path',
+    pathHint: `The moved ${kind} recording, anywhere on this machine.`,
+  };
+}
+
 /** Crumbs from the location root down to the open folder. */
 function crumbs(root: FootageRoot, directory: string): { name: string; path: string | undefined }[] {
   const base = root.path.endsWith('/') ? root.path : `${root.path}/`;
@@ -176,7 +215,7 @@ function ImportReport({ report }: Readonly<{ report: Report }>) {
   );
 }
 
-export function ImportDialog({ initialKind, busy, error, actions, onClose }: Readonly<Props>) {
+export function ImportDialog({ initialKind, busy, error, actions, relink, onClose }: Readonly<Props>) {
   const titleId = useId();
   const [roots, setRoots] = useState<FootageRoot[]>([]);
   const [rootId, setRootId] = useState('');
@@ -322,14 +361,25 @@ export function ImportDialog({ initialKind, busy, error, actions, onClose }: Rea
     const add = !selected.has(file.path);
     select(from < 0 ? [file] : files.slice(Math.min(from, to), Math.max(from, to) + 1), add);
   };
+  const pick = (file: FileEntry): void => {
+    setSelected(selected.has(file.path) ? new Map() : new Map([[file.path, file]]));
+  };
 
-  const run = async (task: (report: Report) => Promise<string[]>): Promise<void> => {
+  const whileBusy = async (task: () => Promise<void>): Promise<void> => {
     if (blocked || pending.current) return;
     pending.current = true;
     setImporting(true);
-    setReport(null);
-    const result: Report = { videos: 0, music: 0, queued: 0, problems: [] };
     try {
+      await task();
+    } finally {
+      pending.current = false;
+      if (mounted.current) setImporting(false);
+    }
+  };
+  const run = (task: (report: Report) => Promise<string[]>): Promise<void> =>
+    whileBusy(async () => {
+      setReport(null);
+      const result: Report = { videos: 0, music: 0, queued: 0, problems: [] };
       const done = await task(result);
       if (!mounted.current) return;
       const next = new Map(selected);
@@ -337,11 +387,12 @@ export function ImportDialog({ initialKind, busy, error, actions, onClose }: Rea
       setSelected(next);
       if (result.videos + result.music > 0 && !result.problems.length) onClose(true);
       else setReport(result);
-    } finally {
-      pending.current = false;
-      if (mounted.current) setImporting(false);
-    }
-  };
+    });
+  // The dialog closes once the relink is queued; its full check runs in Activity.
+  const relinkTo = (path: string): Promise<void> =>
+    whileBusy(async () => {
+      await relink?.onRelink(path);
+    });
   const addVideos = (report: Report, outcome: ImportResult): boolean => {
     report.videos += outcome.added + outcome.existing;
     report.queued += outcome.queued;
@@ -384,12 +435,14 @@ export function ImportDialog({ initialKind, busy, error, actions, onClose }: Rea
       }
       return [];
     });
+  const submitFiles = (items: readonly FileEntry[]): Promise<void> =>
+    relink ? relinkTo(items[0]!.path) : importFiles(items);
+  const submitPath = (): Promise<void> => (relink ? relinkTo(manualPath.trim()) : importPath());
 
   const chosenVideos = chosen.filter((entry) => entry.kind === 'video').length;
-  const summary = mediaSummary(chosenVideos, chosen.length - chosenVideos);
+  const text = dialogText(relink?.target, chosen, mediaSummary(chosenVideos, chosen.length - chosenVideos));
   const availableRoots = roots.filter((item) => item.available);
-  let importLabel = chosen.length ? `Import ${chosen.length}` : 'Import';
-  if (importing) importLabel = 'Importing…';
+  const chooseFile: (file: FileEntry, shift: boolean) => void = relink ? pick : toggleFile;
   return (
     <Modal
       className="import-media-dialog"
@@ -399,8 +452,8 @@ export function ImportDialog({ initialKind, busy, error, actions, onClose }: Rea
       onClose={() => onClose(false)}
       footer={
         <>
-          <span className="activity-hint import-selection" aria-live="polite">
-            {summary ? `${summary} selected` : 'Select recordings, or double-click one to import it'}
+          <span className="activity-hint import-selection" aria-live="polite" title={chosen[0]?.path}>
+            {text.selection}
           </span>
           <button type="button" className="secondary-button" disabled={blocked} onClick={() => onClose(false)}>
             {report ? 'Close' : 'Cancel'}
@@ -408,23 +461,29 @@ export function ImportDialog({ initialKind, busy, error, actions, onClose }: Rea
           <button
             type="button"
             className="primary-button"
-            aria-label="Import selected recordings"
+            aria-label={text.actionName}
             disabled={blocked || !chosen.length}
             onClick={() => {
-              void importFiles(chosen);
+              void submitFiles(chosen);
             }}
           >
-            {importLabel}
+            {importing ? text.actionBusy : text.action}
           </button>
         </>
       }
     >
       <div className="activity-dialog-heading">
-        <h2 id={titleId}>Import media</h2>
+        <h2 id={titleId}>{text.title}</h2>
         <span className="privacy-badge" title="PasCap references originals where they are and never copies them">
           Originals stay in place
         </span>
       </div>
+      {relink && (
+        <p className="import-relink-note">
+          Was at <span title={relink.target.sourcePath}>{relink.target.sourcePath}</span>. Choose its moved copy: PasCap
+          checks every byte before using it, and keeps the clips, proxy and settings.
+        </p>
+      )}
       <div className="import-browser" aria-busy={loading || importing}>
         <nav className="import-places" aria-label="Media locations">
           <h3>Locations</h3>
@@ -451,23 +510,20 @@ export function ImportDialog({ initialKind, busy, error, actions, onClose }: Rea
             <form
               onSubmit={(event) => {
                 event.preventDefault();
-                void importPath();
+                void submitPath();
               }}
             >
               <input
-                aria-label="File or folder path"
-                placeholder="/media/footage/Flight"
+                aria-label={text.pathLabel}
+                placeholder={text.placeholder}
                 value={manualPath}
                 disabled={blocked}
                 onChange={(event) => setManualPath(event.target.value)}
               />
               <button type="submit" className="secondary-button small" disabled={blocked || !manualPath.trim()}>
-                Import path
+                {text.pathAction}
               </button>
-              <p className="control-hint">
-                A video or music recording, or a folder: a folder imports every video recording in it and its
-                subfolders.
-              </p>
+              <p className="control-hint">{text.pathHint}</p>
             </form>
           </details>
         </nav>
@@ -518,28 +574,30 @@ export function ImportDialog({ initialKind, busy, error, actions, onClose }: Rea
             </button>
           </div>
           <div className="import-filters">
-            <fieldset className="import-kinds">
-              <legend className="declutter-sr-only">Show</legend>
-              {(
-                [
-                  ['all', 'All'],
-                  ['video', 'Video'],
-                  ['audio', 'Music'],
-                ] as const
-              ).map(([value, label]) => (
-                <button
-                  key={value}
-                  type="button"
-                  aria-pressed={kind === value}
-                  onClick={() => {
-                    setKind(value);
-                    anchor.current = null;
-                  }}
-                >
-                  {label}
-                </button>
-              ))}
-            </fieldset>
+            {!relink && (
+              <fieldset className="import-kinds">
+                <legend className="declutter-sr-only">Show</legend>
+                {(
+                  [
+                    ['all', 'All'],
+                    ['video', 'Video'],
+                    ['audio', 'Music'],
+                  ] as const
+                ).map(([value, label]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    aria-pressed={kind === value}
+                    onClick={() => {
+                      setKind(value);
+                      anchor.current = null;
+                    }}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </fieldset>
+            )}
             <label className="import-search">
               <Icon name="search" size={14} />
               <input
@@ -563,7 +621,7 @@ export function ImportDialog({ initialKind, busy, error, actions, onClose }: Rea
                 type="checkbox"
                 aria-label="Select all recordings in this folder"
                 checked={allSelected}
-                disabled={blocked || !files.length}
+                disabled={blocked || !files.length || relink !== undefined}
                 onChange={() => select(files, !allSelected)}
               />
               <span>Name</span>
@@ -595,7 +653,7 @@ export function ImportDialog({ initialKind, busy, error, actions, onClose }: Rea
                       data-selected={selected.has(entry.path)}
                       title={entry.path}
                       onDoubleClick={() => {
-                        void importFiles([entry as FileEntry]);
+                        void submitFiles([entry as FileEntry]);
                       }}
                     >
                       <input
@@ -604,7 +662,7 @@ export function ImportDialog({ initialKind, busy, error, actions, onClose }: Rea
                         checked={selected.has(entry.path)}
                         disabled={blocked}
                         onChange={(event) =>
-                          toggleFile(
+                          chooseFile(
                             entry as FileEntry,
                             shiftHeld.current || (event.nativeEvent as MouseEvent).shiftKey === true,
                           )

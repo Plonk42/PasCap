@@ -89,6 +89,7 @@ function fakeLibrary(): MediaLibrary {
       name: `${id}.mp4`,
       sourcePath: '/never-read-original.mp4',
       fingerprint: { algorithm: 'sampled-sha256-v1', digest: 'a'.repeat(64), size: 1, mtimeMs: 0, device: 1, inode: 1 },
+      content: null,
       metadata: {
         width: 160,
         height: 90,

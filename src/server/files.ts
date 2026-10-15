@@ -2,7 +2,7 @@ import { lstat, open, readdir } from 'node:fs/promises';
 import type { Stats } from 'node:fs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
-import type { SourceFingerprint } from '../shared/media.js';
+import type { SourceContent, SourceFingerprint } from '../shared/media.js';
 import { forEachSerial } from '../shared/serial.js';
 import { errorMessage, isNotFound, ServiceError } from './errors.js';
 
@@ -79,7 +79,7 @@ export async function assertSourceIdentity(
   } catch (error) {
     if (isNotFound(error))
       throw new ServiceError(
-        'The original recording is missing. Reconnect its drive or restore the original at its registered path. PasCap does not relink automatically.',
+        'The original recording is missing. Reconnect its drive, restore it at its registered path, or relink it to its new location.',
         409,
       );
     throw error;
@@ -91,9 +91,73 @@ export async function assertSourceIdentity(
     stat.ino !== fingerprint.inode ||
     stat.dev !== fingerprint.device
   )
-    throw new ServiceError('Source is missing or changed. Re-register it; the old clip will not be reassociated.', 409);
+    throw new ServiceError(
+      'The file at the registered path was replaced or modified. Restore the original there, or relink the recording to an unchanged copy.',
+      409,
+    );
   if (deep && (await fingerprintFile(filename)).digest !== fingerprint.digest)
     throw new ServiceError('Source content changed. Re-register it before preparing or rendering.', 409);
+}
+
+/** Streams every byte; the file must not change while it is read. */
+export async function hashFile(
+  filename: string,
+  signal?: AbortSignal,
+  onProgress?: (fraction: number) => void,
+): Promise<SourceContent> {
+  const before = await assertNoSymlinks(filename);
+  if (!before.isFile()) throw new ServiceError('Source must be a regular file.', 422);
+  const hash = createHash('sha256');
+  const handle = await open(filename, 'r');
+  let read = 0;
+  let reported = 0;
+  try {
+    for await (const chunk of handle.createReadStream({
+      autoClose: false,
+      highWaterMark: 1024 * 1024,
+    }) as AsyncIterable<Buffer>) {
+      if (signal?.aborted) throw new ServiceError('Job cancelled.', 499);
+      hash.update(chunk);
+      read += chunk.length;
+      if (onProgress && before.size > 0 && read - reported >= 64 * 1024 * 1024) {
+        reported = read;
+        onProgress(read / before.size);
+      }
+    }
+    const after = await handle.stat();
+    if (
+      read !== before.size ||
+      after.size !== before.size ||
+      after.mtimeMs !== before.mtimeMs ||
+      after.ino !== before.ino
+    )
+      throw new ServiceError('Source changed while it was being read.', 409);
+  } finally {
+    await handle.close();
+  }
+  return { algorithm: 'sha256-full-v1', digest: hash.digest('hex'), size: read };
+}
+
+/** A moved original must match the recorded checksum byte for byte; returns its new location fingerprint. */
+export async function verifyMovedOriginal(
+  filename: string,
+  content: SourceContent,
+  signal?: AbortSignal,
+  onProgress?: (fraction: number) => void,
+): Promise<SourceFingerprint> {
+  const fingerprint = await fingerprintFile(filename);
+  if (fingerprint.size !== content.size)
+    throw new ServiceError(
+      `${path.basename(filename)} is ${fingerprint.size} bytes, not ${content.size}: it is a different recording. Nothing was changed.`,
+      422,
+    );
+  if ((await hashFile(filename, signal, onProgress)).digest !== content.digest)
+    throw new ServiceError(
+      `${path.basename(filename)} has the same size but different content: it is a different recording. Nothing was changed.`,
+      422,
+    );
+  await assertSourceIdentity(filename, fingerprint, true);
+  return fingerprint;
 }
 
 export interface Discovery {

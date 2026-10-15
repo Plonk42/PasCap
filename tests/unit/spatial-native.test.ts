@@ -488,6 +488,7 @@ describe('layered renderer metadata and continuous retiming ownership with memor
       name: 'Synthetic',
       sourcePath: '/synthetic-not-read.mp4',
       fingerprint: { algorithm: 'sampled-sha256-v1', digest: 'a'.repeat(64), size: 1, mtimeMs: 0, device: 1, inode: 1 },
+      content: null,
       metadata: {
         width: 13,
         height: 7,

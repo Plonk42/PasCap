@@ -80,9 +80,10 @@ PASCAP_MEDIA_ROOTS='["/home/you/Videos","/mnt/footage"]' npm run dev
 ```
 
 Generated data is not an original-footage backup; keep it outside footage. It holds
-registries, proxies/thumbnails, Import dialog previews, projects, exports/receipts, measurements and scratch.
-Original paths remain identity-checked even with ready proxies; no implicit relink/
-migration exists. Preserve registered bytes/paths, including previously copied sources.
+registries (`videos.json`, `music.json`, version 2), proxies/thumbnails, Import dialog previews, projects, exports/receipts, measurements and scratch.
+Original paths remain identity-checked even with ready proxies; relinking is explicit
+and byte-verified ([relinking](design/SOURCE_RELINK.md)), with no implicit relink or
+migration. Preserve registered bytes/paths, including previously copied sources.
 The browsing/registration API table and mount/security contract live in
 [DEPLOYMENT.md](DEPLOYMENT.md#no-copy-source-access-today), not a second API table here.
 
@@ -570,8 +571,9 @@ independent numeric IN/OUT pair (Enter/blur applies, Escape restores) is unchang
   ID. Require a 0–8 `music` array with unique instance IDs and complete independent
   settings, plus captured audio-source/instance-plan arrays in current receipts.
   Reject and preserve incompatible v1–v17 projects/receipt snapshots and finished videos,
-  without automatic deletion; recreate projects deliberately. Registry/proxy formats,
-  source protections and native resource budgets remain unchanged.
+  without automatic deletion; recreate projects deliberately. Proxy formats,
+  source protections and native resource budgets remain unchanged; the registries are
+  version 2 (full-content checksums).
 - Reuse `JobQueue`, library and backpressured raw/retime helpers: one heavy job,
   bounded threads/buffers, cancellation and owned-scratch cleanup. Keep serial awaits/
   [serial helpers](../src/shared/serial.ts), not parallel media work to satisfy lint.

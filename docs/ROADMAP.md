@@ -39,7 +39,8 @@ preserved before clipping only. Static track
 follow scalar grading without adding animation channels. v1–v17 projects
 and receipt snapshots are preserved/incompatible and require recreation, without
 migration, defaults, null/old-format readers or automatic deletion;
-registry/proxy/current PCM formats remain unchanged. Schema 18 requires a 0–8
+proxy/current PCM formats remain unchanged; the registries are version 2 (full-content
+checksums). Schema 18 requires a 0–8
 identified music track array (`[]` without music); version-1 export receipts
 require strict v18 snapshots and captured audio-source/instance-plan arrays.
 Music can extend duration to maximum video/music OUT: closing video fades finish
@@ -80,9 +81,9 @@ approval. Releases, milestone closure and real-media jobs still require explicit
 owner approval; no issue status or acceptance is changed by this contract update.
 
 Use concrete work issues and [ready next actions](https://github.com/Plonk42/PasCap/issues?q=is%3Aissue%20is%3Aopen%20label%3A%22status%3Aready%22)
-for mutable progress. The [#2 identity proposal](design/SOURCE_RELINK.md) requires
-approval of its strict storage/registration and confirmed-location contract before
-implementation; no unsafe relink or automatic migration is introduced.
+for mutable progress. [#2](https://github.com/Plonk42/PasCap/issues/2) implements
+[verified relinking](design/SOURCE_RELINK.md) of moved video and music originals with
+version-2 registries; there is no path guessing or automatic migration.
 #5 covers the approved MIT license, dependency notices and native distribution review.
 GPU/flight work requires owner setup/consent,
 and containers remain a future milestone. The private repository-linked
@@ -104,7 +105,7 @@ cleanup; no new Iteration dates or Project field/view changes are implied here.
 | Issue                                                                                    | Scope                                                                                                                                                                                                                                                                                 |
 | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [#1 — Deterministic raw-frame reader tests](https://github.com/Plonk42/PasCap/issues/1)  | Retain the locally verified exit-before-read fix; verify fresh Node 22/24 CI without hiding failures or weakening exact frame/resource checks                                                                                                                                         |
-| [#2 — Explicit verified source relinking](https://github.com/Plonk42/PasCap/issues/2)    | Approve the [strong identity/atomic relink design](design/SOURCE_RELINK.md), then implement confirmed moved/remounted-original recovery; never guess from names                                                                                                                       |
+| [#2 — Explicit verified source relinking](https://github.com/Plonk42/PasCap/issues/2)    | Implemented [verified relink](design/SOURCE_RELINK.md) of moved video and music originals: full-content checksum match, registry v2, IDs/caches/clips kept; never guess from names                                                                                                    |
 | [#3 — Export disk preflight](https://github.com/Plonk42/PasCap/issues/3)                 | Explain scratch needs and handle low space without destroying original/successful data                                                                                                                                                                                                |
 | [#4 — Entry bundle loading](https://github.com/Plonk42/PasCap/issues/4)                  | Measure and reduce initial JS without suppressing the warning or changing per-frame ownership                                                                                                                                                                                         |
 | [#5 — License and redistribution notices](https://github.com/Plonk42/PasCap/issues/5)    | Approved MIT project terms, retained npm notices and the separate GPL-enabled native distribution contract                                                                                                                                                                            |
@@ -121,9 +122,9 @@ forms. Those are delivered work, not duplicate open backlog tasks.
 The local [UX-hardening update](UX_HARDENING.md) implements the #1 deterministic
 raw-reader fix, #3 storage/recovery controls and genuine constrained-volume test,
 and #4 measured loading boundaries, with simpler visual UI throughout. Delivery
-and acceptance are recorded on those issues, not duplicated here. #2 has a
-documented sampled-versus-full identity prerequisite; no unsafe relink action was
-introduced. [Licensing](LICENSING.md) defines the approved project terms and
+and acceptance are recorded on those issues, not duplicated here. #2 adds
+full-content checksums and an explicit [verified relink](design/SOURCE_RELINK.md).
+[Licensing](LICENSING.md) defines the approved project terms and
 remaining actual-artifact distribution/legal-review gates, not release approval.
 
 Clip speed is clip-only: constant or editable source-frame curves with presets such as

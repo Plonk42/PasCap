@@ -44,6 +44,7 @@ than failing startup. JSON paths must be absolute; a literal `~` is not expanded
 | `POST /api/audio/register-selected`                                        | JSON `{"path":"/media/footage/Music/track.wav"}` for one explicitly confirmed audio candidate inside approved roots; existing standalone-audio probe/preparation remains authoritative |
 | `POST /api/audio/register`                                                 | Deliberate typed audio-path import; browser roots do not restrict this action or expand automatically                                                                                  |
 | `POST /api/media/register` / `POST /api/media/import`                      | Deliberate typed video-file path / recursive folder import, also outside browser roots                                                                                                 |
+| `POST /api/media/:id/relink` / `POST /api/audio/:id/relink`                | JSON `{"path":"/media/footage/Moved/DJI_0001.MP4"}` for a recording that `GET /api/media` / `GET /api/audio` list in `missing`; returns 202 `{ job }` for a verified relink job        |
 
 Use the root IDs returned by the service. Listings use directory/file metadata
 only: no media-byte reads, probing, recursive discovery, registration, cache writes
@@ -94,7 +95,8 @@ and receipt snapshots remain unchanged/incompatible and require project recreati
 without migration, compatibility defaults, null/old-format readers or automatic deletion.
 Export receipts remain version 1 with strict v18 snapshots and required captured
 audio-source/instance-plan arrays; invalid arrays/older snapshots remain preserved
-and rejected. Registry/proxy/current PCM formats and source identity checks are unchanged.
+and rejected. Proxy/current PCM formats and source identity checks are unchanged; the
+registries are version 2 (`videos.json`, `music.json`, with full-content checksums).
 
 Music import populates the project bin/preparation queue, never implicit placement.
 Up to eight independent music tracks can reference the same or different originals
@@ -145,7 +147,8 @@ stable across restarts and upgrades. Originals must remain accessible there; mov
 a recording, changing mounts or disconnecting a drive fails explicitly, even if a
 proxy exists. Filesystem fingerprints still apply: a stable pathname does not bypass
 identity checks. There is no implicit path guessing, native-to-container path/
-fingerprint rewrite or migration; an explicit relink workflow remains pending.
+fingerprint rewrite or migration; an explicit [verified relink](design/SOURCE_RELINK.md)
+accepts a moved copy only when every byte matches the registered original.
 
 Previously copied source files from the removed implementation are **not deleted
 or migrated automatically**. Preserve registered paths and bytes for any still-used

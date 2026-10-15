@@ -19,8 +19,8 @@ test.beforeEach(async ({ page, request }) => {
     throw new Error('Detail tests require the prepared synthetic pattern; no real-media work.');
   const reads: Record<string, unknown> = {
     '/api/health': { name: 'PasCap', milestone: 'editing-and-export', frameRate: '30000/1001', workerConcurrency: 1 },
-    '/api/media': { assets: [asset] },
-    '/api/audio': { assets: [] },
+    '/api/media': { assets: [asset], missing: [] },
+    '/api/audio': { assets: [], missing: [] },
     '/api/jobs': { jobs: [] },
   };
   await page.route('**/api/**', async (route) => {

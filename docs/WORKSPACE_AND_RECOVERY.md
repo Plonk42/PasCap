@@ -37,7 +37,9 @@ clip detail filters before grading; see [detail filters](design/DETAIL_FILTERS.m
   status. **Media options** holds filter/sort/view controls. A plain click reviews;
   checkboxes/Ctrl/Shift select. With two or more recordings selected, the
   **Select all** bar shows their count with Prepare/Clear; dragging
-  a selected recording inserts the whole selection.
+  a selected recording inserts the whole selection. A recording or music file whose
+  original is not at its registered path shows **Original missing** with a **Relink**
+  button in place of its add/prepare actions.
 - Centre: docked **Timeline preview** / **Source preview** tabs, never an overlay
   covering other editor controls. Tab arrows and Home/End switch viewer contexts.
 - Right: scrollable **Clip / Track / Audio** inspector tabs
@@ -647,9 +649,9 @@ must be checked before submitting the import again.
 Music reimport reuses an entry only for the same absolute path and unchanged source
 identity. Deliberately importing a moved file or another hard-linked location
 creates a new music entry and verifies the selected path, not a missing old one.
-The old entry, its project references and caches remain unchanged; this is a fresh
-import, not relinking. Add the new entry separately to place music.
-The serial worker reuses an eligible verified PCM cache without rewriting it.
+The new entry prepares its own PCM cache; the old entry, its project references and
+caches remain unchanged. Add the new entry separately to place music. To keep the
+existing entry, its music tracks and cache, use **Relink** instead.
 
 ### Independent music tracks
 
@@ -722,7 +724,8 @@ Earlier v1–v17 projects/receipt snapshots are preserved, incompatible
 and never migrated or rewritten with fallback/default local fields or old-format
 readers. **Create a new
 project** and import its media deliberately; there is no automatic deletion of
-projects, receipts or finished videos, and registry/proxy/current PCM formats are unchanged.
+projects, receipts or finished videos. Proxy/current PCM formats are unchanged; the
+registries are version 2 (`videos.json`, `music.json`, with full-content checksums).
 Registered recordings and currently
 verified ready proxies are reusable.
 The live v3 sample appearing incompatible is expected. No sample preparation or
@@ -768,7 +771,7 @@ outstanding reads before late work can restart.
 Missing current PCM caches appear as **Prepare** actions on the files in Media → Music;
 no read automatically prepares, rewrites or removes older AAC caches. Explicit
 preparation creates the current versioned PCM cache without changing originals,
-project documents, registry/video-proxy formats or finished exports.
+project documents, video-proxy formats or finished exports.
 
 Read and response decoding have deadlines; incompatible/HTML responses are errors,
 not defaults. If a write transport times out, its result may be uncertain: check
@@ -780,7 +783,11 @@ are not reclassified as failures merely because a following status GET fails.
 Originals must remain readable at their registered absolute service-side paths.
 Moving recordings or disconnecting a drive causes explicit identity/missing-source
 errors, even with a ready proxy. The editor does not guess another path, silently
-reassociate a source or bypass fingerprints; an explicit relink workflow is pending.
+reassociate a source or bypass fingerprints. Media marks such recordings **Original
+missing**; **Relink** opens the Import media dialog for the moved copy, and a serial
+Activity job accepts it only if every byte matches, keeping the ID, caches, clips and
+music tracks ([relinking](design/SOURCE_RELINK.md)). Recordings never prepared cannot
+be relinked and must be imported again.
 Previously copied source files from the removed implementation are **not deleted
 or migrated automatically**. Preserve registered source paths and bytes still in
 use. This is data safety, not compatibility/migration code or an optional copy mode.

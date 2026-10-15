@@ -58,14 +58,14 @@ test.beforeEach(async ({ page, request }) => {
   // Only reads for these existing synthetic proxies/thumbnails (and explicitly selected fixture music) reach the server.
   const reads: Record<string, unknown> = {
     '/api/health': { name: 'PasCap', milestone: 'editing-and-export', frameRate: '30000/1001', workerConcurrency: 1 },
-    '/api/media': { assets },
+    '/api/media': { assets, missing: [] },
     '/api/jobs': { jobs: [] },
   };
   await page.route('**/api/**', async (route) => {
     const pathname = new URL(route.request().url()).pathname;
     const method = route.request().method();
     if (method === 'GET' && pathname === '/api/audio') {
-      await route.fulfill({ json: { assets: audioAssets } });
+      await route.fulfill({ json: { assets: audioAssets, missing: [] } });
       return;
     }
     if (method === 'GET' && reads[pathname] !== undefined) {

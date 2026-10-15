@@ -492,7 +492,8 @@ svg {
   background: #d7b57f;
 }
 
-.media-state.error > span {
+.media-state.error > span,
+.media-state.missing > span {
   background: #efaa98;
 }
 

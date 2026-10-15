@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { fingerprintSchema } from './media.js';
+import { contentSchema, fingerprintSchema } from './media.js';
 import { frameSchema, idSchema } from './model.js';
 import type { MusicTrack } from './model.js';
 
@@ -9,6 +9,7 @@ export const audioAssetSchema = z
     name: z.string(),
     sourcePath: z.string(),
     fingerprint: fingerprintSchema,
+    content: contentSchema.nullable(),
     metadata: z
       .object({
         codec: z.string(),

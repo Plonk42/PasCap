@@ -40,7 +40,7 @@ const receiptSchema = z
     profile: exportProfileSchema,
     // Receipts written before output names existed have none; they keep the default label.
     outputName: exportOutputNameSchema.optional(),
-    musicSources: z.array(audioAssetSchema).max(MAX_MUSIC_TRACKS),
+    musicSources: z.array(audioAssetSchema.omit({ content: true })).max(MAX_MUSIC_TRACKS),
     settings: z.looseObject({
       audio: z.array(exportMusicPlanSchema).max(MAX_MUSIC_TRACKS),
     }),

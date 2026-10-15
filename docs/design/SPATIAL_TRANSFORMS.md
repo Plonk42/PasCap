@@ -231,4 +231,5 @@ salmon **●** custom-speed lane is unchanged.
 Projects and version-1 export receipt snapshots must satisfy strict **schema 18**.
 Incompatible v1–v17 projects/receipt snapshots and completed videos remain untouched.
 Recreate projects deliberately; do not migrate, default-fill, rewrite or delete old
-data automatically. Registry/proxy/PCM and receipt/report format versions do not change.
+data automatically. Proxy/PCM and receipt/report format versions do not change; the
+registries are version 2 (full-content checksums).

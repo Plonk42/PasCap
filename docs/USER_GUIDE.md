@@ -31,12 +31,20 @@ remain version 1 with a strict v18 snapshot and required audio-source/instance-p
 Create a new project and import its media deliberately. Finished videos remain
 untouched. **Delete project** requires confirmation and deletes only the saved
 project document, not originals, the shared registry/proxy cache or exports/receipts.
-Registry/proxy/current PCM cache formats are unchanged.
+Proxy and current PCM cache formats are unchanged; the video and music registries are
+version 2 (`videos.json`, `music.json`, with full-content checksums), so recordings
+from older registries must be imported again.
 
 Keep originals readable at their registered service-side paths. Moving a file,
 changing a mount or disconnecting a drive can fail even with a ready proxy.
-There is no automatic path guessing or relink workflow. Keep generated data outside
-footage, and back up originals and saved project/export data separately.
+If an original was moved, its Media card shows **Original missing**: choose
+**Relink** (link icon) and pick the moved copy, or type its path under **Other
+location**. Activity checks every byte against the registered original; on a match
+clips, proxy and settings are kept, and a different file is refused. Recordings
+never prepared have no checksum and cannot be relinked: import them again. There is
+no automatic path guessing or search; see [relinking](design/SOURCE_RELINK.md).
+Keep generated data outside footage, and back up originals and saved project/export
+data separately.
 
 ## Import and prepare recordings
 
@@ -573,10 +581,10 @@ onto the music lane. Importing alone never places music. The trash on the file i
 tracks) from this project. No soundtrack is
 supplied; use music you own or have permission to use and keep private paths private.
 
-If music was moved, import its new location normally and add the new entry
-after preparation. This does not reconnect or replace the old entry; existing
-projects and caches remain untouched. Reimporting the same unchanged path reuses its
-entry, while a missing old location stays visibly unavailable.
+If music was moved, **Relink** its **Original missing** file in Media → Music to keep
+its music tracks and cache (see above). Importing the new location instead creates a
+separate entry that prepares its own cache and leaves the old entry and projects
+untouched. Reimporting the same unchanged path reuses its entry.
 
 Use up to **eight independent music tracks**, including several from the same
 recording. **Music track** selects the track to edit; **Add music track** adds
@@ -600,7 +608,7 @@ music restart; genuine video buffering or audio read/processor failures stay exp
 If an older prepared recording lacks the current PCM cache, **Audio → Music →
 Retry recording name** explicitly prepares it. No startup/library read starts that
 job, and older caches/originals remain untouched. This cache needs about 11.52 MB
-per minute; registry/video-proxy/PCM cache formats are unchanged.
+per minute; video-proxy/PCM cache formats are unchanged.
 
 **Music can extend the project.** Duration is the maximum of every retimed video
 clip OUT and every music start + duration. Video closing fades remain at their

@@ -11,6 +11,8 @@ import {
   assertSourceIdentity,
   discoverVideos,
   fingerprintFile,
+  hashFile,
+  verifyMovedOriginal,
 } from './files.js';
 import { JobQueue, type JobContext } from './jobs.js';
 import { NATIVE_THREADS } from './native-threads.js';
@@ -20,6 +22,8 @@ import { atomicWrite, ensurePrivateDirectory, SerialWriter } from './storage.js'
 
 export const PROXY_PROFILE = 'h264-720p-bt709-gop15-v1' as const;
 export const FRAME_SAMPLE_MAE_LIMIT = 6;
+/** Registry v2; the earlier library.json is no longer read. */
+export const VIDEO_REGISTRY = 'videos.json';
 
 export interface ImportForEditingResult {
   assets: MediaAsset[];
@@ -68,6 +72,7 @@ export class MediaLibrary {
   readonly #registering = new Map<string, Promise<MediaAsset>>();
   readonly #prepareRequests = new Map<string, Promise<MediaJob>>();
   readonly #preparing = new Map<string, string>();
+  readonly #relinking = new Map<string, string>();
   constructor(
     readonly config: ServiceConfig,
     readonly jobs: JobQueue,
@@ -76,7 +81,7 @@ export class MediaLibrary {
     await mkdir(this.config.dataDir, { recursive: true, mode: 0o700 });
     try {
       const saved = registrySchema.parse(
-        JSON.parse(await readFile(path.join(this.config.dataDir, 'library.json'), 'utf8')),
+        JSON.parse(await readFile(path.join(this.config.dataDir, VIDEO_REGISTRY), 'utf8')),
       );
       for (const asset of saved.assets) {
         // A terminated process cannot leave an active preparation job behind.
@@ -99,8 +104,20 @@ export class MediaLibrary {
     if (!asset) throw new ServiceError('Registered media not found.', 404);
     return mediaAssetSchema.parse(asset);
   }
+  /** Recordings whose original is not at its registered path (metadata check only). */
+  async missing(): Promise<string[]> {
+    const missing: string[] = [];
+    await forEachSerial([...this.#assets.values()], async (asset) => {
+      try {
+        await assertSourceIdentity(asset.sourcePath, asset.fingerprint);
+      } catch {
+        missing.push(asset.id);
+      }
+    });
+    return missing;
+  }
   assetDir(asset: MediaAsset): string {
-    return path.join(this.config.dataDir, 'assets', asset.fingerprint.digest, PROXY_PROFILE);
+    return path.join(this.config.dataDir, 'assets', asset.id, PROXY_PROFILE);
   }
   proxyPath(asset: MediaAsset): string {
     return path.join(this.assetDir(asset), 'proxy.mp4');
@@ -112,8 +129,8 @@ export class MediaLibrary {
     await this.#writer.run(() => this.#writeRegistry());
   }
   async #writeRegistry(): Promise<void> {
-    const contents = `${JSON.stringify({ version: 1, assets: this.list() }, null, 2)}\n`;
-    await atomicWrite(path.join(this.config.dataDir, 'library.json'), contents);
+    const contents = `${JSON.stringify({ version: 2, assets: this.list() }, null, 2)}\n`;
+    await atomicWrite(path.join(this.config.dataDir, VIDEO_REGISTRY), contents);
   }
   /** Raw read-only registration for fixtures and explicit preparation scripts. */
   async register(filename: string): Promise<MediaAsset> {
@@ -126,7 +143,15 @@ export class MediaLibrary {
     const id = `media-${fingerprint.digest.slice(0, 32)}`;
     const pending = this.#registering.get(id);
     if (pending !== undefined) return { asset: await pending, added: false };
-    if (this.#assets.has(id)) return { asset: this.get(id), added: false };
+    // A relinked recording keeps its first ID while living at another location.
+    const located = [...this.#assets.values()].find((asset) => asset.fingerprint.digest === fingerprint.digest);
+    if (located) return { asset: this.get(located.id), added: false };
+    const existing = this.#assets.get(id);
+    if (existing)
+      throw new ServiceError(
+        `This recording was registered before and relinked to ${existing.sourcePath}. Use that location, or relink it back here.`,
+        409,
+      );
     // Install the request before probing or saving. A repeat cannot overwrite
     // an asset already queued by another import, or observe an uncommitted save.
     const request = Promise.resolve()
@@ -138,6 +163,7 @@ export class MediaLibrary {
           name: path.basename(sourcePath),
           sourcePath,
           fingerprint,
+          content: null,
           metadata,
           status: 'registered',
           error: null,
@@ -267,6 +293,8 @@ export class MediaLibrary {
   async #enqueue(id: string): Promise<MediaJob> {
     const active = this.#preparing.get(id);
     if (active) return this.jobs.get(active);
+    if (this.#relinking.has(id))
+      throw new ServiceError('This recording is being relinked. Prepare it once the relink finishes.', 409);
     const registration = this.#registering.get(id);
     if (registration !== undefined) await registration;
     const asset = this.get(id);
@@ -287,6 +315,12 @@ export class MediaLibrary {
           await this.#save();
           // A queued source may have disappeared or changed before its turn.
           await assertSourceIdentity(current.sourcePath, current.fingerprint, true);
+          if (current.content === null) {
+            context.update(0.01, 'Checksumming the original');
+            const content = await hashFile(current.sourcePath, context.signal);
+            await assertSourceIdentity(current.sourcePath, current.fingerprint, true);
+            current.content = content;
+          }
           await this.#prepareAsset(current, context);
           if (context.signal.aborted) throw new ServiceError('Job cancelled.', 499);
         },
@@ -319,6 +353,49 @@ export class MediaLibrary {
       }
       throw error;
     }
+  }
+  /** Points a recording at a verified byte-identical copy; its ID, proxy and clips stay. */
+  relink(id: string, filename: string): MediaJob {
+    const asset = this.get(id);
+    const content = asset.content;
+    if (content === null)
+      throw new ServiceError(
+        `${asset.name} was never prepared, so PasCap has no checksum to verify a moved copy against. Import the recording from its new location instead.`,
+        409,
+      );
+    if (this.#relinking.has(id) || this.#preparing.has(id) || this.#prepareRequests.has(id))
+      throw new ServiceError(`${asset.name} is busy. Relink it once its current job finishes.`, 409);
+    const sourcePath = path.resolve(filename);
+    assertCacheOutsideSource(path.dirname(sourcePath), this.config.dataDir);
+    const job = this.jobs.submit(
+      'relink',
+      asset.name,
+      async (context) => {
+        context.update(0.01, `Checking every byte of ${sourcePath}`);
+        const fingerprint = await verifyMovedOriginal(sourcePath, content, context.signal, (fraction) =>
+          context.update(0.01 + fraction * 0.97, `Checking every byte of ${sourcePath}`),
+        );
+        if (context.signal.aborted) throw new ServiceError('Job cancelled.', 499);
+        await this.#writer.run(async () => {
+          const current = this.#assets.get(id)!;
+          const previous = { name: current.name, sourcePath: current.sourcePath, fingerprint: current.fingerprint };
+          Object.assign(current, { name: path.basename(sourcePath), sourcePath, fingerprint });
+          try {
+            await this.#writeRegistry();
+          } catch (error) {
+            Object.assign(current, previous);
+            throw error;
+          }
+        });
+        context.update(1, `Relinked to ${sourcePath}`);
+      },
+      () => {
+        this.#relinking.delete(id);
+        return Promise.resolve();
+      },
+    );
+    this.#relinking.set(id, job.id);
+    return job;
   }
   async #prepareAsset(asset: MediaAsset, context: JobContext): Promise<void> {
     const directory = this.assetDir(asset);

@@ -87,7 +87,8 @@ unknown fields and saved clip Colour/correction are invalid. Reject **v1–v17**
 documents and receipt snapshots clearly; preserve their bytes and successful
 outputs. Recreate projects deliberately: no migrations, v17 acceptance,
 compatibility readers, injected defaults, fallback or automatic deletion.
-Receipt/report/registry/proxy/PCM format versions remain independent and unchanged;
+Receipt/report/proxy/PCM format versions remain independent and unchanged (the
+registries are version 2, with full-content checksums);
 new reference/measurement metadata identifies schema 18, historical evidence does
 not change.
 

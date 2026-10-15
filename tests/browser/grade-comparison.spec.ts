@@ -286,11 +286,11 @@ const test = browserTest.extend<{ comparison: ComparisonFixture }>({
       const path = new URL(request.url()).pathname;
       const method = request.method();
       if (method === 'GET' && path === '/api/media') {
-        await route.fulfill({ json: { assets: videos } });
+        await route.fulfill({ json: { assets: videos, missing: [] } });
         return;
       }
       if (method === 'GET' && path === '/api/audio') {
-        await route.fulfill({ json: { assets: [song!] } });
+        await route.fulfill({ json: { assets: [song!], missing: [] } });
         return;
       }
       if (method === 'GET' && path === '/api/jobs') {

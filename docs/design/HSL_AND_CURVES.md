@@ -22,7 +22,8 @@ editable; nonmonotonic outputs are valid. No control-node IDs or preset fields a
 Neutral factories create independent nested objects/arrays, with each curve starting as three identity nodes (0, 0.5, 1). They are only creators,
 never repairs for missing saved fields. Projects 1…17 and their receipt snapshots
 are incompatible and preserved; recreate deliberately. Receipt format remains 1;
-registry, proxy and PCM formats are unchanged. No migration or automatic deletion.
+proxy and PCM formats are unchanged; the registries are version 2 (full-content
+checksums). No migration or automatic deletion.
 
 The exact order is inverse BT.709 → normalized Temperature/Tint linear gains →
 Exposure → Contrast → Brightness → Shadows/Highlights → Hue/Saturation → final

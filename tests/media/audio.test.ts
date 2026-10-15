@@ -181,8 +181,8 @@ describe.skipIf(!enabled)('registered music · disposable lavfi audio only', () 
     const asset = await registerReady(silencePath);
     expect(asset.waveform.length).toBeGreaterThan(0);
     expect(asset.waveform.every((peak) => peak === 0)).toBe(true);
-    const registry = JSON.parse(await readFile(path.join(config.dataDir, 'audio.json'), 'utf8'));
-    expect(registry.version).toBe(1);
+    const registry = JSON.parse(await readFile(path.join(config.dataDir, 'music.json'), 'utf8'));
+    expect(registry.version).toBe(2);
     const queue = new JobQueue();
     try {
       const reloaded = new AudioLibrary(config, queue);
@@ -213,7 +213,7 @@ describe.skipIf(!enabled)('registered music · disposable lavfi audio only', () 
       expect(first.state).toBe('queued');
       expect(service.jobs.list().filter((job) => job.state === 'running')).toHaveLength(1);
       expect(service.audio.get(asset.id).status).toBe('queued');
-      const saved = JSON.parse(await readFile(path.join(config.dataDir, 'audio.json'), 'utf8'));
+      const saved = JSON.parse(await readFile(path.join(config.dataDir, 'music.json'), 'utf8'));
       expect(saved.assets.find((entry: AudioAsset) => entry.id === asset.id).status).toBe('queued');
       service.jobs.cancel(first.id);
     } finally {
@@ -264,7 +264,7 @@ describe.skipIf(!enabled)('registered music · disposable lavfi audio only', () 
       expect(asset.status).toBe('error');
       expect(asset.waveform).toEqual([]);
       expect(await readdir(service.audio.assetDir(asset))).toEqual([]);
-      const saved = JSON.parse(await readFile(path.join(config.dataDir, 'audio.json'), 'utf8'));
+      const saved = JSON.parse(await readFile(path.join(config.dataDir, 'music.json'), 'utf8'));
       expect(saved.assets.find((entry: AudioAsset) => entry.id === asset.id).status).toBe('error');
       expect(await readFile(cancelledPath)).toEqual(original);
     } finally {
@@ -529,7 +529,7 @@ describe.skipIf(!enabled)('registered music · disposable lavfi audio only', () 
     const bytes = Buffer.from('preserved older generated music cache');
     await writeFile(archived, bytes);
     await rm(playback);
-    const registry = await readFile(path.join(config.dataDir, 'audio.json'));
+    const registry = await readFile(path.join(config.dataDir, 'music.json'));
     const jobs = service.jobs.list();
     const response = await service.app.inject({ url: '/api/audio', headers });
     expect(response.statusCode).toBe(200);
@@ -542,7 +542,7 @@ describe.skipIf(!enabled)('registered music · disposable lavfi audio only', () 
     ).toBe(409);
     expect(service.audio.get(asset.id)).toEqual(asset);
     expect(service.jobs.list()).toEqual(jobs);
-    expect(await readFile(path.join(config.dataDir, 'audio.json'))).toEqual(registry);
+    expect(await readFile(path.join(config.dataDir, 'music.json'))).toEqual(registry);
     expect(await readFile(archived)).toEqual(bytes);
     const prepared = await service.audio.prepare(asset.id);
     expect((await service.jobs.wait(prepared.id)).state).toBe('completed');
@@ -593,8 +593,9 @@ describe.skipIf(!enabled)('registered music · disposable lavfi audio only', () 
       const repeated = await service.audio.register(selectedPath);
       expect(repeated.asset.id).toBe(imported.id);
       expect((await service.jobs.wait(repeated.job.id)).state).toBe('completed');
-      expect(native.mock.calls.some(([binary]) => binary === config.ffmpeg)).toBe(false);
-      expect(service.audio.playbackPath(imported)).toBe(playback);
+      expect(native.mock.calls.some(([binary]) => binary === config.ffmpeg)).toBe(true);
+      // The new entry prepares its own cache; the old entry's verified cache is untouched.
+      expect(service.audio.playbackPath(imported)).not.toBe(playback);
       const finalStat = await lstat(playback);
       expect([finalStat.ino, finalStat.mtimeMs, finalStat.size]).toEqual([
         cacheStat.ino,
