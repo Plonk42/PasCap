@@ -32,9 +32,22 @@ describe('authoritative colour transform', () => {
   it('brightness is a linear offset', () => {
     expect(gradePixel([0, 0, 0], { ...NEUTRAL_COLOUR, brightness: 0.1 })[0]).toBeCloseTo(encode709(0.1), 10);
   });
-  it('shadow/highlight controls use fixed squared luminance masks', () => {
-    expect(gradePixel([0, 0, 0], { ...NEUTRAL_COLOUR, shadows: 1 })[0]).toBeCloseTo(encode709(0.25), 10);
+  it('highlights use a fixed squared luminance mask', () => {
     expect(gradePixel([1, 1, 1], { ...NEUTRAL_COLOUR, highlights: -1 })[0]).toBeCloseTo(encode709(0.75), 10);
+  });
+  it('shadows lift dark tones by a luminance gain, keeping black, white and colour ratios', () => {
+    const lift = { ...NEUTRAL_COLOUR, shadows: 1 };
+    expect(gradePixel([0, 0, 0], lift)).toEqual([0, 0, 0]);
+    expect(gradePixel([1, 1, 1], lift)[0]).toBeCloseTo(1, 10);
+    expect(gradePixel([0.2, 0.2, 0.2], lift)[0]).toBeCloseTo(0.2 + 0.2 * 0.8 ** 2, 10);
+    expect(gradePixel([0.2, 0.2, 0.2], { ...NEUTRAL_COLOUR, shadows: -1 })[0]).toBeCloseTo(0.2 - 0.2 * 0.8 ** 2, 10);
+    const dark: RGB = [0.05, 0.1, 0.3];
+    const lifted = gradePixel(dark, lift);
+    const linear = dark.map(decode709);
+    const gained = lifted.map(decode709);
+    expect(gained[2]! / gained[0]!).toBeCloseTo(linear[2]! / linear[0]!, 6);
+    expect(gained[1]! / gained[0]!).toBeCloseTo(linear[1]! / linear[0]!, 6);
+    expect(lifted[2]).toBeGreaterThan(dark[2] + 0.1);
   });
   it('zero saturation removes chroma, hue leaves grey alone', () => {
     const grey = gradePixel([0.7, 0.2, 0.4], { ...NEUTRAL_COLOUR, saturation: 0 });
