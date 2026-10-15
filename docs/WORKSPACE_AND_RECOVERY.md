@@ -851,7 +851,7 @@ Rendering details hold the fixed snapshot with counts of clips/video tracks (ena
 track keyframes and animated settings, and all independent music tracks. A keyframe
 with several channels counts once, not as separate clip/channel keyframes. Both 720p/4K
 use originals. The static fast path requires neutral HSL/identity colour curves and one enabled, unanimated,
-zero-origin contiguous video track with Opacity 1 and HDR 0, an exactly neutral Transform base
+zero-origin contiguous video track with Opacity 1 and Shadows/Highlights/HDR 0, an exactly neutral Transform base
 and no Transform keyframes; any Transform edit/keyframe (even neutral keyframes), clip detail filter, nonzero HDR, track keyframe, leading start,
 gap, unsupported coverage or music beyond video OUT uses generalized composited
 export. Static video must cover full project duration; composited export fills music

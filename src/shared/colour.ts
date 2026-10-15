@@ -154,9 +154,15 @@ export function compileGradeInto(settings: ColourSettings): PixelGrade {
     },
   };
 }
-/** HDR is a neighbourhood stage before grading (src/shared/detail.ts), not part of the per-pixel grade. */
+/** Local tone settings run in the neighbourhood stage before grading (src/shared/detail.ts), not in the per-pixel grade. */
+export const LOCAL_TONE_SETTINGS = ['shadows', 'highlights', 'hdr'] as const;
+export type LocalToneSetting = (typeof LOCAL_TONE_SETTINGS)[number];
+export function isNeutralLocalTone(settings: Pick<ColourSettings, LocalToneSetting>): boolean {
+  return LOCAL_TONE_SETTINGS.every((key) => settings[key] === 0);
+}
+const localToneSettings: ReadonlySet<string> = new Set(LOCAL_TONE_SETTINGS);
 function isNeutralScalarColour(settings: ColourSettings): boolean {
-  return COLOUR_CONTROLS.every(({ key }) => key === 'hdr' || settings[key] === NEUTRAL_COLOUR[key]);
+  return COLOUR_CONTROLS.every(({ key }) => localToneSettings.has(key) || settings[key] === NEUTRAL_COLOUR[key]);
 }
 /** Scalar SDR stages from decoded linear input to an encoded triple. */
 function compileScalarGrade(
@@ -164,9 +170,9 @@ function compileScalarGrade(
 ): (linearRed: number, linearGreen: number, linearBlue: number, out: Float64Array) => void {
   const [redGain, greenGain, blueGain] = temperatureTintGains(settings);
   const exposure = 2 ** settings.exposure;
-  const { contrast, brightness, saturation, vibrance, shadows, highlights, whites, blacks } = settings;
-  const tonal = contrast !== 1 || brightness !== 0 || shadows !== 0 || highlights !== 0 || whites !== 0 || blacks !== 0;
-  const blackGain = blacks < 0 ? 0 : (2 - contrast) * (1 + 2 * brightness) * (1 + shadows);
+  const { contrast, brightness, saturation, vibrance, whites, blacks } = settings;
+  const tonal = contrast !== 1 || brightness !== 0 || whites !== 0 || blacks !== 0;
+  const blackGain = blacks < 0 ? 0 : (2 - contrast) * (1 + 2 * brightness);
   const angle = (settings.hue * Math.PI) / 180;
   const cos = Math.cos(angle);
   const sin = Math.sin(angle);
@@ -207,17 +213,13 @@ function vibranceGain(red: number, green: number, blue: number, vibrance: number
   const colourfulness = maximum > 0 ? (maximum - Math.min(red, green, blue)) / maximum : 0;
   return 1 + vibrance * (1 - Math.min(1, colourfulness)) ** 2;
 }
-/** Negative Highlights also dims pure white by this much (encoded). */
-export const HIGHLIGHTS_WHITE = 0.15;
 /** Whites moves pure white by this much (encoded) at ±1; monotonic up to 0.25. */
 export const WHITES_RANGE = 0.25;
-/** Contrast, Brightness, Shadows, Highlights then Whites on encoded luminance, applied as a linear RGB gain. */
+/** Contrast, Brightness then Whites on encoded luminance, applied as a linear RGB gain. */
 function toneCurve(v: number, settings: ColourSettings): number {
-  const { contrast, brightness, shadows, highlights, whites } = settings;
+  const { contrast, brightness, whites } = settings;
   v += (contrast - 1) * v * (1 - v) * (2 * v - 1);
   v += 2 * brightness * v * (1 - v);
-  v += shadows * v * (1 - v) ** 2;
-  v += highlights * v * v * (1 - v) + Math.min(highlights, 0) * HIGHLIGHTS_WHITE * v ** 3;
   return v + whites * WHITES_RANGE * v ** 4;
 }
 /** Blacks moves black by this much (encoded) at ±1: lowered as a gain that crushes, raised as an added lift. */
@@ -227,7 +229,7 @@ function blacksCurve(v: number, blacks: number): number {
 }
 
 export function isNeutralColour(settings: ColourSettings): boolean {
-  return settings.hdr === 0 && isNeutralScalarColour(settings) && isNeutralAdvancedColour(settings);
+  return isNeutralLocalTone(settings) && isNeutralScalarColour(settings) && isNeutralAdvancedColour(settings);
 }
 
 export function isNeutralAdvancedColour(settings: ColourSettings): boolean {

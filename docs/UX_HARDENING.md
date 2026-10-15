@@ -213,7 +213,7 @@ two 65³ Float32 LUTs add **6,591,000 bytes**, excluding native/audio memory.
 One original decoder, two intermediate readers, one encoder and three video children
 per serial pass bound concurrency, not duration-dependent disk use. The static
 fast path requires one enabled, unanimated, zero-origin contiguous track
-with track Opacity 1 and HDR 0, an exactly neutral track Transform base and no Transform keyframes; Transform
+with track Opacity 1 and Shadows/Highlights/HDR 0, an exactly neutral track Transform base and no Transform keyframes; Transform
 edits/keyframes (even neutral keyframes) or unsupported placement/coverage use generalized
 composited export, with unchanged raw-buffer/LUT/process budgets.
 

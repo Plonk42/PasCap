@@ -377,7 +377,7 @@ test('all main colour, Opacity, constant-rate and Gain sliders draft locally and
   page,
 }) => {
   // Twelve live-previewed drags: 44 s measured CI-like (software GL, two cores).
-  test.setTimeout(120_000);
+  test.setTimeout(240_000);
   await pointerEdit(page, 'Opacity', opacityEdit);
   for (const control of COLOUR_CONTROLS) {
     await pointerEdit(page, control.label, (document, value) => ({

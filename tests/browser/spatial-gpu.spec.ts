@@ -212,7 +212,7 @@ const allCases: { name: string; groups: CompositeGroup[] }[] = [
               opacity: 0.63,
               blendWeight: 0.37,
               brightness: 0.4,
-              settings: { ...NEUTRAL_COLOUR, exposure: 0.4, hue: 19, saturation: 0.8, shadows: 0.1 },
+              settings: { ...NEUTRAL_COLOUR, exposure: 0.4, hue: 19, saturation: 0.8, blacks: 0.1 },
             },
           ),
           clip(
@@ -222,7 +222,7 @@ const allCases: { name: string; groups: CompositeGroup[] }[] = [
               opacity: 0.63,
               blendWeight: 0.63,
               brightness: 0.7,
-              settings: { ...NEUTRAL_COLOUR, exposure: 0.4, hue: 19, saturation: 0.8, shadows: 0.1 },
+              settings: { ...NEUTRAL_COLOUR, exposure: 0.4, hue: 19, saturation: 0.8, blacks: 0.1 },
             },
           ),
         ],

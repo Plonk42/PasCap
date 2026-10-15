@@ -66,7 +66,7 @@ least one retained video clip; this is not an audio-only export feature.
 
 A music tail beyond video OUT requires the **composited exporter**, which fills
 trailing black frames through project OUT. The static fast path still requires
-one enabled, opaque, unanimated, zero-origin contiguous video track with HDR 0, exactly
+one enabled, opaque, unanimated, zero-origin contiguous video track with Shadows/Highlights/HDR 0, exactly
 neutral spatial bases and no spatial keyframes, covering
 the entire project duration. No frozen-last-image or shortened-audio shortcut is
 permitted.

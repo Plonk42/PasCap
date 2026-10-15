@@ -65,7 +65,7 @@ Texture, decoder and full-frame buffer counts stay unchanged. Exact neutral spat
 poses retain their existing opaque black letterbox path.
 
 With neutral HSL and identity curves, static export generates a 65³ scalar LUT
-from the video track's Colour alone; nonneutral scalar colour with HDR 0 retains this cheap path.
+from the video track's Colour alone; nonneutral scalar colour with Shadows/Highlights/HDR 0 retains this cheap path.
 Track keyframes, nonzero HDR, Transform edits/keyframes or nonneutral HSL/curves require composited export. Scalar-only
 composited grades use evaluated track parameters and at most two reused LUT arrays.
 Advanced grades evaluate the complete scalar/HSL/curve transform exactly on the
@@ -77,7 +77,7 @@ Scalar LUT interpolation and H.264 quantisation remain measured approximations,
 not bitwise shader equivalence. Sharp curves are tested after production-resolution
 input scaling: grading and resampling do not commute. The two-clip diagnostic
 reference and measurement helper accept static scalar video track Colour with neutral HSL
-and identity curves and HDR 0, without independent clip grades.
+and identity curves and Shadows/Highlights/HDR 0, without independent clip grades.
 
 ## Inspector and history
 

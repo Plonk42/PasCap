@@ -1,6 +1,6 @@
 import { colourSchema, NEUTRAL_COLOUR, type ColourSettings } from '../shared/colour.js';
 import { isNeutralDetail, NEUTRAL_DETAIL } from '../shared/detail.js';
-import { hasLayerKeys } from '../shared/keyframes.js';
+import { usesLocalTone } from '../shared/keyframes.js';
 import { projectSchema, type ProjectDocument, type VideoClip } from '../shared/model.js';
 import {
   calculateLayout,
@@ -455,8 +455,7 @@ export class PreviewEngine {
     if (
       this.#compositor.available &&
       document &&
-      (document.clips.some((clip) => !isNeutralDetail(clip.detail)) ||
-        document.layers.some((layer) => layer.colour.hdr !== 0 || hasLayerKeys(layer, 'hdr')))
+      (document.clips.some((clip) => !isNeutralDetail(clip.detail)) || document.layers.some(usesLocalTone))
     )
       this.#compositor.prepareDetail();
   }

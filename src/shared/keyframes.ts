@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import type { ScalarColourSetting } from './colour.js';
-import { COLOUR_CONTROLS, colourSchema, NEUTRAL_COLOUR } from './colour.js';
+import type { ColourSettings, LocalToneSetting, ScalarColourSetting } from './colour.js';
+import { COLOUR_CONTROLS, colourSchema, LOCAL_TONE_SETTINGS, NEUTRAL_COLOUR } from './colour.js';
 
 export const interpolationSchema = z.enum(['hold', 'linear', 'ease-in', 'ease-out', 'smooth']);
 export type Interpolation = z.infer<typeof interpolationSchema>;
@@ -217,6 +217,15 @@ export function keyInterval<T extends { frame: number }>(
 
 export function hasLayerKeys(layer: { keyframes: readonly LayerKeyframe[] }, setting: KeyframeSetting): boolean {
   return layer.keyframes.some((key) => key.values[setting] !== null);
+}
+/** Whether any frame of the track can evaluate a nonzero Shadows, Highlights or HDR. */
+export function usesLocalTone(layer: {
+  colour: Pick<ColourSettings, LocalToneSetting>;
+  keyframes: readonly LayerKeyframe[];
+}): boolean {
+  return LOCAL_TONE_SETTINGS.some(
+    (setting) => layer.colour[setting] !== 0 || layer.keyframes.some((key) => (key.values[setting] ?? 0) !== 0),
+  );
 }
 export function keySettings(key: LayerKeyframe): KeyframeSetting[] {
   return KEYFRAME_SETTINGS.filter((setting) => key.values[setting.key] !== null).map((setting) => setting.key);

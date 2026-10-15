@@ -79,8 +79,8 @@ function singleProject(id: string, title: string, video: MediaAsset): ProjectDoc
     contrast: 1.15,
     hue: 28,
     saturation: 0.65,
-    highlights: -0.25,
-    shadows: 0.12,
+    whites: -0.25,
+    blacks: 0.12,
   };
   document.layers[0]!.colour.hsl.red = { hue: -12, saturation: -0.3, lightness: 0.04 };
   document.layers[0]!.colour.curves.master = [
@@ -129,8 +129,8 @@ function layeredProject(videos: readonly MediaAsset[]): ProjectDocument {
           contrast: 1.25,
           hue: 35 + index * 20,
           saturation: 0.55,
-          highlights: -0.3,
-          shadows: 0.2,
+          whites: -0.3,
+          blacks: 0.2,
         },
         'smooth',
       ),
@@ -146,8 +146,8 @@ function layeredProject(videos: readonly MediaAsset[]): ProjectDocument {
         contrast: 0.8,
         hue: -40,
         saturation: 1.3,
-        highlights: 0.15,
-        shadows: -0.1,
+        whites: 0.15,
+        blacks: -0.1,
       }),
     ];
     // Keep a static channel active on both participants of each dissolve,

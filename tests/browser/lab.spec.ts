@@ -167,8 +167,8 @@ test('GPU matches CPU for neutral, each control and a combined grade', async ({ 
       { contrast: 1.3 },
       { hue: 45 },
       { saturation: 0.4 },
-      { highlights: -0.5 },
-      { shadows: 0.3 },
+      { whites: -0.5 },
+      { blacks: 0.3 },
     ].map((change) => ({ ...NEUTRAL_COLOUR, ...change })),
     {
       ...NEUTRAL_COLOUR,
@@ -177,8 +177,8 @@ test('GPU matches CPU for neutral, each control and a combined grade', async ({ 
       contrast: 1.1,
       hue: 12,
       saturation: 1.2,
-      highlights: -0.2,
-      shadows: 0.15,
+      whites: -0.2,
+      blacks: 0.15,
     },
   ];
   const results = await page.evaluate(

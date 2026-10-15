@@ -383,8 +383,8 @@ test('Temperature/Tint: scalar/single/full switches preserve opacity and fades',
     exposure: 0.15,
     hue: -13,
     saturation: 0.85,
-    shadows: 0.1,
-    highlights: -0.15,
+    blacks: 0.1,
+    whites: -0.15,
   };
   const advancedLeft = structuredClone(scalarLeft);
   const advancedRight = structuredClone(scalarRight);

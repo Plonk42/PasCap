@@ -391,7 +391,7 @@ The [measurement helper](../scripts/measure-preview.ts) accepts exactly **two
 forward 1× clips on one enabled, zero-origin contiguous video track with Opacity 1**, no music,
 extra tracks, Transform edits/keyframes or shared track keyframes
 (even neutral keyframes). `PASCAP_MEASURE_URL` selects that project.
-Measurement uses static scalar track Colour (including Temperature/Tint) with HDR 0, neutral
+Measurement uses static scalar track Colour (including Temperature/Tint) with Shadows/Highlights/HDR 0, neutral
 HSL and identity curves; metadata must identify the strict current-schema snapshot independently of the
 report format/identifier; historical reports and receipt snapshots stay untouched.
 `npm run measure -- --skip-playback --reference` skips playback benchmarking but
@@ -436,7 +436,7 @@ run on at most eight worker threads sharing those buffers, without copies. Two r
 three timeline representations bound concurrency, **not disk GB**;
 scratch grows with duration ([resource contract](LAYERS_AND_KEYFRAMES.md#inspector-and-resource-limits)).
 The static fast path requires one enabled, unanimated, zero-origin contiguous
-video track with Opacity 1 and HDR 0, neutral HSL/identity colour curves, an exactly neutral track Transform base without Transform keyframes
+video track with Opacity 1 and Shadows/Highlights/HDR 0, neutral HSL/identity colour curves, an exactly neutral track Transform base without Transform keyframes
 and neutral clip Sharpen/Clarity/Denoise;
 any Transform edit/keyframe (even neutral keyframes), [detail filter](design/DETAIL_FILTERS.md) or unsupported placement/coverage uses
 generalized composited export, regardless

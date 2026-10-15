@@ -5,7 +5,14 @@ import {
   isIdentityCurve,
   isNeutralHsl,
 } from '../shared/advanced-colour.js';
-import { gradePixel, NEUTRAL_COLOUR, temperatureTintGains, type ColourSettings, type RGB } from '../shared/colour.js';
+import {
+  gradePixel,
+  isNeutralLocalTone,
+  NEUTRAL_COLOUR,
+  temperatureTintGains,
+  type ColourSettings,
+  type RGB,
+} from '../shared/colour.js';
 import { compositePixel } from '../shared/composition.js';
 import {
   DETAIL_REFERENCE_LINES,
@@ -27,7 +34,7 @@ import {
   vertexShader,
 } from './shaders.js';
 
-const DETAIL_UNIFORMS = ['detail0', 'detail1', 'detailStep0', 'detailStep1', 'hdr'];
+const DETAIL_UNIFORMS = ['detail0', 'detail1', 'detailStep0', 'detailStep1', 'localTone0', 'localTone1'];
 /** Two timeline video decoders per track: both dissolve sources, or the active and next clip. */
 export const MAX_VIDEO_DECODERS = 2 * MAX_VIDEO_LAYERS;
 
@@ -365,7 +372,7 @@ export class Compositor {
         CURVE_CHANNELS.some((channel) => !isIdentityCurve(source.settings.curves[channel])),
     );
     const advancedPath = group.clips.length === 1 ? 'single' : 'full';
-    const detailed = sources.some((source) => !isNeutralDetail(source.detail) || source.settings.hdr !== 0);
+    const detailed = sources.some((source) => !isNeutralDetail(source.detail) || !isNeutralLocalTone(source.settings));
     this.#useGrade(advanced ? advancedPath : 'scalar', detailed);
     const mappings = sources.map((source) =>
       compileSpatialMapping(
@@ -428,13 +435,7 @@ export class Compositor {
         settings.contrast,
         settings.saturation,
       );
-      gl.uniform4f(
-        this.#location(`extra${index}`),
-        (settings.hue * Math.PI) / 180,
-        settings.highlights,
-        settings.shadows,
-        settings.whites,
-      );
+      gl.uniform2f(this.#location(`extra${index}`), (settings.hue * Math.PI) / 180, settings.whites);
       if (detailed) {
         const { sharpen, clarity, denoise } = source.detail;
         gl.uniform4f(this.#location(`detail${index}`), sharpen, clarity, denoise, denoiseRangeFactor(denoise));
@@ -442,9 +443,15 @@ export class Compositor {
         const stepV = 1 / DETAIL_REFERENCE_LINES;
         const stepU = (stepV * source.originalHeight) / source.originalWidth;
         gl.uniform2f(this.#location(`detailStep${index}`), stepU, stepV);
+        gl.uniform4f(
+          this.#location(`localTone${index}`),
+          settings.shadows,
+          settings.highlights,
+          settings.hdr,
+          settings.exposure,
+        );
       }
     }
-    if (detailed) gl.uniform2f(this.#location('hdr'), sources[0]!.settings.hdr, sources[1]!.settings.hdr);
     gl.uniform2f(
       this.#location('coverage'),
       sources[0]!.opacity * sources[0]!.blendWeight,
@@ -565,8 +572,6 @@ function comparisonColour(test: number, random: () => number): ColourSettings {
     saturation: 0.4 + random() * 1.3,
     vibrance: random() * 0.8 - 0.4,
     hue: random() * 220 - 110,
-    highlights: random() * 0.6 - 0.3,
-    shadows: random() * 0.6 - 0.3,
     whites: random() * 0.6 - 0.3,
     blacks: random() * 0.6 - 0.3,
   };
