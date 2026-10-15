@@ -22,7 +22,7 @@ import {
   type InspectorMode,
   type InspectorSectionRequest,
 } from './InspectorSection.js';
-import { KeyframeControls } from './KeyframeControls.js';
+import { ColourKeyframeList } from './ColourKeyframeList.js';
 import { KeyframeToggle } from './KeyframeToggle.js';
 import { clipStartRestriction } from './layer-actions.js';
 import { NumberField } from './NumberField.js';
@@ -365,7 +365,7 @@ function ColourSection({
           />
         ))}
       </div>
-      <KeyframeControls
+      <ColourKeyframeList
         project={project}
         layer={layer}
         frame={frame}

@@ -348,16 +348,17 @@ captures that setting's evaluated value; sliders never create keyframes.
 
 At the end of the section, below the pose settings, a small **Keyframes** heading introduces
 the Transform keyframe list (**Transform keyframes** plus the track name), shown only when
-the track has Transform keyframes. Each row has **Go to Transform keyframe N**, which seeks the
-nearest available frame, **Default** and **Outside duration** badges, a trash (**Delete
-Transform keyframe N**), blue enabled-setting chips and an **Edit** disclosure (open initially
-for three or fewer keyframes) with **Timeline frame**, **Easing** and a slider/exact field per
-enabled setting. Its **Easing** sets every enabled setting's Easing (**Mixed** when they
-differ), with **Per setting** selects like a track keyframe's; it is disabled when no enabled
-setting continues to a later keyframe. The keyframe line's **Previous/Next** pair and the row
-timecode buttons share a track-local cursor that advances even when several previews
-coincide; the inspected row is marked current and a hint distinguishes the stored timeline
-frame from the playhead. List fields edit their stored keyframe, not the real-playhead pose.
+the track has Transform keyframes. It is the same shared list as Colour's. Each row has **Go to
+Transform keyframe N** stretched over the row (a click anywhere outside its controls seeks the
+nearest available frame), **Default** and **Outside duration** badges, a trash (**Delete
+Transform keyframe N**), blue enabled-setting chips with per-setting Previous/Next arrows and an
+**Edit** disclosure (closed initially) with **Timeline frame**, **Easing** and a slider/exact
+field per enabled setting. Its **Easing** sets every enabled setting's Easing (**Mixed** when
+they differ), with **Per setting** selects like a track keyframe's. The keyframe line's
+**Previous/Next** pair, the rows and the chip arrows share a track-local cursor that advances
+even when several previews coincide; the inspected row is marked current, and a key after the
+duration gets the dashed **Stored keyframe** panel with **Follow playhead**.
+List fields edit their stored keyframe, not the real-playhead pose.
 Time/value edits do not seek automatically; navigation does not save.
 This cursor is distinct from the shared Colour inspection cursor below.
 
@@ -411,9 +412,10 @@ including on empty tracks. Removing the final keyed colour setting reveals its u
 track base. Speed is clip-only and never a track setting.
 
 The list has no outer disclosure or per-track list expansion preference. Each entry has a
-timecode button (**Go to track keyframe N**), **Default** and **Outside duration** badges where
+timecode button (**Go to track keyframe N**) stretched over the entry, so a click anywhere
+outside its controls selects it, **Default** and **Outside duration** badges where
 they apply, a trash (**Delete track keyframe N**) and its enabled-setting chips;
-its inner **Edit** disclosure (open initially for three or fewer keyframes) provides
+its inner **Edit** disclosure (closed initially) provides
 **Timeline frame**, **Easing** and values for the enabled settings.
 A time edit moves all enabled settings
 and their Easing together in **one Undo step**; colliding times/invalid

@@ -399,13 +399,14 @@ lower tracks; exact neutral poses retain the old opaque black letterbox.
   playhead (neutral pose, Hold), or removes the one there, exactly like the Colour default
   keyframe: it returns the pose to neutral from its frame without changing earlier frames.
 - At the end of the section, below the eight settings, a **Keyframes** list shows one row per
-  Transform keyframe: its timecode (click to seek the nearest available frame), **Default** and
-  **Outside duration** badges where they apply, a trash and its enabled settings. The keyframe
-  line's **Previous/Next** pair and the timecodes reach all keyframes, including those after the
-  duration; the current row is marked, and the stored timeline frame is shown separately from
-  the playhead. A row's **Edit** holds **Timeline frame**, **Easing** and a slider/field per
-  enabled setting, which edit that keyframe; time and
-  value edits do not seek automatically. Easing is disabled when no enabled setting continues to a later keyframe.
+  Transform keyframe, exactly like Colour's list: click anywhere on a row (or its timecode) to
+  seek the nearest available frame; **Default** and **Outside duration** badges where they
+  apply, a trash and its enabled settings, each with Previous/Next arrows. The keyframe
+  line's **Previous/Next** pair and the rows reach all keyframes, including those after the
+  duration; the current row is marked, and a keyframe after the duration is described above
+  the list. A row's **Edit** (closed initially) holds **Timeline frame**, **Easing** and a
+  slider/field per enabled setting, which edit that keyframe; time and
+  value edits do not seek automatically.
   **Easing** sets every setting of the keyframe at once; when they should differ, choose
   **Per setting** and pick each one. Differing settings read **Mixed** and keep their
   per-setting choices visible. A setting added to a keyframe takes the Easing its other

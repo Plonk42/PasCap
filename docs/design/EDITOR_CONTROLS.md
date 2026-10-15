@@ -190,9 +190,10 @@ or that setting's key at the playhead; a keyed setting without a key
 there stays read-only until its own blue triangle (hollow ▽ / filled ▼, as on the timeline marker, never the Colour diamond) captures it.
 Every setting has its own triangle and **Previous/Next** buttons like Colour, plus the single **Previous/Next** pair in the keyframe line,
 which also holds **Reset transform** and **Add default Transform keyframe**. Below the settings, a
-**Keyframes** list shows one row per Transform keyframe like Colour's: **Go to Transform keyframe N**
-seeks the nearest available frame and marks the row current, a hint separates stored time from the
-playhead, and each row's **Edit** holds **Timeline frame / Easing** and its enabled-setting fields.
+**Keyframes** list, the same shared list as Colour's, shows one row per Transform keyframe: a click anywhere
+on a row (or its **Go to Transform keyframe N** timecode) seeks the nearest available frame and marks the row
+current, its setting chips carry Previous/Next arrows, and each row's **Edit** (closed initially) holds
+**Timeline frame / Easing** and its enabled-setting fields.
 A row's trash removes that keyframe, revealing the saved
 base of settings left unkeyed; **Reset transform** behaves like Colour's Reset (neutral base
 without keyframes, else the enabled settings of the key at the playhead). There is no graph/canvas gizmo. Exact

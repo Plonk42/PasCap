@@ -190,24 +190,25 @@ button (hollow ▽ / filled ▼, **Keyframe Scale**, etc.) and per-setting **Pre
   the one there, in one Undo step; it is unavailable where an ordinary keyframe exists.
 - Below the eight settings, when the track has Transform keyframes, a small **Keyframes**
   heading introduces the list (fieldset **Transform keyframes** plus the track name, list
-  **Edit Transform keyframes**), one row per key, like Colour's. Each row has a timecode
-  button **Go to Transform keyframe N**, a light-blue **Default** badge for a default
-  keyframe, an **Outside duration** badge, a trash **Delete Transform keyframe N** (removes
-  the whole key; deleting the last reveals the saved base) and blue enabled-setting chips
-  without arrows.
-- The row timecodes and the keyframe line's and per-setting Previous/Next reach every stored
+  **Edit Transform keyframes**), built from the same shared stored keyframe list as Colour's.
+  Each row has a timecode button **Go to Transform keyframe N** stretched over the whole row
+  (a click anywhere outside the row's controls selects the key), a light-blue **Default**
+  badge for a default keyframe, an **Outside duration** badge, a trash **Delete Transform
+  keyframe N** (removes the whole key; deleting the last reveals the saved base) and blue
+  enabled-setting chips with per-setting **Previous/Next** arrows.
+- The rows, chip arrows, the keyframe line's and per-setting Previous/Next reach every stored
   key, including keys after the duration, previewing the nearest available frame. A
   section-local stored cursor keeps stepping through keys that preview the same last frame;
-  it is cleared by a manual seek, playback or track inspection. The row of the inspected key,
-  or of the key at the playhead, is marked current. Stored time stays distinct from the
-  playhead (**Stored timeline frame N · playhead frame P** above the list, adding that
-  preview uses the nearest available frame after the duration); capture always uses the playhead.
-- Each row's **Edit** disclosure (open initially for three or fewer keys) edits that key:
+  it is cleared by a manual seek, playback, track inspection or **Follow playhead**. The row of
+  the inspected key, or of the key at the playhead, is marked current. An inspected key the
+  preview cannot show (after the duration) gets a dashed **Stored keyframe · timeline frame N**
+  panel; capture always uses the playhead.
+- Each row's **Edit** disclosure (closed initially) edits that key:
   **Timeline frame** (**Transform keyframe frame N**), **Easing** (**Transform keyframe
   easing N**; sets every enabled setting, reads **Mixed** when they differ; **Per setting**
-  reveals one select per continuing setting, **<Setting> easing at Transform keyframe N**;
-  disabled when no enabled setting continues to a later key) and a slider with an exact
-  field and Reset icon per enabled setting (**Scale keyframe value N**, etc.).
+  reveals one select per continuing setting, **<Setting> easing at Transform keyframe N**)
+  and a slider with an exact field and Reset icon per enabled setting (**Scale keyframe value
+  N**, etc.).
 - Numeric drafts keep full precision, apply on Enter/blur and restore on Escape; invalid
   values and occupied frames stay editable with inline errors, never clamped or merged.
 

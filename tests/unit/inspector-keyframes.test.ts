@@ -5,7 +5,7 @@ import { EMPTY_KEY_VALUES, KEYFRAME_SETTINGS, layerKeyframe } from '../../src/sh
 import { createProject } from '../../src/shared/model.js';
 import { Inspector } from '../../src/web/Inspector.js';
 import { KeyframeNavigationContext } from '../../src/web/keyframe-navigation.js';
-import { KeyframeControls } from '../../src/web/KeyframeControls.js';
+import { ColourKeyframeList } from '../../src/web/ColourKeyframeList.js';
 import { RangeSettingControl } from '../../src/web/SettingValueControl.js';
 
 const navigation = {
@@ -111,7 +111,7 @@ describe('dedicated Inspector keyframe controls', () => {
       createElement(
         KeyframeNavigationContext.Provider,
         { value: navigation },
-        createElement(KeyframeControls, {
+        createElement(ColourKeyframeList, {
           project,
           layer: project.layers[0]!,
           frame: 0,
