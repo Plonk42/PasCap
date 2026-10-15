@@ -1,6 +1,12 @@
 import { mkdir, readFile, rename, rm } from 'node:fs/promises';
 import path from 'node:path';
-import { mediaAssetSchema, registrySchema, type MediaAsset, type MediaJob } from '../shared/media.js';
+import {
+  mediaAssetSchema,
+  registrySchema,
+  type MediaAsset,
+  type MediaJob,
+  type SourceFingerprint,
+} from '../shared/media.js';
 import { framesToSeconds } from '../shared/timing.js';
 import { forEachSerial } from '../shared/serial.js';
 import type { ServiceConfig } from './config.js';
@@ -15,6 +21,7 @@ import {
   verifyMovedOriginal,
 } from './files.js';
 import { JobQueue, type JobContext } from './jobs.js';
+import type { RelinkCandidate } from './relink.js';
 import { NATIVE_THREADS } from './native-threads.js';
 import { probeVideo } from './probe.js';
 import { runProcess } from './process.js';
@@ -376,18 +383,8 @@ export class MediaLibrary {
           context.update(0.01 + fraction * 0.97, `Checking every byte of ${sourcePath}`),
         );
         if (context.signal.aborted) throw new ServiceError('Job cancelled.', 499);
-        await this.#writer.run(async () => {
-          const current = this.#assets.get(id)!;
-          const previous = { name: current.name, sourcePath: current.sourcePath, fingerprint: current.fingerprint };
-          Object.assign(current, { name: path.basename(sourcePath), sourcePath, fingerprint });
-          try {
-            await this.#writeRegistry();
-          } catch (error) {
-            Object.assign(current, previous);
-            throw error;
-          }
-        });
-        context.update(1, `Relinked to ${sourcePath}`);
+        await this.commitRelink(id, sourcePath, fingerprint);
+        return `Relinked to ${sourcePath}`;
       },
       () => {
         this.#relinking.delete(id);
@@ -396,6 +393,33 @@ export class MediaLibrary {
     );
     this.#relinking.set(id, job.id);
     return job;
+  }
+  /** Missing recordings with a recorded checksum and no queued work of their own. */
+  async relinkCandidates(): Promise<RelinkCandidate[]> {
+    const missing = new Set(await this.missing());
+    return this.list().flatMap((asset) =>
+      missing.has(asset.id) &&
+      asset.content &&
+      !this.#relinking.has(asset.id) &&
+      !this.#preparing.has(asset.id) &&
+      !this.#prepareRequests.has(asset.id)
+        ? [{ id: asset.id, name: asset.name, content: asset.content }]
+        : [],
+    );
+  }
+  /** Publishes a location already verified against the recorded checksum. */
+  async commitRelink(id: string, sourcePath: string, fingerprint: SourceFingerprint): Promise<void> {
+    await this.#writer.run(async () => {
+      const current = this.#assets.get(id)!;
+      const previous = { name: current.name, sourcePath: current.sourcePath, fingerprint: current.fingerprint };
+      Object.assign(current, { name: path.basename(sourcePath), sourcePath, fingerprint });
+      try {
+        await this.#writeRegistry();
+      } catch (error) {
+        Object.assign(current, previous);
+        throw error;
+      }
+    });
   }
   async #prepareAsset(asset: MediaAsset, context: JobContext): Promise<void> {
     const directory = this.assetDir(asset);

@@ -45,6 +45,7 @@ than failing startup. JSON paths must be absolute; a literal `~` is not expanded
 | `POST /api/audio/register`                                                 | Deliberate typed audio-path import; browser roots do not restrict this action or expand automatically                                                                                  |
 | `POST /api/media/register` / `POST /api/media/import`                      | Deliberate typed video-file path / recursive folder import, also outside browser roots                                                                                                 |
 | `POST /api/media/:id/relink` / `POST /api/audio/:id/relink`                | JSON `{"path":"/media/footage/Moved/DJI_0001.MP4"}` for a recording that `GET /api/media` / `GET /api/audio` list in `missing`; returns 202 `{ job }` for a verified relink job        |
+| `POST /api/relink-folder`                                                  | JSON `{"directory":"/media/footage/Moved"}`; returns 202 `{ job }` that relinks every missing recording whose exact bytes are found in that folder or its subfolders                   |
 
 Use the root IDs returned by the service. Listings use directory/file metadata
 only: no media-byte reads, probing, recursive discovery, registration, cache writes

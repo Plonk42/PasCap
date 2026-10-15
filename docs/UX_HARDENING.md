@@ -156,7 +156,8 @@ those IDs, so a location change keeps them. The registries are version 2
 missing shows **Relink** in Media. A serial job checks the candidate's size and full
 checksum, rejects any difference and only then updates name, path and fingerprint
 atomically. Recordings without `content` cannot be relinked and must be imported
-again. Timing/colour metadata and matching filenames are never accepted as evidence;
+again. **Relink folder…** applies the same check to every missing recording found in a
+chosen folder and its subfolders, in one job. Timing/colour metadata and matching filenames are never accepted as evidence;
 there is no whole-filesystem search or hidden reassociation.
 
 ## Issue #3: export storage and recovery

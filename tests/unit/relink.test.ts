@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, mkdtemp, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -284,5 +284,109 @@ describe('music relink', () => {
     expect(audio.get(asset.id)).toMatchObject({ id: asset.id, sourcePath: moved, waveform: [0.5] });
     expect(audio.playbackPath(audio.get(asset.id))).toBe(playback);
     expect(await audio.missing()).toEqual([]);
+  });
+});
+
+describe('folder relink', () => {
+  /** A service whose card folder holds prepared videos and one prepared music file. */
+  async function folderFixture(videos: Record<string, string>) {
+    const directories = await setup();
+    const song = path.join(directories.card, 'Music', 'song.wav');
+    await mkdir(path.dirname(song));
+    await writeFile(song, 'disposable music bytes');
+    const music = audioAssetSchema.parse({
+      id: 'audio-folder',
+      name: 'song.wav',
+      sourcePath: song,
+      fingerprint: await fingerprintFile(song),
+      content: await hashFile(song),
+      metadata: { codec: 'pcm_s16le', sampleRate: 48000, channels: 2, durationSeconds: 1, frameCount: 30 },
+      status: 'ready',
+      error: null,
+      waveform: [0.5],
+    });
+    await storage.atomicWrite(
+      path.join(directories.config.dataDir, 'music.json'),
+      JSON.stringify({ version: 2, assets: [music] }),
+    );
+    const service = await createApp(directories.config);
+    services.push(service);
+    const ids: Record<string, string> = {};
+    for (const [name, bytes] of Object.entries(videos)) {
+      await writeFile(path.join(directories.card, name), bytes);
+      const accepted = await service.library.addForEditing(path.join(directories.card, name));
+      await service.jobs.wait(accepted.job!.id);
+      ids[name] = accepted.asset.id;
+    }
+    return { ...directories, service, ids, musicId: music.id };
+  }
+  async function relinkFolder(service: Awaited<ReturnType<typeof createApp>>, directory: string) {
+    const response = await service.app.inject({
+      method: 'POST',
+      url: '/api/relink-folder',
+      headers: { ...headers, 'content-type': 'application/json' },
+      payload: { directory },
+    });
+    expect(response.statusCode, response.body).toBe(202);
+    return service.jobs.wait(response.json().job.id);
+  }
+
+  it('relinks every missing video and music file found below the folder in one job', async () => {
+    const { card, drive, service, ids, musicId } = await folderFixture({ 'a.mp4': 'flight a', 'b.mp4': 'flight b' });
+    const moved = path.join(drive, 'Archive', '2026');
+    await mkdir(path.dirname(moved));
+    await rename(card, moved);
+    expect((await service.library.missing()).sort()).toEqual(Object.values(ids).sort());
+
+    const finished = await relinkFolder(service, drive);
+    expect(finished.state, finished.message).toBe('completed');
+    expect(finished.kind).toBe('relink');
+    expect(finished.message).toBe('Relinked all 3 missing recordings');
+    expect(service.library.get(ids['a.mp4']!).sourcePath).toBe(path.join(moved, 'a.mp4'));
+    expect(service.library.get(ids['b.mp4']!).sourcePath).toBe(path.join(moved, 'b.mp4'));
+    expect(service.audio.get(musicId).sourcePath).toBe(path.join(moved, 'Music', 'song.wav'));
+    expect(await service.library.missing()).toEqual([]);
+    expect(await service.audio.missing()).toEqual([]);
+  });
+
+  it('keeps each recording on its own same-name copy and reports what was not found', async () => {
+    const { card, drive, service, ids } = await folderFixture({
+      'a.mp4': 'same bytes',
+      'b.mp4': 'same bytes',
+      'c.mp4': 'flight c',
+    });
+    await Promise.all(['a.mp4', 'b.mp4'].map((name) => copyFile(path.join(card, name), path.join(drive, name))));
+    // Same name and size as c.mp4, other content: never accepted.
+    await writeFile(path.join(drive, 'c.mp4'), 'flight C');
+    await rm(card, { recursive: true });
+
+    const finished = await relinkFolder(service, drive);
+    expect(finished.state, finished.message).toBe('completed');
+    expect(finished.message).toBe('Relinked 2 of 4 missing recordings. Not found: c.mp4, song.wav');
+    expect(service.library.get(ids['a.mp4']!).sourcePath).toBe(path.join(drive, 'a.mp4'));
+    expect(service.library.get(ids['b.mp4']!).sourcePath).toBe(path.join(drive, 'b.mp4'));
+    expect(service.library.get(ids['c.mp4']!).sourcePath).toBe(path.join(card, 'c.mp4'));
+  });
+
+  it('changes nothing when no missing recording is in the folder', async () => {
+    const { card, drive, service, ids } = await folderFixture({ 'a.mp4': 'flight a' });
+    await writeFile(path.join(drive, 'other.mp4'), 'flight z');
+    await rm(card, { recursive: true });
+    const finished = await relinkFolder(service, drive);
+    expect(finished.state).toBe('failed');
+    expect(finished.message).toContain('None of the 2 missing recordings');
+    expect(service.library.get(ids['a.mp4']!).sourcePath).toBe(path.join(card, 'a.mp4'));
+  });
+
+  it('refuses a folder that does not exist', async () => {
+    const { drive, service } = await folderFixture({});
+    const response = await service.app.inject({
+      method: 'POST',
+      url: '/api/relink-folder',
+      headers: { ...headers, 'content-type': 'application/json' },
+      payload: { directory: path.join(drive, 'absent') },
+    });
+    expect(response.statusCode).toBe(404);
+    expect(service.jobs.list()).toEqual([]);
   });
 });

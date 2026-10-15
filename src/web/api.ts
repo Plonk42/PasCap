@@ -244,6 +244,9 @@ export const api = {
   /** Queues a full-content check of the moved copy; the job's outcome is the answer. */
   relinkMedia: (id: string, path: string) =>
     request(`/api/media/${id}/relink`, z.object({ job: jobSchema }), 'POST', { path }),
+  /** Queues one search below the folder for every missing video and music original. */
+  relinkFolder: (directory: string) =>
+    request('/api/relink-folder', z.object({ job: jobSchema }), 'POST', { directory }),
   cancel: (id: string) => request(`/api/jobs/${id}/cancel`, z.object({ job: jobSchema }), 'POST', {}),
   projects: (options?: RequestOptions) =>
     request('/api/projects', z.object({ projects: z.array(projectSummarySchema) }), 'GET', undefined, options),
