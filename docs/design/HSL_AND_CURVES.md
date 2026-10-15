@@ -26,10 +26,12 @@ proxy and PCM formats are unchanged; the registries are version 2 (full-content
 checksums). No migration or automatic deletion.
 
 The exact order is inverse BT.709 → normalized Temperature/Tint linear gains →
-Exposure → Contrast → Brightness → Shadows/Highlights/Whites/Blacks → Hue/Saturation/Vibrance → final
+Exposure → Contrast → Brightness → Whites/Blacks → Hue/Saturation/Vibrance → final
 linear clipping/BT.709 encoding → encoded HSL → master curve → separate RGB curves →
 black-fade brightness → grouped coverage and source-over. This is not HDR output,
 scene-linear HSL, automatic white balance, a speed curve or a per-clip correction.
+Shadows, Highlights and HDR are local stages on source pixels before this grade; see
+[detail filters](DETAIL_FILTERS.md#local-shadows-and-highlights).
 The Original preview bypasses **all** colour stages, retaining
 geometry, timing, visibility, Opacity, black fades and music.
 

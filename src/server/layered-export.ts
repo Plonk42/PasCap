@@ -4,8 +4,9 @@ import path from 'node:path';
 import type { Writable } from 'node:stream';
 import { setImmediate as yieldToEvents } from 'node:timers/promises';
 import { isDeepStrictEqual } from 'node:util';
-import { isNeutralAdvancedColour } from '../shared/colour.js';
+import { isNeutralAdvancedColour, isNeutralLocalTone } from '../shared/colour.js';
 import { detailTapCount, isNeutralDetail } from '../shared/detail.js';
+import { usesLocalTone } from '../shared/keyframes.js';
 import {
   LAYERED_EXPORT_RESOURCES,
   planLayeredExport,
@@ -175,7 +176,7 @@ function usesGpuKernel(sources: readonly LayerFrameSource[]): boolean {
   return sources.some(
     ({ sample }) =>
       !isNeutralDetail(sample.detail) ||
-      sample.colour.hdr !== 0 ||
+      !isNeutralLocalTone(sample.colour) ||
       !isNeutralAdvancedColour(sample.colour) ||
       !isNeutralSpatial(sample.spatial),
   );
@@ -444,9 +445,9 @@ class SequentialLayeredRenderer {
   /** Progress units of one composed frame, where a retimed or source-over frame is one unit. */
   private frameCost(layerId: string, clipIndexes: readonly number[]): number {
     const layer = this.options.document.layers.find((item) => item.id === layerId)!;
-    const hdr = layer.colour.hdr > 0 || layer.keyframes.some((key) => (key.values.hdr ?? 0) > 0);
+    const local = usesLocalTone(layer);
     const taps = clipIndexes.reduce(
-      (sum, index) => sum + detailTapCount(this.options.document.clips[index]!.detail, hdr),
+      (sum, index) => sum + detailTapCount(this.options.document.clips[index]!.detail, local),
       0,
     );
     if (this.#gpu && this.mayUseGpu(layer, clipIndexes)) return 1 + PROGRESS_UNITS_PER_GPU_FRAME;
@@ -456,8 +457,7 @@ class SequentialLayeredRenderer {
   /** Whether any frame of these clips can need the GPU kernel (keyframes may evaluate neutral). */
   private mayUseGpu(layer: ProjectDocument['layers'][number], clipIndexes: readonly number[]): boolean {
     return (
-      layer.colour.hdr > 0 ||
-      layer.keyframes.some((key) => (key.values.hdr ?? 0) > 0) ||
+      usesLocalTone(layer) ||
       !isNeutralAdvancedColour(layer.colour) ||
       hasSpatialEdits(layer.transform) ||
       clipIndexes.some((index) => !isNeutralDetail(this.options.document.clips[index]!.detail))

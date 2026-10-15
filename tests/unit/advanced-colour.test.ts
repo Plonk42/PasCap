@@ -170,7 +170,7 @@ describe('strict current-schema static advanced row colour', () => {
   it('compiled per-frame grading matches the reference exactly for every stage combination', () => {
     for (let mask = 0; mask < 8; mask++) {
       const settings = createColourSettings();
-      if (mask & 1) Object.assign(settings, { exposure: 0.37, hue: -23, saturation: 0.8, shadows: 0.12 });
+      if (mask & 1) Object.assign(settings, { exposure: 0.37, hue: -23, saturation: 0.8, blacks: 0.12 });
       if (mask & 2) settings.hsl.red = { hue: 17, saturation: -0.3, lightness: 0.04 };
       if (mask & 4)
         settings.curves.master = [
@@ -346,8 +346,8 @@ describe('strict current-schema static advanced row colour', () => {
           contrast: 1.1,
           hue: 12,
           saturation: 0.8,
-          shadows: 0.1,
-          highlights: -0.2,
+          blacks: 0.1,
+          whites: -0.2,
         });
         HSL_BANDS.forEach((band, i) => {
           settings.hsl[band] = { hue: i % 2 ? 8 : -6, saturation: -0.12, lightness: 0.015 };

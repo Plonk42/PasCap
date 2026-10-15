@@ -247,6 +247,13 @@ one Undo step: **Opacity**; **Colour** (Temperature, Tint, Hue, Saturation, Vibr
 **Vibrance** saturates muted colours more than strong ones: raise it to bring out a hazy
 sky or dull foliage without making faces or bright colours garish; lower it to mute the
 weakest colours first.
+**Shadows** and **Highlights** work on areas, like Lightroom's: raise Shadows to open up
+a shaded slope or a backlit subject, lower Highlights to bring back a bright sky. Each
+area is brightened or darkened as a whole according to its overall brightness, so dark
+texture in a sunlit field and the contrast inside the lifted area are kept, and mid-grey
+never moves. They choose tones after Exposure. Nonzero or keyed Shadows or Highlights
+make export use the slower composited path. Details:
+[local Shadows and Highlights](design/DETAIL_FILTERS.md#local-shadows-and-highlights).
 **Whites** moves the brightest tones: lower it to bring back a blown-out sky, raise it
 to make whites brighter. **Blacks** moves the darkest tones: lower it to deepen hazy or
 flat blacks, raise it for a faded, matte look.

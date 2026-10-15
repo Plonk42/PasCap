@@ -197,11 +197,13 @@ clarity −1–1, denoise 0–1 }`, neutral 0, with no keyframes or track channe
   Compare bypasses Colour and Detail. Clip → Detail is the third section, collapsed
   by default, with live slider preview and one Undo per release. See
   [detail filters](../docs/design/DETAIL_FILTERS.md).
-- Track Colour **HDR** (`colour.hdr` 0–1, fourteenth keyframe channel `hdr`) is an SDR
-  local tone-mapping look evaluated at project time but applied in the shared detail
-  kernel on source taps before grading (Denoise → HDR → Clarity → Sharpen), excluded
-  from the per-pixel grade and LUT identity; nonzero or keyed HDR needs composited
-  export. See [detail filters](../docs/design/DETAIL_FILTERS.md).
+- Track Colour **Shadows**, **Highlights** (−1…1) and **HDR** (`colour.hdr` 0–1, fourteenth
+  keyframe channel `hdr`, an SDR local tone-mapping look) are local tone settings: evaluated
+  at project time but applied in the shared detail kernel on source taps before grading
+  (Denoise → HDR → Shadows/Highlights → Clarity → Sharpen) from one guided edge-aware base,
+  excluded from the per-pixel grade and LUT identity; any nonzero or keyed value needs
+  composited export. Shadows/Highlights are linear-light gains in stops chosen by the base
+  after Exposure. See [detail filters](../docs/design/DETAIL_FILTERS.md).
 - Final approved [#67](https://github.com/Plonk42/PasCap/issues/67): **Opacity** is
   one row-owned setting, not a clip setting. `VideoLayer.opacity` is a required
   number in 0–1; new tracks start at 1 (100%). No saved `clip.opacity` field.
