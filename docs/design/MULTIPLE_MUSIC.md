@@ -1,4 +1,4 @@
-# Multiple music tracks · strict project schema 22
+# Multiple music tracks
 
 Current contract for [#35](https://github.com/Plonk42/PasCap/issues/35). This specifies
 the required behaviour, not completed implementation, test evidence or release
@@ -10,7 +10,7 @@ Usage belongs in [the user guide](../USER_GUIDE.md) and
 
 ## Strict document and track identity
 
-- `schemaVersion` is exactly **22**. Required `music: MusicTrack[]` contains **0–8**
+- `schemaVersion` is exactly the current schema. Required `music: MusicTrack[]` contains **0–8**
   independent music tracks; `[]` means no music. Omitted fields, `null`, a single
   object, unknown fields and duplicate track IDs are invalid. There are no
   migrations, compatibility readers, null fallbacks or injected defaults.
@@ -33,11 +33,11 @@ Usage belongs in [the user guide](../USER_GUIDE.md) and
   `temperature`, `tint`, `vibrance`, `whites` and `blacks`) and `hdr`. Complete static/keyed Colour remains video track-owned;
   HSL/curves remain static. There is no clip colour/correction, clip opacity or
   second opacity channel. Clip-only constant/custom source-frame speed retains
-  its ownership and retiming, plus a required boolean clip `reverse`. Schema 22 also requires video track-owned Transform
+  its ownership and retiming, plus a required boolean clip `reverse`. Projects also require video track-owned Transform
   base/per-setting project-frame keyframes;
   [spatial transforms](SPATIAL_TRANSFORMS.md) do not change music or video track Opacity.
 
-v1–v21 projects and receipt snapshots are incompatible and preserved byte-for-byte,
+Projects and receipt snapshots with an earlier schema version are incompatible and preserved byte-for-byte,
 along with finished exports. Recreate projects deliberately; do not rewrite,
 repair or delete them automatically. Video-proxy and current
 `pcm16-48k-stereo-mono-unity-v3` PCM cache formats and source guards are unchanged;
@@ -199,7 +199,7 @@ for those video budgets.
 
 ## Receipts, preservation and acceptance
 
-Export receipt format remains **version 1**, with a strict **schema-22 project
+Export receipt format remains **version 1**, with a strict **current-schema project
 snapshot**. Required `musicSources` is an array of captured unique registered
 audio assets; required `settings.audio` is an array of instance plans carrying
 `id`/`mediaId` and independent timing/gain/fades/loop sample positions. Both are

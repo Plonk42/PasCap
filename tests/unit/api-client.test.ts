@@ -4,7 +4,7 @@ import type { AudioAsset } from '../../src/shared/audio.js';
 import type { ExportPreflight } from '../../src/shared/export-space.js';
 import { EMPTY_KEY_VALUES, layerKeyframe, uniformKeyframe } from '../../src/shared/keyframes.js';
 import type { MediaJob } from '../../src/shared/media.js';
-import { createClip, createProject } from '../../src/shared/model.js';
+import { createClip, createProject, PROJECT_SCHEMA_VERSION } from '../../src/shared/model.js';
 import { api, ApiError, request, type ServiceHealth } from '../../src/web/api.js';
 import { unsupportedProject } from './project-fixtures.js';
 
@@ -389,8 +389,8 @@ describe('registered API methods', () => {
     await expect(api.save(project, 0)).rejects.toMatchObject({ status: 200, kind: 'response' });
   });
 
-  it('uses complete schema-22 project mocks and rejects a version-8 response without changing it', async () => {
-    expect(project.schemaVersion).toBe(22);
+  it('uses complete current-schema project mocks and rejects a version-8 response without changing it', async () => {
+    expect(project.schemaVersion).toBe(PROJECT_SCHEMA_VERSION);
     expect(project.layers[0]!.keyframes).toEqual([]);
     const unsupported = unsupportedProject(8, project.id, project.title);
     const before = JSON.stringify(unsupported);
@@ -417,7 +417,7 @@ describe('registered API methods', () => {
   });
 
   it.each(['clip opacity', 'layerOpacity', 'clipOpacity', 'speed'])(
-    'rejects a removed %s in a v22 response without dropping it or retrying',
+    'rejects a removed %s in a current-schema response without dropping it or retrying',
     async (removed) => {
       const layer = project.layers[0]!;
       const legacyLayer =

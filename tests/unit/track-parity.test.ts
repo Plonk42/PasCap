@@ -16,6 +16,7 @@ import {
   createClip,
   createLayer,
   createProject,
+  PROJECT_SCHEMA_VERSION,
   projectSchema,
   type ProjectDocument,
   type Transition,
@@ -25,7 +26,7 @@ import { calculateLayout, layerClips, sampleTimeline } from '../../src/shared/ti
 import { clipStartRestriction, layerActionRestrictions } from '../../src/web/layer-actions.js';
 import { planTimelineDrop } from '../../src/web/timeline-placement.js';
 import { timelineRows } from '../../src/web/timeline-rows.js';
-import { unsupportedProject } from './project-fixtures.js';
+import { EARLIER_SCHEMA_VERSIONS, unsupportedProject } from './project-fixtures.js';
 
 const TRACK_IDS = ['ground', 'middle', 'sky'];
 const cases = TRACK_IDS.flatMap((layerId) => [false, true].map((ripple) => ({ layerId, ripple })));
@@ -106,10 +107,10 @@ function rejected(document: ProjectDocument, command: EditCommand, message: stri
   expect(history.canRedo).toBe(false);
 }
 
-describe('strict uniform schema-22 tracks', () => {
+describe('strict uniform current-schema tracks', () => {
   it('uses Ripple ON for the initial track and every newly created track', () => {
     const initial = createProject('new', 'New');
-    expect(initial.schemaVersion).toBe(22);
+    expect(initial.schemaVersion).toBe(PROJECT_SCHEMA_VERSION);
     expect(initial.layers).toEqual([createLayer(BASE_LAYER_ID, 'Track 1')]);
     for (const id of [BASE_LAYER_ID, ...Array.from({ length: 8 }, (_, index) => `arbitrary-${index}`)]) {
       expect(createLayer(id, 'Track')).toEqual({
@@ -150,7 +151,7 @@ describe('strict uniform schema-22 tracks', () => {
     }
     for (const extra of [{ transitions: [] }, { openingFade: 0 }, { closingFade: 0 }])
       expect(projectSchema.safeParse({ ...document, ...extra }).success).toBe(false);
-    for (const schemaVersion of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21])
+    for (const schemaVersion of EARLIER_SCHEMA_VERSIONS)
       expect(projectSchema.safeParse({ ...document, schemaVersion }).success).toBe(false);
     expect(projectSchema.safeParse(unsupportedProject(5, 'old', 'Unsupported topology')).success).toBe(false);
     expect(document).not.toHaveProperty('transitions');

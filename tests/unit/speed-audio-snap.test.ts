@@ -1,18 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import { musicGainAt, musicSourceFrame } from '../../src/shared/audio.js';
 import { applyCommand } from '../../src/shared/commands.js';
-import { createClip, createProject, projectSchema } from '../../src/shared/model.js';
+import { createClip, createProject, PROJECT_SCHEMA_VERSION, projectSchema } from '../../src/shared/model.js';
 import { snapFrame, snapPoints } from '../../src/shared/snap.js';
 import { trimByOutputFrames } from '../../src/shared/source-range.js';
 import { clipDuration, compileRetiming, sourceFrameAt } from '../../src/shared/speed.js';
 import { calculateLayout, sampleTimeline } from '../../src/shared/timeline.js';
-import { unsupportedProject } from './project-fixtures.js';
+import { EARLIER_SCHEMA_VERSIONS, unsupportedProject } from './project-fixtures.js';
 
 describe('shared retiming and recoverable speed edits', () => {
-  it('requires explicit v22 static speed settings; earlier documents are not guessed', () => {
+  it('requires explicit current-schema static speed settings; earlier documents are not guessed', () => {
     const project = createProject('flight', 'Flight');
-    expect(project.schemaVersion).toBe(22);
-    for (const schemaVersion of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21])
+    expect(project.schemaVersion).toBe(PROJECT_SCHEMA_VERSION);
+    for (const schemaVersion of EARLIER_SCHEMA_VERSIONS)
       expect(() => projectSchema.parse({ ...project, schemaVersion })).toThrow();
     expect(() => projectSchema.parse(unsupportedProject(4, 'old-flight', 'Unsupported flight'))).toThrow();
     const clip = createClip('a', 'source', 0, 600);

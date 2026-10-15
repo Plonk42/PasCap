@@ -73,7 +73,9 @@ PasCap is a solo, pre-release project: optimize for fast iteration. Details are 
 - Until the first release candidate, approved changes may break saved projects and
   persisted formats. Keep one strict current contract: no migrations, legacy fields,
   compatibility defaults or old-format readers unless requested. Reject
-  incompatible data clearly; never silently rewrite or delete it.
+  incompatible data clearly; never silently rewrite or delete it. Bump
+  `PROJECT_SCHEMA_VERSION` (src/shared/model.ts) for incompatible changes; never
+  write the schema number in docs.
 - Never commit or post private paths, media, credentials, caches or generated reports.
 
 ## Architecture
@@ -88,7 +90,7 @@ PasCap is a solo, pre-release project: optimize for fast iteration. Details are 
   source frames (presets such as Ramp up replace its keyframes). A clip's duration
   depends only on its own speed and source range, never its track, start or Ripple
   position; there is no track Speed channel.
-- #171 (schema 22): every clip requires boolean `reverse` (Clip → Speed checkbox), a
+- #171: every clip requires boolean `reverse` (Clip → Speed checkbox), a
   direction, not a negative rate. The retiming map mirrors forward output time, so
   duration and speed-keyframe footage are unchanged. Timeline edits act on the clip as
   displayed (left handle/Q trim source OUT; split/cut pieces stay reversed). Preview
@@ -119,11 +121,11 @@ PasCap is a solo, pre-release project: optimize for fast iteration. Details are 
   Navigation never edits,
   saves or creates history. See [speed/audio](../docs/SPEED_AND_AUDIO.md) and
   [spatial transforms](../docs/design/SPATIAL_TRANSFORMS.md).
-- Strict schema 22 (#143) requires project `bookmarks`: 0–1,000 unique ascending project
+- #143: projects require `bookmarks`: 0–1,000 unique ascending project
   frames, `[]` on new projects. They are extra `snapPoints()` for every snapping gesture,
   slide through `useKeyframeSlide` (a dragged bookmark never snaps to itself) and never
   retime, render or export. See [timeline](../docs/TIMELINE_EDITING.md).
-- Strict schema 22 requires complete row Colour with twelve graded scalar fields
+- The strict current schema requires complete row Colour with twelve graded scalar fields
   (including `vibrance`, −1…1, a chroma scale after Saturation weighted towards muted
   colours; #184 `whites`, −1…1, a white-point tone stage after Highlights, and `blacks`,
   −1…1, a black-point tone stage after Whites; raised it adds a matte lift),
@@ -158,7 +160,7 @@ PasCap is a solo, pre-release project: optimize for fast iteration. Details are 
   row bases and absolute points, without per-clip colour copies. HSL and curves
   retain that ownership, as do Temperature and Tint.
   See [row appearance](../docs/design/ROW_APPEARANCE.md).
-- Owner-approved #131 (schema 22): Transform is **track-owned, exactly like Colour**.
+- Owner-approved #131: Transform is **track-owned, exactly like Colour**.
   Every video track requires strict `transform: { base, keyframes }`; clips have no
   `spatial` field. Eight complete pose values and 0–256 ascending absolute project-frame
   keys `{ frame, values, easing, reset }`; each key enables any of the eight settings
@@ -223,10 +225,10 @@ clarity −1–1, denoise 0–1 }`, neutral 0, with no keyframes or track channe
   $\mathrm{result} = C + \mathrm{lower}(1 - A)$, evaluating row Opacity for each
   source with no additional layer multiplier; $m_i$ is spatial source coverage,
   including opaque neutral letterboxing. Black fades never reduce that coverage.
-  Version-1 export receipts require strict v22 snapshots and captured audio-source/
+  Version-1 export receipts require strict current-schema snapshots and captured audio-source/
   instance-plan arrays; receipt, registry/proxy/PCM and benchmark format versions
   remain independent and unchanged.
-  Reject and preserve incompatible v1–v21 projects/receipt snapshots; require recreation,
+  Reject and preserve projects/receipt snapshots with an earlier schema version; require recreation,
   without migrations, compatibility defaults or automatic deletion.
 - Owner-approved #135/#87: track and Transform keyframes store one Easing per enabled
   setting (`easing` mirrors `values`); a joining setting adopts the Easing its keyframe's

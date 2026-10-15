@@ -8,6 +8,7 @@ import { EMPTY_KEY_VALUES, layerKeyframe } from '../../src/shared/keyframes.js';
 import { createClip, createLayer, createProject, projectSchema } from '../../src/shared/model.js';
 import { sampleTimeline } from '../../src/shared/timeline.js';
 import { colourResetCommands } from '../../src/web/colour-reset.js';
+import { EARLIER_SCHEMA_VERSIONS } from './project-fixtures.js';
 
 function fixture() {
   const project = createProject('appearance', 'Row appearance');
@@ -217,7 +218,7 @@ describe('strict row-only Colour and Opacity', () => {
 
   it('requires complete row colour and rejects both clip fields and every older schema', () => {
     const project = fixture();
-    for (let schemaVersion = 1; schemaVersion < 22; schemaVersion++)
+    for (const schemaVersion of EARLIER_SCHEMA_VERSIONS)
       expect(projectSchema.safeParse({ ...project, schemaVersion }).success).toBe(false);
     const { colour: _row, ...missingRow } = project.layers[0]!;
     for (const invalid of [

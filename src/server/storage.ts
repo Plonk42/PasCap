@@ -2,7 +2,14 @@ import { createHash, randomUUID } from 'node:crypto';
 import { lstat, mkdir, open, readdir, readFile, rename, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { ZodError } from 'zod';
-import { createProject, frameSchema, idSchema, projectSchema, type ProjectDocument } from '../shared/model.js';
+import {
+  createProject,
+  frameSchema,
+  idSchema,
+  PROJECT_SCHEMA_VERSION,
+  projectSchema,
+  type ProjectDocument,
+} from '../shared/model.js';
 import { projectSummarySchema, type ProjectSummary } from '../shared/projects.js';
 import { calculateLayout } from '../shared/timeline.js';
 import { errorMessage, isNotFound, ServiceError } from './errors.js';
@@ -74,13 +81,18 @@ export class ProjectStore {
     return { value: JSON.parse(await readFile(filename, 'utf8')) as unknown, updatedAt: info.mtime.toISOString() };
   }
   private decode(id: string, value: unknown): ProjectDocument {
-    if (typeof value !== 'object' || value === null || !('schemaVersion' in value) || value.schemaVersion !== 22) {
+    if (
+      typeof value !== 'object' ||
+      value === null ||
+      !('schemaVersion' in value) ||
+      value.schemaVersion !== PROJECT_SCHEMA_VERSION
+    ) {
       const rawVersion =
         typeof value === 'object' && value !== null && 'schemaVersion' in value ? value.schemaVersion : undefined;
       const version =
         typeof rawVersion === 'string' || typeof rawVersion === 'number' ? String(rawVersion) : 'missing or invalid';
       throw new ServiceError(
-        `Unsupported project schema version ${version}; this build requires version 22 with project bookmarks, clip-owned speed (constant or keyframes) and playback direction, track-owned Colour, Temperature, Tint, Vibrance, Whites, Blacks, HDR, HSL ranges, curves and Opacity, fourteen required nullable keyframe channels with per-setting Easing, track-owned Transform, explicit clip detail settings, identified music instances and per-track Ripple, transitions and fades. No migration is performed.`,
+        `Unsupported project schema version ${version}; this build requires version ${PROJECT_SCHEMA_VERSION}. No migration is performed.`,
         422,
       );
     }
@@ -97,7 +109,7 @@ export class ProjectStore {
             .join('; ')
         : errorMessage(error);
     return new ServiceError(
-      `Cannot open this project: ${message} Restore a valid version 22 project, open it with a compatible PasCap version, or create a new project. The existing file was not changed.`,
+      `Cannot open this project: ${message} Restore a valid version ${PROJECT_SCHEMA_VERSION} project, open it with a compatible PasCap version, or create a new project. The existing file was not changed.`,
       422,
     );
   }

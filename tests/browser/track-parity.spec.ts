@@ -3,7 +3,14 @@ import type { AudioAsset } from '../../src/shared/audio.js';
 import { estimateExportSpace } from '../../src/shared/export-space.js';
 import type { ExportProfile } from '../../src/shared/export.js';
 import type { MediaAsset } from '../../src/shared/media.js';
-import { createClip, createLayer, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
+import {
+  createClip,
+  createLayer,
+  createProject,
+  PROJECT_SCHEMA_VERSION,
+  projectSchema,
+  type ProjectDocument,
+} from '../../src/shared/model.js';
 import { calculateLayout, sampleTimeline } from '../../src/shared/timeline.js';
 import {
   closeOptions,
@@ -178,7 +185,7 @@ async function captureAt(page: Page, frame: number) {
   return captured;
 }
 
-test('the initial track and every newly added track default to Ripple on with independent strict schema-12 fields', async ({
+test('the initial track and every newly added track default to Ripple on with independent strict current-schema fields', async ({
   page,
 }) => {
   const before = await current(page);
@@ -194,7 +201,7 @@ test('the initial track and every newly added track default to Ripple on with in
   await page.getByRole('button', { name: 'Add video track', exact: true }).click();
   const added = await current(page);
   await ready(page, added);
-  expect(added.schemaVersion).toBe(22);
+  expect(added.schemaVersion).toBe(PROJECT_SCHEMA_VERSION);
   for (const field of ['transitions', 'openingFade', 'closingFade']) expect(added).not.toHaveProperty(field);
   expect(added.layers.slice(0, 2)).toEqual(before.layers);
   expect(added.clips).toEqual(before.clips);

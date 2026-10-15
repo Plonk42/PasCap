@@ -2,7 +2,14 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 import path from 'node:path';
 import { KEYFRAME_SETTINGS, uniformKeyframe } from '../../src/shared/keyframes.js';
 import type { MediaAsset } from '../../src/shared/media.js';
-import { createClip, createLayer, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
+import {
+  createClip,
+  createLayer,
+  createProject,
+  PROJECT_SCHEMA_VERSION,
+  projectSchema,
+  type ProjectDocument,
+} from '../../src/shared/model.js';
 import { createSpatialSettings, evaluateSpatial, NEUTRAL_SPATIAL_POSE } from '../../src/shared/spatial.js';
 import { calculateLayout, type PlacedClip } from '../../src/shared/timeline.js';
 import {
@@ -275,7 +282,7 @@ for (const viewport of [
         document.clips[0]!.speed = { mode: 'constant', rate: 1 };
         document.layers[0]!.transform = createSpatialSettings();
       });
-      expect(document.schemaVersion).toBe(22);
+      expect(document.schemaVersion).toBe(PROJECT_SCHEMA_VERSION);
       await inspectorTab(page, 'Track');
       await expect(inspector(page).getByRole('button', { name: /^Animate / })).toHaveCount(0);
       await expect(line(page, 'Colour')).toContainText('0 keyframes');

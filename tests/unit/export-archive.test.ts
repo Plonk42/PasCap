@@ -10,11 +10,11 @@ import { JobQueue } from '../../src/server/jobs.js';
 import { audioAssetSchema } from '../../src/shared/audio.js';
 import { planExportMusic } from '../../src/shared/export.js';
 import { EMPTY_KEY_VALUES, layerKeyframe, uniformKeyframe } from '../../src/shared/keyframes.js';
-import { createClip, createProject, type ProjectDocument } from '../../src/shared/model.js';
+import { createClip, createProject, PROJECT_SCHEMA_VERSION, type ProjectDocument } from '../../src/shared/model.js';
 import { NEUTRAL_SPATIAL_POSE } from '../../src/shared/spatial.js';
 import { calculateLayout } from '../../src/shared/timeline.js';
 import { framesToSeconds } from '../../src/shared/timing.js';
-import { unsupportedProject } from './project-fixtures.js';
+import { EARLIER_SCHEMA_VERSIONS, unsupportedProject } from './project-fixtures.js';
 
 function audioAsset(id: string) {
   return audioAssetSchema.omit({ content: true }).parse({
@@ -158,7 +158,7 @@ describe('durable export receipts', () => {
       fadeOut: index,
       loop: false,
     }));
-    expect(snapshot.schemaVersion).toBe(22);
+    expect(snapshot.schemaVersion).toBe(PROJECT_SCHEMA_VERSION);
     const receipt = receiptFixture(snapshot, id);
     expect(receipt.musicSources).toHaveLength(2);
     expect(receipt.settings.audio).toHaveLength(8);
@@ -463,7 +463,7 @@ describe('durable export receipts', () => {
       }
     },
   );
-  it.each([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21])(
+  it.each(EARLIER_SCHEMA_VERSIONS)(
     'leaves version-1 receipts with unsupported v%s snapshots and their completed outputs unchanged',
     async (version) => {
       const root = await mkdtemp(path.join(os.tmpdir(), 'pascap-archive-'));
@@ -489,7 +489,7 @@ describe('durable export receipts', () => {
         const warnings = await restoreExports(createConfig({ dataDir: root }), jobs);
         expect(warnings).toHaveLength(1);
         expect(warnings[0]).toContain(
-          `Unsupported export snapshot schema version ${version}; this build requires version 22`,
+          `Unsupported export snapshot schema version ${version}; this build requires version ${PROJECT_SCHEMA_VERSION}`,
         );
         expect(jobs.list()).toEqual([]);
         expect(await readFile(path.join(folder, 'receipt.json'), 'utf8')).toBe(text);

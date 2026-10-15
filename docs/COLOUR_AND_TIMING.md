@@ -1,4 +1,4 @@
-# PasCap colour and timing contract · project v22
+# PasCap colour and timing contract
 
 This specification is shared by the CPU reference, WebGL2 shader and native
 scalar LUT or exact advanced-colour export. It is elementary SDR grading, not
@@ -214,7 +214,7 @@ resets to normal graded preview. Export continues to use the saved grading contr
 
 ## Music sampling and mixing
 
-Strict schema 22 requires a 0–8 `music` array of independent uniquely identified
+Projects require a 0–8 `music` array of independent uniquely identified
 music tracks, `[]` without music. Each has source IN/OUT, start/duration, gain, fades
 and loop; source-video audio remains disabled. At 48 kHz, source/placement/duration/
 fade positions round independently to integer samples using the rational frame
@@ -260,19 +260,19 @@ neutral HSL and identity curves, HDR 0, an exactly neutral track Transform
 base without Transform keyframes, without music, extra tracks or track keyframes,
 and is limited to 3,600 project frames. It refuses unsupported
 documents regardless of Ripple or track ID.
-It requires a strict schema-22 project snapshot, including explicit project media
+It requires a strict current-schema project snapshot, including explicit project media
 membership; its reference receipt format remains independently version 1. New
-measurement reports must identify their v22 project snapshot without overwriting
+measurement reports must identify their project snapshot's schema without overwriting
 historical reports; the report identifier is separate from the project schema.
 Project identifiers such as `preview-lab`/`preview-lab-v6` are not schema versions
 and are not renamed by this contract.
-v1–v21 project documents and receipt snapshots are incompatible and preserved;
+Project documents and receipt snapshots with an earlier schema version are incompatible and preserved;
 recreate projects deliberately, with no migration, compatibility defaults or
-old-format/null fallback readers or automatic deletion. Strict v22 requires
+old-format/null fallback readers or automatic deletion. The strict current schema requires
 complete video track `colour`, including Temperature/Tint/Vibrance/Whites/Blacks/HDR bases and static HSL/curves,
 all fourteen nullable keyframe fields, constant or custom-curve clip speed, boolean clip `reverse`, track `transform` base/per-setting keyframes and track `opacity`; saved `clip.colour`, `clip.correction`, `clip.opacity`, `clip.spatial` and
 old `clipOpacity`/`layerOpacity` keyframe fields are rejected, not defaulted.
-Production export receipts also remain version 1, with strict v22 snapshots and
+Production export receipts also remain version 1, with strict current-schema snapshots and
 required `musicSources` captured-original/`settings.audio` identified-plan arrays;
 older snapshots or invalid arrays are rejected without rewriting receipts/MP4s.
 Proxy/current PCM formats and source guards are unchanged; the registries are

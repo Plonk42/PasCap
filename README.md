@@ -137,7 +137,7 @@ Missing mounts and symlinks fail explicitly. In the eventual container package,
 originals will be read-only bind mounts and application data will be a separate
 persistent writable mount. See [deployment design](docs/DEPLOYMENT.md).
 
-**Project format:** strict schema **v22**, with required complete video track `colour`, including `temperature`, `tint`, `vibrance`, `whites`, `blacks` and `hdr`, no clip colour/correction/spatial field, a required boolean clip `reverse` (`false` on new clips), video track `transform` base and
+**Project format:** strict current schema, with required complete video track `colour`, including `temperature`, `tint`, `vibrance`, `whites`, `blacks` and `hdr`, no clip colour/correction/spatial field, a required boolean clip `reverse` (`false` on new clips), video track `transform` base and
 0–256 per-setting project-frame keyframes, required `music` array (0–8
 music tracks, unique required IDs; `[]` without music), required project `bookmarks` (unique ascending frames; `[]` on new projects), per-track Ripple,
 transitions, fades and numeric `VideoLayer.opacity` (0–1; new tracks start at 1),
@@ -145,9 +145,9 @@ and exactly fourteen nullable keyframe channels: `opacity`, `temperature`,
 `tint`, `exposure`, `brightness`, `contrast`, `hue`, `saturation`, `vibrance`, `highlights`,
 `shadows`, `whites`, `blacks`, `hdr`. HSL/curves remain static. Track `opacity` is required and valid; saved `clip.opacity` and old
 `clipOpacity`/`layerOpacity` channels are rejected, not ignored or defaulted.
-v1–v21 projects and receipt snapshots remain unchanged
+Projects and receipt snapshots with an earlier schema version remain unchanged
 on disk but are incompatible: recreate projects and import media deliberately.
-Export receipts remain version 1 with a strict v22 snapshot and required captured
+Export receipts remain version 1 with a strict current-schema snapshot and required captured
 audio-source/instance-plan arrays. Proxy/current PCM cache formats and source
 protections do not change; the video and music registries are version 2
 (`videos.json`, `music.json`, with full-content checksums), so import recordings again.
@@ -191,11 +191,11 @@ real-workload qualification, and local Docker/Podman packaging. See
 - [Timing and colour contract](docs/COLOUR_AND_TIMING.md)
 - [Tracks and keyframes](docs/LAYERS_AND_KEYFRAMES.md)
 - [Speed, audio and export](docs/SPEED_AND_AUDIO.md)
-- [Video track appearance/schema-22 contract](docs/design/ROW_APPEARANCE.md)
-- [Temperature and Tint/schema-22 contract](docs/design/TEMPERATURE_AND_TINT.md)
-- [Track Transform/schema-22 contract](docs/design/SPATIAL_TRANSFORMS.md)
-- [Clip detail filters and HDR/schema-22 contract](docs/design/DETAIL_FILTERS.md)
-- [Multiple music/schema-22 contract](docs/design/MULTIPLE_MUSIC.md) — required behaviour; implementation/validation acceptance remains pending, not a test or release claim.
+- [Video track appearance contract](docs/design/ROW_APPEARANCE.md)
+- [Temperature and Tint contract](docs/design/TEMPERATURE_AND_TINT.md)
+- [Track Transform contract](docs/design/SPATIAL_TRANSFORMS.md)
+- [Clip detail filters and HDR contract](docs/design/DETAIL_FILTERS.md)
+- [Multiple music contract](docs/design/MULTIPLE_MUSIC.md) — required behaviour; implementation/validation acceptance remains pending, not a test or release claim.
 - [Deployment target](docs/DEPLOYMENT.md)
 - [Historical feasibility study](docs/FEASIBILITY_REPORT.md)
 

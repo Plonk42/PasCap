@@ -11,7 +11,8 @@ import {
   type RGB,
 } from '../../src/shared/colour.js';
 import { EMPTY_KEY_VALUES, layerKeyframeSchema, uniformKeyframe } from '../../src/shared/keyframes.js';
-import { createLayer, createProject, projectSchema } from '../../src/shared/model.js';
+import { createLayer, createProject, PROJECT_SCHEMA_VERSION, projectSchema } from '../../src/shared/model.js';
+import { EARLIER_SCHEMA_VERSIONS } from './project-fixtures.js';
 
 const luma: RGB = [0.2126, 0.7152, 0.0722];
 const axes = [-1, -0.234567891, 0, 0.123456789, 1];
@@ -26,8 +27,8 @@ describe('normalized linear Temperature and Tint', () => {
     expect(createLayer('empty', 'Empty').colour).toEqual(settings);
     expect(Object.keys(EMPTY_KEY_VALUES)).toHaveLength(14);
     const project = createProject('strict', 'Strict');
-    expect(project.schemaVersion).toBe(22);
-    for (let schemaVersion = 1; schemaVersion < 22; schemaVersion++)
+    expect(project.schemaVersion).toBe(PROJECT_SCHEMA_VERSION);
+    for (const schemaVersion of EARLIER_SCHEMA_VERSIONS)
       expect(projectSchema.safeParse({ ...project, schemaVersion }).success).toBe(false);
     for (const channel of ['temperature', 'tint'] as const) {
       const incomplete = { ...settings };

@@ -117,9 +117,12 @@ export const bookmarksSchema = z
     message: 'Bookmarks must be unique ascending project frames.',
   });
 
+/** The only accepted project schema; bump it for every incompatible change. */
+export const PROJECT_SCHEMA_VERSION = 22;
+
 const baseProjectSchema = z
   .object({
-    schemaVersion: z.literal(22),
+    schemaVersion: z.literal(PROJECT_SCHEMA_VERSION),
     id: idSchema,
     title: z.string().trim().min(1).max(200),
     media: z
@@ -176,7 +179,7 @@ export function createLayer(id: string, name: string, ripple = true): VideoLayer
 
 export function createProject(id: string, title: string): ProjectDocument {
   return projectSchema.parse({
-    schemaVersion: 22,
+    schemaVersion: PROJECT_SCHEMA_VERSION,
     id,
     title,
     media: { videoIds: [], audioIds: [] },

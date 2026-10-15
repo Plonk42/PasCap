@@ -2,8 +2,8 @@
 
 ## Scope and decisions
 
-Controls use native elements, the existing editor layout and strict project
-schema 22, including complete track Colour and Transform, clip-only speed and reverse and 0–8 independent music tracks. No UI framework or icon dependency is introduced. Exact
+Controls use native elements, the existing editor layout and the strict current project
+schema, including complete track Colour and Transform, clip-only speed and reverse and 0–8 independent music tracks. No UI framework or icon dependency is introduced. Exact
 timing entry is retained: Clip Range uses timecode text fields and a
 full-original range bar; other frame/duration/fade fields retain numeric steppers.
 
@@ -38,7 +38,7 @@ neither needs replacing merely to make their implementation identical.
 
 This is the source of terminology for visible UI text, help, accessible names,
 test selectors and current-behaviour guides. Internal identifiers, persisted fields
-and technical paths stay unchanged; this glossary does not change schema 22.
+and technical paths stay unchanged; this glossary does not change the project schema.
 
 - **Recording**: the complete original file, video or music. Use **video recording**
   or **music recording** when the distinction matters; never bare “video” for a file.
