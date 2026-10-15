@@ -472,7 +472,7 @@ Navigation/inspection creates no history entry or save and adds no persisted fie
 
 The thin strip above video tracks is the **time ruler**. Its separators/ticks denote
 TIME; a click seeks, a drag selects a range to cut and the playhead handle scrubs.
-The distinct **Cut / Fade / Dissolve** boundary
+The distinct **Cut / Fade / Pause / Dissolve** boundary
 buttons open that boundary in Track → Transitions, not keyframe controls. Full keyframe
 semantics are in [LAYERS_AND_KEYFRAMES.md](LAYERS_AND_KEYFRAMES.md).
 
@@ -481,13 +481,28 @@ for the selected track. Track → Transitions lists every boundary left to right
 the selected one (from a boundary button, the list, or the selected clip's incoming
 boundary, else its outgoing one) is expanded. No earlier choice sticks when the
 selection changes. Exactly one record joins each adjacent pair. Cut permits a
-gap; non-cut transitions require touching clips or that pair's existing dissolve.
+gap; non-cut transitions require touching clips or that pair's existing dissolve or pause.
 Gapped pairs explain the disabled non-cut choices: explicitly close the gap or
 enable that track's Ripple first. Cross-dissolve duration explicitly sets the right
 start to left OUT minus duration; changing/removing an existing dissolve changes
 that overlap. Ripple on re-sequences the suffix; off changes only the paired right
 clip and rejects conflicts with others. Arbitrary/triple overlap is forbidden.
-Fade-through-black keeps a touching boundary without overlap. Track opening/closing
+Fade-through-black keeps a touching boundary without overlap.
+
+**Fade through black with pause** (`fade-black-pause`, timeline label **Pause**) has
+two settings: **Fade** frames, the length of both the fade-out at the end of the left
+clip and the fade-in at the start of the right clip, and **Pause** frames of black
+between them. The fades consume footage like a fade through black; the pause does
+not: it is the transition's own **timeslot**, so the right clip starts exactly at left
+OUT plus pause. Like a dissolve's overlap, that offset is stored placement: Ripple
+sequences it, and with Ripple off choosing, lengthening or removing the pause moves
+only the paired right clip and rejects conflicts. The timeline draws the slot as a
+dark block in the track. During the slot the track shows black with its Transform
+geometry (the left clip's recording aspect) and its Opacity, so lower tracks stay
+covered exactly as during a fade through black; no frame is decoded for it. Any slot
+routes export through the composited path. Future transitions that need their own
+time use the same slot: `transitionOffset` places the right clip and `sampleSlots`
+supplies what the slot draws. Track opening/closing
 fades apply at actual first/last placements, darken only that track's RGB and preserve
 coverage. Empty tracks retain dormant fades; adding footage validates them again.
 No edit silently shortens fades/transitions to fit.

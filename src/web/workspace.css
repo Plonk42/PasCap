@@ -563,6 +563,14 @@ body {
   grid-template-columns: minmax(0, 1fr) 92px;
 }
 
+.product-workspace .transition-fields.has-pause {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+
+.product-workspace .transition-fields.has-pause > label:first-child {
+  grid-column: 1 / -1;
+}
+
 .product-workspace .speed-settings > select,
 .product-workspace .speed-field select,
 .product-workspace .transition-fields label,

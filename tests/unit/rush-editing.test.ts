@@ -525,7 +525,7 @@ describe('atomic source removal on the primary ripple row', () => {
   ])('rejects transition-invalid removal $sourceIn..$sourceOut without hidden clamping', ({ sourceIn, sourceOut }) => {
     const document = withDissolves();
     rejected(document, removal('rush', sourceIn, sourceOut), 'regions overlap or exceed');
-    expect(document.layers[0]!.transitions.map((transition) => transition.duration)).toEqual([10, 12, 0]);
+    expect(document.layers[0]!.transitions).toMatchObject([{ duration: 10 }, { duration: 12 }, { duration: 0 }]);
   });
 
   it.each([

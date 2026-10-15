@@ -1283,6 +1283,15 @@ svg {
   border-color: #a5cfae;
 }
 
+.timeline-transition-slot {
+  position: absolute;
+  height: 67px;
+  border: 1px dashed #4a6554;
+  border-radius: 4px;
+  background: #050806;
+  pointer-events: none;
+}
+
 .timeline-playhead {
   position: absolute;
   top: 31px;

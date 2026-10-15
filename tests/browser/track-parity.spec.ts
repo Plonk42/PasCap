@@ -468,7 +468,45 @@ test('each row has its own boundary button and Sequence edits target only the se
     expect(blackFade.clips).toEqual(before.clips);
     await expect(boundary).toHaveText('Fade');
     await undoOnce(page, before);
+    await boundary.click();
+    await page.getByRole('combobox', { name: 'Transition type', exact: true }).selectOption('fade-black-pause');
+    const paused = await current(page);
+    const pause = { leftId: `left-${index}`, rightId: `right-${index}`, type: 'fade-black-pause', fade: 15, pause: 15 };
+    expect(paused.layers).toEqual(
+      before.layers.map((item) => (item.id === layer.id ? { ...item, transitions: [pause] } : item)),
+    );
+    expect(paused.clips).toEqual(
+      before.clips.map((clip) => (clip.id === `right-${index}` ? { ...clip, start: index * 20 + 75 } : clip)),
+    );
+    await expect(boundary).toHaveText('Pause');
+    await expect(page.locator('.timeline-transition-slot')).toHaveCount(1);
+    await commitNumber(page, 'Transition pause duration', 20);
+    const longer = await current(page);
+    expect(longer.layers.find((item) => item.id === layer.id)!.transitions).toEqual([{ ...pause, pause: 20 }]);
+    expect(trackGeometry(longer, layer.id)).toEqual([
+      [`left-${index}`, index * 20, index * 20 + 60],
+      [`right-${index}`, index * 20 + 80, index * 20 + 140],
+    ]);
+    await page.getByRole('button', { name: 'Undo', exact: true }).click();
+    expect(await current(page)).toEqual(paused);
+    await undoOnce(page, before);
   }
+});
+
+test('a black pause timeslot covers lower tracks in the preview where a plain gap reveals them', async ({ page }) => {
+  const document = boundaries();
+  document.clips.find((clip) => clip.id === 'right-1')!.start = 90;
+  await fixture(page, document);
+  expect((await captureAt(page, 85)).sum).toBeGreaterThan(0);
+  document.layers[1]!.transitions = [
+    { leftId: 'left-1', rightId: 'right-1', type: 'fade-black-pause', fade: 5, pause: 10 },
+  ];
+  await fixture(page, projectSchema.parse(document));
+  expect(calculateLayout(document).transitions.find((item) => item.layerId === 'upper')!.slot).toEqual({
+    start: 80,
+    end: 90,
+  });
+  expect((await captureAt(page, 85)).sum).toBe(0);
 });
 
 test('Track transitions list every boundary and follow the selection instead of a sticky earlier boundary', async ({
