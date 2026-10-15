@@ -79,13 +79,37 @@ The check is byte equality, so an identical copy of the same recording is accept
 wherever it is, and a same-name file with other content never is. Relinking neither
 reads the old location nor copies, converts or writes any original.
 
+## Relinking a whole folder
+
+The usual move is a whole directory. While any recording of the open project is
+missing, Media shows **N originals are missing** with **Relink folder…**, which opens
+the dialog without a target (**Relink missing recordings**; files are listed but not
+selectable). A single recording's relink dialog also offers **Search this folder**.
+Either searches the open folder; a typed folder path under **Other location** does
+the same. `POST /api/relink-folder` with `{ directory }` (outside the PasCap cache,
+existing, not a symlink) queues one **Recording relink** job that:
+
+1. Takes every missing video and music recording of the service, in any project, that
+   has a checksum and no queued preparation or relink of its own.
+2. Lists the folder and its subfolders without following symlinks or entering the
+   PasCap cache, keeping only video and music files whose size equals a wanted
+   checksum's size; more than 100,000 media files is refused as too broad.
+3. Hashes those candidates one at a time, same-name files first, skipping any file
+   whose checksum is already found unless it carries a wanted recording's name, and
+   checks each did not change while read.
+4. Gives each recording its same-name copy when its bytes match, otherwise any
+   matching copy, rechecks the file and commits it like a single relink.
+
+The job completes with **Relinked all N missing recordings** or **Relinked n of N …
+Not found: …** (up to five names). If nothing matches it fails with nothing changed.
+Recordings already committed stay relinked if a later commit fails.
+
 ## Limits
 
 - Recordings registered before their first preparation, and every version-1 registry
   entry, have no checksum and must be imported again.
-- Relinking is one recording at a time; there is no folder-wide matching or automatic
-  search.
+- There is no automatic search: the user chooses the recording's copy or the folder.
 - An export queued before a relink keeps its captured old path and fails its identity
   check; export again after relinking.
-- The check reads the whole candidate: about a second per 600 MB from SSD, longer from
-  USB disks or SD cards.
+- The check reads every candidate of a matching size: about a second per 600 MB from
+  SSD, longer from USB disks or SD cards.

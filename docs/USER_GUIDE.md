@@ -40,7 +40,11 @@ changing a mount or disconnecting a drive can fail even with a ready proxy.
 If an original was moved, its Media card shows **Original missing**: choose
 **Relink** (link icon) and pick the moved copy, or type its path under **Other
 location**. Activity checks every byte against the registered original; on a match
-clips, proxy and settings are kept, and a different file is refused. Recordings
+clips, proxy and settings are kept, and a different file is refused. If a whole
+folder moved, choose **Relink folder…** above the Media list (or **Search this
+folder** in any Relink dialog), open the new folder and search it: every missing
+recording found there or in its subfolders is relinked in one Activity job, which
+lists any it did not find. Recordings
 never prepared have no checksum and cannot be relinked: import them again. There is
 no automatic path guessing or search; see [relinking](design/SOURCE_RELINK.md).
 Keep generated data outside footage, and back up originals and saved project/export

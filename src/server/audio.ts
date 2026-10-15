@@ -4,7 +4,7 @@ import { chmod, open, readFile, rename, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { z } from 'zod';
 import { audioAssetSchema, type AudioAsset } from '../shared/audio.js';
-import type { MediaJob } from '../shared/media.js';
+import type { MediaJob, SourceFingerprint } from '../shared/media.js';
 import { idSchema } from '../shared/model.js';
 import { MUSIC_BYTES_PER_SAMPLE, MUSIC_SAMPLE_RATE, MUSIC_SAMPLES_PER_FRAME } from '../shared/music-stream.js';
 import { forEachSerial, whileSerial } from '../shared/serial.js';
@@ -21,6 +21,7 @@ import {
 } from './files.js';
 import { JobQueue, type JobContext } from './jobs.js';
 import { runProcess } from './process.js';
+import type { RelinkCandidate } from './relink.js';
 import { atomicWrite, ensurePrivateDirectory, SerialWriter } from './storage.js';
 
 export const AUDIO_PROFILE = 'pcm16-48k-stereo-mono-unity-v3' as const;
@@ -427,18 +428,8 @@ export class AudioLibrary {
             context.update(0.01 + fraction * 0.97, `Checking every byte of ${sourcePath}`),
           );
           assertNotCancelled(context.signal);
-          await this.#operations.run(async () => {
-            const current = this.#assets.get(id)!;
-            const previous = { name: current.name, sourcePath: current.sourcePath, fingerprint: current.fingerprint };
-            Object.assign(current, { name: path.basename(sourcePath), sourcePath, fingerprint });
-            try {
-              await this.#save();
-            } catch (error) {
-              Object.assign(current, previous);
-              throw error;
-            }
-          });
-          context.update(1, `Relinked to ${sourcePath}`);
+          await this.commitRelink(id, sourcePath, fingerprint);
+          return `Relinked to ${sourcePath}`;
         },
         () => {
           this.#relinking.delete(id);
@@ -447,6 +438,29 @@ export class AudioLibrary {
       );
       this.#relinking.set(id, job.id);
       return Promise.resolve(job);
+    });
+  }
+  /** Missing music with a recorded checksum and no queued work of its own. */
+  async relinkCandidates(): Promise<RelinkCandidate[]> {
+    const missing = new Set(await this.missing());
+    return this.list().flatMap((asset) =>
+      missing.has(asset.id) && asset.content && !this.#relinking.has(asset.id) && !this.#preparing.has(asset.id)
+        ? [{ id: asset.id, name: asset.name, content: asset.content }]
+        : [],
+    );
+  }
+  /** Publishes a location already verified against the recorded checksum. */
+  async commitRelink(id: string, sourcePath: string, fingerprint: SourceFingerprint): Promise<void> {
+    await this.#operations.run(async () => {
+      const current = this.#assets.get(id)!;
+      const previous = { name: current.name, sourcePath: current.sourcePath, fingerprint: current.fingerprint };
+      Object.assign(current, { name: path.basename(sourcePath), sourcePath, fingerprint });
+      try {
+        await this.#save();
+      } catch (error) {
+        Object.assign(current, previous);
+        throw error;
+      }
     });
   }
   async #cachedWaveform(asset: AudioAsset, context: JobContext): Promise<number[] | null> {

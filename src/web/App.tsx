@@ -213,7 +213,7 @@ export function App() {
   const [jobs, setJobs] = useState<MediaJob[]>([]);
   const [audioAssets, setAudioAssets] = useState<AudioAsset[]>([]);
   const [missingOriginals, setMissingOriginals] = useState<ReadonlySet<string>>(new Set());
-  const [relinkTarget, setRelinkTarget] = useState<RelinkTarget | null>(null);
+  const [relinking, setRelinking] = useState<{ target: RelinkTarget | null } | null>(null);
   const [projectList, setProjectList] = useState<ProjectSummary[]>([]);
   const [showProjects, setShowProjects] = useState(false);
   const [showExport, setShowExport] = useState(false);
@@ -1374,23 +1374,27 @@ export function App() {
       refreshAfterAcceptance();
     }
   };
-  const requestRelink = (target: RelinkTarget): void => {
+  const requestRelink = (target: RelinkTarget | null): void => {
     setActionError('');
-    setRelinkTarget(target);
+    setRelinking({ target });
   };
-  const relink = async (path: string): Promise<boolean> => {
-    const target = relinkTarget;
-    if (!target) return false;
-    const result = await act(() =>
-      target.kind === 'video' ? api.relinkMedia(target.id, path) : api.relinkAudio(target.id, path),
-    );
+  const queueRelink = async (submit: () => Promise<{ job: MediaJob }>): Promise<boolean> => {
+    const result = await act(submit);
     if (!result.ok) return false;
     receiveJob(result.value.job);
     refreshAfterAcceptance();
-    setRelinkTarget(null);
+    setRelinking(null);
     setShowActivity(true);
     return true;
   };
+  const relink = (path: string): Promise<boolean> => {
+    const target = relinking?.target;
+    if (!target) return Promise.resolve(false);
+    return queueRelink(() =>
+      target.kind === 'video' ? api.relinkMedia(target.id, path) : api.relinkAudio(target.id, path),
+    );
+  };
+  const relinkFolder = (directory: string): Promise<boolean> => queueRelink(() => api.relinkFolder(directory));
   const importOriginals = async (operation: () => ReturnType<typeof api.importFolder>): Promise<ImportResult> => {
     const failed: ImportResult = {
       ok: false,
@@ -2205,14 +2209,14 @@ export function App() {
               onClose={closeImport}
             />
           )}
-          {relinkTarget !== null && (
+          {relinking !== null && (
             <ImportDialog
-              initialKind={relinkTarget.kind}
+              initialKind={relinking.target?.kind ?? 'all'}
               busy={busy || connection.state !== 'ready'}
               error={actionError}
               actions={importActions}
-              relink={{ target: relinkTarget, onRelink: relink }}
-              onClose={() => setRelinkTarget(null)}
+              relink={{ target: relinking.target, onRelink: relink, onRelinkFolder: relinkFolder }}
+              onClose={() => setRelinking(null)}
             />
           )}
           {showRecovery && (
