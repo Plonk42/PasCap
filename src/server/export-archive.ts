@@ -109,11 +109,11 @@ function parseReceipt(raw: unknown): z.infer<typeof receiptSchema> | null {
     typeof snapshot === 'object' && snapshot !== null && 'schemaVersion' in snapshot
       ? snapshot.schemaVersion
       : undefined;
-  if (rawVersion !== 20) {
+  if (rawVersion !== 21) {
     const version =
       typeof rawVersion === 'string' || typeof rawVersion === 'number' ? String(rawVersion) : 'missing or invalid';
     throw new Error(
-      `Unsupported export snapshot schema version ${version}; this build requires version 20. The existing receipt and successful output were not changed.`,
+      `Unsupported export snapshot schema version ${version}; this build requires version 21. The existing receipt and successful output were not changed.`,
     );
   }
   const parsed = receiptSchema.safeParse(raw);

@@ -22,6 +22,7 @@ export const colourSchema = z
     highlights: z.number().min(-1).max(1),
     shadows: z.number().min(-1).max(1),
     whites: z.number().min(-1).max(1),
+    blacks: z.number().min(-1).max(1),
     hdr: z.number().min(0).max(1),
     hsl: hslSchema,
     curves: curvesSchema,
@@ -42,6 +43,7 @@ export function createColourSettings(): ColourSettings {
     highlights: 0,
     shadows: 0,
     whites: 0,
+    blacks: 0,
     hdr: 0,
     hsl: createHslSettings(),
     curves: createColourCurves(),
@@ -68,10 +70,11 @@ export const COLOUR_CONTROLS = [
   { key: 'highlights', label: 'Highlights', min: -1, max: 1, step: 0.01, unit: '' },
   { key: 'shadows', label: 'Shadows', min: -1, max: 1, step: 0.01, unit: '' },
   { key: 'whites', label: 'Whites', min: -1, max: 1, step: 0.01, unit: '' },
+  { key: 'blacks', label: 'Blacks', min: -1, max: 1, step: 0.01, unit: '' },
   { key: 'hdr', label: 'HDR', min: 0, max: 1, step: 0.01, unit: '' },
 ] as const;
 export type ScalarColourSetting = (typeof COLOUR_CONTROLS)[number]['key'];
-/** Only the ten numeric channels, never static structured settings. */
+/** Only the scalar numeric channels, never static structured settings. */
 export function scalarColourValues(settings: ColourSettings): Record<ScalarColourSetting, number> {
   return Object.fromEntries(COLOUR_CONTROLS.map(({ key }) => [key, settings[key]])) as Record<
     ScalarColourSetting,
@@ -158,9 +161,9 @@ function compileScalarGrade(
 ): (linearRed: number, linearGreen: number, linearBlue: number, out: Float64Array) => void {
   const [redGain, greenGain, blueGain] = temperatureTintGains(settings);
   const exposure = 2 ** settings.exposure;
-  const { contrast, brightness, saturation, shadows, highlights, whites } = settings;
-  const tonal = contrast !== 1 || brightness !== 0 || shadows !== 0 || highlights !== 0 || whites !== 0;
-  const blackGain = (2 - contrast) * (1 + 2 * brightness) * (1 + shadows);
+  const { contrast, brightness, saturation, shadows, highlights, whites, blacks } = settings;
+  const tonal = contrast !== 1 || brightness !== 0 || shadows !== 0 || highlights !== 0 || whites !== 0 || blacks !== 0;
+  const blackGain = blacks < 0 ? 0 : (2 - contrast) * (1 + 2 * brightness) * (1 + shadows);
   const angle = (settings.hue * Math.PI) / 180;
   const cos = Math.cos(angle);
   const sin = Math.sin(angle);
@@ -170,11 +173,16 @@ function compileScalarGrade(
     const baseBlue = linearBlue * blueGain * exposure;
     const y = clamp01(0.2126 * baseRed + 0.7152 * baseGreen + 0.0722 * baseBlue);
     let gain = 1;
-    if (tonal && y > 0) gain = decode709(toneCurve(encode709(y), settings)) / y;
-    else if (tonal) gain = blackGain;
-    const toneRed = baseRed * gain;
-    const toneGreen = baseGreen * gain;
-    const toneBlue = baseBlue * gain;
+    let lift = 0;
+    if (tonal) {
+      let toned = toneCurve(encode709(y), settings);
+      if (blacks < 0) toned = Math.max(0, blacksCurve(toned, blacks));
+      gain = y > 0 ? decode709(toned) / y : blackGain;
+      if (blacks > 0) lift = decode709(blacksCurve(toned, blacks)) - decode709(toned);
+    }
+    const toneRed = baseRed * gain + lift;
+    const toneGreen = baseGreen * gain + lift;
+    const toneBlue = baseBlue * gain + lift;
     const luminance = 0.2126 * toneRed + 0.7152 * toneGreen + 0.0722 * toneBlue;
     const cb = (toneBlue - luminance) / 1.8556;
     const cr = (toneRed - luminance) / 1.5748;
@@ -201,6 +209,11 @@ function toneCurve(v: number, settings: ColourSettings): number {
   v += shadows * v * (1 - v) ** 2;
   v += highlights * v * v * (1 - v) + Math.min(highlights, 0) * HIGHLIGHTS_WHITE * v ** 3;
   return v + whites * WHITES_RANGE * v ** 4;
+}
+/** Blacks moves black by this much (encoded) at ±1: lowered as a gain that crushes, raised as an added lift. */
+export const BLACKS_RANGE = 0.25;
+function blacksCurve(v: number, blacks: number): number {
+  return v + blacks * BLACKS_RANGE * (1 - v) ** 4;
 }
 
 export function isNeutralColour(settings: ColourSettings): boolean {

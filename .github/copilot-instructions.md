@@ -88,7 +88,7 @@ PasCap is a solo, pre-release project: optimize for fast iteration. Details are 
   source frames (presets such as Ramp up replace its keyframes). A clip's duration
   depends only on its own speed and source range, never its track, start or Ripple
   position; there is no track Speed channel.
-- #171 (schema 20): every clip requires boolean `reverse` (Clip → Speed checkbox), a
+- #171 (schema 21): every clip requires boolean `reverse` (Clip → Speed checkbox), a
   direction, not a negative rate. The retiming map mirrors forward output time, so
   duration and speed-keyframe footage are unchanged. Timeline edits act on the clip as
   displayed (left handle/Q trim source OUT; split/cut pieces stay reversed). Preview
@@ -105,7 +105,7 @@ PasCap is a solo, pre-release project: optimize for fast iteration. Details are 
   channel is nonnull (zero is enabled), sharing the central off-duration inspection cursor. Each expanded
   section has one keyframe line (count, one Previous/Next pair over the same set, Reset), hidden
   while collapsed. Colour and Transform each end with their own stored keyframe list (same
-  row pattern via one shared `StoredKeyframeList`); there is no separate Keyframes section. The pair: Colour visits Opacity/ten scalar
+  row pattern via one shared `StoredKeyframeList`); there is no separate Keyframes section. The pair: Colour visits Opacity/eleven scalar
   colour/HDR keyframes; Speed visits **all retained custom speed source keyframes of the
   selected clip**, including off-trim keyframes and original exclusive OUT; Speed's
   single setting has no extra per-setting arrows beside its diamond. Clip source navigation
@@ -119,12 +119,13 @@ PasCap is a solo, pre-release project: optimize for fast iteration. Details are 
   Navigation never edits,
   saves or creates history. See [speed/audio](../docs/SPEED_AND_AUDIO.md) and
   [spatial transforms](../docs/design/SPATIAL_TRANSFORMS.md).
-- Strict schema 20 (#143) requires project `bookmarks`: 0–1,000 unique ascending project
+- Strict schema 21 (#143) requires project `bookmarks`: 0–1,000 unique ascending project
   frames, `[]` on new projects. They are extra `snapPoints()` for every snapping gesture,
   slide through `useKeyframeSlide` (a dragged bookmark never snaps to itself) and never
   retime, render or export. See [timeline](../docs/TIMELINE_EDITING.md).
-- Strict schema 20 requires complete row Colour with ten graded scalar fields
-  (including #184 `whites`, −1…1, a white-point tone stage after Highlights),
+- Strict schema 21 requires complete row Colour with eleven graded scalar fields
+  (including #184 `whites`, −1…1, a white-point tone stage after Highlights, and `blacks`,
+  −1…1, a black-point tone stage after Whites; raised it adds a matte lift),
   `hdr`, `colour.hsl` (eight complete named bands) and `colour.curves` (master/red/green/blue
   2–16-point arrays). HSL/curves remain static, not animation channels. All Colour
   is row-owned, keyed or not; clips have no colour/correction. Neutral creators
@@ -145,7 +146,7 @@ PasCap is a solo, pre-release project: optimize for fast iteration. Details are 
   explicit capture, row ownership, empty-row editing and one-step gestures.
   Compare bypasses all Colour, including Temperature/Tint, and clip Detail, never coverage or geometry.
   See [Temperature and Tint](../docs/design/TEMPERATURE_AND_TINT.md).
-- Owner-approved #70: required row `colour` contains all ten scalar SDR channels,
+- Owner-approved #70: required row `colour` contains all eleven scalar SDR channels,
   neutral on new rows, with sole row `opacity` initially 1. Reject saved
   `clip.colour`, `clip.correction` and missing row colour. Static and keyed Colour
   have identical row ownership; different treatments require different rows.
@@ -156,7 +157,7 @@ PasCap is a solo, pre-release project: optimize for fast iteration. Details are 
   row bases and absolute points, without per-clip colour copies. HSL and curves
   retain that ownership, as do Temperature and Tint.
   See [row appearance](../docs/design/ROW_APPEARANCE.md).
-- Owner-approved #131 (schema 20): Transform is **track-owned, exactly like Colour**.
+- Owner-approved #131 (schema 21): Transform is **track-owned, exactly like Colour**.
   Every video track requires strict `transform: { base, keyframes }`; clips have no
   `spatial` field. Eight complete pose values and 0–256 ascending absolute project-frame
   keys `{ frame, values, easing, reset }`; each key enables any of the eight settings
@@ -193,7 +194,7 @@ clarity −1–1, denoise 0–1 }`, neutral 0, with no keyframes or track channe
   Compare bypasses Colour and Detail. Clip → Detail is the third section, collapsed
   by default, with live slider preview and one Undo per release. See
   [detail filters](../docs/design/DETAIL_FILTERS.md).
-- Track Colour **HDR** (`colour.hdr` 0–1, twelfth keyframe channel `hdr`) is an SDR
+- Track Colour **HDR** (`colour.hdr` 0–1, thirteenth keyframe channel `hdr`) is an SDR
   local tone-mapping look evaluated at project time but applied in the shared detail
   kernel on source taps before grading (Denoise → HDR → Clarity → Sharpen), excluded
   from the per-pixel grade and LUT identity; nonzero or keyed HDR needs composited
@@ -201,9 +202,9 @@ clarity −1–1, denoise 0–1 }`, neutral 0, with no keyframes or track channe
 - Final approved [#67](https://github.com/Plonk42/PasCap/issues/67): **Opacity** is
   one row-owned setting, not a clip setting. `VideoLayer.opacity` is a required
   number in 0–1; new tracks start at 1 (100%). No saved `clip.opacity` field.
-  The sole row Opacity key channel is `opacity`; points require all twelve nullable
+  The sole row Opacity key channel is `opacity`; points require all thirteen nullable
   channels: `opacity`, `temperature`, `tint`, `exposure`, `brightness`,
-  `contrast`, `hue`, `saturation`, `highlights`, `shadows`, `whites`, `hdr`. Reject missing row opacity,
+  `contrast`, `hue`, `saturation`, `highlights`, `shadows`, `whites`, `blacks`, `hdr`. Reject missing row opacity,
   saved `clip.opacity` and old `clipOpacity`/`layerOpacity` channels; do not supply
   compatibility defaults. `layer.opacity` is the valid sole stored row value.
   Put the single **Opacity** slider/diamond/navigation in **Track → Colour** beside
@@ -221,15 +222,15 @@ clarity −1–1, denoise 0–1 }`, neutral 0, with no keyframes or track channe
   $\mathrm{result} = C + \mathrm{lower}(1 - A)$, evaluating row Opacity for each
   source with no additional layer multiplier; $m_i$ is spatial source coverage,
   including opaque neutral letterboxing. Black fades never reduce that coverage.
-  Version-1 export receipts require strict v20 snapshots and captured audio-source/
+  Version-1 export receipts require strict v21 snapshots and captured audio-source/
   instance-plan arrays; receipt, registry/proxy/PCM and benchmark format versions
   remain independent and unchanged.
-  Reject and preserve incompatible v1–v19 projects/receipt snapshots; require recreation,
+  Reject and preserve incompatible v1–v20 projects/receipt snapshots; require recreation,
   without migrations, compatibility defaults or automatic deletion.
 - Owner-approved #135/#87: track and Transform keyframes store one Easing per enabled
   setting (`easing` mirrors `values`); a joining setting adopts the Easing its keyframe's
   settings agree on, else Linear. Track keyframes require boolean `reset`: a **default
-  keyframe** (`reset: true`, created with all twelve settings neutral and Hold Easing)
+  keyframe** (`reset: true`, created with all thirteen settings neutral and Hold Easing)
   never reaches back, so a setting whose first keyframe it is keeps its unkeyed value before
   it. Toggle **Add default keyframe** in the Colour keyframe line; amber filled marker.
   Transform keyframes carry the same `reset` flag (own toggle in the Transform line). See
