@@ -16,7 +16,13 @@ import { renderReference, validateReference } from '../../src/server/reference.j
 import { ProjectStore } from '../../src/server/storage.js';
 import { HSL_BANDS, evaluateColourCurve } from '../../src/shared/advanced-colour.js';
 import { audioAssetSchema, type AudioAsset } from '../../src/shared/audio.js';
-import { COLOUR_CONTROLS, NEUTRAL_COLOUR, createColourSettings, scalarColourValues } from '../../src/shared/colour.js';
+import {
+  COLOUR_CONTROLS,
+  LOCAL_TONE_SETTINGS,
+  NEUTRAL_COLOUR,
+  createColourSettings,
+  scalarColourValues,
+} from '../../src/shared/colour.js';
 import { compositePixel } from '../../src/shared/composition.js';
 import { estimateExportSpace } from '../../src/shared/export-space.js';
 import {
@@ -511,10 +517,10 @@ describe.skipIf(!enabled)('current-schema layered native export · disposable sy
         exposure: -0.3,
         brightness: 0.015,
         hue: -20,
-        shadows: 0.2,
+        blacks: 0.2,
       }),
-      point(6, { opacity: 0.85, exposure: 0.25, brightness: 0.06, hue: 20, shadows: -0.1 }, 'smooth'),
-      point(14, { opacity: 0.55, exposure: -0.1, brightness: 0.025, hue: -5, shadows: 0.1 }, 'hold'),
+      point(6, { opacity: 0.85, exposure: 0.25, brightness: 0.06, hue: 20, blacks: -0.1 }, 'smooth'),
+      point(14, { opacity: 0.55, exposure: -0.1, brightness: 0.025, hue: -5, blacks: 0.1 }, 'hold'),
     ];
     const packedLeft = { ...createClip('packed-left', assets[0]!.id, 2, 8, packed.id), start: 2 };
     const packedRight = createClip('packed-right', assets[1]!.id, 8, 14, packed.id);
@@ -534,7 +540,7 @@ describe.skipIf(!enabled)('current-schema layered native export · disposable sy
         { frame: 14, rate: 1.5, interpolation: 'hold' },
       ],
     };
-    packed.colour = { ...NEUTRAL_COLOUR, contrast: 0.9, saturation: 0.8, highlights: -0.2 };
+    packed.colour = { ...NEUTRAL_COLOUR, contrast: 0.9, saturation: 0.8, whites: -0.2 };
     packed.transitions = [{ leftId: packedLeft.id, rightId: packedRight.id, type: 'cross-dissolve', duration: 2 }];
     project.layers = [packed];
     project.clips = [packedLeft, packedRight];
@@ -559,7 +565,7 @@ describe.skipIf(!enabled)('current-schema layered native export · disposable sy
       ...createClip('positioned-right', assets[0]!.id, 11, 15, positioned.id),
       start: overlap.start,
     };
-    positioned.colour = { ...NEUTRAL_COLOUR, brightness: 0.025, contrast: 1.1, saturation: 0.7, shadows: 0.2 };
+    positioned.colour = { ...NEUTRAL_COLOUR, brightness: 0.025, contrast: 1.1, saturation: 0.7, blacks: 0.2 };
     const afterGap = {
       ...createClip('after-gap', assets[1]!.id, 17, 19, positioned.id),
       start: positionedRight.start + 6,
@@ -896,8 +902,6 @@ describe.skipIf(!enabled)('current-schema layered native export · disposable sy
           hue: -25,
           saturation: 0.7,
           vibrance: 0.3,
-          highlights: 0.1,
-          shadows: 0.2,
           whites: -0.4,
           blacks: -0.2,
         },
@@ -913,29 +917,30 @@ describe.skipIf(!enabled)('current-schema layered native export · disposable sy
           hue: 30,
           saturation: 1.2,
           vibrance: -0.25,
-          highlights: -0.35,
+          whites: -0.35,
         },
         'ease-out',
       ),
-      point(12, { opacity: 0.4, brightness: 0.06, contrast: 1.25, shadows: -0.1, tint: -0.7 }),
-      point(18, { opacity: 0.9, shadows: 0.15, highlights: 0.2, whites: 0.3, blacks: 0.15 }, 'hold'),
+      point(12, { opacity: 0.4, brightness: 0.06, contrast: 1.25, blacks: -0.1, tint: -0.7 }),
+      point(18, { opacity: 0.9, whites: 0.3, blacks: 0.15 }, 'hold'),
     ];
     project.layers[1]!.keyframes = [
-      point(0, { opacity: 0.2, hue: 40, highlights: -0.3, tint: -0.5 }, 'ease-in'),
-      point(6, { opacity: 0.85, exposure: 0.2, shadows: 0.15, temperature: 0.8 }, 'smooth'),
-      point(10, { opacity: 0.8, hue: -35, exposure: 0.4, highlights: -0.1, tint: 0.65 }, 'smooth'),
-      point(24, { opacity: 0.45, hue: 15, shadows: -0.2, temperature: -0.6 }, 'hold'),
+      point(0, { opacity: 0.2, hue: 40, whites: -0.3, tint: -0.5 }, 'ease-in'),
+      point(6, { opacity: 0.85, exposure: 0.2, blacks: 0.15, temperature: 0.8 }, 'smooth'),
+      point(10, { opacity: 0.8, hue: -35, exposure: 0.4, whites: -0.1, tint: 0.65 }, 'smooth'),
+      point(24, { opacity: 0.45, hue: 15, blacks: -0.2, temperature: -0.6 }, 'hold'),
     ];
     project.layers[2]!.keyframes = [
       point(0, { brightness: 0.08, hue: -15, temperature: -0.7, tint: 0.8 }, 'ease-out'),
       point(
         12,
-        { exposure: -0.2, shadows: 0.4, saturation: 1.3, brightness: -0.02, hue: 40, temperature: 0.5, tint: -0.6 },
+        { exposure: -0.2, blacks: 0.4, saturation: 1.3, brightness: -0.02, hue: 40, temperature: 0.5, tint: -0.6 },
         'hold',
       ),
     ];
-    // HDR is a source-tap stage, covered by tests/media/spatial-transforms.test.ts.
-    for (const { key } of COLOUR_CONTROLS.filter((control) => control.key !== 'hdr')) {
+    // Shadows, Highlights and HDR are source-tap stages, covered by tests/media/spatial-transforms.test.ts.
+    const local: readonly string[] = LOCAL_TONE_SETTINGS;
+    for (const { key } of COLOUR_CONTROLS.filter((control) => !local.includes(control.key))) {
       expect(hasLayerKeys(project.layers[0]!, key)).toBe(true);
       expect(
         project.layers[0]!.keyframes.filter((keyframe) => keyframe.values[key] !== null).length,
@@ -947,7 +952,7 @@ describe.skipIf(!enabled)('current-schema layered native export · disposable sy
     right.speed = { mode: 'constant', rate: 2 };
     // A reversed dissolve source decodes through the chunked reverse path.
     right.reverse = true;
-    project.layers[0]!.colour = { ...NEUTRAL_COLOUR, exposure: 0.2, brightness: 0.015, shadows: 0.05 };
+    project.layers[0]!.colour = { ...NEUTRAL_COLOUR, exposure: 0.2, brightness: 0.015, blacks: 0.05 };
     project.clips = [left, right];
     project.layers[0]!.transitions = [{ leftId: left.id, rightId: right.id, type: 'cross-dissolve', duration: 2 }];
     project.layers[0]!.openingFade = 1;
@@ -1165,7 +1170,7 @@ describe.skipIf(!enabled)('current-schema layered native export · disposable sy
       exposure: 0.2,
       brightness: 0.02,
       hue: -30,
-      shadows: 0.2,
+      blacks: 0.2,
     };
     project.layers[1]!.colour = { ...NEUTRAL_COLOUR, temperature: -0.7, tint: 0.9 };
     project.layers[1]!.keyframes = [point(0, { opacity: 0.2 }), point(4, { opacity: 0.9 }, 'hold')];
@@ -1249,15 +1254,15 @@ describe.skipIf(!enabled)('current-schema layered native export · disposable sy
     project.layers[0]!.openingFade = 1;
     project.layers[0]!.closingFade = 1;
     project.layers[0]!.keyframes = [
-      point(0, { brightness: 0.05, shadows: 0.5 }),
+      point(0, { brightness: 0.05, blacks: 0.5 }),
       point(3, { exposure: -0.2 }),
-      point(6, { brightness: 0.1, exposure: 0.5, hue: 25, shadows: 0.3 }, 'hold'),
+      point(6, { brightness: 0.1, exposure: 0.5, hue: 25, blacks: 0.3 }, 'hold'),
     ];
     project.layers.find((row) => row.id === project.clips[2]!.layerId)!.colour = {
       ...NEUTRAL_COLOUR,
       brightness: 0.1,
       exposure: 0.4,
-      highlights: -0.2,
+      whites: -0.2,
     };
     const spawnOffset = vi.mocked(spawn).mock.calls.length;
     const result = await complete(project);
@@ -1400,7 +1405,7 @@ describe.skipIf(!enabled)('current-schema layered native export · disposable sy
     project.layers.push(layer('video-3'));
     project.clips[0]!.mediaId = uhd.id;
     project.layers[0]!.opacity = 0.8;
-    project.layers[0]!.colour = { ...NEUTRAL_COLOUR, exposure: 0.15, shadows: 0.25 };
+    project.layers[0]!.colour = { ...NEUTRAL_COLOUR, exposure: 0.15, blacks: 0.25 };
     project.layers[1]!.keyframes = [point(1, { opacity: 0.7 }), point(2, { opacity: 0.3 }, 'hold')];
     project.layers[2]!.opacity = 0.6;
     const top = { ...createClip('uhd-top', assets[1]!.id, 4, 5), layerId: 'video-3', start: 2 };

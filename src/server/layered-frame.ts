@@ -4,6 +4,7 @@ import {
   colourSchema,
   compileGradeInto,
   isNeutralAdvancedColour,
+  isNeutralLocalTone,
   type ColourSettings,
   type PixelGrade,
 } from '../shared/colour.js';
@@ -11,9 +12,11 @@ import {
   compileDetail,
   detailSchema,
   isNeutralDetail,
+  localTone,
   type DetailFilter,
   type DetailSampler,
   type DetailSettings,
+  type LocalTone,
 } from '../shared/detail.js';
 import { forEachSerial } from '../shared/serial.js';
 import { compileSpatialMapping, type SpatialMapping } from '../shared/spatial.js';
@@ -41,10 +44,10 @@ export interface FrameSource {
   lut: Float32Array | null;
   /** Nonneutral HSL/curves grade exactly per pixel instead of through the LUT. */
   exactColour: ColourSettings | null;
-  /** Clip Sharpen/Clarity/Denoise applied to source taps before grading; null when they and HDR are neutral. */
+  /** Clip Sharpen/Clarity/Denoise applied to source taps before grading; null when they and local tone are neutral. */
   detail: DetailSettings | null;
-  /** Evaluated track Colour HDR amount, a neighbourhood stage of the same detail kernel. */
-  hdr: number;
+  /** Evaluated track Colour Shadows/Highlights/HDR (and Exposure), neighbourhood stages of the same kernel. */
+  tone: LocalTone;
   multiplier: number;
   coverage: number;
   mapping: SpatialMapping;
@@ -213,8 +216,8 @@ async function prepareSources(
     validateBounds(source.bounds, target);
     // Validate and choose the grading path once per source/frame, never per pixel.
     const evaluated = colourSchema.parse(source.sample.colour);
-    // HDR runs in the detail stage: keep it out of LUT identity so animation reuses one LUT.
-    const colour = { ...evaluated, hdr: 0 };
+    // Local tone runs in the detail stage: keep it out of LUT identity so animation reuses one LUT.
+    const colour = { ...evaluated, shadows: 0, highlights: 0, hdr: 0 };
     const exactColour = isNeutralAdvancedColour(colour) ? null : colour;
     const mapping = compileSpatialMapping(
       source.sample.spatial,
@@ -229,8 +232,10 @@ async function prepareSources(
       lut: exactColour ? null : await cache.get(colour, signal, pool), // NOSONAR -- two borrowed slots, never parallel LUT builds.
       exactColour,
       detail:
-        isNeutralDetail(source.sample.detail) && evaluated.hdr === 0 ? null : detailSchema.parse(source.sample.detail),
-      hdr: evaluated.hdr,
+        isNeutralDetail(source.sample.detail) && isNeutralLocalTone(evaluated)
+          ? null
+          : detailSchema.parse(source.sample.detail),
+      tone: localTone(evaluated),
       multiplier: source.sample.opacity * source.sample.blendWeight * source.sample.brightness * 65535,
       coverage: source.sample.opacity * source.sample.blendWeight,
       mapping,
@@ -272,7 +277,7 @@ export function composeRows(
       ...source,
       exactColour: source.exactColour ? compileGradeInto(source.exactColour) : null,
       detail: source.detail
-        ? compileDetail(source.detail, source.mapping.fittedWidth / source.mapping.fittedHeight, source.hdr)
+        ? compileDetail(source.detail, source.mapping.fittedWidth / source.mapping.fittedHeight, source.tone)
         : null,
       sampler: (u, v, out) => {
         sampleFitted(source, u, v, sampled);

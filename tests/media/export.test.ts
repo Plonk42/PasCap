@@ -488,8 +488,8 @@ describe.skipIf(!enabled)('production native export · opt-in disposable media o
         contrast: 1.05,
         saturation: 0.9,
         hue: 7,
-        highlights: -0.1,
-        shadows: 0.08,
+        whites: -0.1,
+        blacks: 0.08,
       };
       project.layers[0]!.openingFade = 1;
       project.layers[0]!.closingFade = 1;
@@ -528,7 +528,7 @@ describe.skipIf(!enabled)('production native export · opt-in disposable media o
     project.layers[0]!.colour = {
       ...NEUTRAL_COLOUR,
       contrast: 1.05,
-      shadows: 0.05,
+      blacks: 0.05,
       hue: 10,
       exposure: 0.2,
       brightness: 0.04,
@@ -682,7 +682,7 @@ describe.skipIf(!enabled)('production native export · opt-in disposable media o
   it('renders a few genuine UHD frames, grading before output-frame one-frame black fades', async () => {
     const project = document(6);
     project.clips[0]!.speed = { mode: 'constant', rate: 2 };
-    project.layers[0]!.colour = { ...NEUTRAL_COLOUR, brightness: 0.1, shadows: 0.25 };
+    project.layers[0]!.colour = { ...NEUTRAL_COLOUR, brightness: 0.1, blacks: 0.25 };
     project.layers[0]!.openingFade = 1;
     project.layers[0]!.closingFade = 1;
     const result = await completed(project, 'final4k');

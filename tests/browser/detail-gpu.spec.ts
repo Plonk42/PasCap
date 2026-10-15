@@ -2,8 +2,8 @@ import { expect, test } from '@playwright/test';
 import { fileURLToPath } from 'node:url';
 import { build } from 'vite';
 import type { CompositeClip } from '../../src/preview/compositor.js';
-import { NEUTRAL_COLOUR, type RGB } from '../../src/shared/colour.js';
-import { compileDetail, type DetailSettings } from '../../src/shared/detail.js';
+import { gradePixel, NEUTRAL_COLOUR, type ColourSettings, type RGB } from '../../src/shared/colour.js';
+import { compileDetail, localTone, type DetailSettings } from '../../src/shared/detail.js';
 import { NEUTRAL_SPATIAL_POSE, type SpatialPose } from '../../src/shared/spatial.js';
 
 // Real compositor bundled in memory: no editor, fixtures, media, saved project or API writes.
@@ -64,10 +64,14 @@ function bilinear(u: number, t: number, out: Float64Array): void {
       (at(x, y + 1, channel) * (1 - dx) + at(x + 1, y + 1, channel) * dx) * dy;
 }
 
-function clip(detail: DetailSettings, pose: Partial<SpatialPose> = {}, hdr = 0): CompositeClip {
+function clip(
+  detail: DetailSettings,
+  pose: Partial<SpatialPose> = {},
+  tone: Partial<Pick<ColourSettings, 'shadows' | 'highlights' | 'hdr' | 'exposure'>> = {},
+): CompositeClip {
   return {
     slot: 0,
-    settings: { ...NEUTRAL_COLOUR, hdr },
+    settings: { ...NEUTRAL_COLOUR, ...tone },
     aspect: textureWidth / textureHeight,
     spatial: { ...NEUTRAL_SPATIAL_POSE, ...pose },
     detail,
@@ -79,7 +83,7 @@ function clip(detail: DetailSettings, pose: Partial<SpatialPose> = {}, hdr = 0):
   };
 }
 
-/** Independent CPU expectation: shared detail kernel on a bilinear sampler, neutral grade, opaque source. */
+/** Independent CPU expectation: shared detail kernel on a bilinear sampler, then the grade, opaque source. */
 function expected(source: CompositeClip, x: number, y: number, width: number, height: number): RGB {
   const pose = source.spatial;
   let u = (x + 0.5) / width;
@@ -95,10 +99,10 @@ function expected(source: CompositeClip, x: number, y: number, width: number, he
   }
   const out = new Float64Array(3);
   const sampler = (su: number, sv: number, target: Float64Array): void => bilinear(su, 1 - sv, target);
-  const filter = compileDetail(source.detail, source.originalWidth / source.originalHeight, source.settings.hdr);
+  const filter = compileDetail(source.detail, source.originalWidth / source.originalHeight, localTone(source.settings));
   if (filter) filter.apply(sampler, u, v, out);
   else sampler(u, v, out);
-  return [out[0]!, out[1]!, out[2]!];
+  return gradePixel([out[0]!, out[1]!, out[2]!], source.settings);
 }
 
 const cases: { name: string; source: CompositeClip }[] = [
@@ -110,10 +114,22 @@ const cases: { name: string; source: CompositeClip }[] = [
     name: 'all three on a rotated, scaled clip',
     source: clip({ sharpen: 0.5, clarity: 0.4, denoise: 0.5 }, { scale: 0.83, rotation: 17 }),
   },
-  { name: 'track HDR', source: clip({ sharpen: 0, clarity: 0, denoise: 0 }, {}, 0.8) },
+  { name: 'track HDR', source: clip({ sharpen: 0, clarity: 0, denoise: 0 }, {}, { hdr: 0.8 }) },
   {
     name: 'track HDR with all three on a rotated, scaled clip',
-    source: clip({ sharpen: 0.5, clarity: 0.4, denoise: 0.5 }, { scale: 0.83, rotation: 17 }, 0.6),
+    source: clip({ sharpen: 0.5, clarity: 0.4, denoise: 0.5 }, { scale: 0.83, rotation: 17 }, { hdr: 0.6 }),
+  },
+  {
+    name: 'track Shadows and Highlights',
+    source: clip({ sharpen: 0, clarity: 0, denoise: 0 }, {}, { shadows: 0.9, highlights: -0.8 }),
+  },
+  {
+    name: 'track Shadows, Highlights, HDR and Exposure with all three on a rotated, scaled clip',
+    source: clip(
+      { sharpen: 0.5, clarity: 0.4, denoise: 0.5 },
+      { scale: 0.83, rotation: 17 },
+      { shadows: -0.7, highlights: 0.6, hdr: 0.4, exposure: -0.5 },
+    ),
   },
 ];
 
@@ -124,7 +140,7 @@ for (const [width, height] of [
   test(`detail filters agree with the shared CPU kernel on the GPU at ${width}×${height}`, async ({
     page,
   }, testInfo) => {
-    if (width === 3840) test.setTimeout(90_000);
+    if (width === 3840) test.setTimeout(180_000);
     await page.route('**/*', (route) =>
       route.fulfill({ contentType: 'text/html', body: '<!doctype html><title>Synthetic GPU only</title>' }),
     );
@@ -201,7 +217,7 @@ for (const [width, height] of [
     for (const item of cases) {
       const unfiltered = {
         ...item.source,
-        settings: { ...item.source.settings, hdr: 0 },
+        settings: { ...item.source.settings, shadows: 0, highlights: 0, hdr: 0 },
         detail: { sharpen: 0, clarity: 0, denoise: 0 },
       };
       const change = Math.max(

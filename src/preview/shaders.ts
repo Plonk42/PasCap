@@ -5,12 +5,17 @@ import {
   DETAIL_WIDE_TAPS,
   HDR_COMPRESSION,
   HDR_DETAIL_GAIN,
-  HDR_RANGE_FACTOR,
+  TONE_BASE_GUIDE_TAPS,
+  TONE_BASE_RANGE_FACTOR,
   HDR_RATIO_FLOOR,
-  HDR_TAPS,
+  TONE_BASE_TAPS,
+  LOCAL_TONE_FLOOR,
+  LOCAL_TONE_RANGE,
+  LOCAL_TONE_SLOPE,
+  MID_GREY_STOPS,
   SHARPEN_GAIN,
 } from '../shared/detail.js';
-import { BLACKS_RANGE, HIGHLIGHTS_WHITE, WHITES_RANGE } from '../shared/colour.js';
+import { BLACKS_RANGE, WHITES_RANGE } from '../shared/colour.js';
 
 export const vertexShader = `#version 300 es
 precision highp float;
@@ -78,22 +83,29 @@ ${glslFloatArray(
   DETAIL_WIDE_TAPS.map((tap) => tap.weight),
 )}
 ${glslVec2Array('detailClarity', DETAIL_CLARITY_TAPS)}
-${glslVec2Array('hdrTaps', HDR_TAPS)}
+${glslVec2Array('toneBaseTaps', TONE_BASE_TAPS)}
 ${glslFloatArray(
-  'hdrWeight',
-  HDR_TAPS.map((tap) => tap.weight),
+  'toneBaseWeight',
+  TONE_BASE_TAPS.map((tap) => tap.weight),
 )}
-vec3 hdrTone(sampler2D source, vec2 coordinate, vec3 rgb, float y, float amount, vec2 stride) {
-  float sum = y;
-  float total = 1.0;
-  for (int i = 0; i < ${HDR_TAPS.length}; i++) {
-    float level = dot(texture(source, coordinate + hdrTaps[i] * stride).rgb, luma);
-    float difference = level - y;
-    float weight = hdrWeight[i] * exp(-difference * difference * ${glslFloat(HDR_RANGE_FACTOR)});
-    sum += weight * level;
+float toneBase(sampler2D source, vec2 coordinate, float y, vec2 stride) {
+  float levels[${TONE_BASE_TAPS.length}];
+  float guide = y;
+  for (int i = 0; i < ${TONE_BASE_TAPS.length}; i++) {
+    levels[i] = dot(texture(source, coordinate + toneBaseTaps[i] * stride).rgb, luma);
+    if (i < ${TONE_BASE_GUIDE_TAPS}) guide += levels[i];
+  }
+  guide /= ${glslFloat(TONE_BASE_GUIDE_TAPS + 1)};
+  float total = exp(-(y - guide) * (y - guide) * ${glslFloat(TONE_BASE_RANGE_FACTOR)});
+  float sum = total * y;
+  for (int i = 0; i < ${TONE_BASE_TAPS.length}; i++) {
+    float weight = toneBaseWeight[i] * exp(-(levels[i] - guide) * (levels[i] - guide) * ${glslFloat(TONE_BASE_RANGE_FACTOR)});
+    sum += weight * levels[i];
     total += weight;
   }
-  float base = sum / total;
+  return sum / total;
+}
+vec3 hdrTone(vec3 rgb, float y, float base, float amount) {
   float target = base + ${glslFloat(HDR_COMPRESSION)} * amount * base * (1.0 - base) * (1.0 - 2.0 * base) +
                  (y - base) * (1.0 + ${glslFloat(HDR_DETAIL_GAIN)} * amount);
   float lift = target - y;
@@ -101,7 +113,20 @@ vec3 hdrTone(sampler2D source, vec2 coordinate, vec3 rgb, float y, float amount,
   float blend = min(1.0, y / ${glslFloat(HDR_RATIO_FLOOR)});
   return rgb + lift + blend * (rgb * (target / y) - rgb - lift);
 }
-vec3 detailFilter(sampler2D source, vec2 coordinate, vec3 centre, vec4 detail, vec2 stride, float hdrAmount) {
+// localTone: (shadows, highlights, hdr, exposure).
+float softRamp(float x) {
+  float knee = clamp(x, 0.0, 1.0);
+  return knee * knee * knee - 0.5 * knee * knee * knee * knee + max(0.0, x - 1.0);
+}
+float toneDistance(float stops) {
+  return softRamp(stops) - softRamp(stops - ${glslFloat(LOCAL_TONE_RANGE)});
+}
+float localToneStops(float base, vec4 localTone) {
+  float stops = log2(max(${glslFloat(LOCAL_TONE_FLOOR)}, decode709(clamp(base, 0.0, 1.0)) * exp2(localTone.w)));
+  return ${glslFloat(LOCAL_TONE_SLOPE)} * (localTone.x * toneDistance(${glslFloat(MID_GREY_STOPS)} - stops) +
+                                           localTone.y * toneDistance(stops - ${glslFloat(MID_GREY_STOPS)}));
+}
+vec3 detailFilter(sampler2D source, vec2 coordinate, vec3 centre, vec4 detail, vec2 stride, vec4 localTone) {
   vec3 denoised = centre;
   vec3 gaussian = centre;
   if (detail.x > 0.0 || detail.z > 0.0) {
@@ -138,22 +163,31 @@ vec3 detailFilter(sampler2D source, vec2 coordinate, vec3 centre, vec4 detail, v
     delta += ${glslFloat(CLARITY_GAIN)} * detail.y * clamp(4.0 * base * (1.0 - base), 0.0, 1.0) * (base - mean);
   }
   if (detail.x > 0.0) delta += ${glslFloat(SHARPEN_GAIN)} * detail.x * (base - dot(gaussian, luma));
-  if (hdrAmount > 0.0) denoised = hdrTone(source, coordinate, denoised, base, hdrAmount, stride);
+  if (any(notEqual(localTone.xyz, vec3(0.0)))) {
+    float smoothBase = toneBase(source, coordinate, base, stride);
+    if (localTone.z > 0.0) denoised = hdrTone(denoised, base, smoothBase, localTone.z);
+    if (localTone.x != 0.0 || localTone.y != 0.0) {
+      float gain = exp2(localToneStops(smoothBase, localTone));
+      denoised = vec3(encode709(decode709(denoised.r) * gain), encode709(decode709(denoised.g) * gain),
+                      encode709(decode709(denoised.b) * gain));
+    }
+  }
   return clamp(denoised + delta, 0.0, 1.0);
 }`;
 // (sharpen, clarity, denoise, denoise range factor), the 1/720-image-height step in texture UV
-// and the evaluated track Colour HDR amount per source.
+// and the evaluated track Colour (shadows, highlights, hdr, exposure) per source.
 const detailUniforms = `uniform vec4 detail0;
 uniform vec4 detail1;
 uniform vec2 detailStep0;
 uniform vec2 detailStep1;
-uniform vec2 hdr;`;
+uniform vec4 localTone0;
+uniform vec4 localTone1;`;
 const detailSample = `vec3 centre = texture(source, coordinate).rgb;
   vec4 detail = sourceIndex == 0 ? detail0 : detail1;
-  float hdrAmount = sourceIndex == 0 ? hdr.x : hdr.y;
-  if (all(equal(detail.xyz, vec3(0.0))) && hdrAmount == 0.0) return centre;
+  vec4 localTone = sourceIndex == 0 ? localTone0 : localTone1;
+  if (all(equal(detail.xyz, vec3(0.0))) && all(equal(localTone.xyz, vec3(0.0)))) return centre;
   vec2 stride = sourceIndex == 0 ? detailStep0 : detailStep1;
-  return detailFilter(source, coordinate, centre, detail, stride, hdrAmount);`;
+  return detailFilter(source, coordinate, centre, detail, stride, localTone);`;
 
 const singleMain = `void main() {
   vec4 left = vec4(0.0);
@@ -185,8 +219,8 @@ uniform sampler2D source0;
 uniform sampler2D source1;
 uniform vec4 tone0;
 uniform vec4 tone1;
-uniform vec4 extra0;
-uniform vec4 extra1;
+uniform vec2 extra0;
+uniform vec2 extra1;
 uniform vec4 correction0;
 uniform vec4 correction1;
 uniform vec2 vibrance;
@@ -221,30 +255,29 @@ float encode709(float v) {
   return v < beta ? 4.5 * v : alpha * pow(v, 0.45) - (alpha - 1.0);
 }
 ${detail ? detailFunction : ''}
-float toneCurve(float v, vec4 tone, vec4 extra) {
+// extra: (hue in radians, whites).
+float toneCurve(float v, vec4 tone, vec2 extra) {
   v += (tone.z - 1.0) * v * (1.0 - v) * (2.0 * v - 1.0);
   v += 2.0 * tone.y * v * (1.0 - v);
-  v += extra.z * v * (1.0 - v) * (1.0 - v);
-  v += extra.y * v * v * (1.0 - v) + min(extra.y, 0.0) * ${glslFloat(HIGHLIGHTS_WHITE)} * v * v * v;
-  return v + extra.w * ${glslFloat(WHITES_RANGE)} * v * v * v * v;
+  return v + extra.y * ${glslFloat(WHITES_RANGE)} * v * v * v * v;
 }
 float blacksCurve(float v, float blacks) {
   float shadow = (1.0 - v) * (1.0 - v);
   return v + blacks * ${glslFloat(BLACKS_RANGE)} * shadow * shadow;
 }
 // correction: Temperature/Tint linear gains in xyz, Blacks in w.
-vec3 scalarGrade(vec3 code, vec4 tone, vec4 extra, vec4 correction, float vibrance) {
+vec3 scalarGrade(vec3 code, vec4 tone, vec2 extra, vec4 correction, float vibrance) {
   if (all(equal(correction, vec4(1.0, 1.0, 1.0, 0.0))) && all(equal(tone, vec4(0.0, 0.0, 1.0, 1.0))) &&
-      all(equal(extra, vec4(0.0))) && vibrance == 0.0) return code;
+      all(equal(extra, vec2(0.0))) && vibrance == 0.0) return code;
   vec3 rgb = vec3(decode709(code.r), decode709(code.g), decode709(code.b));
   rgb *= correction.xyz;
   rgb *= exp2(tone.x);
   float baseY = clamp(dot(rgb, luma), 0.0, 1.0);
   float blacks = correction.w;
-  if (tone.y != 0.0 || tone.z != 1.0 || extra.yzw != vec3(0.0) || blacks != 0.0) {
+  if (tone.y != 0.0 || tone.z != 1.0 || extra.y != 0.0 || blacks != 0.0) {
     float toned = toneCurve(encode709(baseY), tone, extra);
     if (blacks < 0.0) toned = max(0.0, blacksCurve(toned, blacks));
-    float blackGain = blacks < 0.0 ? 0.0 : (2.0 - tone.z) * (1.0 + 2.0 * tone.y) * (1.0 + extra.z);
+    float blackGain = blacks < 0.0 ? 0.0 : (2.0 - tone.z) * (1.0 + 2.0 * tone.y);
     rgb *= baseY > 0.0 ? decode709(toned) / baseY : blackGain;
     if (blacks > 0.0) rgb += decode709(blacksCurve(toned, blacks)) - decode709(toned);
   }
@@ -297,7 +330,7 @@ vec3 rangeGrade(vec3 code, int sourceIndex) {
   return vec3(l) + amplitude * (vec3(hueComponent(h), hueComponent(h - 120.0), hueComponent(h - 240.0)) - 0.5);
 }
 ${curveFunctions}
-vec3 grade(vec3 code, vec4 tone, vec4 extra, int sourceIndex) {
+vec3 grade(vec3 code, vec4 tone, vec2 extra, int sourceIndex) {
   vec3 base = scalarGrade(code, tone, extra, sourceIndex == 0 ? correction0 : correction1,
                           sourceIndex == 0 ? vibrance.x : vibrance.y);
   ivec4 identity = sourceIndex == 0 ? curveIdentity0 : curveIdentity1;
@@ -314,14 +347,14 @@ vec3 grade(vec3 code, vec4 tone, vec4 extra, int sourceIndex) {
 vec3 sampleRgb(sampler2D source, vec2 coordinate, int sourceIndex) {
   ${detail ? detailSample : 'return texture(source, coordinate).rgb;'}
 }
-vec3 sampleGraded(sampler2D source, vec4 tone, vec4 extra, float aspect, int sourceIndex) {
+vec3 sampleGraded(sampler2D source, vec4 tone, vec2 extra, float aspect, int sourceIndex) {
   vec2 local = uv;
   if (aspect > canvasAspect) local.y = (uv.y - 0.5) * aspect / canvasAspect + 0.5;
   else local.x = (uv.x - 0.5) * canvasAspect / aspect + 0.5;
   if (any(lessThan(local, vec2(0.0))) || any(greaterThan(local, vec2(1.0)))) return vec3(0.0);
   return grade(sampleRgb(source, local, sourceIndex), tone, extra, sourceIndex);
 }
-vec4 sampleSpatial(sampler2D source, vec4 tone, vec4 extra, float aspect,
+vec4 sampleSpatial(sampler2D source, vec4 tone, vec2 extra, float aspect,
                    vec3 rowU, vec3 rowV, vec4 crop, float neutral, int sourceIndex) {
   // Exact identity retains the opaque, proxy-aspect letterbox path.
   if (neutral > 0.5) return vec4(sampleGraded(source, tone, extra, aspect, sourceIndex), 1.0);
@@ -343,7 +376,7 @@ export const singleFragmentShader = createFragmentShader(true, false);
 // a scalar-only program, avoiding driver execution cost of unused bounded arrays.
 const scalarOf = (shader: string): string =>
   shader.slice(0, shader.indexOf('float hueComponent')) +
-  `vec3 grade(vec3 code, vec4 tone, vec4 extra, int sourceIndex) {
+  `vec3 grade(vec3 code, vec4 tone, vec2 extra, int sourceIndex) {
     return scalarGrade(code, tone, extra, sourceIndex == 0 ? correction0 : correction1,
                        sourceIndex == 0 ? vibrance.x : vibrance.y);
   }

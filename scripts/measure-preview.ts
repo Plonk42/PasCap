@@ -75,8 +75,8 @@ try {
     { ...NEUTRAL_COLOUR, contrast: 1.3 },
     { ...NEUTRAL_COLOUR, hue: 45 },
     { ...NEUTRAL_COLOUR, saturation: 0.4 },
-    { ...NEUTRAL_COLOUR, highlights: -0.5 },
-    { ...NEUTRAL_COLOUR, shadows: 0.3 },
+    { ...NEUTRAL_COLOUR, whites: -0.5 },
+    { ...NEUTRAL_COLOUR, blacks: 0.3 },
     {
       ...NEUTRAL_COLOUR,
       temperature: 0.3,
@@ -86,8 +86,8 @@ try {
       contrast: 1.1,
       hue: 12,
       saturation: 1.2,
-      highlights: -0.2,
-      shadows: 0.15,
+      whites: -0.2,
+      blacks: 0.15,
     },
   ];
   const gpu = await page.evaluate(

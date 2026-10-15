@@ -725,7 +725,7 @@ Diagnostic counters, shader tests and the two-clip native comparison tool remain
 hidden behind Diagnostics. **Export** uses the bounded native multi-clip
 renderer, with profiles for 720p drafts and 4K finals. The diagnostic two-clip
 reference remains limited to two normal-speed forward clips on one enabled,
-zero-origin contiguous video track with Opacity 1, HDR 0 and a neutral track Transform
+zero-origin contiguous video track with Opacity 1, Shadows/Highlights/HDR 0 and a neutral track Transform
 without keyframes and neutral detail filters, without music/extra tracks/shared track keyframes
 and at most 3,600 project frames.
 Clip sections collapse independently and retain expansion across reloads; collapsing

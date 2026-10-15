@@ -584,7 +584,7 @@ native `reverse` filter holds at most 256 MiB of output RGB frames; Node still h
 The plain static single-track path retains at most two lossless clips, two
 intermediate decoders and one reusable RGB frame (24.9 MB UHD), plus native memory.
 
-The static fast path is eligible only with neutral HSL/identity colour curves, HDR 0 and one enabled video track with Opacity 1,
+The static fast path is eligible only with neutral HSL/identity colour curves, Shadows/Highlights/HDR 0 and one enabled video track with Opacity 1,
 no track keyframes, an exactly neutral track Transform base without Transform keyframes, neutral clip
 [detail filters](design/DETAIL_FILTERS.md), a zero first
 start and no internal gaps, covering the **full project duration**. Music beyond

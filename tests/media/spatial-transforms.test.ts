@@ -10,8 +10,8 @@ import { JobQueue } from '../../src/server/jobs.js';
 import { renderLayeredExport, type LayeredRenderReport } from '../../src/server/layered-export.js';
 import { MediaLibrary } from '../../src/server/library.js';
 import { runProcess } from '../../src/server/process.js';
-import { gradePixel, NEUTRAL_COLOUR, type RGB } from '../../src/shared/colour.js';
-import { compileDetail, type DetailFilter, type DetailSettings } from '../../src/shared/detail.js';
+import { gradePixel, NEUTRAL_COLOUR, type ColourSettings, type RGB } from '../../src/shared/colour.js';
+import { compileDetail, localTone, type DetailFilter, type DetailSettings } from '../../src/shared/detail.js';
 import {
   EXPORT_PROFILES,
   LAYERED_EXPORT_RESOURCES,
@@ -364,7 +364,7 @@ describe.skipIf(!enabled)('spatial transforms · real native FFmpeg, disposable 
         neutral: (Object.keys(spatial) as (keyof SpatialPose)[]).every(
           (key) => spatial[key] === NEUTRAL_SPATIAL_POSE[key],
         ),
-        detail: compileDetail(sample.detail, asset.metadata.width / asset.metadata.height, sample.colour.hdr),
+        detail: compileDetail(sample.detail, asset.metadata.width / asset.metadata.height, localTone(sample.colour)),
         cosine: Math.cos(radians),
         sine: Math.sin(radians),
         denominatorX: fit * asset.metadata.width * spatial.scale,
@@ -555,7 +555,7 @@ describe.skipIf(!enabled)('spatial transforms · real native FFmpeg, disposable 
     changes: Partial<SpatialPose>;
     asset: number;
     detail?: DetailSettings;
-    hdr?: number;
+    tone?: Partial<Pick<ColourSettings, 'shadows' | 'highlights' | 'hdr' | 'exposure'>>;
   }[] = [
     {
       name: 'crop with exact inclusive IN/exclusive OUT pixel centres',
@@ -596,24 +596,37 @@ describe.skipIf(!enabled)('spatial transforms · real native FFmpeg, disposable 
       changes: { scale: 1.2, rotation: 13, translateX: 0.04 },
       detail: { sharpen: 0.5, clarity: -0.7, denoise: 0.9 },
     },
-    { name: 'track HDR on the neutral letterboxed path', asset: 1, changes: {}, hdr: 0.8 },
+    { name: 'track HDR on the neutral letterboxed path', asset: 1, changes: {}, tone: { hdr: 0.8 } },
     {
       name: 'track HDR with clip detail before a rotated, scaled grade',
       asset: 0,
       changes: { scale: 1.2, rotation: 13, translateX: 0.04 },
       detail: { sharpen: 0.4, clarity: 0.3, denoise: 0.5 },
-      hdr: 0.6,
+      tone: { hdr: 0.6 },
+    },
+    {
+      name: 'track Shadows and Highlights on the neutral letterboxed path',
+      asset: 1,
+      changes: {},
+      tone: { shadows: 0.8, highlights: -0.7 },
+    },
+    {
+      name: 'track Shadows, Highlights, HDR and Exposure with clip detail before a rotated, scaled grade',
+      asset: 0,
+      changes: { scale: 1.2, rotation: 13, translateX: 0.04 },
+      detail: { sharpen: 0.4, clarity: 0.3, denoise: 0.5 },
+      tone: { shadows: -0.6, highlights: 0.5, hdr: 0.4, exposure: 0.3 },
     },
   ];
 
-  it.each(staticCases)('720p lossless native parity: $name', async ({ changes, asset, detail, hdr }) => {
-    await staticParity(changes, asset, detail, hdr, false);
+  it.each(staticCases)('720p lossless native parity: $name', async ({ changes, asset, detail, tone }) => {
+    await staticParity(changes, asset, detail, tone, false);
   });
 
   it.each(staticCases)(
     '720p lossless native parity through the GPU worker: $name',
-    async ({ changes, asset, detail, hdr }) => {
-      await staticParity(changes, asset, detail, hdr, true);
+    async ({ changes, asset, detail, tone }) => {
+      await staticParity(changes, asset, detail, tone, true);
     },
   );
 
@@ -621,14 +634,14 @@ describe.skipIf(!enabled)('spatial transforms · real native FFmpeg, disposable 
     changes: Partial<SpatialPose>,
     asset: number,
     detail: DetailSettings | undefined,
-    hdr: number | undefined,
+    tone: Partial<ColourSettings> | undefined,
     gpu: boolean,
   ): Promise<void> {
     const project = createProject('static-spatial', 'Disposable one-frame spatial test');
     const clip = createClip('pattern', assets[asset]!.id, 1, 2);
     project.layers[0]!.transform.base = pose(changes);
     if (detail) clip.detail = detail;
-    if (hdr) project.layers[0]!.colour.hdr = hdr;
+    Object.assign(project.layers[0]!.colour, tone);
     project.clips = [clip];
     const captured = projectSchema.parse(project);
     expect(needsLayeredExport(captured)).toBe(true);

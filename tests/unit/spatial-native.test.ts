@@ -26,7 +26,7 @@ vi.mock('node:fs/promises', async (importOriginal) => ({
 afterEach(() => vi.restoreAllMocks());
 
 const signal = (): AbortSignal => new AbortController().signal;
-const mild: ColourSettings = { ...NEUTRAL_COLOUR, exposure: 0.2, shadows: 0.08, highlights: -0.06 };
+const mild: ColourSettings = { ...NEUTRAL_COLOUR, exposure: 0.2, blacks: 0.08, whites: -0.06 };
 
 function sample(pose: Partial<SpatialPose> = {}, overrides: Partial<PreviewLayer> = {}): PreviewLayer {
   return {

@@ -1,6 +1,6 @@
 import { mkdir, rename, rm } from 'node:fs/promises';
 import path from 'node:path';
-import { generateCube } from '../shared/colour.js';
+import { generateCube, isNeutralLocalTone } from '../shared/colour.js';
 import type { MediaJob } from '../shared/media.js';
 import { projectSchema, type ProjectDocument } from '../shared/model.js';
 import { isNeutralDetail } from '../shared/detail.js';
@@ -47,8 +47,10 @@ export function validateReference(project: ProjectDocument, library: MediaLibrar
     );
   if (hasSpatialEdits(snapshot.layers[0]!.transform))
     throw new ServiceError('The diagnostic reference does not support Transform edits or keyframes. Use Export.');
-  if (snapshot.clips.some((clip) => !isNeutralDetail(clip.detail)) || snapshot.layers[0]!.colour.hdr !== 0)
-    throw new ServiceError('The diagnostic reference does not support HDR, Sharpen, Clarity or Denoise. Use Export.');
+  if (snapshot.clips.some((clip) => !isNeutralDetail(clip.detail)) || !isNeutralLocalTone(snapshot.layers[0]!.colour))
+    throw new ServiceError(
+      'The diagnostic reference does not support Shadows, Highlights, HDR, Sharpen, Clarity or Denoise. Use Export.',
+    );
   const layout = calculateLayout(snapshot);
   const [left, right] = layout.clips;
   const transition = snapshot.layers[0]!.transitions[0]!;

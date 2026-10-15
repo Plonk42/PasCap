@@ -58,10 +58,12 @@ $$
 After inverse BT.709 decoding, apply $L'=L\odot g$ component-wise, **before**
 Exposure's $2^{\mathrm{exposure}}$ multiplier. Do not clip the gains or intermediate
 linear RGB. The complete order is inverse BT.709 → Temperature/Tint gains →
-Exposure → Contrast → Brightness → Shadows/Highlights/Whites/Blacks → Hue/Saturation/Vibrance → final
+Exposure → Contrast → Brightness → Whites/Blacks → Hue/Saturation/Vibrance → final
 linear clipping and BT.709 encoding → static encoded HSL → master curve → RGB
 curves → black-fade brightness → Opacity/spatial coverage and grouped source-over.
-See [the grading equations](../COLOUR_AND_TIMING.md) for the remaining stages.
+See [the grading equations](../COLOUR_AND_TIMING.md) for the remaining stages. Shadows,
+Highlights and HDR are local stages on source pixels before this grade; see
+[detail filters](DETAIL_FILTERS.md#local-shadows-and-highlights).
 
 At $T=I=0$, all gains equal 1. Normalization preserves **neutral-white linear
 BT.709 luminance before clipping only**: $0.2126g_R+0.7152g_G+0.0722g_B=1$.

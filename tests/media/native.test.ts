@@ -61,8 +61,8 @@ describe.skipIf(!enabled)('native FFmpeg integration · disposable synthetic sou
       { ...NEUTRAL_COLOUR, contrast: 1.25 },
       { ...NEUTRAL_COLOUR, hue: 31 },
       { ...NEUTRAL_COLOUR, saturation: 1.3 },
-      { ...NEUTRAL_COLOUR, highlights: -0.4 },
-      { ...NEUTRAL_COLOUR, shadows: 0.3 },
+      { ...NEUTRAL_COLOUR, whites: -0.4 },
+      { ...NEUTRAL_COLOUR, blacks: 0.3 },
       {
         ...NEUTRAL_COLOUR,
         temperature: 0.8,
@@ -72,8 +72,8 @@ describe.skipIf(!enabled)('native FFmpeg integration · disposable synthetic sou
         contrast: 1.1,
         hue: 12,
         saturation: 1.2,
-        highlights: -0.2,
-        shadows: 0.15,
+        whites: -0.2,
+        blacks: 0.15,
       },
     ];
     const pixels = Buffer.alloc(17 * 17 * 3);
@@ -161,7 +161,7 @@ describe.skipIf(!enabled)('native FFmpeg integration · disposable synthetic sou
       document = applyCommand(document, {
         type: 'colour',
         layerId: document.layers[0]!.id,
-        colour: { ...NEUTRAL_COLOUR, brightness: 0.05, shadows: 0.1 },
+        colour: { ...NEUTRAL_COLOUR, brightness: 0.05, blacks: 0.1 },
       });
       document = applyCommand(document, { type: 'fades', layerId: document.layers[0]!.id, opening: 6, closing: 6 });
       const job = startReference(document, fixture.library);

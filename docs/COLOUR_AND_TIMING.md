@@ -39,10 +39,10 @@ See [track appearance](design/ROW_APPEARANCE.md) for ownership, UI and strict st
   - Contrast `c`: `V ← V + (c − 1) × V × (1 − V) × (2V − 1)`, an S-curve (c > 1) or
     flattening (c < 1) pivoting at encoded 0.5; its midtone slope is `(1 + c) / 2`.
   - Brightness `b`: `V ← V + 2b × V × (1 − V)`, moving mid grey by `b / 2`.
-  - Shadows `s`: `V ← V + s × V × (1 − V)^2`, acting mostly below perceptual mid grey.
-  - Highlights `h`: `V ← V + h × V^2 × (1 − V) + min(h, 0) × 0.15 × V^3`, the mirror of
-    Shadows above mid grey. Lowering it also dims pure white to `1 − 0.15 |h|`; Whites
-    (below) moves the white point on its own. Raising it never pushes tones past white.
+  - Shadows and Highlights are not part of this per-pixel grade: they are local
+    exposure changes applied to source pixels before grading, from each area's
+    edge-aware base brightness. See
+    [detail filters](design/DETAIL_FILTERS.md#local-shadows-and-highlights).
   - Whites `w`: `V ← V + 0.25w × V^4`, moving the white point: −1 dims pure white to 0.75,
     +1 pushes near-white tones to white; it barely touches tones below the upper range.
   - Blacks `k`: `V + 0.25k × (1 − V)^4`, moving the black point; it fades out towards white.
@@ -54,10 +54,10 @@ See [track appearance](design/ROW_APPEARANCE.md) for ownership, UI and strict st
     afterwards: a matte, faded look in which near-black tones turn greyer (black becomes
     encoded 0.25 at +1).
 
-  Multiply every channel by `EOTF(V) / Y` (`(2 − c)(1 + 2b)(1 + s)` at `Y = 0`, or 0 when
+  Multiply every channel by `EOTF(V) / Y` (`(2 − c)(1 + 2b)` at `Y = 0`, or 0 when
   Blacks is lowered), then add any raised-Blacks lift. Each curve is monotonic over its
-  whole range and keeps black (except raised Blacks) and white (except lowered Highlights
-  and Whites); as a gain the result keeps chroma ratios, so colours turn greyer only
+  whole range and keeps black (except raised Blacks) and white (except lowered Whites);
+  as a gain the result keeps chroma ratios, so colours turn greyer only
   through the raised-Blacks lift and clip to black only through lowered Blacks.
 
 - Recompute unclipped linear luminance. Define
@@ -244,7 +244,7 @@ are not allocated per stored clip; missing decoded frames buffer explicitly
 ([WebCodecs preview decoding](design/WEBCODECS_PREVIEW.md)).
 
 Production export reads originals and uses exact shared retiming. The static fast
-path requires neutral HSL/identity curves, HDR 0, one enabled video track with Opacity 1, no track keyframes, an exactly neutral
+path requires neutral HSL/identity curves, Shadows/Highlights/HDR 0, one enabled video track with Opacity 1, no track keyframes, an exactly neutral
 track Transform base without Transform keyframes, zero origin
 and no internal gaps, covering full project duration; supported track fades/dissolves retain bounded chunks.
 Other valid timelines use generalized sequential RGBA16 group and source-over
@@ -256,7 +256,7 @@ export requires at least one retained video clip. Resource and numeric limits ar
 
 The diagnostic reference accepts **exactly two normal-speed (constant 1×) clips on one
 enabled, zero-origin contiguous video track with Opacity 1 and static scalar track Colour**,
-neutral HSL and identity curves, HDR 0, an exactly neutral track Transform
+neutral HSL and identity curves, Shadows/Highlights/HDR 0, an exactly neutral track Transform
 base without Transform keyframes, without music, extra tracks or track keyframes,
 and is limited to 3,600 project frames. It refuses unsupported
 documents regardless of Ripple or track ID.
