@@ -267,7 +267,7 @@ function unchangedOthers(
   editedIds: readonly string[],
   transitions: Readonly<Record<string, readonly Transition[]>> = {},
 ): void {
-  expect(next.schemaVersion).toBe(21);
+  expect(next.schemaVersion).toBe(22);
   expect(next.media).toEqual(before.media);
   expect(next.layers).toEqual(
     before.layers.map((layer) => ({ ...layer, transitions: transitions[layer.id] ?? layer.transitions })),
@@ -734,7 +734,7 @@ test('Q and W retain the mapped displayed frame, ripple dissolves and recover bo
   await expect(page.getByRole('button', { name: 'Redo', exact: true })).toBeEnabled();
 });
 
-test('I/O middle removal is transient then one edit, preserving absolute thirteen-channel row points, music and overlays', async ({
+test('I/O middle removal is transient then one edit, preserving absolute fourteen-channel row points, music and overlays', async ({
   page,
   request,
 }) => {

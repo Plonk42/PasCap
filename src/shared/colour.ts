@@ -19,6 +19,7 @@ export const colourSchema = z
     contrast: z.number().min(0).max(2),
     hue: z.number().min(-180).max(180),
     saturation: z.number().min(0).max(2),
+    vibrance: z.number().min(-1).max(1),
     highlights: z.number().min(-1).max(1),
     shadows: z.number().min(-1).max(1),
     whites: z.number().min(-1).max(1),
@@ -40,6 +41,7 @@ export function createColourSettings(): ColourSettings {
     contrast: 1,
     hue: 0,
     saturation: 1,
+    vibrance: 0,
     highlights: 0,
     shadows: 0,
     whites: 0,
@@ -67,6 +69,7 @@ export const COLOUR_CONTROLS = [
   { key: 'contrast', label: 'Contrast', min: 0, max: 2, step: 0.01, unit: '×' },
   { key: 'hue', label: 'Hue', min: -180, max: 180, step: 1, unit: '°' },
   { key: 'saturation', label: 'Saturation', min: 0, max: 2, step: 0.01, unit: '×' },
+  { key: 'vibrance', label: 'Vibrance', min: -1, max: 1, step: 0.01, unit: '' },
   { key: 'highlights', label: 'Highlights', min: -1, max: 1, step: 0.01, unit: '' },
   { key: 'shadows', label: 'Shadows', min: -1, max: 1, step: 0.01, unit: '' },
   { key: 'whites', label: 'Whites', min: -1, max: 1, step: 0.01, unit: '' },
@@ -161,7 +164,7 @@ function compileScalarGrade(
 ): (linearRed: number, linearGreen: number, linearBlue: number, out: Float64Array) => void {
   const [redGain, greenGain, blueGain] = temperatureTintGains(settings);
   const exposure = 2 ** settings.exposure;
-  const { contrast, brightness, saturation, shadows, highlights, whites, blacks } = settings;
+  const { contrast, brightness, saturation, vibrance, shadows, highlights, whites, blacks } = settings;
   const tonal = contrast !== 1 || brightness !== 0 || shadows !== 0 || highlights !== 0 || whites !== 0 || blacks !== 0;
   const blackGain = blacks < 0 ? 0 : (2 - contrast) * (1 + 2 * brightness) * (1 + shadows);
   const angle = (settings.hue * Math.PI) / 180;
@@ -186,8 +189,9 @@ function compileScalarGrade(
     const luminance = 0.2126 * toneRed + 0.7152 * toneGreen + 0.0722 * toneBlue;
     const cb = (toneBlue - luminance) / 1.8556;
     const cr = (toneRed - luminance) / 1.5748;
-    const u = saturation * (cb * cos - cr * sin);
-    const v = saturation * (cb * sin + cr * cos);
+    const chroma = vibrance === 0 ? saturation : saturation * vibranceGain(toneRed, toneGreen, toneBlue, vibrance);
+    const u = chroma * (cb * cos - cr * sin);
+    const v = chroma * (cb * sin + cr * cos);
     const red = luminance + 1.5748 * v;
     const blue = luminance + 1.8556 * u;
     const green = (luminance - 0.2126 * red - 0.0722 * blue) / 0.7152;
@@ -197,6 +201,12 @@ function compileScalarGrade(
   };
 }
 
+/** Vibrance scales chroma most on muted pixels: 1 + v(1 − c)² with c the pixel's linear (max − min) / max. */
+function vibranceGain(red: number, green: number, blue: number, vibrance: number): number {
+  const maximum = Math.max(red, green, blue);
+  const colourfulness = maximum > 0 ? (maximum - Math.min(red, green, blue)) / maximum : 0;
+  return 1 + vibrance * (1 - Math.min(1, colourfulness)) ** 2;
+}
 /** Negative Highlights also dims pure white by this much (encoded). */
 export const HIGHLIGHTS_WHITE = 0.15;
 /** Whites moves pure white by this much (encoded) at ±1; monotonic up to 0.25. */

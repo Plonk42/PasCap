@@ -140,6 +140,7 @@ export class Compositor {
         'extra1',
         'correction0',
         'correction1',
+        'vibrance',
         'coverage',
         'brightness',
         'imageAspect',
@@ -450,6 +451,7 @@ export class Compositor {
       sources[1]!.opacity * sources[1]!.blendWeight,
     );
     gl.uniform2f(this.#location('brightness'), sources[0]!.brightness, sources[1]!.brightness);
+    gl.uniform2f(this.#location('vibrance'), sources[0]!.settings.vibrance, sources[1]!.settings.vibrance);
     if (this.#advanced)
       gl.uniform2f(
         this.#location('neutralHsl'),
@@ -561,6 +563,7 @@ function comparisonColour(test: number, random: () => number): ColourSettings {
     brightness: random() * 0.16 - 0.08,
     contrast: 0.7 + random() * 0.6,
     saturation: 0.4 + random() * 1.3,
+    vibrance: random() * 0.8 - 0.4,
     hue: random() * 220 - 110,
     highlights: random() * 0.6 - 0.3,
     shadows: random() * 0.6 - 0.3,
