@@ -570,6 +570,15 @@ export function App() {
       seekEngine(Math.max(0, Math.min(duration - 1, frame)));
     }
   }, []);
+  const seekBoundary = useCallback(
+    (edge: 'start' | 'end'): void => {
+      const range = playRange.current;
+      if (range) seek(edge === 'start' ? range.inFrame : range.outFrame - 1);
+      else if (edge === 'start') seek(0);
+      else if (current.current) seek(calculateLayout(current.current).duration - 1);
+    },
+    [seek],
+  );
   const togglePlayback = useCallback(() => {
     if (drafting.current) return;
     seeking.current.pending = null;
@@ -1088,10 +1097,10 @@ export function App() {
           setFitRequest((value) => value + 1);
           break;
         case 'start':
-          seek(0);
+          seekBoundary('start');
           break;
         case 'end':
-          if (current.current) seek(calculateLayout(current.current).duration - 1);
+          seekBoundary('end');
           break;
         case 'step':
           seek((engine.current?.diagnostics().frame ?? 0) + shortcut.delta);
@@ -1104,7 +1113,20 @@ export function App() {
       window.removeEventListener('beforeunload', beforeUnload);
       window.removeEventListener('keydown', keyboard);
     };
-  }, [remove, seek, split, duplicate, nudge, togglePlayback, undoRedo, quickTrim, cutRange, addBookmark, goToBookmark]);
+  }, [
+    remove,
+    seek,
+    seekBoundary,
+    split,
+    duplicate,
+    nudge,
+    togglePlayback,
+    undoRedo,
+    quickTrim,
+    cutRange,
+    addBookmark,
+    goToBookmark,
+  ]);
 
   const act = async <T,>(
     action: () => Promise<T>,
@@ -1896,6 +1918,7 @@ export function App() {
                 rangeSelected={timeRange !== null}
                 onHoldOriginal={holdOriginal}
                 onSeek={seek}
+                onSeekBoundary={seekBoundary}
                 onRetry={retryPreview}
                 onMedia={openMedia}
                 onImport={() => requestImport()}

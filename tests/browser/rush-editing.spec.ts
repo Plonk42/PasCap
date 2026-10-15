@@ -1111,6 +1111,16 @@ test('missing, outside and empty ranges are rejected; click and Escape restore; 
   await expect.poll(playhead).toBe(30);
   expect(await current(page)).toEqual(before);
   await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
+  // With a range selected, the start/end buttons and Home/End go to the range edges.
+  await page.getByRole('button', { name: 'Go to selection start', exact: true }).click();
+  await expect.poll(playhead).toBe(20);
+  await page.getByRole('button', { name: 'Go to selection end', exact: true }).click();
+  await expect.poll(playhead).toBe(30);
+  await shortcut(page, 'Home');
+  await expect.poll(playhead).toBe(20);
+  await shortcut(page, 'End');
+  await expect.poll(playhead).toBe(30);
+  await expectCutOverlay(page, 20, 31);
   const keys = ['i', 'o', 'q', 'w', 's', 'Shift+Delete'];
   const input = page.getByRole('textbox', { name: 'Source IN frame', exact: true });
   await input.fill('00:00:00:15');
