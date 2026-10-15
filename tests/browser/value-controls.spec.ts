@@ -479,6 +479,19 @@ test('main exact Opacity, exposure and Gain preserve full precision; Enter then 
   await preciseEdit(page, 'Music gain', -7.123456789, gainEdit);
 });
 
+test('stepping an exact field with its arrows commits at once, without Enter or leaving the field', async ({
+  page,
+}) => {
+  await showControl(page, 'Exposure');
+  const { exact } = controls(page, 'Exposure');
+  const before = await checkpoint(page);
+  await exact.focus();
+  await exact.press('ArrowUp');
+  await expect(exact).toBeFocused();
+  await expect(exact).toHaveValue('0.01');
+  await committed(page, before, applyCommand(before.document, exposureEdit(before.document, 0.01)));
+});
+
 test('main and stored Opacity percentages reject invalid entries, cancel drafts and reset without changing fractional bases or other keys', async ({
   page,
 }) => {

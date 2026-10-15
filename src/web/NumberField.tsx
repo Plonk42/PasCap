@@ -81,11 +81,11 @@ export function NumberField({
   const error = validation && !validation.valid ? validation.error : null;
   const dirty = state.draft !== String(value);
   const restore = (): void => setState({ value, resetKey, disabled, draft: String(value), attempted: false });
-  const commit = (): void => {
-    if (disabled || !dirty) return;
-    const result = validateNumberDraft(state.draft, constraints);
+  const commit = (draft = state.draft): void => {
+    if (disabled || draft === String(value)) return;
+    const result = validateNumberDraft(draft, constraints);
     if (!result.valid) {
-      setState({ ...state, attempted: true });
+      setState({ ...state, draft, attempted: true });
       return;
     }
     // Settle before calling out: a later blur must not submit the Enter edit twice.
@@ -113,8 +113,18 @@ export function NumberField({
           .filter(Boolean)
           .join(' ')}
         title={`Enter or leave the field to apply. Escape restores ${value}.`}
-        onChange={(event) => setState({ ...state, draft: event.currentTarget.value })}
-        onBlur={commit}
+        onChange={(event) => {
+          const draft = event.currentTarget.value;
+          // Chrome steps with a plain Event, Firefox with insertReplacementText; typing is any other InputEvent.
+          const { nativeEvent } = event;
+          const typed =
+            nativeEvent instanceof InputEvent &&
+            nativeEvent.inputType !== '' &&
+            nativeEvent.inputType !== 'insertReplacementText';
+          if (typed) setState({ ...state, draft });
+          else commit(draft);
+        }}
+        onBlur={() => commit()}
         onKeyDown={(event) => {
           if (event.nativeEvent.isComposing) return;
           if (event.key === 'Enter') {
