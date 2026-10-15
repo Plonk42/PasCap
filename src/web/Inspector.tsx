@@ -519,66 +519,67 @@ function SequenceControls({
                 </button>
                 {item === boundary && (
                   <section className="boundary-inspector" aria-label="Boundary transition">
-                    <div className={`transition-fields ${boundary.type === 'fade-black-pause' ? 'has-pause' : ''}`}>
-                      <label>
-                        <span>Type</span>
-                        <select
-                          aria-label="Transition type"
-                          aria-describedby={transitionGap ? `${id}-transition-gap` : `${id}-transition-help`}
-                          disabled={drafting}
-                          value={boundary.type}
-                          onChange={(event) =>
-                            setTransition(transitionOfType(boundary, event.target.value as Transition['type']))
-                          }
-                        >
-                          <option value="cut">Cut</option>
-                          <option value="fade-through-black" disabled={transitionGap}>
-                            Fade through black
-                          </option>
-                          <option value="fade-black-pause" disabled={transitionGap}>
-                            Fade through black with pause
-                          </option>
-                          <option value="cross-dissolve" disabled={transitionGap}>
-                            Cross-dissolve
-                          </option>
-                        </select>
-                      </label>
-                      {boundary.type === 'fade-black-pause' ? (
-                        <>
-                          <label>
-                            Fade <small>frames · {sourceSeconds(boundary.fade)}</small>
-                            <NumberField
-                              aria-label="Transition fade duration"
-                              aria-describedby={`${id}-transition-help`}
-                              min={1}
-                              max={2_147_483_647}
-                              integer
-                              step={1}
-                              disabled={drafting}
-                              value={boundary.fade}
-                              resetKey={resetKey}
-                              validate={(fade) => transitionError({ ...boundary, fade })}
-                              onCommit={(fade) => setTransition({ ...boundary, fade })}
-                            />
-                          </label>
-                          <label>
-                            Pause <small>frames · {sourceSeconds(boundary.pause)}</small>
-                            <NumberField
-                              aria-label="Transition pause duration"
-                              aria-describedby={`${id}-transition-help`}
-                              min={1}
-                              max={2_147_483_647}
-                              integer
-                              step={1}
-                              disabled={drafting}
-                              value={boundary.pause}
-                              resetKey={resetKey}
-                              validate={(pause) => transitionError({ ...boundary, pause })}
-                              onCommit={(pause) => setTransition({ ...boundary, pause })}
-                            />
-                          </label>
-                        </>
-                      ) : (
+                    <label className="transition-type">
+                      <span>Type</span>
+                      <select
+                        aria-label="Transition type"
+                        aria-describedby={transitionGap ? `${id}-transition-gap` : `${id}-transition-help`}
+                        disabled={drafting}
+                        value={boundary.type}
+                        onChange={(event) =>
+                          setTransition(transitionOfType(boundary, event.target.value as Transition['type']))
+                        }
+                      >
+                        <option value="cut">Cut</option>
+                        <option value="fade-through-black" disabled={transitionGap}>
+                          Fade through black
+                        </option>
+                        <option value="fade-black-pause" disabled={transitionGap}>
+                          Fade through black with pause
+                        </option>
+                        <option value="cross-dissolve" disabled={transitionGap}>
+                          Cross-dissolve
+                        </option>
+                      </select>
+                    </label>
+                    {boundary.type === 'fade-black-pause' && (
+                      <div className="range-fields">
+                        <label>
+                          Fade <small>frames · {sourceSeconds(boundary.fade)}</small>
+                          <NumberField
+                            aria-label="Transition fade duration"
+                            aria-describedby={`${id}-transition-help`}
+                            min={1}
+                            max={2_147_483_647}
+                            integer
+                            step={1}
+                            disabled={drafting}
+                            value={boundary.fade}
+                            resetKey={resetKey}
+                            validate={(fade) => transitionError({ ...boundary, fade })}
+                            onCommit={(fade) => setTransition({ ...boundary, fade })}
+                          />
+                        </label>
+                        <label>
+                          Pause <small>frames · {sourceSeconds(boundary.pause)}</small>
+                          <NumberField
+                            aria-label="Transition pause duration"
+                            aria-describedby={`${id}-transition-help`}
+                            min={1}
+                            max={2_147_483_647}
+                            integer
+                            step={1}
+                            disabled={drafting}
+                            value={boundary.pause}
+                            resetKey={resetKey}
+                            validate={(pause) => transitionError({ ...boundary, pause })}
+                            onCommit={(pause) => setTransition({ ...boundary, pause })}
+                          />
+                        </label>
+                      </div>
+                    )}
+                    {(boundary.type === 'fade-through-black' || boundary.type === 'cross-dissolve') && (
+                      <div className="range-fields">
                         <label>
                           Duration <small>frames · {sourceSeconds(boundary.duration)}</small>
                           <NumberField
@@ -588,19 +589,15 @@ function SequenceControls({
                             max={2_147_483_647}
                             integer
                             step={1}
-                            disabled={drafting || boundary.type === 'cut'}
+                            disabled={drafting}
                             value={boundary.duration}
                             resetKey={resetKey}
-                            validate={(duration) =>
-                              boundary.type === 'cut' ? null : transitionError({ ...boundary, duration })
-                            }
-                            onCommit={(duration) => {
-                              if (boundary.type !== 'cut') setTransition({ ...boundary, duration });
-                            }}
+                            validate={(duration) => transitionError({ ...boundary, duration })}
+                            onCommit={(duration) => setTransition({ ...boundary, duration })}
                           />
                         </label>
-                      )}
-                    </div>
+                      </div>
+                    )}
                     {transitionGap && (
                       <p className="control-hint" id={`${id}-transition-gap`}>
                         These clips have a gap. Close it, or turn on Ripple for this track, before adding a fade or

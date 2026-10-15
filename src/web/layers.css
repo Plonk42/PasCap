@@ -225,9 +225,10 @@
 
 .boundary-choice {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: 2px 8px;
   width: 100%;
   min-height: 32px;
   padding: 4px 8px;
@@ -250,6 +251,7 @@
 
 .boundary-choice > small {
   flex-shrink: 0;
+  margin-left: auto;
   color: var(--muted);
   font-size: 11px;
 }

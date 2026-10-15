@@ -559,22 +559,10 @@ body {
   font-size: 12px;
 }
 
-.product-workspace .transition-fields {
-  grid-template-columns: minmax(0, 1fr) 92px;
-}
-
-.product-workspace .transition-fields.has-pause {
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-}
-
-.product-workspace .transition-fields.has-pause > label:first-child {
-  grid-column: 1 / -1;
-}
-
 .product-workspace .speed-settings > select,
 .product-workspace .speed-field select,
-.product-workspace .transition-fields label,
-.product-workspace .transition-fields select {
+.product-workspace .transition-type,
+.product-workspace .transition-type select {
   font-size: 13px;
 }
 
