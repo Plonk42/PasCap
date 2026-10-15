@@ -37,6 +37,7 @@ than failing startup. JSON paths must be absolute; a literal `~` is not expanded
 | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `GET /api/footage/roots`                                                   | Root IDs, paths and availability/error information                                                                                                                                     |
 | `GET /api/footage?rootId=root-0&directory=%2Fmedia%2Ffootage%2FFlight`     | Metadata for one folder inside the selected root; `directory` is an encoded absolute path, or omitted for the root itself                                                              |
+| `GET /api/footage/preview?path=%2Fmedia%2Ffootage%2FFlight%2FDJI_0001.MP4` | A JPEG (at most 320 × 180) of the keyframe nearest the middle of one video inside approved roots, with an identity `ETag`; read-only, bounded and cached in the data directory         |
 | `POST /api/media/register-paths`                                           | JSON `{"paths":["/media/footage/Flight/DJI_0001.MP4"]}` with 1–5,000 selected absolute video paths inside approved roots                                                               |
 | `GET /api/audio/roots`                                                     | The same approved-root IDs, paths and availability/error information for music                                                                                                         |
 | `GET /api/audio/browse?rootId=root-0&directory=%2Fmedia%2Ffootage%2FMusic` | Metadata-only one-folder audio candidates and subfolders, with the same containment, symlink, cache-exclusion and truncation guards                                                    |
@@ -44,9 +45,13 @@ than failing startup. JSON paths must be absolute; a literal `~` is not expanded
 | `POST /api/audio/register`                                                 | Deliberate typed audio-path import; browser roots do not restrict this action or expand automatically                                                                                  |
 | `POST /api/media/register` / `POST /api/media/import`                      | Deliberate typed video-file path / recursive folder import, also outside browser roots                                                                                                 |
 
-Use the root IDs returned by the service. Browsing uses directory/file metadata
+Use the root IDs returned by the service. Listings use directory/file metadata
 only: no media-byte reads, probing, recursive discovery, registration, cache writes
-or preparation. Listings put folders first and naturally sort names, retain at
+or preparation. Previews are the one bounded exception: FFmpeg reads a video's
+container index and the keyframe nearest its middle (never the whole file), two
+at a time with sixteen waiting and a 20-second limit each, cancelled when the
+browser disconnects; the JPEG goes to the data directory's `browse-previews/`, at
+most 4,000 files. No original is sent to the browser. Listings put folders first and naturally sort names, retain at
 most **2,000 entries**, and explicitly return `truncated`; choose a narrower folder
 when it is true instead of assuming the listing is complete. The cache branch is excluded, path
 containment is enforced and symlinks are rejected. Registration retains the

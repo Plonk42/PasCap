@@ -288,4 +288,53 @@ describe.skipIf(!enabled)('approved-root no-copy import · disposable native pro
     expect(await readdir(sources)).toEqual(['Not actually video.mov']);
     expect(await readdir(config.dataDir)).toEqual(['audio.json']);
   });
+
+  it('previews browsed recordings with real FFmpeg, read-only, without registering, preparing or writing next to them', async () => {
+    const { sources, config, app, library, jobs } = await fixture();
+    // Twelve frames with a single keyframe at 0: the middle seek must still yield that keyframe.
+    const filename = path.join(sources, 'DJI_0468.MP4');
+    const broken = path.join(sources, 'DJI_0999.MP4');
+    await syntheticOriginal(config, filename);
+    await writeFile(broken, 'not a video despite the supported filename');
+    permissions.push({ filename, mode: 0o600 }, { filename: sources, mode: 0o700 });
+    await chmod(filename, 0o444);
+    await chmod(sources, 0o555);
+    const original = await readFile(filename);
+    const identity = await fingerprintFile(filename);
+
+    const response = await app.inject({
+      url: `/api/footage/preview?${new URLSearchParams({ path: filename })}`,
+      headers,
+    });
+    expect(response.statusCode, response.body).toBe(200);
+    expect(response.headers['content-type']).toBe('image/jpeg');
+    expect(response.rawPayload.subarray(0, 2)).toEqual(Buffer.from([0xff, 0xd8]));
+    const cached = path.join(config.dataDir, 'browse-previews', `${String(response.headers['etag']).slice(1, -1)}.jpg`);
+    expect(await readFile(cached)).toEqual(response.rawPayload);
+    const picture = JSON.parse(
+      (
+        await runProcess(config.ffprobe, [
+          '-v',
+          'error',
+          '-show_entries',
+          'stream=codec_name,width,height',
+          '-of',
+          'json',
+          cached,
+        ])
+      ).toString('utf8'),
+    ) as { streams: { codec_name: string; width: number; height: number }[] };
+    expect(picture.streams).toEqual([{ codec_name: 'mjpeg', width: 320, height: 180 }]);
+
+    const failed = await app.inject({ url: `/api/footage/preview?${new URLSearchParams({ path: broken })}`, headers });
+    expect(failed.statusCode).toBe(422);
+    expect(failed.json()).toEqual({ error: 'No preview: this file could not be decoded as video.' });
+
+    expect(await readFile(filename)).toEqual(original);
+    expect(await fingerprintFile(filename)).toEqual(identity);
+    expect((await readdir(sources)).sort()).toEqual(['DJI_0468.MP4', 'DJI_0999.MP4']);
+    expect(library.list()).toEqual([]);
+    expect(jobs.list()).toEqual([]);
+    expect((await readdir(config.dataDir)).sort()).toEqual(['audio.json', 'browse-previews']);
+  });
 });
