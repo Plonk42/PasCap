@@ -35,7 +35,7 @@ function hueRgb(hue: number): RGB {
   return [value(0), value(-120), value(-240)];
 }
 
-describe('strict schema-19 static advanced row colour', () => {
+describe('strict schema-20 static advanced row colour', () => {
   it('creates deeply independent bands and curves for settings, rows and projects', () => {
     const a = createColourSettings(),
       b = createColourSettings();
@@ -51,7 +51,7 @@ describe('strict schema-19 static advanced row colour', () => {
   });
   it('requires every field and rejects old schemas, unknown entries and nonfinite data without repair', () => {
     const document = createProject('p', 'P');
-    for (let schemaVersion = 1; schemaVersion < 19; schemaVersion++)
+    for (let schemaVersion = 1; schemaVersion < 20; schemaVersion++)
       expect(projectSchema.safeParse({ ...document, schemaVersion }).success).toBe(false);
     for (const field of ['hsl', 'curves'] as const) {
       const value = { ...document.layers[0]!.colour };
@@ -70,7 +70,7 @@ describe('strict schema-19 static advanced row colour', () => {
           }).success,
         ).toBe(false);
     }
-    expect(KEYFRAME_SETTINGS).toHaveLength(11);
+    expect(KEYFRAME_SETTINGS).toHaveLength(12);
     expect(
       projectSchema.safeParse({ ...document, clips: [{ ...createClip('c', 'm', 0, 2), colour: NEUTRAL_COLOUR }] })
         .success,

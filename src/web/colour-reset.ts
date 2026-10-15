@@ -13,7 +13,7 @@ import type { VideoLayer } from '../shared/model.js';
 export const COLOUR_GROUPS: readonly { name: string; settings: readonly KeyframeSetting[] }[] = [
   { name: 'Opacity', settings: ['opacity'] },
   { name: 'Colour', settings: ['temperature', 'tint', 'hue', 'saturation'] },
-  { name: 'Light', settings: ['exposure', 'brightness', 'contrast', 'highlights', 'shadows'] },
+  { name: 'Light', settings: ['exposure', 'brightness', 'contrast', 'highlights', 'shadows', 'whites'] },
   { name: 'Effects', settings: ['hdr'] },
 ];
 

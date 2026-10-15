@@ -66,7 +66,9 @@ async function commitNumber(page: Page, name: string, value: string): Promise<vo
   if (name.includes('keyframe')) await inspectorTab(page, 'Track keyframes');
   else if (name.startsWith('Music')) await inspectorTab(page, 'Audio');
   else if (/Opening|Closing|Transition/.test(name)) await inspectorTab(page, 'Sequence');
-  else if (/^(Opacity|Temperature|Tint|Exposure|Brightness|Contrast|Hue|Saturation|Highlights|Shadows)$/.test(name))
+  else if (
+    /^(Opacity|Temperature|Tint|Exposure|Brightness|Contrast|Hue|Saturation|Highlights|Shadows|Whites)$/.test(name)
+  )
     await inspectorTab(page, 'Track');
   else await inspectorTab(page, 'Clip');
   const field = page.getByRole('spinbutton', { name, exact: true });

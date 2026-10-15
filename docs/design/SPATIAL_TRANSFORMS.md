@@ -1,4 +1,4 @@
-# Track Transform · strict project schema 19
+# Track Transform · strict project schema 20
 
 Current contract for [#131](https://github.com/Plonk42/PasCap/issues/131), which made
 Transform (crop, uniform scale, translation and rotation) **track-owned, like Colour**,
@@ -38,7 +38,7 @@ moving a clip to another track adopts that track's Transform.
 
 ## Required data and ownership
 
-Every schema-19 video track requires `transform: { base, keyframes }`; clips have no
+Every schema-20 video track requires `transform: { base, keyframes }`; clips have no
 `spatial` field, and a saved one is invalid. Both objects and all keyframes are strict:
 no unknown fields, optional legacy values, coercion, persisted defaults or load-time
 repair. `base` is one complete eight-value pose; `keyframes` is a required array of
@@ -61,7 +61,7 @@ Opposite crops may meet or cross (left + right ≥ 1, or top + bottom ≥ 1): th
 covers nothing and the track displays nothing there. It is never rejected or repaired.
 
 Neutral creation values are not defaults for missing saved data. Transform keyframes
-are separate from the eleven shared Colour/Opacity track keyframe channels: they have
+are separate from the twelve shared Colour/Opacity track keyframe channels: they have
 their own list in **Track → Transform** and their own timeline markers. Colour, Opacity,
 clip-only speed and clip-only Detail are unchanged.
 
@@ -228,8 +228,8 @@ salmon **●** custom-speed lane is unchanged.
 
 ## Preservation
 
-Projects and version-1 export receipt snapshots must satisfy strict **schema 19**.
-Incompatible v1–v18 projects/receipt snapshots and completed videos remain untouched.
+Projects and version-1 export receipt snapshots must satisfy strict **schema 20**.
+Incompatible v1–v19 projects/receipt snapshots and completed videos remain untouched.
 Recreate projects deliberately; do not migrate, default-fill, rewrite or delete old
 data automatically. Proxy/PCM and receipt/report format versions do not change; the
 registries are version 2 (full-content checksums).
