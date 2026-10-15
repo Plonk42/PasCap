@@ -137,14 +137,10 @@
   pointer-events: none;
 }
 
-/* Firefox's stepper cannot reserve room, so the unit stays in the padding after it. */
+/* Firefox's stepper cannot reserve room on its left, so the unit overlays the end of the text area beside it. */
 @supports (-moz-appearance: none) {
-  .product-workspace .value-control[data-unit='true'] .number-field-input {
-    padding-right: calc(var(--value-unit-space, 2ch) + 10px);
-  }
-
   .product-workspace .value-control > .value-control-unit {
-    margin-right: 8px;
+    margin-right: 28px;
   }
 }
 

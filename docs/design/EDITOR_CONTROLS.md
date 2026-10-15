@@ -100,7 +100,7 @@ and technical paths stay unchanged; this glossary does not change schema 18.
 - Bounded appearance values, playback rates and gain: native slider plus exact
   numeric draft. A pointer gesture is one edit; Escape, cancellation and lost
   capture restore it. Keyboard range adjustments remain native and precise entry
-  applies on Enter/blur. Invalid numeric drafts remain editable with inline errors.
+  applies on Enter/blur, while the exact field's stepper and ↑/↓ commit each step at once. The stepper sits at the right of the unit. Invalid numeric drafts remain editable with inline errors.
 - Clip Range: exact **Source IN / OUT** text fields display **HH:MM:SS:FF**
   (30 fps NDF) and accept whole original frames or timecode on Enter/blur.
   Invalid drafts retain editable errors; Escape restores. One full-original bar
