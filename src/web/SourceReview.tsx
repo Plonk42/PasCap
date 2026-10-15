@@ -6,6 +6,7 @@ import {
   useLayoutEffect,
   useRef,
   useState,
+  type ChangeEvent,
   type KeyboardEvent,
   type PointerEvent,
   type ReactNode,
@@ -586,6 +587,23 @@ function SourceRangeEditor({
     commit({ mediaId: asset.id, sourceIn: Number(numbers.sourceIn), sourceOut: Number(numbers.sourceOut) });
   };
 
+  const changeNumber = (event: ChangeEvent<HTMLInputElement>, edge: MediaSelectionEdge): void => {
+    const text = event.currentTarget.value;
+    const { nativeEvent } = event;
+    // Chrome steps with a plain Event, Firefox with insertReplacementText; typing is any other InputEvent.
+    const typed =
+      nativeEvent instanceof InputEvent &&
+      nativeEvent.inputType !== '' &&
+      nativeEvent.inputType !== 'insertReplacementText';
+    const next = edge === 'in' ? { ...numbers, sourceIn: text } : { ...numbers, sourceOut: text };
+    setNumbers(next);
+    if (typed || !next.sourceIn.trim() || !next.sourceOut.trim()) return;
+    const candidate = { mediaId: asset.id, sourceIn: Number(next.sourceIn), sourceOut: Number(next.sourceOut) };
+    commit(candidate);
+    const shown = edge === 'in' ? candidate.sourceIn : candidate.sourceOut - 1;
+    if (Number.isInteger(shown) && shown >= 0 && shown < count) onFrame(shown);
+  };
+
   const moveAt = (clientX: number): void => {
     const active = drag.current;
     if (!active) return;
@@ -785,7 +803,7 @@ function SourceRangeEditor({
                 if (event.key === 'Enter' && !event.nativeEvent.isComposing) commitNumbers();
                 onKeyDown(event);
               }}
-              onChange={(event) => setNumbers({ ...numbers, sourceIn: event.target.value })}
+              onChange={(event) => changeNumber(event, 'in')}
             />
           </label>
           <label>
@@ -805,7 +823,7 @@ function SourceRangeEditor({
                 if (event.key === 'Enter' && !event.nativeEvent.isComposing) commitNumbers();
                 onKeyDown(event);
               }}
-              onChange={(event) => setNumbers({ ...numbers, sourceOut: event.target.value })}
+              onChange={(event) => changeNumber(event, 'out')}
             />
           </label>
         </form>

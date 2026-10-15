@@ -2018,6 +2018,22 @@ test('an invalid exact source range keeps its draft, an actionable error and no 
   expect(memory.saves).toBe(0);
 });
 
+test('stepping the numeric source IN and OUT applies each step to the range strip at once', async ({ page }) => {
+  await page.getByRole('button', { name: 'Review pattern-a.mp4', exact: true }).click();
+  await sourceRange(page, 10, 40);
+  const strip = page.locator('.source-range-strip');
+  const sourceIn = page.getByRole('spinbutton', { name: 'Source IN', exact: true });
+  const sourceOut = page.getByRole('spinbutton', { name: 'Source OUT', exact: true });
+  await sourceIn.focus();
+  await sourceIn.press('ArrowUp');
+  await expect(strip).toHaveAttribute('data-source-in', '11');
+  await expect(page.getByRole('slider', { name: 'Source playhead' })).toHaveValue('11');
+  await sourceOut.focus();
+  await sourceOut.press('ArrowDown');
+  await expect(strip).toHaveAttribute('data-source-out', '39');
+  await expect(page.getByRole('slider', { name: 'Source playhead' })).toHaveValue('38');
+});
+
 test('numeric source IN and OUT apply as a pair when focus leaves them, not between the two fields', async ({
   page,
 }) => {
