@@ -34,14 +34,19 @@ See [track appearance](design/ROW_APPEARANCE.md) for ownership, UI and strict st
   same math, not Kelvin/HDR/automatic white balance. See
   [Temperature and Tint](design/TEMPERATURE_AND_TINT.md).
 - Exposure: multiply linear RGB by `2^exposure`.
-- Contrast: `(RGB − 0.18) × contrast + 0.18` (linear middle-grey pivot).
-- Brightness: add its linear offset equally to all channels.
-- Compute `Y = clamp(dot(RGB, [0.2126, 0.7152, 0.0722]), 0, 1)`.
-  Shadows: with encoded luminance `V = OETF(Y)` and `V' = V + shadows × V × (1 − V)^2`,
-  multiply every channel by `EOTF(V') / Y` (`1 + shadows` at `Y = 0`). This tone
-  curve keeps black and white, acts mostly below perceptual mid grey and, as a gain,
-  keeps chroma ratios: dark colours brighten without turning grey. It is monotonic
-  for shadows in −1…1. Highlights: then add `0.25 × highlights × Y^2` to each channel.
+- Tone curves: compute `Y = clamp(dot(RGB, [0.2126, 0.7152, 0.0722]), 0, 1)` and
+  encoded luminance `V = OETF(Y)`, then apply in order:
+  - Contrast `c`: `V ← V + (c − 1) × V × (1 − V) × (2V − 1)`, an S-curve (c > 1) or
+    flattening (c < 1) pivoting at encoded 0.5; its midtone slope is `(1 + c) / 2`.
+  - Brightness `b`: `V ← V + 2b × V × (1 − V)`, moving mid grey by `b / 2`.
+  - Shadows `s`: `V ← V + s × V × (1 − V)^2`, acting mostly below perceptual mid grey.
+
+  Multiply every channel by `EOTF(V) / Y` (`(2 − c)(1 + 2b)(1 + s)` at `Y = 0`). Each
+  curve is monotonic over its whole range and keeps black and white; as a gain the
+  result keeps chroma ratios, so colours never turn grey or clip to black.
+  Highlights: then add `0.25 × highlights × M^2` to each channel, where `M` is the
+  luminance after Contrast and Brightness (`EOTF` of `V` before Shadows).
+
 - Recompute unclipped linear luminance. Define
   `Cb = (B − Y) / 1.8556`, `Cr = (R − Y) / 1.5748`.
   Rotate `(Cb, Cr)` by hue in radians, then multiply by saturation.

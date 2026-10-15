@@ -460,7 +460,7 @@ describe('fractional tetrahedral grade after RGB interpolation', () => {
 
   it('grades the interpolated RGB, not an interpolation of already graded taps', async () => {
     const target = { width: 4, height: 2 };
-    const colour = { ...NEUTRAL_COLOUR, contrast: 2, brightness: 0.1 };
+    const colour = { ...NEUTRAL_COLOUR, contrast: 2, brightness: 0.4 };
     const source = patternedSource(target, target, sample({ translateX: 0.125 }, { colour }));
     for (let pixel = 0; pixel < 8; pixel++) source.rgb.fill(pixel % 2 ? 255 : 0, pixel * 3, pixel * 3 + 3);
     const output = Buffer.alloc(8 * 8);
