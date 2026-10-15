@@ -37,7 +37,13 @@ import { CompositorPool } from './layered-pool.js';
 import { FFV1_SLICE_ARGUMENTS, NATIVE_THREADS } from './native-threads.js';
 import { runProcess } from './process.js';
 import { runRawVideoPass, writeRawFrame, type RawPassReport, type RawVideoPass } from './raw-process.js';
-import { retimeRawVideo, type RawRetimingReport } from './retime-process.js';
+import {
+  excerptFilter,
+  excerptInputArgs,
+  retimeRawVideo,
+  type RawRetimingReport,
+  type SourceExcerpt,
+} from './retime-process.js';
 import { atomicWrite } from './storage.js';
 
 const BASE = ['-hide_banner', '-loglevel', 'error', '-nostdin', '-n'];
@@ -225,16 +231,16 @@ async function sourceOverGroup(lower: Buffer, group: Buffer, signal: AbortSignal
 
 /** Decode/scale tagged original BT.709 BEFORE any CPU grade, once per clip instance. */
 export function layeredDecodeFilter(
-  clip: ProjectDocument['clips'][number],
+  excerpt: Readonly<SourceExcerpt>,
   asset: MediaAsset,
   target: Readonly<ExportProfileSettings>,
 ): string {
   const bounds = fittedContent(asset.metadata, target);
-  return (
-    `trim=start_frame=${clip.sourceIn}:end_frame=${clip.sourceOut},setpts=PTS-STARTPTS,` +
+  return excerptFilter(
+    excerpt,
     `scale=${bounds.width}:${bounds.height}:flags=bicubic:in_color_matrix=bt709:out_color_matrix=bt709:` +
-    `in_range=${asset.metadata.colourRange}:out_range=pc,format=rgb24,` +
-    `pad=${target.width}:${target.height}:${bounds.x}:${bounds.y}:black,setsar=1`
+      `in_range=${asset.metadata.colourRange}:out_range=pc,format=rgb24,` +
+      `pad=${target.width}:${target.height}:${bounds.x}:${bounds.y}:black,setsar=1`,
   );
 }
 
@@ -517,7 +523,7 @@ class SequentialLayeredRenderer {
       frameBytes: this.#rgb[0].length,
       frameBuffer: this.#rgb[0],
       signal: context.signal,
-      decodeArgs: [
+      decodeArgs: (excerpt) => [
         ...BASE,
         '-xerror',
         '-err_detect',
@@ -525,6 +531,7 @@ class SequentialLayeredRenderer {
         '-threads',
         NATIVE_THREADS,
         '-noautorotate',
+        ...excerptInputArgs(excerpt),
         '-i',
         asset.sourcePath,
         '-map',
@@ -535,9 +542,9 @@ class SequentialLayeredRenderer {
         '-filter_threads',
         NATIVE_THREADS,
         '-vf',
-        layeredDecodeFilter(clip, asset, target),
+        layeredDecodeFilter(excerpt, asset, target),
         '-frames:v',
-        String(clip.sourceOut - clip.sourceIn),
+        String(excerpt.sourceOut - excerpt.sourceIn),
         '-fps_mode',
         'passthrough',
         '-c:v',
@@ -558,8 +565,8 @@ class SequentialLayeredRenderer {
     await assertSourceIdentity(asset.sourcePath, asset.fingerprint, true);
     this.#retiming.push(report);
     this.#report.renderedClipIds.push(clip.id);
-    this.#report.originalDecoderProcesses++;
-    this.#report.nativeVideoProcesses += 2;
+    this.#report.originalDecoderProcesses += report.decoderProcesses;
+    this.#report.nativeVideoProcesses += report.decoderProcesses + 1;
     this.#report.peakOriginalVideoDecoders = 1;
     this.#report.peakVideoEncoders = Math.max(1, this.#report.peakVideoEncoders);
     this.#report.peakNativeVideoChildren = Math.max(2, this.#report.peakNativeVideoChildren);

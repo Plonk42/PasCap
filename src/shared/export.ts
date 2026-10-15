@@ -62,6 +62,8 @@ export const EXPORT_RESOURCES = Object.freeze({
   maxIntermediateVideoDecoders: 2,
   maxLosslessClipsOnDisk: 2,
   rawFrameBuffers: 1,
+  // Native `reverse` filter buffer per reversed-clip decoder chunk, in output RGB frames.
+  reverseChunkBytes: 256 * 1024 * 1024,
   stderrBytesPerChild: 32_768,
   terminateGraceMs: 2_000,
   lutSize: 65,

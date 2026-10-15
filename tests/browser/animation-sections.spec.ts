@@ -275,7 +275,7 @@ for (const viewport of [
         document.clips[0]!.speed = { mode: 'constant', rate: 1 };
         document.layers[0]!.transform = createSpatialSettings();
       });
-      expect(document.schemaVersion).toBe(18);
+      expect(document.schemaVersion).toBe(19);
       await inspectorTab(page, 'Track');
       await expect(inspector(page).getByRole('button', { name: /^Animate / })).toHaveCount(0);
       await expect(line(page, 'Colour')).toContainText('0 keyframes');

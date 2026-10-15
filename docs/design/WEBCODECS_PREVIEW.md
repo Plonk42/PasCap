@@ -44,7 +44,8 @@ page sends `start`, `extend`, `credit` and `stop` commands; the worker posts
 `frame` reports, transferring each `VideoFrame` with its exact source frame and
 the lane's stream generation, or a `failed` report.
 
-- A stream is an ascending list of wanted source frames. The worker decodes from
+- A stream is an ascending list of wanted source frames (descending for a
+  [reversed lane](#reversed-lanes)). The worker decodes from
   the keyframe at or before each wanted frame, never earlier than its current
   position, so it skips whole GOPs between distant wanted frames. Frames that are
   decoded but not wanted are closed in the worker immediately.
@@ -52,14 +53,28 @@ the lane's stream generation, or a `failed` report.
   keyframe; the decoder queue holds at most eight chunks.
 - **Credits** bound memory: a lane may have at most six frames decoded but not
   yet returned (queued in the page or in flight). The page returns one credit for
-  each frame it presents, passes or supersedes, together with the lowest source
-  frame it still needs, so a late lane skips frames the clock has already passed
+  each frame it presents, passes or supersedes, together with the source frame the
+  clock needs (`needed`), so a late lane skips frames the clock has already passed
   instead of decoding them.
 - `stop` (or a new `start`) increments the generation: stale reports are closed
   on arrival, never shown. A completed stream flushes its decoder.
 - A failed range read, a range request answered with the whole file, a frame
   beyond the proxy, an unsupported codec configuration or a decoder error is a
   `failed` report for that lane, surfaced as a preview error.
+
+### Reversed lanes
+
+A stream started with `reverse` lists its wanted frames **descending**, for a
+[reversed clip](../SPEED_AND_AUDIO.md#reverse). H.264 decodes only forward, so the
+worker takes the GOP of the highest wanted frame, decodes it from its keyframe up to
+that frame, keeps at most **six** (`REVERSE_GROUP_FRAMES`) of its highest wanted
+frames, flushes the decoder and posts them highest first under the same credits.
+Wanted frames below those six are decoded again from the same keyframe on a later
+pass, so a 15-frame GOP played backwards at 1× costs 27 decodes for 15 frames. The
+next pass starts only once the held frames are posted, bounding a reversed lane to
+**12** decoded frames: six held in the worker plus six outstanding. The credit’s
+`needed` frame skips frames the clock has passed, which are above it when reversed;
+whole passed GOPs are never decoded.
 
 ## Timeline engine
 
@@ -122,13 +137,13 @@ seconds.** Closing, hiding or changing recording or project terminates the worke
 The editor requires WebCodecs `VideoDecoder` with H.264 support, module workers,
 WebGL2 and AudioWorklet. A missing capability is a preview error, not a fallback.
 
-| Resource            | Bound                                                                       |
-| ------------------- | --------------------------------------------------------------------------- |
-| Timeline decoders   | Two per video track, at most 16, in one worker                              |
-| Decoded frames      | At most six outstanding per decoder (page queue plus worker)                |
-| Decoder input       | At most eight queued chunks per decoder; reads of at most 32 frames per GOP |
-| Proxy indexes       | At most 16 cached per worker                                                |
-| Source review       | One worker, one decoder, one 2D canvas                                      |
-| Compositor textures | One per timeline decoder, reused across clips                               |
+| Resource            | Bound                                                                                                         |
+| ------------------- | ------------------------------------------------------------------------------------------------------------- |
+| Timeline decoders   | Two per video track, at most 16, in one worker                                                                |
+| Decoded frames      | At most six outstanding per decoder (page queue plus worker); reversed lanes also hold at most six of one GOP |
+| Decoder input       | At most eight queued chunks per decoder; reads of at most 32 frames per GOP                                   |
+| Proxy indexes       | At most 16 cached per worker                                                                                  |
+| Source review       | One worker, one decoder, one 2D canvas                                                                        |
+| Compositor textures | One per timeline decoder, reused across clips                                                                 |
 
-Music, native export, proxy preparation and the project schema are unchanged.
+Music, proxy preparation and the proxy format are unchanged.

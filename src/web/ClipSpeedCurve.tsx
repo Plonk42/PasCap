@@ -340,6 +340,7 @@ export function ClipSpeedCurve({
       </div>
       <div className="clip-speed-axis-times">
         <span>{formatTimecode(clip.sourceIn)}</span>
+        {clip.reverse && <span title="This reversed clip plays the graph from OUT back to IN.">◂ backwards</span>}
         <span>{formatTimecode(clip.sourceOut)}</span>
       </div>
       <div className="clip-speed-selection">

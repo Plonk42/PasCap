@@ -33,11 +33,13 @@ export interface RetimedClip {
   sourceIn: number;
   sourceOut: number;
   speed: SpeedSettings;
+  /** Plays the selected range from OUT − 1 back to IN; duration is unchanged. */
+  reverse: boolean;
 }
 export interface Retiming {
   duration: number;
   sourceAt: (outputFrame: number) => number;
-  /** Continuous original-source coordinate; exclusive OUT at/after duration. */
+  /** Continuous original-source coordinate; exclusive OUT at/after duration (at/before 0 when reversed). */
   sourcePositionAt: (outputFrame: number) => number;
   outputAt: (sourceFrame: number) => number;
 }
@@ -51,6 +53,25 @@ function finiteFrame(frame: number): number {
   return frame;
 }
 
+/**
+ * Mirror a forward map in output time, so speed keys stay on the same footage.
+ * Moving backwards, a continuous position x shows the frame whose interval
+ * [k, k + 1) it is leaving: ceil(x) − 1. Constant rates equal the source mirror.
+ */
+function reversed(forward: Retiming, sourceIn: number, sourceOut: number): Retiming {
+  const { duration } = forward;
+  return {
+    duration,
+    sourcePositionAt: (frame) => forward.sourcePositionAt(duration - finiteFrame(frame)),
+    sourceAt: (frame) =>
+      Math.max(
+        sourceIn,
+        Math.min(sourceOut - 1, Math.ceil(forward.sourcePositionAt(duration - finiteFrame(frame)) - 1e-8) - 1),
+      ),
+    outputAt: (source) => duration - 1 - forward.outputAt(source),
+  };
+}
+
 const cache = new Map<string, Retiming>();
 /** Constant rates have a closed form; curves integrate dt=ds/rate(s). See SPEED_AND_AUDIO.md. */
 export function compileRetiming(clip: RetimedClip): Retiming {
@@ -60,7 +81,9 @@ export function compileRetiming(clip: RetimedClip): Retiming {
     sourceIn: clip.sourceIn,
     sourceOut: clip.sourceOut,
     speed: Object.freeze(speedSchema.parse(clip.speed)),
+    reverse: clip.reverse,
   });
+  if (typeof clip.reverse !== 'boolean') throw new Error('Retiming requires an explicit playback direction.');
   if (clip.speed.mode === 'curve') {
     clip.speed.keyframes.forEach(Object.freeze);
     Object.freeze(clip.speed.keyframes);
@@ -74,7 +97,7 @@ export function compileRetiming(clip: RetimedClip): Retiming {
     length <= 0
   )
     throw new Error('Retiming requires a positive integer source range within supported frames.');
-  const key = JSON.stringify([clip.sourceIn, clip.sourceOut, clip.speed]);
+  const key = JSON.stringify([clip.sourceIn, clip.sourceOut, clip.speed, clip.reverse]);
   const cached = cache.get(key);
   if (cached) return cached;
   let result: Retiming;
@@ -101,6 +124,7 @@ export function compileRetiming(clip: RetimedClip): Retiming {
     result = compileClipSpeedCurve(clip.sourceIn, clip.sourceOut, clip.speed);
   }
   if (result.duration > 2_147_483_647) throw new RangeError('Track duration exceeds supported project frames.');
+  if (clip.reverse) result = reversed(result, clip.sourceIn, clip.sourceOut);
   Object.freeze(result);
   cache.set(key, result);
   if (cache.size > 128) cache.delete(cache.keys().next().value!);

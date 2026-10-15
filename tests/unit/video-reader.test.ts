@@ -1,5 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { DECODER_FRAME_BUDGET, type VideoReaderReport } from '../../src/preview/video-protocol.js';
+import {
+  DECODER_FRAME_BUDGET,
+  REVERSE_GROUP_FRAMES,
+  type VideoReaderReport,
+} from '../../src/preview/video-protocol.js';
 import { VideoReader, type DecoderPlatform } from '../../src/preview/video-source.js';
 import { buildProxy } from './proxy-fixture.js';
 
@@ -30,7 +34,9 @@ class FakeDecoder {
   ondequeue: (() => void) | null = null;
   config: VideoDecoderConfig | null = null;
   readonly chunks: FakeChunk[] = [];
+  flushes = 0;
   #pending = 0;
+  #needsKey = true;
   constructor(readonly init: VideoDecoderInit) {}
   configure(config: VideoDecoderConfig): void {
     this.config = config;
@@ -38,7 +44,9 @@ class FakeDecoder {
   }
   decode(chunk: FakeChunk): void {
     if (this.state !== 'configured') throw new Error('Decoder is not configured.');
-    if (!this.chunks.length && chunk.type !== 'key') throw new Error('A key chunk must come first.');
+    // Like WebCodecs, the first chunk and the first after a flush must be a key chunk.
+    if (this.#needsKey && chunk.type !== 'key') throw new Error('A key chunk must come first.');
+    this.#needsKey = false;
     expect(chunk.first).toBe(chunk.timestamp & 0xff);
     this.chunks.push(chunk);
     this.#pending++;
@@ -59,6 +67,8 @@ class FakeDecoder {
   }
   async flush(): Promise<void> {
     while (this.#pending) await new Promise((resolve) => setTimeout(resolve, 0));
+    this.flushes++;
+    this.#needsKey = true;
   }
   close(): void {
     this.state = 'closed';
@@ -119,7 +129,15 @@ afterEach(() => {
 describe('WebCodecs video reader', () => {
   it('decodes from the keyframe before the first frame, outputs only requested frames and closes the rest', async () => {
     const video = reader();
-    video.receive({ kind: 'start', lane: 0, generation: 1, url: 'http://proxy/a', frames: [20, 21], complete: true });
+    video.receive({
+      kind: 'start',
+      reverse: false,
+      lane: 0,
+      generation: 1,
+      url: 'http://proxy/a',
+      frames: [20, 21],
+      complete: true,
+    });
     await settle();
     expect(delivered()).toEqual([20, 21]);
     expect(decoders[0]!.config).toMatchObject({
@@ -143,10 +161,18 @@ describe('WebCodecs video reader', () => {
   it('holds at most the frame budget until the page returns credits', async () => {
     const video = reader();
     const all = Array.from({ length: 30 }, (_value, frame) => frame);
-    video.receive({ kind: 'start', lane: 2, generation: 4, url: 'http://proxy/a', frames: all, complete: false });
+    video.receive({
+      kind: 'start',
+      reverse: false,
+      lane: 2,
+      generation: 4,
+      url: 'http://proxy/a',
+      frames: all,
+      complete: false,
+    });
     await settle();
     expect(delivered(2)).toEqual(all.slice(0, DECODER_FRAME_BUDGET));
-    video.receive({ kind: 'credit', lane: 2, generation: 4, count: 2, minimum: 2 });
+    video.receive({ kind: 'credit', lane: 2, generation: 4, count: 2, needed: 2 });
     await settle();
     expect(delivered(2)).toEqual(all.slice(0, DECODER_FRAME_BUDGET + 2));
     expect(reports.every((report) => report.kind !== 'frame' || report.generation === 4)).toBe(true);
@@ -158,6 +184,7 @@ describe('WebCodecs video reader', () => {
     const video = reader();
     video.receive({
       kind: 'start',
+      reverse: false,
       lane: 0,
       generation: 1,
       url: 'http://proxy/a',
@@ -169,13 +196,21 @@ describe('WebCodecs video reader', () => {
     expect(decoders[0]!.chunks.map((chunk) => chunk.timestamp)).toEqual([0, 15, 16, 30, 31, 32]);
   });
 
-  it('drops frames the clock has passed and jumps to the keyframe before its minimum', async () => {
+  it('drops frames the clock has passed and jumps to the keyframe before the needed frame', async () => {
     const video = reader();
     const all = Array.from({ length: 40 }, (_value, frame) => frame);
-    video.receive({ kind: 'start', lane: 0, generation: 1, url: 'http://proxy/a', frames: all, complete: true });
+    video.receive({
+      kind: 'start',
+      reverse: false,
+      lane: 0,
+      generation: 1,
+      url: 'http://proxy/a',
+      frames: all,
+      complete: true,
+    });
     await settle();
     expect(delivered()).toEqual(all.slice(0, DECODER_FRAME_BUDGET));
-    video.receive({ kind: 'credit', lane: 0, generation: 1, count: DECODER_FRAME_BUDGET, minimum: 25 });
+    video.receive({ kind: 'credit', lane: 0, generation: 1, count: DECODER_FRAME_BUDGET, needed: 25 });
     await settle();
     expect(delivered().slice(DECODER_FRAME_BUDGET)).toEqual(all.slice(25, 25 + DECODER_FRAME_BUDGET));
     const decoded = decoders[0]!.chunks.map((chunk) => chunk.timestamp);
@@ -185,20 +220,52 @@ describe('WebCodecs video reader', () => {
 
   it('extends a running stream and rejects frames that do not continue it', async () => {
     const video = reader();
-    video.receive({ kind: 'start', lane: 0, generation: 1, url: 'http://proxy/a', frames: [0, 1], complete: false });
+    video.receive({
+      kind: 'start',
+      reverse: false,
+      lane: 0,
+      generation: 1,
+      url: 'http://proxy/a',
+      frames: [0, 1],
+      complete: false,
+    });
     video.receive({ kind: 'extend', lane: 0, generation: 1, frames: [2, 3], complete: true });
     await settle();
     expect(delivered()).toEqual([0, 1, 2, 3]);
-    video.receive({ kind: 'start', lane: 1, generation: 1, url: 'http://proxy/a', frames: [5], complete: false });
+    video.receive({
+      kind: 'start',
+      reverse: false,
+      lane: 1,
+      generation: 1,
+      url: 'http://proxy/a',
+      frames: [5],
+      complete: false,
+    });
     video.receive({ kind: 'extend', lane: 1, generation: 1, frames: [4], complete: true });
-    expect(failures()).toEqual(['Video stream extensions must continue its ascending frames.']);
+    expect(failures()).toEqual(['Video stream extensions must continue its frames in order.']);
   });
 
   it('closes late frames of a superseded stream and reads each index once', async () => {
     const video = reader();
-    video.receive({ kind: 'start', lane: 0, generation: 1, url: 'http://proxy/a', frames: [10], complete: true });
+    video.receive({
+      kind: 'start',
+      reverse: false,
+      lane: 0,
+      generation: 1,
+      url: 'http://proxy/a',
+      frames: [10],
+      complete: true,
+    });
     await new Promise((resolve) => setTimeout(resolve, 0));
-    video.receive({ kind: 'start', lane: 0, generation: 2, url: 'http://proxy/a', frames: [40], complete: true });
+    video.receive({
+      kind: 'start',
+      reverse: false,
+      lane: 0,
+      generation: 2,
+      url: 'http://proxy/a',
+      frames: [40],
+      complete: true,
+    });
     await settle();
     expect(reports).toEqual([expect.objectContaining({ kind: 'frame', generation: 2, sourceFrame: 40 })]);
     expect(requests.filter((request) => request.endsWith('bytes=0-65535'))).toHaveLength(1);
@@ -211,7 +278,7 @@ describe('WebCodecs video reader', () => {
     ['http://proxy/a', [60], 'Source frame 60 is beyond the 60-frame editing proxy.'],
   ])('reports %s %j as a failure', async (url, requested, message) => {
     const video = reader();
-    video.receive({ kind: 'start', lane: 3, generation: 7, url, frames: requested, complete: true });
+    video.receive({ kind: 'start', reverse: false, lane: 3, generation: 7, url, frames: requested, complete: true });
     await settle();
     expect(reports).toEqual([{ kind: 'failed', lane: 3, generation: 7, message }]);
   });
@@ -219,12 +286,28 @@ describe('WebCodecs video reader', () => {
   it('reports an unsupported configuration and a decoder error', async () => {
     supported = false;
     const video = reader();
-    video.receive({ kind: 'start', lane: 0, generation: 1, url: 'http://proxy/a', frames: [1], complete: true });
+    video.receive({
+      kind: 'start',
+      reverse: false,
+      lane: 0,
+      generation: 1,
+      url: 'http://proxy/a',
+      frames: [1],
+      complete: true,
+    });
     await settle();
     expect(failures()).toEqual(['This browser cannot decode avc1.64001f editing proxies with WebCodecs.']);
     supported = true;
     const other = reader();
-    other.receive({ kind: 'start', lane: 0, generation: 2, url: 'http://proxy/a', frames: [1], complete: false });
+    other.receive({
+      kind: 'start',
+      reverse: false,
+      lane: 0,
+      generation: 2,
+      url: 'http://proxy/a',
+      frames: [1],
+      complete: false,
+    });
     await settle();
     decoders[0]!.init.error(new DOMException('Decoding failed.', 'EncodingError'));
     expect(failures().at(-1)).toBe('Decoding failed.');
@@ -233,9 +316,110 @@ describe('WebCodecs video reader', () => {
 
   it('rejects returning more credits than delivered frames', async () => {
     const video = reader();
-    video.receive({ kind: 'start', lane: 0, generation: 1, url: 'http://proxy/a', frames: [0], complete: false });
+    video.receive({
+      kind: 'start',
+      reverse: false,
+      lane: 0,
+      generation: 1,
+      url: 'http://proxy/a',
+      frames: [0],
+      complete: false,
+    });
     await settle();
-    video.receive({ kind: 'credit', lane: 0, generation: 1, count: 2, minimum: 0 });
+    video.receive({ kind: 'credit', lane: 0, generation: 1, count: 2, needed: 0 });
     expect(failures()).toEqual(['Video stream credits exceed its delivered frames.']);
+  });
+});
+
+describe('reversed WebCodecs video reader', () => {
+  const descending = (from: number, to: number): number[] =>
+    Array.from({ length: from - to + 1 }, (_value, index) => from - index);
+  function start(video: VideoReader, frames: number[], complete = true): void {
+    video.receive({ kind: 'start', reverse: true, lane: 0, generation: 1, url: 'http://proxy/a', frames, complete });
+  }
+  /** Return every outstanding credit with the clock at `needed`, as the page does when it presents frames. */
+  function credit(video: VideoReader, needed: number): void {
+    const count = delivered().length - credited;
+    credited += count;
+    if (count) video.receive({ kind: 'credit', lane: 0, generation: 1, count, needed });
+  }
+  let credited = 0;
+  beforeEach(() => {
+    credited = 0;
+  });
+
+  it('decodes each GOP forward and posts it backwards within the frame budget', async () => {
+    const video = reader();
+    start(video, descending(20, 13));
+    await settle();
+    expect(delivered()).toEqual(descending(20, 15));
+    // The next GOP pass is decoded and held, but not posted without credits.
+    expect(decoders[0]!.chunks.map((chunk) => chunk.timestamp)).toEqual([
+      ...descending(20, 15).reverse(),
+      ...descending(14, 0).reverse(),
+    ]);
+    expect(decoders[0]!.chunks.filter((chunk) => chunk.type === 'key').map((chunk) => chunk.timestamp)).toEqual([
+      15, 0,
+    ]);
+    credit(video, 15);
+    await settle();
+    expect(delivered()).toEqual(descending(20, 13));
+    const live = frames.filter((frame) => !frame.closed).map((frame) => frame.timestamp);
+    expect(live.sort((left, right) => right - left)).toEqual(descending(20, 13));
+    expect(decoders[0]!.state).toBe('closed');
+  });
+
+  it('decodes a GOP again from its keyframe when it holds more wanted frames than one pass keeps', async () => {
+    const video = reader();
+    start(video, descending(14, 0));
+    for (let round = 0; round < 6; round++) {
+      await settle();
+      credit(video, delivered().at(-1) ?? 14);
+    }
+    expect(delivered()).toEqual(descending(14, 0));
+    const keys = decoders[0]!.chunks.filter((chunk) => chunk.type === 'key');
+    expect(keys).toHaveLength(Math.ceil(15 / REVERSE_GROUP_FRAMES));
+    expect(decoders[0]!.chunks).toHaveLength(15 + 9 + 3);
+    expect(decoders[0]!.flushes).toBeGreaterThanOrEqual(3);
+  });
+
+  it('skips frames the clock has passed above the needed frame', async () => {
+    const video = reader();
+    start(video, descending(44, 0));
+    await settle();
+    expect(delivered()).toEqual(descending(44, 39));
+    credit(video, 20);
+    for (let round = 0; round < 4; round++) {
+      await settle();
+      credit(video, 20);
+    }
+    expect(delivered().slice(DECODER_FRAME_BUDGET, DECODER_FRAME_BUDGET + 3)).toEqual([20, 19, 18]);
+    expect(
+      delivered()
+        .slice(DECODER_FRAME_BUDGET)
+        .every((frame) => frame <= 20),
+    ).toBe(true);
+    // The two GOP-30 passes before the credit are not repeated, and the passed part of GOP 15 is never decoded.
+    const decoded = decoders[0]!.chunks.map((chunk) => chunk.timestamp);
+    expect(decoded.filter((frame) => frame === 30)).toHaveLength(2);
+    expect(decoded.filter((frame) => frame > 20 && frame < 30)).toEqual([]);
+  });
+
+  it('rejects frames that do not follow the playback direction', async () => {
+    const video = reader();
+    start(video, [3, 4]);
+    expect(failures()).toEqual(['Video stream frames must follow its playback direction.']);
+    const other = reader();
+    other.receive({
+      kind: 'start',
+      reverse: true,
+      lane: 1,
+      generation: 1,
+      url: 'http://proxy/a',
+      frames: [5],
+      complete: false,
+    });
+    other.receive({ kind: 'extend', lane: 1, generation: 1, frames: [6], complete: true });
+    expect(failures().at(-1)).toBe('Video stream extensions must continue its frames in order.');
   });
 });

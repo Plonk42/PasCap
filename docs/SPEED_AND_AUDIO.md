@@ -1,4 +1,4 @@
-# Speed and audio contract · project v18
+# Speed and audio contract · project v19
 
 Nine video track-owned scalar Colour controls include Temperature/Tint (−1…1, neutral 0),
 whose normalized linear gains precede Exposure. Positive Temperature warms;
@@ -14,7 +14,7 @@ likewise appearance-only; see [detail filters](design/DETAIL_FILTERS.md#hdr-look
 
 ## Clip speed
 
-Speed belongs only to the clip and is positive, **0.1×–8×**. Strict schema 18
+Speed belongs only to the clip and is positive, **0.1×–8×**. Strict schema 19
 requires each clip's `speed` to be `{ mode: 'constant', rate }` or
 `{ mode: 'curve', keyframes }`; there is no track Speed setting, ramp mode or
 project-wide speed field. A clip's duration and sampled frames depend only on its
@@ -64,12 +64,44 @@ clip creates a flat curve at its rate; choosing **Constant speed** returns to
 constant 1×. Removing the last keyframe keeps its rate as constant speed. Keyframes
 remain ordinary editable data, not hidden saved preset IDs.
 
+### Reverse
+
+Reverse is a playback **direction**, not a negative rate
+([#171](https://github.com/Plonk42/PasCap/issues/171)). Every clip requires a boolean
+`reverse`; new clips are `false`. A reversed clip plays its selected range from its
+last included frame (source OUT − 1) back to source IN, with exactly the same
+duration as the forward clip. The retiming map mirrors the forward map in output
+time: with forward continuous position $P(t)$, the reversed position at output frame
+$f$ is $P(d-f)$ and it shows source frame $\lceil P(d-f)\rceil-1$, clamped to IN/OUT.
+Speed keyframes therefore stay anchored to the same original footage: a 0.25× moment
+lasts as long reversed, just earlier or later in the clip. At constant speed this is
+the exact source mirror $\text{IN}+\text{OUT}-1-\text{forward}(f)$. Presets and the
+curve graph keep their source-frame order; Clip → Range keeps editing source IN/OUT.
+
+Timeline edits act on the clip as displayed. The left trim handle and **Trim start**
+(Q) trim source OUT, the right handle and **Trim end** (W) trim source IN; Ripple-off
+left trims still keep the timeline OUT, recovering footage after source OUT. Split
+keeps the frame at the playhead as the first image of the right piece; split and cut
+pieces are all reversed, the left piece holding the higher source frames. Duplicate
+and Move to new track copy the flag. Toggling Reverse never moves or resizes the clip
+and is one Undo step. Track Colour, Opacity, Transform and keyframes stay in project
+time. Music has no reverse and source-video audio stays disabled.
+
+Preview decodes reversed clips GOP by GOP ([decoding](design/WEBCODECS_PREVIEW.md#reversed-lanes)).
+Native export decodes the original in serial chunks from OUT down to IN: each chunk
+decoder seeks exactly (originals have verified PTS $n/\text{fps}$ from 0), trims its
+frames and reverses them with FFmpeg's `reverse` filter, which holds at most
+`floor(256 MiB / output RGB frame)` frames (10 at UHD, 97 at 720p). Node keeps its
+single raw frame; one original decoder runs at a time, so the reader/encoder/child
+bounds, lossless intermediates and scratch are unchanged. Decoding cost grows with
+the original's GOP length, since each chunk decodes from its preceding keyframe.
+
 ### Placement, preview and native parity
 
 `calculateLayout()` places each clip with its own compiled **`PlacedClip.retiming`**,
 the single authoritative map for layout, UI, preview seeking, decoder rates, inverse
 queries, native original retiming/span checks and storage planning, in static and
-composited export alike. Native output requires a monotonic,
+composited export alike. Native output requires a monotonic (descending when reversed),
 integer, in-range `sourceAt` result and exact frame counts; a malformed supplied
 map is rejected rather than falling back to a clip's stored speed.
 
@@ -147,11 +179,14 @@ invalid drafts remain editable without clamping or rounding.
 stored preference. While expanded, its keyframe line shows **N keyframes**, one
 native **Previous/Next** pair and **Reset** (constant 1×, removing the keyframes);
 the line is hidden while collapsed. Below it come the source → output duration
-overview, the **Speed mode** select (**Constant speed / Custom curve**), the
+overview, the **Speed mode** select (**Constant speed / Custom curve**), the native
+**Reverse** checkbox (one Undo step; the section badge then shows ◂), the
 constant **0.25×–4×** presets (constant mode only) and the main **Speed ×** row; in
-curve mode that row sits between the curve presets and the graph.
+curve mode that row sits between the curve presets and the graph, whose axis notes
+**◂ backwards** for a reversed clip. Reset leaves the direction unchanged.
 
-Previous/Next visits **all retained clip speed keyframes**, including off-trim
+Previous/Next visits **all retained clip speed keyframes** in timeline order (higher
+source frames first when reversed), including off-trim
 keyframes and the original exclusive OUT, previewing the nearest mapped image
 through authoritative `PlacedClip.retiming`: off-trim keyframes use the first/last
 available output image, and original OUT never requests an out-of-range image.
@@ -239,6 +274,8 @@ Inside each clip rectangle, custom-speed source keyframes appear as a boxed salm
 the track row; each title lists the keyframe's rate. Positions follow authoritative retiming: each marker
 sits on the output frame showing its source image, where a click puts the playhead. Off-trim keyframes are
 omitted. Exclusive OUT has a boundary marker that seeks the final available frame.
+A reversed clip mirrors these positions: OUT is its left boundary, seeking its first
+frame, and source IN sits on its last frame.
 Click, Enter or Space selects the clip, seeks its nearest mapped image and opens
 Clip → Speed; a click edits nothing.
 
@@ -246,8 +283,8 @@ Speed keyframes slide like the other timeline keyframe markers, through the shar
 `useKeyframeSlide`/`KeyframeMarkers`. Drag horizontally: after a 3-pixel threshold,
 capture-relative output-frame travel maps through the captured placed retiming to
 an original source frame, snapping to boundaries and the playhead (Alt bypasses;
-snapping to the clip end lands on exclusive OUT). Or press ←/→ for one source frame
-(Shift ten). Drafts preview without history/save, the preview following the dragged
+snapping to the clip end lands on exclusive OUT for a forward clip). Or press ←/→ for one source frame
+(Shift ten), along the timeline: on a reversed clip → moves to a lower source frame. Drafts preview without history/save, the preview following the dragged
 keyframe. A valid release is one `speed` command and one Undo step. Moving a speed
 keyframe retimes the clip, so its duration and Ripple suffix can change;
 overlap/fade/transition conflicts reject the release. Escape, pointer cancellation,
@@ -260,7 +297,7 @@ frame for main capture.
 
 ## Music
 
-Strict schema 18 requires `music: MusicTrack[]`, with **0–8 independent music tracks**
+Strict schema 19 requires `music: MusicTrack[]`, with **0–8 independent music tracks**
 and unique required track `id` values; `[]` means no music. Each music track
 requires `mediaId`, `sourceIn`, `sourceOut`, `start`, `duration`, `gainDb`, `fadeIn`,
 `fadeOut` and `loop`. Several music tracks can use the same registered recording
@@ -388,7 +425,7 @@ preview caches remain unchanged but are not current playback input. Missing curr
 PCM caches appear as an explicit **Prepare** action on the file in Media → Music;
 startup/library reads never prepare, rewrite or delete them. Prepare deliberately
 to create the current cache, retaining originals and older generated files. Project
-schema is 18; the music and video registries are version 2 (`music.json`,
+schema is 19; the music and video registries are version 2 (`music.json`,
 `videos.json`, with full-content checksums), while video-proxy and PCM cache formats
 are unchanged. Native export
 still reads original audio, not the preview transport.
@@ -412,10 +449,10 @@ cancellation cleans only owned scratch/partials and preserves completed outputs.
 
 ## Versioning
 
-Project schema **v18** requires explicit `media.videoIds` and `media.audioIds` arrays,
+Project schema **v19** requires explicit `media.videoIds` and `media.audioIds` arrays,
 unique and limited to 10,000 IDs each, plus complete video track colour with Temperature/Tint/HDR
 and static HSL/curves, clip constant or 1–256-keyframe custom-curve
-speed, required video track `transform: { base, keyframes }` with eight-value base and
+speed and a boolean `reverse`, required video track `transform: { base, keyframes }` with eight-value base and
 0–256 project-frame keyframes with required per-setting easing and `reset`, track
 keyframe arrays with all eleven nullable value fields, placement and music
 source OUT. `music` is a required 0–8 array with unique required music track IDs and
@@ -433,7 +470,7 @@ Track `opacity` is valid and required; saved `clip.opacity` and old
 New projects have empty video/music bins. Standalone audio imports belong
 to the open project's bin; every music track's references also count as membership.
 Global registered music/proxies are reusable on deliberate import, never automatically
-inherited by a new project. Earlier v1–v17 projects and export receipt snapshots remain unchanged
+inherited by a new project. Earlier v1–v18 projects and export receipt snapshots remain unchanged
 and incompatible. There is no migration, compatibility reader, null fallback, default-field
 injection or automatic deletion; recreate projects and import their media to reuse
 registered assets/verified ready proxies. Confirmed project deletion affects only
@@ -443,7 +480,7 @@ Video-proxy/current PCM formats, source guards and native video budgets are unch
 native composition uses the sole Opacity contract without a track multiplier.
 Preview uses the current explicitly prepared PCM cache described above.
 
-Export receipts remain **version 1** with a strict **v18** snapshot, required
+Export receipts remain **version 1** with a strict **v19** snapshot, required
 `musicSources` captured unique-original array and `settings.audio` identified
 instance-plan array (`[]` for each without music). Plans preserve independent
 timing/gain/fades/loop; several may refer to the same captured original. The plan

@@ -41,8 +41,10 @@ export function validateReference(project: ProjectDocument, library: MediaLibrar
       'The diagnostic reference does not support video tracks, opacity or shared project-frame track keyframes (including speed). Use Export.',
     );
   }
-  if (snapshot.clips.some((clip) => clip.speed.mode !== 'constant' || clip.speed.rate !== 1))
-    throw new ServiceError('The diagnostic reference only supports normal speed. Use Export for retimed clips.');
+  if (snapshot.clips.some((clip) => clip.reverse || clip.speed.mode !== 'constant' || clip.speed.rate !== 1))
+    throw new ServiceError(
+      'The diagnostic reference only supports normal forward speed. Use Export for retimed or reversed clips.',
+    );
   if (hasSpatialEdits(snapshot.layers[0]!.transform))
     throw new ServiceError('The diagnostic reference does not support Transform edits or keyframes. Use Export.');
   if (snapshot.clips.some((clip) => !isNeutralDetail(clip.detail)) || snapshot.layers[0]!.colour.hdr !== 0)

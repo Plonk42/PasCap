@@ -3,7 +3,7 @@
 ## Scope and decisions
 
 Controls use native elements, the existing editor layout and strict project
-schema 18, including complete track Colour and Transform, clip-only speed and 0–8 independent music tracks. No UI framework or icon dependency is introduced. Exact
+schema 19, including complete track Colour and Transform, clip-only speed and reverse and 0–8 independent music tracks. No UI framework or icon dependency is introduced. Exact
 timing entry is retained: Clip Range uses timecode text fields and a
 full-original range bar; other frame/duration/fade fields retain numeric steppers.
 
@@ -12,7 +12,7 @@ full-original range bar; other frame/duration/fade fields retain numeric stepper
 | Area                          | Control                                                                                                                                                                                           | Contract                                                                                                                                                                                         |
 | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Colour / Opacity              | Native slider and exact field in main/stored editors; Temperature, Tint, Saturation, Hue and Opacity have coloured tracks; main sliders grouped under Opacity, Colour, Light and Effects headings | Opacity UI 0–100%, neutral 100%; stored track/keyframe values remain 0–1                                                                                                                         |
-| Speed                         | Clip constant rate or 1–256 source-frame keyframes; Keyframe Speed circle                                                                                                                         | Bounded slider/exact-value pattern; retain presets and curve graph                                                                                                                               |
+| Speed                         | Clip constant rate or 1–256 source-frame keyframes; Keyframe Speed circle; native **Reverse** checkbox                                                                                            | Bounded slider/exact-value pattern; retain presets and curve graph                                                                                                                               |
 | Transform                     | Eight track pose sliders/exact fields, each with its own blue triangle and Previous/Next, stored keyframe list, default keyframe toggle                                                           | Works exactly like Colour: explicit per-setting project-frame capture; distinguish stored time from preview                                                                                      |
 | Detail                        | Clip Sharpen, Clarity and Denoise sliders/exact fields with **Reset detail**                                                                                                                      | Static, no keyframes; live image preview while dragging; one Undo per release                                                                                                                    |
 | Audio                         | Music track / Recording selects, Add music track, selected-track trash and gain slider                                                                                                            | Independent identified tracks; exact gain draft; import never implicitly places                                                                                                                  |
@@ -38,7 +38,7 @@ neither needs replacing merely to make their implementation identical.
 
 This is the source of terminology for visible UI text, help, accessible names,
 test selectors and current-behaviour guides. Internal identifiers, persisted fields
-and technical paths stay unchanged; this glossary does not change schema 18.
+and technical paths stay unchanged; this glossary does not change schema 19.
 
 - **Recording**: the complete original file, video or music. Use **video recording**
   or **music recording** when the distinction matters; never bare “video” for a file.
@@ -66,6 +66,9 @@ and technical paths stay unchanged; this glossary does not change schema 18.
 - **Opacity**, **Speed**, **Colour** and **Ripple** retain their established names.
   Opacity is track-owned coverage, not an additional grading operation. Main and
   stored sliders/exact fields use 0–100%, neutral 100%; track/keyframe storage stays 0–1.
+- **Reverse** is a clip's playback direction (Clip → Speed checkbox), never a negative
+  speed. Edits name the result as displayed: **Trim start** of a reversed clip trims
+  its source OUT.
 - **Temperature / Tint** are track-owned normalized −1…1 scalar Colour controls,
   neutral 0: positive Temperature warms, positive Tint adds magenta. They precede
   Exposure, are independently animatable and work on empty tracks, with the standard

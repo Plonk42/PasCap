@@ -1,6 +1,6 @@
 # Desktop workspace and recovery
 
-The workspace uses **strict schema 18 with complete required video track colour and Transform, clip-only speed, uniform video tracks, required per-track
+The workspace uses **strict schema 19 with complete required video track colour and Transform, clip-only speed and reverse, uniform video tracks, required per-track
 Ripple/transitions/fades, 0–8 independently identified music tracks, project-specific
 video/music bins and draggable shared project-time track keyframes**, with per-setting channel navigation. Layout preferences,
 stored-keyframe inspection and recovery feedback remain editor-only. Source protection,
@@ -334,7 +334,8 @@ constant 0.25×–4× presets and the **Speed ×** row. Its **Keyframe Speed** c
 captures or removes a Linear keyframe at the actually displayed source frame,
 then preview follows the retimed keyframe; the rate is read-only in curve mode
 without a keyframe there. Reset returns the clip to constant 1×. Curve presets
-(including Ramp up/Ramp down) replace its keyframes. Details:
+(including Ramp up/Ramp down) replace its keyframes. The native **Reverse** checkbox
+plays the clip backwards with the same duration, in one Undo step. Details:
 [speed and audio](SPEED_AND_AUDIO.md#editing-speed).
 
 ### Track Transform animation
@@ -535,7 +536,7 @@ there is no automatic write retry. Late folder reads are aborted on navigation/d
 browser roots: a music or video recording, or a folder as an explicit **recursive
 whole-folder import** that can queue substantial work. It never silently extends root
 configuration. No original is
-copied: strict schema 18 references registered originals in place, with only
+copied: strict schema 19 references registered originals in place, with only
 generated proxies/thumbnails, metadata, exports/receipts and scratch written locally.
 
 There is no upload endpoint, browser file picker, optional copy flow or true
@@ -697,10 +698,10 @@ saved document. It never deletes original recordings, shared registry entries,
 proxies/cache files, successful MP4s or receipts. This is not cache garbage
 collection; another project's membership and immutable export snapshots are unaffected.
 
-Only strict v18 projects and v18 project snapshots in version-1 export receipts are interpreted.
+Only strict v19 projects and v19 project snapshots in version-1 export receipts are interpreted.
 Every video track requires complete Colour, including `temperature`, `tint` and `hdr` bases
 and static HSL/curves; missing fields and clip colour/correction are invalid.
-Every clip requires constant or 1–256-keyframe custom-curve speed; every video track
+Every clip requires constant or 1–256-keyframe custom-curve speed and a boolean `reverse`; every video track
 requires complete Transform base/per-setting project-frame keyframes with easing and
 `reset`; saved `clip.spatial` or missing track Transform is invalid, not default-filled.
 The required `music` array holds 0–8 music tracks with unique required `id` values and
@@ -720,7 +721,7 @@ eleven nullable fields, in control order: `opacity`, `temperature`,
 `shadows`, `hdr`. HSL/curves remain static. Track
 `opacity` is the sole valid stored value; saved `clip.opacity` and old
 `clipOpacity`/`layerOpacity` channels are invalid, not ignored or defaulted.
-Earlier v1–v17 projects/receipt snapshots are preserved, incompatible
+Earlier v1–v18 projects/receipt snapshots are preserved, incompatible
 and never migrated or rewritten with fallback/default local fields or old-format
 readers. **Create a new
 project** and import its media deliberately; there is no automatic deletion of
@@ -816,7 +817,7 @@ invalid release leaves the saved document and history unchanged.
 For an HTTP 409 or incompatible save response, **Review latest save** explains:
 
 1. **Keep editing this draft** — no saved document changes; the save error persists.
-2. **Download unsaved project** — download a strict v18 JSON snapshot with the current
+2. **Download unsaved project** — download a strict v19 JSON snapshot with the current
    local changes/expected revision before replacing them.
 3. **Discard local changes and reload** — explicitly replace local history/document
    with a newly read saved version. It performs no overwrite POST/PUT.
