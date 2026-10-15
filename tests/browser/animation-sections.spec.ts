@@ -275,7 +275,7 @@ for (const viewport of [
         document.clips[0]!.speed = { mode: 'constant', rate: 1 };
         document.layers[0]!.transform = createSpatialSettings();
       });
-      expect(document.schemaVersion).toBe(21);
+      expect(document.schemaVersion).toBe(22);
       await inspectorTab(page, 'Track');
       await expect(inspector(page).getByRole('button', { name: /^Animate / })).toHaveCount(0);
       await expect(line(page, 'Colour')).toContainText('0 keyframes');
@@ -382,7 +382,7 @@ for (const viewport of [
       await unchanged(page, document);
     });
 
-    test('Colour header visits Opacity, all eleven scalar settings and HDR and retains main arrows', async ({
+    test('Colour header visits Opacity, all twelve scalar settings and HDR and retains main arrows', async ({
       page,
     }) => {
       const document = await fixture(page, (document) => {
@@ -404,7 +404,7 @@ for (const viewport of [
       const next = navigation(page, 'Colour', 'Next');
       const previous = navigation(page, 'Colour', 'Previous');
       await expect(previous).toBeDisabled();
-      for (const frame of [5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60]) {
+      for (const frame of [5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65]) {
         await next.click();
         await previewAt(page, document, frame);
         await expect(layerKeyframes(page, TRACK).locator('.keyframe-row[aria-current="true"]')).toHaveAttribute(
@@ -414,7 +414,7 @@ for (const viewport of [
       }
       await expect(next).toBeDisabled();
       await previous.click();
-      await previewAt(page, document, 55);
+      await previewAt(page, document, 60);
       await unchanged(page, document);
     });
 

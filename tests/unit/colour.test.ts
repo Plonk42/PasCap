@@ -127,6 +127,24 @@ describe('authoritative colour transform', () => {
     expect(grey[1]).toBeCloseTo(grey[2], 10);
     expect(gradePixel([0.4, 0.4, 0.4], { ...NEUTRAL_COLOUR, hue: 130 })[0]).toBeCloseTo(0.4, 10);
   });
+  it('vibrance saturates muted colours most and leaves grey and saturated colours alone', () => {
+    const chroma = (rgb: RGB) => {
+      const linear = rgb.map(decode709);
+      return (Math.max(...linear) - Math.min(...linear)) / Math.max(...linear);
+    };
+    const muted: RGB = [0.55, 0.62, 0.7];
+    const strong: RGB = [0.9, 0.3, 0.1];
+    for (const vibrance of [-1, 1]) {
+      const settings = { ...NEUTRAL_COLOUR, vibrance };
+      expect(gradePixel([0.4, 0.4, 0.4], settings)[0]).toBeCloseTo(0.4, 10);
+      expect(Math.sign(chroma(gradePixel(muted, settings)) - chroma(muted))).toBe(vibrance);
+    }
+    const boosted = { ...NEUTRAL_COLOUR, vibrance: 1 };
+    const saturated = { ...NEUTRAL_COLOUR, saturation: 1.5 };
+    expect(chroma(gradePixel(strong, boosted)) - chroma(strong)).toBeLessThan(0.01);
+    expect(chroma(gradePixel(strong, saturated)) - chroma(strong)).toBeGreaterThan(0.02);
+    expect(chroma(gradePixel(muted, boosted))).toBeGreaterThan(chroma(muted) + 0.08);
+  });
   it('clips gamut and rejects incomplete/out-of-range/non-finite settings', () => {
     const result = gradePixel([1, 0.8, 0], {
       ...NEUTRAL_COLOUR,

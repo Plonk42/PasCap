@@ -3,7 +3,7 @@
 ## Scope and decisions
 
 Controls use native elements, the existing editor layout and strict project
-schema 21, including complete track Colour and Transform, clip-only speed and reverse and 0–8 independent music tracks. No UI framework or icon dependency is introduced. Exact
+schema 22, including complete track Colour and Transform, clip-only speed and reverse and 0–8 independent music tracks. No UI framework or icon dependency is introduced. Exact
 timing entry is retained: Clip Range uses timecode text fields and a
 full-original range bar; other frame/duration/fade fields retain numeric steppers.
 
@@ -38,7 +38,7 @@ neither needs replacing merely to make their implementation identical.
 
 This is the source of terminology for visible UI text, help, accessible names,
 test selectors and current-behaviour guides. Internal identifiers, persisted fields
-and technical paths stay unchanged; this glossary does not change schema 21.
+and technical paths stay unchanged; this glossary does not change schema 22.
 
 - **Recording**: the complete original file, video or music. Use **video recording**
   or **music recording** when the distinction matters; never bare “video” for a file.
@@ -75,6 +75,9 @@ and technical paths stay unchanged; this glossary does not change schema 21.
   slider/exact-field/reset pattern, capture diamonds,
   adjacent per-setting Previous/Next buttons, section navigation and stored-setting
   chip arrows. No Kelvin or AWB label.
+- **Vibrance** is a track-owned −1…1 scalar Colour control, neutral 0, last in the **Colour**
+  group after Saturation: it scales saturation more for muted colours than strong ones
+  (greys and fully saturated colours stay unchanged); a plain slider track, no gradient.
 - **Whites** is a track-owned −1…1 scalar Colour control, neutral 0, after Shadows in the **Light**
   group: it moves the white point (lower dims the brightest tones, higher pushes them to white).
 - **Blacks** is a track-owned −1…1 scalar Colour control, neutral 0, last in the **Light**
@@ -128,7 +131,7 @@ and technical paths stay unchanged; this glossary does not change schema 21.
 - Easing/modes/recordings: native select; selected easing has its existing graph.
 - Boolean settings: native checkbox. Main scalar Colour/Opacity controls expose a capture diamond with
   `aria-pressed` and adjacent per-setting **Previous/Next** buttons, since a shared
-  keyframe need not enable every setting. Colour's keyframe-line Previous/Next pair visits the union of Opacity, eleven scalar and HDR keyframes.
+  keyframe need not enable every setting. Colour's keyframe-line Previous/Next pair visits the union of Opacity, twelve scalar and HDR keyframes.
   Clip **Speed ×** has one **Keyframe Speed** circle capturing or removing a keyframe at the
   actually displayed source frame, without extra per-setting arrows; in curve mode its rate is
   read-only without a keyframe there. Speed's pair visits all retained
@@ -152,7 +155,7 @@ and technical paths stay unchanged; this glossary does not change schema 21.
   width. Double-clicking the name does the same; sections keep one Reset in their keyframe line (Colour, Speed, Transform) and HSL/curves name theirs
   **Reset red** / **Reset all**.
 - Setting groups: **Track → Colour** shows its main sliders in four static fieldsets with small uppercase
-  headings: **Opacity**; **Colour** (Temperature, Tint, Hue, Saturation); **Light** (Exposure, Brightness,
+  headings: **Opacity**; **Colour** (Temperature, Tint, Hue, Saturation, Vibrance); **Light** (Exposure, Brightness,
   Contrast, Highlights, Shadows, Whites, Blacks); **Effects** (HDR). Each heading has a Reset icon (**Reset the Light group**,
   etc.) that resets the group's editable settings in one Undo step, dimmed at the defaults. Headings add no
   tab stop besides that icon; the visible order differs from the unchanged storage/keyframe channel order.

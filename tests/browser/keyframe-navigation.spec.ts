@@ -216,8 +216,8 @@ async function readOnly(page: Page, document: ProjectDocument): Promise<void> {
 }
 
 function interleaved(): LayerKeyframe[] {
-  return [3, 42, 81].flatMap((start) =>
-    KEYFRAME_SETTINGS.map(({ key }, index) => sharedPoint(start + index * 3, { [key]: 0 })),
+  return [3, 43, 83].flatMap((start) =>
+    KEYFRAME_SETTINGS.map(({ key }, index) => sharedPoint(start + index * 2, { [key]: 0 })),
   );
 }
 
@@ -225,9 +225,9 @@ test('unkeyed settings keep diamonds with visible guarded per-setting arrows and
   page,
 }) => {
   const document = await current(page);
-  expect(KEYFRAME_SETTINGS).toHaveLength(13);
-  // Thirteen Colour/Opacity diamonds plus the eight track Transform capture buttons.
-  await expect(inspector(page).getByRole('button', { name: /^Keyframe / })).toHaveCount(13 + 8);
+  expect(KEYFRAME_SETTINGS).toHaveLength(14);
+  // Fourteen Colour/Opacity diamonds plus the eight track Transform capture buttons.
+  await expect(inspector(page).getByRole('button', { name: /^Keyframe / })).toHaveCount(14 + 8);
   for (const { label } of KEYFRAME_SETTINGS) {
     await settingTab(page, label);
     const toggle = diamond(page, label);
@@ -286,7 +286,7 @@ test('Colour section arrows visit the Opacity/scalar union and share chip inspec
       .locator('.colour-controls')
       .locator('.keyframe-setting-navigation')
       .getByRole('button', { name: /^(Previous|Next) .* keyframe$/ }),
-  ).toHaveCount(26);
+  ).toHaveCount(28);
   for (const frame of [10, 30, 50, 100, 130, 160]) {
     await next.scrollIntoViewIfNeeded();
     await next.click();
@@ -425,9 +425,9 @@ for (const [index, { key, label }] of KEYFRAME_SETTINGS.entries()) {
   }) => {
     const document = sequence(interleaved());
     await fixture(page, document);
-    const first = 3 + index * 3;
-    const middle = 42 + index * 3;
-    const last = 81 + index * 3;
+    const first = 3 + index * 2;
+    const middle = 43 + index * 2;
+    const last = 83 + index * 2;
     await settingTab(page, label);
     await expect(diamond(page, label)).toBeEnabled();
     await expect(diamond(page, label)).toHaveAttribute('aria-pressed', 'false');
@@ -671,7 +671,7 @@ test('main diamond tabs through Previous/Next before its value controls and stor
   await readOnly(page, document);
 });
 
-test('all thirteen setting buttons remain present and disabled throughout a native trim draft', async ({ page }) => {
+test('all fourteen setting buttons remain present and disabled throughout a native trim draft', async ({ page }) => {
   const document = sequence(interleaved());
   await fixture(page, document);
   await seek(page, 45);
