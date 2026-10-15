@@ -88,7 +88,8 @@ v1–v17 project/receipt snapshots remain unchanged/incompatible
 and require recreation, without migration, defaults or automatic deletion.
 Track `opacity` is the required sole stored value, not obsolete; saved `clip.opacity`
 and old `clipOpacity`/`layerOpacity` keyframe channels are invalid.
-Registry/proxy/current PCM formats do not change. Version-1 export receipts require
+Proxy/current PCM formats do not change; the registries are version 2 (full-content
+checksums). Version-1 export receipts require
 strict v18 snapshots and captured audio-source/instance-plan arrays, rejecting
 invalid arrays/older snapshots without rewriting successful exports. No null
 fallback or old-format reader is permitted. Source-copy prohibition,
@@ -135,56 +136,28 @@ cancellation/reaping and two-reader/one-encoder pass limits. Retries, skipped ca
 or EOF tolerances are not substitutes for bounded read ownership. Local checks and
 actual-commit remote CI remain separate evidence.
 
-## Issue #2: identity evidence before relinking
+## Issue #2: identity evidence for relinking
 
-The current registry's **sampled-sha256-v1** digest hashes size, modification time,
-device/inode, offsets and at most three 1 MiB byte samples (beginning/middle/end).
-It does **not** hash the complete recording. `assertSourceIdentity(..., true)`
-recomputes those same samples; the `deep` argument is not full-byte verification.
+Two kinds of evidence identify an original. The **sampled-sha256-v1** fingerprint
+hashes size, modification time, device/inode, offsets and at most three 1 MiB byte
+samples; it is checked on every read, proves the file **at this path** is the one
+registered and changes when the file moves. It does not hash the complete recording.
+The **sha256-full-v1** `content` checksum (digest and size) hashes every byte,
+independent of path and filesystem.
 
-The identity limitations are:
+A moved copy can only be verified against a checksum taken while the original was
+readable, so the first preparation job (proxy for video, PCM for music) records
+`content` while it already reads the original; until then it is `null`. Projects
+refer to asset IDs, not source paths, and proxy/thumbnail/PCM caches are keyed by
+those IDs, so a location change keeps them. The registries are version 2
+(`videos.json`, `music.json`); version-1 files are neither read nor modified.
 
-| Operation                                                                  | Consequence                                                                                         |
-| -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| Same-device/inode rename preserving modification time and bytes            | Fingerprint and derived media/cache identity remain identical; old registered path is still missing |
-| Different device/inode, changed time or size                               | Fingerprint identity changes, even if every content byte is identical                               |
-| Unsampled byte changed in an 8 MiB file, preserving size/time/device/inode | Full-file SHA-256 changes but the stored sampled fingerprint does not                               |
-
-Video IDs derive from the sampled digest; proxy directories also use that digest.
-Projects refer to media IDs, **not source paths on each clip**. Re-registering a
-same-inode rename finds the existing asset and does not update its missing path.
-Changing a candidate's filesystem fingerprint without separating stable cache
-identity would also move the lookup away from its existing prepared proxy.
-
-Therefore a full moved/remounted-source relink cannot honestly be labelled
-full-content verified using this registry alone. A candidate's new full checksum
-is not evidence of equality with a missing original whose full checksum was never
-captured. Timing/colour metadata and matching filenames are not a substitute.
-
-The implementation prerequisite is an explicit strong identity design:
-
-1. Capture a full streamed checksum of a **known-good, readable original** before
-   it is unavailable, with unchanged-before/after source checks.
-2. Keep stable asset/proxy identity separate from the current location's
-   device/inode evidence; preserve references, prepared files and completed receipts.
-3. Document the required evidence storage/version and its strict incompatibility
-   policy before implementation. No optional legacy default, migration, cache move
-   or implicit user-footage hash job is permitted.
-4. An explicit approved-location proposal must show old/new paths, verify all
-   required evidence and require confirmation; commit atomically only if source,
-   association and active-job state still match. Pre-commit failure keeps the old
-   association; lost post-commit acknowledgement requires honest readback/recovery,
-   not promised rollback or a blind retry.
-5. If the original is already missing without strong baseline evidence, explain
-   that limitation rather than accepting a name/sample-only association.
-
-**Relinking is not implemented.** Missing-source guidance recommends reconnecting
-the drive or restoring the original at its registered path. There is no relink
-button, whole-filesystem search or hidden reassociation.
-The [separate proposed relink contract](design/SOURCE_RELINK.md) specifies full
-baseline evidence, immutable asset/cache identity, strict format implications and
-confirmed atomic location changes. It requires explicit approval before implementation;
-the current registry and usage behaviour are unchanged.
+[Relinking](design/SOURCE_RELINK.md) is explicit: a recording whose original is
+missing shows **Relink** in Media. A serial job checks the candidate's size and full
+checksum, rejects any difference and only then updates name, path and fingerprint
+atomically. Recordings without `content` cannot be relinked and must be imported
+again. Timing/colour metadata and matching filenames are never accepted as evidence;
+there is no whole-filesystem search or hidden reassociation.
 
 ## Issue #3: export storage and recovery
 

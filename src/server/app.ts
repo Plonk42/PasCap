@@ -160,7 +160,9 @@ export async function createApp(config = createConfig()) {
   app.get('/api/health', (_request, reply) =>
     reply.send({ name: 'PasCap', milestone: 'editing-and-export', frameRate: '30000/1001', workerConcurrency: 1 }),
   );
-  app.get('/api/media', (_request, reply) => reply.send({ assets: library.list() }));
+  app.get('/api/media', async (_request, reply) =>
+    reply.send({ assets: library.list(), missing: await library.missing() }),
+  );
   app.get('/api/footage/roots', async () => ({ roots: await footage.roots() }));
   app.get('/api/footage', async (request) => {
     const query = footageQuerySchema.parse(request.query);
@@ -197,6 +199,12 @@ export async function createApp(config = createConfig()) {
     z.object({}).strict().parse(request.body);
     return { job: await library.prepare(idParams.parse(request.params).id) };
   });
+  app.post('/api/media/:id/relink', async (request, reply) => {
+    const { path: filename } = registerSchema.parse(request.body);
+    return reply
+      .code(202)
+      .send({ job: library.relink(idParams.parse(request.params).id, footage.validateManualPath(filename)) });
+  });
   app.route({
     method: ['GET', 'HEAD'],
     url: '/api/media/:id/proxy',
@@ -225,7 +233,9 @@ export async function createApp(config = createConfig()) {
       throw new ServiceError('Indexed thumbnail not found.', 404);
     await serveRegisteredFile(request, reply, library.thumbnailPath(asset, parameters.frame), 'image/jpeg');
   });
-  app.get('/api/audio', async (_request, reply) => reply.send({ assets: await audio.availableList() }));
+  app.get('/api/audio', async (_request, reply) =>
+    reply.send({ assets: await audio.availableList(), missing: await audio.missing() }),
+  );
   app.get('/api/audio/roots', async () => ({ roots: await footage.roots() }));
   app.get('/api/audio/browse', async (request) => {
     const query = footageQuerySchema.parse(request.query);
@@ -241,6 +251,11 @@ export async function createApp(config = createConfig()) {
   app.post('/api/audio/:id/prepare', async (request, reply) => {
     z.object({}).strict().parse(request.body);
     return reply.code(202).send({ job: await audio.prepare(idParams.parse(request.params).id) });
+  });
+  app.post('/api/audio/:id/relink', async (request, reply) => {
+    const { path: filename } = registerSchema.parse(request.body);
+    const job = await audio.relink(idParams.parse(request.params).id, footage.validateManualPath(filename));
+    return reply.code(202).send({ job });
   });
   app.route({
     method: ['GET', 'HEAD'],

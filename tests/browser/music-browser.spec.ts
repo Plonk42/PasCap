@@ -231,7 +231,7 @@ test('real explicit import persists only importing-project audio membership, sur
   )!;
   const playback = path.resolve(
     '.pascap/browser-tests/audio-assets',
-    registered.fingerprint.digest,
+    registered.id,
     'pcm16-48k-stereo-mono-unity-v3',
     'playback.pcm',
   );
@@ -406,7 +406,7 @@ test('pending registration blocks Escape, Cancel and duplicate submit; accepted 
   await page.route('**/api/audio', (route) =>
     accepted
       ? route.fulfill({ status: 503, json: { error: 'Synthetic accepted-import status read failed.' } })
-      : route.fulfill({ json: { assets: [music] } }),
+      : route.fulfill({ json: { assets: [music], missing: [] } }),
   );
   const modal = await openBrowser(page);
   await modal.getByRole('checkbox', { name: `Select ${sourceName}`, exact: true }).check();

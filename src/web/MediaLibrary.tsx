@@ -11,6 +11,7 @@ import { MAX_VIDEO_LAYERS, type ProjectDocument } from '../shared/model.js';
 import { mediaRemovalUsage } from '../shared/projects.js';
 import { durationLabel, MEDIA_DRAG_TYPE, mediaReady, shortName } from './display.js';
 import { Icon } from './icons.js';
+import type { RelinkTarget } from './ImportDialog.js';
 import './media-review.css';
 import './media-import.css';
 import { MediaMusicList, musicMatchesFilter } from './MediaMusicList.js';
@@ -30,6 +31,9 @@ interface Props {
   onDragMedia: (mediaIds: string[] | null) => void;
   onPrepare: (mediaIds: string[]) => Promise<void>;
   onPrepareMusic: (id: string) => Promise<void>;
+  /** Recordings and music whose original is not at its registered path. */
+  missing: ReadonlySet<string>;
+  onRelink: (target: RelinkTarget) => void;
   onRemove: (mediaIds: string[]) => boolean;
   onRemoveMusic: (ids: string[]) => boolean;
   onImport: () => void;
@@ -83,6 +87,25 @@ function externalFiles(transfer: DataTransfer): boolean {
   return Array.from(transfer.types).includes('Files') && !Array.from(transfer.types).includes(MEDIA_DRAG_TYPE);
 }
 
+function cardStatus(asset: MediaAsset, lost: boolean, readyLabel: string) {
+  if (lost)
+    return {
+      state: 'missing',
+      label: 'Original missing',
+      spoken: 'Original missing',
+      icon: 'warning',
+      title: `Not found at ${asset.sourcePath}`,
+    } as const;
+  const label = asset.status === 'ready' ? readyLabel : STATUS_LABEL[asset.status];
+  return {
+    state: asset.status,
+    label,
+    spoken: STATUS_LABEL[asset.status],
+    icon: STATUS_ICON[asset.status],
+    title: asset.error ?? label,
+  };
+}
+
 function MediaAction({
   asset,
   hasProject,
@@ -90,9 +113,11 @@ function MediaAction({
   targetLayer,
   trackLimit,
   busy,
+  missing,
   onInsert,
   onInsertOnNewTrack,
   onPrepare,
+  onRelink,
 }: Readonly<{
   asset: MediaAsset;
   hasProject: boolean;
@@ -100,11 +125,28 @@ function MediaAction({
   targetLayer: string;
   trackLimit: boolean;
   busy: boolean;
+  missing: boolean;
   onInsert: Props['onInsert'];
   onInsertOnNewTrack: Props['onInsertOnNewTrack'];
   onPrepare: Props['onPrepare'];
+  onRelink: Props['onRelink'];
 }>) {
   const rangeLabel = trimmed ? 'selected range' : 'full recording';
+  if (missing)
+    return (
+      <>
+        <button
+          className="icon-button relink-media"
+          aria-label={`Relink ${asset.name}`}
+          title={`Original missing at ${asset.sourcePath}. Relink it to its moved copy`}
+          disabled={busy}
+          onClick={() => onRelink({ kind: 'video', id: asset.id, name: asset.name, sourcePath: asset.sourcePath })}
+        >
+          <Icon name="link" size={15} />
+        </button>
+        <span className="media-action-space" aria-hidden="true" />
+      </>
+    );
   if (mediaReady(asset))
     return (
       <>
@@ -168,6 +210,8 @@ export function MediaLibrary({
   onDragMedia,
   onPrepare,
   onPrepareMusic,
+  missing,
+  onRelink,
   onRemove,
   onRemoveMusic,
   onImport,
@@ -570,14 +614,15 @@ export function MediaLibrary({
           const excerptCount = usage.get(asset.id) ?? 0;
           const excerptLabel = `${excerptCount} ${excerptCount === 1 ? 'clip' : 'clips'}`;
           const usageDescription = excerptCount > 0 ? `, ${excerptLabel} in timeline` : '';
-          let statusLabel = STATUS_LABEL[asset.status];
-          if (asset.status === 'ready') statusLabel = excerptCount > 0 ? `${excerptLabel} in timeline` : 'Ready';
+          const lost = missing.has(asset.id);
+          const status = cardStatus(asset, lost, excerptCount > 0 ? `${excerptLabel} in timeline` : 'Ready');
+          const usable = mediaReady(asset) && !lost;
           return (
             <article
               key={asset.id}
               className={`media-item ${selected.has(asset.id) ? 'selected' : ''} ${reviewedAsset?.id === asset.id ? 'reviewing' : ''}`}
               data-media-id={asset.id}
-              draggable={mediaReady(asset)}
+              draggable={usable}
               onDragStart={(event) => {
                 clearHover();
                 const ids = selected.has(asset.id)
@@ -609,7 +654,7 @@ export function MediaLibrary({
                 onPointerMove={(event) => queueHover(event, asset)}
                 onPointerLeave={() => leaveHover(asset.id)}
                 onDoubleClick={() => {
-                  if (project && !busy && mediaReady(asset)) onInsert([asset.id]);
+                  if (project && !busy && usable) onInsert([asset.id]);
                 }}
                 title={
                   excerptCount > 0
@@ -618,7 +663,7 @@ export function MediaLibrary({
                 }
               >
                 <span className="media-thumb" data-source-in={range.sourceIn} data-source-out={range.sourceOut}>
-                  {asset.prepared ? (
+                  {asset.prepared && !lost ? (
                     <img
                       loading="lazy"
                       draggable={false}
@@ -660,7 +705,7 @@ export function MediaLibrary({
                         {excerptLabel}
                       </span>
                     )}
-                    {asset.status !== 'ready' && <span className="media-status-text">{statusLabel}</span>}
+                    {status.state !== 'ready' && <span className="media-status-text">{status.label}</span>}
                   </span>
                   {trimmed && (
                     <span className="declutter-sr-only" id={rangeId}>
@@ -673,15 +718,15 @@ export function MediaLibrary({
                 )}
               </button>
               <span
-                className={`media-state ${asset.status}`}
+                className={`media-state ${status.state}`}
                 data-used={usage.has(asset.id)}
-                title={asset.error ?? statusLabel}
-                aria-label={`${asset.name}: ${STATUS_LABEL[asset.status]}${usageDescription}`}
+                title={status.title}
+                aria-label={`${asset.name}: ${status.spoken}${usageDescription}`}
               >
                 <span className="media-state-icon" aria-hidden="true">
-                  <Icon name={STATUS_ICON[asset.status]} size={13} />
+                  <Icon name={status.icon} size={13} />
                 </span>
-                <small>{statusLabel}</small>
+                <small>{status.label}</small>
               </span>
               <MediaAction
                 asset={asset}
@@ -690,9 +735,11 @@ export function MediaLibrary({
                 targetLayer={targetLayer}
                 trackLimit={(project?.layers.length ?? 0) >= MAX_VIDEO_LAYERS}
                 busy={busy}
+                missing={lost}
                 onInsert={onInsert}
                 onInsertOnNewTrack={onInsertOnNewTrack}
                 onPrepare={onPrepare}
+                onRelink={onRelink}
               />
               <button
                 className="icon-button media-remove"
@@ -737,7 +784,9 @@ export function MediaLibrary({
           music={visibleMusic}
           project={project}
           busy={busy}
+          missing={missing}
           onPrepare={onPrepareMusic}
+          onRelink={onRelink}
           onRemove={onRemoveMusic}
         />
       </div>

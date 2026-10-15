@@ -130,7 +130,7 @@ async function source(directory: string, name = 'clip.mp4'): Promise<string> {
   return filename;
 }
 async function savedAssets(directory: string): Promise<MediaAsset[]> {
-  return registrySchema.parse(JSON.parse(await readFile(path.join(directory, 'library.json'), 'utf8'))).assets;
+  return registrySchema.parse(JSON.parse(await readFile(path.join(directory, 'videos.json'), 'utf8'))).assets;
 }
 async function fakeProcess(
   _binary: string,
@@ -184,8 +184,8 @@ describe('raw registration and startup stay non-queuing', () => {
         });
       }),
     );
-    const contents = JSON.stringify(registrySchema.parse({ version: 1, assets }));
-    await writeFile(path.join(config.dataDir, 'library.json'), contents);
+    const contents = JSON.stringify(registrySchema.parse({ version: 2, assets }));
+    await writeFile(path.join(config.dataDir, 'videos.json'), contents);
     vi.mocked(probeVideo).mockClear();
     const service = await createApp(config);
     services.push(service);
@@ -198,7 +198,7 @@ describe('raw registration and startup stay non-queuing', () => {
       'ready',
     ]);
     expect(service.library.get(assets[1]!.id).error).toContain('Retry explicitly');
-    expect(await readFile(path.join(config.dataDir, 'library.json'), 'utf8')).toBe(contents);
+    expect(await readFile(path.join(config.dataDir, 'videos.json'), 'utf8')).toBe(contents);
     expect(probeVideo).not.toHaveBeenCalled();
     expect(runProcess).not.toHaveBeenCalled();
   });
@@ -543,7 +543,7 @@ describe('registration and preparation admission races', () => {
     vi.spyOn(storage, 'atomicWrite').mockImplementation(async (filename, contents) => {
       if (
         !held &&
-        filename.endsWith('library.json') &&
+        filename.endsWith('videos.json') &&
         registrySchema.parse(JSON.parse(contents)).assets.some((asset) => asset.status === 'ready')
       ) {
         held = true;
@@ -689,7 +689,7 @@ describe('source and cache safety for automatic admissions', () => {
         const assets = path.join(config.dataDir, 'assets');
         const outside = path.join(root, 'outside');
         await Promise.all([mkdir(assets), mkdir(outside)]);
-        await symlink(outside, path.join(assets, accepted.asset.fingerprint.digest));
+        await symlink(outside, path.join(assets, accepted.asset.id));
       } else {
         await mkdir(library.assetDir(accepted.asset), { recursive: true });
         await symlink(

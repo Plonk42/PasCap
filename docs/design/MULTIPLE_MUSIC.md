@@ -39,8 +39,9 @@ Usage belongs in [the user guide](../USER_GUIDE.md) and
 
 v1–v17 projects and receipt snapshots are incompatible and preserved byte-for-byte,
 along with finished exports. Recreate projects deliberately; do not rewrite,
-repair or delete them automatically. Registry, video-proxy and current
-`pcm16-48k-stereo-mono-unity-v3` PCM cache formats and source guards are unchanged.
+repair or delete them automatically. Video-proxy and current
+`pcm16-48k-stereo-mono-unity-v3` PCM cache formats and source guards are unchanged;
+the registries are version 2 (full-content checksums).
 
 ## Duration, black tails and video fades
 

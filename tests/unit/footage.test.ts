@@ -526,7 +526,7 @@ describe('metadata-only approved-root audio browsing and explicit registration',
     );
     await fs.symlink(originals[0]!, path.join(sources, 'Linked.wav'));
     await fs.symlink(outside, path.join(sources, 'Linked album'));
-    const savedRegistry = await fs.readFile(path.join(config.dataDir, 'audio.json'));
+    const savedRegistry = await fs.readFile(path.join(config.dataDir, 'music.json'));
     const read = vi.spyOn(fs, 'readFile');
     const open = vi.spyOn(fs, 'open');
     const write = vi.spyOn(fs, 'writeFile');
@@ -576,8 +576,8 @@ describe('metadata-only approved-root audio browsing and explicit registration',
     expect(library.list()).toEqual([]);
     expect(audio.list()).toEqual([]);
     expect(jobs.list()).toEqual([]);
-    expect(await fs.readdir(config.dataDir)).toEqual(['audio.json']);
-    expect(await fs.readFile(path.join(config.dataDir, 'audio.json'))).toEqual(savedRegistry);
+    expect(await fs.readdir(config.dataDir)).toEqual(['music.json']);
+    expect(await fs.readFile(path.join(config.dataDir, 'music.json'))).toEqual(savedRegistry);
   });
 
   it('keeps nested-root parents and validates strict queries, path boundaries, symlink directories and missing roots', async () => {
@@ -1132,9 +1132,7 @@ describe('batch path prevalidation and serial no-copy registration', () => {
     ]);
     expect(result.assets.map((asset) => asset.status)).toEqual(['error', 'queued']);
     expect(result.jobs).toHaveLength(1);
-    const saved = registrySchema.parse(
-      JSON.parse(await fs.readFile(path.join(config.dataDir, 'library.json'), 'utf8')),
-    );
+    const saved = registrySchema.parse(JSON.parse(await fs.readFile(path.join(config.dataDir, 'videos.json'), 'utf8')));
     expect(saved.assets).toEqual(library.list());
     const repeat = (await postPaths(app, [first, second])).json<ImportForEditingResult>();
     expect(repeat).toMatchObject({ added: 0, existing: 2, errors: [], queueErrors: [] });
@@ -1231,7 +1229,7 @@ describe('batch path prevalidation and serial no-copy registration', () => {
     expect((await fs.stat(filename)).mode & 0o777).toBe(0o444);
     expect((await fs.stat(sources)).mode & 0o777).toBe(0o555);
     expect(await fs.readdir(sources)).toEqual(['Clip 1.mp4']);
-    expect((await fs.readdir(config.dataDir)).sort()).toEqual(['assets', 'audio.json', 'library.json']);
+    expect((await fs.readdir(config.dataDir)).sort()).toEqual(['assets', 'music.json', 'videos.json']);
     expect(library.get(result.assets[0]!.id).status).toBe('ready');
   });
 
@@ -1382,7 +1380,7 @@ describe('trusted JSON-only HTTP boundary and retained native registry entries',
     expect(multipart.statusCode).toBe(415);
     expect(library.list()).toEqual([]);
     expect(jobs.list()).toEqual([]);
-    expect(await fs.readdir(config.dataDir)).toEqual(['audio.json']);
+    expect(await fs.readdir(config.dataDir)).toEqual(['music.json']);
   });
 
   it('removes the upload route entirely and never creates copy scratch for rejected requests', async () => {
@@ -1398,7 +1396,7 @@ describe('trusted JSON-only HTTP boundary and retained native registry entries',
     expect([404, 415]).toContain(multipart.statusCode);
     expect(library.list()).toEqual([]);
     expect(jobs.list()).toEqual([]);
-    expect(await fs.readdir(config.dataDir)).toEqual(['audio.json']);
+    expect(await fs.readdir(config.dataDir)).toEqual(['music.json']);
   });
 
   it('preserves an already registered extensionless copied source, verified proxy and exact bytes across restart', async () => {
@@ -1414,17 +1412,18 @@ describe('trusted JSON-only HTTP boundary and retained native registry entries',
       name: 'Old recording.MP4',
       sourcePath: filename,
       fingerprint,
+      content: null,
       metadata: metadata(),
       status: 'ready',
       error: null,
       prepared: prepared(),
     });
-    const proxyDirectory = path.join(config.dataDir, 'assets', fingerprint.digest, PROXY_PROFILE);
+    const proxyDirectory = path.join(config.dataDir, 'assets', asset.id, PROXY_PROFILE);
     await fs.mkdir(proxyDirectory, { recursive: true });
     const proxy = Buffer.from('seeded verified proxy: exact bytes retained');
     await fs.writeFile(path.join(proxyDirectory, 'proxy.mp4'), proxy);
-    const registry = `${JSON.stringify({ version: 1, assets: [asset] })}\n`;
-    await fs.writeFile(path.join(config.dataDir, 'library.json'), registry);
+    const registry = `${JSON.stringify({ version: 2, assets: [asset] })}\n`;
+    await fs.writeFile(path.join(config.dataDir, 'videos.json'), registry);
     await setPermissions(filename, 0o444, 0o600);
     await setPermissions(directory, 0o555);
     const serviceConfig = createConfig({ ...config, mediaRoots: [root] });
@@ -1449,7 +1448,7 @@ describe('trusted JSON-only HTTP boundary and retained native registry entries',
     );
     expect((await restarted.app.inject({ url: `/api/media/${asset.id}/proxy`, headers })).rawPayload).toEqual(proxy);
     expect(await files.fingerprintFile(filename)).toEqual(fingerprint);
-    expect(await fs.readFile(path.join(config.dataDir, 'library.json'), 'utf8')).toBe(registry);
+    expect(await fs.readFile(path.join(config.dataDir, 'videos.json'), 'utf8')).toBe(registry);
     expect(probeVideo).not.toHaveBeenCalled();
     expect(runProcess).not.toHaveBeenCalled();
   });

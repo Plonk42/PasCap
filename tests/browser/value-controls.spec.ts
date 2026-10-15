@@ -39,8 +39,8 @@ test.beforeEach(async ({ page, request }) => {
 
   const reads: Record<string, unknown> = {
     '/api/health': { name: 'PasCap', milestone: 'editing-and-export', frameRate: '30000/1001', workerConcurrency: 1 },
-    '/api/media': { assets },
-    '/api/audio': { assets: [music] },
+    '/api/media': { assets, missing: [] },
+    '/api/audio': { assets: [music], missing: [] },
     '/api/jobs': { jobs: [] },
   };
   // Project routes registered below take precedence. No other writes reach the service.

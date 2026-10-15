@@ -289,8 +289,10 @@ Importing a different location creates a **new music entry**, even when a move o
 hard link retains the original filesystem identity. The selected file is verified
 at its own path; an older entry's missing path does not block that new import.
 Existing entries and project references are not reassociated or removed. Add the
-new entry with **Add music track** for deliberate placement. Verified fingerprint-matching PCM can
-be reused through the serial worker; originals and old caches remain untouched.
+new entry with **Add music track** for deliberate placement; it prepares its own PCM
+cache, and originals and old caches remain untouched. To move music without losing
+its music tracks or cache, use **Relink** on the **Original missing** file instead: it
+requires a full-content match ([relinking](design/SOURCE_RELINK.md)).
 
 Standalone music import requires exactly one audio stream and no video footage.
 Embedded cover artwork explicitly marked as an attached picture is accepted and
@@ -386,7 +388,9 @@ preview caches remain unchanged but are not current playback input. Missing curr
 PCM caches appear as an explicit **Prepare** action on the file in Media → Music;
 startup/library reads never prepare, rewrite or delete them. Prepare deliberately
 to create the current cache, retaining originals and older generated files. Project
-schema is 18; registry, video-proxy and PCM cache formats are unchanged. Native export
+schema is 18; the music and video registries are version 2 (`music.json`,
+`videos.json`, with full-content checksums), while video-proxy and PCM cache formats
+are unchanged. Native export
 still reads original audio, not the preview transport.
 
 Native mixing decodes **one original at a time** to exact selected **48 kHz stereo
@@ -435,7 +439,7 @@ injection or automatic deletion; recreate projects and import their media to reu
 registered assets/verified ready proxies. Confirmed project deletion affects only
 its saved document, not originals,
 the shared content-deduplicated registry/cache or finished exports/receipts.
-Registry/video-proxy/current PCM formats, source guards and native video budgets are unchanged;
+Video-proxy/current PCM formats, source guards and native video budgets are unchanged;
 native composition uses the sole Opacity contract without a track multiplier.
 Preview uses the current explicitly prepared PCM cache described above.
 

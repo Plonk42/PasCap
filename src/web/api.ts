@@ -4,7 +4,7 @@ import { exportPreflightSchema } from '../shared/export-space.js';
 import type { ExportProfile } from '../shared/export.js';
 import { audioDirectorySchema, footageDirectorySchema, footageRootSchema } from '../shared/footage.js';
 import { jobSchema, mediaAssetSchema } from '../shared/media.js';
-import { projectSchema, type ProjectDocument } from '../shared/model.js';
+import { idSchema, projectSchema, type ProjectDocument } from '../shared/model.js';
 import { projectSummarySchema } from '../shared/projects.js';
 
 export type ApiErrorKind = 'http' | 'network' | 'timeout' | 'response' | 'aborted' | 'request';
@@ -183,7 +183,13 @@ export const api = {
   // A validated response is readiness: the actual service has no separate "ready" field.
   health: (options?: RequestOptions) => request('/api/health', healthSchema, 'GET', undefined, options),
   library: (options?: RequestOptions) =>
-    request('/api/media', z.object({ assets: z.array(mediaAssetSchema) }), 'GET', undefined, options),
+    request(
+      '/api/media',
+      z.object({ assets: z.array(mediaAssetSchema), missing: z.array(idSchema) }),
+      'GET',
+      undefined,
+      options,
+    ),
   jobs: (options?: RequestOptions) =>
     request('/api/jobs', z.object({ jobs: z.array(jobSchema) }), 'GET', undefined, options),
   importFolder: (directory: string) =>
@@ -235,6 +241,9 @@ export const api = {
       { timeoutMs: IMPORT_TIMEOUT_MS },
     ),
   prepare: (id: string) => request(`/api/media/${id}/prepare`, z.object({ job: jobSchema }), 'POST', {}),
+  /** Queues a full-content check of the moved copy; the job's outcome is the answer. */
+  relinkMedia: (id: string, path: string) =>
+    request(`/api/media/${id}/relink`, z.object({ job: jobSchema }), 'POST', { path }),
   cancel: (id: string) => request(`/api/jobs/${id}/cancel`, z.object({ job: jobSchema }), 'POST', {}),
   projects: (options?: RequestOptions) =>
     request('/api/projects', z.object({ projects: z.array(projectSummarySchema) }), 'GET', undefined, options),
@@ -249,7 +258,13 @@ export const api = {
       expectedRevision,
     }).then((result) => result.document),
   audio: (options?: RequestOptions) =>
-    request('/api/audio', z.object({ assets: z.array(audioAssetSchema) }), 'GET', undefined, options),
+    request(
+      '/api/audio',
+      z.object({ assets: z.array(audioAssetSchema), missing: z.array(idSchema) }),
+      'GET',
+      undefined,
+      options,
+    ),
   audioRoots: (options?: RequestOptions) =>
     request(
       '/api/audio/roots',
@@ -280,6 +295,8 @@ export const api = {
       { timeoutMs: IMPORT_TIMEOUT_MS },
     ),
   prepareAudio: (id: string) => request(`/api/audio/${id}/prepare`, z.object({ job: jobSchema }), 'POST', {}),
+  relinkAudio: (id: string, path: string) =>
+    request(`/api/audio/${id}/relink`, z.object({ job: jobSchema }), 'POST', { path }),
   exportPreflight: (document: ProjectDocument, profile: ExportProfile, options?: RequestOptions) =>
     request(
       '/api/exports/preflight',

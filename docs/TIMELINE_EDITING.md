@@ -126,12 +126,14 @@ into Timeline remains unchanged. Uncertain registration results are not retried
 automatically; check Media/Activity before resubmitting.
 
 Strict schema 18 requires complete video track colour with Temperature/Tint/HDR and static HSL/curves, track Transform, per-track Ripple, transitions and fades, and a required
-0–8 identified music track `music` array (`[]` without music); registry/proxy/PCM
-formats are unchanged. Only generated proxies/thumbnails, metadata,
+0–8 identified music track `music` array (`[]` without music); proxy/PCM formats are
+unchanged and the registries are version 2 (full-content checksums). Only generated
+proxies/thumbnails, metadata,
 exports/receipts and scratch are created, not duplicate originals. Keep originals
 accessible at their registered paths: moving files or disconnecting a drive fails
-explicitly, even with a proxy; there is no implicit guessing/reassociation and an
-explicit relink workflow is pending. Previously copied source files from the
+explicitly, even with a proxy; there is no implicit guessing/reassociation. The
+explicit **Relink** action in Media accepts a moved copy only after a full-content
+match ([relinking](design/SOURCE_RELINK.md)). Previously copied source files from the
 removed implementation are not automatically deleted or migrated: preserve their
 registered paths and bytes. This is data safety, not compatibility code.
 
@@ -616,8 +618,8 @@ to reuse registered sources/verified ready proxies. Confirmed project deletion r
 document, never originals, the shared registry/proxy cache or successful exports/
 receipts. Removing a clip is not removing that recording from the import bin;
 use **Remove from project** for that. The
-existing live v3 sample appearing incompatible is expected. Registry/proxy formats
-are unchanged.
+existing live v3 sample appearing incompatible is expected. Proxy formats are
+unchanged; the registries are version 2 (full-content checksums).
 
 The required `music` array holds **0–8 independent music tracks**, each with a unique
 required `id`, registered `mediaId`, source IN/OUT, start/duration, gain, fades and

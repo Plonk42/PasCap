@@ -69,6 +69,7 @@ async function fixture() {
     name: 'original.mp4',
     sourcePath: source,
     fingerprint,
+    content: null,
     status: 'registered',
     error: null,
     prepared: null,

@@ -30,7 +30,7 @@ fields, filenames and URLs retain their technical spelling.
 | [SPEED_AND_AUDIO.md](SPEED_AND_AUDIO.md)                         | Clip-only constant/source-frame keyframe speed, curve presets, precise editing, sliding timeline markers, shared retiming and music/export audio                               |
 | [TIMELINE_EDITING.md](TIMELINE_EDITING.md)                       | No-copy import, source ranges, per-track Ripple/independent placement, recoverable trims, marked cuts, history and snapping                                                    |
 | [WORKSPACE_AND_RECOVERY.md](WORKSPACE_AND_RECOVERY.md)           | Layout, field/keyboard contexts, project bins, serial saves/conflicts, Activity and failure recovery                                                                           |
-| [UX_HARDENING.md](UX_HARDENING.md)                               | Visual controls, deterministic raw-reader ownership, relink identity prerequisite, export-space assumptions/disk-full recovery and deferred loading                            |
+| [UX_HARDENING.md](UX_HARDENING.md)                               | Visual controls, deterministic raw-reader ownership, relink identity evidence, export-space assumptions/disk-full recovery and deferred loading                                |
 | [design/MULTIPLE_MUSIC.md](design/MULTIPLE_MUSIC.md)             | Strict schema-18 identified music arrays, corrected project duration/black tails, final-only summed clipping, one bounded clock and serial native mixing                       |
 | [design/ROW_APPEARANCE.md](design/ROW_APPEARANCE.md)             | Required video track-only static/keyed Colour and Opacity, shared ownership, resets and destination-track adoption                                                             |
 | [design/TEMPERATURE_AND_TINT.md](design/TEMPERATURE_AND_TINT.md) | Required normalized track Temperature/Tint, exact pre-exposure linear gains, independent capture and strict schema-18 preservation                                             |
@@ -38,6 +38,7 @@ fields, filenames and URLs retain their technical spelling.
 | [design/SPATIAL_TRANSFORMS.md](design/SPATIAL_TRANSFORMS.md)     | Required video track Transform base/per-setting project-frame keyframes, crop/affine geometry, neutral letterboxing, per-pixel coverage and Transform controls                 |
 | [design/DETAIL_FILTERS.md](design/DETAIL_FILTERS.md)             | Required static clip Sharpen/Clarity/Denoise and keyable track HDR look, shared source-tap kernel before grading, preview/native parity gates and Detail controls              |
 | [design/WEBCODECS_PREVIEW.md](design/WEBCODECS_PREVIEW.md)       | WebCodecs proxy decoding in workers: proxy index contract, credit-bounded exact frames, decoder lanes, buffering and source review                                             |
+| [design/SOURCE_RELINK.md](design/SOURCE_RELINK.md)               | Verified relinking of moved video/music originals: full-content checksums, version-2 registries, ID-keyed caches and the Relink flow                                           |
 
 Use the final approved [#67](https://github.com/Plonk42/PasCap/issues/67) contract:
 one required numeric video track `opacity`, initially 1 (100%) on new tracks, with the sole
@@ -73,7 +74,8 @@ clip OUT then black while music continues/fades at its own end. Clip speed,
 track Colour and sole Opacity are unchanged. Version-1 export receipts require strict v18
 snapshots and captured audio-source/instance-plan arrays; preserve incompatible
 v1–v17 documents/receipts/MP4s, recreate deliberately, and never migrate/default
-or use null/older readers. Registry/proxy/current PCM formats remain unchanged.
+or use null/older readers. Proxy/current PCM formats remain unchanged; the registries
+are version 2 (full-content checksums).
 The #35 contract has pending implementation/validation acceptance; no passed
 tests, release or milestone closure is claimed by this documentation update.
 Guides describe current contracts. Explicitly historical reports/design records
@@ -104,9 +106,6 @@ and Git history retain earlier evidence, not current acceptance claims.
   milestone closure or real-media job; those still require explicit owner approval.
 - [../EDITOR_IMPLEMENTATION_PLAN.md](../EDITOR_IMPLEMENTATION_PLAN.md) retains the
   original plan and chronology.
-- [Source relink proposal](design/SOURCE_RELINK.md) is the separate #2 design record:
-  required full-byte evidence, stable IDs/cache and confirmed location/format decisions,
-  **not an implemented relink workflow or approved data migration**.
 - [Historical track-parity design record](design/TRACK_PARITY.md) records the approved #25
   choices: uniform tracks, default-on continuous Ripple with pack-on-enable,
   track-local transitions/fades, schema 6 and concurrent-dissolve resources.

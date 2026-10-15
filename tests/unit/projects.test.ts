@@ -65,6 +65,7 @@ function registryAsset(directory: string, id: string, status: AudioAsset['status
     name: `${id}.wav`,
     sourcePath: path.join(directory, `${id}.wav`),
     fingerprint: { algorithm: 'sampled-sha256-v1', digest: 'a'.repeat(64), size: 100, mtimeMs: 1, device: 1, inode: 1 },
+    content: null,
     metadata: { codec: 'pcm_s16le', sampleRate: 48_000, channels: 2, durationSeconds: 2, frameCount: 59 },
     status,
     error: null,
@@ -429,7 +430,7 @@ describe('multiple-project store', () => {
     const first = await store.create('Delete me');
     const second = await store.create('Keep me');
     const kept = new Map<string, string>();
-    for (const name of ['original.mp4', 'library.json', 'audio.json', 'proxies/ready.mp4', 'renders/export.mp4']) {
+    for (const name of ['original.mp4', 'videos.json', 'music.json', 'proxies/ready.mp4', 'renders/export.mp4']) {
       const filename = path.join(directory, name);
       await mkdir(path.dirname(filename), { recursive: true });
       const bytes = `Keep ${name} unchanged`;
@@ -702,7 +703,7 @@ describe('multiple-project HTTP API', () => {
     expect((await service.app.inject({ url: '/api/projects/preview-lab', headers })).json().document.revision).toBe(1);
     expect(service.audio.jobs).toBe(service.jobs);
     expect(service.library.jobs).toBe(service.jobs);
-    expect(JSON.parse(await readFile(path.join(directory, 'audio.json'), 'utf8'))).toEqual({ version: 1, assets: [] });
+    expect(JSON.parse(await readFile(path.join(directory, 'music.json'), 'utf8'))).toEqual({ version: 2, assets: [] });
   });
 
   it('keeps local request restrictions and rejects bad titles, revisions, IDs and incompatible loads', async () => {
@@ -845,6 +846,7 @@ describe('multiple-project HTTP API', () => {
       name: 'video.mp4',
       sourcePath: videoPath,
       fingerprint: await fingerprintFile(videoPath),
+      content: null,
       metadata: {
         width: 320,
         height: 180,
@@ -867,16 +869,18 @@ describe('multiple-project HTTP API', () => {
       ...registryAsset(sources, 'music-unit', 'registered'),
       sourcePath: musicPath,
       fingerprint: await fingerprintFile(musicPath),
+      content: null,
       waveform: [],
     });
     const secondMusic = audioAssetSchema.parse({
       ...registryAsset(sources, 'second-music-unit', 'registered'),
       sourcePath: secondMusicPath,
       fingerprint: await fingerprintFile(secondMusicPath),
+      content: null,
       waveform: [],
     });
-    await atomicWrite(path.join(dataDir, 'library.json'), JSON.stringify({ version: 1, assets: [video] }));
-    await atomicWrite(path.join(dataDir, 'audio.json'), JSON.stringify({ version: 1, assets: [music, secondMusic] }));
+    await atomicWrite(path.join(dataDir, 'videos.json'), JSON.stringify({ version: 2, assets: [video] }));
+    await atomicWrite(path.join(dataDir, 'music.json'), JSON.stringify({ version: 2, assets: [music, secondMusic] }));
     const service = await serviceAt(dataDir);
     const document = projectSchema.parse({
       ...createProject('preview-lab', 'Video and music'),
@@ -999,7 +1003,7 @@ describe('audio registry and HTTP registration boundary', () => {
     const directory = await temp();
     const queued = registryAsset(directory, 'queued-music', 'queued');
     const running = registryAsset(directory, 'running-music', 'preparing');
-    await atomicWrite(path.join(directory, 'audio.json'), JSON.stringify({ version: 1, assets: [queued, running] }));
+    await atomicWrite(path.join(directory, 'music.json'), JSON.stringify({ version: 2, assets: [queued, running] }));
     const queue = new JobQueue();
     queues.push(queue);
     const audio = new AudioLibrary(createConfig({ dataDir: directory }), queue);
@@ -1009,8 +1013,8 @@ describe('audio registry and HTTP registration boundary', () => {
       expect(asset.error).toContain('interrupted');
       expect(asset.waveform).toEqual([]);
     });
-    const saved = JSON.parse(await readFile(path.join(directory, 'audio.json'), 'utf8'));
-    expect(saved.version).toBe(1);
+    const saved = JSON.parse(await readFile(path.join(directory, 'music.json'), 'utf8'));
+    expect(saved.version).toBe(2);
     expect(saved.assets.every((asset: AudioAsset) => asset.status === 'error' && asset.waveform.length === 0)).toBe(
       true,
     );
@@ -1027,7 +1031,7 @@ describe('audio registry and HTTP registration boundary', () => {
   it('wires asset/job registration and explicit retry without accepting arbitrary bodies or downloads', async () => {
     const directory = await temp();
     const asset = registryAsset(directory, 'music-unit', 'registered');
-    await atomicWrite(path.join(directory, 'audio.json'), JSON.stringify({ version: 1, assets: [asset] }));
+    await atomicWrite(path.join(directory, 'music.json'), JSON.stringify({ version: 2, assets: [asset] }));
     const service = await serviceAt(directory);
     const job: MediaJob = {
       id: 'audio-job',

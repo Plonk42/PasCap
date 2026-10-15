@@ -370,6 +370,7 @@ describe.skipIf(!enabled)('production native export · opt-in disposable media o
       name: 'selected-tone.wav',
       sourcePath: audioPath,
       fingerprint: await fingerprintFile(audioPath),
+      content: null,
       metadata: {
         codec: 'pcm_s16le',
         sampleRate: 48000,
@@ -879,7 +880,8 @@ describe.skipIf(!enabled)('production native export · opt-in disposable media o
           [long.id, exportAudioSample(projectFrames), exportAudioSample(projectFrames)],
           ['shorter-last', exportAudioSample(1), exportAudioSample(projectFrames)],
         ]);
-        expect(receipt.musicSources).toEqual([audio]);
+        const { content: _content, ...musicSource } = audio;
+        expect(receipt.musicSources).toEqual([musicSource]);
         expect(accumulators).toEqual([0, 1]);
         const filename = path.join(outputDirectory, 'export.mp4');
         const rgb = await rawVideo(config, { ...assets[0]!, sourcePath: filename });

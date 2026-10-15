@@ -143,7 +143,10 @@ describe('Import dialog recording previews', () => {
     expect((await listFiles(path.join(dataDir, 'browse-previews'))).filter((name) => name.endsWith('.jpg'))).toEqual([
       `${String(first.headers['etag']).slice(1, -1)}.jpg`,
     ]);
-    expect((await app.inject({ method: 'GET', url: '/api/media', headers: host })).json()).toEqual({ assets: [] });
+    expect((await app.inject({ method: 'GET', url: '/api/media', headers: host })).json()).toEqual({
+      assets: [],
+      missing: [],
+    });
     expect((await app.inject({ method: 'GET', url: '/api/jobs', headers: host })).json()).toEqual({ jobs: [] });
 
     await fs.appendFile(filename, ' replaced');

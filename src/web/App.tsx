@@ -62,7 +62,7 @@ import { clipStartRestriction } from './layer-actions.js';
 import { registerLivePreview } from './live-preview.js';
 import { MediaLibrary, type ReviewTarget } from './MediaLibrary.js';
 import { nextLayerName } from './move-to-track.js';
-import type { ImportActions, ImportKind, ImportResult } from './ImportDialog.js';
+import type { ImportActions, ImportKind, ImportResult, RelinkTarget } from './ImportDialog.js';
 import { MusicControls } from './MusicControls.js';
 import { Popover } from './Popover.js';
 import { readPreference, writePreference } from './preferences.js';
@@ -212,6 +212,8 @@ export function App() {
   const [assets, setAssets] = useState<MediaAsset[]>([]);
   const [jobs, setJobs] = useState<MediaJob[]>([]);
   const [audioAssets, setAudioAssets] = useState<AudioAsset[]>([]);
+  const [missingOriginals, setMissingOriginals] = useState<ReadonlySet<string>>(new Set());
+  const [relinkTarget, setRelinkTarget] = useState<RelinkTarget | null>(null);
   const [projectList, setProjectList] = useState<ProjectSummary[]>([]);
   const [showProjects, setShowProjects] = useState(false);
   const [showExport, setShowExport] = useState(false);
@@ -338,6 +340,10 @@ export function App() {
     setAssets(library.assets);
     latestAudio.current = audio.assets;
     setAudioAssets(audio.assets);
+    setMissingOriginals((previous) => {
+      const next = [...library.missing, ...audio.missing];
+      return next.length === previous.size && next.every((id) => previous.has(id)) ? previous : new Set(next);
+    });
     // A GET begun before a newly accepted job must not erase that job's feedback.
     if (generation === jobGeneration.current) setJobs(queue.jobs);
   }, []);
@@ -1368,6 +1374,23 @@ export function App() {
       refreshAfterAcceptance();
     }
   };
+  const requestRelink = (target: RelinkTarget): void => {
+    setActionError('');
+    setRelinkTarget(target);
+  };
+  const relink = async (path: string): Promise<boolean> => {
+    const target = relinkTarget;
+    if (!target) return false;
+    const result = await act(() =>
+      target.kind === 'video' ? api.relinkMedia(target.id, path) : api.relinkAudio(target.id, path),
+    );
+    if (!result.ok) return false;
+    receiveJob(result.value.job);
+    refreshAfterAcceptance();
+    setRelinkTarget(null);
+    setShowActivity(true);
+    return true;
+  };
   const importOriginals = async (operation: () => ReturnType<typeof api.importFolder>): Promise<ImportResult> => {
     const failed: ImportResult = {
       ok: false,
@@ -1847,6 +1870,8 @@ export function App() {
               onDragMedia={setDraggedMediaIds}
               onPrepare={prepare}
               onPrepareMusic={prepareAudio}
+              missing={missingOriginals}
+              onRelink={requestRelink}
               onRemove={(videoIds) => removeMedia({ videoIds, audioIds: [] })}
               onRemoveMusic={(audioIds) => removeMedia({ videoIds: [], audioIds })}
               onImport={() => requestImport()}
@@ -2178,6 +2203,16 @@ export function App() {
               error={actionError}
               actions={importActions}
               onClose={closeImport}
+            />
+          )}
+          {relinkTarget !== null && (
+            <ImportDialog
+              initialKind={relinkTarget.kind}
+              busy={busy || connection.state !== 'ready'}
+              error={actionError}
+              actions={importActions}
+              relink={{ target: relinkTarget, onRelink: relink }}
+              onClose={() => setRelinkTarget(null)}
             />
           )}
           {showRecovery && (

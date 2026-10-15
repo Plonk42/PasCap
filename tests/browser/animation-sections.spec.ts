@@ -184,8 +184,8 @@ for (const viewport of [
           frameRate: '30000/1001',
           workerConcurrency: 1,
         },
-        '/api/media': { assets: [asset] },
-        '/api/audio': { assets: [] },
+        '/api/media': { assets: [asset], missing: [] },
+        '/api/audio': { assets: [], missing: [] },
         '/api/jobs': { jobs: [] },
       };
       // Install first: memoryProjects owns every project write, never the real store.
