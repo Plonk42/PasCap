@@ -235,6 +235,12 @@ test('seeks before, inside and after every transition and cancels obsolete scrub
 });
 
 test('playback and colour updates run outside React, shortcuts ignore text inputs', async ({ page }) => {
+  // Quarter speed keeps playback running (~20 s) through the slow UI steps of a software-rendered runner.
+  let project = projectSchema.parse(await page.evaluate(() => window.pascapLab!.project()));
+  for (const clip of project.clips)
+    project = applyCommand(project, { type: 'speed', clipId: clip.id, speed: { mode: 'constant', rate: 0.25 } });
+  await page.evaluate((document) => window.pascapLab!.setDocument(document), project);
+  await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
   await page.evaluate(() => window.pascapLab!.engine.seek(10));
   await page.getByRole('textbox', { name: 'Search media' }).focus();
   await page.keyboard.press('Space');
@@ -838,7 +844,7 @@ test('changing a later boundary preserves independent excerpts while Colour appl
   const project = projectSchema.parse(await page.evaluate(() => window.pascapLab!.project()));
   expect(project.layers[0]?.colour.exposure).toBe(0.8);
   expect(project.clips.every((clip) => !('colour' in clip) && !('correction' in clip))).toBe(true);
-  expect(project.layers[0]!.transitions[0]?.duration).toBe(18);
+  expect(project.layers[0]!.transitions[0]).toMatchObject({ duration: 18 });
   expect(project.layers[0]!.transitions[1]).toMatchObject({ type: 'cross-dissolve', duration: 30 });
   const region = calculateLayout(project).transitions[1]!;
   const state = await page.evaluate(

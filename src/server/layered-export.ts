@@ -19,7 +19,13 @@ import type { ProjectDocument } from '../shared/model.js';
 import { forEachSerial } from '../shared/serial.js';
 import { hasSpatialEdits, isNeutralSpatial } from '../shared/spatial.js';
 import type { Retiming } from '../shared/speed.js';
-import { calculateLayout, sampleTimeline, type PlacedClip, type PreviewLayer } from '../shared/timeline.js';
+import {
+  calculateLayout,
+  sampleSlots,
+  sampleTimeline,
+  type PlacedClip,
+  type PreviewLayer,
+} from '../shared/timeline.js';
 import { framesToSeconds } from '../shared/timing.js';
 import { ServiceError } from './errors.js';
 import { assertSourceIdentity } from './files.js';
@@ -596,6 +602,21 @@ class SequentialLayeredRenderer {
       };
     });
   }
+  /** Transition timeslots fall in clip-free spans: their sources need geometry, not decoded pixels. */
+  private slotSources(layerId: string, frame: number): LayerFrameSource[] {
+    const { document, assets, target } = this.options;
+    return sampleSlots(document, frame, this.#layout)
+      .filter((sample) => sample.layerId === layerId)
+      .map((sample) => {
+        const { width, height } = assets[document.clips.findIndex((clip) => clip.id === sample.clipId)]!.metadata;
+        return {
+          sample,
+          rgb: this.#rgb[0]!,
+          original: { width, height },
+          bounds: fittedContent({ width, height }, target),
+        };
+      });
+  }
   private async span(
     layerId: string,
     span: Span,
@@ -659,6 +680,7 @@ class SequentialLayeredRenderer {
           (sample) => sample.layerId === layerId,
         );
         const sources = this.frameSources(clips, inputs, maps, frame, samples);
+        sources.push(...this.slotSources(layerId, span.start + frame));
         const started = performance.now();
         await this.composeGroup(sources, output);
         this.#report.compositionMs += performance.now() - started;

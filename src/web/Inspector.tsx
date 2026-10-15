@@ -5,7 +5,7 @@ import { colourAt } from '../shared/composition.js';
 import { activeLayerSetting, evaluateLayerSetting, hasLayerKeys, type KeyframeSetting } from '../shared/keyframes.js';
 import type { MediaAsset } from '../shared/media.js';
 import type { ProjectDocument, Transition, VideoClip, VideoLayer } from '../shared/model.js';
-import { calculateLayout, type TimelineLayout } from '../shared/timeline.js';
+import { calculateLayout, transitionOffset, type TimelineLayout } from '../shared/timeline.js';
 import { ColourCurvesSection, HslRangesSection } from './AdvancedColour.js';
 import { TrackAnimationControls } from './AnimationControls.js';
 import { ClipSourceRange } from './ClipSourceRange.js';
@@ -66,7 +66,22 @@ const TRANSITION_LABEL: Record<Transition['type'], string> = {
   cut: 'Cut',
   'fade-through-black': 'Fade through black',
   'cross-dissolve': 'Cross-dissolve',
+  'fade-black-pause': 'Black pause',
 };
+
+function transitionTiming(item: Transition): string {
+  if (item.type === 'cut') return '';
+  return ` · ${sourceSeconds(item.type === 'fade-black-pause' ? item.pause : item.duration)}`;
+}
+
+/** Switching type keeps the visible fade length where both types have one. */
+function transitionOfType(boundary: Transition, type: Transition['type']): Transition {
+  const pair = { leftId: boundary.leftId, rightId: boundary.rightId };
+  if (type === 'cut') return { ...pair, type, duration: 0 };
+  const span = boundary.type === 'fade-black-pause' ? 2 * boundary.fade : boundary.duration || 30;
+  if (type === 'fade-black-pause') return { ...pair, type, fade: Math.ceil(span / 2), pause: 15 };
+  return { ...pair, type, duration: type === 'fade-through-black' ? Math.max(2, span) : span };
+}
 
 function commandNumberError(project: ProjectDocument, command: EditCommand, recovery: string): string | null {
   try {
@@ -83,7 +98,7 @@ function trackScope(clips: number): string {
 }
 
 function transitionHasGap(boundary: Transition | undefined, layout: TimelineLayout): boolean {
-  if (!boundary || boundary.type === 'cross-dissolve') return false;
+  if (!boundary || transitionOffset(boundary) !== 0) return false;
   const left = layout.clips.find((item) => item.clip.id === boundary.leftId);
   const right = layout.clips.find((item) => item.clip.id === boundary.rightId);
   return !!left && !!right && left.end !== right.start;
@@ -455,12 +470,14 @@ function SequenceControls({
   const transitionGap = transitionHasGap(boundary, layout);
   const clipName = (clipId: string): string =>
     shortName(assets.find((item) => item.id === project.clips.find((clip) => clip.id === clipId)?.mediaId)?.name ?? '');
-  const setTransition = (type: Transition['type'], duration: number): void => {
-    if (!boundary) return;
-    const pair = { leftId: boundary.leftId, rightId: boundary.rightId };
-    if (type === 'cut') onEdit({ type: 'transition', transition: { ...pair, type, duration: 0 } });
-    else onEdit({ type: 'transition', transition: { ...pair, type, duration } });
-  };
+  const setTransition = (transition: Transition): void => onEdit({ type: 'transition', transition });
+  const transitionError = (transition: Transition): string | null =>
+    commandNumberError(
+      project,
+      { type: 'transition', transition },
+      'Shorten this transition or adjust conflicting fades/placements on this track.',
+    );
+  const resetKey = `${project.id}:${layer.id}:${boundary?.leftId}:${boundary?.rightId}:${boundary?.type}`;
   return (
     <>
       {layer.transitions.length > 0 && (
@@ -497,12 +514,12 @@ function SequenceControls({
                   </span>
                   <small>
                     {TRANSITION_LABEL[item.type]}
-                    {item.type === 'cut' ? '' : ` · ${sourceSeconds(item.duration)}`}
+                    {transitionTiming(item)}
                   </small>
                 </button>
                 {item === boundary && (
                   <section className="boundary-inspector" aria-label="Boundary transition">
-                    <div className="transition-fields">
+                    <div className={`transition-fields ${boundary.type === 'fade-black-pause' ? 'has-pause' : ''}`}>
                       <label>
                         <span>Type</span>
                         <select
@@ -511,45 +528,78 @@ function SequenceControls({
                           disabled={drafting}
                           value={boundary.type}
                           onChange={(event) =>
-                            setTransition(
-                              event.target.value as Transition['type'],
-                              boundary.type === 'cut' ? 30 : boundary.duration,
-                            )
+                            setTransition(transitionOfType(boundary, event.target.value as Transition['type']))
                           }
                         >
                           <option value="cut">Cut</option>
                           <option value="fade-through-black" disabled={transitionGap}>
                             Fade through black
                           </option>
+                          <option value="fade-black-pause" disabled={transitionGap}>
+                            Fade through black with pause
+                          </option>
                           <option value="cross-dissolve" disabled={transitionGap}>
                             Cross-dissolve
                           </option>
                         </select>
                       </label>
-                      <label>
-                        Duration <small>frames · {sourceSeconds(boundary.duration)}</small>
-                        <NumberField
-                          aria-label="Transition duration"
-                          aria-describedby={`${id}-transition-help`}
-                          min={boundary.type === 'fade-through-black' ? 2 : 1}
-                          max={2_147_483_647}
-                          integer
-                          step={1}
-                          disabled={drafting || boundary.type === 'cut'}
-                          value={boundary.duration}
-                          resetKey={`${project.id}:${layer.id}:${boundary.leftId}:${boundary.rightId}:${boundary.type}`}
-                          validate={(duration) =>
-                            boundary.type === 'cut'
-                              ? null
-                              : commandNumberError(
-                                  project,
-                                  { type: 'transition', transition: { ...boundary, duration } },
-                                  'Shorten this transition or adjust conflicting fades/placements on this track.',
-                                )
-                          }
-                          onCommit={(duration) => setTransition(boundary.type, duration)}
-                        />
-                      </label>
+                      {boundary.type === 'fade-black-pause' ? (
+                        <>
+                          <label>
+                            Fade <small>frames · {sourceSeconds(boundary.fade)}</small>
+                            <NumberField
+                              aria-label="Transition fade duration"
+                              aria-describedby={`${id}-transition-help`}
+                              min={1}
+                              max={2_147_483_647}
+                              integer
+                              step={1}
+                              disabled={drafting}
+                              value={boundary.fade}
+                              resetKey={resetKey}
+                              validate={(fade) => transitionError({ ...boundary, fade })}
+                              onCommit={(fade) => setTransition({ ...boundary, fade })}
+                            />
+                          </label>
+                          <label>
+                            Pause <small>frames · {sourceSeconds(boundary.pause)}</small>
+                            <NumberField
+                              aria-label="Transition pause duration"
+                              aria-describedby={`${id}-transition-help`}
+                              min={1}
+                              max={2_147_483_647}
+                              integer
+                              step={1}
+                              disabled={drafting}
+                              value={boundary.pause}
+                              resetKey={resetKey}
+                              validate={(pause) => transitionError({ ...boundary, pause })}
+                              onCommit={(pause) => setTransition({ ...boundary, pause })}
+                            />
+                          </label>
+                        </>
+                      ) : (
+                        <label>
+                          Duration <small>frames · {sourceSeconds(boundary.duration)}</small>
+                          <NumberField
+                            aria-label="Transition duration"
+                            aria-describedby={`${id}-transition-help`}
+                            min={boundary.type === 'fade-through-black' ? 2 : 1}
+                            max={2_147_483_647}
+                            integer
+                            step={1}
+                            disabled={drafting || boundary.type === 'cut'}
+                            value={boundary.duration}
+                            resetKey={resetKey}
+                            validate={(duration) =>
+                              boundary.type === 'cut' ? null : transitionError({ ...boundary, duration })
+                            }
+                            onCommit={(duration) => {
+                              if (boundary.type !== 'cut') setTransition({ ...boundary, duration });
+                            }}
+                          />
+                        </label>
+                      )}
                     </div>
                     {transitionGap && (
                       <p className="control-hint" id={`${id}-transition-gap`}>

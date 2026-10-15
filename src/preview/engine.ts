@@ -5,6 +5,7 @@ import { projectSchema, type ProjectDocument, type VideoClip } from '../shared/m
 import {
   calculateLayout,
   layerClips,
+  sampleSlots,
   sampleTimeline,
   type PlacedClip,
   type PreviewLayer,
@@ -631,12 +632,24 @@ export class PreviewEngine {
     if (!this.#document || !this.#compositor.available) return false;
     const layers = sampleTimeline(this.#document, frame, this.#layout);
     if (layers.some((layer) => !this.#shows(this.#laneOf(layer.clipId), layer))) return false;
+    // Transition timeslots need no decoded image, so any texture can back them.
+    const slots = sampleSlots(this.#document, frame, this.#layout).map((layer) => ({
+      layer,
+      slot: 0,
+      aspect: null as number | null,
+    }));
     const groups: CompositeGroup[] = [];
     for (const group of this.#document.layers) {
-      const members = layers.filter((layer) => layer.layerId === group.id);
+      const members = [
+        ...layers.map((layer) => {
+          const lane = this.#laneOf(layer.clipId)!;
+          return { layer, slot: lane.index, aspect: lane.aspect };
+        }),
+        ...slots,
+      ].filter(({ layer }) => layer.layerId === group.id);
       if (!members.length) continue;
       groups.push({
-        clips: members.map((layer) => {
+        clips: members.map(({ layer, slot, aspect }) => {
           const dimensions = this.#originalDimensions(layer.mediaId);
           if (
             !dimensions ||
@@ -646,11 +659,10 @@ export class PreviewEngine {
             dimensions.height <= 0
           )
             throw new Error('Original media dimensions must be positive integers.');
-          const lane = this.#laneOf(layer.clipId)!;
           return {
-            slot: lane.index,
+            slot,
             settings: this.#ungraded ? NEUTRAL_COLOUR : layer.colour,
-            aspect: lane.aspect,
+            aspect: aspect ?? dimensions.width / dimensions.height,
             spatial: layer.spatial,
             detail: this.#ungraded ? NEUTRAL_DETAIL : layer.detail,
             originalWidth: dimensions.width,

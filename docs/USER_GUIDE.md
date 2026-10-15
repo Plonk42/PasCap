@@ -204,11 +204,15 @@ clip edges; **Alt** bypasses. Each add, move or delete is one Undo step. Bookmar
 are saved with the project but never rendered or exported. Details:
 [bookmarks](TIMELINE_EDITING.md#bookmarks).
 
-Boundary **Cut / Fade / Dissolve** and **Fades** belong to the selected
+Boundary **Cut / Fade / Pause / Dissolve** and **Fades** belong to the selected
 track in **Track**; clicking a boundary button opens that tab with the boundary expanded.
 Gapped pairs are Cut only: explicitly close the gap or enable Ripple before adding
 a fade/dissolve. A cross-dissolve explicitly adjusts the right clip to its overlap;
 with Ripple off, no other clip moves and conflicts reject it.
+**Fade through black with pause** fades out over **Fade** frames, holds black for
+**Pause** frames, then fades in over the same **Fade** frames. The pause adds time
+between the clips instead of hiding footage, so the right clip moves later by the
+pause, the same way a dissolve moves it earlier.
 Black fades darken only that video track's RGB, preserving coverage rather than revealing
 lower footage. Opening/closing fades use actual first/last placements and remain
 stored but dormant on empty tracks. A closing fade ends at its last video clip's

@@ -1,6 +1,6 @@
-import type { ColourSettings } from './colour.js';
+import { NEUTRAL_COLOUR, type ColourSettings } from './colour.js';
 import { colourAt, opacityAt } from './composition.js';
-import type { DetailSettings } from './detail.js';
+import { NEUTRAL_DETAIL, type DetailSettings } from './detail.js';
 import type { ProjectDocument, Transition, VideoClip, VideoLayer } from './model.js';
 import { evaluateSpatial, type SpatialPose } from './spatial.js';
 import { compileRetiming, type Retiming } from './speed.js';
@@ -18,6 +18,8 @@ export interface PlacedTransition {
   start: number;
   boundary: number;
   end: number;
+  /** Frames the transition owns between the left OUT and the right start, if any. */
+  slot: { start: number; end: number } | null;
 }
 export interface TimelineLayout {
   clips: PlacedClip[];
@@ -61,9 +63,21 @@ export function blackFadeParts(duration: number): { out: number; in: number } {
   return { out: Math.ceil(duration / 2), in: Math.floor(duration / 2) };
 }
 
-function regionConsumption(transition: Transition | undefined, side: 'in' | 'out'): number {
+/** Frames a transition owns between its clips, rendered by the transition itself rather than footage. */
+export function transitionSlot(transition: Transition | undefined): number {
+  return transition?.type === 'fade-black-pause' ? transition.pause : 0;
+}
+
+/** Signed frames from the left clip's OUT to the right clip's start: negative overlap or a positive slot. */
+export function transitionOffset(transition: Transition | undefined): number {
+  return transition?.type === 'cross-dissolve' ? -transition.duration : transitionSlot(transition);
+}
+
+/** Footage frames a transition consumes at the end of its left clip ('out') or start of its right clip ('in'). */
+export function transitionConsumption(transition: Transition | undefined, side: 'in' | 'out'): number {
   if (!transition || transition.type === 'cut') return 0;
   if (transition.type === 'cross-dissolve') return transition.duration;
+  if (transition.type === 'fade-black-pause') return transition.fade;
   return blackFadeParts(transition.duration)[side];
 }
 
@@ -94,18 +108,31 @@ function validateClipRegions(
   closing: number,
 ): void {
   if (duration <= 0) throw new Error('Clips must contain at least one frame.');
-  if (regionConsumption(incoming, 'in') + regionConsumption(outgoing, 'out') + opening + closing > duration)
+  if (transitionConsumption(incoming, 'in') + transitionConsumption(outgoing, 'out') + opening + closing > duration)
     throw new Error(`Fade/transition regions overlap or exceed clip ${clip.id}.`);
 }
 
 function placeTransition(layerId: string, transition: Transition, start: number): PlacedTransition {
-  if (transition.type === 'cross-dissolve')
-    return { layerId, transition, start, boundary: start + transition.duration, end: start + transition.duration };
+  if (transition.type === 'cross-dissolve') {
+    const end = start + transition.duration;
+    return { layerId, transition, start, boundary: end, end, slot: null };
+  }
   if (transition.type === 'fade-through-black') {
     const parts = blackFadeParts(transition.duration);
-    return { layerId, transition, start: start - parts.out, boundary: start, end: start + parts.in };
+    return { layerId, transition, start: start - parts.out, boundary: start, end: start + parts.in, slot: null };
   }
-  return { layerId, transition, start, boundary: start, end: start };
+  if (transition.type === 'fade-black-pause') {
+    const boundary = start - transition.pause;
+    return {
+      layerId,
+      transition,
+      start: boundary - transition.fade,
+      boundary,
+      end: start + transition.fade,
+      slot: { start: boundary, end: start },
+    };
+  }
+  return { layerId, transition, start, boundary: start, end: start, slot: null };
 }
 
 function placementStart(
@@ -115,8 +142,7 @@ function placementStart(
   incoming: Transition | undefined,
 ): number {
   if (!layer.ripple || !previous) return clip.start;
-  const overlap = incoming?.type === 'cross-dissolve' ? incoming.duration : 0;
-  return previous.end - overlap;
+  return previous.end + transitionOffset(incoming);
 }
 
 function validatePlacement(
@@ -133,6 +159,8 @@ function validatePlacement(
       throw new Error('Clips on the same track cannot overlap except in an exact adjacent cross-dissolve.');
     if (incoming?.type === 'fade-through-black' && placed.start !== previous.end)
       throw new Error('Fade-through-black requires touching clips, not a gap.');
+    if (incoming?.type === 'fade-black-pause' && placed.start !== previous.end + incoming.pause)
+      throw new Error('A black pause must keep exactly its pause frames between the clips.');
   }
   if (earlier && placed.start < earlier.end) throw new Error('A track cannot contain a triple overlap.');
 }
@@ -215,6 +243,13 @@ function clipWeights(
         ? fadeOutWeight(frame - region.start, parts.out)
         : fadeInWeight(frame - region.boundary, parts.in);
   }
+  if (region?.transition.type === 'fade-black-pause') {
+    const { fade } = region.transition;
+    brightness =
+      placed.clip.id === region.transition.leftId
+        ? fadeOutWeight(frame - region.start, fade)
+        : fadeInWeight(frame - placed.start, fade);
+  }
   const clips = layout.clips.filter((item) => item.clip.layerId === layer.id);
   if (placed === clips[0] && frame < placed.start + layer.openingFade)
     brightness *= fadeInWeight(frame - placed.start, layer.openingFade);
@@ -251,6 +286,41 @@ export function sampleTimeline(
         blendWeight,
         brightness,
         opacity: opacities.get(layer.id)!,
+      },
+    ];
+  });
+}
+
+/**
+ * Layers a transition draws in its own timeslot, where no clip is active on its track. They
+ * need no decoded image: a black pause is the left clip's geometry at brightness 0, so it keeps
+ * the track's Transform coverage and Opacity like a fade through black.
+ */
+export function sampleSlots(
+  project: ProjectDocument,
+  frame: number,
+  layout = calculateLayout(project),
+): PreviewLayer[] {
+  return layout.transitions.flatMap(({ layerId, transition, slot }) => {
+    if (!slot || frame < slot.start || frame >= slot.end) return [];
+    const layer = project.layers.find((item) => item.id === layerId)!;
+    if (!layer.enabled) return [];
+    const left = layout.clips.find((item) => item.clip.id === transition.leftId)!;
+    const last = left.duration - 1;
+    return [
+      {
+        clipId: left.clip.id,
+        mediaId: left.clip.mediaId,
+        layerId,
+        sourceFrame: left.retiming.sourceAt(last),
+        sourcePosition: left.retiming.sourcePositionAt(last),
+        spatial: evaluateSpatial(layer.transform, frame),
+        detail: { ...NEUTRAL_DETAIL },
+        colour: structuredClone(NEUTRAL_COLOUR),
+        weight: 0,
+        blendWeight: 1,
+        brightness: 0,
+        opacity: opacityAt(layer, frame),
       },
     ];
   });

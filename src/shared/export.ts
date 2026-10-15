@@ -11,7 +11,7 @@ import {
   type VideoLayer,
 } from './model.js';
 import { hasSpatialEdits } from './spatial.js';
-import { blackFadeParts, calculateLayout, type PlacedClip, type TimelineLayout } from './timeline.js';
+import { calculateLayout, transitionConsumption, type PlacedClip, type TimelineLayout } from './timeline.js';
 import { PROJECT_FPS, sameRate } from './timing.js';
 
 export const exportProfileSchema = z.enum(['draft720', 'final4k']);
@@ -165,7 +165,7 @@ export interface LayeredExportPlan extends ExportPlan {
 }
 
 function blackFadeLength(transition: Transition | undefined, side: 'in' | 'out'): number {
-  return transition?.type === 'fade-through-black' ? blackFadeParts(transition.duration)[side] : 0;
+  return transition?.type === 'cross-dissolve' ? 0 : transitionConsumption(transition, side);
 }
 function planClip(
   layer: VideoLayer,
