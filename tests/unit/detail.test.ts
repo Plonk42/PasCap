@@ -218,7 +218,7 @@ describe('clip detail settings', () => {
 });
 
 describe('track HDR look', () => {
-  it('is a bounded eleventh track Colour channel that skips the per-pixel grade', () => {
+  it('is a bounded track Colour channel that skips the per-pixel grade', () => {
     expect(createColourSettings().hdr).toBe(0);
     expect(colourSchema.safeParse({ ...createColourSettings(), hdr: 1.01 }).success).toBe(false);
     expect(colourSchema.safeParse({ ...createColourSettings(), hdr: -0.01 }).success).toBe(false);

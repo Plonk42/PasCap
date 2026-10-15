@@ -9,6 +9,7 @@ import {
   HIGHLIGHTS_WHITE,
   NEUTRAL_COLOUR,
   type RGB,
+  WHITES_RANGE,
 } from '../../src/shared/colour.js';
 import { musicSchema } from '../../src/shared/model.js';
 
@@ -44,8 +45,13 @@ describe('authoritative colour transform', () => {
     { tone: { brightness: -0.5 }, white: 1 },
     { tone: { highlights: 1 }, white: 1 },
     { tone: { highlights: -1 }, white: 1 - HIGHLIGHTS_WHITE },
-    { tone: { contrast: 2, brightness: -0.5, shadows: -1, highlights: -1 }, white: 1 - HIGHLIGHTS_WHITE },
-    { tone: { contrast: 0, brightness: 0.5, shadows: 1, highlights: 1 }, white: 1 },
+    { tone: { whites: 1 }, white: 1 },
+    { tone: { whites: -1 }, white: 1 - WHITES_RANGE },
+    {
+      tone: { contrast: 2, brightness: -0.5, shadows: -1, highlights: -1, whites: -1 },
+      white: 1 - HIGHLIGHTS_WHITE - WHITES_RANGE * (1 - HIGHLIGHTS_WHITE) ** 4,
+    },
+    { tone: { contrast: 0, brightness: 0.5, shadows: 1, highlights: 1, whites: 1 }, white: 1 },
   ])('tone curves $tone keep black, white, colour ratios and tone order', ({ tone, white }) => {
     const settings = { ...NEUTRAL_COLOUR, ...tone };
     expect(gradePixel([0, 0, 0], settings)).toEqual([0, 0, 0]);
@@ -68,6 +74,14 @@ describe('authoritative colour transform', () => {
     expect(grey(2 / 3, -1)).toBeCloseTo(2 / 3 - 4 / 27 - (HIGHLIGHTS_WHITE * 8) / 27, 10);
     expect(grey(1, 1)).toBeCloseTo(1, 10);
     expect(grey(1, -1)).toBeCloseTo(1 - HIGHLIGHTS_WHITE, 10);
+  });
+  it('whites moves the white point with little effect below the upper tones', () => {
+    const grey = (v: number, whites: number) => gradePixel([v, v, v], { ...NEUTRAL_COLOUR, whites })[0];
+    expect(grey(1, -1)).toBeCloseTo(1 - WHITES_RANGE, 10);
+    expect(grey(0.8, -1)).toBeCloseTo(0.8 - WHITES_RANGE * 0.8 ** 4, 10);
+    expect(grey(0.8, 1)).toBeCloseTo(0.8 + WHITES_RANGE * 0.8 ** 4, 10);
+    expect(grey(0.9, 1)).toBe(1);
+    expect(Math.abs(grey(0.5, -1) - 0.5)).toBeLessThan(0.02);
   });
   it('shadows lift dark tones by a luminance gain, keeping black, white and colour ratios', () => {
     const lift = { ...NEUTRAL_COLOUR, shadows: 1 };

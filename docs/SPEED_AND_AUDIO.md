@@ -1,6 +1,6 @@
-# Speed and audio contract · project v19
+# Speed and audio contract · project v20
 
-Nine video track-owned scalar Colour controls include Temperature/Tint (−1…1, neutral 0),
+Ten video track-owned scalar Colour controls include Temperature/Tint (−1…1, neutral 0),
 whose normalized linear gains precede Exposure. Positive Temperature warms;
 positive Tint adds magenta; nonzero settings intentionally colour greys. They
 can be keyed independently in video track animation, which is appearance-only and
@@ -14,7 +14,7 @@ likewise appearance-only; see [detail filters](design/DETAIL_FILTERS.md#hdr-look
 
 ## Clip speed
 
-Speed belongs only to the clip and is positive, **0.1×–8×**. Strict schema 19
+Speed belongs only to the clip and is positive, **0.1×–8×**. Strict schema 20
 requires each clip's `speed` to be `{ mode: 'constant', rate }` or
 `{ mode: 'curve', keyframes }`; there is no track Speed setting, ramp mode or
 project-wide speed field. A clip's duration and sampled frames depend only on its
@@ -297,7 +297,7 @@ frame for main capture.
 
 ## Music
 
-Strict schema 19 requires `music: MusicTrack[]`, with **0–8 independent music tracks**
+Strict schema 20 requires `music: MusicTrack[]`, with **0–8 independent music tracks**
 and unique required track `id` values; `[]` means no music. Each music track
 requires `mediaId`, `sourceIn`, `sourceOut`, `start`, `duration`, `gainDb`, `fadeIn`,
 `fadeOut` and `loop`. Several music tracks can use the same registered recording
@@ -449,12 +449,12 @@ cancellation cleans only owned scratch/partials and preserves completed outputs.
 
 ## Versioning
 
-Project schema **v19** requires explicit `media.videoIds` and `media.audioIds` arrays,
-unique and limited to 10,000 IDs each, plus complete video track colour with Temperature/Tint/HDR
+Project schema **v20** requires explicit `media.videoIds` and `media.audioIds` arrays,
+unique and limited to 10,000 IDs each, plus complete video track colour with Temperature/Tint/Whites/HDR
 and static HSL/curves, clip constant or 1–256-keyframe custom-curve
 speed and a boolean `reverse`, required video track `transform: { base, keyframes }` with eight-value base and
 0–256 project-frame keyframes with required per-setting easing and `reset`, track
-keyframe arrays with all eleven nullable value fields, placement and music
+keyframe arrays with all twelve nullable value fields, placement and music
 source OUT. `music` is a required 0–8 array with unique required music track IDs and
 all per-track fields above; `[]` is the sole no-music representation, not null
 or a compatibility default. Every video track also requires `ripple`, `transitions`, `openingFade` and
@@ -463,14 +463,14 @@ not a default for missing saved fields. Transitions/fades are track-local, with
 no special first-track identity. Video tracks display and composite in their saved bottom-to-top array order.
 The sole track `opacity` channel overrides the track's saved `opacity` on every clip,
 including both dissolve sources; otherwise all use the saved track value.
-Required nullable channels are `opacity`, the nine scalar colour settings
-(including `temperature` and `tint`) and `hdr`. Missing saved bases/channels are invalid, not defaulted.
+Required nullable channels are `opacity`, the ten scalar colour settings
+(including `temperature`, `tint` and `whites`) and `hdr`. Missing saved bases/channels are invalid, not defaulted.
 Track `opacity` is valid and required; saved `clip.opacity` and old
 `clipOpacity`/`layerOpacity` channels are rejected, not defaulted.
 New projects have empty video/music bins. Standalone audio imports belong
 to the open project's bin; every music track's references also count as membership.
 Global registered music/proxies are reusable on deliberate import, never automatically
-inherited by a new project. Earlier v1–v18 projects and export receipt snapshots remain unchanged
+inherited by a new project. Earlier v1–v19 projects and export receipt snapshots remain unchanged
 and incompatible. There is no migration, compatibility reader, null fallback, default-field
 injection or automatic deletion; recreate projects and import their media to reuse
 registered assets/verified ready proxies. Confirmed project deletion affects only
@@ -480,7 +480,7 @@ Video-proxy/current PCM formats, source guards and native video budgets are unch
 native composition uses the sole Opacity contract without a track multiplier.
 Preview uses the current explicitly prepared PCM cache described above.
 
-Export receipts remain **version 1** with a strict **v19** snapshot, required
+Export receipts remain **version 1** with a strict **v20** snapshot, required
 `musicSources` captured unique-original array and `settings.audio` identified
 instance-plan array (`[]` for each without music). Plans preserve independent
 timing/gain/fades/loop; several may refer to the same captured original. The plan

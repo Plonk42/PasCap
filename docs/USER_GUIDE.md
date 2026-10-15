@@ -13,22 +13,22 @@ inherit the shared media registry. Importing the same original into another proj
 deliberately adds it to that project's bin and reuses eligible verified proxies.
 Removing a clip or music track does not remove the imported recording.
 
-Projects use **strict format v19**, with complete required video track colour and track
+Projects use **strict format v20**, with complete required video track colour and track
 Transform (base plus per-setting project-frame keyframes), a required `bookmarks` array of project frames (`[]` on new projects), a required `music` array of 0–8 independent
 music tracks and unique required IDs (`[]` without music), every video track's Ripple, transitions and
 opening/closing fades and required numeric `opacity` in 0–1 (1 on new tracks),
-with eleven nullable animation channels, in control order: `opacity`,
+with twelve nullable animation channels, in control order: `opacity`,
 `temperature`, `tint`, `exposure`, `brightness`, `contrast`, `hue`, `saturation`,
-`highlights`, `shadows`, `hdr`. Clip speed is constant or a 1–256-keyframe custom curve,
+`highlights`, `shadows`, `whites`, `hdr`. Clip speed is constant or a 1–256-keyframe custom curve,
 and every clip requires a boolean `reverse`.
-Video track Colour requires Temperature/Tint/HDR bases and static
+Video track Colour requires Temperature/Tint/Whites/HDR bases and static
 HSL/curves; missing fields and saved clip colour/correction are invalid.
 Track `opacity` is the sole saved Opacity value; saved `clip.opacity` and old
 `clipOpacity`/`layerOpacity` keyframe channels are invalid, not ignored or defaulted.
-v1–v18 project documents and receipt snapshots
+v1–v19 project documents and receipt snapshots
 stay on disk but are incompatible: there is no migration, compatibility default,
 null fallback, old-format reader, automatic repair or deletion. Export receipts
-remain version 1 with a strict v19 snapshot and required audio-source/instance-plan arrays.
+remain version 1 with a strict v20 snapshot and required audio-source/instance-plan arrays.
 Create a new project and import its media deliberately. Finished videos remain
 untouched. **Delete project** requires confirmation and deletes only the saved
 project document, not originals, the shared registry/proxy cache or exports/receipts.
@@ -243,7 +243,9 @@ Find its single native slider/exact numeric field in **Track → Colour**, with 
 capture diamond and adjacent per-setting Previous/Next buttons. Colour groups its sliders
 under small headings, each with a **Reset** icon that resets the group's editable settings in
 one Undo step: **Opacity**; **Colour** (Temperature, Tint, Hue, Saturation); **Light**
-(Exposure, Brightness, Contrast, Highlights, Shadows); **Effects** (HDR).
+(Exposure, Brightness, Contrast, Highlights, Shadows, Whites); **Effects** (HDR).
+**Whites** moves the brightest tones: lower it to bring back a blown-out sky, raise it
+to make whites brighter.
 Main and stored sliders/exact fields use **0–100%**, neutral **100%**.
 Saved track `opacity` and keyframe values remain **0–1**; this is UI conversion only, not a schema change.
 Without Opacity keyframes, either value control edits the track's saved `opacity` and works even
@@ -506,9 +508,9 @@ counts and visits the same keyframes. **Animation help** beside its heading comb
 animation and keyframe-timing guidance. **Clip** keeps source/clip settings and playhead
 Speed controls; **Track → Colour** keeps Opacity and Colour controls and **Track → Transform** the pose.
 All shared track keyframes use absolute project frames and affect every clip on that track.
-Eleven settings can be keyed independently:
-Opacity (`opacity`), the nine scalar colour controls, including
-Temperature and Tint, and HDR (`hdr`). HSL/curves remain static and Speed is clip-only. At most 256
+Twelve settings can be keyed independently:
+Opacity (`opacity`), the ten scalar colour controls, including
+Temperature, Tint and Whites, and HDR (`hdr`). HSL/curves remain static and Speed is clip-only. At most 256
 shared keyframes are allowed per video track.
 
 - Each main setting has a **hollow ◇ / filled ◆ diamond**
@@ -707,7 +709,7 @@ indicate adjusted settings without expanding everything. Animated channels use
 an amber curve/diamond: dashed between keyframes, filled when the setting is enabled
 at the playhead. **Animation help** beside Colour's **Keyframes** heading explains scope,
 capture and keyframe timing; there is no separate Keyframe timing help button.
-All eleven track settings retain their unkeyed values, explicit capture and stored-keyframe editing.
+All twelve track settings retain their unkeyed values, explicit capture and stored-keyframe editing.
 Search/filter clear actions,
 mixed select-all and always-visible media Add simplify the library.
 
@@ -760,7 +762,7 @@ in memory and automatic write retries stop. **Retry save** is offered only for
 recoverable transport/server errors. On a revision conflict, **Review latest save**
 offers keeping the draft, **Download unsaved project**, or explicitly discarding
 local changes and reloading. It never silently overwrites or rebases another save.
-Download before discarding; the v19 JSON snapshot is for manual recovery/examination,
+Download before discarding; the v20 JSON snapshot is for manual recovery/examination,
 not a supported JSON-import or migration flow. Unapplied input/pointer drafts are
 not committed project edits.
 

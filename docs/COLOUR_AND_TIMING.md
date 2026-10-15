@@ -1,4 +1,4 @@
-# PasCap colour and timing contract · project v19
+# PasCap colour and timing contract · project v20
 
 This specification is shared by the CPU reference, WebGL2 shader and native
 scalar LUT or exact advanced-colour export. It is elementary SDR grading, not
@@ -41,13 +41,14 @@ See [track appearance](design/ROW_APPEARANCE.md) for ownership, UI and strict st
   - Brightness `b`: `V ← V + 2b × V × (1 − V)`, moving mid grey by `b / 2`.
   - Shadows `s`: `V ← V + s × V × (1 − V)^2`, acting mostly below perceptual mid grey.
   - Highlights `h`: `V ← V + h × V^2 × (1 − V) + min(h, 0) × 0.15 × V^3`, the mirror of
-    Shadows above mid grey. Lowering it also dims pure white to `1 − 0.15 |h|`, since
-    there is no separate Whites setting ([#184](https://github.com/Plonk42/PasCap/issues/184));
-    raising it never pushes tones past white.
+    Shadows above mid grey. Lowering it also dims pure white to `1 − 0.15 |h|`; Whites
+    (below) moves the white point on its own. Raising it never pushes tones past white.
+  - Whites `w`: `V ← V + 0.25w × V^4`, moving the white point: −1 dims pure white to 0.75,
+    +1 pushes near-white tones to white; it barely touches tones below the upper range.
 
   Multiply every channel by `EOTF(V) / Y` (`(2 − c)(1 + 2b)(1 + s)` at `Y = 0`). Each
   curve is monotonic over its whole range and keeps black (and white, except lowered
-  Highlights); as a gain the result keeps chroma ratios, so colours never turn grey
+  Highlights and Whites); as a gain the result keeps chroma ratios, so colours never turn grey
   or clip to black.
 
 - Recompute unclipped linear luminance. Define
@@ -87,12 +88,12 @@ frames**; unkeyed track colour uses `layer.colour` and unkeyed Transform setting
 setting: `VideoLayer.opacity` is a required number in 0–1, initially 1 on a new
 track. Without keyed Opacity settings, every source uses that track value; otherwise
 the track's sole `opacity` channel overrides it, including both dissolve sources.
-There is no saved `clip.opacity` or second opacity channel. The eleven required
+There is no saved `clip.opacity` or second opacity channel. The twelve required
 nullable keyframe fields are `opacity`, `temperature`, `tint`, `exposure`, `brightness`, `contrast`,
-`hue`, `saturation`, `highlights`, `shadows` and `hdr`.
+`hue`, `saturation`, `highlights`, `shadows`, `whites` and `hdr`.
 Hold/linear/ease-in/ease-out/smooth interpolation is that setting's own Easing at the left keyframe
 with that setting enabled; endpoints hold outside the
-keyed interval. Colour evaluates all nine scalar parameter values before applying the
+keyed interval. Colour evaluates all ten scalar parameter values before applying the
 equations above; evaluated HDR feeds the detail kernel before grading instead. Trim/split never copy or shift track keyframes or Transform; they retain clip-speed
 anchors, including those outside the clip range and at the registered
 original's exclusive OUT. Transform poses evaluate at absolute project time, like
@@ -198,7 +199,7 @@ resets to normal graded preview. Export continues to use the saved grading contr
 
 ## Music sampling and mixing
 
-Strict schema 19 requires a 0–8 `music` array of independent uniquely identified
+Strict schema 20 requires a 0–8 `music` array of independent uniquely identified
 music tracks, `[]` without music. Each has source IN/OUT, start/duration, gain, fades
 and loop; source-video audio remains disabled. At 48 kHz, source/placement/duration/
 fade positions round independently to integer samples using the rational frame
@@ -244,19 +245,19 @@ neutral HSL and identity curves, HDR 0, an exactly neutral track Transform
 base without Transform keyframes, without music, extra tracks or track keyframes,
 and is limited to 3,600 project frames. It refuses unsupported
 documents regardless of Ripple or track ID.
-It requires a strict schema-19 project snapshot, including explicit project media
+It requires a strict schema-20 project snapshot, including explicit project media
 membership; its reference receipt format remains independently version 1. New
-measurement reports must identify their v19 project snapshot without overwriting
+measurement reports must identify their v20 project snapshot without overwriting
 historical reports; the report identifier is separate from the project schema.
 Project identifiers such as `preview-lab`/`preview-lab-v6` are not schema versions
 and are not renamed by this contract.
-v1–v18 project documents and receipt snapshots are incompatible and preserved;
+v1–v19 project documents and receipt snapshots are incompatible and preserved;
 recreate projects deliberately, with no migration, compatibility defaults or
-old-format/null fallback readers or automatic deletion. Strict v19 requires
-complete video track `colour`, including Temperature/Tint/HDR bases and static HSL/curves,
-all eleven nullable keyframe fields, constant or custom-curve clip speed, boolean clip `reverse`, track `transform` base/per-setting keyframes and track `opacity`; saved `clip.colour`, `clip.correction`, `clip.opacity`, `clip.spatial` and
+old-format/null fallback readers or automatic deletion. Strict v20 requires
+complete video track `colour`, including Temperature/Tint/Whites/HDR bases and static HSL/curves,
+all twelve nullable keyframe fields, constant or custom-curve clip speed, boolean clip `reverse`, track `transform` base/per-setting keyframes and track `opacity`; saved `clip.colour`, `clip.correction`, `clip.opacity`, `clip.spatial` and
 old `clipOpacity`/`layerOpacity` keyframe fields are rejected, not defaulted.
-Production export receipts also remain version 1, with strict v19 snapshots and
+Production export receipts also remain version 1, with strict v20 snapshots and
 required `musicSources` captured-original/`settings.audio` identified-plan arrays;
 older snapshots or invalid arrays are rejected without rewriting receipts/MP4s.
 Proxy/current PCM formats and source guards are unchanged; the registries are
@@ -268,7 +269,7 @@ Video track colour also requires static eight-band HSL and master/red/green/blue
 The order is decoded linear Temperature/Tint gains before Exposure and the
 remaining scalar SDR stages, encoded BT.709 HSL, master curve, individual RGB
 curves, black-fade brightness and group coverage/source-over. HSL/curves add no
-channels to the eleven nullable track fields. HSL protects greys in its incoming
+channels to the twelve nullable track fields. HSL protects greys in its incoming
 RGB, not greys already coloured by Temperature/Tint. The Original preview bypasses
 the entire colour transform, not geometry or coverage. Precise advanced bounds,
 circular weighting, smooth monotone cubic curves and resource budgets are in

@@ -80,21 +80,21 @@ external desktop file/folder drag-and-drop import**. External drops prevent
 navigation and show Import guidance without a POST. Internal ready-Media-to-Timeline
 dragging remains supported. Imports reference originals; generated proxies/
 thumbnails, project/registry metadata, exports/receipts and scratch are the only
-new local data, not duplicate original footage. Projects use strict schema 19 with
-complete required video track Colour, including Temperature/Tint/HDR and static HSL/curves,
+new local data, not duplicate original footage. Projects use strict schema 20 with
+complete required video track Colour, including Temperature/Tint/Whites/HDR and static HSL/curves,
 no clip colour/correction/spatial fields, a required boolean clip `reverse`, required video track `transform` base/per-setting project-frame keyframes and
 required `music` array (0–8 independent music tracks, unique required IDs; `[]` without
 music), and
 required per-track Ripple, transitions, opening/closing fades and numeric
-`VideoLayer.opacity` in 0–1 (1 on new tracks), plus eleven nullable keyframe channels:
-`opacity`, nine scalar colour settings (including `temperature` and
-`tint`) and `hdr`. HSL/curves remain static. Track `opacity` is the sole saved
+`VideoLayer.opacity` in 0–1 (1 on new tracks), plus twelve nullable keyframe channels:
+`opacity`, ten scalar colour settings (including `temperature`,
+`tint` and `whites`) and `hdr`. HSL/curves remain static. Track `opacity` is the sole saved
 Opacity value; saved `clip.opacity` and old `clipOpacity`/`layerOpacity` channels
 are rejected. The track value or its overriding keyframes supply Opacity to each source
-in a dissolve group, without an additional track multiplier. v1–v18 projects
+in a dissolve group, without an additional track multiplier. v1–v19 projects
 and receipt snapshots remain unchanged/incompatible and require project recreation,
 without migration, compatibility defaults, null/old-format readers or automatic deletion.
-Export receipts remain version 1 with strict v19 snapshots and required captured
+Export receipts remain version 1 with strict v20 snapshots and required captured
 audio-source/instance-plan arrays; invalid arrays/older snapshots remain preserved
 and rejected. Proxy/current PCM formats and source identity checks are unchanged; the
 registries are version 2 (`videos.json`, `music.json`, with full-content checksums).

@@ -59,7 +59,7 @@ describe('project dialog filtering', () => {
     project('legacy', {
       title: 'North flight old',
       compatible: false,
-      error: 'Unsupported project schema version 6; this build requires version 19.',
+      error: 'Unsupported project schema version 6; this build requires version 20.',
     }),
     project('south', { title: 'South flight', updatedAt: '2026-10-01T12:00:00Z' }),
   ];
@@ -93,7 +93,7 @@ describe('project dialog filtering', () => {
     const unavailable = Object.freeze(entries[2]!);
     const filtered = filterProjects(Object.freeze([unavailable]), 'old', 'unsupported');
     expect(filtered[0]).toBe(unavailable);
-    expect(filtered[0]?.error).toBe('Unsupported project schema version 6; this build requires version 19.');
+    expect(filtered[0]?.error).toBe('Unsupported project schema version 6; this build requires version 20.');
     expect(filtered[0]?.compatible).toBe(false);
     expect(filtered[0]?.clipCount).toBe(0);
   });
@@ -198,12 +198,12 @@ describe('activity ordering and summaries', () => {
 });
 
 describe('export snapshot summary', () => {
-  it('summarizes an empty strict version 19 project without adding defaults', () => {
+  it('summarizes an empty strict version 20 project without adding defaults', () => {
     const document = createProject('empty', 'Empty');
     const summary = summarizeExport(document);
     expect(summary).toMatchObject({ duration: 0, clips: 0, layers: 1, enabledLayers: 1, layered: false });
     expect(summary.keys).toEqual({ points: 0, settings: 0, colour: 0, opacity: 0 });
-    expect(document.schemaVersion).toBe(19);
+    expect(document.schemaVersion).toBe(20);
     expect(document.media).toEqual({ videoIds: [], audioIds: [] });
     expect(document.layers[0]!.keyframes).toEqual([]);
   });
