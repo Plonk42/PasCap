@@ -40,12 +40,15 @@ See [track appearance](design/ROW_APPEARANCE.md) for ownership, UI and strict st
     flattening (c < 1) pivoting at encoded 0.5; its midtone slope is `(1 + c) / 2`.
   - Brightness `b`: `V ← V + 2b × V × (1 − V)`, moving mid grey by `b / 2`.
   - Shadows `s`: `V ← V + s × V × (1 − V)^2`, acting mostly below perceptual mid grey.
+  - Highlights `h`: `V ← V + h × V^2 × (1 − V) + min(h, 0) × 0.15 × V^3`, the mirror of
+    Shadows above mid grey. Lowering it also dims pure white to `1 − 0.15 |h|`, since
+    there is no separate Whites setting ([#184](https://github.com/Plonk42/PasCap/issues/184));
+    raising it never pushes tones past white.
 
   Multiply every channel by `EOTF(V) / Y` (`(2 − c)(1 + 2b)(1 + s)` at `Y = 0`). Each
-  curve is monotonic over its whole range and keeps black and white; as a gain the
-  result keeps chroma ratios, so colours never turn grey or clip to black.
-  Highlights: then add `0.25 × highlights × M^2` to each channel, where `M` is the
-  luminance after Contrast and Brightness (`EOTF` of `V` before Shadows).
+  curve is monotonic over its whole range and keeps black (and white, except lowered
+  Highlights); as a gain the result keeps chroma ratios, so colours never turn grey
+  or clip to black.
 
 - Recompute unclipped linear luminance. Define
   `Cb = (B − Y) / 1.8556`, `Cr = (R − Y) / 1.5748`.
