@@ -178,7 +178,8 @@ original exclusive OUT. Source review keeps its independent numeric IN/OUT pair 
   the selected clip is removed by **Cut range / Shift+Delete**, in **one Undo step**;
   without a range or a clip, or with a range outside the clip, its tooltip says why.
   A click on the ruler or Escape clears the range. While a range is selected, Play
-  replays only that range, stopping on its last frame.
+  replays only that range, stopping on its last frame; the start/end buttons and
+  **Home/End** go to the range's first and last frame.
   Ripple-on cuts close the gap on that track; off keeps the removed gap and fixed neighbours.
 - **Duplicate** (right-click the clip) or **Ctrl+D** makes an independent clip. Timeline
   Delete removes a clip, not its original or project-bin membership.

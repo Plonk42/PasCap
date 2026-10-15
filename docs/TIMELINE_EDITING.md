@@ -237,6 +237,8 @@ toolbar covering the lanes. Each track header has one **Ripple** toggle icon
   IN, stopping on the last included frame (OUT − 1) so the section can be replayed.
   At the end of the range, or of the timeline without one, Play restarts from IN or
   frame 0, also when pressed while the preview is still settling on the last frame.
+  The preview's start/end buttons and **Home/End** likewise go to IN and the last
+  included frame (OUT − 1) while a range is selected, else to the timeline's ends.
 - **Cut range / Shift+Delete** is enabled only when a range and a clip are both
   selected and the range overlaps that clip; otherwise its tooltip names the reason
   (no range, no clip, or range outside the clip). It removes the overlapping part

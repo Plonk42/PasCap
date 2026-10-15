@@ -18,6 +18,8 @@ interface Props {
   /** Shows the image without Colour and Detail for as long as `active` stays true. */
   onHoldOriginal: (active: boolean) => void;
   onSeek: (frame: number) => void;
+  /** Start/end of the selected range, else of the timeline. */
+  onSeekBoundary: (edge: 'start' | 'end') => void;
   onRetry: () => void;
   onMedia: () => void;
   onImport: () => void;
@@ -100,6 +102,7 @@ export function PreviewPanel({
   rangeSelected,
   onHoldOriginal,
   onSeek,
+  onSeekBoundary,
   onRetry,
   onMedia,
   onImport,
@@ -218,10 +221,10 @@ export function PreviewPanel({
         <div className="transport-buttons">
           <button
             className="icon-button"
-            aria-label="Go to timeline start"
-            title="Timeline start (Home)"
+            aria-label={rangeSelected ? 'Go to selection start' : 'Go to timeline start'}
+            title={rangeSelected ? 'Selection start (Home)' : 'Timeline start (Home)'}
             disabled={controlsUnavailable}
-            onClick={() => onSeek(0)}
+            onClick={() => onSeekBoundary('start')}
           >
             <Icon name="start" size={16} />
           </button>
@@ -254,10 +257,10 @@ export function PreviewPanel({
           </button>
           <button
             className="icon-button"
-            aria-label="Go to timeline end"
-            title="Timeline end (End)"
+            aria-label={rangeSelected ? 'Go to selection end' : 'Go to timeline end'}
+            title={rangeSelected ? 'Selection end (End)' : 'Timeline end (End)'}
             disabled={controlsUnavailable}
-            onClick={() => onSeek(duration - 1)}
+            onClick={() => onSeekBoundary('end')}
           >
             <Icon name="end" size={16} />
           </button>
