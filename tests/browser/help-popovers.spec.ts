@@ -227,7 +227,9 @@ test('bulk collapse retains invalid drafts, nested disclosure state and reachabl
   const list = page.getByRole('list', { name: 'Edit track keyframes', exact: true, includeHidden: true });
   await expect(list).toBeVisible();
   const point = page.getByLabel('Edit track keyframe 10', { exact: true });
-  // Lists of three or fewer points open their Edit details initially.
+  // Edit details start closed; an opened one stays open across bulk collapse.
+  await expect(point.locator('..')).not.toHaveAttribute('open');
+  await point.click();
   await expect(point.locator('..')).toHaveAttribute('open', '');
   await inspectorTab(page, 'Clip');
   await page.getByRole('button', { name: 'Collapse all Clip sections', exact: true }).click();
@@ -699,6 +701,7 @@ test('direct point list keeps timing help available and nested drafts mounted ac
   await inspectorTab(page, 'Track keyframes');
   const list = page.getByRole('list', { name: 'Edit track keyframes', exact: true });
   await expect(list).toBeVisible();
+  await page.getByLabel('Edit track keyframe 10', { exact: true }).click();
   await expect(page.getByLabel('Edit track keyframe 10', { exact: true }).locator('..')).toHaveAttribute('open', '');
   const field = page.getByRole('spinbutton', { name: 'Track keyframe frame 10', exact: true, includeHidden: true });
   await field.fill('0.5');

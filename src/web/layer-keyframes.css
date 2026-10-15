@@ -198,18 +198,9 @@
   margin: 0;
 }
 
-.layer-keyframe-current,
 .layer-keyframe-inspected {
   display: grid;
   gap: 5px;
-}
-
-.layer-keyframe-caption {
-  color: var(--muted);
-  font-size: 11px;
-}
-
-.layer-keyframe-inspected {
   margin-top: 9px;
   padding: 8px;
   border: 1px dashed var(--line);
@@ -238,12 +229,12 @@
   white-space: nowrap;
 }
 
-.keyframe-row-default.transform-default {
+.transform-keyframes .keyframe-row-default {
   color: #10202b;
   background: #c4e9ff;
 }
 
-.transform-keyframe-chips > .layer-keyframe-chip {
+.transform-keyframes .layer-keyframe-chip {
   border-color: #3e6680;
   background: #1b3446;
   color: #c4e9ff;
@@ -261,6 +252,36 @@
 .layer-keyframe-controls .keyframe-entries .keyframe-row {
   display: block;
   min-width: 0;
+}
+
+/* The timecode button covers the whole row, so a click anywhere outside its controls selects the keyframe. */
+.keyframe-entries .stored-keyframe-row {
+  position: relative;
+  cursor: pointer;
+}
+
+.keyframe-entries .stored-keyframe-row:not(.current):hover {
+  border-color: #59675d;
+}
+
+.stored-keyframe-row .stored-keyframe-select::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+}
+
+/* The global hover filter would make the button the overlay's containing block and shrink it. */
+.stored-keyframe-row .stored-keyframe-select:hover:not(:disabled) {
+  filter: none;
+}
+
+.stored-keyframe-row :is(.keyframe-row-header > .icon-button, .channel-keyframe-navigation, details > *) {
+  position: relative;
+  z-index: 1;
+}
+
+.stored-keyframe-row details > div {
+  cursor: auto;
 }
 
 .layer-keyframe-controls .keyframe-row-header > .text-button {
@@ -296,10 +317,6 @@
 
 .layer-keyframe-controls .layer-keyframe-point-fields > .keyframe-easing {
   grid-column: auto;
-}
-
-.layer-keyframe-point-fields > .spatial-pose-fields {
-  grid-column: 1 / -1;
 }
 
 .keyframe-easing {

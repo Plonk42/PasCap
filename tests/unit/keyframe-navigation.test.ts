@@ -490,11 +490,12 @@ describe('main diamonds with per-setting arrows and stored-channel navigation', 
     expect(buttons(diamonds.splice(speedDiamond, 1)[0]![0])).toHaveLength(1);
     for (const direction of ['Previous', 'Next'])
       expect(inspector.split(`aria-label="${direction} Speed keyframe"`)).toHaveLength(2);
-    for (const { label } of SPATIAL_CONTROLS) {
-      // Each Transform setting has one diamond with one Previous/Next pair, like Colour.
+    for (const { key, label } of SPATIAL_CONTROLS) {
+      // Each Transform setting has one diamond with one Previous/Next pair, like Colour, plus one per stored chip.
+      const chips = document.layers[0]!.transform.keyframes.filter((point) => point.values[key] !== null).length;
       expect(inspector.split(`aria-label="Keyframe ${label}"`)).toHaveLength(2);
       for (const direction of ['Previous', 'Next'])
-        expect(inspector.split(`aria-label="${direction} ${label} keyframe"`)).toHaveLength(2);
+        expect(inspector.split(`aria-label="${direction} ${label} keyframe"`)).toHaveLength(2 + chips);
     }
     expect(inspector).not.toContain('Transform keyframe at displayed source frame');
     for (const [markup] of diamonds) {

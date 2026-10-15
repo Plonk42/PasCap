@@ -305,12 +305,14 @@ Speed, need a selected clip.
 
 Colour's **Keyframes** list has no outer disclosure, per-track list expansion preference,
 count or navigation of its own; the keyframe line above counts and visits its keyframes.
-The chips of a keyframe at the playhead follow an **At playhead:** caption; an inspected
-stored keyframe away from the playhead shows a dashed **Stored keyframe · timeline frame N**
-panel with **Follow playhead**. Each shared keyframe entry has a timecode button
-(**Go to track keyframe N**), **Default** and **Outside duration** badges where they apply,
-a trash (**Delete track keyframe N**), its enabled-setting chips and an inner **Edit**
-disclosure, open initially when the list has three or fewer keyframes.
+Colour's and Transform's lists are one shared component, so they look and behave alike.
+The entry of the keyframe at the playhead, or of the inspected one, is marked current; an inspected
+stored keyframe the preview cannot show (after the duration, or on an empty timeline) shows
+a dashed **Stored keyframe · timeline frame N** panel with **Follow playhead**. Each shared
+keyframe entry has a timecode button (**Go to track keyframe N**) stretched over the whole
+entry, so a click anywhere outside its controls selects it, **Default** and **Outside
+duration** badges where they apply, a trash (**Delete track keyframe N**), its enabled-setting
+chips and an inner **Edit** disclosure, closed initially.
 Its Timeline frame field moves
 **every enabled setting and its Easing together in one Undo step**.
 The visibly labelled **Easing** select (accessible name **Track keyframe easing N**) sets

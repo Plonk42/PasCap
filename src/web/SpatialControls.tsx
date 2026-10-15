@@ -13,17 +13,14 @@ import {
   type SpatialKeyframe,
   type SpatialSettings,
 } from '../shared/spatial.js';
-import { KeyframeSteps, keyframeCount } from './AnimationControls.js';
+import { ChannelSteps, KeyframeSteps, keyframeCount } from './AnimationControls.js';
 import { HelpPopover } from './HelpPopover.js';
 import { Icon } from './icons.js';
 import { InspectorSection } from './InspectorSection.js';
-import { KeyframeEasing } from './KeyframeEasing.js';
-import { StoredKeyframeRow, StoredKeyframesHeading, useStoredKeyframeRows } from './KeyframeControls.js';
-import { keySeekHint, useKeyframeNavigation } from './keyframe-navigation.js';
+import { useKeyframeNavigation } from './keyframe-navigation.js';
 import './keyframe-navigation.css';
 import './layer-keyframes.css';
 import { livePreview } from './live-preview.js';
-import { NumberField } from './NumberField.js';
 import './spatial-editor.css';
 import {
   editSpatialPose,
@@ -42,6 +39,7 @@ import {
   type SpatialInspection,
 } from './spatial-navigation.js';
 import { LockedCue, ResetLabel, resetBlocked } from './SettingValueControl.js';
+import { StoredKeyframeList, type StoredKeyframeKind } from './StoredKeyframeList.js';
 import { ValueControl } from './ValueControl.js';
 
 interface Props {
@@ -53,7 +51,10 @@ interface Props {
   onEdit: (command: EditCommand) => void;
   onSeek: (frame: number) => void;
   selectedFrame?: number | null;
+  /** The stored keyframe Transform's own cursor inspects, if any. */
+  inspectedFrame?: number | null;
   onSelectStored?: (frame: number) => void;
+  onFollowPlayhead?: () => void;
   steps?: ReactNode;
 }
 
@@ -93,34 +94,17 @@ function SpatialChannelKeys({
       >
         <span aria-hidden="true">{active ? '▼' : '▽'}</span>
       </button>
-      <span className="channel-keyframe-navigation">
-        <button
-          type="button"
-          className="icon-button"
-          aria-label={`Previous ${label} keyframe`}
-          title={previous ? keySeekHint(previous.frame, duration) : `No previous ${label} keyframe`}
-          aria-disabled={disabled || !previous}
-          tabIndex={disabled || !previous ? -1 : 0}
-          onClick={() => {
-            if (previous && !disabled) keys.onSeek(previous);
-          }}
-        >
-          <Icon name="back" size={12} />
-        </button>
-        <button
-          type="button"
-          className="icon-button"
-          aria-label={`Next ${label} keyframe`}
-          title={next ? keySeekHint(next.frame, duration) : `No next ${label} keyframe`}
-          aria-disabled={disabled || !next}
-          tabIndex={disabled || !next ? -1 : 0}
-          onClick={() => {
-            if (next && !disabled) keys.onSeek(next);
-          }}
-        >
-          <Icon name="forward" size={12} />
-        </button>
-      </span>
+      <ChannelSteps
+        label={label}
+        previous={previous?.frame}
+        next={next?.frame}
+        duration={duration}
+        disabled={disabled}
+        onSeek={(target) => {
+          const key = previous?.frame === target ? previous : next;
+          if (key) keys.onSeek(key);
+        }}
+      />
     </span>
   );
 }
@@ -239,7 +223,9 @@ export function SpatialControls({
   disabled,
   onEdit,
   selectedFrame,
+  inspectedFrame,
   onSelectStored,
+  onFollowPlayhead,
   steps,
 }: Readonly<Omit<Props, 'onSeek'>>) {
   const navigation = useKeyframeNavigation();
@@ -256,7 +242,6 @@ export function SpatialControls({
   const channelActive = (channel: SpatialChannel): boolean => atFrame?.values[channel] != null;
   const readOnly = (channel: SpatialChannel): boolean =>
     hasSpatialChannelKeys(settings, channel) && !channelActive(channel);
-  const rows = useStoredKeyframeRows(context, settings.keyframes);
   const [error, setError] = useState('');
   const command = (transform: SpatialSettings): EditCommand => ({ type: 'transform', layerId: layer.id, transform });
   const validate = (produce: () => SpatialSettings): string | null => {
@@ -319,7 +304,47 @@ export function SpatialControls({
     editSpatialPose(settings, valid ? frame : null, key, value);
   const storedAt = (stored: SpatialKeyframe, key: SpatialChannel, value: number) => () =>
     replaceSpatialKey(settings, stored.frame, { values: { ...stored.values, [key]: value } });
-  const inspectedAway = settings.keyframes.find((key) => key.frame === selectedFrame && key.frame !== frame);
+  const kind: StoredKeyframeKind<SpatialChannel, SpatialKeyframe> = {
+    noun: 'Transform',
+    title: 'Transform keyframes',
+    tone: 'transform-keyframes',
+    settings: SPATIAL_CONTROLS,
+    enabled: spatialKeyChannels,
+    continuing: (key) => continuingSettings(settings.keyframes, key, SPATIAL_CHANNELS),
+    neighbours: (key, channel) => {
+      const from = inspectedFrame ?? key.frame;
+      const keyed = settings.keyframes.filter((other) => other.values[channel] !== null);
+      return {
+        previous: [...keyed].reverse().find((other) => other.frame < from)?.frame,
+        next: keyed.find((other) => other.frame > from)?.frame,
+      };
+    },
+    seek: (target) => {
+      if (!unavailable) onSelectStored?.(target);
+    },
+    validateFrame: (key, value) => validate(() => replaceSpatialKey(settings, key.frame, { frame: value })),
+    moveFrame: (key, value) => change(() => replaceSpatialKey(settings, key.frame, { frame: value })),
+    setEasing: (key, channel, interpolation) =>
+      change(() => setSpatialEasing(settings, key.frame, channel, interpolation)),
+    remove: (key) => change(() => removeSpatialKey(settings, key.frame)),
+    removeTitle: 'Remove this whole Transform keyframe and all its settings',
+    renderValues: (key, row) => (
+      <PoseFields
+        values={key.values as Record<SpatialChannel, number>}
+        channels={spatialKeyChannels(key)}
+        label={(setting) => `${setting} keyframe value ${key.frame}`}
+        resetName={(setting) => `${setting} keyframe value ${key.frame}`}
+        context={`${context}:stored:${row}`}
+        disabled={unavailable}
+        frame={frame}
+        duration={duration}
+        validate={(channel, value) => validate(storedAt(key, channel, value))}
+        onCommit={(channel, value) => change(storedAt(key, channel, value))}
+        onDraft={(channel, value) => draft(storedAt(key, channel, value ?? 0), value)}
+        onReset={(channel) => change(storedAt(key, channel, NEUTRAL_SPATIAL_POSE[channel]))}
+      />
+    ),
+  };
   return (
     <section className="spatial-editor" aria-label="Track Transform editor">
       <div className="spatial-tools section-keyframe-line">
@@ -371,101 +396,18 @@ export function SpatialControls({
         onDraft={(key, value) => draft(poseAt(key, value ?? 0), value)}
         onReset={(key) => change(poseAt(key, NEUTRAL_SPATIAL_POSE[key]))}
       />
-      {settings.keyframes.length > 0 && (
-        <fieldset
-          className="keyframe-controls declutter-keyframes layer-keyframe-controls section-keyframes"
-          aria-label={`Transform keyframes ${layer.name}`}
-        >
-          <legend className="declutter-sr-only">Transform keyframes</legend>
-          <StoredKeyframesHeading />
-          {inspectedAway && (
-            <p className="control-hint">
-              Stored timeline frame {inspectedAway.frame} · playhead frame {frame}
-              {inspectedAway.frame >= duration ? ' · outside duration; preview uses the nearest available frame' : ''}
-            </p>
-          )}
-          <ol className="keyframe-list keyframe-entries" aria-label="Edit Transform keyframes">
-            {settings.keyframes.map((key, index) => {
-              const row = rows[index]!;
-              const channels = spatialKeyChannels(key);
-              // Easing only matters where an enabled setting continues to a later key.
-              const continuing = continuingSettings(settings.keyframes, key, SPATIAL_CHANNELS);
-              const labels = SPATIAL_CONTROLS.filter((control) => channels.includes(control.key)).map(
-                (control) => control.label,
-              );
-              return (
-                <StoredKeyframeRow
-                  key={row.id}
-                  noun="Transform"
-                  frame={key.frame}
-                  duration={duration}
-                  current={key.frame === selectedFrame}
-                  isDefault={key.reset}
-                  defaultClassName="transform-default"
-                  initiallyOpen={settings.keyframes.length <= 3}
-                  disabled={unavailable}
-                  deleteTitle="Remove this whole Transform keyframe and all its settings"
-                  chips={
-                    // A complete default keyframe's badge already says every setting is enabled.
-                    !(key.reset && channels.length === SPATIAL_CHANNELS.length) && (
-                      <div className="layer-keyframe-chips transform-keyframe-chips" aria-label="Animated settings">
-                        {labels.map((label) => (
-                          <span className="layer-keyframe-chip" key={label}>
-                            {label}
-                          </span>
-                        ))}
-                      </div>
-                    )
-                  }
-                  onSeek={() => seek(key)}
-                  onDelete={() => change(() => removeSpatialKey(settings, key.frame))}
-                >
-                  <label className="speed-field">
-                    Timeline frame
-                    <NumberField
-                      aria-label={`Transform keyframe frame ${key.frame}`}
-                      value={key.frame}
-                      integer
-                      min={0}
-                      max={2_147_483_647}
-                      step={1}
-                      disabled={unavailable}
-                      resetKey={`${context}:stored:${row.id}:frame`}
-                      validate={(value) => validate(() => replaceSpatialKey(settings, key.frame, { frame: value }))}
-                      onCommit={(value) => change(() => replaceSpatialKey(settings, key.frame, { frame: value }))}
-                    />
-                  </label>
-                  <KeyframeEasing
-                    label={`Transform keyframe easing ${key.frame}`}
-                    settingLabel={(setting) => `${setting} easing at Transform keyframe ${key.frame}`}
-                    settings={SPATIAL_CONTROLS.filter((control) => channels.includes(control.key))}
-                    continuing={continuing}
-                    easing={key.easing}
-                    disabled={unavailable || !continuing.length}
-                    onChange={(channel, interpolation) =>
-                      change(() => setSpatialEasing(settings, key.frame, channel, interpolation))
-                    }
-                  />
-                  <PoseFields
-                    values={key.values as Record<SpatialChannel, number>}
-                    channels={channels}
-                    label={(setting) => `${setting} keyframe value ${key.frame}`}
-                    resetName={(setting) => `${setting} keyframe value ${key.frame}`}
-                    context={`${context}:stored:${row.id}`}
-                    disabled={unavailable}
-                    frame={frame}
-                    duration={duration}
-                    validate={(channel, value) => validate(storedAt(key, channel, value))}
-                    onCommit={(channel, value) => change(storedAt(key, channel, value))}
-                    onDraft={(channel, value) => draft(storedAt(key, channel, value ?? 0), value)}
-                    onReset={(channel) => change(storedAt(key, channel, NEUTRAL_SPATIAL_POSE[channel]))}
-                  />
-                </StoredKeyframeRow>
-              );
-            })}
-          </ol>
-        </fieldset>
-      )}
+      <StoredKeyframeList
+        kind={kind}
+        trackName={layer.name}
+        keys={settings.keyframes}
+        context={context}
+        frame={frame}
+        duration={duration}
+        inspected={settings.keyframes.find((key) => key.frame === inspectedFrame)}
+        current={selectedFrame ?? null}
+        disabled={unavailable}
+        {...(onFollowPlayhead && inspectedFrame !== null && inspectedFrame !== undefined ? { onFollowPlayhead } : {})}
+      />
       {error && (
         <p className="control-hint" role="alert">
           {error}
@@ -475,7 +417,9 @@ export function SpatialControls({
   );
 }
 
-export function TransformSection(props: Readonly<Omit<Props, 'selectedFrame' | 'onSelectStored' | 'steps'>>) {
+export function TransformSection(
+  props: Readonly<Omit<Props, 'selectedFrame' | 'inspectedFrame' | 'onSelectStored' | 'onFollowPlayhead' | 'steps'>>,
+) {
   const navigation = useKeyframeNavigation();
   const [selection, setSelection] = useState<SpatialInspection | null>(null);
   const context = `${props.project.id}:${props.layer.id}:${navigation.sourceEpoch ?? 0}:transform`;
@@ -515,6 +459,8 @@ export function TransformSection(props: Readonly<Omit<Props, 'selectedFrame' | '
       <SpatialControls
         {...props}
         selectedFrame={inspected ?? playheadKey}
+        inspectedFrame={inspected}
+        onFollowPlayhead={() => setSelection(null)}
         steps={
           <KeyframeSteps
             label="Transform"

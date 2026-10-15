@@ -109,6 +109,54 @@ export function TrackAnimationControls({
   );
 }
 
+/** One setting's Previous/Next keyframe arrows: beside main capture buttons and on stored setting chips. */
+export function ChannelSteps({
+  label,
+  previous,
+  next,
+  duration,
+  disabled,
+  onSeek,
+}: Readonly<{
+  label: string;
+  previous: number | undefined;
+  next: number | undefined;
+  duration: number;
+  disabled: boolean;
+  onSeek: (frame: number) => void;
+}>) {
+  return (
+    <span className="channel-keyframe-navigation">
+      <button
+        type="button"
+        className="icon-button"
+        aria-label={`Previous ${label} keyframe`}
+        title={previous === undefined ? `No previous ${label} keyframe` : keySeekHint(previous, duration)}
+        aria-disabled={disabled || previous === undefined}
+        tabIndex={disabled || previous === undefined ? -1 : 0}
+        onClick={() => {
+          if (previous !== undefined && !disabled) onSeek(previous);
+        }}
+      >
+        <Icon name="back" size={12} />
+      </button>
+      <button
+        type="button"
+        className="icon-button"
+        aria-label={`Next ${label} keyframe`}
+        title={next === undefined ? `No next ${label} keyframe` : keySeekHint(next, duration)}
+        aria-disabled={disabled || next === undefined}
+        tabIndex={disabled || next === undefined ? -1 : 0}
+        onClick={() => {
+          if (next !== undefined && !disabled) onSeek(next);
+        }}
+      >
+        <Icon name="forward" size={12} />
+      </button>
+    </span>
+  );
+}
+
 /** Main diamonds and stored enabled-setting chips share channel-only navigation. */
 export function ChannelKeyframeNavigation({
   layer,
@@ -130,33 +178,13 @@ export function ChannelKeyframeNavigation({
     setting,
   );
   return (
-    <span className="channel-keyframe-navigation">
-      <button
-        type="button"
-        className="icon-button"
-        aria-label={`Previous ${label} keyframe`}
-        title={previous ? keySeekHint(previous.frame, navigation.duration) : `No previous ${label} keyframe`}
-        aria-disabled={disabled || navigation.disabled || !previous}
-        tabIndex={disabled || navigation.disabled || !previous ? -1 : 0}
-        onClick={() => {
-          if (previous && !disabled && !navigation.disabled) navigation.onSeekKeyframe(layer.id, previous.frame);
-        }}
-      >
-        <Icon name="back" size={12} />
-      </button>
-      <button
-        type="button"
-        className="icon-button"
-        aria-label={`Next ${label} keyframe`}
-        title={next ? keySeekHint(next.frame, navigation.duration) : `No next ${label} keyframe`}
-        aria-disabled={disabled || navigation.disabled || !next}
-        tabIndex={disabled || navigation.disabled || !next ? -1 : 0}
-        onClick={() => {
-          if (next && !disabled && !navigation.disabled) navigation.onSeekKeyframe(layer.id, next.frame);
-        }}
-      >
-        <Icon name="forward" size={12} />
-      </button>
-    </span>
+    <ChannelSteps
+      label={label}
+      previous={previous?.frame}
+      next={next?.frame}
+      duration={navigation.duration}
+      disabled={disabled || navigation.disabled}
+      onSeek={(target) => navigation.onSeekKeyframe(layer.id, target)}
+    />
   );
 }

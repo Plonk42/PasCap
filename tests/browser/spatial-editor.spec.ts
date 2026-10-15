@@ -12,7 +12,12 @@ import {
 import { calculateLayout } from '../../src/shared/timeline.js';
 import { formatTimecode } from '../../src/shared/timing.js';
 import { SPATIAL_CONTROLS } from '../../src/web/spatial-editor.js';
-import { currentKeyframeRow, expandedInspectorPreferences, transformKeyframes } from './editor-helpers.js';
+import {
+  currentKeyframeRow,
+  editTransformKeyframe,
+  expandedInspectorPreferences,
+  transformKeyframes,
+} from './editor-helpers.js';
 import { memoryProjects, type MemoryProjects } from './memory-projects.js';
 
 let memory: MemoryProjects;
@@ -115,6 +120,11 @@ const exact = (page: Page, label: string, storedFrame?: number) =>
     name: storedFrame === undefined ? `Transform ${label}` : `${label} keyframe value ${storedFrame}`,
     exact: true,
   });
+/** Main per-setting arrows, beside each capture triangle; stored chips carry the same names. */
+const mainStep = (page: Page, direction: 'Previous' | 'Next', label: string) =>
+  page
+    .locator('.spatial-editor .keyframe-setting-navigation')
+    .getByRole('button', { name: `${direction} ${label} keyframe`, exact: true });
 async function expectSelected(page: Page, frame: number): Promise<void> {
   await expect(currentKeyframeRow(transformKeyframes(page))).toHaveAttribute('data-keyframe-frame', String(frame));
 }
@@ -260,18 +270,15 @@ test('per-setting Previous/Next visit only that setting’s keys; the timeline m
   expect(markerBox.y - clipBox.y).toBeLessThan(10);
   // No clip-owned Transform lane remains inside clips.
   await expect(page.locator('[data-clip-keyframe="transform"]')).toHaveCount(0);
-  await page.getByRole('button', { name: 'Next Scale keyframe', exact: true }).click();
+  await mainStep(page, 'Next', 'Scale').click();
   await expectSelected(page, 10);
-  await page.getByRole('button', { name: 'Next Scale keyframe', exact: true }).click();
+  await mainStep(page, 'Next', 'Scale').click();
   // Frame 40 enables only Rotation, so Scale skips straight to its next key.
   await expectSelected(page, 70);
   await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(70);
-  await page.getByRole('button', { name: 'Previous Rotation keyframe', exact: true }).click();
+  await mainStep(page, 'Previous', 'Rotation').click();
   await expectSelected(page, 40);
-  await expect(page.getByRole('button', { name: 'Next Rotation keyframe', exact: true })).toHaveAttribute(
-    'aria-disabled',
-    'true',
-  );
+  await expect(mainStep(page, 'Next', 'Rotation')).toHaveAttribute('aria-disabled', 'true');
   expect(await current(page)).toEqual(before);
   expect(memory.saves).toBe(0);
 });
@@ -452,6 +459,7 @@ test('stored keyframes keep frame input focus through move/Undo, reject collisio
     transform(document).base.scale = 1.5;
     transform(document).keyframes = [0, 100].map((frame) => key(frame, { ...NEUTRAL_SPATIAL_POSE }, 'linear'));
   });
+  await editTransformKeyframe(page, 0);
   const time = page.getByRole('spinbutton', { name: 'Transform keyframe frame 0', exact: true });
   await time.fill('40');
   await time.press('Enter');
@@ -494,7 +502,16 @@ test('stored navigation reaches keyframes after the duration through the nearest
     await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(output);
     await expectSelected(page, frame);
   }
-  await expect(list).toContainText('Stored timeline frame 300 · playhead frame 119 · outside duration');
+  await expect(list.locator('.layer-keyframe-inspected')).toContainText(
+    'Stored keyframe · timeline frame 300 · outside current duration',
+  );
+  // The shared list explains only keyframes the preview cannot show, so stepping never flashes it.
+  await list.getByRole('button', { name: 'Go to Transform keyframe 41', exact: true }).click();
+  await expect(list.locator('.layer-keyframe-inspected')).toHaveCount(0);
+  await list.getByRole('button', { name: 'Go to Transform keyframe 300', exact: true }).click();
+  await list.getByRole('button', { name: 'Follow playhead', exact: true }).click();
+  await expect(list.locator('.layer-keyframe-inspected')).toHaveCount(0);
+  await list.getByRole('button', { name: 'Go to Transform keyframe 300', exact: true }).click();
   // Two stored keyframes preview the same last frame; the cursor still steps between them.
   await page.getByRole('button', { name: 'Previous Transform keyframe', exact: true }).click();
   await expectSelected(page, 119);
@@ -503,6 +520,33 @@ test('stored navigation reaches keyframes after the duration through the nearest
   expect(await current(page)).toEqual(before);
   expect(memory.saves).toBe(0);
   await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
+});
+
+test('stored rows start closed, select on a click anywhere and step each setting from its chips', async ({ page }) => {
+  const before = await seed(page, (document) => {
+    transform(document).keyframes = [
+      key(10, { scale: 2 }, 'linear'),
+      key(40, { rotation: 45 }, 'linear'),
+      key(70, { scale: 3 }, 'linear'),
+    ];
+  });
+  const list = transformKeyframes(page);
+  await expect(list.locator('.keyframe-row')).toHaveCount(3);
+  await expect(list.locator('details[open]')).toHaveCount(0);
+  // A real click on the chip text, not on the timecode, selects the row.
+  const chip = list.locator('[data-keyframe-frame="40"] .layer-keyframe-chip');
+  await chip.scrollIntoViewIfNeeded();
+  const box = (await chip.boundingBox())!;
+  await page.mouse.click(box.x + 6, box.y + box.height / 2);
+  await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(40);
+  await expectSelected(page, 40);
+  // Chips carry the same per-setting arrows as Colour's.
+  const scaleNext = list.locator('[data-keyframe-frame="10"]').getByRole('button', { name: 'Next Scale keyframe' });
+  await scaleNext.click();
+  await expectSelected(page, 70);
+  await expect(list.locator('details[open]')).toHaveCount(0);
+  expect(await current(page)).toEqual(before);
+  expect(memory.saves).toBe(0);
 });
 
 test('last-key deletion reveals the preserved base', async ({ page }) => {
@@ -584,6 +628,7 @@ test('Transform controls fit the 270px Inspector at the default and minimum view
     await expect(divider).toHaveAttribute('aria-valuenow', '270');
     const editor = page.getByRole('region', { name: 'Track Transform editor', exact: true });
     await expect(editor).toBeVisible();
+    await editTransformKeyframe(page, 0);
     for (const stored of [undefined, 0]) {
       for (const control of SPATIAL_CONTROLS) {
         const field = exact(page, control.label, stored);

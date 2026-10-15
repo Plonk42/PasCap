@@ -399,7 +399,10 @@ test('Transform section navigation retains keyframes after the duration with tru
     await next.click();
     await previewAt(page, preview);
     await expect(currentKeyframeRow(transformKeyframes(page))).toHaveAttribute('data-keyframe-frame', String(frame));
-    if (frame !== preview) await expect(transformKeyframes(page)).toContainText(`Stored timeline frame ${frame}`);
+    if (frame !== preview)
+      await expect(transformKeyframes(page).locator('.layer-keyframe-inspected')).toContainText(
+        `Stored keyframe · timeline frame ${frame}`,
+      );
   }
   await expect(next).toBeDisabled();
   for (const [frame, preview] of [

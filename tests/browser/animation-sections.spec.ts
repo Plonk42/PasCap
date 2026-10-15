@@ -617,7 +617,9 @@ for (const viewport of [
         await previewAt(page, document, preview);
         await expect(currentKeyframeRow(list)).toHaveAttribute('data-keyframe-frame', String(frame));
         if (frame !== preview)
-          await expect(list).toContainText(`Stored timeline frame ${frame} · playhead frame ${preview}`);
+          await expect(list.locator('.layer-keyframe-inspected')).toContainText(
+            `Stored keyframe · timeline frame ${frame} · outside current duration`,
+          );
       }
       await expect(navigation(page, 'Transform', 'Next')).toBeDisabled();
       for (const frame of [90, 50, 10, 0]) {
