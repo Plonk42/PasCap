@@ -26,14 +26,14 @@ fields, filenames and URLs retain their technical spelling.
 | Document                                                         | Authority/scope                                                                                                                                                                |
 | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | [COLOUR_AND_TIMING.md](COLOUR_AND_TIMING.md)                     | SDR grading, fade/dissolve/rational-frame equations and preview/reference scope                                                                                                |
-| [LAYERS_AND_KEYFRAMES.md](LAYERS_AND_KEYFRAMES.md)               | Uniform schema-19 video tracks, track Colour/Opacity/eleven-channel keyframes, track Transform, per-track Ripple/transitions/fades, spatial coverage and music resource bounds |
+| [LAYERS_AND_KEYFRAMES.md](LAYERS_AND_KEYFRAMES.md)               | Uniform schema-20 video tracks, track Colour/Opacity/twelve-channel keyframes, track Transform, per-track Ripple/transitions/fades, spatial coverage and music resource bounds |
 | [SPEED_AND_AUDIO.md](SPEED_AND_AUDIO.md)                         | Clip-only constant/source-frame keyframe speed, curve presets, precise editing, sliding timeline markers, shared retiming and music/export audio                               |
 | [TIMELINE_EDITING.md](TIMELINE_EDITING.md)                       | No-copy import, source ranges, per-track Ripple/independent placement, recoverable trims, marked cuts, history and snapping                                                    |
 | [WORKSPACE_AND_RECOVERY.md](WORKSPACE_AND_RECOVERY.md)           | Layout, field/keyboard contexts, project bins, serial saves/conflicts, Activity and failure recovery                                                                           |
 | [UX_HARDENING.md](UX_HARDENING.md)                               | Visual controls, deterministic raw-reader ownership, relink identity evidence, export-space assumptions/disk-full recovery and deferred loading                                |
-| [design/MULTIPLE_MUSIC.md](design/MULTIPLE_MUSIC.md)             | Strict schema-19 identified music arrays, corrected project duration/black tails, final-only summed clipping, one bounded clock and serial native mixing                       |
+| [design/MULTIPLE_MUSIC.md](design/MULTIPLE_MUSIC.md)             | Strict schema-20 identified music arrays, corrected project duration/black tails, final-only summed clipping, one bounded clock and serial native mixing                       |
 | [design/ROW_APPEARANCE.md](design/ROW_APPEARANCE.md)             | Required video track-only static/keyed Colour and Opacity, shared ownership, resets and destination-track adoption                                                             |
-| [design/TEMPERATURE_AND_TINT.md](design/TEMPERATURE_AND_TINT.md) | Required normalized track Temperature/Tint, exact pre-exposure linear gains, independent capture and strict schema-19 preservation                                             |
+| [design/TEMPERATURE_AND_TINT.md](design/TEMPERATURE_AND_TINT.md) | Required normalized track Temperature/Tint, exact pre-exposure linear gains, independent capture and strict schema-20 preservation                                             |
 | [design/HSL_AND_CURVES.md](design/HSL_AND_CURVES.md)             | Required static track HSL bands and master/RGB curves, SDR order, bounded GPU/native evaluation and exact editor gestures                                                      |
 | [design/SPATIAL_TRANSFORMS.md](design/SPATIAL_TRANSFORMS.md)     | Required video track Transform base/per-setting project-frame keyframes, crop/affine geometry, neutral letterboxing, per-pixel coverage and Transform controls                 |
 | [design/DETAIL_FILTERS.md](design/DETAIL_FILTERS.md)             | Required static clip Sharpen/Clarity/Denoise and keyable track HDR look, shared source-tap kernel before grading, preview/native parity gates and Detail controls              |
@@ -45,35 +45,36 @@ one required numeric video track `opacity`, initially 1 (100%) on new tracks, wi
 track keyframe channel `opacity` overriding that value on every clip. Its single slider
 is in **Track → Colour**, works on empty tracks and never creates implicit keyframes;
 **Placement** contains placement only. Opacity is composition coverage, not SDR
-RGB grading; unkeyed colour settings are track-owned. Eleven nullable keyframe fields
+RGB grading; unkeyed colour settings are track-owned. Twelve nullable keyframe fields
 are required, in control order: `opacity`, `temperature`, `tint`,
 `exposure`, `brightness`, `contrast`, `hue`, `saturation`, `highlights`, `shadows`,
-`hdr`.
+`whites`, `hdr`.
 Saved `clip.opacity`
 and old `clipOpacity`/`layerOpacity` channels are rejected, not the valid track value.
 Colour animation remains track-wide, while clip-only speed (constant or keyframed)
 curves use source frames; every clip also requires a boolean `reverse`.
-Schema 19 requires complete video track-owned Colour and Opacity with identical static/keyed scope,
+Schema 20 requires complete video track-owned Colour and Opacity with identical static/keyed scope,
 and rejects saved `clip.colour` and `clip.correction`. It also requires video track `transform: { base, keyframes }`: a complete
 eight-value pose and 0–256 per-setting project-frame keyframes with required easing
 and a default-keyframe `reset` flag; saved `clip.spatial` is rejected. Like Colour,
 Transform evaluates at absolute project time on every source of the track and is
-never copied or shifted by clip edits; it is separate from the eleven shared track
+never copied or shifted by clip edits; it is separate from the twelve shared track
 channels, and the sole track Opacity contract is unchanged.
 Temperature and Tint are required normalized −1…1 track bases, neutral 0, with
 independently enabled settings at shared keyframes. Positive Temperature warms; positive Tint
 adds magenta. Normalized linear gains precede Exposure; nonzero values
 intentionally colour greys, with neutral-white luminance preservation before
-clipping only. HSL/curves remain required static settings, not extra channels.
+clipping only. Required track Whites (−1…1, neutral 0) is a keyable tone stage that
+moves the white point. HSL/curves remain required static settings, not extra channels.
 Required track HDR (0–1, neutral 0) is a keyable SDR local tone-mapping look
 applied in the clip detail kernel before grading.
-Schema 19 requires `music: MusicTrack[]`, 0–8 independent uniquely
+Schema 20 requires `music: MusicTrack[]`, 0–8 independent uniquely
 identified music tracks (`[]` without music). Project duration is maximum video clip
 OUT or music start + duration: music can extend it, with video closing fades at
 clip OUT then black while music continues/fades at its own end. Clip speed,
-track Colour and sole Opacity are unchanged. Version-1 export receipts require strict v19
+track Colour and sole Opacity are unchanged. Version-1 export receipts require strict v20
 snapshots and captured audio-source/instance-plan arrays; preserve incompatible
-v1–v18 documents/receipts/MP4s, recreate deliberately, and never migrate/default
+v1–v19 documents/receipts/MP4s, recreate deliberately, and never migrate/default
 or use null/older readers. Proxy/current PCM formats remain unchanged; the registries
 are version 2 (full-content checksums).
 The #35 contract has pending implementation/validation acceptance; no passed

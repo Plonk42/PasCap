@@ -491,7 +491,7 @@ describe.skipIf(!enabled)('production native export · opt-in disposable media o
       expect(needsLayeredExport(project)).toBe(false);
       const result = await completed(project);
       expect(result.receipt.snapshot).toEqual(captured);
-      expect(result.receipt.snapshot.schemaVersion).toBe(19);
+      expect(result.receipt.snapshot.schemaVersion).toBe(20);
       expect(result.receipt.settings.pipeline).toBe('static-single-layer');
       expect(result.receipt.settings.resources).toEqual(EXPORT_RESOURCES);
       expect(result.receipt.settings.layered).toBeNull();

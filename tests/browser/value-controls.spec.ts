@@ -128,7 +128,7 @@ function controls(scope: Page | Locator, name: string) {
 async function showControl(page: Page, name: string): Promise<void> {
   if (name === 'Music gain') await inspectorTab(page, 'Audio');
   else if (
-    /keyframe value|^(Opacity|Temperature|Tint|Exposure|Brightness|Contrast|Hue|Saturation|Highlights|Shadows)$/.test(
+    /keyframe value|^(Opacity|Temperature|Tint|Exposure|Brightness|Contrast|Hue|Saturation|Highlights|Shadows|Whites)$/.test(
       name,
     )
   )
@@ -324,7 +324,7 @@ test('row Colour captures its base and keeps precise release-only edits identica
   expect(changed.clips).toEqual(document.clips);
 });
 
-test('empty rows expose all eleven editable row appearance widgets and no clip colour scope', async ({ page }) => {
+test('empty rows expose all twelve editable row appearance widgets and no clip colour scope', async ({ page }) => {
   const document = await current(page);
   document.clips = [];
   document.music = [];
@@ -346,7 +346,7 @@ test('Track Colour groups its sliders under labelled headings, each with a one-s
   const groups = {
     Opacity: ['Opacity'],
     Colour: ['Temperature', 'Tint', 'Hue', 'Saturation'],
-    Light: ['Exposure', 'Brightness', 'Contrast', 'Highlights', 'Shadows'],
+    Light: ['Exposure', 'Brightness', 'Contrast', 'Highlights', 'Shadows', 'Whites'],
     Effects: ['HDR'],
   };
   const colourControls = page.locator('.inspector-panel .colour-controls');
@@ -862,8 +862,8 @@ test('common widgets fit 270px inspectors at the default and minimum viewports w
             };
           }),
       );
-      // Clip: speed rate and three Detail values; Track: eleven Colour/Opacity, three HSL, eight Transform and three stored values.
-      expect(widgets.length, `${width}px ${tab}`).toBe(tab === 'Clip' ? 4 : tab === 'Track' ? 25 : 1);
+      // Clip: speed rate and three Detail values; Track: twelve Colour/Opacity, three HSL, eight Transform and three stored values.
+      expect(widgets.length, `${width}px ${tab}`).toBe(tab === 'Clip' ? 4 : tab === 'Track' ? 26 : 1);
       for (const widget of widgets) {
         expect(widget.inputs, `${width}px ${widget.name}`).toBe(2);
         expect(widget.outputs).toBe(0);

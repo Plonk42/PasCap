@@ -111,12 +111,12 @@ function audioAsset() {
 }
 
 describe('strict production export request and immutable validation', () => {
-  it('offers exactly 720p and UHD profiles, accepts no-music v19 and rejects empty/legacy/unknown requests', () => {
+  it('offers exactly 720p and UHD profiles, accepts no-music v20 and rejects empty/legacy/unknown requests', () => {
     expect(EXPORT_PROFILES.draft720).toMatchObject({ width: 1280, height: 720 });
     expect(EXPORT_PROFILES.final4k).toMatchObject({ width: 3840, height: 2160 });
     const document = documentWithClips();
     expect(exportRequestSchema.parse({ document, profile: 'draft720' }).document.music).toEqual([]);
-    expect(exportRequestSchema.parse({ document, profile: 'draft720' }).document.schemaVersion).toBe(19);
+    expect(exportRequestSchema.parse({ document, profile: 'draft720' }).document.schemaVersion).toBe(20);
     for (const request of [
       { document: createProject('empty', 'Empty'), profile: 'draft720' },
       {

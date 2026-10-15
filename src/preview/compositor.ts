@@ -427,11 +427,12 @@ export class Compositor {
         settings.contrast,
         settings.saturation,
       );
-      gl.uniform3f(
+      gl.uniform4f(
         this.#location(`extra${index}`),
         (settings.hue * Math.PI) / 180,
         settings.highlights,
         settings.shadows,
+        settings.whites,
       );
       if (detailed) {
         const { sharpen, clarity, denoise } = source.detail;
@@ -563,6 +564,7 @@ function comparisonColour(test: number, random: () => number): ColourSettings {
     hue: random() * 220 - 110,
     highlights: random() * 0.6 - 0.3,
     shadows: random() * 0.6 - 0.3,
+    whites: random() * 0.6 - 0.3,
   };
 }
 
