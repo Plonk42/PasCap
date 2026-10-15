@@ -72,8 +72,8 @@ function overlay(
   });
 }
 const colourKeys = (): LayerKeyframe[] => [point(0, { exposure: 1 }, 'hold'), point(100, { hue: 20 })];
-describe('strict schema-21 row points and independently participating settings', () => {
-  it('exports an ordered immutable thirteen-setting catalogue and explicit all-null template', () => {
+describe('strict schema-22 row points and independently participating settings', () => {
+  it('exports an ordered immutable fourteen-setting catalogue and explicit all-null template', () => {
     const settings = [
       'opacity',
       'temperature',
@@ -83,6 +83,7 @@ describe('strict schema-21 row points and independently participating settings',
       'contrast',
       'hue',
       'saturation',
+      'vibrance',
       'highlights',
       'shadows',
       'whites',
@@ -91,16 +92,16 @@ describe('strict schema-21 row points and independently participating settings',
     ];
     expect(KEYFRAME_SETTINGS.map((setting) => setting.key)).toEqual(settings);
     expect(Object.keys(EMPTY_KEY_VALUES)).toEqual(settings);
-    expect(Object.values(EMPTY_KEY_VALUES)).toEqual(Array(13).fill(null));
+    expect(Object.values(EMPTY_KEY_VALUES)).toEqual(Array(14).fill(null));
     expect(Object.isFrozen(EMPTY_KEY_VALUES)).toBe(true);
     expect(Object.isFrozen(KEYFRAME_SETTINGS)).toBe(true);
     expect(KEYFRAME_SETTINGS.every(Object.isFrozen)).toBe(true);
   });
 
-  it('requires version 21, explicit media membership, row opacity and clip settings without legacy fields', () => {
+  it('requires version 22, explicit media membership, row opacity and clip settings without legacy fields', () => {
     const project = createProject('strict', 'Strict');
     const clip = createClip('one', 'source', 0, 20);
-    expect(project.schemaVersion).toBe(21);
+    expect(project.schemaVersion).toBe(22);
     expect(project.media).toEqual({ videoIds: [], audioIds: [] });
     expect(project.layers[0]).toEqual(row());
     expect(Object.keys(clip)).toEqual([
@@ -355,7 +356,7 @@ describe('strict schema-21 row points and independently participating settings',
     expect(layerKeyframeSchema.safeParse(withoutKind).success).toBe(false);
   });
 
-  it('can independently toggle all thirteen participants at one frame', () => {
+  it('can independently toggle all fourteen participants at one frame', () => {
     let project = createProject('ten', 'Ten');
     for (const setting of KEYFRAME_SETTINGS)
       project = applyCommand(project, {

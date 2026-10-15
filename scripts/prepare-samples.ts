@@ -67,7 +67,7 @@ try {
     project = applyCommand(project, { type: 'fades', layerId, opening: 12, closing: 12 });
     await store.save(project, 0);
     console.log(
-      `Saved a new schema-21 sample edit (${sampleId}, historical identifier retained); earlier v1–v20 projects remain untouched and incompatible. No migration is performed.`,
+      `Saved a new schema-22 sample edit (${sampleId}, historical identifier retained); earlier v1–v21 projects remain untouched and incompatible. No migration is performed.`,
     );
   }
 } catch (error) {

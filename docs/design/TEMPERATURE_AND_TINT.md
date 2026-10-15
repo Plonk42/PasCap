@@ -1,4 +1,4 @@
-# Video track Temperature and Tint · strict project schema 21
+# Video track Temperature and Tint · strict project schema 22
 
 Approved contract for [#68](https://github.com/Plonk42/PasCap/issues/68).
 These are normalized **SDR colour controls**, not Kelvin, HDR output, illuminant
@@ -17,9 +17,9 @@ their track's complete grade, including both dissolve sources. Empty tracks rema
 editable; different treatments require different tracks. No clip Colour/correction
 base, ownership toggle or copy to clips is introduced.
 
-Shared video track keyframes require exactly **thirteen nullable channels**, in control order:
+Shared video track keyframes require exactly **fourteen nullable channels**, in control order:
 `opacity`, `temperature`, `tint`, `exposure`, `brightness`, `contrast`,
-`hue`, `saturation`, `highlights`, `shadows`, `whites`, `blacks`, `hdr`. Temperature and Tint are keyed
+`hue`, `saturation`, `vibrance`, `highlights`, `shadows`, `whites`, `blacks`, `hdr`. Temperature and Tint are keyed
 independently at absolute project frames, interpolate parameter values using their own
 Easing at the left keyframe and hold endpoints. Keyframes without that enabled setting are
 skipped. No keyframes for a setting means the saved track base; removing its final keyframe reveals
@@ -30,7 +30,7 @@ animation channels. Speed is clip-only, never a track channel.
 applies them before Exposure). Main and stored
 keyed settings use native sliders (step 0.01) with coloured tracks (Temperature
 blue → yellow, Tint green → magenta), adjacent exact numeric fields,
-and reset to 0 by double-clicking the name. Main capture diamonds are always visible, with adjacent per-setting **Previous/Next** buttons because not every setting is enabled at every shared keyframe. Its single keyframe-line Previous/Next pair (with the keyframe count) visits the union of Opacity, all eleven scalar colour and HDR keys.
+and reset to 0 by double-clicking the name. Main capture diamonds are always visible, with adjacent per-setting **Previous/Next** buttons because not every setting is enabled at every shared keyframe. Its single keyframe-line Previous/Next pair (with the keyframe count) visits the union of Opacity, all twelve scalar colour and HDR keys.
 Enabled setting chips in stored Colour keyframe rows retain
 their per-channel arrows. All main and stored per-channel arrows visit strictly
 earlier/later keyframes where that channel is nonnull (zero is enabled), sharing
@@ -58,7 +58,7 @@ $$
 After inverse BT.709 decoding, apply $L'=L\odot g$ component-wise, **before**
 Exposure's $2^{\mathrm{exposure}}$ multiplier. Do not clip the gains or intermediate
 linear RGB. The complete order is inverse BT.709 → Temperature/Tint gains →
-Exposure → Contrast → Brightness → Shadows/Highlights/Whites/Blacks → Hue/Saturation → final
+Exposure → Contrast → Brightness → Shadows/Highlights/Whites/Blacks → Hue/Saturation/Vibrance → final
 linear clipping and BT.709 encoding → static encoded HSL → master curve → RGB
 curves → black-fade brightness → Opacity/spatial coverage and grouped source-over.
 See [the grading equations](../COLOUR_AND_TIMING.md) for the remaining stages.
@@ -81,15 +81,15 @@ native process; existing frame/pixel/resource and A/V gates remain unchanged.
 
 ## Strict preservation and validation
 
-Only **schema 21** projects and schema-21 snapshots in version-1 export receipts
+Only **schema 22** projects and schema-22 snapshots in version-1 export receipts
 are accepted. Missing Temperature/Tint bases or either nullable keyframe field,
-unknown fields and saved clip Colour/correction are invalid. Reject **v1–v20**
+unknown fields and saved clip Colour/correction are invalid. Reject **v1–v21**
 documents and receipt snapshots clearly; preserve their bytes and successful
-outputs. Recreate projects deliberately: no migrations, v20 acceptance,
+outputs. Recreate projects deliberately: no migrations, v21 acceptance,
 compatibility readers, injected defaults, fallback or automatic deletion.
 Receipt/report/proxy/PCM format versions remain independent and unchanged (the
 registries are version 2, with full-content checksums);
-new reference/measurement metadata identifies schema 21, historical evidence does
+new reference/measurement metadata identifies schema 22, historical evidence does
 not change.
 
 Required disposable checks cover strict bounds/rejection/preservation, neutral

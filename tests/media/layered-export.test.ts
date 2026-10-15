@@ -139,7 +139,7 @@ function coverage(samples: PreviewLayer[]): number {
   return result;
 }
 
-describe.skipIf(!enabled)('schema-21 layered native export · disposable synthetic sources only', () => {
+describe.skipIf(!enabled)('schema-22 layered native export · disposable synthetic sources only', () => {
   let root: string;
   let config: ServiceConfig;
   let jobs: JobQueue;
@@ -895,6 +895,7 @@ describe.skipIf(!enabled)('schema-21 layered native export · disposable synthet
           exposure: -0.5,
           hue: -25,
           saturation: 0.7,
+          vibrance: 0.3,
           highlights: 0.1,
           shadows: 0.2,
           whites: -0.4,
@@ -911,6 +912,7 @@ describe.skipIf(!enabled)('schema-21 layered native export · disposable synthet
           exposure: 0.4,
           hue: 30,
           saturation: 1.2,
+          vibrance: -0.25,
           highlights: -0.35,
         },
         'ease-out',

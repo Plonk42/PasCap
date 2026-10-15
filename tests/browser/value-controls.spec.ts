@@ -128,7 +128,7 @@ function controls(scope: Page | Locator, name: string) {
 async function showControl(page: Page, name: string): Promise<void> {
   if (name === 'Music gain') await inspectorTab(page, 'Audio');
   else if (
-    /keyframe value|^(Opacity|Temperature|Tint|Exposure|Brightness|Contrast|Hue|Saturation|Highlights|Shadows|Whites|Blacks)$/.test(
+    /keyframe value|^(Opacity|Temperature|Tint|Exposure|Brightness|Contrast|Hue|Saturation|Vibrance|Highlights|Shadows|Whites|Blacks)$/.test(
       name,
     )
   )
@@ -324,7 +324,7 @@ test('row Colour captures its base and keeps precise release-only edits identica
   expect(changed.clips).toEqual(document.clips);
 });
 
-test('empty rows expose all thirteen editable row appearance widgets and no clip colour scope', async ({ page }) => {
+test('empty rows expose all fourteen editable row appearance widgets and no clip colour scope', async ({ page }) => {
   const document = await current(page);
   document.clips = [];
   document.music = [];
@@ -345,7 +345,7 @@ test('Track Colour groups its sliders under labelled headings, each with a one-s
   await inspectorTab(page, 'Track');
   const groups = {
     Opacity: ['Opacity'],
-    Colour: ['Temperature', 'Tint', 'Hue', 'Saturation'],
+    Colour: ['Temperature', 'Tint', 'Hue', 'Saturation', 'Vibrance'],
     Light: ['Exposure', 'Brightness', 'Contrast', 'Highlights', 'Shadows', 'Whites', 'Blacks'],
     Effects: ['HDR'],
   };
@@ -862,8 +862,8 @@ test('common widgets fit 270px inspectors at the default and minimum viewports w
             };
           }),
       );
-      // Clip: speed rate and three Detail values; Track: thirteen Colour/Opacity, three HSL, eight Transform and three stored values.
-      expect(widgets.length, `${width}px ${tab}`).toBe(tab === 'Clip' ? 4 : tab === 'Track' ? 27 : 1);
+      // Clip: speed rate and three Detail values; Track: fourteen Colour/Opacity, three HSL, eight Transform and three stored values.
+      expect(widgets.length, `${width}px ${tab}`).toBe(tab === 'Clip' ? 4 : tab === 'Track' ? 28 : 1);
       for (const widget of widgets) {
         expect(widget.inputs, `${width}px ${widget.name}`).toBe(2);
         expect(widget.outputs).toBe(0);

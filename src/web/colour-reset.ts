@@ -12,7 +12,7 @@ import type { VideoLayer } from '../shared/model.js';
 /** Visible grouping of Track → Colour; storage and keyframe channel order stay unchanged. */
 export const COLOUR_GROUPS: readonly { name: string; settings: readonly KeyframeSetting[] }[] = [
   { name: 'Opacity', settings: ['opacity'] },
-  { name: 'Colour', settings: ['temperature', 'tint', 'hue', 'saturation'] },
+  { name: 'Colour', settings: ['temperature', 'tint', 'hue', 'saturation', 'vibrance'] },
   { name: 'Light', settings: ['exposure', 'brightness', 'contrast', 'highlights', 'shadows', 'whites', 'blacks'] },
   { name: 'Effects', settings: ['hdr'] },
 ];

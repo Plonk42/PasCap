@@ -9,10 +9,10 @@ import { calculateLayout, sampleTimeline } from '../../src/shared/timeline.js';
 import { unsupportedProject } from './project-fixtures.js';
 
 describe('shared retiming and recoverable speed edits', () => {
-  it('requires explicit v21 static speed settings; earlier documents are not guessed', () => {
+  it('requires explicit v22 static speed settings; earlier documents are not guessed', () => {
     const project = createProject('flight', 'Flight');
-    expect(project.schemaVersion).toBe(21);
-    for (const schemaVersion of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20])
+    expect(project.schemaVersion).toBe(22);
+    for (const schemaVersion of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21])
       expect(() => projectSchema.parse({ ...project, schemaVersion })).toThrow();
     expect(() => projectSchema.parse(unsupportedProject(4, 'old-flight', 'Unsupported flight'))).toThrow();
     const clip = createClip('a', 'source', 0, 600);

@@ -189,6 +189,7 @@ uniform vec4 extra0;
 uniform vec4 extra1;
 uniform vec4 correction0;
 uniform vec4 correction1;
+uniform vec2 vibrance;
 uniform vec2 coverage;
 uniform vec2 brightness;
 uniform vec2 imageAspect;
@@ -232,9 +233,9 @@ float blacksCurve(float v, float blacks) {
   return v + blacks * ${glslFloat(BLACKS_RANGE)} * shadow * shadow;
 }
 // correction: Temperature/Tint linear gains in xyz, Blacks in w.
-vec3 scalarGrade(vec3 code, vec4 tone, vec4 extra, vec4 correction) {
+vec3 scalarGrade(vec3 code, vec4 tone, vec4 extra, vec4 correction, float vibrance) {
   if (all(equal(correction, vec4(1.0, 1.0, 1.0, 0.0))) && all(equal(tone, vec4(0.0, 0.0, 1.0, 1.0))) &&
-      all(equal(extra, vec4(0.0)))) return code;
+      all(equal(extra, vec4(0.0))) && vibrance == 0.0) return code;
   vec3 rgb = vec3(decode709(code.r), decode709(code.g), decode709(code.b));
   rgb *= correction.xyz;
   rgb *= exp2(tone.x);
@@ -250,8 +251,15 @@ vec3 scalarGrade(vec3 code, vec4 tone, vec4 extra, vec4 correction) {
   float y = dot(rgb, luma);
   float cb = (rgb.b - y) / 1.8556;
   float cr = (rgb.r - y) / 1.5748;
-  float u = tone.w * (cb * cos(extra.x) - cr * sin(extra.x));
-  float v = tone.w * (cb * sin(extra.x) + cr * cos(extra.x));
+  float chroma = tone.w;
+  if (vibrance != 0.0) {
+    float maximum = max(rgb.r, max(rgb.g, rgb.b));
+    float colourfulness = maximum > 0.0 ? (maximum - min(rgb.r, min(rgb.g, rgb.b))) / maximum : 0.0;
+    float muted = 1.0 - min(1.0, colourfulness);
+    chroma *= 1.0 + vibrance * muted * muted;
+  }
+  float u = chroma * (cb * cos(extra.x) - cr * sin(extra.x));
+  float v = chroma * (cb * sin(extra.x) + cr * cos(extra.x));
   float red = y + 1.5748 * v;
   float blue = y + 1.8556 * u;
   float green = (y - 0.2126 * red - 0.0722 * blue) / 0.7152;
@@ -290,7 +298,8 @@ vec3 rangeGrade(vec3 code, int sourceIndex) {
 }
 ${curveFunctions}
 vec3 grade(vec3 code, vec4 tone, vec4 extra, int sourceIndex) {
-  vec3 base = scalarGrade(code, tone, extra, sourceIndex == 0 ? correction0 : correction1);
+  vec3 base = scalarGrade(code, tone, extra, sourceIndex == 0 ? correction0 : correction1,
+                          sourceIndex == 0 ? vibrance.x : vibrance.y);
   ivec4 identity = sourceIndex == 0 ? curveIdentity0 : curveIdentity1;
   if (neutralHsl[sourceIndex] > 0.5 && all(equal(identity, ivec4(1)))) return base;
   vec3 rgb = rangeGrade(base, sourceIndex);
@@ -335,7 +344,8 @@ export const singleFragmentShader = createFragmentShader(true, false);
 const scalarOf = (shader: string): string =>
   shader.slice(0, shader.indexOf('float hueComponent')) +
   `vec3 grade(vec3 code, vec4 tone, vec4 extra, int sourceIndex) {
-    return scalarGrade(code, tone, extra, sourceIndex == 0 ? correction0 : correction1);
+    return scalarGrade(code, tone, extra, sourceIndex == 0 ? correction0 : correction1,
+                       sourceIndex == 0 ? vibrance.x : vibrance.y);
   }
 ` +
   shader.slice(shader.indexOf('vec3 sampleRgb'));
