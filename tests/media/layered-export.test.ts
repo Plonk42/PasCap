@@ -139,7 +139,7 @@ function coverage(samples: PreviewLayer[]): number {
   return result;
 }
 
-describe.skipIf(!enabled)('schema-18 layered native export · disposable synthetic sources only', () => {
+describe.skipIf(!enabled)('schema-19 layered native export · disposable synthetic sources only', () => {
   let root: string;
   let config: ServiceConfig;
   let jobs: JobQueue;
@@ -941,6 +941,8 @@ describe.skipIf(!enabled)('schema-18 layered native export · disposable synthet
     const right = createClip('right', assets[1]!.id, 3, 11);
     left.speed = { mode: 'constant', rate: 0.5 };
     right.speed = { mode: 'constant', rate: 2 };
+    // A reversed dissolve source decodes through the chunked reverse path.
+    right.reverse = true;
     project.layers[0]!.colour = { ...NEUTRAL_COLOUR, exposure: 0.2, brightness: 0.015, shadows: 0.05 };
     project.clips = [left, right];
     project.layers[0]!.transitions = [{ leftId: left.id, rightId: right.id, type: 'cross-dissolve', duration: 2 }];

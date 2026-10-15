@@ -188,24 +188,62 @@ function timelineInteractionMessage(
   return interactionMessage(error, plan, draft, selected);
 }
 
+/** Timeline-direction trim steps: positive moves the edge right. A reversed clip shows source OUT at its left. */
 function keyboardTrimDelta(key: string, shift: boolean, clip: VideoClip, edge: TrimEdge, count: number): number | null {
+  const head = clip.reverse ? count - clip.sourceOut : clip.sourceIn;
+  const tail = clip.reverse ? clip.sourceIn : count - clip.sourceOut;
+  const shrink = clip.sourceOut - 1 - clip.sourceIn;
   switch (key) {
     case 'ArrowLeft':
       return shift ? -10 : -1;
     case 'ArrowRight':
       return shift ? 10 : 1;
     case 'Home':
-      return edge === 'in' ? -clip.sourceIn : clip.sourceIn + 1 - clip.sourceOut;
+      return edge === 'in' ? -head : -shrink;
     case 'End':
-      return edge === 'out' ? count - clip.sourceOut : clip.sourceOut - 1 - clip.sourceIn;
+      return edge === 'out' ? tail : shrink;
     default:
       return null;
   }
 }
 
+/** Output frames of omitted footage beyond the clip's left edge (after OUT when reversed). */
+function recoverableHead(placed: PlacedClip | undefined, frameCount: number | undefined): number {
+  if (!placed || frameCount === undefined) return 0;
+  const restored = placed.clip.reverse ? { sourceOut: frameCount } : { sourceIn: 0 };
+  return clipDuration({ ...placed.clip, ...restored }) - placed.duration;
+}
+/** Output frames of omitted footage beyond the clip's right edge (before IN when reversed). */
+function recoverableTail(placed: PlacedClip, frameCount: number): number {
+  const restored = placed.clip.reverse ? { sourceIn: 0 } : { sourceOut: frameCount };
+  return clipDuration({ ...placed.clip, ...restored }) - placed.duration;
+}
+
+/** A trim handle reports the source endpoint it edits: OUT at the left edge of a reversed clip. */
+function trimHandleValue(
+  clip: VideoClip,
+  edge: TrimEdge,
+  frameCount = clip.sourceOut,
+): { min: number; max: number; now: number } {
+  if (clip.reverse === (edge === 'in')) return { min: clip.sourceIn + 1, max: frameCount, now: clip.sourceOut };
+  return { min: 0, max: clip.sourceOut - 1, now: clip.sourceIn };
+}
+
+/** The clip strip shows playback order: a reversed clip lists its snapshots backwards. */
+function filmstrip(asset: MediaAsset | undefined, reverse: boolean): { sourceFrame: number; src: string }[] {
+  if (!asset?.prepared) return [];
+  const strip = asset.prepared.thumbnailFrames.slice(0, 4);
+  if (reverse) strip.reverse();
+  return strip.map((sourceFrame) => ({
+    sourceFrame,
+    src: `/api/media/${asset.id}/thumbnail/${sourceFrame}`,
+  }));
+}
+
 function speedLabel(clip: VideoClip): string {
-  if (clip.speed.mode === 'curve') return ' · curve';
-  return clip.speed.rate === 1 ? '' : ` · ${clip.speed.rate}×`;
+  const direction = clip.reverse ? ' · reverse' : '';
+  if (clip.speed.mode === 'curve') return ` · curve${direction}`;
+  return (clip.speed.rate === 1 ? '' : ` · ${clip.speed.rate}×`) + direction;
 }
 
 function timelineEmptyMessage(project: ProjectDocument): string {
@@ -632,16 +670,12 @@ export function Timeline(props: Readonly<Props>) {
   const source = assets.find((asset) => asset.id === selected?.clip.mediaId);
   // Reserve access to omitted head/tail footage, including the first/last clip.
   // Outward trimming must not require dragging beyond the edge of the browser.
-  const availableHead = selected ? clipDuration({ ...selected.clip, sourceIn: 0 }) - selected.duration : 0;
+  const availableHead = recoverableHead(selected, source?.metadata.frameCount);
   // Selection must not move frame zero beneath the mouse. The timeline origin
   // stays fixed; omitted source is still recoverable through handles/Home/End.
   const leading = drag.current?.leading ?? movement.current?.leading ?? musicGesture?.leading ?? 32;
   const unusedTail =
-    source && selected
-      ? clipDuration({ ...selected.clip, sourceOut: source.metadata.frameCount }) -
-        selected.duration -
-        (layout.duration - selected.end)
-      : 0;
+    source && selected ? recoverableTail(selected, source.metadata.frameCount) - (layout.duration - selected.end) : 0;
   const trailing = Math.max(96, unusedTail * scale + 24);
   const musicEnd = timelineMusicExtent(project, musicGesture);
   // Stored points after video or music OUT stay reachable, without extending the playable duration.
@@ -851,8 +885,8 @@ export function Timeline(props: Readonly<Props>) {
     const asset = assets.find((item) => item.id === clip.mediaId);
     if (!asset || !scroll.current) return;
     const placed = baseLayout.clips.find((item) => item.clip.id === clip.id)!;
-    const recoverableHead = clipDuration({ ...clip, sourceIn: 0 }) - placed.duration;
-    const originShift = edge === 'in' ? Math.max(0, Math.ceil((recoverableHead - placed.start) * scale)) : 0;
+    const head = recoverableHead(placed, asset.metadata.frameCount);
+    const originShift = edge === 'in' ? Math.max(0, Math.ceil((head - placed.start) * scale)) : 0;
     event.preventDefault();
     event.stopPropagation();
     onPause();
@@ -1398,14 +1432,8 @@ export function Timeline(props: Readonly<Props>) {
                     }}
                   >
                     <span className="clip-filmstrip">
-                      {asset?.prepared?.thumbnailFrames.slice(0, 4).map((sourceFrame) => (
-                        <img
-                          loading="lazy"
-                          draggable={false}
-                          key={sourceFrame}
-                          src={`/api/media/${asset.id}/thumbnail/${sourceFrame}`}
-                          alt=""
-                        />
+                      {filmstrip(asset, clip.reverse).map(({ sourceFrame, src }) => (
+                        <img loading="lazy" draggable={false} key={sourceFrame} src={src} alt="" />
                       ))}
                     </span>
                     <span className="timeline-clip-label">
@@ -1430,12 +1458,10 @@ export function Timeline(props: Readonly<Props>) {
                       role="slider"
                       aria-label={`Trim ${edge === 'in' ? 'start' : 'end'} of ${name}, clip ${index + 1}`}
                       disabled={keyframes.active || musicGesture !== null}
-                      aria-valuemin={edge === 'in' ? 0 : clip.sourceIn + 1}
-                      aria-valuemax={
-                        edge === 'in' ? clip.sourceOut - 1 : (asset?.metadata.frameCount ?? clip.sourceOut)
-                      }
-                      aria-valuenow={edge === 'in' ? clip.sourceIn : clip.sourceOut}
-                      aria-valuetext={sourceSeconds(edge === 'in' ? clip.sourceIn : clip.sourceOut)}
+                      aria-valuemin={trimHandleValue(clip, edge, asset?.metadata.frameCount).min}
+                      aria-valuemax={trimHandleValue(clip, edge, asset?.metadata.frameCount).max}
+                      aria-valuenow={trimHandleValue(clip, edge, asset?.metadata.frameCount).now}
+                      aria-valuetext={sourceSeconds(trimHandleValue(clip, edge, asset?.metadata.frameCount).now)}
                       title={`Trim ${edge === 'in' ? 'start' : 'end'}; drag outward to restore recording frames. Arrow keys: one frame; Shift: ten.`}
                       onPointerDown={(event) => beginTrim(event, placed.clip, edge)}
                       onPointerMove={moveTrim}

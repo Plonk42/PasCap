@@ -375,7 +375,13 @@ export class PreviewEngine {
     lane.lastRequested = lane.shown?.mediaId === placed.clip.mediaId && lane.shown.sourceFrame === first ? first : -1;
     const frames = this.#requestFrames(lane, placed, local + STREAM_WINDOW);
     lane.firstRequested = frames[0] ?? null;
-    this.#streams.start(lane.index, this.#proxyUrl(placed.clip.mediaId), frames, lane.requested >= placed.duration);
+    this.#streams.start(
+      lane.index,
+      this.#proxyUrl(placed.clip.mediaId),
+      frames,
+      lane.requested >= placed.duration,
+      placed.clip.reverse,
+    );
   }
   #extendStream(lane: Lane, placed: PlacedClip, local: number): void {
     if (lane.requested >= placed.duration || lane.requested - local > STREAM_WINDOW / 2) return;
@@ -428,7 +434,7 @@ export class PreviewEngine {
         const lane = lanes[index]!;
         if (this.#shows(lane, layer)) return;
         lane.streaming = true;
-        this.#streams.start(lane.index, this.#proxyUrl(layer.mediaId), [layer.sourceFrame], true);
+        this.#streams.start(lane.index, this.#proxyUrl(layer.mediaId), [layer.sourceFrame], true, false);
         await this.#streams.ready(lane.index, layer.sourceFrame, 1, signal);
         if (!this.#isCurrent(signal)) return;
         this.#present(lane, layer);

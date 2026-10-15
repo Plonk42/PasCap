@@ -518,6 +518,7 @@ describe('layered renderer metadata and continuous retiming ownership with memor
       frameBytes: options.frameBytes,
       rawFrameBuffers: 1,
       largestReadChunkBytes: options.frameBytes,
+      decoderProcesses: 1,
     }));
     vi.spyOn(RawVideoPass.prototype, 'reader').mockImplementation(function () {
       const reader = RawFrameReader.create(

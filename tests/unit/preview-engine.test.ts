@@ -38,6 +38,7 @@ interface FakeFrame {
 interface LaneDouble {
   generation: number;
   url: string;
+  reverse: boolean;
   pending: number[];
   complete: boolean;
   queue: FakeFrame[];
@@ -46,7 +47,7 @@ interface LaneDouble {
 }
 interface StreamsDouble {
   lanes: LaneDouble[];
-  starts: { lane: number; url: string; frames: number[]; complete: boolean }[];
+  starts: { lane: number; url: string; frames: number[]; complete: boolean; reverse: boolean }[];
   extensions: { lane: number; frames: number[]; complete: boolean }[];
   stops: number[];
   open: Set<FakeFrame>;
@@ -114,6 +115,7 @@ vi.mock('../../src/preview/video-streams.js', () => {
         this.lanes = Array.from({ length: count }, () => ({
           generation: 0,
           url: '',
+          reverse: false,
           pending: [],
           complete: true,
           queue: [],
@@ -164,11 +166,12 @@ vi.mock('../../src/preview/video-streams.js', () => {
         if (failure) this.fail(index, failure);
         else if (state.autoDecode) this.decode(index);
       }
-      start(index: number, url: string, frames: number[], complete: boolean): void {
+      start(index: number, url: string, frames: number[], complete: boolean, reverse: boolean): void {
         const lane = this.lanes[index]!;
         this.#reset(lane);
-        this.starts.push({ lane: index, url, frames: [...frames], complete });
+        this.starts.push({ lane: index, url, frames: [...frames], complete, reverse });
         lane.url = url;
+        lane.reverse = reverse;
         lane.pending = [...frames];
         lane.complete = complete;
         this.#auto(index);
@@ -192,7 +195,8 @@ vi.mock('../../src/preview/video-streams.js', () => {
         const lane = this.lanes[index]!;
         if (lane.error) throw lane.error;
         let credits = 0;
-        while (lane.queue.length && lane.queue[0]!.sourceFrame < sourceFrame) {
+        const passed = (frame: number): boolean => (lane.reverse ? frame > sourceFrame : frame < sourceFrame);
+        while (lane.queue.length && passed(lane.queue[0]!.sourceFrame)) {
           lane.queue.shift()!.close();
           this.droppedFrames++;
           credits++;
@@ -200,8 +204,8 @@ vi.mock('../../src/preview/video-streams.js', () => {
         if (lane.queue.length && lane.queue[0]!.sourceFrame !== sourceFrame)
           throw new Error(`Video decoder ${index + 1} skipped source frame ${sourceFrame}.`);
         const frame = take ? (lane.queue.shift() ?? null) : null;
-        // Like the worker, learn the clock's minimum only with returned credits.
-        if (credits || frame) lane.pending = lane.pending.filter((pending) => pending >= sourceFrame);
+        // Like the worker, learn the clock's needed frame only with returned credits.
+        if (credits || frame) lane.pending = lane.pending.filter((pending) => !passed(pending));
         return frame;
       }
       take(index: number, sourceFrame: number): FakeFrame | null {
@@ -530,6 +534,7 @@ describe('exact paused frames', () => {
         url: proxyUrl(layer.mediaId),
         frames: [layer.sourceFrame],
         complete: true,
+        reverse: false,
       })),
     );
     expect(engine.diagnostics()).toMatchObject({
@@ -633,6 +638,7 @@ describe('playback on one clock', () => {
       url: proxyUrl('video'),
       frames: Array.from({ length: 51 }, (_value, index) => 9 + index),
       complete: true,
+      reverse: false,
     });
     expect(engine.diagnostics()).toMatchObject({ status: 'buffering', message: 'Starting playback', stalls: 0 });
     streams().decode(lane, 2);
@@ -667,6 +673,25 @@ describe('playback on one clock', () => {
       expect(compositor().visible![0]![0]!.sourceFrame).toBe(placed.retiming.sourceAt(frame));
     }
     expect(engine.diagnostics().droppedDecodedFrames).toBe(0);
+  });
+
+  it.each([1, 0.5, 2])('streams a reversed clip backwards at %s×, presenting each exact frame', async (rate) => {
+    const project = singleProject();
+    project.clips[0]!.speed = { mode: 'constant', rate };
+    project.clips[0]!.reverse = true;
+    const { engine, anchor } = await playing(project, 8);
+    const placed = calculateLayout(project).clips[0]!;
+    const shown = placed.retiming.sourceAt(8);
+    const start = streams().starts.at(-1)!;
+    expect(start.reverse).toBe(true);
+    expect(start.frames[0]).toBeLessThan(shown);
+    expect(start.frames.every((frame, index) => index === 0 || frame < start.frames[index - 1]!)).toBe(true);
+    for (let frame = 9; frame < 14; frame++) {
+      tick(anchor, frame - 8);
+      expect(engine.diagnostics()).toMatchObject({ status: 'playing', frame });
+      expect(compositor().visible![0]![0]!.sourceFrame).toBe(placed.retiming.sourceAt(frame));
+    }
+    expect(engine.diagnostics()).toMatchObject({ droppedDecodedFrames: 0, stalls: 0 });
   });
 
   it('extends the requested window as playback advances, completing at the clip end', async () => {

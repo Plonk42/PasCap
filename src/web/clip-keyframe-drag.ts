@@ -110,12 +110,15 @@ export function clipKeyframeKind(
         : placed.start + Math.max(0, Math.min(placed.duration - 1, marker.outputFrame + travel)),
     planAt: (project, target, at) => {
       const { placed, marker } = target;
-      // A snap to the clip's end lands on its exclusive OUT boundary.
-      const frame =
-        at >= placed.end ? placed.clip.sourceOut : clipKeyframeTarget(placed, marker, at - marker.timelineFrame);
+      // A snap to a forward clip's end lands on its exclusive OUT boundary; a reversed
+      // clip's start is its first frame, so travel maps through the retiming there too.
+      const boundary = !placed.clip.reverse && at >= placed.end;
+      const frame = boundary ? placed.clip.sourceOut : clipKeyframeTarget(placed, marker, at - marker.timelineFrame);
       return move(project, target, frame);
     },
-    step: (project, target, delta) => move(project, target, target.origin + delta),
+    // Arrow keys move the marker along the timeline: a reversed clip shows lower source frames to the right.
+    step: (project, target, delta) =>
+      move(project, target, target.origin + (target.placed.clip.reverse ? -delta : delta)),
     seekFrame: (document, target, frame) => seekFrameFor(document, target.scope, type, frame),
     select: ({ scope }) => options.onSelect(scope),
     reveal: (document, target, frame, open) => {

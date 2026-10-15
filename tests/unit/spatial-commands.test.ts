@@ -66,7 +66,7 @@ function withTransform(document: ProjectDocument, transform: unknown): unknown {
   return { ...document, layers: [{ ...document.layers[0]!, transform }, ...document.layers.slice(1)] };
 }
 
-describe('strict schema-18 track Transform persistence', () => {
+describe('strict schema-19 track Transform persistence', () => {
   it('creates independent explicit neutral track settings and round-trips complete poses and keys', () => {
     const first = createLayer('first', 'First');
     const second = createLayer('second', 'Second');
@@ -76,9 +76,9 @@ describe('strict schema-18 track Transform persistence', () => {
     expect(first.transform.keyframes).not.toBe(second.transform.keyframes);
     expect(createClip('clip', 'original', 0, 1)).not.toHaveProperty('spatial');
     const document = fixture();
-    expect(document.schemaVersion).toBe(18);
+    expect(document.schemaVersion).toBe(19);
     expect(projectSchema.parse(JSON.parse(JSON.stringify(document)))).toEqual(document);
-    for (const schemaVersion of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17])
+    for (const schemaVersion of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18])
       expect(projectSchema.safeParse({ ...document, schemaVersion }).success).toBe(false);
   });
 

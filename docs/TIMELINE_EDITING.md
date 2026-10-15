@@ -14,7 +14,7 @@ HSL/curves remain static. See [Temperature and Tint](design/TEMPERATURE_AND_TINT
 See [track appearance](design/ROW_APPEARANCE.md).
 
 The media library describes complete recordings belonging to the open project's
-bin, not every globally registered source. Strict schema 18 requires unique
+bin, not every globally registered source. Strict schema 19 requires unique
 `media.videoIds` and `media.audioIds` arrays (10,000 IDs maximum each). Imports add
 membership even without timeline placement; clip/music references also remain
 visible. New projects start with both arrays empty. **Remove from project** (the
@@ -29,7 +29,7 @@ deliberately reuses the global content-deduplicated registry/proxy cache; switch
 projects never automatically adopts that global library. An insertion creates
 a unique clip-instance ID and copies the latest media-review IN/OUT, or
 `sourceIn = 0`, `sourceOut = registered frameCount` without a choice. New clips have
-normal constant speed and neutral Sharpen/Clarity/Denoise, with no saved opacity or
+normal constant speed, `reverse` `false` and neutral Sharpen/Clarity/Denoise, with no saved opacity or
 transform field. They use the destination track's `opacity` value or its overriding Opacity
 keyframes, and its Transform.
 New clips start without custom speed keyframes; existing track curves immediately apply at their project placement.
@@ -125,7 +125,7 @@ Import guidance, **without a POST**. Internal dragging of ready registered Media
 into Timeline remains unchanged. Uncertain registration results are not retried
 automatically; check Media/Activity before resubmitting.
 
-Strict schema 18 requires complete video track colour with Temperature/Tint/HDR and static HSL/curves, track Transform, per-track Ripple, transitions and fades, and a required
+Strict schema 19 requires complete video track colour with Temperature/Tint/HDR and static HSL/curves, track Transform, a boolean clip `reverse`, per-track Ripple, transitions and fades, and a required
 0–8 identified music track `music` array (`[]` without music); proxy/PCM formats are
 unchanged and the registries are version 2 (full-content checksums). Only generated
 proxies/thumbnails, metadata,
@@ -148,7 +148,9 @@ original-source range controls have the separate contract below.
   including horizontal scroll. The clip's placed map converts the requested
   output-duration change back to a recoverable original endpoint; drafts do not
   accumulate rounding or rescale track keyframes.
-- A left drag changes IN; a right drag changes OUT. Bounds come from registered
+- A left drag changes IN; a right drag changes OUT. A [reversed](SPEED_AND_AUDIO.md#reverse)
+  clip shows source OUT at its left, so its left drag changes OUT and its right drag
+  changes IN: handles always trim the clip as displayed. Bounds come from registered
   media metadata, **never the previously shortened clip duration**.
 - Geometry and paused preview update against the draft. Autosave/history and the
   committed document remain untouched until pointer release.
@@ -178,8 +180,10 @@ original-source range controls have the separate contract below.
   keyframes are retained, including outside the new trim.
 
 The selected clip's left/right trim edges are keyboard sliders. Arrow keys
-move by one original source frame; Shift moves by ten. Home at the left edge requests
-IN=0; End at the right edge requests the original OUT. A Ripple-off left restoration
+move by one original source frame; Shift moves by ten. Home at the left edge restores
+the whole head (IN=0, or OUT = original OUT when reversed); End at the right edge
+restores the whole tail (original OUT, or IN=0 when reversed). Each handle reports the
+source endpoint it edits. A Ripple-off left restoration
 cannot extend before project frame zero or silently change its retained timeline
 OUT; normal overlap/fade validation still applies.
 
@@ -219,9 +223,13 @@ toolbar covering the lanes. Each track header has one **Ripple** toggle icon
 - **Split / S** maps the playhead through the placed retiming map and creates two
   independent clips. On success the right piece is selected and its beginning
   previewed, ready for another split/trim/delete. Invalid splits preserve selection
-  and history. The playhead must be strictly inside the clip's source range.
+  and history. The playhead must be strictly inside the clip's source range. On a
+  reversed clip both pieces stay reversed: the left keeps the higher source frames and
+  the right starts with the image at the playhead.
 - **Trim start / Q** discards footage before the displayed source frame; **Trim
   end / W** discards footage after it, keeping that frame via source OUT = frame + 1.
+  Both act in output order, so on a reversed clip Q sets source OUT = frame + 1 and
+  W sets source IN = frame.
   Ripple-on left trims keep their sequence start and recompile later clips;
   Ripple-off left trims retain their old OUT.
   These are shrinking operations. Handles or Restore full recording recover omitted
@@ -250,7 +258,8 @@ toolbar covering the lanes. Each track header has one **Ripple** toggle icon
   removal deletes it. Retained pieces share the original media but have independent
   ranges/settings, including original-source speed keyframes. Off-trim and original
   exclusive-OUT speed anchors remain stored.
-  No proxy is cut.
+  No proxy is cut. A reversed clip removes the source frames its range displays and
+  keeps the higher remaining frames as the left piece; every piece stays reversed.
 - With Ripple on, the track closes the removed gap and recalculates later starts
   without changing their order, original-source ranges, durations or settings. The new
   left/right boundary is a cut. Existing valid incoming/outgoing transitions are
@@ -322,7 +331,7 @@ and undoable, and never move music, other tracks or absolute track keyframes.
   that track. Each piece retimes/rounds independently,
   so total duration can change. Invalid edits never enter history.
 - **Duplicate** (right-click the clip, or its Menu key) / **Ctrl+D** copies the complete clip range,
-  constant/custom speed and detail filters into
+  constant/custom speed, direction and detail filters into
   an independent ID; it does not
   copy or change track Colour/Opacity/Transform. Ripple-on duplicates insert after the original with
   new cut boundaries. Ripple-off duplicates start immediately
@@ -570,7 +579,7 @@ toggle persists for the current timeline session, not the renderable document.
 ### Bookmarks
 
 A **bookmark** marks one project-time frame, for example a beat or an event in the
-footage, as an extra snap point. Bookmarks belong to the project: strict schema 18
+footage, as an extra snap point. Bookmarks belong to the project: strict schema 19
 requires `bookmarks`, an array of at most 1,000 unique ascending integer project
 frames (0–2,147,483,647), `[]` on new projects; a missing or malformed array is
 invalid, never defaulted. They are editing aids only: they never retime clips,
@@ -601,12 +610,12 @@ music or keyframes and are never rendered or exported.
 Adding, moving and deleting are each one Undo step and autosave like other edits.
 Bookmarks are project-wide: not per track, named, coloured or ranged.
 
-Projects are named separate **version-18** documents with complete required video track colour, track
-Transform base/per-setting project-frame keyframes, project bookmarks and per-track Ripple,
+Projects are named separate **version-19** documents with complete required video track colour, track
+Transform base/per-setting project-frame keyframes, a boolean clip `reverse`, project bookmarks and per-track Ripple,
 transitions, opening/closing fades and numeric `opacity` in 0–1. New tracks start
 at 1 (100%); a missing saved field is invalid. Switching flushes autosave first,
 blocks on failed saves, and resets session selection/history; successful export
-snapshots are independent of the open project. Earlier v1–v17 projects and receipt
+snapshots are independent of the open project. Earlier v1–v18 projects and receipt
 snapshots remain incompatible and preserved, without migration/fabricated defaults.
 There is no automatic deletion. Track `opacity` is the required sole stored value;
 saved `clip.opacity` and old `clipOpacity`/`layerOpacity` keyframe fields are rejected,
@@ -624,7 +633,7 @@ unchanged; the registries are version 2 (full-content checksums).
 The required `music` array holds **0–8 independent music tracks**, each with a unique
 required `id`, registered `mediaId`, source IN/OUT, start/duration, gain, fades and
 loop flag. No null/singular fallback, omitted-field default or old-format reader
-is accepted. Version-1 export receipts require a strict v18 snapshot and captured
+is accepted. Version-1 export receipts require a strict v19 snapshot and captured
 audio-source/instance-plan arrays; older snapshots/invalid arrays are rejected
 while the receipt and finished output remain preserved. Current PCM format is unchanged.
 
@@ -715,7 +724,7 @@ zoom keeps its slider and **Fit**, with **Zoom out / Zoom in** buttons beside it
 Diagnostic counters, shader tests and the two-clip native comparison tool remain
 hidden behind Diagnostics. **Export** uses the bounded native multi-clip
 renderer, with profiles for 720p drafts and 4K finals. The diagnostic two-clip
-reference remains limited to two normal-speed clips on one enabled,
+reference remains limited to two normal-speed forward clips on one enabled,
 zero-origin contiguous video track with Opacity 1, HDR 0 and a neutral track Transform
 without keyframes and neutral detail filters, without music/extra tracks/shared track keyframes
 and at most 3,600 project frames.
@@ -737,4 +746,4 @@ and both-runtime acceptance belong to
 [DEPLOYMENT.md](DEPLOYMENT.md). Actual-commit correctness results are available in
 [GitHub Actions](https://github.com/Plonk42/PasCap/actions).
 
-Video track Colour includes static **HSL ranges** and **Colour curves**, each in its own collapsible Track section after Colour. They affect every clip and both dissolve sources on the track, whether or not its nine scalar channels are keyed. Moves use the destination track's complete colour; clip edits never copy these settings. They are not speed curves or new animation channels. See [the schema-18 HSL/curves contract](design/HSL_AND_CURVES.md).
+Video track Colour includes static **HSL ranges** and **Colour curves**, each in its own collapsible Track section after Colour. They affect every clip and both dissolve sources on the track, whether or not its nine scalar channels are keyed. Moves use the destination track's complete colour; clip edits never copy these settings. They are not speed curves or new animation channels. See [the schema-19 HSL/curves contract](design/HSL_AND_CURVES.md).

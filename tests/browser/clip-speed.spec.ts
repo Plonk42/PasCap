@@ -465,6 +465,83 @@ test('a slow clip-key click previews that exact original image instead of the pr
   expect(memory.saves).toBe(0);
 });
 
+test('Reverse is one Undo step and seeks and plays exact decoded frames backwards', async ({ page }) => {
+  test.setTimeout(45_000);
+  const before = await current(page);
+  const reverse = page.getByRole('checkbox', { name: 'Reverse', exact: true });
+  await expect(reverse).not.toBeChecked();
+  await reverse.check();
+  const reversed = await current(page);
+  expect(reversed.clips[0]).toEqual({ ...before.clips[0], reverse: true });
+  await ready(page, reversed);
+  await expect(page.locator('.timeline-clip-label')).toContainText('reverse');
+  const placed = calculateLayout(reversed).clips[0]!;
+  const shown = (): Promise<{ frame: number; source: number | undefined; status: string }> =>
+    page.evaluate(() => {
+      const state = window.pascapLab!.engine.diagnostics();
+      return {
+        frame: state.frame,
+        source: state.decodedSourceFrames[state.assignedClipIds.indexOf('one')],
+        status: state.status,
+      };
+    });
+  for (const frame of [0, 1, 37, 118, 119]) {
+    await seek(page, frame);
+    await expect.poll(shown).toEqual({ frame, source: placed.retiming.sourceAt(frame), status: 'paused' });
+  }
+  expect(placed.retiming.sourceAt(0)).toBe(119);
+  await seek(page, 60);
+  await page.evaluate(() => {
+    const samples: [number, number][] = [];
+    Reflect.set(window, 'reverseSamples', samples);
+    window.pascapLab!.engine.subscribe((state) => {
+      const slot = state.assignedClipIds.indexOf('one');
+      if (state.status === 'playing' && slot >= 0) samples.push([state.frame, state.decodedSourceFrames[slot]!]);
+    });
+  });
+  await page.evaluate(() => window.pascapLab!.engine.play());
+  await page.waitForFunction(
+    () => {
+      const state = window.pascapLab!.engine.diagnostics();
+      return state.status === 'error' || (!state.playing && state.frame === 119);
+    },
+    undefined,
+    { timeout: 30_000 },
+  );
+  const result = await page.evaluate(() => ({
+    state: window.pascapLab!.engine.diagnostics(),
+    samples: Reflect.get(window, 'reverseSamples') as [number, number][],
+  }));
+  expect(result.state.status, result.state.message).toBe('paused');
+  expect(result.samples.length).toBeGreaterThan(10);
+  for (const [frame, source] of result.samples) expect(source).toBe(placed.retiming.sourceAt(frame));
+  expect(result.samples.every(([, source], index) => index === 0 || source <= result.samples[index - 1]![1])).toBe(
+    true,
+  );
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  expect(await current(page)).toEqual(before);
+  await expect(reverse).not.toBeChecked();
+});
+
+test('timeline trim handles of a reversed clip trim the displayed start and end', async ({ page }) => {
+  await page.getByRole('checkbox', { name: 'Reverse', exact: true }).check();
+  const reversed = await current(page);
+  const start = page.getByRole('slider', { name: 'Trim start of pattern-a.mp4, clip 1', exact: true });
+  await expect(start).toHaveAttribute('aria-valuenow', '120');
+  await start.focus();
+  await start.press('ArrowRight');
+  expect((await current(page)).clips[0]).toMatchObject({ sourceIn: 0, sourceOut: 119 });
+  const end = page.getByRole('slider', { name: 'Trim end of pattern-a.mp4, clip 1', exact: true });
+  await expect(end).toHaveAttribute('aria-valuenow', '0');
+  await end.focus();
+  await end.press('Shift+ArrowLeft');
+  expect((await current(page)).clips[0]).toMatchObject({ sourceIn: 10, sourceOut: 119 });
+  await end.press('End');
+  expect((await current(page)).clips[0]).toMatchObject({ sourceIn: 0, sourceOut: 119 });
+  for (let step = 0; step < 3; step++) await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  expect(await current(page)).toEqual(reversed);
+});
+
 test('custom controls fit a 270px Inspector at the default and minimum viewports with accessible point hit targets', async ({
   page,
 }) => {

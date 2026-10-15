@@ -491,7 +491,7 @@ describe.skipIf(!enabled)('production native export · opt-in disposable media o
       expect(needsLayeredExport(project)).toBe(false);
       const result = await completed(project);
       expect(result.receipt.snapshot).toEqual(captured);
-      expect(result.receipt.snapshot.schemaVersion).toBe(18);
+      expect(result.receipt.snapshot.schemaVersion).toBe(19);
       expect(result.receipt.settings.pipeline).toBe('static-single-layer');
       expect(result.receipt.settings.resources).toEqual(EXPORT_RESOURCES);
       expect(result.receipt.settings.layered).toBeNull();
@@ -531,6 +531,8 @@ describe.skipIf(!enabled)('production native export · opt-in disposable media o
     project.clips = speeds.map((speed, index) => ({
       ...createClip(`instance-${index}`, assets[index % 2]!.id, 1 + (index % 4), 19 + (index % 4)),
       speed,
+      // Every third clip plays backwards through the chunked reverse decoder.
+      reverse: index % 3 === 2,
     }));
     project.layers[0]!.transitions = project.clips.slice(1).map((clip, index) => {
       const pair = { leftId: project.clips[index]!.id, rightId: clip.id };

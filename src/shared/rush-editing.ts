@@ -30,8 +30,19 @@ export function sourceRangeForCut(
   const inFrame = Math.max(range.inFrame, placed.start);
   const outFrame = Math.min(range.outFrame, placed.end);
   if (outFrame <= inFrame) throw new Error('The selected range is outside the selected clip.');
-  const sourceIn = placed.retiming.sourceAt(inFrame - placed.start);
-  const sourceOut = outFrame === placed.end ? placed.clip.sourceOut : placed.retiming.sourceAt(outFrame - placed.start);
+  const { retiming, clip } = placed;
+  const atEnd = outFrame === placed.end;
+  const shownAt = (frame: number): number => retiming.sourceAt(frame - placed.start);
+  // A reversed clip shows descending frames: the range covers (sourceAt(OUT), sourceAt(IN)].
+  let sourceIn: number;
+  let sourceOut: number;
+  if (clip.reverse) {
+    sourceIn = atEnd ? clip.sourceIn : shownAt(outFrame) + 1;
+    sourceOut = shownAt(inFrame) + 1;
+  } else {
+    sourceIn = shownAt(inFrame);
+    sourceOut = atEnd ? clip.sourceOut : shownAt(outFrame);
+  }
   if (sourceOut <= sourceIn)
     throw new Error('The selected range contains no original source frame at this speed. Widen it.');
   return { sourceIn, sourceOut };
@@ -46,9 +57,16 @@ export function removeSelectedRange(
   return { type: 'remove-source-range', clipId, ...sourceRangeForCut(project, clipId, range), newClipId };
 }
 
-/** Keep the displayed original frame: BEFORE retains it as IN; AFTER retains
- * it via source-frame + 1 as exclusive OUT. The playhead must be inside [start,
- * end); it is never clamped from another clip or from the exclusive end.
+/** The split boundary that starts the right piece with the image displayed at `frame`. */
+export function splitSourceFrame(placed: PlacedClip, frame: number): number {
+  const shown = placed.retiming.sourceAt(frame - placed.start);
+  return placed.clip.reverse ? shown + 1 : shown;
+}
+
+/** Keep the displayed original frame: BEFORE (the output start) and AFTER (the
+ * output end) are output terms, so a reversed clip trims source OUT before and
+ * source IN after it. The playhead must be inside [start, end); it is never
+ * clamped from another clip or from the exclusive end.
  */
 export function trimAtPlayhead(
   project: ProjectDocument,
@@ -62,8 +80,12 @@ export function trimAtPlayhead(
   if (frame < placed.start || frame >= placed.end)
     throw new Error('Place the playhead inside the selected clip to trim it; its OUT boundary is exclusive.');
   const sourceFrame = placed.retiming.sourceAt(frame - placed.start);
-  const delta = edge === 'in' ? sourceFrame - placed.clip.sourceIn : sourceFrame + 1 - placed.clip.sourceOut;
+  const { sourceIn, sourceOut, reverse } = placed.clip;
+  // Timeline-direction deltas: positive moves the edge right.
+  let delta: number;
+  if (reverse) delta = edge === 'in' ? sourceOut - 1 - sourceFrame : sourceIn - sourceFrame;
+  else delta = edge === 'in' ? sourceFrame - sourceIn : sourceFrame + 1 - sourceOut;
   // Repeated endpoint samples yield delta 0 and history discards the no-op.
   // sourceOut is only a shrinking ceiling here, not a claimed asset frame count.
-  return trimOnTimeline(project, clipId, edge, delta, placed.clip.sourceOut, 'source');
+  return trimOnTimeline(project, clipId, edge, delta, sourceOut, 'source');
 }

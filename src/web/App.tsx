@@ -40,7 +40,7 @@ import {
   type MediaRemoval,
   type ProjectSummary,
 } from '../shared/projects.js';
-import { removeSelectedRange, trimAtPlayhead, type TimelineRange } from '../shared/rush-editing.js';
+import { removeSelectedRange, splitSourceFrame, trimAtPlayhead, type TimelineRange } from '../shared/rush-editing.js';
 import { forEachSerial } from '../shared/serial.js';
 import { validateSourceRanges } from '../shared/source-range.js';
 import { calculateLayout, layerClips } from '../shared/timeline.js';
@@ -625,7 +625,7 @@ export function App() {
       const next = applyCommand(current.current, {
         type: 'split',
         clipId: placed.clip.id,
-        sourceFrame: placed.retiming.sourceAt(frame - placed.start),
+        sourceFrame: splitSourceFrame(placed, frame),
         newClipId,
       });
       requestedFrame.current = calculateLayout(next).clips.find((item) => item.clip.id === newClipId)!.start;

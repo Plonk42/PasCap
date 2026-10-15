@@ -60,7 +60,7 @@ describe('page video streams', () => {
   it('starts one module worker and resolves proxy URLs against the editor', () => {
     const streams = new VideoStreams(2);
     expect(FakeWorker.last.options).toEqual({ type: 'module', name: 'pascap-video-reader' });
-    streams.start(1, '/api/media/a/proxy', [3, 4], true);
+    streams.start(1, '/api/media/a/proxy', [3, 4], true, false);
     expect(FakeWorker.last.commands).toEqual([
       {
         kind: 'start',
@@ -68,23 +68,24 @@ describe('page video streams', () => {
         generation: 1,
         url: 'http://127.0.0.1:4318/api/media/a/proxy',
         frames: [3, 4],
+        reverse: false,
         complete: true,
       },
     ]);
-    expect(() => streams.start(2, '/x', [0], true)).toThrow('outside the decoder budget');
+    expect(() => streams.start(2, '/x', [0], true, false)).toThrow('outside the decoder budget');
     streams.dispose();
     expect(FakeWorker.last.terminated).toBe(true);
   });
 
-  it('presents the exact frame, drops passed ones and returns one credit with the new minimum', () => {
+  it('presents the exact frame, drops passed ones and returns one credit with the needed frame', () => {
     const streams = new VideoStreams(1);
-    streams.start(0, '/p', [1, 2, 3, 4], true);
+    streams.start(0, '/p', [1, 2, 3, 4], true, false);
     const passed = [deliver(0, 1), deliver(0, 2)];
     deliver(0, 3);
     const taken = streams.take(0, 3) as unknown as FakeFrame;
     expect(taken.closed).toBe(false);
     expect(passed.every((item) => item.closed)).toBe(true);
-    expect(credits()).toEqual([{ kind: 'credit', lane: 0, generation: 1, count: 3, minimum: 3 }]);
+    expect(credits()).toEqual([{ kind: 'credit', lane: 0, generation: 1, count: 3, needed: 3 }]);
     expect(streams).toMatchObject({ decodedFrames: 3, droppedFrames: 2 });
     expect(streams.take(0, 4)).toBeNull();
     deliver(0, 6);
@@ -92,11 +93,29 @@ describe('page video streams', () => {
     streams.dispose();
   });
 
+  it('drops passed frames above the needed one on a reversed lane', () => {
+    const streams = new VideoStreams(1);
+    streams.start(0, '/p', [9, 8, 7, 6], true, true);
+    expect(FakeWorker.last.commands[0]).toMatchObject({ kind: 'start', frames: [9, 8, 7, 6], reverse: true });
+    const passed = [deliver(0, 9), deliver(0, 8)];
+    deliver(0, 7);
+    const taken = streams.take(0, 7) as unknown as FakeFrame;
+    expect(taken.closed).toBe(false);
+    expect(passed.every((item) => item.closed)).toBe(true);
+    expect(credits()).toEqual([{ kind: 'credit', lane: 0, generation: 1, count: 3, needed: 7 }]);
+    deliver(0, 4);
+    expect(() => streams.take(0, 6)).toThrow('Video decoder 1 skipped source frame 6.');
+    streams.start(0, '/p', [1, 2], true, false);
+    deliver(0, 2, 2);
+    expect(streams.take(0, 2)).not.toBeNull();
+    streams.dispose();
+  });
+
   it('closes frames of a superseded stream without crediting them', () => {
     const streams = new VideoStreams(1);
-    streams.start(0, '/p', [1], true);
+    streams.start(0, '/p', [1], true, false);
     const queued = deliver(0, 1);
-    streams.start(0, '/p', [9], true);
+    streams.start(0, '/p', [9], true, false);
     expect(queued.closed).toBe(true);
     const late = deliver(0, 1, 1);
     expect(late.closed).toBe(true);
@@ -111,7 +130,7 @@ describe('page video streams', () => {
 
   it('waits until a frame heads the queue with enough frames decoded', async () => {
     const streams = new VideoStreams(1);
-    streams.start(0, '/p', [4, 5, 6], true);
+    streams.start(0, '/p', [4, 5, 6], true, false);
     const ready = vi.fn();
     void streams.ready(0, 4, 2, new AbortController().signal).then(ready);
     deliver(0, 4);
@@ -126,18 +145,18 @@ describe('page video streams', () => {
   it('rejects a wait on failure, supersession, cancellation and its deadline', async () => {
     vi.useFakeTimers();
     const streams = new VideoStreams(1);
-    streams.start(0, '/p', [4], true);
+    streams.start(0, '/p', [4], true, false);
     const failed = streams.ready(0, 4, 1, new AbortController().signal);
     FakeWorker.last.report({ kind: 'failed', lane: 0, generation: 1, message: 'Decoding failed.' });
     await expect(failed).rejects.toThrow('Decoding failed.');
     expect(() => streams.take(0, 4)).toThrow('Decoding failed.');
 
-    streams.start(0, '/p', [4], true);
+    streams.start(0, '/p', [4], true, false);
     const superseded = streams.ready(0, 4, 1, new AbortController().signal);
     streams.stop(0);
     await expect(superseded).rejects.toMatchObject({ name: 'AbortError' });
 
-    streams.start(0, '/p', [4], true);
+    streams.start(0, '/p', [4], true, false);
     const controller = new AbortController();
     const aborted = streams.ready(0, 4, 1, controller.signal);
     controller.abort();
@@ -154,7 +173,7 @@ describe('page video streams', () => {
 
   it('fails every decoder when the worker itself fails', async () => {
     const streams = new VideoStreams(2);
-    streams.start(1, '/p', [0], true);
+    streams.start(1, '/p', [0], true, false);
     const waiting = streams.ready(1, 0, 1, new AbortController().signal);
     FakeWorker.last.onerror?.();
     await expect(waiting).rejects.toThrow('The video decoder worker failed.');
