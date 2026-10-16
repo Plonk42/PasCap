@@ -24,7 +24,7 @@ describe.skipIf(!enabled)('current-schema storage/archive integration · generat
     await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
   });
 
-  it('loads strict current-schema row gains/fourteen-channel points and preserves unsupported earlier versions', async () => {
+  it('loads strict current-schema row gains/fifteen-channel points and preserves unsupported earlier versions', async () => {
     const root = await temp();
     const store = new ProjectStore(root);
     const project = createProject('strict-current', 'Strict current document');
@@ -44,7 +44,7 @@ describe.skipIf(!enabled)('current-schema storage/archive integration · generat
     expect(saved.layers[0]!.colour).toMatchObject({ temperature: 0.75, tint: -0.65 });
     expect(saved.layers[0]!.keyframes).toEqual(project.layers[0]!.keyframes);
     for (const keyframe of saved.layers[0]!.keyframes) {
-      expect(Object.keys(keyframe.values)).toHaveLength(14);
+      expect(Object.keys(keyframe.values)).toHaveLength(15);
       expect(keyframe.values).not.toHaveProperty('speed');
       expect(keyframe.values).toHaveProperty('temperature');
       expect(keyframe.values).toHaveProperty('tint');

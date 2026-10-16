@@ -2,12 +2,14 @@
 
 The current strict schema requires twelve graded scalar bases in each video track's `colour`,
 including Temperature/Tint, Vibrance, Whites and Blacks (−1…1, neutral 0), plus `hdr` (0–1, neutral 0; a
-detail-stage look applied before grading, see [detail filters](design/DETAIL_FILTERS.md#hdr-look)),
+detail-stage look applied before grading, see [detail filters](design/DETAIL_FILTERS.md#hdr-look))
+and `localContrast` (−1…1, neutral 0; HDR's local-detail boost alone, see
+[local contrast](design/DETAIL_FILTERS.md#local-contrast)),
 all eight HSL bands and all four
-colour curves. Shared keyframes require fourteen nullable fields, each enabled one with its own Easing, and a
+colour curves. Shared keyframes require fifteen nullable fields, each enabled one with its own Easing, and a
 boolean `reset` (default keyframe), in control order:
 `opacity`, `temperature`, `tint`, `exposure`, `brightness`, `contrast`,
-`hue`, `saturation`, `vibrance`, `highlights`, `shadows`, `whites`, `blacks`, `hdr`. HSL/curves remain static; speed is
+`hue`, `saturation`, `vibrance`, `highlights`, `shadows`, `whites`, `blacks`, `hdr`, `localContrast`. HSL/curves remain static; speed is
 clip-only (constant or 1–256 source-frame keyframes), and every clip requires a boolean `reverse`.
 Reject/preserve documents and receipt snapshots with an earlier schema version; no load defaults,
 migrations, legacy acceptance or automatic deletion. CPU/reference/native/GPU
@@ -299,7 +301,7 @@ originals in `.pascap/browser-footage/synthetic-sources/` are outside that cache
 [fixture factory](../scripts/fixtures.ts) uses `preview-lab-v6` outside the browser
 cache and `preview-lab` inside it. These are project identifiers, not schema
 versions; newly generated documents must satisfy the strict current schema, including complete video track
-colour with Temperature/Tint/Vibrance/Whites/Blacks/HDR, all fourteen nullable channels and track Transform
+colour with Temperature/Tint/Vibrance/Whites/Blacks/HDR/Local contrast, all fifteen nullable channels and track Transform
 base/per-setting keyframes. Bin resets never imply
 a global-library fallback.
 Neither suite invokes real-source sample preparation or needs private footage/music.
@@ -391,7 +393,7 @@ The [measurement helper](../scripts/measure-preview.ts) accepts exactly **two
 forward 1× clips on one enabled, zero-origin contiguous video track with Opacity 1**, no music,
 extra tracks, Transform edits/keyframes or shared track keyframes
 (even neutral keyframes). `PASCAP_MEASURE_URL` selects that project.
-Measurement uses static scalar track Colour (including Temperature/Tint) with Shadows/Highlights/HDR 0, neutral
+Measurement uses static scalar track Colour (including Temperature/Tint) with Shadows/Highlights/HDR/Local contrast 0, neutral
 HSL and identity curves; metadata must identify the strict current-schema snapshot independently of the
 report format/identifier; historical reports and receipt snapshots stay untouched.
 `npm run measure -- --skip-playback --reference` skips playback benchmarking but
@@ -436,7 +438,7 @@ run on at most eight worker threads sharing those buffers, without copies. Two r
 three timeline representations bound concurrency, **not disk GB**;
 scratch grows with duration ([resource contract](LAYERS_AND_KEYFRAMES.md#inspector-and-resource-limits)).
 The static fast path requires one enabled, unanimated, zero-origin contiguous
-video track with Opacity 1 and Shadows/Highlights/HDR 0, neutral HSL/identity colour curves, an exactly neutral track Transform base without Transform keyframes
+video track with Opacity 1 and Shadows/Highlights/HDR/Local contrast 0, neutral HSL/identity colour curves, an exactly neutral track Transform base without Transform keyframes
 and neutral clip Sharpen/Clarity/Denoise;
 any Transform edit/keyframe (even neutral keyframes), [detail filter](design/DETAIL_FILTERS.md) or unsupported placement/coverage uses
 generalized composited export, regardless
@@ -485,7 +487,7 @@ Track options contains rename, Ripple, ordering and deletion, with visibility se
 
 Colour, Speed and Transform always show their capture diamonds while the section is expanded, Colour and Transform with adjacent per-setting **Previous/Next** buttons; there is no Animate toggle and no stored preference. Each expanded section has one keyframe line with the **number of keyframes**, one **Previous/Next** pair over the same set and **Reset**. The line is hidden while the section is collapsed; the title row and its help stay reachable. Rendering, retained keyframes and read-only constraints never depend on what is shown. The per-setting buttons remain alongside the stored enabled-setting chip arrows because not every setting is enabled at every shared keyframe.
 Each keyframe line has one Previous/Next pair: Colour visits the union of
-Opacity, twelve scalar and HDR keyframes; Speed visits all retained custom speed source
+Opacity, twelve scalar, HDR and Local contrast keyframes; Speed visits all retained custom speed source
 keyframes of the selected clip, including off-trim keyframes and original exclusive
 OUT, previewing the nearest mapped image through authoritative retiming. Transform
 visits all its stored track keyframes, including those after the duration, through
@@ -554,18 +556,18 @@ independent numeric IN/OUT pair (Enter/blur applies, Escape restores) is unchang
   rejection, cache exclusion and HTTP guards.
 - Keep **the strict current schema**: required project `bookmarks` (at most 1,000 unique ascending
   frames, editing aids only) and complete required video track `colour`, including
-  Temperature/Tint/Vibrance/Whites/Blacks/HDR and static HSL/curves; reject saved `clip.colour`
+  Temperature/Tint/Vibrance/Whites/Blacks/HDR/Local contrast and static HSL/curves; reject saved `clip.colour`
   and `clip.correction`. Grade sources once with evaluated track Colour, retaining
   two LUT buffers and existing raw/process budgets. Main Colour controls and keyframes
   have identical track scope and work empty. Required track `transform` (base and
   project-frame keyframes) has the same scope; reject saved `clip.spatial`. See
   [track appearance](design/ROW_APPEARANCE.md). Required static clip `detail` and boolean `reverse`,
-  required unique video/audio membership, all fourteen nullable
+  required unique video/audio membership, all fifteen nullable
   channels and per-track `ripple`, `transitions`, `openingFade`, `closingFade` and
   numeric `opacity` in 0–1. A new track starts at 1; a missing saved field is invalid.
   The channels are `opacity` (sole UI **Opacity**), `temperature`, `tint`,
   `exposure`, `brightness`, `contrast`, `hue`, `saturation`, `vibrance`, `highlights`, `shadows`,
-  `whites`, `blacks`, `hdr`.
+  `whites`, `blacks`, `hdr`, `localContrast`.
   Missing bases/channels are invalid; neutral values are creation values only.
   Track `opacity` is the sole valid stored value; reject saved `clip.opacity`
   and old `clipOpacity`/`layerOpacity` channels. No project-level

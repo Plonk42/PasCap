@@ -735,7 +735,7 @@ test('Q and W retain the mapped displayed frame, ripple dissolves and recover bo
   await expect(page.getByRole('button', { name: 'Redo', exact: true })).toBeEnabled();
 });
 
-test('I/O middle removal is transient then one edit, preserving absolute fourteen-channel row points, music and overlays', async ({
+test('I/O middle removal is transient then one edit, preserving absolute fifteen-channel row points, music and overlays', async ({
   page,
   request,
 }) => {

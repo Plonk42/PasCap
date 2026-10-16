@@ -2,9 +2,9 @@
 
 Current contract for [#123](https://github.com/Plonk42/PasCap/issues/123): three
 static, clip-owned detail filters applied identically in preview and native export,
-plus the keyframable track Colour **Shadows**, **Highlights** and **HDR** settings that
-share their kernel (see [local Shadows and Highlights](#local-shadows-and-highlights)
-and [HDR look](#hdr-look)).
+plus the keyframable track Colour **Shadows**, **Highlights**, **HDR** and **Local contrast**
+settings that share their kernel (see [local Shadows and Highlights](#local-shadows-and-highlights),
+[HDR look](#hdr-look) and [Local contrast](#local-contrast)).
 This describes the implementation contract, not hardware/long-run qualification,
 release approval or milestone closure. Usage is in [the user guide](../USER_GUIDE.md).
 
@@ -51,7 +51,7 @@ look scales with the image rather than the output resolution. Every tap is a bil
 sample clamped to the image content (never decode padding). Values are encoded
 BT.709 RGB in 0–1 and luma is $Y = 0.2126R + 0.7152G + 0.0722B$.
 
-For centre sample $c$ the stages run **Denoise → HDR → Shadows/Highlights → Clarity → Sharpen**:
+For centre sample $c$ the stages run **Denoise → HDR and Local contrast → Shadows/Highlights → Clarity → Sharpen**:
 
 1. **Fine ring** (only when Sharpen or Denoise is nonzero): the eight neighbours at
    unit offsets $(\pm1, 0), (0, \pm1), (\pm1, \pm1)$ with Gaussian spatial weights
@@ -69,21 +69,21 @@ For centre sample $c$ the stages run **Denoise → HDR → Shadows/Highlights �
    centre against the raw Gaussian keeps sharpening from re-amplifying removed noise.
 
 The output is $\mathrm{clamp}(D' + \text{clarity term} + \text{sharpen term}, 0, 1)$ per
-channel, where $D'$ is $D$ after [HDR](#hdr-look) and then
-[Shadows/Highlights](#local-shadows-and-highlights) ($D' = D$ when all three are 0).
+channel, where $D'$ is $D$ after [HDR](#hdr-look) and [Local contrast](#local-contrast), then
+[Shadows/Highlights](#local-shadows-and-highlights) ($D' = D$ when all four are 0).
 Clarity and Sharpen measure $y = Y(D)$ before them, so they never re-amplify the tone change.
 Luma detail is added equally to R, G and B, so it does not create colour
 fringes. At most 33 taps per source pixel without local tone (57 with it); Sharpen alone
-needs 9, Clarity alone 17, local tone alone 25: Shadows, Highlights and HDR share one base.
+needs 9, Clarity alone 17, local tone alone 25: Shadows, Highlights, HDR and Local contrast share one base.
 
-**Exact neutral settings are a bypass**: all three zero and track Shadows, Highlights and HDR
-exactly zero skip the kernel entirely, so neutral output is bit-identical to unfiltered
+**Exact neutral settings are a bypass**: all three zero and track Shadows, Highlights, HDR and
+Local contrast exactly zero skip the kernel entirely, so neutral output is bit-identical to unfiltered
 rendering in preview, static and composited export. Any nonzero value, however small, uses
 the kernel.
 
 ## Edge-aware base
 
-Shadows, Highlights and HDR act on a large-scale luma base $B$ around each pixel, so
+Shadows, Highlights, HDR and Local contrast act on a large-scale luma base $B$ around each pixel, so
 they treat an area as a whole: a dark slope is one shadow, but the dark gaps between
 sunlit grass are texture of a bright area. With $y = Y(D)$:
 
@@ -142,7 +142,8 @@ local detail, preserving true black, mid-grey and white on flat areas.
 - **Base**: the shared [edge-aware base](#edge-aware-base) $B$.
 - **Tone**: target luma $y' = B + h\,B(1-B)(1-2B) + (y-B)(1+h)$: the base keeps 0, ½
   and 1 while shadows rise and highlights fall (monotonic for $h \le 1$), and the local
-  residual $y-B$ is boosted up to ×2.
+  residual $y-B$ is boosted up to ×2. [Local contrast](#local-contrast) $c$ adds to that
+  factor: $(y-B)(1+h+c)$.
 - **Colour**: with $\Delta = y' - y$ and blend $b = \min(1, y/0.1)$, each channel becomes
   $D_i + \Delta + b\,(D_i\,y'/y - D_i - \Delta)$ (just $D_i + \Delta$ at $y = 0$): a
   hue-preserving luma ratio, fading to an additive change in deep shadows where the
@@ -151,13 +152,36 @@ local detail, preserving true black, mid-grey and white on flat areas.
 Any nonzero HDR base or HDR keyframe requires composited export (keyframes already do).
 In preview, HDR uses the detail program variants below; no texture, buffer, decoder,
 LUT or native process is added. The diagnostic two-clip reference and measurement
-helper reject HDR. **Track → Colour** lists HDR last, in its Effects group, with the common slider/exact
+helper reject HDR. **Track → Colour** lists HDR in its Effects group, above Local contrast, with the common slider/exact
 field, capture diamond and Previous/Next arrows, live slider preview and one Undo
 per release. The Original preview bypasses it with the rest of Colour.
 
+## Local contrast
+
+**Local contrast** is HDR's local-detail boost on its own, without HDR's shadow and
+highlight compression, so the two can be compared or combined; HDR itself is unchanged.
+
+- **Data**: required track `colour.localContrast` in **−1…1**, neutral 0 on new tracks, and
+  the fifteenth nullable track keyframe channel `localContrast`, after `hdr`. It is keyframed,
+  interpolated, held and reset like the other scalar Colour settings; default keyframes set
+  it to 0. Missing fields are invalid; earlier schema versions are rejected and preserved.
+- **Tone**: with HDR $h$ and Local contrast $c$, HDR's target becomes
+  $y' = B + h\,B(1-B)(1-2B) + (y-B)(1+h+c)$ on the shared [edge-aware base](#edge-aware-base)
+  $B$, applied with HDR's hue-preserving colour step. With HDR 0 it is $y' = y + c\,(y-B)$:
+  flat areas ($y = B$) never move, +1 doubles the residual like HDR 1's detail boost and
+  −1 flattens the area to its base.
+- **Not a grade stage**: like Shadows, Highlights and HDR, it is excluded from the per-pixel
+  grade, its LUTs and LUT identity. Any nonzero base or keyframe value requires composited
+  export; the diagnostic two-clip reference and measurement helper reject it. Preview adds
+  one `vec2 localContrast` uniform (one value per source) to the detail variants.
+
+**Track → Colour** lists Local contrast last, below HDR in its Effects group, with the common
+slider/exact field, capture diamond, Previous/Next arrows, Reset icon, live slider preview and
+one Undo per release. The Original preview bypasses it with the rest of Colour.
+
 ## Pipeline order
 
-Inverse track Transform mapping → **Detail, HDR, Shadows and Highlights** on source taps → track Colour grade (Temperature/Tint
+Inverse track Transform mapping → **Detail, HDR, Local contrast, Shadows and Highlights** on source taps → track Colour grade (Temperature/Tint
 … curves) → black fades → Opacity/spatial coverage and grouped source-over. Detail
 is not graded twice, does not change coverage and leaves the exact-neutral opaque
 letterbox path in place: with a neutral pose the filter runs at each fitted pixel
@@ -169,9 +193,10 @@ Colour and Detail, never geometry, Opacity, fades, stacking or music.
 The WebGL shader generates its tap tables from the same constants as the CPU kernel.
 The kernel lives only in three separate detail variants of the fixed programs, compiled
 when a loaded or edited project first contains nonneutral detail or nonzero track
-Shadows, Highlights or HDR, as a base or keyframe value (including a live slider draft),
-before any draw uses them; uniforms are one `vec4` and one `vec2` per source plus one
-`vec4` per source of (Shadows, Highlights, HDR, Exposure). Groups whose sources are all
+Shadows, Highlights, HDR or Local contrast, as a base or keyframe value (including a live slider draft),
+before any draw uses them; uniforms are one `vec4` and one `vec2` per source, one
+`vec4` per source of (Shadows, Highlights, HDR, Exposure) and one `vec2` of Local contrast
+(one value per source). Groups whose sources are all
 neutral with zero local tone (and the Original preview) keep the unchanged programs: software rasterizers can pay for
 texture taps behind an untaken uniform branch. No texture, framebuffer, decoder or
 pass is added; sources are still graded once.
@@ -189,7 +214,7 @@ reference and the measurement helper reject nonneutral detail.
 
 When a hardware GPU is available, export renders every track group frame whose CPU path
 is per-pixel heavy with the **same WebGL programs as the preview**: nonneutral detail,
-Shadows, Highlights or HDR, nonneutral HSL ranges or colour curves, or a nonneutral evaluated track Transform pose on
+Shadows, Highlights, HDR or Local contrast, nonneutral HSL ranges or colour curves, or a nonneutral evaluated track Transform pose on
 either source. It uses one headless Chrome page the service launches per
 export ([service side](../../src/server/gpu-compositor.ts),
 [page](../../src/gpu-worker/main.ts)). Neutral, scalar-colour and Opacity/fade-only
@@ -271,13 +296,13 @@ only that setting; **Reset detail** restores all three in one Undo step.
 ## Validation and parity gates
 
 - Unit: strict schema, neutral bypass, an independent transcription of the kernel
-  including the guided base, HDR, Shadows and Highlights (agreement to $10^{-12}$),
+  including the guided base, HDR, Local contrast, Shadows and Highlights (agreement to $10^{-12}$),
   edge/noise behaviour, HDR black/grey/white preservation, detail boost, hue preservation,
   no halo at a strong edge, Shadows/Highlights monotonic flat response, fixed black and
   mid-grey, tone choice after Exposure and untouched dark texture in a bright area, commands,
   export routing, one reused LUT while local tone animates and the
   native compositor at 720p and UHD (≤ 0.01/255 before RGBA16 rounding).
-- GPU (SwiftShader in CI): every setting, track HDR, Shadows/Highlights with Exposure and
+- GPU (SwiftShader in CI): every setting, track HDR, Local contrast, Shadows/Highlights with Exposure and
   rotated/scaled combinations against the
   CPU kernel on a 720p synthetic texture at 1280×720 and 3840×2160, max < 2/255 and
   mean < 0.6/255 per channel; each case must change the fixture by more than 8/255.

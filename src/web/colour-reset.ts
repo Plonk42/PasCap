@@ -14,7 +14,7 @@ export const COLOUR_GROUPS: readonly { name: string; settings: readonly Keyframe
   { name: 'Opacity', settings: ['opacity'] },
   { name: 'Colour', settings: ['temperature', 'tint', 'hue', 'saturation', 'vibrance'] },
   { name: 'Light', settings: ['exposure', 'brightness', 'contrast', 'highlights', 'shadows', 'whites', 'blacks'] },
-  { name: 'Effects', settings: ['hdr'] },
+  { name: 'Effects', settings: ['hdr', 'localContrast'] },
 ];
 
 const neutralValue = (setting: KeyframeSetting): number => (setting === 'opacity' ? 1 : NEUTRAL_COLOUR[setting]);

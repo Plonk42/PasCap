@@ -217,7 +217,7 @@ async function prepareSources(
     // Validate and choose the grading path once per source/frame, never per pixel.
     const evaluated = colourSchema.parse(source.sample.colour);
     // Local tone runs in the detail stage: keep it out of LUT identity so animation reuses one LUT.
-    const colour = { ...evaluated, shadows: 0, highlights: 0, hdr: 0 };
+    const colour = { ...evaluated, shadows: 0, highlights: 0, hdr: 0, localContrast: 0 };
     const exactColour = isNeutralAdvancedColour(colour) ? null : colour;
     const mapping = compileSpatialMapping(
       source.sample.spatial,

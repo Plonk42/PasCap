@@ -25,7 +25,7 @@ describe('normalized linear Temperature and Tint', () => {
     expect(gradePixel(input, settings)).toBe(input);
     expect(compilePixelGrade(settings)(input)).toBe(input);
     expect(createLayer('empty', 'Empty').colour).toEqual(settings);
-    expect(Object.keys(EMPTY_KEY_VALUES)).toHaveLength(14);
+    expect(Object.keys(EMPTY_KEY_VALUES)).toHaveLength(15);
     const project = createProject('strict', 'Strict');
     expect(project.schemaVersion).toBe(PROJECT_SCHEMA_VERSION);
     for (const schemaVersion of EARLIER_SCHEMA_VERSIONS)

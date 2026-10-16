@@ -9,7 +9,7 @@ Static track HSL and master/RGB colour curves follow scalar grading and precede
 black fades/coverage. They remain active with scalar keyframes, add no animation
 channels and are unrelated to speed curves. The Original preview bypasses all Colour
 without changing retiming, geometry, Opacity or music. Required data/resources:
-[HSL_AND_CURVES.md](design/HSL_AND_CURVES.md). The keyable track HDR look is
+[HSL_AND_CURVES.md](design/HSL_AND_CURVES.md). The keyable track HDR look and Local contrast are
 likewise appearance-only; see [detail filters](design/DETAIL_FILTERS.md#hdr-look).
 
 ## Clip speed
@@ -126,7 +126,7 @@ with $C = \sum_i G_i b_i o_i w_i m_i$ and $A = \sum_i o_i w_i m_i$. Source-over 
 $\mathrm{result} = C + \mathrm{lower}(1 - A)$, with no track multiplier; black fades
 change RGB without reducing coverage. Any shared track keyframe
 requires the composited export path; any nonneutral track Transform base or Transform
-keyframe (even neutral keyframes) does too, as does nonzero track HDR or any clip [detail filter](design/DETAIL_FILTERS.md). Exact neutral poses retain opaque black letterboxing
+keyframe (even neutral keyframes) does too, as does nonzero track HDR, Local contrast or any clip [detail filter](design/DETAIL_FILTERS.md). Exact neutral poses retain opaque black letterboxing
 after grading; nonneutral uncovered pixels reveal lower footage. The static chunk
 plan cannot silently omit these edits.
 Opacity is composition coverage, not part of the SDR RGB grade.
@@ -450,11 +450,11 @@ cancellation cleans only owned scratch/partials and preserves completed outputs.
 ## Versioning
 
 The current project schema requires explicit `media.videoIds` and `media.audioIds` arrays,
-unique and limited to 10,000 IDs each, plus complete video track colour with Temperature/Tint/Vibrance/Whites/Blacks/HDR
+unique and limited to 10,000 IDs each, plus complete video track colour with Temperature/Tint/Vibrance/Whites/Blacks/HDR/Local contrast
 and static HSL/curves, clip constant or 1–256-keyframe custom-curve
 speed and a boolean `reverse`, required video track `transform: { base, keyframes }` with eight-value base and
 0–256 project-frame keyframes with required per-setting easing and `reset`, track
-keyframe arrays with all fourteen nullable value fields, placement and music
+keyframe arrays with all fifteen nullable value fields, placement and music
 source OUT. `music` is a required 0–8 array with unique required music track IDs and
 all per-track fields above; `[]` is the sole no-music representation, not null
 or a compatibility default. Every video track also requires `ripple`, `transitions`, `openingFade` and
@@ -464,7 +464,7 @@ no special first-track identity. Video tracks display and composite in their sav
 The sole track `opacity` channel overrides the track's saved `opacity` on every clip,
 including both dissolve sources; otherwise all use the saved track value.
 Required nullable channels are `opacity`, the twelve scalar colour settings
-(including `temperature`, `tint`, `vibrance`, `whites` and `blacks`) and `hdr`. Missing saved bases/channels are invalid, not defaulted.
+(including `temperature`, `tint`, `vibrance`, `whites` and `blacks`), `hdr` and `localContrast`. Missing saved bases/channels are invalid, not defaulted.
 Track `opacity` is valid and required; saved `clip.opacity` and old
 `clipOpacity`/`layerOpacity` channels are rejected, not defaulted.
 New projects have empty video/music bins. Standalone audio imports belong

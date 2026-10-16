@@ -71,7 +71,7 @@ export const DETAIL_CLARITY_TAPS = [5, 10].flatMap((radius) =>
 );
 const FINE_WEIGHT = 1 + DETAIL_FINE_TAPS.reduce((sum, tap) => sum + tap.weight, 0);
 
-/** Edge-aware large-scale luma base shared by HDR, Shadows and Highlights; see docs/design/DETAIL_FILTERS.md. */
+/** Edge-aware large-scale luma base shared by the local tone settings; see docs/design/DETAIL_FILTERS.md. */
 export const TONE_BASE_SPATIAL_SIGMA = 16;
 export const TONE_BASE_RANGE_SIGMA = 0.12;
 export const TONE_BASE_RANGE_FACTOR = 1 / (2 * TONE_BASE_RANGE_SIGMA * TONE_BASE_RANGE_SIGMA);
@@ -115,11 +115,14 @@ export interface LocalTone {
   shadows: number;
   highlights: number;
   hdr: number;
+  /** Boosts (or, below 0, flattens) the residual around the base, like HDR's detail part alone. */
+  localContrast: number;
   /** Shadows and Highlights select tones after Exposure, which itself stays in the grade. */
   exposure: number;
 }
 export function localTone(colour: Pick<ColourSettings, LocalToneSetting | 'exposure'>): LocalTone {
-  return { shadows: colour.shadows, highlights: colour.highlights, hdr: colour.hdr, exposure: colour.exposure };
+  const { shadows, highlights, hdr, localContrast, exposure } = colour;
+  return { shadows, highlights, hdr, localContrast, exposure };
 }
 
 /** Shadows/Highlights pivot: linear mid-grey, in stops below white. */
@@ -171,7 +174,8 @@ export function denoiseRangeFactor(denoise: number): number {
 }
 
 /**
- * Denoise → HDR → Shadows/Highlights → Clarity → Sharpen on source pixels, before grading. Null when neutral.
+ * Denoise → HDR and Local contrast → Shadows/Highlights → Clarity → Sharpen on source pixels, before grading.
+ * Null when neutral.
  * `aspect` is the original width / height, so radii follow the image height.
  * `tone` holds the evaluated track Colour local tone settings at this project frame.
  */
@@ -181,14 +185,15 @@ export function compileDetail(
   tone: Readonly<LocalTone>,
 ): DetailFilter | null {
   const { sharpen, clarity, denoise } = detailSchema.parse(settings);
-  const { shadows, highlights, hdr, exposure } = tone;
+  const { shadows, highlights, hdr, localContrast, exposure } = tone;
   if (!Number.isFinite(hdr) || hdr < 0 || hdr > 1) throw new Error('HDR must be between 0 and 1.');
-  for (const value of [shadows, highlights])
+  for (const value of [shadows, highlights, localContrast])
     if (!Number.isFinite(value) || value < -1 || value > 1)
-      throw new Error('Shadows and Highlights must be between -1 and 1.');
+      throw new Error('Shadows, Highlights and Local contrast must be between -1 and 1.');
   if (!Number.isFinite(exposure)) throw new Error('Exposure must be finite.');
   const toneGain = shadows !== 0 || highlights !== 0;
-  if (isNeutralDetail({ sharpen, clarity, denoise }) && hdr === 0 && !toneGain) return null;
+  const residual = hdr > 0 || localContrast !== 0;
+  if (isNeutralDetail({ sharpen, clarity, denoise }) && !residual && !toneGain) return null;
   if (!Number.isFinite(aspect) || aspect <= 0) throw new Error('Detail filters need a positive image aspect.');
   const stepV = 1 / DETAIL_REFERENCE_LINES;
   const stepU = stepV / aspect;
@@ -233,7 +238,7 @@ export function compileDetail(
     return sum / (DETAIL_CLARITY_TAPS.length + 1);
   };
   const compression = HDR_COMPRESSION * hdr;
-  const detailGain = 1 + HDR_DETAIL_GAIN * hdr;
+  const detailGain = 1 + HDR_DETAIL_GAIN * hdr + localContrast;
   // Range weights compare taps with a small local mean rather than the pixel itself, so a dark
   // pixel within bright texture takes its surroundings' base, while large edges still stop it.
   const levels = new Float64Array(TONE_BASE_TAPS.length);
@@ -284,9 +289,9 @@ export function compileDetail(
         delta += CLARITY_GAIN * clarity * midtones * (base - localMean(sample, u, v));
       }
       if (sharpen > 0) delta += SHARPEN_GAIN * sharpen * (base - luma(gaussian));
-      if (hdr > 0 || toneGain) {
+      if (residual || toneGain) {
         const smooth = edgeAwareBase(sample, u, v, base);
-        if (hdr > 0) toneMap(base, smooth);
+        if (residual) toneMap(base, smooth);
         if (toneGain) {
           // A linear-light gain keeps local contrast and colour ratios, and black at black.
           const gain = 2 ** localToneStops(smooth, tone);

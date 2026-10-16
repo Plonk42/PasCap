@@ -67,7 +67,7 @@ function bilinear(u: number, t: number, out: Float64Array): void {
 function clip(
   detail: DetailSettings,
   pose: Partial<SpatialPose> = {},
-  tone: Partial<Pick<ColourSettings, 'shadows' | 'highlights' | 'hdr' | 'exposure'>> = {},
+  tone: Partial<Pick<ColourSettings, 'shadows' | 'highlights' | 'hdr' | 'localContrast' | 'exposure'>> = {},
 ): CompositeClip {
   return {
     slot: 0,
@@ -123,12 +123,13 @@ const cases: { name: string; source: CompositeClip }[] = [
     name: 'track Shadows and Highlights',
     source: clip({ sharpen: 0, clarity: 0, denoise: 0 }, {}, { shadows: 0.9, highlights: -0.8 }),
   },
+  { name: 'track Local contrast', source: clip({ sharpen: 0, clarity: 0, denoise: 0 }, {}, { localContrast: 1 }) },
   {
     name: 'track Shadows, Highlights, HDR and Exposure with all three on a rotated, scaled clip',
     source: clip(
       { sharpen: 0.5, clarity: 0.4, denoise: 0.5 },
       { scale: 0.83, rotation: 17 },
-      { shadows: -0.7, highlights: 0.6, hdr: 0.4, exposure: -0.5 },
+      { shadows: -0.7, highlights: 0.6, hdr: 0.4, localContrast: -0.4, exposure: -0.5 },
     ),
   },
 ];
@@ -217,7 +218,7 @@ for (const [width, height] of [
     for (const item of cases) {
       const unfiltered = {
         ...item.source,
-        settings: { ...item.source.settings, shadows: 0, highlights: 0, hdr: 0 },
+        settings: { ...item.source.settings, shadows: 0, highlights: 0, hdr: 0, localContrast: 0 },
         detail: { sharpen: 0, clarity: 0, denoise: 0 },
       };
       const change = Math.max(

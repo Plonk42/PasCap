@@ -389,7 +389,7 @@ for (const viewport of [
       await unchanged(page, document);
     });
 
-    test('Colour header visits Opacity, all twelve scalar settings and HDR and retains main arrows', async ({
+    test('Colour header visits Opacity, all twelve scalar settings, HDR and Local contrast and retains main arrows', async ({
       page,
     }) => {
       const document = await fixture(page, (document) => {
@@ -411,7 +411,7 @@ for (const viewport of [
       const next = navigation(page, 'Colour', 'Next');
       const previous = navigation(page, 'Colour', 'Previous');
       await expect(previous).toBeDisabled();
-      for (const frame of [5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65]) {
+      for (const frame of [5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70]) {
         await next.click();
         await previewAt(page, document, frame);
         await expect(layerKeyframes(page, TRACK).locator('.keyframe-row[aria-current="true"]')).toHaveAttribute(
@@ -421,7 +421,7 @@ for (const viewport of [
       }
       await expect(next).toBeDisabled();
       await previous.click();
-      await previewAt(page, document, 60);
+      await previewAt(page, document, 65);
       await unchanged(page, document);
     });
 
