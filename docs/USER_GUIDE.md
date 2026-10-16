@@ -124,12 +124,14 @@ Scrubbing or changing the range pauses first. Closing, switching sources/project
 or leaving the Source tab cancels playback. Source playback does not move the
 timeline or music and does not create Undo steps or saves. Failures expose Retry.
 
-**Find smooth part**, below the strip, looks for the steadiest part of a drone
-recording: it measures the camera motion of the prepared proxy once (a background job
-in Activity) and marks the longest stretch without brutal angle or speed changes with
-a cyan bar under the strip. **Use** sets IN and OUT to it. Move **Tolerance** left for
-only very steady footage, right to accept more movement. Straight-ahead speed changes
-barely move the picture, so check the start of forward flights yourself.
+Under the strip, the **motion timeline** marks the steadiest part of a drone recording,
+measured when its proxy was prepared: the red area is roughness (sudden angle or speed
+changes), the grey line camera motion and the blue band the suggested smooth part.
+**Use** (under the play button) sets IN and OUT to it. Drag the handle at the right end
+of the dashed tolerance line down for only very
+steady footage, up to accept more movement. Recordings prepared earlier offer **Find
+smooth part** to measure them once. Straight-ahead speed changes barely move the
+picture, so check the start of forward flights yourself.
 
 Choose **Add clip** (it shows the applied range length, for example **Add clip 3.00 s**),
 mark another range, then add again: each addition creates an independent clip and

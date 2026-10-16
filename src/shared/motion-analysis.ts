@@ -68,11 +68,15 @@ function filled(values: readonly (number | null)[]): number[] {
   });
 }
 
-/**
- * How fast the camera motion changes at each frame, in % of image width per s². Zoom and
- * rotation count as the displacement they cause 100 analysis pixels from the centre.
- */
-export function motionRoughness(analysis: MotionAnalysis, fps: number): number[] {
+export interface MotionProfile {
+  /** Camera motion per frame, in % of image width per second. */
+  speed: number[];
+  /** How fast that motion changes, in % of image width per s². */
+  roughness: number[];
+}
+
+/** Zoom and rotation count as the displacement they cause 100 analysis pixels from the centre. */
+export function motionProfile(analysis: MotionAnalysis, fps: number): MotionProfile {
   const perSecond = (100 / MOTION_WIDTH) * fps;
   const components = [
     filled(analysis.tx),
@@ -93,7 +97,14 @@ export function motionRoughness(analysis: MotionAnalysis, fps: number): number[]
     if (a === b) return 0;
     return Math.hypot(...components.map((values) => values[b]! - values[a]!)) / ((b - a) / fps);
   });
-  return gaussian(acceleration, 8);
+  return {
+    speed: Array.from({ length: n }, (_, t) => Math.hypot(...components.map((values) => values[t]!))),
+    roughness: gaussian(acceleration, 8),
+  };
+}
+
+export function motionRoughness(analysis: MotionAnalysis, fps: number): number[] {
+  return motionProfile(analysis, fps).roughness;
 }
 
 function steadyMask(roughness: readonly number[], tolerance: number, gap: number): boolean[] {

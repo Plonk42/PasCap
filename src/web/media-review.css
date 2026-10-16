@@ -301,18 +301,191 @@
   pointer-events: none;
 }
 
-/* Suggested smooth parts sit just under the strip, clear of the thumbnails and handles. */
-.source-range-suggestion {
+/* Image roughness and camera motion, aligned under the range strip; Use sits under Play. */
+.smooth-use-button {
+  flex: 0 0 36px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  height: 40px;
+  padding: 0;
+  border: 1px solid #7fd3e6;
+  border-radius: 6px;
+  background: #18292d;
+  color: #e6f6fa;
+  font-size: 9px;
+  cursor: pointer;
+}
+
+.smooth-use-button:is(:hover, :focus-visible):not(:disabled) {
+  background: #22404a;
+}
+
+.smooth-use-button:disabled {
+  border-color: var(--line);
+  background: transparent;
+  color: var(--muted);
+  cursor: default;
+}
+
+.smooth-use-button[data-applied]:disabled {
+  border-color: #7fd3e6;
+  color: #7fd3e6;
+  opacity: 1;
+}
+
+.source-motion-lane {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  margin-inline: 18px;
+}
+
+.source-motion {
+  position: relative;
+  height: 40px;
+  border-radius: 4px;
+  background: #141e17;
+  cursor: pointer;
+  touch-action: none;
+}
+
+.source-motion[data-disabled] {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.source-motion svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.source-motion-band {
+  fill: #7fd3e633;
+}
+
+.source-motion-band.alternative {
+  fill: #7fd3e614;
+}
+
+.source-motion-roughness {
+  fill: #e8735a59;
+  stroke: #e8735a;
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.source-motion-speed {
+  fill: none;
+  stroke: #c9d4e0;
+  stroke-width: 1.2;
+  vector-effect: non-scaling-stroke;
+  opacity: 0.75;
+}
+
+.source-motion-tolerance {
+  stroke: #e8735a;
+  stroke-width: 1;
+  stroke-dasharray: 4 3;
+  vector-effect: non-scaling-stroke;
+}
+
+.source-motion-legend {
   position: absolute;
-  bottom: -6px;
+  top: 2px;
+  left: 5px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 9px;
+  color: var(--muted);
+  pointer-events: none;
+  text-shadow: 0 0 3px #0a120c;
+}
+
+.source-motion-legend i {
+  width: 10px;
   height: 3px;
   border-radius: 2px;
-  background: #7fd3e6;
+}
+
+.source-motion-legend i.roughness {
+  background: #e8735a;
+}
+
+.source-motion-legend i.speed {
+  margin-left: 6px;
+  background: #c9d4e0;
+}
+
+.source-motion-head {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+  background: #eef8eecc;
   pointer-events: none;
 }
 
-.source-range-suggestion.alternative {
-  opacity: 0.4;
+.source-motion-summary {
+  position: absolute;
+  top: 2px;
+  right: 5px;
+  font-size: 9px;
+  color: #d6eef4;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+  text-shadow: 0 0 3px #0a120c;
+}
+
+/* Sits in the strip's right handle margin, its thumb on the end of the dashed line. */
+.source-motion-tolerance-input {
+  position: absolute;
+  right: -16px;
+  width: 14px;
+  margin: 0;
+  padding: 0;
+  writing-mode: vertical-lr;
+  direction: rtl;
+  appearance: none;
+  background: transparent;
+  cursor: ns-resize;
+}
+
+.source-motion-tolerance-input::-webkit-slider-runnable-track {
+  width: 2px;
+  background: #e8735a40;
+}
+
+.source-motion-tolerance-input::-moz-range-track {
+  width: 2px;
+  background: #e8735a40;
+}
+
+.source-motion-tolerance-input::-webkit-slider-thumb {
+  appearance: none;
+  width: 12px;
+  height: 6px;
+  margin-left: -5px;
+  border-radius: 2px;
+  background: #e8735a;
+}
+
+.source-motion-tolerance-input::-moz-range-thumb {
+  width: 12px;
+  height: 6px;
+  border: 0;
+  border-radius: 2px;
+  background: #e8735a;
+}
+
+.source-motion-tolerance-input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .smooth-range-row {
@@ -325,33 +498,8 @@
   color: var(--muted);
 }
 
-.smooth-range-row strong {
-  color: #d6eef4;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-}
-
-.smooth-range-swatch {
-  width: 12px;
-  height: 3px;
-  border-radius: 2px;
-  background: #7fd3e6;
-}
-
 .smooth-range-error {
   color: var(--error);
-}
-
-.smooth-range-tolerance {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-left: auto;
-}
-
-.smooth-range-tolerance input {
-  width: 96px;
-  accent-color: #7fd3e6;
 }
 
 .source-playhead-input {
