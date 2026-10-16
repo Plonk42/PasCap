@@ -121,6 +121,12 @@ describe('authoritative colour transform', () => {
     expect(chroma(gradePixel(strong, boosted)) - chroma(strong)).toBeLessThan(0.01);
     expect(chroma(gradePixel(strong, saturated)) - chroma(strong)).toBeGreaterThan(0.02);
     expect(chroma(gradePixel(muted, boosted))).toBeGreaterThan(chroma(muted) + 0.08);
+    // The +2 maximum roughly doubles a muted colour's chroma, never a fully saturated one's.
+    const strongest = { ...NEUTRAL_COLOUR, vibrance: 2 };
+    expect(chroma(gradePixel(muted, strongest))).toBeGreaterThan(chroma(gradePixel(muted, boosted)) + 0.08);
+    expect(gradePixel([1, 0, 0], strongest)).toEqual([1, 0, 0]);
+    for (const invalid of [-1.01, 2.01])
+      expect(colourSchema.safeParse({ ...NEUTRAL_COLOUR, vibrance: invalid }).success).toBe(false);
   });
   it('clips gamut and rejects incomplete/out-of-range/non-finite settings', () => {
     const result = gradePixel([1, 0.8, 0], {

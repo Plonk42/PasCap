@@ -1,6 +1,6 @@
 # Speed and audio contract
 
-Twelve video track-owned scalar Colour controls include Temperature/Tint (−1…1, neutral 0),
+Twelve video track-owned scalar Colour controls include Temperature/Tint (−2…2 and −1…1, neutral 0),
 whose normalized linear gains precede Exposure. Positive Temperature warms;
 positive Tint adds magenta; nonzero settings intentionally colour greys. They
 can be keyed independently in video track animation, which is appearance-only and

@@ -7,7 +7,7 @@ with shared project-time keyframes. Every clip on the same track shares Colour w
 without keyframes; different treatments require different tracks. Moving adopts destination
 appearance; trim/split/cut/duplicate preserve track bases and absolute keyframes.
 Main Colour edits work on empty tracks. There is no clip colour/correction field.
-Temperature and Tint are track-owned −1…1 scalars, neutral 0, with independent
+Temperature (−2…2) and Tint (−1…1) are track-owned scalars, neutral 0, with independent
 explicit keyframe capture. Positive Temperature warms; positive Tint adds magenta.
 Their normalized linear gains precede Exposure and intentionally colour greys.
 HSL/curves remain static. See [Temperature and Tint](design/TEMPERATURE_AND_TINT.md).

@@ -60,11 +60,11 @@ and a default-keyframe `reset` flag; saved `clip.spatial` is rejected. Like Colo
 Transform evaluates at absolute project time on every source of the track and is
 never copied or shifted by clip edits; it is separate from the fifteen shared track
 channels, and the sole track Opacity contract is unchanged.
-Temperature and Tint are required normalized −1…1 track bases, neutral 0, with
+Temperature and Tint are required normalized track bases (−2…2 and −1…1), neutral 0, with
 independently enabled settings at shared keyframes. Positive Temperature warms; positive Tint
 adds magenta. Normalized linear gains precede Exposure; nonzero values
 intentionally colour greys, with neutral-white luminance preservation before
-clipping only. Required track Vibrance (−1…1, neutral 0) is a keyable chroma scale
+clipping only. Required track Vibrance (−1…2, neutral 0) is a keyable chroma scale
 after Saturation, weighted towards muted colours. Required track Whites (−1…1, neutral 0) is a keyable tone stage that
 moves the white point; required track Blacks (−1…1, neutral 0) is the keyable stage after
 it that moves the black point. HSL/curves remain required static settings, not extra channels.

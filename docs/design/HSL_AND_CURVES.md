@@ -6,7 +6,7 @@ can be keyed independently in video track animation. HSL ranges and colour curve
 **static video track settings**, including on empty tracks; the fifteen nullable keyframe
 channels are Opacity, those twelve scalars, HDR and Local contrast (detail-stage settings applied
 before grading; see [detail filters](DETAIL_FILTERS.md#hdr-look)). Animation does not suppress
-or replace advanced static settings. Temperature/Tint use normalized −1…1,
+or replace advanced static settings. Temperature (−2…2) and Tint (−1…1) use normalized values,
 neutral 0, and linear gains before Exposure; see
 [their exact contract](TEMPERATURE_AND_TINT.md).
 

@@ -69,13 +69,13 @@ and technical paths stay unchanged; this glossary does not change the project sc
 - **Reverse** is a clip's playback direction (Clip → Speed checkbox), never a negative
   speed. Edits name the result as displayed: **Trim start** of a reversed clip trims
   its source OUT.
-- **Temperature / Tint** are track-owned normalized −1…1 scalar Colour controls,
+- **Temperature / Tint** are track-owned normalized scalar Colour controls (Temperature −2…2, Tint −1…1),
   neutral 0: positive Temperature warms, positive Tint adds magenta. They precede
   Exposure, are independently animatable and work on empty tracks, with the standard
   slider/exact-field/reset pattern, capture diamonds,
   adjacent per-setting Previous/Next buttons, section navigation and stored-setting
   chip arrows. No Kelvin or AWB label.
-- **Vibrance** is a track-owned −1…1 scalar Colour control, neutral 0, last in the **Colour**
+- **Vibrance** is a track-owned −1…2 scalar Colour control, neutral 0, last in the **Colour**
   group after Saturation: it scales saturation more for muted colours than strong ones
   (greys and fully saturated colours stay unchanged); a plain slider track, no gradient.
 - **Whites** is a track-owned −1…1 scalar Colour control, neutral 0, after Shadows in the **Light**
