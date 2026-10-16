@@ -24,7 +24,7 @@ See [track appearance](design/ROW_APPEARANCE.md) for ownership, UI and strict st
 - Inverse BT.709: `L = V / 4.5` below `4.5 β`, otherwise
   `L = ((V + α − 1) / α)^(1 / 0.45)`, where
   `α = 1.09929682680944`, `β = 0.018053968510807` (continuous join).
-- Temperature $T$ and Tint $I$: normalized −1…1, neutral 0. Raw linear gains are
+- Temperature $T$ and Tint $I$: normalized −2…2 and −1…1, neutral 0. Raw linear gains are
   $q=(2^{T/2+I/4},2^{-I/4},2^{-T/2+I/4})$; normalize with
   $N=0.2126q_R+0.7152q_G+0.0722q_B$ and apply $L'=L\odot(q/N)$ before Exposure,
   without clipping intermediate gains/RGB. Positive Temperature warms; positive
@@ -63,7 +63,7 @@ See [track appearance](design/ROW_APPEARANCE.md) for ownership, UI and strict st
 - Recompute unclipped linear luminance. Define
   `Cb = (B − Y) / 1.8556`, `Cr = (R − Y) / 1.5748`.
   Rotate `(Cb, Cr)` by hue in radians, then multiply by
-  `saturation × (1 + v × (1 − c)²)`. Vibrance `v` is −1…1, neutral 0; `c = (max − min) / max`
+  `saturation × (1 + v × (1 − c))`. Vibrance `v` is −1…2, neutral 0; `c = (max − min) / max`
   of the linear RGB after the tone stages (0 for grey, 1 for a fully saturated colour).
   Vibrance changes muted colours most and leaves fully saturated colours unchanged, so
   raising it does not push strong colours out of gamut; greys stay grey. There is no

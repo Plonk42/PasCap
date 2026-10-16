@@ -7,7 +7,7 @@ behaviour and required validation, not completed tests or hardware qualification
 
 ## Ownership, data and controls
 
-Every video track requires finite `colour.temperature` and `colour.tint` in **−1…1**;
+Every video track requires finite `colour.temperature` in **−2…2** and `colour.tint` in **−1…1**;
 new tracks start at **0**, neutral. Positive Temperature warms (red relative to
 blue), negative cools; positive Tint adds magenta (red/blue relative to green),
 negative adds green. Nonzero settings intentionally colour greys.

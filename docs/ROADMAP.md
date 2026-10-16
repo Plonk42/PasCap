@@ -31,7 +31,7 @@ unkeyed colour settings are track-owned. Shared keyframes have fifteen nullable 
 `vibrance`, `whites` and `blacks`), `hdr` and `localContrast`. Saved `clip.opacity` and old
 `clipOpacity`/`layerOpacity` channels are rejected; track `opacity` is required and
 valid. Track-owned [Temperature and Tint](design/TEMPERATURE_AND_TINT.md) use
-normalized −1…1, neutral 0, with independent animation. Positive Temperature
+normalized −2…2 and −1…1, neutral 0, with independent animation. Positive Temperature
 warms; positive Tint adds magenta. The shared normalized linear-gain formula runs
 before Exposure and intentionally colours greys; neutral-white luminance is
 preserved before clipping only. Static track

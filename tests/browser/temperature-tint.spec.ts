@@ -27,8 +27,8 @@ async function inspectorTab(page: Page, name: 'Clip' | 'Track keyframes'): Promi
 }
 
 const channels = [
-  { setting: 'temperature', label: 'Temperature', precise: 0.123456789 },
-  { setting: 'tint', label: 'Tint', precise: -0.234567891 },
+  { setting: 'temperature', label: 'Temperature', precise: 0.123456789, limit: 2 },
+  { setting: 'tint', label: 'Tint', precise: -0.234567891, limit: 1 },
 ] as const;
 type Setting = (typeof channels)[number]['setting'];
 type Cancellation = 'Escape' | 'pointercancel' | 'lostcapture' | 'windowblur';
@@ -270,15 +270,15 @@ test('empty-row native controls preserve exact precision, invalid drafts, indivi
   await expect(page.locator('[role="tabpanel"]:not([hidden]) .selected-clip-name')).toContainText(
     'Applies to every clip added to this track',
   );
-  for (const { setting, label, precise } of channels) {
+  for (const { setting, label, precise, limit } of channels) {
     const { slider, exact, widget } = controls(page, label);
     await expect(slider).toBeEnabled();
     await expect(exact).toBeEnabled();
     await expect(exact).toHaveValue('0');
     await expect(slider).toHaveAttribute('type', 'range');
     for (const field of [slider, exact]) {
-      await expect(field).toHaveAttribute('min', '-1');
-      await expect(field).toHaveAttribute('max', '1');
+      await expect(field).toHaveAttribute('min', String(-limit));
+      await expect(field).toHaveAttribute('max', String(limit));
     }
     await expect(widget.locator('input')).toHaveCount(2);
     await expect(widget.locator('output')).toHaveCount(0);
@@ -314,13 +314,17 @@ test('empty-row native controls preserve exact precision, invalid drafts, indivi
     await expect(exact).toHaveValue(String(precise));
 
     const preciseState = await checkpoint(page);
-    for (const invalid of ['', '-1.0001', '1.0001']) {
+    for (const invalid of ['', `-${limit}.0001`, `${limit}.0001`]) {
       await exact.fill(invalid);
       await exact.press('Enter');
       await expect(exact).toHaveValue(invalid);
       await expect(exact).toHaveAttribute('aria-invalid', 'true');
       await expect(exact.locator('..').getByRole('alert')).toContainText(
-        invalid === '' ? 'Enter a number' : invalid.startsWith('-') ? 'Enter -1 or greater.' : 'Enter 1 or less.',
+        invalid === ''
+          ? 'Enter a number'
+          : invalid.startsWith('-')
+            ? `Enter -${limit} or greater.`
+            : `Enter ${limit} or less.`,
       );
       await exact.press('Tab');
       await unchanged(page, preciseState);
@@ -522,7 +526,7 @@ test('main and off-duration stored resets edit only existing participants; exact
   await expect(row.getByRole('slider', { name: 'Exposure keyframe value 180', exact: true })).toHaveCount(0);
   await expect(controls(row, 'Opacity keyframe value 180').widget).toHaveAttribute('data-tone', 'opacity');
   await expect(controls(page, 'Exposure').widget).not.toHaveAttribute('data-tone');
-  for (const { setting, label, precise } of channels) {
+  for (const { setting, label, precise, limit } of channels) {
     const name = `${label} keyframe value 180`;
     const { slider, exact, widget } = controls(row, name);
     await expect(widget).toHaveAttribute('data-tone', setting);
@@ -538,7 +542,7 @@ test('main and off-duration stored resets edit only existing participants; exact
     await editAndUndo(page, before, edited(before.document, setting, precise, 'video-1', 180));
     await expect(exact).toHaveValue(initial);
     const restored = await checkpoint(page);
-    for (const invalid of ['', '-1.01', '1.01']) {
+    for (const invalid of ['', `-${limit}.01`, `${limit}.01`]) {
       await exact.fill(invalid);
       await exact.press('Enter');
       await expect(exact).toHaveValue(invalid);

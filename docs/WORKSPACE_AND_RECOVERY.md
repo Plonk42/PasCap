@@ -19,7 +19,7 @@ on empty tracks. Static and keyed Colour share this track ownership on every cli
 Different treatments require different tracks; there is no per-clip grade or scope
 toggle. Sources are graded once; the Original preview neutralizes track Colour and clip Detail only.
 See [track appearance](design/ROW_APPEARANCE.md) for reset, context and storage details.
-**Temperature / Tint** precede Exposure, use normalized −1…1 values and Reset to
+**Temperature / Tint** precede Exposure, use normalized values (Temperature −2…2, Tint −1…1) and Reset to
 0, and retain native sliders/exact fields in main and stored editors. Main
 diamonds and adjacent per-setting Previous/Next buttons are always visible, alongside section-header navigation and existing stored enabled-setting chip arrows.
 Positive Temperature warms; positive Tint adds magenta.
