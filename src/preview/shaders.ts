@@ -105,9 +105,9 @@ float toneBase(sampler2D source, vec2 coordinate, float y, vec2 stride) {
   }
   return sum / total;
 }
-vec3 hdrTone(vec3 rgb, float y, float base, float amount) {
+vec3 hdrTone(vec3 rgb, float y, float base, float amount, float contrast) {
   float target = base + ${glslFloat(HDR_COMPRESSION)} * amount * base * (1.0 - base) * (1.0 - 2.0 * base) +
-                 (y - base) * (1.0 + ${glslFloat(HDR_DETAIL_GAIN)} * amount);
+                 (y - base) * (1.0 + ${glslFloat(HDR_DETAIL_GAIN)} * amount + contrast);
   float lift = target - y;
   if (y <= 0.0) return rgb + lift;
   float blend = min(1.0, y / ${glslFloat(HDR_RATIO_FLOOR)});
@@ -126,7 +126,8 @@ float localToneStops(float base, vec4 localTone) {
   return ${glslFloat(LOCAL_TONE_SLOPE)} * (localTone.x * toneDistance(${glslFloat(MID_GREY_STOPS)} - stops) +
                                            localTone.y * toneDistance(stops - ${glslFloat(MID_GREY_STOPS)}));
 }
-vec3 detailFilter(sampler2D source, vec2 coordinate, vec3 centre, vec4 detail, vec2 stride, vec4 localTone) {
+vec3 detailFilter(sampler2D source, vec2 coordinate, vec3 centre, vec4 detail, vec2 stride, vec4 localTone,
+                  float contrast) {
   vec3 denoised = centre;
   vec3 gaussian = centre;
   if (detail.x > 0.0 || detail.z > 0.0) {
@@ -163,9 +164,10 @@ vec3 detailFilter(sampler2D source, vec2 coordinate, vec3 centre, vec4 detail, v
     delta += ${glslFloat(CLARITY_GAIN)} * detail.y * clamp(4.0 * base * (1.0 - base), 0.0, 1.0) * (base - mean);
   }
   if (detail.x > 0.0) delta += ${glslFloat(SHARPEN_GAIN)} * detail.x * (base - dot(gaussian, luma));
-  if (any(notEqual(localTone.xyz, vec3(0.0)))) {
+  if (any(notEqual(localTone.xyz, vec3(0.0))) || contrast != 0.0) {
     float smoothBase = toneBase(source, coordinate, base, stride);
-    if (localTone.z > 0.0) denoised = hdrTone(denoised, base, smoothBase, localTone.z);
+    if (localTone.z > 0.0 || contrast != 0.0)
+      denoised = hdrTone(denoised, base, smoothBase, localTone.z, contrast);
     if (localTone.x != 0.0 || localTone.y != 0.0) {
       float gain = exp2(localToneStops(smoothBase, localTone));
       denoised = vec3(encode709(decode709(denoised.r) * gain), encode709(decode709(denoised.g) * gain),
@@ -175,19 +177,21 @@ vec3 detailFilter(sampler2D source, vec2 coordinate, vec3 centre, vec4 detail, v
   return clamp(denoised + delta, 0.0, 1.0);
 }`;
 // (sharpen, clarity, denoise, denoise range factor), the 1/720-image-height step in texture UV
-// and the evaluated track Colour (shadows, highlights, hdr, exposure) per source.
+// and the evaluated track Colour (shadows, highlights, hdr, exposure) and Local contrast per source.
 const detailUniforms = `uniform vec4 detail0;
 uniform vec4 detail1;
 uniform vec2 detailStep0;
 uniform vec2 detailStep1;
 uniform vec4 localTone0;
-uniform vec4 localTone1;`;
+uniform vec4 localTone1;
+uniform vec2 localContrast;`;
 const detailSample = `vec3 centre = texture(source, coordinate).rgb;
   vec4 detail = sourceIndex == 0 ? detail0 : detail1;
   vec4 localTone = sourceIndex == 0 ? localTone0 : localTone1;
-  if (all(equal(detail.xyz, vec3(0.0))) && all(equal(localTone.xyz, vec3(0.0)))) return centre;
+  float contrast = sourceIndex == 0 ? localContrast.x : localContrast.y;
+  if (all(equal(detail.xyz, vec3(0.0))) && all(equal(localTone.xyz, vec3(0.0))) && contrast == 0.0) return centre;
   vec2 stride = sourceIndex == 0 ? detailStep0 : detailStep1;
-  return detailFilter(source, coordinate, centre, detail, stride, localTone);`;
+  return detailFilter(source, coordinate, centre, detail, stride, localTone, contrast);`;
 
 const singleMain = `void main() {
   vec4 left = vec4(0.0);

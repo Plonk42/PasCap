@@ -3,8 +3,8 @@
 All colour belongs to the video track, keyed or unkeyed. Clips have no colour or
 correction fields. Twelve scalar colour controls, including Temperature, Tint, Vibrance, Whites and Blacks,
 can be keyed independently in video track animation. HSL ranges and colour curves are
-**static video track settings**, including on empty tracks; the fourteen nullable keyframe
-channels are Opacity, those twelve scalars and HDR (a detail-stage look applied
+**static video track settings**, including on empty tracks; the fifteen nullable keyframe
+channels are Opacity, those twelve scalars, HDR and Local contrast (detail-stage settings applied
 before grading; see [detail filters](DETAIL_FILTERS.md#hdr-look)). Animation does not suppress
 or replace advanced static settings. Temperature/Tint use normalized −1…1,
 neutral 0, and linear gains before Exposure; see
@@ -30,7 +30,7 @@ Exposure → Contrast → Brightness → Whites/Blacks → Hue/Saturation/Vibran
 linear clipping/BT.709 encoding → encoded HSL → master curve → separate RGB curves →
 black-fade brightness → grouped coverage and source-over. This is not HDR output,
 scene-linear HSL, automatic white balance, a speed curve or a per-clip correction.
-Shadows, Highlights and HDR are local stages on source pixels before this grade; see
+Shadows, Highlights, HDR and Local contrast are local stages on source pixels before this grade; see
 [detail filters](DETAIL_FILTERS.md#local-shadows-and-highlights).
 The Original preview bypasses **all** colour stages, retaining
 geometry, timing, visibility, Opacity, black fades and music.
@@ -71,7 +71,7 @@ quantisation remain measured approximations under the unchanged error gates.
 
 ## Editing, resets and resource ownership
 
-Track → Colour contains twelve scalar sliders, HDR and the sole Opacity control, grouped
+Track → Colour contains twelve scalar sliders, HDR, Local contrast and the sole Opacity control, grouped
 as in [track appearance](ROW_APPEARANCE.md#inspector-and-history).
 The separate, initially collapsed Track sections
 **HSL ranges** and **Colour curves** (after Colour) choose their band/channel with a row of coloured

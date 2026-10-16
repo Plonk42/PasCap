@@ -125,7 +125,7 @@ Import guidance, **without a POST**. Internal dragging of ready registered Media
 into Timeline remains unchanged. Uncertain registration results are not retried
 automatically; check Media/Activity before resubmitting.
 
-The strict current schema requires complete video track colour with Temperature/Tint/Vibrance/Whites/Blacks/HDR and static HSL/curves, track Transform, a boolean clip `reverse`, per-track Ripple, transitions and fades, and a required
+The strict current schema requires complete video track colour with Temperature/Tint/Vibrance/Whites/Blacks/HDR/Local contrast and static HSL/curves, track Transform, a boolean clip `reverse`, per-track Ripple, transitions and fades, and a required
 0–8 identified music track `music` array (`[]` without music); proxy/PCM formats are
 unchanged and the registries are version 2 (full-content checksums). Only generated
 proxies/thumbnails, metadata,
@@ -359,10 +359,11 @@ and undoable, and never move music, other tracks or absolute track keyframes.
 ## Track keyframes, time ruler and transitions
 
 Shared track keyframes belong to the **whole video track**, not individual clips. One ordered
-keyframe at a project frame has fourteen required nullable channels: **Opacity**
-(`opacity`), twelve scalar colour settings and **HDR** (`hdr`), enabled independently.
+keyframe at a project frame has fifteen required nullable channels: **Opacity**
+(`opacity`), twelve scalar colour settings, **HDR** (`hdr`) and **Local contrast**
+(`localContrast`), enabled independently.
 In control order: `opacity`, `temperature`, `tint`, `exposure`,
-`brightness`, `contrast`, `hue`, `saturation`, `vibrance`, `highlights`, `shadows`, `whites`, `blacks`, `hdr`.
+`brightness`, `contrast`, `hue`, `saturation`, `vibrance`, `highlights`, `shadows`, `whites`, `blacks`, `hdr`, `localContrast`.
 Static HSL/curves are not animation channels; speed is clip-only.
 Every `VideoLayer` also requires numeric `opacity` in 0–1, initially 1 (100%) on
 new tracks. Without Opacity keyframes, every clip uses the track value; keyframes override it
@@ -441,7 +442,7 @@ Transform keyframe in one Undo step, never merging into an occupied frame.
 ### Channel navigation and off-duration inspection
 
 Each section's keyframe line has one native **Previous/Next** pair, beside the keyframe count it visits.
-Colour visits the union of Opacity, twelve scalar and HDR keyframes. Speed visits all
+Colour visits the union of Opacity, twelve scalar, HDR and Local contrast keyframes. Speed visits all
 retained custom speed source keyframes of the selected clip, including off-trim
 keyframes and original exclusive OUT, previewing the nearest mapped image through
 authoritative retiming. Transform visits all track Transform keyframes, including
@@ -619,8 +620,8 @@ snapshots are independent of the open project. Projects and receipt snapshots wi
 earlier schema version remain incompatible and preserved, without migration/fabricated defaults.
 There is no automatic deletion. Track `opacity` is the required sole stored value;
 saved `clip.opacity` and old `clipOpacity`/`layerOpacity` keyframe fields are rejected,
-not ignored or defaulted. Keyframes require exactly fourteen nullable channels: `opacity`,
-twelve scalar colour fields (including required `temperature`, `tint`, `vibrance`, `whites` and `blacks`) and `hdr`.
+not ignored or defaulted. Keyframes require exactly fifteen nullable channels: `opacity`,
+twelve scalar colour fields (including required `temperature`, `tint`, `vibrance`, `whites` and `blacks`), `hdr` and `localContrast`.
 Track Colour requires those bases and static HSL/curves; missing fields are invalid.
 Recreate projects and deliberately import recordings/music
 to reuse registered sources/verified ready proxies. Confirmed project deletion removes only its saved
@@ -725,7 +726,7 @@ Diagnostic counters, shader tests and the two-clip native comparison tool remain
 hidden behind Diagnostics. **Export** uses the bounded native multi-clip
 renderer, with profiles for 720p drafts and 4K finals. The diagnostic two-clip
 reference remains limited to two normal-speed forward clips on one enabled,
-zero-origin contiguous video track with Opacity 1, Shadows/Highlights/HDR 0 and a neutral track Transform
+zero-origin contiguous video track with Opacity 1, Shadows/Highlights/HDR/Local contrast 0 and a neutral track Transform
 without keyframes and neutral detail filters, without music/extra tracks/shared track keyframes
 and at most 3,600 project frames.
 Clip sections collapse independently and retain expansion across reloads; collapsing

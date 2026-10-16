@@ -2,7 +2,8 @@
 
 Required video track Colour includes twelve graded scalar fields, including **Temperature**,
 **Tint**, **Vibrance**, **Whites** and **Blacks**, the **HDR** look (0–1, applied before grading with the clip
-[detail filters](design/DETAIL_FILTERS.md#hdr-look)), plus static **HSL ranges** and **Colour curves**. Temperature/Tint use
+[detail filters](design/DETAIL_FILTERS.md#hdr-look)) and **Local contrast** (−1…1, HDR's local-detail boost alone),
+plus static **HSL ranges** and **Colour curves**. Temperature/Tint use
 −1…1, neutral 0; positive values warm/add magenta respectively and intentionally
 colour greys. Their normalized linear gains run before Exposure. See
 [Temperature and Tint](design/TEMPERATURE_AND_TINT.md).
@@ -113,32 +114,33 @@ in that track's dissolve. They do not restart at a clip's IN, start or boundary.
 Each track requires `layers[].keyframes` as ordered `{ frame, values, easing, reset }`
 keyframes, with **at most 256 keyframes per track**. Frames are unique, strictly ascending,
 non-negative and at most 2,147,483,647. Every keyframe's `values` object (`LayerKeyValues`)
-requires **all fourteen nullable fields** below: a number enables that setting; `null` leaves it disabled.
-Its `easing` object has the same fourteen fields: each enabled setting has its own Easing
+requires **all fifteen nullable fields** below: a number enables that setting; `null` leaves it disabled.
+Its `easing` object has the same fifteen fields: each enabled setting has its own Easing
 (`hold`, `linear`, `ease-in`, `ease-out` or `smooth`) and each disabled setting `null`. Omitted/unknown
 fields, a mismatched Easing, the former shared `interpolation` field and all-null keyframes are
 invalid, not repaired with defaults. The required boolean `reset` marks a **default keyframe**
 (below); ordinary keyframes have `false`.
 
-| Channel                     | Value          | Value when this channel has no track keyframes            |
-| --------------------------- | -------------- | --------------------------------------------------------- |
-| Opacity (`opacity`)         | 0–1            | The track's required `opacity`, initially 1 on new tracks |
-| Temperature (`temperature`) | −1 to +1       | The track's saved colour value, initially 0               |
-| Tint (`tint`)               | −1 to +1       | The track's saved colour value, initially 0               |
-| Exposure (`exposure`)       | −3 to +3 stops | The track's saved colour value                            |
-| Brightness (`brightness`)   | −0.5 to +0.5   | The track's saved colour value                            |
-| Contrast (`contrast`)       | 0–2            | The track's saved colour value                            |
-| Hue (`hue`)                 | −180° to +180° | The track's saved colour value                            |
-| Saturation (`saturation`)   | 0–2            | The track's saved colour value                            |
-| Vibrance (`vibrance`)       | −1 to +1       | The track's saved colour value, initially 0               |
-| Highlights (`highlights`)   | −1 to +1       | The track's saved colour value                            |
-| Shadows (`shadows`)         | −1 to +1       | The track's saved colour value                            |
-| Whites (`whites`)           | −1 to +1       | The track's saved colour value, initially 0               |
-| Blacks (`blacks`)           | −1 to +1       | The track's saved colour value, initially 0               |
-| HDR (`hdr`)                 | 0 to 1         | The track's saved colour value, initially 0               |
+| Channel                          | Value          | Value when this channel has no track keyframes            |
+| -------------------------------- | -------------- | --------------------------------------------------------- |
+| Opacity (`opacity`)              | 0–1            | The track's required `opacity`, initially 1 on new tracks |
+| Temperature (`temperature`)      | −1 to +1       | The track's saved colour value, initially 0               |
+| Tint (`tint`)                    | −1 to +1       | The track's saved colour value, initially 0               |
+| Exposure (`exposure`)            | −3 to +3 stops | The track's saved colour value                            |
+| Brightness (`brightness`)        | −0.5 to +0.5   | The track's saved colour value                            |
+| Contrast (`contrast`)            | 0–2            | The track's saved colour value                            |
+| Hue (`hue`)                      | −180° to +180° | The track's saved colour value                            |
+| Saturation (`saturation`)        | 0–2            | The track's saved colour value                            |
+| Vibrance (`vibrance`)            | −1 to +1       | The track's saved colour value, initially 0               |
+| Highlights (`highlights`)        | −1 to +1       | The track's saved colour value                            |
+| Shadows (`shadows`)              | −1 to +1       | The track's saved colour value                            |
+| Whites (`whites`)                | −1 to +1       | The track's saved colour value, initially 0               |
+| Blacks (`blacks`)                | −1 to +1       | The track's saved colour value, initially 0               |
+| HDR (`hdr`)                      | 0 to 1         | The track's saved colour value, initially 0               |
+| Local contrast (`localContrast`) | −1 to +1       | The track's saved colour value, initially 0               |
 
-The exact fourteen required value fields are `opacity`, `temperature`, `tint`, `exposure`,
-`brightness`, `contrast`, `hue`, `saturation`, `vibrance`, `highlights`, `shadows`, `whites`, `blacks` and `hdr`; every
+The exact fifteen required value fields are `opacity`, `temperature`, `tint`, `exposure`,
+`brightness`, `contrast`, `hue`, `saturation`, `vibrance`, `highlights`, `shadows`, `whites`, `blacks`, `hdr` and `localContrast`; every
 track channel is appearance-only and never changes timing.
 Clip documents contain independent **constant or custom-keyframed**
 speed, a required boolean `reverse` and static `detail` (Sharpen, Clarity,
@@ -167,7 +169,7 @@ it; track keyframes never change clip durations.
 
 ## Independent channel interpolation
 
-Enabled settings are independent, including between the twelve scalar colour parameters and HDR.
+Enabled settings are independent, including between the twelve scalar colour parameters, HDR and Local contrast.
 Each enabled setting has its own Easing at a keyframe, and **each channel interpolates
 to its own next keyframe with that setting enabled**, skipping keyframes where that channel is null.
 So Exposure can hold while Contrast eases in from the same keyframe.
@@ -203,8 +205,8 @@ repeat/drop sampling without optical flow.
 
 A **default keyframe** returns the track to its default appearance at one frame without
 working out which settings changed. It is a stored track keyframe with `reset: true`,
-created with all fourteen settings enabled at their neutral creation values (Opacity 1,
-Temperature/Tint/Exposure/Brightness/Hue/Vibrance/Highlights/Shadows/Whites/Blacks/HDR 0, Contrast/Saturation 1)
+created with all fifteen settings enabled at their neutral creation values (Opacity 1,
+Temperature/Tint/Exposure/Brightness/Hue/Vibrance/Highlights/Shadows/Whites/Blacks/HDR/Local contrast 0, Contrast/Saturation 1)
 and every Easing **Hold**. It evaluates like any keyframe with one difference: it never
 reaches back. Before a default keyframe that is a setting's first keyframe, that setting
 keeps its unkeyed value (track `opacity` or track `colour`) instead of holding the
@@ -252,7 +254,7 @@ Colour, Speed and Transform always show their capture diamonds while the section
   disable actions; hollow status itself cannot.
 
 Each section's keyframe line has one native **Previous/Next** pair, beside the count of the keyframes it visits.
-Colour visits the union of Opacity, twelve scalar colour and HDR keyframes, exactly the rows of
+Colour visits the union of Opacity, twelve scalar colour, HDR and Local contrast keyframes, exactly the rows of
 its stored list, with seek-hint tooltips. Speed visits all
 retained custom speed source keyframes of the selected clip, including off-trim
 keyframes and the original exclusive OUT, previewing the nearest mapped image through
@@ -278,7 +280,7 @@ changes no document, history or autosave state.
 per-setting Previous/Next buttons. The main sliders sit under four static headings,
 each with a one-Undo group Reset: **Opacity**; **Colour** (Temperature, Tint, Hue,
 Saturation, Vibrance); **Light** (Exposure, Brightness, Contrast, Highlights, Shadows, Whites, Blacks); **Effects**
-(HDR). This visible order differs from the unchanged channel order above
+(HDR, Local contrast). This visible order differs from the unchanged channel order above
 ([track appearance](design/ROW_APPEARANCE.md#inspector-and-history)).
 Main and stored sliders/exact fields use **0–100%**, neutral **100%**.
 Required track `opacity` and keyframe values stay **0–1**, with UI-only conversion and no schema change.
@@ -584,14 +586,14 @@ native `reverse` filter holds at most 256 MiB of output RGB frames; Node still h
 The plain static single-track path retains at most two lossless clips, two
 intermediate decoders and one reusable RGB frame (24.9 MB UHD), plus native memory.
 
-The static fast path is eligible only with neutral HSL/identity colour curves, Shadows/Highlights/HDR 0 and one enabled video track with Opacity 1,
+The static fast path is eligible only with neutral HSL/identity colour curves, Shadows/Highlights/HDR/Local contrast 0 and one enabled video track with Opacity 1,
 no track keyframes, an exactly neutral track Transform base without Transform keyframes, neutral clip
 [detail filters](design/DETAIL_FILTERS.md), a zero first
 start and no internal gaps, covering the **full project duration**. Music beyond
 video OUT requires composited export's trailing black spans,
 not a held last image. Ripple itself is not
 an eligibility requirement. Other valid timelines, including any (even
-neutral) track keyframe, nonzero HDR or any Transform edit/keyframe (even neutral keyframes), use the generalized
+neutral) track keyframe, nonzero HDR or Local contrast, or any Transform edit/keyframe (even neutral keyframes), use the generalized
 composited path; static planning rejects them.
 That pipeline remains sequential, with at most one original decoder, two intermediate readers and one
 encoder, and at most three native video children per pass. Each enabled populated
@@ -667,13 +669,13 @@ not all sources or loop repetitions. It grows with duration and is additional to
 the unchanged video raw-buffer/child/LUT bounds above. Cancellation/failure removes
 only owned scratch, never originals, saved projects or successful outputs.
 
-The current schema **is strict**, including complete required video track `colour` with Temperature/Tint/Vibrance/Whites/Blacks/HDR and static HSL/curves, no clip colour/correction/spatial fields, a required boolean clip `reverse`, and track `transform` base/eight-value
+The current schema **is strict**, including complete required video track `colour` with Temperature/Tint/Vibrance/Whites/Blacks/HDR/Local contrast and static HSL/curves, no clip colour/correction/spatial fields, a required boolean clip `reverse`, and track `transform` base/eight-value
 project-frame keyframes and required unique `media.videoIds` / `media.audioIds`
 arrays, at most 10,000 IDs each, and all required per-track settings. Project-level
 transitions/fades, saved `clip.opacity` and old `clipOpacity`/`layerOpacity` keyframe
 channels are not accepted. `VideoLayer.opacity` is the required sole stored track
 value, a number in 0–1; 1 is a new-track initial value, not a missing-field default.
-Keyframes require exactly the fourteen nullable fields listed above, including `opacity`, `temperature`, `tint`, `vibrance`, `whites`, `blacks` and `hdr`.
+Keyframes require exactly the fifteen nullable fields listed above, including `opacity`, `temperature`, `tint`, `vibrance`, `whites`, `blacks`, `hdr` and `localContrast`.
 The required `music` array contains 0–8 independent music tracks with unique required
 IDs and complete source IN/OUT/start/duration/gain/fades/loop fields; `[]` without
 music, never a null/singular value or default. Version-1 export receipts require

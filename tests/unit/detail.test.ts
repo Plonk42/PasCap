@@ -29,11 +29,18 @@ import { calculateLayout, sampleTimeline, type PreviewLayer } from '../../src/sh
 
 type Image = (u: number, v: number) => RGB;
 type Tone = Partial<LocalTone>;
-const toneOf = (tone: Tone): LocalTone => ({ shadows: 0, highlights: 0, hdr: 0, exposure: 0, ...tone });
+const toneOf = (tone: Tone): LocalTone => ({
+  shadows: 0,
+  highlights: 0,
+  hdr: 0,
+  localContrast: 0,
+  exposure: 0,
+  ...tone,
+});
 
 /** Independent transcription of the documented kernel, without the production tap tables. */
 function reference(image: Image, u: number, v: number, settings: DetailSettings, aspect: number, tone: Tone = {}): RGB {
-  const { shadows, highlights, hdr, exposure } = toneOf(tone);
+  const { shadows, highlights, hdr, localContrast, exposure } = toneOf(tone);
   const dv = 1 / 720;
   const du = dv / aspect;
   const luma = (rgb: RGB): number => 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2];
@@ -81,7 +88,7 @@ function reference(image: Image, u: number, v: number, settings: DetailSettings,
     delta += settings.clarity * Math.min(1, Math.max(0, 4 * base * (1 - base))) * (base - mean);
   }
   if (settings.sharpen > 0) delta += 2 * settings.sharpen * (base - luma(gaussian));
-  if (hdr > 0 || shadows !== 0 || highlights !== 0) {
+  if (hdr > 0 || localContrast !== 0 || shadows !== 0 || highlights !== 0) {
     const taps: { level: number; spatial: number }[] = [];
     for (const [radius, rotation] of [
       [6, 0],
@@ -104,8 +111,8 @@ function reference(image: Image, u: number, v: number, settings: DetailSettings,
       total += spatial * range(level);
     }
     const b = sum / total;
-    if (hdr > 0) {
-      const target = b + hdr * b * (1 - b) * (1 - 2 * b) + (base - b) * (1 + hdr);
+    if (hdr > 0 || localContrast !== 0) {
+      const target = b + hdr * b * (1 - b) * (1 - 2 * b) + (base - b) * (1 + hdr + localContrast);
       const lift = target - base;
       const blend = Math.min(1, base / 0.1);
       denoised = denoised.map((channel) =>
@@ -329,6 +336,73 @@ describe('track HDR look', () => {
     expect(keyed.layers[0]!.keyframes[0]!.values.hdr).toBe(0.6);
     expect(sampleTimeline(keyed, 20)[0]!.colour.hdr).toBe(0.6);
     expect(needsLayeredExport(keyed)).toBe(true);
+  });
+});
+
+describe('track Local contrast', () => {
+  const fine: Image = (u) => {
+    const level = 0.5 + 0.05 * Math.sin(u * 1280 * 0.7);
+    return [level, level, level];
+  };
+  const crest = (Math.PI / 2 / 0.7 + 0.5) / 1280;
+
+  it('is a bounded keyframable channel outside the per-pixel grade', () => {
+    expect(createColourSettings().localContrast).toBe(0);
+    for (const invalid of [-1.01, 1.01])
+      expect(colourSchema.safeParse({ ...createColourSettings(), localContrast: invalid }).success).toBe(false);
+    const { localContrast: _localContrast, ...missing } = createColourSettings();
+    expect(colourSchema.safeParse(missing).success).toBe(false);
+    const settings = { ...createColourSettings(), localContrast: -0.4 };
+    expect(isNeutralColour(settings)).toBe(false);
+    const input: RGB = [0.2, 0.4, 0.6];
+    expect(gradePixel(input, settings)).toBe(input);
+    expect(compileDetail(NEUTRAL_DETAIL, 1, toneOf({ localContrast: 0.01 }))).not.toBeNull();
+    for (const invalid of [-1.01, 1.01, Number.NaN])
+      expect(() => compileDetail(NEUTRAL_DETAIL, 1, toneOf({ localContrast: invalid }))).toThrow();
+  });
+
+  it('matches the transcription alone and added to HDR', () => {
+    const cases: [DetailSettings, Tone][] = [
+      [NEUTRAL_DETAIL, { localContrast: 1 }],
+      [NEUTRAL_DETAIL, { localContrast: -0.7 }],
+      [
+        { sharpen: 0.35, clarity: 0.4, denoise: 0.8 },
+        { hdr: 0.5, localContrast: 0.6, shadows: 0.4 },
+      ],
+    ];
+    for (const [settings, tone] of cases)
+      for (const [u, v] of [
+        [0.31, 0.43],
+        [0.02, 0.97],
+        [0.77, 0.12],
+      ]) {
+        const actual = run(textured, u!, v!, settings, 4 / 3, tone);
+        reference(textured, u!, v!, settings, 4 / 3, tone).forEach((channel, index) =>
+          expect(actual[index]).toBeCloseTo(channel, 12),
+        );
+      }
+  });
+
+  it("is HDR's detail boost without its tone compression: flat areas never move", () => {
+    for (const level of [0, 0.1, 0.5, 0.9, 1])
+      for (const localContrast of [-1, 1])
+        expect(run(() => [level, level, level], 0.5, 0.5, NEUTRAL_DETAIL, 16 / 9, { localContrast })[0]).toBeCloseTo(
+          level,
+          12,
+        );
+    const input = fine(crest, 0.5)[0] - 0.5;
+    const boosted = run(fine, crest, 0.5, NEUTRAL_DETAIL, 16 / 9, { localContrast: 1 })[0]! - 0.5;
+    expect(boosted).toBeGreaterThan(1.6 * input);
+    expect(Math.abs(run(fine, crest, 0.5, NEUTRAL_DETAIL, 16 / 9, { localContrast: -1 })[0]! - 0.5)).toBeLessThan(
+      0.5 * input,
+    );
+  });
+
+  it('routes a nonzero value through the composited exporter', () => {
+    const document = project(NEUTRAL_DETAIL);
+    const layer = document.layers[0]!;
+    const edited = { ...document, layers: [{ ...layer, colour: { ...layer.colour, localContrast: -0.2 } }] };
+    expect(needsLayeredExport(projectSchema.parse(edited))).toBe(true);
   });
 });
 
@@ -643,10 +717,12 @@ describe('native detail filtering', () => {
     const high = await render({ hdr: 0.9 });
     const shadows = await render({ shadows: 0.6 });
     const highlights = await render({ highlights: -0.6 });
+    const contrast = await render({ localContrast: 0.6 });
     expect(low).not.toEqual(plain);
     expect(high).not.toEqual(low);
     expect(shadows).not.toEqual(plain);
     expect(highlights).not.toEqual(shadows);
+    expect(contrast).not.toEqual(plain);
     expect(cache.report.generated).toBe(1);
   });
 });

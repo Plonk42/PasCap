@@ -71,7 +71,7 @@ describe('strict current-schema static advanced row colour', () => {
           }).success,
         ).toBe(false);
     }
-    expect(KEYFRAME_SETTINGS).toHaveLength(14);
+    expect(KEYFRAME_SETTINGS).toHaveLength(15);
     expect(
       projectSchema.safeParse({ ...document, clips: [{ ...createClip('c', 'm', 0, 2), colour: NEUTRAL_COLOUR }] })
         .success,

@@ -211,7 +211,7 @@ for (const context of ['shared', 'clip'] as const) {
     expect(before.schemaVersion).toBe(PROJECT_SCHEMA_VERSION);
     expect(before.layers[0]!.opacity).toBe(1);
     expect(before.clips[0]).not.toHaveProperty('opacity');
-    expect(Object.keys(before.layers[0]!.keyframes[0]!.values)).toHaveLength(14);
+    expect(Object.keys(before.layers[0]!.keyframes[0]!.values)).toHaveLength(15);
     const initialValue = (await select.inputValue())!;
     expect(memory.saves).toBe(0);
     for (const value of interpolationSchema.options) {

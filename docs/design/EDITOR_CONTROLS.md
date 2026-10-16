@@ -86,6 +86,10 @@ and technical paths stay unchanged; this glossary does not change the project sc
 - **HDR** is a track-owned 0–1 Colour control, neutral 0: an SDR local tone-mapping
   look, not HDR output. It is keyframable like the other Colour settings and runs
   on source taps before the grade, with the clip detail filters.
+- **Local contrast** is a track-owned −1…1 Colour control, neutral 0, below HDR in the
+  **Effects** group: HDR's local-detail boost alone, without its tone compression
+  (raised it separates each area from its surroundings, lowered it flattens them). It is
+  keyframable like the other Colour settings and runs with HDR in the detail kernel.
 - **Transform** is track-owned crop, Scale, Translate X/Y and Rotation, applied to every
   clip on the track like Colour; each setting has its own capture triangle, and its
   keyframes are separate from the shared Colour/Opacity keyframes
@@ -131,7 +135,7 @@ and technical paths stay unchanged; this glossary does not change the project sc
 - Easing/modes/recordings: native select; selected easing has its existing graph.
 - Boolean settings: native checkbox. Main scalar Colour/Opacity controls expose a capture diamond with
   `aria-pressed` and adjacent per-setting **Previous/Next** buttons, since a shared
-  keyframe need not enable every setting. Colour's keyframe-line Previous/Next pair visits the union of Opacity, twelve scalar and HDR keyframes.
+  keyframe need not enable every setting. Colour's keyframe-line Previous/Next pair visits the union of Opacity, twelve scalar, HDR and Local contrast keyframes.
   Clip **Speed ×** has one **Keyframe Speed** circle capturing or removing a keyframe at the
   actually displayed source frame, without extra per-setting arrows; in curve mode its rate is
   read-only without a keyframe there. Speed's pair visits all retained
@@ -156,7 +160,7 @@ and technical paths stay unchanged; this glossary does not change the project sc
   **Reset red** / **Reset all**.
 - Setting groups: **Track → Colour** shows its main sliders in four static fieldsets with small uppercase
   headings: **Opacity**; **Colour** (Temperature, Tint, Hue, Saturation, Vibrance); **Light** (Exposure, Brightness,
-  Contrast, Highlights, Shadows, Whites, Blacks); **Effects** (HDR). Each heading has a Reset icon (**Reset the Light group**,
+  Contrast, Highlights, Shadows, Whites, Blacks); **Effects** (HDR, Local contrast). Each heading has a Reset icon (**Reset the Light group**,
   etc.) that resets the group's editable settings in one Undo step, dimmed at the defaults. Headings add no
   tab stop besides that icon; the visible order differs from the unchanged storage/keyframe channel order.
 - Setting rows (Colour, Opacity, Transform, Speed, Detail and stored keyframe values) use two compact lines:

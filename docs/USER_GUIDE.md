@@ -17,11 +17,11 @@ Projects use **a strict current format**, with complete required video track col
 Transform (base plus per-setting project-frame keyframes), a required `bookmarks` array of project frames (`[]` on new projects), a required `music` array of 0–8 independent
 music tracks and unique required IDs (`[]` without music), every video track's Ripple, transitions and
 opening/closing fades and required numeric `opacity` in 0–1 (1 on new tracks),
-with fourteen nullable animation channels, in control order: `opacity`,
+with fifteen nullable animation channels, in control order: `opacity`,
 `temperature`, `tint`, `exposure`, `brightness`, `contrast`, `hue`, `saturation`,
-`vibrance`, `highlights`, `shadows`, `whites`, `blacks`, `hdr`. Clip speed is constant or a 1–256-keyframe custom curve,
+`vibrance`, `highlights`, `shadows`, `whites`, `blacks`, `hdr`, `localContrast`. Clip speed is constant or a 1–256-keyframe custom curve,
 and every clip requires a boolean `reverse`.
-Video track Colour requires Temperature/Tint/Vibrance/Whites/Blacks/HDR bases and static
+Video track Colour requires Temperature/Tint/Vibrance/Whites/Blacks/HDR/Local contrast bases and static
 HSL/curves; missing fields and saved clip colour/correction are invalid.
 Track `opacity` is the sole saved Opacity value; saved `clip.opacity` and old
 `clipOpacity`/`layerOpacity` keyframe channels are invalid, not ignored or defaulted.
@@ -243,7 +243,7 @@ Find its single native slider/exact numeric field in **Track → Colour**, with 
 capture diamond and adjacent per-setting Previous/Next buttons. Colour groups its sliders
 under small headings, each with a **Reset** icon that resets the group's editable settings in
 one Undo step: **Opacity**; **Colour** (Temperature, Tint, Hue, Saturation, Vibrance); **Light**
-(Exposure, Brightness, Contrast, Highlights, Shadows, Whites, Blacks); **Effects** (HDR).
+(Exposure, Brightness, Contrast, Highlights, Shadows, Whites, Blacks); **Effects** (HDR, Local contrast).
 **Vibrance** saturates muted colours more than strong ones: raise it to bring out a hazy
 sky or dull foliage without making faces or bright colours garish; lower it to mute the
 weakest colours first.
@@ -286,7 +286,7 @@ Colour, Speed and Transform always show their capture diamonds while the section
 Colour and Transform capture buttons have adjacent per-setting **Previous/Next** buttons
 because not every setting is enabled at every keyframe; Speed has a single setting, so its
 keyframe line's pair is enough. Each section's keyframe line counts the keyframes its single **Previous/Next** pair visits. Colour visits any Opacity, scalar
-colour or HDR keyframe. Speed visits **all retained custom
+colour, HDR or Local contrast keyframe. Speed visits **all retained custom
 speed source keyframes of the selected clip**, including off-trim keyframes and the
 original exclusive OUT, previewing the nearest mapped image.
 Speed keeps a clip-local stored-source selection separate from track
@@ -333,11 +333,19 @@ all these Colour stages, retaining Opacity and geometry. Exact processing:
 
 ### HDR
 
-**HDR**, last in **Track → Colour**, opens shadows and recovers highlights while
+**HDR**, in the Effects group of **Track → Colour**, opens shadows and recovers highlights while
 boosting local detail, like a tone-mapped look; **0** is off and **1** is the strongest.
 It is an SDR effect, not HDR output, and can be keyframed like the other Colour
 settings. Nonzero or keyed HDR makes export use the slower composited path.
 The Original preview bypasses it. Details: [detail filters](design/DETAIL_FILTERS.md#hdr-look).
+
+**Local contrast**, just below HDR, raises or lowers the contrast between neighbouring
+areas and their surroundings, like HDR's detail boost but without its shadow and
+highlight compression; flat areas never move. **0** is off, **+1** the strongest and
+**−1** flattens each area towards its surroundings. It can be keyframed like the other
+Colour settings; nonzero or keyed Local contrast makes export use the slower composited
+path, and the Original preview bypasses it. Details:
+[local contrast](design/DETAIL_FILTERS.md#local-contrast).
 
 ### Show the original image
 
@@ -519,9 +527,9 @@ counts and visits the same keyframes. **Animation help** beside its heading comb
 animation and keyframe-timing guidance. **Clip** keeps source/clip settings and playhead
 Speed controls; **Track → Colour** keeps Opacity and Colour controls and **Track → Transform** the pose.
 All shared track keyframes use absolute project frames and affect every clip on that track.
-Fourteen settings can be keyed independently:
+Fifteen settings can be keyed independently:
 Opacity (`opacity`), the twelve scalar colour controls, including
-Temperature, Tint, Vibrance, Whites and Blacks, and HDR (`hdr`). HSL/curves remain static and Speed is clip-only. At most 256
+Temperature, Tint, Vibrance, Whites and Blacks, HDR (`hdr`) and Local contrast (`localContrast`). HSL/curves remain static and Speed is clip-only. At most 256
 shared keyframes are allowed per video track.
 
 - Each main setting has a **hollow ◇ / filled ◆ diamond**
@@ -720,7 +728,7 @@ indicate adjusted settings without expanding everything. Animated channels use
 an amber curve/diamond: dashed between keyframes, filled when the setting is enabled
 at the playhead. **Animation help** beside Colour's **Keyframes** heading explains scope,
 capture and keyframe timing; there is no separate Keyframe timing help button.
-All fourteen track settings retain their unkeyed values, explicit capture and stored-keyframe editing.
+All fifteen track settings retain their unkeyed values, explicit capture and stored-keyframe editing.
 Search/filter clear actions,
 mixed select-all and always-visible media Add simplify the library.
 

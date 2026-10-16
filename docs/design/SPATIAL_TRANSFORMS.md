@@ -61,7 +61,7 @@ Opposite crops may meet or cross (left + right ≥ 1, or top + bottom ≥ 1): th
 covers nothing and the track displays nothing there. It is never rejected or repaired.
 
 Neutral creation values are not defaults for missing saved data. Transform keyframes
-are separate from the fourteen shared Colour/Opacity track keyframe channels: they have
+are separate from the fifteen shared Colour/Opacity track keyframe channels: they have
 their own list in **Track → Transform** and their own timeline markers. Colour, Opacity,
 clip-only speed and clip-only Detail are unchanged.
 

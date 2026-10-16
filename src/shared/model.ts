@@ -118,7 +118,7 @@ export const bookmarksSchema = z
   });
 
 /** The only accepted project schema; bump it for every incompatible change. */
-export const PROJECT_SCHEMA_VERSION = 22;
+export const PROJECT_SCHEMA_VERSION = 23;
 
 const baseProjectSchema = z
   .object({

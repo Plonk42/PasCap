@@ -34,7 +34,15 @@ import {
   vertexShader,
 } from './shaders.js';
 
-const DETAIL_UNIFORMS = ['detail0', 'detail1', 'detailStep0', 'detailStep1', 'localTone0', 'localTone1'];
+const DETAIL_UNIFORMS = [
+  'detail0',
+  'detail1',
+  'detailStep0',
+  'detailStep1',
+  'localTone0',
+  'localTone1',
+  'localContrast',
+];
 /** Two timeline video decoders per track: both dissolve sources, or the active and next clip. */
 export const MAX_VIDEO_DECODERS = 2 * MAX_VIDEO_LAYERS;
 
@@ -452,6 +460,12 @@ export class Compositor {
         );
       }
     }
+    if (detailed)
+      gl.uniform2f(
+        this.#location('localContrast'),
+        sources[0]!.settings.localContrast,
+        sources[1]!.settings.localContrast,
+      );
     gl.uniform2f(
       this.#location('coverage'),
       sources[0]!.opacity * sources[0]!.blendWeight,

@@ -16,7 +16,7 @@ clips, multi-track timelines, colour/opacity track keyframes, music and verified
 Video track-owned crop/scale/translation/rotation and per-setting project-frame
 animation are specified by [#131's current contract](design/SPATIAL_TRANSFORMS.md), without
 claiming qualification or changing milestone status. Static clip Sharpen, Clarity
-and Denoise and the keyable track HDR look follow [#123's contract](design/DETAIL_FILTERS.md), likewise without a
+and Denoise and the keyable track HDR look and Local contrast follow [#123's contract](design/DETAIL_FILTERS.md), likewise without a
 qualification claim.
 The final approved [#67](https://github.com/Plonk42/PasCap/issues/67) contract has
 one video track-owned **Opacity** setting: required numeric `VideoLayer.opacity` in 0–1,
@@ -26,9 +26,9 @@ multiplier. The single slider/diamond/navigation lives in **Track → Colour** a
 works on empty tracks; **Placement** contains placement only. Without Opacity keyframes,
 the slider edits the track value; with keyframes, a setting not enabled at the real
 playhead is read-only until explicitly captured. Sliders never create keyframes, and
-unkeyed colour settings are track-owned. Shared keyframes have fourteen nullable channels:
+unkeyed colour settings are track-owned. Shared keyframes have fifteen nullable channels:
 `opacity`, twelve scalar colour settings (including `temperature`, `tint`,
-`vibrance`, `whites` and `blacks`) and `hdr`. Saved `clip.opacity` and old
+`vibrance`, `whites` and `blacks`), `hdr` and `localContrast`. Saved `clip.opacity` and old
 `clipOpacity`/`layerOpacity` channels are rejected; track `opacity` is required and
 valid. Track-owned [Temperature and Tint](design/TEMPERATURE_AND_TINT.md) use
 normalized −1…1, neutral 0, with independent animation. Positive Temperature

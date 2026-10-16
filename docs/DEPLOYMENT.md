@@ -81,14 +81,14 @@ navigation and show Import guidance without a POST. Internal ready-Media-to-Time
 dragging remains supported. Imports reference originals; generated proxies/
 thumbnails, project/registry metadata, exports/receipts and scratch are the only
 new local data, not duplicate original footage. Projects use the strict current schema with
-complete required video track Colour, including Temperature/Tint/Vibrance/Whites/Blacks/HDR and static HSL/curves,
+complete required video track Colour, including Temperature/Tint/Vibrance/Whites/Blacks/HDR/Local contrast and static HSL/curves,
 no clip colour/correction/spatial fields, a required boolean clip `reverse`, required video track `transform` base/per-setting project-frame keyframes and
 required `music` array (0–8 independent music tracks, unique required IDs; `[]` without
 music), and
 required per-track Ripple, transitions, opening/closing fades and numeric
-`VideoLayer.opacity` in 0–1 (1 on new tracks), plus fourteen nullable keyframe channels:
+`VideoLayer.opacity` in 0–1 (1 on new tracks), plus fifteen nullable keyframe channels:
 `opacity`, twelve scalar colour settings (including `temperature`,
-`tint`, `vibrance`, `whites` and `blacks`) and `hdr`. HSL/curves remain static. Track `opacity` is the sole saved
+`tint`, `vibrance`, `whites` and `blacks`), `hdr` and `localContrast`. HSL/curves remain static. Track `opacity` is the sole saved
 Opacity value; saved `clip.opacity` and old `clipOpacity`/`layerOpacity` channels
 are rejected. The track value or its overriding keyframes supply Opacity to each source
 in a dissolve group, without an additional track multiplier. Projects with an earlier schema version

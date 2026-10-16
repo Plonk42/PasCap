@@ -543,7 +543,7 @@ describe('main diamonds with per-setting arrows and stored-channel navigation', 
       ),
     );
     expect(sidebar).toContain('Track options Track 1');
-    expect(KEYFRAME_SETTINGS).toHaveLength(14);
+    expect(KEYFRAME_SETTINGS).toHaveLength(15);
     expect(inspector).toContain('aria-label="Keyframe Opacity"');
     expect(inspector).not.toContain('Keyframe Track opacity');
     expect(inspector).not.toContain('Keyframe Clip opacity');

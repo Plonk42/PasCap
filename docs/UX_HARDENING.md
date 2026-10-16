@@ -62,12 +62,12 @@ This guide is not a delivery ledger or a fresh validation result.
   uncertainty, errors/recheck and disclosed location/assumptions. Snapshot and
   native processing details remain available in **Rendering details**.
 
-The current schema requires complete video track Colour with Temperature/Tint/Vibrance/Whites/Blacks/HDR and static HSL/curves,
+The current schema requires complete video track Colour with Temperature/Tint/Vibrance/Whites/Blacks/HDR/Local contrast and static HSL/curves,
 video track Transform base/per-setting project-frame keyframes, a boolean clip `reverse` and uses a
 required 0–8 `music` array with unique required music track IDs and
 uniform video tracks with required Ripple/transitions/fades and
-numeric `VideoLayer.opacity` in 0–1 (1 on new tracks), plus fourteen nullable keyframe
-channels: `opacity`, twelve scalar colour settings and `hdr`. Video tracks
+numeric `VideoLayer.opacity` in 0–1 (1 on new tracks), plus fifteen nullable keyframe
+channels: `opacity`, twelve scalar colour settings, `hdr` and `localContrast`. Video tracks
 follow saved bottom-to-top composition order. Track options exposes default-on
 Ripple: enabling closes gaps from the first current start in one Undo; while on,
 later clips continuously sequence there. Turning it off keeps actual placements.
@@ -213,7 +213,7 @@ two 65³ Float32 LUTs add **6,591,000 bytes**, excluding native/audio memory.
 One original decoder, two intermediate readers, one encoder and three video children
 per serial pass bound concurrency, not duration-dependent disk use. The static
 fast path requires one enabled, unanimated, zero-origin contiguous track
-with track Opacity 1 and Shadows/Highlights/HDR 0, an exactly neutral track Transform base and no Transform keyframes; Transform
+with track Opacity 1 and Shadows/Highlights/HDR/Local contrast 0, an exactly neutral track Transform base and no Transform keyframes; Transform
 edits/keyframes (even neutral keyframes) or unsupported placement/coverage use generalized
 composited export, with unchanged raw-buffer/LUT/process budgets.
 

@@ -324,7 +324,7 @@ test('row Colour captures its base and keeps precise release-only edits identica
   expect(changed.clips).toEqual(document.clips);
 });
 
-test('empty rows expose all fourteen editable row appearance widgets and no clip colour scope', async ({ page }) => {
+test('empty rows expose all fifteen editable row appearance widgets and no clip colour scope', async ({ page }) => {
   const document = await current(page);
   document.clips = [];
   document.music = [];
@@ -347,7 +347,7 @@ test('Track Colour groups its sliders under labelled headings, each with a one-s
     Opacity: ['Opacity'],
     Colour: ['Temperature', 'Tint', 'Hue', 'Saturation', 'Vibrance'],
     Light: ['Exposure', 'Brightness', 'Contrast', 'Highlights', 'Shadows', 'Whites', 'Blacks'],
-    Effects: ['HDR'],
+    Effects: ['HDR', 'Local contrast'],
   };
   const colourControls = page.locator('.inspector-panel .colour-controls');
   await expect(colourControls.getByRole('group')).toHaveCount(4);
@@ -862,8 +862,8 @@ test('common widgets fit 270px inspectors at the default and minimum viewports w
             };
           }),
       );
-      // Clip: speed rate and three Detail values; Track: fourteen Colour/Opacity, three HSL, eight Transform and three stored values.
-      expect(widgets.length, `${width}px ${tab}`).toBe(tab === 'Clip' ? 4 : tab === 'Track' ? 28 : 1);
+      // Clip: speed rate and three Detail values; Track: fifteen Colour/Opacity, three HSL, eight Transform and three stored values.
+      expect(widgets.length, `${width}px ${tab}`).toBe(tab === 'Clip' ? 4 : tab === 'Track' ? 29 : 1);
       for (const widget of widgets) {
         expect(widget.inputs, `${width}px ${widget.name}`).toBe(2);
         expect(widget.outputs).toBe(0);

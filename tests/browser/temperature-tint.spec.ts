@@ -434,7 +434,7 @@ test('animated missing participants stay read-only until explicit capture; remov
   ];
   await fixture(page, document);
   expect(document.schemaVersion).toBe(PROJECT_SCHEMA_VERSION);
-  expect(Object.keys(document.layers[0]!.keyframes[0]!.values)).toHaveLength(14);
+  expect(Object.keys(document.layers[0]!.keyframes[0]!.values)).toHaveLength(15);
   await seek(page, 20);
   const temperature = controls(page, 'Temperature');
   const tint = controls(page, 'Tint');
