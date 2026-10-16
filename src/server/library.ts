@@ -8,6 +8,7 @@ import {
   type SourceFingerprint,
 } from '../shared/media.js';
 import { framesToSeconds } from '../shared/timing.js';
+import { MOTION_ANALYSIS_VERSION, motionAnalysisSchema, type MotionAnalysis } from '../shared/motion-analysis.js';
 import { forEachSerial } from '../shared/serial.js';
 import type { ServiceConfig } from './config.js';
 import { errorMessage, isNotFound, ServiceError } from './errors.js';
@@ -21,6 +22,7 @@ import {
   verifyMovedOriginal,
 } from './files.js';
 import { JobQueue, type JobContext } from './jobs.js';
+import { analyseProxy } from './motion.js';
 import type { RelinkCandidate } from './relink.js';
 import { NATIVE_THREADS } from './native-threads.js';
 import { probeVideo } from './probe.js';
@@ -80,6 +82,7 @@ export class MediaLibrary {
   readonly #prepareRequests = new Map<string, Promise<MediaJob>>();
   readonly #preparing = new Map<string, string>();
   readonly #relinking = new Map<string, string>();
+  readonly #analysing = new Map<string, string>();
   constructor(
     readonly config: ServiceConfig,
     readonly jobs: JobQueue,
@@ -131,6 +134,65 @@ export class MediaLibrary {
   }
   thumbnailPath(asset: MediaAsset, frame: number): string {
     return path.join(this.assetDir(asset), `frame-${frame}.jpg`);
+  }
+  motionPath(asset: MediaAsset): string {
+    return path.join(this.assetDir(asset), `motion-v${MOTION_ANALYSIS_VERSION}.json`);
+  }
+  /** The cached analysis of the current verified proxy, or null when it has not been analysed. */
+  async motion(id: string): Promise<MotionAnalysis | null> {
+    const asset = this.get(id);
+    if (asset.status !== 'ready' || !asset.prepared) return null;
+    let text: string;
+    try {
+      text = await readFile(this.motionPath(asset), 'utf8');
+    } catch (error) {
+      if (isNotFound(error)) return null;
+      throw error;
+    }
+    const analysis = motionAnalysisSchema.parse(JSON.parse(text));
+    // An analysis of an earlier proxy no longer describes the current one.
+    return analysis.verifiedAt === asset.prepared.verification.verifiedAt &&
+      analysis.frameCount === asset.prepared.verification.frameCount
+      ? analysis
+      : null;
+  }
+  /** Measures camera motion in the verified proxy for smooth-range suggestions. */
+  analyseMotion(id: string): MediaJob {
+    const active = this.#analysing.get(id);
+    if (active !== undefined) return this.jobs.get(active);
+    const asset = this.get(id);
+    if (asset.status !== 'ready' || !asset.prepared)
+      throw new ServiceError('Prepare the recording before looking for its smooth part.', 409);
+    if (this.#preparing.has(id) || this.#prepareRequests.has(id) || this.#relinking.has(id))
+      throw new ServiceError(`${asset.name} is busy. Try again once its current job finishes.`, 409);
+    const { verifiedAt, frameCount } = asset.prepared.verification;
+    const job = this.jobs.submit(
+      'motion',
+      asset.name,
+      async (context) => {
+        const current = this.get(id);
+        if (current.prepared?.verification.verifiedAt !== verifiedAt)
+          throw new ServiceError('The proxy changed while waiting. Look for the smooth part again.', 409);
+        await assertSourceIdentity(current.sourcePath, current.fingerprint);
+        context.update(0.01, 'Measuring camera motion');
+        const analysis = await analyseProxy(
+          this.config.ffmpeg,
+          this.proxyPath(current),
+          frameCount,
+          verifiedAt,
+          context.signal,
+          (fraction) => context.update(0.01 + fraction * 0.97, 'Measuring camera motion'),
+        );
+        await atomicWrite(this.motionPath(current), JSON.stringify(analysis));
+        return 'Camera motion measured';
+      },
+      () => {
+        this.#analysing.delete(id);
+        return Promise.resolve();
+      },
+    );
+    this.#analysing.set(id, job.id);
+    return job;
   }
   async #save(): Promise<void> {
     await this.#writer.run(() => this.#writeRegistry());

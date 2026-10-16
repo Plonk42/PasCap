@@ -3,6 +3,13 @@ import { audioAssetSchema, type AudioAsset } from '../../src/shared/audio.js';
 import { applyCommand } from '../../src/shared/commands.js';
 import { mediaAssetSchema, type MediaAsset } from '../../src/shared/media.js';
 import {
+  MOTION_ANALYSIS_VERSION,
+  motionRoughness,
+  SMOOTH_TOLERANCE,
+  smoothRanges,
+  type MotionAnalysis,
+} from '../../src/shared/motion-analysis.js';
+import {
   createClip,
   createLayer,
   createProject,
@@ -1796,6 +1803,103 @@ test('missing source snapshots degrade explicitly without changing the track or 
   await flush(page);
   expect(requests).toEqual([]);
   expect(memory.saves).toBe(0);
+});
+
+test('Find smooth part analyses once, marks the steady part under the strip and Use applies it as IN/OUT', async ({
+  page,
+}) => {
+  const asset = assets[0]!;
+  const fps = 30000 / 1001;
+  // A jerky first second of reframing, then a steady pan.
+  const tx = Array.from({ length: 120 }, (_, frame) => {
+    if (frame === 0) return null;
+    return frame < 30 ? 3 * Math.sin(frame / 2) : 1.5;
+  });
+  const still = tx.map((value) => (value === null ? null : 0));
+  const analysis: MotionAnalysis = {
+    version: MOTION_ANALYSIS_VERSION,
+    verifiedAt: asset.prepared!.verification.verifiedAt,
+    frameCount: 120,
+    tx,
+    ty: still,
+    zoom: still,
+    rotation: still,
+  };
+  const roughness = motionRoughness(analysis, fps);
+  const steady = smoothRanges(roughness, SMOOTH_TOLERANCE.initial, fps)[0]!;
+  const tolerant = smoothRanges(roughness, SMOOTH_TOLERANCE.max, fps)[0]!;
+  expect(steady.sourceIn).toBeGreaterThan(20);
+  expect(tolerant.sourceIn).toBeLessThan(steady.sourceIn);
+  const job = {
+    id: 'motion-job',
+    kind: 'motion',
+    label: asset.name,
+    state: 'running',
+    progress: 0.5,
+    message: 'Measuring camera motion',
+    createdAt: new Date().toISOString(),
+    finishedAt: null,
+    outputUrl: null,
+    receiptUrl: null,
+  };
+  const posts: string[] = [];
+  let polls = 0;
+  await page.route(`**/api/media/${asset.id}/motion`, async (route) => {
+    if (route.request().method() === 'POST') {
+      posts.push(route.request().postData() ?? '');
+      await route.fulfill({ status: 202, json: { job } });
+      return;
+    }
+    await route.fulfill({ json: { analysis: polls >= 2 ? analysis : null } });
+  });
+  await page.route('**/api/jobs', async (route) => {
+    if (!posts.length) {
+      await route.fulfill({ json: { jobs: [] } });
+      return;
+    }
+    polls++;
+    const done = polls >= 2;
+    await route.fulfill({
+      json: { jobs: [{ ...job, ...(done && { state: 'completed', progress: 1, finishedAt: job.createdAt }) }] },
+    });
+  });
+  const before = await current(page);
+  await page.getByRole('button', { name: 'Review pattern-a.mp4', exact: true }).click();
+  await page.getByRole('button', { name: 'Find smooth part', exact: true }).click();
+  const row = page.locator('.smooth-range-row');
+  await expect(row).toHaveAttribute('data-smooth-in', String(steady.sourceIn));
+  await expect(row).toHaveAttribute('data-smooth-out', String(steady.sourceOut));
+  expect(posts).toEqual(['{}']);
+  const band = page.locator('.source-range-suggestion:not(.alternative)');
+  await expect(band).toHaveCount(1);
+  expect(Number.parseFloat(await band.evaluate((element) => (element as HTMLElement).style.left))).toBeCloseTo(
+    (steady.sourceIn / 120) * 100,
+    3,
+  );
+
+  const use = page.getByRole('button', { name: /^Use smooth part / });
+  await use.click();
+  const strip = page.locator('.source-range-strip');
+  await expect(strip).toHaveAttribute('data-source-in', String(steady.sourceIn));
+  await expect(strip).toHaveAttribute('data-source-out', String(steady.sourceOut));
+  await expect(page.locator('.source-preview')).toHaveAttribute('data-source-frame', String(steady.sourceIn));
+  await expect(use).toBeDisabled();
+  await expect(use).toHaveText('In use');
+
+  await page.getByRole('slider', { name: 'Smooth part tolerance', exact: true }).fill(String(SMOOTH_TOLERANCE.max));
+  await expect(row).toHaveAttribute('data-smooth-in', String(tolerant.sourceIn));
+  await expect(use).toBeEnabled();
+  await expect(strip).toHaveAttribute('data-source-in', String(steady.sourceIn));
+
+  // The analysis is kept for this session: reopening needs no new request.
+  await page.getByRole('button', { name: 'Close source review', exact: true }).click();
+  await page.getByRole('button', { name: 'Review pattern-a.mp4', exact: true }).click();
+  await expect(row).toHaveAttribute('data-smooth-in', String(tolerant.sourceIn));
+  expect(posts).toHaveLength(1);
+  expect(await current(page)).toEqual(before);
+  await flush(page);
+  expect(memory.saves).toBe(0);
+  await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
 });
 
 test('Media thumbnails dim the omitted head/tail of the applied source range, not drafts', async ({ page }) => {
