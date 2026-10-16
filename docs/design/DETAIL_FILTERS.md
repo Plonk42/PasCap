@@ -128,8 +128,10 @@ two-clip reference and the measurement helper reject them.
 ## HDR look
 
 **HDR** is an SDR local tone-mapping look, not HDR output, Kelvin or automatic
-exposure: it opens shadows and recovers highlights over large areas while boosting
-local detail, preserving true black, mid-grey and white on flat areas.
+exposure: it opens shadows and recovers highlights over large areas while keeping
+local detail, preserving true black, mid-grey and white on flat areas. Its local-detail
+boost is the separate [Local contrast](#local-contrast) setting; HDR 1 with Local contrast 1
+is the look HDR 1 alone used to give.
 
 - **Data**: required track `colour.hdr` in **0–1**, neutral 0 on new tracks, and the
   fourteenth nullable track keyframe channel `hdr`, after `blacks`. It is keyframed,
@@ -140,10 +142,9 @@ local detail, preserving true black, mid-grey and white on flat areas.
   identity, so animating HDR reuses one scalar LUT. It runs in this kernel, on source
   taps after Denoise, with the evaluated amount $h$.
 - **Base**: the shared [edge-aware base](#edge-aware-base) $B$.
-- **Tone**: target luma $y' = B + h\,B(1-B)(1-2B) + (y-B)(1+h)$: the base keeps 0, ½
-  and 1 while shadows rise and highlights fall (monotonic for $h \le 1$), and the local
-  residual $y-B$ is boosted up to ×2. [Local contrast](#local-contrast) $c$ adds to that
-  factor: $(y-B)(1+h+c)$.
+- **Tone**: target luma $y' = B + h\,B(1-B)(1-2B) + (y-B)(1+c)$ with
+  [Local contrast](#local-contrast) $c$: the base keeps 0, ½ and 1 while shadows rise and
+  highlights fall (monotonic for $h \le 1$); HDR alone keeps the local residual $y-B$.
 - **Colour**: with $\Delta = y' - y$ and blend $b = \min(1, y/0.1)$, each channel becomes
   $D_i + \Delta + b\,(D_i\,y'/y - D_i - \Delta)$ (just $D_i + \Delta$ at $y = 0$): a
   hue-preserving luma ratio, fading to an additive change in deep shadows where the
@@ -158,18 +159,18 @@ per release. The Original preview bypasses it with the rest of Colour.
 
 ## Local contrast
 
-**Local contrast** is HDR's local-detail boost on its own, without HDR's shadow and
-highlight compression, so the two can be compared or combined; HDR itself is unchanged.
+**Local contrast** is the local-detail boost split out of HDR, so HDR's tone compression and
+this boost can be judged and set separately.
 
 - **Data**: required track `colour.localContrast` in **−1…1**, neutral 0 on new tracks, and
   the fifteenth nullable track keyframe channel `localContrast`, after `hdr`. It is keyframed,
   interpolated, held and reset like the other scalar Colour settings; default keyframes set
   it to 0. Missing fields are invalid; earlier schema versions are rejected and preserved.
 - **Tone**: with HDR $h$ and Local contrast $c$, HDR's target becomes
-  $y' = B + h\,B(1-B)(1-2B) + (y-B)(1+h+c)$ on the shared [edge-aware base](#edge-aware-base)
+  $y' = B + h\,B(1-B)(1-2B) + (y-B)(1+c)$ on the shared [edge-aware base](#edge-aware-base)
   $B$, applied with HDR's hue-preserving colour step. With HDR 0 it is $y' = y + c\,(y-B)$:
-  flat areas ($y = B$) never move, +1 doubles the residual like HDR 1's detail boost and
-  −1 flattens the area to its base.
+  flat areas ($y = B$) never move, +1 doubles the residual and −1 flattens the area to its
+  base.
 - **Not a grade stage**: like Shadows, Highlights and HDR, it is excluded from the per-pixel
   grade, its LUTs and LUT identity. Any nonzero base or keyframe value requires composited
   export; the diagnostic two-clip reference and measurement helper reject it. Preview adds
@@ -297,7 +298,7 @@ only that setting; **Reset detail** restores all three in one Undo step.
 
 - Unit: strict schema, neutral bypass, an independent transcription of the kernel
   including the guided base, HDR, Local contrast, Shadows and Highlights (agreement to $10^{-12}$),
-  edge/noise behaviour, HDR black/grey/white preservation, detail boost, hue preservation,
+  edge/noise behaviour, HDR black/grey/white preservation, Local contrast detail boost, hue preservation,
   no halo at a strong edge, Shadows/Highlights monotonic flat response, fixed black and
   mid-grey, tone choice after Exposure and untouched dark texture in a bright area, commands,
   export routing, one reused LUT while local tone animates and the
