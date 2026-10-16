@@ -89,7 +89,7 @@ white balance. Static HSL/curves add no animation channels. See
 [Temperature and Tint](docs/design/TEMPERATURE_AND_TINT.md).
 **HDR** (0–1, neutral 0) is a keyable SDR local tone-mapping look applied with the
 clip detail filters before grading; see [detail filters](docs/design/DETAIL_FILTERS.md#hdr-look).
-**Local contrast** (−1…1, neutral 0) applies HDR's local-detail boost alone, without its
+**Local contrast** (−1…1, neutral 0) applies the local-detail boost split out of HDR, without its
 tone compression; see [local contrast](docs/design/DETAIL_FILTERS.md#local-contrast).
 **Clip → Placement** contains placement only.
 Track options contains only rename, Ripple, ordering and deletion; visibility

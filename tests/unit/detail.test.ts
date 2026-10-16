@@ -112,7 +112,7 @@ function reference(image: Image, u: number, v: number, settings: DetailSettings,
     }
     const b = sum / total;
     if (hdr > 0 || localContrast !== 0) {
-      const target = b + hdr * b * (1 - b) * (1 - 2 * b) + (base - b) * (1 + hdr + localContrast);
+      const target = b + hdr * b * (1 - b) * (1 - 2 * b) + (base - b) * (1 + localContrast);
       const lift = target - base;
       const blend = Math.min(1, base / 0.1);
       denoised = denoised.map((channel) =>
@@ -300,14 +300,19 @@ describe('track HDR look', () => {
     expect(dimmer).toBeLessThan(run(flat(0.2), 0.5, 0.5, NEUTRAL_DETAIL, 16 / 9, { hdr: 1 })[0]!);
   });
 
-  it('boosts local detail, preserves hue in colour and does not halo across a strong edge', () => {
+  it('keeps local detail without boosting it, preserves hue in colour and does not halo across a strong edge', () => {
     const fine: Image = (u) => {
       const level = 0.5 + 0.05 * Math.sin(u * 1280 * 0.7);
       return [level, level, level];
     };
     const u = (Math.PI / 2 / 0.7 + 0.5) / 1280;
     const input = fine(u, 0.5)[0] - 0.5;
-    expect(run(fine, u, 0.5, NEUTRAL_DETAIL, 16 / 9, { hdr: 1 })[0]! - 0.5).toBeGreaterThan(1.6 * input);
+    const kept = run(fine, u, 0.5, NEUTRAL_DETAIL, 16 / 9, { hdr: 1 })[0]! - 0.5;
+    expect(Math.abs(kept - input)).toBeLessThan(0.2 * input);
+    // HDR 1 with Local contrast 1 is the former HDR 1, detail boost included.
+    expect(run(fine, u, 0.5, NEUTRAL_DETAIL, 16 / 9, { hdr: 1, localContrast: 1 })[0]! - 0.5).toBeGreaterThan(
+      1.6 * input,
+    );
     const tinted: Image = () => [0.3, 0.2, 0.1];
     const [red, green, blue] = run(tinted, 0.5, 0.5, NEUTRAL_DETAIL, 16 / 9, { hdr: 1 });
     expect(red! / blue!).toBeCloseTo(3, 10);
@@ -383,7 +388,7 @@ describe('track Local contrast', () => {
       }
   });
 
-  it("is HDR's detail boost without its tone compression: flat areas never move", () => {
+  it("is HDR's former detail boost on its own: flat areas never move", () => {
     for (const level of [0, 0.1, 0.5, 0.9, 1])
       for (const localContrast of [-1, 1])
         expect(run(() => [level, level, level], 0.5, 0.5, NEUTRAL_DETAIL, 16 / 9, { localContrast })[0]).toBeCloseTo(

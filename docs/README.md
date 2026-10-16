@@ -70,7 +70,7 @@ moves the white point; required track Blacks (−1…1, neutral 0) is the keyabl
 it that moves the black point. HSL/curves remain required static settings, not extra channels.
 Required track HDR (0–1, neutral 0) is a keyable SDR local tone-mapping look
 applied in the clip detail kernel before grading; required track Local contrast
-(−1…1, neutral 0) is HDR's keyable local-detail boost alone, in the same kernel.
+(−1…1, neutral 0) is the keyable local-detail boost split out of HDR, in the same kernel.
 Projects require `music: MusicTrack[]`, 0–8 independent uniquely
 identified music tracks (`[]` without music). Project duration is maximum video clip
 OUT or music start + duration: music can extend it, with video closing fades at
