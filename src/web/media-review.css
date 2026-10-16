@@ -301,6 +301,59 @@
   pointer-events: none;
 }
 
+/* Suggested smooth parts sit just under the strip, clear of the thumbnails and handles. */
+.source-range-suggestion {
+  position: absolute;
+  bottom: -6px;
+  height: 3px;
+  border-radius: 2px;
+  background: #7fd3e6;
+  pointer-events: none;
+}
+
+.source-range-suggestion.alternative {
+  opacity: 0.4;
+}
+
+.smooth-range-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  min-height: 26px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.smooth-range-row strong {
+  color: #d6eef4;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.smooth-range-swatch {
+  width: 12px;
+  height: 3px;
+  border-radius: 2px;
+  background: #7fd3e6;
+}
+
+.smooth-range-error {
+  color: var(--error);
+}
+
+.smooth-range-tolerance {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.smooth-range-tolerance input {
+  width: 96px;
+  accent-color: #7fd3e6;
+}
+
 .source-playhead-input {
   position: absolute;
   inset: 0;

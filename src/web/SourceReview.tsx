@@ -21,10 +21,12 @@ import {
   type MediaSelectionEdge,
 } from '../shared/media-selection.js';
 import type { MediaAsset } from '../shared/media.js';
+import type { SmoothRange } from '../shared/motion-analysis.js';
 import { formatTimecode } from '../shared/timing.js';
 import { mediaReady, sourceSeconds } from './display.js';
 import { Icon } from './icons.js';
 import { Popover } from './Popover.js';
+import { SmoothRangeRow, useSmoothRange } from './SmoothRange.js';
 import { SourceTransport, type SourceTransportState } from './source-transport.js';
 import { useDelayedFlag } from './use-delayed-flag.js';
 import './rush-source.css';
@@ -64,6 +66,7 @@ interface RangeProps {
   range: MediaSelection;
   frame: number;
   observedFrame: number | null;
+  suggestions: readonly SmoothRange[];
   disabled: boolean;
   onFrame: (frame: number) => void;
   onRange: (range: MediaSelection) => void;
@@ -113,6 +116,7 @@ export function SourceReview({
   const [retry, setRetry] = useState(0);
   const [lastAddedId, setLastAddedId] = useState<string | null>(null);
   const [rangeDraft, setRangeDraft] = useState(false);
+  const smooth = useSmoothRange(asset);
   const requestedFrame = Math.max(0, Math.min(asset.metadata.frameCount - 1, Math.round(frame)));
   const rate = asset.metadata.frameRate;
   const resourceKey = `${asset.id}/${asset.prepared?.verification.verifiedAt}/${asset.metadata.frameCount}/${rate.numerator}/${rate.denominator}/${retry}`;
@@ -352,6 +356,7 @@ export function SourceReview({
         range={range}
         frame={observedFrame ?? requestedFrame}
         observedFrame={observedFrame}
+        suggestions={smooth.ranges}
         disabled={disabled}
         onFrame={scrub}
         onRange={onRange}
@@ -382,6 +387,19 @@ export function SourceReview({
           </div>
         }
       />
+      {mediaReady(asset) && (
+        <SmoothRangeRow
+          asset={asset}
+          range={range}
+          smooth={smooth}
+          disabled={disabled || rangeDraft}
+          onApply={(suggestion) => {
+            scrub(suggestion.sourceIn);
+            onRange({ mediaId: asset.id, ...suggestion });
+          }}
+          onKeyDown={keyboard}
+        />
+      )}
       <output
         className="source-add-feedback"
         aria-live="polite"
@@ -480,6 +498,7 @@ function SourceRangeEditor({
   range,
   frame,
   observedFrame,
+  suggestions,
   disabled,
   onFrame,
   onRange,
@@ -722,6 +741,17 @@ function SourceRangeEditor({
             }}
             aria-hidden="true"
           />
+          {suggestions.map((suggestion, index) => (
+            <span
+              key={`${suggestion.sourceIn}-${suggestion.sourceOut}`}
+              className={index ? 'source-range-suggestion alternative' : 'source-range-suggestion'}
+              style={{
+                left: `${(suggestion.sourceIn / count) * 100}%`,
+                width: `${((suggestion.sourceOut - suggestion.sourceIn) / count) * 100}%`,
+              }}
+              aria-hidden="true"
+            />
+          ))}
           <input
             className="source-playhead-input"
             type="range"

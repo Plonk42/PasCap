@@ -697,6 +697,32 @@ recordings/projects or leaving Source preview cancels pending playback and relea
 its sole decoder. Loading/playback failures remain explicit with Retry. Source
 playback never moves the timeline/music, changes clips/track keyframes or saves/history.
 Choices persist per project in that browser and affect future insertions only.
+
+### Smooth part suggestion
+
+Below the source range strip, **Find smooth part** suggests the steadiest stretch of
+a drone recording, where the camera moves without brutal changes of angle or speed.
+It queues one **Smooth-part analysis** job in the one-heavy-job worker (shown in
+Activity), which decodes the verified editing proxy at 320 × 180 grey and measures,
+for every frame, the camera's global motion since the previous one: translation,
+zoom and rotation from block phase correlation with a robust fit that ignores moving
+water, trees or other subjects. Featureless frames stay unmeasured. The result is
+cached as `motion-v1.json` beside the proxy and its thumbnails, tied to the proxy's
+verification time; re-preparing the proxy makes it stale. Nothing is analysed
+implicitly: opening a recording never requests it, and a found analysis is reused for
+the rest of the session. The original is only identity-checked, never read.
+
+**Roughness** is how fast that motion changes (% of image width per s², smoothed):
+a steady pan or forward flight is smooth, reframing, braking and starting are rough.
+The suggestion is the longest stretch of at least 2 s below the **Tolerance**
+slider (0.5–6, initially 2, a browser preference), bridging jolts shorter than 0.5 s
+and keeping 0.2 s clear of rough edges inside the recording. A cyan bar under the strip
+marks it, fainter bars mark other smooth stretches, and the row names its IN/OUT
+timecode and length. **Use** applies it as the applied source range (and shows its IN
+frame), like any other range choice: no project edit, history or save. Forward
+acceleration seen straight ahead barely changes the picture, so speed changes without
+turning are not detected; flight logs are not used.
+
 Source **Add clip** stays in the pinned review for repeated additions. Its
 sticky header and native nonmodal clip popup keep adding/reviewing reachable
 without a tall list shrinking the preview or moving controls. Media

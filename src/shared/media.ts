@@ -77,7 +77,7 @@ export type ProxyVerification = z.infer<typeof proxyVerificationSchema>;
 export const jobSchema = z
   .object({
     id: idSchema,
-    kind: z.enum(['prepare', 'reference', 'audio', 'export', 'relink']),
+    kind: z.enum(['prepare', 'reference', 'audio', 'export', 'relink', 'motion']),
     label: z.string(),
     state: z.enum(['queued', 'running', 'completed', 'failed', 'cancelled']),
     progress: z.number().min(0).max(1),
