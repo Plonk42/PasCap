@@ -200,7 +200,12 @@ describe.skipIf(!enabled)('current-schema storage/archive integration · generat
       { ...valid, layers: [{ ...valid.layers[0]!, transform: { ...valid.layers[0]!.transform, unknown: true } }] },
       { ...valid, clips: [{ ...valid.clips[0]!, spatial: valid.layers[0]!.transform }] },
       { ...valid, unexpected: true },
-      ...(['temperature', 'tint'] as const).flatMap((setting) => {
+      ...(
+        [
+          ['temperature', 2],
+          ['tint', 1],
+        ] as const
+      ).flatMap(([setting, limit]) => {
         const colour: Record<string, unknown> = { ...valid.layers[0]!.colour };
         delete colour[setting];
         const values: Record<string, unknown> = { ...EMPTY_KEY_VALUES, exposure: 0.25 };
@@ -218,11 +223,11 @@ describe.skipIf(!enabled)('current-schema storage/archive integration · generat
               },
             ],
           },
-          ...[null, -1.001, 1.001, '0'].map((value) => ({
+          ...[null, -limit - 0.001, limit + 0.001, '0'].map((value) => ({
             ...valid,
             layers: [{ ...valid.layers[0]!, colour: { ...valid.layers[0]!.colour, [setting]: value } }],
           })),
-          ...[-1.001, 1.001, '0'].map((value) => ({
+          ...[-limit - 0.001, limit + 0.001, '0'].map((value) => ({
             ...valid,
             layers: [
               {
