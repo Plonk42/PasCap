@@ -76,7 +76,7 @@ See [track appearance](design/ROW_APPEARANCE.md) for ownership, UI and strict st
 - Grade each decoder independently, then blend **encoded** RGB for dissolves.
   Black fades multiply already-graded encoded RGB. Thus tinted/lifted black cannot
   contaminate fade-to-black. No hidden sharpening, tone mapping or loudness change;
-  clip **Sharpen/Clarity/Denoise** and track **HDR** run only when set, on source
+  clip **Sharpen/Clarity/Denoise** and track **HDR** and **Local contrast** run only when set, on source
   taps before this grade ([detail filters](design/DETAIL_FILTERS.md)).
 - With neutral HSL/identity curves, static single-track export generates a 65³
   scalar cube for FFmpeg `lut3d` tetrahedral interpolation. Composited/animated export
@@ -103,13 +103,13 @@ frames**; unkeyed track colour uses `layer.colour` and unkeyed Transform setting
 setting: `VideoLayer.opacity` is a required number in 0–1, initially 1 on a new
 track. Without keyed Opacity settings, every source uses that track value; otherwise
 the track's sole `opacity` channel overrides it, including both dissolve sources.
-There is no saved `clip.opacity` or second opacity channel. The fourteen required
+There is no saved `clip.opacity` or second opacity channel. The fifteen required
 nullable keyframe fields are `opacity`, `temperature`, `tint`, `exposure`, `brightness`, `contrast`,
-`hue`, `saturation`, `vibrance`, `highlights`, `shadows`, `whites`, `blacks` and `hdr`.
+`hue`, `saturation`, `vibrance`, `highlights`, `shadows`, `whites`, `blacks`, `hdr` and `localContrast`.
 Hold/linear/ease-in/ease-out/smooth interpolation is that setting's own Easing at the left keyframe
 with that setting enabled; endpoints hold outside the
 keyed interval. Colour evaluates all twelve scalar parameter values before applying the
-equations above; evaluated HDR feeds the detail kernel before grading instead. Trim/split never copy or shift track keyframes or Transform; they retain clip-speed
+equations above; evaluated HDR and Local contrast feed the detail kernel before grading instead. Trim/split never copy or shift track keyframes or Transform; they retain clip-speed
 anchors, including those outside the clip range and at the registered
 original's exclusive OUT. Transform poses evaluate at absolute project time, like
 Colour, and apply to every source on the track; see
@@ -244,7 +244,7 @@ are not allocated per stored clip; missing decoded frames buffer explicitly
 ([WebCodecs preview decoding](design/WEBCODECS_PREVIEW.md)).
 
 Production export reads originals and uses exact shared retiming. The static fast
-path requires neutral HSL/identity curves, Shadows/Highlights/HDR 0, one enabled video track with Opacity 1, no track keyframes, an exactly neutral
+path requires neutral HSL/identity curves, Shadows/Highlights/HDR/Local contrast 0, one enabled video track with Opacity 1, no track keyframes, an exactly neutral
 track Transform base without Transform keyframes, zero origin
 and no internal gaps, covering full project duration; supported track fades/dissolves retain bounded chunks.
 Other valid timelines use generalized sequential RGBA16 group and source-over
@@ -256,7 +256,7 @@ export requires at least one retained video clip. Resource and numeric limits ar
 
 The diagnostic reference accepts **exactly two normal-speed (constant 1×) clips on one
 enabled, zero-origin contiguous video track with Opacity 1 and static scalar track Colour**,
-neutral HSL and identity curves, Shadows/Highlights/HDR 0, an exactly neutral track Transform
+neutral HSL and identity curves, Shadows/Highlights/HDR/Local contrast 0, an exactly neutral track Transform
 base without Transform keyframes, without music, extra tracks or track keyframes,
 and is limited to 3,600 project frames. It refuses unsupported
 documents regardless of Ripple or track ID.
@@ -269,8 +269,8 @@ and are not renamed by this contract.
 Project documents and receipt snapshots with an earlier schema version are incompatible and preserved;
 recreate projects deliberately, with no migration, compatibility defaults or
 old-format/null fallback readers or automatic deletion. The strict current schema requires
-complete video track `colour`, including Temperature/Tint/Vibrance/Whites/Blacks/HDR bases and static HSL/curves,
-all fourteen nullable keyframe fields, constant or custom-curve clip speed, boolean clip `reverse`, track `transform` base/per-setting keyframes and track `opacity`; saved `clip.colour`, `clip.correction`, `clip.opacity`, `clip.spatial` and
+complete video track `colour`, including Temperature/Tint/Vibrance/Whites/Blacks/HDR/Local contrast bases and static HSL/curves,
+all fifteen nullable keyframe fields, constant or custom-curve clip speed, boolean clip `reverse`, track `transform` base/per-setting keyframes and track `opacity`; saved `clip.colour`, `clip.correction`, `clip.opacity`, `clip.spatial` and
 old `clipOpacity`/`layerOpacity` keyframe fields are rejected, not defaulted.
 Production export receipts also remain version 1, with strict current-schema snapshots and
 required `musicSources` captured-original/`settings.audio` identified-plan arrays;
@@ -284,7 +284,7 @@ Video track colour also requires static eight-band HSL and master/red/green/blue
 The order is decoded linear Temperature/Tint gains before Exposure and the
 remaining scalar SDR stages, encoded BT.709 HSL, master curve, individual RGB
 curves, black-fade brightness and group coverage/source-over. HSL/curves add no
-channels to the fourteen nullable track fields. HSL protects greys in its incoming
+channels to the fifteen nullable track fields. HSL protects greys in its incoming
 RGB, not greys already coloured by Temperature/Tint. The Original preview bypasses
 the entire colour transform, not geometry or coverage. Precise advanced bounds,
 circular weighting, smooth monotone cubic curves and resource budgets are in

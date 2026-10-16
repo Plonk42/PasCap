@@ -6,7 +6,7 @@ export const interpolationSchema = z.enum(['hold', 'linear', 'ease-in', 'ease-ou
 export type Interpolation = z.infer<typeof interpolationSchema>;
 export type KeyframeSetting = 'opacity' | ScalarColourSetting;
 
-/** One ordered control catalogue for the fourteen independently participating track channels. */
+/** One ordered control catalogue for the fifteen independently participating track channels. */
 export const KEYFRAME_SETTINGS = Object.freeze(
   (
     [
@@ -32,6 +32,7 @@ const layerKeyValuesSchema = z
     whites: colourSchema.shape.whites.nullable(),
     blacks: colourSchema.shape.blacks.nullable(),
     hdr: colourSchema.shape.hdr.nullable(),
+    localContrast: colourSchema.shape.localContrast.nullable(),
   })
   .strict();
 export type LayerKeyValues = z.infer<typeof layerKeyValuesSchema>;
@@ -50,6 +51,7 @@ export const EMPTY_KEY_VALUES: Readonly<LayerKeyValues> = Object.freeze({
   whites: null,
   blacks: null,
   hdr: null,
+  localContrast: null,
 });
 
 /** One nullable Easing per setting, in the same strict shape as that keyframe's values. */

@@ -74,7 +74,7 @@ function overlay(
 }
 const colourKeys = (): LayerKeyframe[] => [point(0, { exposure: 1 }, 'hold'), point(100, { hue: 20 })];
 describe('strict current-schema row points and independently participating settings', () => {
-  it('exports an ordered immutable fourteen-setting catalogue and explicit all-null template', () => {
+  it('exports an ordered immutable fifteen-setting catalogue and explicit all-null template', () => {
     const settings = [
       'opacity',
       'temperature',
@@ -90,10 +90,11 @@ describe('strict current-schema row points and independently participating setti
       'whites',
       'blacks',
       'hdr',
+      'localContrast',
     ];
     expect(KEYFRAME_SETTINGS.map((setting) => setting.key)).toEqual(settings);
     expect(Object.keys(EMPTY_KEY_VALUES)).toEqual(settings);
-    expect(Object.values(EMPTY_KEY_VALUES)).toEqual(Array(14).fill(null));
+    expect(Object.values(EMPTY_KEY_VALUES)).toEqual(Array(15).fill(null));
     expect(Object.isFrozen(EMPTY_KEY_VALUES)).toBe(true);
     expect(Object.isFrozen(KEYFRAME_SETTINGS)).toBe(true);
     expect(KEYFRAME_SETTINGS.every(Object.isFrozen)).toBe(true);
@@ -357,7 +358,7 @@ describe('strict current-schema row points and independently participating setti
     expect(layerKeyframeSchema.safeParse(withoutKind).success).toBe(false);
   });
 
-  it('can independently toggle all fourteen participants at one frame', () => {
+  it('can independently toggle all fifteen participants at one frame', () => {
     let project = createProject('ten', 'Ten');
     for (const setting of KEYFRAME_SETTINGS)
       project = applyCommand(project, {

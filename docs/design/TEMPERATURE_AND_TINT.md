@@ -17,9 +17,9 @@ their track's complete grade, including both dissolve sources. Empty tracks rema
 editable; different treatments require different tracks. No clip Colour/correction
 base, ownership toggle or copy to clips is introduced.
 
-Shared video track keyframes require exactly **fourteen nullable channels**, in control order:
+Shared video track keyframes require exactly **fifteen nullable channels**, in control order:
 `opacity`, `temperature`, `tint`, `exposure`, `brightness`, `contrast`,
-`hue`, `saturation`, `vibrance`, `highlights`, `shadows`, `whites`, `blacks`, `hdr`. Temperature and Tint are keyed
+`hue`, `saturation`, `vibrance`, `highlights`, `shadows`, `whites`, `blacks`, `hdr`, `localContrast`. Temperature and Tint are keyed
 independently at absolute project frames, interpolate parameter values using their own
 Easing at the left keyframe and hold endpoints. Keyframes without that enabled setting are
 skipped. No keyframes for a setting means the saved track base; removing its final keyframe reveals
@@ -30,7 +30,7 @@ animation channels. Speed is clip-only, never a track channel.
 applies them before Exposure). Main and stored
 keyed settings use native sliders (step 0.01) with coloured tracks (Temperature
 blue → yellow, Tint green → magenta), adjacent exact numeric fields,
-and reset to 0 by double-clicking the name. Main capture diamonds are always visible, with adjacent per-setting **Previous/Next** buttons because not every setting is enabled at every shared keyframe. Its single keyframe-line Previous/Next pair (with the keyframe count) visits the union of Opacity, all twelve scalar colour and HDR keys.
+and reset to 0 by double-clicking the name. Main capture diamonds are always visible, with adjacent per-setting **Previous/Next** buttons because not every setting is enabled at every shared keyframe. Its single keyframe-line Previous/Next pair (with the keyframe count) visits the union of Opacity, all twelve scalar colour, HDR and Local contrast keys.
 Enabled setting chips in stored Colour keyframe rows retain
 their per-channel arrows. All main and stored per-channel arrows visit strictly
 earlier/later keyframes where that channel is nonnull (zero is enabled), sharing
@@ -62,7 +62,7 @@ Exposure → Contrast → Brightness → Whites/Blacks → Hue/Saturation/Vibran
 linear clipping and BT.709 encoding → static encoded HSL → master curve → RGB
 curves → black-fade brightness → Opacity/spatial coverage and grouped source-over.
 See [the grading equations](../COLOUR_AND_TIMING.md) for the remaining stages. Shadows,
-Highlights and HDR are local stages on source pixels before this grade; see
+Highlights, HDR and Local contrast are local stages on source pixels before this grade; see
 [detail filters](DETAIL_FILTERS.md#local-shadows-and-highlights).
 
 At $T=I=0$, all gains equal 1. Normalization preserves **neutral-white linear

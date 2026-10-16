@@ -555,7 +555,7 @@ describe.skipIf(!enabled)('spatial transforms · real native FFmpeg, disposable 
     changes: Partial<SpatialPose>;
     asset: number;
     detail?: DetailSettings;
-    tone?: Partial<Pick<ColourSettings, 'shadows' | 'highlights' | 'hdr' | 'exposure'>>;
+    tone?: Partial<Pick<ColourSettings, 'shadows' | 'highlights' | 'hdr' | 'localContrast' | 'exposure'>>;
   }[] = [
     {
       name: 'crop with exact inclusive IN/exclusive OUT pixel centres',
@@ -609,6 +609,12 @@ describe.skipIf(!enabled)('spatial transforms · real native FFmpeg, disposable 
       asset: 1,
       changes: {},
       tone: { shadows: 0.8, highlights: -0.7 },
+    },
+    {
+      name: 'track Local contrast on the neutral letterboxed path',
+      asset: 1,
+      changes: {},
+      tone: { localContrast: 0.9 },
     },
     {
       name: 'track Shadows, Highlights, HDR and Exposure with clip detail before a rotated, scaled grade',

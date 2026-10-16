@@ -25,6 +25,7 @@ export const colourSchema = z
     whites: z.number().min(-1).max(1),
     blacks: z.number().min(-1).max(1),
     hdr: z.number().min(0).max(1),
+    localContrast: z.number().min(-1).max(1),
     hsl: hslSchema,
     curves: curvesSchema,
   })
@@ -47,6 +48,7 @@ export function createColourSettings(): ColourSettings {
     whites: 0,
     blacks: 0,
     hdr: 0,
+    localContrast: 0,
     hsl: createHslSettings(),
     curves: createColourCurves(),
   };
@@ -75,6 +77,7 @@ export const COLOUR_CONTROLS = [
   { key: 'whites', label: 'Whites', min: -1, max: 1, step: 0.01, unit: '' },
   { key: 'blacks', label: 'Blacks', min: -1, max: 1, step: 0.01, unit: '' },
   { key: 'hdr', label: 'HDR', min: 0, max: 1, step: 0.01, unit: '' },
+  { key: 'localContrast', label: 'Local contrast', min: -1, max: 1, step: 0.01, unit: '' },
 ] as const;
 export type ScalarColourSetting = (typeof COLOUR_CONTROLS)[number]['key'];
 /** Only the scalar numeric channels, never static structured settings. */
@@ -155,7 +158,7 @@ export function compileGradeInto(settings: ColourSettings): PixelGrade {
   };
 }
 /** Local tone settings run in the neighbourhood stage before grading (src/shared/detail.ts), not in the per-pixel grade. */
-export const LOCAL_TONE_SETTINGS = ['shadows', 'highlights', 'hdr'] as const;
+export const LOCAL_TONE_SETTINGS = ['shadows', 'highlights', 'hdr', 'localContrast'] as const;
 export type LocalToneSetting = (typeof LOCAL_TONE_SETTINGS)[number];
 export function isNeutralLocalTone(settings: Pick<ColourSettings, LocalToneSetting>): boolean {
   return LOCAL_TONE_SETTINGS.every((key) => settings[key] === 0);

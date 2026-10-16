@@ -400,7 +400,7 @@ describe('registered API methods', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
-  it('validates all fourteen required nullable members in a shared row point, including zero participation', async () => {
+  it('validates all fifteen required nullable members in a shared row point, including zero participation', async () => {
     const point = layerKeyframe(100, { ...EMPTY_KEY_VALUES, exposure: 0, opacity: 0 }, 'linear');
     const document = { ...project, layers: [{ ...project.layers[0]!, keyframes: [point] }] };
     fetchMock.mockResolvedValueOnce(jsonResponse({ document }));

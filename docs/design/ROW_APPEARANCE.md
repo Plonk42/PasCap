@@ -1,7 +1,7 @@
 # Owner-approved video track-only Colour and Opacity
 
 Required Colour includes twelve graded scalar settings, including Temperature, Tint, Vibrance, Whites and Blacks,
-the HDR look (applied before grading with the clip detail filters; see
+the HDR look and Local contrast (applied before grading with the clip detail filters; see
 [detail filters](DETAIL_FILTERS.md#hdr-look)),
 eight static HSL bands and four master/RGB colour curves. HSL/curves share video track
 ownership but add no nullable animation channels. Scalar keyframes override their own
@@ -13,7 +13,7 @@ order: [Temperature/Tint](TEMPERATURE_AND_TINT.md) and
 
 Each video track requires complete `VideoLayer.colour`, neutral on creation,
 alongside its sole required `opacity`, initially 1. Colour contains the twelve
-graded scalar channels, `hdr`, plus required HSL and curves. Clips have no colour or correction
+graded scalar channels, `hdr`, `localContrast`, plus required HSL and curves. Clips have no colour or correction
 field: both `clip.colour` and `clip.correction` are invalid.
 The owner-approved scope is identical with or without animation: every clip on
 the same video track shares all colour treatment. Different treatments require different
@@ -29,15 +29,15 @@ Receipt format remains 1 with strict current-schema snapshots; proxy and PCM for
 unchanged, and the registries are version 2 (full-content checksums). Recreate
 incompatible projects deliberately.
 
-The twelve shared scalar colour channels and HDR override **video track colour**, independently, in
+The twelve shared scalar colour channels, HDR and Local contrast override **video track colour**, independently, in
 absolute project time. Skip keyframes without the relevant enabled setting, interpolate parameter values
 using that setting's own Easing at the left keyframe, and hold endpoints. Removing the last keyframe for a setting
 reveals the unchanged track base. HSL and curves remain static.
 Speed is clip-only and never a track channel. Opacity ownership,
 source-over composition, spatial coverage and black-fade coverage are unchanged.
-Every keyframe requires all fourteen nullable fields, in control order: `opacity`,
+Every keyframe requires all fifteen nullable fields, in control order: `opacity`,
 `temperature`, `tint`, `exposure`, `brightness`, `contrast`, `hue`,
-`saturation`, `vibrance`, `highlights`, `shadows`, `whites`, `blacks`, `hdr`. Missing fields are invalid, never defaulted.
+`saturation`, `vibrance`, `highlights`, `shadows`, `whites`, `blacks`, `hdr`, `localContrast`. Missing fields are invalid, never defaulted.
 
 For example, clips A and B on one video track both use Exposure 0.5 without keyframes.
 An Exposure curve applies the same evaluated value to both at any project frame,
@@ -65,8 +65,8 @@ Texture, decoder and full-frame buffer counts stay unchanged. Exact neutral spat
 poses retain their existing opaque black letterbox path.
 
 With neutral HSL and identity curves, static export generates a 65³ scalar LUT
-from the video track's Colour alone; nonneutral scalar colour with Shadows/Highlights/HDR 0 retains this cheap path.
-Track keyframes, nonzero HDR, Transform edits/keyframes or nonneutral HSL/curves require composited export. Scalar-only
+from the video track's Colour alone; nonneutral scalar colour with Shadows/Highlights/HDR/Local contrast 0 retains this cheap path.
+Track keyframes, nonzero HDR or Local contrast, Transform edits/keyframes or nonneutral HSL/curves require composited export. Scalar-only
 composited grades use evaluated track parameters and at most two reused LUT arrays.
 Advanced grades evaluate the complete scalar/HSL/curve transform exactly on the
 fractional sampled RGB. Source/frame compilation determines neutral stages once,
@@ -77,17 +77,17 @@ Scalar LUT interpolation and H.264 quantisation remain measured approximations,
 not bitwise shader equivalence. Sharp curves are tested after production-resolution
 input scaling: grading and resampling do not commute. The two-clip diagnostic
 reference and measurement helper accept static scalar video track Colour with neutral HSL
-and identity curves and Shadows/Highlights/HDR 0, without independent clip grades.
+and identity curves and Shadows/Highlights/HDR/Local contrast 0, without independent clip grades.
 
 ## Inspector and history
 
 Control vocabulary follows the [editor control catalogue](EDITOR_CONTROLS.md#vocabulary).
 
-**Track → Colour** has fourteen main widgets: twelve graded scalar video track colour controls,
-HDR and sole Opacity. All use existing slider/exact-field/reset controls and work on an empty
+**Track → Colour** has fifteen main widgets: twelve graded scalar video track colour controls,
+HDR, Local contrast and sole Opacity. All use existing slider/exact-field/reset controls and work on an empty
 track. They sit in four static groups, each a labelled fieldset with a small heading:
 **Opacity**; **Colour** (Temperature, Tint, Hue, Saturation, Vibrance); **Light** (Exposure,
-Brightness, Contrast, Highlights, Shadows, Whites, Blacks); **Effects** (HDR). This visible order differs from
+Brightness, Contrast, Highlights, Shadows, Whites, Blacks); **Effects** (HDR, Local contrast). This visible order differs from
 the storage and keyframe channel order, which is unchanged. Each heading's Reset icon
 (**Reset the Light group**, etc.) resets the group's editable settings in one Undo step, as
 their own Reset icons would: an unkeyed setting's track value, a keyed setting's keyframe at
@@ -97,7 +97,7 @@ convert only at the UI boundary. Required
 `VideoLayer.opacity` and `opacity` keyframe values remain **0–1**, without a schema change.
 Main capture diamonds are always visible; each retains adjacent per-setting **Previous/Next** buttons because not every
 setting is enabled at every shared keyframe. One keyframe-line Previous/Next pair (with the keyframe count) visits
-the union of Opacity, twelve scalar colour and HDR keys.
+the union of Opacity, twelve scalar colour, HDR and Local contrast keys.
 Enabled setting chips in stored Colour keyframe rows retain their per-channel arrows.
 All main and stored per-channel arrows visit strictly earlier/later keyframes
 where that channel is nonnull (zero is enabled), using the shared central

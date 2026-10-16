@@ -28,9 +28,9 @@ Usage belongs in [the user guide](../USER_GUIDE.md) and
   membership, each limited to 10,000 IDs. Every music reference also counts as
   visible membership; importing does not place music implicitly.
 - Video contracts do not change: 1–8 uniform tracks, required Ripple/transitions/
-  opening/closing fades and sole video track `opacity` in 0–1. All fourteen nullable keyframe
+  opening/closing fades and sole video track `opacity` in 0–1. All fifteen nullable keyframe
   channels are `opacity`, twelve scalar colour fields (including
-  `temperature`, `tint`, `vibrance`, `whites` and `blacks`) and `hdr`. Complete static/keyed Colour remains video track-owned;
+  `temperature`, `tint`, `vibrance`, `whites` and `blacks`), `hdr` and `localContrast`. Complete static/keyed Colour remains video track-owned;
   HSL/curves remain static. There is no clip colour/correction, clip opacity or
   second opacity channel. Clip-only constant/custom source-frame speed retains
   its ownership and retiming, plus a required boolean clip `reverse`. Projects also require video track-owned Transform
@@ -66,7 +66,7 @@ least one retained video clip; this is not an audio-only export feature.
 
 A music tail beyond video OUT requires the **composited exporter**, which fills
 trailing black frames through project OUT. The static fast path still requires
-one enabled, opaque, unanimated, zero-origin contiguous video track with Shadows/Highlights/HDR 0, exactly
+one enabled, opaque, unanimated, zero-origin contiguous video track with Shadows/Highlights/HDR/Local contrast 0, exactly
 neutral spatial bases and no spatial keyframes, covering
 the entire project duration. No frozen-last-image or shortened-audio shortcut is
 permitted.
