@@ -15,7 +15,7 @@ import { createLayer, createProject, PROJECT_SCHEMA_VERSION, projectSchema } fro
 import { EARLIER_SCHEMA_VERSIONS } from './project-fixtures.js';
 
 const luma: RGB = [0.2126, 0.7152, 0.0722];
-const axes = [-1, -0.234567891, 0, 0.123456789, 1];
+const axes = [-2, -1, -0.234567891, 0, 0.123456789, 1, 2];
 
 describe('normalized linear Temperature and Tint', () => {
   it('keeps exact neutral identity and makes new rows neutral without compatibility defaults', () => {
@@ -30,7 +30,10 @@ describe('normalized linear Temperature and Tint', () => {
     expect(project.schemaVersion).toBe(PROJECT_SCHEMA_VERSION);
     for (const schemaVersion of EARLIER_SCHEMA_VERSIONS)
       expect(projectSchema.safeParse({ ...project, schemaVersion }).success).toBe(false);
-    for (const channel of ['temperature', 'tint'] as const) {
+    for (const [channel, limit] of [
+      ['temperature', 2],
+      ['tint', 1],
+    ] as const) {
       const incomplete = { ...settings };
       delete (incomplete as Partial<typeof settings>)[channel];
       expect(colourSchema.safeParse(incomplete).success).toBe(false);
@@ -39,9 +42,9 @@ describe('normalized linear Temperature and Tint', () => {
       expect(layerKeyframeSchema.safeParse({ ...uniformKeyframe(0, values, 'linear'), reset: false }).success).toBe(
         false,
       );
-      for (const value of [-1.000001, 1.000001, NaN, Infinity, -Infinity, null, undefined])
+      for (const value of [-limit - 0.000001, limit + 0.000001, NaN, Infinity, -Infinity, null, undefined])
         expect(colourSchema.safeParse({ ...settings, [channel]: value }).success).toBe(false);
-      for (const value of [-1, 0, 0.123456789, 1])
+      for (const value of [-limit, 0, 0.123456789, limit])
         expect(colourSchema.parse({ ...settings, [channel]: value })[channel]).toBe(value);
     }
   });

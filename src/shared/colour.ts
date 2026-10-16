@@ -12,14 +12,14 @@ import {
 
 export const colourSchema = z
   .object({
-    temperature: z.number().min(-1).max(1),
+    temperature: z.number().min(-2).max(2),
     tint: z.number().min(-1).max(1),
     exposure: z.number().min(-3).max(3),
     brightness: z.number().min(-0.5).max(0.5),
     contrast: z.number().min(0).max(2),
     hue: z.number().min(-180).max(180),
     saturation: z.number().min(0).max(2),
-    vibrance: z.number().min(-1).max(1),
+    vibrance: z.number().min(-1).max(2),
     highlights: z.number().min(-1).max(1),
     shadows: z.number().min(-1).max(1),
     whites: z.number().min(-1).max(1),
@@ -64,14 +64,14 @@ Object.freeze(neutral.curves);
 export const NEUTRAL_COLOUR: Readonly<ColourSettings> = Object.freeze(neutral);
 
 export const COLOUR_CONTROLS = [
-  { key: 'temperature', label: 'Temperature', min: -1, max: 1, step: 0.01, unit: '' },
+  { key: 'temperature', label: 'Temperature', min: -2, max: 2, step: 0.01, unit: '' },
   { key: 'tint', label: 'Tint', min: -1, max: 1, step: 0.01, unit: '' },
   { key: 'exposure', label: 'Exposure', min: -3, max: 3, step: 0.01, unit: 'EV' },
   { key: 'brightness', label: 'Brightness', min: -0.5, max: 0.5, step: 0.005, unit: '' },
   { key: 'contrast', label: 'Contrast', min: 0, max: 2, step: 0.01, unit: '×' },
   { key: 'hue', label: 'Hue', min: -180, max: 180, step: 1, unit: '°' },
   { key: 'saturation', label: 'Saturation', min: 0, max: 2, step: 0.01, unit: '×' },
-  { key: 'vibrance', label: 'Vibrance', min: -1, max: 1, step: 0.01, unit: '' },
+  { key: 'vibrance', label: 'Vibrance', min: -1, max: 2, step: 0.01, unit: '' },
   { key: 'highlights', label: 'Highlights', min: -1, max: 1, step: 0.01, unit: '' },
   { key: 'shadows', label: 'Shadows', min: -1, max: 1, step: 0.01, unit: '' },
   { key: 'whites', label: 'Whites', min: -1, max: 1, step: 0.01, unit: '' },
@@ -210,11 +210,11 @@ function compileScalarGrade(
   };
 }
 
-/** Vibrance scales chroma most on muted pixels: 1 + v(1 − c)² with c the pixel's linear (max − min) / max. */
+/** Vibrance scales chroma most on muted pixels: 1 + v(1 − c) with c the pixel's linear (max − min) / max. */
 function vibranceGain(red: number, green: number, blue: number, vibrance: number): number {
   const maximum = Math.max(red, green, blue);
   const colourfulness = maximum > 0 ? (maximum - Math.min(red, green, blue)) / maximum : 0;
-  return 1 + vibrance * (1 - Math.min(1, colourfulness)) ** 2;
+  return 1 + vibrance * (1 - Math.min(1, colourfulness));
 }
 /** Whites moves pure white by this much (encoded) at ±1; monotonic up to 0.25. */
 export const WHITES_RANGE = 0.25;

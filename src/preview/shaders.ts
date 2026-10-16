@@ -292,7 +292,7 @@ vec3 scalarGrade(vec3 code, vec4 tone, vec2 extra, vec4 correction, float vibran
     float maximum = max(rgb.r, max(rgb.g, rgb.b));
     float colourfulness = maximum > 0.0 ? (maximum - min(rgb.r, min(rgb.g, rgb.b))) / maximum : 0.0;
     float muted = 1.0 - min(1.0, colourfulness);
-    chroma *= 1.0 + vibrance * muted * muted;
+    chroma *= 1.0 + vibrance * muted;
   }
   float u = chroma * (cb * cos(extra.x) - cr * sin(extra.x));
   float v = chroma * (cb * sin(extra.x) + cr * cos(extra.x));

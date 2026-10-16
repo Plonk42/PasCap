@@ -126,7 +126,7 @@ PasCap is a solo, pre-release project: optimize for fast iteration. Details are 
   slide through `useKeyframeSlide` (a dragged bookmark never snaps to itself) and never
   retime, render or export. See [timeline](../docs/TIMELINE_EDITING.md).
 - The strict current schema requires complete row Colour with twelve graded scalar fields
-  (including `vibrance`, −1…1, a chroma scale after Saturation weighted towards muted
+  (including `vibrance`, −1…2, a chroma scale after Saturation weighted towards muted
   colours; #184 `whites`, −1…1, a white-point tone stage after Highlights, and `blacks`,
   −1…1, a black-point tone stage after Whites; raised it adds a matte lift),
   `hdr`, `localContrast`, `colour.hsl` (eight complete named bands) and `colour.curves` (master/red/green/blue
@@ -137,7 +137,7 @@ PasCap is a solo, pre-release project: optimize for fast iteration. Details are 
   settings. Keep existing LUT/buffer/decoder/native budgets and strict gates. See
   [the advanced colour contract](../docs/design/HSL_AND_CURVES.md).
 - Approved #68: required row `temperature` and `tint` colour fields use normalized
-  −1…1, neutral 0; positive Temperature warms, positive Tint adds magenta.
+  −2…2 and −1…1, neutral 0; positive Temperature warms, positive Tint adds magenta.
   For Temperature $T$, Tint $I$, raw gains are
   $q=(2^{T/2+I/4},2^{-I/4},2^{-T/2+I/4})$, normalized as
   $g=q/(0.2126q_R+0.7152q_G+0.0722q_B)$. Apply to decoded linear RGB before

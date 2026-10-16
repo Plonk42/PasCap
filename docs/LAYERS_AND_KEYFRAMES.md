@@ -124,14 +124,14 @@ invalid, not repaired with defaults. The required boolean `reset` marks a **defa
 | Channel                          | Value          | Value when this channel has no track keyframes            |
 | -------------------------------- | -------------- | --------------------------------------------------------- |
 | Opacity (`opacity`)              | 0–1            | The track's required `opacity`, initially 1 on new tracks |
-| Temperature (`temperature`)      | −1 to +1       | The track's saved colour value, initially 0               |
+| Temperature (`temperature`)      | −2 to +2       | The track's saved colour value, initially 0               |
 | Tint (`tint`)                    | −1 to +1       | The track's saved colour value, initially 0               |
 | Exposure (`exposure`)            | −3 to +3 stops | The track's saved colour value                            |
 | Brightness (`brightness`)        | −0.5 to +0.5   | The track's saved colour value                            |
 | Contrast (`contrast`)            | 0–2            | The track's saved colour value                            |
 | Hue (`hue`)                      | −180° to +180° | The track's saved colour value                            |
 | Saturation (`saturation`)        | 0–2            | The track's saved colour value                            |
-| Vibrance (`vibrance`)            | −1 to +1       | The track's saved colour value, initially 0               |
+| Vibrance (`vibrance`)            | −1 to +2       | The track's saved colour value, initially 0               |
 | Highlights (`highlights`)        | −1 to +1       | The track's saved colour value                            |
 | Shadows (`shadows`)              | −1 to +1       | The track's saved colour value                            |
 | Whites (`whites`)                | −1 to +1       | The track's saved colour value, initially 0               |

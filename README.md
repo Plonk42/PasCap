@@ -81,7 +81,7 @@ playhead is read-only until its hollow diamond captures a keyframe there.
 Static and keyed Colour have the same video track ownership and grade each source once.
 Different colour treatments require different tracks. See [track appearance](docs/design/ROW_APPEARANCE.md). Opacity controls composition coverage,
 not the SDR RGB grade, with no additional track multiplier or sidebar duplicate.
-**Temperature / Tint** use normalized **−1…1** values, neutral **0**: positive
+**Temperature / Tint** use normalized **−2…2** and **−1…1** values, neutral **0**: positive
 Temperature warms, positive Tint adds magenta. They are track-owned, independently
 keyable and editable on empty tracks. Nonzero settings intentionally colour greys;
 the shared linear-gain formula runs before Exposure, not as Kelvin/HDR output/automatic

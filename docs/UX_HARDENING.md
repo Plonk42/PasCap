@@ -44,7 +44,7 @@ This guide is not a delivery ledger or a fresh validation result.
   controls composition coverage, not SDR RGB grading. **Placement** contains
   placement only. There is no sidebar duplicate; Track options contains only
   rename, Ripple, ordering and deletion, with visibility separate in the sidebar.
-- **Temperature / Tint** are video track-owned normalized −1…1 scalar Colour controls,
+- **Temperature / Tint** are video track-owned normalized scalar Colour controls (Temperature −2…2, Tint −1…1),
   neutral/reset 0, with the same exact field, release-only slider, explicit capture
   and channel-navigation pattern, including on empty tracks. Positive Temperature
   warms; positive Tint adds magenta. Nonzero values intentionally colour greys;

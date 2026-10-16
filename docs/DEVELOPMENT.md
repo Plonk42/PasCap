@@ -1,7 +1,7 @@
 # Development
 
 The current strict schema requires twelve graded scalar bases in each video track's `colour`,
-including Temperature/Tint, Vibrance, Whites and Blacks (−1…1, neutral 0), plus `hdr` (0–1, neutral 0; a
+including Temperature (−2…2), Tint, Whites and Blacks (−1…1), Vibrance (−1…2), all neutral 0, plus `hdr` (0–1, neutral 0; a
 detail-stage look applied before grading, see [detail filters](design/DETAIL_FILTERS.md#hdr-look))
 and `localContrast` (−1…1, neutral 0; the local-detail boost split out of HDR, see
 [local contrast](design/DETAIL_FILTERS.md#local-contrast)),
