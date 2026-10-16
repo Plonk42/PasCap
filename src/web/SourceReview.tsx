@@ -21,12 +21,11 @@ import {
   type MediaSelectionEdge,
 } from '../shared/media-selection.js';
 import type { MediaAsset } from '../shared/media.js';
-import type { SmoothRange } from '../shared/motion-analysis.js';
 import { formatTimecode } from '../shared/timing.js';
 import { mediaReady, sourceSeconds } from './display.js';
 import { Icon } from './icons.js';
 import { Popover } from './Popover.js';
-import { SmoothRangeRow, useSmoothRange } from './SmoothRange.js';
+import { MotionTimeline, SmoothRangeStatus, useSmoothRange } from './SmoothRange.js';
 import { SourceTransport, type SourceTransportState } from './source-transport.js';
 import { useDelayedFlag } from './use-delayed-flag.js';
 import './rush-source.css';
@@ -66,7 +65,8 @@ interface RangeProps {
   range: MediaSelection;
   frame: number;
   observedFrame: number | null;
-  suggestions: readonly SmoothRange[];
+  /** Shown under the range strip, aligned with it. */
+  motion: ReactNode;
   disabled: boolean;
   onFrame: (frame: number) => void;
   onRange: (range: MediaSelection) => void;
@@ -356,7 +356,23 @@ export function SourceReview({
         range={range}
         frame={observedFrame ?? requestedFrame}
         observedFrame={observedFrame}
-        suggestions={smooth.ranges}
+        motion={
+          smooth.profile && (
+            <MotionTimeline
+              asset={asset}
+              range={range}
+              smooth={smooth}
+              frame={observedFrame ?? requestedFrame}
+              disabled={disabled || rangeDraft}
+              onFrame={scrub}
+              onApply={(suggestion) => {
+                scrub(suggestion.sourceIn);
+                onRange({ mediaId: asset.id, ...suggestion });
+              }}
+              onKeyDown={keyboard}
+            />
+          )
+        }
         disabled={disabled}
         onFrame={scrub}
         onRange={onRange}
@@ -388,17 +404,7 @@ export function SourceReview({
         }
       />
       {mediaReady(asset) && (
-        <SmoothRangeRow
-          asset={asset}
-          range={range}
-          smooth={smooth}
-          disabled={disabled || rangeDraft}
-          onApply={(suggestion) => {
-            scrub(suggestion.sourceIn);
-            onRange({ mediaId: asset.id, ...suggestion });
-          }}
-          onKeyDown={keyboard}
-        />
+        <SmoothRangeStatus smooth={smooth} disabled={disabled || rangeDraft} onKeyDown={keyboard} />
       )}
       <output
         className="source-add-feedback"
@@ -498,7 +504,7 @@ function SourceRangeEditor({
   range,
   frame,
   observedFrame,
-  suggestions,
+  motion,
   disabled,
   onFrame,
   onRange,
@@ -741,17 +747,6 @@ function SourceRangeEditor({
             }}
             aria-hidden="true"
           />
-          {suggestions.map((suggestion, index) => (
-            <span
-              key={`${suggestion.sourceIn}-${suggestion.sourceOut}`}
-              className={index ? 'source-range-suggestion alternative' : 'source-range-suggestion'}
-              style={{
-                left: `${(suggestion.sourceIn / count) * 100}%`,
-                width: `${((suggestion.sourceOut - suggestion.sourceIn) / count) * 100}%`,
-              }}
-              aria-hidden="true"
-            />
-          ))}
           <input
             className="source-playhead-input"
             type="range"
@@ -806,6 +801,7 @@ function SourceRangeEditor({
           })}
         </div>
       </div>
+      {motion}
       <div className="source-range-row">
         {readout}
         <form

@@ -94,18 +94,9 @@ describe.skipIf(!enabled)('smooth-part motion analysis · disposable native fixt
     const id = early.asset.id;
     const unprepared = await app.inject({ method: 'POST', url: `/api/media/${id}/motion`, headers, payload: {} });
     expect(unprepared.statusCode).toBe(409);
-    expect((await jobs.wait(early.job!.id)).state).toBe('completed');
-
-    const before = await app.inject({ method: 'GET', url: `/api/media/${id}/motion`, headers });
-    expect(before.json()).toEqual({ analysis: null });
-    const started = await app.inject({ method: 'POST', url: `/api/media/${id}/motion`, headers, payload: {} });
-    expect(started.statusCode).toBe(202);
-    const job = started.json<{ job: MediaJob }>().job;
-    expect(job.kind).toBe('motion');
-    const again = await app.inject({ method: 'POST', url: `/api/media/${id}/motion`, headers, payload: {} });
-    expect(again.json<{ job: MediaJob }>().job.id).toBe(job.id);
-    const finished = await jobs.wait(job.id);
-    expect(finished.state, finished.message).toBe('completed');
+    const prepared = await jobs.wait(early.job!.id);
+    expect(prepared.state).toBe('completed');
+    expect(prepared.message).toBe('Complete');
 
     const response = await app.inject({ method: 'GET', url: `/api/media/${id}/motion`, headers });
     const { analysis } = response.json<{ analysis: MotionAnalysis }>();
@@ -116,12 +107,28 @@ describe.skipIf(!enabled)('smooth-part motion analysis · disposable native fixt
     expect(Math.abs(median(analysis.tx.slice(5, 55)))).toBeLessThan(0.1);
     expect(median(analysis.tx.slice(70, 205))).toBeCloseTo(-2, 0);
     expect(Math.abs(median(analysis.ty.slice(70, 205)))).toBeLessThan(0.2);
-    expect(JSON.parse(await readFile(library.motionPath(library.get(id)), 'utf8'))).toEqual(analysis);
+    const cache = library.motionPath(library.get(id));
+    expect(JSON.parse(await readFile(cache, 'utf8'))).toEqual(analysis);
 
     const [best] = smoothRanges(motionRoughness(analysis, FPS), 2, FPS);
     expect(best!.sourceIn).toBeGreaterThanOrEqual(60);
     expect(best!.sourceIn).toBeLessThan(95);
     expect(best!.sourceOut).toBe(210);
+
+    // A proxy prepared before the analysis existed is measured on request, once at a time.
+    await rm(cache);
+    expect((await app.inject({ method: 'GET', url: `/api/media/${id}/motion`, headers })).json()).toEqual({
+      analysis: null,
+    });
+    const started = await app.inject({ method: 'POST', url: `/api/media/${id}/motion`, headers, payload: {} });
+    expect(started.statusCode).toBe(202);
+    const job = started.json<{ job: MediaJob }>().job;
+    expect(job.kind).toBe('motion');
+    const again = await app.inject({ method: 'POST', url: `/api/media/${id}/motion`, headers, payload: {} });
+    expect(again.json<{ job: MediaJob }>().job.id).toBe(job.id);
+    const finished = await jobs.wait(job.id);
+    expect(finished.state, finished.message).toBe('completed');
+    expect(JSON.parse(await readFile(cache, 'utf8'))).toEqual(analysis);
     expect(await readFile(filename)).toEqual(original);
   });
 });

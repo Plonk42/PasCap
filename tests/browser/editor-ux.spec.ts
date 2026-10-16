@@ -108,7 +108,7 @@ test.beforeEach(async ({ page, request }) => {
       await route.fulfill({ status: 202, json: { job } });
       return;
     }
-    const video = /^\/api\/media\/([^/]+)\/(?:proxy|thumbnail\/\d+)$/.exec(pathname);
+    const video = /^\/api\/media\/([^/]+)\/(?:proxy|thumbnail\/\d+|motion)$/.exec(pathname);
     const music = /^\/api\/audio\/([^/]+)\/(?:playback|waveform)$/.exec(pathname);
     if (
       method === 'GET' &&
