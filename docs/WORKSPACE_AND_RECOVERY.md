@@ -29,7 +29,7 @@ They are not Kelvin/HDR output/automatic white balance. HSL/curves remain static
 [Temperature and Tint](design/TEMPERATURE_AND_TINT.md).
 **HDR** (0–1, neutral 0) is a keyable SDR local tone-mapping look applied with the
 clip detail filters before grading; see [detail filters](design/DETAIL_FILTERS.md#hdr-look).
-**Local contrast** (−1…1, neutral 0) is HDR's keyable local-detail boost alone, in the
+**Local contrast** (−1…1, neutral 0) is the keyable local-detail boost split out of HDR, in the
 same kernel; see [local contrast](design/DETAIL_FILTERS.md#local-contrast).
 
 - Header: project picker/title, Undo/Redo, save state, keyboard help,

@@ -199,8 +199,8 @@ clarity −1–1, denoise 0–1 }`, neutral 0, with no keyframes or track channe
   [detail filters](../docs/design/DETAIL_FILTERS.md).
 - Track Colour **Shadows**, **Highlights** (−1…1), **HDR** (`colour.hdr` 0–1, fourteenth
   keyframe channel `hdr`, an SDR local tone-mapping look) and **Local contrast**
-  (`colour.localContrast` −1…1, fifteenth channel `localContrast`, HDR's local-detail boost
-  alone) are local tone settings: evaluated at project time but applied in the shared detail
+  (`colour.localContrast` −1…1, fifteenth channel `localContrast`, the local-detail boost
+  split out of HDR, which keeps only its tone compression) are local tone settings: evaluated at project time but applied in the shared detail
   kernel on source taps before grading (Denoise → HDR/Local contrast → Shadows/Highlights →
   Clarity → Sharpen) from one guided edge-aware base,
   excluded from the per-pixel grade and LUT identity; any nonzero or keyed value needs

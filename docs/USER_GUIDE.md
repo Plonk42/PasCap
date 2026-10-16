@@ -333,15 +333,16 @@ all these Colour stages, retaining Opacity and geometry. Exact processing:
 
 ### HDR
 
-**HDR**, in the Effects group of **Track → Colour**, opens shadows and recovers highlights while
-boosting local detail, like a tone-mapped look; **0** is off and **1** is the strongest.
+**HDR**, in the Effects group of **Track → Colour**, opens shadows and recovers highlights
+over large areas, like a tone-mapped look, while keeping local detail as it is; **0** is off
+and **1** is the strongest.
 It is an SDR effect, not HDR output, and can be keyframed like the other Colour
 settings. Nonzero or keyed HDR makes export use the slower composited path.
 The Original preview bypasses it. Details: [detail filters](design/DETAIL_FILTERS.md#hdr-look).
 
 **Local contrast**, just below HDR, raises or lowers the contrast between neighbouring
-areas and their surroundings, like HDR's detail boost but without its shadow and
-highlight compression; flat areas never move. **0** is off, **+1** the strongest and
+areas and their surroundings, without changing their overall brightness; flat areas never
+move. Together with HDR it gives the classic tone-mapped look. **0** is off, **+1** the strongest and
 **−1** flattens each area towards its surroundings. It can be keyframed like the other
 Colour settings; nonzero or keyed Local contrast makes export use the slower composited
 path, and the Original preview bypasses it. Details:

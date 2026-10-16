@@ -87,7 +87,7 @@ and technical paths stay unchanged; this glossary does not change the project sc
   look, not HDR output. It is keyframable like the other Colour settings and runs
   on source taps before the grade, with the clip detail filters.
 - **Local contrast** is a track-owned −1…1 Colour control, neutral 0, below HDR in the
-  **Effects** group: HDR's local-detail boost alone, without its tone compression
+  **Effects** group: the local-detail boost split out of HDR, without its tone compression
   (raised it separates each area from its surroundings, lowered it flattens them). It is
   keyframable like the other Colour settings and runs with HDR in the detail kernel.
 - **Transform** is track-owned crop, Scale, Translate X/Y and Rotation, applied to every

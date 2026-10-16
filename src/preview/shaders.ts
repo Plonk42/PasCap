@@ -4,7 +4,6 @@ import {
   DETAIL_FINE_TAPS,
   DETAIL_WIDE_TAPS,
   HDR_COMPRESSION,
-  HDR_DETAIL_GAIN,
   TONE_BASE_GUIDE_TAPS,
   TONE_BASE_RANGE_FACTOR,
   HDR_RATIO_FLOOR,
@@ -107,7 +106,7 @@ float toneBase(sampler2D source, vec2 coordinate, float y, vec2 stride) {
 }
 vec3 hdrTone(vec3 rgb, float y, float base, float amount, float contrast) {
   float target = base + ${glslFloat(HDR_COMPRESSION)} * amount * base * (1.0 - base) * (1.0 - 2.0 * base) +
-                 (y - base) * (1.0 + ${glslFloat(HDR_DETAIL_GAIN)} * amount + contrast);
+                 (y - base) * (1.0 + contrast);
   float lift = target - y;
   if (y <= 0.0) return rgb + lift;
   float blend = min(1.0, y / ${glslFloat(HDR_RATIO_FLOOR)});

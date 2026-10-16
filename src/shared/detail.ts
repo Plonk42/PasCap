@@ -77,9 +77,8 @@ export const TONE_BASE_RANGE_SIGMA = 0.12;
 export const TONE_BASE_RANGE_FACTOR = 1 / (2 * TONE_BASE_RANGE_SIGMA * TONE_BASE_RANGE_SIGMA);
 /** The first ring's taps, averaged with the centre, guide the range weights. */
 export const TONE_BASE_GUIDE_TAPS = 8;
-/** Track HDR look: base compression plus detail boost. */
+/** Track HDR look: base compression; its former detail boost is Local contrast. */
 export const HDR_COMPRESSION = 1;
-export const HDR_DETAIL_GAIN = 1;
 /** Below this encoded luma, the luma change blends from chroma-preserving ratio to additive. */
 export const HDR_RATIO_FLOOR = 0.1;
 const EIGHTH_TURN = Math.PI / 8;
@@ -238,7 +237,7 @@ export function compileDetail(
     return sum / (DETAIL_CLARITY_TAPS.length + 1);
   };
   const compression = HDR_COMPRESSION * hdr;
-  const detailGain = 1 + HDR_DETAIL_GAIN * hdr + localContrast;
+  const detailGain = 1 + localContrast;
   // Range weights compare taps with a small local mean rather than the pixel itself, so a dark
   // pixel within bright texture takes its surroundings' base, while large edges still stop it.
   const levels = new Float64Array(TONE_BASE_TAPS.length);
@@ -261,7 +260,7 @@ export function compileDetail(
     }
     return sum / total;
   };
-  // Compress the base (black/white fixed) and boost the residual.
+  // HDR compresses the base (black/white fixed); Local contrast scales the residual.
   const toneMap = (y: number, base: number): void => {
     const target = base + compression * base * (1 - base) * (1 - 2 * base) + (y - base) * detailGain;
     const lift = target - y;

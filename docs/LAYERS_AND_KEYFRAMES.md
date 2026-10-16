@@ -2,7 +2,7 @@
 
 Required video track Colour includes twelve graded scalar fields, including **Temperature**,
 **Tint**, **Vibrance**, **Whites** and **Blacks**, the **HDR** look (0–1, applied before grading with the clip
-[detail filters](design/DETAIL_FILTERS.md#hdr-look)) and **Local contrast** (−1…1, HDR's local-detail boost alone),
+[detail filters](design/DETAIL_FILTERS.md#hdr-look)) and **Local contrast** (−1…1, the local-detail boost split out of HDR),
 plus static **HSL ranges** and **Colour curves**. Temperature/Tint use
 −1…1, neutral 0; positive values warm/add magenta respectively and intentionally
 colour greys. Their normalized linear gains run before Exposure. See
