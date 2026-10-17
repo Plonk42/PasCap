@@ -6,6 +6,7 @@ import {
   useRef,
   useState,
   type KeyboardEvent,
+  type CSSProperties,
   type PointerEvent as ReactPointerEvent,
 } from 'react';
 import type { MediaAsset, MediaJob } from '../shared/media.js';
@@ -22,6 +23,7 @@ import {
 import { formatTimecode, type FrameRate } from '../shared/timing.js';
 import { api, ApiError } from './api.js';
 import { mediaReady, sourceSeconds } from './display.js';
+import { HelpPopover } from './HelpPopover.js';
 import { Icon } from './icons.js';
 import {
   availableSeries,
@@ -249,6 +251,7 @@ function LaneChooser({ available, shown, onShown }: Readonly<ChooserProps>) {
                 );
               }}
             />
+            <i style={{ background: spec.colour }} aria-hidden="true" />
             {spec.label}
           </label>
         ))}
@@ -329,7 +332,7 @@ interface SeriesLaneProps {
 /** One flight data value on its own scale, labelled with its name or its value under the pointer. */
 function SeriesLane({ spec, d, count, ranges, value }: Readonly<SeriesLaneProps>) {
   return (
-    <div className="source-motion-plot" data-lane={spec.key}>
+    <div className="source-motion-plot" data-lane={spec.key} style={{ '--series': spec.colour } as CSSProperties}>
       <svg viewBox={`0 0 ${count} 100`} preserveAspectRatio="none" aria-hidden="true">
         <Bands ranges={ranges} />
         <path className="source-motion-line" d={d} />
@@ -367,25 +370,44 @@ function suggestionText(best: SmoothRange | undefined, applied: boolean, rate: F
   };
 }
 
-interface LanesProps {
+export interface MotionLanesProps {
   asset: MediaAsset;
   smooth: SmoothRangeState;
-  profile: MotionProfile;
-  lanes: readonly SeriesSpec[];
-  frame: number;
+  view: CameraMotionView;
+  /** The range shown on the strip above, including a trim draft. */
+  range: MediaSelection;
   disabled: boolean;
   onFrame: (frame: number) => void;
 }
 
+/** The lanes stacked under the range strip, sharing its playhead; nothing while unmeasured or collapsed. */
+export function MotionLanes(props: Readonly<MotionLanesProps>) {
+  const { profile } = props.smooth;
+  if (!profile || props.view.collapsed) return null;
+  return <Lanes {...props} profile={profile} />;
+}
+
 /**
- * Lanes aligned under the range strip: image jolts, camera movement and the draggable allowed
- * movement, then one lane per chosen flight data value.
+ * Image jolts, camera movement and the draggable allowed movement, then one lane per chosen
+ * flight data value; the range omitted by IN/OUT is hatched as on the strip.
  */
-function MotionLanes({ asset, smooth, profile, lanes, frame, disabled, onFrame }: Readonly<LanesProps>) {
+function Lanes({
+  asset,
+  smooth,
+  view,
+  range,
+  profile,
+  disabled,
+  onFrame,
+}: Readonly<MotionLanesProps & { profile: MotionProfile }>) {
   const { telemetry, ranges, tolerance, setTolerance } = smooth;
   const count = asset.metadata.frameCount;
   const rate = asset.metadata.frameRate;
   const fps = rate.numerator / rate.denominator;
+  const lanes = useMemo(
+    () => availableSeries(telemetry).filter((spec) => view.shown.includes(spec.key)),
+    [telemetry, view.shown],
+  );
   const paths = useMemo(
     () => lanes.map((spec) => ({ spec, d: seriesPath(spec, telemetry, count, fps, laneY) })),
     [lanes, telemetry, count, fps],
@@ -418,63 +440,67 @@ function MotionLanes({ asset, smooth, profile, lanes, frame, disabled, onFrame }
   const at = (value: number): string => `${count === 1 ? 0 : (value / (count - 1)) * 100}%`;
 
   return (
-    <div className="source-track smooth-panel-lanes">
-      <span className="source-track-spacer" aria-hidden="true" />
-      <div className="source-motion-lane">
-        <div
-          className="source-motion"
-          data-disabled={disabled || undefined}
-          data-near-tolerance={(nearLine && !disabled) || adjusting || undefined}
-          title="Shaded: jolts, how fast the camera movement changes (dashed line: allowed movement, drag it). White line: camera movement. Other lanes: flight data. Green bands: steady ranges. Click or drag to scrub."
-          onPointerDown={(event) => {
-            if (disabled || event.button !== 0) return;
-            const point = position(event);
-            event.currentTarget.setPointerCapture(event.pointerId);
-            drag.current = { kind: point.onLine ? 'tolerance' : 'scrub', pointer: event.pointerId };
-            if (point.onLine) setAdjusting(true);
-            else onFrame(point.frame);
-          }}
-          onPointerMove={(event) => {
-            const current = drag.current;
-            const point = position(event);
-            if (current?.pointer === event.pointerId && current.kind === 'tolerance') {
-              setTolerance(toleranceAt(point.y));
-              return;
-            }
-            setHover(point.frame);
-            setNearLine(point.onLine);
-            if (current?.pointer === event.pointerId) onFrame(point.frame);
-          }}
-          onPointerLeave={leave}
-          onPointerUp={end}
-          onLostPointerCapture={end}
-        >
-          <ImageLane
-            asset={asset}
-            profile={profile}
-            ranges={ranges}
-            roughness={roughness}
-            cameraMotion={cameraMotion}
-            toleranceY={toleranceY}
-            hover={hover}
-            tolerance={adjusting || (nearLine && drag.current === null) ? tolerance : null}
-          />
-          {paths.map(({ spec, d }) => (
-            <SeriesLane
-              key={spec.key}
-              spec={spec}
-              d={d}
-              count={count}
-              ranges={ranges}
-              value={hover === null ? null : seriesValue(spec, telemetry, hover, fps)}
-            />
-          ))}
-          {hover !== null && !nearLine && !adjusting && (
-            <span className="source-motion-cursor" style={{ left: at(hover) }} aria-hidden="true" />
-          )}
-          <span className="source-motion-head" style={{ left: at(frame) }} aria-hidden="true" />
-        </div>
-      </div>
+    <div
+      className="source-motion"
+      data-disabled={disabled || undefined}
+      data-near-tolerance={(nearLine && !disabled) || adjusting || undefined}
+      title="Click or drag to scrub; drag the dashed line to change the allowed movement"
+      onPointerDown={(event) => {
+        if (disabled || event.button !== 0) return;
+        const point = position(event);
+        event.currentTarget.setPointerCapture(event.pointerId);
+        drag.current = { kind: point.onLine ? 'tolerance' : 'scrub', pointer: event.pointerId };
+        if (point.onLine) setAdjusting(true);
+        else onFrame(point.frame);
+      }}
+      onPointerMove={(event) => {
+        const current = drag.current;
+        const point = position(event);
+        if (current?.pointer === event.pointerId && current.kind === 'tolerance') {
+          setTolerance(toleranceAt(point.y));
+          return;
+        }
+        setHover(point.frame);
+        setNearLine(point.onLine);
+        if (current?.pointer === event.pointerId) onFrame(point.frame);
+      }}
+      onPointerLeave={leave}
+      onPointerUp={end}
+      onLostPointerCapture={end}
+    >
+      <ImageLane
+        asset={asset}
+        profile={profile}
+        ranges={ranges}
+        roughness={roughness}
+        cameraMotion={cameraMotion}
+        toleranceY={toleranceY}
+        hover={hover}
+        tolerance={adjusting || (nearLine && drag.current === null) ? tolerance : null}
+      />
+      {paths.map(({ spec, d }) => (
+        <SeriesLane
+          key={spec.key}
+          spec={spec}
+          d={d}
+          count={count}
+          ranges={ranges}
+          value={hover === null ? null : seriesValue(spec, telemetry, hover, fps)}
+        />
+      ))}
+      <span
+        className="source-motion-omitted"
+        style={{ left: 0, width: `${(range.sourceIn / count) * 100}%` }}
+        aria-hidden="true"
+      />
+      <span
+        className="source-motion-omitted"
+        style={{ left: `${(range.sourceOut / count) * 100}%`, right: 0 }}
+        aria-hidden="true"
+      />
+      {hover !== null && !nearLine && !adjusting && (
+        <span className="source-motion-cursor" style={{ left: at(hover) }} aria-hidden="true" />
+      )}
     </div>
   );
 }
@@ -517,49 +543,53 @@ function AnalysisStatus({ smooth, disabled, onKeyDown }: Readonly<StatusProps>) 
   );
 }
 
+export interface CameraMotionView {
+  collapsed: boolean;
+  toggle: () => void;
+  shown: readonly SeriesKey[];
+  show: (keys: SeriesKey[]) => void;
+}
+
+/** Browser preferences shared by the lanes under the strip and the panel below the range fields. */
+export function useCameraMotionView(): CameraMotionView {
+  const [collapsed, setCollapsed] = useState(() => readPreference(COLLAPSED_PREFERENCE) === 'true');
+  const [shown, setShown] = useState(readSeries);
+  return {
+    collapsed,
+    toggle: () => {
+      setCollapsed(!collapsed);
+      writePreference(COLLAPSED_PREFERENCE, String(!collapsed));
+    },
+    shown,
+    show: (keys) => {
+      setShown(keys);
+      writePreference(SERIES_PREFERENCE, JSON.stringify(keys));
+    },
+  };
+}
+
 interface PanelProps {
   asset: MediaAsset;
   range: MediaSelection;
   smooth: SmoothRangeState;
-  frame: number;
+  view: CameraMotionView;
   disabled: boolean;
-  onFrame: (frame: number) => void;
   onApply: (range: SmoothRange) => void;
   onKeyDown: (event: KeyboardEvent<HTMLElement>) => void;
 }
 
 /**
- * The camera motion section of Source preview: a header with the steadiest range and Use, a row
- * with the allowed movement and the flight data choice, then the motion lanes. Collapsing keeps
- * only the title and the suggestion.
+ * The camera motion controls below the range fields: a header with the steadiest range and Use,
+ * then the allowed movement and the flight data choice. Collapsing also hides the lanes.
  */
-export function SmoothPartPanel({
-  asset,
-  range,
-  smooth,
-  frame,
-  disabled,
-  onFrame,
-  onApply,
-  onKeyDown,
-}: Readonly<PanelProps>) {
+export function CameraMotionPanel({ asset, range, smooth, view, disabled, onApply, onKeyDown }: Readonly<PanelProps>) {
   const { profile, telemetry, ranges, tolerance, setTolerance } = smooth;
   const toleranceId = useId();
-  const [collapsed, setCollapsed] = useState(() => readPreference(COLLAPSED_PREFERENCE) === 'true');
-  const [shown, setShown] = useState(readSeries);
+  const { collapsed } = view;
   const available = useMemo(() => availableSeries(telemetry), [telemetry]);
-  const lanes = useMemo(() => available.filter((spec) => shown.includes(spec.key)), [available, shown]);
   const best = ranges[0];
   const applied = best?.sourceIn === range.sourceIn && best?.sourceOut === range.sourceOut;
   const { span, label, hint } = suggestionText(best, applied, asset.metadata.frameRate);
-  const toggle = (): void => {
-    setCollapsed(!collapsed);
-    writePreference(COLLAPSED_PREFERENCE, String(!collapsed));
-  };
-  const show = (keys: SeriesKey[]): void => {
-    setShown(keys);
-    writePreference(SERIES_PREFERENCE, JSON.stringify(keys));
-  };
 
   return (
     <section
@@ -577,11 +607,20 @@ export function SmoothPartPanel({
           aria-label={collapsed ? 'Expand camera motion' : 'Collapse camera motion'}
           title={collapsed ? 'Show the camera motion controls and lanes' : 'Hide the camera motion controls and lanes'}
           onKeyDown={onKeyDown}
-          onClick={toggle}
+          onClick={view.toggle}
         >
           <Icon name={collapsed ? 'chevron-down' : 'chevron-up'} size={14} />
           <strong>Camera motion</strong>
         </button>
+        <HelpPopover label="Camera motion" guide="find-the-steadiest-range">
+          <p>
+            The lanes under the range show how the camera moves: the amber area marks jolts, the white line its movement
+            and the green bands steady ranges. Use sets IN and OUT to the steadiest one.
+          </p>
+          <p className="editor-help-tip">
+            Tip: drag the dashed line, or move Allowed movement, to accept more or less movement.
+          </p>
+        </HelpPopover>
         {profile ? (
           <span className="smooth-panel-summary">
             {best ? (
@@ -635,19 +674,8 @@ export function SmoothPartPanel({
               onCommit={setTolerance}
             />
           </div>
-          <LaneChooser available={available} shown={shown} onShown={show} />
+          <LaneChooser available={available} shown={view.shown} onShown={view.show} />
         </div>
-      )}
-      {profile && !collapsed && (
-        <MotionLanes
-          asset={asset}
-          smooth={smooth}
-          profile={profile}
-          lanes={lanes}
-          frame={frame}
-          disabled={disabled}
-          onFrame={onFrame}
-        />
       )}
     </section>
   );

@@ -1868,13 +1868,17 @@ test('the motion timeline shows jolts, allowed movement and the steadiest range;
   await expect(band).toHaveAttribute('width', String(steady.sourceOut - steady.sourceIn));
   const tolerance = timeline.locator('.source-motion-tolerance');
   await expect(tolerance).toHaveAttribute('y1', String(lineY(SMOOTH_TOLERANCE.initial)));
-  // The timeline lines up with the range strip above it.
-  const [stripBox, timelineBox] = await Promise.all([
+  // The lanes sit directly under the range strip, in its column, and its playhead runs through them.
+  const [stripBox, timelineBox, headBox] = await Promise.all([
     page.locator('.source-range-strip').boundingBox(),
     timeline.boundingBox(),
+    page.locator('.source-range-head').boundingBox(),
   ]);
   expect(timelineBox!.x).toBeCloseTo(stripBox!.x, 0);
   expect(timelineBox!.width).toBeCloseTo(stripBox!.width, 0);
+  expect(timelineBox!.y - (stripBox!.y + stripBox!.height)).toBeLessThan(8);
+  expect(headBox!.y).toBeLessThan(stripBox!.y);
+  expect(headBox!.y + headBox!.height).toBeCloseTo(timelineBox!.y + timelineBox!.height, 0);
 
   const use = page.getByRole('button', { name: /^Use steadiest range / });
   await expect(row.locator('.smooth-panel-summary')).toContainText(seconds(steady));
@@ -1885,6 +1889,12 @@ test('the motion timeline shows jolts, allowed movement and the steadiest range;
   await expect(page.locator('.source-preview')).toHaveAttribute('data-source-frame', String(steady.sourceIn));
   await expect(use).toBeDisabled();
   await expect(use).toHaveText('In use');
+  // The lanes hatch the footage outside IN/OUT like the strip.
+  const omitted = await timeline
+    .locator('.source-motion-omitted')
+    .evaluateAll((spans) => spans.map((span) => span.getBoundingClientRect().width));
+  expect(omitted[0]).toBeCloseTo((timelineBox!.width * steady.sourceIn) / 120, 0);
+  expect(omitted[1]).toBeCloseTo((timelineBox!.width * (120 - steady.sourceOut)) / 120, 0);
 
   await page.getByRole('slider', { name: 'Allowed movement', exact: true }).fill(String(SMOOTH_TOLERANCE.max));
   await expect(row).toHaveAttribute('data-smooth-in', String(tolerant.sourceIn));

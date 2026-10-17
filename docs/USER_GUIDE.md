@@ -124,20 +124,6 @@ Scrubbing or changing the range pauses first. Closing, switching sources/project
 or leaving the Source tab cancels playback. Source playback does not move the
 timeline or music and does not create Undo steps or saves. Failures expose Retry.
 
-Below the range, the **Camera motion** section marks the steadiest range of a drone
-recording, measured when its proxy was prepared. Its header gives the **Steadiest range**
-length and IN–OUT; **Use** sets IN and OUT to it. Below it, move **Allowed movement** left
-for only very steady footage, right to accept more movement; **Flight data** adds or
-removes lanes: flight and vertical speed, height, distance from home, ISO, shutter speed,
-exposure bias and digital zoom, for example to spot a climb or an exposure jump. The
-chevron collapses the section to its title and suggestion. In the lanes, the first shows
-jolts (shaded area: sudden angle or speed changes), camera movement and the dashed allowed
-movement (drag it too), and the green bands mark the steady ranges, the suggested one
-strongest; hover them to read the values at that moment. Recordings prepared earlier offer
-**Analyse camera motion** to measure them once. Straight-ahead speed changes barely move
-the picture: the flight speed lane shows them, so check the start of forward flights
-yourself.
-
 Choose **Add clip** (it shows the applied range length, for example **Add clip 3.00 s**),
 mark another range, then add again: each addition creates an independent clip and
 keeps the same source open at the same frame/range. **Clip added · mark another range**
@@ -150,6 +136,22 @@ Media **+**, double-click and drag/drop (dragging a selected recording carries t
 whole selection) also copy the applied range
 (or the full recording without a choice). Later source choices never alter existing
 clips. Plus/double-click target the selected video track; a drop targets the track under the pointer.
+
+### Find the steadiest range
+
+Preparing a drone recording also measures its camera motion. Lanes directly under the
+source range strip share its playhead and hatching: the first shows jolts (amber area:
+sudden angle or speed changes), camera movement (white line) and the dashed allowed
+movement (drag it); the green bands mark steady ranges, the suggested one strongest.
+Hover to read the values at that moment; click or drag to scrub. Below the IN/OUT
+fields, **Camera motion** gives the **Steadiest range** length and IN–OUT, and **Use**
+sets IN and OUT to it. Move **Allowed movement** left for only very steady footage,
+right to accept more movement. **Flight data** adds or removes lanes: flight and
+vertical speed, height, distance from home, ISO, shutter speed, exposure bias and digital
+zoom, for example to spot a climb or an exposure jump. The chevron hides the lanes and
+controls, keeping the suggestion. Recordings prepared earlier offer **Analyse camera
+motion** to measure them once. Straight-ahead speed changes barely move the picture: the
+flight speed lane shows them, so check the start of forward flights yourself.
 
 ## Assemble, trim and cut
 

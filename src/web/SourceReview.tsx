@@ -25,7 +25,13 @@ import { formatTimecode } from '../shared/timing.js';
 import { mediaReady, sourceSeconds } from './display.js';
 import { Icon } from './icons.js';
 import { Popover } from './Popover.js';
-import { SmoothPartPanel, useSmoothRange } from './SmoothRange.js';
+import {
+  CameraMotionPanel,
+  MotionLanes,
+  useCameraMotionView,
+  useSmoothRange,
+  type MotionLanesProps,
+} from './SmoothRange.js';
 import { SourceTransport, type SourceTransportState } from './source-transport.js';
 import { useDelayedFlag } from './use-delayed-flag.js';
 import './rush-source.css';
@@ -73,6 +79,8 @@ interface RangeProps {
   onKeyDown: (event: KeyboardEvent<HTMLElement>) => void;
   transport: ReactNode;
   readout: ReactNode;
+  /** Camera motion lanes stacked under the strip, sharing its playhead and range. */
+  motion: Omit<MotionLanesProps, 'range'> | null;
   ref: Ref<RangeCommands>;
 }
 interface RangeDrag {
@@ -115,6 +123,7 @@ export function SourceReview({
   const [lastAddedId, setLastAddedId] = useState<string | null>(null);
   const [rangeDraft, setRangeDraft] = useState(false);
   const smooth = useSmoothRange(asset);
+  const motionView = useCameraMotionView();
   const requestedFrame = Math.max(0, Math.min(asset.metadata.frameCount - 1, Math.round(frame)));
   const rate = asset.metadata.frameRate;
   const resourceKey = `${asset.id}/${asset.prepared?.verification.verifiedAt}/${asset.metadata.frameCount}/${rate.numerator}/${rate.denominator}/${retry}`;
@@ -383,15 +392,19 @@ export function SourceReview({
             <small>{transportLabel}</small>
           </div>
         }
+        motion={
+          mediaReady(asset)
+            ? { asset, smooth, view: motionView, disabled: disabled || rangeDraft, onFrame: scrub }
+            : null
+        }
       />
       {mediaReady(asset) && (
-        <SmoothPartPanel
+        <CameraMotionPanel
           asset={asset}
           range={range}
           smooth={smooth}
-          frame={observedFrame ?? requestedFrame}
+          view={motionView}
           disabled={disabled || rangeDraft}
-          onFrame={scrub}
           onApply={(suggestion) => {
             scrub(suggestion.sourceIn);
             onRange({ mediaId: asset.id, ...suggestion });
@@ -505,6 +518,7 @@ function SourceRangeEditor({
   onKeyDown,
   transport,
   readout,
+  motion,
   ref,
 }: Readonly<RangeProps>) {
   const count = asset.metadata.frameCount;
@@ -695,102 +709,105 @@ function SourceRangeEditor({
     <div className="source-range-editor" data-dirty={numbersDirty || draft !== null}>
       <div className="source-track">
         {transport}
-        <div
-          className="source-range-strip"
-          ref={strip}
-          aria-label="Range"
-          data-source-in={selected.sourceIn}
-          data-source-out={selected.sourceOut}
-          data-range-draft={draft ? 'true' : 'false'}
-          data-snapshots={snapshotsAvailable ? 'true' : 'false'}
-        >
-          <span className="source-filmstrip" aria-hidden="true">
-            {snapshots.map((sourceFrame) => (
-              <img
-                key={sourceFrame}
-                loading="lazy"
-                draggable={false}
-                hidden={failedSnapshots.includes(sourceFrame)}
-                src={`/api/media/${encodeURIComponent(asset.id)}/thumbnail/${sourceFrame}`}
-                alt=""
-                onError={() => setFailedSnapshots((failed) => [...failed, sourceFrame])}
-              />
-            ))}
-          </span>
-          {!snapshotsAvailable && <span className="source-filmstrip-missing">Snapshots unavailable</span>}
-          <span
-            className="source-range-omitted before"
-            style={{ width: `${(selected.sourceIn / count) * 100}%` }}
-            aria-hidden="true"
-          />
-          <span
-            className="source-range-omitted after"
-            style={{
-              left: `${(selected.sourceOut / count) * 100}%`,
-              width: `${((count - selected.sourceOut) / count) * 100}%`,
-            }}
-            aria-hidden="true"
-          />
-          <span
-            className="source-range-selection"
-            style={{
-              left: `${(selected.sourceIn / count) * 100}%`,
-              width: `${((selected.sourceOut - selected.sourceIn) / count) * 100}%`,
-            }}
-            aria-hidden="true"
-          />
-          <input
-            className="source-playhead-input"
-            type="range"
-            aria-label="Source playhead"
-            min={0}
-            max={count - 1}
-            step={1}
-            value={frame}
-            aria-valuetext={`Source frame ${frame}, ${formatTimecode(frame, asset.metadata.frameRate)}`}
-            onKeyDown={onKeyDown}
-            onChange={(event) => onFrame(Number(event.target.value))}
-          />
+        <div className="source-track-stack">
+          <div
+            className="source-range-strip"
+            ref={strip}
+            aria-label="Range"
+            data-source-in={selected.sourceIn}
+            data-source-out={selected.sourceOut}
+            data-range-draft={draft ? 'true' : 'false'}
+            data-snapshots={snapshotsAvailable ? 'true' : 'false'}
+          >
+            <span className="source-filmstrip" aria-hidden="true">
+              {snapshots.map((sourceFrame) => (
+                <img
+                  key={sourceFrame}
+                  loading="lazy"
+                  draggable={false}
+                  hidden={failedSnapshots.includes(sourceFrame)}
+                  src={`/api/media/${encodeURIComponent(asset.id)}/thumbnail/${sourceFrame}`}
+                  alt=""
+                  onError={() => setFailedSnapshots((failed) => [...failed, sourceFrame])}
+                />
+              ))}
+            </span>
+            {!snapshotsAvailable && <span className="source-filmstrip-missing">Snapshots unavailable</span>}
+            <span
+              className="source-range-omitted before"
+              style={{ width: `${(selected.sourceIn / count) * 100}%` }}
+              aria-hidden="true"
+            />
+            <span
+              className="source-range-omitted after"
+              style={{
+                left: `${(selected.sourceOut / count) * 100}%`,
+                width: `${((count - selected.sourceOut) / count) * 100}%`,
+              }}
+              aria-hidden="true"
+            />
+            <span
+              className="source-range-selection"
+              style={{
+                left: `${(selected.sourceIn / count) * 100}%`,
+                width: `${((selected.sourceOut - selected.sourceIn) / count) * 100}%`,
+              }}
+              aria-hidden="true"
+            />
+            <input
+              className="source-playhead-input"
+              type="range"
+              aria-label="Source playhead"
+              min={0}
+              max={count - 1}
+              step={1}
+              value={frame}
+              aria-valuetext={`Source frame ${frame}, ${formatTimecode(frame, asset.metadata.frameRate)}`}
+              onKeyDown={onKeyDown}
+              onChange={(event) => onFrame(Number(event.target.value))}
+            />
+            {(['in', 'out'] as const).map((edge) => {
+              const value = edge === 'in' ? selected.sourceIn : selected.sourceOut;
+              return (
+                <button
+                  key={edge}
+                  className={`source-trim-handle ${edge}`}
+                  role="slider"
+                  aria-label={`Trim source ${edge === 'in' ? 'start' : 'end'}`}
+                  disabled={disabled}
+                  style={{ left: `${(value / count) * 100}%` }}
+                  aria-valuemin={edge === 'in' ? 0 : selected.sourceIn + 1}
+                  aria-valuemax={edge === 'in' ? selected.sourceOut - 1 : count}
+                  aria-valuenow={value}
+                  aria-valuetext={`${value}, ${formatTimecode(value, asset.metadata.frameRate)}${edge === 'out' ? ', OUT exclusive' : ''}`}
+                  title={`Source ${edge === 'in' ? 'IN' : 'OUT (exclusive)'}. Drag to trim or restore; arrows: 1 frame, Shift: 10.`}
+                  onPointerDown={(event) => begin(event, edge)}
+                  onPointerMove={move}
+                  onPointerUp={finish}
+                  onPointerCancel={() => cancel()}
+                  onLostPointerCapture={() => {
+                    if (drag.current) cancel();
+                  }}
+                  onKeyDown={(event) => {
+                    trimKeyboard(event, edge);
+                    onKeyDown(event);
+                  }}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                  }}
+                >
+                  <span />
+                </button>
+              );
+            })}
+          </div>
+          {motion && <MotionLanes {...motion} range={selected} />}
           <span
             className="source-range-head"
             style={{ left: `${count === 1 ? 0 : (frame / (count - 1)) * 100}%` }}
             aria-hidden="true"
           />
-          {(['in', 'out'] as const).map((edge) => {
-            const value = edge === 'in' ? selected.sourceIn : selected.sourceOut;
-            return (
-              <button
-                key={edge}
-                className={`source-trim-handle ${edge}`}
-                role="slider"
-                aria-label={`Trim source ${edge === 'in' ? 'start' : 'end'}`}
-                disabled={disabled}
-                style={{ left: `${(value / count) * 100}%` }}
-                aria-valuemin={edge === 'in' ? 0 : selected.sourceIn + 1}
-                aria-valuemax={edge === 'in' ? selected.sourceOut - 1 : count}
-                aria-valuenow={value}
-                aria-valuetext={`${value}, ${formatTimecode(value, asset.metadata.frameRate)}${edge === 'out' ? ', OUT exclusive' : ''}`}
-                title={`Source ${edge === 'in' ? 'IN' : 'OUT (exclusive)'}. Drag to trim or restore; arrows: 1 frame, Shift: 10.`}
-                onPointerDown={(event) => begin(event, edge)}
-                onPointerMove={move}
-                onPointerUp={finish}
-                onPointerCancel={() => cancel()}
-                onLostPointerCapture={() => {
-                  if (drag.current) cancel();
-                }}
-                onKeyDown={(event) => {
-                  trimKeyboard(event, edge);
-                  onKeyDown(event);
-                }}
-                onClick={(event) => {
-                  event.preventDefault();
-                  event.stopPropagation();
-                }}
-              >
-                <span />
-              </button>
-            );
-          })}
         </div>
       </div>
       <div className="source-range-row">

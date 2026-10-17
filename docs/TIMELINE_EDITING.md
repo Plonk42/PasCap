@@ -719,25 +719,27 @@ caches are ignored (use **Analyse camera motion** to measure again). A failed me
 never fails preparation: the job reports it and the proxy stays usable. The original
 is identity-checked and only its subtitle track is read.
 
-Opening a recording reads its analysis, once per session. Below the range strip and the
-IN/OUT fields, a **Camera motion** section has a header row: its title (a chevron button,
-**Collapse camera motion**), **Steadiest range** with its length and IN–OUT timecode, and
-**Use**. A controls row follows: the **Allowed movement** setting, the shared slider with
-exact field and Reset (0.5–6, initially 2; neutral is the initial value), and **Flight
-data** (**Flight data lanes**), a menu choosing which flight data values this recording
-has get a lane, **Flight speed** initially. Collapsing hides everything but the title and
-the suggestion; the collapse, allowed movement and flight data choices are browser
-preferences. Under the controls, aligned with the strip, the **motion timeline** stacks
-lanes, each labelled at its top-left. The 44 px image lane plots the **jolts** (shaded
-area: how fast the camera movement changes, % of image width per s², up to 8), the
-**movement** in the picture (white line, up to 10 % of width per s) and the **allowed
+Opening a recording reads its analysis, once per session. Directly under the range strip,
+in the same column, the **motion timeline** stacks lanes, each labelled at its top-left;
+one playhead line runs through the strip and every lane, and the footage omitted by IN/OUT
+(including a trim draft) is hatched across them. The 44 px image lane plots the **jolts**
+(amber area: how fast the camera movement changes, % of image width per s², up to 8),
+the **movement** in the picture (white line, up to 10 % of width per s) and the **allowed
 movement** (dashed accent line); a 30 px lane follows for each chosen flight data value,
 scaled to its own range (speeds from 0 to at least 16 m/s, vertical speed and exposure
-bias around zero). The plots use the editor's neutral greys and accent; steady ranges are
+bias around zero), each in its own colour, matching its swatch in the menu; steady ranges are
 accent bands across every lane, the suggested one strongest. While hovering, every lane
 label shows its value under the pointer (flight data interpolated between its
 once-per-second samples) and the image lane the timecode. Clicking or dragging any lane
-scrubs like the strip. The suggestion is the longest stretch of at least 2 s below the
+scrubs like the strip. Below the IN/OUT fields, separated by a hairline, the **Camera
+motion** section has a header row: its title (a chevron button, **Collapse camera
+motion**), its help, **Steadiest range** with its length and IN–OUT timecode, and **Use**.
+A controls row follows: the **Allowed movement** setting, the shared slider with exact
+field and Reset (0.5–6, initially 2; neutral is the initial value), and **Flight data**
+(**Flight data lanes**), a menu choosing which flight data values this recording has get
+a lane, **Flight speed** initially. Collapsing hides the lanes and controls, keeping the
+title and the suggestion; the collapse, allowed movement and flight data choices are
+browser preferences. The suggestion is the longest stretch of at least 2 s below the
 allowed movement, bridging jolts shorter than 0.5 s and keeping 0.2 s clear of rough
 edges inside the recording. Move the **Allowed movement** slider, or drag the dashed line
 itself (it highlights within 6 px, and the image lane shows its value; dragging the line
