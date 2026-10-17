@@ -124,7 +124,7 @@ test('dragging a marker moves all participants/easing with preview-only drafts, 
   await page.keyboard.up('Alt');
   await expect(marker(page, 30)).toHaveClass(/moving/);
   await expect(marker(page, 30)).toHaveAttribute('data-keyframe-origin', '20');
-  await expect(marker(page, 30).locator('.timeline-layer-key-time')).toHaveText('00:00:01:00');
+  await expect(marker(page, 30).locator('.timeline-layer-key-time')).toHaveText('00:01:00');
   await expect(page.locator('.timeline-bottom')).toContainText('all animated settings move together');
   expect(await current(page)).toEqual(before);
   await page.evaluate(() => window.pascapLab!.flush());

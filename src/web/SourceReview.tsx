@@ -25,6 +25,7 @@ import { formatTimecode } from '../shared/timing.js';
 import { mediaReady, sourceSeconds } from './display.js';
 import { Icon } from './icons.js';
 import { Popover } from './Popover.js';
+import { SmoothPartPanel, useSmoothRange } from './SmoothRange.js';
 import { SourceTransport, type SourceTransportState } from './source-transport.js';
 import { useDelayedFlag } from './use-delayed-flag.js';
 import './rush-source.css';
@@ -113,6 +114,7 @@ export function SourceReview({
   const [retry, setRetry] = useState(0);
   const [lastAddedId, setLastAddedId] = useState<string | null>(null);
   const [rangeDraft, setRangeDraft] = useState(false);
+  const smooth = useSmoothRange(asset);
   const requestedFrame = Math.max(0, Math.min(asset.metadata.frameCount - 1, Math.round(frame)));
   const rate = asset.metadata.frameRate;
   const resourceKey = `${asset.id}/${asset.prepared?.verification.verifiedAt}/${asset.metadata.frameCount}/${rate.numerator}/${rate.denominator}/${retry}`;
@@ -382,6 +384,21 @@ export function SourceReview({
           </div>
         }
       />
+      {mediaReady(asset) && (
+        <SmoothPartPanel
+          asset={asset}
+          range={range}
+          smooth={smooth}
+          frame={observedFrame ?? requestedFrame}
+          disabled={disabled || rangeDraft}
+          onFrame={scrub}
+          onApply={(suggestion) => {
+            scrub(suggestion.sourceIn);
+            onRange({ mediaId: asset.id, ...suggestion });
+          }}
+          onKeyDown={keyboard}
+        />
+      )}
       <output
         className="source-add-feedback"
         aria-live="polite"

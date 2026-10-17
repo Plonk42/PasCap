@@ -148,7 +148,7 @@ test('frame/timecode fields: Enter/blur, Escape, no-op edits and one-step Undo/R
   await untouched(page, before, 0);
   await input.press('Enter');
   await expect(input).toBeFocused();
-  await expect(input).toHaveValue('00:00:00:25');
+  await expect(input).toHaveValue('00:00:25');
   const next = applyCommand(before, { type: 'trim', clipId: 'a', sourceIn: 25, sourceOut: 105 });
   expect(await current(page)).toEqual(next);
   await input.press('Enter');
@@ -162,21 +162,21 @@ test('frame/timecode fields: Enter/blur, Escape, no-op edits and one-step Undo/R
   await page.getByRole('button', { name: 'Redo', exact: true }).click();
   expect(await current(page)).toEqual(next);
   await undo(page).click();
-  await input.fill('00:00:01:00');
+  await input.fill('00:01:00');
   await input.press('Tab');
   expect(await current(page)).toEqual(
     applyCommand(before, { type: 'trim', clipId: 'a', sourceIn: 30, sourceOut: 105 }),
   );
-  await expect(input).toHaveValue('00:00:01:00');
+  await expect(input).toHaveValue('00:01:00');
   await undo(page).click();
   await expect(undo(page)).toBeDisabled();
   await flush(page);
   const stableSaves = memory.saves;
   await input.fill('42');
   await input.press('Escape');
-  await expect(input).toHaveValue('00:00:00:15');
+  await expect(input).toHaveValue('00:00:15');
   await expect(input).toBeFocused();
-  for (const notation of ['15', '00:00:00:15']) {
+  for (const notation of ['15', '00:00:15']) {
     await input.fill(notation);
     await input.press('Enter');
     await input.press('Tab');
@@ -193,8 +193,8 @@ test('invalid frame/timecode drafts retain text/errors without clamping, saves o
     const input = field(page, edge);
     const drafts =
       edge === 'in'
-        ? ['', '15.5', '-1', '105', '00:00:00:30', '00:60:00:00', 'NaN']
-        : ['15', '121', '00:00:04:01', '00:00:99:00'];
+        ? ['', '15.5', '-1', '105', '00:00:30', '00:00:00:00', 'NaN']
+        : ['15', '121', '00:04:01', '00:99:00'];
     for (const draft of drafts) {
       await input.fill(draft);
       await input.press('Enter');
@@ -245,7 +245,7 @@ for (const ripple of [true, false]) {
     expect(await current(page)).toEqual(before);
     await expect(undo(page)).toBeDisabled();
     // The exact field must use the same fixed-start semantics, not retained OUT.
-    await field(page, 'in').fill('00:00:01:00');
+    await field(page, 'in').fill('00:01:00');
     await field(page, 'in').press('Enter');
     expect(await current(page)).toEqual(next);
     await undo(page).click();
@@ -270,10 +270,10 @@ test('final transition-invalid OUT rejects the gesture, not the last valid draft
   await expect(page.locator('.clip-source-bar')).toHaveAttribute('data-invalid', 'true');
   await page.mouse.up();
   await expect(page.locator('.clip-source-range').getByRole('alert')).toContainText('conflicting fades');
-  await expect(field(page, 'out')).toHaveValue('00:00:03:15');
+  await expect(field(page, 'out')).toHaveValue('00:03:15');
   await ready(page, before);
   await untouched(page, before, 0);
-  await field(page, 'out').fill('00:00:00:25');
+  await field(page, 'out').fill('00:00:25');
   await field(page, 'out').press('Enter');
   await expect(field(page, 'out')).toHaveAttribute('aria-invalid', 'true');
   await untouched(page, before, 0);
@@ -296,7 +296,7 @@ test('Escape, pointercancel, lost capture and window blur restore range/preview 
     else await page.evaluate(() => globalThis.dispatchEvent(new Event('blur')));
     await page.mouse.up();
     await expect(page.locator('.clip-source-bar')).toHaveAttribute('data-range-draft', 'false');
-    await expect(field(page, 'in')).toHaveValue('00:00:00:15');
+    await expect(field(page, 'in')).toHaveValue('00:00:15');
     await expect(field(page, 'in')).toBeEnabled();
     expect(await drag.target.evaluate((element) => element.hasPointerCapture(1))).toBe(false);
     await ready(page, before, 45);
@@ -402,14 +402,14 @@ test('collapse/tabs retain draft identity; clip selection replaces context witho
   await untouched(page, before, 0);
   // No blur-based valid commit: select while the former invalid draft is mounted.
   await page.locator('[data-clip-id="b"] .timeline-clip-body').click();
-  await expect(input).toHaveValue('00:00:01:00');
+  await expect(input).toHaveValue('00:01:00');
   await expect(input).toHaveAttribute('aria-invalid', 'false');
   expect(await node.evaluate((element) => element.isConnected)).toBe(false);
   await input.press('Enter');
   await input.press('Tab');
   await untouched(page, before, 0);
   await page.locator('[data-clip-id="a"] .timeline-clip-body').click();
-  await expect(input).toHaveValue('00:00:00:15');
+  await expect(input).toHaveValue('00:00:15');
   await untouched(page, before, 0);
 });
 
@@ -456,7 +456,7 @@ for (const viewport of [
     await expect(handle(page, 'in')).toHaveAttribute('aria-valuemax', '104');
     await expect(handle(page, 'out')).toHaveAttribute('aria-valuemin', '16');
     await expect(handle(page, 'out')).toHaveAttribute('aria-valuemax', '120');
-    await expect(handle(page, 'out')).toHaveAttribute('aria-valuetext', '00:00:03:15, OUT exclusive');
+    await expect(handle(page, 'out')).toHaveAttribute('aria-valuetext', '00:03:15, OUT exclusive');
     const barBounds = (await bar.boundingBox())!;
     for (const edge of ['in', 'out'] as const) {
       const target = handle(page, edge);
@@ -482,7 +482,7 @@ for (const viewport of [
       body: await page.screenshot(),
       contentType: 'image/png',
     });
-    await field(page, 'in').fill('00:00:00:30');
+    await field(page, 'in').fill('00:00:30');
     await field(page, 'in').press('Enter');
     await expect(field(page, 'in')).toHaveAttribute('aria-invalid', 'true');
     await expect(field(page, 'in').locator('..').getByRole('alert')).toBeInViewport();
@@ -496,8 +496,8 @@ for (const viewport of [
     expect(await current(page)).toEqual(
       applyCommand(before, { type: 'trim', clipId: 'a', sourceIn: 0, sourceOut: 120 }),
     );
-    await expect(field(page, 'in')).toHaveValue('00:00:00:00');
-    await expect(field(page, 'out')).toHaveValue('00:00:04:00');
+    await expect(field(page, 'in')).toHaveValue('00:00:00');
+    await expect(field(page, 'out')).toHaveValue('00:04:00');
     await expect(page.getByRole('button', { name: 'Restore full recording', exact: true })).toBeDisabled();
     expect(await bar.locator('.before').evaluate((element) => element.getBoundingClientRect().width)).toBe(0);
     expect(await bar.locator('.after').evaluate((element) => element.getBoundingClientRect().width)).toBe(0);

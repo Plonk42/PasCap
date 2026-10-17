@@ -8,6 +8,7 @@ import {
   type SourceFingerprint,
 } from '../shared/media.js';
 import { framesToSeconds } from '../shared/timing.js';
+import { MOTION_ANALYSIS_VERSION, motionAnalysisSchema, type MotionAnalysis } from '../shared/motion-analysis.js';
 import { forEachSerial } from '../shared/serial.js';
 import type { ServiceConfig } from './config.js';
 import { errorMessage, isNotFound, ServiceError } from './errors.js';
@@ -21,6 +22,7 @@ import {
   verifyMovedOriginal,
 } from './files.js';
 import { JobQueue, type JobContext } from './jobs.js';
+import { analyseProxy, readTelemetry } from './motion.js';
 import type { RelinkCandidate } from './relink.js';
 import { NATIVE_THREADS } from './native-threads.js';
 import { probeVideo } from './probe.js';
@@ -80,6 +82,7 @@ export class MediaLibrary {
   readonly #prepareRequests = new Map<string, Promise<MediaJob>>();
   readonly #preparing = new Map<string, string>();
   readonly #relinking = new Map<string, string>();
+  readonly #analysing = new Map<string, string>();
   constructor(
     readonly config: ServiceConfig,
     readonly jobs: JobQueue,
@@ -131,6 +134,56 @@ export class MediaLibrary {
   }
   thumbnailPath(asset: MediaAsset, frame: number): string {
     return path.join(this.assetDir(asset), `frame-${frame}.jpg`);
+  }
+  motionPath(asset: MediaAsset): string {
+    return path.join(this.assetDir(asset), `motion-v${MOTION_ANALYSIS_VERSION}.json`);
+  }
+  /** The cached analysis of the current verified proxy, or null when it has not been analysed. */
+  async motion(id: string): Promise<MotionAnalysis | null> {
+    const asset = this.get(id);
+    if (asset.status !== 'ready' || !asset.prepared) return null;
+    let text: string;
+    try {
+      text = await readFile(this.motionPath(asset), 'utf8');
+    } catch (error) {
+      if (isNotFound(error)) return null;
+      throw error;
+    }
+    const analysis = motionAnalysisSchema.parse(JSON.parse(text));
+    // An analysis of an earlier proxy no longer describes the current one.
+    return analysis.verifiedAt === asset.prepared.verification.verifiedAt &&
+      analysis.frameCount === asset.prepared.verification.frameCount
+      ? analysis
+      : null;
+  }
+  /** Measures camera motion in the verified proxy for smooth-range suggestions. */
+  analyseMotion(id: string): MediaJob {
+    const active = this.#analysing.get(id);
+    if (active !== undefined) return this.jobs.get(active);
+    const asset = this.get(id);
+    if (asset.status !== 'ready' || !asset.prepared)
+      throw new ServiceError('Prepare the recording before looking for its smooth part.', 409);
+    if (this.#preparing.has(id) || this.#prepareRequests.has(id) || this.#relinking.has(id))
+      throw new ServiceError(`${asset.name} is busy. Try again once its current job finishes.`, 409);
+    const { verifiedAt } = asset.prepared.verification;
+    const job = this.jobs.submit(
+      'motion',
+      asset.name,
+      async (context) => {
+        const current = this.get(id);
+        if (current.prepared?.verification.verifiedAt !== verifiedAt)
+          throw new ServiceError('The proxy changed while waiting. Look for the smooth part again.', 409);
+        await assertSourceIdentity(current.sourcePath, current.fingerprint);
+        await this.#measureMotion(current, context, 0.01, 0.98);
+        return 'Camera motion measured';
+      },
+      () => {
+        this.#analysing.delete(id);
+        return Promise.resolve();
+      },
+    );
+    this.#analysing.set(id, job.id);
+    return job;
   }
   async #save(): Promise<void> {
     await this.#writer.run(() => this.#writeRegistry());
@@ -328,8 +381,9 @@ export class MediaLibrary {
             await assertSourceIdentity(current.sourcePath, current.fingerprint, true);
             current.content = content;
           }
-          await this.#prepareAsset(current, context);
+          const note = await this.#prepareAsset(current, context);
           if (context.signal.aborted) throw new ServiceError('Job cancelled.', 499);
+          return note;
         },
         async (finished) => {
           current.status = finished.state === 'completed' ? 'ready' : 'error';
@@ -421,7 +475,7 @@ export class MediaLibrary {
       }
     });
   }
-  async #prepareAsset(asset: MediaAsset, context: JobContext): Promise<void> {
+  async #prepareAsset(asset: MediaAsset, context: JobContext): Promise<string | undefined> {
     const directory = this.assetDir(asset);
     const thumbnailFrames = [
       ...new Set([
@@ -448,6 +502,8 @@ export class MediaLibrary {
       }
       if (cached) {
         await assertSourceIdentity(asset.sourcePath, asset.fingerprint, true);
+        // Proxies prepared before smooth-part analysis existed gain it here.
+        if (!(await this.#hasMotion(asset))) return this.#measureAfterPreparation(asset, context);
         context.update(0.99, 'Verified cached proxy');
         return;
       }
@@ -590,10 +646,53 @@ export class MediaLibrary {
         thumbnailFrames,
         verification: { frameCount: metadata.frameCount, samples, verifiedAt: new Date().toISOString() },
       };
-      context.update(0.99, 'Proxy and indexed thumbnails verified');
+      return await this.#measureAfterPreparation(asset, context);
     } finally {
       await rm(temporary, { force: true });
     }
+  }
+  async #measureMotion(asset: MediaAsset, context: JobContext, from: number, to: number): Promise<void> {
+    const { verifiedAt, frameCount } = asset.prepared!.verification;
+    context.update(from, 'Measuring camera motion for smooth-part suggestions');
+    const motion = await analyseProxy(
+      this.config.ffmpeg,
+      this.proxyPath(asset),
+      frameCount,
+      verifiedAt,
+      context.signal,
+      (fraction) =>
+        context.update(from + fraction * (to - from), 'Measuring camera motion for smooth-part suggestions'),
+    );
+    const telemetry = await readTelemetry(this.config, asset.sourcePath, context.signal);
+    await atomicWrite(this.motionPath(asset), JSON.stringify({ ...motion, telemetry }));
+  }
+  /** Smooth-part analysis is a convenience: its failure leaves a usable, verified proxy. */
+  async #measureAfterPreparation(asset: MediaAsset, context: JobContext): Promise<string | undefined> {
+    try {
+      await this.#measureMotion(asset, context, 0.84, 0.99);
+      return undefined;
+    } catch (error) {
+      if (context.signal.aborted) throw error;
+      return `Proxy ready; smooth-part analysis failed: ${errorMessage(error)} Use Find smooth part to retry.`;
+    }
+  }
+  async #hasMotion(asset: MediaAsset): Promise<boolean> {
+    let text: string;
+    try {
+      text = await readFile(this.motionPath(asset), 'utf8');
+    } catch (error) {
+      if (isNotFound(error)) return false;
+      throw error;
+    }
+    // An unreadable analysis is regenerated like a missing one; it is only a cache.
+    let value: unknown;
+    try {
+      value = JSON.parse(text);
+    } catch {
+      return false;
+    }
+    const parsed = motionAnalysisSchema.safeParse(value);
+    return parsed.success && parsed.data.verifiedAt === asset.prepared?.verification.verifiedAt;
   }
 }
 

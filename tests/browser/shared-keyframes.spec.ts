@@ -930,7 +930,7 @@ test('numeric trim, mapped split, duplicate and overlay moves keep absolute row 
     .locator('[data-clip-id="overlay"] .timeline-clip-body')
     .evaluate((button) => (button as HTMLButtonElement).click());
   await inspectorTab(page, 'Clip');
-  await expect(sourceIn).toHaveValue('00:00:00:10');
+  await expect(sourceIn).toHaveValue('00:00:10');
   await expect(start).toHaveValue('80');
   await expect(page.getByRole('button', { name: 'Track keyframe 5 on Track 2', exact: true })).toHaveCount(1);
 });
