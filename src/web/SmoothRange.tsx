@@ -25,6 +25,7 @@ import { mediaReady, sourceSeconds } from './display.js';
 import { Icon } from './icons.js';
 import {
   availableSeries,
+  cameraMotionPath,
   DEFAULT_SERIES,
   SERIES,
   seriesPath,
@@ -36,17 +37,17 @@ import { Popover } from './Popover.js';
 import { readPreference, writePreference } from './preferences.js';
 
 const TOLERANCE_PREFERENCE = 'pascap-smooth-tolerance';
-const COLLAPSED_PREFERENCE = 'pascap-motion-timeline-collapsed';
+const COLLAPSED_PREFERENCE = 'pascap-smooth-panel-collapsed';
 const SERIES_PREFERENCE = 'pascap-motion-timeline-series';
 const POLL_MS = 1000;
-/** Roughness scale in % of image width per s²; other series scale to their own range. */
+/** Roughness scale in % of image width per s². */
 const ROUGHNESS_MAX = 8;
 const CHART_POINTS = 600;
-/** The top of the plotted area in the 0–100 viewBox, leaving room for one line of text. */
-const PLOT_TOP = 30;
+/** Image lane height in pixels; telemetry lanes are sized in CSS. */
+const IMAGE_PX = 44;
+/** Of the image lane's 0–100 viewBox, the part under its text line. */
+const PLOT_SPAN = 72;
 const LINE_GRAB_PX = 6;
-const COLLAPSED_PX = 22;
-const THUMB_PX = 14;
 
 type Phase =
   | { kind: 'idle' }
@@ -173,9 +174,14 @@ export function useSmoothRange(asset: MediaAsset): SmoothRangeState {
   return { phase, profile, telemetry, ranges, tolerance, setTolerance: keepTolerance, find };
 }
 
-/** The plotted area of the 0–100 viewBox, for a 0 (bottom) – 1 (top) fraction of a scale. */
+/** The 0–100 viewBox height for a 0 (bottom) – 1 (top) fraction of a scale, below the lane's text line. */
 function plotY(fraction: number): number {
-  return 100 - Math.max(0, Math.min(1, fraction)) * (100 - PLOT_TOP);
+  return 100 - Math.max(0, Math.min(1, fraction)) * PLOT_SPAN;
+}
+
+/** Telemetry lanes plot below their label. */
+function laneY(fraction: number): number {
+  return 94 - Math.max(0, Math.min(1, fraction)) * 56;
 }
 
 /** At most CHART_POINTS samples: the peak roughness of each bucket. */
@@ -201,153 +207,138 @@ function readSeries(): SeriesKey[] {
   return [...DEFAULT_SERIES];
 }
 
-interface ReadoutProps {
-  asset: MediaAsset;
-  profile: MotionProfile;
-  telemetry: readonly TelemetrySample[];
-  series: readonly SeriesSpec[];
-  hover: number | null;
-  /** Shown instead of the values while the dashed line is hovered or dragged. */
-  tolerance: number | null;
-}
-
-/** The legend, or the values under the pointer, above the plotted lines. */
-function MotionReadout({ asset, profile, telemetry, series, hover, tolerance }: Readonly<ReadoutProps>) {
-  const rate = asset.metadata.frameRate;
-  const fps = rate.numerator / rate.denominator;
-  if (tolerance !== null)
-    return (
-      <span className="source-motion-readout" aria-hidden="true">
-        <span className="tolerance">Tolerance {tolerance.toFixed(1)} · drag up to accept more movement</span>
-      </span>
-    );
-  const values = series.map((spec) => ({
-    spec,
-    value: hover === null ? null : seriesValue(spec, profile, telemetry, hover, fps),
-  }));
-  return (
-    <span className="source-motion-readout" aria-hidden="true">
-      {hover !== null && <b>{formatTimecode(hover, rate)}</b>}
-      <span className="roughness">Roughness{hover !== null && ` ${profile.roughness[hover]!.toFixed(1)}`}</span>
-      {values.map(({ spec, value }) =>
-        hover !== null && value === null ? null : (
-          <span key={spec.key} className="series" style={{ '--series': spec.colour } as CSSProperties}>
-            {value === null ? spec.label : `${spec.short} ${spec.format(value)}`}
-          </span>
-        ),
-      )}
-    </span>
-  );
-}
-
-interface ToolsProps {
-  collapsed: boolean;
-  onCollapsed: (collapsed: boolean) => void;
+interface ChooserProps {
   available: readonly SeriesSpec[];
   shown: readonly SeriesKey[];
   onShown: (shown: SeriesKey[]) => void;
-  hasTelemetry: boolean;
 }
 
-/** Collapse and series choice, kept as browser preferences. */
-function MotionTools({ collapsed, onCollapsed, available, shown, onShown, hasTelemetry }: Readonly<ToolsProps>) {
+/** Which telemetry values get a lane, kept as a browser preference. */
+function LaneChooser({ available, shown, onShown }: Readonly<ChooserProps>) {
   return (
-    <span className="source-motion-tools">
-      <button
-        className="source-motion-toggle"
-        type="button"
-        aria-label={collapsed ? 'Expand motion timeline' : 'Collapse motion timeline'}
-        aria-expanded={!collapsed}
-        title={collapsed ? 'Show roughness, camera motion and telemetry' : 'Show only the smooth parts'}
-        onClick={() => onCollapsed(!collapsed)}
-      >
-        <Icon name={collapsed ? 'chevron-down' : 'chevron-up'} size={13} />
-      </button>
-      {!collapsed && (
-        <Popover
-          label="Motion timeline series"
-          className="source-motion-series"
-          trigger={<Icon name="sliders" size={13} />}
-        >
-          <div className="source-motion-series-list">
-            {available.map((spec) => (
-              <label key={spec.key}>
-                <input
-                  type="checkbox"
-                  checked={shown.includes(spec.key)}
-                  onChange={(event) => {
-                    const on = event.target.checked;
-                    onShown(
-                      SERIES.filter((candidate) =>
-                        candidate.key === spec.key ? on : shown.includes(candidate.key),
-                      ).map((candidate) => candidate.key),
-                    );
-                  }}
-                />
-                <i style={{ background: spec.colour }} aria-hidden="true" />
-                {spec.label}
-              </label>
-            ))}
-            {!hasTelemetry && <p>No drone telemetry in this recording.</p>}
-          </div>
-        </Popover>
-      )}
-    </span>
+    <Popover
+      label="Motion timeline series"
+      className="smooth-panel-lanes-menu"
+      trigger={
+        <>
+          <Icon name="sliders" size={14} />
+          <span>Telemetry</span>
+        </>
+      }
+    >
+      <div className="source-motion-series-list">
+        {available.map((spec) => (
+          <label key={spec.key}>
+            <input
+              type="checkbox"
+              checked={shown.includes(spec.key)}
+              onChange={(event) => {
+                const on = event.target.checked;
+                onShown(
+                  SERIES.filter((candidate) => (candidate.key === spec.key ? on : shown.includes(candidate.key))).map(
+                    (candidate) => candidate.key,
+                  ),
+                );
+              }}
+            />
+            <i style={{ background: spec.colour }} aria-hidden="true" />
+            {spec.label}
+          </label>
+        ))}
+        {available.length === 0 && <p>No drone telemetry in this recording.</p>}
+      </div>
+    </Popover>
   );
 }
 
-interface PlotProps {
+function Bands({ ranges }: Readonly<{ ranges: readonly SmoothRange[] }>) {
+  return ranges.map((smoothRange, index) => (
+    <rect
+      key={`${smoothRange.sourceIn}-${smoothRange.sourceOut}`}
+      className={index ? 'source-motion-band alternative' : 'source-motion-band'}
+      x={smoothRange.sourceIn}
+      width={smoothRange.sourceOut - smoothRange.sourceIn}
+      y={0}
+      height={100}
+    />
+  ));
+}
+
+interface ImageLaneProps {
+  asset: MediaAsset;
+  profile: MotionProfile;
+  ranges: readonly SmoothRange[];
+  roughness: string;
+  cameraMotion: string;
+  toleranceY: number;
+  hover: number | null;
+  /** Shown instead of the legend while the dashed line is hovered or dragged. */
+  tolerance: number | null;
+}
+
+/** Image roughness, camera motion and the tolerance, with the legend or the values under the pointer. */
+function ImageLane(props: Readonly<ImageLaneProps>) {
+  const { asset, profile, ranges, hover, tolerance } = props;
+  const count = asset.metadata.frameCount;
+  let label = (
+    <>
+      <span className="roughness">Roughness</span>
+      <span className="series camera">Camera motion</span>
+    </>
+  );
+  if (tolerance !== null)
+    label = <span className="tolerance">Tolerance {tolerance.toFixed(1)} · drag up to accept more movement</span>;
+  else if (hover !== null)
+    label = (
+      <>
+        <b>{formatTimecode(hover, asset.metadata.frameRate)}</b>
+        <span className="roughness">Roughness {profile.roughness[hover]!.toFixed(1)}</span>
+        <span className="series camera">Camera {profile.speed[hover]!.toFixed(1)} %/s</span>
+      </>
+    );
+  return (
+    <div className="source-motion-plot image" data-lane="image">
+      <svg viewBox={`0 0 ${count} 100`} preserveAspectRatio="none" aria-hidden="true">
+        <Bands ranges={ranges} />
+        <path className="source-motion-roughness" d={props.roughness} />
+        <path className="source-motion-line camera" d={props.cameraMotion} />
+        <line className="source-motion-tolerance" x1={0} x2={count} y1={props.toleranceY} y2={props.toleranceY} />
+      </svg>
+      <span className="source-motion-readout" aria-hidden="true">
+        {label}
+      </span>
+    </div>
+  );
+}
+
+interface SeriesLaneProps {
+  spec: SeriesSpec;
+  d: string;
   count: number;
   ranges: readonly SmoothRange[];
-  collapsed: boolean;
-  roughness: string;
-  lines: readonly { spec: SeriesSpec; d: string }[];
-  toleranceY: number;
+  value: number | null;
 }
 
-function MotionPlot({ count, ranges, collapsed, roughness, lines, toleranceY }: Readonly<PlotProps>) {
-  const top = collapsed ? 0 : PLOT_TOP;
+/** One telemetry value on its own scale, labelled with its name or its value under the pointer. */
+function SeriesLane({ spec, d, count, ranges, value }: Readonly<SeriesLaneProps>) {
   return (
-    <svg viewBox={`0 0 ${count} 100`} preserveAspectRatio="none" aria-hidden="true">
-      {ranges.map((smoothRange, index) => (
-        <rect
-          key={`${smoothRange.sourceIn}-${smoothRange.sourceOut}`}
-          className={index ? 'source-motion-band alternative' : 'source-motion-band'}
-          x={smoothRange.sourceIn}
-          width={smoothRange.sourceOut - smoothRange.sourceIn}
-          y={top}
-          height={100 - top}
-        />
-      ))}
-      {!collapsed && (
-        <>
-          <path className="source-motion-roughness" d={roughness} />
-          {lines.map(({ spec, d }) => (
-            <path key={spec.key} className="source-motion-line" data-series={spec.key} d={d} stroke={spec.colour} />
-          ))}
-          <line className="source-motion-tolerance" x1={0} x2={count} y1={toleranceY} y2={toleranceY} />
-        </>
-      )}
-    </svg>
+    <div className="source-motion-plot" data-lane={spec.key} style={{ '--series': spec.colour } as CSSProperties}>
+      <svg viewBox={`0 0 ${count} 100`} preserveAspectRatio="none" aria-hidden="true">
+        <Bands ranges={ranges} />
+        <path className="source-motion-line" d={d} />
+      </svg>
+      <span className="source-motion-readout" aria-hidden="true">
+        <span className="series">{value === null ? spec.label : `${spec.label} ${spec.format(value)}`}</span>
+      </span>
+    </div>
   );
-}
-
-interface TimelineProps {
-  asset: MediaAsset;
-  range: MediaSelection;
-  smooth: SmoothRangeState;
-  frame: number;
-  disabled: boolean;
-  onFrame: (frame: number) => void;
-  onApply: (range: SmoothRange) => void;
-  onKeyDown: (event: KeyboardEvent<HTMLElement>) => void;
 }
 
 type Drag = { kind: 'scrub' | 'tolerance'; pointer: number };
 
-/** The tolerance whose dashed line sits at y (0–100 from the top), on the slider's steps. */
+/** The tolerance whose dashed line sits at y (0–100 from the top of the image lane), on the slider's steps. */
 function toleranceAt(y: number): number {
-  const value = ((100 - y) / (100 - PLOT_TOP)) * ROUGHNESS_MAX;
+  const value = ((100 - y) / PLOT_SPAN) * ROUGHNESS_MAX;
   const stepped = Math.round(value / SMOOTH_TOLERANCE.step) * SMOOTH_TOLERANCE.step;
   return Number(Math.max(SMOOTH_TOLERANCE.min, Math.min(SMOOTH_TOLERANCE.max, stepped)).toFixed(1));
 }
@@ -357,7 +348,7 @@ function suggestionText(best: SmoothRange | undefined, applied: boolean, rate: F
     return { span: '', label: 'No smooth part to use', hint: 'No steady part of 2 s or more at this tolerance' };
   const from = formatTimecode(best.sourceIn, rate);
   const to = formatTimecode(best.sourceOut, rate);
-  const span = `${from} – ${to} · ${sourceSeconds(best.sourceOut - best.sourceIn)}`;
+  const span = `${sourceSeconds(best.sourceOut - best.sourceIn)} · ${from} – ${to}`;
   return {
     span,
     label: `Use smooth part ${from} to ${to}`,
@@ -365,61 +356,44 @@ function suggestionText(best: SmoothRange | undefined, applied: boolean, rate: F
   };
 }
 
-const inTools = (event: ReactPointerEvent): boolean =>
-  event.target instanceof Element && event.target.closest('.source-motion-tools') !== null;
-
-/** Pixels: the chart grows a little with more series. */
-function expandedHeight(series: number): number {
-  return 56 + Math.min(4, Math.max(0, series - 2)) * 6;
+interface LanesProps {
+  asset: MediaAsset;
+  smooth: SmoothRangeState;
+  profile: MotionProfile;
+  lanes: readonly SeriesSpec[];
+  frame: number;
+  disabled: boolean;
+  onFrame: (frame: number) => void;
 }
 
 /**
- * One row aligned under the range strip: Use (under Play), image roughness, camera motion and
- * the chosen telemetry along the whole recording, and the tolerance as a draggable dashed line.
- * Collapsed, it keeps only the smooth parts.
+ * Lanes aligned under the range strip, like the prototype report: image roughness, camera motion
+ * and the draggable tolerance, then one lane per chosen telemetry value.
  */
-export function MotionTimeline({
-  asset,
-  range,
-  smooth,
-  frame,
-  disabled,
-  onFrame,
-  onApply,
-  onKeyDown,
-}: Readonly<TimelineProps>) {
-  const { profile, telemetry, ranges, tolerance, setTolerance } = smooth;
+function MotionLanes({ asset, smooth, profile, lanes, frame, disabled, onFrame }: Readonly<LanesProps>) {
+  const { telemetry, ranges, tolerance, setTolerance } = smooth;
   const count = asset.metadata.frameCount;
   const rate = asset.metadata.frameRate;
   const fps = rate.numerator / rate.denominator;
-  const [collapsed, setCollapsed] = useState(() => readPreference(COLLAPSED_PREFERENCE) === 'true');
-  const [shown, setShown] = useState(readSeries);
-  const available = useMemo(() => availableSeries(telemetry), [telemetry]);
-  const visible = useMemo(() => available.filter((spec) => shown.includes(spec.key)), [available, shown]);
-  const roughness = useMemo(() => (profile ? roughnessPath(profile, count) : ''), [profile, count]);
-  const lines = useMemo(
-    () =>
-      profile ? visible.map((spec) => ({ spec, d: seriesPath(spec, profile, telemetry, count, fps, plotY) })) : [],
-    [profile, visible, telemetry, count, fps],
+  const paths = useMemo(
+    () => lanes.map((spec) => ({ spec, d: seriesPath(spec, telemetry, count, fps, laneY) })),
+    [lanes, telemetry, count, fps],
   );
+  const roughness = useMemo(() => roughnessPath(profile, count), [profile, count]);
+  const cameraMotion = useMemo(() => cameraMotionPath(profile, count, plotY), [profile, count]);
   const drag = useRef<Drag | null>(null);
   const [hover, setHover] = useState<number | null>(null);
   const [nearLine, setNearLine] = useState(false);
   const [adjusting, setAdjusting] = useState(false);
-  if (!profile) return null;
-  const best = ranges[0];
-  const applied = best?.sourceIn === range.sourceIn && best?.sourceOut === range.sourceOut;
   const toleranceY = plotY(tolerance / ROUGHNESS_MAX);
-  const toleranceTop = plotY(SMOOTH_TOLERANCE.max / ROUGHNESS_MAX);
-  const toleranceBottom = plotY(SMOOTH_TOLERANCE.min / ROUGHNESS_MAX);
   const position = (event: ReactPointerEvent<HTMLDivElement>) => {
     const box = event.currentTarget.getBoundingClientRect();
     const x = Math.max(0, Math.min(1, (event.clientX - box.left) / box.width));
-    const y = ((event.clientY - box.top) / box.height) * 100;
+    const y = event.clientY - box.top;
     return {
       frame: Math.min(count - 1, Math.floor(x * count)),
-      y,
-      onLine: !collapsed && Math.abs(((y - toleranceY) / 100) * box.height) <= LINE_GRAB_PX,
+      y: (y / IMAGE_PX) * 100,
+      onLine: Math.abs(y - (toleranceY / 100) * IMAGE_PX) <= LINE_GRAB_PX,
     };
   };
   const end = (): void => {
@@ -430,129 +404,65 @@ export function MotionTimeline({
     setHover(null);
     setNearLine(false);
   };
-  const collapse = (value: boolean): void => {
-    setCollapsed(value);
-    leave();
-    writePreference(COLLAPSED_PREFERENCE, String(value));
-  };
-  const show = (keys: SeriesKey[]): void => {
-    setShown(keys);
-    writePreference(SERIES_PREFERENCE, JSON.stringify(keys));
-  };
-  const { span, label, hint } = suggestionText(best, applied, rate);
+  const at = (value: number): string => `${count === 1 ? 0 : (value / (count - 1)) * 100}%`;
 
   return (
-    <div
-      className="source-track source-motion-row"
-      data-collapsed={collapsed || undefined}
-      data-smooth-in={best?.sourceIn}
-      data-smooth-out={best?.sourceOut}
-      style={{ '--motion-height': `${collapsed ? COLLAPSED_PX : expandedHeight(visible.length)}px` } as CSSProperties}
-    >
-      <button
-        className="smooth-use-button"
-        type="button"
-        data-applied={applied || undefined}
-        aria-label={label}
-        title={hint}
-        disabled={disabled || !best || applied}
-        onKeyDown={onKeyDown}
-        onClick={() => best && onApply(best)}
-      >
-        <Icon name={applied ? 'check' : 'wand'} size={collapsed ? 13 : 15} />
-        {!collapsed && <span>{applied ? 'In use' : 'Use'}</span>}
-      </button>
+    <div className="source-track smooth-panel-lanes">
+      <span className="source-track-spacer" aria-hidden="true" />
       <div className="source-motion-lane">
         <div
           className="source-motion"
           data-disabled={disabled || undefined}
           data-near-tolerance={(nearLine && !disabled) || adjusting || undefined}
-          title="Red: roughness, how fast the camera motion changes (dashed: tolerance, drag it). Lines: the series chosen with the sliders button. Blue: smooth parts. Click or drag to scrub."
+          title="Red: roughness, how fast the camera motion changes (dashed: tolerance, drag it). Grey: camera motion. Other lanes: the drone's telemetry. Blue: smooth parts. Click or drag to scrub."
           onPointerDown={(event) => {
-            if (disabled || event.button !== 0 || inTools(event)) return;
-            const at = position(event);
+            if (disabled || event.button !== 0) return;
+            const point = position(event);
             event.currentTarget.setPointerCapture(event.pointerId);
-            drag.current = { kind: at.onLine ? 'tolerance' : 'scrub', pointer: event.pointerId };
-            if (at.onLine) setAdjusting(true);
-            else onFrame(at.frame);
+            drag.current = { kind: point.onLine ? 'tolerance' : 'scrub', pointer: event.pointerId };
+            if (point.onLine) setAdjusting(true);
+            else onFrame(point.frame);
           }}
           onPointerMove={(event) => {
             const current = drag.current;
-            if (current === null && inTools(event)) return leave();
-            const at = position(event);
+            const point = position(event);
             if (current?.pointer === event.pointerId && current.kind === 'tolerance') {
-              setTolerance(toleranceAt(at.y));
+              setTolerance(toleranceAt(point.y));
               return;
             }
-            setHover(at.frame);
-            setNearLine(at.onLine);
-            if (current?.pointer === event.pointerId) onFrame(at.frame);
+            setHover(point.frame);
+            setNearLine(point.onLine);
+            if (current?.pointer === event.pointerId) onFrame(point.frame);
           }}
           onPointerLeave={leave}
           onPointerUp={end}
           onLostPointerCapture={end}
         >
-          <MotionPlot
-            count={count}
+          <ImageLane
+            asset={asset}
+            profile={profile}
             ranges={ranges}
-            collapsed={collapsed}
             roughness={roughness}
-            lines={lines}
+            cameraMotion={cameraMotion}
             toleranceY={toleranceY}
+            hover={hover}
+            tolerance={adjusting || (nearLine && drag.current === null) ? tolerance : null}
           />
-          <MotionTools
-            collapsed={collapsed}
-            onCollapsed={collapse}
-            available={available}
-            shown={shown}
-            onShown={show}
-            hasTelemetry={available.length > 1}
-          />
-          {!collapsed && (
-            <MotionReadout
-              asset={asset}
-              profile={profile}
-              telemetry={telemetry}
-              series={visible}
-              hover={hover}
-              tolerance={adjusting || (nearLine && drag.current === null) ? tolerance : null}
+          {paths.map(({ spec, d }) => (
+            <SeriesLane
+              key={spec.key}
+              spec={spec}
+              d={d}
+              count={count}
+              ranges={ranges}
+              value={hover === null ? null : seriesValue(spec, telemetry, hover, fps)}
             />
+          ))}
+          {hover !== null && !nearLine && !adjusting && (
+            <span className="source-motion-cursor" style={{ left: at(hover) }} aria-hidden="true" />
           )}
-          <span className="source-motion-summary">{best ? `Smooth ${span}` : 'No steady part of 2 s or more'}</span>
-          {hover !== null && !nearLine && !adjusting && !collapsed && (
-            <span
-              className="source-motion-cursor"
-              style={{ left: `${count === 1 ? 0 : (hover / (count - 1)) * 100}%` }}
-              aria-hidden="true"
-            />
-          )}
-          <span
-            className="source-motion-head"
-            style={{ left: `${count === 1 ? 0 : (frame / (count - 1)) * 100}%` }}
-            aria-hidden="true"
-          />
+          <span className="source-motion-head" style={{ left: at(frame) }} aria-hidden="true" />
         </div>
-        {!collapsed && (
-          // The thumb centre travels exactly over the tolerance values of the dashed line.
-          <input
-            className="source-motion-tolerance-input"
-            type="range"
-            aria-label="Smooth part tolerance"
-            aria-valuetext={`${tolerance.toFixed(1)}: ${tolerance < SMOOTH_TOLERANCE.initial ? 'stricter' : 'more tolerant'}`}
-            title={`Tolerance ${tolerance.toFixed(1)}: drag up to accept more camera movement, down for only very steady footage`}
-            min={SMOOTH_TOLERANCE.min}
-            max={SMOOTH_TOLERANCE.max}
-            step={SMOOTH_TOLERANCE.step}
-            value={tolerance}
-            disabled={disabled}
-            style={{
-              top: `calc(${toleranceTop}% - ${THUMB_PX / 2}px)`,
-              height: `calc(${toleranceBottom - toleranceTop}% + ${THUMB_PX}px)`,
-            }}
-            onKeyDown={onKeyDown}
-            onChange={(event) => setTolerance(Number(event.target.value))}
-          />
-        )}
       </div>
     </div>
   );
@@ -565,18 +475,18 @@ interface StatusProps {
 }
 
 /** Recordings without an analysis yet: measure one on request, with its progress. */
-export function SmoothRangeStatus({ smooth, disabled, onKeyDown }: Readonly<StatusProps>) {
+function AnalysisStatus({ smooth, disabled, onKeyDown }: Readonly<StatusProps>) {
   const { phase } = smooth;
   if (phase.kind === 'running')
     return (
-      <output className="smooth-range-row">
+      <output className="smooth-panel-status">
         <span className="spinner" />
         Measuring camera motion… {Math.round(phase.progress * 100)} %
       </output>
     );
-  if (phase.kind !== 'idle' && phase.kind !== 'error') return null;
+  if (phase.kind === 'checking') return <span className="smooth-panel-status">Reading the analysis…</span>;
   return (
-    <div className="smooth-range-row">
+    <>
       <button
         className="secondary-button small"
         type="button"
@@ -592,6 +502,127 @@ export function SmoothRangeStatus({ smooth, disabled, onKeyDown }: Readonly<Stat
           {phase.message}
         </span>
       )}
-    </div>
+    </>
+  );
+}
+
+interface PanelProps {
+  asset: MediaAsset;
+  range: MediaSelection;
+  smooth: SmoothRangeState;
+  frame: number;
+  disabled: boolean;
+  onFrame: (frame: number) => void;
+  onApply: (range: SmoothRange) => void;
+  onKeyDown: (event: KeyboardEvent<HTMLElement>) => void;
+}
+
+/**
+ * The smooth-part section of Source preview: a header with the suggestion, Use, the tolerance and
+ * the telemetry choice, then the motion lanes. Collapsing keeps only the title and suggestion.
+ */
+export function SmoothPartPanel({
+  asset,
+  range,
+  smooth,
+  frame,
+  disabled,
+  onFrame,
+  onApply,
+  onKeyDown,
+}: Readonly<PanelProps>) {
+  const { profile, telemetry, ranges, tolerance, setTolerance } = smooth;
+  const [collapsed, setCollapsed] = useState(() => readPreference(COLLAPSED_PREFERENCE) === 'true');
+  const [shown, setShown] = useState(readSeries);
+  const available = useMemo(() => availableSeries(telemetry), [telemetry]);
+  const lanes = useMemo(() => available.filter((spec) => shown.includes(spec.key)), [available, shown]);
+  const best = ranges[0];
+  const applied = best?.sourceIn === range.sourceIn && best?.sourceOut === range.sourceOut;
+  const { span, label, hint } = suggestionText(best, applied, asset.metadata.frameRate);
+  const toggle = (): void => {
+    setCollapsed(!collapsed);
+    writePreference(COLLAPSED_PREFERENCE, String(!collapsed));
+  };
+  const show = (keys: SeriesKey[]): void => {
+    setShown(keys);
+    writePreference(SERIES_PREFERENCE, JSON.stringify(keys));
+  };
+
+  return (
+    <section
+      className="smooth-panel"
+      aria-label="Smooth part"
+      data-collapsed={collapsed || undefined}
+      data-smooth-in={best?.sourceIn}
+      data-smooth-out={best?.sourceOut}
+    >
+      <div className="smooth-panel-header">
+        <button
+          className="smooth-panel-toggle"
+          type="button"
+          aria-expanded={!collapsed}
+          aria-label={collapsed ? 'Expand smooth part' : 'Collapse smooth part'}
+          title={
+            collapsed ? 'Show the smooth part controls and motion lanes' : 'Hide the smooth part controls and lanes'
+          }
+          onKeyDown={onKeyDown}
+          onClick={toggle}
+        >
+          <Icon name={collapsed ? 'chevron-down' : 'chevron-up'} size={14} />
+          <strong>Smooth part</strong>
+        </button>
+        {profile ? (
+          <span className="smooth-panel-summary">{best ? span : 'No steady part of 2 s or more'}</span>
+        ) : (
+          <AnalysisStatus smooth={smooth} disabled={disabled} onKeyDown={onKeyDown} />
+        )}
+        {profile && !collapsed && (
+          <>
+            <button
+              className="secondary-button small smooth-use-button"
+              type="button"
+              data-applied={applied || undefined}
+              aria-label={label}
+              title={hint}
+              disabled={disabled || !best || applied}
+              onKeyDown={onKeyDown}
+              onClick={() => best && onApply(best)}
+            >
+              <Icon name={applied ? 'check' : 'wand'} size={14} />
+              <span>{applied ? 'In use' : 'Use'}</span>
+            </button>
+            <label className="smooth-panel-tolerance">
+              <span>Tolerance</span>
+              <input
+                type="range"
+                aria-label="Smooth part tolerance"
+                aria-valuetext={`${tolerance.toFixed(1)}: ${tolerance < SMOOTH_TOLERANCE.initial ? 'stricter' : 'more tolerant'}`}
+                title="Right accepts more camera movement; left suggests only very steady footage"
+                min={SMOOTH_TOLERANCE.min}
+                max={SMOOTH_TOLERANCE.max}
+                step={SMOOTH_TOLERANCE.step}
+                value={tolerance}
+                disabled={disabled}
+                onKeyDown={onKeyDown}
+                onChange={(event) => setTolerance(Number(event.target.value))}
+              />
+              <output>{tolerance.toFixed(1)}</output>
+            </label>
+            <LaneChooser available={available} shown={shown} onShown={show} />
+          </>
+        )}
+      </div>
+      {profile && !collapsed && (
+        <MotionLanes
+          asset={asset}
+          smooth={smooth}
+          profile={profile}
+          lanes={lanes}
+          frame={frame}
+          disabled={disabled}
+          onFrame={onFrame}
+        />
+      )}
+    </section>
   );
 }
