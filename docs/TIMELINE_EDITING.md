@@ -708,24 +708,32 @@ rotation from block phase correlation, with a robust fit that ignores moving wat
 trees or other subjects). Featureless frames stay unmeasured. This adds roughly a
 quarter of the recording's duration to preparation (about 120 frames/s for a 720p
 proxy on the development machine). It also reads the original's first subtitle track,
-where DJI drones record telemetry once per second, and keeps its horizontal speed
-(`H.S`, m/s); this demuxes only that track (about 0.2 s for a 600 MB rush), and
-recordings without it simply have no flight speed. The result is cached as
-`motion-v2.json` beside the proxy and its thumbnails, tied to the proxy's verification
-time; re-preparing the proxy replaces it, and an older `motion-v1.json` is ignored (use
-**Find smooth part** to measure again). A failed measurement never fails preparation:
-the job reports it and the proxy stays usable. The original is identity-checked and
-only its subtitle track is read.
+where DJI Mini drones record telemetry once per second, and keeps horizontal and
+vertical speed (`H.S`, `V.S`, m/s), height (`H`) and distance from home (`D`, m), ISO,
+shutter speed (`SS`), exposure bias (`EV`) and digital zoom (`DZOOM`); GPS position and
+aperture are not kept. This demuxes only that track (about 0.2 s for a 600 MB rush);
+recordings without it simply have no telemetry. The result is cached as
+`motion-v3.json` beside the proxy and its thumbnails, tied to the proxy's verification
+time; re-preparing the proxy replaces it, and older `motion-v1.json`/`motion-v2.json`
+caches are ignored (use **Find smooth part** to measure again). A failed measurement
+never fails preparation: the job reports it and the proxy stays usable. The original
+is identity-checked and only its subtitle track is read.
 
 Opening a recording reads its analysis, once per session. Under the range strip and
 aligned with it, a **motion timeline** plots, below a line of text: the **roughness**
 (red area: how fast the camera motion changes, % of image width per s², up to 8), the
-**camera motion** (grey line, scaled to the recording's peak), the recorded **flight
-speed** (yellow line, up to 16 m/s or the recording's peak), the **tolerance** (red
-dashed line) and the smooth stretches (blue bands, the suggested one strongest). The
-text line shows the legend and the suggestion's IN–OUT timecode and length; while
-hovering it shows the timecode and the three values under the pointer instead. Clicking
-or dragging the timeline scrubs like the strip. The suggestion is the longest stretch
+**tolerance** (red dashed line), the smooth stretches (blue bands, the suggested one
+strongest) and one line per chosen series. The sliders button at the start of the text
+line (**Motion timeline series**) chooses among **Camera motion** (in the picture) and
+the telemetry values this recording has; camera motion and **Flight speed** are shown
+initially. Each line is scaled to its own range (speeds from 0 to at least 16 m/s,
+vertical speed and exposure bias around zero), and the chart grows by 6 px per series
+beyond two, up to 80 px. The chevron before it (**Collapse motion timeline**) leaves a
+22 px bar with only the smooth parts and the suggestion; both choices are browser
+preferences. The text line shows the legend and the suggestion's IN–OUT timecode and
+length; while hovering it shows the timecode and the values under the pointer instead
+(telemetry interpolated between its once-per-second samples). Clicking or dragging the
+timeline scrubs like the strip. The suggestion is the longest stretch
 of at least 2 s below the tolerance (0.5–6, initially 2, a browser preference),
 bridging jolts shorter than 0.5 s and keeping 0.2 s clear of rough edges inside the
 recording. Drag the dashed line itself (it highlights within 6 px, and the text line

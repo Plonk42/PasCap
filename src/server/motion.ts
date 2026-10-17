@@ -3,8 +3,9 @@ import {
   MOTION_ANALYSIS_VERSION,
   MOTION_HEIGHT,
   MOTION_WIDTH,
-  type FlightSpeedSample,
   type MotionAnalysis,
+  type TelemetryField,
+  type TelemetrySample,
 } from '../shared/motion-analysis.js';
 import { whileSerial } from '../shared/serial.js';
 import { ServiceError } from './errors.js';
@@ -247,28 +248,54 @@ export function blockSpectra(frame: Uint8Array): Spectrum[] {
   return BLOCKS.map((block) => spectrum(frame, block.cx, block.cy));
 }
 
-/** DJI telemetry subtitles: one block per second, e.g. "… H 26.80m, H.S 10.24m/s, V.S -0.00m/s". */
-export function parseFlightSpeed(srt: string): FlightSpeedSample[] {
-  const samples: FlightSpeedSample[] = [];
+const NUMBER = String.raw`(-?\d+(?:\.\d+)?)`;
+/** One pattern per DJI Mini telemetry value; vertical speed in the subtitles is positive upwards. */
+const TELEMETRY_PATTERNS: Readonly<Record<TelemetryField, RegExp>> = {
+  horizontalSpeed: new RegExp(String.raw`\bH\.S ${NUMBER}m/s`),
+  verticalSpeed: new RegExp(String.raw`\bV\.S ${NUMBER}m/s`),
+  height: new RegExp(String.raw`\bH ${NUMBER}m\b`),
+  distance: new RegExp(String.raw`\bD ${NUMBER}m\b`),
+  iso: new RegExp(String.raw`\bISO ${NUMBER}`),
+  shutter: new RegExp(String.raw`\bSS ${NUMBER}`),
+  ev: new RegExp(String.raw`\bEV \+?${NUMBER}`),
+  digitalZoom: new RegExp(String.raw`\bDZOOM ${NUMBER}`),
+};
+
+function telemetryValue(block: string, field: TelemetryField): number | null {
+  const match = TELEMETRY_PATTERNS[field].exec(block);
+  return match ? Number(match[1]) : null;
+}
+
+/** DJI telemetry subtitles: one block per second, e.g. "… ISO 100, EV 0, … H 26.80m, H.S 10.24m/s, V.S -0.00m/s". */
+export function parseTelemetry(srt: string): TelemetrySample[] {
+  const samples: TelemetrySample[] = [];
   for (const block of srt.split(/\r?\n\r?\n/)) {
     const time = /^(\d{2}):(\d{2}):(\d{2})[,.](\d{3}) -->/m.exec(block);
-    const speed = /\bH\.S (-?\d+(?:\.\d+)?)m\/s/.exec(block);
-    if (!time || !speed) continue;
+    if (!time) continue;
     const [hours, minutes, seconds, milliseconds] = time.slice(1).map(Number) as [number, number, number, number];
-    samples.push({
+    const horizontalSpeed = telemetryValue(block, 'horizontalSpeed');
+    const sample: TelemetrySample = {
       time: hours * 3600 + minutes * 60 + seconds + milliseconds / 1000,
-      value: Math.abs(Number(speed[1])),
-    });
+      horizontalSpeed: horizontalSpeed === null ? null : Math.abs(horizontalSpeed),
+      verticalSpeed: telemetryValue(block, 'verticalSpeed'),
+      height: telemetryValue(block, 'height'),
+      distance: telemetryValue(block, 'distance'),
+      iso: telemetryValue(block, 'iso'),
+      shutter: telemetryValue(block, 'shutter'),
+      ev: telemetryValue(block, 'ev'),
+      digitalZoom: telemetryValue(block, 'digitalZoom'),
+    };
+    if (Object.values(sample).filter((value) => value !== null).length > 1) samples.push(sample);
   }
   return samples;
 }
 
-/** Reads only the original's first subtitle track; recordings without one have no flight speed. */
-export async function readFlightSpeed(
+/** Reads only the original's first subtitle track; recordings without one have no telemetry. */
+export async function readTelemetry(
   tools: { ffmpeg: string; ffprobe: string },
   source: string,
   signal: AbortSignal,
-): Promise<FlightSpeedSample[]> {
+): Promise<TelemetrySample[]> {
   const streams = await runProcess(
     tools.ffprobe,
     ['-v', 'error', '-select_streams', 's', '-show_entries', 'stream=index', '-of', 'csv=p=0', source],
@@ -280,7 +307,7 @@ export async function readFlightSpeed(
     ['-hide_banner', '-loglevel', 'error', '-nostdin', '-i', source, '-map', '0:s:0', '-f', 'srt', 'pipe:1'],
     { signal, maxBytes: 16 * 1024 * 1024 },
   );
-  return parseFlightSpeed(srt.toString('utf8'));
+  return parseTelemetry(srt.toString('utf8'));
 }
 
 /** Measures every proxy frame against the previous one; the proxy has one frame per source frame. */
@@ -291,7 +318,7 @@ export async function analyseProxy(
   verifiedAt: string,
   signal: AbortSignal,
   progress: (fraction: number) => void,
-): Promise<Omit<MotionAnalysis, 'flightSpeed'>> {
+): Promise<Omit<MotionAnalysis, 'telemetry'>> {
   const child = spawn(
     ffmpeg,
     [
@@ -327,7 +354,7 @@ export async function analyseProxy(
   const cancelled = (): void => {
     if (signal.aborted) throw new ServiceError('Job cancelled.', 499);
   };
-  const analysis: Omit<MotionAnalysis, 'flightSpeed'> = {
+  const analysis: Omit<MotionAnalysis, 'telemetry'> = {
     version: MOTION_ANALYSIS_VERSION,
     verifiedAt,
     frameCount,

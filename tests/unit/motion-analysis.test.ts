@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { blockSpectra, estimateMotion, parseFlightSpeed } from '../../src/server/motion.js';
+import { blockSpectra, estimateMotion, parseTelemetry } from '../../src/server/motion.js';
 import {
   MOTION_ANALYSIS_VERSION,
   MOTION_HEIGHT,
@@ -56,24 +56,55 @@ function analysis(tx: (number | null)[]): MotionAnalysis {
     ty: zeros,
     zoom: zeros,
     rotation: zeros,
-    flightSpeed: [],
+    telemetry: [],
   };
 }
 
-describe('recorded flight speed', () => {
-  it('reads the horizontal speed of each DJI telemetry subtitle and ignores other text', () => {
+const NO_VALUES = {
+  horizontalSpeed: null,
+  verticalSpeed: null,
+  height: null,
+  distance: null,
+  iso: null,
+  shutter: null,
+  ev: null,
+  digitalZoom: null,
+};
+
+describe('recorded telemetry', () => {
+  it('reads every value of the DJI telemetry subtitles and ignores other text', () => {
     const srt = [
       '1\n00:00:00,000 --> 00:00:01,000\nF/1.7, SS 747.99, ISO 100, EV 0, DZOOM 1.000, GPS (5.9271, 45.0521, 23), D 26.20m, H 26.80m, H.S 0.00m/s, V.S -0.00m/s \n',
-      '2\n00:00:01,000 --> 00:00:02,000\nF/1.7, SS 642.76, ISO 100, EV 0, DZOOM 1.000, GPS (5.9281, 45.0532, 23), D 170.79m, H 28.80m, H.S 10.24m/s, V.S -0.50m/s \n',
+      '2\n00:00:01,000 --> 00:00:02,000\nF/1.7, SS 642.76, ISO 400, EV +0.7, DZOOM 2.000, GPS (5.9281, 45.0532, 23), D 170.79m, H -2.50m, H.S 10.24m/s, V.S -0.50m/s \n',
       '3\n01:02:03,500 --> 01:02:04,500\nH.S -3.5m/s\n',
       '4\n00:00:04,000 --> 00:00:05,000\nA caption without telemetry\n',
     ].join('\n');
-    expect(parseFlightSpeed(srt)).toEqual([
-      { time: 0, value: 0 },
-      { time: 1, value: 10.24 },
-      { time: 3723.5, value: 3.5 },
+    expect(parseTelemetry(srt)).toEqual([
+      {
+        time: 0,
+        horizontalSpeed: 0,
+        verticalSpeed: -0,
+        height: 26.8,
+        distance: 26.2,
+        iso: 100,
+        shutter: 747.99,
+        ev: 0,
+        digitalZoom: 1,
+      },
+      {
+        time: 1,
+        horizontalSpeed: 10.24,
+        verticalSpeed: -0.5,
+        height: -2.5,
+        distance: 170.79,
+        iso: 400,
+        shutter: 642.76,
+        ev: 0.7,
+        digitalZoom: 2,
+      },
+      { ...NO_VALUES, time: 3723.5, horizontalSpeed: 3.5 },
     ]);
-    expect(parseFlightSpeed('')).toEqual([]);
+    expect(parseTelemetry('')).toEqual([]);
   });
 });
 

@@ -22,7 +22,7 @@ import {
   verifyMovedOriginal,
 } from './files.js';
 import { JobQueue, type JobContext } from './jobs.js';
-import { analyseProxy, readFlightSpeed } from './motion.js';
+import { analyseProxy, readTelemetry } from './motion.js';
 import type { RelinkCandidate } from './relink.js';
 import { NATIVE_THREADS } from './native-threads.js';
 import { probeVideo } from './probe.js';
@@ -663,8 +663,8 @@ export class MediaLibrary {
       (fraction) =>
         context.update(from + fraction * (to - from), 'Measuring camera motion for smooth-part suggestions'),
     );
-    const flightSpeed = await readFlightSpeed(this.config, asset.sourcePath, context.signal);
-    await atomicWrite(this.motionPath(asset), JSON.stringify({ ...motion, flightSpeed }));
+    const telemetry = await readTelemetry(this.config, asset.sourcePath, context.signal);
+    await atomicWrite(this.motionPath(asset), JSON.stringify({ ...motion, telemetry }));
   }
   /** Smooth-part analysis is a convenience: its failure leaves a usable, verified proxy. */
   async #measureAfterPreparation(asset: MediaAsset, context: JobContext): Promise<string | undefined> {
