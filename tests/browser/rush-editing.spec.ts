@@ -1889,6 +1889,18 @@ test('the motion timeline shows jolts, allowed movement and the steadiest range;
   await expect(page.locator('.source-preview')).toHaveAttribute('data-source-frame', String(steady.sourceIn));
   await expect(use).toBeDisabled();
   await expect(use).toHaveText('In use');
+  // Dragging the slider previews the suggestion before release; Escape restores it.
+  const allowed = page.getByRole('slider', { name: 'Allowed movement', exact: true });
+  const allowedBox = (await allowed.boundingBox())!;
+  await page.mouse.move(allowedBox.x + allowedBox.width * 0.25, allowedBox.y + allowedBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(allowedBox.x + allowedBox.width + 20, allowedBox.y + allowedBox.height / 2, { steps: 4 });
+  await expect(tolerance).toHaveAttribute('y1', String(lineY(SMOOTH_TOLERANCE.max)));
+  await expect(row).toHaveAttribute('data-smooth-in', String(tolerant.sourceIn));
+  await page.keyboard.press('Escape');
+  await page.mouse.up();
+  await expect(tolerance).toHaveAttribute('y1', String(lineY(SMOOTH_TOLERANCE.initial)));
+  await expect(row).toHaveAttribute('data-smooth-in', String(steady.sourceIn));
   // The lanes hatch the footage outside IN/OUT like the strip.
   const omitted = await timeline
     .locator('.source-motion-omitted')

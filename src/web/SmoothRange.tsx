@@ -92,8 +92,13 @@ export interface SmoothRangeState {
   profile: MotionProfile | null;
   telemetry: readonly TelemetrySample[];
   ranges: readonly SmoothRange[];
+  /** The allowed movement in effect, including a slider drag in progress. */
   tolerance: number;
+  /** The kept allowed movement, without a drag in progress. */
+  savedTolerance: number;
   setTolerance: (value: number) => void;
+  /** A slider drag's value, or null when it ends or is cancelled. */
+  previewTolerance: (value: number | null) => void;
   find: () => void;
 }
 
@@ -102,7 +107,9 @@ export function useSmoothRange(asset: MediaAsset): SmoothRangeState {
   const ready = mediaReady(asset);
   const key = `${asset.id}/${asset.prepared?.verification.verifiedAt ?? ''}`;
   const [phase, setPhase] = useState<Phase>({ kind: 'idle' });
-  const [tolerance, setTolerance] = useState(readTolerance);
+  const [savedTolerance, setSavedTolerance] = useState(readTolerance);
+  const [draftTolerance, setDraftTolerance] = useState<number | null>(null);
+  const tolerance = draftTolerance ?? savedTolerance;
   const controller = useRef<AbortController | null>(null);
 
   const start = useCallback((): AbortSignal => {
@@ -171,11 +178,21 @@ export function useSmoothRange(asset: MediaAsset): SmoothRangeState {
     [profile, tolerance, fps],
   );
   const keepTolerance = useCallback((value: number) => {
-    setTolerance(value);
+    setSavedTolerance(value);
     writePreference(TOLERANCE_PREFERENCE, String(value));
   }, []);
   const telemetry = phase.kind === 'ready' ? phase.analysis.telemetry : NO_TELEMETRY;
-  return { phase, profile, telemetry, ranges, tolerance, setTolerance: keepTolerance, find };
+  return {
+    phase,
+    profile,
+    telemetry,
+    ranges,
+    tolerance,
+    savedTolerance,
+    setTolerance: keepTolerance,
+    previewTolerance: setDraftTolerance,
+    find,
+  };
 }
 
 /** The 0–100 viewBox height for a 0 (bottom) – 1 (top) fraction of a scale, below the lane's text line. */
@@ -583,7 +600,7 @@ interface PanelProps {
  * then the allowed movement and the flight data choice. Collapsing also hides the lanes.
  */
 export function CameraMotionPanel({ asset, range, smooth, view, disabled, onApply, onKeyDown }: Readonly<PanelProps>) {
-  const { profile, telemetry, ranges, tolerance, setTolerance } = smooth;
+  const { profile, telemetry, ranges, savedTolerance, setTolerance, previewTolerance } = smooth;
   const toleranceId = useId();
   const { collapsed } = view;
   const available = useMemo(() => availableSeries(telemetry), [telemetry]);
@@ -657,7 +674,7 @@ export function CameraMotionPanel({ asset, range, smooth, view, disabled, onAppl
               htmlFor={toleranceId}
               title="Right accepts more camera movement; left suggests only very steady footage"
               name="Allowed movement"
-              blocked={resetBlocked(tolerance === SMOOTH_TOLERANCE.initial, disabled)}
+              blocked={resetBlocked(savedTolerance === SMOOTH_TOLERANCE.initial, disabled)}
               onReset={() => setTolerance(SMOOTH_TOLERANCE.initial)}
             >
               Allowed movement
@@ -668,10 +685,11 @@ export function CameraMotionPanel({ asset, range, smooth, view, disabled, onAppl
               min={SMOOTH_TOLERANCE.min}
               max={SMOOTH_TOLERANCE.max}
               step={SMOOTH_TOLERANCE.step}
-              value={tolerance}
+              value={savedTolerance}
               disabled={disabled}
               resetKey="allowed-movement"
               onCommit={setTolerance}
+              onDraft={previewTolerance}
             />
           </div>
           <LaneChooser available={available} shown={view.shown} onShown={view.show} />
