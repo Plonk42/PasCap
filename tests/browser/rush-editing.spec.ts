@@ -1823,7 +1823,17 @@ function jerkyThenSteady(asset: MediaAsset): MotionAnalysis {
     ty: still,
     zoom: still,
     rotation: still,
-    flightSpeed: [0, 1, 2, 3].map((time) => ({ time, value: 2 + 2 * time })),
+    telemetry: [0, 1, 2, 3].map((time) => ({
+      time,
+      horizontalSpeed: 2 + 2 * time,
+      verticalSpeed: 0,
+      height: 30 + 5 * time,
+      distance: null,
+      iso: 100,
+      shutter: null,
+      ev: null,
+      digitalZoom: null,
+    })),
   };
 }
 
@@ -1896,6 +1906,34 @@ test('the motion timeline shows roughness, tolerance and the smooth part; Use ap
   await page.mouse.move(0, 0);
   await expect(readout).toHaveText(/^RoughnessCamera motionFlight speed$/);
 
+  // Telemetry series are chosen in a popover; only values this recording has are offered.
+  await openOptions(page, 'Motion timeline series');
+  const seriesList = page.locator('.source-motion-series-list');
+  await expect(seriesList.getByRole('checkbox')).toHaveCount(5);
+  await expect(seriesList.getByRole('checkbox', { name: 'Distance from home' })).toHaveCount(0);
+  await seriesList.getByRole('checkbox', { name: 'Height' }).check();
+  await seriesList.getByRole('checkbox', { name: 'Flight speed' }).uncheck();
+  await closeOptions(page);
+  await expect(timeline.locator('path[data-series="height"]')).toHaveCount(1);
+  await expect(timeline.locator('path[data-series="horizontalSpeed"]')).toHaveCount(0);
+  await page.mouse.move(timelineBox!.x + timelineBox!.width * 0.75, timelineBox!.y + timelineBox!.height * 0.85);
+  await expect(readout).toContainText('Height 45 m');
+  await expect(readout).not.toContainText('Flight');
+  await page.mouse.move(0, 0);
+
+  // Collapsed, only the smooth parts remain, and the choice is kept.
+  await page.getByRole('button', { name: 'Collapse motion timeline', exact: true }).click();
+  await expect(page.locator('.source-motion-row')).toHaveAttribute('data-collapsed', 'true');
+  await expect(timeline.locator('.source-motion-roughness')).toHaveCount(0);
+  await expect(page.getByRole('slider', { name: 'Smooth part tolerance', exact: true })).toHaveCount(0);
+  await expect(band).toHaveCount(1);
+  expect((await timeline.boundingBox())!.height).toBeLessThan(30);
+  await page.getByRole('button', { name: 'Close source review', exact: true }).click();
+  await page.getByRole('button', { name: 'Review pattern-a.mp4', exact: true }).click();
+  await expect(page.locator('.source-motion-row')).toHaveAttribute('data-collapsed', 'true');
+  await page.getByRole('button', { name: 'Expand motion timeline', exact: true }).click();
+  await expect(timeline.locator('path[data-series="height"]')).toHaveCount(1);
+
   // The analysis is kept for this session: reopening needs no new request.
   await page.getByRole('button', { name: 'Close source review', exact: true }).click();
   await page.getByRole('button', { name: 'Review pattern-a.mp4', exact: true }).click();
@@ -1903,6 +1941,7 @@ test('the motion timeline shows roughness, tolerance and the smooth part; Use ap
   expect(requests).toEqual(['GET']);
 
   // The dashed line itself is a handle: dragging it to the bottom asks for the steadiest footage.
+  await expect(page.locator('.source-preview')).toHaveAttribute('data-source-frame', /^\d+$/);
   const frameBefore = await page.locator('.source-preview').getAttribute('data-source-frame');
   const box = (await timeline.boundingBox())!;
   const lineAt = box.y + (lineY(SMOOTH_TOLERANCE.max) / 100) * box.height;

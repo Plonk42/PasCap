@@ -124,9 +124,9 @@ describe.skipIf(!enabled)('smooth-part motion analysis · disposable native fixt
     expect(Math.abs(median(analysis.tx.slice(5, 55)))).toBeLessThan(0.1);
     expect(median(analysis.tx.slice(70, 205))).toBeCloseTo(-2, 0);
     expect(Math.abs(median(analysis.ty.slice(70, 205)))).toBeLessThan(0.2);
-    expect(analysis.flightSpeed).toEqual(
-      Array.from({ length: 7 }, (_, second) => ({ time: second, value: second < 2 ? 0 : 5.5 })),
-    );
+    expect(
+      analysis.telemetry.map((sample) => [sample.time, sample.horizontalSpeed, sample.height, sample.iso, sample.ev]),
+    ).toEqual(Array.from({ length: 7 }, (_, second) => [second, second < 2 ? 0 : 5.5, 20, 100, null]));
     const cache = library.motionPath(library.get(id));
     expect(JSON.parse(await readFile(cache, 'utf8'))).toEqual(analysis);
 

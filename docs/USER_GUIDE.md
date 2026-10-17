@@ -126,12 +126,15 @@ timeline or music and does not create Undo steps or saves. Failures expose Retry
 
 Under the strip, the **motion timeline** marks the steadiest part of a drone recording,
 measured when its proxy was prepared: the red area is roughness (sudden angle or speed
-changes), the grey line camera motion, the yellow line the speed the drone recorded (DJI
-recordings) and the blue band the suggested smooth part. Hover it to read the values
+changes), the blue band the suggested smooth part, and lines show camera motion and the
+speed the drone recorded (DJI recordings). The sliders button chooses other lines:
+vertical speed, height, distance from home, ISO, shutter speed, exposure bias and digital
+zoom, for example to spot a climb or an exposure jump; the chevron collapses the chart to
+the smooth parts only. Hover it to read the values
 at that moment. **Use** (under the play button) sets IN and OUT to it. Drag the dashed
 tolerance line (or the handle at its right end) down for only very steady footage, up
 to accept more movement. Recordings prepared earlier offer **Find smooth part** to
-measure them once. Straight-ahead speed changes barely move the picture: the yellow
+measure them once. Straight-ahead speed changes barely move the picture: the flight
 speed line shows them, so check the start of forward flights yourself.
 
 Choose **Add clip** (it shows the applied range length, for example **Add clip 3.00 s**),
