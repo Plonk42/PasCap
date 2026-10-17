@@ -31,6 +31,7 @@ import {
   DEFAULT_SERIES,
   SERIES,
   seriesPath,
+  seriesScale,
   seriesValue,
   type SeriesKey,
   type SeriesSpec,
@@ -341,13 +342,15 @@ function ImageLane(props: Readonly<ImageLaneProps>) {
 interface SeriesLaneProps {
   spec: SeriesSpec;
   d: string;
+  /** The lowest and highest recorded values, which span the lane. */
+  extent: string;
   count: number;
   ranges: readonly SmoothRange[];
   value: number | null;
 }
 
-/** One flight data value on its own scale, labelled with its name or its value under the pointer. */
-function SeriesLane({ spec, d, count, ranges, value }: Readonly<SeriesLaneProps>) {
+/** One flight data value on its own min–max scale, labelled with that extent or its value under the pointer. */
+function SeriesLane({ spec, d, extent, count, ranges, value }: Readonly<SeriesLaneProps>) {
   return (
     <div className="source-motion-plot" data-lane={spec.key} style={{ '--series': spec.colour } as CSSProperties}>
       <svg viewBox={`0 0 ${count} 100`} preserveAspectRatio="none" aria-hidden="true">
@@ -356,6 +359,7 @@ function SeriesLane({ spec, d, count, ranges, value }: Readonly<SeriesLaneProps>
       </svg>
       <span className="source-motion-readout" aria-hidden="true">
         <span className="series">{value === null ? spec.label : `${spec.label} ${spec.format(value)}`}</span>
+        {value === null && extent && <span className="extent">{extent}</span>}
       </span>
     </div>
   );
@@ -426,7 +430,13 @@ function Lanes({
     [telemetry, view.shown],
   );
   const paths = useMemo(
-    () => lanes.map((spec) => ({ spec, d: seriesPath(spec, telemetry, count, fps, laneY) })),
+    () =>
+      lanes.map((spec) => {
+        const scale = seriesScale(spec, telemetry, count, fps);
+        const extent =
+          scale === null || scale.min === scale.max ? '' : `${spec.format(scale.min)} – ${spec.format(scale.max)}`;
+        return { spec, extent, d: seriesPath(spec, telemetry, count, fps, laneY) };
+      }),
     [lanes, telemetry, count, fps],
   );
   const roughness = useMemo(() => roughnessPath(profile, count), [profile, count]);
@@ -495,11 +505,12 @@ function Lanes({
         hover={hover}
         tolerance={adjusting || (nearLine && drag.current === null) ? tolerance : null}
       />
-      {paths.map(({ spec, d }) => (
+      {paths.map(({ spec, d, extent }) => (
         <SeriesLane
           key={spec.key}
           spec={spec}
           d={d}
+          extent={extent}
           count={count}
           ranges={ranges}
           value={hover === null ? null : seriesValue(spec, telemetry, hover, fps)}

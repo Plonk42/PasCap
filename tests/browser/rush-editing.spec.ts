@@ -1927,7 +1927,7 @@ test('the motion timeline shows jolts, allowed movement and the steadiest range;
   await expect(flightLane).toContainText('Flight speed 8.0 m/s');
   await page.mouse.move(0, 0);
   await expect(readout).toHaveText('JoltsMovement');
-  await expect(flightLane).toHaveText('Flight speed');
+  await expect(flightLane).toHaveText('Flight speed2.0 m/s – 8.0 m/s');
 
   // Flight data lanes are chosen in a popover; only values this recording has are offered.
   await openOptions(page, 'Flight data lanes');

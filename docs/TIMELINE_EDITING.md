@@ -726,8 +726,9 @@ one playhead line runs through the strip and every lane, and the footage omitted
 (amber area: how fast the camera movement changes, % of image width per s², up to 8),
 the **movement** in the picture (white line, up to 10 % of width per s) and the **allowed
 movement** (dashed accent line); a 30 px lane follows for each chosen flight data value,
-scaled to its own range (speeds from 0 to at least 16 m/s, vertical speed and exposure
-bias around zero), each in its own colour, matching its swatch in the menu; steady ranges are
+scaled from its lowest to its highest value in the recording, which its label shows (a
+nearly flat value is widened to a minimum span, such as 5 m of height or 2 m/s of speed,
+so sensor noise does not fill the lane), each in its own colour, matching its swatch in the menu; steady ranges are
 accent bands across every lane, the suggested one strongest. While hovering, every lane
 label shows its value under the pointer (flight data interpolated between its
 once-per-second samples) and the image lane the timecode. Clicking or dragging any lane

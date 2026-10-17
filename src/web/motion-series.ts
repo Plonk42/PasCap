@@ -9,10 +9,8 @@ export interface SeriesSpec {
   short: string;
   colour: string;
   format: (value: number) => string;
-  /** Smallest top of the scale, so small variations do not fill the plot. */
-  floor: number;
-  /** Scaled symmetrically around zero. */
-  signed?: boolean;
+  /** Smallest span of the scale, so sensor noise does not fill the lane. */
+  minSpan: number;
 }
 
 const signedText = (value: number, digits: number): string => `${value > 0 ? '+' : ''}${value.toFixed(digits)}`;
@@ -24,7 +22,7 @@ export const SERIES: readonly SeriesSpec[] = [
     short: 'Flight',
     colour: '#7cc4e8',
     format: (value) => `${value.toFixed(1)} m/s`,
-    floor: 16,
+    minSpan: 2,
   },
   {
     key: 'verticalSpeed',
@@ -32,8 +30,7 @@ export const SERIES: readonly SeriesSpec[] = [
     short: 'Vertical',
     colour: '#b9a0ff',
     format: (value) => `${signedText(value, 1)} m/s`,
-    floor: 3,
-    signed: true,
+    minSpan: 1,
   },
   {
     key: 'height',
@@ -41,7 +38,7 @@ export const SERIES: readonly SeriesSpec[] = [
     short: 'Height',
     colour: '#9fe0a8',
     format: (value) => `${value.toFixed(0)} m`,
-    floor: 20,
+    minSpan: 5,
   },
   {
     key: 'distance',
@@ -49,16 +46,16 @@ export const SERIES: readonly SeriesSpec[] = [
     short: 'Distance',
     colour: '#ee9fd0',
     format: (value) => `${value.toFixed(0)} m`,
-    floor: 50,
+    minSpan: 10,
   },
-  { key: 'iso', label: 'ISO', short: 'ISO', colour: '#f08f8f', format: (value) => value.toFixed(0), floor: 200 },
+  { key: 'iso', label: 'ISO', short: 'ISO', colour: '#f08f8f', format: (value) => value.toFixed(0), minSpan: 100 },
   {
     key: 'shutter',
     label: 'Shutter speed',
     short: 'Shutter',
     colour: '#e2dc82',
     format: (value) => `1/${value.toFixed(0)} s`,
-    floor: 100,
+    minSpan: 50,
   },
   {
     key: 'ev',
@@ -66,8 +63,7 @@ export const SERIES: readonly SeriesSpec[] = [
     short: 'EV',
     colour: '#7fdcd0',
     format: (value) => `${signedText(value, 1)} EV`,
-    floor: 1,
-    signed: true,
+    minSpan: 0.7,
   },
   {
     key: 'digitalZoom',
@@ -75,7 +71,7 @@ export const SERIES: readonly SeriesSpec[] = [
     short: 'Zoom',
     colour: '#f2f2f2',
     format: (value) => `${value.toFixed(1)}×`,
-    floor: 2,
+    minSpan: 0.5,
   },
 ];
 
@@ -104,7 +100,40 @@ export function cameraMotionPath(profile: MotionProfile, count: number, plotY: (
   return `M${points.join(' L')}`;
 }
 
-/** One telemetry line on its own scale, each sample holding for the second after it; breaks at gaps. */
+interface SeriesPoint {
+  x: number;
+  value: number | null;
+}
+
+/** The plotted samples, each holding for the second after it, up to the recording's last frame. */
+function seriesPoints(spec: SeriesSpec, telemetry: readonly TelemetrySample[], count: number, fps: number) {
+  const field = spec.key;
+  const line: SeriesPoint[] = telemetry
+    .filter((sample) => sample.time * fps <= count)
+    .map((sample) => ({ x: sample.time * fps, value: sample[field] }));
+  const last = telemetry.at(-1);
+  if (last && last.time * fps < count) line.push({ x: Math.min(count, (last.time + 1) * fps), value: last[field] });
+  return line;
+}
+
+/** The lane's scale, from the lowest to the highest value, widened around them to at least `minSpan`. */
+export function seriesScale(
+  spec: SeriesSpec,
+  telemetry: readonly TelemetrySample[],
+  count: number,
+  fps: number,
+): { min: number; max: number; low: number; high: number } | null {
+  const values = seriesPoints(spec, telemetry, count, fps).flatMap((point) =>
+    point.value === null ? [] : [point.value],
+  );
+  if (!values.length) return null;
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const widen = Math.max(0, spec.minSpan - (max - min)) / 2;
+  return { min, max, low: min - widen, high: max + widen };
+}
+
+/** One telemetry line on its own min–max scale; breaks at gaps. */
 export function seriesPath(
   spec: SeriesSpec,
   telemetry: readonly TelemetrySample[],
@@ -112,20 +141,12 @@ export function seriesPath(
   fps: number,
   plotY: (fraction: number) => number,
 ): string {
-  const field = spec.key;
-  const line = telemetry
-    .filter((sample) => sample.time * fps <= count)
-    .map((sample) => ({ x: sample.time * fps, value: sample[field] }));
-  const last = telemetry.at(-1);
-  if (last && last.time * fps < count) line.push({ x: Math.min(count, (last.time + 1) * fps), value: last[field] });
-  const values = line.flatMap((point) => (point.value === null ? [] : [point.value]));
-  if (!values.length) return '';
-  const peak = Math.max(spec.floor, ...values.map(Math.abs));
-  const low = spec.signed ? -peak : Math.min(0, ...values);
-  const high = spec.signed ? peak : Math.max(spec.floor, ...values);
+  const scale = seriesScale(spec, telemetry, count, fps);
+  if (!scale) return '';
+  const { low, high } = scale;
   let path = '';
   let pen = 'M';
-  for (const point of line) {
+  for (const point of seriesPoints(spec, telemetry, count, fps)) {
     if (point.value === null) {
       pen = 'M';
       continue;
