@@ -1,5 +1,5 @@
 import { useId, useState } from 'react';
-import { formatTimecode } from '../shared/timing.js';
+import { formatTimecode, parseTimecodeFrames } from '../shared/timing.js';
 import { validateNumberDraft, type NumberConstraints, type NumberValidation } from './NumberField.js';
 import { NUMBER_FIELD_INSTRUCTIONS_ID } from './SharedInstructions.js';
 import './input-controls.css';
@@ -7,10 +7,8 @@ import './input-controls.css';
 /** Source boundaries include exclusive OUT; the stored value is always an integer frame. */
 export function validateFrameDraft(draft: string, constraints: Readonly<NumberConstraints>): NumberValidation {
   if (!draft.includes(':')) return validateNumberDraft(draft, { ...constraints, integer: true });
-  const match = /^(\d+):(\d{2}):(\d{2}):(\d{2})$/.exec(draft.trim());
-  if (!match || Number(match[2]) >= 60 || Number(match[3]) >= 60 || Number(match[4]) >= 30)
-    return { valid: false, error: 'Use HH:MM:SS:FF (30 fps NDF), or a whole source frame.' };
-  const frame = ((Number(match[1]) * 60 + Number(match[2])) * 60 + Number(match[3])) * 30 + Number(match[4]);
+  const frame = parseTimecodeFrames(draft);
+  if (frame === null) return { valid: false, error: 'Use MM:SS:FF (30 fps NDF), or a whole source frame.' };
   return validateNumberDraft(String(frame), { ...constraints, integer: true });
 }
 
@@ -73,7 +71,7 @@ export function FrameField({
         aria-invalid={error !== null}
         aria-errormessage={error ? errorId : undefined}
         aria-describedby={[describedBy, NUMBER_FIELD_INSTRUCTIONS_ID, error ? errorId : null].filter(Boolean).join(' ')}
-        title="Source frame or HH:MM:SS:FF (30 fps NDF). Enter/blur applies; Escape restores."
+        title="Source frame or MM:SS:FF (30 fps NDF). Enter/blur applies; Escape restores."
         onChange={(event) => setState({ ...state, draft: event.currentTarget.value })}
         onBlur={commit}
         onKeyDown={(event) => {

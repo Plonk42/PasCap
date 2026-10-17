@@ -362,7 +362,7 @@ async function beginHeadTrim(page: Page): Promise<{ origin: number; scrollLeft: 
     .toBe(scrollLeft + shift);
   await expect(page.locator('.timeline-surface')).toHaveAttribute('data-leading', String(32 + shift));
   await expect.poll(() => frameOrigin(page)).toBe(origin);
-  await expect(page.getByRole('textbox', { name: 'Source IN frame', exact: true })).toHaveValue('00:00:03:00');
+  await expect(page.getByRole('textbox', { name: 'Source IN frame', exact: true })).toHaveValue('00:03:00');
   return { origin, scrollLeft, edgeX: viewport.x + 2, y };
 }
 
@@ -1096,7 +1096,7 @@ test('missing, outside and empty ranges are rejected; click and Escape restore; 
   await page.mouse.down();
   await page.mouse.move(await rulerX(75), await rulerY(), { steps: 3 });
   await expect(rulerRange(page)).toHaveAttribute('data-range-out', '75');
-  await expect(page.locator('.timeline-ruler-range-readout')).toHaveText('00:00:02:00 – 00:00:02:15');
+  await expect(page.locator('.timeline-ruler-range-readout')).toHaveText('00:02:00 – 00:02:15');
   await page.mouse.move(await rulerX(60), await rulerY(), { steps: 3 });
   await page.mouse.up();
   await page.keyboard.up('Alt');
@@ -1105,7 +1105,7 @@ test('missing, outside and empty ranges are rejected; click and Escape restore; 
   // Escape cancels a drag, restoring the previous range and playhead without an edit.
   await markRange(page, 20, 31);
   await expectCutOverlay(page, 20, 31);
-  await expect(page.locator('.timeline-ruler-range-readout')).toHaveText('00:00:00:20 – 00:00:01:01');
+  await expect(page.locator('.timeline-ruler-range-readout')).toHaveText('00:00:20 – 00:01:01');
   await page.keyboard.down('Alt');
   await page.mouse.move(await rulerX(60), await rulerY());
   await page.mouse.down();
@@ -1131,13 +1131,13 @@ test('missing, outside and empty ranges are rejected; click and Escape restore; 
   await expectCutOverlay(page, 20, 31);
   const keys = ['i', 'o', 'q', 'w', 's', 'Shift+Delete'];
   const input = page.getByRole('textbox', { name: 'Source IN frame', exact: true });
-  await input.fill('00:00:00:15');
+  await input.fill('00:00:15');
   await input.press('End');
   for (const key of keys) await input.press(key);
-  await expect(input).toHaveValue('00:00:00:15ioqws');
+  await expect(input).toHaveValue('00:00:15ioqws');
   expect(await current(page)).toEqual(before);
   await input.press('Escape');
-  await expect(input).toHaveValue('00:00:00:15');
+  await expect(input).toHaveValue('00:00:15');
   await expectCutOverlay(page, 20, 31);
   expect(await current(page)).toEqual(before);
   const search = page.getByRole('textbox', { name: 'Search media', exact: true });
@@ -1322,7 +1322,7 @@ test('native first-clip edge autoscroll restores a head longer than 32px without
   await page.mouse.move(drag.edgeX, drag.y, { steps: 4 });
   await expect
     .poll(() => page.getByRole('textbox', { name: 'Source IN frame', exact: true }).inputValue())
-    .toBe('00:00:00:00');
+    .toBe('00:00:00');
   await expect(clip(page, 'a').locator('[data-trim-handle="in"]')).toHaveAttribute('aria-valuenow', '0');
   expect(await current(page)).toEqual(before); // Inspector shows a draft; committed sourceIn is still 90.
   await flush(page);
@@ -1363,7 +1363,7 @@ test('Escape and pointercancel discard native autoscrolled head drafts and resto
     await page.mouse.move(drag.edgeX, drag.y, { steps: 4 });
     await expect
       .poll(() => page.getByRole('textbox', { name: 'Source IN frame', exact: true }).inputValue())
-      .toBe('00:00:00:00');
+      .toBe('00:00:00');
     expect(await current(page)).toEqual(before);
     if (cancellation === 'Escape') await page.keyboard.press('Escape');
     else
@@ -1373,7 +1373,7 @@ test('Escape and pointercancel discard native autoscrolled head drafts and resto
     await page.mouse.up();
     await expect(page.locator('.timeline-surface')).not.toHaveClass(/trim-drafting/);
     await expect(page.locator('.timeline-surface')).toHaveAttribute('data-leading', '32');
-    await expect(page.getByRole('textbox', { name: 'Source IN frame', exact: true })).toHaveValue('00:00:03:00');
+    await expect(page.getByRole('textbox', { name: 'Source IN frame', exact: true })).toHaveValue('00:03:00');
     await expect
       .poll(() => page.locator('.timeline-scroll').evaluate((element) => element.scrollLeft))
       .toBe(drag.scrollLeft);
@@ -1901,7 +1901,7 @@ test('the motion timeline shows roughness, tolerance and the smooth part; Use ap
   // Hovering reads the values there in each lane, including the speed the drone recorded (8 m/s at 3 s).
   const readout = imageLane.locator('.source-motion-readout');
   const flightLane = timeline.locator('[data-lane="horizontalSpeed"]');
-  await expect(readout).toContainText('00:00:03:00');
+  await expect(readout).toContainText('00:03:00');
   await expect(flightLane).toContainText('Flight speed 8.0 m/s');
   await page.mouse.move(0, 0);
   await expect(readout).toHaveText('RoughnessCamera motion');

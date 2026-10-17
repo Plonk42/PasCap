@@ -529,7 +529,7 @@ type supplies only a `KeyframeSlideKind`: frame mapping, validation, seek
 and Inspector section. Plain keys stay with a focused marker; Undo/Redo still apply.
 
 **Clip → Range** uses one full-original hatched bar with IN/OUT handles and exact
-text fields below its ends, displaying 30 fps NDF **HH:MM:SS:FF** and accepting
+text fields below its ends, displaying 30 fps NDF **MM:SS:FF** and accepting
 whole original frames or timecode on Enter/blur. Invalid drafts remain editable;
 Escape restores. No duplicate duration/original/source-frame/head-tail labels.
 Fields/bar use ordinary source-range trim with fixed placement and normal Ripple

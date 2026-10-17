@@ -191,7 +191,7 @@ OUT; normal overlap/fade validation still applies.
 
 One full-original range bar hatches omitted footage and has draggable **IN / OUT**
 handles. Exact **Source IN / OUT** text fields sit below the respective ends,
-displaying **HH:MM:SS:FF** (30 fps NDF). They accept whole original-frame numbers
+displaying **MM:SS:FF** (30 fps NDF). They accept whole original-frame numbers
 or timecode on Enter/blur; OUT remains exclusive. Empty, malformed, fractional,
 out-of-original or conflicting ranges retain editable inline errors, never clamp
 or silently round; Escape restores. There are no duplicate section duration,
