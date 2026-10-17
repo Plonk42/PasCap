@@ -1,11 +1,11 @@
 import {
   useCallback,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
   type KeyboardEvent,
-  type CSSProperties,
   type PointerEvent as ReactPointerEvent,
 } from 'react';
 import type { MediaAsset, MediaJob } from '../shared/media.js';
@@ -35,6 +35,8 @@ import {
 } from './motion-series.js';
 import { Popover } from './Popover.js';
 import { readPreference, writePreference } from './preferences.js';
+import { ResetLabel, resetBlocked } from './SettingValueControl.js';
+import { ValueControl } from './ValueControl.js';
 
 const TOLERANCE_PREFERENCE = 'pascap-smooth-tolerance';
 const COLLAPSED_PREFERENCE = 'pascap-smooth-panel-collapsed';
@@ -93,7 +95,7 @@ export interface SmoothRangeState {
   find: () => void;
 }
 
-/** Smooth-part suggestions for one recording, from the analysis made when its proxy was prepared. */
+/** Steadiest-range suggestions for one recording, from the analysis made when its proxy was prepared. */
 export function useSmoothRange(asset: MediaAsset): SmoothRangeState {
   const ready = mediaReady(asset);
   const key = `${asset.id}/${asset.prepared?.verification.verifiedAt ?? ''}`;
@@ -219,16 +221,16 @@ interface ChooserProps {
   onShown: (shown: SeriesKey[]) => void;
 }
 
-/** Which telemetry values get a lane, kept as a browser preference. */
+/** Which flight data values get a lane, kept as a browser preference. */
 function LaneChooser({ available, shown, onShown }: Readonly<ChooserProps>) {
   return (
     <Popover
-      label="Motion timeline series"
+      label="Flight data lanes"
       className="smooth-panel-lanes-menu"
       trigger={
         <>
           <Icon name="sliders" size={14} />
-          <span>Telemetry</span>
+          <span>Flight data</span>
         </>
       }
     >
@@ -247,11 +249,10 @@ function LaneChooser({ available, shown, onShown }: Readonly<ChooserProps>) {
                 );
               }}
             />
-            <i style={{ background: spec.colour }} aria-hidden="true" />
             {spec.label}
           </label>
         ))}
-        {available.length === 0 && <p>No drone telemetry in this recording.</p>}
+        {available.length === 0 && <p>No flight data in this recording.</p>}
       </div>
     </Popover>
   );
@@ -282,24 +283,24 @@ interface ImageLaneProps {
   tolerance: number | null;
 }
 
-/** Image roughness, camera motion and the tolerance, with the legend or the values under the pointer. */
+/** Image jolts, camera movement and the allowed movement, with the legend or the values under the pointer. */
 function ImageLane(props: Readonly<ImageLaneProps>) {
   const { asset, profile, ranges, hover, tolerance } = props;
   const count = asset.metadata.frameCount;
   let label = (
     <>
-      <span className="roughness">Roughness</span>
-      <span className="series camera">Camera motion</span>
+      <span className="roughness">Jolts</span>
+      <span className="series camera">Movement</span>
     </>
   );
   if (tolerance !== null)
-    label = <span className="tolerance">Tolerance {tolerance.toFixed(1)} · drag up to accept more movement</span>;
+    label = <span className="tolerance">Allowed movement {tolerance.toFixed(1)} · drag the line</span>;
   else if (hover !== null)
     label = (
       <>
         <b>{formatTimecode(hover, asset.metadata.frameRate)}</b>
-        <span className="roughness">Roughness {measuredAt(profile.roughness, hover).toFixed(1)}</span>
-        <span className="series camera">Camera {measuredAt(profile.speed, hover).toFixed(1)} %/s</span>
+        <span className="roughness">Jolts {measuredAt(profile.roughness, hover).toFixed(1)}</span>
+        <span className="series camera">Movement {measuredAt(profile.speed, hover).toFixed(1)} %/s</span>
       </>
     );
   return (
@@ -325,10 +326,10 @@ interface SeriesLaneProps {
   value: number | null;
 }
 
-/** One telemetry value on its own scale, labelled with its name or its value under the pointer. */
+/** One flight data value on its own scale, labelled with its name or its value under the pointer. */
 function SeriesLane({ spec, d, count, ranges, value }: Readonly<SeriesLaneProps>) {
   return (
-    <div className="source-motion-plot" data-lane={spec.key} style={{ '--series': spec.colour } as CSSProperties}>
+    <div className="source-motion-plot" data-lane={spec.key}>
       <svg viewBox={`0 0 ${count} 100`} preserveAspectRatio="none" aria-hidden="true">
         <Bands ranges={ranges} />
         <path className="source-motion-line" d={d} />
@@ -351,14 +352,18 @@ function toleranceAt(y: number): number {
 
 function suggestionText(best: SmoothRange | undefined, applied: boolean, rate: FrameRate) {
   if (!best)
-    return { span: '', label: 'No smooth part to use', hint: 'No steady part of 2 s or more at this tolerance' };
+    return {
+      span: '',
+      label: 'No steadiest range to use',
+      hint: 'No steady range of 2 s or more at this allowed movement',
+    };
   const from = formatTimecode(best.sourceIn, rate);
   const to = formatTimecode(best.sourceOut, rate);
   const span = `${sourceSeconds(best.sourceOut - best.sourceIn)} · ${from} – ${to}`;
   return {
     span,
-    label: `Use smooth part ${from} to ${to}`,
-    hint: applied ? `In use: ${span}` : `Set IN and OUT to the smooth part ${span}`,
+    label: `Use steadiest range ${from} to ${to}`,
+    hint: applied ? `In use: ${span}` : `Set IN and OUT to the steadiest range ${span}`,
   };
 }
 
@@ -373,8 +378,8 @@ interface LanesProps {
 }
 
 /**
- * Lanes aligned under the range strip, like the prototype report: image roughness, camera motion
- * and the draggable tolerance, then one lane per chosen telemetry value.
+ * Lanes aligned under the range strip: image jolts, camera movement and the draggable allowed
+ * movement, then one lane per chosen flight data value.
  */
 function MotionLanes({ asset, smooth, profile, lanes, frame, disabled, onFrame }: Readonly<LanesProps>) {
   const { telemetry, ranges, tolerance, setTolerance } = smooth;
@@ -420,7 +425,7 @@ function MotionLanes({ asset, smooth, profile, lanes, frame, disabled, onFrame }
           className="source-motion"
           data-disabled={disabled || undefined}
           data-near-tolerance={(nearLine && !disabled) || adjusting || undefined}
-          title="Red: roughness, how fast the camera motion changes (dashed: tolerance, drag it). Grey: camera motion. Other lanes: the drone's telemetry. Blue: smooth parts. Click or drag to scrub."
+          title="Shaded: jolts, how fast the camera movement changes (dashed line: allowed movement, drag it). White line: camera movement. Other lanes: flight data. Green bands: steady ranges. Click or drag to scrub."
           onPointerDown={(event) => {
             if (disabled || event.button !== 0) return;
             const point = position(event);
@@ -496,12 +501,12 @@ function AnalysisStatus({ smooth, disabled, onKeyDown }: Readonly<StatusProps>) 
       <button
         className="secondary-button small"
         type="button"
-        title="Measure the camera motion of this recording (a background job) and suggest its steadiest part"
+        title="Measure the camera motion of this recording (a background job) and suggest its steadiest range"
         disabled={disabled}
         onKeyDown={onKeyDown}
         onClick={smooth.find}
       >
-        {phase.kind === 'error' ? 'Retry finding the smooth part' : 'Find smooth part'}
+        {phase.kind === 'error' ? 'Retry analysing camera motion' : 'Analyse camera motion'}
       </button>
       {phase.kind === 'error' && (
         <span className="smooth-range-error" role="alert">
@@ -524,8 +529,9 @@ interface PanelProps {
 }
 
 /**
- * The smooth-part section of Source preview: a header with the suggestion, Use, the tolerance and
- * the telemetry choice, then the motion lanes. Collapsing keeps only the title and suggestion.
+ * The camera motion section of Source preview: a header with the steadiest range and Use, a row
+ * with the allowed movement and the flight data choice, then the motion lanes. Collapsing keeps
+ * only the title and the suggestion.
  */
 export function SmoothPartPanel({
   asset,
@@ -538,6 +544,7 @@ export function SmoothPartPanel({
   onKeyDown,
 }: Readonly<PanelProps>) {
   const { profile, telemetry, ranges, tolerance, setTolerance } = smooth;
+  const toleranceId = useId();
   const [collapsed, setCollapsed] = useState(() => readPreference(COLLAPSED_PREFERENCE) === 'true');
   const [shown, setShown] = useState(readSeries);
   const available = useMemo(() => availableSeries(telemetry), [telemetry]);
@@ -557,7 +564,7 @@ export function SmoothPartPanel({
   return (
     <section
       className="smooth-panel"
-      aria-label="Smooth part"
+      aria-label="Camera motion"
       data-collapsed={collapsed || undefined}
       data-smooth-in={best?.sourceIn}
       data-smooth-out={best?.sourceOut}
@@ -567,57 +574,70 @@ export function SmoothPartPanel({
           className="smooth-panel-toggle"
           type="button"
           aria-expanded={!collapsed}
-          aria-label={collapsed ? 'Expand smooth part' : 'Collapse smooth part'}
-          title={
-            collapsed ? 'Show the smooth part controls and motion lanes' : 'Hide the smooth part controls and lanes'
-          }
+          aria-label={collapsed ? 'Expand camera motion' : 'Collapse camera motion'}
+          title={collapsed ? 'Show the camera motion controls and lanes' : 'Hide the camera motion controls and lanes'}
           onKeyDown={onKeyDown}
           onClick={toggle}
         >
           <Icon name={collapsed ? 'chevron-down' : 'chevron-up'} size={14} />
-          <strong>Smooth part</strong>
+          <strong>Camera motion</strong>
         </button>
         {profile ? (
-          <span className="smooth-panel-summary">{best ? span : 'No steady part of 2 s or more'}</span>
+          <span className="smooth-panel-summary">
+            {best ? (
+              <>
+                Steadiest range <b>{span}</b>
+              </>
+            ) : (
+              'No steady range of 2 s or more'
+            )}
+          </span>
         ) : (
           <AnalysisStatus smooth={smooth} disabled={disabled} onKeyDown={onKeyDown} />
         )}
         {profile && !collapsed && (
-          <>
-            <button
-              className="secondary-button small smooth-use-button"
-              type="button"
-              data-applied={applied || undefined}
-              aria-label={label}
-              title={hint}
-              disabled={disabled || !best || applied}
-              onKeyDown={onKeyDown}
-              onClick={() => best && onApply(best)}
-            >
-              <Icon name={applied ? 'check' : 'wand'} size={14} />
-              <span>{applied ? 'In use' : 'Use'}</span>
-            </button>
-            <label className="smooth-panel-tolerance">
-              <span>Tolerance</span>
-              <input
-                type="range"
-                aria-label="Smooth part tolerance"
-                aria-valuetext={`${tolerance.toFixed(1)}: ${tolerance < SMOOTH_TOLERANCE.initial ? 'stricter' : 'more tolerant'}`}
-                title="Right accepts more camera movement; left suggests only very steady footage"
-                min={SMOOTH_TOLERANCE.min}
-                max={SMOOTH_TOLERANCE.max}
-                step={SMOOTH_TOLERANCE.step}
-                value={tolerance}
-                disabled={disabled}
-                onKeyDown={onKeyDown}
-                onChange={(event) => setTolerance(Number(event.target.value))}
-              />
-              <output>{tolerance.toFixed(1)}</output>
-            </label>
-            <LaneChooser available={available} shown={shown} onShown={show} />
-          </>
+          <button
+            className="secondary-button small smooth-use-button"
+            type="button"
+            data-applied={applied || undefined}
+            aria-label={label}
+            title={hint}
+            disabled={disabled || !best || applied}
+            onKeyDown={onKeyDown}
+            onClick={() => best && onApply(best)}
+          >
+            <Icon name={applied ? 'check' : 'wand'} size={14} />
+            <span>{applied ? 'In use' : 'Use'}</span>
+          </button>
         )}
       </div>
+      {profile && !collapsed && (
+        <div className="smooth-panel-controls">
+          <div className="smooth-panel-tolerance">
+            <ResetLabel
+              htmlFor={toleranceId}
+              title="Right accepts more camera movement; left suggests only very steady footage"
+              name="Allowed movement"
+              blocked={resetBlocked(tolerance === SMOOTH_TOLERANCE.initial, disabled)}
+              onReset={() => setTolerance(SMOOTH_TOLERANCE.initial)}
+            >
+              Allowed movement
+            </ResetLabel>
+            <ValueControl
+              id={toleranceId}
+              aria-label="Allowed movement"
+              min={SMOOTH_TOLERANCE.min}
+              max={SMOOTH_TOLERANCE.max}
+              step={SMOOTH_TOLERANCE.step}
+              value={tolerance}
+              disabled={disabled}
+              resetKey="allowed-movement"
+              onCommit={setTolerance}
+            />
+          </div>
+          <LaneChooser available={available} shown={shown} onShown={show} />
+        </div>
+      )}
       {profile && !collapsed && (
         <MotionLanes
           asset={asset}

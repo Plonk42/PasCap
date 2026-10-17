@@ -1837,7 +1837,7 @@ function jerkyThenSteady(asset: MediaAsset): MotionAnalysis {
   };
 }
 
-test('the motion timeline shows roughness, tolerance and the smooth part; Use applies it as IN/OUT', async ({
+test('the motion timeline shows jolts, allowed movement and the steadiest range; Use applies it as IN/OUT', async ({
   page,
 }) => {
   const asset = assets[0]!;
@@ -1860,7 +1860,7 @@ test('the motion timeline shows roughness, tolerance and the smooth part; Use ap
   const row = page.locator('.smooth-panel');
   await expect(row).toHaveAttribute('data-smooth-in', String(steady.sourceIn));
   await expect(row).toHaveAttribute('data-smooth-out', String(steady.sourceOut));
-  await expect(page.getByRole('button', { name: 'Find smooth part', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Analyse camera motion', exact: true })).toHaveCount(0);
   const timeline = page.locator('.source-motion');
   const imageLane = timeline.locator('[data-lane="image"]');
   const band = imageLane.locator('.source-motion-band:not(.alternative)');
@@ -1876,7 +1876,7 @@ test('the motion timeline shows roughness, tolerance and the smooth part; Use ap
   expect(timelineBox!.x).toBeCloseTo(stripBox!.x, 0);
   expect(timelineBox!.width).toBeCloseTo(stripBox!.width, 0);
 
-  const use = page.getByRole('button', { name: /^Use smooth part / });
+  const use = page.getByRole('button', { name: /^Use steadiest range / });
   await expect(row.locator('.smooth-panel-summary')).toContainText(seconds(steady));
   await use.click();
   const strip = page.locator('.source-range-strip');
@@ -1886,7 +1886,7 @@ test('the motion timeline shows roughness, tolerance and the smooth part; Use ap
   await expect(use).toBeDisabled();
   await expect(use).toHaveText('In use');
 
-  await page.getByRole('slider', { name: 'Smooth part tolerance', exact: true }).fill(String(SMOOTH_TOLERANCE.max));
+  await page.getByRole('slider', { name: 'Allowed movement', exact: true }).fill(String(SMOOTH_TOLERANCE.max));
   await expect(row).toHaveAttribute('data-smooth-in', String(tolerant.sourceIn));
   await expect(tolerance).toHaveAttribute('y1', String(lineY(SMOOTH_TOLERANCE.max)));
   await expect(use).toBeEnabled();
@@ -1904,11 +1904,11 @@ test('the motion timeline shows roughness, tolerance and the smooth part; Use ap
   await expect(readout).toContainText('00:03:00');
   await expect(flightLane).toContainText('Flight speed 8.0 m/s');
   await page.mouse.move(0, 0);
-  await expect(readout).toHaveText('RoughnessCamera motion');
+  await expect(readout).toHaveText('JoltsMovement');
   await expect(flightLane).toHaveText('Flight speed');
 
-  // Telemetry lanes are chosen in a popover; only values this recording has are offered.
-  await openOptions(page, 'Motion timeline series');
+  // Flight data lanes are chosen in a popover; only values this recording has are offered.
+  await openOptions(page, 'Flight data lanes');
   const seriesList = page.locator('.source-motion-series-list');
   await expect(seriesList.getByRole('checkbox')).toHaveCount(4);
   await expect(seriesList.getByRole('checkbox', { name: 'Distance from home' })).toHaveCount(0);
@@ -1923,17 +1923,17 @@ test('the motion timeline shows roughness, tolerance and the smooth part; Use ap
   await page.mouse.move(0, 0);
 
   // Collapsing hides the whole panel but its title and suggestion, and the choice is kept.
-  await page.getByRole('button', { name: 'Collapse smooth part', exact: true }).click();
+  await page.getByRole('button', { name: 'Collapse camera motion', exact: true }).click();
   await expect(row).toHaveAttribute('data-collapsed', 'true');
   await expect(timeline).toHaveCount(0);
   await expect(use).toHaveCount(0);
-  await expect(page.getByRole('slider', { name: 'Smooth part tolerance', exact: true })).toHaveCount(0);
-  await expect(page.locator('summary[aria-label="Motion timeline series"]')).toHaveCount(0);
+  await expect(page.getByRole('slider', { name: 'Allowed movement', exact: true })).toHaveCount(0);
+  await expect(page.locator('summary[aria-label="Flight data lanes"]')).toHaveCount(0);
   await expect(row.locator('.smooth-panel-summary')).toContainText(seconds(tolerant));
   await page.getByRole('button', { name: 'Close source review', exact: true }).click();
   await page.getByRole('button', { name: 'Review pattern-a.mp4', exact: true }).click();
   await expect(row).toHaveAttribute('data-collapsed', 'true');
-  await page.getByRole('button', { name: 'Expand smooth part', exact: true }).click();
+  await page.getByRole('button', { name: 'Expand camera motion', exact: true }).click();
   await expect(heightLane).toHaveCount(1);
 
   // The analysis is kept for this session: reopening needs no new request.
@@ -1949,11 +1949,11 @@ test('the motion timeline shows roughness, tolerance and the smooth part; Use ap
   const lineAt = box.y + (lineY(SMOOTH_TOLERANCE.max) / 100) * box.height;
   await page.mouse.move(box.x + box.width * 0.4, lineAt);
   await expect(timeline).toHaveAttribute('data-near-tolerance', 'true');
-  await expect(readout).toContainText('Tolerance 6.0');
+  await expect(readout).toContainText('Allowed movement 6.0');
   await page.mouse.down();
   await page.mouse.move(box.x + box.width * 0.4, box.y + box.height + 20, { steps: 4 });
   await page.mouse.up();
-  const slider = page.getByRole('slider', { name: 'Smooth part tolerance', exact: true });
+  const slider = page.getByRole('slider', { name: 'Allowed movement', exact: true });
   await expect(slider).toHaveValue(String(SMOOTH_TOLERANCE.min));
   await expect(tolerance).toHaveAttribute('y1', String(lineY(SMOOTH_TOLERANCE.min)));
   await expect(page.locator('.source-preview')).toHaveAttribute('data-source-frame', frameBefore!);
@@ -1963,7 +1963,7 @@ test('the motion timeline shows roughness, tolerance and the smooth part; Use ap
   await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
 });
 
-test('a proxy prepared before the analysis offers Find smooth part, which runs one background job', async ({
+test('a proxy prepared before the analysis offers Analyse camera motion, which runs one background job', async ({
   page,
 }) => {
   const asset = assets[0]!;
@@ -2003,7 +2003,7 @@ test('a proxy prepared before the analysis offers Find smooth part, which runs o
   });
   await page.getByRole('button', { name: 'Review pattern-a.mp4', exact: true }).click();
   await expect(page.locator('.source-motion')).toHaveCount(0);
-  await page.getByRole('button', { name: 'Find smooth part', exact: true }).click();
+  await page.getByRole('button', { name: 'Analyse camera motion', exact: true }).click();
   await expect(page.locator('.smooth-panel')).toContainText('Measuring camera motion… 50 %');
   await expect(page.locator('.smooth-panel')).toHaveAttribute('data-smooth-in', /^\d+$/);
   await expect(page.locator('.source-motion')).toHaveCount(1);

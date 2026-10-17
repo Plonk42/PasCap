@@ -698,7 +698,7 @@ its sole decoder. Loading/playback failures remain explicit with Retry. Source
 playback never moves the timeline/music, changes clips/track keyframes or saves/history.
 Choices persist per project in that browser and affect future insertions only.
 
-### Smooth part suggestion
+### Camera motion and the steadiest range
 
 Source preview suggests the steadiest stretch of a drone recording, where the camera
 moves without brutal changes of angle or speed. Proxy preparation measures it as its
@@ -715,37 +715,39 @@ aperture are not kept. This demuxes only that track (about 0.2 s for a 600 MB ru
 recordings without it simply have no telemetry. The result is cached as
 `motion-v3.json` beside the proxy and its thumbnails, tied to the proxy's verification
 time; re-preparing the proxy replaces it, and older `motion-v1.json`/`motion-v2.json`
-caches are ignored (use **Find smooth part** to measure again). A failed measurement
+caches are ignored (use **Analyse camera motion** to measure again). A failed measurement
 never fails preparation: the job reports it and the proxy stays usable. The original
 is identity-checked and only its subtitle track is read.
 
 Opening a recording reads its analysis, once per session. Below the range strip and the
-IN/OUT fields, a **Smooth part** section has a header row: its title (a chevron button,
-**Collapse smooth part**), the suggestion's length and IN–OUT timecode, **Use**, a
-horizontal **Tolerance** slider with its value, and **Telemetry** (**Motion timeline
-series**), a menu choosing which telemetry values this recording has get a lane,
-**Flight speed** initially. Collapsing hides everything but the title and the
-suggestion; the collapse, tolerance and telemetry choices are browser preferences.
-Under the header, aligned with the strip, the **motion timeline** stacks lanes, each
-labelled at its top-left. The 44 px image lane plots the **roughness** (red area: how
-fast the camera motion changes, % of image width per s², up to 8), the **camera motion**
-in the picture (grey line, up to 10 % of width per s) and the **tolerance** (red dashed
-line); a 30 px lane follows for each chosen telemetry value, scaled to its own range
-(speeds from 0 to at least 16 m/s, vertical speed and exposure bias around zero). The
-smooth stretches are blue bands across every lane, the suggested one strongest. While
-hovering, every lane label shows its value under the pointer (telemetry interpolated
-between its once-per-second samples) and the image lane the timecode. Clicking or
-dragging any lane scrubs like the strip. The suggestion is the longest stretch
-of at least 2 s below the tolerance (0.5–6, initially 2),
-bridging jolts shorter than 0.5 s and keeping 0.2 s clear of rough edges inside the
-recording. Move the **Smooth part tolerance** slider, or drag the dashed line itself (it
-highlights within 6 px, and the image lane shows its value; dragging the line never
-scrubs). **Use** applies the suggestion as the applied source range (and shows its IN frame),
-like any other range choice: no project edit, history or save; it reads **In use** once
-applied. Recordings prepared before this analysis existed show **Find smooth part** in
-the header instead, which queues one **Smooth-part analysis** job (shown in Activity). Forward
+IN/OUT fields, a **Camera motion** section has a header row: its title (a chevron button,
+**Collapse camera motion**), **Steadiest range** with its length and IN–OUT timecode, and
+**Use**. A controls row follows: the **Allowed movement** setting, the shared slider with
+exact field and Reset (0.5–6, initially 2; neutral is the initial value), and **Flight
+data** (**Flight data lanes**), a menu choosing which flight data values this recording
+has get a lane, **Flight speed** initially. Collapsing hides everything but the title and
+the suggestion; the collapse, allowed movement and flight data choices are browser
+preferences. Under the controls, aligned with the strip, the **motion timeline** stacks
+lanes, each labelled at its top-left. The 44 px image lane plots the **jolts** (shaded
+area: how fast the camera movement changes, % of image width per s², up to 8), the
+**movement** in the picture (white line, up to 10 % of width per s) and the **allowed
+movement** (dashed accent line); a 30 px lane follows for each chosen flight data value,
+scaled to its own range (speeds from 0 to at least 16 m/s, vertical speed and exposure
+bias around zero). The plots use the editor's neutral greys and accent; steady ranges are
+accent bands across every lane, the suggested one strongest. While hovering, every lane
+label shows its value under the pointer (flight data interpolated between its
+once-per-second samples) and the image lane the timecode. Clicking or dragging any lane
+scrubs like the strip. The suggestion is the longest stretch of at least 2 s below the
+allowed movement, bridging jolts shorter than 0.5 s and keeping 0.2 s clear of rough
+edges inside the recording. Move the **Allowed movement** slider, or drag the dashed line
+itself (it highlights within 6 px, and the image lane shows its value; dragging the line
+never scrubs). **Use** applies the suggestion as the applied source range (and shows its
+IN frame), like any other range choice: no project edit, history or save; it reads **In
+use** once applied. Recordings prepared before this analysis existed show **Analyse
+camera motion** in the header instead, which queues one **Camera motion analysis** job
+(shown in Activity). Forward
 acceleration seen straight ahead barely changes the picture, so speed changes without
-turning are not detected by the roughness; the flight speed line shows them, but does
+turning are not detected by the jolts; the flight speed line shows them, but does
 not change the suggestion. Flight logs are not used.
 
 Source **Add clip** stays in the pinned review for repeated additions. Its

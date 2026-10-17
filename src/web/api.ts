@@ -251,7 +251,7 @@ export const api = {
       undefined,
       options,
     ),
-  /** Queues the camera-motion analysis that smooth-part suggestions need. */
+  /** Queues the camera-motion analysis that steadiest-range suggestions need. */
   analyseMotion: (id: string) => request(`/api/media/${id}/motion`, z.object({ job: jobSchema }), 'POST', {}),
   /** Queues a full-content check of the moved copy; the job's outcome is the answer. */
   relinkMedia: (id: string, path: string) =>

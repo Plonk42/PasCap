@@ -124,18 +124,19 @@ Scrubbing or changing the range pauses first. Closing, switching sources/project
 or leaving the Source tab cancels playback. Source playback does not move the
 timeline or music and does not create Undo steps or saves. Failures expose Retry.
 
-Below the range, the **Smooth part** section marks the steadiest part of a drone
-recording, measured when its proxy was prepared. Its header gives the suggestion's
-length and IN–OUT; **Use** sets IN and OUT to it; move **Tolerance** left for only very
-steady footage, right to accept more movement; **Telemetry** adds or removes lanes:
-flight and vertical speed, height, distance from home, ISO, shutter speed, exposure bias
-and digital zoom, for example to spot a climb or an exposure jump. The chevron collapses
-the whole section to its title and suggestion. In the lanes, the first shows roughness
-(red area: sudden angle or speed changes), camera motion and the dashed tolerance (drag
-it too), and the blue band marks the suggested smooth part; hover them to read the
-values at that moment. Recordings prepared earlier offer **Find smooth part** to
-measure them once. Straight-ahead speed changes barely move the picture: the flight
-speed lane shows them, so check the start of forward flights yourself.
+Below the range, the **Camera motion** section marks the steadiest range of a drone
+recording, measured when its proxy was prepared. Its header gives the **Steadiest range**
+length and IN–OUT; **Use** sets IN and OUT to it. Below it, move **Allowed movement** left
+for only very steady footage, right to accept more movement; **Flight data** adds or
+removes lanes: flight and vertical speed, height, distance from home, ISO, shutter speed,
+exposure bias and digital zoom, for example to spot a climb or an exposure jump. The
+chevron collapses the section to its title and suggestion. In the lanes, the first shows
+jolts (shaded area: sudden angle or speed changes), camera movement and the dashed allowed
+movement (drag it too), and the green bands mark the steady ranges, the suggested one
+strongest; hover them to read the values at that moment. Recordings prepared earlier offer
+**Analyse camera motion** to measure them once. Straight-ahead speed changes barely move
+the picture: the flight speed lane shows them, so check the start of forward flights
+yourself.
 
 Choose **Add clip** (it shows the applied range length, for example **Add clip 3.00 s**),
 mark another range, then add again: each addition creates an independent clip and

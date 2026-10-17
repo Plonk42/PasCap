@@ -7,7 +7,6 @@ export interface SeriesSpec {
   label: string;
   /** Readout prefix while hovering. */
   short: string;
-  colour: string;
   format: (value: number) => string;
   /** Smallest top of the scale, so small variations do not fill the plot. */
   floor: number;
@@ -22,7 +21,6 @@ export const SERIES: readonly SeriesSpec[] = [
     key: 'horizontalSpeed',
     label: 'Flight speed',
     short: 'Flight',
-    colour: '#e6c35c',
     format: (value) => `${value.toFixed(1)} m/s`,
     floor: 16,
   },
@@ -30,7 +28,6 @@ export const SERIES: readonly SeriesSpec[] = [
     key: 'verticalSpeed',
     label: 'Vertical speed',
     short: 'Vertical',
-    colour: '#b58cff',
     format: (value) => `${signedText(value, 1)} m/s`,
     floor: 3,
     signed: true,
@@ -39,7 +36,6 @@ export const SERIES: readonly SeriesSpec[] = [
     key: 'height',
     label: 'Height',
     short: 'Height',
-    colour: '#7cc4e8',
     format: (value) => `${value.toFixed(0)} m`,
     floor: 20,
   },
@@ -47,16 +43,14 @@ export const SERIES: readonly SeriesSpec[] = [
     key: 'distance',
     label: 'Distance from home',
     short: 'Distance',
-    colour: '#e88fc7',
     format: (value) => `${value.toFixed(0)} m`,
     floor: 50,
   },
-  { key: 'iso', label: 'ISO', short: 'ISO', colour: '#f0a35e', format: (value) => value.toFixed(0), floor: 200 },
+  { key: 'iso', label: 'ISO', short: 'ISO', format: (value) => value.toFixed(0), floor: 200 },
   {
     key: 'shutter',
     label: 'Shutter speed',
     short: 'Shutter',
-    colour: '#d8d77a',
     format: (value) => `1/${value.toFixed(0)} s`,
     floor: 100,
   },
@@ -64,7 +58,6 @@ export const SERIES: readonly SeriesSpec[] = [
     key: 'ev',
     label: 'Exposure bias',
     short: 'EV',
-    colour: '#9fe0c0',
     format: (value) => `${signedText(value, 1)} EV`,
     floor: 1,
     signed: true,
@@ -73,7 +66,6 @@ export const SERIES: readonly SeriesSpec[] = [
     key: 'digitalZoom',
     label: 'Digital zoom',
     short: 'Zoom',
-    colour: '#f2f2f2',
     format: (value) => `${value.toFixed(1)}×`,
     floor: 2,
   },
