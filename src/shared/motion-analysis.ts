@@ -11,7 +11,7 @@ const SMOOTH_GAP_SECONDS = 0.5;
 const SMOOTH_MIN_SECONDS = 2;
 const SMOOTH_MARGIN_SECONDS = 0.2;
 /** Below this camera movement (% of image width per s) a frame is still: ~3 min to pan one width. */
-export const STILL_SPEED = 0.6;
+export const STILL_SPEED = 0.5;
 /** A steady range with at least this share of still frames is a hover with nothing happening. */
 export const STILL_SHARE = 0.995;
 

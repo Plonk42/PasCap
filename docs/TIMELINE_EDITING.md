@@ -743,7 +743,7 @@ title and the suggestion; the collapse, allowed movement and flight data choices
 browser preferences. The suggestion is the longest stretch of at least 2 s below the
 allowed movement, bridging jolts shorter than 0.5 s and keeping 0.2 s clear of rough
 edges inside the recording. A stretch where the camera stands still is not a steady range:
-when at least 99.5 % of its frames move less than 0.6 % of the image width per second
+when at least 99.5 % of its frames move less than 0.5 % of the image width per second
 (about three minutes to pan one width), the drone is hovering with nothing happening in
 the picture, so it gets no band, suggestion or Add all clip. Move the **Allowed movement** slider, or drag the dashed line
 itself (it highlights within 6 px, and the image lane shows its value; dragging the line
