@@ -13,11 +13,12 @@ import {
   motionProfile,
   smoothRanges,
   SMOOTH_TOLERANCE,
+  type FlightSpeedSample,
   type MotionAnalysis,
   type MotionProfile,
   type SmoothRange,
 } from '../shared/motion-analysis.js';
-import { formatTimecode } from '../shared/timing.js';
+import { formatTimecode, type FrameRate } from '../shared/timing.js';
 import { api, ApiError } from './api.js';
 import { mediaReady, sourceSeconds } from './display.js';
 import { Icon } from './icons.js';
@@ -25,10 +26,16 @@ import { readPreference, writePreference } from './preferences.js';
 
 const TOLERANCE_PREFERENCE = 'pascap-smooth-tolerance';
 const POLL_MS = 1000;
-/** Chart scale: roughness in % of width per s²; camera motion is scaled to its own peak. */
+/** Chart scales: roughness in % of width per s²; camera motion is scaled to its own peak. */
 const ROUGHNESS_MAX = 8;
-const SPEED_FLOOR = 5;
+const MOTION_FLOOR = 5;
+/** m/s: about the top speed of small DJI drones, so recordings compare at a glance. */
+const FLIGHT_SPEED_SCALE = 16;
 const CHART_POINTS = 600;
+/** The top of the plotted area in the 0–100 viewBox, leaving room for one line of text. */
+const PLOT_TOP = 30;
+const LINE_GRAB_PX = 6;
+const THUMB_PX = 14;
 
 type Phase =
   | { kind: 'idle' }
@@ -39,6 +46,7 @@ type Phase =
 
 /** Analyses already fetched this session, per verified proxy. */
 const known = new Map<string, MotionAnalysis>();
+const NO_FLIGHT_SPEED: readonly FlightSpeedSample[] = [];
 
 function readTolerance(): number {
   const value = Number(readPreference(TOLERANCE_PREFERENCE));
@@ -66,6 +74,7 @@ function failure(cause: unknown): Phase {
 export interface SmoothRangeState {
   phase: Phase;
   profile: MotionProfile | null;
+  flightSpeed: readonly FlightSpeedSample[];
   ranges: readonly SmoothRange[];
   tolerance: number;
   setTolerance: (value: number) => void;
@@ -77,7 +86,7 @@ export function useSmoothRange(asset: MediaAsset): SmoothRangeState {
   const ready = mediaReady(asset);
   const key = `${asset.id}/${asset.prepared?.verification.verifiedAt ?? ''}`;
   const [phase, setPhase] = useState<Phase>({ kind: 'idle' });
-  const [tolerance, setToleranceState] = useState(readTolerance);
+  const [tolerance, setTolerance] = useState(readTolerance);
   const controller = useRef<AbortController | null>(null);
 
   const start = useCallback((): AbortSignal => {
@@ -145,20 +154,39 @@ export function useSmoothRange(asset: MediaAsset): SmoothRangeState {
     () => (profile ? smoothRanges(profile.roughness, tolerance, fps) : []),
     [profile, tolerance, fps],
   );
-  const setTolerance = useCallback((value: number) => {
-    setToleranceState(value);
+  const keepTolerance = useCallback((value: number) => {
+    setTolerance(value);
     writePreference(TOLERANCE_PREFERENCE, String(value));
   }, []);
-  return { phase, profile, ranges, tolerance, setTolerance, find };
+  const flightSpeed = phase.kind === 'ready' ? phase.analysis.flightSpeed : NO_FLIGHT_SPEED;
+  return { phase, profile, flightSpeed, ranges, tolerance, setTolerance: keepTolerance, find };
+}
+
+interface ChartPaths {
+  roughness: string;
+  motion: string;
+  flight: string;
+  motionMax: number;
+  flightMax: number;
+}
+
+/** Plot height in the 0–100 viewBox; the band above it holds the legend and summary text. */
+function plotY(value: number, max: number): number {
+  return 100 - (Math.min(value, max) / max) * (100 - PLOT_TOP);
 }
 
 /** At most CHART_POINTS samples: the peak roughness and mean motion of each bucket. */
-function chartPaths(profile: MotionProfile, count: number): { roughness: string; speed: string } {
+function chartPaths(
+  profile: MotionProfile,
+  flightSpeed: readonly FlightSpeedSample[],
+  count: number,
+  fps: number,
+): ChartPaths {
   const step = Math.max(1, Math.ceil(count / CHART_POINTS));
-  const speedMax = profile.speed.reduce((peak, value) => Math.max(peak, value), SPEED_FLOOR);
-  const y = (value: number, max: number): string => (100 - (Math.min(value, max) / max) * 96).toFixed(1);
+  const motionMax = profile.speed.reduce((peak, value) => Math.max(peak, value), MOTION_FLOOR);
+  const flightMax = flightSpeed.reduce((peak, sample) => Math.max(peak, sample.value), FLIGHT_SPEED_SCALE);
   const rough: string[] = [];
-  const speed: string[] = [];
+  const motion: string[] = [];
   for (let start = 0; start < count; start += step) {
     const end = Math.min(count, start + step);
     let peak = 0;
@@ -168,10 +196,73 @@ function chartPaths(profile: MotionProfile, count: number): { roughness: string;
       sum += profile.speed[frame]!;
     }
     const x = ((start + end) / 2).toFixed(1);
-    rough.push(`${x},${y(peak, ROUGHNESS_MAX)}`);
-    speed.push(`${x},${y(sum / (end - start), speedMax)}`);
+    rough.push(`${x},${plotY(peak, ROUGHNESS_MAX).toFixed(1)}`);
+    motion.push(`${x},${plotY(sum / (end - start), motionMax).toFixed(1)}`);
   }
-  return { roughness: `M0,100 L${rough.join(' L')} L${count},100 Z`, speed: `M${speed.join(' L')}` };
+  const flight = flightSpeed
+    .filter((sample) => sample.time * fps <= count)
+    .map((sample) => `${(sample.time * fps).toFixed(1)},${plotY(sample.value, flightMax).toFixed(1)}`);
+  // Each sample stands for the second that follows it.
+  const last = flightSpeed.at(-1);
+  if (last && last.time * fps < count)
+    flight.push(`${Math.min(count, (last.time + 1) * fps).toFixed(1)},${plotY(last.value, flightMax).toFixed(1)}`);
+  return {
+    roughness: `M0,100 L${rough.join(' L')} L${count},100 Z`,
+    motion: `M${motion.join(' L')}`,
+    flight: flight.length > 1 ? `M${flight.join(' L')}` : '',
+    motionMax,
+    flightMax,
+  };
+}
+
+/** Linear between the recorded samples; null outside them. */
+function flightSpeedAt(samples: readonly FlightSpeedSample[], seconds: number): number | null {
+  const next = samples.findIndex((sample) => sample.time > seconds);
+  const last = samples.at(-1);
+  if (next === -1) return last && seconds - last.time <= 1 ? last.value : null;
+  if (next === 0) return null;
+  const a = samples[next - 1]!;
+  const b = samples[next]!;
+  return a.value + ((b.value - a.value) * (seconds - a.time)) / (b.time - a.time);
+}
+
+interface ReadoutProps {
+  asset: MediaAsset;
+  profile: MotionProfile;
+  flightSpeed: readonly FlightSpeedSample[];
+  hover: number | null;
+  /** Shown instead of the values while the dashed line is hovered or dragged. */
+  tolerance: number | null;
+}
+
+/** The legend, or the values under the pointer, above the plotted lines. */
+function MotionReadout({ asset, profile, flightSpeed, hover, tolerance }: Readonly<ReadoutProps>) {
+  const rate = asset.metadata.frameRate;
+  let content = (
+    <>
+      <span className="roughness">Roughness</span>
+      <span className="motion">Camera motion</span>
+      {flightSpeed.length > 0 && <span className="flight">Flight speed</span>}
+    </>
+  );
+  if (tolerance !== null) {
+    content = <span className="tolerance">Tolerance {tolerance.toFixed(1)} · drag up to accept more movement</span>;
+  } else if (hover !== null) {
+    const flight = flightSpeedAt(flightSpeed, (hover * rate.denominator) / rate.numerator);
+    content = (
+      <>
+        <b>{formatTimecode(hover, rate)}</b>
+        <span className="roughness">Roughness {profile.roughness[hover]!.toFixed(1)}</span>
+        <span className="motion">Camera {profile.speed[hover]!.toFixed(1)} %/s</span>
+        {flight !== null && <span className="flight">Flight {flight.toFixed(1)} m/s</span>}
+      </>
+    );
+  }
+  return (
+    <span className="source-motion-readout" aria-hidden="true">
+      {content}
+    </span>
+  );
 }
 
 interface TimelineProps {
@@ -185,9 +276,31 @@ interface TimelineProps {
   onKeyDown: (event: KeyboardEvent<HTMLElement>) => void;
 }
 
+type Drag = { kind: 'scrub' | 'tolerance'; pointer: number };
+
+/** The tolerance whose dashed line sits at y (0–100 from the top), on the slider's steps. */
+function toleranceAt(y: number): number {
+  const value = ((100 - y) / (100 - PLOT_TOP)) * ROUGHNESS_MAX;
+  const stepped = Math.round(value / SMOOTH_TOLERANCE.step) * SMOOTH_TOLERANCE.step;
+  return Number(Math.max(SMOOTH_TOLERANCE.min, Math.min(SMOOTH_TOLERANCE.max, stepped)).toFixed(1));
+}
+
+function suggestionText(best: SmoothRange | undefined, applied: boolean, rate: FrameRate) {
+  if (!best)
+    return { span: '', label: 'No smooth part to use', hint: 'No steady part of 2 s or more at this tolerance' };
+  const from = formatTimecode(best.sourceIn, rate);
+  const to = formatTimecode(best.sourceOut, rate);
+  const span = `${from} – ${to} · ${sourceSeconds(best.sourceOut - best.sourceIn)}`;
+  return {
+    span,
+    label: `Use smooth part ${from} to ${to}`,
+    hint: applied ? `In use: ${span}` : `Set IN and OUT to the smooth part ${span}`,
+  };
+}
+
 /**
- * One row aligned under the range strip: Use (under Play), image roughness and camera
- * motion along the whole recording, and the tolerance as a handle on its dashed line.
+ * One row aligned under the range strip: Use (under Play), image roughness, camera motion and
+ * recorded flight speed along the whole recording, and the tolerance as a draggable dashed line.
  */
 export function MotionTimeline({
   asset,
@@ -199,30 +312,41 @@ export function MotionTimeline({
   onApply,
   onKeyDown,
 }: Readonly<TimelineProps>) {
-  const { profile, ranges, tolerance } = smooth;
+  const { profile, flightSpeed, ranges, tolerance, setTolerance } = smooth;
   const count = asset.metadata.frameCount;
   const rate = asset.metadata.frameRate;
-  const paths = useMemo(() => (profile ? chartPaths(profile, count) : null), [profile, count]);
-  const scrubbing = useRef<number | null>(null);
-  if (!paths) return null;
+  const fps = rate.numerator / rate.denominator;
+  const paths = useMemo(
+    () => (profile ? chartPaths(profile, flightSpeed, count, fps) : null),
+    [profile, flightSpeed, count, fps],
+  );
+  const drag = useRef<Drag | null>(null);
+  const [hover, setHover] = useState<number | null>(null);
+  const [nearLine, setNearLine] = useState(false);
+  const [adjusting, setAdjusting] = useState(false);
+  if (!paths || !profile) return null;
   const best = ranges[0];
   const applied = best?.sourceIn === range.sourceIn && best?.sourceOut === range.sourceOut;
-  const seekAt = (event: ReactPointerEvent<HTMLDivElement>): void => {
+  const toleranceY = plotY(tolerance, ROUGHNESS_MAX);
+  const toleranceTop = plotY(SMOOTH_TOLERANCE.max, ROUGHNESS_MAX);
+  const toleranceBottom = plotY(SMOOTH_TOLERANCE.min, ROUGHNESS_MAX);
+  const position = (event: ReactPointerEvent<HTMLDivElement>) => {
     const box = event.currentTarget.getBoundingClientRect();
-    const fraction = Math.max(0, Math.min(1, (event.clientX - box.left) / box.width));
-    onFrame(Math.min(count - 1, Math.floor(fraction * count)));
+    const x = Math.max(0, Math.min(1, (event.clientX - box.left) / box.width));
+    const y = ((event.clientY - box.top) / box.height) * 100;
+    return {
+      frame: Math.min(count - 1, Math.floor(x * count)),
+      y,
+      onLine: Math.abs(((y - toleranceY) / 100) * box.height) <= LINE_GRAB_PX,
+    };
   };
-  const toleranceY = 100 - (Math.min(tolerance, ROUGHNESS_MAX) / ROUGHNESS_MAX) * 96;
-  const toleranceTop = 100 - (SMOOTH_TOLERANCE.max / ROUGHNESS_MAX) * 96;
-  const toleranceBottom = 100 - (SMOOTH_TOLERANCE.min / ROUGHNESS_MAX) * 96;
-  const label = best
-    ? `Use smooth part ${formatTimecode(best.sourceIn, rate)} to ${formatTimecode(best.sourceOut, rate)}`
-    : 'No smooth part to use';
-  const span = best
-    ? `${formatTimecode(best.sourceIn, rate)} – ${formatTimecode(best.sourceOut, rate)} · ${sourceSeconds(best.sourceOut - best.sourceIn)}`
-    : '';
-  let hint = 'No steady part of 2 s or more at this tolerance';
-  if (best) hint = applied ? `In use: ${span}` : `Set IN and OUT to the smooth part ${span}`;
+  const end = (): void => {
+    drag.current = null;
+    setAdjusting(false);
+  };
+  const { span, label, hint } = suggestionText(best, applied, rate);
+  const hasFlight = paths.flight !== '';
+
   return (
     <div className="source-track" data-smooth-in={best?.sourceIn} data-smooth-out={best?.sourceOut}>
       <button
@@ -242,22 +366,33 @@ export function MotionTimeline({
         <div
           className="source-motion"
           data-disabled={disabled || undefined}
-          title="Red: roughness, how fast the camera motion changes. Grey: camera motion. Blue: smooth parts below the dashed tolerance. Click or drag to scrub."
+          data-near-tolerance={(nearLine && !disabled) || adjusting || undefined}
+          title={`Red: roughness, how fast the camera motion changes (dashed: tolerance, drag it). Grey: camera motion in the picture.${hasFlight ? ' Yellow: flight speed recorded by the drone.' : ''} Blue: smooth parts. Click or drag to scrub.`}
           onPointerDown={(event) => {
             if (disabled || event.button !== 0) return;
+            const at = position(event);
             event.currentTarget.setPointerCapture(event.pointerId);
-            scrubbing.current = event.pointerId;
-            seekAt(event);
+            drag.current = { kind: at.onLine ? 'tolerance' : 'scrub', pointer: event.pointerId };
+            if (at.onLine) setAdjusting(true);
+            else onFrame(at.frame);
           }}
           onPointerMove={(event) => {
-            if (scrubbing.current === event.pointerId) seekAt(event);
+            const at = position(event);
+            const current = drag.current;
+            if (current?.pointer === event.pointerId && current.kind === 'tolerance') {
+              setTolerance(toleranceAt(at.y));
+              return;
+            }
+            setHover(at.frame);
+            setNearLine(at.onLine);
+            if (current?.pointer === event.pointerId) onFrame(at.frame);
           }}
-          onPointerUp={() => {
-            scrubbing.current = null;
+          onPointerLeave={() => {
+            setHover(null);
+            setNearLine(false);
           }}
-          onLostPointerCapture={() => {
-            scrubbing.current = null;
-          }}
+          onPointerUp={end}
+          onLostPointerCapture={end}
         >
           <svg viewBox={`0 0 ${count} 100`} preserveAspectRatio="none" aria-hidden="true">
             {ranges.map((smoothRange, index) => (
@@ -266,41 +401,54 @@ export function MotionTimeline({
                 className={index ? 'source-motion-band alternative' : 'source-motion-band'}
                 x={smoothRange.sourceIn}
                 width={smoothRange.sourceOut - smoothRange.sourceIn}
-                y={0}
-                height={100}
+                y={PLOT_TOP}
+                height={100 - PLOT_TOP}
               />
             ))}
             <path className="source-motion-roughness" d={paths.roughness} />
-            <path className="source-motion-speed" d={paths.speed} />
+            <path className="source-motion-speed" d={paths.motion} />
+            {hasFlight && <path className="source-motion-flight" d={paths.flight} />}
             <line className="source-motion-tolerance" x1={0} x2={count} y1={toleranceY} y2={toleranceY} />
           </svg>
-          <span className="source-motion-legend" aria-hidden="true">
-            <i className="roughness" />
-            <span>Roughness</span>
-            <i className="speed" />
-            <span>Camera motion</span>
-          </span>
+          <MotionReadout
+            asset={asset}
+            profile={profile}
+            flightSpeed={hasFlight ? flightSpeed : []}
+            hover={hover}
+            tolerance={adjusting || (nearLine && drag.current === null) ? tolerance : null}
+          />
           <span className="source-motion-summary">{best ? `Smooth ${span}` : 'No steady part of 2 s or more'}</span>
+          {hover !== null && !nearLine && !adjusting && (
+            <span
+              className="source-motion-cursor"
+              style={{ left: `${count === 1 ? 0 : (hover / (count - 1)) * 100}%` }}
+              aria-hidden="true"
+            />
+          )}
           <span
             className="source-motion-head"
             style={{ left: `${count === 1 ? 0 : (frame / (count - 1)) * 100}%` }}
             aria-hidden="true"
           />
         </div>
-        {/* Vertical, spanning exactly the tolerance values of the dashed line it moves. */}
+        {/* The thumb centre travels exactly over the tolerance values of the dashed line. */}
         <input
           className="source-motion-tolerance-input"
           type="range"
           aria-label="Smooth part tolerance"
           aria-valuetext={`${tolerance.toFixed(1)}: ${tolerance < SMOOTH_TOLERANCE.initial ? 'stricter' : 'more tolerant'}`}
-          title="Tolerance: drag the dashed line up to accept more camera movement, down for only very steady footage"
+          title={`Tolerance ${tolerance.toFixed(1)}: drag up to accept more camera movement, down for only very steady footage`}
           min={SMOOTH_TOLERANCE.min}
           max={SMOOTH_TOLERANCE.max}
           step={SMOOTH_TOLERANCE.step}
           value={tolerance}
-          style={{ top: `${toleranceTop}%`, height: `${toleranceBottom - toleranceTop}%` }}
+          disabled={disabled}
+          style={{
+            top: `calc(${toleranceTop}% - ${THUMB_PX / 2}px)`,
+            height: `calc(${toleranceBottom - toleranceTop}% + ${THUMB_PX}px)`,
+          }}
           onKeyDown={onKeyDown}
-          onChange={(event) => smooth.setTolerance(Number(event.target.value))}
+          onChange={(event) => setTolerance(Number(event.target.value))}
         />
       </div>
     </div>

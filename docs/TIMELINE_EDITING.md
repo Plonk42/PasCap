@@ -707,27 +707,37 @@ every frame, the camera's global motion since the previous one (translation, zoo
 rotation from block phase correlation, with a robust fit that ignores moving water,
 trees or other subjects). Featureless frames stay unmeasured. This adds roughly a
 quarter of the recording's duration to preparation (about 120 frames/s for a 720p
-proxy on the development machine). The result is cached as `motion-v1.json` beside the
-proxy and its thumbnails, tied to the proxy's verification time; re-preparing the proxy
-replaces it. A failed measurement never fails preparation: the job reports it and the
-proxy stays usable. The original is only identity-checked, never read.
+proxy on the development machine). It also reads the original's first subtitle track,
+where DJI drones record telemetry once per second, and keeps its horizontal speed
+(`H.S`, m/s); this demuxes only that track (about 0.2 s for a 600 MB rush), and
+recordings without it simply have no flight speed. The result is cached as
+`motion-v2.json` beside the proxy and its thumbnails, tied to the proxy's verification
+time; re-preparing the proxy replaces it, and an older `motion-v1.json` is ignored (use
+**Find smooth part** to measure again). A failed measurement never fails preparation:
+the job reports it and the proxy stays usable. The original is identity-checked and
+only its subtitle track is read.
 
 Opening a recording reads its analysis, once per session. Under the range strip and
-aligned with it, a **motion timeline** shows the **roughness** (red area: how fast the
-camera motion changes, % of image width per s², up to 8), the **camera motion** (grey
-line, scaled to the recording's peak), the **tolerance** (red dashed line) and the smooth
-stretches (blue bands, the suggested one strongest), with the suggestion's IN–OUT
-timecode and length in its corner. Clicking or dragging it scrubs like the strip. The
-suggestion is the longest stretch of at least 2 s below the tolerance (0.5–6, initially
-2, a browser preference), bridging jolts shorter than 0.5 s and keeping 0.2 s clear of
-rough edges inside the recording. Drag the **Smooth part tolerance** handle at the right
-end of the dashed line (or use its arrow keys) to move it. **Use**, under the play
+aligned with it, a **motion timeline** plots, below a line of text: the **roughness**
+(red area: how fast the camera motion changes, % of image width per s², up to 8), the
+**camera motion** (grey line, scaled to the recording's peak), the recorded **flight
+speed** (yellow line, up to 16 m/s or the recording's peak), the **tolerance** (red
+dashed line) and the smooth stretches (blue bands, the suggested one strongest). The
+text line shows the legend and the suggestion's IN–OUT timecode and length; while
+hovering it shows the timecode and the three values under the pointer instead. Clicking
+or dragging the timeline scrubs like the strip. The suggestion is the longest stretch
+of at least 2 s below the tolerance (0.5–6, initially 2, a browser preference),
+bridging jolts shorter than 0.5 s and keeping 0.2 s clear of rough edges inside the
+recording. Drag the dashed line itself (it highlights within 6 px, and the text line
+shows its value) or the **Smooth part tolerance** handle at its right end (also with
+the arrow keys) to move it; dragging the line never scrubs. **Use**, under the play
 button, applies the suggestion as the applied source range (and shows its IN frame),
 like any other range choice: no project edit, history or save; it reads **In use** once
 applied. Recordings prepared before this analysis existed show **Find smooth part**
 instead, which queues one **Smooth-part analysis** job (shown in Activity). Forward
 acceleration seen straight ahead barely changes the picture, so speed changes without
-turning are not detected; flight logs are not used.
+turning are not detected by the roughness; the flight speed line shows them, but does
+not change the suggestion. Flight logs are not used.
 
 Source **Add clip** stays in the pinned review for repeated additions. Its
 sticky header and native nonmodal clip popup keep adding/reviewing reachable
