@@ -218,21 +218,30 @@
 /* Track-style source range: the whole original maps left (frame 0) to right (exclusive OUT). */
 .source-track {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 10px;
 }
 
 .source-track .source-play-button {
   flex-shrink: 0;
+  margin-top: 4px;
+}
+
+/* The strip and the camera motion lanes under it share one column and one playhead. */
+.source-track-stack {
+  position: relative;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  /* Room for the outer IN/OUT handles and their wider pointer targets. */
+  margin-inline: 18px;
 }
 
 .source-range-strip {
   position: relative;
-  flex: 1;
-  min-width: 0;
   height: 44px;
-  /* Room for the outer IN/OUT handles and their wider pointer targets. */
-  margin-inline: 18px;
   border-radius: 4px;
   background: #1b2a20;
   touch-action: none;
@@ -301,6 +310,290 @@
   pointer-events: none;
 }
 
+/* Camera motion controls below the range fields, separated like the Inspector's setting groups. */
+.smooth-panel {
+  display: grid;
+  gap: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--line);
+}
+
+.smooth-panel-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  min-height: 26px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.smooth-panel-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px 2px 4px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: #e6efe8;
+  font: inherit;
+  cursor: pointer;
+}
+
+.smooth-panel-toggle:is(:hover, :focus-visible) {
+  background: #2c3b30;
+}
+
+.smooth-panel-summary {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.smooth-panel-summary b {
+  margin-left: 4px;
+  color: #e6efe8;
+  font-weight: 400;
+}
+
+.smooth-panel-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.smooth-panel .smooth-use-button,
+.smooth-panel .smooth-add-all-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  padding-block: 0;
+}
+
+.smooth-panel .smooth-use-button {
+  margin-left: auto;
+}
+
+.smooth-use-button[data-applied]:disabled {
+  border-color: var(--accent);
+  color: var(--accent);
+  opacity: 1;
+}
+
+.smooth-panel-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 16px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.smooth-panel-tolerance {
+  display: flex;
+  flex: 0 1 440px;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.smooth-panel-tolerance .setting-reset-group {
+  flex: none;
+  white-space: nowrap;
+}
+
+.product-workspace .smooth-panel-tolerance .value-control {
+  flex: 1 1 auto;
+  grid-template-columns: minmax(0, 1fr) 72px;
+  min-width: 150px;
+}
+
+.product-workspace .smooth-panel-tolerance .value-control .number-field-input {
+  padding-block: 4px;
+}
+
+.smooth-panel .smooth-panel-lanes-menu {
+  margin-left: auto;
+}
+
+.smooth-panel .smooth-panel-lanes-menu > summary.editor-popover-trigger {
+  gap: 6px;
+  width: auto;
+  height: 26px;
+  padding: 0 10px;
+  border-color: var(--line);
+  font-size: 12px;
+}
+
+.source-motion {
+  --jolts: #eaa646;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  cursor: pointer;
+  touch-action: none;
+}
+
+.source-motion-omitted {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: repeating-linear-gradient(135deg, #05090680 0 3px, #05090640 3px 6px);
+  pointer-events: none;
+}
+
+.source-motion-plot {
+  position: relative;
+  height: 30px;
+  border-radius: 3px;
+  background: #121a15;
+}
+
+.source-motion-plot.image {
+  height: 44px;
+}
+
+.source-motion[data-near-tolerance] {
+  cursor: ns-resize;
+}
+
+.source-motion[data-disabled] {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.source-motion svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.source-motion-band {
+  fill: rgb(183 239 191 / 16%);
+}
+
+.source-motion-band.alternative {
+  fill: rgb(183 239 191 / 7%);
+}
+
+.source-motion-roughness {
+  fill: rgb(234 166 70 / 30%);
+  stroke: var(--jolts);
+  stroke-width: 1.2;
+  vector-effect: non-scaling-stroke;
+}
+
+.source-motion-line {
+  fill: none;
+  stroke: var(--series);
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.source-motion-line.camera {
+  stroke: #eef8ee;
+  stroke-width: 1.2;
+}
+
+.source-motion-tolerance {
+  stroke: var(--accent);
+  stroke-width: 1;
+  stroke-dasharray: 5 3;
+  vector-effect: non-scaling-stroke;
+}
+
+.source-motion[data-near-tolerance] .source-motion-tolerance {
+  stroke-width: 2.5;
+}
+
+.source-motion-series-list {
+  display: grid;
+  gap: 8px;
+  min-width: 200px;
+  font-size: 12px;
+}
+
+.editor-popover-content .source-motion-series-list label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #dbe7de;
+  cursor: pointer;
+}
+
+.source-motion-series-list i {
+  width: 16px;
+  height: 3px;
+  border-radius: 2px;
+}
+
+.source-motion-series-list p {
+  margin: 2px 0 0;
+  color: var(--muted);
+}
+
+.source-motion-readout {
+  position: absolute;
+  top: 2px;
+  left: 6px;
+  right: 6px;
+  display: flex;
+  gap: 12px;
+  overflow: hidden;
+  font-size: 10px;
+  line-height: 12px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  pointer-events: none;
+  text-shadow: 0 0 3px #0a120c;
+  z-index: 1;
+}
+
+.source-motion-readout b {
+  color: #eef8ee;
+  font-weight: 600;
+}
+
+.source-motion-readout :is(.roughness, .series)::before {
+  content: '';
+  display: inline-block;
+  width: 9px;
+  height: 3px;
+  margin: 0 4px 2px 0;
+  border-radius: 2px;
+  vertical-align: middle;
+  background: var(--series);
+}
+
+.source-motion-readout .roughness {
+  --series: var(--jolts);
+}
+
+.source-motion-readout .camera {
+  --series: #eef8ee;
+}
+
+.source-motion-readout .tolerance {
+  color: var(--accent);
+}
+
+.source-motion-cursor {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: #eef8ee59;
+  pointer-events: none;
+}
+
+.smooth-range-error {
+  color: var(--error);
+}
+
 .source-playhead-input {
   position: absolute;
   inset: 0;
@@ -347,7 +640,7 @@
 .source-range-head {
   position: absolute;
   top: -6px;
-  bottom: -2px;
+  bottom: 0;
   width: 2px;
   margin-left: -1px;
   background: #eef8ee;

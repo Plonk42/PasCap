@@ -32,11 +32,18 @@ export function parseRate(text: string): FrameRate {
   return { numerator, denominator };
 }
 
-/** Non-drop-frame timecode. Integer frame count, not a wall-clock timestamp. */
+/** Non-drop-frame MM:SS:FF timecode; minutes keep counting past an hour. Integer frames, not wall-clock time. */
 export function formatTimecode(frame: number, rate: FrameRate = PROJECT_FPS): string {
   const nominal = Math.ceil(rate.numerator / rate.denominator);
   const totalSeconds = Math.floor(frame / nominal);
-  return [Math.floor(totalSeconds / 3600), Math.floor(totalSeconds / 60) % 60, totalSeconds % 60, frame % nominal]
+  return [Math.floor(totalSeconds / 60), totalSeconds % 60, frame % nominal]
     .map((part) => String(part).padStart(2, '0'))
     .join(':');
+}
+
+/** The frame of an MM:SS:FF timecode at 30 nominal frames per second, or null when malformed. */
+export function parseTimecodeFrames(text: string): number | null {
+  const match = /^(\d{1,7}):(\d{2}):(\d{2})$/.exec(text.trim());
+  if (!match || Number(match[2]) >= 60 || Number(match[3]) >= 30) return null;
+  return (Number(match[1]) * 60 + Number(match[2])) * 30 + Number(match[3]);
 }

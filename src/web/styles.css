@@ -1162,7 +1162,7 @@ svg {
   display: flex;
   position: absolute;
   inset: 0;
-  opacity: 0.45;
+  opacity: 1;
 }
 
 .clip-filmstrip img {
@@ -1176,7 +1176,7 @@ svg {
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(0deg, #0a2418ed, transparent);
+  background: linear-gradient(0deg, #0a2418b0, transparent 55%);
 }
 
 .timeline-clip-label {

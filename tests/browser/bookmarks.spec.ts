@@ -123,7 +123,7 @@ test('M and the toolbar add and delete bookmarks at the playhead; duplicates are
   await page.getByRole('region', { name: 'Video timeline', exact: true }).focus();
   await page.keyboard.press('m');
   await expect.poll(() => bookmarks(page)).toEqual([60]);
-  await expect(marker(page, 60)).toHaveAccessibleName('Bookmark at 00:00:02:00');
+  await expect(marker(page, 60)).toHaveAccessibleName('Bookmark at 00:02:00');
   await page.keyboard.press('m');
   await expect(page.getByRole('alert')).toContainText('A bookmark already exists at this frame.');
   expect(await bookmarks(page)).toEqual([60]);

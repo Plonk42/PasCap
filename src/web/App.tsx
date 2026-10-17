@@ -148,6 +148,26 @@ function shortcutBlocked(event: KeyboardEvent): boolean {
 function message(cause: unknown, fallback: string): string {
   return cause instanceof Error && cause.message ? cause.message : fallback;
 }
+
+/** A new clip of a recording's applied range, or of an explicit range such as a steady range. */
+function clipForSource(
+  source: string | MediaSelection,
+  assets: readonly MediaAsset[],
+  ranges: MediaSelections,
+  layerId: string,
+) {
+  const id = typeof source === 'string' ? source : source.mediaId;
+  const asset = assets.find((item) => item.id === id);
+  if (!asset || !mediaReady(asset)) throw new Error('Prepare the recording before adding it to the timeline.');
+  const range = typeof source === 'string' ? resolveMediaSelection(id, asset.metadata.frameCount, ranges) : source;
+  return createClip(crypto.randomUUID(), id, range.sourceIn, range.sourceOut, layerId);
+}
+
+function withLayer(project: ProjectDocument, layer: VideoLayer): ProjectDocument {
+  if (project.layers.length >= MAX_VIDEO_LAYERS)
+    throw new Error(`A project can have at most ${MAX_VIDEO_LAYERS} video tracks.`);
+  return applyCommand(project, { type: 'layer-add', layer });
+}
 type ActionResult<T> = { ok: true; value: T } | { ok: false };
 interface ConnectionState {
   state: 'connecting' | 'ready' | 'error';
@@ -468,30 +488,23 @@ export function App() {
   );
   const insert = useCallback(
     (
-      mediaIds: string[],
+      /** Recordings with their applied range, or explicit ranges such as the steady ranges. */
+      sources: readonly (string | MediaSelection)[],
       index?: number,
       layerId?: string,
       start?: number,
       keepReview = false,
       newLayer?: VideoLayer,
     ): string | null => {
-      if (!current.current || drafting.current || !mediaIds.length) return null;
+      if (!current.current || drafting.current || !sources.length) return null;
       try {
-        let next = current.current;
-        if (newLayer) {
-          if (next.layers.length >= MAX_VIDEO_LAYERS)
-            throw new Error(`A project can have at most ${MAX_VIDEO_LAYERS} video tracks.`);
-          next = applyCommand(next, { type: 'layer-add', layer: newLayer });
-        }
+        let next = newLayer ? withLayer(current.current, newLayer) : current.current;
         const targetLayer = newLayer?.id ?? layerId ?? selectedLayer.current;
         const layer = next.layers.find((layer) => layer.id === targetLayer);
         if (!layer) throw new Error('Choose a video track before inserting.');
-        const instances = mediaIds.map((id) => {
-          const asset = latestAssets.current.find((item) => item.id === id);
-          if (!asset || !mediaReady(asset)) throw new Error('Prepare the recording before adding it to the timeline.');
-          const range = resolveMediaSelection(id, asset.metadata.frameCount, sourceRanges.current);
-          return createClip(crypto.randomUUID(), id, range.sourceIn, range.sourceOut, targetLayer);
-        });
+        const instances = sources.map((source) =>
+          clipForSource(source, latestAssets.current, sourceRanges.current, targetLayer),
+        );
         const lastClip = layerClips(next, targetLayer).at(-1);
         const last = calculateLayout(next).clips.find((item) => item.clip.id === lastClip?.id);
         let cursor = start ?? (layer.ripple && last ? last.end : (engine.current?.diagnostics().frame ?? 0));
@@ -520,7 +533,7 @@ export function App() {
           cursor = calculateLayout(next).clips.find((item) => item.clip.id === clip.id)!.end;
         }
         validate(next);
-        const first = instances[0]!; // The nonempty mediaIds guard also guarantees a nonempty batch.
+        const first = instances[0]!; // The nonempty sources guard also guarantees a nonempty batch.
         requestedFrame.current = calculateLayout(next).clips.find((item) => item.clip.id === first.id)!.start;
         commit(next);
         select(first.id);
@@ -1984,10 +1997,10 @@ export function App() {
                     onFrame={(frame) => reviewFrame({ mediaId: reviewAsset.id, frame })}
                     onRange={setSourceRange}
                     onClose={closeReview}
-                    onInsert={() => {
+                    onInsert={(steady) => {
                       chosenReview.current = review;
                       hoveringReview.current = false;
-                      return insert([reviewAsset.id], undefined, undefined, undefined, true);
+                      return insert(steady ?? [reviewAsset.id], undefined, undefined, undefined, true);
                     }}
                     onRevealClip={revealClip}
                     targetLayer={targetLayer}

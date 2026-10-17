@@ -713,7 +713,7 @@ function SourceRangeSection({
         <HelpPopover label="Source timing" guide="assemble-trim-and-cut">
           <p id={`${id}-source-help`}>
             The bar shows the whole recording; drag IN and OUT to keep only the part you want. Type a frame number or
-            HH:MM:SS:FF in the fields.
+            MM:SS:FF in the fields.
           </p>
           <p className="editor-help-tip">Tip: Restore full recording undoes a trim.</p>
         </HelpPopover>
