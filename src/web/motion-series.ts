@@ -1,6 +1,6 @@
 import type { MotionProfile, TelemetryField, TelemetrySample } from '../shared/motion-analysis.js';
 
-export type SeriesKey = 'motion' | TelemetryField;
+export type SeriesKey = TelemetryField;
 
 export interface SeriesSpec {
   key: SeriesKey;
@@ -18,14 +18,6 @@ export interface SeriesSpec {
 const signedText = (value: number, digits: number): string => `${value > 0 ? '+' : ''}${value.toFixed(digits)}`;
 
 export const SERIES: readonly SeriesSpec[] = [
-  {
-    key: 'motion',
-    label: 'Camera motion',
-    short: 'Camera',
-    colour: '#c9d4e0',
-    format: (value) => `${value.toFixed(1)} %/s`,
-    floor: 5,
-  },
   {
     key: 'horizontalSpeed',
     label: 'Flight speed',
@@ -87,60 +79,44 @@ export const SERIES: readonly SeriesSpec[] = [
   },
 ];
 
-export const DEFAULT_SERIES: readonly SeriesKey[] = ['motion', 'horizontalSpeed'];
+export const DEFAULT_SERIES: readonly SeriesKey[] = ['horizontalSpeed'];
+/** % of image width per second at the top of the image lane, so recordings compare at a glance. */
+export const CAMERA_MOTION_MAX = 10;
 /** At most this many points per line, whatever the recording's length. */
 const CHART_POINTS = 600;
 
-/** Camera motion, and each telemetry value this recording has. */
+/** The telemetry values this recording has. */
 export function availableSeries(telemetry: readonly TelemetrySample[]): SeriesSpec[] {
-  return SERIES.filter(
-    (spec) => spec.key === 'motion' || telemetry.some((sample) => sample[spec.key as TelemetryField] !== null),
-  );
+  return SERIES.filter((spec) => telemetry.some((sample) => sample[spec.key] !== null));
 }
 
-interface Point {
-  x: number;
-  value: number | null;
-}
-
-/** Bucket means of camera motion, or the telemetry samples, each holding for the second after it. */
-function points(
-  spec: SeriesSpec,
-  profile: MotionProfile,
-  telemetry: readonly TelemetrySample[],
-  count: number,
-  fps: number,
-): Point[] {
-  if (spec.key === 'motion') {
-    const step = Math.max(1, Math.ceil(count / CHART_POINTS));
-    const result: Point[] = [];
-    for (let start = 0; start < count; start += step) {
-      const end = Math.min(count, start + step);
-      let sum = 0;
-      for (let frame = start; frame < end; frame++) sum += profile.speed[frame]!;
-      result.push({ x: (start + end) / 2, value: sum / (end - start) });
-    }
-    return result;
+/** Bucket means of camera motion; `plotY` maps 0 (bottom) – 1 (top) to the viewBox. */
+export function cameraMotionPath(profile: MotionProfile, count: number, plotY: (fraction: number) => number): string {
+  const step = Math.max(1, Math.ceil(count / CHART_POINTS));
+  const points: string[] = [];
+  for (let start = 0; start < count; start += step) {
+    const end = Math.min(count, start + step);
+    let sum = 0;
+    for (let frame = start; frame < end; frame++) sum += profile.speed[frame]!;
+    points.push(`${((start + end) / 2).toFixed(1)},${plotY(sum / (end - start) / CAMERA_MOTION_MAX).toFixed(1)}`);
   }
-  const field = spec.key;
-  const result = telemetry
-    .filter((sample) => sample.time * fps <= count)
-    .map((sample) => ({ x: sample.time * fps, value: sample[field] }));
-  const last = telemetry.at(-1);
-  if (last && last.time * fps < count) result.push({ x: Math.min(count, (last.time + 1) * fps), value: last[field] });
-  return result;
+  return `M${points.join(' L')}`;
 }
 
-/** An SVG path for one series; `plotY` maps 0 (scale bottom) – 1 (top) to the viewBox. */
+/** One telemetry line on its own scale, each sample holding for the second after it; breaks at gaps. */
 export function seriesPath(
   spec: SeriesSpec,
-  profile: MotionProfile,
   telemetry: readonly TelemetrySample[],
   count: number,
   fps: number,
   plotY: (fraction: number) => number,
 ): string {
-  const line = points(spec, profile, telemetry, count, fps);
+  const field = spec.key;
+  const line = telemetry
+    .filter((sample) => sample.time * fps <= count)
+    .map((sample) => ({ x: sample.time * fps, value: sample[field] }));
+  const last = telemetry.at(-1);
+  if (last && last.time * fps < count) line.push({ x: Math.min(count, (last.time + 1) * fps), value: last[field] });
   const values = line.flatMap((point) => (point.value === null ? [] : [point.value]));
   if (!values.length) return '';
   const peak = Math.max(spec.floor, ...values.map(Math.abs));
@@ -159,15 +135,13 @@ export function seriesPath(
   return path.trim();
 }
 
-/** The value at a frame: camera motion exactly, telemetry linearly between its samples. */
+/** The telemetry value at a frame, linear between samples and held for a second after the last. */
 export function seriesValue(
   spec: SeriesSpec,
-  profile: MotionProfile,
   telemetry: readonly TelemetrySample[],
   frame: number,
   fps: number,
 ): number | null {
-  if (spec.key === 'motion') return profile.speed[frame] ?? null;
   const field = spec.key;
   const seconds = frame / fps;
   const next = telemetry.findIndex((sample) => sample.time > seconds);

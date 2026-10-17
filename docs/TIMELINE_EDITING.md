@@ -719,30 +719,31 @@ caches are ignored (use **Find smooth part** to measure again). A failed measure
 never fails preparation: the job reports it and the proxy stays usable. The original
 is identity-checked and only its subtitle track is read.
 
-Opening a recording reads its analysis, once per session. Under the range strip and
-aligned with it, a **motion timeline** plots, below a line of text: the **roughness**
-(red area: how fast the camera motion changes, % of image width per s², up to 8), the
-**tolerance** (red dashed line), the smooth stretches (blue bands, the suggested one
-strongest) and one line per chosen series. The sliders button at the start of the text
-line (**Motion timeline series**) chooses among **Camera motion** (in the picture) and
-the telemetry values this recording has; camera motion and **Flight speed** are shown
-initially. Each line is scaled to its own range (speeds from 0 to at least 16 m/s,
-vertical speed and exposure bias around zero), and the chart grows by 6 px per series
-beyond two, up to 80 px. The chevron before it (**Collapse motion timeline**) leaves a
-22 px bar with only the smooth parts and the suggestion; both choices are browser
-preferences. The text line shows the legend and the suggestion's IN–OUT timecode and
-length; while hovering it shows the timecode and the values under the pointer instead
-(telemetry interpolated between its once-per-second samples). Clicking or dragging the
-timeline scrubs like the strip. The suggestion is the longest stretch
-of at least 2 s below the tolerance (0.5–6, initially 2, a browser preference),
+Opening a recording reads its analysis, once per session. Below the range strip and the
+IN/OUT fields, a **Smooth part** section has a header row: its title (a chevron button,
+**Collapse smooth part**), the suggestion's length and IN–OUT timecode, **Use**, a
+horizontal **Tolerance** slider with its value, and **Telemetry** (**Motion timeline
+series**), a menu choosing which telemetry values this recording has get a lane,
+**Flight speed** initially. Collapsing hides everything but the title and the
+suggestion; the collapse, tolerance and telemetry choices are browser preferences.
+Under the header, aligned with the strip, the **motion timeline** stacks lanes, each
+labelled at its top-left. The 44 px image lane plots the **roughness** (red area: how
+fast the camera motion changes, % of image width per s², up to 8), the **camera motion**
+in the picture (grey line, up to 10 % of width per s) and the **tolerance** (red dashed
+line); a 30 px lane follows for each chosen telemetry value, scaled to its own range
+(speeds from 0 to at least 16 m/s, vertical speed and exposure bias around zero). The
+smooth stretches are blue bands across every lane, the suggested one strongest. While
+hovering, every lane label shows its value under the pointer (telemetry interpolated
+between its once-per-second samples) and the image lane the timecode. Clicking or
+dragging any lane scrubs like the strip. The suggestion is the longest stretch
+of at least 2 s below the tolerance (0.5–6, initially 2),
 bridging jolts shorter than 0.5 s and keeping 0.2 s clear of rough edges inside the
-recording. Drag the dashed line itself (it highlights within 6 px, and the text line
-shows its value) or the **Smooth part tolerance** handle at its right end (also with
-the arrow keys) to move it; dragging the line never scrubs. **Use**, under the play
-button, applies the suggestion as the applied source range (and shows its IN frame),
+recording. Move the **Smooth part tolerance** slider, or drag the dashed line itself (it
+highlights within 6 px, and the image lane shows its value; dragging the line never
+scrubs). **Use** applies the suggestion as the applied source range (and shows its IN frame),
 like any other range choice: no project edit, history or save; it reads **In use** once
-applied. Recordings prepared before this analysis existed show **Find smooth part**
-instead, which queues one **Smooth-part analysis** job (shown in Activity). Forward
+applied. Recordings prepared before this analysis existed show **Find smooth part** in
+the header instead, which queues one **Smooth-part analysis** job (shown in Activity). Forward
 acceleration seen straight ahead barely changes the picture, so speed changes without
 turning are not detected by the roughness; the flight speed line shows them, but does
 not change the suggestion. Flight logs are not used.

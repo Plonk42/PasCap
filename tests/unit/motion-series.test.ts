@@ -1,9 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import type { TelemetrySample } from '../../src/shared/motion-analysis.js';
-import { availableSeries, SERIES, seriesPath, seriesValue } from '../../src/web/motion-series.js';
+import {
+  availableSeries,
+  cameraMotionPath,
+  CAMERA_MOTION_MAX,
+  SERIES,
+  seriesPath,
+  seriesValue,
+} from '../../src/web/motion-series.js';
 
 const FPS = 30;
-const profile = { speed: Array.from({ length: 90 }, (_, frame) => frame / 10), roughness: new Array(90).fill(0) };
 const empty = {
   horizontalSpeed: null,
   verticalSpeed: null,
@@ -20,30 +26,30 @@ const telemetry: TelemetrySample[] = [
   { ...empty, time: 2, horizontalSpeed: 8, height: 30 },
 ];
 const spec = (key: string) => SERIES.find((candidate) => candidate.key === key)!;
+const identity = (fraction: number): number => fraction;
 
 describe('motion timeline series', () => {
-  it('offers camera motion and only the telemetry values the recording has', () => {
-    expect(availableSeries([]).map((candidate) => candidate.key)).toEqual(['motion']);
-    expect(availableSeries(telemetry).map((candidate) => candidate.key)).toEqual([
-      'motion',
-      'horizontalSpeed',
-      'height',
-    ]);
+  it('offers only the telemetry values the recording has', () => {
+    expect(availableSeries([])).toEqual([]);
+    expect(availableSeries(telemetry).map((candidate) => candidate.key)).toEqual(['horizontalSpeed', 'height']);
   });
 
-  it('reads camera motion per frame and telemetry between its samples, holding the last second', () => {
-    expect(seriesValue(spec('motion'), profile, telemetry, 25, FPS)).toBe(2.5);
-    expect(seriesValue(spec('horizontalSpeed'), profile, telemetry, 45, FPS)).toBe(6);
-    expect(seriesValue(spec('horizontalSpeed'), profile, telemetry, 89, FPS)).toBe(8);
-    expect(seriesValue(spec('height'), profile, telemetry, 15, FPS)).toBe(10);
-    expect(seriesValue(spec('height'), profile, telemetry, 45, FPS)).toBeNull();
-    expect(seriesValue(spec('height'), profile, telemetry, 65, FPS)).toBe(30);
-    expect(seriesValue(spec('horizontalSpeed'), profile, [], 10, FPS)).toBeNull();
+  it('reads telemetry between its samples, holding the last one for a second', () => {
+    expect(seriesValue(spec('horizontalSpeed'), telemetry, 45, FPS)).toBe(6);
+    expect(seriesValue(spec('horizontalSpeed'), telemetry, 89, FPS)).toBe(8);
+    expect(seriesValue(spec('height'), telemetry, 15, FPS)).toBe(10);
+    expect(seriesValue(spec('height'), telemetry, 45, FPS)).toBeNull();
+    expect(seriesValue(spec('height'), telemetry, 65, FPS)).toBe(30);
+    expect(seriesValue(spec('horizontalSpeed'), [], 10, FPS)).toBeNull();
   });
 
   it('breaks a line where a value is missing', () => {
-    const path = seriesPath(spec('height'), profile, telemetry, 90, FPS, (fraction) => 100 - fraction * 100);
-    expect(path.match(/M/g)).toHaveLength(2);
-    expect(seriesPath(spec('iso'), profile, telemetry, 90, FPS, (fraction) => fraction)).toBe('');
+    expect(seriesPath(spec('height'), telemetry, 90, FPS, identity).match(/M/g)).toHaveLength(2);
+    expect(seriesPath(spec('iso'), telemetry, 90, FPS, identity)).toBe('');
+  });
+
+  it('plots camera motion on a fixed scale so recordings compare', () => {
+    const speed = [0, CAMERA_MOTION_MAX / 2, CAMERA_MOTION_MAX];
+    expect(cameraMotionPath({ speed, roughness: [0, 0, 0] }, 3, identity)).toBe('M0.5,0.0 L1.5,0.5 L2.5,1.0');
   });
 });
