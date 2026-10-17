@@ -92,10 +92,11 @@ export function availableSeries(telemetry: readonly TelemetrySample[]): SeriesSp
 
 /** Bucket means of camera motion; `plotY` maps 0 (bottom) – 1 (top) to the viewBox. */
 export function cameraMotionPath(profile: MotionProfile, count: number, plotY: (fraction: number) => number): string {
-  const step = Math.max(1, Math.ceil(count / CHART_POINTS));
+  const frames = Math.min(count, profile.speed.length);
+  const step = Math.max(1, Math.ceil(frames / CHART_POINTS));
   const points: string[] = [];
-  for (let start = 0; start < count; start += step) {
-    const end = Math.min(count, start + step);
+  for (let start = 0; start < frames; start += step) {
+    const end = Math.min(frames, start + step);
     let sum = 0;
     for (let frame = start; frame < end; frame++) sum += profile.speed[frame]!;
     points.push(`${((start + end) / 2).toFixed(1)},${plotY(sum / (end - start) / CAMERA_MOTION_MAX).toFixed(1)}`);
