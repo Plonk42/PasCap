@@ -184,17 +184,23 @@ function laneY(fraction: number): number {
   return 94 - Math.max(0, Math.min(1, fraction)) * 56;
 }
 
+/** The proxy can have a frame fewer than the original: its last measured value covers the rest. */
+function measuredAt(values: readonly number[], frame: number): number {
+  return values[Math.min(frame, values.length - 1)]!;
+}
+
 /** At most CHART_POINTS samples: the peak roughness of each bucket. */
 function roughnessPath(profile: MotionProfile, count: number): string {
-  const step = Math.max(1, Math.ceil(count / CHART_POINTS));
+  const frames = Math.min(count, profile.roughness.length);
+  const step = Math.max(1, Math.ceil(frames / CHART_POINTS));
   const points: string[] = [];
-  for (let start = 0; start < count; start += step) {
-    const end = Math.min(count, start + step);
+  for (let start = 0; start < frames; start += step) {
+    const end = Math.min(frames, start + step);
     let peak = 0;
     for (let frame = start; frame < end; frame++) peak = Math.max(peak, profile.roughness[frame]!);
     points.push(`${((start + end) / 2).toFixed(1)},${plotY(peak / ROUGHNESS_MAX).toFixed(1)}`);
   }
-  return `M0,100 L${points.join(' L')} L${count},100 Z`;
+  return `M0,100 L${points.join(' L')} L${frames},100 Z`;
 }
 
 function readSeries(): SeriesKey[] {
@@ -292,8 +298,8 @@ function ImageLane(props: Readonly<ImageLaneProps>) {
     label = (
       <>
         <b>{formatTimecode(hover, asset.metadata.frameRate)}</b>
-        <span className="roughness">Roughness {profile.roughness[hover]!.toFixed(1)}</span>
-        <span className="series camera">Camera {profile.speed[hover]!.toFixed(1)} %/s</span>
+        <span className="roughness">Roughness {measuredAt(profile.roughness, hover).toFixed(1)}</span>
+        <span className="series camera">Camera {measuredAt(profile.speed, hover).toFixed(1)} %/s</span>
       </>
     );
   return (
