@@ -362,13 +362,17 @@
   gap: 6px;
 }
 
-.smooth-panel .smooth-use-button {
+.smooth-panel .smooth-use-button,
+.smooth-panel .smooth-add-all-button {
   display: inline-flex;
   align-items: center;
   gap: 5px;
   height: 26px;
-  margin-left: auto;
   padding-block: 0;
+}
+
+.smooth-panel .smooth-use-button {
+  margin-left: auto;
 }
 
 .smooth-use-button[data-applied]:disabled {

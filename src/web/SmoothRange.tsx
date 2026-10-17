@@ -603,6 +603,11 @@ interface PanelProps {
   view: CameraMotionView;
   disabled: boolean;
   onApply: (range: SmoothRange) => void;
+  /** Name of the video track that receives added clips. */
+  targetLayer: string;
+  addDisabled: boolean;
+  /** Adds one clip per steady range, in one Undo step. */
+  onAddAll: (ranges: readonly SmoothRange[]) => void;
   onKeyDown: (event: KeyboardEvent<HTMLElement>) => void;
 }
 
@@ -610,7 +615,18 @@ interface PanelProps {
  * The camera motion controls below the range fields: a header with the steadiest range and Use,
  * then the allowed movement and the flight data choice. Collapsing also hides the lanes.
  */
-export function CameraMotionPanel({ asset, range, smooth, view, disabled, onApply, onKeyDown }: Readonly<PanelProps>) {
+export function CameraMotionPanel({
+  asset,
+  range,
+  smooth,
+  view,
+  disabled,
+  onApply,
+  targetLayer,
+  addDisabled,
+  onAddAll,
+  onKeyDown,
+}: Readonly<PanelProps>) {
   const { profile, telemetry, ranges, savedTolerance, setTolerance, previewTolerance } = smooth;
   const toleranceId = useId();
   const { collapsed } = view;
@@ -663,19 +679,37 @@ export function CameraMotionPanel({ asset, range, smooth, view, disabled, onAppl
           <AnalysisStatus smooth={smooth} disabled={disabled} onKeyDown={onKeyDown} />
         )}
         {profile && !collapsed && (
-          <button
-            className="secondary-button small smooth-use-button"
-            type="button"
-            data-applied={applied || undefined}
-            aria-label={label}
-            title={hint}
-            disabled={disabled || !best || applied}
-            onKeyDown={onKeyDown}
-            onClick={() => best && onApply(best)}
-          >
-            <Icon name={applied ? 'check' : 'wand'} size={14} />
-            <span>{applied ? 'In use' : 'Use'}</span>
-          </button>
+          <>
+            <button
+              className="secondary-button small smooth-use-button"
+              type="button"
+              data-applied={applied || undefined}
+              aria-label={label}
+              title={hint}
+              disabled={disabled || !best || applied}
+              onKeyDown={onKeyDown}
+              onClick={() => best && onApply(best)}
+            >
+              <Icon name={applied ? 'check' : 'wand'} size={14} />
+              <span>{applied ? 'In use' : 'Use'}</span>
+            </button>
+            <button
+              className="secondary-button small smooth-add-all-button"
+              type="button"
+              aria-label={`Add all ${ranges.length} steady ranges to ${targetLayer}`}
+              title={
+                ranges.length
+                  ? `Add one clip per steady range to ${targetLayer}, in recording order`
+                  : 'No steady range of 2 s or more at this allowed movement'
+              }
+              disabled={addDisabled || !ranges.length}
+              onKeyDown={onKeyDown}
+              onClick={() => onAddAll(ranges)}
+            >
+              <Icon name="plus" size={14} />
+              <span>Add all {ranges.length}</span>
+            </button>
+          </>
         )}
       </div>
       {profile && !collapsed && (

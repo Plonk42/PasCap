@@ -53,7 +53,8 @@ interface Props {
   onFrame: (frame: number) => void;
   onRange: (range: MediaSelection) => void;
   onClose: () => void;
-  onInsert: () => string | null;
+  /** Adds the applied range, or the given ranges in one Undo step; returns the first new clip. */
+  onInsert: (ranges?: readonly MediaSelection[]) => string | null;
   onRevealClip: (id: string) => void;
   targetLayer: string;
 }
@@ -98,6 +99,10 @@ function message(cause: unknown): string {
   return cause instanceof Error ? cause.message : 'Cannot review this recording.';
 }
 
+function addedFeedback(count: number): string {
+  return count > 1 ? `${count} clips added · one per steady range` : 'Clip added · mark another range';
+}
+
 /** One video-only proxy decoder, independent of the project preview and transport. */
 export function SourceReview({
   asset,
@@ -120,7 +125,7 @@ export function SourceReview({
   const [decoderError, setDecoderError] = useState('');
   const [visible, setVisible] = useState(true);
   const [retry, setRetry] = useState(0);
-  const [lastAddedId, setLastAddedId] = useState<string | null>(null);
+  const [lastAdded, setLastAdded] = useState<{ id: string; count: number } | null>(null);
   const [rangeDraft, setRangeDraft] = useState(false);
   const smooth = useSmoothRange(asset);
   const motionView = useCameraMotionView();
@@ -131,7 +136,7 @@ export function SourceReview({
   latest.current = { frame: requestedFrame, range, onFrame };
 
   useEffect(() => {
-    setLastAddedId(null);
+    setLastAdded(null);
   }, [asset.id]);
 
   useEffect(() => {
@@ -256,13 +261,13 @@ export function SourceReview({
     }
   };
 
-  const lastAddedExcerpt = excerpts.find((excerpt) => excerpt.id === lastAddedId);
+  const lastAddedExcerpt = excerpts.find((excerpt) => excerpt.id === lastAdded?.id);
   const insertDisabled = disabled || !mediaReady(asset);
-  const insertExcerpt = (): void => {
-    setLastAddedId(null);
+  const insertExcerpt = (ranges?: readonly MediaSelection[]): void => {
+    setLastAdded(null);
     if (insertDisabled) return;
-    const id = onInsert();
-    if (id !== null) setLastAddedId(id);
+    const id = onInsert(ranges);
+    if (id !== null) setLastAdded({ id, count: ranges?.length ?? 1 });
   };
 
   return (
@@ -298,7 +303,7 @@ export function SourceReview({
           title={`Append this range to ${targetLayer} as a new, independent clip; omitted source frames remain available`}
           disabled={insertDisabled}
           onKeyDown={keyboard}
-          onClick={insertExcerpt}
+          onClick={() => insertExcerpt()}
         >
           <Icon name="plus" size={15} />
           Add clip {sourceSeconds(range.sourceOut - range.sourceIn)}
@@ -409,6 +414,15 @@ export function SourceReview({
             scrub(suggestion.sourceIn);
             onRange({ mediaId: asset.id, ...suggestion });
           }}
+          targetLayer={targetLayer}
+          addDisabled={insertDisabled || rangeDraft}
+          onAddAll={(steady) =>
+            insertExcerpt(
+              [...steady]
+                .sort((a, b) => a.sourceIn - b.sourceIn)
+                .map((part) => ({ mediaId: asset.id, sourceIn: part.sourceIn, sourceOut: part.sourceOut })),
+            )
+          }
           onKeyDown={keyboard}
         />
       )}
@@ -418,7 +432,7 @@ export function SourceReview({
         aria-atomic="true"
         data-added-clip-id={lastAddedExcerpt?.id}
       >
-        {lastAddedExcerpt && 'Clip added · mark another range'}
+        {lastAddedExcerpt && addedFeedback(lastAdded?.count ?? 1)}
       </output>
     </section>
   );

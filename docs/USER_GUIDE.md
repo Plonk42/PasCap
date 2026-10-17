@@ -145,7 +145,9 @@ sudden angle or speed changes), camera movement (white line) and the dashed allo
 movement (drag it); the green bands mark steady ranges, the suggested one strongest.
 Hover to read the values at that moment; click or drag to scrub. Below the IN/OUT
 fields, **Camera motion** gives the **Steadiest range** length and IN–OUT, and **Use**
-sets IN and OUT to it. Move **Allowed movement** left for only very steady footage,
+sets IN and OUT to it. **Add all N** adds one clip per steady range to the target video
+track, in recording order and in one Undo step, without changing the applied range.
+Move **Allowed movement** left for only very steady footage,
 right to accept more movement. **Flight data** adds or removes lanes: flight and
 vertical speed, height, distance from home, ISO, shutter speed, exposure bias and digital
 zoom, for example to spot a climb or an exposure jump. The chevron hides the lanes and

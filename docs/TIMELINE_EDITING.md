@@ -746,7 +746,11 @@ edges inside the recording. Move the **Allowed movement** slider, or drag the da
 itself (it highlights within 6 px, and the image lane shows its value; dragging the line
 never scrubs). **Use** applies the suggestion as the applied source range (and shows its
 IN frame), like any other range choice: no project edit, history or save; it reads **In
-use** once applied. Recordings prepared before this analysis existed show **Analyse
+use** once applied. **Add all N** (**Add all N steady ranges to** the target track)
+inserts one independent clip per steady range at the current allowed movement, in
+recording order, exactly like **Add clip** with that range: Ripple-on tracks append,
+positioned tracks start at the playhead, and the whole batch is one Undo step. It leaves
+the applied source range unchanged. Recordings prepared before this analysis existed show **Analyse
 camera motion** in the header instead, which queues one **Camera motion analysis** job
 (shown in Activity). Forward
 acceleration seen straight ahead barely changes the picture, so speed changes without

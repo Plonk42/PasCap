@@ -1985,6 +1985,32 @@ test('the motion timeline shows jolts, allowed movement and the steadiest range;
   await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
 });
 
+test('Add all adds one clip per steady range to the target track in one Undo step', async ({ page }) => {
+  const asset = assets[0]!;
+  const fps = 30000 / 1001;
+  const analysis = jerkyThenSteady(asset);
+  const steady = smoothRanges(motionProfile(analysis, fps).roughness, SMOOTH_TOLERANCE.initial, fps);
+  await page.route(`**/api/media/${asset.id}/motion`, (route) => route.fulfill({ json: { analysis } }));
+  const before = await current(page);
+  await page.getByRole('button', { name: 'Review pattern-a.mp4', exact: true }).click();
+  const addAll = page.getByRole('button', { name: /^Add all \d+ steady ranges to / });
+  await expect(addAll).toHaveText(`Add all ${steady.length}`);
+  await addAll.click();
+  await expect(page.locator('.source-add-feedback')).toHaveAttribute('data-added-clip-id', /.+/);
+  const after = await current(page);
+  const added = after.clips.filter((item) => !before.clips.some((existing) => existing.id === item.id));
+  expect(added.map(({ mediaId, sourceIn, sourceOut }) => ({ mediaId, sourceIn, sourceOut }))).toEqual(
+    [...steady]
+      .sort((a, b) => a.sourceIn - b.sourceIn)
+      .map(({ sourceIn, sourceOut }) => ({ mediaId: asset.id, sourceIn, sourceOut })),
+  );
+  // The applied source range is untouched: Add all inserts the steady ranges, it does not apply them.
+  await expect(page.locator('.source-range-strip')).toHaveAttribute('data-source-in', '0');
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect.poll(async () => (await current(page)).clips.length).toBe(before.clips.length);
+  await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
+});
+
 test('a proxy prepared before the analysis offers Analyse camera motion, which runs one background job', async ({
   page,
 }) => {
