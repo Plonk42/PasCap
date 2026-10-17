@@ -3,10 +3,12 @@ import {
   MOTION_ANALYSIS_VERSION,
   MOTION_HEIGHT,
   MOTION_WIDTH,
+  type FlightSpeedSample,
   type MotionAnalysis,
 } from '../shared/motion-analysis.js';
 import { whileSerial } from '../shared/serial.js';
 import { ServiceError } from './errors.js';
+import { runProcess } from './process.js';
 import { RawFrameReader } from './raw-process.js';
 
 const N = 64;
@@ -245,6 +247,42 @@ export function blockSpectra(frame: Uint8Array): Spectrum[] {
   return BLOCKS.map((block) => spectrum(frame, block.cx, block.cy));
 }
 
+/** DJI telemetry subtitles: one block per second, e.g. "… H 26.80m, H.S 10.24m/s, V.S -0.00m/s". */
+export function parseFlightSpeed(srt: string): FlightSpeedSample[] {
+  const samples: FlightSpeedSample[] = [];
+  for (const block of srt.split(/\r?\n\r?\n/)) {
+    const time = /^(\d{2}):(\d{2}):(\d{2})[,.](\d{3}) -->/m.exec(block);
+    const speed = /\bH\.S (-?\d+(?:\.\d+)?)m\/s/.exec(block);
+    if (!time || !speed) continue;
+    const [hours, minutes, seconds, milliseconds] = time.slice(1).map(Number) as [number, number, number, number];
+    samples.push({
+      time: hours * 3600 + minutes * 60 + seconds + milliseconds / 1000,
+      value: Math.abs(Number(speed[1])),
+    });
+  }
+  return samples;
+}
+
+/** Reads only the original's first subtitle track; recordings without one have no flight speed. */
+export async function readFlightSpeed(
+  tools: { ffmpeg: string; ffprobe: string },
+  source: string,
+  signal: AbortSignal,
+): Promise<FlightSpeedSample[]> {
+  const streams = await runProcess(
+    tools.ffprobe,
+    ['-v', 'error', '-select_streams', 's', '-show_entries', 'stream=index', '-of', 'csv=p=0', source],
+    { signal },
+  );
+  if (!streams.toString('utf8').trim()) return [];
+  const srt = await runProcess(
+    tools.ffmpeg,
+    ['-hide_banner', '-loglevel', 'error', '-nostdin', '-i', source, '-map', '0:s:0', '-f', 'srt', 'pipe:1'],
+    { signal, maxBytes: 16 * 1024 * 1024 },
+  );
+  return parseFlightSpeed(srt.toString('utf8'));
+}
+
 /** Measures every proxy frame against the previous one; the proxy has one frame per source frame. */
 export async function analyseProxy(
   ffmpeg: string,
@@ -253,7 +291,7 @@ export async function analyseProxy(
   verifiedAt: string,
   signal: AbortSignal,
   progress: (fraction: number) => void,
-): Promise<MotionAnalysis> {
+): Promise<Omit<MotionAnalysis, 'flightSpeed'>> {
   const child = spawn(
     ffmpeg,
     [
@@ -289,7 +327,7 @@ export async function analyseProxy(
   const cancelled = (): void => {
     if (signal.aborted) throw new ServiceError('Job cancelled.', 499);
   };
-  const analysis: MotionAnalysis = {
+  const analysis: Omit<MotionAnalysis, 'flightSpeed'> = {
     version: MOTION_ANALYSIS_VERSION,
     verifiedAt,
     frameCount,

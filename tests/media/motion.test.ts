@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -33,8 +33,17 @@ async function fixture() {
   return { sources, ...service };
 }
 
-/** 2 s held still, then a steady 4 px/frame pan to the right across a textured synthetic pattern. */
+/** 2 s held still, then a steady 4 px/frame pan to the right, with DJI-style telemetry subtitles. */
 async function pan(config: ServiceConfig, filename: string): Promise<void> {
+  const telemetry = `${filename}.srt`;
+  await writeFile(
+    telemetry,
+    Array.from(
+      { length: 7 },
+      (_, second) =>
+        `${second + 1}\n00:00:0${second},000 --> 00:00:0${second + 1},000\nF/1.7, ISO 100, H 20.00m, H.S ${second < 2 ? '0.00' : '5.50'}m/s, V.S 0.00m/s\n`,
+    ).join('\n'),
+  );
   await runProcess(config.ffmpeg, [
     '-hide_banner',
     '-loglevel',
@@ -45,6 +54,14 @@ async function pan(config: ServiceConfig, filename: string): Promise<void> {
     'lavfi',
     '-i',
     "color=c=gray:s=1280x720:r=30000/1001,format=yuv420p,geq=lum='128+50*sin(X/7.3+Y/31)+40*sin(Y/5.1-X/23)+30*sin((X+Y)/13.7)':cb=128:cr=128",
+    '-i',
+    telemetry,
+    '-map',
+    '0:v',
+    '-map',
+    '1:s',
+    '-c:s',
+    'mov_text',
     '-frames:v',
     '210',
     '-vf',
@@ -107,6 +124,9 @@ describe.skipIf(!enabled)('smooth-part motion analysis · disposable native fixt
     expect(Math.abs(median(analysis.tx.slice(5, 55)))).toBeLessThan(0.1);
     expect(median(analysis.tx.slice(70, 205))).toBeCloseTo(-2, 0);
     expect(Math.abs(median(analysis.ty.slice(70, 205)))).toBeLessThan(0.2);
+    expect(analysis.flightSpeed).toEqual(
+      Array.from({ length: 7 }, (_, second) => ({ time: second, value: second < 2 ? 0 : 5.5 })),
+    );
     const cache = library.motionPath(library.get(id));
     expect(JSON.parse(await readFile(cache, 'utf8'))).toEqual(analysis);
 

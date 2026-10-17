@@ -1805,6 +1805,9 @@ test('missing source snapshots degrade explicitly without changing the track or 
   expect(memory.saves).toBe(0);
 });
 
+/** Where the chart draws a tolerance: its plot spans the lower 70 % of the 0–100 viewBox, up to 8. */
+const lineY = (tolerance: number): number => 100 - (tolerance / 8) * 70;
+
 /** A jerky first second of reframing, then a steady pan, for the 120-frame fixture. */
 function jerkyThenSteady(asset: MediaAsset): MotionAnalysis {
   const tx = Array.from({ length: 120 }, (_, frame) => {
@@ -1820,6 +1823,7 @@ function jerkyThenSteady(asset: MediaAsset): MotionAnalysis {
     ty: still,
     zoom: still,
     rotation: still,
+    flightSpeed: [0, 1, 2, 3].map((time) => ({ time, value: 2 + 2 * time })),
   };
 }
 
@@ -1850,7 +1854,7 @@ test('the motion timeline shows roughness, tolerance and the smooth part; Use ap
   await expect(band).toHaveAttribute('x', String(steady.sourceIn));
   await expect(band).toHaveAttribute('width', String(steady.sourceOut - steady.sourceIn));
   const tolerance = timeline.locator('.source-motion-tolerance');
-  await expect(tolerance).toHaveAttribute('y1', String(100 - (SMOOTH_TOLERANCE.initial / 8) * 96));
+  await expect(tolerance).toHaveAttribute('y1', String(lineY(SMOOTH_TOLERANCE.initial)));
   // The timeline lines up with the range strip above it.
   const [stripBox, timelineBox] = await Promise.all([
     page.locator('.source-range-strip').boundingBox(),
@@ -1875,22 +1879,43 @@ test('the motion timeline shows roughness, tolerance and the smooth part; Use ap
 
   await page.getByRole('slider', { name: 'Smooth part tolerance', exact: true }).fill(String(SMOOTH_TOLERANCE.max));
   await expect(row).toHaveAttribute('data-smooth-in', String(tolerant.sourceIn));
-  await expect(tolerance).toHaveAttribute('y1', String(100 - (SMOOTH_TOLERANCE.max / 8) * 96));
+  await expect(tolerance).toHaveAttribute('y1', String(lineY(SMOOTH_TOLERANCE.max)));
   await expect(use).toBeEnabled();
   await expect(strip).toHaveAttribute('data-source-in', String(steady.sourceIn));
 
-  // Clicking the timeline scrubs the source like the strip does.
-  await timeline.click({ position: { x: timelineBox!.width * 0.75, y: timelineBox!.height / 2 } });
+  // Clicking the timeline away from the dashed line scrubs the source like the strip does.
+  await timeline.click({ position: { x: timelineBox!.width * 0.75, y: timelineBox!.height * 0.85 } });
   await expect
     .poll(async () => Number(await page.locator('.source-preview').getAttribute('data-source-frame')))
     .toBeGreaterThanOrEqual(88);
   expect(Number(await page.locator('.source-preview').getAttribute('data-source-frame'))).toBeLessThanOrEqual(91);
+  // Hovering reads the values there, including the speed the drone recorded (8 m/s at 3 s).
+  const readout = timeline.locator('.source-motion-readout');
+  await expect(readout).toContainText('00:00:03:00');
+  await expect(readout).toContainText('Flight 8.0 m/s');
+  await page.mouse.move(0, 0);
+  await expect(readout).toHaveText(/^RoughnessCamera motionFlight speed$/);
 
   // The analysis is kept for this session: reopening needs no new request.
   await page.getByRole('button', { name: 'Close source review', exact: true }).click();
   await page.getByRole('button', { name: 'Review pattern-a.mp4', exact: true }).click();
   await expect(row).toHaveAttribute('data-smooth-in', String(tolerant.sourceIn));
   expect(requests).toEqual(['GET']);
+
+  // The dashed line itself is a handle: dragging it to the bottom asks for the steadiest footage.
+  const frameBefore = await page.locator('.source-preview').getAttribute('data-source-frame');
+  const box = (await timeline.boundingBox())!;
+  const lineAt = box.y + (lineY(SMOOTH_TOLERANCE.max) / 100) * box.height;
+  await page.mouse.move(box.x + box.width * 0.4, lineAt);
+  await expect(timeline).toHaveAttribute('data-near-tolerance', 'true');
+  await expect(timeline.locator('.source-motion-readout')).toContainText('Tolerance 6.0');
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width * 0.4, box.y + box.height + 20, { steps: 4 });
+  await page.mouse.up();
+  const slider = page.getByRole('slider', { name: 'Smooth part tolerance', exact: true });
+  await expect(slider).toHaveValue(String(SMOOTH_TOLERANCE.min));
+  await expect(tolerance).toHaveAttribute('y1', String(lineY(SMOOTH_TOLERANCE.min)));
+  await expect(page.locator('.source-preview')).toHaveAttribute('data-source-frame', frameBefore!);
   expect(await current(page)).toEqual(before);
   await flush(page);
   expect(memory.saves).toBe(0);
