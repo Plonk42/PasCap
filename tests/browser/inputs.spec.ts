@@ -91,17 +91,17 @@ test('Enter and blur each commit once, while Escape and unchanged drafts do not 
   await field.press('Enter');
   await field.press('Tab');
   await undo.click();
-  await expect(field).toHaveValue('00:00:00:15');
+  await expect(field).toHaveValue('00:00:15');
   await expect(undo).toBeDisabled();
 
-  await field.fill('00:00:01:00');
+  await field.fill('00:01:00');
   await field.press('Tab');
   expect((await currentProject(page)).clips[0]?.sourceIn).toBe(30);
   await undo.click();
   await expect(undo).toBeDisabled();
   await field.fill('42');
   await field.press('Escape');
-  await expect(field).toHaveValue('00:00:00:15');
+  await expect(field).toHaveValue('00:00:15');
   await expect(field).toBeFocused();
   await field.fill('15.0');
   await field.press('Enter');
@@ -114,18 +114,18 @@ test('empty, fractional, out-of-bounds and conflicting timing drafts stay editab
   page,
 }) => {
   const field = page.getByRole('textbox', { name: 'Source IN frame', exact: true });
-  for (const draft of ['', '15.5', '-1', '999', '00:00:00:30', '00:60:00:00', 'not a frame']) {
+  for (const draft of ['', '15.5', '-1', '999', '00:00:30', '00:00:00:00', 'not a frame']) {
     await field.fill(draft);
     await field.press('Enter');
     await expect(field).toHaveAttribute('aria-invalid', 'true');
     await expect(field).toHaveValue(draft);
     const error = field.locator('..').getByRole('alert');
-    await expect(error).toContainText('Escape to restore 00:00:00:15');
+    await expect(error).toContainText('Escape to restore 00:00:15');
     expect(await field.getAttribute('aria-errormessage')).toBe(await error.getAttribute('id'));
     expect((await currentProject(page)).clips[0]?.sourceIn).toBe(15);
     await field.press('Escape');
     await expect(field).toHaveAttribute('aria-invalid', 'false');
-    await expect(field).toHaveValue('00:00:00:15');
+    await expect(field).toHaveValue('00:00:15');
   }
   const out = page.getByRole('textbox', { name: 'Source OUT frame', exact: true });
   await out.fill('999');

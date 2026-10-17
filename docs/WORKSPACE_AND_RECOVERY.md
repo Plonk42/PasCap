@@ -234,8 +234,9 @@ seeks, changes history or saves; explicitly clicking away from a numeric field s
 has the ordinary one-commit blur behavior. Editable section/keyframe/music/import controls,
 storage/render breakdowns and real warning/error lists remain normal disclosures.
 
-The preview timecode accepts nominal 30 fps NDF **HH:MM:SS:FF** or an integer
-timeline frame; it is not rounded wall-clock seconds. Out-of-range/invalid input
+The preview timecode accepts nominal 30 fps NDF **MM:SS:FF** or an integer
+timeline frame; it is not rounded wall-clock seconds. Every timecode in the editor
+omits hours: minutes keep counting past one hour (61:00:29). Out-of-range/invalid input
 stays editable with an error and never seeks. Escape returns to the current display.
 
 ### Preview original image
@@ -286,7 +287,7 @@ unchanged draft creates no undo step, and Enter then blur cannot submit it twice
 
 **Clip → Range** uses one full-original bar with hatched omitted footage
 and draggable IN/OUT handles. Exact **Source IN / OUT** text fields below its ends
-display **HH:MM:SS:FF** (30 fps NDF) and accept whole original frames or timecode
+display **MM:SS:FF** (30 fps NDF) and accept whole original frames or timecode
 on Enter/blur; invalid drafts remain editable with errors and Escape restores.
 No duplicate section duration, original-length, source-frame or recoverable
 head/tail labels accompany it; **Restore full recording** remains.

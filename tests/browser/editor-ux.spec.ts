@@ -337,7 +337,7 @@ test('hiding the deferred inspector applies a blur draft once and retains its se
   expect((await current(page)).clips[0]!.sourceIn).toBe(5);
   await toggle.evaluate((button) => (button as HTMLButtonElement).click());
   await expect(input).toBeVisible();
-  await expect(input).toHaveValue('00:00:00:05');
+  await expect(input).toHaveValue('00:00:05');
   await input.press('Enter');
   expect((await current(page)).clips[0]!.sourceIn).toBe(5);
   await page.getByRole('button', { name: 'Undo', exact: true }).click();

@@ -294,9 +294,9 @@ test('drag handles trim non-destructively, restore both ends, ripple and undo on
   expect(project.clips[0]).toMatchObject({ sourceIn: 45, sourceOut: 105 });
   expect(calculateLayout(project).clips[1]?.start).toBe(42);
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
-  await expect(page.getByRole('textbox', { name: 'Source IN frame' })).toHaveValue('00:00:00:15');
+  await expect(page.getByRole('textbox', { name: 'Source IN frame' })).toHaveValue('00:00:15');
   await page.getByRole('button', { name: 'Redo', exact: true }).click();
-  await expect(page.getByRole('textbox', { name: 'Source IN frame' })).toHaveValue('00:00:01:15');
+  await expect(page.getByRole('textbox', { name: 'Source IN frame' })).toHaveValue('00:01:15');
   await dragTrim(page, 'clip-a', 'out', -15);
   project = projectSchema.parse(await page.evaluate(() => window.pascapLab!.project()));
   expect(project.clips[0]).toMatchObject({ sourceIn: 45, sourceOut: 90 });
@@ -308,8 +308,8 @@ test('drag handles trim non-destructively, restore both ends, ripple and undo on
   await page.evaluate(() => window.pascapLab!.flush());
   await page.reload();
   await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
-  await expect(page.getByRole('textbox', { name: 'Source OUT frame' })).toHaveValue('00:00:04:00');
-  await expect(page.getByRole('textbox', { name: 'Source IN frame' })).toHaveValue('00:00:00:00');
+  await expect(page.getByRole('textbox', { name: 'Source OUT frame' })).toHaveValue('00:04:00');
+  await expect(page.getByRole('textbox', { name: 'Source IN frame' })).toHaveValue('00:00:00');
 });
 
 test('trim drafts do not change the committed project or autosave; Escape cancels', async ({ page }) => {
@@ -323,11 +323,11 @@ test('trim drafts do not change the committed project or autosave; Escape cancel
   await page.mouse.move(box.x + 5, box.y + 25);
   await page.mouse.down();
   await page.mouse.move(box.x + 5 + 30 * scale, box.y + 25, { steps: 6 });
-  await expect(page.getByRole('textbox', { name: 'Source IN frame' })).toHaveValue('00:00:01:15');
+  await expect(page.getByRole('textbox', { name: 'Source IN frame' })).toHaveValue('00:01:15');
   expect(await page.evaluate(() => window.pascapLab!.project()!.clips[0]!.sourceIn)).toBe(15);
   await page.keyboard.press('Escape');
   await page.mouse.up();
-  await expect(page.getByRole('textbox', { name: 'Source IN frame' })).toHaveValue('00:00:00:15');
+  await expect(page.getByRole('textbox', { name: 'Source IN frame' })).toHaveValue('00:00:15');
   expect(saves).toBe(0);
   await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
 });
@@ -912,9 +912,9 @@ test('pointer cancellation restores the committed source range', async ({ page }
   await page.mouse.move(box.x + 5, box.y + 20);
   await page.mouse.down();
   await page.mouse.move(box.x + 5 + 20 * scale, box.y + 20, { steps: 4 });
-  await expect(page.getByRole('textbox', { name: 'Source IN frame' })).toHaveValue('00:00:01:05');
+  await expect(page.getByRole('textbox', { name: 'Source IN frame' })).toHaveValue('00:01:05');
   await handle.dispatchEvent('pointercancel');
   await page.mouse.up();
-  await expect(page.getByRole('textbox', { name: 'Source IN frame' })).toHaveValue('00:00:00:15');
+  await expect(page.getByRole('textbox', { name: 'Source IN frame' })).toHaveValue('00:00:15');
   await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
 });

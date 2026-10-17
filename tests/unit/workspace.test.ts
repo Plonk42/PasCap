@@ -55,15 +55,15 @@ describe('workspace bounds remain editor-only and fit desktop sizes', () => {
 });
 describe('editable non-drop-frame timecode', () => {
   it.each([
-    ['00:00:00:00', 0],
-    ['00:00:01:00', 30],
-    ['00:01:00:29', 1829],
-    ['01:00:00:00', 108000],
+    ['00:00:00', 0],
+    ['00:01:00', 30],
+    ['01:00:29', 1829],
+    ['60:00:00', 108000],
     [' 165 ', 165],
   ])('parses %s to exact nominal frame %s', (value, frame) => {
     expect(parseTimecode(value, 200_000)).toEqual({ frame });
   });
-  it.each(['', '1.5', '-1', '00:60:00:00', '00:00:60:00', '00:00:01:30', '01:00', 'garbage'])(
+  it.each(['', '1.5', '-1', '01:00:00:00', '00:60:00', '00:01:30', '01:00', 'garbage'])(
     'rejects invalid timecode %s',
     (value) => {
       expect(parseTimecode(value, 200)).toHaveProperty('error');
