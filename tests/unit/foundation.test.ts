@@ -28,7 +28,7 @@ describe('rational frame contract', () => {
     expect(sameRate(parseRate('60000/2002'), PROJECT_FPS)).toBe(true);
     expect(() => parseRate('0/0')).toThrow();
     expect(() => parseRate('29.97')).toThrow();
-    expect(formatTimecode(109_829)).toBe('01:01:00:29');
+    expect(formatTimecode(109_829)).toBe('61:00:29');
   });
 });
 

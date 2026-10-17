@@ -3,6 +3,13 @@ import { audioAssetSchema, type AudioAsset } from '../../src/shared/audio.js';
 import { applyCommand } from '../../src/shared/commands.js';
 import { mediaAssetSchema, type MediaAsset } from '../../src/shared/media.js';
 import {
+  MOTION_ANALYSIS_VERSION,
+  motionProfile,
+  SMOOTH_TOLERANCE,
+  smoothRanges,
+  type MotionAnalysis,
+} from '../../src/shared/motion-analysis.js';
+import {
   createClip,
   createLayer,
   createProject,
@@ -73,7 +80,7 @@ test.beforeEach(async ({ page, request }) => {
       await route.fulfill({ json: reads[pathname] });
       return;
     }
-    const media = /^\/api\/media\/([^/]+)\/(?:proxy|thumbnail\/\d+)$/.exec(pathname);
+    const media = /^\/api\/media\/([^/]+)\/(?:proxy|thumbnail\/\d+|motion)$/.exec(pathname);
     if (method === 'GET' && media && assets.some((asset) => asset.id === media[1])) {
       await route.continue();
       return;
@@ -355,7 +362,7 @@ async function beginHeadTrim(page: Page): Promise<{ origin: number; scrollLeft: 
     .toBe(scrollLeft + shift);
   await expect(page.locator('.timeline-surface')).toHaveAttribute('data-leading', String(32 + shift));
   await expect.poll(() => frameOrigin(page)).toBe(origin);
-  await expect(page.getByRole('textbox', { name: 'Source IN frame', exact: true })).toHaveValue('00:00:03:00');
+  await expect(page.getByRole('textbox', { name: 'Source IN frame', exact: true })).toHaveValue('00:03:00');
   return { origin, scrollLeft, edgeX: viewport.x + 2, y };
 }
 
@@ -1089,7 +1096,7 @@ test('missing, outside and empty ranges are rejected; click and Escape restore; 
   await page.mouse.down();
   await page.mouse.move(await rulerX(75), await rulerY(), { steps: 3 });
   await expect(rulerRange(page)).toHaveAttribute('data-range-out', '75');
-  await expect(page.locator('.timeline-ruler-range-readout')).toHaveText('00:00:02:00 – 00:00:02:15');
+  await expect(page.locator('.timeline-ruler-range-readout')).toHaveText('00:02:00 – 00:02:15');
   await page.mouse.move(await rulerX(60), await rulerY(), { steps: 3 });
   await page.mouse.up();
   await page.keyboard.up('Alt');
@@ -1098,7 +1105,7 @@ test('missing, outside and empty ranges are rejected; click and Escape restore; 
   // Escape cancels a drag, restoring the previous range and playhead without an edit.
   await markRange(page, 20, 31);
   await expectCutOverlay(page, 20, 31);
-  await expect(page.locator('.timeline-ruler-range-readout')).toHaveText('00:00:00:20 – 00:00:01:01');
+  await expect(page.locator('.timeline-ruler-range-readout')).toHaveText('00:00:20 – 00:01:01');
   await page.keyboard.down('Alt');
   await page.mouse.move(await rulerX(60), await rulerY());
   await page.mouse.down();
@@ -1124,13 +1131,13 @@ test('missing, outside and empty ranges are rejected; click and Escape restore; 
   await expectCutOverlay(page, 20, 31);
   const keys = ['i', 'o', 'q', 'w', 's', 'Shift+Delete'];
   const input = page.getByRole('textbox', { name: 'Source IN frame', exact: true });
-  await input.fill('00:00:00:15');
+  await input.fill('00:00:15');
   await input.press('End');
   for (const key of keys) await input.press(key);
-  await expect(input).toHaveValue('00:00:00:15ioqws');
+  await expect(input).toHaveValue('00:00:15ioqws');
   expect(await current(page)).toEqual(before);
   await input.press('Escape');
-  await expect(input).toHaveValue('00:00:00:15');
+  await expect(input).toHaveValue('00:00:15');
   await expectCutOverlay(page, 20, 31);
   expect(await current(page)).toEqual(before);
   const search = page.getByRole('textbox', { name: 'Search media', exact: true });
@@ -1315,7 +1322,7 @@ test('native first-clip edge autoscroll restores a head longer than 32px without
   await page.mouse.move(drag.edgeX, drag.y, { steps: 4 });
   await expect
     .poll(() => page.getByRole('textbox', { name: 'Source IN frame', exact: true }).inputValue())
-    .toBe('00:00:00:00');
+    .toBe('00:00:00');
   await expect(clip(page, 'a').locator('[data-trim-handle="in"]')).toHaveAttribute('aria-valuenow', '0');
   expect(await current(page)).toEqual(before); // Inspector shows a draft; committed sourceIn is still 90.
   await flush(page);
@@ -1356,7 +1363,7 @@ test('Escape and pointercancel discard native autoscrolled head drafts and resto
     await page.mouse.move(drag.edgeX, drag.y, { steps: 4 });
     await expect
       .poll(() => page.getByRole('textbox', { name: 'Source IN frame', exact: true }).inputValue())
-      .toBe('00:00:00:00');
+      .toBe('00:00:00');
     expect(await current(page)).toEqual(before);
     if (cancellation === 'Escape') await page.keyboard.press('Escape');
     else
@@ -1366,7 +1373,7 @@ test('Escape and pointercancel discard native autoscrolled head drafts and resto
     await page.mouse.up();
     await expect(page.locator('.timeline-surface')).not.toHaveClass(/trim-drafting/);
     await expect(page.locator('.timeline-surface')).toHaveAttribute('data-leading', '32');
-    await expect(page.getByRole('textbox', { name: 'Source IN frame', exact: true })).toHaveValue('00:00:03:00');
+    await expect(page.getByRole('textbox', { name: 'Source IN frame', exact: true })).toHaveValue('00:03:00');
     await expect
       .poll(() => page.locator('.timeline-scroll').evaluate((element) => element.scrollLeft))
       .toBe(drag.scrollLeft);
@@ -1795,6 +1802,261 @@ test('missing source snapshots degrade explicitly without changing the track or 
   await expect(strip).toHaveAttribute('data-source-in', '10');
   await flush(page);
   expect(requests).toEqual([]);
+  expect(memory.saves).toBe(0);
+});
+
+/** Where the chart draws a tolerance: its plot spans the lower 70 % of the 0–100 viewBox, up to 8. */
+const lineY = (tolerance: number): number => 100 - (tolerance / 8) * 72;
+
+/** A jerky first second of reframing, then a steady pan, for the 120-frame fixture. */
+function jerkyThenSteady(asset: MediaAsset): MotionAnalysis {
+  const tx = Array.from({ length: 120 }, (_, frame) => {
+    if (frame === 0) return null;
+    return frame < 30 ? 3 * Math.sin(frame / 2) : 1.5;
+  });
+  const still = tx.map((value) => (value === null ? null : 0));
+  return {
+    version: MOTION_ANALYSIS_VERSION,
+    verifiedAt: asset.prepared!.verification.verifiedAt,
+    frameCount: 120,
+    tx,
+    ty: still,
+    zoom: still,
+    rotation: still,
+    telemetry: [0, 1, 2, 3].map((time) => ({
+      time,
+      horizontalSpeed: 2 + 2 * time,
+      verticalSpeed: 0,
+      height: 30 + 5 * time,
+      distance: null,
+      iso: 100,
+      shutter: null,
+      ev: null,
+      digitalZoom: null,
+    })),
+  };
+}
+
+test('the motion timeline shows jolts, allowed movement and the steadiest range; Use applies it as IN/OUT', async ({
+  page,
+}) => {
+  const asset = assets[0]!;
+  const fps = 30000 / 1001;
+  const analysis = jerkyThenSteady(asset);
+  const profile = motionProfile(analysis, fps);
+  const steady = smoothRanges(profile, SMOOTH_TOLERANCE.initial, fps)[0]!;
+  const tolerant = smoothRanges(profile, SMOOTH_TOLERANCE.max, fps)[0]!;
+  const seconds = (part: { sourceIn: number; sourceOut: number }): string =>
+    `${((part.sourceOut - part.sourceIn) / fps).toFixed(2)} s`;
+  expect(steady.sourceIn).toBeGreaterThan(20);
+  expect(tolerant.sourceIn).toBeLessThan(steady.sourceIn);
+  const requests: string[] = [];
+  await page.route(`**/api/media/${asset.id}/motion`, async (route) => {
+    requests.push(route.request().method());
+    await route.fulfill({ json: { analysis } });
+  });
+  const before = await current(page);
+  await page.getByRole('button', { name: 'Review pattern-a.mp4', exact: true }).click();
+  const row = page.locator('.smooth-panel');
+  await expect(row).toHaveAttribute('data-smooth-in', String(steady.sourceIn));
+  await expect(row).toHaveAttribute('data-smooth-out', String(steady.sourceOut));
+  await expect(page.getByRole('button', { name: 'Analyse camera motion', exact: true })).toHaveCount(0);
+  const timeline = page.locator('.source-motion');
+  const imageLane = timeline.locator('[data-lane="image"]');
+  const band = imageLane.locator('.source-motion-band:not(.alternative)');
+  await expect(band).toHaveAttribute('x', String(steady.sourceIn));
+  await expect(band).toHaveAttribute('width', String(steady.sourceOut - steady.sourceIn));
+  const tolerance = timeline.locator('.source-motion-tolerance');
+  await expect(tolerance).toHaveAttribute('y1', String(lineY(SMOOTH_TOLERANCE.initial)));
+  // The lanes sit directly under the range strip, in its column, and its playhead runs through them.
+  const [stripBox, timelineBox, headBox] = await Promise.all([
+    page.locator('.source-range-strip').boundingBox(),
+    timeline.boundingBox(),
+    page.locator('.source-range-head').boundingBox(),
+  ]);
+  expect(timelineBox!.x).toBeCloseTo(stripBox!.x, 0);
+  expect(timelineBox!.width).toBeCloseTo(stripBox!.width, 0);
+  expect(timelineBox!.y - (stripBox!.y + stripBox!.height)).toBeLessThan(8);
+  expect(headBox!.y).toBeLessThan(stripBox!.y);
+  expect(headBox!.y + headBox!.height).toBeCloseTo(timelineBox!.y + timelineBox!.height, 0);
+
+  const use = page.getByRole('button', { name: /^Use steadiest range / });
+  await expect(row.locator('.smooth-panel-summary')).toContainText(seconds(steady));
+  await use.click();
+  const strip = page.locator('.source-range-strip');
+  await expect(strip).toHaveAttribute('data-source-in', String(steady.sourceIn));
+  await expect(strip).toHaveAttribute('data-source-out', String(steady.sourceOut));
+  await expect(page.locator('.source-preview')).toHaveAttribute('data-source-frame', String(steady.sourceIn));
+  await expect(use).toBeDisabled();
+  await expect(use).toHaveText('In use');
+  // Dragging the slider previews the suggestion before release; Escape restores it.
+  const allowed = page.getByRole('slider', { name: 'Allowed movement', exact: true });
+  const allowedBox = (await allowed.boundingBox())!;
+  await page.mouse.move(allowedBox.x + allowedBox.width * 0.25, allowedBox.y + allowedBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(allowedBox.x + allowedBox.width + 20, allowedBox.y + allowedBox.height / 2, { steps: 4 });
+  await expect(tolerance).toHaveAttribute('y1', String(lineY(SMOOTH_TOLERANCE.max)));
+  await expect(row).toHaveAttribute('data-smooth-in', String(tolerant.sourceIn));
+  await page.keyboard.press('Escape');
+  await page.mouse.up();
+  await expect(tolerance).toHaveAttribute('y1', String(lineY(SMOOTH_TOLERANCE.initial)));
+  await expect(row).toHaveAttribute('data-smooth-in', String(steady.sourceIn));
+  // The lanes hatch the footage outside IN/OUT like the strip.
+  const omitted = await timeline
+    .locator('.source-motion-omitted')
+    .evaluateAll((spans) => spans.map((span) => span.getBoundingClientRect().width));
+  expect(omitted[0]).toBeCloseTo((timelineBox!.width * steady.sourceIn) / 120, 0);
+  expect(omitted[1]).toBeCloseTo((timelineBox!.width * (120 - steady.sourceOut)) / 120, 0);
+
+  await page.getByRole('slider', { name: 'Allowed movement', exact: true }).fill(String(SMOOTH_TOLERANCE.max));
+  await expect(row).toHaveAttribute('data-smooth-in', String(tolerant.sourceIn));
+  await expect(tolerance).toHaveAttribute('y1', String(lineY(SMOOTH_TOLERANCE.max)));
+  await expect(use).toBeEnabled();
+  await expect(strip).toHaveAttribute('data-source-in', String(steady.sourceIn));
+
+  // Clicking the timeline away from the dashed line scrubs the source like the strip does.
+  await timeline.click({ position: { x: timelineBox!.width * 0.75, y: timelineBox!.height * 0.85 } });
+  await expect
+    .poll(async () => Number(await page.locator('.source-preview').getAttribute('data-source-frame')))
+    .toBeGreaterThanOrEqual(88);
+  expect(Number(await page.locator('.source-preview').getAttribute('data-source-frame'))).toBeLessThanOrEqual(91);
+  // Hovering reads the values there in each lane, including the speed the drone recorded (8 m/s at 3 s).
+  const readout = imageLane.locator('.source-motion-readout');
+  const flightLane = timeline.locator('[data-lane="horizontalSpeed"]');
+  await expect(readout).toContainText('00:03:00');
+  await expect(flightLane).toContainText('Flight speed 8.0 m/s');
+  await page.mouse.move(0, 0);
+  await expect(readout).toHaveText('JoltsMovement');
+  await expect(flightLane).toHaveText('Flight speed2.0 m/s – 8.0 m/s');
+
+  // Flight data lanes are chosen in a popover; only values this recording has are offered.
+  await openOptions(page, 'Flight data lanes');
+  const seriesList = page.locator('.source-motion-series-list');
+  await expect(seriesList.getByRole('checkbox')).toHaveCount(4);
+  await expect(seriesList.getByRole('checkbox', { name: 'Distance from home' })).toHaveCount(0);
+  await seriesList.getByRole('checkbox', { name: 'Height' }).check();
+  await seriesList.getByRole('checkbox', { name: 'Flight speed' }).uncheck();
+  await closeOptions(page);
+  const heightLane = timeline.locator('[data-lane="height"]');
+  await expect(heightLane).toHaveCount(1);
+  await expect(flightLane).toHaveCount(0);
+  await page.mouse.move(timelineBox!.x + timelineBox!.width * 0.75, timelineBox!.y + timelineBox!.height * 0.85);
+  await expect(heightLane).toContainText('Height 45 m');
+  await page.mouse.move(0, 0);
+
+  // Collapsing hides the whole panel but its title and suggestion, and the choice is kept.
+  await page.getByRole('button', { name: 'Collapse camera motion', exact: true }).click();
+  await expect(row).toHaveAttribute('data-collapsed', 'true');
+  await expect(timeline).toHaveCount(0);
+  await expect(use).toHaveCount(0);
+  await expect(page.getByRole('slider', { name: 'Allowed movement', exact: true })).toHaveCount(0);
+  await expect(page.locator('summary[aria-label="Flight data lanes"]')).toHaveCount(0);
+  await expect(row.locator('.smooth-panel-summary')).toContainText(seconds(tolerant));
+  await page.getByRole('button', { name: 'Close source review', exact: true }).click();
+  await page.getByRole('button', { name: 'Review pattern-a.mp4', exact: true }).click();
+  await expect(row).toHaveAttribute('data-collapsed', 'true');
+  await page.getByRole('button', { name: 'Expand camera motion', exact: true }).click();
+  await expect(heightLane).toHaveCount(1);
+
+  // The analysis is kept for this session: reopening needs no new request.
+  await page.getByRole('button', { name: 'Close source review', exact: true }).click();
+  await page.getByRole('button', { name: 'Review pattern-a.mp4', exact: true }).click();
+  await expect(row).toHaveAttribute('data-smooth-in', String(tolerant.sourceIn));
+  expect(requests).toEqual(['GET']);
+
+  // The dashed line itself is a handle: dragging it to the bottom asks for the steadiest footage.
+  await expect(page.locator('.source-preview')).toHaveAttribute('data-source-frame', /^\d+$/);
+  const frameBefore = await page.locator('.source-preview').getAttribute('data-source-frame');
+  const box = (await imageLane.boundingBox())!;
+  const lineAt = box.y + (lineY(SMOOTH_TOLERANCE.max) / 100) * box.height;
+  await page.mouse.move(box.x + box.width * 0.4, lineAt);
+  await expect(timeline).toHaveAttribute('data-near-tolerance', 'true');
+  await expect(readout).toContainText('Allowed movement 6.0');
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width * 0.4, box.y + box.height + 20, { steps: 4 });
+  await page.mouse.up();
+  const slider = page.getByRole('slider', { name: 'Allowed movement', exact: true });
+  await expect(slider).toHaveValue(String(SMOOTH_TOLERANCE.min));
+  await expect(tolerance).toHaveAttribute('y1', String(lineY(SMOOTH_TOLERANCE.min)));
+  await expect(page.locator('.source-preview')).toHaveAttribute('data-source-frame', frameBefore!);
+  expect(await current(page)).toEqual(before);
+  await flush(page);
+  expect(memory.saves).toBe(0);
+  await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
+});
+
+test('Add all adds one clip per steady range to the target track in one Undo step', async ({ page }) => {
+  const asset = assets[0]!;
+  const fps = 30000 / 1001;
+  const analysis = jerkyThenSteady(asset);
+  const steady = smoothRanges(motionProfile(analysis, fps), SMOOTH_TOLERANCE.initial, fps);
+  await page.route(`**/api/media/${asset.id}/motion`, (route) => route.fulfill({ json: { analysis } }));
+  const before = await current(page);
+  await page.getByRole('button', { name: 'Review pattern-a.mp4', exact: true }).click();
+  const addAll = page.getByRole('button', { name: /^Add all \d+ steady ranges to / });
+  await expect(addAll).toHaveText(`Add all ${steady.length}`);
+  await addAll.click();
+  await expect(page.locator('.source-add-feedback')).toHaveAttribute('data-added-clip-id', /.+/);
+  const after = await current(page);
+  const added = after.clips.filter((item) => !before.clips.some((existing) => existing.id === item.id));
+  expect(added.map(({ mediaId, sourceIn, sourceOut }) => ({ mediaId, sourceIn, sourceOut }))).toEqual(
+    [...steady]
+      .sort((a, b) => a.sourceIn - b.sourceIn)
+      .map(({ sourceIn, sourceOut }) => ({ mediaId: asset.id, sourceIn, sourceOut })),
+  );
+  // The applied source range is untouched: Add all inserts the steady ranges, it does not apply them.
+  await expect(page.locator('.source-range-strip')).toHaveAttribute('data-source-in', '0');
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect.poll(async () => (await current(page)).clips.length).toBe(before.clips.length);
+  await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
+});
+
+test('a proxy prepared before the analysis offers Analyse camera motion, which runs one background job', async ({
+  page,
+}) => {
+  const asset = assets[0]!;
+  const analysis = jerkyThenSteady(asset);
+  const job = {
+    id: 'motion-job',
+    kind: 'motion',
+    label: asset.name,
+    state: 'running',
+    progress: 0.5,
+    message: 'Measuring camera motion',
+    createdAt: new Date().toISOString(),
+    finishedAt: null,
+    outputUrl: null,
+    receiptUrl: null,
+  };
+  const posts: string[] = [];
+  let polls = 0;
+  await page.route(`**/api/media/${asset.id}/motion`, async (route) => {
+    if (route.request().method() === 'POST') {
+      posts.push(route.request().postData() ?? '');
+      await route.fulfill({ status: 202, json: { job } });
+      return;
+    }
+    await route.fulfill({ json: { analysis: polls >= 2 ? analysis : null } });
+  });
+  await page.route('**/api/jobs', async (route) => {
+    if (!posts.length) {
+      await route.fulfill({ json: { jobs: [] } });
+      return;
+    }
+    polls++;
+    const done = polls >= 2;
+    await route.fulfill({
+      json: { jobs: [{ ...job, ...(done && { state: 'completed', progress: 1, finishedAt: job.createdAt }) }] },
+    });
+  });
+  await page.getByRole('button', { name: 'Review pattern-a.mp4', exact: true }).click();
+  await expect(page.locator('.source-motion')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Analyse camera motion', exact: true }).click();
+  await expect(page.locator('.smooth-panel')).toContainText('Measuring camera motion… 50 %');
+  await expect(page.locator('.smooth-panel')).toHaveAttribute('data-smooth-in', /^\d+$/);
+  await expect(page.locator('.source-motion')).toHaveCount(1);
+  expect(posts).toEqual(['{}']);
+  await flush(page);
   expect(memory.saves).toBe(0);
 });
 

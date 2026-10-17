@@ -21,6 +21,7 @@ const KIND_LABELS: Readonly<Record<MediaJob['kind'], string>> = {
   reference: 'Reference render',
   export: 'Export',
   relink: 'Recording relink',
+  motion: 'Camera motion analysis',
 };
 const STATE_LABELS: Readonly<Record<MediaJob['state'], string>> = {
   queued: 'Queued',

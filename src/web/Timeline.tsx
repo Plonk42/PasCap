@@ -229,15 +229,31 @@ function trimHandleValue(
   return { min: 0, max: clip.sourceOut - 1, now: clip.sourceIn };
 }
 
-/** The clip strip shows playback order: a reversed clip lists its snapshots backwards. */
-function filmstrip(asset: MediaAsset | undefined, reverse: boolean): { sourceFrame: number; src: string }[] {
-  if (!asset?.prepared) return [];
-  const strip = asset.prepared.thumbnailFrames.slice(0, 4);
-  if (reverse) strip.reverse();
-  return strip.map((sourceFrame) => ({
-    sourceFrame,
-    src: `/api/media/${asset.id}/thumbnail/${sourceFrame}`,
-  }));
+const FILMSTRIP_TILE_PIXELS = 116;
+const FILMSTRIP_MAX_TILES = 60;
+
+/** One tile per ~16:9 slot of the clip, each showing the prepared snapshot nearest the source frame it covers. */
+function filmstrip(
+  asset: MediaAsset | undefined,
+  placed: PlacedClip,
+  widthPixels: number,
+): { frame: number; src: string }[] {
+  const snapshots = asset?.prepared?.thumbnailFrames;
+  if (!asset || !snapshots) return [];
+  const tiles = Math.min(
+    FILMSTRIP_MAX_TILES,
+    placed.duration,
+    Math.max(1, Math.round(widthPixels / FILMSTRIP_TILE_PIXELS)),
+  );
+  return Array.from({ length: tiles }, (_, tile) => {
+    const frame = Math.floor(((tile + 0.5) / tiles) * placed.duration);
+    const shown = placed.retiming.sourceAt(frame);
+    let nearest = snapshots[0]!;
+    for (const candidate of snapshots) {
+      if (Math.abs(candidate - shown) < Math.abs(nearest - shown)) nearest = candidate;
+    }
+    return { frame, src: `/api/media/${asset.id}/thumbnail/${nearest}` };
+  });
 }
 
 function speedLabel(clip: VideoClip): string {
@@ -1432,8 +1448,8 @@ export function Timeline(props: Readonly<Props>) {
                     }}
                   >
                     <span className="clip-filmstrip">
-                      {filmstrip(asset, clip.reverse).map(({ sourceFrame, src }) => (
-                        <img loading="lazy" draggable={false} key={sourceFrame} src={src} alt="" />
+                      {filmstrip(asset, currentPlaced, currentPlaced.duration * scale).map(({ frame, src }) => (
+                        <img loading="lazy" draggable={false} key={frame} src={src} alt="" />
                       ))}
                     </span>
                     <span className="timeline-clip-label">

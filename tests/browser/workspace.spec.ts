@@ -206,7 +206,7 @@ test('help/modal keyboard context preserves clips and timecode supports exact fr
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await page.getByRole('button', { name: 'Go to timecode' }).click();
   const input = page.getByRole('textbox', { name: 'Playhead timecode' });
-  await input.fill('00:00:01:15');
+  await input.fill('00:01:15');
   await input.press('Enter');
   await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(45);
   await page.getByRole('button', { name: 'Go to timecode' }).click();

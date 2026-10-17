@@ -1,15 +1,16 @@
 import { useId, useLayoutEffect, useRef, useState } from 'react';
-import { formatTimecode } from '../shared/timing.js';
+import { formatTimecode, parseTimecodeFrames } from '../shared/timing.js';
 
 /** Non-drop-frame display uses 30 nominal frames, not rounded wall-clock seconds. */
 export function parseTimecode(text: string, duration: number): { frame: number } | { error: string } {
   const value = text.trim();
-  const match = /^(\d{1,3}):(\d{2}):(\d{2}):(\d{2})$/.exec(value);
   let frame: number;
   if (/^\d+$/.test(value)) frame = Number(value);
-  else if (match && Number(match[2]) < 60 && Number(match[3]) < 60 && Number(match[4]) < 30) {
-    frame = ((Number(match[1]) * 60 + Number(match[2])) * 60 + Number(match[3])) * 30 + Number(match[4]);
-  } else return { error: 'Use HH:MM:SS:FF (30 fps NDF), or a whole timeline frame.' };
+  else {
+    const parsed = parseTimecodeFrames(value);
+    if (parsed === null) return { error: 'Use MM:SS:FF (30 fps NDF), or a whole timeline frame.' };
+    frame = parsed;
+  }
   if (!Number.isSafeInteger(frame) || frame < 0 || frame >= duration)
     return { error: `Choose frame 0–${Math.max(0, duration - 1)}, inside the timeline.` };
   return { frame };
@@ -87,7 +88,7 @@ export function TimecodeField({
           ref={button}
           className="timecode-value"
           aria-label="Go to timecode"
-          title="Go to HH:MM:SS:FF or timeline frame"
+          title="Go to MM:SS:FF or timeline frame"
           disabled={disabled || !duration}
           onClick={() => {
             editingActive.current = true;

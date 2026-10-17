@@ -191,7 +191,7 @@ OUT; normal overlap/fade validation still applies.
 
 One full-original range bar hatches omitted footage and has draggable **IN / OUT**
 handles. Exact **Source IN / OUT** text fields sit below the respective ends,
-displaying **HH:MM:SS:FF** (30 fps NDF). They accept whole original-frame numbers
+displaying **MM:SS:FF** (30 fps NDF). They accept whole original-frame numbers
 or timecode on Enter/blur; OUT remains exclusive. Empty, malformed, fractional,
 out-of-original or conflicting ranges retain editable inline errors, never clamp
 or silently round; Escape restores. There are no duplicate section duration,
@@ -697,6 +697,69 @@ recordings/projects or leaving Source preview cancels pending playback and relea
 its sole decoder. Loading/playback failures remain explicit with Retry. Source
 playback never moves the timeline/music, changes clips/track keyframes or saves/history.
 Choices persist per project in that browser and affect future insertions only.
+
+### Camera motion and the steadiest range
+
+Source preview suggests the steadiest stretch of a drone recording, where the camera
+moves without brutal changes of angle or speed. Proxy preparation measures it as its
+last step: it decodes the verified editing proxy at 320 × 180 grey and measures, for
+every frame, the camera's global motion since the previous one (translation, zoom and
+rotation from block phase correlation, with a robust fit that ignores moving water,
+trees or other subjects). Featureless frames stay unmeasured. This adds roughly a
+quarter of the recording's duration to preparation (about 120 frames/s for a 720p
+proxy on the development machine). It also reads the original's first subtitle track,
+where DJI Mini drones record telemetry once per second, and keeps horizontal and
+vertical speed (`H.S`, `V.S`, m/s), height (`H`) and distance from home (`D`, m), ISO,
+shutter speed (`SS`), exposure bias (`EV`) and digital zoom (`DZOOM`); GPS position and
+aperture are not kept. This demuxes only that track (about 0.2 s for a 600 MB rush);
+recordings without it simply have no telemetry. The result is cached as
+`motion-v3.json` beside the proxy and its thumbnails, tied to the proxy's verification
+time; re-preparing the proxy replaces it, and older `motion-v1.json`/`motion-v2.json`
+caches are ignored (use **Analyse camera motion** to measure again). A failed measurement
+never fails preparation: the job reports it and the proxy stays usable. The original
+is identity-checked and only its subtitle track is read.
+
+Opening a recording reads its analysis, once per session. Directly under the range strip,
+in the same column, the **motion timeline** stacks lanes, each labelled at its top-left;
+one playhead line runs through the strip and every lane, and the footage omitted by IN/OUT
+(including a trim draft) is hatched across them. The 44 px image lane plots the **jolts**
+(amber area: how fast the camera movement changes, % of image width per s², up to 8),
+the **movement** in the picture (white line, up to 10 % of width per s) and the **allowed
+movement** (dashed accent line); a 30 px lane follows for each chosen flight data value,
+scaled from its lowest to its highest value in the recording, which its label shows (a
+nearly flat value is widened to a minimum span, such as 5 m of height or 2 m/s of speed,
+so sensor noise does not fill the lane), each in its own colour, matching its swatch in the menu; steady ranges are
+accent bands across every lane, the suggested one strongest. While hovering, every lane
+label shows its value under the pointer (flight data interpolated between its
+once-per-second samples) and the image lane the timecode. Clicking or dragging any lane
+scrubs like the strip. Below the IN/OUT fields, separated by a hairline, the **Camera
+motion** section has a header row: its title (a chevron button, **Collapse camera
+motion**), its help, **Steadiest range** with its length and IN–OUT timecode, and **Use**.
+A controls row follows: the **Allowed movement** setting, the shared slider with exact
+field and Reset (0.5–6, initially 2; neutral is the initial value), and **Flight data**
+(**Flight data lanes**), a menu choosing which flight data values this recording has get
+a lane, **Flight speed** initially. Collapsing hides the lanes and controls, keeping the
+title and the suggestion; the collapse, allowed movement and flight data choices are
+browser preferences. The suggestion is the longest stretch of at least 2 s below the
+allowed movement, bridging jolts shorter than 0.5 s and keeping 0.2 s clear of rough
+edges inside the recording. A stretch where the camera stands still is not a steady range:
+when at least 99.5 % of its frames move less than 0.5 % of the image width per second
+(about three minutes to pan one width), the drone is hovering with nothing happening in
+the picture, so it gets no band, suggestion or Add all clip. Move the **Allowed movement** slider, or drag the dashed line
+itself (it highlights within 6 px, and the image lane shows its value; dragging the line
+never scrubs). **Use** applies the suggestion as the applied source range (and shows its
+IN frame), like any other range choice: no project edit, history or save; it reads **In
+use** once applied. **Add all N** (**Add all N steady ranges to** the target track)
+inserts one independent clip per steady range at the current allowed movement, in
+recording order, exactly like **Add clip** with that range: Ripple-on tracks append,
+positioned tracks start at the playhead, and the whole batch is one Undo step. It leaves
+the applied source range unchanged. Recordings prepared before this analysis existed show **Analyse
+camera motion** in the header instead, which queues one **Camera motion analysis** job
+(shown in Activity). Forward
+acceleration seen straight ahead barely changes the picture, so speed changes without
+turning are not detected by the jolts; the flight speed line shows them, but does
+not change the suggestion. Flight logs are not used.
+
 Source **Add clip** stays in the pinned review for repeated additions. Its
 sticky header and native nonmodal clip popup keep adding/reviewing reachable
 without a tall list shrinking the preview or moving controls. Media

@@ -9,7 +9,7 @@ import { validateFrameDraft } from '../../src/web/FrameField.js';
 import { clipSourceBoundary, planClipSourceRange } from '../../src/web/clip-source-range.js';
 
 const MAX_FRAME = 2_147_483_647;
-const FORMAT_ERROR = 'Use HH:MM:SS:FF (30 fps NDF), or a whole source frame.';
+const FORMAT_ERROR = 'Use MM:SS:FF (30 fps NDF), or a whole source frame.';
 
 function rangeProject(ripple = true) {
   const project = createProject('source-range', 'Source range');
@@ -28,26 +28,26 @@ function rangeProject(ripple = true) {
 
 describe('source frame drafts', () => {
   it.each([
-    ['00:00:00:00', 0],
-    ['00:00:00:29', 29],
-    ['00:00:01:00', 30],
-    ['00:00:59:29', 1_799],
-    ['00:01:00:00', 1_800],
-    ['00:59:59:29', 107_999],
-    ['01:00:00:00', 108_000],
-    [' 1:00:00:01 ', 108_001],
-    ['999:59:59:29', 107_999_999],
-    ['1000:00:00:00', 108_000_000],
-    ['19884:06:28:07', MAX_FRAME],
+    ['00:00:00', 0],
+    ['00:00:29', 29],
+    ['00:01:00', 30],
+    ['00:59:29', 1_799],
+    ['01:00:00', 1_800],
+    ['59:59:29', 107_999],
+    ['60:00:00', 108_000],
+    [' 60:00:01 ', 108_001],
+    ['59999:59:29', 107_999_999],
+    ['60000:00:00', 108_000_000],
+    ['1193046:28:07', MAX_FRAME],
   ] as const)('parses %j as exact nominal 30 fps NDF frame %i', (draft, value) => {
     expect(validateFrameDraft(draft, { min: 0, max: MAX_FRAME })).toEqual({ valid: true, value });
-    expect(formatTimecode(value)).toBe(draft.trim().replace(/^1:/, '01:'));
+    expect(formatTimecode(value)).toBe(draft.trim());
   });
 
   it('accepts the original exclusive OUT, not just its last included image', () => {
-    expect(validateFrameDraft('00:00:20:00', { min: 151, max: 600 })).toEqual({ valid: true, value: 600 });
+    expect(validateFrameDraft('00:20:00', { min: 151, max: 600 })).toEqual({ valid: true, value: 600 });
     expect(validateFrameDraft('600', { min: 151, max: 600 })).toEqual({ valid: true, value: 600 });
-    expect(validateFrameDraft('00:00:20:01', { min: 151, max: 600 })).toEqual({
+    expect(validateFrameDraft('00:20:01', { min: 151, max: 600 })).toEqual({
       valid: false,
       error: 'Enter 600 or less.',
     });
@@ -82,15 +82,15 @@ describe('source frame drafts', () => {
   });
 
   it.each([
-    '00:00:00:30',
-    '00:00:60:00',
-    '00:60:00:00',
-    '00:00:00',
+    '00:00:30',
+    '00:60:00',
+    '01:00:00:00',
+    '00:00:00:00',
     '00:00:00:0',
     '00:0:00:00',
     '00:00:00;01',
-    '-01:00:00:00',
-    '00:00:00:01.5',
+    '-60:00:00',
+    '00:00:01.5',
   ])('rejects malformed/unsupported timecode %j', (draft) => {
     expect(validateFrameDraft(draft, { min: 0, max: MAX_FRAME })).toEqual({ valid: false, error: FORMAT_ERROR });
   });
@@ -100,11 +100,11 @@ describe('source frame drafts', () => {
   });
 
   it('enforces inclusive source bounds and the maximum stored integer frame', () => {
-    expect(validateFrameDraft('00:00:00:09', { min: 10, max: 600 })).toEqual({
+    expect(validateFrameDraft('00:00:09', { min: 10, max: 600 })).toEqual({
       valid: false,
       error: 'Enter 10 or greater.',
     });
-    expect(validateFrameDraft('00:00:00:10', { min: 10, max: 600 })).toEqual({ valid: true, value: 10 });
+    expect(validateFrameDraft('00:00:10', { min: 10, max: 600 })).toEqual({ valid: true, value: 10 });
     expect(validateFrameDraft('-1', { min: 0, max: MAX_FRAME })).toEqual({
       valid: false,
       error: 'Enter 0 or greater.',
@@ -122,17 +122,17 @@ describe('source frame drafts', () => {
   it('passes exact parsed frames to contextual validation only after syntax and bounds succeed', () => {
     const validate = vi.fn((value: number) => (value === 30 ? 'This range conflicts with a fade.' : null));
     const constraints = Object.freeze({ min: 0, max: 600, validate });
-    for (const draft of ['', '1.5', '00:00:00:30', '-1', '601']) {
+    for (const draft of ['', '1.5', '00:00:30', '-1', '601']) {
       expect(validateFrameDraft(draft, constraints).valid).toBe(false);
     }
     expect(validate).not.toHaveBeenCalled();
-    for (const draft of ['00:00:01:00', '3e1']) {
+    for (const draft of ['00:01:00', '3e1']) {
       expect(validateFrameDraft(draft, constraints)).toEqual({
         valid: false,
         error: 'This range conflicts with a fade.',
       });
     }
-    expect(validateFrameDraft('00:00:01:01', constraints)).toEqual({ valid: true, value: 31 });
+    expect(validateFrameDraft('00:01:01', constraints)).toEqual({ valid: true, value: 31 });
     expect(validate.mock.calls).toEqual([[30], [30], [31]]);
   });
 });

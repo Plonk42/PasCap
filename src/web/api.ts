@@ -4,6 +4,7 @@ import { exportPreflightSchema } from '../shared/export-space.js';
 import type { ExportProfile } from '../shared/export.js';
 import { audioDirectorySchema, footageDirectorySchema, footageRootSchema } from '../shared/footage.js';
 import { jobSchema, mediaAssetSchema } from '../shared/media.js';
+import { motionAnalysisSchema } from '../shared/motion-analysis.js';
 import { idSchema, projectSchema, type ProjectDocument } from '../shared/model.js';
 import { projectSummarySchema } from '../shared/projects.js';
 
@@ -241,6 +242,17 @@ export const api = {
       { timeoutMs: IMPORT_TIMEOUT_MS },
     ),
   prepare: (id: string) => request(`/api/media/${id}/prepare`, z.object({ job: jobSchema }), 'POST', {}),
+  /** The cached camera-motion analysis of the current proxy, or null. */
+  motion: (id: string, options?: RequestOptions) =>
+    request(
+      `/api/media/${id}/motion`,
+      z.object({ analysis: motionAnalysisSchema.nullable() }),
+      'GET',
+      undefined,
+      options,
+    ),
+  /** Queues the camera-motion analysis that steadiest-range suggestions need. */
+  analyseMotion: (id: string) => request(`/api/media/${id}/motion`, z.object({ job: jobSchema }), 'POST', {}),
   /** Queues a full-content check of the moved copy; the job's outcome is the answer. */
   relinkMedia: (id: string, path: string) =>
     request(`/api/media/${id}/relink`, z.object({ job: jobSchema }), 'POST', { path }),

@@ -368,7 +368,7 @@ test('Escape closes a hover preview before cancelling an underlying invalid nume
   await expect(input).toBeFocused();
   await expect(input).toHaveValue('0.5');
   await input.press('Escape');
-  await expect(input).toHaveValue('00:00:00:00');
+  await expect(input).toHaveValue('00:00:00');
   expect(await current(page)).toEqual(before);
   expect(memory.saves).toBe(0);
 });
@@ -553,7 +553,7 @@ test('collapsing and restoring a section keeps the same invalid field draft and 
   await expect(input).toHaveAttribute('aria-invalid', 'true');
   expect(await input.evaluate((node, previous) => node === previous, element)).toBe(true);
   await input.press('Escape');
-  await expect(input).toHaveValue('00:00:00:00');
+  await expect(input).toHaveValue('00:00:00');
   expect(await current(page)).toEqual(before);
   expect(memory.saves).toBe(0);
 });
@@ -598,7 +598,7 @@ for (const context of HELP_CONTEXTS) {
 
 test('numeric fields retain their descriptions even while the linked help popover is hidden', async ({ page }) => {
   await expect(page.getByRole('textbox', { name: 'Source IN frame', exact: true })).toHaveAccessibleDescription(
-    /Type a frame number or HH:MM:SS:FF in the fields/,
+    /Type a frame number or MM:SS:FF in the fields/,
   );
   await expect(page.getByRole('spinbutton', { name: 'Clip speed rate', exact: true })).toHaveAccessibleDescription(
     /A keyframe ○ changes the speed over the length of this clip/,
@@ -683,7 +683,7 @@ test('hover keeps a valid numeric draft unapplied; clicking help keeps the ordin
   expect(memory.saves).toBe(0);
   await trigger.click();
   await expect(trigger).toHaveAttribute('aria-pressed', 'true');
-  await expect(input).toHaveValue('00:00:00:05');
+  await expect(input).toHaveValue('00:00:05');
   expect((await current(page)).clips[0]!.sourceIn).toBe(5);
   await page.evaluate(() => window.pascapLab!.flush());
   expect(memory.saves).toBe(1);
