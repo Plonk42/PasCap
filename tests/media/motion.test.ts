@@ -6,7 +6,7 @@ import { createApp } from '../../src/server/app.js';
 import { createConfig, type ServiceConfig } from '../../src/server/config.js';
 import { runProcess } from '../../src/server/process.js';
 import type { MediaJob } from '../../src/shared/media.js';
-import { motionRoughness, smoothRanges, type MotionAnalysis } from '../../src/shared/motion-analysis.js';
+import { motionProfile, smoothRanges, type MotionAnalysis } from '../../src/shared/motion-analysis.js';
 import { PROJECT_FPS } from '../../src/shared/timing.js';
 
 const FPS = PROJECT_FPS.numerator / PROJECT_FPS.denominator;
@@ -130,7 +130,7 @@ describe.skipIf(!enabled)('smooth-part motion analysis · disposable native fixt
     const cache = library.motionPath(library.get(id));
     expect(JSON.parse(await readFile(cache, 'utf8'))).toEqual(analysis);
 
-    const [best] = smoothRanges(motionRoughness(analysis, FPS), 2, FPS);
+    const [best] = smoothRanges(motionProfile(analysis, FPS), 2, FPS);
     expect(best!.sourceIn).toBeGreaterThanOrEqual(60);
     expect(best!.sourceIn).toBeLessThan(95);
     expect(best!.sourceOut).toBe(210);

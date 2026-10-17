@@ -174,10 +174,7 @@ export function useSmoothRange(asset: MediaAsset): SmoothRangeState {
   const rate = asset.metadata.frameRate;
   const fps = rate.numerator / rate.denominator;
   const profile = useMemo(() => (phase.kind === 'ready' ? motionProfile(phase.analysis, fps) : null), [phase, fps]);
-  const ranges = useMemo(
-    () => (profile ? smoothRanges(profile.roughness, tolerance, fps) : []),
-    [profile, tolerance, fps],
-  );
+  const ranges = useMemo(() => (profile ? smoothRanges(profile, tolerance, fps) : []), [profile, tolerance, fps]);
   const keepTolerance = useCallback((value: number) => {
     setSavedTolerance(value);
     writePreference(TOLERANCE_PREFERENCE, String(value));

@@ -143,6 +143,7 @@ Preparing a drone recording also measures its camera motion. Lanes directly unde
 source range strip share its playhead and hatching: the first shows jolts (amber area:
 sudden angle or speed changes), camera movement (white line) and the dashed allowed
 movement (drag it); the green bands mark steady ranges, the suggested one strongest.
+Stretches where the camera does not move at all, such as a hover, are left out.
 Hover to read the values at that moment; click or drag to scrub. Below the IN/OUT
 fields, **Camera motion** gives the **Steadiest range** length and IN–OUT, and **Use**
 sets IN and OUT to it. **Add all N** adds one clip per steady range to the target video

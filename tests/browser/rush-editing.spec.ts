@@ -1843,9 +1843,9 @@ test('the motion timeline shows jolts, allowed movement and the steadiest range;
   const asset = assets[0]!;
   const fps = 30000 / 1001;
   const analysis = jerkyThenSteady(asset);
-  const { roughness } = motionProfile(analysis, fps);
-  const steady = smoothRanges(roughness, SMOOTH_TOLERANCE.initial, fps)[0]!;
-  const tolerant = smoothRanges(roughness, SMOOTH_TOLERANCE.max, fps)[0]!;
+  const profile = motionProfile(analysis, fps);
+  const steady = smoothRanges(profile, SMOOTH_TOLERANCE.initial, fps)[0]!;
+  const tolerant = smoothRanges(profile, SMOOTH_TOLERANCE.max, fps)[0]!;
   const seconds = (part: { sourceIn: number; sourceOut: number }): string =>
     `${((part.sourceOut - part.sourceIn) / fps).toFixed(2)} s`;
   expect(steady.sourceIn).toBeGreaterThan(20);
@@ -1989,7 +1989,7 @@ test('Add all adds one clip per steady range to the target track in one Undo ste
   const asset = assets[0]!;
   const fps = 30000 / 1001;
   const analysis = jerkyThenSteady(asset);
-  const steady = smoothRanges(motionProfile(analysis, fps).roughness, SMOOTH_TOLERANCE.initial, fps);
+  const steady = smoothRanges(motionProfile(analysis, fps), SMOOTH_TOLERANCE.initial, fps);
   await page.route(`**/api/media/${asset.id}/motion`, (route) => route.fulfill({ json: { analysis } }));
   const before = await current(page);
   await page.getByRole('button', { name: 'Review pattern-a.mp4', exact: true }).click();

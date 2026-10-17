@@ -5,8 +5,9 @@ import {
   MOTION_HEIGHT,
   MOTION_WIDTH,
   motionAnalysisSchema,
-  motionRoughness,
+  motionProfile,
   smoothRanges,
+  STILL_SPEED,
   type MotionAnalysis,
 } from '../../src/shared/motion-analysis.js';
 
@@ -141,9 +142,9 @@ describe('smooth ranges', () => {
       if (frame < 360) return 2;
       return Math.max(0, 2 - (frame - 360) * 0.2);
     });
-    const roughness = motionRoughness(analysis(tx), FPS);
-    expect(Math.max(...roughness.slice(120, 300))).toBeLessThan(0.5);
-    const [best, ...others] = smoothRanges(roughness, 2, FPS);
+    const profile = motionProfile(analysis(tx), FPS);
+    expect(Math.max(...profile.roughness.slice(120, 300))).toBeLessThan(0.5);
+    const [best, ...others] = smoothRanges(profile, 2, FPS);
     expect(best!.sourceIn).toBeGreaterThan(55);
     expect(best!.sourceIn).toBeLessThan(110);
     expect(best!.sourceOut).toBeGreaterThan(330);
@@ -153,31 +154,38 @@ describe('smooth ranges', () => {
   });
 
   it('suggests the whole recording when it is steady from start to end', () => {
-    const roughness = motionRoughness(analysis([null, ...Array.from({ length: 299 }, () => 1)]), FPS);
-    expect(smoothRanges(roughness, 2, FPS)).toEqual([{ sourceIn: 0, sourceOut: 300 }]);
+    const profile = motionProfile(analysis([null, ...Array.from({ length: 299 }, () => 1)]), FPS);
+    expect(smoothRanges(profile, 2, FPS)).toEqual([{ sourceIn: 0, sourceOut: 300 }]);
+  });
+
+  it('leaves out a steady range where the camera does not move at all', () => {
+    const roughness = Array.from({ length: 600 }, (_, frame) => (frame >= 280 && frame < 320 ? 5 : 0));
+    const hoverThenPan = Array.from({ length: 600 }, (_, frame) => (frame < 300 ? 0.1 : 3));
+    expect(smoothRanges({ roughness, speed: hoverThenPan }, 2, FPS)).toEqual([{ sourceIn: 326, sourceOut: 600 }]);
+    // A few moving frames among still ones do not make a hover interesting; a slow drift does.
+    const nudged = hoverThenPan.map((speed, frame) => (frame === 100 ? 3 : speed));
+    expect(smoothRanges({ roughness, speed: nudged }, 2, FPS)).toHaveLength(1);
+    const drift = hoverThenPan.map((speed, frame) => (frame < 300 ? STILL_SPEED + 0.1 : speed));
+    expect(smoothRanges({ roughness, speed: drift }, 2, FPS)).toHaveLength(2);
   });
 
   it('bridges a short jolt but not a long one, and needs two seconds', () => {
-    const rough = (start: number, length: number): number[] =>
-      Array.from({ length: 600 }, (_, frame) => (frame >= start && frame < start + length ? 5 : 0));
+    const moving = (roughness: number[]) => ({ roughness, speed: roughness.map(() => 3) });
+    const rough = (start: number, length: number) =>
+      moving(Array.from({ length: 600 }, (_, frame) => (frame >= start && frame < start + length ? 5 : 0)));
     expect(smoothRanges(rough(300, 10), 2, FPS)).toEqual([{ sourceIn: 0, sourceOut: 600 }]);
     expect(smoothRanges(rough(300, 30), 2, FPS)).toEqual([
       { sourceIn: 0, sourceOut: 294 },
       { sourceIn: 336, sourceOut: 600 },
     ]);
-    expect(
-      smoothRanges(
-        Array.from({ length: 50 }, () => 0),
-        2,
-        FPS,
-      ),
-    ).toEqual([]);
+    expect(smoothRanges(moving(Array.from({ length: 50 }, () => 0)), 2, FPS)).toEqual([]);
   });
 
   it('suggests more footage as the tolerance rises', () => {
     const roughness = Array.from({ length: 600 }, (_, frame) => (frame < 100 ? 3 : 1));
-    expect(smoothRanges(roughness, 2, FPS)[0]).toEqual({ sourceIn: 106, sourceOut: 600 });
-    expect(smoothRanges(roughness, 4, FPS)[0]).toEqual({ sourceIn: 0, sourceOut: 600 });
+    const profile = { roughness, speed: roughness.map(() => 3) };
+    expect(smoothRanges(profile, 2, FPS)[0]).toEqual({ sourceIn: 106, sourceOut: 600 });
+    expect(smoothRanges(profile, 4, FPS)[0]).toEqual({ sourceIn: 0, sourceOut: 600 });
   });
 
   it('rejects analyses whose arrays do not match the frame count', () => {

@@ -10,6 +10,10 @@ export const SMOOTH_TOLERANCE = { min: 0.5, max: 6, step: 0.1, initial: 2 } as c
 const SMOOTH_GAP_SECONDS = 0.5;
 const SMOOTH_MIN_SECONDS = 2;
 const SMOOTH_MARGIN_SECONDS = 0.2;
+/** Below this camera movement (% of image width per s) a frame is still: ~3 min to pan one width. */
+export const STILL_SPEED = 0.6;
+/** A steady range with at least this share of still frames is a hover with nothing happening. */
+export const STILL_SHARE = 0.995;
 
 const motionValues = z.array(z.number().nullable());
 
@@ -126,10 +130,6 @@ export function motionProfile(analysis: MotionAnalysis, fps: number): MotionProf
   };
 }
 
-export function motionRoughness(analysis: MotionAnalysis, fps: number): number[] {
-  return motionProfile(analysis, fps).roughness;
-}
-
 function steadyMask(roughness: readonly number[], tolerance: number, gap: number): boolean[] {
   const steady = roughness.map((value) => value < tolerance);
   // Short jolts between steady stretches do not split a flight.
@@ -147,9 +147,18 @@ function steadyMask(roughness: readonly number[], tolerance: number, gap: number
   return steady;
 }
 
-/** Steady stretches of at least two seconds, longest first, as source IN/exclusive OUT. */
-export function smoothRanges(roughness: readonly number[], tolerance: number, fps: number): SmoothRange[] {
-  const steady = steadyMask(roughness, tolerance, Math.round(SMOOTH_GAP_SECONDS * fps));
+function still(speed: readonly number[], sourceIn: number, sourceOut: number): boolean {
+  let frames = 0;
+  for (let frame = sourceIn; frame < sourceOut; frame++) if (speed[frame]! < STILL_SPEED) frames++;
+  return frames >= STILL_SHARE * (sourceOut - sourceIn);
+}
+
+/**
+ * Steady stretches of at least two seconds, longest first, as source IN/exclusive OUT. A stretch
+ * where the camera hardly moves at all is left out: the drone is hovering without filming anything.
+ */
+export function smoothRanges(profile: MotionProfile, tolerance: number, fps: number): SmoothRange[] {
+  const steady = steadyMask(profile.roughness, tolerance, Math.round(SMOOTH_GAP_SECONDS * fps));
   const margin = Math.round(SMOOTH_MARGIN_SECONDS * fps);
   const minimum = SMOOTH_MIN_SECONDS * fps;
   const ranges: SmoothRange[] = [];
@@ -164,7 +173,8 @@ export function smoothRanges(roughness: readonly number[], tolerance: number, fp
     // Keep clear of the rough edge, except at the recording's own ends.
     const sourceIn = start === 0 ? 0 : start + margin;
     const sourceOut = end === steady.length ? end : end - margin;
-    if (sourceOut - sourceIn >= minimum) ranges.push({ sourceIn, sourceOut });
+    if (sourceOut - sourceIn >= minimum && !still(profile.speed, sourceIn, sourceOut))
+      ranges.push({ sourceIn, sourceOut });
     start = end;
   }
   return ranges.sort((a, b) => b.sourceOut - b.sourceIn - (a.sourceOut - a.sourceIn) || a.sourceIn - b.sourceIn);
