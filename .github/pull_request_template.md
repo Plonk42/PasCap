@@ -7,7 +7,7 @@ this PR completes the issue. -->
 
 - Why this needs a PR: <!-- playback/A-V clock, decoder/compositor, native export, schema/persisted format, source-media safety, CI/scripts or dependencies -->
 - Local checks: <!-- e.g. npm run check, affected Playwright specs, npm run test:media -->
-- Data impact: <!-- none, or required project recreation/reset; never silently rewrite or delete data -->
+- Data impact: <!-- none, or the schema/format bump with its upgrade step and frozen fixture; never silently rewrite or delete data -->
 
 ## Follow-up
 

@@ -300,7 +300,7 @@ test('Escape closes the Projects, Export and shortcut dialogs and restores focus
   }
   await page.getByRole('button', { name: 'Open projects' }).click();
   await expect(page.getByRole('dialog', { name: 'Projects' })).toContainText(
-    'Projects saved by an older PasCap version cannot be opened. They are kept unchanged.',
+    'Projects saved by early PasCap development versions cannot be opened. They are kept unchanged.',
   );
   await expect(page.getByRole('combobox', { name: 'Project filter' }).locator('option')).toHaveText([
     'All projects',

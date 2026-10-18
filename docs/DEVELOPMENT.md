@@ -11,8 +11,10 @@ boolean `reset` (default keyframe), in control order:
 `opacity`, `temperature`, `tint`, `exposure`, `brightness`, `contrast`,
 `hue`, `saturation`, `vibrance`, `highlights`, `shadows`, `whites`, `blacks`, `hdr`, `localContrast`. HSL/curves remain static; speed is
 clip-only (constant or 1–256 source-frame keyframes), and every clip requires a boolean `reverse`.
-Reject/preserve documents and receipt snapshots with an earlier schema version; no load defaults,
-migrations, legacy acceptance or automatic deletion. CPU/reference/native/GPU
+Projects saved with an older supported schema are upgraded on load through
+[project migrations](../src/shared/project-migrations.ts); documents and receipt
+snapshots older than `OLDEST_PROJECT_SCHEMA_VERSION` are rejected and preserved, with no
+load defaults or automatic deletion. CPU/reference/native/GPU
 must use the same [Temperature/Tint gain math](design/TEMPERATURE_AND_TINT.md)
 before Exposure, including intentionally coloured greys and pre-clipping
 neutral-white linear luminance normalization only. Required synthetic validation
@@ -544,13 +546,10 @@ independent numeric IN/OUT pair (Enter/blur applies, Escape restores) is unchang
 - Follow [the GitHub workflow](GITHUB_WORKFLOW.md): routine changes go straight to
   `main` after the fast local gate; risky changes use a short-lived PR. Never stash,
   reset, discard or commit unrelated uncommitted work.
-- Before the first release candidate, approved changes may break existing projects
-  and persisted formats: favour one current strict implementation, not backward-
-  compatibility boilerplate. Do not add unrequested migrations, legacy fields,
-  fallback readers/defaults or compatibility-only tests. Update affected tests/docs,
-  disclose incompatibility and recreation/reset needs, and preserve existing files
-  rather than silently rewriting/deleting them. Agree the post-RC1 policy with the
-  owner before RC1; follow the [pre-RC compatibility workflow](GITHUB_WORKFLOW.md#compatibility-before-the-first-release-candidate).
+- Saved projects, registries and receipts must stay backward compatible unless the
+  owner explicitly waives it: an incompatible change ships its upgrade step and a
+  frozen fixture, and data a build cannot open is rejected clearly and left
+  unchanged. Follow the [data compatibility workflow](GITHUB_WORKFLOW.md#data-compatibility).
 - Never modify/copy/delete owner's originals or commit private paths/device IDs,
   saved project IDs, real media/cache or reports. Preserve fingerprints, symlink
   rejection, cache exclusion and HTTP guards.
@@ -571,11 +570,11 @@ independent numeric IN/OUT pair (Enter/blur applies, Escape restores) is unchang
   Missing bases/channels are invalid; neutral values are creation values only.
   Track `opacity` is the sole valid stored value; reject saved `clip.opacity`
   and old `clipOpacity`/`layerOpacity` channels. No project-level
-  transitions/fades, compatibility fields/defaults/migration or mandatory first-track
+  transitions/fades, compatibility fields/defaults or mandatory first-track
   ID. Require a 0–8 `music` array with unique instance IDs and complete independent
   settings, plus captured audio-source/instance-plan arrays in current receipts.
-  Reject and preserve projects/receipt snapshots with an earlier schema version and finished videos,
-  without automatic deletion; recreate projects deliberately. Proxy formats,
+  Reject and preserve projects/receipt snapshots older than the oldest supported schema
+  and finished videos, without automatic deletion. Proxy formats,
   source protections and native resource budgets remain unchanged; the registries are
   version 2 (full-content checksums).
 - Reuse `JobQueue`, library and backpressured raw/retime helpers: one heavy job,

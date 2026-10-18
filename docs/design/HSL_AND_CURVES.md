@@ -20,10 +20,10 @@ green and blue arrays, each 2…16 strict `{ x, y }` control nodes with finite c
 in 0…1. Inputs strictly ascend, with first x=0 and last x=1. Endpoint outputs are
 editable; nonmonotonic outputs are valid. No control-node IDs or preset fields are saved.
 Neutral factories create independent nested objects/arrays, with each curve starting as three identity nodes (0, 0.5, 1). They are only creators,
-never repairs for missing saved fields. Projects with an earlier schema version and their receipt snapshots
-are incompatible and preserved; recreate deliberately. Receipt format remains 1;
+never repairs for missing saved fields. Projects with an older supported schema are upgraded
+on load; older projects and receipt snapshots are rejected and preserved. Receipt format remains 1;
 proxy and PCM formats are unchanged; the registries are version 2 (full-content
-checksums). No migration or automatic deletion.
+checksums). No automatic deletion.
 
 The exact order is inverse BT.709 → normalized Temperature/Tint linear gains →
 Exposure → Contrast → Brightness → Whites/Blacks → Hue/Saturation/Vibrance → final

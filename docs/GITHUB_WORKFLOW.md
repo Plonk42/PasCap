@@ -2,7 +2,8 @@
 
 PasCap is a solo, pre-release project. The workflow favours fast iteration: small
 commits straight to `main`, CI as an asynchronous backstop, pull requests only for
-risky changes and GitHub issues only for work worth tracking.
+risky changes and GitHub issues only for work worth tracking. Saved projects must
+keep working across changes ([data compatibility](#data-compatibility)).
 
 ## Delivering changes
 
@@ -140,19 +141,33 @@ one by one with the routing above, through the
 [work prompt](../.github/prompts/work-on-issue.prompt.md). Invoking it approves
 implementing the selected issues, not owner decisions they leave open.
 
-## Compatibility before the first release candidate
+## Data compatibility
 
-Until RC1, fast iteration takes precedence over backward compatibility. Approved
-changes may break saved projects and persisted formats; the owner accepts
-recreating them.
+Since 2026-10-18 the owner edits real projects with PasCap, so saved data must keep
+working after every change unless the owner explicitly waives compatibility for that
+change. Earlier schemas, from before real editing began, stay unsupported.
 
-- Keep one current, strict data contract: no migrations, optional legacy fields,
-  compatibility defaults, old-format readers or compatibility-only tests unless
-  explicitly requested.
-- Version changed formats so incompatible data is rejected clearly. Never silently
-  rewrite or delete existing data; originals and completed exports stay untouched.
-- Mention required project recreation or data resets in the commit or PR and the
-  affected guides. A reset requirement is guidance, not permission to perform it.
+- **Projects**, including the project snapshots in export receipts: projects saved
+  with any schema from `OLDEST_PROJECT_SCHEMA_VERSION` onwards must open with the
+  same meaning. Prefer additive changes that need no version bump. An incompatible
+  change bumps `PROJECT_SCHEMA_VERSION` and, in the same PR:
+  - adds the upgrade step from the previous version in
+    [project migrations](../src/shared/project-migrations.ts): a pure function on
+    the saved JSON that never drops or reinterprets a value;
+  - adds `tests/fixtures/projects/schema-N.json` for the new version, generated from
+    the current model with representative settings. Never edit an existing fixture:
+    the compatibility tests open every one and fail when a step is missing.
 
-Before RC1, agree the subsequent compatibility policy with the owner and record it
-here.
+  Upgrades run in memory on load. The first save rewrites the file in the current
+  schema and keeps its original bytes beside it (`<id>.json.schema-N.bak`).
+
+- **Video/music registries and export receipts** have their own format versions.
+  Bump one only with an upgrade from the previous version and a test that reads
+  the old format.
+- **Regenerable caches** (proxies, PCM, thumbnails, motion analysis) may change
+  format; old ones must then be ignored or reported, with an explicit way to prepare
+  them again, never silently deleted.
+- Data a build cannot open (too old, newer or invalid) is rejected with a clear
+  reason and left unchanged; never silently rewrite or delete it.
+- Mention any compatibility impact in the PR's **Data impact** line. Persisted-format
+  changes always take the risky route.

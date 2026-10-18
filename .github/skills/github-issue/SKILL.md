@@ -89,8 +89,8 @@ Use a concise, actionable title and these sections, adapting to the matching for
 
 - **Goal / user problem:** the requested outcome and verified current behaviour.
 - **Scope and non-goals:** bounded behaviour; preserve originals, strict persisted
-  data, reversible edits and authoritative integer-frame timing. No unrelated feature,
-  compatibility migration or owner-media qualification is implied.
+  data, reversible edits and authoritative integer-frame timing. No unrelated feature
+  or owner-media qualification is implied; a schema change includes its project upgrade step.
 - **Acceptance criteria:** observable checklist. Distinguish proposed acceptance from
   verified delivery; include relevant regressions without running media work to log it.
 - **Dependencies, milestone and Project context:** known issue links (mention each as

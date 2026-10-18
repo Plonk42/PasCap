@@ -76,9 +76,9 @@ identified music tracks (`[]` without music). Project duration is maximum video 
 OUT or music start + duration: music can extend it, with video closing fades at
 clip OUT then black while music continues/fades at its own end. Clip speed,
 track Colour and sole Opacity are unchanged. Version-1 export receipts require strict current-schema
-snapshots and captured audio-source/instance-plan arrays; preserve incompatible
-documents/receipts/MP4s with an earlier schema version, recreate deliberately, and never migrate/default
-or use null/older readers. Proxy/current PCM formats remain unchanged; the registries
+snapshots and captured audio-source/instance-plan arrays; older supported schemas are
+upgraded on load, and documents/receipts/MP4s older than that are preserved, never
+defaulted or deleted. Proxy/current PCM formats remain unchanged; the registries
 are version 2 (full-content checksums).
 The #35 contract has pending implementation/validation acceptance; no passed
 tests, release or milestone closure is claimed by this documentation update.

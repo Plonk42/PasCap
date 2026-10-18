@@ -266,9 +266,9 @@ measurement reports must identify their project snapshot's schema without overwr
 historical reports; the report identifier is separate from the project schema.
 Project identifiers such as `preview-lab`/`preview-lab-v6` are not schema versions
 and are not renamed by this contract.
-Project documents and receipt snapshots with an earlier schema version are incompatible and preserved;
-recreate projects deliberately, with no migration, compatibility defaults or
-old-format/null fallback readers or automatic deletion. The strict current schema requires
+Project documents saved with an older supported schema are upgraded on load; documents
+and receipt snapshots older than the oldest supported schema are rejected and preserved,
+with no compatibility defaults, old-format/null fallback readers or automatic deletion. The strict current schema requires
 complete video track `colour`, including Temperature/Tint/Vibrance/Whites/Blacks/HDR/Local contrast bases and static HSL/curves,
 all fifteen nullable keyframe fields, constant or custom-curve clip speed, boolean clip `reverse`, track `transform` base/per-setting keyframes and track `opacity`; saved `clip.colour`, `clip.correction`, `clip.opacity`, `clip.spatial` and
 old `clipOpacity`/`layerOpacity` keyframe fields are rejected, not defaulted.
