@@ -38,8 +38,8 @@ unknown fields, coercion, persisted defaults or load-time repair.
 Neutral values are creation values only, never defaults for missing saved data.
 Split, marked cuts and duplicate copy the clip's detail into each retained piece;
 trims, moves (including to another track) and Ripple leave it unchanged. Detail never
-changes timing, placement, speed, track Colour/Opacity or music. Projects with an earlier
-schema version and their receipt snapshots are rejected and preserved, without migration; recreate them.
+changes timing, placement, speed, track Colour/Opacity or music. Projects with an older
+supported schema are upgraded on load; older projects and receipt snapshots are rejected and preserved.
 
 ## Kernel
 

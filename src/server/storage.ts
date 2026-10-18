@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { lstat, mkdir, open, readdir, readFile, rename, rm } from 'node:fs/promises';
+import { constants } from 'node:fs';
+import { copyFile, lstat, mkdir, open, readdir, readFile, rename, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { ZodError } from 'zod';
 import {
@@ -10,12 +11,37 @@ import {
   projectSchema,
   type ProjectDocument,
 } from '../shared/model.js';
+import { supportedProjectVersions, upgradeProject } from '../shared/project-migrations.js';
 import { projectSummarySchema, type ProjectSummary } from '../shared/projects.js';
 import { calculateLayout } from '../shared/timeline.js';
 import { errorMessage, isNotFound, ServiceError } from './errors.js';
 import { assertNoSymlinks } from './files.js';
 
 const MAX_PROJECT_BYTES = 16 * 1024 * 1024;
+
+interface SavedProject {
+  document: ProjectDocument;
+  /** The schema the file was saved with, before upgrading. */
+  schemaVersion: number;
+}
+
+/** The first save after an upgrade keeps the file's original bytes beside it, once per schema version. */
+async function keepOriginal(filename: string, schemaVersion: number): Promise<void> {
+  try {
+    await copyFile(filename, `${filename}.schema-${schemaVersion}.bak`, constants.COPYFILE_EXCL);
+  } catch (error) {
+    if (!(error instanceof Error && 'code' in error && error.code === 'EEXIST')) throw error;
+  }
+}
+
+function describeInvalid(error: unknown): string {
+  return error instanceof ZodError
+    ? error.issues
+        .slice(0, 6)
+        .map((issue) => `${issue.path.join('.')}: ${issue.message}`)
+        .join('; ')
+    : errorMessage(error);
+}
 
 /** Check existing ancestors before mkdir, so a symlink cannot redirect new output. */
 export async function ensurePrivateDirectory(directory: string): Promise<void> {
@@ -81,42 +107,25 @@ export class ProjectStore {
     return { value: JSON.parse(await readFile(filename, 'utf8')) as unknown, updatedAt: info.mtime.toISOString() };
   }
   private decode(id: string, value: unknown): ProjectDocument {
-    if (
-      typeof value !== 'object' ||
-      value === null ||
-      !('schemaVersion' in value) ||
-      value.schemaVersion !== PROJECT_SCHEMA_VERSION
-    ) {
-      const rawVersion =
-        typeof value === 'object' && value !== null && 'schemaVersion' in value ? value.schemaVersion : undefined;
-      const version =
-        typeof rawVersion === 'string' || typeof rawVersion === 'number' ? String(rawVersion) : 'missing or invalid';
-      throw new ServiceError(
-        `Unsupported project schema version ${version}; this build requires version ${PROJECT_SCHEMA_VERSION}. No migration is performed.`,
-        422,
-      );
-    }
-    const document = projectSchema.parse(value);
+    const document = projectSchema.parse(upgradeProject(value));
     if (document.id !== id) throw new ServiceError('The project ID does not match its filename.', 422);
     return document;
   }
   private incompatible(error: unknown): ServiceError {
-    const message =
-      error instanceof ZodError
-        ? error.issues
-            .slice(0, 6)
-            .map((issue) => `${issue.path.join('.')}: ${issue.message}`)
-            .join('; ')
-        : errorMessage(error);
     return new ServiceError(
-      `Cannot open this project: ${message} Restore a valid version ${PROJECT_SCHEMA_VERSION} project, open it with a compatible PasCap version, or create a new project. The existing file was not changed.`,
+      `Cannot open this project: ${describeInvalid(error)} Restore a valid project saved with ${supportedProjectVersions()}, open it with a compatible PasCap version, or create a new project. The existing file was not changed.`,
       422,
     );
   }
   async load(id: string): Promise<ProjectDocument> {
+    return (await this.loadSaved(id)).document;
+  }
+  private async loadSaved(id: string): Promise<SavedProject> {
     const filename = this.filename(id);
     try {
-      return this.decode(id, (await this.read(filename)).value);
+      const { value } = await this.read(filename);
+      const document = this.decode(id, value);
+      return { document, schemaVersion: (value as { schemaVersion: number }).schemaVersion };
     } catch (error) {
       if (isNotFound(error)) throw new ServiceError('Project not found.', 404);
       throw this.incompatible(error);
@@ -195,6 +204,14 @@ export class ProjectStore {
   async create(title: string): Promise<ProjectDocument> {
     return this.save(createProject(randomUUID(), title), 0);
   }
+  /** Reads an opened project file as a new, unsaved project, so it never replaces an existing one. */
+  decodeFile(value: unknown): ProjectDocument {
+    try {
+      return projectSchema.parse({ ...projectSchema.parse(upgradeProject(value)), id: randomUUID(), revision: 0 });
+    } catch (error) {
+      throw new ServiceError(`This is not a PasCap project file this build can open. ${describeInvalid(error)}`, 422);
+    }
+  }
   async delete(id: string, expectedRevision: number | null): Promise<void> {
     const filename = this.filename(id);
     if (expectedRevision !== null) frameSchema.parse(expectedRevision);
@@ -247,16 +264,19 @@ export class ProjectStore {
     return this.#writer.run(() => this.write(snapshot, expectedRevision));
   }
   private async write(snapshot: ProjectDocument, expectedRevision: number): Promise<ProjectDocument> {
-    let current: ProjectDocument | null = null;
+    let current: SavedProject | null = null;
     try {
-      current = await this.load(snapshot.id);
+      current = await this.loadSaved(snapshot.id);
     } catch (error) {
       if (!(error instanceof ServiceError && error.statusCode === 404)) throw error;
     }
-    if ((current?.revision ?? 0) !== expectedRevision)
+    if ((current?.document.revision ?? 0) !== expectedRevision)
       throw new ServiceError('Stale save: this project was saved by another tab. Reload before editing.', 409);
     const saved = projectSchema.parse({ ...snapshot, revision: expectedRevision + 1 });
-    await atomicWrite(this.filename(saved.id), `${JSON.stringify(saved, null, 2)}\n`);
+    const filename = this.filename(saved.id);
+    if (current && current.schemaVersion !== PROJECT_SCHEMA_VERSION)
+      await keepOriginal(filename, current.schemaVersion);
+    await atomicWrite(filename, `${JSON.stringify(saved, null, 2)}\n`);
     return saved;
   }
 }

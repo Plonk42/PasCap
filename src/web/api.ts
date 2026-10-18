@@ -263,6 +263,8 @@ export const api = {
   projects: (options?: RequestOptions) =>
     request('/api/projects', z.object({ projects: z.array(projectSummarySchema) }), 'GET', undefined, options),
   createProject: (title: string) => request('/api/projects', z.object({ document: projectSchema }), 'POST', { title }),
+  importProject: (document: unknown) =>
+    request('/api/projects/import', z.object({ document: projectSchema }), 'POST', { document }),
   deleteProject: (id: string, expectedRevision: number | null) =>
     request(`/api/projects/${id}`, z.object({ deleted: z.literal(true) }), 'DELETE', { expectedRevision }),
   load: (id: string, options?: RequestOptions) =>

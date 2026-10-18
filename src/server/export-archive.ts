@@ -3,7 +3,8 @@ import path from 'node:path';
 import { z } from 'zod';
 import { audioAssetSchema } from '../shared/audio.js';
 import { defaultExportName, exportOutputNameSchema, exportProfileSchema, planExportMusic } from '../shared/export.js';
-import { idSchema, MAX_MUSIC_TRACKS, PROJECT_SCHEMA_VERSION, projectSchema } from '../shared/model.js';
+import { idSchema, MAX_MUSIC_TRACKS, projectSchema } from '../shared/model.js';
+import { upgradeProject } from '../shared/project-migrations.js';
 import { forEachSerial } from '../shared/serial.js';
 import { calculateLayout } from '../shared/timeline.js';
 import type { ServiceConfig } from './config.js';
@@ -104,19 +105,15 @@ interface ArchivedExport {
 
 function parseReceipt(raw: unknown): z.infer<typeof receiptSchema> | null {
   if (typeof raw !== 'object' || raw === null || !('kind' in raw) || raw.kind !== 'export') return null;
-  const snapshot = 'snapshot' in raw ? raw.snapshot : undefined;
-  const rawVersion =
-    typeof snapshot === 'object' && snapshot !== null && 'schemaVersion' in snapshot
-      ? snapshot.schemaVersion
-      : undefined;
-  if (rawVersion !== PROJECT_SCHEMA_VERSION) {
-    const version =
-      typeof rawVersion === 'string' || typeof rawVersion === 'number' ? String(rawVersion) : 'missing or invalid';
-    throw new Error(
-      `Unsupported export snapshot schema version ${version}; this build requires version ${PROJECT_SCHEMA_VERSION}. The existing receipt and successful output were not changed.`,
-    );
+  let snapshot: unknown;
+  try {
+    snapshot = upgradeProject('snapshot' in raw ? raw.snapshot : undefined, 'export snapshot');
+  } catch (error) {
+    throw new Error(`${errorMessage(error)} The existing receipt and successful output were not changed.`, {
+      cause: error,
+    });
   }
-  const parsed = receiptSchema.safeParse(raw);
+  const parsed = receiptSchema.safeParse({ ...raw, snapshot });
   if (!parsed.success)
     throw new Error(
       `Cannot restore this export receipt: ${parsed.error.message}. The existing receipt and successful output were not changed.`,

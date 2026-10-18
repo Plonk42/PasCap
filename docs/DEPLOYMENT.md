@@ -91,9 +91,10 @@ required per-track Ripple, transitions, opening/closing fades and numeric
 `tint`, `vibrance`, `whites` and `blacks`), `hdr` and `localContrast`. HSL/curves remain static. Track `opacity` is the sole saved
 Opacity value; saved `clip.opacity` and old `clipOpacity`/`layerOpacity` channels
 are rejected. The track value or its overriding keyframes supply Opacity to each source
-in a dissolve group, without an additional track multiplier. Projects with an earlier schema version
-and receipt snapshots remain unchanged/incompatible and require project recreation,
-without migration, compatibility defaults, null/old-format readers or automatic deletion.
+in a dissolve group, without an additional track multiplier. Projects saved with an older
+supported schema are upgraded on load; projects and receipt snapshots older than the oldest
+supported schema remain unchanged and rejected, without compatibility defaults,
+null/old-format readers or automatic deletion.
 Export receipts remain version 1 with strict current-schema snapshots and required captured
 audio-source/instance-plan arrays; invalid arrays/older snapshots remain preserved
 and rejected. Proxy/current PCM formats and source identity checks are unchanged; the

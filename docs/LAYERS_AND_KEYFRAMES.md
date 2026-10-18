@@ -680,15 +680,15 @@ The required `music` array contains 0–8 independent music tracks with unique r
 IDs and complete source IN/OUT/start/duration/gain/fades/loop fields; `[]` without
 music, never a null/singular value or default. Version-1 export receipts require
 a strict current-schema snapshot plus captured audio-source/instance-plan arrays.
-Project documents and export receipt snapshots with an earlier schema version remain unchanged/incompatible;
-there are no migrations, compatibility fallback/default fields or automatic deletion
-of projects, receipts or successful videos. Create a new project and deliberately
+Project documents saved with an older supported schema are upgraded on load; documents and
+export receipt snapshots older than the oldest supported schema remain unchanged and rejected;
+there are no compatibility fallback/default fields or automatic deletion
+of projects, receipts or successful videos. Recreate such a project and deliberately
 import its media; registered media and currently verified ready proxies remain reusable.
 Proxy/current PCM formats and source identity checks are unchanged; the registries are
 version 2 (full-content checksums).
 Confirmed project deletion removes only its saved document, preserving originals,
-the shared registry/proxy cache and exports/receipts. The live sample appearing
-incompatible is expected, not a reason to rewrite it.
+the shared registry/proxy cache and exports/receipts.
 
 Workspace layout, field commits and recovery controls are specified in
 [WORKSPACE_AND_RECOVERY.md](WORKSPACE_AND_RECOVERY.md).

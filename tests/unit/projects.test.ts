@@ -928,6 +928,36 @@ describe('multiple-project HTTP API', () => {
     expect(current.music).toEqual(document.music);
     const confirmedPath = path.join(dataDir, 'projects', 'preview-lab.json');
     const confirmedBytes = await readFile(confirmedPath);
+    // A project file opens as a new copy: it never replaces the project it was saved from.
+    const imported = await service.app.inject({
+      method: 'POST',
+      url: '/api/projects/import',
+      headers,
+      payload: { document: JSON.parse(confirmedBytes.toString('utf8')) as unknown },
+    });
+    expect(imported.statusCode).toBe(201);
+    const copy = projectSchema.parse(imported.json().document);
+    expect(copy.id).not.toBe(current.id);
+    expect({ ...copy, id: current.id, revision: current.revision }).toEqual(current);
+    expect(copy.revision).toBe(1);
+    expect(await service.projects.load(copy.id)).toEqual(copy);
+    for (const [document, error] of [
+      [{ ...current, clips: [createClip('clip-a', 'video-elsewhere', 0, 120)] }, 'not imported in this PasCap service'],
+      [{ ...current, schemaVersion: PROJECT_SCHEMA_VERSION + 1 }, 'saved by a newer PasCap version'],
+      [{ ...current, schemaVersion: EARLIER_SCHEMA_VERSIONS.at(-1) }, 'cannot be upgraded'],
+      [{ ...current, title: '' }, 'title'],
+    ] as const) {
+      const rejected = await service.app.inject({
+        method: 'POST',
+        url: '/api/projects/import',
+        headers,
+        payload: { document },
+      });
+      expect(rejected.statusCode).toBe(422);
+      expect(rejected.json().error).toContain(error);
+    }
+    expect((await service.projects.list()).map((entry) => entry.id).sort()).toEqual([copy.id, 'preview-lab'].sort());
+    expect(await readFile(confirmedPath)).toEqual(confirmedBytes);
     const transformAfterDuration = structuredClone(current);
     transformAfterDuration.layers[0]!.transform.keyframes = [
       { ...uniformKeyframe(0, { ...NEUTRAL_SPATIAL_POSE }, 'linear'), reset: false },

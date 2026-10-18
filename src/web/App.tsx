@@ -51,6 +51,7 @@ import { mediaReady } from './display.js';
 import { Icon } from './icons.js';
 import { PanelRail, toggleSidePanel, type SidePanel } from './PanelToggle.js';
 import { trackPointerFocus, type PointerFocus } from './pointer-focus.js';
+import { chooseProjectFile, readProjectFile } from './project-file.js';
 import type { InspectorMode, InspectorSectionRequest, InspectorSectionTarget } from './InspectorSection.js';
 import { Jobs } from './Jobs.js';
 import {
@@ -1310,6 +1311,17 @@ export function App() {
         setError('');
       })
     ).ok;
+  const refreshProjectList = (): void => {
+    // A read failure cannot turn an accepted create into an invitation to retry the POST.
+    void api
+      .projects()
+      .then((result) => {
+        if (mounted.current) setProjectList(result.projects);
+      })
+      .catch(() => {
+        /* Reopen Projects to read the latest list. */
+      });
+  };
   const createNewProject = async (title: string): Promise<boolean> =>
     (
       await act(async () => {
@@ -1317,15 +1329,26 @@ export function App() {
         const loaded = (await api.createProject(title)).document;
         installProject(loaded);
         setError('');
-        // A read failure cannot turn an accepted create into an invitation to retry the POST.
-        void api
-          .projects()
-          .then((result) => {
-            if (mounted.current) setProjectList(result.projects);
-          })
-          .catch(() => {
-            /* Reopen Projects to read the latest list. */
-          });
+        refreshProjectList();
+      })
+    ).ok;
+  const saveProjectFile = async (entry: ProjectSummary): Promise<boolean> =>
+    (
+      await act(async () => {
+        const write = await chooseProjectFile(entry.title);
+        if (!write) return;
+        await flushBeforeSwitch();
+        await write((await api.load(entry.id)).document);
+      })
+    ).ok;
+  const openProjectFile = async (file: File): Promise<boolean> =>
+    (
+      await act(async () => {
+        const value = await readProjectFile(file);
+        await flushBeforeSwitch();
+        installProject((await api.importProject(value)).document);
+        setError('');
+        refreshProjectList();
       })
     ).ok;
   const deleteProject = async (entry: ProjectSummary): Promise<boolean> =>
@@ -2206,6 +2229,8 @@ export function App() {
               onOpen={openProject}
               onCreate={createNewProject}
               onDelete={deleteProject}
+              onSaveFile={saveProjectFile}
+              onOpenFile={openProjectFile}
               onClose={() => setShowProjects(false)}
             />
           )}

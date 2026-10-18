@@ -4,7 +4,8 @@ Reply in English. Keep summaries short and name remaining limitations.
 
 ## Workflow
 
-PasCap is a solo, pre-release project: optimize for fast iteration. Details are in
+PasCap is a solo, pre-release project: optimize for fast iteration, but the owner now
+edits real projects with it, so saved data must keep working. Details are in
 [the GitHub workflow](../docs/GITHUB_WORKFLOW.md).
 
 - Start from current `main` (`git pull --ff-only`). Never stash, reset, discard or
@@ -70,12 +71,17 @@ PasCap is a solo, pre-release project: optimize for fast iteration. Details are 
   Keep contextual accessible names and technical/internal math terms such as
   anchor, participant and `interpolation` where needed; do not rename saved fields
   or internal identifiers merely to match visible labels.
-- Until the first release candidate, approved changes may break saved projects and
-  persisted formats. Keep one strict current contract: no migrations, legacy fields,
-  compatibility defaults or old-format readers unless requested. Reject
-  incompatible data clearly; never silently rewrite or delete it. Bump
-  `PROJECT_SCHEMA_VERSION` (src/shared/model.ts) for incompatible changes; never
-  write the schema number in docs.
+- **Backward compatibility is required** (owner, 2026-10-18), unless the owner
+  explicitly waives it for a change. Projects (including export receipt snapshots),
+  the video/music registries and receipts saved by any supported version must keep
+  opening with the same meaning. An incompatible project change bumps
+  `PROJECT_SCHEMA_VERSION` (src/shared/model.ts), adds the upgrade step from the
+  previous version in `src/shared/project-migrations.ts` and a frozen
+  `tests/fixtures/projects/schema-N.json` (never edit an existing one). Prefer
+  additive changes that need no bump. Never silently drop or reinterpret saved
+  values; reject data a build cannot open clearly and leave it unchanged.
+  Regenerable caches (proxies, PCM, thumbnails, motion analysis) may instead
+  require explicit re-preparation. Never write the schema number in docs.
 - Never commit or post private paths, media, credentials, caches or generated reports.
 
 ## Architecture
@@ -233,8 +239,8 @@ clarity −1–1, denoise 0–1 }`, neutral 0, with no keyframes or track channe
   Version-1 export receipts require strict current-schema snapshots and captured audio-source/
   instance-plan arrays; receipt, registry/proxy/PCM and benchmark format versions
   remain independent and unchanged.
-  Reject and preserve projects/receipt snapshots with an earlier schema version; require recreation,
-  without migrations, compatibility defaults or automatic deletion.
+  Reject and preserve projects/receipt snapshots older than the oldest supported
+  schema (`OLDEST_PROJECT_SCHEMA_VERSION`), without automatic deletion.
 - Owner-approved #135/#87: track and Transform keyframes store one Easing per enabled
   setting (`easing` mirrors `values`); a joining setting adopts the Easing its keyframe's
   settings agree on, else Linear. Track keyframes require boolean `reset`: a **default

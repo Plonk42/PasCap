@@ -49,6 +49,18 @@ export async function memoryProjects(page: Page, initial: ProjectDocument): Prom
   await page.route(/\/api\/projects\/[^/?]+(?:\?.*)?$/, async (route) => {
     const id = new URL(route.request().url()).pathname.slice('/api/projects/'.length);
     const method = route.request().method();
+    if (id === 'import' && method === 'POST') {
+      const body = route.request().postDataJSON() as { document: unknown };
+      const parsed = projectSchema.safeParse(body.document);
+      if (!parsed.success) {
+        await route.fulfill({ status: 422, json: { error: 'This is not a PasCap project file this build can open.' } });
+        return;
+      }
+      const copy = projectSchema.parse({ ...parsed.data, id: `browser-project-${++serial}`, revision: 1 });
+      documents.set(copy.id, copy);
+      await route.fulfill({ status: 201, json: { document: copy } });
+      return;
+    }
     const saved = documents.get(id);
     if (!saved) {
       await route.fulfill({ status: 404, json: { error: 'Memory-only project not found.' } });

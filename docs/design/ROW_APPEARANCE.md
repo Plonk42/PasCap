@@ -23,11 +23,11 @@ Positive Temperature warms; positive Tint adds magenta. Nonzero settings
 intentionally colour greys; normalized linear gains precede Exposure, preserving
 neutral-white linear luminance before clipping only, not arbitrary/final images.
 Other scalar bounds and neutral values retain the existing SDR contract.
-No optional legacy field, additive parameter merge, migration or default-on-load exists.
-The current schema rejects earlier schema versions without rewriting or deleting their documents.
+No optional legacy field, additive parameter merge or default-on-load exists.
+Projects saved with an older supported schema are upgraded on load; older schema versions
+are rejected without rewriting or deleting their documents.
 Receipt format remains 1 with strict current-schema snapshots; proxy and PCM formats are
-unchanged, and the registries are version 2 (full-content checksums). Recreate
-incompatible projects deliberately.
+unchanged, and the registries are version 2 (full-content checksums).
 
 The twelve shared scalar colour channels, HDR and Local contrast override **video track colour**, independently, in
 absolute project time. Skip keyframes without the relevant enabled setting, interpolate parameter values
