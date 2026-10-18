@@ -33,6 +33,15 @@ export function isNeutralDetail(settings: Readonly<DetailSettings>): boolean {
 
 /** Radii are in 1/720 of the image height: one pixel of the 720p preview and draft export. */
 export const DETAIL_REFERENCE_LINES = 720;
+/**
+ * Above 720 lines, detail is measured on taps shifted by up to half a source pixel diagonally, so each
+ * bilinear tap averages up to 2×2 pixels: the sparse kernel then sees the 720p picture, not finer detail.
+ */
+export function detailShift(lines: number): number {
+  return 0.5 * Math.min(1, Math.max(0, lines / DETAIL_REFERENCE_LINES - 1));
+}
+/** Denoise eases finer-than-720p detail below this fraction of its range sigma. */
+export const DENOISE_DETAIL_CORE = 0.5;
 /** Denoise range sigma at full strength, in encoded RGB units. */
 export const DENOISE_RANGE_SIGMA = 0.1;
 export const SHARPEN_GAIN = 2;
@@ -166,6 +175,12 @@ function luma(rgb: Float64Array): number {
   return 0.2126 * rgb[0]! + 0.7152 * rgb[1]! + 0.0722 * rgb[2]!;
 }
 
+/** Soft threshold d³ / (d² + t²): nearly zero well below t, nearly d well above it; d itself when t is 0. */
+export function softThreshold(value: number, threshold: number): number {
+  if (threshold <= 0) return value;
+  return (value * value * value) / (value * value + threshold * threshold);
+}
+
 /** Sharpened luma with its excess beyond [low, high] eased towards SHARPEN_HALO; small overshoots stay. */
 export function limitOvershoot(value: number, low: number, high: number): number {
   // Capped: tanh(10) is 1 in float32, and some GPU tanh implementations overflow far beyond it.
@@ -188,12 +203,14 @@ export function denoiseRangeFactor(denoise: number): number {
  * Denoise → HDR and Local contrast → Shadows/Highlights → Clarity → Sharpen on source pixels, before grading.
  * Null when neutral.
  * `aspect` is the original width / height, so radii follow the image height.
+ * `lines` is the sampled image's height in pixels.
  * `tone` holds the evaluated track Colour local tone settings at this project frame.
  */
 export function compileDetail(
   settings: Readonly<DetailSettings>,
   aspect: number,
   tone: Readonly<LocalTone>,
+  lines: number,
 ): DetailFilter | null {
   const { sharpen, clarity, denoise } = detailSchema.parse(settings);
   const { shadows, highlights, hdr, localContrast, exposure } = tone;
@@ -206,28 +223,34 @@ export function compileDetail(
   const residual = hdr > 0 || localContrast !== 0;
   if (isNeutralDetail({ sharpen, clarity, denoise }) && !residual && !toneGain) return null;
   if (!Number.isFinite(aspect) || aspect <= 0) throw new Error('Detail filters need a positive image aspect.');
+  if (!Number.isFinite(lines) || lines <= 0) throw new Error('Detail filters need a positive image height.');
   const stepV = 1 / DETAIL_REFERENCE_LINES;
   const stepU = stepV / aspect;
+  const shift = isNeutralDetail({ sharpen, clarity, denoise }) ? 0 : detailShift(lines);
+  const shiftV = shift / lines;
+  const shiftU = shiftV / aspect;
   const inverseRange = denoiseRangeFactor(denoise);
+  const core = DENOISE_DETAIL_CORE * DENOISE_RANGE_SIGMA * denoise;
   const centre = new Float64Array(3);
+  const measured = new Float64Array(3);
   const tap = new Float64Array(3);
   const gaussian = new Float64Array(3);
   const denoised = new Float64Array(3);
   let denoisedWeight = 1;
   let low = 0;
   let high = 0;
-  // Bilateral weight: spatial Gaussian times an encoded-RGB range Gaussian around the centre.
+  // Bilateral weight: spatial Gaussian times an encoded-RGB range Gaussian around the measured centre.
   const bilateral = (weight: number): void => {
-    const red = tap[0]! - centre[0]!;
-    const green = tap[1]! - centre[1]!;
-    const blue = tap[2]! - centre[2]!;
+    const red = tap[0]! - measured[0]!;
+    const green = tap[1]! - measured[1]!;
+    const blue = tap[2]! - measured[2]!;
     const w = weight * Math.exp(-(red * red + green * green + blue * blue) * inverseRange);
     denoisedWeight += w;
     for (let channel = 0; channel < 3; channel++) denoised[channel]! += w * tap[channel]!;
   };
   const fine = (sample: DetailSampler, u: number, v: number): void => {
-    gaussian.set(centre);
-    low = high = luma(centre);
+    gaussian.set(measured);
+    low = high = luma(measured);
     for (const { x, y, weight } of DETAIL_FINE_TAPS) {
       sample(u + x * stepU, v + y * stepV, tap);
       const level = luma(tap);
@@ -247,7 +270,7 @@ export function compileDetail(
     }
   };
   const localMean = (sample: DetailSampler, u: number, v: number): number => {
-    let sum = luma(centre);
+    let sum = luma(measured);
     for (const { x, y } of DETAIL_CLARITY_TAPS) {
       sample(u + x * stepU, v + y * stepV, tap);
       sum += luma(tap);
@@ -293,35 +316,47 @@ export function compileDetail(
       denoised[channel] = value + lift + blend * (value * ratio - value - lift);
     }
   };
+  const clarityTerm = (sample: DetailSampler, u: number, v: number, y: number): number => {
+    const midtones = Math.min(1, Math.max(0, 4 * y * (1 - y)));
+    return CLARITY_GAIN * clarity * midtones * (y - localMean(sample, u, v));
+  };
+  const sharpenTerm = (y: number): number => {
+    const sharpened = y + SHARPEN_GAIN * sharpen * softThreshold(y - luma(gaussian), SHARPEN_THRESHOLD);
+    // Denoise's wide ring can move the base outside the fine range: never limit towards it.
+    return limitOvershoot(sharpened, Math.min(low, y), Math.max(high, y)) - y;
+  };
+  // Finer-than-720p detail passes through, eased below the Denoise threshold.
+  const addFiner = (): void => {
+    for (let channel = 0; channel < 3; channel++)
+      denoised[channel]! += softThreshold(centre[channel]! - measured[channel]!, core);
+  };
+  const applyLocalTone = (sample: DetailSampler, u: number, v: number): void => {
+    const base = luma(denoised);
+    const smooth = edgeAwareBase(sample, u, v, base);
+    if (residual) toneMap(base, smooth);
+    if (toneGain) {
+      // A linear-light gain keeps local contrast and colour ratios, and black at black.
+      const gain = 2 ** localToneStops(smooth, tone);
+      for (let channel = 0; channel < 3; channel++) denoised[channel] = encode709(decode709(denoised[channel]!) * gain);
+    }
+  };
   return {
     apply(sample, u, v, out) {
       sample(u, v, centre);
-      denoised.set(centre);
+      // Detail is measured at 720p scale (shifted taps) and applied to the full-resolution pixel.
+      const mu = u + shiftU;
+      const mv = v + shiftV;
+      if (shift > 0) sample(mu, mv, measured);
+      else measured.set(centre);
+      denoised.set(measured);
       denoisedWeight = 1;
-      if (sharpen > 0 || denoise > 0) fine(sample, u, v);
-      const base = luma(denoised);
+      if (sharpen > 0 || denoise > 0) fine(sample, mu, mv);
+      const detailBase = luma(denoised);
       let delta = 0;
-      if (clarity !== 0) {
-        const midtones = Math.min(1, Math.max(0, 4 * base * (1 - base)));
-        delta += CLARITY_GAIN * clarity * midtones * (base - localMean(sample, u, v));
-      }
-      if (sharpen > 0) {
-        const detail = base - luma(gaussian);
-        const cored = (detail * detail * detail) / (detail * detail + SHARPEN_THRESHOLD * SHARPEN_THRESHOLD);
-        const sharpened = base + SHARPEN_GAIN * sharpen * cored;
-        // Denoise's wide ring can move the base outside the fine range: never limit towards it.
-        delta += limitOvershoot(sharpened, Math.min(low, base), Math.max(high, base)) - base;
-      }
-      if (residual || toneGain) {
-        const smooth = edgeAwareBase(sample, u, v, base);
-        if (residual) toneMap(base, smooth);
-        if (toneGain) {
-          // A linear-light gain keeps local contrast and colour ratios, and black at black.
-          const gain = 2 ** localToneStops(smooth, tone);
-          for (let channel = 0; channel < 3; channel++)
-            denoised[channel] = encode709(decode709(denoised[channel]!) * gain);
-        }
-      }
+      if (clarity !== 0) delta += clarityTerm(sample, mu, mv, detailBase);
+      if (sharpen > 0) delta += sharpenTerm(detailBase);
+      if (shift > 0) addFiner();
+      if (residual || toneGain) applyLocalTone(sample, u, v);
       for (let channel = 0; channel < 3; channel++) out[channel] = Math.min(1, Math.max(0, denoised[channel]! + delta));
     },
   };

@@ -364,7 +364,12 @@ describe.skipIf(!enabled)('spatial transforms · real native FFmpeg, disposable 
         neutral: (Object.keys(spatial) as (keyof SpatialPose)[]).every(
           (key) => spatial[key] === NEUTRAL_SPATIAL_POSE[key],
         ),
-        detail: compileDetail(sample.detail, asset.metadata.width / asset.metadata.height, localTone(sample.colour)),
+        detail: compileDetail(
+          sample.detail,
+          asset.metadata.width / asset.metadata.height,
+          localTone(sample.colour),
+          bounds.height,
+        ),
         cosine: Math.cos(radians),
         sine: Math.sin(radians),
         denominatorX: fit * asset.metadata.width * spatial.scale,
