@@ -38,6 +38,8 @@ export const DENOISE_RANGE_SIGMA = 0.1;
 export const SHARPEN_GAIN = 2;
 /** Sharpen overshoot beyond the 3×3 luma range tends to this, in encoded units: no hard halos. */
 export const SHARPEN_HALO = 0.05;
+/** Fine detail below about this luma amplitude (≈ 1/255: grain, compression noise) is barely sharpened. */
+export const SHARPEN_THRESHOLD = 0.004;
 export const CLARITY_GAIN = 1;
 const DIAGONAL = Math.SQRT1_2;
 const DIRECTIONS: readonly (readonly [number, number])[] = [
@@ -304,7 +306,9 @@ export function compileDetail(
         delta += CLARITY_GAIN * clarity * midtones * (base - localMean(sample, u, v));
       }
       if (sharpen > 0) {
-        const sharpened = base + SHARPEN_GAIN * sharpen * (base - luma(gaussian));
+        const detail = base - luma(gaussian);
+        const cored = (detail * detail * detail) / (detail * detail + SHARPEN_THRESHOLD * SHARPEN_THRESHOLD);
+        const sharpened = base + SHARPEN_GAIN * sharpen * cored;
         // Denoise's wide ring can move the base outside the fine range: never limit towards it.
         delta += limitOvershoot(sharpened, Math.min(low, base), Math.max(high, base)) - base;
       }
