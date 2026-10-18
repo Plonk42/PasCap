@@ -92,7 +92,8 @@ function reference(image: Image, u: number, v: number, settings: DetailSettings,
     delta += settings.clarity * Math.min(1, Math.max(0, 4 * base * (1 - base))) * (base - mean);
   }
   if (settings.sharpen > 0) {
-    const sharpened = base + 2 * settings.sharpen * (base - luma(gaussian));
+    const fine = base - luma(gaussian);
+    const sharpened = base + (2 * settings.sharpen * fine ** 3) / (fine ** 2 + 0.004 ** 2);
     const top = Math.max(high, base);
     const bottom = Math.min(low, base);
     const ease = (excess: number): number => 0.05 * Math.tanh(Math.min(10, excess / 0.05));
@@ -249,12 +250,18 @@ describe('clip detail settings', () => {
     const knee = 0.5 + 3.5 * pixel;
     expect(run(ramp, knee, 0.5, sharp)[0]).toBeGreaterThan(ramp(knee, 0.5)[0] + 0.01);
     expect(run(ramp, knee, 0.5, sharp)[0]).toBeLessThanOrEqual(0.7);
-    // Low-contrast texture keeps nearly all of its sharpening.
+    // Texture keeps nearly all of its sharpening.
     const texture: Image = (u) => {
-      const level = 0.5 + 0.02 * Math.cos(((u * 1280 - 0.5) * 2 * Math.PI) / 6);
+      const level = 0.5 + 0.04 * Math.cos(((u * 1280 - 0.5) * 2 * Math.PI) / 6);
       return [level, level, level];
     };
-    expect(run(texture, 6.5 / 1280, 0.5, sharp)[0]! - 0.5).toBeGreaterThan(1.45 * 0.02);
+    expect(run(texture, 6.5 / 1280, 0.5, sharp)[0]! - 0.5).toBeGreaterThan(1.4 * 0.04);
+    // Grain-sized detail is left alone rather than amplified.
+    const faint: Image = (u) => {
+      const level = 0.5 + 0.003 * Math.cos(((u * 1280 - 0.5) * 2 * Math.PI) / 6);
+      return [level, level, level];
+    };
+    expect(run(faint, 6.5 / 1280, 0.5, sharp)[0]! - 0.5).toBeLessThan(1.05 * 0.003);
     const near = 0.5 + 4 * pixel;
     expect(run(edge, near, 0.5, { sharpen: 0, clarity: 1, denoise: 0 })[0]).toBeGreaterThan(0.7);
     expect(run(edge, near, 0.5, { sharpen: 0, clarity: -1, denoise: 0 })[0]).toBeLessThan(0.7);

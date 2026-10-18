@@ -65,7 +65,9 @@ For centre sample $c$ the stages run **Denoise → HDR and Local contrast → Sh
 3. **Clarity**: $L$ is the luma mean of $c$ and sixteen taps on two rings of eight
    directions at radii 5 and 10 units. With $y = Y(D)$ and midtone mask
    $m = \mathrm{clamp}(4y(1-y), 0, 1)$, it contributes $\mathrm{clarity} \cdot m \cdot (y - L)$.
-4. **Sharpen** raises $y$ to $s = y + 2 \cdot \mathrm{sharpen} \cdot (y - Y(G))$. Using the denoised
+4. **Sharpen** raises $y$ to $s = y + 2 \cdot \mathrm{sharpen} \cdot k(y - Y(G))$, where the soft
+   noise threshold $k(d) = d^3 / (d^2 + t^2)$ with $t = 0.004$ (about 1/255) leaves grain and
+   compression noise nearly untouched while passing real detail. Using the denoised
    centre against the raw Gaussian keeps sharpening from re-amplifying removed noise.
    To avoid halos, $s$ leaves the luma range $[\ell, h]$ of the centre and fine ring (widened
    to include $y$) only softly: an excess $e$ beyond it becomes $0.05 \tanh(e / 0.05)$. Small

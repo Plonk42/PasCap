@@ -14,6 +14,7 @@ import {
   MID_GREY_STOPS,
   SHARPEN_GAIN,
   SHARPEN_HALO,
+  SHARPEN_THRESHOLD,
 } from '../shared/detail.js';
 import { BLACKS_RANGE, WHITES_RANGE } from '../shared/colour.js';
 
@@ -175,7 +176,9 @@ vec3 detailFilter(sampler2D source, vec2 coordinate, vec3 centre, vec4 detail, v
     delta += ${glslFloat(CLARITY_GAIN)} * detail.y * clamp(4.0 * base * (1.0 - base), 0.0, 1.0) * (base - mean);
   }
   if (detail.x > 0.0) {
-    float sharpened = base + ${glslFloat(SHARPEN_GAIN)} * detail.x * (base - dot(gaussian, luma));
+    float fine = base - dot(gaussian, luma);
+    float cored = fine * fine * fine / (fine * fine + ${glslFloat(SHARPEN_THRESHOLD * SHARPEN_THRESHOLD)});
+    float sharpened = base + ${glslFloat(SHARPEN_GAIN)} * detail.x * cored;
     delta += limitOvershoot(sharpened, min(low, base), max(high, base)) - base;
   }
   if (any(notEqual(localTone.xyz, vec3(0.0))) || contrast != 0.0) {
