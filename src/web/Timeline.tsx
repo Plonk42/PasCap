@@ -404,7 +404,8 @@ function BookmarkButton(
   const previous = adjacentBookmark(props.project.bookmarks, props.frame, props.duration, -1);
   const next = adjacentBookmark(props.project.bookmarks, props.frame, props.duration, 1);
   return (
-    <span className="timeline-bookmark-actions">
+    <fieldset className="timeline-bookmark-actions rush-quick-actions">
+      <legend className="declutter-sr-only">Bookmarks</legend>
       <button
         type="button"
         className="icon-button"
@@ -436,7 +437,7 @@ function BookmarkButton(
       >
         <Icon name="forward" size={14} />
       </button>
-    </span>
+    </fieldset>
   );
 }
 
@@ -1153,14 +1154,6 @@ export function Timeline(props: Readonly<Props>) {
     <section className="timeline-panel panel" id="timeline-pane" tabIndex={-1} aria-label="Video timeline">
       <div className="timeline-toolbar">
         <h2 className="declutter-sr-only">Timeline</h2>
-        <BookmarkButton
-          project={project}
-          frame={frame}
-          duration={layout.duration}
-          disabled={interactionBlocked}
-          onEdit={onEdit}
-          onSeek={onSeek}
-        />
         <button
           className={`secondary-button small timeline-view-action ${snapping ? 'active' : ''}`}
           aria-label="Toggle snapping"
@@ -1172,6 +1165,14 @@ export function Timeline(props: Readonly<Props>) {
           <Icon name="magnet" size={15} />
           <span className="timeline-action-label">Snap</span>
         </button>
+        <BookmarkButton
+          project={project}
+          frame={frame}
+          duration={layout.duration}
+          disabled={interactionBlocked}
+          onEdit={onEdit}
+          onSeek={onSeek}
+        />
         <RushEditBar
           project={project}
           selected={selected}
