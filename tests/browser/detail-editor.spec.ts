@@ -113,7 +113,7 @@ test('exact fields reject invalid drafts, names reset one setting, Reset detail 
   const before = await current(page);
   const plain = await checksum(page);
   const sharpen = page.getByRole('spinbutton', { name: 'Clip Sharpen', exact: true });
-  await sharpen.fill('1.5');
+  await sharpen.fill('2.5');
   await sharpen.press('Enter');
   await expect(sharpen).toHaveAttribute('aria-invalid', 'true');
   expect(await current(page)).toEqual(before);
