@@ -229,7 +229,7 @@ salmon **●** custom-speed lane is unchanged.
 ## Preservation
 
 Projects and version-1 export receipt snapshots must satisfy the strict **current schema**.
-Projects/receipt snapshots with an earlier schema version and completed videos remain untouched.
-Recreate projects deliberately; do not migrate, default-fill, rewrite or delete old
-data automatically. Proxy/PCM and receipt/report format versions do not change; the
+Projects saved with an older supported schema are upgraded on load, keeping the original
+file as a backup; projects/receipt snapshots older than the oldest supported schema and
+completed videos remain untouched. Do not default-fill or delete old data automatically. Proxy/PCM and receipt/report format versions do not change; the
 registries are version 2 (full-content checksums).

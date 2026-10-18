@@ -36,9 +36,9 @@ warms; positive Tint adds magenta. The shared normalized linear-gain formula run
 before Exposure and intentionally colours greys; neutral-white luminance is
 preserved before clipping only. Static track
 [HSL ranges and master/RGB curves](design/HSL_AND_CURVES.md)
-follow scalar grading without adding animation channels. Projects with an earlier schema version
-and receipt snapshots are preserved/incompatible and require recreation, without
-migration, defaults, null/old-format readers or automatic deletion;
+follow scalar grading without adding animation channels. Projects saved with an older
+supported schema are upgraded on load; projects and receipt snapshots older than the
+oldest supported schema are rejected and preserved, without defaults or automatic deletion;
 proxy/current PCM formats remain unchanged; the registries are version 2 (full-content
 checksums). Projects require a 0–8
 identified music track array (`[]` without music); version-1 export receipts
@@ -164,7 +164,8 @@ bundle private footage or promise GPU-native encoding.
 ## Scope boundaries
 
 - Original recordings are never uploaded, copied or automatically deleted.
-- Strict local data remains explicit; no unrequested migrations or fallback fields.
+- Strict local data remains explicit; older supported projects are upgraded on load,
+  without fallback fields.
 - The application is local/single-user, not GitHub Pages, LAN hosting or remote SaaS.
 - No new rendering effect is scheduled from an inspection checklist alone.
 - [The implementation plan](../EDITOR_IMPLEMENTATION_PLAN.md) is retained as design

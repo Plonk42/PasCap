@@ -84,8 +84,9 @@ $w_i$ dissolve weight and $m_i$ spatial pixel coverage. Exact neutral poses
 preserve opaque black letterboxing after grading; nonneutral uncovered pixels
 reveal lower footage. Each source uses the same evaluated track Opacity at that
 project frame, from the track value or its overriding curve.
-Project/receipt snapshots with an earlier schema version remain unchanged/incompatible
-and require recreation, without migration, defaults or automatic deletion.
+Projects saved with an older supported schema are upgraded on load; projects/receipt
+snapshots older than the oldest supported schema remain unchanged and are rejected,
+without defaults or automatic deletion.
 Track `opacity` is the required sole stored value, not obsolete; saved `clip.opacity`
 and old `clipOpacity`/`layerOpacity` keyframe channels are invalid.
 Proxy/current PCM formats do not change; the registries are version 2 (full-content

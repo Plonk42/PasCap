@@ -147,14 +147,16 @@ and exactly fifteen nullable keyframe channels: `opacity`, `temperature`,
 `tint`, `exposure`, `brightness`, `contrast`, `hue`, `saturation`, `vibrance`, `highlights`,
 `shadows`, `whites`, `blacks`, `hdr`, `localContrast`. HSL/curves remain static. Track `opacity` is required and valid; saved `clip.opacity` and old
 `clipOpacity`/`layerOpacity` channels are rejected, not ignored or defaulted.
-Projects and receipt snapshots with an earlier schema version remain unchanged
-on disk but are incompatible: recreate projects and import media deliberately.
+Projects saved with an older supported schema are upgraded when they open, and their
+first save keeps the original file beside them; projects and receipt snapshots from
+early development versions remain unchanged on disk but cannot be opened.
 Export receipts remain version 1 with a strict current-schema snapshot and required captured
 audio-source/instance-plan arrays. Proxy/current PCM cache formats and source
 protections do not change; the video and music registries are version 2
 (`videos.json`, `music.json`, with full-content checksums), so import recordings again.
-There are no migrations, null fallbacks,
-compatibility readers, default-filled legacy fields or automatic deletions.
+There are no null fallbacks, default-filled legacy fields or automatic deletions.
+**Projects → Save file** keeps your own copy of a project; **Open project file…**
+opens one as a new project.
 Unsaved in-memory changes are not guaranteed to survive forced
 shutdown. See [workspace and recovery](docs/WORKSPACE_AND_RECOVERY.md).
 

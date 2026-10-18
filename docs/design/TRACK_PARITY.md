@@ -21,8 +21,8 @@ start, and shared track keyframes are appearance-only. Historical semantics and 
 [the control vocabulary](EDITOR_CONTROLS.md#vocabulary). Current usage belongs in
 [the track contract](../LAYERS_AND_KEYFRAMES.md), [editing guide](../TIMELINE_EDITING.md)
 and [retiming contract](../SPEED_AND_AUDIO.md). Publication, verification and remaining
-acceptance belong on the work issue, not here. This does not authorize migrations,
-change related issues' scopes or permit real-media jobs.
+acceptance belong on the work issue, not here. This does not change related issues'
+scopes or permit real-media jobs.
 
 ## Uniform boundaries
 

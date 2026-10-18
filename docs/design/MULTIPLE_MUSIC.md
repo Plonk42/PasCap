@@ -13,7 +13,7 @@ Usage belongs in [the user guide](../USER_GUIDE.md) and
 - `schemaVersion` is exactly the current schema. Required `music: MusicTrack[]` contains **0–8**
   independent music tracks; `[]` means no music. Omitted fields, `null`, a single
   object, unknown fields and duplicate track IDs are invalid. There are no
-  migrations, compatibility readers, null fallbacks or injected defaults.
+  compatibility readers, null fallbacks or injected defaults.
 - Each music track requires `id`, `mediaId`, `sourceIn`, `sourceOut`, `start`,
   `duration`, `gainDb`, `fadeIn`, `fadeOut` and `loop`. Its unique `id` identifies
   the placement, not the registered recording; several music tracks may use the same
@@ -37,9 +37,9 @@ Usage belongs in [the user guide](../USER_GUIDE.md) and
   base/per-setting project-frame keyframes;
   [spatial transforms](SPATIAL_TRANSFORMS.md) do not change music or video track Opacity.
 
-Projects and receipt snapshots with an earlier schema version are incompatible and preserved byte-for-byte,
-along with finished exports. Recreate projects deliberately; do not rewrite,
-repair or delete them automatically. Video-proxy and current
+Projects saved with an older supported schema are upgraded on load; projects and receipt
+snapshots older than the oldest supported schema are rejected and preserved byte-for-byte,
+along with finished exports. Do not repair or delete them automatically. Video-proxy and current
 `pcm16-48k-stereo-mono-unity-v3` PCM cache formats and source guards are unchanged;
 the registries are version 2 (full-content checksums).
 

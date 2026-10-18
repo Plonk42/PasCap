@@ -25,16 +25,31 @@ Video track Colour requires Temperature/Tint/Vibrance/Whites/Blacks/HDR/Local co
 HSL/curves; missing fields and saved clip colour/correction are invalid.
 Track `opacity` is the sole saved Opacity value; saved `clip.opacity` and old
 `clipOpacity`/`layerOpacity` keyframe channels are invalid, not ignored or defaulted.
-Project documents and receipt snapshots with an earlier schema version
-stay on disk but are incompatible: there is no migration, compatibility default,
-null fallback, old-format reader, automatic repair or deletion. Export receipts
+Projects saved by this or a later PasCap version keep opening: an update that
+changes the project format upgrades a project when it opens and, on its first save,
+keeps the original file beside it (`<id>.json.schema-N.bak`). Project documents and
+receipt snapshots from early development versions stay on disk but cannot be opened:
+there is no automatic repair or deletion. A project saved by a newer PasCap version
+is refused until you update. Export receipts
 remain version 1 with a strict current-schema snapshot and required audio-source/instance-plan arrays.
-Create a new project and import its media deliberately. Finished videos remain
+Finished videos remain
 untouched. **Delete project** requires confirmation and deletes only the saved
 project document, not originals, the shared registry/proxy cache or exports/receipts.
 Proxy and current PCM cache formats are unchanged; the video and music registries are
 version 2 (`videos.json`, `music.json`, with full-content checksums), so recordings
 from older registries must be imported again.
+
+### Project files
+
+PasCap saves projects automatically in its data directory. To keep your own copy,
+for a backup or before a risky edit, open **Projects** and choose **Save file** on a
+project: Chrome asks where to save it, other browsers download it as
+`<title>.pascap.json`. Unsaved edits of the current project are saved first. To
+return to that copy, choose **Open project file…** in Projects: it opens as a **new**
+project with the same title and never replaces the project it came from. Its
+recordings and music must already be imported in this PasCap service, with their
+originals in place; otherwise nothing is created. A file only references recordings
+by their PasCap ID: it contains no media, proxies or exports.
 
 Keep originals readable at their registered service-side paths. Moving a file,
 changing a mount or disconnecting a drive can fail even with a ready proxy.
@@ -809,8 +824,8 @@ in memory and automatic write retries stop. **Retry save** is offered only for
 recoverable transport/server errors. On a revision conflict, **Review latest save**
 offers keeping the draft, **Download unsaved project**, or explicitly discarding
 local changes and reloading. It never silently overwrites or rebases another save.
-Download before discarding; the JSON snapshot is for manual recovery/examination,
-not a supported JSON-import or migration flow. Unapplied input/pointer drafts are
+Download before discarding; the JSON snapshot can be opened later with **Open project
+file…** in Projects, as a new project. Unapplied input/pointer drafts are
 not committed project edits.
 
 `beforeunload` can warn about unsaved changes and dirty controls, but cannot protect

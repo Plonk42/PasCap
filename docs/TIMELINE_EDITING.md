@@ -624,19 +624,19 @@ Transform base/per-setting project-frame keyframes, a boolean clip `reverse`, pr
 transitions, opening/closing fades and numeric `opacity` in 0–1. New tracks start
 at 1 (100%); a missing saved field is invalid. Switching flushes autosave first,
 blocks on failed saves, and resets session selection/history; successful export
-snapshots are independent of the open project. Projects and receipt snapshots with an
-earlier schema version remain incompatible and preserved, without migration/fabricated defaults.
+snapshots are independent of the open project. Projects saved with an older supported
+schema are upgraded on load; projects and receipt snapshots older than the oldest supported
+schema remain rejected and preserved, without fabricated defaults.
 There is no automatic deletion. Track `opacity` is the required sole stored value;
 saved `clip.opacity` and old `clipOpacity`/`layerOpacity` keyframe fields are rejected,
 not ignored or defaulted. Keyframes require exactly fifteen nullable channels: `opacity`,
 twelve scalar colour fields (including required `temperature`, `tint`, `vibrance`, `whites` and `blacks`), `hdr` and `localContrast`.
 Track Colour requires those bases and static HSL/curves; missing fields are invalid.
-Recreate projects and deliberately import recordings/music
+Recreate projects older than the oldest supported schema and deliberately import recordings/music
 to reuse registered sources/verified ready proxies. Confirmed project deletion removes only its saved
 document, never originals, the shared registry/proxy cache or successful exports/
 receipts. Removing a clip is not removing that recording from the import bin;
-use **Remove from project** for that. The
-existing live sample appearing incompatible is expected. Proxy formats are
+use **Remove from project** for that. Proxy formats are
 unchanged; the registries are version 2 (full-content checksums).
 
 The required `music` array holds **0–8 independent music tracks**, each with a unique

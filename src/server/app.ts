@@ -7,7 +7,7 @@ import { z, ZodError } from 'zod';
 import { exportRequestSchema } from '../shared/export.js';
 import { MAX_FOOTAGE_FILES } from '../shared/footage.js';
 import type { SourceFingerprint } from '../shared/media.js';
-import { frameSchema, idSchema, projectSchema } from '../shared/model.js';
+import { frameSchema, idSchema, projectSchema, type ProjectDocument } from '../shared/model.js';
 import { validateSourceRanges } from '../shared/source-range.js';
 import { AudioLibrary } from './audio.js';
 import { BrowsePreviews } from './browse-previews.js';
@@ -40,6 +40,7 @@ const titleSchema = z.string().trim().min(1).max(200);
 const createProjectSchema = z.object({ title: titleSchema }).strict();
 const renameProjectSchema = z.object({ title: titleSchema, expectedRevision: frameSchema }).strict();
 const deleteProjectSchema = z.object({ expectedRevision: frameSchema.nullable() }).strict();
+const importProjectSchema = z.object({ document: z.unknown() }).strict();
 
 function validateLocalRequest(request: FastifyRequest, reply: FastifyReply, config: ServiceConfig): void {
   const host = request.headers.host;
@@ -117,6 +118,44 @@ export async function serveRegisteredFile(
   } finally {
     await file.close();
   }
+}
+
+/** Saved projects may only reference registered, unchanged recordings and music within their frames. */
+async function assertProjectSources(
+  document: ProjectDocument,
+  library: MediaLibrary,
+  audio: AudioLibrary,
+): Promise<void> {
+  document.media.videoIds.forEach((id) => library.get(id));
+  document.media.audioIds.forEach((id) => audio.get(id));
+  const sources = new Map<string, { sourcePath: string; fingerprint: SourceFingerprint }>();
+  const frameCounts = new Map(
+    document.clips.map((clip) => {
+      const asset = library.get(clip.mediaId);
+      return [asset.id, asset.metadata.frameCount] as const;
+    }),
+  );
+  try {
+    validateSourceRanges(document, frameCounts);
+  } catch (error) {
+    throw new ServiceError(errorMessage(error), 422);
+  }
+  for (const clip of document.clips) {
+    const asset = library.get(clip.mediaId);
+    if (clip.sourceOut > asset.metadata.frameCount)
+      throw new ServiceError(`Clip ${clip.id} exceeds its registered source frames.`, 422);
+    sources.set(`video:${asset.id}`, asset);
+  }
+  for (const track of document.music) {
+    const asset = audio.get(track.mediaId);
+    if (track.sourceOut > asset.metadata.frameCount)
+      throw new ServiceError('Music exceeds its registered source frames.', 422);
+    sources.set(`audio:${asset.id}`, asset);
+  }
+  await [...sources.values()].reduce(async (previous, asset) => {
+    await previous;
+    await assertSourceIdentity(asset.sourcePath, asset.fingerprint, true);
+  }, Promise.resolve());
 }
 
 export async function createApp(config = createConfig()) {
@@ -303,37 +342,21 @@ export async function createApp(config = createConfig()) {
     const body = saveSchema.parse(request.body);
     if (body.document.id !== idParams.parse(request.params).id)
       throw new ServiceError('Project ID must match its route.');
-    body.document.media.videoIds.forEach((id) => library.get(id));
-    body.document.media.audioIds.forEach((id) => audio.get(id));
-    const sources = new Map<string, { sourcePath: string; fingerprint: SourceFingerprint }>();
-    const frameCounts = new Map(
-      body.document.clips.map((clip) => {
-        const asset = library.get(clip.mediaId);
-        return [asset.id, asset.metadata.frameCount] as const;
-      }),
-    );
-    try {
-      validateSourceRanges(body.document, frameCounts);
-    } catch (error) {
-      throw new ServiceError(errorMessage(error), 422);
-    }
-    for (const clip of body.document.clips) {
-      const asset = library.get(clip.mediaId);
-      if (clip.sourceOut > asset.metadata.frameCount)
-        throw new ServiceError(`Clip ${clip.id} exceeds its registered source frames.`, 422);
-      sources.set(`video:${asset.id}`, asset);
-    }
-    for (const track of body.document.music) {
-      const asset = audio.get(track.mediaId);
-      if (track.sourceOut > asset.metadata.frameCount)
-        throw new ServiceError('Music exceeds its registered source frames.', 422);
-      sources.set(`audio:${asset.id}`, asset);
-    }
-    await [...sources.values()].reduce(async (previous, asset) => {
-      await previous;
-      await assertSourceIdentity(asset.sourcePath, asset.fingerprint, true);
-    }, Promise.resolve());
+    await assertProjectSources(body.document, library, audio);
     return { document: await projects.save(body.document, body.expectedRevision) };
+  });
+  app.post('/api/projects/import', async (request, reply) => {
+    const document = projects.decodeFile(importProjectSchema.parse(request.body).document);
+    try {
+      await assertProjectSources(document, library, audio);
+    } catch (error) {
+      if (!(error instanceof ServiceError && error.statusCode === 404)) throw error;
+      throw new ServiceError(
+        'This project file uses recordings or music that are not imported in this PasCap service. Nothing was created.',
+        422,
+      );
+    }
+    return reply.code(201).send({ document: await projects.save(document, 0) });
   });
   app.get('/api/jobs', (_request, reply) => reply.send({ jobs: jobs.list() }));
   app.get('/api/jobs/:id', (request, reply) => reply.send({ job: jobs.get(idParams.parse(request.params).id) }));

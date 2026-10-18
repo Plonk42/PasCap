@@ -470,9 +470,10 @@ Track `opacity` is valid and required; saved `clip.opacity` and old
 New projects have empty video/music bins. Standalone audio imports belong
 to the open project's bin; every music track's references also count as membership.
 Global registered music/proxies are reusable on deliberate import, never automatically
-inherited by a new project. Projects and export receipt snapshots with an earlier schema version remain unchanged
-and incompatible. There is no migration, compatibility reader, null fallback, default-field
-injection or automatic deletion; recreate projects and import their media to reuse
+inherited by a new project. Projects saved with an older supported schema are upgraded on
+load; projects and export receipt snapshots older than the oldest supported schema remain
+unchanged and rejected. There is no compatibility reader, null fallback, default-field
+injection or automatic deletion; recreate such projects and import their media to reuse
 registered assets/verified ready proxies. Confirmed project deletion affects only
 its saved document, not originals,
 the shared content-deduplicated registry/cache or finished exports/receipts.

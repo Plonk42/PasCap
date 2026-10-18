@@ -12,6 +12,8 @@ export interface ProjectsProps {
   onOpen: (id: string) => Promise<boolean>;
   onCreate: (title: string) => Promise<boolean>;
   onDelete: (project: ProjectSummary) => Promise<boolean>;
+  onSaveFile: (project: ProjectSummary) => Promise<boolean>;
+  onOpenFile: (file: File) => Promise<boolean>;
   onClose: () => void;
   restoreFocusTo?: RefObject<HTMLElement | null>;
 }
@@ -45,7 +47,7 @@ export function filterProjects(
     );
 }
 
-type PendingProject = { kind: 'create' } | { kind: 'open' | 'delete'; id: string; title: string };
+type PendingProject = { kind: 'create' | 'import' } | { kind: 'open' | 'delete' | 'save'; id: string; title: string };
 
 export function Projects({
   projects,
@@ -55,6 +57,8 @@ export function Projects({
   onOpen,
   onCreate,
   onDelete,
+  onSaveFile,
+  onOpenFile,
   onClose,
   restoreFocusTo,
 }: Readonly<ProjectsProps>) {
@@ -65,6 +69,7 @@ export function Projects({
   const [pending, setPending] = useState<PendingProject | null>(null);
   const [deleting, setDeleting] = useState<ProjectSummary | null>(null);
   const deleteTrigger = useRef<HTMLButtonElement | null>(null);
+  const fileInput = useRef<HTMLInputElement | null>(null);
   const pendingAction = useRef(false);
   const [localError, setLocalError] = useState('');
   const submitting = busy || pending !== null;
@@ -74,6 +79,37 @@ export function Projects({
   if (pending?.kind === 'open') pendingLabel = `Opening ${pending.title}…`;
   else if (pending?.kind === 'delete') pendingLabel = `Deleting ${pending.title}…`;
   else if (pending?.kind === 'create') pendingLabel = 'Creating project…';
+  else if (pending?.kind === 'save') pendingLabel = `Saving ${pending.title} to a file…`;
+  else if (pending?.kind === 'import') pendingLabel = 'Opening project file…';
+
+  const run = async (next: PendingProject, action: () => Promise<boolean>, failure: string): Promise<boolean> => {
+    if (busy || pendingAction.current) return false;
+    pendingAction.current = true;
+    setPending(next);
+    setLocalError('');
+    try {
+      if (await action()) return true;
+      setLocalError(failure);
+    } catch (cause) {
+      setLocalError(cause instanceof Error ? cause.message : failure);
+    } finally {
+      pendingAction.current = false;
+      setPending(null);
+    }
+    return false;
+  };
+
+  const saveFile = (project: ProjectSummary): void => {
+    void run(
+      { kind: 'save', id: project.id, title: project.title },
+      () => onSaveFile(project),
+      'The project file could not be saved.',
+    );
+  };
+
+  const openFile = async (file: File): Promise<void> => {
+    if (await run({ kind: 'import' }, () => onOpenFile(file), 'The project file could not be opened.')) onClose();
+  };
 
   const openProject = async (project: ProjectSummary): Promise<void> => {
     if (busy || pendingAction.current || !project.compatible) return;
@@ -139,7 +175,7 @@ export function Projects({
       footer={
         <>
           <span className="activity-hint">
-            Projects saved by an older PasCap version cannot be opened. They are kept unchanged.
+            Projects saved by early PasCap development versions cannot be opened. They are kept unchanged.
           </span>
           <button className="secondary-button" onClick={onClose} disabled={submitting}>
             Close
@@ -225,6 +261,17 @@ export function Projects({
               >
                 {pending?.kind === 'open' && pending.id === project.id ? 'Opening…' : 'Open'}
               </button>
+              {project.compatible && (
+                <button
+                  className="secondary-button"
+                  aria-label={`Save ${project.title} to a file`}
+                  title="Save a copy of this project to a file on this computer"
+                  disabled={submitting}
+                  onClick={() => saveFile(project)}
+                >
+                  {pending?.kind === 'save' && pending.id === project.id ? 'Saving…' : 'Save file'}
+                </button>
+              )}
               <button
                 className="secondary-button project-delete"
                 aria-label={`Delete ${project.title}`}
@@ -287,6 +334,29 @@ export function Projects({
           </button>
         </div>
       </form>
+      <section className="activity-new-project" aria-labelledby={`${id}-file`}>
+        <h3 id={`${id}-file`}>Project file</h3>
+        <div className="activity-new-project-fields">
+          <p className="activity-hint">
+            Open a file made with Save file as a new project. Its recordings must already be imported here.
+          </p>
+          <button className="secondary-button" disabled={submitting} onClick={() => fileInput.current?.click()}>
+            {pending?.kind === 'import' ? 'Opening…' : 'Open project file…'}
+          </button>
+          <input
+            ref={fileInput}
+            type="file"
+            accept=".json,application/json"
+            aria-label="Project file to open"
+            hidden
+            onChange={(event) => {
+              const file = event.currentTarget.files?.[0];
+              event.currentTarget.value = '';
+              if (file) void openFile(file);
+            }}
+          />
+        </div>
+      </section>
       {deleting && (
         <Modal
           className="project-delete-dialog"

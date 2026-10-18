@@ -709,6 +709,15 @@ stay inside the dialog, preserve typed titles/quality choices and never close it
 as a false success. Closing restores keyboard focus to the origin, including when
 the dialog was loaded asynchronously while its trigger was disabled.
 
+**Save file** on a project writes its saved document, after flushing the current
+project's autosave, to `<title>.pascap.json`: through the browser's save dialog where
+available (Chrome), else as a download; cancelling the dialog does nothing.
+**Open project file…** reads such a file (at most 16 MiB) and creates a **new**
+project from it with a fresh ID, upgrading an older supported schema; it never
+overwrites an existing project. The service validates it like a save: its
+recordings and music must be registered here with unchanged originals and valid
+ranges, otherwise nothing is created and the error stays in the dialog.
+
 **Delete project** requires explicit confirmation and removes only the selected
 saved document. It never deletes original recordings, shared registry entries,
 proxies/cache files, successful MP4s or receipts. This is not cache garbage
@@ -737,10 +746,11 @@ fifteen nullable fields, in control order: `opacity`, `temperature`,
 `shadows`, `whites`, `blacks`, `hdr`, `localContrast`. HSL/curves remain static. Track
 `opacity` is the sole valid stored value; saved `clip.opacity` and old
 `clipOpacity`/`layerOpacity` channels are invalid, not ignored or defaulted.
-Projects/receipt snapshots with an earlier schema version are preserved, incompatible
-and never migrated or rewritten with fallback/default local fields or old-format
-readers. **Create a new
-project** and import its media deliberately; there is no automatic deletion of
+Projects/receipt snapshots saved with an older supported schema are upgraded in memory
+on load; the first save keeps the original file as `<id>.json.schema-N.bak`. Those
+older than the oldest supported schema, or saved by a newer PasCap, are preserved,
+incompatible and never rewritten with fallback/default local fields; there is no
+automatic deletion of
 projects, receipts or finished videos. Proxy/current PCM formats are unchanged; the
 registries are version 2 (`videos.json`, `music.json`, with full-content checksums).
 Registered recordings and currently
@@ -838,8 +848,8 @@ For an HTTP 409 or incompatible save response, **Review latest save** explains:
 3. **Discard local changes and reload** — explicitly replace local history/document
    with a newly read saved version. It performs no overwrite POST/PUT.
 
-The snapshot is for manual recovery/examination; no JSON-import/migration workflow
-is added. Switching projects or exporting is blocked while autosave remains dirty.
+The snapshot can be opened later with **Open project file…**, as a new project.
+Switching projects or exporting is blocked while autosave remains dirty.
 Reload/discard never happens just because the service reports a conflict. Browser
 navigation warns about committed unsaved changes and dirty UI fields/pointer drafts.
 A forced browser or laptop shutdown can still lose in-memory unsaved changes:

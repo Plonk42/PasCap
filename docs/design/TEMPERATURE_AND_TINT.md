@@ -83,11 +83,11 @@ native process; existing frame/pixel/resource and A/V gates remain unchanged.
 
 ## Strict preservation and validation
 
-Only **current-schema** projects and current-schema snapshots in version-1 export receipts
-are accepted. Missing Temperature/Tint bases or either nullable keyframe field,
-unknown fields and saved clip Colour/correction are invalid. Reject documents and
-receipt snapshots with **an earlier schema version** clearly; preserve their bytes and successful
-outputs. Recreate projects deliberately: no migrations, acceptance of older versions,
+Projects are upgraded to the **current schema** on load from the oldest supported schema
+onwards; current-schema snapshots in version-1 export receipts are accepted. Missing
+Temperature/Tint bases or either nullable keyframe field, unknown fields and saved clip
+Colour/correction are invalid. Reject documents and receipt snapshots **older than the
+oldest supported schema** clearly; preserve their bytes and successful outputs, without
 compatibility readers, injected defaults, fallback or automatic deletion.
 Receipt/report/proxy/PCM format versions remain independent and unchanged (the
 registries are version 2, with full-content checksums);

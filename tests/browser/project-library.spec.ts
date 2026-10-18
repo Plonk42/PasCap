@@ -281,3 +281,51 @@ for (const oldVersion of EARLIER_SCHEMA_VERSIONS)
     expect(reads).toBe(0);
     expect(await page.evaluate(() => window.pascapLab!.project()!.id)).toBe(initialId);
   });
+
+test('Save file writes the saved project to a chosen file and Open project file opens it as a new copy', async ({
+  page,
+}) => {
+  await page.evaluate(() => {
+    const saved: { name: string; text: string }[] = [];
+    Object.assign(globalThis, { savedProjectFiles: saved });
+    Object.defineProperty(globalThis, 'showSaveFilePicker', {
+      configurable: true,
+      value: async (options: { suggestedName: string }) => ({
+        createWritable: async () => ({
+          write: async (text: string) => {
+            saved.push({ name: options.suggestedName, text });
+          },
+          close: async () => {},
+        }),
+      }),
+    });
+  });
+  await page.getByRole('button', { name: 'Open projects', exact: true }).click();
+  await page.getByRole('button', { name: `Save ${initialTitle} to a file`, exact: true }).click();
+  await expect
+    .poll(() => page.evaluate(() => (globalThis as unknown as { savedProjectFiles: unknown[] }).savedProjectFiles))
+    .toHaveLength(1);
+  const [file] = await page.evaluate(
+    () => (globalThis as unknown as { savedProjectFiles: { name: string; text: string }[] }).savedProjectFiles,
+  );
+  expect(file!.name).toBe('First flight · memory-only.pascap.json');
+  expect(JSON.parse(file!.text)).toEqual(memory.snapshot(initialId));
+
+  // Browsers without a save dialog download the same file.
+  await page.evaluate(() => Object.defineProperty(globalThis, 'showSaveFilePicker', { value: undefined }));
+  const download = page.waitForEvent('download');
+  await page.getByRole('button', { name: `Save ${initialTitle} to a file`, exact: true }).click();
+  expect((await download).suggestedFilename()).toBe('First flight · memory-only.pascap.json');
+
+  const input = page.getByLabel('Project file to open', { exact: true });
+  await input.setInputFiles({ name: 'broken.pascap.json', mimeType: 'application/json', buffer: Buffer.from('{') });
+  await expect(page.getByRole('dialog', { name: 'Projects', exact: true }).getByRole('alert')).toContainText(
+    'it does not contain JSON',
+  );
+  await input.setInputFiles({ name: file!.name, mimeType: 'application/json', buffer: Buffer.from(file!.text) });
+  await expect(page.getByRole('dialog', { name: 'Projects', exact: true })).toHaveCount(0);
+  const copyId = await page.evaluate(() => window.pascapLab!.project()!.id);
+  expect(copyId).not.toBe(initialId);
+  expect({ ...memory.snapshot(copyId), id: initialId }).toEqual(memory.snapshot(initialId));
+  await expect(page.getByRole('textbox', { name: 'Project title', exact: true })).toHaveValue(initialTitle);
+});

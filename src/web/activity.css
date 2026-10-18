@@ -437,6 +437,12 @@
   flex: 1;
 }
 
+.activity-new-project-fields > p {
+  flex: 1;
+  margin: 0;
+  align-self: center;
+}
+
 .activity-new-project-fields > button {
   min-height: 32px;
   flex-shrink: 0;
