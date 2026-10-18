@@ -122,7 +122,10 @@ pads a damaged tail and blacks out the recorded ranges before counting frames, s
 exact frame counts and positions hold. Those decodes omit `-xerror`/`explode`;
 undamaged originals keep strict decoding and unchanged filters. The diagnostic
 reference rejects damaged recordings, and proxy samples and thumbnails avoid the
-black ranges. The original is never modified.
+black ranges. Source preview hatches them red on the range strip and motion lanes,
+whose hover readout names them, and steady ranges never include or bridge them: their
+black has no motion to measure, so the analysis would otherwise hold the previous
+value and call them smooth. The original is never modified.
 
 **Other location** (bottom of Locations) imports a typed path, including outside
 browser roots: a video or music recording, or a folder through the existing

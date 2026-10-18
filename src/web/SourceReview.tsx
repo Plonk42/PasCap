@@ -22,6 +22,7 @@ import {
 } from '../shared/media-selection.js';
 import type { MediaAsset } from '../shared/media.js';
 import { formatTimecode } from '../shared/timing.js';
+import { DamageMarks } from './DamageMarks.js';
 import { mediaReady, sourceSeconds } from './display.js';
 import { Icon } from './icons.js';
 import { Popover } from './Popover.js';
@@ -772,6 +773,7 @@ function SourceRangeEditor({
               }}
               aria-hidden="true"
             />
+            <DamageMarks damage={asset.damage} count={count} className="source-range-damaged" />
             <span
               className="source-range-selection"
               style={{

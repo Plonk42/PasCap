@@ -444,6 +444,21 @@
   pointer-events: none;
 }
 
+/* Damaged frames, shown black: unmistakable on the strip and every motion lane. */
+.source-motion-damaged,
+.source-range-damaged {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  min-width: 3px;
+  background: repeating-linear-gradient(45deg, #e0524ccc 0 2px, #2a0c0bcc 2px 5px);
+  pointer-events: none;
+}
+
+.source-motion-readout .damaged {
+  color: #f08a85;
+}
+
 .source-motion-plot {
   position: relative;
   height: 30px;

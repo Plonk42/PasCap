@@ -9,7 +9,7 @@ import {
   type CSSProperties,
   type PointerEvent as ReactPointerEvent,
 } from 'react';
-import type { MediaAsset, MediaJob } from '../shared/media.js';
+import { damagedAt, type MediaAsset, type MediaJob } from '../shared/media.js';
 import type { MediaSelection } from '../shared/media-selection.js';
 import {
   motionProfile,
@@ -22,6 +22,7 @@ import {
 } from '../shared/motion-analysis.js';
 import { formatTimecode, type FrameRate } from '../shared/timing.js';
 import { api, ApiError } from './api.js';
+import { DamageMarks } from './DamageMarks.js';
 import { mediaReady, sourceSeconds } from './display.js';
 import { HelpPopover } from './HelpPopover.js';
 import { Icon } from './icons.js';
@@ -174,7 +175,10 @@ export function useSmoothRange(asset: MediaAsset): SmoothRangeState {
   const rate = asset.metadata.frameRate;
   const fps = rate.numerator / rate.denominator;
   const profile = useMemo(() => (phase.kind === 'ready' ? motionProfile(phase.analysis, fps) : null), [phase, fps]);
-  const ranges = useMemo(() => (profile ? smoothRanges(profile, tolerance, fps) : []), [profile, tolerance, fps]);
+  const ranges = useMemo(
+    () => (profile ? smoothRanges(profile, tolerance, fps, asset.damage) : []),
+    [profile, tolerance, fps, asset.damage],
+  );
   const keepTolerance = useCallback((value: number) => {
     setSavedTolerance(value);
     writePreference(TOLERANCE_PREFERENCE, String(value));
@@ -313,6 +317,13 @@ function ImageLane(props: Readonly<ImageLaneProps>) {
   );
   if (tolerance !== null)
     label = <span className="tolerance">Allowed movement {tolerance.toFixed(1)} · drag the line</span>;
+  else if (hover !== null && damagedAt(asset.damage, hover))
+    label = (
+      <>
+        <b>{formatTimecode(hover, asset.metadata.frameRate)}</b>
+        <span className="damaged">Damaged · shown black</span>
+      </>
+    );
   else if (hover !== null)
     label = (
       <>
@@ -523,6 +534,7 @@ function Lanes({
         style={{ left: `${(range.sourceOut / count) * 100}%`, right: 0 }}
         aria-hidden="true"
       />
+      <DamageMarks damage={asset.damage} count={count} className="source-motion-damaged" />
       {hover !== null && !nearLine && !adjusting && (
         <span className="source-motion-cursor" style={{ left: at(hover) }} aria-hidden="true" />
       )}

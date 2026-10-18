@@ -121,7 +121,9 @@ second around the unreadable frames, since the frames that depend on them decode
 as garbage. Choose the card's wrench button (**Prepare … with damaged frames shown
 black**) to use the rest of the recording. Those frames then show black in the
 preview and in every export, and the card keeps a **Damaged** badge; hover it for
-the time range. The original is never modified. Copying the recording again from
+the time range. In Source preview they are hatched red on the range strip and the
+camera motion lanes (hovering reads **Damaged · shown black**), and steady ranges
+never include them. The original is never modified. Copying the recording again from
 the camera card may give an undamaged file.
 
 ## Review a recording and add clips

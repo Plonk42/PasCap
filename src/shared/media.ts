@@ -86,6 +86,9 @@ export type DamagedRange = z.infer<typeof damagedRangeSchema>;
 export function damageLabel(damage: readonly DamagedRange[]): string {
   return damage.map((range) => `${formatTimecode(range.start)}–${formatTimecode(range.end - 1)}`).join(', ');
 }
+export function damagedAt(damage: readonly DamagedRange[], frame: number): boolean {
+  return damage.some((range) => frame >= range.start && frame < range.end);
+}
 export type ProxyVerification = z.infer<typeof proxyVerificationSchema>;
 
 export const jobSchema = z
