@@ -30,7 +30,7 @@ const CLIP = 'animated-clip';
 const colourSettings = KEYFRAME_SETTINGS;
 
 function inspector(page: Page): Locator {
-  return page.getByRole('complementary', { name: 'Clip inspector', exact: true });
+  return page.getByRole('complementary', { name: 'Properties', exact: true });
 }
 
 /** The expanded section's keyframe line: count, Previous/Next and the section reset. */

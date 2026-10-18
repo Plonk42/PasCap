@@ -45,9 +45,9 @@ clips; invalid overlap is rejected atomically. Left-edge handle/keyboard trims
 move the start to retain timeline OUT; restoring IN stops where the start would
 precede frame 0. With Ripple on, these trims keep the sequence start and recompile the
 suffix. Right timeline trims and **Clip → Range** fields/bar/**Restore full recording**
-keep the selected start in either mode; the inspector uses ordinary source-range
+keep the selected start in either mode; the Properties panel uses ordinary source-range
 trim, not the timeline left handle's retained-OUT rule. Source-frame speed anchors
-remain independent. See [the Range controls](TIMELINE_EDITING.md#clip-inspector-range).
+remain independent. See [the Range controls](TIMELINE_EDITING.md#clip-range).
 
 A cross-dissolve explicitly places the right clip at the
 left OUT minus its duration; changing/removing it adjusts that overlap. With Ripple
@@ -71,7 +71,7 @@ names apply on Enter/blur, Escape restores, and a rename is one Undo step. Selec
 an empty video track retains both its **Track** context (Colour, Opacity, keyframes) and the target for Media
 **+**/double-click insertion. A populated track selects its first clip and
 reveals its track without changing placement. Selecting a clip or populated/empty
-track preserves the chosen Inspector tab and safely refreshes its editing context.
+track preserves the chosen Properties tab and safely refreshes its editing context.
 Media drops target the track under the pointer: Ripple-on drops choose a sequence
 insertion slot; Ripple-off drops use
 independent project-frame placement.
@@ -272,7 +272,7 @@ All these per-channel arrows visit **strictly earlier/later** keyframes where
 other channels are skipped. There is no wrap or revisit of the current keyframe.
 The arrows are disabled when the relevant neighbour is absent, no project is open,
 or any document-preview draft is active. Navigation preserves the
-chosen Inspector tab and activated button's focus instead of forcing Clip, and
+chosen Properties tab and activated button's focus instead of forcing Clip, and
 changes no document, history or autosave state.
 
 **Track → Colour** contains the single **Opacity** native slider/exact
@@ -281,7 +281,7 @@ per-setting Previous/Next buttons. The main sliders sit under four static headin
 each with a one-Undo group Reset: **Opacity**; **Colour** (Temperature, Tint, Hue,
 Saturation, Vibrance); **Light** (Exposure, Brightness, Contrast, Highlights, Shadows, Whites, Blacks); **Effects**
 (HDR, Local contrast). This visible order differs from the unchanged channel order above
-([track appearance](design/ROW_APPEARANCE.md#inspector-and-history)).
+([track appearance](design/ROW_APPEARANCE.md#properties-and-history)).
 Main and stored sliders/exact fields use **0–100%**, neutral **100%**.
 Required track `opacity` and keyframe values stay **0–1**, with UI-only conversion and no schema change.
 Without Opacity keyframes, either value control edits the selected track's `opacity`,
@@ -346,7 +346,7 @@ reuse the same bounds and double-click-the-name resets; Opacity numeric entry
 uses **0–100%**, neutral **100%**, in both contexts. The channel table gives stored
 bounds; only Opacity scales those values by 100 for the UI.
 
-Dragging a Colour, Opacity, HSL or Transform slider (main or stored) previews the draft value in the image, coalesced to the display rate, without any document, history, autosave or Inspector change, and without restarting music. Release commits one validated edit and one Undo step. Escape, pointer cancellation, lost capture, window blur or an invalid value restores the control and the preview. Other sliders (speed, gain) keep their release-only image update. Each keyboard slider adjustment is an individual validated edit. The full value-control contract is in
+Dragging a Colour, Opacity, HSL or Transform slider (main or stored) previews the draft value in the image, coalesced to the display rate, without any document, history, autosave or Properties change, and without restarting music. Release commits one validated edit and one Undo step. Escape, pointer cancellation, lost capture, window blur or an invalid value restores the control and the preview. Other sliders (speed, gain) keep their release-only image update. Each keyboard slider adjustment is an individual validated edit. The full value-control contract is in
 [WORKSPACE_AND_RECOVERY.md](WORKSPACE_AND_RECOVERY.md#numbers-titles-and-animation).
 
 Only existing non-null enabled settings get value editors. Each accepted value/reset
@@ -386,7 +386,7 @@ There is **one marker per stored track keyframe**, even across multiple clips or
 dissolve, not one marker per channel/clip. Its title names the video track, project time
 and enabled settings; the panel exposes chips/dependencies. **Click or Enter** selects
 the track, seeks and opens Track → Colour, without editing. Whole-track keyframe
-navigation retains the chosen Inspector tab. Keyframes after the last clip keep their marker at
+navigation retains the chosen Properties tab. Keyframes after the last clip keep their marker at
 their own project time, like keyframes before the first clip. The scrollable timeline
 widens to reach the last stored keyframe, but duration, playback and seeking still end
 at the last project frame, determined by the maximum video/music OUT, not keyframes.
@@ -536,9 +536,9 @@ autosave/undo/rendered documents. They survive reload in that browser, reset on 
 new project, and do not follow a project copied to another browser. Close/hidden/
 offscreen/unmount/project-switch releases the review decoder.
 
-## Inspector and resource limits
+## Properties panel and resource limits
 
-The inspector uses **Clip / Track / Audio** tabs, split by ownership. **Clip**
+The Properties panel uses **Clip / Track / Audio** tabs, split by ownership. **Clip**
 holds the selected clip's **Speed**, **Detail**, **Range** and **Placement** (placement only) under a "Clip N of M · track" header; on an empty video track it shows only
 "Select a clip on … to edit it." **Track** holds everything the whole video track owns
 under an "Applies to all N clips on this track" header: Colour (including the sole

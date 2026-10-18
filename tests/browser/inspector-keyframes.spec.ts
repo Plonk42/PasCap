@@ -74,7 +74,7 @@ async function selectClip(page: Page, id: string): Promise<void> {
 test('three accessible tabs preserve selection across clips, populated/empty tracks and projects without writes', async ({
   page,
 }) => {
-  const tabs = page.getByRole('tablist', { name: 'Inspector sections', exact: true });
+  const tabs = page.getByRole('tablist', { name: 'Properties sections', exact: true });
   await expect(tabs.getByRole('tab')).toHaveText(['Clip', 'Track', 'Audio']);
   await tabs.getByRole('tab', { name: 'Clip', exact: true }).focus();
   for (const label of ['Track', 'Audio']) {
@@ -271,13 +271,13 @@ test('four tabs and participant controls fit the minimum Inspector at the defaul
     await page.setViewportSize({ width, height });
     await inspectorTab(page, 'Track keyframes');
     const row = await editLayerPoint(page, 'Track 1', 10);
-    const divider = page.getByRole('slider', { name: 'Resize Inspector panel', exact: true });
+    const divider = page.getByRole('slider', { name: 'Resize Properties panel', exact: true });
     await expect(divider).toHaveAttribute('aria-valuenow', '270');
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-    const panel = page.getByRole('complementary', { name: 'Clip inspector', exact: true });
+    const panel = page.getByRole('complementary', { name: 'Properties', exact: true });
     expect(await panel.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
     for (const tab of await page
-      .getByRole('tablist', { name: 'Inspector sections', exact: true })
+      .getByRole('tablist', { name: 'Properties sections', exact: true })
       .getByRole('tab')
       .all()) {
       await expect(tab).toBeVisible();

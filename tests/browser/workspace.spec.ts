@@ -131,13 +131,13 @@ test('pane resize cancels on Escape, persists on release/keyboard and never edit
   await page.reload();
   await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
   await expect(resizer).toHaveAttribute('aria-valuenow', String(initial + 16));
-  await collapsePanel(page, 'Inspector').click();
-  await expect(page.getByRole('complementary', { name: 'Clip inspector' })).toBeHidden();
+  await collapsePanel(page, 'Properties').click();
+  await expect(page.getByRole('complementary', { name: 'Properties' })).toBeHidden();
   await openOptions(page, 'Workspace options');
   await page.getByRole('button', { name: 'Reset workspace layout' }).click();
   await expect(resizer).toHaveAttribute('aria-valuenow', '300');
   await closeOptions(page);
-  await expect(page.getByRole('complementary', { name: 'Clip inspector' })).toBeVisible();
+  await expect(page.getByRole('complementary', { name: 'Properties' })).toBeVisible();
 });
 
 test('workspace keeps both side panels without document overflow at the default and minimum viewports', async ({
@@ -152,7 +152,7 @@ test('workspace keeps both side panels without document overflow at the default 
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await expect(page.getByRole('region', { name: 'Video timeline' })).toBeInViewport();
     await expect(page.getByRole('button', { name: 'Export video', exact: true })).toBeInViewport();
-    await expect(page.getByRole('complementary', { name: 'Clip inspector' })).toBeVisible();
+    await expect(page.getByRole('complementary', { name: 'Properties' })).toBeVisible();
     await expect(page.getByRole('complementary', { name: 'Media library' })).toBeVisible();
   }
   expect(await page.evaluate(() => window.pascapLab!.project())).toEqual(before);
@@ -354,7 +354,7 @@ test('denied browser preference storage does not prevent opening/editing a proje
   await inspectorTab(page, 'Track');
   await page.getByRole('slider', { name: 'Exposure', exact: true }).fill('0.3');
   expect(await page.evaluate(() => window.pascapLab!.project()!.layers[0]!.colour.exposure)).toBe(0.3);
-  await collapsePanel(page, 'Inspector').click();
+  await collapsePanel(page, 'Properties').click();
   await expect(page.getByRole('status').filter({ hasText: 'Layout changed for this session' })).toBeVisible();
 });
 

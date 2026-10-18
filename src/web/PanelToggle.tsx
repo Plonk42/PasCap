@@ -6,7 +6,7 @@ export type SidePanel = 'media' | 'inspector';
 const PANELS = {
   media: { title: 'Media', controls: 'media-pane', collapse: 'panel-left-close', expand: 'panel-left-open' },
   inspector: {
-    title: 'Inspector',
+    title: 'Properties',
     controls: 'inspector-pane',
     collapse: 'panel-right-close',
     expand: 'panel-right-open',

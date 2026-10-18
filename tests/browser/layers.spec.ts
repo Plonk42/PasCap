@@ -202,7 +202,7 @@ test('shares row opacity and individual colour channels at project points and ke
 }) => {
   const id = await addOverlay(page);
   await seek(page, 0);
-  const inspector = page.getByRole('complementary', { name: 'Clip inspector' });
+  const inspector = page.getByRole('complementary', { name: 'Properties' });
   await inspectorTab(page, 'Track');
   await page.getByRole('slider', { name: 'Opacity', exact: true }).fill('0');
   await inspector.getByRole('button', { name: 'Keyframe Opacity', exact: true }).click();
@@ -248,7 +248,7 @@ test('clip speed keys support easing, removal and their own duration while share
   await expect(
     page.getByRole('combobox', { name: 'Speed mode', exact: true }).locator('option[value="keyframes"]'),
   ).toHaveCount(0);
-  const inspector = page.getByRole('complementary', { name: 'Clip inspector' });
+  const inspector = page.getByRole('complementary', { name: 'Properties' });
   const diamond = inspector.getByRole('button', { name: 'Keyframe Speed', exact: true });
   const speedOf = async () =>
     projectSchema.parse(await page.evaluate(() => window.pascapLab!.project())).clips[0]!.speed;

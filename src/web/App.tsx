@@ -1653,7 +1653,7 @@ export function App() {
               workspace.update({ inspectorOpen: true, ...(workspace.viewport.width < 980 ? { mediaOpen: false } : {}) })
             }
           >
-            Clip inspector
+            Properties
           </a>
           <a href="#timeline-pane">Timeline</a>
         </nav>
@@ -2018,7 +2018,7 @@ export function App() {
           {workspace.layout.inspectorOpen ? (
             <WorkspaceResizer
               className="inspector-resizer"
-              label="Resize Inspector panel"
+              label="Resize Properties panel"
               disabled={draft !== null}
               orientation="vertical"
               direction={-1}
@@ -2038,7 +2038,7 @@ export function App() {
             tabIndex={-1}
           >
             <DeferredPanel
-              label="Inspector"
+              label="Properties"
               load={loadInspector}
               onReload={reloadEditor}
               onDownload={downloadDraft}
@@ -2047,7 +2047,7 @@ export function App() {
               fallback={
                 <output className="panel inspector-loading">
                   <span className="spinner" />
-                  Opening Inspector…
+                  Opening Properties…
                 </output>
               }
             >

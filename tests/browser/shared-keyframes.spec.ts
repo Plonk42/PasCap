@@ -115,7 +115,7 @@ async function seek(page: Page, frame: number): Promise<void> {
 
 function diamond(page: Page, label: string) {
   return page
-    .getByRole('complementary', { name: 'Clip inspector', exact: true })
+    .getByRole('complementary', { name: 'Properties', exact: true })
     .getByRole('button', { name: `Keyframe ${label}`, exact: true });
 }
 

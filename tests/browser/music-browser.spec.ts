@@ -67,7 +67,7 @@ function trigger(page: Page): Locator {
 }
 
 async function audioControls(page: Page): Promise<void> {
-  const expand = expandPanel(page, 'Inspector');
+  const expand = expandPanel(page, 'Properties');
   if (await expand.isVisible()) await expand.click();
   await inspectorTab(page, 'Audio');
   const section = page.getByRole('button', { name: 'Music section', exact: true });

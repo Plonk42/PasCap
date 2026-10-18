@@ -9,7 +9,7 @@ unchanged. Every video track has one required numeric `opacity` in 0–1, initia
 on new tracks; its sole `opacity` keyframe channel overrides the track value for every
 source, including both dissolve sources. There is no saved `clip.opacity`
 or additional track multiplier; current native bounds
-are in [the resource contract](LAYERS_AND_KEYFRAMES.md#inspector-and-resource-limits).
+are in [the resource contract](LAYERS_AND_KEYFRAMES.md#properties-panel-and-resource-limits).
 The intended discrete-GPU and long real-flight checks remain deferred.
 
 ## Layout and navigation
@@ -35,11 +35,13 @@ same kernel; see [local contrast](design/DETAIL_FILTERS.md#local-contrast).
 - Header: project picker/title, Undo/Redo, save state, keyboard help,
   **Workspace options** and Export. Workspace options holds layout reset and
   Diagnostics.
-- Panels are docked edge to edge, without outer margins, separated by 1 px dividers.
-  Media and the Inspector each have a panel icon at the right of their heading
-  (**Collapse Media panel** / **Collapse Inspector panel**, `aria-expanded`). A
+- Panels are bordered tiles separated by 6 px gutters, also below the header and above the
+  Activity bar but not at the window sides; corners on the window edges are square, the others rounded 4 px.
+  The gutters are the resize dividers; each divider grabs 2 px into its neighbours.
+  Media and the Properties panel each have a panel icon at the right of their heading
+  (**Collapse Media panel** / **Collapse Properties panel**, `aria-expanded`). A
   collapsed panel leaves a 28 px labelled strip on its side; the whole strip is the
-  **Expand Media panel** / **Expand Inspector panel** button. Focus moves between
+  **Expand Media panel** / **Expand Properties panel** button. Focus moves between
   the two buttons.
 - Left: independently scrolling Media list/grid with search, import and compact
   status. **Media options** holds filter/sort/view controls. A plain click reviews;
@@ -50,7 +52,7 @@ same kernel; see [local contrast](design/DETAIL_FILTERS.md#local-contrast).
   button in place of its add/prepare actions.
 - Centre: docked **Timeline preview** / **Source preview** tabs, never an overlay
   covering other editor controls. Tab arrows and Home/End switch viewer contexts.
-- Right: scrollable **Clip / Track / Audio** inspector tabs
+- Right: scrollable **Clip / Track / Audio** Properties tabs
   with readable inputs and independent collapsible sections, split by ownership.
   Clip ("Clip N of M · track") contains the selected clip's **Speed**,
   **Detail**, **Range** and **Placement**; an empty video track shows one line instead.
@@ -75,20 +77,20 @@ same kernel; see [local contrast](design/DETAIL_FILTERS.md#local-contrast).
   a click seeks, a drag selects a range to cut and the handle scrubs;
   distinct Cut/Fade/Dissolve buttons open boundary transitions, not keyframes.
   While dragging a ruler range or the playhead, the preview shows each decoded frame as soon as it is
-  ready (the newest pointer position wins, never aborting an undecoded seek); the Inspector's
+  ready (the newest pointer position wins, never aborting an undecoded seek); the Properties panel's
   playhead values catch up whenever the pointer rests, even before release, and exactly on release.
 
-Viewer and Inspector tabs use native buttons with consistent padding, borders and
+Viewer and Properties tabs use native buttons with consistent padding, borders and
 selected appearance, retaining arrow/Home/End navigation. Colour's and Transform's keyframe
 lists keep their accessible names under a small visible **Keyframes** heading.
-The Inspector tab bar stays pinned while its content scrolls; keyboard focus and
+The Properties tab bar stays pinned while its content scrolls; keyboard focus and
 scroll-into-view reveal controls below that bar rather than beneath it.
 Control vocabulary and button/icon conventions follow the
 [editor control catalogue](design/EDITOR_CONTROLS.md#vocabulary). Trash deletes; × closes or
 dismisses. Icon-only actions retain accessible names and tooltips.
 
-Media/Inspector widths and Timeline height can be resized by pointer or focused-divider
-arrows (16 px; Shift uses 32 px); each divider's pointer target extends 3 px beyond its line. Double-click/Home resets a divider. Pointer move
+Media/Properties widths and Timeline height can be resized by pointer or focused-divider
+arrows (16 px; Shift uses 32 px). Double-click/Home resets a divider. Pointer move
 changes only a transient UI size; release saves the layout preference. Escape,
 pointer cancellation and lost capture restore the prior size. Dividers are disabled
 during timeline trim/shared-keyframe/music drafts to preserve captured geometry.
@@ -99,7 +101,7 @@ Side-panel visibility and dimensions are
 browser-local UI preferences, never document/history fields. Sizes are clamped to
 viewport bounds. The supported minimum is a **1280 × 720** CSS viewport; 1440 × 900
 is the default desktop size. At supported sizes the workspace does not overflow
-horizontally, Keyframe controls remain reachable with the Inspector at its 270 px
+horizontally, Keyframe controls remain reachable with the Properties panel at its 270 px
 minimum, and the toolbar and music lanes retain usable pointer targets. Smaller
 windows are best effort, not a support or validation target: below 980 px one side
 drawer is visible at a time, and the CSS floor is 640 px. This is not a mobile editor.
@@ -110,7 +112,7 @@ certification.
 Choosing a video track selects its first clip (if present), highlights that track and
 reveals it vertically. Empty-track selection clears clip selection but retains the
 insertion target **and its Track context/settings**. Selecting a
-clip or a populated/empty track preserves the user's chosen Inspector tab. Its fields
+clip or a populated/empty track preserves the user's chosen Properties tab. Its fields
 refresh for the new editing context without applying the previous track/clip's drafts
 to that selection. Automatic track reveal never runs under an active
 trim/shared-keyframe/native clip drag. Selected clips and source-list **Show**
@@ -179,18 +181,18 @@ On a focused track keyframe marker, Left/Right moves that keyframe one project f
 moves ten. Marker keyboard events remain in that context, retaining keyframe/Timeline
 focus while navigating to the moved keyframe, without also firing ordinary playhead-step,
 clip-nudge or other editor shortcuts.
-Click or Enter on a marker selects its track, seeks and opens Track → Colour, without editing; whole-track keyframe navigation preserves the chosen Inspector tab.
+Click or Enter on a marker selects its track, seeks and opens Track → Colour, without editing; whole-track keyframe navigation preserves the chosen Properties tab.
 A focused bookmark moves the same way and Delete/Backspace removes it; click, Enter
 or Space only seeks to it.
 
 Options are nonmodal disclosures with normal Tab navigation, not custom ARIA menus.
 They use the browser top layer to avoid clipping inside panels. Escape closes and
 returns focus to the trigger; clicking outside closes without stealing focus from
-the clicked control. Inspector tab arrows/Home/End switch contexts without discarding
+the clicked control. Properties tab arrows/Home/End switch contexts without discarding
 mounted content or its valid/invalid drafts within the same editing context.
 Selecting a clip or track keeps the chosen tab; explicit Cut/Fade/Dissolve boundary
 buttons open Track with that boundary expanded.
-**Expand all / Collapse all** is an icon button on the Inspector tab bar that changes
+**Expand all / Collapse all** is an icon button on the Properties panel tab bar that changes
 only the visible tab's sections, including temporarily absent ones: Clip's **Speed**,
 **Detail**, **Range** and **Placement**; Track's **Colour**, **HSL ranges**, **Colour curves**, **Transform**,
 **Transitions** and **Fades**; Audio's **Music**. It is hidden while Clip has no
@@ -205,7 +207,7 @@ not repeated across the main workspace. Collapsing never disables processing.
 
 All inline help uses a small **question-mark button**, including animation, source,
 opacity, speed, Transform, colour, keyframe/transition/fade/audio timing and startup details.
-Inspector **Speed**, **Detail**, **Range**, **Placement**, **Colour**, **HSL ranges**, **Colour curves**, **Transform**, Transition and Sequence
+Properties **Speed**, **Detail**, **Range**, **Placement**, **Colour**, **HSL ranges**, **Colour curves**, **Transform**, Transition and Sequence
 fades put help beside their titles, reachable even when collapsed. Expansion and
 help are independent native buttons in normal section → help → fields Tab order
 (an open help's **Learn more** link comes right after its button);
@@ -279,7 +281,7 @@ The field is the sole numeric value display, not a read-only output or number-on
 layout. Opacity sliders/exact fields always use **0–100%**, neutral **100%**;
 only UI values are scaled, with track `opacity` and keyframe storage unchanged at **0–1**.
 
-Pointer sliding keeps a transient local control-value draft that updates the thumb and numeric value, not the document. Dragging a Colour, Opacity, HSL or Transform slider (main or stored) previews the draft value in the image, coalesced to the display rate, without any document, history, autosave or Inspector change, and without restarting music. Release commits one validated edit and one Undo step. Escape, pointer cancellation, lost capture, window blur or an invalid value restores the control and the preview. Other sliders (speed, gain) update the image on release, after one validated document edit and one Undo step. An invalid release applies nothing; an unchanged value creates no history entry. Each native keyboard slider adjustment is an individual validated edit. Timeline/curve-keyframe gestures retain
+Pointer sliding keeps a transient local control-value draft that updates the thumb and numeric value, not the document. Dragging a Colour, Opacity, HSL or Transform slider (main or stored) previews the draft value in the image, coalesced to the display rate, without any document, history, autosave or Properties change, and without restarting music. Release commits one validated edit and one Undo step. Escape, pointer cancellation, lost capture, window blur or an invalid value restores the control and the preview. Other sliders (speed, gain) update the image on release, after one validated document edit and one Undo step. An invalid release applies nothing; an unchanged value creates no history entry. Each native keyboard slider adjustment is an individual validated edit. Timeline/curve-keyframe gestures retain
 their separate live-preview contracts.
 
 Numeric fields keep a local text draft with full entered precision, independent of
@@ -303,7 +305,7 @@ Dragging previews the complete validated document without history/save; final
 valid release is one Undo step. Invalid final release, Escape, cancellation, lost
 capture or window blur restores, never commits an earlier valid draft. Handle
 arrows move one original frame (Shift ten); Home on IN restores zero, End on OUT
-restores the original exclusive OUT. Details: [Range](TIMELINE_EDITING.md#clip-inspector-range).
+restores the original exclusive OUT. Details: [Range](TIMELINE_EDITING.md#clip-range).
 
 Other integer source/timeline frames, durations and fades retain exact native
 `NumberField` steppers and timecode feedback, not arbitrary sliders. Source review
@@ -406,7 +408,7 @@ earlier/later keyframes where that setting is not `null`, including zero, and sk
 keyframes enabling only unrelated channels. Main and stored Opacity arrows visit keyframes with
 `opacity` enabled; Colour's keyframe line visits the colour/Opacity union.
 No opacity diamond/buttons are duplicated in the sidebar.
-Navigation preserves the chosen Inspector tab and the activated button's focus,
+Navigation preserves the chosen Properties tab and the activated button's focus,
 rather than forcing Clip;
 it never saves or creates an Undo step.
 
@@ -884,7 +886,7 @@ at most two intermediate audio inputs, one audio child per pass and three scratc
 audio files (selected source + old/new accumulators). One final mixed input clamps
 once before AAC. Audio planning is maximum selected PCM + two full-project Float64
 stereo timelines, duration-dependent and additional to video. Exact byte bounds are in
-[the resource contract](LAYERS_AND_KEYFRAMES.md#inspector-and-resource-limits). Export
+[the resource contract](LAYERS_AND_KEYFRAMES.md#properties-panel-and-resource-limits). Export
 shows one line of free space on its output/scratch volume; **Storage details** holds
 the explicitly advisory planning
 allowance, not a compressed-size guarantee or time estimate. Low space/mount
@@ -894,7 +896,7 @@ details remain disclosed. Accepted submission opens Activity and later editing
 cannot change its snapshot. See [UX_HARDENING.md](UX_HARDENING.md) for storage
 assumptions, measurement procedures and the private constrained-volume test.
 
-Preview/Inspector loading is deferred without changing per-frame ownership.
+Preview/Properties loading is deferred without changing per-frame ownership.
 Module-load failures keep the editor available and offer **Reload editor**, which
 first flushes pending committed edits, plus **Download project**. A save failure
 prevents reload and retains the draft; browsers cache failed imports, so this is

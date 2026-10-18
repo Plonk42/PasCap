@@ -9,8 +9,8 @@ This guide is not a delivery ledger or a fresh validation result.
 ## Presentation and track controls
 
 - **Keyboard help** is directly in the header. Workspace options holds layout
-  reset and Diagnostics; Media and the Inspector collapse from their own headings.
-- The **selected clip or whole-track context comes first** in Inspector.
+  reset and Diagnostics; Media and the Properties panel collapse from their own headings.
+- The **selected clip or whole-track context comes first** in Properties.
   Collapsed sections have relevant icons, compact duration/rate readouts and an
   adjusted-state dot; expanding preserves every control and existing preferences.
 - Animation uses contextual help rather than a paragraph below every control. Static values use
@@ -254,12 +254,12 @@ job-owned cleanup and preservation. Quota errors explain quota-specific recovery
 
 ## Issue #4: deferred loading boundaries
 
-The production build defers the preview decoder/compositor bootstrap, Inspector
+The production build defers the preview decoder/compositor bootstrap, Properties
 and optional Diagnostics. Existing lazy dialogs/source review/footage browsing
 remain. Per-frame rendering still belongs to the preview engine outside React;
 loading a module performs no media preparation or hidden job.
 
-Default-visible Inspector and preview still load their chunks after the shell;
+Default-visible Properties and preview still load their chunks after the shell;
 code splitting redistributes work and adds requests, not a GPU-performance gain.
 Measure entry, eager shared and deferred chunks separately for the actual build.
 Do not raise or suppress a bundle-warning threshold to substitute for measurement.
@@ -269,7 +269,7 @@ discard its in-memory project. Browsers cache failed module imports, so recovery
 offers **Reload editor**, guarded by saving pending edits first, plus a strict
 project download. A save failure prevents reload and retains the draft. Runtime
 preview failures still have their ordinary **Retry preview** action. Hidden
-Inspector panels stay mounted, retaining section state and normal one-time
+Properties panels stay mounted, retaining section state and normal one-time
 Enter/blur commits. Keyboard/focus/history contracts and the two-decoders-per-track
 preview bound remain; eight tracks have 16 decoders plus one separate source-review decoder.
 

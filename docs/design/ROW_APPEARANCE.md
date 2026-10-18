@@ -79,7 +79,7 @@ input scaling: grading and resampling do not commute. The two-clip diagnostic
 reference and measurement helper accept static scalar video track Colour with neutral HSL
 and identity curves and Shadows/Highlights/HDR/Local contrast 0, without independent clip grades.
 
-## Inspector and history
+## Properties and history
 
 Control vocabulary follows the [editor control catalogue](EDITOR_CONTROLS.md#vocabulary).
 
@@ -127,7 +127,7 @@ edit, atomic rejection and editor-only navigation retain their existing contract
 ## Validation scope
 
 Ownership/history/schema tests, CPU single grading and bounded LUT tests,
-real GPU comparison, synthetic 720p/UHD native parity and memory-only inspector
+real GPU comparison, synthetic 720p/UHD native parity and memory-only Properties
 workflows are required to validate this contract, including Temperature/Tint math
 and editing. This guide claims no new test results. Passing synthetic tests does not qualify
 intended-GPU speed, long-flight throughput, real media or long-run A/V behaviour.

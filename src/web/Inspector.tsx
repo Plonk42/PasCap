@@ -140,7 +140,7 @@ function InspectorTabs({
   };
   return (
     <div className="panel-heading inspector-tabs">
-      <div className="inspector-tab-list" role="tablist" aria-label="Inspector sections">
+      <div className="inspector-tab-list" role="tablist" aria-label="Properties sections">
         {INSPECTOR_MODES.map((mode) => (
           <button
             key={mode.id}
@@ -808,7 +808,7 @@ function InspectorPanel({
 
   return (
     <InspectorExpansionContext value={expansion}>
-      <aside className="inspector-panel panel declutter-inspector" aria-label="Clip inspector">
+      <aside className="inspector-panel panel declutter-inspector" aria-label="Properties">
         <InspectorTabs
           id={inspectorId}
           section={section}

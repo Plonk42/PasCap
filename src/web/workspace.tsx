@@ -57,7 +57,6 @@ export function workspaceDockStyle(layout: WorkspaceLayout, sizes: ReturnType<ty
   const side = (open: boolean, size: number) => ({
     width: `${open ? size : PANEL_RAIL_WIDTH}px`,
     rail: `${open ? 0 : PANEL_RAIL_WIDTH}px`,
-    divider: open ? '1px' : '0px',
   });
   const media = side(layout.mediaOpen, sizes.media);
   const inspector = side(layout.inspectorOpen, sizes.inspector);
@@ -66,8 +65,6 @@ export function workspaceDockStyle(layout: WorkspaceLayout, sizes: ReturnType<ty
     '--inspector-width': inspector.width,
     '--media-rail': media.rail,
     '--inspector-rail': inspector.rail,
-    '--media-divider': media.divider,
-    '--inspector-divider': inspector.divider,
     '--timeline-height': `${sizes.timeline}px`,
   } as CSSProperties;
 }

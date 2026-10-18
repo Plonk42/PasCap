@@ -327,7 +327,7 @@ automated specs, not a full browser-suite run:
 3. Capture and inspect **rendered screenshots** for alignment, spacing, clipping,
    readable values, reachable controls and scrolling at the **1440 × 900** default
    and the **1280 × 720** minimum supported viewport. When panels are affected,
-   also check their minimum sizes at 1280 × 720: Media 240 px, Inspector 270 px,
+   also check their minimum sizes at 1280 × 720: Media 240 px, Properties 270 px,
    Timeline 200 px. Size the viewport explicitly; a docked browser panel is often
    smaller. Smaller windows are best effort and need no live inspection
    ([supported sizes](WORKSPACE_AND_RECOVERY.md#layout-and-navigation)).
@@ -436,7 +436,7 @@ two RGBA16) use **22 bytes/pixel = 182,476,800 bytes at UHD**; two 65³ Float32 
 add **6,591,000 bytes**, excluding native/audio memory. CPU composition/LUT bands
 run on at most eight worker threads sharing those buffers, without copies. Two retained clip files and
 three timeline representations bound concurrency, **not disk GB**;
-scratch grows with duration ([resource contract](LAYERS_AND_KEYFRAMES.md#inspector-and-resource-limits)).
+scratch grows with duration ([resource contract](LAYERS_AND_KEYFRAMES.md#properties-panel-and-resource-limits)).
 The static fast path requires one enabled, unanimated, zero-origin contiguous
 video track with Opacity 1 and Shadows/Highlights/HDR/Local contrast 0, neutral HSL/identity colour curves, an exactly neutral track Transform base without Transform keyframes
 and neutral clip Sharpen/Clarity/Denoise;
@@ -526,7 +526,7 @@ preview following the dragged key, the red ghost at an invalid target, Escape/bl
 cancellation, one Undo step per valid release, ←/→ moves and focus; `KeyframeMarkers`
 renders one element per stored key whose React key survives the drag. A keyframe
 type supplies only a `KeyframeSlideKind`: frame mapping, validation, seek
-and Inspector section. Plain keys stay with a focused marker; Undo/Redo still apply.
+and Properties section. Plain keys stay with a focused marker; Undo/Redo still apply.
 
 **Clip → Range** uses one full-original hatched bar with IN/OUT handles and exact
 text fields below its ends, displaying 30 fps NDF **MM:SS:FF** and accepting
@@ -537,7 +537,7 @@ suffix sequencing, not the timeline left handle's retained-OUT rule. Drag previe
 the complete validated document; final valid release is one Undo, invalid final/
 cancel/lost capture/blur restores. Arrows move one original frame (Shift ten),
 Home/End restore IN/OUT endpoints; Restore full recording stays. Source review's
-independent numeric IN/OUT pair (Enter/blur applies, Escape restores) is unchanged. See [Range](TIMELINE_EDITING.md#clip-inspector-range).
+independent numeric IN/OUT pair (Enter/blur applies, Escape restores) is unchanged. See [Range](TIMELINE_EDITING.md#clip-range).
 
 ## Contributor safety
 

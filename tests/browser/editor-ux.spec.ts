@@ -337,10 +337,10 @@ test('hiding the deferred inspector applies a blur draft once and retains its se
   const input = page.getByRole('textbox', { name: 'Source IN frame', exact: true });
   await input.fill('5');
   // Hiding a focused native input itself blurs it; the existing Enter/blur contract must still apply once.
-  await collapsePanel(page, 'Inspector').evaluate((button) => (button as HTMLButtonElement).click());
+  await collapsePanel(page, 'Properties').evaluate((button) => (button as HTMLButtonElement).click());
   await expect(input).toBeHidden();
   expect((await current(page)).clips[0]!.sourceIn).toBe(5);
-  await expandPanel(page, 'Inspector').evaluate((button) => (button as HTMLButtonElement).click());
+  await expandPanel(page, 'Properties').evaluate((button) => (button as HTMLButtonElement).click());
   await expect(input).toBeVisible();
   await expect(input).toHaveValue('00:00:05');
   await input.press('Enter');

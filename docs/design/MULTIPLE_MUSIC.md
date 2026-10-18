@@ -5,7 +5,7 @@ the required behaviour, not completed implementation, test evidence or release
 acceptance. Unit, native and browser validation of this contract is pending.
 Usage belongs in [the user guide](../USER_GUIDE.md) and
 [speed and audio](../SPEED_AND_AUDIO.md); resource/storage limits also belong in
-[tracks and keyframes](../LAYERS_AND_KEYFRAMES.md#inspector-and-resource-limits) and
+[tracks and keyframes](../LAYERS_AND_KEYFRAMES.md#properties-panel-and-resource-limits) and
 [UX hardening](../UX_HARDENING.md#issue-3-export-storage-and-recovery).
 
 ## Strict document and track identity

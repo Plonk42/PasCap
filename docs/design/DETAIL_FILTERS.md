@@ -276,7 +276,7 @@ at least as fast as the transport below, and remains the parity reference.
   (Vulkan) composes the same frame in the same ≈ 0.21 s: loopback transport, not the
   GPU, bounds it; its browser starts in ≈ 1 s instead of ≈ 3 s. Owner 4K test project
   (1,509 frames, Intel): ≈ 13 min export, 0.28 s per composed frame. With span pipelining
-  ([resources](../LAYERS_AND_KEYFRAMES.md#inspector-and-resource-limits)) and banded
+  ([resources](../LAYERS_AND_KEYFRAMES.md#properties-panel-and-resource-limits)) and banded
   uploads, a 60-frame UHD render with a direct x264 medium encode went 44.7 s → 40.4 s,
   composition 0.37 s → 0.34 s per frame under encoder load; that synthetic noise
   makes x264 the floor.

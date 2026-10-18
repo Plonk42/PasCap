@@ -20,12 +20,12 @@ export async function expectDecoders(page: Page, count: number): Promise<void> {
 }
 
 /** A side panel collapses from its own heading. */
-export function collapsePanel(page: Page, name: 'Media' | 'Inspector'): Locator {
+export function collapsePanel(page: Page, name: 'Media' | 'Properties'): Locator {
   return page.getByRole('button', { name: `Collapse ${name} panel`, exact: true });
 }
 
 /** A collapsed side panel expands from the rail it leaves. */
-export function expandPanel(page: Page, name: 'Media' | 'Inspector'): Locator {
+export function expandPanel(page: Page, name: 'Media' | 'Properties'): Locator {
   return page.getByRole('button', { name: `Expand ${name} panel`, exact: true });
 }
 
