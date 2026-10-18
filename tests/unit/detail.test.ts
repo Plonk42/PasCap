@@ -67,8 +67,10 @@ function reference(
     const sigma = 0.1 * settings.denoise;
     const sumG = [0, 0, 0];
     const sumD = [0, 0, 0];
+    const sumC = [0, 0, 0];
     let weightG = 0;
     let weightD = 0;
+    let weightC = 0;
     for (const radius of [1, 2])
       for (let i = -1; i <= 1; i++)
         for (let j = -1; j <= 1; j++) {
@@ -84,14 +86,25 @@ function reference(
             high = Math.max(high, luma(tap));
           }
           if (settings.denoise > 0) {
+            // Luma uses range sigma σ, colour 2.5σ, both over a spatial Gaussian of 1.5 units.
+            const wide = Math.exp(-(x * x + y * y) / (2 * 1.5 ** 2));
             const meanSquare = tap.reduce((sum, channel, index) => sum + (channel - measured[index]!) ** 2, 0) / 3;
-            const range = Math.exp(-meanSquare / (2 * sigma * sigma));
-            weightD += spatial * range;
-            tap.forEach((channel, index) => (sumD[index]! += spatial * range * channel));
+            const range = wide * Math.exp(-meanSquare / (2 * sigma * sigma));
+            const colour = wide * Math.exp(-meanSquare / (2 * (2.5 * sigma) ** 2));
+            weightD += range;
+            weightC += colour;
+            tap.forEach((channel, index) => {
+              sumD[index]! += range * channel;
+              sumC[index]! += colour * channel;
+            });
           }
         }
     gaussian = sumG.map((sum) => sum / weightG) as unknown as RGB;
-    if (settings.denoise > 0) denoised = sumD.map((sum) => sum / weightD) as unknown as RGB;
+    if (settings.denoise > 0) {
+      const tight = sumD.map((sum) => sum / weightD) as unknown as RGB;
+      const colour = sumC.map((sum) => sum / weightC) as unknown as RGB;
+      denoised = colour.map((channel) => channel + luma(tight) - luma(colour)) as unknown as RGB;
+    }
   }
   const detailBase = luma(denoised);
   // Edge-aware base: three rings of eight (the middle one turned 22.5°), range weights against
@@ -363,6 +376,24 @@ describe('clip detail settings', () => {
     const denoise = { sharpen: 0, clarity: 0, denoise: 1 };
     expect(run(noisy, left, 0.5, denoise)[0]).toBeLessThan(0.3);
     expect(run(noisy, right, 0.5, denoise)[0]).toBeGreaterThan(0.7);
+    // Colour noise of equal luma goes at moderate strength while the luma stays exact.
+    const blotches = new Map<string, number>();
+    const tinted: Image = (u, v) => {
+      const key = `${Math.round(u * 1280)}:${Math.round(v * 720)}`;
+      if (!blotches.has(key)) blotches.set(key, 0.4 * noise());
+      const shade = blotches.get(key)!;
+      return [0.5 + 0.7152 * shade, 0.5 - 0.2126 * shade, 0.5];
+    };
+    const colourSpread = (settings: DetailSettings): number => {
+      let sum = 0;
+      for (let index = 0; index < 50; index++) {
+        const [red, green, blue] = run(tinted, 0.25 + index * pixel, 0.5, settings);
+        expect(0.2126 * red! + 0.7152 * green! + 0.0722 * blue!).toBeCloseTo(0.5, 12);
+        sum += (red! - green!) ** 2;
+      }
+      return Math.sqrt(sum / 50);
+    };
+    expect(colourSpread({ sharpen: 0, clarity: 0, denoise: 0.5 })).toBeLessThan(colourSpread(NEUTRAL_DETAIL) * 0.45);
   });
 });
 
