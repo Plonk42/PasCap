@@ -44,6 +44,10 @@ export function detailShift(lines: number): number {
 export const DENOISE_DETAIL_CORE = 0.5;
 /** Denoise range sigma at full strength, in encoded RGB units. */
 export const DENOISE_RANGE_SIGMA = 0.1;
+/** Colour is smoothed with this many times Denoise's range sigma: colour noise goes, colour edges stay. */
+export const DENOISE_CHROMA_RANGE = 2.5;
+/** Denoise's spatial Gaussian sigma in units, over both rings. */
+export const DENOISE_SPATIAL_SIGMA = 1.5;
 export const SHARPEN_GAIN = 2;
 /** Sharpen overshoot beyond the 3×3 luma range tends to this, in encoded units: no hard halos. */
 export const SHARPEN_HALO = 0.05;
@@ -71,13 +75,16 @@ const SQUARE: readonly (readonly [number, number])[] = [
   [0, -1],
   [1, -1],
 ];
-/** Gaussian (sigma 1 unit) spatial weights of the 3×3 and 5×5 rings, centre 1. */
-export const DETAIL_FINE_TAPS = SQUARE.map(([x, y]) => ({ x, y, weight: Math.exp(-(x * x + y * y) / 2) }));
-export const DETAIL_WIDE_TAPS = SQUARE.map(([x, y]) => ({
-  x: 2 * x,
-  y: 2 * y,
-  weight: Math.exp(-2 * (x * x + y * y)),
+/** 3×3 and 5×5 rings: Sharpen's Gaussian (sigma 1 unit) and Denoise's spatial weights, centre 1. */
+const denoiseWeight = (x: number, y: number): number =>
+  Math.exp(-(x * x + y * y) / (2 * DENOISE_SPATIAL_SIGMA * DENOISE_SPATIAL_SIGMA));
+export const DETAIL_FINE_TAPS = SQUARE.map(([x, y]) => ({
+  x,
+  y,
+  weight: Math.exp(-(x * x + y * y) / 2),
+  denoise: denoiseWeight(x, y),
 }));
+export const DETAIL_WIDE_TAPS = SQUARE.map(([x, y]) => ({ x: 2 * x, y: 2 * y, denoise: denoiseWeight(2 * x, 2 * y) }));
 const FINE_WEIGHT = 1 + DETAIL_FINE_TAPS.reduce((sum, tap) => sum + tap.weight, 0);
 
 const EIGHTH_TURN = Math.PI / 8;
@@ -240,38 +247,52 @@ export function compileDetail(
   const tap = new Float64Array(3);
   const gaussian = new Float64Array(3);
   const denoised = new Float64Array(3);
+  const chroma = new Float64Array(3);
   let denoisedWeight = 1;
+  let chromaWeight = 1;
   let low = 0;
   let high = 0;
-  // Bilateral weight: spatial Gaussian times an encoded-RGB range Gaussian around the measured centre.
+  const chromaRange = inverseRange / (DENOISE_CHROMA_RANGE * DENOISE_CHROMA_RANGE);
+  // Bilateral weights: spatial Gaussian times an encoded-RGB range Gaussian around the measured centre,
+  // a wider one for colour.
   const bilateral = (weight: number): void => {
     const red = tap[0]! - measured[0]!;
     const green = tap[1]! - measured[1]!;
     const blue = tap[2]! - measured[2]!;
-    const w = weight * Math.exp(-(red * red + green * green + blue * blue) * inverseRange);
+    const distance = red * red + green * green + blue * blue;
+    const w = weight * Math.exp(-distance * inverseRange);
+    const c = weight * Math.exp(-distance * chromaRange);
     denoisedWeight += w;
-    for (let channel = 0; channel < 3; channel++) denoised[channel]! += w * tap[channel]!;
+    chromaWeight += c;
+    for (let channel = 0; channel < 3; channel++) {
+      denoised[channel]! += w * tap[channel]!;
+      chroma[channel]! += c * tap[channel]!;
+    }
   };
   const fine = (sample: DetailSampler, u: number, v: number): void => {
     gaussian.set(measured);
     low = high = luma(measured);
-    for (const { x, y, weight } of DETAIL_FINE_TAPS) {
+    for (const { x, y, weight, denoise: spatial } of DETAIL_FINE_TAPS) {
       sample(u + x * stepU, v + y * stepV, tap);
       const level = luma(tap);
       low = Math.min(low, level);
       high = Math.max(high, level);
       for (let channel = 0; channel < 3; channel++) gaussian[channel]! += weight * tap[channel]!;
-      if (denoise > 0) bilateral(weight);
+      if (denoise > 0) bilateral(spatial);
     }
-    if (denoise > 0)
-      for (const { x, y, weight } of DETAIL_WIDE_TAPS) {
-        sample(u + x * stepU, v + y * stepV, tap);
-        bilateral(weight);
-      }
+    for (let channel = 0; channel < 3; channel++) gaussian[channel]! /= FINE_WEIGHT;
+    if (denoise === 0) return;
+    for (const { x, y, denoise: spatial } of DETAIL_WIDE_TAPS) {
+      sample(u + x * stepU, v + y * stepV, tap);
+      bilateral(spatial);
+    }
     for (let channel = 0; channel < 3; channel++) {
-      gaussian[channel]! /= FINE_WEIGHT;
       denoised[channel]! /= denoisedWeight;
+      chroma[channel]! /= chromaWeight;
     }
+    // Luma from the tight weights, colour from the wide ones.
+    const lift = luma(denoised) - luma(chroma);
+    for (let channel = 0; channel < 3; channel++) denoised[channel] = chroma[channel]! + lift;
   };
   const compression = HDR_COMPRESSION * hdr;
   const detailGain = 1 + localContrast;
@@ -350,6 +371,8 @@ export function compileDetail(
       else measured.set(centre);
       denoised.set(measured);
       denoisedWeight = 1;
+      chroma.set(measured);
+      chromaWeight = 1;
       if (sharpen > 0 || denoise > 0) fine(sample, mu, mv);
       const detailBase = luma(denoised);
       let delta = 0;
