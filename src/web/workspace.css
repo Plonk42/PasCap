@@ -843,15 +843,6 @@ body {
   opacity: 0.35;
 }
 
-.clip-nudge-controls {
-  display: flex;
-  gap: 6px;
-}
-
-.clip-nudge-controls > button {
-  flex: 1;
-}
-
 .workspace-options .editor-popover-content > button,
 .clip-context-menu > button {
   justify-content: flex-start;

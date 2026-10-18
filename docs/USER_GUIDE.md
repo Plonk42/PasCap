@@ -222,8 +222,8 @@ which never depends on its track or start.
 Red invalid ghosts never commit. **Snap** uses nearby boundaries; **Alt** bypasses
 magnets, but cannot turn a Ripple-on track into free placement. Trim and keyframe drags
 preview transiently, commit once on valid release, and cancel with Escape.
-**Timeline start frame** and nudge controls work on independently positioned clips
-or the **first Ripple anchor only**. Later Ripple clips expose an accessible reason:
+**Timeline start frame** works on independently positioned clips
+or the **first Ripple anchor only**. Later Ripple clips expose a tooltip reason:
 drag to reorder, or turn Ripple off in Track options to set an independent start.
 
 **Bookmarks** mark times of interest, such as a beat, so edits snap to them. Press

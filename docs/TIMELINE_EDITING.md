@@ -352,9 +352,9 @@ and undoable, and never move music, other tracks or absolute track keyframes.
   Splits/cuts/duplicates copy detail filters independently;
   trims/moves/Ripple never shift, rescale or discard speed's original-source anchors.
 - **Alt+Left/Right** nudges a positioned clip or the first Ripple anchor one frame;
-  adding Shift nudges ten. Clip → Placement has one-frame nudge buttons beside
-  **Timeline start frame**, which is available on every track. Later Ripple
-  starts are derived and disabled with an accessible reason: drag to reorder or
+  adding Shift nudges ten. Clip → Placement's **Timeline start frame** field,
+  available on every track, steps one frame with its stepper. Later Ripple
+  starts are derived and disabled with a tooltip reason: drag to reorder or
   turn Ripple off for independent placement. Moving the first anchor while it
   remains first re-sequences its track. Starts remain nonnegative, conflicts reject
   the whole edit, and each successful action is one Undo step.

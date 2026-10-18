@@ -316,8 +316,6 @@ for (const row of [0, 1]) {
     const start = page.getByRole('spinbutton', { name: 'Clip timeline start', exact: true });
     await expect(start).toBeEnabled();
     await expect(start).toHaveValue('7');
-    for (const name of ['Move clip one frame earlier', 'Move clip one frame later'])
-      await expect(page.getByRole('button', { name, exact: true })).toBeEnabled();
     await commitNumber(page, 'Clip timeline start', 13);
     const anchored = await current(page);
     expect(trackGeometry(anchored, layer.id)).toEqual([
@@ -333,11 +331,7 @@ for (const row of [0, 1]) {
     await undoOnce(page, before);
     await selectClip(page, `later-${row}`);
     await expect(start).toBeDisabled();
-    await expect(start).toHaveAccessibleDescription(/Later clips follow the first one while Ripple is on/);
-    for (const name of ['Move clip one frame earlier', 'Move clip one frame later']) {
-      await expect(page.getByRole('button', { name, exact: true })).toBeDisabled();
-      await expect(page.getByRole('button', { name, exact: true })).toHaveAccessibleDescription(/Ripple is on/);
-    }
+    await expect(page.getByTitle(/Later clips follow the first one while Ripple is on/)).toBeVisible();
     await openOptions(page, `Track options ${layer.name}`);
     await page.getByRole('checkbox', { name: `Ripple on track ${layer.name}`, exact: true }).uncheck();
     const positioned = await current(page);
@@ -347,8 +341,6 @@ for (const row of [0, 1]) {
     );
     await closeOptions(page);
     await ready(page, positioned);
-    for (const name of ['Move clip one frame earlier', 'Move clip one frame later'])
-      await expect(page.getByRole('button', { name, exact: true })).toBeEnabled();
     await expect(start).toBeEnabled();
     await commitNumber(page, 'Clip timeline start', 72);
     const moved = await current(page);

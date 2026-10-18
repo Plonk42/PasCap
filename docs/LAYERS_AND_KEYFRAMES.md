@@ -35,8 +35,8 @@ when its first clip changes. Turning Ripple off captures actual placements;
 future edits keep other clips at their independent starts. Neither switch moves
 music, other tracks or absolute track keyframes.
 
-The Timeline start field and nudge controls work on any positioned clip, or the
-**first anchor only** while Ripple is on. Later Ripple starts expose an accessible
+The Timeline start field works on any positioned clip, or the
+**first anchor only** while Ripple is on. Later Ripple starts expose a tooltip
 reason: drag to reorder, or turn Ripple off for independent placement. Ripple is
 not a future-edits-only policy that preserves gaps while enabled.
 

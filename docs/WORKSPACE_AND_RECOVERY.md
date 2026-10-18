@@ -158,8 +158,8 @@ Enabling Ripple packs current clips from the first
 current start, closing gaps in one Undo and retaining valid dissolves. While on,
 later clips continuously follow the first anchor; commands persist actual starts.
 Turning off captures actual placements for independent edits. **Timeline start
-frame** and nudges work on positioned clips or the first Ripple anchor; later
-Ripple starts are disabled with an accessible explanation to drag to reorder or
+frame** works on positioned clips or the first Ripple anchor; later
+Ripple starts are disabled with a tooltip explaining how to reorder or
 turn Ripple off. Music, other tracks and absolute track keyframes never follow Ripple.
 
 In **Track**, Transitions lists every boundary of the selected track and **Fades**
