@@ -66,6 +66,17 @@ describe.skipIf(!enabled)('damaged originals · disposable native fixtures', () 
     library = new MediaLibrary(config, jobs);
     await library.initialise();
     const filename = path.join(sources, 'damaged.mp4');
+    await damagedSource(filename, 0);
+    asset = await library.register(filename);
+    originalBytes = await readFile(filename);
+  });
+  afterAll(async () => {
+    await jobs?.close();
+    if (root) await rm(root, { recursive: true, force: true });
+  });
+
+  /** 90 synthetic frames in 30-frame groups of pictures, with packets 31–33 overwritten. */
+  async function damagedSource(filename: string, bFrames: number): Promise<void> {
     await runProcess(config.ffmpeg, [
       '-hide_banner',
       '-loglevel',
@@ -94,7 +105,7 @@ describe.skipIf(!enabled)('damaged originals · disposable native fixtures', () 
       '-sc_threshold',
       '0',
       '-bf',
-      '0',
+      String(bFrames),
       '-threads',
       '2',
       '-color_primaries',
@@ -112,13 +123,7 @@ describe.skipIf(!enabled)('damaged originals · disposable native fixtures', () 
       filename,
     ]);
     await corruptPackets(config, filename, BROKEN);
-    asset = await library.register(filename);
-    originalBytes = await readFile(filename);
-  });
-  afterAll(async () => {
-    await jobs?.close();
-    if (root) await rm(root, { recursive: true, force: true });
-  });
+  }
 
   async function lumas(filename: string): Promise<number[]> {
     const output = await runProcess(config.ffmpeg, [
@@ -157,6 +162,18 @@ describe.skipIf(!enabled)('damaged originals · disposable native fixtures', () 
     expect(values).toHaveLength(calculateLayout(document).duration);
     return values;
   }
+
+  it('refuses to show damage black in a recording with B-frames, where frames could shift', async () => {
+    const filename = path.join(root, 'sources', 'reordered.mp4');
+    await damagedSource(filename, 2);
+    const reordered = await library.register(filename);
+    expect((await jobs.wait((await library.prepare(reordered.id)).id)).state).toBe('failed');
+    expect(library.get(reordered.id).damage.length).toBeGreaterThan(0);
+    const result = await jobs.wait((await library.prepare(reordered.id, true)).id);
+    expect(result.state).toBe('failed');
+    expect(result.message).toContain('uses B-frames');
+    expect(library.get(reordered.id)).toMatchObject({ status: 'error', prepared: null });
+  }, 60_000);
 
   it('records the damaged group of pictures and asks for an explicit choice', async () => {
     const job = await library.prepare(asset.id);

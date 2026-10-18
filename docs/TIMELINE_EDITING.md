@@ -119,8 +119,14 @@ registries, meaning none). Only an explicit **Prepare … with damaged frames sh
 black** prepares it then: every decode of that original (proxy, static and composited
 export, forward or seeked reversed chunks) refills dropped frames with FFmpeg `fps`,
 pads a damaged tail and blacks out the recorded ranges before counting frames, so
-exact frame counts and positions hold. Those decodes omit `-xerror`/`explode`;
-undamaged originals keep strict decoding and unchanged filters. The diagnostic
+exact frame counts and positions hold. Those decodes omit `-xerror`/`explode` and
+strip packet decode timestamps (`setts=dts=NOPTS`): after a hole the decoder can emit
+a stale picture whose timestamp goes backwards, and FFmpeg would then label every
+later frame from decode timestamps, one frame late in DJI files. Pictures keep their
+own timestamps only in decode order, so recordings with B-frames are refused with an
+explanation, and the black-out preparation fails unless the two frames after each
+damaged range match their own original frames better than their neighbours.
+Undamaged originals keep strict decoding and unchanged filters. The diagnostic
 reference rejects damaged recordings, and proxy samples and thumbnails avoid the
 black ranges. Source preview hatches them red on the range strip and motion lanes,
 whose hover readout names them, and steady ranges never include or bridge them: their

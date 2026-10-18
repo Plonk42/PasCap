@@ -64,9 +64,29 @@ export async function findDamage(
   return { missing: missing.length, damage: damagedRanges(missing, keyframes, frameCount) };
 }
 
+/** Whether any picture comes after a later one in decode order (B-frames). */
+export async function hasReorderedFrames(
+  config: ServiceConfig,
+  original: string,
+  signal: AbortSignal,
+): Promise<boolean> {
+  const packets = await videoPackets(config, original, signal);
+  return packets.some((packet, index) => index > 0 && packet.frame < packets[index - 1]!.frame);
+}
+
+/**
+ * Input options for decoding an accepted damaged original. After a hole the decoder can
+ * output a stale picture whose timestamp goes backwards; FFmpeg then labels every later
+ * frame from packet decode timestamps, which DJI files offset by one frame. Without
+ * them it keeps the pictures' own timestamps, so frames stay at their positions.
+ */
+export function repairInputArgs(damage: readonly DamagedRange[]): string[] {
+  return damage.length ? ['-bsf:v', 'setts=dts=NOPTS'] : [];
+}
+
 /** Strict decoding, unless the original's damage was found and accepted at preparation. */
 export function originalErrorArgs(asset: Pick<MediaAsset, 'damage'>): string[] {
-  return asset.damage.length ? [] : ['-xerror', '-err_detect', 'explode'];
+  return asset.damage.length ? repairInputArgs(asset.damage) : ['-xerror', '-err_detect', 'explode'];
 }
 
 /**
