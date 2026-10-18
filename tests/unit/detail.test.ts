@@ -39,15 +39,29 @@ const toneOf = (tone: Tone): LocalTone => ({
 });
 
 /** Independent transcription of the documented kernel, without the production tap tables. */
-function reference(image: Image, u: number, v: number, settings: DetailSettings, aspect: number, tone: Tone = {}): RGB {
+function reference(
+  image: Image,
+  u: number,
+  v: number,
+  settings: DetailSettings,
+  aspect: number,
+  tone: Tone = {},
+  lines = 720,
+): RGB {
   const { shadows, highlights, hdr, localContrast, exposure } = toneOf(tone);
   const dv = 1 / 720;
   const du = dv / aspect;
   const luma = (rgb: RGB): number => 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2];
   const centre = image(u, v);
-  let denoised: RGB = centre;
-  let gaussian: RGB = centre;
-  let low = luma(centre);
+  const neutral = settings.sharpen === 0 && settings.clarity === 0 && settings.denoise === 0;
+  // Above 720 lines detail is measured half a pixel (at most) down and right, then applied to the pixel.
+  const shift = neutral ? 0 : 0.5 * Math.min(1, Math.max(0, lines / 720 - 1));
+  const mu = u + shift / lines / aspect;
+  const mv = v + shift / lines;
+  const measured = shift > 0 ? image(mu, mv) : centre;
+  let denoised: RGB = measured;
+  let gaussian: RGB = measured;
+  let low = luma(measured);
   let high = low;
   if (settings.sharpen > 0 || settings.denoise > 0) {
     const sigma = 0.1 * settings.denoise;
@@ -61,7 +75,7 @@ function reference(image: Image, u: number, v: number, settings: DetailSettings,
           if (radius === 2 && i === 0 && j === 0) continue;
           const x = i * radius;
           const y = j * radius;
-          const tap = image(u + x * du, v + y * dv);
+          const tap = image(mu + x * du, mv + y * dv);
           const spatial = Math.exp(-(x * x + y * y) / 2);
           if (radius === 1) {
             weightG += spatial;
@@ -70,7 +84,7 @@ function reference(image: Image, u: number, v: number, settings: DetailSettings,
             high = Math.max(high, luma(tap));
           }
           if (settings.denoise > 0) {
-            const meanSquare = tap.reduce((sum, channel, index) => sum + (channel - centre[index]!) ** 2, 0) / 3;
+            const meanSquare = tap.reduce((sum, channel, index) => sum + (channel - measured[index]!) ** 2, 0) / 3;
             const range = Math.exp(-meanSquare / (2 * sigma * sigma));
             weightD += spatial * range;
             tap.forEach((channel, index) => (sumD[index]! += spatial * range * channel));
@@ -79,29 +93,37 @@ function reference(image: Image, u: number, v: number, settings: DetailSettings,
     gaussian = sumG.map((sum) => sum / weightG) as unknown as RGB;
     if (settings.denoise > 0) denoised = sumD.map((sum) => sum / weightD) as unknown as RGB;
   }
-  const base = luma(denoised);
+  const detailBase = luma(denoised);
   let delta = 0;
   if (settings.clarity !== 0) {
-    let mean = luma(centre);
+    let mean = luma(measured);
     for (const radius of [5, 10])
       for (let k = 0; k < 8; k++) {
         const angle = (k * Math.PI) / 4;
-        mean += luma(image(u + Math.cos(angle) * radius * du, v + Math.sin(angle) * radius * dv));
+        mean += luma(image(mu + Math.cos(angle) * radius * du, mv + Math.sin(angle) * radius * dv));
       }
     mean /= 17;
-    delta += settings.clarity * Math.min(1, Math.max(0, 4 * base * (1 - base))) * (base - mean);
+    delta += settings.clarity * Math.min(1, Math.max(0, 4 * detailBase * (1 - detailBase))) * (detailBase - mean);
   }
   if (settings.sharpen > 0) {
-    const fine = base - luma(gaussian);
-    const sharpened = base + (2 * settings.sharpen * fine ** 3) / (fine ** 2 + 0.004 ** 2);
-    const top = Math.max(high, base);
-    const bottom = Math.min(low, base);
+    const fine = detailBase - luma(gaussian);
+    const sharpened = detailBase + (2 * settings.sharpen * fine ** 3) / (fine ** 2 + 0.004 ** 2);
+    const top = Math.max(high, detailBase);
+    const bottom = Math.min(low, detailBase);
     const ease = (excess: number): number => 0.05 * Math.tanh(Math.min(10, excess / 0.05));
     let limited = sharpened;
     if (sharpened > top) limited = top + ease(sharpened - top);
     if (sharpened < bottom) limited = bottom - ease(bottom - sharpened);
-    delta += limited - base;
+    delta += limited - detailBase;
   }
+  if (shift > 0) {
+    const core = 0.5 * 0.1 * settings.denoise;
+    denoised = denoised.map((channel, index) => {
+      const finer = centre[index]! - measured[index]!;
+      return channel + (core > 0 ? finer ** 3 / (finer ** 2 + core ** 2) : finer);
+    }) as unknown as RGB;
+  }
+  const base = luma(denoised);
   if (hdr > 0 || localContrast !== 0 || shadows !== 0 || highlights !== 0) {
     const taps: { level: number; spatial: number }[] = [];
     for (const [radius, rotation] of [
@@ -145,8 +167,16 @@ function reference(image: Image, u: number, v: number, settings: DetailSettings,
   return denoised.map((channel) => Math.min(1, Math.max(0, channel + delta))) as unknown as RGB;
 }
 
-function run(image: Image, u: number, v: number, settings: DetailSettings, aspect = 16 / 9, tone: Tone = {}): RGB {
-  const filter = compileDetail(settings, aspect, toneOf(tone));
+function run(
+  image: Image,
+  u: number,
+  v: number,
+  settings: DetailSettings,
+  aspect = 16 / 9,
+  tone: Tone = {},
+  lines = 720,
+): RGB {
+  const filter = compileDetail(settings, aspect, toneOf(tone), lines);
   if (!filter) return image(u, v);
   const out = new Float64Array(3);
   filter.apply(
@@ -187,7 +217,7 @@ describe('clip detail settings', () => {
       expect(detailSchema.safeParse(invalid).success).toBe(false);
     expect(isNeutralDetail(NEUTRAL_DETAIL)).toBe(true);
     expect(isNeutralDetail({ sharpen: Number.MIN_VALUE, clarity: 0, denoise: 0 })).toBe(false);
-    expect(compileDetail(NEUTRAL_DETAIL, 1, toneOf({}))).toBeNull();
+    expect(compileDetail(NEUTRAL_DETAIL, 1, toneOf({}), 720)).toBeNull();
   });
 
   it('counts the kernel taps each setting adds', () => {
@@ -218,6 +248,41 @@ describe('clip detail settings', () => {
           expect(actual[index]).toBeCloseTo(channel, 12),
         );
       }
+  });
+
+  it('measures detail at 720p scale on larger images, keeping finer detail as it is', () => {
+    for (const lines of [1080, 1440, 2160])
+      for (const settings of [
+        { sharpen: 1, clarity: 0, denoise: 0 },
+        { sharpen: 0.35, clarity: 0.4, denoise: 0.8 },
+      ])
+        for (const [u, v] of [
+          [0.31, 0.43],
+          [0.02, 0.97],
+        ]) {
+          const actual = run(textured, u!, v!, settings, 4 / 3, { hdr: 0.3 }, lines);
+          reference(textured, u!, v!, settings, 4 / 3, { hdr: 0.3 }, lines).forEach((channel, index) =>
+            expect(actual[index]).toBeCloseTo(channel, 12),
+          );
+        }
+    const sharp = { sharpen: 1, clarity: 0, denoise: 0 };
+    const gain = (period: number, lines: number): number => {
+      const width = lines * (16 / 9);
+      const stripes: Image = (u) => {
+        const level = 0.5 + 0.05 * Math.cos(((u * width - 0.5) * 2 * Math.PI) / period);
+        return [level, level, level];
+      };
+      let peak = 0;
+      for (let x = 100; x < 100 + 2 * period; x++)
+        peak = Math.max(peak, Math.abs(run(stripes, (x + 0.5) / width, 0.5, sharp, 16 / 9, {}, lines)[0]! - 0.5));
+      return peak / 0.05;
+    };
+    // UHD pixel-level stripes, invisible at 720p, are no longer boosted like 720p detail.
+    expect(gain(2, 2160)).toBeLessThan(1.1);
+    expect(gain(4, 2160)).toBeLessThan(1.7);
+    // Detail the 720p preview shows is sharpened in UHD as in the preview.
+    expect(gain(6, 2160)).toBeGreaterThan(0.85 * gain(2, 720));
+    expect(gain(9, 2160)).toBeGreaterThan(0.85 * gain(3, 720));
   });
 
   it('leaves flat footage unchanged and stays finite for the tiniest strengths', () => {
@@ -300,9 +365,9 @@ describe('track HDR look', () => {
     expect(isNeutralColour(hdrOnly)).toBe(false);
     const input: RGB = [0.2, 0.4, 0.6];
     expect(gradePixel(input, hdrOnly)).toBe(input);
-    expect(compileDetail(NEUTRAL_DETAIL, 1, toneOf({ hdr: 0.01 }))).not.toBeNull();
+    expect(compileDetail(NEUTRAL_DETAIL, 1, toneOf({ hdr: 0.01 }), 720)).not.toBeNull();
     for (const invalid of [-0.01, 1.01, Number.NaN])
-      expect(() => compileDetail(NEUTRAL_DETAIL, 1, toneOf({ hdr: invalid }))).toThrow();
+      expect(() => compileDetail(NEUTRAL_DETAIL, 1, toneOf({ hdr: invalid }), 720)).toThrow();
   });
 
   it('matches an independent transcription of the Denoise → HDR → Clarity → Sharpen kernel', () => {
@@ -398,9 +463,9 @@ describe('track Local contrast', () => {
     expect(isNeutralColour(settings)).toBe(false);
     const input: RGB = [0.2, 0.4, 0.6];
     expect(gradePixel(input, settings)).toBe(input);
-    expect(compileDetail(NEUTRAL_DETAIL, 1, toneOf({ localContrast: 0.01 }))).not.toBeNull();
+    expect(compileDetail(NEUTRAL_DETAIL, 1, toneOf({ localContrast: 0.01 }), 720)).not.toBeNull();
     for (const invalid of [-1.01, 1.01, Number.NaN])
-      expect(() => compileDetail(NEUTRAL_DETAIL, 1, toneOf({ localContrast: invalid }))).toThrow();
+      expect(() => compileDetail(NEUTRAL_DETAIL, 1, toneOf({ localContrast: invalid }), 720)).toThrow();
   });
 
   it('matches the transcription alone and added to HDR', () => {
@@ -460,13 +525,13 @@ describe('local Shadows and Highlights', () => {
       const settings = { ...createColourSettings(), [setting]: -0.6 };
       expect(isNeutralColour(settings)).toBe(false);
       expect(gradePixel(input, settings)).toBe(input);
-      expect(compileDetail(NEUTRAL_DETAIL, 1, toneOf({ [setting]: 0.01 }))).not.toBeNull();
+      expect(compileDetail(NEUTRAL_DETAIL, 1, toneOf({ [setting]: 0.01 }), 720)).not.toBeNull();
       for (const invalid of [-1.01, 1.01, Number.NaN])
-        expect(() => compileDetail(NEUTRAL_DETAIL, 1, toneOf({ [setting]: invalid }))).toThrow();
+        expect(() => compileDetail(NEUTRAL_DETAIL, 1, toneOf({ [setting]: invalid }), 720)).toThrow();
     }
-    expect(() => compileDetail(NEUTRAL_DETAIL, 1, toneOf({ shadows: 0.5, exposure: Number.NaN }))).toThrow();
+    expect(() => compileDetail(NEUTRAL_DETAIL, 1, toneOf({ shadows: 0.5, exposure: Number.NaN }), 720)).toThrow();
     // Exposure alone is graded per pixel, never in this stage.
-    expect(compileDetail(NEUTRAL_DETAIL, 1, toneOf({ exposure: 1 }))).toBeNull();
+    expect(compileDetail(NEUTRAL_DETAIL, 1, toneOf({ exposure: 1 }), 720)).toBeNull();
   });
 
   it('matches an independent transcription, combined with detail, HDR and Exposure', () => {
@@ -659,7 +724,7 @@ describe('native detail filtering', () => {
         for (const x of [0, 1, Math.floor(width / 3), width - 2, width - 1]) {
           const u = (x + 0.5) / width;
           const v = (row + 0.5) / height;
-          const expected = gradePixel(reference(image, u, v, detail, width / height, tone), exactColour);
+          const expected = gradePixel(reference(image, u, v, detail, width / height, tone, height), exactColour);
           for (let channel = 0; channel < 3; channel++)
             maximum = Math.max(
               maximum,

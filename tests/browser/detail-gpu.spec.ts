@@ -31,33 +31,38 @@ test.beforeAll(async () => {
   expect(compositorScript.length).toBeGreaterThan(0);
 });
 
-// A 720p proxy-sized synthetic texture with fine and coarse structure. uploadPixels
+// Proxy-sized and larger synthetic textures with fine and coarse structure. uploadPixels
 // has flipY=false: row zero is the BOTTOM of the image.
-const textureWidth = 1280;
-const textureHeight = 720;
-const texture = new Uint8Array(textureWidth * textureHeight * 4);
-for (let pixel = 0; pixel < textureWidth * textureHeight; pixel++) {
-  const x = pixel % textureWidth;
-  const bottomY = Math.floor(pixel / textureWidth);
-  texture[pixel * 4] = Math.round(127 + 100 * Math.sin(x * 0.9 + bottomY * 0.31));
-  texture[pixel * 4 + 1] = (x * 37 + bottomY * 11) % 256;
-  texture[pixel * 4 + 2] = Math.round(127 + 90 * Math.cos(x * 0.021 - bottomY * 0.077) + 20 * Math.sin(x * 1.7));
-  texture[pixel * 4 + 3] = 255;
+interface Texture {
+  width: number;
+  height: number;
+  pixels: Uint8Array;
 }
+function syntheticTexture(width: number, height: number): Texture {
+  const pixels = new Uint8Array(width * height * 4);
+  for (let pixel = 0; pixel < width * height; pixel++) {
+    const x = pixel % width;
+    const bottomY = Math.floor(pixel / width);
+    pixels[pixel * 4] = Math.round(127 + 100 * Math.sin(x * 0.9 + bottomY * 0.31));
+    pixels[pixel * 4 + 1] = (x * 37 + bottomY * 11) % 256;
+    pixels[pixel * 4 + 2] = Math.round(127 + 90 * Math.cos(x * 0.021 - bottomY * 0.077) + 20 * Math.sin(x * 1.7));
+    pixels[pixel * 4 + 3] = 255;
+  }
+  return { width, height, pixels };
+}
+const proxyTexture = syntheticTexture(1280, 720);
 
-function bilinear(u: number, t: number, out: Float64Array): void {
-  const px = u * textureWidth - 0.5;
-  const py = t * textureHeight - 0.5;
+function bilinear(texture: Texture, u: number, t: number, out: Float64Array): void {
+  const { width, height, pixels } = texture;
+  const px = u * width - 0.5;
+  const py = t * height - 0.5;
   const x = Math.floor(px);
   const y = Math.floor(py);
   const dx = px - x;
   const dy = py - y;
   const at = (column: number, row: number, channel: number): number =>
-    texture[
-      (Math.max(0, Math.min(textureHeight - 1, row)) * textureWidth + Math.max(0, Math.min(textureWidth - 1, column))) *
-        4 +
-        channel
-    ]! / 255;
+    pixels[(Math.max(0, Math.min(height - 1, row)) * width + Math.max(0, Math.min(width - 1, column))) * 4 + channel]! /
+    255;
   for (let channel = 0; channel < 3; channel++)
     out[channel] =
       (at(x, y, channel) * (1 - dx) + at(x + 1, y, channel) * dx) * (1 - dy) +
@@ -72,7 +77,7 @@ function clip(
   return {
     slot: 0,
     settings: { ...NEUTRAL_COLOUR, ...tone },
-    aspect: textureWidth / textureHeight,
+    aspect: 16 / 9,
     spatial: { ...NEUTRAL_SPATIAL_POSE, ...pose },
     detail,
     originalWidth: 3840,
@@ -84,7 +89,7 @@ function clip(
 }
 
 /** Independent CPU expectation: shared detail kernel on a bilinear sampler, then the grade, opaque source. */
-function expected(source: CompositeClip, x: number, y: number, width: number, height: number): RGB {
+function expected(source: CompositeClip, texture: Texture, x: number, y: number, width: number, height: number): RGB {
   const pose = source.spatial;
   let u = (x + 0.5) / width;
   let v = (y + 0.5) / height;
@@ -98,8 +103,13 @@ function expected(source: CompositeClip, x: number, y: number, width: number, he
     if (u < 0 || u >= 1 || v < 0 || v >= 1) return [0, 0, 0];
   }
   const out = new Float64Array(3);
-  const sampler = (su: number, sv: number, target: Float64Array): void => bilinear(su, 1 - sv, target);
-  const filter = compileDetail(source.detail, source.originalWidth / source.originalHeight, localTone(source.settings));
+  const sampler = (su: number, sv: number, target: Float64Array): void => bilinear(texture, su, 1 - sv, target);
+  const filter = compileDetail(
+    source.detail,
+    source.originalWidth / source.originalHeight,
+    localTone(source.settings),
+    texture.height,
+  );
   if (filter) filter.apply(sampler, u, v, out);
   else sampler(u, v, out);
   return gradePixel([out[0]!, out[1]!, out[2]!], source.settings);
@@ -134,14 +144,17 @@ const cases: { name: string; source: CompositeClip }[] = [
   },
 ];
 
-for (const [width, height] of [
-  [1280, 720],
-  [3840, 2160],
+// The 1440-line texture exercises the 720p-scale measurement taps of larger export frames.
+for (const [width, height, lines] of [
+  [1280, 720, 720],
+  [3840, 2160, 720],
+  [2560, 1440, 1440],
 ] as const) {
-  test(`detail filters agree with the shared CPU kernel on the GPU at ${width}×${height}`, async ({
+  test(`detail filters agree with the shared CPU kernel on the GPU at ${width}×${height} from ${lines} lines`, async ({
     page,
   }, testInfo) => {
-    if (width === 3840) test.setTimeout(180_000);
+    if (width > 1280) test.setTimeout(180_000);
+    const texture = lines === 720 ? proxyTexture : syntheticTexture((lines * 16) / 9, lines);
     await page.route('**/*', (route) =>
       route.fulfill({ contentType: 'text/html', body: '<!doctype html><title>Synthetic GPU only</title>' }),
     );
@@ -192,10 +205,10 @@ for (const [width, height] of [
         width,
         height,
         sources: cases.map((item) => item.source),
-        pixels: Buffer.from(texture).toString('base64'),
+        pixels: Buffer.from(texture.pixels).toString('base64'),
         points,
-        textureWidth,
-        textureHeight,
+        textureWidth: texture.width,
+        textureHeight: texture.height,
       },
     );
     expect(result.error).toBe(0);
@@ -204,7 +217,7 @@ for (const [width, height] of [
     let count = 0;
     const check = (name: string, actual: number[][], source: CompositeClip): void =>
       points.forEach(([x, y], index) => {
-        const reference = expected(source, x!, y!, width, height);
+        const reference = expected(source, texture, x!, y!, width, height);
         expect(actual[index]![3], `${name} alpha at ${x},${y}`).toBe(255);
         reference.forEach((channel, at) => {
           const error = Math.abs(actual[index]![at]! - channel * 255);
@@ -223,8 +236,8 @@ for (const [width, height] of [
       };
       const change = Math.max(
         ...points.flatMap(([x, y]) => {
-          const filtered = expected(item.source, x!, y!, width, height);
-          return expected(unfiltered, x!, y!, width, height).map(
+          const filtered = expected(item.source, texture, x!, y!, width, height);
+          return expected(unfiltered, texture, x!, y!, width, height).map(
             (channel, at) => Math.abs(channel - filtered[at]!) * 255,
           );
         }),
