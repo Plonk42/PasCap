@@ -19,6 +19,7 @@ import {
   type Transition,
 } from '../../src/shared/model.js';
 import { validateSourceRanges } from '../../src/shared/source-range.js';
+import { removeSelectedRange } from '../../src/shared/rush-editing.js';
 import { calculateLayout, layerClips } from '../../src/shared/timeline.js';
 import {
   clipAction,
@@ -1306,6 +1307,52 @@ test('clear, Escape, timing, Undo and project switching invalidate only the tran
   await page.getByRole('button', { name: 'Review pattern-a.mp4', exact: true }).click();
   await expect(page.locator('.source-range-strip')).toHaveAttribute('data-source-in', '12');
   await expect(page.locator('.source-range-strip')).toHaveAttribute('data-source-out', '24');
+  await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
+});
+
+test('transition and fade edits keep the range at its project frames; Cut range then removes exactly it', async ({
+  page,
+}) => {
+  const before = await current(page);
+  // Clip c starts at 150 until the dissolve below moves it to 120.
+  await markRange(page, 150, 180);
+  await page.locator('.boundary-button').first().click();
+  await page.getByRole('combobox', { name: 'Transition type', exact: true }).selectOption('cross-dissolve');
+  const dissolved = await current(page);
+  expect(dissolved.layers[0]!.transitions[0]).toEqual({
+    leftId: 'a',
+    rightId: 'b',
+    type: 'cross-dissolve',
+    duration: 30,
+  });
+  expect(firstTrackGeometry(dissolved).map(([id, start]) => [id, start])).toEqual([
+    ['a', 0],
+    ['b', 60],
+    ['c', 120],
+  ]);
+  await expect(rulerRange(page)).toHaveAttribute('data-range-in', '150');
+  await expect(rulerRange(page)).toHaveAttribute('data-range-out', '180');
+  await expect(page.locator('.timeline-ruler-range-readout')).toHaveText('00:05:00 – 00:06:00');
+  const opening = page.getByRole('spinbutton', { name: 'Opening fade', exact: true });
+  await opening.fill('8');
+  await opening.press('Enter');
+  const faded = await current(page);
+  expect(faded.layers[0]!.openingFade).toBe(8);
+  await expect(rulerRange(page)).toHaveAttribute('data-range-in', '150');
+  await selectClip(page, 'c');
+  await expectCutOverlay(page, 150, 180);
+  await shortcut(page, 'Shift+Delete');
+  expect(await current(page)).toEqual(
+    applyCommand(faded, removeSelectedRange(faded, 'c', { inFrame: 150, outFrame: 180 }, 'unused')),
+  );
+  // One Undo per edit; Undo clears the range.
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  expect(await current(page)).toEqual(faded);
+  await expect(rulerRange(page)).toHaveCount(0);
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  expect(await current(page)).toEqual(dissolved);
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  expect(await current(page)).toEqual(before);
   await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
 });
 

@@ -457,6 +457,9 @@ for (const [index, { key, label }] of KEYFRAME_SETTINGS.entries()) {
     await previewAt(page, last);
     await guardedUnavailable(mainNext);
     await expect(mainNext).toBeFocused();
+    // After a click Space would play; focused by keyboard, the unavailable button activates nothing.
+    await mainNext.blur();
+    await mainNext.focus();
     await mainNext.press('Enter');
     await mainNext.press('Space');
     await previewAt(page, last);
@@ -569,6 +572,9 @@ for (const empty of [false, true]) {
     }
     await guardedUnavailable(next);
     await expect(next).toBeFocused();
+    // After a click Space would play; focused by keyboard, the unavailable button activates nothing.
+    await next.blur();
+    await next.focus();
     await next.press('Enter');
     await next.press('Space');
     await expect(keys.locator('.keyframe-row[aria-current="true"]')).toHaveAttribute('data-keyframe-frame', '240');

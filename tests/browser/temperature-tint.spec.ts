@@ -670,6 +670,9 @@ test('channel navigation skips unrelated keys and shares an off-duration cursor 
   await expect(tintPrevious).toHaveAttribute('aria-disabled', 'true');
   await expect(tintPrevious).toHaveJSProperty('disabled', false);
   await expect(tintPrevious).toHaveAttribute('tabindex', '-1');
+  // After a click Space would play; focused by keyboard, the unavailable button activates nothing.
+  await tintPrevious.blur();
+  await tintPrevious.focus();
   await tintPrevious.press('Space');
   await expect(tintPrevious).toBeFocused();
   await previewAt(page, 20);

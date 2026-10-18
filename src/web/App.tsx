@@ -50,6 +50,7 @@ import { DeferredPanel } from './DeferredPanel.js';
 import { mediaReady } from './display.js';
 import { Icon } from './icons.js';
 import { PanelRail, toggleSidePanel, type SidePanel } from './PanelToggle.js';
+import { trackPointerFocus, type PointerFocus } from './pointer-focus.js';
 import type { InspectorMode, InspectorSectionRequest, InspectorSectionTarget } from './InspectorSection.js';
 import { Jobs } from './Jobs.js';
 import {
@@ -68,7 +69,7 @@ import { Popover } from './Popover.js';
 import { readPreference, writePreference } from './preferences.js';
 import { PreviewPanel } from './PreviewPanel.js';
 import { ProjectTitle } from './ProjectTitle.js';
-import { editorShortcut } from './shortcuts.js';
+import { editorShortcut, typesSpace } from './shortcuts.js';
 import { planTimelineDrop } from './timeline-placement.js';
 import { adjacentBookmark } from './timeline-bookmarks.js';
 import { Timeline, type DraftPreview } from './Timeline.js';
@@ -138,17 +139,32 @@ function timingKey(project: ProjectDocument): string {
     music: project.music,
   });
 }
+/** Transition and fade edits may shift clips, but the ruler range keeps its project frames. */
+const RANGE_KEEPING_COMMANDS: ReadonlySet<EditCommand['type']> = new Set(['transition', 'fades']);
 
-function shortcutBlocked(event: KeyboardEvent): boolean {
-  const target = event.target;
-  return (
-    event.defaultPrevented ||
-    !!document.querySelector('dialog[open]') ||
-    (target instanceof HTMLElement &&
-      target.closest(
-        'input,textarea,select,[role="slider"],[role="separator"],[contenteditable="true"],.source-review,.activity-drawer,.editor-popover,.editor-help,.clip-speed-curve-editor',
-      ) !== null)
-  );
+function rangeWithin(range: TimelineRange | null, duration: number): TimelineRange | null {
+  if (!range || range.inFrame >= duration) return null;
+  return range.outFrame <= duration ? range : { ...range, outFrame: duration };
+}
+
+const OVERLAYS = '.source-review,.activity-drawer,.editor-popover,.editor-help,.clip-speed-curve-editor';
+const FIELDS = 'input,textarea,select,[role="slider"],[role="separator"],[contenteditable="true"]';
+
+/** Whether a key reaches the editor shortcuts, and whether Space keeps its native activation. */
+function shortcutTarget(
+  event: KeyboardEvent,
+  pointerFocus: PointerFocus | null,
+): { blocked: boolean; nativeSpace: boolean } {
+  const target = event.target instanceof HTMLElement ? event.target : null;
+  if (event.defaultPrevented || document.querySelector('dialog[open]') || target?.closest(OVERLAYS))
+    return { blocked: true, nativeSpace: true };
+  // Space plays after a pointer press on a control; keyboard focus keeps its native activation.
+  if (event.code === 'Space' && target && pointerFocus?.byPointer(target) && !typesSpace(target))
+    return { blocked: false, nativeSpace: false };
+  return {
+    blocked: !!target?.closest(FIELDS),
+    nativeSpace: !!target?.closest('button,a,summary,[role="tab"]'),
+  };
 }
 
 function message(cause: unknown, fallback: string): string {
@@ -235,6 +251,7 @@ export function App() {
   const [scrubbing, setScrubbing] = useState(false);
   const [ranges, setRanges] = useState<MediaSelections>({});
   const [boundaryId, setBoundaryId] = useState<string | null>(null);
+  const pointerFocus = useRef<PointerFocus | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [showDiagnostics, setShowDiagnostics] = useState(false);
@@ -344,11 +361,12 @@ export function App() {
     }
   }, []);
   const publish = useCallback(
-    (next: ProjectDocument) => {
+    (next: ProjectDocument, keepRange = false) => {
       const previous = current.current;
       if (!previous || timingKey(previous) !== timingKey(next)) {
         engine.current?.pause();
-        setTimeRange(null);
+        if (keepRange) setTimeRange((range) => rangeWithin(range, calculateLayout(next).duration));
+        else setTimeRange(null);
       }
       current.current = next;
       setProject(next);
@@ -391,7 +409,7 @@ export function App() {
     [select],
   );
   const commit = useCallback(
-    (next: ProjectDocument, removed?: MediaRemoval) => {
+    (next: ProjectDocument, removed?: MediaRemoval, keepRange = false) => {
       const previous = current.current;
       // Keep imported and previously used sources in the bin even after removing their last excerpt,
       // unless the user explicitly removed them from the project.
@@ -406,7 +424,7 @@ export function App() {
       };
       validate(document);
       if (!history.current) throw new Error('Project has not loaded yet.');
-      publish(history.current.replace(document));
+      publish(history.current.replace(document), keepRange);
     },
     [publish, validate],
   );
@@ -426,7 +444,11 @@ export function App() {
           const previous = current.current.clips.find((item) => item.id === command.clipId)!;
           requestedFrame.current = previous.sourceIn !== command.sourceIn ? placed.start : placed.end - 1;
         }
-        commit(next);
+        commit(
+          next,
+          undefined,
+          commands.every((item) => RANGE_KEEPING_COMMANDS.has(item.type)),
+        );
         setError('');
         setViewerMode('timeline');
       } catch (cause) {
@@ -1020,14 +1042,22 @@ export function App() {
     };
   }, [trackingJobs, showActivity, connection.state, refresh]);
   useEffect(() => {
+    const tracker = trackPointerFocus(document);
+    pointerFocus.current = tracker;
+    return () => {
+      tracker.dispose();
+      pointerFocus.current = null;
+    };
+  }, []);
+  useEffect(() => {
     const beforeUnload = (event: BeforeUnloadEvent): void => {
       if (autosave.current?.dirty || drafting.current || document.querySelector('[data-dirty="true"]'))
         event.preventDefault();
     };
     const keyboard = (event: KeyboardEvent): void => {
-      if (drafting.current || shortcutBlocked(event)) return;
-      const nativeSpace =
-        event.target instanceof HTMLElement && !!event.target.closest('button,a,summary,[role="tab"]');
+      if (drafting.current) return;
+      const { blocked, nativeSpace } = shortcutTarget(event, pointerFocus.current);
+      if (blocked) return;
       const shortcut = editorShortcut(event, nativeSpace);
       if (!shortcut) return;
       event.preventDefault();
@@ -2106,11 +2136,7 @@ export function App() {
             onBoundary={(id) => {
               select(id);
               setBoundaryId(id);
-              setInspectorMode('track');
-              workspace.update({
-                inspectorOpen: true,
-                ...(workspace.viewport.width < 980 ? { mediaOpen: false } : {}),
-              });
+              openInspectorSection('transition');
             }}
             onSeek={seek}
             onOpenSection={openInspectorSection}

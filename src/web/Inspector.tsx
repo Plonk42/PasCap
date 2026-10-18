@@ -21,6 +21,7 @@ import {
   useInspectorExpansion,
   type InspectorMode,
   type InspectorSectionRequest,
+  type InspectorSectionTarget,
 } from './InspectorSection.js';
 import { ColourKeyframeList } from './ColourKeyframeList.js';
 import { KeyframeToggle } from './KeyframeToggle.js';
@@ -64,6 +65,23 @@ const INSPECTOR_MODES: readonly { id: InspectorMode; label: string }[] = [
   { id: 'track', label: 'Track' },
   { id: 'audio', label: 'Audio' },
 ];
+
+const SECTION_TITLES: Record<InspectorSectionTarget, string> = {
+  colour: 'Colour',
+  speed: 'Speed',
+  transform: 'Transform',
+  transition: 'Transitions',
+};
+
+/** Bring a section to the top of the Inspector panel, then its detail into view, without scrolling the workspace. */
+function revealInPanel(section: Element, detail: Element | null): void {
+  const panel = section.closest<HTMLElement>('.inspector-panel');
+  if (!panel) return;
+  const padding = Number.parseFloat(getComputedStyle(panel).scrollPaddingTop) || 0;
+  panel.scrollTop += section.getBoundingClientRect().top - panel.getBoundingClientRect().top - padding;
+  const overflow = (detail?.getBoundingClientRect().bottom ?? 0) - panel.getBoundingClientRect().bottom;
+  if (overflow > 0) panel.scrollTop += overflow;
+}
 
 const TRANSITION_LABEL: Record<Transition['type'], string> = {
   cut: 'Cut',
@@ -774,23 +792,18 @@ function InspectorPanel({
   const position = project.clips.findIndex((item) => item.id === clip?.id);
   const trackPosition = trackClips.findIndex((item) => item.clip.id === clip?.id);
   useEffect(() => {
-    // A timeline boundary click must reveal its transition even if the section was collapsed.
-    if (boundaryId !== null && section === 'track') setOpen('transition', true);
-  }, [boundaryId, section]);
-  useEffect(() => {
-    // A timeline keyframe marker opens the section that edits it, even if it was collapsed.
+    // A timeline marker or boundary opens the section that edits it, even if it was collapsed.
     if (!sectionRequest) return;
     const { section: target } = sectionRequest;
     setOpen(target, true);
-    const title = target.charAt(0).toUpperCase() + target.slice(1);
     // Wait for the tab switch and expansion to lay out, then bring the whole section to the top.
     let frameId = requestAnimationFrame(() => {
-      frameId = requestAnimationFrame(() =>
-        globalThis.document
-          .querySelector<HTMLElement>(`.inspector-panel [aria-label="${title} section"]`)
-          ?.closest('.inspector-section')
-          ?.scrollIntoView({ block: 'start' }),
-      );
+      frameId = requestAnimationFrame(() => {
+        const element = globalThis.document
+          .querySelector<HTMLElement>(`.inspector-panel [aria-label="${SECTION_TITLES[target]} section"]`)
+          ?.closest('.inspector-section');
+        if (element) revealInPanel(element, element.querySelector('[data-selected="true"]'));
+      });
     });
     return () => cancelAnimationFrame(frameId);
   }, [sectionRequest]);

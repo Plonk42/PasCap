@@ -272,7 +272,11 @@ toolbar covering the lanes. Each track header has one **Ripple** toggle icon
   source frame cannot remove footage; errors preserve document/history and the range.
 - The range is transient editor state, not an autosaved/rendered field, and does not
   belong to a clip: selecting another clip or track keeps it. Clear/Escape, a ruler
-  click, timing edits, Undo/Redo and project changes clear it. Source-review I/O
+  click, other timing edits (trims, moves, speed, deletions, music), Undo/Redo and
+  project changes clear it. Transition and fade edits keep it at its project frames,
+  even when they shift clips, so a range around a boundary can be replayed while the
+  transition is tuned; its OUT is shortened to a shorter project, and a range starting
+  after the new end is cleared. Source-review I/O
   controls are a separate context and never edit it or the timeline.
   Form/modal/slider/popover keyboard guards still apply.
 

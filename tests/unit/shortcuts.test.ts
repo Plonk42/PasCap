@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { editorShortcut } from '../../src/web/shortcuts.js';
+import { editorShortcut, typesSpace } from '../../src/web/shortcuts.js';
 
 const base = { key: '', code: '', ctrlKey: false, metaKey: false, altKey: false, shiftKey: false, repeat: false };
 describe('editor shortcut mapping', () => {
@@ -28,6 +28,21 @@ describe('editor shortcut mapping', () => {
     expect(editorShortcut({ ...base, key: ' ', code: 'Space' })).toEqual({ type: 'play' });
     expect(editorShortcut({ ...base, key: ' ', code: 'Space' }, true)).toBeNull();
     expect(editorShortcut({ ...base, key: ' ', code: 'Space', repeat: true })).toBeNull();
+  });
+  it('keeps Space in text entry even after a pointer press, but not on other controls', () => {
+    const element = (tagName: string, type?: string, isContentEditable = false) => ({
+      tagName,
+      isContentEditable,
+      ...(type === undefined ? {} : { type }),
+    });
+    for (const type of ['text', 'number', 'search', 'email', 'url', 'tel', 'password'])
+      expect(typesSpace(element('INPUT', type))).toBe(true);
+    expect(typesSpace(element('INPUT'))).toBe(true);
+    expect(typesSpace(element('TEXTAREA'))).toBe(true);
+    expect(typesSpace(element('DIV', undefined, true))).toBe(true);
+    for (const type of ['checkbox', 'radio', 'range', 'button', 'submit', 'color'])
+      expect(typesSpace(element('INPUT', type))).toBe(false);
+    for (const tag of ['BUTTON', 'SELECT', 'A', 'SUMMARY', 'DIV']) expect(typesSpace(element(tag))).toBe(false);
   });
   it('maps exact one/ten-frame steps and leaves Alt or unrecognized keys alone', () => {
     expect(editorShortcut({ ...base, key: 'ArrowLeft' })).toEqual({ type: 'step', delta: -1 });

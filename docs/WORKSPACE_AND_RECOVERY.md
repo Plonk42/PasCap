@@ -174,7 +174,10 @@ Keyboard help is available via the **header help button** or `?`
 outside form/modal/source controls. Space, S, Q/W, M (add bookmark), Shift+↑/↓ (previous/next bookmark), Shift+Delete, Escape,
 Ctrl+D, Delete/Backspace, Undo/Redo,
 arrows, Shift+arrows, Alt+arrows, Alt+Shift+arrows, Home/End and F
-are mapped explicitly. Native button Space remains button activation. Editing
+are mapped explicitly. Space plays or pauses after a pointer press on a control
+(button, tab, checkbox, slider, select or divider), so focus left by a click never
+swallows it; a control reached by keyboard keeps native Space activation, and text
+or number fields always keep the typed space. Editing
 shortcuts cannot mutate clips while using a modal, source control, input, options
 popover, activity drawer or pane divider. Skip links expose the major editor regions.
 On a focused track keyframe marker, Left/Right moves that keyframe one project frame and Shift

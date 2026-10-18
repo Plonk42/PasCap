@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import type { AudioAsset } from '../../src/shared/audio.js';
+import { applyCommand } from '../../src/shared/commands.js';
 import { estimateExportSpace } from '../../src/shared/export-space.js';
 import type { ExportProfile } from '../../src/shared/export.js';
 import type { MediaAsset } from '../../src/shared/media.js';
@@ -14,7 +15,9 @@ import {
 import { calculateLayout, sampleTimeline } from '../../src/shared/timeline.js';
 import {
   closeOptions,
+  collapsePanel,
   expandedInspectorPreferences,
+  expandPanel,
   inspectorTab,
   openOptions,
   sharedPoint,
@@ -498,6 +501,74 @@ test('each row has its own boundary button and Sequence edits target only the se
     expect(await current(page)).toEqual(paused);
     await undoOnce(page, before);
   }
+});
+
+test('each boundary button reveals its expanded transition in Track → Transitions from any Properties state, without editing', async ({
+  page,
+}) => {
+  let document = boundaries();
+  for (const [index, layer] of document.layers.entries()) {
+    document.clips.push({ ...createClip(`third-${index}`, assets[0]!.id, 0, 60, layer.id), start: index * 20 + 120 });
+    document.layers[index]!.transitions.push({
+      leftId: `right-${index}`,
+      rightId: `third-${index}`,
+      type: 'cut',
+      duration: 0,
+    });
+  }
+  for (const transition of [
+    { leftId: 'left-0', rightId: 'right-0', type: 'fade-through-black', duration: 30 },
+    { leftId: 'right-0', rightId: 'third-0', type: 'fade-black-pause', fade: 10, pause: 10 },
+    { leftId: 'left-1', rightId: 'right-1', type: 'cross-dissolve', duration: 30 },
+  ] as const)
+    document = applyCommand(document, { type: 'transition', transition });
+  await fixture(page, projectSchema.parse(document));
+  const before = await current(page);
+  const saves = memory.saves;
+  const section = page.getByRole('button', { name: 'Transitions section', exact: true });
+  const panel = page.locator('.inspector-panel');
+  const cases = [
+    { layer: before.layers[0]!, nth: 0, label: 'Fade', type: 'fade-through-black' },
+    { layer: before.layers[0]!, nth: 1, label: 'Pause', type: 'fade-black-pause' },
+    { layer: before.layers[1]!, nth: 0, label: 'Dissolve', type: 'cross-dissolve' },
+    { layer: before.layers[1]!, nth: 1, label: 'Cut', type: 'cut' },
+  ];
+  for (const [index, { layer, nth, label, type }] of cases.entries()) {
+    await inspectorTab(page, 'Track');
+    if (index % 2 === 0) {
+      // Clip tab, collapsed section and collapsed Properties panel.
+      if ((await section.getAttribute('aria-expanded')) === 'true') await section.click();
+      await inspectorTab(page, 'Clip');
+      await collapsePanel(page, 'Properties').click();
+      await expect(expandPanel(page, 'Properties')).toBeVisible();
+    } else {
+      // Track tab scrolled to its top, far above Transitions.
+      if ((await section.getAttribute('aria-expanded')) !== 'true') await section.click();
+      await panel.evaluate((element) => element.scrollTo({ top: 0 }));
+    }
+    const button = page.locator(`.boundary-button[data-transition-layer="${layer.id}"]`).nth(nth);
+    await expect(button).toHaveText(label);
+    await button.click();
+    await expect(page.getByRole('tab', { name: 'Track', exact: true })).toHaveAttribute('aria-selected', 'true');
+    await expect(section).toHaveAttribute('aria-expanded', 'true');
+    const choices = page.getByRole('list', { name: `Transitions on ${layer.name}`, exact: true }).getByRole('button');
+    await expect(choices.nth(nth)).toHaveAttribute('aria-pressed', 'true');
+    const select = page.getByRole('combobox', { name: 'Transition type', exact: true });
+    await expect(select).toHaveValue(type);
+    await expect(select).toBeInViewport({ ratio: 1 });
+    // Only the Properties panel scrolls; the workspace around it stays put.
+    expect((await page.getByRole('banner').boundingBox())!.y).toBe(0);
+    expect(await current(page)).toEqual(before);
+    await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
+  }
+  // Clicking the already selected boundary again reopens a section collapsed by hand.
+  await section.click();
+  await expect(section).toHaveAttribute('aria-expanded', 'false');
+  await page.locator(`.boundary-button[data-transition-layer="${before.layers[1]!.id}"]`).nth(1).click();
+  await expect(section).toHaveAttribute('aria-expanded', 'true');
+  await expect(page.getByRole('combobox', { name: 'Transition type', exact: true })).toBeInViewport({ ratio: 1 });
+  expect(await current(page)).toEqual(before);
+  expect(memory.saves).toBe(saves);
 });
 
 test('a black pause timeslot covers lower tracks in the preview where a plain gap reveals them', async ({ page }) => {

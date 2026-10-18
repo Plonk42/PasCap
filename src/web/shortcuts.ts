@@ -21,6 +21,14 @@ export type EditorShortcut =
     }
   | { type: 'step' | 'nudge'; delta: number };
 type ShortcutEvent = Pick<KeyboardEvent, 'key' | 'code' | 'ctrlKey' | 'metaKey' | 'altKey' | 'shiftKey' | 'repeat'>;
+const NON_TEXT_INPUTS = new Set(['button', 'checkbox', 'color', 'file', 'image', 'radio', 'range', 'reset', 'submit']);
+
+/** Whether Space types a character into this focused element, wherever its focus came from. */
+export function typesSpace(element: { tagName: string; type?: string; isContentEditable: boolean }): boolean {
+  const tag = element.tagName.toLowerCase();
+  if (element.isContentEditable || tag === 'textarea') return true;
+  return tag === 'input' && !NON_TEXT_INPUTS.has(element.type ?? 'text');
+}
 
 function modifiedShortcut(event: ShortcutEvent): EditorShortcut | null {
   const key = event.key.toLowerCase();

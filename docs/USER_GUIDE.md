@@ -209,7 +209,8 @@ original exclusive OUT. Source review keeps its independent numeric IN/OUT pair 
   (the preview shows the edge you drag) and select the clip. The hatched part of
   the selected clip is removed by **Cut range / Shift+Delete**, in **one Undo step**;
   without a range or a clip, or with a range outside the clip, its tooltip says why.
-  A click on the ruler or Escape clears the range. While a range is selected, Play
+  A click on the ruler or Escape clears the range; changing a transition or fade keeps
+  it. While a range is selected, Play
   replays only that range, stopping on its last frame; the start/end buttons and
   **Home/End** go to the range's first and last frame.
   Ripple-on cuts close the gap on that track; off keeps the removed gap and fixed neighbours.
@@ -238,7 +239,8 @@ are saved with the project but never rendered or exported. Details:
 [bookmarks](TIMELINE_EDITING.md#bookmarks).
 
 Boundary **Cut / Fade / Pause / Dissolve** and **Fades** belong to the selected
-track in **Track**; clicking a boundary button opens that tab with the boundary expanded.
+track in **Track**; clicking a boundary button opens that tab and scrolls to the
+boundary, expanded.
 Gapped pairs are Cut only: explicitly close the gap or enable Ripple before adding
 a fade/dissolve. A cross-dissolve explicitly adjusts the right clip to its overlap;
 with Ripple off, no other clip moves and conflicts reject it.
@@ -788,8 +790,9 @@ storage/render breakdowns remain their existing expandable controls, not help bu
 | Focused source review                       | I/O marks the source range, not the timeline range                                    |
 | Shortcut guide                              | ? outside form/modal/source controls                                                  |
 
-Keyboard actions respect focused inputs, buttons, source controls, dialogs and
-dividers. Click the preview timecode for an exact frame or **MM:SS:FF** at 30 fps
+Keyboard actions respect text and number fields, source controls, dialogs and a control
+reached with Tab. After a click on a button, tab, checkbox or slider, Space still
+plays or pauses. Click the preview timecode for an exact frame or **MM:SS:FF** at 30 fps
 NDF; this display is not wall-clock duration at 30000/1001 fps. Undo/Redo is session
 history, not a persistent project revision browser.
 

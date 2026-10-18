@@ -255,6 +255,63 @@ test('playback and colour updates run outside React, shortcuts ignore text input
   await page.evaluate(() => window.pascapLab!.flush());
 });
 
+test('Space plays after a pointer press on a control, but keeps keyboard activation, text entry and popovers', async ({
+  page,
+}) => {
+  // Quarter speed keeps each toggle well inside the timeline on a slow runner.
+  let project = projectSchema.parse(await page.evaluate(() => window.pascapLab!.project()));
+  for (const clip of project.clips)
+    project = applyCommand(project, { type: 'speed', clipId: clip.id, speed: { mode: 'constant', rate: 0.25 } });
+  await page.evaluate((document) => window.pascapLab!.setDocument(document), project);
+  await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
+  const before = await page.evaluate(() => window.pascapLab!.project());
+  const playing = () => page.evaluate(() => window.pascapLab!.engine.diagnostics().playing);
+  const toggle = async (expected: boolean): Promise<void> => {
+    await page.keyboard.press('Space');
+    await expect.poll(playing).toBe(expected);
+  };
+  const snap = page.getByRole('button', { name: 'Toggle snapping', exact: true });
+  const initial = await snap.getAttribute('aria-pressed');
+  await snap.click();
+  const clicked = await snap.getAttribute('aria-pressed');
+  expect(clicked).not.toBe(initial);
+  await toggle(true);
+  await toggle(false);
+  await expect(snap).toBeFocused();
+  await expect(snap).toHaveAttribute('aria-pressed', clicked!);
+
+  // The same control reached by keyboard keeps its native Space activation.
+  await page.keyboard.press('Tab');
+  await page.keyboard.press('Shift+Tab');
+  await expect(snap).toBeFocused();
+  await page.keyboard.press('Space');
+  await expect(snap).toHaveAttribute('aria-pressed', initial!);
+  expect(await playing()).toBe(false);
+
+  await page.getByRole('tab', { name: 'Track', exact: true }).click();
+  await toggle(true);
+  await toggle(false);
+  // Pressing the slider's centre keeps neutral Saturation 1, so this is a focus change, not an edit.
+  const saturation = page.getByRole('slider', { name: 'Saturation', exact: true });
+  await saturation.click();
+  await expect(saturation).toBeFocused();
+  await toggle(true);
+  await toggle(false);
+  expect(await page.evaluate(() => window.pascapLab!.project())).toEqual(before);
+
+  const search = page.getByRole('textbox', { name: 'Search media' });
+  await search.click();
+  await page.keyboard.press('Space');
+  await expect(search).toHaveValue(' ');
+  expect(await playing()).toBe(false);
+  await search.fill('');
+
+  await openOptions(page, 'Workspace options');
+  await page.keyboard.press('Space');
+  expect(await playing()).toBe(false);
+  await closeOptions(page);
+});
+
 test('disposal releases both decoders and stops engine playback', async ({ page }) => {
   await page.evaluate(() => window.pascapLab!.engine.dispose());
   await expectDecoders(page, 0);
