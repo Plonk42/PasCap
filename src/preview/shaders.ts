@@ -1,5 +1,7 @@
 import {
   CLARITY_GAIN,
+  DENOISE_DETAIL_CORE,
+  DENOISE_RANGE_SIGMA,
   DETAIL_CLARITY_TAPS,
   DETAIL_FINE_TAPS,
   DETAIL_WIDE_TAPS,
@@ -133,22 +135,27 @@ float limitOvershoot(float value, float low, float high) {
   if (value < low) return low - halo * tanh(min(10.0, (low - value) / halo));
   return value;
 }
-vec3 detailFilter(sampler2D source, vec2 coordinate, vec3 centre, vec4 detail, vec2 stride, vec4 localTone,
+// steps: the 1/720-image-height stride in xy, the shift of the 720p-scale measurement taps in zw.
+vec3 detailFilter(sampler2D source, vec2 coordinate, vec3 centre, vec4 detail, vec4 steps, vec4 localTone,
                   float contrast) {
-  vec3 denoised = centre;
-  vec3 gaussian = centre;
-  float low = dot(centre, luma);
+  vec2 stride = steps.xy;
+  bool shifted = any(notEqual(steps.zw, vec2(0.0))) && any(notEqual(detail.xyz, vec3(0.0)));
+  vec2 measuredAt = shifted ? coordinate + steps.zw : coordinate;
+  vec3 measured = shifted ? texture(source, measuredAt).rgb : centre;
+  vec3 denoised = measured;
+  vec3 gaussian = measured;
+  float low = dot(measured, luma);
   float high = low;
   if (detail.x > 0.0 || detail.z > 0.0) {
     float denoisedWeight = 1.0;
     for (int i = 0; i < ${DETAIL_FINE_TAPS.length}; i++) {
-      vec3 tap = texture(source, coordinate + detailFine[i] * stride).rgb;
+      vec3 tap = texture(source, measuredAt + detailFine[i] * stride).rgb;
       float level = dot(tap, luma);
       low = min(low, level);
       high = max(high, level);
       gaussian += detailFineWeight[i] * tap;
       if (detail.z > 0.0) {
-        vec3 difference = tap - centre;
+        vec3 difference = tap - measured;
         float weight = detailFineWeight[i] * exp(-dot(difference, difference) * detail.w);
         denoised += weight * tap;
         denoisedWeight += weight;
@@ -156,8 +163,8 @@ vec3 detailFilter(sampler2D source, vec2 coordinate, vec3 centre, vec4 detail, v
     }
     if (detail.z > 0.0) {
       for (int i = 0; i < ${DETAIL_WIDE_TAPS.length}; i++) {
-        vec3 tap = texture(source, coordinate + detailWide[i] * stride).rgb;
-        vec3 difference = tap - centre;
+        vec3 tap = texture(source, measuredAt + detailWide[i] * stride).rgb;
+        vec3 difference = tap - measured;
         float weight = detailWideWeight[i] * exp(-dot(difference, difference) * detail.w);
         denoised += weight * tap;
         denoisedWeight += weight;
@@ -166,21 +173,28 @@ vec3 detailFilter(sampler2D source, vec2 coordinate, vec3 centre, vec4 detail, v
     gaussian /= ${glslFloat(fineTotal)};
     denoised /= denoisedWeight;
   }
-  float base = dot(denoised, luma);
+  float detailBase = dot(denoised, luma);
   float delta = 0.0;
   if (detail.y != 0.0) {
-    float mean = dot(centre, luma);
+    float mean = dot(measured, luma);
     for (int i = 0; i < ${DETAIL_CLARITY_TAPS.length}; i++)
-      mean += dot(texture(source, coordinate + detailClarity[i] * stride).rgb, luma);
+      mean += dot(texture(source, measuredAt + detailClarity[i] * stride).rgb, luma);
     mean /= ${glslFloat(DETAIL_CLARITY_TAPS.length + 1)};
-    delta += ${glslFloat(CLARITY_GAIN)} * detail.y * clamp(4.0 * base * (1.0 - base), 0.0, 1.0) * (base - mean);
+    delta += ${glslFloat(CLARITY_GAIN)} * detail.y * clamp(4.0 * detailBase * (1.0 - detailBase), 0.0, 1.0) *
+             (detailBase - mean);
   }
   if (detail.x > 0.0) {
-    float fine = base - dot(gaussian, luma);
+    float fine = detailBase - dot(gaussian, luma);
     float cored = fine * fine * fine / (fine * fine + ${glslFloat(SHARPEN_THRESHOLD * SHARPEN_THRESHOLD)});
-    float sharpened = base + ${glslFloat(SHARPEN_GAIN)} * detail.x * cored;
-    delta += limitOvershoot(sharpened, min(low, base), max(high, base)) - base;
+    float sharpened = detailBase + ${glslFloat(SHARPEN_GAIN)} * detail.x * cored;
+    delta += limitOvershoot(sharpened, min(low, detailBase), max(high, detailBase)) - detailBase;
   }
+  if (shifted) {
+    vec3 finer = centre - measured;
+    float core = ${glslFloat(DENOISE_DETAIL_CORE * DENOISE_RANGE_SIGMA)} * detail.z;
+    denoised += core > 0.0 ? finer * finer * finer / (finer * finer + core * core) : finer;
+  }
+  float base = dot(denoised, luma);
   if (any(notEqual(localTone.xyz, vec3(0.0))) || contrast != 0.0) {
     float smoothBase = toneBase(source, coordinate, base, stride);
     if (localTone.z > 0.0 || contrast != 0.0)
@@ -193,12 +207,12 @@ vec3 detailFilter(sampler2D source, vec2 coordinate, vec3 centre, vec4 detail, v
   }
   return clamp(denoised + delta, 0.0, 1.0);
 }`;
-// (sharpen, clarity, denoise, denoise range factor), the 1/720-image-height step in texture UV
+// (sharpen, clarity, denoise, denoise range factor), the texture UV stride and measurement shift
 // and the evaluated track Colour (shadows, highlights, hdr, exposure) and Local contrast per source.
 const detailUniforms = `uniform vec4 detail0;
 uniform vec4 detail1;
-uniform vec2 detailStep0;
-uniform vec2 detailStep1;
+uniform vec4 detailStep0;
+uniform vec4 detailStep1;
 uniform vec4 localTone0;
 uniform vec4 localTone1;
 uniform vec2 localContrast;`;
@@ -207,8 +221,8 @@ const detailSample = `vec3 centre = texture(source, coordinate).rgb;
   vec4 localTone = sourceIndex == 0 ? localTone0 : localTone1;
   float contrast = sourceIndex == 0 ? localContrast.x : localContrast.y;
   if (all(equal(detail.xyz, vec3(0.0))) && all(equal(localTone.xyz, vec3(0.0))) && contrast == 0.0) return centre;
-  vec2 stride = sourceIndex == 0 ? detailStep0 : detailStep1;
-  return detailFilter(source, coordinate, centre, detail, stride, localTone, contrast);`;
+  vec4 steps = sourceIndex == 0 ? detailStep0 : detailStep1;
+  return detailFilter(source, coordinate, centre, detail, steps, localTone, contrast);`;
 
 const singleMain = `void main() {
   vec4 left = vec4(0.0);

@@ -17,6 +17,7 @@ import { compositePixel } from '../shared/composition.js';
 import {
   DETAIL_REFERENCE_LINES,
   denoiseRangeFactor,
+  detailShift,
   isNeutralDetail,
   NEUTRAL_DETAIL,
   type DetailSettings,
@@ -449,8 +450,12 @@ export class Compositor {
         gl.uniform4f(this.#location(`detail${index}`), sharpen, clarity, denoise, denoiseRangeFactor(denoise));
         // Texture UV spans the image: one step is 1/720 of its height, in the original aspect.
         const stepV = 1 / DETAIL_REFERENCE_LINES;
-        const stepU = (stepV * source.originalHeight) / source.originalWidth;
-        gl.uniform2f(this.#location(`detailStep${index}`), stepU, stepV);
+        const aspect = source.originalWidth / source.originalHeight;
+        const stepU = stepV / aspect;
+        const lines = this.#sizes[source.slot]![1];
+        const shiftV = (isNeutralDetail(source.detail) ? 0 : detailShift(lines)) / lines;
+        // Texture rows run bottom-up: a shift down the image is negative in texture V.
+        gl.uniform4f(this.#location(`detailStep${index}`), stepU, stepV, shiftV / aspect, -shiftV);
         gl.uniform4f(
           this.#location(`localTone${index}`),
           settings.shadows,

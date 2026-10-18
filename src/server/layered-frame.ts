@@ -277,7 +277,12 @@ export function composeRows(
       ...source,
       exactColour: source.exactColour ? compileGradeInto(source.exactColour) : null,
       detail: source.detail
-        ? compileDetail(source.detail, source.mapping.fittedWidth / source.mapping.fittedHeight, source.tone)
+        ? compileDetail(
+            source.detail,
+            source.mapping.fittedWidth / source.mapping.fittedHeight,
+            source.tone,
+            source.bounds.height,
+          )
         : null,
       sampler: (u, v, out) => {
         sampleFitted(source, u, v, sampled);

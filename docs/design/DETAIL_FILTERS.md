@@ -51,6 +51,16 @@ look scales with the image rather than the output resolution. Every tap is a bil
 sample clamped to the image content (never decode padding). Values are encoded
 BT.709 RGB in 0–1 and luma is $Y = 0.2126R + 0.7152G + 0.0722B$.
 
+**Larger images are measured at 720p scale.** On an image of $H > 720$ lines, unit taps
+are $H/720$ pixels apart and would skip the pixels between them: a UHD export would then
+sharpen pixel-level grain the preview never shows. So when any of the three settings is
+nonzero, the centre $c_m$ and every Denoise, Clarity and Sharpen tap are taken
+$s = \tfrac12 \min(1, H/720 - 1)$ pixels further right and down, where each bilinear tap
+averages up to 2×2 pixels; the stages below use $c_m$ as their centre. The finer detail
+$f = c - c_m$ is then added back per channel to $D$, eased like noise when Denoise is on:
+$f^3 / (f^2 + \tau^2)$ with $\tau = 0.5\sigma$. At 720 lines and below $s = 0$ and $c_m = c$.
+The [edge-aware base](#edge-aware-base) keeps unshifted taps.
+
 For centre sample $c$ the stages run **Denoise → HDR and Local contrast → Shadows/Highlights → Clarity → Sharpen**:
 
 1. **Fine ring** (only when Sharpen or Denoise is nonzero): the eight neighbours at
@@ -78,9 +88,11 @@ For centre sample $c$ the stages run **Denoise → HDR and Local contrast → Sh
 The output is $\mathrm{clamp}(D' + \text{clarity term} + \text{sharpen term}, 0, 1)$ per
 channel, where $D'$ is $D$ after [HDR](#hdr-look) and [Local contrast](#local-contrast), then
 [Shadows/Highlights](#local-shadows-and-highlights) ($D' = D$ when all four are 0).
-Clarity and Sharpen measure $y = Y(D)$ before them, so they never re-amplify the tone change.
+Clarity and Sharpen measure $y = Y(D)$ before them (and before the finer detail is added
+back), so they never re-amplify the tone change.
 Luma detail is added equally to R, G and B, so it does not create colour
-fringes. At most 33 taps per source pixel without local tone (57 with it); Sharpen alone
+fringes. At most 33 taps per source pixel without local tone (57 with it), plus the shifted
+centre above 720 lines; Sharpen alone
 needs 9, Clarity alone 17, local tone alone 25: Shadows, Highlights, HDR and Local contrast share one base.
 
 **Exact neutral settings are a bypass**: all three zero and track Shadows, Highlights, HDR and
@@ -202,7 +214,8 @@ The WebGL shader generates its tap tables from the same constants as the CPU ker
 The kernel lives only in three separate detail variants of the fixed programs, compiled
 when a loaded or edited project first contains nonneutral detail or nonzero track
 Shadows, Highlights, HDR or Local contrast, as a base or keyframe value (including a live slider draft),
-before any draw uses them; uniforms are one `vec4` and one `vec2` per source, one
+before any draw uses them; uniforms are two `vec4` per source (settings; stride and the
+measurement shift from the texture height, negative in texture V since rows run bottom-up), one
 `vec4` per source of (Shadows, Highlights, HDR, Exposure) and one `vec2` of Local contrast
 (one value per source). Groups whose sources are all
 neutral with zero local tone (and the Original preview) keep the unchanged programs: software rasterizers can pay for

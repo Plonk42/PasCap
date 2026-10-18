@@ -519,7 +519,8 @@ step, and Escape cancels. Double-click a setting's name to reset it, or use
 follow it to another track and are copied by Split, Cut range and Duplicate.
 
 The filters work on the recording before the track's Colour, scaled to the image
-height, so the 720p preview shows what both export profiles produce. **Original**
+height, so the 720p preview shows what both export profiles produce: a 4K export sharpens
+what the preview sharpens, not grain finer than the preview can show. **Original**
 hides them together with Colour. Any detail setting renders through the composited
 exporter and makes it slower, especially in 4K. Details:
 [detail filters](design/DETAIL_FILTERS.md).
