@@ -49,6 +49,7 @@ export type IconName =
   | 'ripple'
   | 'default-key'
   | 'bookmark'
+  | 'clock'
   | 'link'
   | 'panel-left-close'
   | 'panel-left-open'
@@ -106,6 +107,7 @@ const paths: Record<IconName, string> = {
   ripple: 'M2 12h7m0 0-3-3m3 3-3 3M22 12h-7m0 0 3-3m-3 3 3 3M12 5v14',
   'default-key': 'm12 2 10 10-10 10L2 12 12 2Zm-3.5 9a3.6 3.6 0 1 1 1 3.6M8.5 8v3h3',
   bookmark: 'M6 3h12v18l-6-5-6 5V3Z',
+  clock: 'M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0ZM12 7v5l3 2',
   'panel-left-close': 'M3 4h18v16H3V4Zm6 0v16m7-11-3 3 3 3',
   'panel-left-open': 'M3 4h18v16H3V4Zm6 0v16m4-11 3 3-3 3',
   'panel-right-close': 'M3 4h18v16H3V4Zm12 0v16M8 9l3 3-3 3',

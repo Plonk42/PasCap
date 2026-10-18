@@ -264,10 +264,85 @@
   margin: 0;
 }
 
+.declutter-media {
+  container-type: inline-size;
+}
+
+.declutter-media .library-heading-title {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.declutter-media .library-heading-title h2 {
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+}
+
+/* The count sits inside the h2 and the total beside it: pin one box so they join as one pill. */
+.declutter-media .library-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  box-sizing: border-box;
+  height: 18px;
+  margin-left: 5px;
+  padding: 0 5px;
+  font-size: 11px;
+  font-weight: 450;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.declutter-media .library-heading-title h2:has(+ .library-total) .library-stat {
+  border-radius: 4px 0 0 4px;
+}
+
+.declutter-media .library-total {
+  margin-left: 1px;
+  border-radius: 0 4px 4px 0;
+}
+
+.declutter-media .library-stat svg {
+  flex: none;
+  opacity: 0.75;
+}
+
+/* Below these widths the Import label, then the stat icons, would push the total out of the heading. */
+@container (max-width: 333px) {
+  .declutter-media .library-import-label {
+    display: none;
+  }
+}
+
 .declutter-media .library-heading-actions {
   display: flex;
   align-items: center;
   gap: 4px;
+}
+
+@container (max-width: 279px) {
+  .declutter-media .panel-heading {
+    padding-inline: 8px;
+  }
+
+  .declutter-media .library-stat svg {
+    display: none;
+  }
+
+  .declutter-media .library-heading-actions {
+    gap: 2px;
+  }
+
+  .declutter-media .library-heading-actions .secondary-button {
+    padding-inline: 6px;
+  }
+
+  .declutter-media .library-heading-actions .icon-button,
+  .declutter-media .library-heading-actions .media-options > summary {
+    width: 28px;
+  }
 }
 
 .declutter-media .media-options .library-tools {

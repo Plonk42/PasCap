@@ -788,7 +788,11 @@ at the playhead. **Animation help** beside Colour's **Keyframes** heading explai
 capture and keyframe timing; there is no separate Keyframe timing help button.
 All fifteen track settings retain their unkeyed values, explicit capture and stored-keyframe editing.
 Search/filter clear actions,
-mixed select-all and always-visible media Add simplify the library.
+mixed select-all and always-visible media Add simplify the library. The Media heading shows
+the number of recordings (video icon) and, joined to it, their total duration (clock icon;
+minutes keep counting past
+an hour); it covers every recording in the project's bin, whatever the search or filter,
+and is absent while the bin is empty.
 
 Inline help is a small **? button**, not an expandable text section. Find it
 beside the relevant title—**Speed**, **Range**, **Placement**,

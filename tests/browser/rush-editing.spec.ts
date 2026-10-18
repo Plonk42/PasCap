@@ -20,6 +20,7 @@ import {
 } from '../../src/shared/model.js';
 import { validateSourceRanges } from '../../src/shared/source-range.js';
 import { removeSelectedRange } from '../../src/shared/rush-editing.js';
+import { durationLabel } from '../../src/web/display.js';
 import { calculateLayout, layerClips } from '../../src/shared/timeline.js';
 import {
   clipAction,
@@ -2225,12 +2226,17 @@ test('removing recordings from the project bin confirms used footage and Undo re
   const before = await edited();
   const card = (index: number) => page.locator(`.media-item[data-media-id="${assets[index]!.id}"]`);
   const heading = page.getByRole('heading', { name: /^Media \d+$/ });
+  const total = page.locator('.library-total');
+  const duration = (items: MediaAsset[]) =>
+    durationLabel(items.reduce((sum, item) => sum + item.metadata.durationSeconds, 0));
   const undo = page.getByRole('button', { name: 'Undo', exact: true });
 
   // An unused recording leaves immediately, with focus kept in the list.
+  await expect(total).toHaveText(duration([assets[0]!, assets[1]!]));
   await page.getByRole('button', { name: 'Remove pattern-b.mp4 from project', exact: true }).click();
   await expect(card(1)).toHaveCount(0);
   await expect(heading).toHaveText('Media 1');
+  await expect(total).toHaveText(duration([assets[0]!]));
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(card(0).locator('.media-checkbox')).toBeFocused();
   expect((await current(page)).media.videoIds).toEqual([assets[0]!.id]);
@@ -2276,6 +2282,7 @@ test('removing recordings from the project bin confirms used footage and Undo re
   );
   await page.getByRole('button', { name: 'Remove from project', exact: true }).click();
   await expect(heading).toHaveText('Media 0');
+  await expect(total).toHaveCount(0);
   await expect(page.locator('.library-summary')).toContainText('Select all');
   removed = await current(page);
   expect(removed.media.videoIds).toEqual([]);
