@@ -13,6 +13,7 @@ import {
   LOCAL_TONE_SLOPE,
   MID_GREY_STOPS,
   SHARPEN_GAIN,
+  SHARPEN_HALO,
 } from '../shared/detail.js';
 import { BLACKS_RANGE, WHITES_RANGE } from '../shared/colour.js';
 
@@ -125,14 +126,25 @@ float localToneStops(float base, vec4 localTone) {
   return ${glslFloat(LOCAL_TONE_SLOPE)} * (localTone.x * toneDistance(${glslFloat(MID_GREY_STOPS)} - stops) +
                                            localTone.y * toneDistance(stops - ${glslFloat(MID_GREY_STOPS)}));
 }
+float limitOvershoot(float value, float low, float high) {
+  const float halo = ${glslFloat(SHARPEN_HALO)};
+  if (value > high) return high + halo * tanh(min(10.0, (value - high) / halo));
+  if (value < low) return low - halo * tanh(min(10.0, (low - value) / halo));
+  return value;
+}
 vec3 detailFilter(sampler2D source, vec2 coordinate, vec3 centre, vec4 detail, vec2 stride, vec4 localTone,
                   float contrast) {
   vec3 denoised = centre;
   vec3 gaussian = centre;
+  float low = dot(centre, luma);
+  float high = low;
   if (detail.x > 0.0 || detail.z > 0.0) {
     float denoisedWeight = 1.0;
     for (int i = 0; i < ${DETAIL_FINE_TAPS.length}; i++) {
       vec3 tap = texture(source, coordinate + detailFine[i] * stride).rgb;
+      float level = dot(tap, luma);
+      low = min(low, level);
+      high = max(high, level);
       gaussian += detailFineWeight[i] * tap;
       if (detail.z > 0.0) {
         vec3 difference = tap - centre;
@@ -162,7 +174,10 @@ vec3 detailFilter(sampler2D source, vec2 coordinate, vec3 centre, vec4 detail, v
     mean /= ${glslFloat(DETAIL_CLARITY_TAPS.length + 1)};
     delta += ${glslFloat(CLARITY_GAIN)} * detail.y * clamp(4.0 * base * (1.0 - base), 0.0, 1.0) * (base - mean);
   }
-  if (detail.x > 0.0) delta += ${glslFloat(SHARPEN_GAIN)} * detail.x * (base - dot(gaussian, luma));
+  if (detail.x > 0.0) {
+    float sharpened = base + ${glslFloat(SHARPEN_GAIN)} * detail.x * (base - dot(gaussian, luma));
+    delta += limitOvershoot(sharpened, min(low, base), max(high, base)) - base;
+  }
   if (any(notEqual(localTone.xyz, vec3(0.0))) || contrast != 0.0) {
     float smoothBase = toneBase(source, coordinate, base, stride);
     if (localTone.z > 0.0 || contrast != 0.0)
