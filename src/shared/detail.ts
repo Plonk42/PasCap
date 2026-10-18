@@ -78,39 +78,43 @@ export const DETAIL_WIDE_TAPS = SQUARE.map(([x, y]) => ({
   y: 2 * y,
   weight: Math.exp(-2 * (x * x + y * y)),
 }));
-/** Clarity's local mean: centre plus two equal-weight rings of eight. */
-export const DETAIL_CLARITY_TAPS = [5, 10].flatMap((radius) =>
-  DIRECTIONS.map(([x, y]) => ({ x: x * radius, y: y * radius })),
-);
 const FINE_WEIGHT = 1 + DETAIL_FINE_TAPS.reduce((sum, tap) => sum + tap.weight, 0);
+
+const EIGHTH_TURN = Math.PI / 8;
+/** Three rings of eight, the middle one rotated 22.5°, with Gaussian spatial weights. */
+function threeRings(radii: readonly number[], sigma: number): { x: number; y: number; weight: number }[] {
+  return radii.flatMap((radius, ring) =>
+    DIRECTIONS.map(([x, y]) => {
+      const rotation = ring === 1 ? EIGHTH_TURN : 0;
+      const cos = Math.cos(rotation);
+      const sin = Math.sin(rotation);
+      return {
+        x: radius * (x * cos - y * sin),
+        y: radius * (x * sin + y * cos),
+        weight: Math.exp(-(radius * radius) / (2 * sigma * sigma)),
+      };
+    }),
+  );
+}
+/** Edge-aware bases: the first ring's taps, averaged with the centre, guide the range weights. */
+export const EDGE_GUIDE_TAPS = 8;
+
+/** Clarity's edge-aware mid-scale base, at radii 3, 6 and 10 units: no halos along strong edges. */
+export const CLARITY_SPATIAL_SIGMA = 6;
+export const CLARITY_RANGE_SIGMA = 0.1;
+export const CLARITY_RANGE_FACTOR = 1 / (2 * CLARITY_RANGE_SIGMA * CLARITY_RANGE_SIGMA);
+export const DETAIL_CLARITY_TAPS = threeRings([3, 6, 10], CLARITY_SPATIAL_SIGMA);
 
 /** Edge-aware large-scale luma base shared by the local tone settings; see docs/design/DETAIL_FILTERS.md. */
 export const TONE_BASE_SPATIAL_SIGMA = 16;
 export const TONE_BASE_RANGE_SIGMA = 0.12;
 export const TONE_BASE_RANGE_FACTOR = 1 / (2 * TONE_BASE_RANGE_SIGMA * TONE_BASE_RANGE_SIGMA);
-/** The first ring's taps, averaged with the centre, guide the range weights. */
-export const TONE_BASE_GUIDE_TAPS = 8;
 /** Track HDR look: base compression; its former detail boost is Local contrast. */
 export const HDR_COMPRESSION = 1;
 /** Below this encoded luma, the luma change blends from chroma-preserving ratio to additive. */
 export const HDR_RATIO_FLOOR = 0.1;
-const EIGHTH_TURN = Math.PI / 8;
-/** Three rings of eight at radii 6, 16 and 32 units; the middle ring is rotated 22.5°. */
-export const TONE_BASE_TAPS = [
-  { radius: 6, rotation: 0 },
-  { radius: 16, rotation: EIGHTH_TURN },
-  { radius: 32, rotation: 0 },
-].flatMap(({ radius, rotation }) =>
-  DIRECTIONS.map(([x, y]) => {
-    const cos = Math.cos(rotation);
-    const sin = Math.sin(rotation);
-    return {
-      x: radius * (x * cos - y * sin),
-      y: radius * (x * sin + y * cos),
-      weight: Math.exp(-(radius * radius) / (2 * TONE_BASE_SPATIAL_SIGMA * TONE_BASE_SPATIAL_SIGMA)),
-    };
-  }),
-);
+/** Radii 6, 16 and 32 units. */
+export const TONE_BASE_TAPS = threeRings([6, 16, 32], TONE_BASE_SPATIAL_SIGMA);
 
 /** Kernel taps per pixel beyond the centre: the dominant per-pixel cost of these filters. */
 export function detailTapCount(settings: Readonly<DetailSettings>, localTone: boolean): number {
@@ -269,38 +273,34 @@ export function compileDetail(
       denoised[channel]! /= denoisedWeight;
     }
   };
-  const localMean = (sample: DetailSampler, u: number, v: number): number => {
-    let sum = luma(measured);
-    for (const { x, y } of DETAIL_CLARITY_TAPS) {
-      sample(u + x * stepU, v + y * stepV, tap);
-      sum += luma(tap);
-    }
-    return sum / (DETAIL_CLARITY_TAPS.length + 1);
-  };
   const compression = HDR_COMPRESSION * hdr;
   const detailGain = 1 + localContrast;
   // Range weights compare taps with a small local mean rather than the pixel itself, so a dark
   // pixel within bright texture takes its surroundings' base, while large edges still stop it.
-  const levels = new Float64Array(TONE_BASE_TAPS.length);
-  const edgeAwareBase = (sample: DetailSampler, u: number, v: number, y: number): number => {
-    let guide = y;
-    for (const [index, { x, y: offset }] of TONE_BASE_TAPS.entries()) {
-      sample(u + x * stepU, v + offset * stepV, tap);
-      levels[index] = luma(tap);
-      if (index < TONE_BASE_GUIDE_TAPS) guide += levels[index]!;
-    }
-    guide /= TONE_BASE_GUIDE_TAPS + 1;
-    const selfWeight = Math.exp(-(y - guide) * (y - guide) * TONE_BASE_RANGE_FACTOR);
-    let sum = selfWeight * y;
-    let total = selfWeight;
-    for (const [index, { weight }] of TONE_BASE_TAPS.entries()) {
-      const level = levels[index]!;
-      const w = weight * Math.exp(-(level - guide) * (level - guide) * TONE_BASE_RANGE_FACTOR);
-      sum += w * level;
-      total += w;
-    }
-    return sum / total;
+  const edgeAware = (taps: typeof TONE_BASE_TAPS, rangeFactor: number) => {
+    const levels = new Float64Array(taps.length);
+    return (sample: DetailSampler, u: number, v: number, y: number): number => {
+      let guide = y;
+      for (const [index, { x, y: offset }] of taps.entries()) {
+        sample(u + x * stepU, v + offset * stepV, tap);
+        levels[index] = luma(tap);
+        if (index < EDGE_GUIDE_TAPS) guide += levels[index]!;
+      }
+      guide /= EDGE_GUIDE_TAPS + 1;
+      const selfWeight = Math.exp(-(y - guide) * (y - guide) * rangeFactor);
+      let sum = selfWeight * y;
+      let total = selfWeight;
+      for (const [index, { weight }] of taps.entries()) {
+        const level = levels[index]!;
+        const w = weight * Math.exp(-(level - guide) * (level - guide) * rangeFactor);
+        sum += w * level;
+        total += w;
+      }
+      return sum / total;
+    };
   };
+  const edgeAwareBase = edgeAware(TONE_BASE_TAPS, TONE_BASE_RANGE_FACTOR);
+  const clarityBase = edgeAware(DETAIL_CLARITY_TAPS, CLARITY_RANGE_FACTOR);
   // HDR compresses the base (black/white fixed); Local contrast scales the residual.
   const toneMap = (y: number, base: number): void => {
     const target = base + compression * base * (1 - base) * (1 - 2 * base) + (y - base) * detailGain;
@@ -318,7 +318,7 @@ export function compileDetail(
   };
   const clarityTerm = (sample: DetailSampler, u: number, v: number, y: number): number => {
     const midtones = Math.min(1, Math.max(0, 4 * y * (1 - y)));
-    return CLARITY_GAIN * clarity * midtones * (y - localMean(sample, u, v));
+    return CLARITY_GAIN * clarity * midtones * (y - clarityBase(sample, u, v, y));
   };
   const sharpenTerm = (y: number): number => {
     const sharpened = y + SHARPEN_GAIN * sharpen * softThreshold(y - luma(gaussian), SHARPEN_THRESHOLD);

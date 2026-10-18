@@ -94,15 +94,39 @@ function reference(
     if (settings.denoise > 0) denoised = sumD.map((sum) => sum / weightD) as unknown as RGB;
   }
   const detailBase = luma(denoised);
+  // Edge-aware base: three rings of eight (the middle one turned 22.5°), range weights against
+  // the mean of the centre and first ring.
+  const edgeBase = (
+    cu: number,
+    cv: number,
+    y: number,
+    radii: number[],
+    spatialSigma: number,
+    rangeSigma: number,
+  ): number => {
+    const taps: { level: number; spatial: number }[] = [];
+    radii.forEach((radius, ring) => {
+      for (let k = 0; k < 8; k++) {
+        const angle = (k * Math.PI) / 4 + (ring === 1 ? Math.PI / 8 : 0);
+        taps.push({
+          level: luma(image(cu + Math.cos(angle) * radius * du, cv + Math.sin(angle) * radius * dv)),
+          spatial: Math.exp(-(radius * radius) / (2 * spatialSigma ** 2)),
+        });
+      }
+    });
+    const guide = (y + taps.slice(0, 8).reduce((sum, tap) => sum + tap.level, 0)) / 9;
+    const range = (level: number): number => Math.exp(-((level - guide) ** 2) / (2 * rangeSigma ** 2));
+    let sum = range(y) * y;
+    let total = range(y);
+    for (const { level, spatial } of taps) {
+      sum += spatial * range(level) * level;
+      total += spatial * range(level);
+    }
+    return sum / total;
+  };
   let delta = 0;
   if (settings.clarity !== 0) {
-    let mean = luma(measured);
-    for (const radius of [5, 10])
-      for (let k = 0; k < 8; k++) {
-        const angle = (k * Math.PI) / 4;
-        mean += luma(image(mu + Math.cos(angle) * radius * du, mv + Math.sin(angle) * radius * dv));
-      }
-    mean /= 17;
+    const mean = edgeBase(mu, mv, detailBase, [3, 6, 10], 6, 0.1);
     delta += settings.clarity * Math.min(1, Math.max(0, 4 * detailBase * (1 - detailBase))) * (detailBase - mean);
   }
   if (settings.sharpen > 0) {
@@ -125,28 +149,7 @@ function reference(
   }
   const base = luma(denoised);
   if (hdr > 0 || localContrast !== 0 || shadows !== 0 || highlights !== 0) {
-    const taps: { level: number; spatial: number }[] = [];
-    for (const [radius, rotation] of [
-      [6, 0],
-      [16, Math.PI / 8],
-      [32, 0],
-    ] as const)
-      for (let k = 0; k < 8; k++) {
-        const angle = (k * Math.PI) / 4 + rotation;
-        taps.push({
-          level: luma(image(u + Math.cos(angle) * radius * du, v + Math.sin(angle) * radius * dv)),
-          spatial: Math.exp(-(radius * radius) / (2 * 16 * 16)),
-        });
-      }
-    const guide = (base + taps.slice(0, 8).reduce((sum, tap) => sum + tap.level, 0)) / 9;
-    const range = (level: number): number => Math.exp(-((level - guide) ** 2) / (2 * 0.12 ** 2));
-    let sum = range(base) * base;
-    let total = range(base);
-    for (const { level, spatial } of taps) {
-      sum += spatial * range(level) * level;
-      total += spatial * range(level);
-    }
-    const b = sum / total;
+    const b = edgeBase(u, v, base, [6, 16, 32], 16, 0.12);
     if (hdr > 0 || localContrast !== 0) {
       const target = b + hdr * b * (1 - b) * (1 - 2 * b) + (base - b) * (1 + localContrast);
       const lift = target - base;
@@ -224,9 +227,9 @@ describe('clip detail settings', () => {
     expect(detailTapCount(NEUTRAL_DETAIL, false)).toBe(0);
     expect(detailTapCount({ sharpen: 0.3, clarity: 0, denoise: 0 }, false)).toBe(8);
     expect(detailTapCount({ sharpen: 0, clarity: 0, denoise: 0.2 }, false)).toBe(16);
-    expect(detailTapCount({ sharpen: 0, clarity: -0.5, denoise: 0 }, false)).toBe(16);
+    expect(detailTapCount({ sharpen: 0, clarity: -0.5, denoise: 0 }, false)).toBe(24);
     expect(detailTapCount(NEUTRAL_DETAIL, true)).toBe(24);
-    expect(detailTapCount({ sharpen: 0.4, clarity: 0.5, denoise: 0.3 }, true)).toBe(56);
+    expect(detailTapCount({ sharpen: 0.4, clarity: 0.5, denoise: 0.3 }, true)).toBe(64);
   });
 
   it('matches an independent transcription of the Denoise → Clarity → Sharpen kernel', () => {
@@ -328,8 +331,17 @@ describe('clip detail settings', () => {
     };
     expect(run(faint, 6.5 / 1280, 0.5, sharp)[0]! - 0.5).toBeLessThan(1.05 * 0.003);
     const near = 0.5 + 4 * pixel;
-    expect(run(edge, near, 0.5, { sharpen: 0, clarity: 1, denoise: 0 })[0]).toBeGreaterThan(0.7);
-    expect(run(edge, near, 0.5, { sharpen: 0, clarity: -1, denoise: 0 })[0]).toBeLessThan(0.7);
+    // Clarity leaves the bright side of a strong edge alone instead of drawing a halo band.
+    for (const clarity of [-1, 1])
+      expect(Math.abs(run(edge, near, 0.5, { sharpen: 0, clarity, denoise: 0 })[0]! - 0.7)).toBeLessThan(0.005);
+    // It still lifts or flattens mid-scale texture.
+    const bumps: Image = (u) => {
+      const level = 0.5 + 0.05 * Math.cos(((u * 1280 - 0.5) * 2 * Math.PI) / 16);
+      return [level, level, level];
+    };
+    const crest = 16.5 / 1280;
+    expect(run(bumps, crest, 0.5, { sharpen: 0, clarity: 1, denoise: 0 })[0]).toBeGreaterThan(0.56);
+    expect(run(bumps, crest, 0.5, { sharpen: 0, clarity: -1, denoise: 0 })[0]).toBeLessThan(0.54);
     let seed = 7;
     const noise = (): number => {
       seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
