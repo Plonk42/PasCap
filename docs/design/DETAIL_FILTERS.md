@@ -72,8 +72,9 @@ For centre sample $c$ the stages run **Denoise → HDR and Local contrast → Sh
    mean squared RGB difference to $c$ and $\sigma = 0.1 \cdot \mathrm{denoise}$.
    The normalized weighted mean is $D$; without Denoise $D = c$. The exponent factor
    is capped at $10^{30}$ so tiny strengths stay finite in float32.
-3. **Clarity**: $L$ is the luma mean of $c$ and sixteen taps on two rings of eight
-   directions at radii 5 and 10 units. With $y = Y(D)$ and midtone mask
+3. **Clarity**: $L$ is a smaller [edge-aware base](#edge-aware-base) of $y = Y(D)$: rings at
+   radii 3, 6 and 10 units with spatial $\sigma = 6$ and range $\sigma = 0.1$, so it does not
+   reach across strong edges and draws no halo band along a horizon. With midtone mask
    $m = \mathrm{clamp}(4y(1-y), 0, 1)$, it contributes $\mathrm{clarity} \cdot m \cdot (y - L)$.
 4. **Sharpen** raises $y$ to $s = y + 2 \cdot \mathrm{sharpen} \cdot k(y - Y(G))$, where the soft
    noise threshold $k(d) = d^3 / (d^2 + t^2)$ with $t = 0.004$ (about 1/255) leaves grain and
@@ -91,9 +92,9 @@ channel, where $D'$ is $D$ after [HDR](#hdr-look) and [Local contrast](#local-co
 Clarity and Sharpen measure $y = Y(D)$ before them (and before the finer detail is added
 back), so they never re-amplify the tone change.
 Luma detail is added equally to R, G and B, so it does not create colour
-fringes. At most 33 taps per source pixel without local tone (57 with it), plus the shifted
+fringes. At most 41 taps per source pixel without local tone (65 with it), plus the shifted
 centre above 720 lines; Sharpen alone
-needs 9, Clarity alone 17, local tone alone 25: Shadows, Highlights, HDR and Local contrast share one base.
+needs 9, Clarity alone 25, local tone alone 25: Shadows, Highlights, HDR and Local contrast share one base.
 
 **Exact neutral settings are a bypass**: all three zero and track Shadows, Highlights, HDR and
 Local contrast exactly zero skip the kernel entirely, so neutral output is bit-identical to unfiltered
@@ -104,7 +105,9 @@ the kernel.
 
 Shadows, Highlights, HDR and Local contrast act on a large-scale luma base $B$ around each pixel, so
 they treat an area as a whole: a dark slope is one shadow, but the dark gaps between
-sunlit grass are texture of a bright area. With $y = Y(D)$:
+sunlit grass are texture of a bright area. Clarity uses the same construction at a
+smaller scale (radii 3, 6 and 10, spatial $\sigma = 6$, range $\sigma = 0.1$), around the
+measured centre. With $y = Y(D)$:
 
 - **Taps**: 24 on rings of eight directions at radii 6, 16 (rotated 22.5°) and 32 units,
   with spatial weight $e^{-r^2/(2\cdot16^2)}$.
@@ -227,7 +230,7 @@ cannot represent a neighbourhood filter. The native compositor evaluates the sha
 kernel on the existing fitted RGB8 frame inside the existing worker bands, before
 LUT or exact grading. No image, mask, LUT or full-frame buffer and no native process
 is added: four raw buffers (22 bytes/pixel), two LUTs and the serial child limits are
-unchanged. Up to 33 bilinear taps per source pixel make detail the costliest
+unchanged. Up to 41 bilinear taps per source pixel make detail the costliest
 composited path after exact HSL/curves, especially at UHD. The diagnostic two-clip
 reference and the measurement helper reject nonneutral detail.
 

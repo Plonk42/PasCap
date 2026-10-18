@@ -1,12 +1,13 @@
 import {
   CLARITY_GAIN,
+  CLARITY_RANGE_FACTOR,
   DENOISE_DETAIL_CORE,
   DENOISE_RANGE_SIGMA,
   DETAIL_CLARITY_TAPS,
   DETAIL_FINE_TAPS,
   DETAIL_WIDE_TAPS,
+  EDGE_GUIDE_TAPS,
   HDR_COMPRESSION,
-  TONE_BASE_GUIDE_TAPS,
   TONE_BASE_RANGE_FACTOR,
   HDR_RATIO_FLOOR,
   TONE_BASE_TAPS,
@@ -72,6 +73,34 @@ const glslVec2Array = (name: string, taps: readonly { x: number; y: number }[]):
 const glslFloatArray = (name: string, values: readonly number[]): string =>
   `const float ${name}[${values.length}] = float[${values.length}](${values.map(glslFloat).join(', ')});`;
 const fineTotal = 1 + DETAIL_FINE_TAPS.reduce((sum, tap) => sum + tap.weight, 0);
+// Edge-aware luma base: range weights against the mean of the centre and first ring.
+const edgeAwareBase = (
+  name: string,
+  taps: readonly { x: number; y: number; weight: number }[],
+  rangeFactor: number,
+): string => `
+${glslVec2Array(`${name}Taps`, taps)}
+${glslFloatArray(
+  `${name}Weight`,
+  taps.map((tap) => tap.weight),
+)}
+float ${name}(sampler2D source, vec2 coordinate, float y, vec2 stride) {
+  float levels[${taps.length}];
+  float guide = y;
+  for (int i = 0; i < ${taps.length}; i++) {
+    levels[i] = dot(texture(source, coordinate + ${name}Taps[i] * stride).rgb, luma);
+    if (i < ${EDGE_GUIDE_TAPS}) guide += levels[i];
+  }
+  guide /= ${glslFloat(EDGE_GUIDE_TAPS + 1)};
+  float total = exp(-(y - guide) * (y - guide) * ${glslFloat(rangeFactor)});
+  float sum = total * y;
+  for (int i = 0; i < ${taps.length}; i++) {
+    float weight = ${name}Weight[i] * exp(-(levels[i] - guide) * (levels[i] - guide) * ${glslFloat(rangeFactor)});
+    sum += weight * levels[i];
+    total += weight;
+  }
+  return sum / total;
+}`;
 
 // The same taps, weights and order as compileDetail() in src/shared/detail.ts.
 const detailFunction = `
@@ -85,29 +114,8 @@ ${glslFloatArray(
   'detailWideWeight',
   DETAIL_WIDE_TAPS.map((tap) => tap.weight),
 )}
-${glslVec2Array('detailClarity', DETAIL_CLARITY_TAPS)}
-${glslVec2Array('toneBaseTaps', TONE_BASE_TAPS)}
-${glslFloatArray(
-  'toneBaseWeight',
-  TONE_BASE_TAPS.map((tap) => tap.weight),
-)}
-float toneBase(sampler2D source, vec2 coordinate, float y, vec2 stride) {
-  float levels[${TONE_BASE_TAPS.length}];
-  float guide = y;
-  for (int i = 0; i < ${TONE_BASE_TAPS.length}; i++) {
-    levels[i] = dot(texture(source, coordinate + toneBaseTaps[i] * stride).rgb, luma);
-    if (i < ${TONE_BASE_GUIDE_TAPS}) guide += levels[i];
-  }
-  guide /= ${glslFloat(TONE_BASE_GUIDE_TAPS + 1)};
-  float total = exp(-(y - guide) * (y - guide) * ${glslFloat(TONE_BASE_RANGE_FACTOR)});
-  float sum = total * y;
-  for (int i = 0; i < ${TONE_BASE_TAPS.length}; i++) {
-    float weight = toneBaseWeight[i] * exp(-(levels[i] - guide) * (levels[i] - guide) * ${glslFloat(TONE_BASE_RANGE_FACTOR)});
-    sum += weight * levels[i];
-    total += weight;
-  }
-  return sum / total;
-}
+${edgeAwareBase('clarityBase', DETAIL_CLARITY_TAPS, CLARITY_RANGE_FACTOR)}
+${edgeAwareBase('toneBase', TONE_BASE_TAPS, TONE_BASE_RANGE_FACTOR)}
 vec3 hdrTone(vec3 rgb, float y, float base, float amount, float contrast) {
   float target = base + ${glslFloat(HDR_COMPRESSION)} * amount * base * (1.0 - base) * (1.0 - 2.0 * base) +
                  (y - base) * (1.0 + contrast);
@@ -176,10 +184,7 @@ vec3 detailFilter(sampler2D source, vec2 coordinate, vec3 centre, vec4 detail, v
   float detailBase = dot(denoised, luma);
   float delta = 0.0;
   if (detail.y != 0.0) {
-    float mean = dot(measured, luma);
-    for (int i = 0; i < ${DETAIL_CLARITY_TAPS.length}; i++)
-      mean += dot(texture(source, measuredAt + detailClarity[i] * stride).rgb, luma);
-    mean /= ${glslFloat(DETAIL_CLARITY_TAPS.length + 1)};
+    float mean = clarityBase(source, measuredAt, detailBase, stride);
     delta += ${glslFloat(CLARITY_GAIN)} * detail.y * clamp(4.0 * detailBase * (1.0 - detailBase), 0.0, 1.0) *
              (detailBase - mean);
   }
