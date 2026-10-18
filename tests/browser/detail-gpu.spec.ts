@@ -116,7 +116,7 @@ function expected(source: CompositeClip, texture: Texture, x: number, y: number,
 }
 
 const cases: { name: string; source: CompositeClip }[] = [
-  { name: 'Sharpen', source: clip({ sharpen: 1, clarity: 0, denoise: 0 }) },
+  { name: 'Sharpen', source: clip({ sharpen: 2, clarity: 0, denoise: 0 }) },
   { name: 'Clarity', source: clip({ sharpen: 0, clarity: 0.8, denoise: 0 }) },
   { name: 'negative Clarity', source: clip({ sharpen: 0, clarity: -1, denoise: 0 }) },
   { name: 'Denoise', source: clip({ sharpen: 0, clarity: 0, denoise: 0.7 }) },
