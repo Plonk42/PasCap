@@ -36,6 +36,8 @@ export const DETAIL_REFERENCE_LINES = 720;
 /** Denoise range sigma at full strength, in encoded RGB units. */
 export const DENOISE_RANGE_SIGMA = 0.1;
 export const SHARPEN_GAIN = 2;
+/** Sharpen overshoot beyond the 3×3 luma range tends to this, in encoded units: no hard halos. */
+export const SHARPEN_HALO = 0.05;
 export const CLARITY_GAIN = 1;
 const DIAGONAL = Math.SQRT1_2;
 const DIRECTIONS: readonly (readonly [number, number])[] = [
@@ -162,6 +164,14 @@ function luma(rgb: Float64Array): number {
   return 0.2126 * rgb[0]! + 0.7152 * rgb[1]! + 0.0722 * rgb[2]!;
 }
 
+/** Sharpened luma with its excess beyond [low, high] eased towards SHARPEN_HALO; small overshoots stay. */
+export function limitOvershoot(value: number, low: number, high: number): number {
+  // Capped: tanh(10) is 1 in float32, and some GPU tanh implementations overflow far beyond it.
+  if (value > high) return high + SHARPEN_HALO * Math.tanh(Math.min(10, (value - high) / SHARPEN_HALO));
+  if (value < low) return low - SHARPEN_HALO * Math.tanh(Math.min(10, (low - value) / SHARPEN_HALO));
+  return value;
+}
+
 /**
  * Range-kernel exponent factor 1 / (2σ² · 3) for the mean squared RGB difference.
  * Capped so tiny strengths stay finite in float32 shaders, where it still rejects any 8-bit step.
@@ -202,6 +212,8 @@ export function compileDetail(
   const gaussian = new Float64Array(3);
   const denoised = new Float64Array(3);
   let denoisedWeight = 1;
+  let low = 0;
+  let high = 0;
   // Bilateral weight: spatial Gaussian times an encoded-RGB range Gaussian around the centre.
   const bilateral = (weight: number): void => {
     const red = tap[0]! - centre[0]!;
@@ -213,8 +225,12 @@ export function compileDetail(
   };
   const fine = (sample: DetailSampler, u: number, v: number): void => {
     gaussian.set(centre);
+    low = high = luma(centre);
     for (const { x, y, weight } of DETAIL_FINE_TAPS) {
       sample(u + x * stepU, v + y * stepV, tap);
+      const level = luma(tap);
+      low = Math.min(low, level);
+      high = Math.max(high, level);
       for (let channel = 0; channel < 3; channel++) gaussian[channel]! += weight * tap[channel]!;
       if (denoise > 0) bilateral(weight);
     }
@@ -287,7 +303,11 @@ export function compileDetail(
         const midtones = Math.min(1, Math.max(0, 4 * base * (1 - base)));
         delta += CLARITY_GAIN * clarity * midtones * (base - localMean(sample, u, v));
       }
-      if (sharpen > 0) delta += SHARPEN_GAIN * sharpen * (base - luma(gaussian));
+      if (sharpen > 0) {
+        const sharpened = base + SHARPEN_GAIN * sharpen * (base - luma(gaussian));
+        // Denoise's wide ring can move the base outside the fine range: never limit towards it.
+        delta += limitOvershoot(sharpened, Math.min(low, base), Math.max(high, base)) - base;
+      }
       if (residual || toneGain) {
         const smooth = edgeAwareBase(sample, u, v, base);
         if (residual) toneMap(base, smooth);

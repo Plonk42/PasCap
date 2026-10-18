@@ -525,7 +525,7 @@ Details: [spatial transforms](design/SPATIAL_TRANSFORMS.md).
 ### Sharpen, clarity and denoise a clip
 
 Select a clip and open **Clip → Detail** (collapsed initially, after Speed).
-**Sharpen** (0–1) crisps fine edges, **Clarity** (−1–1) adds midtone local contrast
+**Sharpen** (0–1) crisps fine edges without bright or dark outlines, **Clarity** (−1–1) adds midtone local contrast
 or, below zero, softens it, and **Denoise** (0–1) smooths grain while keeping strong
 edges. Each has a native slider and an exact field; 0 leaves the clip untouched.
 Dragging a slider previews the result live in the image; releasing commits one Undo

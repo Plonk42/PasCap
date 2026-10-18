@@ -47,6 +47,8 @@ function reference(image: Image, u: number, v: number, settings: DetailSettings,
   const centre = image(u, v);
   let denoised: RGB = centre;
   let gaussian: RGB = centre;
+  let low = luma(centre);
+  let high = low;
   if (settings.sharpen > 0 || settings.denoise > 0) {
     const sigma = 0.1 * settings.denoise;
     const sumG = [0, 0, 0];
@@ -64,6 +66,8 @@ function reference(image: Image, u: number, v: number, settings: DetailSettings,
           if (radius === 1) {
             weightG += spatial;
             tap.forEach((channel, index) => (sumG[index]! += spatial * channel));
+            low = Math.min(low, luma(tap));
+            high = Math.max(high, luma(tap));
           }
           if (settings.denoise > 0) {
             const meanSquare = tap.reduce((sum, channel, index) => sum + (channel - centre[index]!) ** 2, 0) / 3;
@@ -87,7 +91,16 @@ function reference(image: Image, u: number, v: number, settings: DetailSettings,
     mean /= 17;
     delta += settings.clarity * Math.min(1, Math.max(0, 4 * base * (1 - base))) * (base - mean);
   }
-  if (settings.sharpen > 0) delta += 2 * settings.sharpen * (base - luma(gaussian));
+  if (settings.sharpen > 0) {
+    const sharpened = base + 2 * settings.sharpen * (base - luma(gaussian));
+    const top = Math.max(high, base);
+    const bottom = Math.min(low, base);
+    const ease = (excess: number): number => 0.05 * Math.tanh(Math.min(10, excess / 0.05));
+    let limited = sharpened;
+    if (sharpened > top) limited = top + ease(sharpened - top);
+    if (sharpened < bottom) limited = bottom - ease(bottom - sharpened);
+    delta += limited - base;
+  }
   if (hdr > 0 || localContrast !== 0 || shadows !== 0 || highlights !== 0) {
     const taps: { level: number; spatial: number }[] = [];
     for (const [radius, rotation] of [
@@ -225,6 +238,23 @@ describe('clip detail settings', () => {
     const sharp = { sharpen: 1, clarity: 0, denoise: 0 };
     expect(run(edge, left, 0.5, sharp)[0]).toBeLessThan(0.3);
     expect(run(edge, right, 0.5, sharp)[0]).toBeGreaterThan(0.7);
+    // Halo control: a hard step overshoots by at most 0.05 instead of turning black or white.
+    expect(run(edge, left, 0.5, sharp)[0]).toBeGreaterThanOrEqual(0.25);
+    expect(run(edge, right, 0.5, sharp)[0]).toBeLessThanOrEqual(0.75);
+    // A soft edge still steepens inside its range, near its knee.
+    const ramp: Image = (u) => {
+      const level = Math.min(0.7, Math.max(0.3, 0.5 + (u - 0.5) * 1280 * 0.05));
+      return [level, level, level];
+    };
+    const knee = 0.5 + 3.5 * pixel;
+    expect(run(ramp, knee, 0.5, sharp)[0]).toBeGreaterThan(ramp(knee, 0.5)[0] + 0.01);
+    expect(run(ramp, knee, 0.5, sharp)[0]).toBeLessThanOrEqual(0.7);
+    // Low-contrast texture keeps nearly all of its sharpening.
+    const texture: Image = (u) => {
+      const level = 0.5 + 0.02 * Math.cos(((u * 1280 - 0.5) * 2 * Math.PI) / 6);
+      return [level, level, level];
+    };
+    expect(run(texture, 6.5 / 1280, 0.5, sharp)[0]! - 0.5).toBeGreaterThan(1.45 * 0.02);
     const near = 0.5 + 4 * pixel;
     expect(run(edge, near, 0.5, { sharpen: 0, clarity: 1, denoise: 0 })[0]).toBeGreaterThan(0.7);
     expect(run(edge, near, 0.5, { sharpen: 0, clarity: -1, denoise: 0 })[0]).toBeLessThan(0.7);
