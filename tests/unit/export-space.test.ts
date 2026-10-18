@@ -73,6 +73,7 @@ async function fixture() {
     status: 'registered',
     error: null,
     prepared: null,
+    damage: [],
     metadata: {
       width: 320,
       height: 180,

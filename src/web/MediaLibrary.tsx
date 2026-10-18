@@ -6,7 +6,7 @@ import {
   sourcePointerRatio,
   type MediaSelections,
 } from '../shared/media-selection.js';
-import type { MediaAsset } from '../shared/media.js';
+import { damageLabel, type MediaAsset } from '../shared/media.js';
 import { MAX_VIDEO_LAYERS, type ProjectDocument } from '../shared/model.js';
 import { mediaRemovalUsage } from '../shared/projects.js';
 import { durationLabel, MEDIA_DRAG_TYPE, mediaReady, shortName } from './display.js';
@@ -30,7 +30,7 @@ interface Props {
   onInsert: (mediaIds: string[]) => void;
   onInsertOnNewTrack: (mediaIds: string[]) => void;
   onDragMedia: (mediaIds: string[] | null) => void;
-  onPrepare: (mediaIds: string[]) => Promise<void>;
+  onPrepare: (mediaIds: string[], blackOutDamage?: boolean) => Promise<void>;
   onPrepareMusic: (id: string) => Promise<void>;
   /** Recordings and music whose original is not at its registered path. */
   missing: ReadonlySet<string>;
@@ -123,6 +123,8 @@ function cardStatus(asset: MediaAsset, lost: boolean, readyLabel: string) {
       title: `Not found at ${asset.sourcePath}`,
     } as const;
   const label = asset.status === 'ready' ? readyLabel : STATUS_LABEL[asset.status];
+  if (asset.status === 'error' && asset.damage.length)
+    return { state: 'error', label: 'Damaged', spoken: 'Damaged', icon: 'warning', title: asset.error ?? '' } as const;
   return {
     state: asset.status,
     label,
@@ -204,6 +206,23 @@ function MediaAction({
     return (
       <>
         <span className="media-action-space" aria-hidden="true" />
+        <span className="media-action-space" aria-hidden="true" />
+      </>
+    );
+  if (asset.damage.length)
+    return (
+      <>
+        <button
+          className="icon-button prepare-media"
+          aria-label={`Prepare ${asset.name} with damaged frames shown black`}
+          title={`Prepare with the damaged frames ${damageLabel(asset.damage)} shown black`}
+          disabled={busy}
+          onClick={() => {
+            void onPrepare([asset.id], true);
+          }}
+        >
+          <Icon name="wand" size={15} />
+        </button>
         <span className="media-action-space" aria-hidden="true" />
       </>
     );
@@ -378,8 +397,9 @@ export function MediaLibrary({
   );
   const selectedAssets = assets.filter((asset) => selected.has(asset.id));
   const visibleMusic = music.filter((asset) => musicMatchesFilter(asset, project, search, filter));
+  // Damaged recordings need their own explicit choice to show the damage black.
   const prepareIds = selectedAssets
-    .filter((asset) => !mediaReady(asset) && !['queued', 'preparing'].includes(asset.status))
+    .filter((asset) => !mediaReady(asset) && !['queued', 'preparing'].includes(asset.status) && !asset.damage.length)
     .map((asset) => asset.id);
   const allVisibleSelected = visible.length > 0 && visible.every((asset) => selected.has(asset.id));
   useEffect(() => {
@@ -739,6 +759,14 @@ export function MediaLibrary({
                     {excerptCount > 0 && (
                       <span className="media-usage-badge" title={`${excerptLabel} from this recording in this project`}>
                         {excerptLabel}
+                      </span>
+                    )}
+                    {asset.status === 'ready' && asset.damage.length > 0 && (
+                      <span
+                        className="media-damage-badge"
+                        title={`Damaged frames ${damageLabel(asset.damage)} cannot be decoded and are shown black`}
+                      >
+                        Damaged
                       </span>
                     )}
                     {status.state !== 'ready' && <span className="media-status-text">{status.label}</span>}

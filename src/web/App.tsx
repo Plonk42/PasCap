@@ -1404,11 +1404,11 @@ export function App() {
       setProjectList((await api.projects()).projects);
     });
   };
-  const prepare = async (ids: string[]): Promise<void> => {
+  const prepare = async (ids: string[], blackOutDamage = false): Promise<void> => {
     const result = await act(async () => {
       // Serial requests respect the one-heavy-job queue; no hidden preparation on hover.
       await forEachSerial(new Set(ids), async (id) => {
-        receiveJob((await api.prepare(id)).job);
+        receiveJob((await api.prepare(id, blackOutDamage)).job);
       });
     });
     if (result.ok) refreshAfterAcceptance();

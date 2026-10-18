@@ -42,7 +42,7 @@ function decoder(excerpt: Readonly<SourceExcerpt>, extra = 0): string[] {
 describe('reversed raw retiming (no FFmpeg needed)', () => {
   it('selects excerpts by input seek and native reverse only when reversed', () => {
     expect(excerptInputArgs({ sourceIn: 30, sourceOut: 40, reverse: false })).toEqual([]);
-    expect(excerptFilter({ sourceIn: 30, sourceOut: 40, reverse: false }, 'scale=1:1')).toBe(
+    expect(excerptFilter({ sourceIn: 30, sourceOut: 40, reverse: false }, 'scale=1:1', [])).toBe(
       'trim=start_frame=30:end_frame=40,setpts=PTS-STARTPTS,scale=1:1',
     );
     expect(excerptInputArgs({ sourceIn: 0, sourceOut: 4, reverse: true })).toEqual([]);
@@ -51,11 +51,22 @@ describe('reversed raw retiming (no FFmpeg needed)', () => {
     // Strictly between the PTS of frames 29 and 30.
     expect(Number(seek)).toBeGreaterThan((29 * 1001) / 30000);
     expect(Number(seek)).toBeLessThan((30 * 1001) / 30000);
-    expect(excerptFilter({ sourceIn: 30, sourceOut: 34, reverse: true }, 'scale=1:1')).toBe(
+    expect(excerptFilter({ sourceIn: 30, sourceOut: 34, reverse: true }, 'scale=1:1', [])).toBe(
       'trim=end_frame=4,setpts=PTS-STARTPTS,scale=1:1,reverse',
     );
     expect(reverseChunkFrames(6)).toBe(4);
     expect(reverseChunkFrames(1_000)).toBe(1);
+  });
+  it('repairs recorded damage before counting frames, relative to the first decoded frame', () => {
+    const damage = [{ start: 390, end: 420 }];
+    const repair = "fps=30000/1001:start_time=0,tpad=stop=-1:stop_mode=clone,drawbox=c=black:t=fill:enable='";
+    expect(excerptFilter({ sourceIn: 400, sourceOut: 500, reverse: false }, 'scale=1:1', damage)).toBe(
+      `${repair}between(n,390,419)',trim=start_frame=400:end_frame=500,setpts=PTS-STARTPTS,scale=1:1`,
+    );
+    // Seeked reversed chunks start counting at their own IN.
+    expect(excerptFilter({ sourceIn: 393, sourceOut: 425, reverse: true }, 'scale=1:1', damage)).toBe(
+      `${repair}between(n,-3,26)',trim=end_frame=32,setpts=PTS-STARTPTS,scale=1:1,reverse`,
+    );
   });
 
   it.each<SpeedSettings>([

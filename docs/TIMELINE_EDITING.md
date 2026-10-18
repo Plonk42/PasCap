@@ -110,6 +110,20 @@ interrupted preparation requires explicit **Prepare**. Merely opening folders or
 selecting files never starts that work. Music follows the same dialog; see
 [music](SPEED_AND_AUDIO.md#music).
 
+**Damaged recordings.** The decoder drops video frames it cannot read and silently
+conceals the frames that depend on them, so preparation compares the passthrough
+proxy's frames with the original's: any missing frame fails preparation and records
+its whole group of pictures, from the keyframe at or before it to the next keyframe
+(exclusive), as the asset's `damage` ranges in the video registry (absent in older
+registries, meaning none). Only an explicit **Prepare … with damaged frames shown
+black** prepares it then: every decode of that original (proxy, static and composited
+export, forward or seeked reversed chunks) refills dropped frames with FFmpeg `fps`,
+pads a damaged tail and blacks out the recorded ranges before counting frames, so
+exact frame counts and positions hold. Those decodes omit `-xerror`/`explode`;
+undamaged originals keep strict decoding and unchanged filters. The diagnostic
+reference rejects damaged recordings, and proxy samples and thumbnails avoid the
+black ranges. The original is never modified.
+
 **Other location** (bottom of Locations) imports a typed path, including outside
 browser roots: a video or music recording, or a folder through the existing
 recursive import. A folder can register and autoqueue many recordings, so choose a
