@@ -478,9 +478,16 @@ export function MediaLibrary({
   return (
     <aside className="media-panel panel declutter-media" aria-label="Media library">
       <div className="panel-heading">
-        <h2>
-          Media <span className="count">{assets.length}</span>
-        </h2>
+        <div className="library-heading-title">
+          <h2>
+            Media <span className="count">{assets.length}</span>
+          </h2>
+          {assets.length > 0 && (
+            <span className="count library-total" title="Total duration of all recordings in this project">
+              {durationLabel(assets.reduce((total, asset) => total + asset.metadata.durationSeconds, 0))}
+            </span>
+          )}
+        </div>
         <div className="library-heading-actions">
           <button
             className="secondary-button small"
@@ -490,7 +497,7 @@ export function MediaLibrary({
             onClick={onImport}
           >
             <Icon name="plus" size={15} />
-            Import
+            <span className="library-import-label">Import</span>
           </button>
           <Popover label="Media options" className="media-options">
             <div className="library-tools">

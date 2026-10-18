@@ -9,7 +9,7 @@ export interface WorkspaceLayout {
   inspectorOpen: boolean;
 }
 export const DEFAULT_LAYOUT: Readonly<WorkspaceLayout> = Object.freeze({
-  mediaWidth: 300,
+  mediaWidth: 340,
   inspectorWidth: 320,
   timelineHeight: null,
   mediaOpen: true,

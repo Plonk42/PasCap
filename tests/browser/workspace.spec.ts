@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import type { MediaAsset, MediaJob } from '../../src/shared/media.js';
 import { createClip, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
 import { calculateLayout } from '../../src/shared/timeline.js';
+import { DEFAULT_LAYOUT } from '../../src/web/workspace.js';
 import { closeOptions, collapsePanel, inspectorTab, openOptions } from './editor-helpers.js';
 
 let saved: ProjectDocument;
@@ -135,7 +136,7 @@ test('pane resize cancels on Escape, persists on release/keyboard and never edit
   await expect(page.getByRole('complementary', { name: 'Properties' })).toBeHidden();
   await openOptions(page, 'Workspace options');
   await page.getByRole('button', { name: 'Reset workspace layout' }).click();
-  await expect(resizer).toHaveAttribute('aria-valuenow', '300');
+  await expect(resizer).toHaveAttribute('aria-valuenow', String(DEFAULT_LAYOUT.mediaWidth));
   await closeOptions(page);
   await expect(page.getByRole('complementary', { name: 'Properties' })).toBeVisible();
 });
