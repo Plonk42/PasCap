@@ -162,7 +162,7 @@ describe.skipIf(!enabled)('supplied clip retiming maps · native pipes and dispo
         '-filter_threads',
         '2',
         '-vf',
-        excerptFilter(excerpt, RGB_FILTER),
+        excerptFilter(excerpt, RGB_FILTER, []),
         '-frames:v',
         String(excerpt.sourceOut - excerpt.sourceIn),
         '-fps_mode',

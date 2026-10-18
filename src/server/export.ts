@@ -36,6 +36,7 @@ import { FFV1_SLICE_ARGUMENTS, NATIVE_THREADS } from './native-threads.js';
 import { inspectStreams, probeVideo } from './probe.js';
 import { runProcess } from './process.js';
 import { nativeFadeFilters } from './reference.js';
+import { originalErrorArgs } from './damage.js';
 import { excerptFilter, excerptInputArgs, retimeRawVideo, type RawRetimingReport } from './retime-process.js';
 import { atomicWrite } from './storage.js';
 
@@ -324,9 +325,7 @@ async function retimeClip(
     signal: context.signal,
     decodeArgs: (excerpt) => [
       ...BASE_ARGS,
-      '-xerror',
-      '-err_detect',
-      'explode',
+      ...originalErrorArgs(asset),
       '-threads',
       NATIVE_THREADS,
       '-noautorotate',
@@ -341,7 +340,7 @@ async function retimeClip(
       '-filter_threads',
       NATIVE_THREADS,
       '-vf',
-      excerptFilter(excerpt, decodeFilter),
+      excerptFilter(excerpt, decodeFilter, asset.damage),
       '-frames:v',
       String(excerpt.sourceOut - excerpt.sourceIn),
       '-fps_mode',

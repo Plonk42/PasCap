@@ -1,16 +1,20 @@
 import { mkdir, readFile, rename, rm } from 'node:fs/promises';
 import path from 'node:path';
 import {
+  damageLabel,
   mediaAssetSchema,
   registrySchema,
+  type DamagedRange,
   type MediaAsset,
   type MediaJob,
   type SourceFingerprint,
+  type VideoMetadata,
 } from '../shared/media.js';
 import { framesToSeconds } from '../shared/timing.js';
 import { MOTION_ANALYSIS_VERSION, motionAnalysisSchema, type MotionAnalysis } from '../shared/motion-analysis.js';
 import { forEachSerial } from '../shared/serial.js';
 import type { ServiceConfig } from './config.js';
+import { findDamage, repairFilter } from './damage.js';
 import { errorMessage, isNotFound, ServiceError } from './errors.js';
 import {
   assertCacheOutsideSource,
@@ -73,6 +77,31 @@ async function assertCacheOutput(filename: string): Promise<void> {
   } catch (error) {
     if (!isNotFound(error)) throw error;
   }
+}
+
+function damageMessage(asset: MediaAsset, missing?: number): string {
+  const frames = missing === undefined ? 'Some video frames' : `${missing} video frames`;
+  return (
+    `${frames} cannot be decoded, which spoils ${damageLabel(asset.damage)}. ` +
+    'Prepare the recording with the damaged frames shown black to edit the rest of it.'
+  );
+}
+
+/** The nearest frame outside `damage`, preferring later ones, for samples and thumbnails. */
+function undamagedFrame(frame: number, damage: readonly DamagedRange[], frameCount: number): number {
+  const range = damage.find((item) => frame >= item.start && frame < item.end);
+  if (!range) return frame;
+  if (range.end < frameCount) return undamagedFrame(range.end, damage, frameCount);
+  if (range.start > 0) return range.start - 1;
+  throw new ServiceError('Every frame of the recording is damaged.', 422);
+}
+/** The repair pads a damaged tail indefinitely; stop at the original's frame count. */
+function repairedFrameLimit(repair: readonly DamagedRange[], frameCount: number): string[] {
+  return repair.length ? ['-frames:v', String(frameCount)] : [];
+}
+function preparedNote(repair: readonly DamagedRange[], note: string | undefined): string | undefined {
+  if (!repair.length) return note;
+  return [`Damaged frames ${damageLabel(repair)} are shown black.`, note].filter(Boolean).join(' ');
 }
 
 export class MediaLibrary {
@@ -338,19 +367,19 @@ export class MediaLibrary {
       throw new MediaQueueError(this.get(id), error);
     }
   }
-  prepare(id: string): Promise<MediaJob> {
+  prepare(id: string, blackOutDamage = false): Promise<MediaJob> {
     const pending = this.#prepareRequests.get(id);
     if (pending !== undefined) return pending;
     // The Promise is visible before validation/save can yield to another caller.
     const request = Promise.resolve()
-      .then(() => this.#enqueue(id))
+      .then(() => this.#enqueue(id, blackOutDamage))
       .finally(() => {
         this.#prepareRequests.delete(id);
       });
     this.#prepareRequests.set(id, request);
     return request;
   }
-  async #enqueue(id: string): Promise<MediaJob> {
+  async #enqueue(id: string, blackOutDamage: boolean): Promise<MediaJob> {
     const active = this.#preparing.get(id);
     if (active) return this.jobs.get(active);
     if (this.#relinking.has(id))
@@ -358,6 +387,9 @@ export class MediaLibrary {
     const registration = this.#registering.get(id);
     if (registration !== undefined) await registration;
     const asset = this.get(id);
+    // Its damage is already known: preparing again unchanged would only fail again.
+    if (asset.damage.length && !blackOutDamage && asset.status !== 'ready')
+      throw new ServiceError(damageMessage(asset), 409);
     const current = this.#assets.get(id)!;
     try {
       // Registration validates the import flow. Preparation reads only this
@@ -381,7 +413,7 @@ export class MediaLibrary {
             await assertSourceIdentity(current.sourcePath, current.fingerprint, true);
             current.content = content;
           }
-          const note = await this.#prepareAsset(current, context);
+          const note = await this.#prepareAsset(current, context, blackOutDamage ? current.damage : []);
           if (context.signal.aborted) throw new ServiceError('Job cancelled.', 499);
           return note;
         },
@@ -475,16 +507,23 @@ export class MediaLibrary {
       }
     });
   }
-  async #prepareAsset(asset: MediaAsset, context: JobContext): Promise<string | undefined> {
+  /** `repair` lists accepted damaged ranges: the proxy shows them black instead of failing. */
+  async #prepareAsset(
+    asset: MediaAsset,
+    context: JobContext,
+    repair: readonly DamagedRange[],
+  ): Promise<string | undefined> {
     const directory = this.assetDir(asset);
     const thumbnailFrames = [
-      ...new Set([
-        0,
-        Math.floor(asset.metadata.frameCount / 4),
-        Math.floor(asset.metadata.frameCount / 2),
-        Math.floor((asset.metadata.frameCount * 3) / 4),
-        asset.metadata.frameCount - 1,
-      ]),
+      ...new Set(
+        [
+          0,
+          Math.floor(asset.metadata.frameCount / 4),
+          Math.floor(asset.metadata.frameCount / 2),
+          Math.floor((asset.metadata.frameCount * 3) / 4),
+          asset.metadata.frameCount - 1,
+        ].map((frame) => undamagedFrame(frame, repair, asset.metadata.frameCount)),
+      ),
     ];
     await ensurePrivateDirectory(directory);
     await Promise.all(
@@ -530,7 +569,8 @@ export class MediaLibrary {
           '-sn',
           '-dn',
           '-vf',
-          `scale=w='min(1280,iw)':h='min(720,ih)':force_original_aspect_ratio=decrease:force_divisible_by=2:flags=bicubic:in_color_matrix=bt709:out_color_matrix=bt709:in_range=${inputRange}:out_range=tv,setsar=1`,
+          `${repairFilter(repair, 0)}scale=w='min(1280,iw)':h='min(720,ih)':force_original_aspect_ratio=decrease:force_divisible_by=2:flags=bicubic:in_color_matrix=bt709:out_color_matrix=bt709:in_range=${inputRange}:out_range=tv,setsar=1`,
+          ...repairedFrameLimit(repair, asset.metadata.frameCount),
           '-fps_mode',
           'passthrough',
           '-c:v',
@@ -584,10 +624,10 @@ export class MediaLibrary {
         },
       );
       context.update(0.77, 'Checking beginning, middle and end frame correspondence');
-      const metadata = await probeVideo(this.config, temporary, context.signal);
-      if (metadata.frameCount !== asset.metadata.frameCount)
-        throw new ServiceError('Proxy frame count differs from the original. Editing disabled.', 422);
-      const frames = [0, Math.floor((metadata.frameCount - 1) / 2), metadata.frameCount - 1];
+      const metadata = await this.#verifyProxyTiming(asset, repair, temporary, context);
+      const frames = [0, Math.floor((metadata.frameCount - 1) / 2), metadata.frameCount - 1].map((frame) =>
+        undamagedFrame(frame, repair, metadata.frameCount),
+      );
       const samples: { frame: number; meanAbsoluteError8Bit: number }[] = [];
       await forEachSerial(frames, async (frame) => {
         const original = await extractComparisonFrame(
@@ -646,10 +686,44 @@ export class MediaLibrary {
         thumbnailFrames,
         verification: { frameCount: metadata.frameCount, samples, verifiedAt: new Date().toISOString() },
       };
-      return await this.#measureAfterPreparation(asset, context);
+      return preparedNote(repair, await this.#measureAfterPreparation(asset, context));
     } finally {
       await rm(temporary, { force: true });
     }
+  }
+  async #verifyProxyTiming(
+    asset: MediaAsset,
+    repair: readonly DamagedRange[],
+    proxy: string,
+    context: JobContext,
+  ): Promise<VideoMetadata> {
+    let metadata: VideoMetadata;
+    try {
+      metadata = await probeVideo(this.config, proxy, context.signal);
+    } catch (error) {
+      if (context.signal.aborted) throw error;
+      await this.#recordDamage(asset, repair, proxy, context);
+      throw error;
+    }
+    if (metadata.frameCount !== asset.metadata.frameCount) {
+      await this.#recordDamage(asset, repair, proxy, context);
+      throw new ServiceError('Proxy frame count differs from the original. Editing disabled.', 422);
+    }
+    return metadata;
+  }
+  /** The decoder drops undecodable frames, so a damaged original yields a proxy with gaps. */
+  async #recordDamage(
+    asset: MediaAsset,
+    repair: readonly DamagedRange[],
+    proxy: string,
+    context: JobContext,
+  ): Promise<void> {
+    // A repaired proxy refills those gaps; its damage was found by an earlier preparation.
+    if (repair.length) return;
+    const found = await findDamage(this.config, asset.sourcePath, proxy, asset.metadata.frameCount, context.signal);
+    if (!found.damage.length) return;
+    asset.damage = found.damage;
+    throw new ServiceError(damageMessage(asset, found.missing), 422);
   }
   async #measureMotion(asset: MediaAsset, context: JobContext, from: number, to: number): Promise<void> {
     const { verifiedAt, frameCount } = asset.prepared!.verification;

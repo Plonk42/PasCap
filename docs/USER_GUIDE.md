@@ -111,6 +111,19 @@ timestamps/frame counts, 8-bit `yuv420p`, and explicit SDR BT.709 colour/range t
 HDR, untagged colour and ambiguous timing are rejected, not silently normalised.
 See [TIMELINE_EDITING.md](TIMELINE_EDITING.md) and [DEPLOYMENT.md](DEPLOYMENT.md).
 
+### Damaged recordings
+
+A recording damaged by a bad copy or card can contain video frames no decoder can
+read. Players such as VLC skip them; PasCap stops instead, because every frame
+must stay at its exact position. Preparation then fails with **Damaged** on the
+card and names the spoiled time, for example _00:13:00–00:13:29_: the whole
+second around the unreadable frames, since the frames that depend on them decode
+as garbage. Choose the card's wand button (**Prepare … with damaged frames shown
+black**) to use the rest of the recording. Those frames then show black in the
+preview and in every export, and the card keeps a **Damaged** badge; hover it for
+the time range. The original is never modified. Copying the recording again from
+the camera card may give an undamaged file.
+
 ## Review a recording and add clips
 
 Hover a ready recording to open **Source preview**; horizontal mouse position

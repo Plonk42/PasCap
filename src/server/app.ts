@@ -236,8 +236,8 @@ export async function createApp(config = createConfig()) {
       .send(await library.addForEditing(footage.validateManualPath(registerSchema.parse(request.body).path))),
   );
   app.post('/api/media/:id/prepare', async (request) => {
-    z.object({}).strict().parse(request.body);
-    return { job: await library.prepare(idParams.parse(request.params).id) };
+    const { blackOutDamage } = z.object({ blackOutDamage: z.boolean().optional() }).strict().parse(request.body);
+    return { job: await library.prepare(idParams.parse(request.params).id, blackOutDamage === true) };
   });
   app.post('/api/media/:id/relink', async (request, reply) => {
     const { path: filename } = registerSchema.parse(request.body);

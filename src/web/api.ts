@@ -241,7 +241,13 @@ export const api = {
       { path },
       { timeoutMs: IMPORT_TIMEOUT_MS },
     ),
-  prepare: (id: string) => request(`/api/media/${id}/prepare`, z.object({ job: jobSchema }), 'POST', {}),
+  prepare: (id: string, blackOutDamage = false) =>
+    request(
+      `/api/media/${id}/prepare`,
+      z.object({ job: jobSchema }),
+      'POST',
+      blackOutDamage ? { blackOutDamage: true } : {},
+    ),
   /** The cached camera-motion analysis of the current proxy, or null. */
   motion: (id: string, options?: RequestOptions) =>
     request(
