@@ -25,7 +25,9 @@ export function musicMatchesFilter(
   if (!asset.name.toLocaleLowerCase().includes(search.toLocaleLowerCase())) return false;
   if (filter === 'ready') return asset.status === 'ready';
   if (filter === 'unprepared') return asset.status !== 'ready';
-  if (filter === 'used') return project?.music.some((track) => track.mediaId === asset.id) ?? false;
+  const used = project?.music.some((track) => track.mediaId === asset.id) ?? false;
+  if (filter === 'used') return used;
+  if (filter === 'unused') return !used;
   return true;
 }
 

@@ -84,6 +84,7 @@ const FILTER_LABEL: Record<string, string> = {
   ready: 'Ready',
   unprepared: 'Not prepared',
   used: 'In timeline',
+  unused: 'Not in timeline',
 };
 
 function externalFiles(transfer: DataTransfer): boolean {
@@ -361,6 +362,7 @@ export function MediaLibrary({
           if (filter === 'ready') return mediaReady(asset);
           if (filter === 'unprepared') return !mediaReady(asset);
           if (filter === 'used') return usage.has(asset.id);
+          if (filter === 'unused') return !usage.has(asset.id);
           return true;
         })
         .sort((left, right) => {
@@ -479,6 +481,7 @@ export function MediaLibrary({
                   <option value="ready">Ready</option>
                   <option value="unprepared">Not prepared</option>
                   <option value="used">In timeline</option>
+                  <option value="unused">Not in timeline</option>
                 </select>
               </label>
               <label>
