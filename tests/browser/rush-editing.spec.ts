@@ -801,8 +801,8 @@ test('I/O middle removal is transient then one edit, preserving absolute fifteen
 
   // A valid range can still produce a transition-invalid result. Keep the range and the whole history atomically.
   await markRange(page, 0, 89);
-  await expect(page.getByRole('button', { name: 'Cut selected range', exact: true })).toBeEnabled();
-  await page.getByRole('button', { name: 'Cut selected range', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Delete selected range', exact: true })).toBeEnabled();
+  await page.getByRole('button', { name: 'Delete selected range', exact: true }).click();
   await expect(page.locator('.error-banner')).toContainText('Fade/transition regions overlap or exceed clip a.');
   await expectCutOverlay(page, 0, 89);
   expect(await current(page)).toEqual(before);
@@ -844,7 +844,7 @@ test('I/O middle removal is transient then one edit, preserving absolute fifteen
   await expect(clip(page, right.id).locator('.timeline-clip-body')).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('.timeline-ruler-range')).toHaveCount(0);
   await expect(page.locator('.timeline-cut-selection')).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Cut selected range', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Delete selected range', exact: true })).toHaveCount(0);
   await flush(page);
   expect(memory.saves).toBe(saves + 1);
   expect(memory.snapshot()).toEqual({ ...next, revision: before.revision + 1 });
@@ -899,7 +899,7 @@ test('overlay middle cuts keep their gap and neighbours fixed; visible quick tri
   expect(overlayTop - firstTrackTop).toBe(78);
   await markRange(page, 60, 80);
   await expectCutOverlay(page, 60, 80);
-  await page.getByRole('button', { name: 'Cut selected range', exact: true }).click();
+  await page.getByRole('button', { name: 'Delete selected range', exact: true }).click();
   const cut = await current(page);
   const right = cut.clips.find((item) => !before.clips.some((original) => original.id === item.id))!;
   expect(cut.clips.find((item) => item.id === 'top')).toEqual({
@@ -982,7 +982,7 @@ test('prefix, suffix and whole Ripple track cuts retain only necessary IDs and u
     const saves = memory.saves;
     await markRange(page, scenario.inFrame, scenario.outFrame, scenario.name === 'suffix');
     await expectCutOverlay(page, scenario.inFrame, scenario.outFrame);
-    await page.getByRole('button', { name: 'Cut selected range', exact: true }).click();
+    await page.getByRole('button', { name: 'Delete selected range', exact: true }).click();
     const next = await current(page);
     expect(
       next.clips.every((item) => before.clips.some((original) => original.id === item.id)),
@@ -1049,7 +1049,7 @@ test('missing, outside and empty ranges are rejected; click and Escape restore; 
   page,
 }) => {
   const before = await current(page);
-  const cut = page.getByRole('button', { name: 'Cut selected range', exact: true });
+  const cut = page.getByRole('button', { name: 'Delete selected range', exact: true });
   const ruler = page.getByLabel('Timeline ruler', { exact: true });
   const scale = Number(await page.locator('.timeline-surface').getAttribute('data-pixels-per-frame'));
   const rulerX = async (frame: number): Promise<number> => (await frameOrigin(page)) + frame * scale;
@@ -1058,8 +1058,8 @@ test('missing, outside and empty ranges are rejected; click and Escape restore; 
     return box.y + box.height - 6;
   };
   const playhead = (): Promise<number> => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame);
-  await expect(cut).toBeDisabled();
-  await expect(cut).toHaveAttribute('title', 'Drag on the time ruler to select a range to cut.');
+  await expect(cut).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Delete selected clip', exact: true })).toBeEnabled();
   for (const name of ['Mark cut IN', 'Mark cut OUT'])
     await expect(page.getByRole('button', { name, exact: true })).toHaveCount(0);
   await seek(page, 20);
@@ -1089,7 +1089,7 @@ test('missing, outside and empty ranges are rejected; click and Escape restore; 
   await page.mouse.click(await rulerX(50), await rulerY());
   await expect(rulerRange(page)).toHaveCount(0);
   await expect.poll(playhead).toBe(50);
-  await expect(cut).toHaveAttribute('title', 'Drag on the time ruler to select a range to cut.');
+  await expect(cut).toHaveCount(0);
 
   // Dragging back to the starting frame selects nothing.
   await page.keyboard.down('Alt');

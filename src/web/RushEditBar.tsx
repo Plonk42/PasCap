@@ -33,7 +33,7 @@ export function rangeLabel(range: TimelineRange): string {
   return `${formatTimecode(range.inFrame)} – ${formatTimecode(range.outFrame)}`;
 }
 
-/** The part of the selected clip that Cut range would remove. */
+/** The part of the selected clip that deleting the selected range would remove. */
 export function TimelineCutOverlay({
   range,
   selected,
@@ -105,7 +105,7 @@ export function RushEditBar({
 
   return (
     <div className="rush-edit-bar" aria-label="Clip editing actions">
-      <fieldset className="rush-quick-actions">
+      <fieldset className="rush-quick-actions" data-marked={timeRange !== null}>
         <legend className="declutter-sr-only">Edit selected clip</legend>
         <button
           type="button"
@@ -142,30 +142,18 @@ export function RushEditBar({
         </button>
         <button
           type="button"
-          className="icon-button"
-          aria-label="Delete selected clip"
-          title="Remove this clip only; originals remain recoverable · Delete"
-          disabled={disabled || !selected}
-          onClick={onDelete}
+          className={`icon-button ${timeRange ? 'rush-delete-range' : ''}`}
+          aria-label={timeRange ? 'Delete selected range' : 'Delete selected clip'}
+          title={
+            timeRange
+              ? error ||
+                'Remove the selected range from the selected clip in one Undo step; this track’s Ripple setting controls gap closure · Delete'
+              : 'Remove this clip only; originals remain recoverable · Delete'
+          }
+          disabled={disabled || (timeRange ? !!error : !selected)}
+          onClick={timeRange ? onCutRange : onDelete}
         >
           <Icon name="trash" size={15} />
-        </button>
-      </fieldset>
-      <fieldset className="rush-cut-actions" data-marked={timeRange !== null}>
-        <legend className="declutter-sr-only">Remove a selected range</legend>
-        <button
-          type="button"
-          className="secondary-button small rush-cut-button"
-          aria-label="Cut selected range"
-          title={
-            error ||
-            'Remove the selected range from the selected clip in one Undo step; this track’s Ripple setting controls gap closure · Shift+Delete'
-          }
-          disabled={disabled || !!error}
-          onClick={onCutRange}
-        >
-          <Icon name="cut" size={15} />
-          <span className="timeline-action-label">Cut range</span>
         </button>
         {timeRange && (
           <button

@@ -207,8 +207,8 @@ original exclusive OUT. Source review keeps its independent numeric IN/OUT pair 
   removes the tail after it. Both keep that frame; handles can recover omitted footage.
 - To remove a middle section, **drag on the time ruler** across the unwanted frames
   (the preview shows the edge you drag) and select the clip. The hatched part of
-  the selected clip is removed by **Cut range / Shift+Delete**, in **one Undo step**;
-  without a range or a clip, or with a range outside the clip, its tooltip says why.
+  the selected clip is removed by **Delete** (the orange trash) or Shift+Delete, in **one Undo step**;
+  without a clip, or with a range outside the clip, its tooltip says why.
   A click on the ruler or Escape clears the range; changing a transition or fade keeps
   it. While a range is selected, Play
   replays only that range, stopping on its last frame; the start/end buttons and
@@ -780,7 +780,7 @@ storage/render breakdowns remain their existing expandable controls, not help bu
 | ------------------------------------------- | ------------------------------------------------------------------------------------- |
 | Timeline play/seek                          | Space; ←/→ one frame; Shift+←/→ ten; Home/End; F to fit                               |
 | Split / quick trim                          | S / Q / W                                                                             |
-| Unwanted timeline range                     | Drag on the ruler; Shift+Delete cuts; Escape clears the range                         |
+| Unwanted timeline range                     | Drag on the ruler; Delete cuts; Escape clears the range                               |
 | Bookmarks                                   | M adds at the playhead; Shift+↑/↓ previous/next; focused: arrows move, Delete removes |
 | Clip actions                                | Ctrl+D duplicate (or right-click the clip); Delete/Backspace remove                   |
 | Session history                             | Ctrl+Z; Ctrl+Shift+Z or Ctrl+Y redo                                                   |

@@ -216,7 +216,7 @@ Enter or when focus leaves both fields; Escape restores.
 ## Cutting an unwanted part
 
 The timeline's visible clip-edit controls expose **Split**, **Trim start**, **Trim end**,
-Delete and **Cut range** in the existing responsive toolbar, not another
+Delete (which removes the selected range while one is selected) in the existing responsive toolbar, not another
 toolbar covering the lanes. Each track header has one **Ripple** toggle icon
 (`aria-pressed`) showing and switching that track's own setting in one Undo step.
 
@@ -249,10 +249,11 @@ toolbar covering the lanes. Each track header has one **Ripple** toggle icon
   frame 0, also when pressed while the preview is still settling on the last frame.
   The preview's start/end buttons and **Home/End** likewise go to IN and the last
   included frame (OUT − 1) while a range is selected, else to the timeline's ends.
-- **Cut range / Shift+Delete** is enabled only when a range and a clip are both
-  selected and the range overlaps that clip; otherwise its tooltip names the reason
-  (no range, no clip, or range outside the clip). It removes the overlapping part
-  of the clip atomically in **one Undo step**.
+- **Delete / Shift+Delete** with a range selected (the trash turns orange and reads
+  **Delete selected range**) is enabled only when a clip is also selected and the
+  range overlaps it; otherwise its tooltip names the reason. It removes the
+  overlapping part of the clip atomically in **one Undo step**. Without a range,
+  Delete removes the whole selected clip.
 - Middle removal keeps a left clip with the original ID and a right clip with
   a fresh ID. Prefix/suffix removal keeps only the retained clip; a whole-range
   removal deletes it. Retained pieces share the original media but have independent

@@ -193,8 +193,7 @@
   padding: 5px 10px;
 }
 
-.rush-quick-actions,
-.rush-cut-actions {
+.rush-quick-actions {
   min-width: 0;
   margin: 0;
   padding: 2px;
@@ -227,11 +226,11 @@
   border-color: #537059;
 }
 
-.rush-cut-actions[data-marked='true'] {
+.rush-quick-actions[data-marked='true'] {
   border-color: #987054;
 }
 
-.product-workspace .rush-cut-actions .rush-cut-button:not(:disabled) {
+.product-workspace .rush-quick-actions .rush-delete-range:not(:disabled) {
   border-color: #9d7057;
   color: #f1c2ad;
   background: #3a2c22;
@@ -311,13 +310,11 @@
 }
 
 @media (max-width: 1120px) {
-  .rush-quick-actions .timeline-action-label,
-  .rush-cut-actions .timeline-action-label {
+  .rush-quick-actions .timeline-action-label {
     display: none;
   }
 
-  .product-workspace .rush-quick-actions .secondary-button,
-  .product-workspace .rush-cut-actions .secondary-button {
+  .product-workspace .rush-quick-actions .secondary-button {
     width: 32px;
     padding: 0;
   }

@@ -682,8 +682,9 @@ export function App() {
     }
   }, [commit, timeRange, select]);
   const remove = useCallback(() => {
-    if (selection.current && !drafting.current) edit({ type: 'delete', clipId: selection.current });
-  }, [edit]);
+    if (timeRange) cutRange();
+    else if (selection.current && !drafting.current) edit({ type: 'delete', clipId: selection.current });
+  }, [edit, cutRange, timeRange]);
   const addBookmark = useCallback(() => {
     if (!current.current || drafting.current) return;
     if (!calculateLayout(current.current).duration) {

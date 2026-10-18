@@ -11,8 +11,7 @@
   flex-wrap: wrap;
 }
 
-.rush-quick-actions,
-.rush-cut-actions {
+.rush-quick-actions {
   display: flex;
   align-items: center;
   gap: 4px;
@@ -27,7 +26,7 @@
   color: #c8e5c3;
 }
 
-.rush-cut-button:not(:disabled) {
+.rush-delete-range:not(:disabled) {
   color: #f1c2ad;
   border-color: #876652;
 }

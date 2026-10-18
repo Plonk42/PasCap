@@ -66,7 +66,7 @@ same kernel; see [local contrast](design/DETAIL_FILTERS.md#local-contrast).
   a browser-local preference that survives reloads.
 - Bottom: frame-scaled multi-track timeline, playhead timecode, highlighted active
   insertion track, one marker per stored track keyframe, dimmed hidden clips and Activity.
-  The responsive toolbar starts with **Bookmark** (add at the playhead, or delete the one there) between Previous/Next bookmark and **Snap**, then keeps Split, Trim start/end, Delete and Cut range
+  The responsive toolbar starts with **Snap**, then the **Bookmark** group (Previous bookmark, add at the playhead or delete the one there, Next bookmark), then keeps Split, Trim start/end and Delete (which deletes the selected range while one is selected)
   directly visible; Duplicate is in the clip's right-click menu (Ctrl+D), and start
   nudging beside Clip → Placement's start field. Zoom keeps its slider and Fit,
   with Zoom out / Zoom in buttons beside them.
@@ -606,9 +606,9 @@ Source remains available through its tab. Changing recordings leaves exactly one
 range editor/decoder, without stale duplicate controls.
 
 Dragging on the time ruler selects a project-frame range (OUT exclusive); with a
-clip selected, **Cut range** removes the part of that clip it covers in one Undo
-step, retaining independent left/right clips where needed. Without a range or a
-clip, or with a range outside the clip, Cut range is disabled with the reason.
+clip selected, the orange **Delete selected range** trash removes the part of that clip it covers in one Undo
+step, retaining independent left/right clips where needed. Without a clip,
+or with a range outside the clip, it is disabled with the reason; without a range, Delete removes the clip.
 **Split** selects the new right piece; **Q/W** keep the displayed frame while
 shrinking the head/tail. The range is temporary, kept across clip selection and
 cleared by a ruler click, Escape, timing/history/project changes, never a project/autosave field.
