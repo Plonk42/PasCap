@@ -140,7 +140,7 @@ export function RushEditBar({
         </button>
         <button
           type="button"
-          className={`icon-button ${timeRange ? 'range-accent' : ''}`}
+          className={`secondary-button small ${timeRange ? 'range-accent' : ''}`}
           aria-label={timeRange ? 'Delete selected range' : 'Delete selected clip'}
           title={
             timeRange
@@ -152,6 +152,7 @@ export function RushEditBar({
           onClick={timeRange ? onCutRange : onDelete}
         >
           <Icon name="trash" size={15} />
+          <span className="timeline-action-label">Cut</span>
         </button>
       </fieldset>
       {timeRange && (
