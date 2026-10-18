@@ -57,6 +57,12 @@ interface Props {
   onInsert: (ranges?: readonly MediaSelection[]) => string | null;
   onRevealClip: (id: string) => void;
   targetLayer: string;
+  ref?: Ref<SourcePlayback>;
+}
+
+/** Lets the editor's Space shortcut play or pause the source preview while it is displayed. */
+export interface SourcePlayback {
+  toggle: () => void;
 }
 
 interface Observation {
@@ -116,6 +122,7 @@ export function SourceReview({
   onInsert,
   onRevealClip,
   targetLayer,
+  ref,
 }: Readonly<Props>) {
   const host = useRef<HTMLDivElement>(null);
   const preview = useRef<HTMLDivElement>(null);
@@ -239,8 +246,16 @@ export function SourceReview({
   const playing = currentObservation?.status === 'playing' || currentObservation?.status === 'starting';
   const steadyTransportLabel = playing ? 'Playing' : 'Paused';
   const transportLabel = currentObservation?.status === 'starting' ? 'Starting' : steadyTransportLabel;
+  const playDisabled = rangeDraft || !visible || disabled || (!playing && (observedFrame === null || !!error));
+  const togglePlayback = (): void => {
+    if (playing) pause();
+    else if (!playDisabled) transport.current?.play();
+  };
+  useImperativeHandle(ref, () => ({ toggle: togglePlayback }));
   const keyboard = (event: KeyboardEvent<HTMLElement>): void => {
-    // No source-review shortcut may reach the main preview's window handlers.
+    // Space reaches the editor shortcut, which plays this preview while it is displayed.
+    if (event.code === 'Space') return;
+    // No other source-review shortcut may reach the main preview's window handlers.
     event.stopPropagation();
     if (event.defaultPrevented) return;
     if (event.key === 'Escape') {
@@ -379,12 +394,9 @@ export function SourceReview({
             className="play-button source-play-button"
             aria-label={playing ? 'Pause source preview' : 'Play source preview'}
             title="Play the applied IN–OUT range without audio; stop at OUT − 1"
-            disabled={rangeDraft || !visible || disabled || (!playing && (observedFrame === null || !!error))}
+            disabled={playDisabled}
             onKeyDown={keyboard}
-            onClick={() => {
-              if (playing) pause();
-              else transport.current?.play();
-            }}
+            onClick={togglePlayback}
           >
             <Icon name={playing ? 'pause' : 'play'} size={19} />
           </button>

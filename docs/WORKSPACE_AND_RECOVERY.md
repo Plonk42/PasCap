@@ -177,7 +177,9 @@ arrows, Shift+arrows, Alt+arrows, Alt+Shift+arrows, Home/End and F
 are mapped explicitly. Space plays or pauses after a pointer press on a control
 (button, tab, checkbox, slider, select or divider), so focus left by a click never
 swallows it; a control reached by keyboard keeps native Space activation, and text
-or number fields always keep the typed space. Editing
+or number fields always keep the typed space. Space drives the displayed preview: the
+source preview's IN–OUT playback while **Source preview** is shown, the timeline
+otherwise. Editing
 shortcuts cannot mutate clips while using a modal, source control, input, options
 popover, activity drawer or pane divider. Skip links expose the major editor regions.
 On a focused track keyframe marker, Left/Right moves that keyframe one project frame and Shift

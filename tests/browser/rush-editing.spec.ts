@@ -1627,6 +1627,37 @@ test('source proxy Play/Pause advances decoded frames and stops at exclusive OUT
   await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
 });
 
+test('Space plays and pauses the displayed preview: the source preview on its tab, the timeline otherwise', async ({
+  page,
+}) => {
+  const before = await current(page);
+  await seek(page, 30);
+  await page.getByRole('button', { name: 'Review pattern-a.mp4', exact: true }).click();
+  await sourceRange(page, 12, 72);
+  await sourceFrame(page, 20);
+  const source = page.locator('.source-preview');
+  const timelinePlaying = () => page.evaluate(() => window.pascapLab!.engine.diagnostics().playing);
+  for (const control of [
+    page.getByRole('button', { name: 'Review source frame of pattern-a.mp4', exact: true }),
+    page.getByRole('tab', { name: 'Source preview', exact: true }),
+  ]) {
+    await control.click();
+    await page.keyboard.press('Space');
+    await expect(source).toHaveAttribute('data-source-status', 'playing');
+    expect(await timelinePlaying()).toBe(false);
+    await page.keyboard.press('Space');
+    await expect(source).toHaveAttribute('data-source-status', 'paused');
+  }
+  await page.getByRole('tab', { name: 'Timeline preview', exact: true }).click();
+  await page.keyboard.press('Space');
+  await expect.poll(timelinePlaying).toBe(true);
+  await page.keyboard.press('Space');
+  await expect.poll(timelinePlaying).toBe(false);
+  expect(await current(page)).toEqual(before);
+  await flush(page);
+  expect(memory.saves).toBe(0);
+});
+
 for (const action of ['scrub', 'mark', 'apply', 'reset', 'trim'] as const) {
   test(`source ${action} pauses proxy playback without timeline history or saves`, async ({ page }) => {
     const before = await current(page);

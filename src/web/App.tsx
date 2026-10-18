@@ -70,6 +70,7 @@ import { readPreference, writePreference } from './preferences.js';
 import { PreviewPanel } from './PreviewPanel.js';
 import { ProjectTitle } from './ProjectTitle.js';
 import { editorShortcut, typesSpace } from './shortcuts.js';
+import type { SourcePlayback } from './SourceReview.js';
 import { planTimelineDrop } from './timeline-placement.js';
 import { adjacentBookmark } from './timeline-bookmarks.js';
 import { Timeline, type DraftPreview } from './Timeline.js';
@@ -147,7 +148,7 @@ function rangeWithin(range: TimelineRange | null, duration: number): TimelineRan
   return range.outFrame <= duration ? range : { ...range, outFrame: duration };
 }
 
-const OVERLAYS = '.source-review,.activity-drawer,.editor-popover,.editor-help,.clip-speed-curve-editor';
+const OVERLAYS = '.activity-drawer,.editor-popover,.editor-help,.clip-speed-curve-editor';
 const FIELDS = 'input,textarea,select,[role="slider"],[role="separator"],[contenteditable="true"]';
 
 /** Whether a key reaches the editor shortcuts, and whether Space keeps its native activation. */
@@ -156,7 +157,12 @@ function shortcutTarget(
   pointerFocus: PointerFocus | null,
 ): { blocked: boolean; nativeSpace: boolean } {
   const target = event.target instanceof HTMLElement ? event.target : null;
-  if (event.defaultPrevented || document.querySelector('dialog[open]') || target?.closest(OVERLAYS))
+  if (
+    event.defaultPrevented ||
+    document.querySelector('dialog[open]') ||
+    target?.closest(OVERLAYS) ||
+    (event.code !== 'Space' && target?.closest('.source-review'))
+  )
     return { blocked: true, nativeSpace: true };
   // Space plays after a pointer press on a control; keyboard focus keeps its native activation.
   if (event.code === 'Space' && target && pointerFocus?.byPointer(target) && !typesSpace(target))
@@ -242,6 +248,9 @@ export function App() {
   const [sectionRequest, setSectionRequest] = useState<InspectorSectionRequest | null>(null);
   const [draggedMediaIds, setDraggedMediaIds] = useState<string[] | null>(null);
   const [viewerMode, setViewerMode] = useState<'timeline' | 'source'>('timeline');
+  const viewer = useRef(viewerMode);
+  viewer.current = viewerMode;
+  const sourcePlayback = useRef<SourcePlayback | null>(null);
   const [review, setReview] = useState<ReviewTarget | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectedMusicId, setSelectedMusicId] = useState<string | null>(null);
@@ -1072,7 +1081,8 @@ export function App() {
           undoRedo('redo');
           break;
         case 'play':
-          togglePlayback();
+          if (viewer.current === 'source') sourcePlayback.current?.toggle();
+          else togglePlayback();
           break;
         case 'split':
           split();
@@ -1979,6 +1989,7 @@ export function App() {
               >
                 {reviewAsset && review && (
                   <SourceReview
+                    ref={sourcePlayback}
                     asset={reviewAsset}
                     frame={review.frame}
                     range={resolveMediaSelection(reviewAsset.id, reviewAsset.metadata.frameCount, ranges)}

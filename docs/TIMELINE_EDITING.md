@@ -696,6 +696,8 @@ verified proxy, without audio, within the applied range,
 from the current displayed frame if it precedes the last included frame, otherwise
 from IN. It stops on exactly OUT − 1, without looping. A one-frame
 range simply displays that frame. Numeric drafts do not change the played range.
+While the **Source preview** tab is shown, Space plays or pauses it like this button,
+never the timeline.
 Scrubbing, trimming, marking and numeric range edits pause first; closing, hiding, switching
 recordings/projects or leaving Source preview cancels pending playback and releases
 its sole decoder. Loading/playback failures remain explicit with Retry. Source

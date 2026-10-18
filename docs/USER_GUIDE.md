@@ -792,7 +792,8 @@ storage/render breakdowns remain their existing expandable controls, not help bu
 
 Keyboard actions respect text and number fields, source controls, dialogs and a control
 reached with Tab. After a click on a button, tab, checkbox or slider, Space still
-plays or pauses. Click the preview timecode for an exact frame or **MM:SS:FF** at 30 fps
+plays or pauses. On the **Source preview** tab, Space plays or pauses the source preview
+instead of the timeline. Click the preview timecode for an exact frame or **MM:SS:FF** at 30 fps
 NDF; this display is not wall-clock duration at 30000/1001 fps. Undo/Redo is session
 history, not a persistent project revision browser.
 
