@@ -452,6 +452,8 @@
   bottom: 0;
   min-width: 3px;
   background: repeating-linear-gradient(45deg, #e0524ccc 0 2px, #2a0c0bcc 2px 5px);
+  /* One stripe origin for the strip and lane marks, so their stripes line up. */
+  background-attachment: fixed;
   pointer-events: none;
 }
 
