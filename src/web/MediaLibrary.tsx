@@ -480,10 +480,18 @@ export function MediaLibrary({
       <div className="panel-heading">
         <div className="library-heading-title">
           <h2>
-            Media <span className="count">{assets.length}</span>
+            Media{' '}
+            <span
+              className="count library-stat"
+              title={`${assets.length} video ${assets.length === 1 ? 'recording' : 'recordings'} in this project`}
+            >
+              <Icon name="video" size={11} />
+              {assets.length}
+            </span>
           </h2>
           {assets.length > 0 && (
-            <span className="count library-total" title="Total duration of all recordings in this project">
+            <span className="count library-stat library-total" title="Total duration of the project's video recordings">
+              <Icon name="clock" size={11} />
               {durationLabel(assets.reduce((total, asset) => total + asset.metadata.durationSeconds, 0))}
             </span>
           )}
