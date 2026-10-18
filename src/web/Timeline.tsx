@@ -53,7 +53,7 @@ import { createMusicInstance, videoTimelineDuration } from './music-ui.js';
 import { MusicTimeline, type MusicTimelineGesture } from './MusicTimeline.js';
 import { RulerRange, RushEditBar, TimelineCutOverlay } from './RushEditBar.js';
 import { useRulerRange } from './ruler-range.js';
-import { adjacentBookmark, bookmarkKind, bookmarkTargets } from './timeline-bookmarks.js';
+import { adjacentBookmark, bookmarkKind, bookmarkTargets, rangeBookmarkCommands } from './timeline-bookmarks.js';
 import './timeline-bookmarks.css';
 import { trackKeyframeKind, transformKeyframeKind } from './timeline-keyframes.js';
 import { planTimelineDrop, type DropPlan, type TimelinePayload } from './timeline-placement.js';
@@ -386,6 +386,30 @@ function TimelineMusicLanes(
   ));
 }
 
+/** What the Bookmark button does: bookmark the selected range's ends, else toggle one at the playhead. */
+function bookmarkAction(project: ProjectDocument, frame: number, duration: number, range: TimelineRange | null) {
+  const rangeCommands = range ? rangeBookmarkCommands(project.bookmarks, range) : [];
+  const deleting = !range && project.bookmarks.includes(frame);
+  let label = 'Add bookmark at playhead';
+  let title = 'Add a bookmark at the playhead; edits snap to it · M';
+  let commands: EditCommand[] = [{ type: 'bookmark-add', frame }];
+  let blocked = !duration;
+  if (range) {
+    label = 'Add bookmarks at range ends';
+    title = rangeCommands.length
+      ? 'Add bookmarks at the start and end of the selected range · M'
+      : 'The selected range already has bookmarks at both ends';
+    commands = rangeCommands;
+    blocked ||= !rangeCommands.length;
+  } else if (deleting) {
+    label = 'Delete bookmark at playhead';
+    title = `Delete the bookmark at ${formatTimecode(frame)}`;
+    commands = [{ type: 'bookmark-remove', frame }];
+  }
+  if (!duration) title = 'Add footage or music before adding a bookmark.';
+  return { label, title, commands, blocked, deleting };
+}
+
 /** Adds a bookmark at the playhead, or deletes the one already there, between Previous/Next bookmark. */
 function BookmarkButton(
   props: Readonly<{
@@ -393,14 +417,12 @@ function BookmarkButton(
     frame: number;
     duration: number;
     disabled: boolean;
-    onEdit: (command: EditCommand) => void;
+    timeRange: TimelineRange | null;
+    onEdit: (command: EditCommand | readonly EditCommand[]) => void;
     onSeek: (frame: number) => void;
   }>,
 ) {
-  const present = props.project.bookmarks.includes(props.frame);
-  let title = 'Add a bookmark at the playhead; edits snap to it · M';
-  if (!props.duration) title = 'Add footage or music before adding a bookmark.';
-  else if (present) title = `Delete the bookmark at ${formatTimecode(props.frame)}`;
+  const action = bookmarkAction(props.project, props.frame, props.duration, props.timeRange);
   const previous = adjacentBookmark(props.project.bookmarks, props.frame, props.duration, -1);
   const next = adjacentBookmark(props.project.bookmarks, props.frame, props.duration, 1);
   return (
@@ -418,13 +440,13 @@ function BookmarkButton(
       </button>
       <button
         type="button"
-        className={`secondary-button small timeline-view-action timeline-bookmark-action ${present ? 'active' : ''}`}
-        aria-label={present ? 'Delete bookmark at playhead' : 'Add bookmark at playhead'}
-        title={title}
-        disabled={props.disabled || !props.duration}
-        onClick={() => props.onEdit({ type: present ? 'bookmark-remove' : 'bookmark-add', frame: props.frame })}
+        className={`secondary-button small timeline-view-action timeline-bookmark-action ${action.deleting ? 'active' : ''} ${props.timeRange ? 'range-accent' : ''}`}
+        aria-label={action.label}
+        title={action.title}
+        disabled={props.disabled || action.blocked}
+        onClick={() => props.onEdit(action.commands)}
       >
-        <Icon name={present ? 'trash' : 'bookmark'} size={15} />
+        <Icon name={action.deleting ? 'trash' : 'bookmark'} size={15} />
         <span className="timeline-action-label">Bookmark</span>
       </button>
       <button
@@ -1170,6 +1192,7 @@ export function Timeline(props: Readonly<Props>) {
           frame={frame}
           duration={layout.duration}
           disabled={interactionBlocked}
+          timeRange={props.timeRange}
           onEdit={onEdit}
           onSeek={onSeek}
         />
@@ -1183,7 +1206,6 @@ export function Timeline(props: Readonly<Props>) {
           onDelete={onDelete}
           onQuickTrim={props.onQuickTrim}
           onCutRange={props.onCutRange}
-          onClearRange={() => props.onTimeRange(null)}
         />
         <div className="timeline-zoom">
           <label htmlFor="timeline-zoom">Zoom</label>

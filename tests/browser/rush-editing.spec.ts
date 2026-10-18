@@ -809,7 +809,7 @@ test('I/O middle removal is transient then one edit, preserving absolute fifteen
   await flush(page);
   expect(memory.saves).toBe(saves);
   await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
-  await page.getByRole('button', { name: 'Clear selected range', exact: true }).click();
+  await shortcut(page, 'Escape');
   await page.getByRole('button', { name: 'Dismiss error', exact: true }).click();
 
   await markRange(page, 20, 40);
@@ -1209,7 +1209,7 @@ test('Play covers only the selected range: from IN or inside it, stopping on its
   await expect(rulerRange(page)).toHaveAttribute('data-range-out', '31');
   expect(await current(page)).toEqual(before);
 
-  await page.getByRole('button', { name: 'Clear selected range', exact: true }).click();
+  await shortcut(page, 'Escape');
   await expect(play).toHaveAttribute('title', 'Play or pause (Space)');
   await seek(page, 20);
   await play.click();
@@ -1246,7 +1246,7 @@ test('Play pressed while playback settles on its last frame restarts from the ra
   expect(range).toBeGreaterThanOrEqual(20);
   expect(range).toBeLessThan(25);
 
-  await page.getByRole('button', { name: 'Clear selected range', exact: true }).click();
+  await shortcut(page, 'Escape');
   const duration = calculateLayout(await current(page)).duration;
   expect(await replayWhileSettling(duration - 1, duration - 20)).toBeLessThan(5);
 });
@@ -1261,7 +1261,7 @@ test('clear, Escape, timing, Undo and project switching invalidate only the tran
   await expect(page.locator('.timeline-cut-selection')).toHaveCount(0);
   await selectClip(page, 'a');
   await expectCutOverlay(page, 10, 20);
-  await page.getByRole('button', { name: 'Clear selected range', exact: true }).click();
+  await shortcut(page, 'Escape');
   await expect(rulerRange(page)).toHaveCount(0);
   await markRange(page, 10, 20);
   await shortcut(page, 'Escape');
@@ -2390,4 +2390,19 @@ test('numeric source IN and OUT apply as a pair when focus leaves them, not betw
   await page.getByRole('button', { name: 'Play source preview', exact: true }).focus();
   await expect(strip).toHaveAttribute('data-source-in', '60');
   await expect(strip).toHaveAttribute('data-source-out', '90');
+});
+
+test('with a range selected, Bookmark adds one at each end in a single Undo step', async ({ page }) => {
+  const before = await current(page);
+  const bookmark = page.locator('.timeline-bookmark-action');
+  await expect(bookmark).not.toHaveClass(/range-accent/);
+  await markRange(page, 20, 31);
+  await expect(bookmark).toHaveClass(/range-accent/);
+  await expect(bookmark).toHaveAccessibleName('Add bookmarks at range ends');
+  await bookmark.click();
+  expect((await current(page)).bookmarks).toEqual([20, 31]);
+  await expect(rulerRange(page)).toHaveAttribute('data-range-out', '31');
+  await expect(bookmark).toBeDisabled();
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  expect((await current(page)).bookmarks).toEqual(before.bookmarks);
 });

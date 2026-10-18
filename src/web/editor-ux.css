@@ -226,16 +226,6 @@
   border-color: #537059;
 }
 
-.rush-quick-actions[data-marked='true'] {
-  border-color: #987054;
-}
-
-.product-workspace .rush-quick-actions .rush-delete-range:not(:disabled) {
-  border-color: #9d7057;
-  color: #f1c2ad;
-  background: #3a2c22;
-}
-
 .product-workspace .timeline-zoom {
   gap: 6px;
 }

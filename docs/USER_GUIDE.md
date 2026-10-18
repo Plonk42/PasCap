@@ -228,7 +228,8 @@ drag to reorder, or turn Ripple off in Track options to set an independent start
 
 **Bookmarks** mark times of interest, such as a beat, so edits snap to them. Press
 **M** or choose **Bookmark** in the timeline toolbar to add one at the playhead; on
-an existing bookmark the button deletes it instead. Bookmarks are small lilac outlines
+an existing bookmark the button deletes it instead. With a time range selected, the
+button turns orange and adds a bookmark at each end of the range. Bookmarks are small lilac outlines
 of the playhead in
 the lower half of the time ruler: click one to go there, drag it or use ←/→
 (Shift: ten frames) to move it, and press Delete to remove it. The arrows beside

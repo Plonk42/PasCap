@@ -72,7 +72,7 @@ import { ProjectTitle } from './ProjectTitle.js';
 import { editorShortcut, typesSpace } from './shortcuts.js';
 import type { SourcePlayback } from './SourceReview.js';
 import { planTimelineDrop } from './timeline-placement.js';
-import { adjacentBookmark } from './timeline-bookmarks.js';
+import { adjacentBookmark, rangeBookmarkCommands } from './timeline-bookmarks.js';
 import { Timeline, type DraftPreview } from './Timeline.js';
 import {
   DEFAULT_LAYOUT,
@@ -691,8 +691,14 @@ export function App() {
       setError('Add footage or music before adding a bookmark.');
       return;
     }
+    if (timeRange) {
+      const commands = rangeBookmarkCommands(current.current.bookmarks, timeRange);
+      if (commands.length) edit(commands);
+      else setError('The selected range already has bookmarks at both ends.');
+      return;
+    }
     edit({ type: 'bookmark-add', frame: engine.current?.diagnostics().frame ?? 0 });
-  }, [edit]);
+  }, [edit, timeRange]);
   const goToBookmark = useCallback(
     (direction: -1 | 1) => {
       if (!current.current || drafting.current) return;

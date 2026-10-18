@@ -395,7 +395,6 @@ for (const { width, height } of [
       'Trim start to playhead',
       'Trim end to playhead',
       'Delete selected range',
-      'Clear selected range',
       'Toggle snapping',
       'Add video track',
     ]) {

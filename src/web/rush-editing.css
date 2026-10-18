@@ -26,9 +26,8 @@
   color: #c8e5c3;
 }
 
-.rush-delete-range:not(:disabled) {
+.product-workspace .timeline-toolbar .range-accent:not(:disabled) {
   color: #f1c2ad;
-  border-color: #876652;
 }
 
 .rush-cut-readout {

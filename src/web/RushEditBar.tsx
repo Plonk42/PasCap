@@ -15,7 +15,6 @@ interface Props {
   onDelete: () => void;
   onQuickTrim: (edge: 'in' | 'out') => void;
   onCutRange: () => void;
-  onClearRange: () => void;
 }
 
 function cutRangeError(project: ProjectDocument, selected: PlacedClip | undefined, range: TimelineRange | null) {
@@ -93,7 +92,6 @@ export function RushEditBar({
   onDelete,
   onQuickTrim,
   onCutRange,
-  onClearRange,
 }: Readonly<Props>) {
   const inClip = !!selected && frame >= selected.start && frame < selected.end;
   const sourceFrame = inClip ? selected.retiming.sourceAt(frame - selected.start) : null;
@@ -105,7 +103,7 @@ export function RushEditBar({
 
   return (
     <div className="rush-edit-bar" aria-label="Clip editing actions">
-      <fieldset className="rush-quick-actions" data-marked={timeRange !== null}>
+      <fieldset className="rush-quick-actions">
         <legend className="declutter-sr-only">Edit selected clip</legend>
         <button
           type="button"
@@ -142,7 +140,7 @@ export function RushEditBar({
         </button>
         <button
           type="button"
-          className={`icon-button ${timeRange ? 'rush-delete-range' : ''}`}
+          className={`icon-button ${timeRange ? 'range-accent' : ''}`}
           aria-label={timeRange ? 'Delete selected range' : 'Delete selected clip'}
           title={
             timeRange
@@ -155,17 +153,6 @@ export function RushEditBar({
         >
           <Icon name="trash" size={15} />
         </button>
-        {timeRange && (
-          <button
-            type="button"
-            className="icon-button"
-            aria-label="Clear selected range"
-            title="Clear the selected time range · Escape"
-            onClick={onClearRange}
-          >
-            <Icon name="x" size={13} />
-          </button>
-        )}
       </fieldset>
       {timeRange && (
         <output className="rush-cut-readout declutter-sr-only" aria-live="polite" title={error || 'OUT exclusive'}>

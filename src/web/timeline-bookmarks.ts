@@ -1,5 +1,6 @@
 import { applyCommand, type EditCommand } from '../shared/commands.js';
 import type { ProjectDocument } from '../shared/model.js';
+import type { TimelineRange } from '../shared/rush-editing.js';
 import { snapPoints } from '../shared/snap.js';
 import { calculateLayout } from '../shared/timeline.js';
 import { previewFrameFor } from './keyframe-navigation.js';
@@ -10,6 +11,13 @@ export const BOOKMARK_SCOPE = 'bookmarks';
 
 export function bookmarkTargets(project: ProjectDocument): KeyframeSlideTarget[] {
   return project.bookmarks.map((origin) => ({ scope: BOOKMARK_SCOPE, origin }));
+}
+
+/** Bookmarks at the selected range's IN and OUT edges (the band's edges, OUT exclusive), skipping those already present. */
+export function rangeBookmarkCommands(bookmarks: readonly number[], range: TimelineRange): EditCommand[] {
+  return [range.inFrame, range.outFrame]
+    .filter((frame) => !bookmarks.includes(frame))
+    .map((frame) => ({ type: 'bookmark-add', frame }));
 }
 
 /** Frame to seek for the nearest bookmark strictly before (-1) or after (1) the playhead; bookmarks past the end preview the last frame. */

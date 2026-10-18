@@ -595,6 +595,9 @@ music or keyframes and are never rendered or exported.
   When the playhead is on a bookmark, the toolbar button becomes **Delete bookmark
   at playhead** (trash icon). **M** on an existing bookmark is rejected with an
   error, never merged. Without footage or music there is no playhead to mark.
+  While a time range is selected, the button turns orange and, with **M**, adds
+  bookmarks at the range's IN and OUT edges (skipping any already present) in one Undo step;
+  it is disabled when both exist.
 - **Previous / Next bookmark** beside the toolbar button, or **Shift+↑ / Shift+↓**,
   move the playhead to the nearest bookmark strictly before or after it, without
   editing; a bookmark after the last frame previews that last frame.
