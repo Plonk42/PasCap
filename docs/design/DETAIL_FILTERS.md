@@ -31,7 +31,7 @@ unknown fields, coercion, persisted defaults or load-time repair.
 
 | Field     | Bounds | Neutral (new clips) | Meaning                                                     |
 | --------- | ------ | ------------------- | ----------------------------------------------------------- |
-| `sharpen` | 0–1    | 0                   | Fine-edge unsharp mask                                      |
+| `sharpen` | 0–2    | 0                   | Fine-edge unsharp mask                                      |
 | `clarity` | −1–1   | 0                   | Midtone local contrast; negative values soften it           |
 | `denoise` | 0–1    | 0                   | Edge-preserving smoothing strength (range-kernel bandwidth) |
 

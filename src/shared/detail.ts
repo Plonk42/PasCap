@@ -4,7 +4,7 @@ import { clamp01, decode709, encode709, type ColourSettings, type LocalToneSetti
 /** Clip-owned static detail filters; see docs/design/DETAIL_FILTERS.md. */
 export const detailSchema = z
   .object({
-    sharpen: z.number().min(0).max(1),
+    sharpen: z.number().min(0).max(2),
     clarity: z.number().min(-1).max(1),
     denoise: z.number().min(0).max(1),
   })
@@ -21,7 +21,7 @@ export function createDetailSettings(): DetailSettings {
 }
 
 export const DETAIL_CONTROLS = [
-  { key: 'sharpen', label: 'Sharpen', min: 0, max: 1, step: 0.01 },
+  { key: 'sharpen', label: 'Sharpen', min: 0, max: 2, step: 0.01 },
   { key: 'clarity', label: 'Clarity', min: -1, max: 1, step: 0.01 },
   { key: 'denoise', label: 'Denoise', min: 0, max: 1, step: 0.01 },
 ] as const satisfies readonly { key: DetailSetting; label: string; min: number; max: number; step: number }[];

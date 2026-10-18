@@ -221,7 +221,7 @@ describe('clip detail settings', () => {
     expect(clipSchema.safeParse(withoutDetail).success).toBe(false);
     for (const invalid of [
       { sharpen: -0.01, clarity: 0, denoise: 0 },
-      { sharpen: 1.01, clarity: 0, denoise: 0 },
+      { sharpen: 2.01, clarity: 0, denoise: 0 },
       { sharpen: 0, clarity: -1.01, denoise: 0 },
       { sharpen: 0, clarity: 1.01, denoise: 0 },
       { sharpen: 0, clarity: 0, denoise: -0.01 },
@@ -248,6 +248,7 @@ describe('clip detail settings', () => {
   it('matches an independent transcription of the Denoise → Clarity → Sharpen kernel', () => {
     const cases: DetailSettings[] = [
       { sharpen: 1, clarity: 0, denoise: 0 },
+      { sharpen: 2, clarity: 0, denoise: 0 },
       { sharpen: 0, clarity: 0.7, denoise: 0 },
       { sharpen: 0, clarity: -1, denoise: 0 },
       { sharpen: 0, clarity: 0, denoise: 0.6 },
@@ -685,7 +686,7 @@ describe('clip detail editing and export routing', () => {
     expect(calculateLayout(edited).duration).toBe(calculateLayout(document).duration);
     expect(sampleTimeline(edited, 3)[0]!.detail).toEqual(detail);
     expect(() =>
-      applyCommand(document, { type: 'detail', clipId: 'clip', detail: { ...detail, sharpen: 1.5 } }),
+      applyCommand(document, { type: 'detail', clipId: 'clip', detail: { ...detail, sharpen: 2.5 } }),
     ).toThrow();
     const split = applyCommand(edited, { type: 'split', clipId: 'clip', sourceFrame: 10, newClipId: 'right' });
     expect(split.clips.map((clip) => clip.detail)).toEqual([detail, detail]);

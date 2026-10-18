@@ -184,7 +184,7 @@ PasCap is a solo, pre-release project: optimize for fast iteration. Details are 
   slider preview; blue ▼ markers sit at the top of the track row. Any spatial
   edit/key requires layered export; native 22 bytes/pixel, two LUTs and process
   bounds remain unchanged. See [spatial transforms](../docs/design/SPATIAL_TRANSFORMS.md).
-- Owner-approved #123: every clip requires strict static `detail: { sharpen 0–1,
+- Owner-approved #123: every clip requires strict static `detail: { sharpen 0–2,
 clarity −1–1, denoise 0–1 }`, neutral 0, with no keyframes or track channel; split/
   cut/duplicate copy it. Filters run on bilinear source taps around the inverse-mapped
   point, before the Colour grade: Denoise (spatial bilateral) → Clarity → Sharpen,
