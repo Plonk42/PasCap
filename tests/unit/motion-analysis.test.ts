@@ -181,6 +181,14 @@ describe('smooth ranges', () => {
     expect(smoothRanges(moving(Array.from({ length: 50 }, () => 0)), 2, FPS)).toEqual([]);
   });
 
+  it('never includes or bridges damaged frames, even shorter than a bridged jolt', () => {
+    const profile = { roughness: Array.from({ length: 600 }, () => 0), speed: Array.from({ length: 600 }, () => 3) };
+    expect(smoothRanges(profile, 2, FPS, [{ start: 300, end: 305 }])).toEqual([
+      { sourceIn: 0, sourceOut: 294 },
+      { sourceIn: 311, sourceOut: 600 },
+    ]);
+  });
+
   it('suggests more footage as the tolerance rises', () => {
     const roughness = Array.from({ length: 600 }, (_, frame) => (frame < 100 ? 3 : 1));
     const profile = { roughness, speed: roughness.map(() => 3) };

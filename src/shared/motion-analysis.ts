@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { DamagedRange } from './media.js';
 
 /** Analysis frames are the proxy scaled to this size; motion is measured in its pixels. */
 export const MOTION_WIDTH = 320;
@@ -156,9 +157,16 @@ function still(speed: readonly number[], sourceIn: number, sourceOut: number): b
 /**
  * Steady stretches of at least two seconds, longest first, as source IN/exclusive OUT. A stretch
  * where the camera hardly moves at all is left out: the drone is hovering without filming anything.
+ * Damaged frames, shown black, are never steady: their black has no motion to measure.
  */
-export function smoothRanges(profile: MotionProfile, tolerance: number, fps: number): SmoothRange[] {
+export function smoothRanges(
+  profile: MotionProfile,
+  tolerance: number,
+  fps: number,
+  damage: readonly DamagedRange[] = [],
+): SmoothRange[] {
   const steady = steadyMask(profile.roughness, tolerance, Math.round(SMOOTH_GAP_SECONDS * fps));
+  for (const range of damage) steady.fill(false, range.start, range.end);
   const margin = Math.round(SMOOTH_MARGIN_SECONDS * fps);
   const minimum = SMOOTH_MIN_SECONDS * fps;
   const ranges: SmoothRange[] = [];
