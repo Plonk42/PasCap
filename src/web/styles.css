@@ -341,14 +341,6 @@ svg {
   font-size: 9px;
 }
 
-.library-tools select:first-child {
-  flex: 1;
-}
-
-.library-tools select:nth-child(2) {
-  width: 73px;
-}
-
 .library-tools .icon-button {
   width: 24px;
   height: 24px;

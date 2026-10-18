@@ -589,10 +589,6 @@ body {
   padding: 6px 4px;
 }
 
-.product-workspace .library-tools select:nth-child(2) {
-  width: 78px;
-}
-
 .product-workspace .library-tools .icon-button {
   width: 26px;
   height: 30px;
