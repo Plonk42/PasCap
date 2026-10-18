@@ -108,6 +108,7 @@ function fakeLibrary(): MediaLibrary {
       status: 'registered',
       error: null,
       prepared: null,
+      damage: [],
     } satisfies MediaAsset),
   );
   return library;

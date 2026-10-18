@@ -189,6 +189,18 @@
   white-space: nowrap;
 }
 
+.media-panel .media-damage-badge {
+  flex-shrink: 0;
+  padding: 0 4px;
+  border: 1px solid #6b5a33;
+  border-radius: 3px;
+  background: #3a3122;
+  color: #e2cf9f;
+  font-size: 9px;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
 .media-panel .media-status-text {
   min-width: 0;
   overflow: hidden;

@@ -1,9 +1,11 @@
 import type { Writable } from 'node:stream';
 import { EXPORT_RESOURCES } from '../shared/export.js';
+import type { DamagedRange } from '../shared/media.js';
 import { clipSchema, type VideoClip } from '../shared/model.js';
 import { whileSerial } from '../shared/serial.js';
 import { compileRetiming, type Retiming } from '../shared/speed.js';
 import { framesToSeconds } from '../shared/timing.js';
+import { repairFilter } from './damage.js';
 import { ServiceError } from './errors.js';
 import { runRawVideoPass, writeRawFrame, type RawFrameReader, type RawVideoPass } from './raw-process.js';
 
@@ -47,12 +49,20 @@ export function excerptInputArgs(excerpt: Readonly<SourceExcerpt>): string[] {
   if (!excerpt.reverse || excerpt.sourceIn === 0) return [];
   return ['-ss', (framesToSeconds(excerpt.sourceIn) - framesToSeconds(1) / 4).toFixed(12)];
 }
-/** Select the excerpt before `filter`; reversed chunks end with FFmpeg's bounded `reverse` buffer. */
-export function excerptFilter(excerpt: Readonly<SourceExcerpt>, filter: string): string {
+/**
+ * Select the excerpt before `filter`, after repairing recorded damage; reversed
+ * chunks end with FFmpeg's bounded `reverse` buffer.
+ */
+export function excerptFilter(
+  excerpt: Readonly<SourceExcerpt>,
+  filter: string,
+  damage: readonly DamagedRange[],
+): string {
   const frames = excerpt.sourceOut - excerpt.sourceIn;
+  const repair = repairFilter(damage, excerptInputArgs(excerpt).length ? excerpt.sourceIn : 0);
   return excerpt.reverse
-    ? `trim=end_frame=${frames},setpts=PTS-STARTPTS,${filter},reverse`
-    : `trim=start_frame=${excerpt.sourceIn}:end_frame=${excerpt.sourceOut},setpts=PTS-STARTPTS,${filter}`;
+    ? `${repair}trim=end_frame=${frames},setpts=PTS-STARTPTS,${filter},reverse`
+    : `${repair}trim=start_frame=${excerpt.sourceIn}:end_frame=${excerpt.sourceOut},setpts=PTS-STARTPTS,${filter}`;
 }
 /** Frames per reversed decoder chunk: the native reverse buffer stays within EXPORT_RESOURCES.reverseChunkBytes. */
 export function reverseChunkFrames(frameBytes: number): number {

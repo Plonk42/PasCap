@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { frameSchema, idSchema, rateSchema } from './model.js';
+import { formatTimecode } from './timing.js';
 
 export const fingerprintSchema = z
   .object({
@@ -53,6 +54,11 @@ export const preparedSchema = z
     verification: proxyVerificationSchema,
   })
   .strict();
+/** Original frames [start, end) shown black: a group of pictures containing undecodable frames. */
+export const damagedRangeSchema = z
+  .object({ start: frameSchema, end: frameSchema })
+  .strict()
+  .refine((range) => range.end > range.start, 'A damaged range must contain at least one frame.');
 export const mediaAssetSchema = z
   .object({
     id: idSchema,
@@ -65,6 +71,8 @@ export const mediaAssetSchema = z
     status: z.enum(['registered', 'queued', 'preparing', 'ready', 'error']),
     error: z.string().nullable(),
     prepared: preparedSchema.nullable(),
+    /** Found by preparation; registries written before damage detection have none recorded. */
+    damage: z.array(damagedRangeSchema).default([]),
   })
   .strict();
 export const registrySchema = z.object({ version: z.literal(2), assets: z.array(mediaAssetSchema) }).strict();
@@ -72,6 +80,12 @@ export type MediaAsset = z.infer<typeof mediaAssetSchema>;
 export type SourceFingerprint = z.infer<typeof fingerprintSchema>;
 export type SourceContent = z.infer<typeof contentSchema>;
 export type VideoMetadata = z.infer<typeof metadataSchema>;
+export type DamagedRange = z.infer<typeof damagedRangeSchema>;
+
+/** Inclusive timecodes, e.g. "00:13:00–00:13:29"; OUT stays exclusive in storage. */
+export function damageLabel(damage: readonly DamagedRange[]): string {
+  return damage.map((range) => `${formatTimecode(range.start)}–${formatTimecode(range.end - 1)}`).join(', ');
+}
 export type ProxyVerification = z.infer<typeof proxyVerificationSchema>;
 
 export const jobSchema = z

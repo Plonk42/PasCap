@@ -28,6 +28,7 @@ import {
   type PreviewLayer,
 } from '../shared/timeline.js';
 import { framesToSeconds } from '../shared/timing.js';
+import { originalErrorArgs } from './damage.js';
 import { ServiceError } from './errors.js';
 import { assertSourceIdentity } from './files.js';
 import { startGpuCompositor, type GpuCompositor, type GpuGroupSource } from './gpu-compositor.js';
@@ -242,6 +243,7 @@ export function layeredDecodeFilter(
     `scale=${bounds.width}:${bounds.height}:flags=bicubic:in_color_matrix=bt709:out_color_matrix=bt709:` +
       `in_range=${asset.metadata.colourRange}:out_range=pc,format=rgb24,` +
       `pad=${target.width}:${target.height}:${bounds.x}:${bounds.y}:black,setsar=1`,
+    asset.damage,
   );
 }
 
@@ -525,9 +527,7 @@ class SequentialLayeredRenderer {
       signal: context.signal,
       decodeArgs: (excerpt) => [
         ...BASE,
-        '-xerror',
-        '-err_detect',
-        'explode',
+        ...originalErrorArgs(asset),
         '-threads',
         NATIVE_THREADS,
         '-noautorotate',

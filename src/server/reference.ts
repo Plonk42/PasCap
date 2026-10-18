@@ -65,6 +65,10 @@ export function validateReference(project: ProjectDocument, library: MediaLibrar
     const asset = library.get(clip.mediaId);
     if (clip.sourceOut > asset.metadata.frameCount)
       throw new ServiceError(`Clip ${clip.id} exceeds its registered source frame count.`);
+    if (asset.damage.length)
+      throw new ServiceError(
+        `${asset.name} has damaged frames shown black; the diagnostic reference decodes originals strictly. Use Export.`,
+      );
   }
   return snapshot;
 }
