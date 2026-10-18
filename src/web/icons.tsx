@@ -44,6 +44,7 @@ export type IconName =
   | 'warning'
   | 'disk'
   | 'wand'
+  | 'wrench'
   | 'lock'
   | 'ripple'
   | 'default-key'
@@ -99,6 +100,8 @@ const paths: Record<IconName, string> = {
   warning: 'm12 3 10 18H2L12 3Zm0 6v5m0 3h.1',
   disk: 'M4 4h14l3 3v14H3V4h1Zm3 0v7h10V4M7 21v-7h10v7M14 7h.1',
   wand: 'm3 21 12-12 2 2L5 23M15 9l2 2M17 2v4m-2-2h4M21 8v3m-1.5-1.5h3M10 3v2M9 4h2',
+  wrench:
+    'M13.69 12.43 7.52 18.61a1.5 1.5 0 0 1-2.13-2.12l6.18-6.18a5 5 0 0 1 6.65-6.79l-2.64 2.64 2.26 2.26 2.64-2.64a5 5 0 0 1-6.79 6.65Z',
   lock: 'M5 11h14v10H5V11Zm3 0V8a4 4 0 0 1 8 0v3',
   ripple: 'M2 12h7m0 0-3-3m3 3-3 3M22 12h-7m0 0 3-3m-3 3 3 3M12 5v14',
   'default-key': 'm12 2 10 10-10 10L2 12 12 2Zm-3.5 9a3.6 3.6 0 1 1 1 3.6M8.5 8v3h3',

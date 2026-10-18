@@ -221,7 +221,7 @@ function MediaAction({
             void onPrepare([asset.id], true);
           }}
         >
-          <Icon name="wand" size={15} />
+          <Icon name="wrench" size={15} />
         </button>
         <span className="media-action-space" aria-hidden="true" />
       </>

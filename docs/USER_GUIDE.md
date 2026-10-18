@@ -118,7 +118,7 @@ read. Players such as VLC skip them; PasCap stops instead, because every frame
 must stay at its exact position. Preparation then fails with **Damaged** on the
 card and names the spoiled time, for example _00:13:00–00:13:29_: the whole
 second around the unreadable frames, since the frames that depend on them decode
-as garbage. Choose the card's wand button (**Prepare … with damaged frames shown
+as garbage. Choose the card's wrench button (**Prepare … with damaged frames shown
 black**) to use the rest of the recording. Those frames then show black in the
 preview and in every export, and the card keeps a **Damaged** badge; hover it for
 the time range. The original is never modified. Copying the recording again from
