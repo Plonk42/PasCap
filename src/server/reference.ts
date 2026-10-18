@@ -28,7 +28,7 @@ export function nativeFadeFilters(length: number, fadeIn: number, fadeOut: numbe
 export function validateReference(project: ProjectDocument, library: MediaLibrary): ProjectDocument {
   const snapshot = projectSchema.parse(project);
   if (!sameRate(snapshot.frameRate, PROJECT_FPS))
-    throw new ServiceError('The prototype reference rate must be 30000/1001.');
+    throw new ServiceError('The diagnostic reference rate must be 30000/1001.');
   if (snapshot.clips.length !== 2 || snapshot.music.length > 0)
     throw new ServiceError(
       'The feasibility reference supports exactly two video clips and no music. This is not the final exporter.',

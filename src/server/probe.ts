@@ -48,7 +48,7 @@ export async function probeVideo(
   const average = parseRate(video.avg_frame_rate);
   const nominal = parseRate(video.r_frame_rate);
   if (!sameRate(average, PROJECT_FPS) || !sameRate(nominal, PROJECT_FPS))
-    throw new ServiceError('Only constant 30000/1001 fps footage is accepted in this prototype.', 422);
+    throw new ServiceError('Only constant 30000/1001 fps footage is supported.', 422);
   const frameCount = Number(video.nb_frames);
   if (!Number.isSafeInteger(frameCount) || frameCount <= 0 || video.duration_ts === undefined || video.start_pts !== 0)
     throw new ServiceError('Ambiguous frame count, duration or non-zero source start timestamp.', 422);
@@ -60,7 +60,7 @@ export async function probeVideo(
       422,
     );
   if (video.side_data_list?.some((data) => data.rotation !== undefined && data.rotation !== 0))
-    throw new ServiceError('Rotated recordings are not supported in the initial landscape prototype.', 422);
+    throw new ServiceError('Rotated recordings are not supported; only landscape footage is accepted.', 422);
   if (
     video.color_space !== 'bt709' ||
     video.color_transfer !== 'bt709' ||
@@ -73,7 +73,7 @@ export async function probeVideo(
     );
   if (video.pix_fmt !== 'yuv420p')
     throw new ServiceError(
-      'Initial source support is 8-bit yuv420p SDR. Other pixel formats are not silently converted.',
+      'Only 8-bit yuv420p SDR sources are supported. Other pixel formats are not silently converted.',
       422,
     );
   await verifyPacketTiming(config, filename, frameCount, signal);
