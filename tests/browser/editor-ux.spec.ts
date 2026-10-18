@@ -15,7 +15,8 @@ import {
   inspectorTab,
   layerKeyframes,
   openOptions,
-  panelToggle,
+  collapsePanel,
+  expandPanel,
   sharedPoint,
 } from './editor-helpers.js';
 import { memoryProjects, type MemoryProjects } from './memory-projects.js';
@@ -151,15 +152,20 @@ async function seek(page: Page, frame: number): Promise<void> {
 
 test('panel and help controls are direct, keyboard accessible, and do not edit the project', async ({ page }) => {
   const before = await current(page);
-  const media = await panelToggle(page, 'Media');
-  await expect(media).toBeVisible();
-  await expect(media).toHaveAttribute('aria-controls', 'media-pane');
-  await media.focus();
-  await media.press('Space');
-  await expect(media).toHaveAttribute('aria-pressed', 'false');
+  const collapse = collapsePanel(page, 'Media');
+  await expect(collapse).toBeVisible();
+  await expect(collapse).toHaveAttribute('aria-controls', 'media-pane');
+  await expect(collapse).toHaveAttribute('aria-expanded', 'true');
+  await collapse.focus();
+  await collapse.press('Space');
   await expect(page.getByRole('complementary', { name: 'Media library' })).toBeHidden();
-  await media.press('Space');
+  const expand = expandPanel(page, 'Media');
+  await expect(expand).toBeFocused();
+  await expect(expand).toHaveAttribute('aria-expanded', 'false');
+  await expand.press('Space');
   await expect(page.getByRole('complementary', { name: 'Media library' })).toBeVisible();
+  await expect(collapse).toBeFocused();
+  await expect(expand).toHaveCount(0);
   const help = page.getByRole('button', { name: 'Keyboard shortcuts', exact: true });
   await help.focus();
   await help.press('Enter');
@@ -330,12 +336,11 @@ test('hiding the deferred inspector applies a blur draft once and retains its se
   await page.getByRole('button', { name: 'Range section', exact: true }).click();
   const input = page.getByRole('textbox', { name: 'Source IN frame', exact: true });
   await input.fill('5');
-  const toggle = await panelToggle(page, 'Clip');
   // Hiding a focused native input itself blurs it; the existing Enter/blur contract must still apply once.
-  await toggle.evaluate((button) => (button as HTMLButtonElement).click());
+  await collapsePanel(page, 'Inspector').evaluate((button) => (button as HTMLButtonElement).click());
   await expect(input).toBeHidden();
   expect((await current(page)).clips[0]!.sourceIn).toBe(5);
-  await toggle.evaluate((button) => (button as HTMLButtonElement).click());
+  await expandPanel(page, 'Inspector').evaluate((button) => (button as HTMLButtonElement).click());
   await expect(input).toBeVisible();
   await expect(input).toHaveValue('00:00:05');
   await input.press('Enter');

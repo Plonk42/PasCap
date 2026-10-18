@@ -7,7 +7,6 @@ import {
   useMemo,
   useRef,
   useState,
-  type CSSProperties,
   type KeyboardEvent as ReactKeyboardEvent,
 } from 'react';
 import type { GpuComparison, GpuCompositionComparison } from '../preview/compositor.js';
@@ -50,6 +49,7 @@ import { waitForService } from './connection.js';
 import { DeferredPanel } from './DeferredPanel.js';
 import { mediaReady } from './display.js';
 import { Icon } from './icons.js';
+import { PanelRail, toggleSidePanel, type SidePanel } from './PanelToggle.js';
 import type { InspectorMode, InspectorSectionRequest, InspectorSectionTarget } from './InspectorSection.js';
 import { Jobs } from './Jobs.js';
 import {
@@ -72,7 +72,13 @@ import { editorShortcut } from './shortcuts.js';
 import { planTimelineDrop } from './timeline-placement.js';
 import { adjacentBookmark } from './timeline-bookmarks.js';
 import { Timeline, type DraftPreview } from './Timeline.js';
-import { DEFAULT_LAYOUT, defaultTimelineHeight, useWorkspace, WorkspaceResizer } from './workspace.js';
+import {
+  DEFAULT_LAYOUT,
+  defaultTimelineHeight,
+  useWorkspace,
+  workspaceDockStyle,
+  WorkspaceResizer,
+} from './workspace.js';
 
 interface EditorDebug {
   engine: PreviewEngine;
@@ -178,51 +184,6 @@ function previewIsLoading(connection: ConnectionState, ready: boolean, error: st
   return connection.state === 'connecting' || (!ready && !error);
 }
 
-function WorkspacePanels({
-  workspace,
-  disabled,
-}: Readonly<{ workspace: ReturnType<typeof useWorkspace>; disabled: boolean }>) {
-  return (
-    <fieldset className="workspace-panel-controls">
-      <legend className="declutter-sr-only">Editor panels</legend>
-      <button
-        className={`secondary-button small ${workspace.layout.mediaOpen ? 'active' : ''}`}
-        aria-label="Toggle Media panel"
-        aria-controls="media-pane"
-        aria-pressed={workspace.layout.mediaOpen}
-        title="Show or hide Media"
-        disabled={disabled}
-        onClick={() =>
-          workspace.update({
-            mediaOpen: !workspace.layout.mediaOpen,
-            ...(workspace.viewport.width < 980 ? { inspectorOpen: false } : {}),
-          })
-        }
-      >
-        <Icon name="folder" size={16} />
-        Media panel
-      </button>
-      <button
-        className={`secondary-button small ${workspace.layout.inspectorOpen ? 'active' : ''}`}
-        aria-label="Toggle Clip panel"
-        aria-controls="inspector-pane"
-        aria-pressed={workspace.layout.inspectorOpen}
-        title="Show or hide Inspector"
-        disabled={disabled}
-        onClick={() =>
-          workspace.update({
-            inspectorOpen: !workspace.layout.inspectorOpen,
-            ...(workspace.viewport.width < 980 ? { mediaOpen: false } : {}),
-          })
-        }
-      >
-        <Icon name="sliders" size={16} />
-        Clip panel
-      </button>
-    </fieldset>
-  );
-}
-
 export function App() {
   const workspace = useWorkspace();
   const latestWorkspace = useRef(workspace);
@@ -323,6 +284,8 @@ export function App() {
       autosave.current?.dispose();
     };
   }, []);
+
+  const togglePanel = useCallback((panel: SidePanel) => toggleSidePanel(latestWorkspace.current, panel), []);
 
   const select = useCallback((id: string) => {
     selection.current = id;
@@ -1668,13 +1631,7 @@ export function App() {
       edit,
     ],
   );
-  const dockStyle = {
-    '--media-width': `${workspace.layout.mediaOpen ? workspace.sizes.media : 0}px`,
-    '--inspector-width': `${workspace.layout.inspectorOpen ? workspace.sizes.inspector : 0}px`,
-    '--timeline-height': `${workspace.sizes.timeline}px`,
-    '--media-divider': workspace.layout.mediaOpen ? '8px' : '0px',
-    '--inspector-divider': workspace.layout.inspectorOpen ? '8px' : '0px',
-  } as CSSProperties;
+  const dockStyle = workspaceDockStyle(workspace.layout, workspace.sizes);
   const modalErrorVisible = showProjects || showExport || showRecovery || importKind !== null;
 
   return (
@@ -1768,7 +1725,6 @@ export function App() {
             <Icon name="help" size={18} />
           </button>
           <Popover label="Workspace options" className="workspace-options">
-            <WorkspacePanels workspace={workspace} disabled={draft !== null} />
             <button
               className="secondary-button small"
               aria-label="Reset workspace layout"
@@ -1897,9 +1853,11 @@ export function App() {
               onReview={reviewSource}
               onReviewHoverEnd={endReviewHover}
               targetLayer={targetLayer}
+              onCollapse={togglePanel}
+              collapseDisabled={draft !== null}
             />
           </div>
-          {workspace.layout.mediaOpen && (
+          {workspace.layout.mediaOpen ? (
             <WorkspaceResizer
               className="media-resizer"
               label="Resize Media panel"
@@ -1911,6 +1869,8 @@ export function App() {
               defaultValue={DEFAULT_LAYOUT.mediaWidth}
               onChange={(mediaWidth, persist) => workspace.update({ mediaWidth }, persist)}
             />
+          ) : (
+            <PanelRail panel="media" disabled={draft !== null} onToggle={togglePanel} />
           )}
           <div className="preview-column" id="viewer-pane" tabIndex={-1}>
             <div className="viewer-tabs" role="tablist" aria-label="Preview mode">
@@ -2055,10 +2015,10 @@ export function App() {
               </DeferredPanel>
             )}
           </div>
-          {workspace.layout.inspectorOpen && (
+          {workspace.layout.inspectorOpen ? (
             <WorkspaceResizer
               className="inspector-resizer"
-              label="Resize Clip panel"
+              label="Resize Inspector panel"
               disabled={draft !== null}
               orientation="vertical"
               direction={-1}
@@ -2068,6 +2028,8 @@ export function App() {
               defaultValue={DEFAULT_LAYOUT.inspectorWidth}
               onChange={(inspectorWidth, persist) => workspace.update({ inspectorWidth }, persist)}
             />
+          ) : (
+            <PanelRail panel="inspector" disabled={draft !== null} onToggle={togglePanel} />
           )}
           <div
             className="workspace-inspector"
@@ -2107,6 +2069,8 @@ export function App() {
                     onPreview={previewDraft}
                     onSeek={seek}
                     onPause={pausePreview}
+                    onCollapse={togglePanel}
+                    collapseDisabled={draft !== null}
                   >
                     {musicControls}
                   </Inspector>

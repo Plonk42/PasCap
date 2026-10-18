@@ -726,8 +726,11 @@ visible tab: Clip's **Speed**, **Detail**, **Range** and **Placement**; Track's
 **Colour**, **HSL ranges**, **Colour curves**, **Transform**, **Transitions** and **Fades**; Audio's **Music**. Other
 tabs, nested disclosures and help remain unchanged.
 
-The header directly exposes keyboard help. **Workspace options** holds the
-**Media panel / Clip panel** toggles, Reset layout and Diagnostics.
+The header directly exposes keyboard help. **Workspace options** holds Reset layout
+and Diagnostics. Media and the Inspector collapse to the side with the panel icon at
+the right of their heading (**Collapse Media panel** / **Collapse Inspector panel**),
+leaving a slim labelled strip that expands them again.
+Panels are docked edge to edge, separated by thin dividers.
 Drag panel dividers or use focused arrows; double-click/Home resets a divider and
 Escape cancels its drag. PasCap is designed for browser windows of at least
 1280 × 720; narrower windows use one side drawer at a time.

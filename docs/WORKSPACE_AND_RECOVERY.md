@@ -33,8 +33,14 @@ clip detail filters before grading; see [detail filters](design/DETAIL_FILTERS.m
 same kernel; see [local contrast](design/DETAIL_FILTERS.md#local-contrast).
 
 - Header: project picker/title, Undo/Redo, save state, keyboard help,
-  **Workspace options** and Export. Workspace options holds the **Media panel /
-  Clip panel** toggles, layout reset and Diagnostics.
+  **Workspace options** and Export. Workspace options holds layout reset and
+  Diagnostics.
+- Panels are docked edge to edge, without outer margins, separated by 1 px dividers.
+  Media and the Inspector each have a panel icon at the right of their heading
+  (**Collapse Media panel** / **Collapse Inspector panel**, `aria-expanded`). A
+  collapsed panel leaves a 28 px labelled strip on its side; the whole strip is the
+  **Expand Media panel** / **Expand Inspector panel** button. Focus moves between
+  the two buttons.
 - Left: independently scrolling Media list/grid with search, import and compact
   status. **Media options** holds filter/sort/view controls. A plain click reviews;
   checkboxes/Ctrl/Shift select. With two or more recordings selected, the
@@ -81,8 +87,8 @@ Control vocabulary and button/icon conventions follow the
 [editor control catalogue](design/EDITOR_CONTROLS.md#vocabulary). Trash deletes; × closes or
 dismisses. Icon-only actions retain accessible names and tooltips.
 
-Media/Clip widths and Timeline height can be resized by pointer or focused-divider
-arrows (16 px; Shift uses 32 px). Double-click/Home resets a divider. Pointer move
+Media/Inspector widths and Timeline height can be resized by pointer or focused-divider
+arrows (16 px; Shift uses 32 px); each divider's pointer target extends 3 px beyond its line. Double-click/Home resets a divider. Pointer move
 changes only a transient UI size; release saves the layout preference. Escape,
 pointer cancellation and lost capture restore the prior size. Dividers are disabled
 during timeline trim/shared-keyframe/music drafts to preserve captured geometry.

@@ -858,7 +858,7 @@ for (const { width, height } of [
     await openFixture(page, comparison.single);
     const inspector = page.getByRole('complementary', { name: 'Clip inspector', exact: true });
     await expect(inspector).toBeVisible();
-    const divider = page.getByRole('slider', { name: 'Resize Clip panel', exact: true });
+    const divider = page.getByRole('slider', { name: 'Resize Inspector panel', exact: true });
     await expect(divider).toHaveAttribute('aria-valuenow', '270');
     const button = compareButton(page);
     await expect(button).toBeInViewport({ ratio: 1 });

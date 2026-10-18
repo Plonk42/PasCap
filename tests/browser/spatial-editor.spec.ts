@@ -616,7 +616,7 @@ test('Transform controls fit the 270px Inspector at the default and minimum view
   await seed(page, (document) => {
     transform(document).keyframes = [key(0, { ...NEUTRAL_SPATIAL_POSE }, 'linear')];
   });
-  const divider = page.getByRole('slider', { name: 'Resize Clip panel', exact: true });
+  const divider = page.getByRole('slider', { name: 'Resize Inspector panel', exact: true });
   await divider.focus();
   for (let index = 0; index < 4; index++) await divider.press('ArrowRight');
   await expect(divider).toHaveAttribute('aria-valuenow', '270');

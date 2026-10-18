@@ -816,7 +816,7 @@ test('common widgets fit 270px inspectors at the default and minimum viewports w
   const document = await current(page);
   document.layers[0]!.keyframes = [sharedPoint(0, { opacity: 0.8, exposure: 0.2, contrast: 1 })];
   await fixture(page, document);
-  const resizer = page.getByRole('slider', { name: 'Resize Clip panel', exact: true });
+  const resizer = page.getByRole('slider', { name: 'Resize Inspector panel', exact: true });
   for (let index = 0; index < 4; index++) await resizer.press('ArrowRight');
   await expect(resizer).toHaveAttribute('aria-valuenow', '270');
   const inspector = page.getByRole('complementary', { name: 'Clip inspector', exact: true });

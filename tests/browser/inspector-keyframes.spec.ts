@@ -271,7 +271,7 @@ test('four tabs and participant controls fit the minimum Inspector at the defaul
     await page.setViewportSize({ width, height });
     await inspectorTab(page, 'Track keyframes');
     const row = await editLayerPoint(page, 'Track 1', 10);
-    const divider = page.getByRole('slider', { name: 'Resize Clip panel', exact: true });
+    const divider = page.getByRole('slider', { name: 'Resize Inspector panel', exact: true });
     await expect(divider).toHaveAttribute('aria-valuenow', '270');
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     const panel = page.getByRole('complementary', { name: 'Clip inspector', exact: true });

@@ -781,7 +781,8 @@ Source-review IN/OUT fields apply as a pair on Enter or when focus leaves both; 
 **Clip / Track / Audio** separates clip-owned source/placement/speed/Detail,
 track-owned Colour/Transform/keyframes/transitions/fades, and music. The header directly exposes
 help; **Workspace options**
-holds the Media/Clip panel toggles, layout reset and Diagnostics. **Track options**
+holds layout reset and Diagnostics, while Media and the Inspector collapse from their
+own headings. **Track options**
 holds only rename/Ripple/stacking/deletion; a clip's right-click menu holds Duplicate,
 while the frequent split/trim/delete/cut actions stay directly visible. The timeline
 zoom keeps its slider and **Fit**, with **Zoom out / Zoom in** buttons beside it.

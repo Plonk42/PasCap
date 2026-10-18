@@ -414,7 +414,7 @@ test('an outside pointer gesture dismisses pinned help before capture so Escape 
   const panel = await panelFor(page, trigger);
   await trigger.click();
   await expect(panel).toBeVisible();
-  const resizer = page.getByRole('slider', { name: 'Resize Clip panel', exact: true });
+  const resizer = page.getByRole('slider', { name: 'Resize Inspector panel', exact: true });
   const initial = Number(await resizer.getAttribute('aria-valuenow'));
   const box = (await resizer.boundingBox())!;
   const grabbedX = box.x + box.width / 2;
@@ -778,7 +778,9 @@ test('all Inspector title actions and help remain distinct and unclipped at a 27
   await page.reload();
   await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
   expect(
-    Number(await page.getByRole('slider', { name: 'Resize Clip panel', exact: true }).getAttribute('aria-valuenow')),
+    Number(
+      await page.getByRole('slider', { name: 'Resize Inspector panel', exact: true }).getAttribute('aria-valuenow'),
+    ),
   ).toBe(270);
   for (const context of INSPECTOR_HELP_HEADINGS) {
     await inspectorTab(page, context.tab);

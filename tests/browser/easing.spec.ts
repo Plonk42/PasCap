@@ -243,7 +243,7 @@ for (const context of ['shared', 'clip'] as const) {
     await page.getByRole('button', { name: 'Undo', exact: true }).click();
     expect(await current(page)).toEqual(before);
     await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
-    await expect(page.getByRole('slider', { name: 'Resize Clip panel', exact: true })).toHaveAttribute(
+    await expect(page.getByRole('slider', { name: 'Resize Inspector panel', exact: true })).toHaveAttribute(
       'aria-valuenow',
       '270',
     );

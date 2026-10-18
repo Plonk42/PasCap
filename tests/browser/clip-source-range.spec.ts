@@ -420,7 +420,7 @@ for (const viewport of [
   test(`${viewport.width}×${viewport.height}: original hatching and controls at 270px`, async ({ page }) => {
     await page.setViewportSize(viewport);
     const before = await open(page);
-    const divider = page.getByRole('slider', { name: 'Resize Clip panel', exact: true });
+    const divider = page.getByRole('slider', { name: 'Resize Inspector panel', exact: true });
     await divider.focus();
     for (let index = 0; index < 4; index++) await divider.press('ArrowRight');
     await expect(divider).toHaveAttribute('aria-valuenow', '270');

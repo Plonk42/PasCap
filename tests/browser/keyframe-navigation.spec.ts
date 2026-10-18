@@ -7,9 +7,11 @@ import { calculateLayout } from '../../src/shared/timeline.js';
 import { clipKeyframeMarkers } from '../../src/web/clip-keyframe-markers.js';
 import {
   closeOptions,
+  collapsePanel,
   currentKeyframeRow,
   editLayerPoint,
   expandedInspectorPreferences,
+  expandPanel,
   layerKeyframes,
   openOptions,
   inspectorTab as openTab,
@@ -761,18 +763,14 @@ test('single opacity navigation on a selected empty row preserves Inspector cont
   });
   await fixture(page, document);
   await inspectorTab(page, 'Sequence');
-  await openOptions(page, 'Workspace options');
-  await page.getByRole('button', { name: 'Toggle Clip panel', exact: true }).click();
-  await closeOptions(page);
+  await collapsePanel(page, 'Inspector').click();
   await expect(inspector(page)).toBeHidden();
   await openOptions(page, 'Track options Track 2');
   const options = page.getByRole('group', { name: 'Track options Track 2', exact: true });
   await expect(options.getByRole('slider')).toHaveCount(0);
   await expect(options.getByRole('button', { name: /Opacity keyframe/ })).toHaveCount(0);
   await closeOptions(page);
-  await openOptions(page, 'Workspace options');
-  await page.getByRole('button', { name: 'Toggle Clip panel', exact: true }).click();
-  await closeOptions(page);
+  await expandPanel(page, 'Inspector').click();
   await page.getByRole('button', { name: 'Select track Track 2', exact: true }).click();
   await expect(page.getByRole('tab', { name: 'Track', exact: true })).toHaveAttribute('aria-selected', 'true');
   await goToPoint(page, 20, 'Track 2');
@@ -1132,7 +1130,7 @@ test('all navigation groups fit the 270px inspector at the default and minimum v
   test.setTimeout(120_000);
   const document = sequence(interleaved());
   await fixture(page, document);
-  const resizer = page.getByRole('slider', { name: 'Resize Clip panel', exact: true });
+  const resizer = page.getByRole('slider', { name: 'Resize Inspector panel', exact: true });
   await resizer.focus();
   for (let index = 0; index < 6; index++) await resizer.press('ArrowRight');
   await expect(resizer).toHaveAttribute('aria-valuenow', '270');

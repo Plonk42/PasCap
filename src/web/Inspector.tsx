@@ -26,6 +26,7 @@ import { ColourKeyframeList } from './ColourKeyframeList.js';
 import { KeyframeToggle } from './KeyframeToggle.js';
 import { clipStartRestriction } from './layer-actions.js';
 import { NumberField } from './NumberField.js';
+import { PanelCollapseButton, type SidePanel } from './PanelToggle.js';
 import { settingPresentation } from './setting-scope.js';
 import { livePreview } from './live-preview.js';
 import { LockedCue, RangeSettingControl, ResetButton } from './SettingValueControl.js';
@@ -54,6 +55,8 @@ interface Props {
   onPreview: (draft: DraftPreview | null, restoreFrame?: number) => void;
   onSeek: (frame: number) => void;
   onPause: () => void;
+  onCollapse: (panel: SidePanel) => void;
+  collapseDisabled: boolean;
 }
 
 const INSPECTOR_MODES: readonly { id: InspectorMode; label: string }[] = [
@@ -754,6 +757,8 @@ function InspectorPanel({
   onPreview,
   onSeek,
   onPause,
+  onCollapse,
+  collapseDisabled,
   children,
 }: Readonly<Props>) {
   const inspectorId = useId();
@@ -809,11 +814,14 @@ function InspectorPanel({
           section={section}
           onSection={onSection}
           trailing={
-            <InspectorExpansionControls
-              expansion={expansion}
-              tab={section}
-              hidden={(section === 'clip' && !placed) || (section === 'track' && !layer)}
-            />
+            <>
+              <InspectorExpansionControls
+                expansion={expansion}
+                tab={section}
+                hidden={(section === 'clip' && !placed) || (section === 'track' && !layer)}
+              />
+              <PanelCollapseButton panel="inspector" disabled={collapseDisabled} onToggle={onCollapse} />
+            </>
           }
         />
         <div

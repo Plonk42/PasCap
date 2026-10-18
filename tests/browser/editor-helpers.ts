@@ -19,10 +19,14 @@ export async function expectDecoders(page: Page, count: number): Promise<void> {
   await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().decoderCount)).toBe(count);
 }
 
-/** Media/Clip panel toggles live in Workspace options. */
-export async function panelToggle(page: Page, name: 'Media' | 'Clip'): Promise<Locator> {
-  await openOptions(page, 'Workspace options');
-  return page.getByRole('button', { name: `Toggle ${name} panel`, exact: true });
+/** A side panel collapses from its own heading. */
+export function collapsePanel(page: Page, name: 'Media' | 'Inspector'): Locator {
+  return page.getByRole('button', { name: `Collapse ${name} panel`, exact: true });
+}
+
+/** A collapsed side panel expands from the rail it leaves. */
+export function expandPanel(page: Page, name: 'Media' | 'Inspector'): Locator {
+  return page.getByRole('button', { name: `Expand ${name} panel`, exact: true });
 }
 
 export async function closeOptions(page: Page): Promise<void> {

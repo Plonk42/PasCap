@@ -8,8 +8,8 @@ This guide is not a delivery ledger or a fresh validation result.
 
 ## Presentation and track controls
 
-- **Keyboard help** is directly in the header. Workspace options holds the
-  Media/Clip panel toggles, layout reset and Diagnostics.
+- **Keyboard help** is directly in the header. Workspace options holds layout
+  reset and Diagnostics; Media and the Inspector collapse from their own headings.
 - The **selected clip or whole-track context comes first** in Inspector.
   Collapsed sections have relevant icons, compact duration/rate readouts and an
   adjusted-state dot; expanding preserves every control and existing preferences.
