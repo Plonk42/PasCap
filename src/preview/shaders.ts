@@ -1,6 +1,7 @@
 import {
   CLARITY_GAIN,
   CLARITY_RANGE_FACTOR,
+  DENOISE_CHROMA_RANGE,
   DENOISE_DETAIL_CORE,
   DENOISE_RANGE_SIGMA,
   DETAIL_CLARITY_TAPS,
@@ -109,10 +110,14 @@ ${glslFloatArray(
   'detailFineWeight',
   DETAIL_FINE_TAPS.map((tap) => tap.weight),
 )}
+${glslFloatArray(
+  'detailFineDenoise',
+  DETAIL_FINE_TAPS.map((tap) => tap.denoise),
+)}
 ${glslVec2Array('detailWide', DETAIL_WIDE_TAPS)}
 ${glslFloatArray(
-  'detailWideWeight',
-  DETAIL_WIDE_TAPS.map((tap) => tap.weight),
+  'detailWideDenoise',
+  DETAIL_WIDE_TAPS.map((tap) => tap.denoise),
 )}
 ${edgeAwareBase('clarityBase', DETAIL_CLARITY_TAPS, CLARITY_RANGE_FACTOR)}
 ${edgeAwareBase('toneBase', TONE_BASE_TAPS, TONE_BASE_RANGE_FACTOR)}
@@ -156,6 +161,9 @@ vec3 detailFilter(sampler2D source, vec2 coordinate, vec3 centre, vec4 detail, v
   float high = low;
   if (detail.x > 0.0 || detail.z > 0.0) {
     float denoisedWeight = 1.0;
+    vec3 chroma = measured;
+    float chromaWeight = 1.0;
+    float chromaRange = detail.w * ${glslFloat(1 / (DENOISE_CHROMA_RANGE * DENOISE_CHROMA_RANGE))};
     for (int i = 0; i < ${DETAIL_FINE_TAPS.length}; i++) {
       vec3 tap = texture(source, measuredAt + detailFine[i] * stride).rgb;
       float level = dot(tap, luma);
@@ -164,22 +172,33 @@ vec3 detailFilter(sampler2D source, vec2 coordinate, vec3 centre, vec4 detail, v
       gaussian += detailFineWeight[i] * tap;
       if (detail.z > 0.0) {
         vec3 difference = tap - measured;
-        float weight = detailFineWeight[i] * exp(-dot(difference, difference) * detail.w);
+        float gap = dot(difference, difference);
+        float weight = detailFineDenoise[i] * exp(-gap * detail.w);
+        float colour = detailFineDenoise[i] * exp(-gap * chromaRange);
         denoised += weight * tap;
         denoisedWeight += weight;
+        chroma += colour * tap;
+        chromaWeight += colour;
       }
     }
+    gaussian /= ${glslFloat(fineTotal)};
     if (detail.z > 0.0) {
       for (int i = 0; i < ${DETAIL_WIDE_TAPS.length}; i++) {
         vec3 tap = texture(source, measuredAt + detailWide[i] * stride).rgb;
         vec3 difference = tap - measured;
-        float weight = detailWideWeight[i] * exp(-dot(difference, difference) * detail.w);
+        float gap = dot(difference, difference);
+        float weight = detailWideDenoise[i] * exp(-gap * detail.w);
+        float colour = detailWideDenoise[i] * exp(-gap * chromaRange);
         denoised += weight * tap;
         denoisedWeight += weight;
+        chroma += colour * tap;
+        chromaWeight += colour;
       }
+      denoised /= denoisedWeight;
+      chroma /= chromaWeight;
+      // Luma from the tight weights, colour from the wide ones.
+      denoised = chroma + (dot(denoised, luma) - dot(chroma, luma));
     }
-    gaussian /= ${glslFloat(fineTotal)};
-    denoised /= denoisedWeight;
   }
   float detailBase = dot(denoised, luma);
   float delta = 0.0;

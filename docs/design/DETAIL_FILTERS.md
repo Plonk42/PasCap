@@ -67,10 +67,13 @@ For centre sample $c$ the stages run **Denoise → HDR and Local contrast → Sh
    unit offsets $(\pm1, 0), (0, \pm1), (\pm1, \pm1)$ with Gaussian spatial weights
    $s = e^{-d^2/2}$ (centre 1). Their weighted mean is $G$.
 2. **Denoise** adds the eight neighbours at offsets $(\pm2, 0), (0, \pm2), (\pm2, \pm2)$
-   with the same spatial Gaussian, and weights every tap (fine and wide) by
-   $s \cdot \exp(-\overline{\Delta^2} / (2\sigma^2))$, where $\overline{\Delta^2}$ is the
-   mean squared RGB difference to $c$ and $\sigma = 0.1 \cdot \mathrm{denoise}$.
-   The normalized weighted mean is $D$; without Denoise $D = c$. The exponent factor
+   and weights every tap (fine and wide) by $w \cdot \exp(-\overline{\Delta^2} / (2\sigma^2))$,
+   where $w = e^{-d^2/(2 \cdot 1.5^2)}$ is its own wider spatial Gaussian (centre 1),
+   $\overline{\Delta^2}$ is the mean squared RGB difference to $c$ and
+   $\sigma = 0.1 \cdot \mathrm{denoise}$; the normalized weighted mean is $D_Y$. The same taps
+   with range $2.5\sigma$ give $D_C$: colour noise, which hides no detail, is smoothed far
+   more than luma, while strong colour edges still stop it. $D = D_C + Y(D_Y) - Y(D_C)$ takes
+   its luma from $D_Y$ and its colour from $D_C$; without Denoise $D = c$. The exponent factor
    is capped at $10^{30}$ so tiny strengths stay finite in float32.
 3. **Clarity**: $L$ is a smaller [edge-aware base](#edge-aware-base) of $y = Y(D)$: rings at
    radii 3, 6 and 10 units with spatial $\sigma = 6$ and range $\sigma = 0.1$, so it does not
