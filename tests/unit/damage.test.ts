@@ -26,7 +26,7 @@ describe('damaged recordings', () => {
   it('decodes undamaged originals strictly and unchanged', () => {
     expect(originalErrorArgs({ damage: [] })).toEqual(['-xerror', '-err_detect', 'explode']);
     expect(repairFilter([], 0)).toBe('');
-    expect(originalErrorArgs({ damage: [{ start: 0, end: 30 }] })).toEqual([]);
+    expect(originalErrorArgs({ damage: [{ start: 0, end: 30 }] })).toEqual(['-bsf:v', 'setts=dts=NOPTS']);
     expect(
       repairFilter(
         [

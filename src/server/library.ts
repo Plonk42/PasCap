@@ -1,6 +1,7 @@
 import { mkdir, readFile, rename, rm } from 'node:fs/promises';
 import path from 'node:path';
 import {
+  damagedAt,
   damageLabel,
   mediaAssetSchema,
   registrySchema,
@@ -14,7 +15,7 @@ import { framesToSeconds } from '../shared/timing.js';
 import { MOTION_ANALYSIS_VERSION, motionAnalysisSchema, type MotionAnalysis } from '../shared/motion-analysis.js';
 import { forEachSerial } from '../shared/serial.js';
 import type { ServiceConfig } from './config.js';
-import { findDamage, repairFilter } from './damage.js';
+import { findDamage, hasReorderedFrames, repairFilter, repairInputArgs } from './damage.js';
 import { errorMessage, isNotFound, ServiceError } from './errors.js';
 import {
   assertCacheOutsideSource,
@@ -35,6 +36,8 @@ import { atomicWrite, ensurePrivateDirectory, SerialWriter } from './storage.js'
 
 export const PROXY_PROFILE = 'h264-720p-bt709-gop15-v1' as const;
 export const FRAME_SAMPLE_MAE_LIMIT = 6;
+/** A frame matching a neighbour better than itself by more than this (8-bit MAE) is shifted. */
+const SHIFT_MARGIN = 0.25;
 /** Registry v2; the earlier library.json is no longer read. */
 export const VIDEO_REGISTRY = 'videos.json';
 
@@ -548,6 +551,7 @@ export class MediaLibrary {
       }
     }
     const temporary = path.join(directory, `proxy-${context.id}.partial.mp4`);
+    await this.#assertRepairable(asset, repair, context);
     try {
       context.update(0.01, 'Encoding a read-only 720p proxy');
       const inputRange = asset.metadata.colourRange === 'tv' ? 'tv' : 'pc';
@@ -561,6 +565,7 @@ export class MediaLibrary {
           '-n',
           '-threads',
           NATIVE_THREADS,
+          ...repairInputArgs(repair),
           '-i',
           asset.sourcePath,
           '-map',
@@ -625,6 +630,7 @@ export class MediaLibrary {
       );
       context.update(0.77, 'Checking beginning, middle and end frame correspondence');
       const metadata = await this.#verifyProxyTiming(asset, repair, temporary, context);
+      await this.#verifyRepairBoundaries(asset, repair, temporary, context);
       const frames = [0, Math.floor((metadata.frameCount - 1) / 2), metadata.frameCount - 1].map((frame) =>
         undamagedFrame(frame, repair, metadata.frameCount),
       );
@@ -710,6 +716,45 @@ export class MediaLibrary {
       throw new ServiceError('Proxy frame count differs from the original. Editing disabled.', 422);
     }
     return metadata;
+  }
+  /** The repair keeps the pictures' own timestamps, which only follow decode order without B-frames. */
+  async #assertRepairable(asset: MediaAsset, repair: readonly DamagedRange[], context: JobContext): Promise<void> {
+    if (repair.length && (await hasReorderedFrames(this.config, asset.sourcePath, context.signal)))
+      throw new ServiceError(
+        'This recording uses B-frames, so its damaged frames cannot be shown black without risking shifted frames.',
+        422,
+      );
+  }
+  /**
+   * A timestamp slip after a hole would show every later frame one frame late, so the
+   * frames just after each damaged range must match their own original frame best.
+   */
+  async #verifyRepairBoundaries(
+    asset: MediaAsset,
+    repair: readonly DamagedRange[],
+    proxy: string,
+    context: JobContext,
+  ): Promise<void> {
+    const count = asset.metadata.frameCount;
+    const original = (frame: number) =>
+      extractComparisonFrame(this.config, asset.sourcePath, frame, asset.metadata.colourRange, context.signal);
+    const checked = repair
+      .flatMap((range) => [range.end, range.end + 1])
+      .filter((frame) => frame < count && !damagedAt(repair, frame));
+    await forEachSerial(checked, async (frame) => {
+      const shown = await extractComparisonFrame(this.config, proxy, frame, 'tv', context.signal);
+      const same = meanAbsoluteError(await original(frame), shown);
+      let neighbour = Infinity;
+      const neighbours = [frame - 1, frame + 1].filter((item) => item < count && !damagedAt(repair, item));
+      await forEachSerial(neighbours, async (item) => {
+        neighbour = Math.min(neighbour, meanAbsoluteError(await original(item), shown));
+      });
+      if (same > FRAME_SAMPLE_MAE_LIMIT || same > neighbour + SHIFT_MARGIN)
+        throw new ServiceError(
+          `Frame ${frame}, just after the damaged frames, does not match the original (${same.toFixed(2)} / 255); the rest of the recording could be shifted.`,
+          422,
+        );
+    });
   }
   /** The decoder drops undecodable frames, so a damaged original yields a proxy with gaps. */
   async #recordDamage(
