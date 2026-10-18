@@ -577,14 +577,14 @@ shared keyframes are allowed per video track.
   channel's strictly earlier/later keyframes where it is nonnull, including zero-valued
   ones. They are disabled without a neighbour/project or during a document draft.
   Section-header arrows retain their unions above.
-  Navigation keeps the chosen Inspector tab and the activated button's focus; it
+  Navigation keeps the chosen Properties tab and the activated button's focus; it
   does not save or create Undo history.
 
 ### Move and inspect shared keyframes
 
 The timeline shows **one marker per stored shared keyframe**, not per clip/channel.
 Click or Enter selects its video track, seeks and opens Track → Colour, without editing.
-Whole-track keyframe navigation keeps the chosen Inspector tab. Drag horizontally to
+Whole-track keyframe navigation keeps the chosen Properties tab. Drag horizontally to
 move **all enabled settings, values and easing together**; valid release is one Undo
 step. With Snap on, pointer movement snaps within eight pixels at the captured zoom
 to captured clip/music/transition boundaries and playhead; **Alt** bypasses it.
@@ -700,7 +700,7 @@ Successful outputs survive later failures/restarts; interrupted exports are not
 resumed or published as finished. Long 4K/composited renders can need substantial
 scratch disk and CPU time; short tests do not qualify long-flight throughput.
 See [SPEED_AND_AUDIO.md](SPEED_AND_AUDIO.md) and
-[Inspector and resource limits](LAYERS_AND_KEYFRAMES.md#inspector-and-resource-limits).
+[Properties panel and resource limits](LAYERS_AND_KEYFRAMES.md#properties-panel-and-resource-limits).
 The [multiple-music contract](design/MULTIPLE_MUSIC.md) specifies schema, mixing,
 resources and pending acceptance; this guide does not claim those tests passed.
 
@@ -715,19 +715,22 @@ drafts within the same editing context; changing the edited track/clip refreshes
 fields rather than applying a previous context's draft to the new selection.
 Explicit boundary buttons open Track with that boundary expanded.
 
-Viewer and Inspector tabs share one native-button appearance and retain their
+Viewer and Properties tabs share one native-button appearance and retain their
 arrow/Home/End navigation.
 Trash icons delete; × closes or dismisses. Icon-only actions keep accessible names
 and tooltips. See the [editor control catalogue](design/EDITOR_CONTROLS.md#vocabulary) for
 control conventions and vocabulary.
 
-**Expand all / Collapse all** is an icon button on the Inspector tab bar for the
+**Expand all / Collapse all** is an icon button on the Properties panel tab bar for the
 visible tab: Clip's **Speed**, **Detail**, **Range** and **Placement**; Track's
 **Colour**, **HSL ranges**, **Colour curves**, **Transform**, **Transitions** and **Fades**; Audio's **Music**. Other
 tabs, nested disclosures and help remain unchanged.
 
-The header directly exposes keyboard help. **Workspace options** holds the
-**Media panel / Clip panel** toggles, Reset layout and Diagnostics.
+The header directly exposes keyboard help. **Workspace options** holds Reset layout
+and Diagnostics. Media and the Properties panel collapse to the side with the panel icon at
+the right of their heading (**Collapse Media panel** / **Collapse Properties panel**),
+leaving a slim labelled strip that expands them again.
+Panels are bordered tiles separated by 6 px gutters, including below the header and above the Activity bar, that are also the resize dividers.
 Drag panel dividers or use focused arrows; double-click/Home resets a divider and
 Escape cancels its drag. PasCap is designed for browser windows of at least
 1280 × 720; narrower windows use one side drawer at a time.
@@ -736,7 +739,7 @@ Enter/blur, Escape restores, and invalid text remains editable. Numeric values r
 full entered precision, independent of slider steps, without clamping or rounding.
 Colour/Opacity/Transform, playback rates and gain use a native slider with one adjacent exact
 numeric field in both main and stored controls, not read-only outputs or number-only
-layouts. Dragging a Colour, Opacity, HSL or Transform slider (main or stored) previews the draft value in the image, coalesced to the display rate, without any document, history, autosave or Inspector change, and without restarting music. Release commits one validated edit and one Undo step. Escape, pointer cancellation, lost capture, window blur or an invalid value restores the control and the preview. Other sliders (speed, gain) keep their release-only image update. Each keyboard slider
+layouts. Dragging a Colour, Opacity, HSL or Transform slider (main or stored) previews the draft value in the image, coalesced to the display rate, without any document, history, autosave or Properties change, and without restarting music. Release commits one validated edit and one Undo step. Escape, pointer cancellation, lost capture, window blur or an invalid value restores the control and the preview. Other sliders (speed, gain) keep their release-only image update. Each keyboard slider
 adjustment is an individual validated edit. **Clip → Range** uses the full-original
 bar and exact timecode text fields described above. Other integer source/timeline
 frames, durations and fades retain exact native numeric steppers and timecode
@@ -810,7 +813,7 @@ against forced browser/laptop shutdown. Wait for **Saved locally** or download t
 unsaved snapshot; there is no crash-proof draft database. Do not run two services
 against the same data directory. **Retry connecting**, **Retry preview** and Activity
 **Refresh** recover reads without submitting hidden writes or duplicate jobs.
-If deferred preview/Inspector code fails to load, **Reload editor** saves pending
+If deferred preview/Properties code fails to load, **Reload editor** saves pending
 committed edits before reloading; a save error blocks it. **Download project**
 keeps a strict snapshot available for recovery. Unapplied control drafts remain
 separate from committed project edits.

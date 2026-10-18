@@ -53,7 +53,7 @@ Enabling Ripple packs from the current first start; while on, clips continuously
 sequence there, and turning it off retains actual placements. Video tracks display stored
 bottom-to-top composition order without primary/overlay roles. The UI provides a
 pinned ruler, synchronized native track access, accessible action bounds and contextual
-heading help. Inspector tabs are **Clip / Track / Audio**, split by ownership: the
+heading help. Properties tabs are **Clip / Track / Audio**, split by ownership: the
 [whole-track keyframe list](https://github.com/Plonk42/PasCap/issues/26) sits at the
 end of **Track → Colour**, under a small **Keyframes** heading with animation/timing help
 beside it. Nested keyframe details retain drafts and input

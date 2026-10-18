@@ -17,6 +17,7 @@ import './media-import.css';
 import { MediaMusicList, musicMatchesFilter } from './MediaMusicList.js';
 import './rush-source.css';
 import { Popover } from './Popover.js';
+import { PanelCollapseButton, type SidePanel } from './PanelToggle.js';
 import { readPreference, writePreference } from './preferences.js';
 import { RemoveMediaDialog } from './RemoveMediaDialog.js';
 
@@ -44,6 +45,8 @@ interface Props {
   onReview: (review: ReviewTarget, choose: boolean) => void;
   onReviewHoverEnd: () => void;
   targetLayer: string;
+  onCollapse: (panel: SidePanel) => void;
+  collapseDisabled: boolean;
 }
 
 export interface ReviewTarget {
@@ -242,6 +245,8 @@ export function MediaLibrary({
   onReview,
   onReviewHoverEnd,
   targetLayer,
+  onCollapse,
+  collapseDisabled,
 }: Readonly<Props>) {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all');
@@ -511,6 +516,7 @@ export function MediaLibrary({
               </fieldset>
             </div>
           </Popover>
+          <PanelCollapseButton panel="media" disabled={collapseDisabled} onToggle={onCollapse} />
         </div>
       </div>
       <div className="library-search">

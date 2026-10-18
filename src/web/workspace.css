@@ -83,22 +83,6 @@ body {
   font-size: 12px;
 }
 
-.workspace-panel-controls {
-  display: contents;
-}
-
-.workspace-panel-controls .text-button {
-  padding: 7px;
-  border-radius: 5px;
-  font-size: 12px;
-  color: var(--muted);
-}
-
-.workspace-panel-controls .active {
-  background: #2a3730;
-  color: var(--accent);
-}
-
 .product-workspace .save-status {
   font-size: 12px;
   margin-left: 0;
@@ -128,13 +112,44 @@ body {
 
 .workbench.docked-workbench {
   position: relative;
-  grid-template-columns: var(--media-width) var(--media-divider) minmax(0, 1fr) var(--inspector-divider) var(
-      --inspector-width
-    );
-  grid-template-rows: minmax(160px, 1fr) 10px var(--timeline-height);
+  grid-template-columns: var(--media-width) 6px minmax(0, 1fr) 6px var(--inspector-width);
+  grid-template-rows: minmax(160px, 1fr) 6px var(--timeline-height);
   gap: 0;
-  padding: 12px;
+  padding: 6px 0;
   overflow: hidden;
+}
+
+/* Panels are tiles separated by 6px gutters, which double as the resize dividers. */
+.docked-workbench .panel,
+.docked-workbench .preview-column,
+.panel-rail {
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+
+/* Corners on the window edges stay square. */
+.workspace-media .panel,
+.panel-rail-media {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
+.workspace-inspector .panel,
+.panel-rail-inspector {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.docked-workbench .timeline-panel {
+  border-radius: 0;
+}
+
+/* Panel content (sticky headings, markers) stays below the dividers' grab areas. */
+.workspace-media,
+.workspace-inspector,
+.docked-workbench .preview-column,
+.docked-workbench .timeline-panel {
+  isolation: isolate;
 }
 
 .workspace-media,
@@ -167,10 +182,52 @@ body {
   grid-column: 3;
   grid-row: 1;
   gap: 0;
-  border: 1px solid var(--line);
-  border-radius: 8px;
   overflow: hidden;
   background: #171d19;
+}
+
+.panel-rail {
+  grid-row: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 12px 0;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.panel-rail-media {
+  grid-column: 1;
+}
+
+.panel-rail-inspector {
+  grid-column: 5;
+}
+
+.panel-rail > span {
+  writing-mode: vertical-rl;
+  letter-spacing: 0.04em;
+}
+
+.panel-rail-media > span {
+  transform: rotate(180deg);
+}
+
+.panel-rail:hover:not(:disabled) {
+  background: #243029;
+  color: var(--accent);
+}
+
+.panel-rail:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.panel-collapse {
+  margin-inline-start: 2px;
 }
 
 .viewer-tabs {
@@ -353,8 +410,19 @@ body {
   position: relative;
   touch-action: none;
   user-select: none;
-  outline-offset: -2px;
+  outline-offset: 0;
   z-index: 4;
+}
+
+/* The 6px gutter plus 2px into each neighbour. */
+.workspace-resizer::before {
+  content: '';
+  position: absolute;
+  inset: 0 -2px;
+}
+
+.workspace-resizer[aria-orientation='horizontal']::before {
+  inset: -2px 0;
 }
 
 .workspace-resizer > span {
@@ -372,7 +440,7 @@ body {
 
 .workspace-resizer[aria-orientation='vertical'] > span {
   top: 44%;
-  left: 3px;
+  left: 2px;
   width: 2px;
   height: 32px;
 }
@@ -392,7 +460,7 @@ body {
 }
 
 .timeline-resizer > span {
-  top: 4px;
+  top: 2px;
   left: calc(50% - 24px);
   width: 48px;
   height: 2px;
@@ -400,8 +468,8 @@ body {
 
 .workspace-resizer:hover,
 .workspace-resizer:focus-visible {
-  background: #41574566;
-  outline: 1px solid #7aab85;
+  background: #5d8a68;
+  outline: none;
 }
 
 .workspace-resizer[aria-disabled='true'] {
@@ -942,10 +1010,6 @@ kbd {
     gap: 0;
   }
 
-  .workspace-panel-controls {
-    padding-inline: 4px;
-  }
-
   .product-workspace .layer-sidebar {
     width: 150px;
   }
@@ -961,29 +1025,25 @@ kbd {
 
 @media (max-width: 979px) {
   .workbench.docked-workbench {
-    grid-template-columns: 1fr;
-  }
-
-  .docked-workbench .preview-column {
-    grid-column: 1;
+    grid-template-columns: var(--media-rail) 6px minmax(0, 1fr) 6px var(--inspector-rail);
   }
 
   .workspace-media,
   .workspace-inspector {
     position: absolute;
-    top: 12px;
-    bottom: calc(var(--timeline-height) + 22px);
+    top: 6px;
+    bottom: calc(var(--timeline-height) + 12px);
     width: min(340px, 46vw);
     z-index: 10;
     filter: drop-shadow(0 10px 18px #0009);
   }
 
   .workspace-media {
-    left: 12px;
+    left: 0;
   }
 
   .workspace-inspector {
-    right: 12px;
+    right: 0;
   }
 
   .media-resizer,
@@ -1014,10 +1074,6 @@ kbd {
 @media (max-width: 760px) {
   .product-workspace .app-header .save-status {
     display: none;
-  }
-
-  .workspace-panel-controls .text-button {
-    padding-inline: 5px;
   }
 
   .product-workspace .timeline-length {

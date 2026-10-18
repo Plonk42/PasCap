@@ -816,10 +816,10 @@ test('common widgets fit 270px inspectors at the default and minimum viewports w
   const document = await current(page);
   document.layers[0]!.keyframes = [sharedPoint(0, { opacity: 0.8, exposure: 0.2, contrast: 1 })];
   await fixture(page, document);
-  const resizer = page.getByRole('slider', { name: 'Resize Clip panel', exact: true });
+  const resizer = page.getByRole('slider', { name: 'Resize Properties panel', exact: true });
   for (let index = 0; index < 4; index++) await resizer.press('ArrowRight');
   await expect(resizer).toHaveAttribute('aria-valuenow', '270');
-  const inspector = page.getByRole('complementary', { name: 'Clip inspector', exact: true });
+  const inspector = page.getByRole('complementary', { name: 'Properties', exact: true });
   for (const { width, height } of [
     { width: 1440, height: 900 },
     { width: 1280, height: 720 },

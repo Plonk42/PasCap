@@ -247,7 +247,7 @@ test('bulk collapse retains invalid drafts, nested disclosure state and reachabl
   await expect(input).toHaveValue('0.5');
   await expect(input).toHaveAttribute('aria-invalid', 'true');
   await page.setViewportSize({ width: 1280, height: 720 });
-  await expect(page.getByRole('complementary', { name: 'Clip inspector', exact: true })).toBeVisible();
+  await expect(page.getByRole('complementary', { name: 'Properties', exact: true })).toBeVisible();
   const bulk = page.getByRole('button', { name: 'Collapse all Clip sections', exact: true });
   await expect(bulk).toBeInViewport();
   expect((await bulk.boundingBox())!.height).toBeGreaterThanOrEqual(24);
@@ -414,7 +414,7 @@ test('an outside pointer gesture dismisses pinned help before capture so Escape 
   const panel = await panelFor(page, trigger);
   await trigger.click();
   await expect(panel).toBeVisible();
-  const resizer = page.getByRole('slider', { name: 'Resize Clip panel', exact: true });
+  const resizer = page.getByRole('slider', { name: 'Resize Properties panel', exact: true });
   const initial = Number(await resizer.getAttribute('aria-valuenow'));
   const box = (await resizer.boundingBox())!;
   const grabbedX = box.x + box.width / 2;
@@ -778,7 +778,9 @@ test('all Inspector title actions and help remain distinct and unclipped at a 27
   await page.reload();
   await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
   expect(
-    Number(await page.getByRole('slider', { name: 'Resize Clip panel', exact: true }).getAttribute('aria-valuenow')),
+    Number(
+      await page.getByRole('slider', { name: 'Resize Properties panel', exact: true }).getAttribute('aria-valuenow'),
+    ),
   ).toBe(270);
   for (const context of INSPECTOR_HELP_HEADINGS) {
     await inspectorTab(page, context.tab);
@@ -790,7 +792,7 @@ test('all Inspector title actions and help remain distinct and unclipped at a 27
     expect(target.x).toBeGreaterThanOrEqual(heading.x + heading.width);
     expect(target.width).toBe(24);
     expect(target.height).toBe(24);
-    const inspector = (await page.getByRole('complementary', { name: 'Clip inspector', exact: true }).boundingBox())!;
+    const inspector = (await page.getByRole('complementary', { name: 'Properties', exact: true }).boundingBox())!;
     expect(target.x + target.width).toBeLessThanOrEqual(inspector.x + inspector.width);
     await help.click();
     await expect(section).toHaveAttribute('aria-expanded', 'true');
@@ -806,7 +808,7 @@ for (const { width, height } of [
 ]) {
   test(`help remains unclipped with a 24px target and bounded panel at ${width}×${height}`, async ({ page }) => {
     await page.setViewportSize({ width, height });
-    await expect(page.getByRole('complementary', { name: 'Clip inspector', exact: true })).toBeVisible();
+    await expect(page.getByRole('complementary', { name: 'Properties', exact: true })).toBeVisible();
     const trigger = page.getByRole('button', { name: 'Speed timing help', exact: true });
     const panel = await panelFor(page, trigger);
     await trigger.scrollIntoViewIfNeeded();

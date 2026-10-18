@@ -175,8 +175,8 @@ and 24, plus native-media and browser integration on the checksum-pinned FFmpeg
 8.0.1 toolchain. CI is correctness evidence, **not target-GPU or long-render certification**.
 Record dated local results and acceptance evidence on the corresponding
 [work issue](https://github.com/Plonk42/PasCap/issues), separately from CI for the
-actual delivery commit. Preview/Inspector/Diagnostics loading is deferred;
-resource limits are documented in the [track contract](docs/LAYERS_AND_KEYFRAMES.md#inspector-and-resource-limits).
+actual delivery commit. Preview/Properties/Diagnostics loading is deferred;
+resource limits are documented in the [track contract](docs/LAYERS_AND_KEYFRAMES.md#properties-panel-and-resource-limits).
 
 [Development guide](docs/DEVELOPMENT.md) · [CI implementation](.github/workflows/ci.yml)
 

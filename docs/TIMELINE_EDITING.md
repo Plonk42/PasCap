@@ -139,7 +139,7 @@ registered paths and bytes. This is data safety, not compatibility code.
 
 ## Non-destructive trim gestures
 
-These timeline-edge gestures use output-frame geometry; the Clip inspector's
+These timeline-edge gestures use output-frame geometry; the Clip tab's
 original-source range controls have the separate contract below.
 
 - Pointer down captures the handle, pauses preview and snapshots the committed
@@ -163,9 +163,9 @@ original-source range controls have the separate contract below.
   track from the existing first anchor. With Ripple off, a left
   handle/keyboard trim solves the new start and source IN together so the timeline
   OUT holds; restoring IN stops where the start would precede project frame 0.
-  Right trims leave the start fixed. Inspector source edits keep placement.
+  Right trims leave the start fixed. Clip → Range edits keep placement.
   The selected original's dashed extent appears during trim hover/focus/drafts,
-  independently of the Clip inspector's full-original **Range** bar.
+  independently of the Clip tab's full-original **Range** bar.
 - The timeline origin stays fixed rather than shifting when a clip is selected.
   On a left-handle gesture only, recoverable headspace is reserved and scroll is
   compensated before paint: pointer/frame-zero positions do not jump at gesture start.
@@ -174,7 +174,7 @@ original-source range controls have the separate contract below.
   removes the temporary gutter; cancellation restores its initial scroll and document.
   No negative project start is stored. Right-edge autoscroll likewise exposes tails.
   Home/End and exact source fields remain available for exact restoration.
-- Inspector IN/OUT and **Restore full recording** share the same source and
+- Clip → Range IN/OUT and **Restore full recording** share the same source and
   transition validation as handles.
 - Trim/restoration never copies or shifts track keyframes. Original-source speed
   keyframes are retained, including outside the new trim.
@@ -187,7 +187,7 @@ source endpoint it edits. A Ripple-off left restoration
 cannot extend before project frame zero or silently change its retained timeline
 OUT; normal overlap/fade validation still applies.
 
-### Clip inspector Range
+### Clip Range
 
 One full-original range bar hatches omitted footage and has draggable **IN / OUT**
 handles. Exact **Source IN / OUT** text fields sit below the respective ends,
@@ -766,12 +766,12 @@ without a tall list shrinking the preview or moving controls. Media
 plus/double-click/drop, explicit Show, selection and timeline edits return to Timeline.
 Close/hidden/offscreen/project switch releases the one review decoder.
 
-The normal editor shows Media, Preview, the contextual inspector and Timeline.
+The normal editor shows Media, Preview, the contextual Properties panel and Timeline.
 Panels are resizable/collapsible with browser-local layout persistence; source
 review occupies a docked viewer tab rather than covering the workspace. Main and
 stored Colour/Opacity/Transform values, playback rates and gain share native sliders with
 adjacent exact `NumberField` controls, not read-only outputs or number-only layouts.
-Dragging a Colour, Opacity, HSL or Transform slider (main or stored) previews the draft value in the image, coalesced to the display rate, without any document, history, autosave or Inspector change, and without restarting music. Release commits one validated edit and one Undo step. Escape, pointer cancellation, lost capture, window blur or an invalid value restores the control and the preview. Other sliders (speed, gain) keep their release-only image update. Each keyboard slider
+Dragging a Colour, Opacity, HSL or Transform slider (main or stored) previews the draft value in the image, coalesced to the display rate, without any document, history, autosave or Properties change, and without restarting music. Release commits one validated edit and one Undo step. Escape, pointer cancellation, lost capture, window blur or an invalid value restores the control and the preview. Other sliders (speed, gain) keep their release-only image update. Each keyboard slider
 adjustment is an individual validated edit. Numeric fields retain full entered
 precision, commit on Enter/blur, keep invalid drafts editable and restore on Escape.
 **Clip → Range** uses the full-original bar and exact timecode text fields above.
@@ -781,7 +781,8 @@ Source-review IN/OUT fields apply as a pair on Enter or when focus leaves both; 
 **Clip / Track / Audio** separates clip-owned source/placement/speed/Detail,
 track-owned Colour/Transform/keyframes/transitions/fades, and music. The header directly exposes
 help; **Workspace options**
-holds the Media/Clip panel toggles, layout reset and Diagnostics. **Track options**
+holds layout reset and Diagnostics, while Media and the Properties panel collapse from their
+own headings. **Track options**
 holds only rename/Ripple/stacking/deletion; a clip's right-click menu holds Duplicate,
 while the frequent split/trim/delete/cut actions stay directly visible. The timeline
 zoom keeps its slider and **Fit**, with **Zoom out / Zoom in** buttons beside it.

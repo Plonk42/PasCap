@@ -243,13 +243,13 @@ for (const context of ['shared', 'clip'] as const) {
     await page.getByRole('button', { name: 'Undo', exact: true }).click();
     expect(await current(page)).toEqual(before);
     await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
-    await expect(page.getByRole('slider', { name: 'Resize Clip panel', exact: true })).toHaveAttribute(
+    await expect(page.getByRole('slider', { name: 'Resize Properties panel', exact: true })).toHaveAttribute(
       'aria-valuenow',
       '270',
     );
     await select.scrollIntoViewIfNeeded();
     const bounds = (await choice.boundingBox())!;
-    const panel = page.getByRole('complementary', { name: 'Clip inspector', exact: true });
+    const panel = page.getByRole('complementary', { name: 'Properties', exact: true });
     const panelBounds = (await panel.boundingBox())!;
     expect(bounds.width).toBeLessThanOrEqual(270);
     expect(bounds.x).toBeGreaterThanOrEqual(panelBounds.x);

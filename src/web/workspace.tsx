@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type PointerEvent } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type PointerEvent } from 'react';
 
 export interface WorkspaceLayout {
   mediaWidth: number;
@@ -50,6 +50,23 @@ export function workspaceSizes(layout: WorkspaceLayout, width: number, height: n
       Math.max(200, Math.min(520, height - 360)),
     ),
   };
+}
+/** Width of the strip a collapsed side panel leaves, holding its expand button. */
+const PANEL_RAIL_WIDTH = 28;
+export function workspaceDockStyle(layout: WorkspaceLayout, sizes: ReturnType<typeof workspaceSizes>): CSSProperties {
+  const side = (open: boolean, size: number) => ({
+    width: `${open ? size : PANEL_RAIL_WIDTH}px`,
+    rail: `${open ? 0 : PANEL_RAIL_WIDTH}px`,
+  });
+  const media = side(layout.mediaOpen, sizes.media);
+  const inspector = side(layout.inspectorOpen, sizes.inspector);
+  return {
+    '--media-width': media.width,
+    '--inspector-width': inspector.width,
+    '--media-rail': media.rail,
+    '--inspector-rail': inspector.rail,
+    '--timeline-height': `${sizes.timeline}px`,
+  } as CSSProperties;
 }
 export function useWorkspace() {
   const [layout, setLayout] = useState<WorkspaceLayout>(() => {

@@ -193,7 +193,7 @@ available output image, and original OUT never requests an out-of-range image.
 A clip-local stored-source cursor, independent of the track inspection and
 Transform cursors, advances through successive keyframes even
 when several preview the same image. Stored source time stays distinct from the
-actual displayed source frame. Navigation is editor-only, preserving the Inspector
+actual displayed source frame. Navigation is editor-only, preserving the Properties panel
 tab/focus without an edit, history or save. Speed has a single setting, so this
 pair is its only keyframe navigation: unlike Colour and Transform, whose settings
 share keyframes, there are no second per-setting arrows beside its diamond.

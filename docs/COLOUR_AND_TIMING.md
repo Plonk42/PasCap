@@ -252,7 +252,7 @@ passes without regrading, then one final H.264 encode,
 with optional mixed 48 kHz AAC music in both paths. Music beyond video OUT requires
 composited export to render black through project OUT. Music-only preview is black;
 export requires at least one retained video clip. Resource and numeric limits are in
-[Inspector and resource limits](LAYERS_AND_KEYFRAMES.md#inspector-and-resource-limits).
+[Properties panel and resource limits](LAYERS_AND_KEYFRAMES.md#properties-panel-and-resource-limits).
 
 The diagnostic reference accepts **exactly two normal-speed (constant 1×) clips on one
 enabled, zero-origin contiguous video track with Opacity 1 and static scalar track Colour**,

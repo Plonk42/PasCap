@@ -856,9 +856,9 @@ for (const { width, height } of [
       ),
     );
     await openFixture(page, comparison.single);
-    const inspector = page.getByRole('complementary', { name: 'Clip inspector', exact: true });
+    const inspector = page.getByRole('complementary', { name: 'Properties', exact: true });
     await expect(inspector).toBeVisible();
-    const divider = page.getByRole('slider', { name: 'Resize Clip panel', exact: true });
+    const divider = page.getByRole('slider', { name: 'Resize Properties panel', exact: true });
     await expect(divider).toHaveAttribute('aria-valuenow', '270');
     const button = compareButton(page);
     await expect(button).toBeInViewport({ ratio: 1 });
@@ -882,7 +882,7 @@ for (const { width, height } of [
       .poll(() =>
         page.evaluate(() => {
           const heading = document.querySelector('.preview-heading')!;
-          const inspector = document.querySelector('[aria-label="Clip inspector"]')!;
+          const inspector = document.querySelector('[aria-label="Properties"]')!;
           return (
             document.documentElement.scrollWidth <= innerWidth &&
             heading.scrollWidth <= heading.clientWidth &&

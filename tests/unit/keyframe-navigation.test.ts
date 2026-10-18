@@ -472,6 +472,8 @@ describe('main diamonds with per-setting arrows and stored-channel navigation', 
           onPreview: vi.fn(),
           onSeek: vi.fn(),
           onPause: vi.fn(),
+          onCollapse: vi.fn(),
+          collapseDisabled: false,
         }),
       ),
     );

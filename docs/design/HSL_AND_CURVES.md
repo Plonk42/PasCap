@@ -72,7 +72,7 @@ quantisation remain measured approximations under the unchanged error gates.
 ## Editing, resets and resource ownership
 
 Track → Colour contains twelve scalar sliders, HDR, Local contrast and the sole Opacity control, grouped
-as in [track appearance](ROW_APPEARANCE.md#inspector-and-history).
+as in [track appearance](ROW_APPEARANCE.md#properties-and-history).
 The separate, initially collapsed Track sections
 **HSL ranges** and **Colour curves** (after Colour) choose their band/channel with a row of coloured
 square swatches (a radio group: **HSL range** with eight band-centre colours, **Colour curve channel**
@@ -124,7 +124,7 @@ source/frame. Exact grading allocates only tiny RGB triples, never another image
 large LUT or duration-sized array; 8-bit unresampled samples reuse a 256-entry
 BT.709 decode table with bitwise-identical results. Frame composition and LUT
 generation split disjoint image-scanline/slice bands across bounded worker threads over the
-existing shared buffers ([resource contract](../LAYERS_AND_KEYFRAMES.md#inspector-and-resource-limits)).
+existing shared buffers ([resource contract](../LAYERS_AND_KEYFRAMES.md#properties-panel-and-resource-limits)).
 Exact grading remains the costliest path, especially at UHD; synthetic
 correctness does not qualify throughput.
 Neutral HSL/identity curves retain the existing scalar-only static fast path and,

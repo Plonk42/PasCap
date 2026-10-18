@@ -48,7 +48,11 @@ export type IconName =
   | 'ripple'
   | 'default-key'
   | 'bookmark'
-  | 'link';
+  | 'link'
+  | 'panel-left-close'
+  | 'panel-left-open'
+  | 'panel-right-close'
+  | 'panel-right-open';
 const paths: Record<IconName, string> = {
   mountain: 'M3 19 9 6l5 9 3-6 4 10H3Zm6-13 2 4-2 2-2-2',
   folder: 'M3 7V5a1 1 0 0 1 1-1h5l2 3h9a1 1 0 0 1 1 1v11H3V7Zm0 3h18',
@@ -99,6 +103,10 @@ const paths: Record<IconName, string> = {
   ripple: 'M2 12h7m0 0-3-3m3 3-3 3M22 12h-7m0 0 3-3m-3 3 3 3M12 5v14',
   'default-key': 'm12 2 10 10-10 10L2 12 12 2Zm-3.5 9a3.6 3.6 0 1 1 1 3.6M8.5 8v3h3',
   bookmark: 'M6 3h12v18l-6-5-6 5V3Z',
+  'panel-left-close': 'M3 4h18v16H3V4Zm6 0v16m7-11-3 3 3 3',
+  'panel-left-open': 'M3 4h18v16H3V4Zm6 0v16m4-11 3 3-3 3',
+  'panel-right-close': 'M3 4h18v16H3V4Zm12 0v16M8 9l3 3-3 3',
+  'panel-right-open': 'M3 4h18v16H3V4Zm12 0v16m-4-11-3 3 3 3',
   link: 'M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7',
 };
 export function Icon({ name, size = 18 }: Readonly<{ name: IconName; size?: number }>) {

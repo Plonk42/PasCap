@@ -329,7 +329,7 @@ test('track keyframe navigation reaches project points and previews outside-dura
   const exposure = page.getByRole('spinbutton', { name: 'Exposure', exact: true });
   await expect(exposure).toBeDisabled();
   const diamond = page
-    .getByRole('complementary', { name: 'Clip inspector' })
+    .getByRole('complementary', { name: 'Properties' })
     .getByRole('button', { name: 'Keyframe Exposure', exact: true });
   await expect(diamond).toBeEnabled();
   await expect(diamond).toHaveAttribute('aria-pressed', 'false');

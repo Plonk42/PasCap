@@ -38,6 +38,8 @@ describe('dedicated Inspector keyframe controls', () => {
           onPreview: vi.fn(),
           onSeek: vi.fn(),
           onPause: vi.fn(),
+          onCollapse: vi.fn(),
+          collapseDisabled: false,
         }),
       ),
     );

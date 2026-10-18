@@ -547,7 +547,7 @@ test('custom controls fit a 270px Inspector at the default and minimum viewports
   page,
 }) => {
   const before = await seedCurve(page);
-  const resizer = page.getByRole('slider', { name: 'Resize Clip panel' });
+  const resizer = page.getByRole('slider', { name: 'Resize Properties panel' });
   await resizer.focus();
   for (let index = 0; index < 4; index++) await resizer.press('ArrowRight');
   await expect(resizer).toHaveAttribute('aria-valuenow', '270');
