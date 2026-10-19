@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { TelemetrySample } from '../../src/shared/motion-analysis.js';
 import {
+  areaUnder,
   availableSeries,
   cameraMotionPath,
   CAMERA_MOTION_MAX,
@@ -47,6 +48,13 @@ describe('motion timeline series', () => {
   it('breaks a line where a value is missing', () => {
     expect(seriesPath(spec('height'), telemetry, 90, FPS, identity).match(/M/g)).toHaveLength(2);
     expect(seriesPath(spec('iso'), telemetry, 90, FPS, identity)).toBe('');
+  });
+
+  it('fills under a line down to the lane bottom, piece by piece', () => {
+    expect(areaUnder('M0,50 L10,20 M30,60 L40,40')).toBe(
+      'M0,100 L0,50 L10,20 L10,100 Z M30,100 L30,60 L40,40 L40,100 Z',
+    );
+    expect(areaUnder('')).toBe('');
   });
 
   it('scales a lane from its lowest to its highest value', () => {
