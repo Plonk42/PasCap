@@ -119,7 +119,10 @@ export class SourceTransport {
     if (!this.#decoding) this.#decodeNext();
   }
 
-  /** While chasing, a target in another GOP shows its keyframe first: one decode instead of up to 15. */
+  /**
+   * While chasing, a target in another GOP first shows a keyframe between the displayed frame
+   * and the target (one decode instead of up to 15), so images keep moving in the scrub's direction.
+   */
   #decodeNext(): void {
     const url = this.#url;
     const target = this.#pending;
@@ -131,8 +134,12 @@ export class SourceTransport {
       this.#publish({ ...this.state, status: 'paused' });
       return;
     }
-    const keyframe = target - (target % PROXY_GOP_FRAMES);
-    const approximate = this.#chasing && keyframe !== target && (shown === null || shown < keyframe || shown > target);
+    const backward = shown !== null && target < shown;
+    const keyframe = backward
+      ? Math.ceil(target / PROXY_GOP_FRAMES) * PROXY_GOP_FRAMES
+      : target - (target % PROXY_GOP_FRAMES);
+    const between = shown === null || (backward ? keyframe < shown : shown < keyframe);
+    const approximate = this.#chasing && keyframe !== target && keyframe < this.frameCount && between;
     const frame = approximate ? keyframe : target;
     if (!approximate) this.#pending = null;
     this.#chasing = false;

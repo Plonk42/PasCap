@@ -230,6 +230,33 @@ describe('owned source proxy transport', () => {
     f.transport.dispose();
   });
 
+  it('scrubbing backwards previews the keyframe above the target, so images never jump forward', async () => {
+    const f = await loaded();
+    f.frames.auto = false;
+    f.transport.seek(100);
+    f.transport.seek(52);
+    f.frames.decode();
+    await settle();
+    expect(f.frames.starts.at(-1)!.frames).toEqual([60]);
+    f.frames.decode();
+    await settle();
+    expect(f.frames.starts.at(-1)!.frames).toEqual([52]);
+    f.frames.decode();
+    await settle();
+    expect(f.drawn).toEqual([20, 100, 60, 52]);
+    // No keyframe lies between 58 and 47: the target is decoded exactly.
+    f.transport.seek(58);
+    f.transport.seek(47);
+    f.frames.decode();
+    await settle();
+    expect(f.frames.starts.at(-1)!.frames).toEqual([47]);
+    f.frames.decode();
+    await settle();
+    expect(f.transport.state).toMatchObject({ status: 'paused', frame: 47 });
+    expect(f.drawn).toEqual([20, 100, 60, 52, 58, 47]);
+    f.transport.dispose();
+  });
+
   it('returns to the displayed frame when the latest seek asks for it', async () => {
     const f = await loaded(30);
     f.frames.auto = false;
