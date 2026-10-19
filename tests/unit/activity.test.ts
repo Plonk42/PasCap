@@ -148,6 +148,17 @@ describe('activity ordering and summaries', () => {
     ]);
   });
 
+  it('lists queued camera motion analyses after the other queued jobs, as they run', () => {
+    expect(
+      orderActivityJobs([
+        job('motion-old', { kind: 'motion', createdAt: '2026-10-03T09:00:00Z' }),
+        job('prepare-new', { createdAt: '2026-10-03T10:00:00Z' }),
+        job('motion-running', { kind: 'motion', state: 'running' }),
+        job('failed', { state: 'failed', finishedAt: '2026-10-03T12:30:00Z' }),
+      ]).map((entry) => entry.id),
+    ).toEqual(['motion-running', 'prepare-new', 'motion-old', 'failed']);
+  });
+
   it('uses stable IDs for ties and tolerates missing completion timestamps', () => {
     expect(orderActivityJobs([job('b'), job('a')]).map((entry) => entry.id)).toEqual(['a', 'b']);
     expect(

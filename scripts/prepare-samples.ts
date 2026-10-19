@@ -44,6 +44,8 @@ try {
     const samples = asset.prepared?.verification.samples.map(formatSample).join(', ');
     console.log(`Frame correspondence MAE / 255: ${samples}`);
   });
+  // Closing the queue would cancel the camera motion analyses that follow preparation.
+  await jobs.idle();
   try {
     await store.load(sampleId);
     console.log('Existing schema-12 sample project kept unchanged (historical identifier retained).');

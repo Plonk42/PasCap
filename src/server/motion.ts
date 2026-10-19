@@ -9,12 +9,15 @@ import {
 } from '../shared/motion-analysis.js';
 import { whileSerial } from '../shared/serial.js';
 import { ServiceError } from './errors.js';
+import { MotionPool } from './motion-pool.js';
 import { runProcess } from './process.js';
 import { RawFrameReader } from './raw-process.js';
 
 const N = 64;
 const LOG2N = 6;
 const FRAME_BYTES = MOTION_WIDTH * MOTION_HEIGHT;
+/** Frames measured per worker task. */
+const CHUNK_FRAMES = 30;
 /** Block centres covering the frame; each block measures a local shift. */
 const BLOCKS = [40, 90, 140].flatMap((cy) => [40, 120, 200, 280].map((cx) => ({ cx, cy })));
 const MIN_TEXTURE = 3;
@@ -251,6 +254,19 @@ export function blockSpectra(frame: Uint8Array): Spectrum[] {
   return BLOCKS.map((block) => spectrum(frame, block.cx, block.cy));
 }
 
+/** Motion of each frame against the one before; with `withPrevious` the first frame is only that reference. */
+export function measureFrames(frames: Uint8Array, withPrevious: boolean): (FrameMotion | null)[] {
+  const motions: (FrameMotion | null)[] = [];
+  let previous: Spectrum[] | null = null;
+  for (let offset = 0; offset < frames.length; offset += FRAME_BYTES) {
+    const pixels = frames.subarray(offset, offset + FRAME_BYTES);
+    const current = blockSpectra(pixels);
+    if (offset > 0 || !withPrevious) motions.push(previous ? estimateMotion(previous, pixels, current) : null);
+    previous = current;
+  }
+  return motions;
+}
+
 const NUMBER = String.raw`(-?\d+(?:\.\d+)?)`;
 /** One pattern per DJI Mini telemetry value; vertical speed in the subtitles is positive upwards. */
 const TELEMETRY_PATTERNS: Readonly<Record<TelemetryField, RegExp>> = {
@@ -366,33 +382,64 @@ export async function analyseProxy(
     zoom: [],
     rotation: [],
   };
+  const pool = MotionPool.forHost();
+  const inFlight = pool?.threads ?? 1;
+  const pending: Promise<(FrameMotion | null)[]>[] = [];
+  let chunks = 0;
+  const append = async (): Promise<void> => {
+    for (const motion of await pending.shift()!) {
+      analysis.tx.push(motion?.tx ?? null);
+      analysis.ty.push(motion?.ty ?? null);
+      analysis.zoom.push(motion?.zoom ?? null);
+      analysis.rotation.push(motion?.rotation ?? null);
+    }
+    progress(analysis.tx.length / frameCount);
+  };
   try {
     const reader = RawFrameReader.create(child.stdout, 'Motion analysis decoder', cancelled);
-    const frame = Buffer.alloc(FRAME_BYTES);
-    let previous: Spectrum[] | null = null;
+    // Each chunk starts with the last frame of the one before, which its first measurement needs.
+    let chunk = new Uint8Array((CHUNK_FRAMES + 1) * FRAME_BYTES);
+    let filled = 0;
+    let withPrevious = false;
+    let read = 0;
+    const dispatch = async (): Promise<void> => {
+      const frames = chunk.subarray(0, filled * FRAME_BYTES);
+      const next = new Uint8Array(chunk.length);
+      next.set(chunk.subarray((filled - 1) * FRAME_BYTES, filled * FRAME_BYTES));
+      const motions = pool
+        ? pool.measure(chunks++, { frames, withPrevious })
+        : Promise.resolve(measureFrames(frames, withPrevious));
+      // Awaited in order below; this only keeps an early failure from being unhandled meanwhile.
+      motions.catch(() => {});
+      pending.push(motions);
+      chunk = next;
+      filled = 1;
+      withPrevious = true;
+      if (pending.length >= inFlight) await append();
+    };
     let ended = false;
     await whileSerial(
       () => !ended,
       async () => {
-        if (!(await reader.readInto(frame))) {
+        if (!(await reader.readInto(Buffer.from(chunk.buffer, filled * FRAME_BYTES, FRAME_BYTES)))) {
           ended = true;
           return;
         }
-        if (analysis.tx.length >= frameCount)
+        if (++read > frameCount)
           throw new ServiceError('The proxy has more frames than its recording. Prepare it again.', 422);
-        const pixels = new Uint8Array(frame);
-        const current = blockSpectra(pixels);
-        const motion = previous ? estimateMotion(previous, pixels, current) : null;
-        analysis.tx.push(motion?.tx ?? null);
-        analysis.ty.push(motion?.ty ?? null);
-        analysis.zoom.push(motion?.zoom ?? null);
-        analysis.rotation.push(motion?.rotation ?? null);
-        previous = current;
-        if (analysis.tx.length % 30 === 0) progress(analysis.tx.length / frameCount);
+        filled++;
+        if (filled === CHUNK_FRAMES + 1) await dispatch();
       },
+    );
+    if (filled > (withPrevious ? 1 : 0)) await dispatch();
+    await whileSerial(
+      () => pending.length > 0,
+      () => append(),
     );
   } finally {
     if (child.exitCode === null) child.kill('SIGKILL');
+    await Promise.allSettled(pending);
+    await pool?.close();
   }
   const code = await closed;
   cancelled();

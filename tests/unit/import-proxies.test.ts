@@ -557,9 +557,12 @@ describe('registration and preparation admission races', () => {
     await entered.promise;
     expect((await library.prepare(accepted.asset.id)).id).toBe(accepted.job!.id);
     expect((await library.importForEditing(sources)).jobs).toEqual([]);
-    expect(jobs.list()).toHaveLength(1);
+    // The camera motion analysis is queued before the ready status is saved.
+    const [motion] = jobs.list().filter((job) => job.kind === 'motion');
+    expect(jobs.list().map((job) => job.kind)).toEqual(['motion', 'prepare']);
     gate.resolve();
     expect((await jobs.wait(accepted.job!.id)).state).toBe('failed');
+    expect((await jobs.wait(motion!.id)).state).toBe('cancelled');
     expect(library.get(accepted.asset.id)).toMatchObject({ status: 'error', prepared: null });
     const retry = await library.prepare(accepted.asset.id);
     expect(retry.id).not.toBe(accepted.job!.id);
@@ -784,7 +787,7 @@ describe('automatic editing import/register HTTP responses', () => {
     });
     expect(repeated.statusCode).toBe(202);
     expect(repeated.json<AddForEditingResult>()).toMatchObject({ asset: { status: 'ready' }, job: null });
-    expect(jobs.list()).toHaveLength(1);
+    expect(jobs.list().filter((job) => job.kind === 'prepare')).toHaveLength(1);
   });
 
   it('reports queue failure with media identity and the preserved asset instead of fake completion', async () => {

@@ -58,7 +58,7 @@ const LINE_GRAB_PX = 6;
 type Phase =
   | { kind: 'idle' }
   | { kind: 'checking' }
-  | { kind: 'running'; progress: number }
+  | { kind: 'running'; queued: boolean; progress: number }
   | { kind: 'ready'; analysis: MotionAnalysis }
   | { kind: 'error'; message: string };
 
@@ -128,6 +128,27 @@ export function useSmoothRange(asset: MediaAsset): SmoothRangeState {
     [key],
   );
 
+  /** Shows a camera motion job's progress, then its analysis. */
+  const follow = useCallback(
+    async (job: MediaJob, signal: AbortSignal): Promise<void> => {
+      const poll = async (current: MediaJob): Promise<MediaJob> => {
+        if (current.state !== 'queued' && current.state !== 'running') return current;
+        setPhase({ kind: 'running', queued: current.state === 'queued', progress: current.progress });
+        await wait(POLL_MS, signal);
+        const next = (await api.jobs({ signal })).jobs.find((candidate) => candidate.id === current.id);
+        if (!next) throw new Error('The analysis job is no longer listed. Try again.');
+        return poll(next);
+      };
+      const done = await poll(job);
+      if (done.state === 'cancelled') return setPhase({ kind: 'idle' });
+      if (done.state === 'failed') throw new Error(done.message);
+      const { analysis } = await api.motion(asset.id, { signal });
+      if (!analysis) throw new Error('The analysis finished but its result is missing. Try again.');
+      finish(analysis);
+    },
+    [asset.id, finish],
+  );
+
   useEffect(() => {
     const cached = known.get(key);
     if (cached || !ready) {
@@ -138,7 +159,12 @@ export function useSmoothRange(asset: MediaAsset): SmoothRangeState {
     setPhase({ kind: 'checking' });
     api
       .motion(asset.id, { signal })
-      .then(({ analysis }) => (analysis ? finish(analysis) : setPhase({ kind: 'idle' })))
+      .then(({ analysis, job }) => {
+        if (analysis) return finish(analysis);
+        // Preparation queues the analysis after the batch's proxies.
+        if (job) return follow(job, signal);
+        setPhase({ kind: 'idle' });
+      })
       .catch((cause: unknown) => {
         if (!signal.aborted) setPhase(failure(cause));
       });
@@ -148,29 +174,13 @@ export function useSmoothRange(asset: MediaAsset): SmoothRangeState {
   // Recordings prepared before the analysis existed can still be measured on request.
   const find = useCallback(() => {
     const signal = start();
-    const poll = async (id: string): Promise<MediaJob> => {
-      await wait(POLL_MS, signal);
-      const job = (await api.jobs({ signal })).jobs.find((candidate) => candidate.id === id);
-      if (!job) throw new Error('The analysis job is no longer listed. Try again.');
-      if (job.state !== 'queued' && job.state !== 'running') return job;
-      setPhase({ kind: 'running', progress: job.progress });
-      return poll(id);
-    };
-    const run = async (): Promise<void> => {
-      const { job } = await api.analyseMotion(asset.id);
-      if (signal.aborted) return;
-      setPhase({ kind: 'running', progress: job.progress });
-      const done = await poll(job.id);
-      if (done.state === 'cancelled') return setPhase({ kind: 'idle' });
-      if (done.state === 'failed') throw new Error(done.message);
-      const { analysis } = await api.motion(asset.id, { signal });
-      if (!analysis) throw new Error('The analysis finished but its result is missing. Try again.');
-      finish(analysis);
-    };
-    run().catch((cause: unknown) => {
-      if (!signal.aborted) setPhase(failure(cause));
-    });
-  }, [asset.id, finish, start]);
+    api
+      .analyseMotion(asset.id)
+      .then(({ job }) => (signal.aborted ? undefined : follow(job, signal)))
+      .catch((cause: unknown) => {
+        if (!signal.aborted) setPhase(failure(cause));
+      });
+  }, [asset.id, follow, start]);
 
   const rate = asset.metadata.frameRate;
   const fps = rate.numerator / rate.denominator;
@@ -555,7 +565,9 @@ function AnalysisStatus({ smooth, disabled, onKeyDown }: Readonly<StatusProps>) 
     return (
       <output className="smooth-panel-status">
         <span className="spinner" />
-        Measuring camera motion… {Math.round(phase.progress * 100)} %
+        {phase.queued
+          ? 'Camera motion queued after the other jobs…'
+          : `Measuring camera motion… ${Math.round(phase.progress * 100)} %`}
       </output>
     );
   if (phase.kind === 'checking') return <span className="smooth-panel-status">Reading the analysis…</span>;

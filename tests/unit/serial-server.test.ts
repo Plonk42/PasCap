@@ -297,4 +297,31 @@ describe('serial queue lifecycle', () => {
     expect(queue.get(next.id).state).toBe('running');
     expect((await queue.wait(next.id)).state).toBe('completed');
   });
+
+  it('runs camera motion jobs after every other queued job, and idle waits for jobs submitted meanwhile', async () => {
+    const queue = createQueue();
+    const order: string[] = [];
+    const gate = deferred();
+    const task = (name: string) => async () => {
+      order.push(name);
+    };
+    queue.submit('prepare', 'first', async () => {
+      order.push('first');
+      await gate.promise;
+    });
+    queue.submit('motion', 'first motion', task('first motion'));
+    queue.submit('prepare', 'second', task('second'), async () => {
+      queue.submit('motion', 'second motion', task('second motion'));
+    });
+    queue.submit('motion', 'third motion', task('third motion'));
+    queue.submit('export', 'export', task('export'));
+    let idle = false;
+    const waiting = queue.idle().then(() => {
+      idle = true;
+    });
+    gate.resolve();
+    await waiting;
+    expect(idle).toBe(true);
+    expect(order).toEqual(['first', 'second', 'export', 'first motion', 'third motion', 'second motion']);
+  });
 });

@@ -433,7 +433,9 @@ one encoder and three native video children per pass. Each video decoder, filter
 and encoder (proxy preparation, export, verification) uses half the host cores,
 bounded to 2–8 threads ([policy](../src/server/native-threads.ts)); lossless FFV1
 intermediates use 16 slices above two threads so every encoder thread has work.
-Audio and thumbnail work keep two. Four raw buffers (two RGB8,
+Audio and thumbnail work keep two. Camera motion analysis, a background job that runs
+after every other queued job, decodes the proxy with two threads and measures 30-frame
+chunks on at most eight worker threads (host cores − 1), about 2 MB of frames each. Four raw buffers (two RGB8,
 two RGBA16) use **22 bytes/pixel = 182,476,800 bytes at UHD**; two 65³ Float32 LUTs
 add **6,591,000 bytes**, excluding native/audio memory. CPU composition/LUT bands
 run on at most eight worker threads sharing those buffers, without copies. Two retained clip files and

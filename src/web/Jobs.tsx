@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react';
-import type { MediaJob } from '../shared/media.js';
+import { runsInBackground, type MediaJob } from '../shared/media.js';
 import './activity.css';
 import { Icon } from './icons.js';
 import { estimateRemainingMs, formatEta, recordProgress, type ProgressSample } from './job-eta.js';
@@ -42,11 +42,11 @@ function timestamp(value: string | null): number {
 
 function activityRank(job: MediaJob): number {
   if (job.state === 'running') return 0;
-  if (job.state === 'queued') return 1;
-  return 2;
+  if (job.state === 'queued') return runsInBackground(job) ? 2 : 1;
+  return 3;
 }
 
-/** Running first, then the FIFO queue, then history by actual completion time. */
+/** Running first, then the queue in run order, then history by actual completion time. */
 export function orderActivityJobs(jobs: readonly MediaJob[]): MediaJob[] {
   return [...jobs].sort((left, right) => {
     const rank = activityRank(left) - activityRank(right);

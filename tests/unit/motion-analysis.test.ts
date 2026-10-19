@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { blockSpectra, estimateMotion, parseTelemetry } from '../../src/server/motion.js';
+import { blockSpectra, estimateMotion, measureFrames, parseTelemetry } from '../../src/server/motion.js';
+import { MotionPool } from '../../src/server/motion-pool.js';
 import {
   MOTION_ANALYSIS_VERSION,
   MOTION_HEIGHT,
@@ -130,6 +131,30 @@ describe('camera motion estimation', () => {
   it('reports nothing for a featureless frame', () => {
     const flat = new Uint8Array(MOTION_WIDTH * MOTION_HEIGHT).fill(90);
     expect(estimateMotion(blockSpectra(flat), flat)).toBeNull();
+  });
+
+  it('measures chunks, in process or on worker threads, exactly like one pass', async () => {
+    const bytes = MOTION_WIDTH * MOTION_HEIGHT;
+    const frames = new Uint8Array(7 * bytes);
+    for (let index = 0; index < 7; index++) frames.set(render(index * 1.5, -index, index * 0.002, 0), index * bytes);
+    const serial = measureFrames(frames, false);
+    expect(serial).toHaveLength(7);
+    expect(serial[0]).toBeNull();
+    // Each chunk after the first starts with the frame before it.
+    const chunks = [frames.slice(0, 3 * bytes), frames.slice(2 * bytes, 6 * bytes), frames.slice(5 * bytes)];
+    expect(chunks.flatMap((chunk, index) => measureFrames(chunk, index > 0))).toEqual(serial);
+    const pool = MotionPool.forHost(3)!;
+    try {
+      expect(pool.threads).toBe(2);
+      const measured = await Promise.all(
+        chunks.map((chunk, index) => pool.measure(index, { frames: chunk, withPrevious: index > 0 })),
+      );
+      expect(measured.flat()).toEqual(serial);
+      expect(chunks[0]!.byteLength).toBe(0);
+    } finally {
+      await pool.close();
+    }
+    expect(MotionPool.forHost(2)).toBeNull();
   });
 });
 
