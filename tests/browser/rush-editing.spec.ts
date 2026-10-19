@@ -2166,7 +2166,7 @@ test('a ready recording follows the camera motion analysis queued after preparat
   await page.route('**/api/jobs', (route) => route.fulfill({ json: { jobs: [{ ...job, ...state }] } }));
   await page.getByRole('button', { name: 'Review pattern-a.mp4', exact: true }).click();
   const panel = page.locator('.smooth-panel');
-  await expect(panel).toContainText('Camera motion queued after the other jobs');
+  await expect(panel).toContainText('Camera motion queued');
   await expect(page.getByRole('button', { name: 'Analyse camera motion', exact: true })).toHaveCount(0);
   state = { state: 'running', progress: 0.25 };
   await expect(panel).toContainText('Measuring camera motion… 25 %');

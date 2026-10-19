@@ -565,9 +565,7 @@ function AnalysisStatus({ smooth, disabled, onKeyDown }: Readonly<StatusProps>) 
     return (
       <output className="smooth-panel-status">
         <span className="spinner" />
-        {phase.queued
-          ? 'Camera motion queued after the other jobs…'
-          : `Measuring camera motion… ${Math.round(phase.progress * 100)} %`}
+        {phase.queued ? 'Camera motion queued…' : `Measuring camera motion… ${Math.round(phase.progress * 100)} %`}
       </output>
     );
   if (phase.kind === 'checking') return <span className="smooth-panel-status">Reading the analysis…</span>;
