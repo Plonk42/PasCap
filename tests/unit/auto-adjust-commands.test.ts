@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { autoAdjustFrames, scaleCorrection, type AutoCorrection } from '../../src/shared/auto-adjust.js';
+import { AUTO_ADJUST, autoAdjustFrames, scaleCorrection, type AutoCorrection } from '../../src/shared/auto-adjust.js';
 import { applyCommand, EditHistory } from '../../src/shared/commands.js';
 import { EMPTY_KEY_VALUES, layerKeyframe } from '../../src/shared/keyframes.js';
 import { createClip, createLayer, createProject, type ProjectDocument } from '../../src/shared/model.js';
@@ -101,7 +101,7 @@ describe('Auto adjust edit', () => {
       layerKeyframe(90, { ...EMPTY_KEY_VALUES, saturation: 1.3 }, 'linear'),
     ];
     expect(animatedSettings(layer).map(settingLabel)).toEqual(['Saturation', 'Exposure']);
-    const next = applyCommand(document, autoAdjustCommand(layer, CORRECTION, 1)!);
+    const next = applyCommand(document, autoAdjustCommand(layer, CORRECTION, AUTO_ADJUST.balancedIntensity)!);
     const colour = next.layers[0]!.colour;
     expect(colour.exposure).toBe(0.25);
     expect(colour.saturation).toBe(layer.colour.saturation);

@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
-import type { AutoCorrection } from '../shared/auto-adjust.js';
+import { AUTO_ADJUST, type AutoCorrection } from '../shared/auto-adjust.js';
 import type { EditCommand } from '../shared/commands.js';
 import type { MediaAsset } from '../shared/media.js';
 import type { VideoLayer } from '../shared/model.js';
@@ -34,9 +34,20 @@ interface Props {
 }
 
 const TITLE = 'Analyse the clip at the playhead and suggest a balanced Colour correction for this track';
+/** The initial Intensity, in percent: the correction as suggested. */
+const BALANCED = Math.round(AUTO_ADJUST.balancedIntensity * 100);
 
 /** Track → Colour → Auto: analyses the clip at the playhead and applies its correction to the track. */
-export function AutoAdjust({ projectId, layer, layout, assets, frame, selectedClipId, disabled, onEdit }: Props) {
+export function AutoAdjust({
+  projectId,
+  layer,
+  layout,
+  assets,
+  frame,
+  selectedClipId,
+  disabled,
+  onEdit,
+}: Readonly<Props>) {
   const hintId = useId();
   const availability = autoAdjustTarget(layer, layout, assets, frame, selectedClipId);
   const blocked = disabled ? 'Colour cannot be edited right now.' : availability.reason;
@@ -92,7 +103,7 @@ function AutoAdjustPopover({
   const [open, setOpen] = useState(false);
   const [phase, setPhase] = useState<Phase>({ kind: 'idle' });
   // Intensity in percent; `draft` is the value being dragged, previewed but not chosen yet.
-  const [percent, setPercent] = useState(100);
+  const [percent, setPercent] = useState(BALANCED);
   const [draft, setDraft] = useState<number | null>(null);
   const [announcement, setAnnouncement] = useState('');
   const controller = useRef<AbortController | null>(null);
@@ -127,8 +138,8 @@ function AutoAdjustPopover({
         if (!abort.signal.aborted) setPhase({ kind: 'analysing', done, total });
       });
       abort.signal.throwIfAborted();
-      rememberAnalysis(projectId, target, { key: target.key, correction, percent: 100 });
-      setPercent(100);
+      rememberAnalysis(projectId, target, { key: target.key, correction, percent: BALANCED });
+      setPercent(BALANCED);
       setPhase({ kind: 'ready', correction });
       setAnnouncement('Auto adjust is ready: its correction is previewed. Choose an Intensity, then Apply.');
     } catch (cause) {
@@ -206,8 +217,8 @@ function AutoAdjustPopover({
                       <ResetLabel
                         htmlFor={id}
                         name="intensity"
-                        blocked={percent === 100 ? 'Already at its default value.' : null}
-                        onReset={() => setPercent(100)}
+                        blocked={percent === BALANCED ? 'Already at its default value.' : null}
+                        onReset={() => setPercent(BALANCED)}
                       >
                         Intensity
                       </ResetLabel>
@@ -225,7 +236,8 @@ function AutoAdjustPopover({
                       onDraft={setDraft}
                     />
                     <span id={`${id}-hint`} className="sr-only">
-                      How much of the suggested correction to apply: 100% applies all of it.
+                      How much of the suggested correction to apply: {BALANCED}% applies it as suggested, more
+                      exaggerates it.
                     </span>
                   </div>
                   {animated.length > 0 && (

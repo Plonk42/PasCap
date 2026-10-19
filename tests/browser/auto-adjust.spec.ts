@@ -211,8 +211,8 @@ const auto = (page: Page) => page.locator('summary[aria-label="Auto adjust"]');
 const apply = (page: Page) => page.getByRole('button', { name: 'Apply', exact: true });
 const intensity = (page: Page) => page.getByRole('spinbutton', { name: 'Auto adjust intensity', exact: true });
 
-function applied(document: ProjectDocument, correction: AutoCorrection, amount: number): ProjectDocument {
-  return applyCommand(document, autoAdjustCommand(document.layers[0]!, correction, amount)!);
+function applied(document: ProjectDocument, correction: AutoCorrection, intensity: number): ProjectDocument {
+  return applyCommand(document, autoAdjustCommand(document.layers[0]!, correction, intensity)!);
 }
 
 test('previews the analysed correction, and Apply sets the ten settings in one Undo step', async ({ page }) => {
@@ -227,7 +227,7 @@ test('previews the analysed correction, and Apply sets the ten settings in one U
 
   await auto(page).click();
   await expect(apply(page)).toBeVisible();
-  await expect(intensity(page)).toHaveValue('100');
+  await expect(intensity(page)).toHaveValue('80');
   expect(proxyReads).toBeGreaterThan(reads);
   await expect.poll(() => checksum(page)).not.toBe(graded);
   const previewed = await checksum(page);
@@ -251,7 +251,8 @@ test('previews the analysed correction, and Apply sets the ten settings in one U
   await apply(page).click();
   await expect(apply(page)).toHaveCount(0);
   expect(proxyReads).toBe(decoded);
-  const expected = applied(before, correction, 1);
+  // The initial 80% applies exactly the analysed correction.
+  const expected = applied(before, correction, 0.8);
   await expect.poll(() => current(page)).toEqual(expected);
   for (const setting of AUTO_ADJUST_SETTINGS) expect(expected.layers[0]!.colour[setting]).toBe(correction[setting]);
   await expect.poll(() => checksum(page)).toBe(previewed);
@@ -266,30 +267,40 @@ test('previews the analysed correction, and Apply sets the ten settings in one U
   expect(await current(page)).toEqual(expected);
 });
 
-test('Intensity scales the correction, and a later Apply replaces it in one Undo step', async ({ page }) => {
+test('Intensity scales the correction, exaggerates it above 80%, and a later Apply replaces it in one Undo step', async ({
+  page,
+}) => {
   const before = await current(page);
   const correction = await expectedCorrection(page);
   const graded = await checksum(page);
   await auto(page).click();
   await expect(apply(page)).toBeVisible();
   await expect.poll(() => checksum(page)).not.toBe(graded);
-  const full = await checksum(page);
+  const suggested = await checksum(page);
   await intensity(page).fill('50');
   await intensity(page).press('Enter');
-  await expect.poll(() => checksum(page)).not.toBe(full);
+  await expect.poll(() => checksum(page)).not.toBe(suggested);
   expect(await current(page)).toEqual(before);
   await apply(page).click();
   const half = applied(before, correction, 0.5);
   await expect.poll(() => current(page)).toEqual(half);
   expect(half.layers[0]!.colour.contrast).toBe(scaleCorrection(correction, 0.5).contrast);
 
-  // Reopening shows the intensity last applied; Reset intensity returns to 100%.
+  // Reopening shows the intensity last applied; Reset intensity returns to 80%.
   await auto(page).click();
   await expect(intensity(page)).toHaveValue('50');
   await page.getByRole('button', { name: 'Reset intensity', exact: true }).click();
-  await expect(intensity(page)).toHaveValue('100');
+  await expect(intensity(page)).toHaveValue('80');
+  await expect.poll(() => checksum(page)).toBe(suggested);
+  // 100% exaggerates the analysed correction: warmer and more contrast than suggested.
+  await intensity(page).fill('100');
+  await intensity(page).press('Enter');
+  await expect.poll(() => checksum(page)).not.toBe(suggested);
   await apply(page).click();
-  await expect.poll(() => current(page)).toEqual(applied(half, correction, 1));
+  const strong = applied(half, correction, 1);
+  await expect.poll(() => current(page)).toEqual(strong);
+  expect(strong.layers[0]!.colour.temperature).toBeGreaterThan(correction.temperature);
+  expect(strong.layers[0]!.colour.contrast).toBeGreaterThan(correction.contrast);
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   expect(await current(page)).toEqual(half);
 });
@@ -311,7 +322,7 @@ test('leaves animated settings and keyframes unchanged and says so', async ({ pa
   await expect(page.getByText('Saturation is animated: not changed', { exact: true })).toBeVisible();
   await expect(page.getByText('Exposure is animated: not changed', { exact: true })).toBeVisible();
   await apply(page).click();
-  const expected = applied(seeded, correction, 1);
+  const expected = applied(seeded, correction, 0.8);
   await expect.poll(() => current(page)).toEqual(expected);
   const colour = expected.layers[0]!.colour;
   expect([colour.exposure, colour.saturation, colour.hue, colour.hdr]).toEqual([0.25, 1, 15, 0.3]);

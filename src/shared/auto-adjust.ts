@@ -1,5 +1,6 @@
 import {
   clamp01,
+  COLOUR_CONTROLS,
   compilePixelGrade,
   createColourSettings,
   decode709,
@@ -63,6 +64,8 @@ export const AUTO_ADJUST = Object.freeze({
   monochrome: 5,
   /** Pixels whose colourfulness is measured, shared among the frames. */
   saturationSamples: 20_000,
+  /** Intensity that applies the correction as fitted; above it, up to 100%, the correction is exaggerated. */
+  balancedIntensity: 0.8,
 });
 
 /** Fitted tone settings in solve order, with their bounds and regularisation scales. */
@@ -101,20 +104,27 @@ export const AUTO_ADJUST_SETTINGS = [
   'blacks',
 ] as const;
 export type AutoAdjustSetting = (typeof AUTO_ADJUST_SETTINGS)[number];
-/** Resolved settings at full intensity, each within its Colour bounds. */
+/** Resolved settings at the balanced intensity, each within its Colour bounds. */
 export type AutoCorrection = Record<AutoAdjustSetting, number>;
 
 /** Settings that scale geometrically from their neutral 1; the others scale linearly from 0. */
 const MULTIPLICATIVE: ReadonlySet<AutoAdjustSetting> = new Set(['contrast', 'saturation']);
+const BOUNDS = new Map<string, { min: number; max: number }>(COLOUR_CONTROLS.map((control) => [control.key, control]));
 
-/** The correction at `amount` (0–1) of its strength: log-gains and offsets linearly, Contrast and Saturation geometrically. */
-export function scaleCorrection(correction: Readonly<AutoCorrection>, amount: number): AutoCorrection {
-  if (!Number.isFinite(amount) || amount < 0 || amount > 1) throw new Error('Intensity must be between 0 and 100%.');
+/**
+ * The correction at `intensity` (0–1), scaled from neutral by intensity / balancedIntensity: log-gains and
+ * offsets linearly, Contrast and Saturation geometrically, each kept within its Colour bounds.
+ */
+export function scaleCorrection(correction: Readonly<AutoCorrection>, intensity: number): AutoCorrection {
+  if (!Number.isFinite(intensity) || intensity < 0 || intensity > 1)
+    throw new Error('Intensity must be between 0 and 100%.');
+  const amount = intensity / AUTO_ADJUST.balancedIntensity;
   return Object.fromEntries(
-    AUTO_ADJUST_SETTINGS.map((setting) => [
-      setting,
-      rounded(MULTIPLICATIVE.has(setting) ? correction[setting] ** amount : correction[setting] * amount),
-    ]),
+    AUTO_ADJUST_SETTINGS.map((setting) => {
+      const { min, max } = BOUNDS.get(setting)!;
+      const value = MULTIPLICATIVE.has(setting) ? correction[setting] ** amount : correction[setting] * amount;
+      return [setting, rounded(Math.min(max, Math.max(min, value)))];
+    }),
   ) as AutoCorrection;
 }
 
@@ -480,5 +490,5 @@ export function analyseAutoAdjust(
   if (!statistics) return null;
   const tone = fitTone(statistics, balance);
   const saturation = fitSaturation(statistics, balance, tone);
-  return scaleCorrection({ ...balance, ...tone, saturation }, 1);
+  return scaleCorrection({ ...balance, ...tone, saturation }, AUTO_ADJUST.balancedIntensity);
 }

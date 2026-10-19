@@ -28,8 +28,9 @@ like [Auto white balance](TEMPERATURE_AND_TINT.md#automatic-white-balance).
 Choosing Auto opens a nonmodal popover naming the analysed recording. While it analyses
 the clip's **whole source range** it shows **Analysing n/16 frames…** and **Cancel**. Then:
 
-- **Intensity**, a slider with an exact field (0–100%, initially 100%, Reset restores
-  100%). The correction at the chosen intensity is previewed in the image while the
+- **Intensity**, a slider with an exact field (0–100%, initially 80%, Reset restores
+  80%). 80% applies the correction as fitted; higher values exaggerate it, up to a quarter
+  more at 100%. The correction at the chosen intensity is previewed in the image while the
   popover is open, the dragged value while dragging, through the live preview path:
   no document, history or save change.
 - A line per setting the track animates, such as **Exposure is animated: not changed**.
@@ -53,10 +54,11 @@ manual edits to them. The memory is dropped when the clip's source range or its 
 changes, on another project and on reload. One correction serves the whole track, taken
 from one clip: tracks holding shots that need different corrections need one track each.
 
-Intensity $a$ scales the correction from neutral: Temperature, Tint, Exposure, Brightness,
-Highlights, Shadows, Whites and Blacks by $a$, Contrast and Saturation as $A^a$, rounded
-to thousandths. Temperature, Tint and Exposure are log-gains, so 50% is the geometric
-midpoint of the light change.
+Intensity $p$ scales the fitted correction from neutral by $a=p/80\%$ (`balancedIntensity`):
+Temperature, Tint, Exposure, Brightness, Highlights, Shadows, Whites and Blacks by $a$,
+Contrast and Saturation as $A^a$, each kept within its setting's range and rounded to
+thousandths. So 40% is half the correction and 100% is 1.25 times it. Temperature, Tint and
+Exposure are log-gains, so half the correction is the geometric midpoint of the light change.
 
 ## Analysis
 
@@ -146,9 +148,14 @@ histogram's white point. So:
 - the low-light guard also halves Brightness and Shadows;
 - colourfulness is the median of per-frame values.
 
+The issue also had Intensity start at 100%, the correction as fitted. Intensity now starts at
+80% for that correction, so the range above it can exaggerate the look.
+
 ## Limits
 
 - One correction per track, from one clip; no per-clip or temporal adaptation.
+- Intensity above 80% exaggerates only what Auto corrects: footage it leaves nearly
+  unchanged stays nearly unchanged at 100%.
 - Overexposed footage with clipped highlights partly reads as high-key, so it is darkened
   conservatively (about −0.2 stop for a stop of overexposure on the synthetic fixtures).
 - White balance damping and the Saturation cap and exponent are partial on purpose:
@@ -167,9 +174,10 @@ bands, a midtone slope at least 1.3× the input's and Saturation above 1.2; expo
 beyond the dead zone corrected stop for stop; cast signs and damping; near idempotence
 (analysing the output changes the image under 20% as much, and flat footage's tone
 settles in one pass); determinism; one outlier frame among 16; hazy, snow, night, sunset,
-sky and sea; intensity scaling and frame selection. Editor tests cover the target, the
-single Colour edit, animated settings and session memory. A browser test checks, on a
-generated flat proxy, that Apply writes exactly the estimator's result for the pixels
-the page decodes, previews without editing, Undo, intensity, reuse without decoding,
-animated settings, cancellation and failures. The analysed pixels equal the compositor
-input, as checked for Auto white balance.
+sky and sea; intensity scaling, exaggeration within bounds and frame selection. Editor
+tests cover the target, the single Colour edit, animated settings and session memory. A
+browser test checks, on a generated flat proxy, that Apply at the initial 80% writes
+exactly the estimator's result for the pixels the page decodes, previews without editing,
+Undo, intensity including 100%, reuse without decoding, animated settings, cancellation
+and failures. The analysed pixels equal the compositor input, as checked for Auto white
+balance.

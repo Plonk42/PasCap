@@ -357,9 +357,10 @@ describe('Auto adjust intensity and frames', () => {
     blacks: -0.6,
   };
 
-  it('scales log-gains and offsets linearly, Contrast and Saturation geometrically, from neutral', () => {
-    expect(scaleCorrection(correction, 1)).toEqual(correction);
-    const half = scaleCorrection(correction, 0.5);
+  it('applies the correction as fitted at 80%, scaled from neutral below: linearly, Contrast and Saturation geometrically', () => {
+    expect(AUTO_ADJUST.balancedIntensity).toBe(0.8);
+    expect(scaleCorrection(correction, 0.8)).toEqual(correction);
+    const half = scaleCorrection(correction, 0.4);
     expect(half).toEqual({
       temperature: 0.2,
       tint: -0.1,
@@ -377,6 +378,23 @@ describe('Auto adjust intensity and frames', () => {
       expect(none[setting]).toBe(setting === 'contrast' || setting === 'saturation' ? 1 : 0);
     for (const amount of [-0.01, 1.01, Number.NaN])
       expect(() => scaleCorrection(correction, amount)).toThrow(/Intensity/);
+  });
+
+  it("exaggerates the correction by a quarter at 100%, within each setting's bounds", () => {
+    expect(scaleCorrection(correction, 1)).toEqual({
+      temperature: 0.5,
+      tint: -0.25,
+      saturation: 1.577,
+      exposure: 1.25,
+      brightness: 0.125,
+      contrast: 1.269,
+      highlights: -0.375,
+      shadows: 0.25,
+      whites: 0.625,
+      blacks: -0.75,
+    });
+    const strong = scaleCorrection({ ...correction, contrast: 1.8, whites: 0.9, blacks: -1 }, 1);
+    expect([strong.contrast, strong.whites, strong.blacks]).toEqual([2, 1, -1]);
   });
 
   it('analyses the centres of up to sixteen equal slices of the source range', () => {

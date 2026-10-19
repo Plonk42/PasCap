@@ -51,18 +51,18 @@ export function settingLabel(setting: AutoAdjustSetting): string {
 }
 
 /**
- * The one Colour edit Auto applies: the correction at `amount` replaces the track's values of the ten
+ * The one Colour edit Auto applies: the correction at `intensity` (0–1) replaces the track's values of the ten
  * settings, except animated ones. Null when every one of them is animated.
  */
 export function autoAdjustCommand(
   layer: VideoLayer,
   correction: Readonly<AutoCorrection>,
-  amount: number,
+  intensity: number,
 ): EditCommand | null {
   const animated = new Set(animatedSettings(layer));
   const settings = AUTO_ADJUST_SETTINGS.filter((setting) => !animated.has(setting));
   if (!settings.length) return null;
-  const scaled = scaleCorrection(correction, amount);
+  const scaled = scaleCorrection(correction, intensity);
   const colour = { ...layer.colour };
   for (const setting of settings) colour[setting] = scaled[setting];
   return { type: 'colour', layerId: layer.id, colour };
