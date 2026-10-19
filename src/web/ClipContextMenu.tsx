@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import './declutter.css';
+import './editor-panels.css';
 import type { EditCommand } from '../shared/commands.js';
 import type { ProjectDocument } from '../shared/model.js';
 import { Icon } from './icons.js';

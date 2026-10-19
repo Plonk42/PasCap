@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
-import './declutter.css';
+import './editor-panels.css';
 import { Icon } from './icons.js';
 import { popoverPosition, type PopoverPosition } from './popover-position.js';
 

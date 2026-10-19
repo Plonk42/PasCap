@@ -1,5 +1,5 @@
 import { createContext, useContext, useId, useState, type ReactNode } from 'react';
-import './declutter.css';
+import './editor-panels.css';
 import { Disclosure } from './Disclosure.js';
 import { Icon, type IconName } from './icons.js';
 import './input-controls.css';
