@@ -127,8 +127,10 @@ Source preview uses its own reader worker with one lane, drawing into a canvas
 frame each. The frame being decoded is never cancelled: it is drawn, then the
 latest request, skipping the ones in between, so images always appear in request
 order and a fast scrub keeps updating. A request that arrives while another frame
-decodes, for a frame in another GOP, first shows that GOP's keyframe (a single
-decode), then its exact frame unless a newer request has arrived; once the pointer
+decodes, for a frame in another GOP, first shows a keyframe between the displayed
+frame and it (a single decode): its GOP's keyframe when scrubbing forwards, the next
+GOP's keyframe when scrubbing backwards, so images never jump against the scrub. It
+then shows the exact frame unless a newer request has arrived; once the pointer
 rests, the image is always the exact frame under it. Hover steps reach the source
 preview directly, without re-rendering the editor. The previous image stays while
 a frame decodes; only after 250 ms without a new image is it hidden behind
