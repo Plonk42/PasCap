@@ -118,7 +118,7 @@ export function Popover({ label, className = '', trigger: triggerContent, childr
           visibility: position ? 'visible' : 'hidden',
         }}
       >
-        <legend className="declutter-sr-only">{label}</legend>
+        <legend className="sr-only">{label}</legend>
         {typeof children === 'function' ? children(close) : children}
       </fieldset>
     </details>

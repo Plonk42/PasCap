@@ -101,7 +101,7 @@ export function ExportSpace({ state }: Readonly<{ state: ExportSpaceState }>) {
       <div className="export-storage-heading">
         <Icon name={space.status === 'available' ? 'check' : 'warning'} size={17} />
         <strong>{formatStorageBytes(space.availableBytes)} free on the export drive</strong>
-        <span className={space.status === 'available' ? 'declutter-sr-only' : 'export-storage-status'}>
+        <span className={space.status === 'available' ? 'sr-only' : 'export-storage-status'}>
           {STORAGE_LABEL[space.status]}
         </span>
         <button

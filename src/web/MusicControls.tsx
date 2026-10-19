@@ -80,7 +80,7 @@ export function MusicControls({
     if (music && !blocked) onEdit({ type: 'music', music: project.music.filter((track) => track.id !== music.id) });
   };
   return (
-    <section className="music-controls declutter-music" aria-label="Music settings">
+    <section className="music-controls editor-music" aria-label="Music settings">
       <div className="music-instance-picker">
         <label className="speed-field">
           <span>
@@ -148,7 +148,7 @@ export function MusicControls({
             <Icon name="plus" size={14} />
             Add music track
             {addReason && (
-              <span className="declutter-sr-only" id={`${helpId}-add-reason`}>
+              <span className="sr-only" id={`${helpId}-add-reason`}>
                 {addReason}
               </span>
             )}

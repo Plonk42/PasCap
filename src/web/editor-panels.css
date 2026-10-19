@@ -1,5 +1,5 @@
 /* Scoped disclosures and editor controls; no workspace or timeline geometry changes. */
-.declutter-sr-only {
+.sr-only {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -90,7 +90,7 @@
   font-size: 13px;
 }
 
-.inspector-panel.declutter-inspector > .inspector-tabs.panel-heading {
+.inspector-panel.editor-inspector > .inspector-tabs.panel-heading {
   display: flex;
   align-items: center;
   gap: 4px;
@@ -98,7 +98,7 @@
   padding: 6px;
 }
 
-.declutter-inspector .inspector-tab-list {
+.editor-inspector .inspector-tab-list {
   display: grid;
   grid-template-columns: repeat(3, minmax(min-content, 1fr));
   flex: 1 1 auto;
@@ -106,7 +106,7 @@
   min-width: 0;
 }
 
-.declutter-inspector .inspector-tab-list > button {
+.editor-inspector .inspector-tab-list > button {
   min-height: 32px;
   padding: 5px 4px;
   border: 1px solid transparent;
@@ -116,7 +116,7 @@
   white-space: nowrap;
 }
 
-.declutter-inspector .inspector-tab-list > button[aria-selected='true'] {
+.editor-inspector .inspector-tab-list > button[aria-selected='true'] {
   color: #e5f1e3;
   background: #304235;
   border-color: #4f6855;
@@ -128,46 +128,46 @@
   min-height: 32px;
 }
 
-.declutter-inspector > [hidden] {
+.editor-inspector > [hidden] {
   display: none;
 }
 
-.inspector-panel.declutter-inspector .inspector-section .disclosure-trigger {
+.inspector-panel.editor-inspector .inspector-section .disclosure-trigger {
   padding: 8px 14px;
   background: #1f2a23;
 }
 
-.declutter-inspector .selected-clip-name {
+.editor-inspector .selected-clip-name {
   padding: 12px 14px;
   border-bottom: 0;
 }
 
-.declutter-inspector .grade-heading {
+.editor-inspector .grade-heading {
   padding-top: 10px;
   padding-bottom: 4px;
 }
 
-.declutter-inspector .colour-controls {
+.editor-inspector .colour-controls {
   gap: 9px;
 }
 
-.declutter-inspector .colour-control-actions .icon-button {
+.editor-inspector .colour-control-actions .icon-button {
   opacity: 0;
 }
 
-.declutter-inspector .colour-control:is(:hover, :focus-within) .colour-control-actions .icon-button {
+.editor-inspector .colour-control:is(:hover, :focus-within) .colour-control-actions .icon-button {
   opacity: 1;
 }
 
-.declutter-keyframes.keyframe-controls {
+.editor-keyframes.keyframe-controls {
   padding-top: 4px;
 }
 
-.declutter-keyframes .keyframe-toolbar {
+.editor-keyframes .keyframe-toolbar {
   gap: 6px;
 }
 
-.declutter-keyframes .keyframe-diamond {
+.editor-keyframes .keyframe-diamond {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -180,33 +180,33 @@
   white-space: nowrap;
 }
 
-.declutter-keyframes .keyframe-count {
+.editor-keyframes .keyframe-count {
   color: var(--muted);
   font-size: 12px;
 }
 
-.declutter-keyframes .keyframe-navigation {
+.editor-keyframes .keyframe-navigation {
   gap: 2px;
   margin: 0;
 }
 
-.declutter-keyframes .keyframe-navigation .icon-button,
-.declutter-keyframes .keyframe-toolbar > .icon-button {
+.editor-keyframes .keyframe-navigation .icon-button,
+.editor-keyframes .keyframe-toolbar > .icon-button {
   width: 28px;
   height: 28px;
 }
 
-.declutter-keyframes .keyframe-row-skipped {
+.editor-keyframes .keyframe-row-skipped {
   color: var(--muted);
   font-size: 11px;
 }
 
-.declutter-keyframes .keyframe-row-header > .text-button {
+.editor-keyframes .keyframe-row-header > .text-button {
   margin-right: auto;
 }
 
-.declutter-speed .speed-overview,
-.declutter-music .music-track-overview {
+.editor-speed .speed-overview,
+.editor-music .music-track-overview {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -217,7 +217,7 @@
   font-size: 12px;
 }
 
-.declutter-speed .speed-reverse {
+.editor-speed .speed-reverse {
   display: flex;
   align-items: center;
   gap: 7px;
@@ -225,13 +225,13 @@
   font-size: 12px;
 }
 
-.declutter-speed .speed-presets {
+.editor-speed .speed-presets {
   flex-wrap: wrap;
   justify-content: flex-start;
   gap: 5px;
 }
 
-.declutter-speed .speed-presets > .text-button {
+.editor-speed .speed-presets > .text-button {
   justify-content: center;
   min-width: 35px;
   padding: 3px 6px;
@@ -239,13 +239,13 @@
   background: #25342a;
 }
 
-.declutter-music .music-timing {
+.editor-music .music-timing {
   margin-top: 12px;
   padding-top: 5px;
   border-top: 1px solid var(--line);
 }
 
-.declutter-music .music-timing .disclosure-trigger {
+.editor-music .music-timing .disclosure-trigger {
   padding: 5px 0;
   cursor: pointer;
   color: #bed1c2;
@@ -264,24 +264,24 @@
   margin: 0;
 }
 
-.declutter-media {
+.editor-media {
   container-type: inline-size;
 }
 
-.declutter-media .library-heading-title {
+.editor-media .library-heading-title {
   display: flex;
   align-items: center;
   min-width: 0;
 }
 
-.declutter-media .library-heading-title h2 {
+.editor-media .library-heading-title h2 {
   display: flex;
   align-items: center;
   white-space: nowrap;
 }
 
 /* The count sits inside the h2 and the total beside it: pin one box so they join as one pill. */
-.declutter-media .library-stat {
+.editor-media .library-stat {
   display: inline-flex;
   align-items: center;
   gap: 3px;
@@ -295,199 +295,199 @@
   font-variant-numeric: tabular-nums;
 }
 
-.declutter-media .library-heading-title h2:has(+ .library-total) .library-stat {
+.editor-media .library-heading-title h2:has(+ .library-total) .library-stat {
   border-radius: 4px 0 0 4px;
 }
 
-.declutter-media .library-total {
+.editor-media .library-total {
   margin-left: 1px;
   border-radius: 0 4px 4px 0;
 }
 
-.declutter-media .library-stat svg {
+.editor-media .library-stat svg {
   flex: none;
   opacity: 0.75;
 }
 
 /* Below these widths the Import label, then the stat icons, would push the total out of the heading. */
 @container (max-width: 333px) {
-  .declutter-media .library-import-label {
+  .editor-media .library-import-label {
     display: none;
   }
 }
 
-.declutter-media .library-heading-actions {
+.editor-media .library-heading-actions {
   display: flex;
   align-items: center;
   gap: 4px;
 }
 
 @container (max-width: 279px) {
-  .declutter-media .panel-heading {
+  .editor-media .panel-heading {
     padding-inline: 8px;
   }
 
-  .declutter-media .library-stat svg {
+  .editor-media .library-stat svg {
     display: none;
   }
 
-  .declutter-media .library-heading-actions {
+  .editor-media .library-heading-actions {
     gap: 2px;
   }
 
-  .declutter-media .library-heading-actions .secondary-button {
+  .editor-media .library-heading-actions .secondary-button {
     padding-inline: 6px;
   }
 
-  .declutter-media .library-heading-actions .icon-button,
-  .declutter-media .library-heading-actions .media-options > summary {
+  .editor-media .library-heading-actions .icon-button,
+  .editor-media .library-heading-actions .media-options > summary {
     width: 28px;
   }
 }
 
-.declutter-media .media-options .library-tools {
+.editor-media .media-options .library-tools {
   display: grid;
   gap: 10px;
   padding: 0;
 }
 
-.declutter-media .media-options .library-tools select {
+.editor-media .media-options .library-tools select {
   width: 100%;
   max-width: none;
   padding: 6px 8px;
 }
 
-.declutter-media .library-view-controls {
+.editor-media .library-view-controls {
   display: flex;
   gap: 6px;
 }
 
-.declutter-media .library-view-field {
+.editor-media .library-view-field {
   min-width: 0;
   margin: 0;
   padding: 0;
   border: 0;
 }
 
-.declutter-media .library-view-field > legend {
+.editor-media .library-view-field > legend {
   margin-bottom: 5px;
   color: var(--muted);
   font-size: 12px;
 }
 
-.declutter-media .library-view-controls > button {
+.editor-media .library-view-controls > button {
   flex: 1;
 }
 
-.declutter-media .library-filter-status {
+.editor-media .library-filter-status {
   color: #b8cbbb;
   font-size: 11px;
 }
 
-.declutter-media .list .media-item {
+.editor-media .list .media-item {
   display: grid;
   grid-template-columns: 14px minmax(0, 1fr) auto 28px 28px 28px;
   align-items: center;
   gap: 5px;
 }
 
-.declutter-media .grid .media-item {
+.editor-media .grid .media-item {
   grid-template-columns: 16px minmax(0, 1fr) 22px 22px 22px;
   column-gap: 2px;
 }
 
-.declutter-media .grid .media-item :is(.icon-button, .media-action-space) {
+.editor-media .grid .media-item :is(.icon-button, .media-action-space) {
   width: 22px;
   height: 22px;
 }
 
-.declutter-media .grid .add-media-new-track {
+.editor-media .grid .add-media-new-track {
   grid-column: 4;
   grid-row: 2;
 }
 
-.declutter-media .grid .media-remove {
+.editor-media .grid .media-remove {
   grid-column: 5;
   grid-row: 2;
 }
 
-.declutter-media .grid .media-state {
+.editor-media .grid .media-state {
   min-width: 0;
   max-width: 100%;
 }
 
-.declutter-media .grid .media-state small {
+.editor-media .grid .media-state small {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.declutter-media .media-item .icon-button {
+.editor-media .media-item .icon-button {
   width: 28px;
   height: 28px;
 }
 
-.declutter-media .media-item .media-checkbox,
-.declutter-media .media-item .add-media,
-.declutter-media .media-item .add-media-new-track,
-.declutter-media .media-item .media-remove {
+.editor-media .media-item .media-checkbox,
+.editor-media .media-item .add-media,
+.editor-media .media-item .add-media-new-track,
+.editor-media .media-item .media-remove {
   opacity: 0;
 }
 
-.declutter-media .media-item:is(:hover, :focus-within, .selected) .media-checkbox,
-.declutter-media .media-item:is(:hover, :focus-within, .selected) .add-media,
-.declutter-media .media-item:is(:hover, :focus-within, .selected) .add-media-new-track,
-.declutter-media .media-item:is(:hover, :focus-within, .selected) .media-remove {
+.editor-media .media-item:is(:hover, :focus-within, .selected) .media-checkbox,
+.editor-media .media-item:is(:hover, :focus-within, .selected) .add-media,
+.editor-media .media-item:is(:hover, :focus-within, .selected) .add-media-new-track,
+.editor-media .media-item:is(:hover, :focus-within, .selected) .media-remove {
   opacity: 1;
 }
 
-.declutter-media .media-state {
+.editor-media .media-state {
   width: 16px;
 }
 
-.declutter-media .media-state small {
+.editor-media .media-state small {
   display: none;
 }
 
-.declutter-media .media-state.ready[data-used='true'] {
+.editor-media .media-state.ready[data-used='true'] {
   width: auto;
 }
 
-.declutter-media .media-state.ready[data-used='true'] small {
+.editor-media .media-state.ready[data-used='true'] small {
   display: inline;
 }
 
-.declutter-media .media-action-space {
+.editor-media .media-action-space {
   display: block;
   width: 28px;
   height: 28px;
 }
 
-.declutter-media .grid .media-action-space {
+.editor-media .grid .media-action-space {
   grid-column: 3;
   grid-row: 2;
 }
 
-.declutter-media .grid :is(.media-action-space, .prepare-media, .relink-media) + .media-action-space {
+.editor-media .grid :is(.media-action-space, .prepare-media, .relink-media) + .media-action-space {
   grid-column: 4;
 }
 
-.declutter-layers .layer-control {
+.editor-layers .layer-control {
   display: flex;
   flex-direction: column;
   justify-content: center;
   gap: 4px;
 }
 
-.declutter-layers .layer-control-main {
+.editor-layers .layer-control-main {
   display: flex;
   align-items: center;
   gap: 3px;
   min-width: 0;
 }
 
-.declutter-layers .layer-select {
+.editor-layers .layer-select {
   display: block;
   flex: 1;
   min-width: 0;
@@ -497,13 +497,13 @@
   text-align: left;
 }
 
-.declutter-layers .layer-control-main > .icon-button,
-.declutter-layers .layer-options > .editor-popover-trigger {
+.editor-layers .layer-control-main > .icon-button,
+.editor-layers .layer-options > .editor-popover-trigger {
   width: 28px;
   height: 28px;
 }
 
-.declutter-layers .layer-kind {
+.editor-layers .layer-kind {
   padding-left: 31px;
   color: var(--muted);
   font-size: 10px;
@@ -542,12 +542,12 @@
 }
 
 @media (hover: none) {
-  .declutter-media .media-item .media-checkbox,
-  .declutter-media .media-item .add-media,
-  .declutter-media .media-item .add-media-new-track,
-  .declutter-media .media-item .media-remove,
-  .declutter-media .media-music-item .media-remove,
-  .declutter-inspector .colour-control-actions .icon-button {
+  .editor-media .media-item .media-checkbox,
+  .editor-media .media-item .add-media,
+  .editor-media .media-item .add-media-new-track,
+  .editor-media .media-item .media-remove,
+  .editor-media .media-music-item .media-remove,
+  .editor-inspector .colour-control-actions .icon-button {
     opacity: 1;
   }
 }

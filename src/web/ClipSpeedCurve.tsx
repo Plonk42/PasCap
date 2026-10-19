@@ -84,7 +84,7 @@ function CurvePresets({
 }: Readonly<{ clip: VideoClip; speed: SpeedCurve; disabled: boolean; onChange: (speed: SpeedCurve) => void }>) {
   return (
     <fieldset className="clip-curve-presets">
-      <legend className="declutter-sr-only">Clip speed curve presets</legend>
+      <legend className="sr-only">Clip speed curve presets</legend>
       <div>
         {CLIP_SPEED_PRESETS.map((preset) => {
           const template = clipSpeedPreset(clip, preset.id);
@@ -431,7 +431,7 @@ export function ClipSpeedCurve({
           {status}
         </p>
       )}
-      <span id={helpId} className="declutter-sr-only">
+      <span id={helpId} className="sr-only">
         Keyframes belong only to this clip. Horizontal dragging changes the original source frame; vertical dragging
         changes speed on a logarithmic axis. Arrows move one source frame or 0.01×; Shift uses ten frames or 0.1×. Enter
         seeks, Delete removes a keyframe; removing the last one keeps its rate as constant speed. Escape cancels a drag.

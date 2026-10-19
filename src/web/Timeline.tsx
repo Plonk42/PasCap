@@ -427,7 +427,7 @@ function BookmarkButton(
   const next = adjacentBookmark(props.project.bookmarks, props.frame, props.duration, 1);
   return (
     <fieldset className="timeline-bookmark-actions rush-quick-actions">
-      <legend className="declutter-sr-only">Bookmarks</legend>
+      <legend className="sr-only">Bookmarks</legend>
       <button
         type="button"
         className="icon-button"
@@ -1175,7 +1175,7 @@ export function Timeline(props: Readonly<Props>) {
   return (
     <section className="timeline-panel panel" id="timeline-pane" tabIndex={-1} aria-label="Video timeline">
       <div className="timeline-toolbar">
-        <h2 className="declutter-sr-only">Timeline</h2>
+        <h2 className="sr-only">Timeline</h2>
         <button
           className={`secondary-button small timeline-view-action ${snapping ? 'active' : ''}`}
           aria-label="Toggle snapping"

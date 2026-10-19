@@ -97,7 +97,7 @@ function LayerName({
           }}
         />
       </label>
-      <span className="declutter-sr-only" id={instructionsId}>
+      <span className="sr-only" id={instructionsId}>
         1–100 characters. Enter or leave the field to apply. Escape restores the current name.
       </span>
       {error ? (
@@ -152,7 +152,7 @@ export function Layers({
   return (
     <aside
       ref={viewport}
-      className="layer-sidebar declutter-layers"
+      className="layer-sidebar editor-layers"
       aria-label="Video tracks"
       style={{ height: viewportHeight ?? undefined }}
       onScroll={(event) => {
@@ -300,17 +300,17 @@ export function Layers({
                         </button>
                       </div>
                       {restrictions.raise && (
-                        <span className="declutter-sr-only" id={`${description}-raise`}>
+                        <span className="sr-only" id={`${description}-raise`}>
                           {restrictions.raise}
                         </span>
                       )}
                       {restrictions.lower && (
-                        <span className="declutter-sr-only" id={`${description}-lower`}>
+                        <span className="sr-only" id={`${description}-lower`}>
                           {restrictions.lower}
                         </span>
                       )}
                       {restrictions.remove && (
-                        <span className="declutter-sr-only" id={`${description}-remove`}>
+                        <span className="sr-only" id={`${description}-remove`}>
                           {restrictions.remove}
                         </span>
                       )}

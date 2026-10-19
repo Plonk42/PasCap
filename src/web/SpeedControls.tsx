@@ -242,7 +242,7 @@ export function SpeedControls({
       help={<SpeedHelp helpId={helpId} />}
     >
       {clip && speed ? (
-        <section className="speed-settings declutter-speed" aria-label="Clip speed">
+        <section className="speed-settings editor-speed" aria-label="Clip speed">
           <KeyframeLine
             label="Speed"
             count={keys.length}

@@ -71,7 +71,7 @@ export function ClipContextMenu({ anchor, onDuplicate, project, onEdit, onClose 
       className="clip-context-menu"
       style={{ left: position?.left ?? 0, top: position?.top ?? 0, visibility: position ? 'visible' : 'hidden' }}
     >
-      <legend className="declutter-sr-only">Clip actions</legend>
+      <legend className="sr-only">Clip actions</legend>
       <button className="secondary-button small" aria-label="Duplicate selected clip" onClick={onDuplicate}>
         <Icon name="plus" size={15} />
         Duplicate <kbd>Ctrl+D</kbd>

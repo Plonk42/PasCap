@@ -476,7 +476,7 @@ export function MediaLibrary({
   const removingUsage = removing && project ? mediaRemovalUsage(project, { videoIds: removing, audioIds: [] }) : null;
 
   return (
-    <aside className="media-panel panel declutter-media" aria-label="Media library">
+    <aside className="media-panel panel editor-media" aria-label="Media library">
       <div className="panel-heading">
         <div className="library-heading-title">
           <h2>
@@ -787,7 +787,7 @@ export function MediaLibrary({
                     {status.state !== 'ready' && <span className="media-status-text">{status.label}</span>}
                   </span>
                   {trimmed && (
-                    <span className="declutter-sr-only" id={rangeId}>
+                    <span className="sr-only" id={rangeId}>
                       Selected range: frames {range.sourceIn} to {range.sourceOut} of {count}, OUT exclusive
                     </span>
                   )}
