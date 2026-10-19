@@ -115,6 +115,7 @@ export class MediaLibrary {
   readonly #preparing = new Map<string, string>();
   readonly #relinking = new Map<string, string>();
   readonly #analysing = new Map<string, { job: string; verifiedAt: string }>();
+  #nvdec: Promise<boolean> | null = null;
   constructor(
     readonly config: ServiceConfig,
     readonly jobs: JobQueue,
@@ -577,7 +578,7 @@ export class MediaLibrary {
     originals.catch(() => {});
     try {
       context.update(0.01, 'Encoding a read-only 720p proxy');
-      await this.#encodeProxy(asset, repair, temporary, context);
+      const fallback = await this.#encodeWithFallback(asset, repair, temporary, context);
       context.update(0.87, 'Checking beginning, middle and end frame correspondence');
       const metadata = await this.#verifyProxyTiming(asset, repair, temporary, context);
       await this.#verifyRepairBoundaries(asset, repair, temporary, context);
@@ -633,11 +634,56 @@ export class MediaLibrary {
         thumbnailFrames,
         verification: { frameCount: metadata.frameCount, samples, verifiedAt: new Date().toISOString() },
       };
-      return preparedNote(repair);
+      return [preparedNote(repair), fallback].filter(Boolean).join(' ') || undefined;
     } finally {
       stop.abort();
       await originals.catch(() => {});
       await rm(temporary, { force: true });
+    }
+  }
+  /** Whether NVDEC can decode originals: probed once, and off after a failed encode. */
+  #hardwareDecode(): Promise<boolean> {
+    if (!this.config.hardwareDecode) return Promise.resolve(false);
+    this.#nvdec ??= runProcess(this.config.ffmpeg, [
+      '-hide_banner',
+      '-loglevel',
+      'error',
+      '-nostdin',
+      '-init_hw_device',
+      'cuda',
+      '-f',
+      'lavfi',
+      '-i',
+      'nullsrc=s=64x64:d=0.04',
+      '-frames:v',
+      '1',
+      '-f',
+      'null',
+      '-',
+    ]).then(
+      () => true,
+      () => false,
+    );
+    return this.#nvdec;
+  }
+  /** NVDEC decodes like the CPU decoder; damaged originals keep the CPU decoder their repair was verified with. */
+  async #encodeWithFallback(
+    asset: MediaAsset,
+    repair: readonly DamagedRange[],
+    temporary: string,
+    context: JobContext,
+  ): Promise<string | undefined> {
+    const gpu = !repair.length && (await this.#hardwareDecode());
+    try {
+      await this.#encodeProxy(asset, repair, temporary, context, gpu);
+      return undefined;
+    } catch (error) {
+      if (!gpu || context.signal.aborted) throw error;
+      await rm(temporary, { force: true });
+      await this.#encodeProxy(asset, repair, temporary, context, false);
+      this.#nvdec = Promise.resolve(false);
+      const reason = errorMessage(error).split('\n')[0]!.slice(0, 300);
+      return `GPU decoding failed (${reason}), so this proxy was decoded on the CPU, like the next ones until PasCap restarts.`;
     }
   }
   /** The original's comparison frames, each from its own seeked decode, independent of the encode. */
@@ -655,6 +701,7 @@ export class MediaLibrary {
     repair: readonly DamagedRange[],
     temporary: string,
     context: JobContext,
+    gpu: boolean,
   ): Promise<void> {
     const inputRange = asset.metadata.colourRange === 'tv' ? 'tv' : 'pc';
     await runProcess(
@@ -668,6 +715,7 @@ export class MediaLibrary {
         '-threads',
         NATIVE_THREADS,
         ...repairInputArgs(repair),
+        ...(gpu ? ['-hwaccel', 'cuda'] : []),
         '-i',
         asset.sourcePath,
         '-map',
@@ -725,7 +773,7 @@ export class MediaLibrary {
           if (Number.isFinite(microseconds))
             context.update(
               0.05 + Math.min(0.8, (microseconds / 1e6 / asset.metadata.durationSeconds) * 0.8),
-              'Encoding proxy',
+              gpu ? 'Encoding proxy · GPU decoding' : 'Encoding proxy',
             );
         },
       },

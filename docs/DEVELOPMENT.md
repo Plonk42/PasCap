@@ -78,6 +78,7 @@ This is not static hosting, LAN/SaaS deployment or a completed container recipe.
 | `PASCAP_MEASURE_URL`               | Editor URL/project used by the optional measurement helper                                                                                                                                   |
 | `PASCAP_CHROME`                    | Browser for the export GPU compositor, otherwise `google-chrome` or `chromium` from PATH                                                                                                     |
 | `PASCAP_GPU_COMPOSITING`           | `auto` (default) composites detail/HDR export groups on a hardware GPU when one starts; `off` always uses the CPU compositor                                                                 |
+| `PASCAP_HW_DECODE`                 | `auto` (default) decodes undamaged originals for proxy encodes with NVDEC when a CUDA device starts; `off` always uses the CPU decoder                                                       |
 
 For example, start with an explicit approved root (literal `~` is not expanded):
 
@@ -433,7 +434,12 @@ one encoder and three native video children per pass. Each video decoder, filter
 and encoder (proxy preparation, export, verification) uses half the host cores,
 bounded to 2–8 threads ([policy](../src/server/native-threads.ts)); lossless FFV1
 intermediates use 16 slices above two threads so every encoder thread has work.
-Audio and thumbnail work keep two. While the proxy encodes, one more two-thread decoder
+Audio and thumbnail work keep two. With `PASCAP_HW_DECODE=auto` and a CUDA device (probed once
+per service), the proxy encode decodes undamaged originals with NVDEC (`-hwaccel cuda`): its frames,
+and so the proxy, are identical to the CPU decoder's, and it frees about half the encode's CPU
+(a 30 s UHD proxy took 6.4 s instead of 10.2 s on the development machine). Damaged originals keep
+the CPU decoder their repair was verified with. A failed NVDEC encode is retried once on the CPU,
+which the service then keeps using, and the job says so. While the proxy encodes, one more two-thread decoder
 seeks the original's three comparison frames (beginning, middle and end), one at a time,
 independently of the encode; it stops if the encode fails or is cancelled, and the frames are compared
 with the proxy only after its own frame-count checks. Camera motion analysis, a background job that runs

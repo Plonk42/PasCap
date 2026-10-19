@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import { link, mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -701,6 +702,71 @@ describe('one worker, cancellation and explicit retry', () => {
     expect(failed).toMatchObject({ state: 'failed', message: 'Cannot decode the original frame.' });
     expect(encoded).toBe(true);
     expect(vi.mocked(probeVideo).mock.calls.some(([, filename]) => filename.endsWith('.partial.mp4'))).toBe(true);
+  });
+});
+
+describe('NVDEC proxy decoding', () => {
+  async function gpuLibrary() {
+    const directories = await setup();
+    const jobs = new JobQueue();
+    queues.push(jobs);
+    const library = new MediaLibrary({ ...directories.config, hardwareDecode: true }, jobs);
+    await library.initialise();
+    return { ...directories, library, jobs };
+  }
+
+  it('probes CUDA once, retries a failed GPU encode on the CPU, and stays on the CPU afterwards', async () => {
+    const { sources, library, jobs } = await gpuLibrary();
+    const encodes: string[] = [];
+    let probes = 0;
+    vi.mocked(runProcess).mockImplementation(async (binary, args, options) => {
+      if (args.includes('-init_hw_device')) {
+        probes++;
+        return Buffer.alloc(0);
+      }
+      if (args.includes('-progress')) {
+        const gpu = args.includes('-hwaccel');
+        encodes.push(gpu ? 'gpu' : 'cpu');
+        if (gpu && encodes.length === 2) {
+          // FFmpeg's -n would refuse to overwrite this partial output on the retry.
+          await writeFile(args.at(-1)!, 'partial proxy');
+          throw new ServiceError('ffmpeg exited 1: CUDA_ERROR_OUT_OF_MEMORY\nmore detail', 422);
+        }
+        expect(existsSync(args.at(-1)!)).toBe(false);
+      }
+      return fakeProcess(binary, args, options);
+    });
+    const messages: string[] = [];
+    for (const name of ['a.mp4', 'b.mp4', 'c.mp4']) {
+      const { job } = await library.addForEditing(await source(sources, name));
+      const result = await jobs.wait(job!.id);
+      expect(result.state, result.message).toBe('completed');
+      messages.push(result.message);
+    }
+    expect(probes).toBe(1);
+    expect(encodes).toEqual(['gpu', 'gpu', 'cpu', 'cpu']);
+    expect(messages).toEqual([
+      'Complete',
+      'GPU decoding failed (ffmpeg exited 1: CUDA_ERROR_OUT_OF_MEMORY), so this proxy was decoded on the CPU, like the next ones until PasCap restarts.',
+      'Complete',
+    ]);
+  });
+
+  it('decodes on the CPU when no CUDA device starts or the setting is off', async () => {
+    const { sources, library, jobs } = await gpuLibrary();
+    vi.mocked(runProcess).mockImplementation(async (binary, args, options) => {
+      if (args.includes('-init_hw_device')) throw new ServiceError('ffmpeg exited 187: CUDA_ERROR_NO_DEVICE', 422);
+      return fakeProcess(binary, args, options);
+    });
+    const { job } = await library.addForEditing(await source(sources));
+    expect((await jobs.wait(job!.id)).state).toBe('completed');
+    const off = await fixture();
+    const other = await off.library.addForEditing(await source(off.sources));
+    expect((await off.jobs.wait(other.job!.id)).state).toBe('completed');
+    const calls = vi.mocked(runProcess).mock.calls.map(([, args]) => args);
+    expect(calls.filter((args) => args.includes('-init_hw_device'))).toHaveLength(1);
+    expect(calls.filter((args) => args.includes('-progress'))).toHaveLength(2);
+    expect(calls.some((args) => args.includes('-hwaccel'))).toBe(false);
   });
 });
 
