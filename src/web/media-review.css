@@ -502,6 +502,16 @@
   vector-effect: non-scaling-stroke;
 }
 
+.source-motion-area {
+  fill: var(--series);
+  fill-opacity: 0.3;
+  stroke: none;
+}
+
+.source-motion-area.camera {
+  --series: #eef8ee;
+}
+
 .source-motion-line {
   fill: none;
   stroke: var(--series);

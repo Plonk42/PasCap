@@ -100,6 +100,21 @@ export function cameraMotionPath(profile: MotionProfile, count: number, plotY: (
   return `M${points.join(' L')}`;
 }
 
+/** The area under a line path (or each piece of a broken one) down to the lane's bottom edge, y = 100. */
+export function areaUnder(line: string): string {
+  return line
+    .split('M')
+    .map((piece) => piece.trim())
+    .filter(Boolean)
+    .map((piece) => {
+      const points = piece.split('L').map((point) => point.trim());
+      const first = points[0]!.split(',')[0];
+      const last = points.at(-1)!.split(',')[0];
+      return `M${first},100 L${points.join(' L')} L${last},100 Z`;
+    })
+    .join(' ');
+}
+
 interface SeriesPoint {
   x: number;
   value: number | null;

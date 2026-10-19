@@ -27,6 +27,7 @@ import { mediaReady, sourceSeconds } from './display.js';
 import { HelpPopover } from './HelpPopover.js';
 import { Icon } from './icons.js';
 import {
+  areaUnder,
   availableSeries,
   cameraMotionPath,
   DEFAULT_SERIES,
@@ -347,6 +348,7 @@ function ImageLane(props: Readonly<ImageLaneProps>) {
       <svg viewBox={`0 0 ${count} 100`} preserveAspectRatio="none" aria-hidden="true">
         <Bands ranges={ranges} />
         <path className="source-motion-roughness" d={props.roughness} />
+        <path className="source-motion-area camera" d={areaUnder(props.cameraMotion)} />
         <path className="source-motion-line camera" d={props.cameraMotion} />
         <line className="source-motion-tolerance" x1={0} x2={count} y1={props.toleranceY} y2={props.toleranceY} />
       </svg>
@@ -373,6 +375,7 @@ function SeriesLane({ spec, d, extent, count, ranges, value }: Readonly<SeriesLa
     <div className="source-motion-plot" data-lane={spec.key} style={{ '--series': spec.colour } as CSSProperties}>
       <svg viewBox={`0 0 ${count} 100`} preserveAspectRatio="none" aria-hidden="true">
         <Bands ranges={ranges} />
+        <path className="source-motion-area" d={areaUnder(d)} />
         <path className="source-motion-line" d={d} />
       </svg>
       <span className="source-motion-readout" aria-hidden="true">
