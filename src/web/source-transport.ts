@@ -1,4 +1,5 @@
 import type { VideoStreams } from '../preview/video-streams.js';
+import { PROXY_GOP_FRAMES } from '../shared/media.js';
 import type { MediaSelection } from '../shared/media-selection.js';
 import { secondsToFrames, type FrameRate } from '../shared/timing.js';
 
@@ -17,7 +18,9 @@ const PREFILL_FRAMES = 3;
 /**
  * An owned, video-only proxy transport on one WebCodecs decoder. Every displayed
  * image is the exact decoded source frame it reports; playback follows the
- * wall clock and holds it while a frame is not decoded yet.
+ * wall clock and holds it while a frame is not decoded yet. Seeks never cancel
+ * the frame being decoded: it is shown, then the latest seek, so images always
+ * follow request order and a fast scrub keeps updating.
  */
 export class SourceTransport {
   state: SourceTransportState;
@@ -31,6 +34,10 @@ export class SourceTransport {
   #clockTime = 0;
   #clockHeld = false;
   #delivered = 0;
+  #decoding = false;
+  #pending: number | null = null;
+  /** A seek arrived while another frame was decoding: the scrub outpaces the decoder. */
+  #chasing = false;
 
   constructor(
     readonly frames: Frames,
@@ -56,6 +63,9 @@ export class SourceTransport {
     this.#operation = new AbortController();
     cancelAnimationFrame(this.#raf);
     this.#raf = 0;
+    this.#decoding = false;
+    this.#pending = null;
+    this.#chasing = false;
     this.frames.stop(0);
     return this.#operation.signal;
   }
@@ -89,27 +99,55 @@ export class SourceTransport {
 
   /** Prop feedback from observed playback is not another seek. Explicit scrubs pause first. */
   follow(frame: number): void {
-    if (this.#disposed || frame === this.state.frame || frame === this.state.requestedFrame) return;
+    if (this.#disposed || frame === this.state.requestedFrame) return;
+    if (frame === this.state.frame && this.state.status !== 'buffering') return;
     this.seek(frame);
   }
 
   seek(frame: number): void {
     if (this.#disposed) return;
     frame = Math.max(0, Math.min(this.frameCount - 1, Math.round(frame)));
-    const url = this.#url;
-    if (url === null) {
+    if (this.#url === null) {
       this.#publish({ ...this.state, requestedFrame: frame });
       return;
     }
-    const signal = this.#cancel();
-    this.#publish({ status: 'buffering', requestedFrame: frame, frame: null, error: '' });
+    if (this.#decoding) this.#chasing = true;
+    else this.#cancel();
+    this.#pending = frame;
+    const shown = this.state.status === 'error' ? null : this.state.frame;
+    this.#publish({ status: 'buffering', requestedFrame: frame, frame: shown, error: '' });
+    if (!this.#decoding) this.#decodeNext();
+  }
+
+  /** While chasing, a target in another GOP shows its keyframe first: one decode instead of up to 15. */
+  #decodeNext(): void {
+    const url = this.#url;
+    const target = this.#pending;
+    if (url === null || target === null) return;
+    const shown = this.state.frame;
+    if (target === shown) {
+      this.#pending = null;
+      this.#chasing = false;
+      this.#publish({ ...this.state, status: 'paused' });
+      return;
+    }
+    const keyframe = target - (target % PROXY_GOP_FRAMES);
+    const approximate = this.#chasing && keyframe !== target && (shown === null || shown < keyframe || shown > target);
+    const frame = approximate ? keyframe : target;
+    if (!approximate) this.#pending = null;
+    this.#chasing = false;
+    this.#decoding = true;
+    const signal = this.#operation.signal;
     this.frames.start(0, url, [frame], true, false);
     void this.frames
       .ready(0, frame, 1, signal)
       .then(() => {
         if (signal.aborted || !this.#present(frame)) return;
         this.frames.stop(0);
-        this.#publish({ ...this.state, status: 'paused', frame });
+        this.#decoding = false;
+        const settled = this.#pending === null;
+        this.#publish({ ...this.state, status: settled ? 'paused' : 'buffering', frame });
+        this.#decodeNext();
       })
       .catch((cause: unknown) => {
         if (!signal.aborted) this.#fail(cause);
