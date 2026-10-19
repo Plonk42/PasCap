@@ -41,11 +41,11 @@
 }
 
 /* Per-setting navigation is not an optional hover-only reset action. */
-.declutter-inspector .colour-control-actions .channel-keyframe-navigation .icon-button {
+.editor-inspector .colour-control-actions .channel-keyframe-navigation .icon-button {
   opacity: 1;
 }
 
-.declutter-inspector .colour-control-actions .channel-keyframe-navigation .icon-button[aria-disabled='true'] {
+.editor-inspector .colour-control-actions .channel-keyframe-navigation .icon-button[aria-disabled='true'] {
   opacity: 0.4;
 }
 

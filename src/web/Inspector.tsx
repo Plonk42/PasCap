@@ -199,7 +199,7 @@ function settingState(layer: VideoLayer, setting: KeyframeSetting, frame: number
 function SettingScope({ scope }: Readonly<{ scope: string }>) {
   return (
     <small className="layer-setting-kind" title={scope}>
-      <span className="declutter-sr-only">{scope}</span>
+      <span className="sr-only">{scope}</span>
     </small>
   );
 }
@@ -815,7 +815,7 @@ function InspectorPanel({
 
   return (
     <InspectorExpansionContext value={expansion}>
-      <aside className="inspector-panel panel declutter-inspector" aria-label="Properties">
+      <aside className="inspector-panel panel editor-inspector" aria-label="Properties">
         <InspectorTabs
           id={inspectorId}
           section={section}

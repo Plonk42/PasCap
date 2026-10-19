@@ -104,7 +104,7 @@ export function RushEditBar({
   return (
     <div className="rush-edit-bar" aria-label="Clip editing actions">
       <fieldset className="rush-quick-actions">
-        <legend className="declutter-sr-only">Edit selected clip</legend>
+        <legend className="sr-only">Edit selected clip</legend>
         <button
           type="button"
           className="secondary-button small"
@@ -156,7 +156,7 @@ export function RushEditBar({
         </button>
       </fieldset>
       {timeRange && (
-        <output className="rush-cut-readout declutter-sr-only" aria-live="polite" title={error || 'OUT exclusive'}>
+        <output className="rush-cut-readout sr-only" aria-live="polite" title={error || 'OUT exclusive'}>
           Selected range {rangeLabel(timeRange)}
         </output>
       )}

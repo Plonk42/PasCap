@@ -54,7 +54,7 @@ export function KeyframeToggle({
         onClick={toggle}
       >
         <span aria-hidden="true">{active ? '◆' : '◇'}</span>
-        <span id={descriptionId} className="declutter-sr-only">
+        <span id={descriptionId} className="sr-only">
           {animated
             ? 'This setting follows the whole track’s animation curve. Capture a keyframe at the playhead before editing between keyframes.'
             : 'Not animated. The diamond captures the displayed value to animate this setting on the whole video track.'}

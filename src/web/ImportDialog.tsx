@@ -622,7 +622,7 @@ export function ImportDialog({ initialKind, busy, error, actions, relink, onClos
           <div className="import-filters">
             {!relink && (
               <fieldset className="import-kinds">
-                <legend className="declutter-sr-only">Show</legend>
+                <legend className="sr-only">Show</legend>
                 {(
                   [
                     ['all', 'All'],

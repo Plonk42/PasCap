@@ -162,7 +162,7 @@ export function RangeSettingControl({
         onCommit={(next) => onCommit(next / scale)}
         {...(onDraft === undefined ? {} : { onDraft: (next) => onDraft(next === null ? null : next / scale) })}
       />
-      <span id={`${id}-hint`} className="declutter-sr-only">
+      <span id={`${id}-hint`} className="sr-only">
         {exactHint}
       </span>
     </>

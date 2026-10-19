@@ -1,6 +1,6 @@
 /* Shared editor tabs only; other headings, buttons and native disclosures stay unchanged. */
 .product-workspace .viewer-tabs,
-.product-workspace .inspector-panel.declutter-inspector > .inspector-tabs.panel-heading {
+.product-workspace .inspector-panel.editor-inspector > .inspector-tabs.panel-heading {
   display: flex;
   align-items: center;
   gap: 4px;
@@ -12,7 +12,7 @@
   background: #1d2720;
 }
 
-.product-workspace .inspector-panel.declutter-inspector .inspector-tab-list {
+.product-workspace .inspector-panel.editor-inspector .inspector-tab-list {
   display: grid;
   grid-template-columns: repeat(3, minmax(min-content, 1fr));
 }
@@ -46,11 +46,11 @@
   outline-offset: 2px;
 }
 
-.product-workspace .declutter-inspector .grade-heading {
+.product-workspace .editor-inspector .grade-heading {
   justify-content: flex-end;
   gap: 8px;
 }
 
-.product-workspace .declutter-inspector .grade-heading > .grade-context:not(.declutter-sr-only) {
+.product-workspace .editor-inspector .grade-heading > .grade-context:not(.sr-only) {
   margin-inline-end: auto;
 }

@@ -20,12 +20,12 @@
 }
 
 /* Unlike optional reset actions, navigation stays visible without hover. */
-.declutter-inspector .colour-control-actions .keyframe-setting-navigation > .keyframe-setting-step {
+.editor-inspector .colour-control-actions .keyframe-setting-navigation > .keyframe-setting-step {
   opacity: 1;
 }
 
 .keyframe-setting-navigation > button.keyframe-setting-step:disabled,
-.declutter-inspector .colour-control-actions .keyframe-setting-navigation > .keyframe-setting-step:disabled {
+.editor-inspector .colour-control-actions .keyframe-setting-navigation > .keyframe-setting-step:disabled {
   opacity: 0.4;
 }
 
@@ -47,7 +47,7 @@
   margin-inline-start: auto;
 }
 
-.declutter-inspector .colour-control-actions > .icon-button {
+.editor-inspector .colour-control-actions > .icon-button {
   width: 28px;
   height: 28px;
 }

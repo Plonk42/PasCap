@@ -278,16 +278,16 @@ export function StoredKeyframeList<S extends string, K extends StoredKeyframe<S>
       .join(' · ');
   return (
     <fieldset
-      className={`keyframe-controls declutter-keyframes layer-keyframe-controls section-keyframes ${kind.tone ?? ''}`.trim()}
+      className={`keyframe-controls editor-keyframes layer-keyframe-controls section-keyframes ${kind.tone ?? ''}`.trim()}
       aria-label={`${kind.title} ${trackName}`}
     >
-      <legend className="declutter-sr-only">{kind.title}</legend>
+      <legend className="sr-only">{kind.title}</legend>
       <div className="keyframe-toolbar stored-keyframes-heading">
         <span className="keyframe-panel-title">Keyframes</span>
         {help}
       </div>
       <div className="layer-keyframe-current">
-        <span className="layer-keyframe-position declutter-sr-only">{position}</span>
+        <span className="layer-keyframe-position sr-only">{position}</span>
       </div>
       {unshown && (
         <div className="layer-keyframe-inspected">
