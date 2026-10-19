@@ -217,10 +217,13 @@ export interface FrameMotion {
 }
 
 /** Global motion between two frames, or null when too few blocks agree. */
-export function estimateMotion(previous: readonly Spectrum[], frame: Uint8Array): FrameMotion | null {
+export function estimateMotion(
+  previous: readonly Spectrum[],
+  frame: Uint8Array,
+  current: readonly Spectrum[] = blockSpectra(frame),
+): FrameMotion | null {
   let shifts: BlockShift[] = BLOCKS.flatMap((block, i) => {
-    const first = spectrum(frame, block.cx, block.cy);
-    const s = refined(previous[i]!, first, frame, block.cx, block.cy);
+    const s = refined(previous[i]!, current[i]!, frame, block.cx, block.cy);
     return previous[i]!.texture > MIN_TEXTURE && s.texture > MIN_TEXTURE && s.peak > MIN_PEAK
       ? [{ ...s, x: block.cx - MOTION_WIDTH / 2, y: block.cy - MOTION_HEIGHT / 2 }]
       : [];
@@ -378,12 +381,13 @@ export async function analyseProxy(
         if (analysis.tx.length >= frameCount)
           throw new ServiceError('The proxy has more frames than its recording. Prepare it again.', 422);
         const pixels = new Uint8Array(frame);
-        const motion = previous ? estimateMotion(previous, pixels) : null;
+        const current = blockSpectra(pixels);
+        const motion = previous ? estimateMotion(previous, pixels, current) : null;
         analysis.tx.push(motion?.tx ?? null);
         analysis.ty.push(motion?.ty ?? null);
         analysis.zoom.push(motion?.zoom ?? null);
         analysis.rotation.push(motion?.rotation ?? null);
-        previous = blockSpectra(pixels);
+        previous = current;
         if (analysis.tx.length % 30 === 0) progress(analysis.tx.length / frameCount);
       },
     );
