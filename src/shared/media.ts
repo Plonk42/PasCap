@@ -45,6 +45,8 @@ export const proxyVerificationSchema = z
     verifiedAt: z.string(),
   })
   .strict();
+/** Every editing proxy profile has a keyframe exactly every 15 frames (closed GOP). */
+export const PROXY_GOP_FRAMES = 15;
 export const preparedSchema = z
   .object({
     profile: z.literal('h264-720p-bt709-gop15-v1'),

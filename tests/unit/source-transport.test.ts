@@ -186,16 +186,62 @@ describe('owned source proxy transport', () => {
     f.transport.dispose();
   });
 
-  it('hides the image while an exact frame is decoded and ignores an obsolete seek', async () => {
+  it('keeps the displayed image while a frame decodes, shows it, then the latest seek, never cancelling it', async () => {
     const f = await loaded();
     f.frames.auto = false;
     f.transport.seek(60);
-    expect(f.transport.state).toMatchObject({ status: 'buffering', frame: null, requestedFrame: 60 });
-    f.transport.seek(15);
+    expect(f.transport.state).toMatchObject({ status: 'buffering', frame: 20, requestedFrame: 60 });
+    f.transport.seek(25);
+    f.transport.seek(45);
+    expect(f.transport.state).toMatchObject({ status: 'buffering', frame: 20, requestedFrame: 45 });
+    expect(f.frames.starts.at(-1)!.frames).toEqual([60]);
     f.frames.decode();
     await settle();
-    expect(f.transport.state).toMatchObject({ status: 'paused', frame: 15 });
-    expect(f.drawn).toEqual([20, 15]);
+    expect(f.drawn).toEqual([20, 60]);
+    expect(f.transport.state).toMatchObject({ status: 'buffering', frame: 60, requestedFrame: 45 });
+    // The obsolete 25 is never decoded; 45 is a GOP keyframe, so it is decoded exactly at once.
+    expect(f.frames.starts.at(-1)!.frames).toEqual([45]);
+    f.frames.decode();
+    await settle();
+    expect(f.transport.state).toMatchObject({ status: 'paused', frame: 45 });
+    expect(f.drawn).toEqual([20, 60, 45]);
+    f.transport.dispose();
+  });
+
+  it('shows the keyframe of a seek that arrived while decoding, then refines to the exact frame', async () => {
+    const f = await loaded();
+    f.frames.auto = false;
+    f.transport.seek(60);
+    f.transport.seek(83);
+    f.frames.decode();
+    await settle();
+    expect(f.frames.starts.at(-1)!.frames).toEqual([75]);
+    f.frames.decode();
+    await settle();
+    expect(f.transport.state).toMatchObject({ status: 'buffering', frame: 75, requestedFrame: 83 });
+    expect(f.frames.starts.at(-1)!.frames).toEqual([83]);
+    f.frames.decode();
+    await settle();
+    expect(f.transport.state).toMatchObject({ status: 'paused', frame: 83 });
+    expect(f.drawn).toEqual([20, 60, 75, 83]);
+    // A seek while idle decodes exactly.
+    f.transport.seek(88);
+    expect(f.frames.starts.at(-1)!.frames).toEqual([88]);
+    f.transport.dispose();
+  });
+
+  it('returns to the displayed frame when the latest seek asks for it', async () => {
+    const f = await loaded(30);
+    f.frames.auto = false;
+    f.transport.seek(60);
+    f.transport.follow(30);
+    f.frames.decode();
+    await settle();
+    expect(f.frames.starts.at(-1)!.frames).toEqual([30]);
+    f.frames.decode();
+    await settle();
+    expect(f.transport.state).toMatchObject({ status: 'paused', frame: 30, requestedFrame: 30 });
+    expect(f.drawn).toEqual([30, 60, 30]);
     f.transport.dispose();
   });
 
