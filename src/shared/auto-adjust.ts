@@ -23,7 +23,7 @@ import {
   type WhiteBalance,
 } from './white-balance.js';
 
-/** Auto adjust (#167): starting values, tuned on synthetic fixtures; see docs/design/AUTO_ADJUST.md. */
+/** Auto adjust (#167): starting values, tuned on synthetic fixtures and real flights; see docs/design/AUTO_ADJUST.md. */
 export const AUTO_ADJUST = Object.freeze({
   /** Source frames analysed, at the centres of equal slices of the clip's range. */
   frames: 16,
@@ -32,20 +32,33 @@ export const AUTO_ADJUST = Object.freeze({
   /** Reinhard's automatic key: mid-grey, adapted to high- and low-key scenes within these bounds. */
   key: 0.18,
   minimumKey: 0.09,
-  maximumKey: 0.36,
+  maximumKey: 0.72,
+  /** A 99th luma percentile at least this bright is clipped: overexposure, not a high-key scene. */
+  clippedLuma: 0.95,
   /** Exposure is left alone while the log-average stays within this many stops of the key. */
   keyTolerance: 0.5,
   keyWeight: 4,
-  /** Encoded output bands of the 0.5th and 99.5th luma percentiles, and their distance scale. */
-  black: [0.01, 0.04] as const,
+  /**
+   * Encoded output bands of the 0.5th and 99.5th luma percentiles, and their distance scale. The black point
+   * may rise to 0.08: Shadows lifts it with the shadow areas.
+   */
+  black: [0.01, 0.08] as const,
   white: [0.92, 0.98] as const,
   bandScale: 0.02,
+  /** Areas are blocks this many to the frame height, about the reach of the base Shadows and Highlights use. */
+  areaLines: 22.5,
+  /**
+   * Once the rest of the tone is fitted, Shadows lifts the darkest tenth of the areas to at most this many
+   * stops below the log-average, up to its bound: on real flights, about the Shadows chosen by hand.
+   */
+  shadowArea: 0.1,
+  shadowStops: 1.5,
   /**
    * Flat footage also lost midtone contrast: Contrast is pulled towards 1 + flatContrast per stop by which
    * the scene's black-to-white range falls short of the bands' range, beyond rangeTolerance stops.
    */
   rangeTolerance: 1,
-  flatContrast: 0.12,
+  flatContrast: 0.2,
   maximumFlatContrast: 1.4,
   /** Weight of stops pushed past clipping on the saturated colour anchor. */
   clipWeight: 4,
@@ -76,7 +89,7 @@ const TONE = [
   { key: 'contrast', low: 0.75, high: 1.8, scale: 0.8 },
   { key: 'brightness', low: -0.15, high: 0.15, scale: 0.1 },
   { key: 'highlights', low: -0.6, high: 0.2, scale: 0.4 },
-  { key: 'shadows', low: -0.2, high: 0.5, scale: 0.4 },
+  { key: 'shadows', low: 0, high: 0.5, scale: 0.4 },
 ] as const;
 type ToneSetting = (typeof TONE)[number]['key'];
 type Tone = Record<ToneSetting, number>;
@@ -183,6 +196,8 @@ export interface ToneStatistics {
   black: number;
   white: number;
   logAverage: number;
+  /** The AUTO_ADJUST.shadowArea quantile of the areas' mean luma: how dark the shadow areas are. */
+  shadow: number;
   /** Reinhard's adaptive key for this scene. */
   key: number;
   /** A colour typical of the 99th percentile of the brightest channel: saturated colours clip first. */
@@ -203,17 +218,25 @@ class FrameAccumulator {
   readonly brightest = new Histogram();
   readonly colours = new Float64Array(BINS * 3);
   readonly samples: number[] = [];
+  /** Per area: summed luma, pixel count and centre weight. */
+  readonly areas: Float64Array;
   logSum = 0;
   #counter = 0;
   constructor(
     readonly gains: RGB,
     readonly stride: number,
-  ) {}
+    areas: number,
+  ) {
+    this.areas = new Float64Array(areas * 3);
+  }
 
-  add(red: number, green: number, blue: number, weight: number): void {
+  add(red: number, green: number, blue: number, weight: number, area: number): void {
     const rgb: RGB = [red * this.gains[0], green * this.gains[1], blue * this.gains[2]];
     if (this.#counter++ % this.stride === 0) this.samples.push(...rgb);
     const level = luma(rgb);
+    this.areas[area * 3]! += level;
+    this.areas[area * 3 + 1]! += 1;
+    this.areas[area * 3 + 2]! += weight;
     if (level < WHITE_BALANCE.noisyLuma) return;
     this.luma.add(level, weight);
     this.logSum += weight * Math.log(level + 1e-4);
@@ -225,12 +248,16 @@ class FrameAccumulator {
     if (this.luma.total <= 0) return null;
     const index = binOf(this.brightest.quantile(0.99));
     const weight = this.brightest.weights[index]!;
+    const areas = new Histogram();
+    for (let area = 0; area < this.areas.length; area += 3)
+      if (this.areas[area + 1]! > 0) areas.add(this.areas[area]! / this.areas[area + 1]!, this.areas[area + 2]!);
     return {
       black: this.luma.quantile(0.005),
       low: this.luma.quantile(0.01),
       high: this.luma.quantile(0.99),
       white: this.luma.quantile(0.995),
       logAverage: Math.exp(this.logSum / this.luma.total),
+      shadow: areas.quantile(AUTO_ADJUST.shadowArea),
       saturated: [0, 1, 2].map((channel) => this.colours[index * 3 + channel]! / weight) as unknown as RGB,
       samples: Float64Array.from(this.samples),
     };
@@ -242,7 +269,13 @@ function frameTone(frame: AnalysisFrame, gains: RGB, samples: number): FrameTone
   if (!box) return null;
   const width = box.right - box.left + 1;
   const height = box.bottom - box.top + 1;
-  const accumulator = new FrameAccumulator(gains, Math.max(1, Math.floor((width * height) / samples)));
+  const size = Math.max(1, Math.round(height / AUTO_ADJUST.areaLines));
+  const columns = Math.ceil(width / size);
+  const accumulator = new FrameAccumulator(
+    gains,
+    Math.max(1, Math.floor((width * height) / samples)),
+    columns * Math.ceil(height / size),
+  );
   const weights = centreWeights(width, height);
   for (let y = 0; y < height; y++)
     for (let x = 0; x < width; x++) {
@@ -252,6 +285,7 @@ function frameTone(frame: AnalysisFrame, gains: RGB, samples: number): FrameTone
         LINEAR_CODES[frame.data[source + 1]!]!,
         LINEAR_CODES[frame.data[source + 2]!]!,
         weights[y * width + x]!,
+        Math.floor(y / size) * columns + Math.floor(x / size),
       );
     }
   return accumulator.tone();
@@ -290,15 +324,18 @@ export function toneStatistics(frames: readonly AnalysisFrame[], balance: WhiteB
   if (!tones.length) return null;
   const pooled = (read: (tone: FrameTone) => number): number => median(tones.map(read));
   const logAverage = pooled((tone) => tone.logAverage);
+  const high = pooled((tone) => tone.high);
+  const key = adaptiveKey(
+    logAverage,
+    pooled((tone) => tone.low),
+    high,
+  );
   return {
     black: pooled((tone) => tone.black),
     white: pooled((tone) => tone.white),
     logAverage,
-    key: adaptiveKey(
-      logAverage,
-      pooled((tone) => tone.low),
-      pooled((tone) => tone.high),
-    ),
+    shadow: pooled((tone) => tone.shadow),
+    key: high >= AUTO_ADJUST.clippedLuma ? Math.min(AUTO_ADJUST.key, key) : key,
     saturated: [0, 1, 2].map((channel) => pooled((tone) => tone.saturated[channel]!)) as unknown as RGB,
     samples: tones.map((tone) => tone.samples),
   };
@@ -376,7 +413,7 @@ function flatContrast(statistics: ToneStatistics): number {
 /**
  * The tone objective, measured through the real local tone and grade on flat anchors: the log-average near
  * the key (Reinhard's display value key / (1 + key)), black and white points in their bands, saturated
- * colours unclipped, and as little correction as possible.
+ * colours unclipped, and as little correction as possible. Shadows is not fitted against it: see fitShadows.
  */
 function toneCost(statistics: ToneStatistics, balance: WhiteBalance): (tone: Readonly<Tone>) => number {
   const target = statistics.key / (1 + statistics.key);
@@ -427,18 +464,48 @@ function lineSearch(cost: (value: number) => number, low: number, high: number, 
 /** Settings that lift dark footage, halved in low light where they would mostly amplify noise. */
 const LIFTING = ['exposure', 'whites', 'brightness', 'shadows'] as const;
 
-/** Projected coordinate descent with a fixed number of sweeps: deterministic and bounded. */
+/**
+ * Projected coordinate descent with a fixed number of sweeps, deterministic and bounded: each sweep fits the
+ * other tone settings to the objective, then Shadows to the shadow areas.
+ */
 function fitTone(statistics: ToneStatistics, balance: WhiteBalance): Tone {
   const cost = toneCost(statistics, balance);
   const tone = { ...NEUTRAL_TONE };
-  for (let sweep = 0; sweep < AUTO_ADJUST.sweeps; sweep++)
+  for (let sweep = 0; sweep < AUTO_ADJUST.sweeps; sweep++) {
     for (const { key, low, high } of TONE)
-      tone[key] = lineSearch((value) => cost({ ...tone, [key]: value }), low, high, tone[key]);
+      if (key !== 'shadows') tone[key] = lineSearch((value) => cost({ ...tone, [key]: value }), low, high, tone[key]);
+    tone.shadows = fitShadows(statistics, balance, tone);
+  }
   if (statistics.white < AUTO_ADJUST.lowLight) {
     for (const key of LIFTING) tone[key] *= 0.5;
     tone.contrast = 1 + (tone.contrast - 1) * 0.5;
   }
   return tone;
+}
+
+const SHADOWS = TONE.find(({ key }) => key === 'shadows')!;
+/**
+ * The smallest Shadows that lifts the darkest tenth of the areas, through the fitted tone, to at most
+ * shadowStops below the log-average, up to its bound. Only Shadows, which changes the areas below mid-grey
+ * and keeps their local contrast, opens them: flattening Contrast or raising Exposure would cost the rest of
+ * the picture. Measured on the output, so opened shadow areas are not opened again.
+ */
+function fitShadows(statistics: ToneStatistics, balance: WhiteBalance, tone: Readonly<Tone>): number {
+  const lifted = (shadows: number): boolean => {
+    const render = renderFlat(balance, { ...tone, shadows }, 1);
+    const level = (value: number): number => decode709(luma(render([value, value, value])));
+    return level(statistics.shadow) >= level(statistics.logAverage) * 2 ** -AUTO_ADJUST.shadowStops;
+  };
+  if (lifted(0)) return 0;
+  if (!lifted(SHADOWS.high)) return SHADOWS.high;
+  let low = 0;
+  let high: number = SHADOWS.high;
+  for (let step = 0; step < AUTO_ADJUST.lineSearchSteps; step++) {
+    const middle = (low + high) / 2;
+    if (lifted(middle)) high = middle;
+    else low = middle;
+  }
+  return high;
 }
 
 /** Hasler–Süsstrunk colourfulness of pixels after white balance and tone, on encoded 0–255 values. */

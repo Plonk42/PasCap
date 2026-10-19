@@ -407,7 +407,8 @@ all these Colour stages, retaining Opacity and geometry. Exact processing:
 
 **Auto**, at the end of the Colour keyframe line, suggests a balanced correction for the
 clip at the playhead: it analyses 16 frames spread over the clip and balances white,
-exposure, contrast, black and white points and saturation, restoring footage shot flat.
+exposure, contrast, black and white points and saturation, restoring footage shot flat,
+and opens dark shadow areas with Shadows.
 The popover previews the result in the image. **Intensity** starts at 80%, the suggested
 correction: lower it for a lighter touch, or raise it towards 100% for a stronger,
 exaggerated look. Then **Apply** sets Temperature, Tint, Saturation, Exposure, Brightness,

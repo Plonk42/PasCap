@@ -131,15 +131,40 @@ function measured(input: readonly AnalysisFrame[]): { black: number; white: numb
 
 const TONE = ['exposure', 'brightness', 'highlights', 'shadows', 'whites', 'blacks'] as const;
 const logged = (value: number): number => Math.abs(Math.log2(value));
+/** Stops between the log-average and the darkest tenth of the areas, as the estimator measures them. */
+const shadowDepth = (input: readonly AnalysisFrame[]): number => {
+  const statistics = toneStatistics(input, { temperature: 0, tint: 0 })!;
+  return Math.log2(statistics.logAverage / statistics.shadow);
+};
 
 describe('Auto adjust estimator', () => {
-  it('leaves well-exposed, neutral, fairly colourful footage almost unchanged', () => {
-    const correction = analyse(frames(6, (seed) => scene(seed)));
+  it('leaves well-exposed, neutral, fairly colourful footage almost unchanged, but opens its darkest areas', () => {
+    const input = frames(6, (seed) => scene(seed));
+    const correction = analyse(input);
     expect(Math.abs(correction.temperature)).toBeLessThan(0.03);
     expect(Math.abs(correction.tint)).toBeLessThan(0.03);
-    for (const setting of TONE) expect(Math.abs(correction[setting])).toBeLessThan(0.03);
+    for (const setting of TONE)
+      if (setting !== 'shadows') expect(Math.abs(correction[setting]), setting).toBeLessThan(0.03);
     expect(logged(correction.contrast)).toBeLessThan(0.03);
     expect(logged(correction.saturation)).toBeLessThan(0.05);
+    // Its darkest tenth of the areas sits more than shadowStops below the log-average: Shadows lifts it.
+    const depth = shadowDepth(input);
+    expect(depth).toBeGreaterThan(AUTO_ADJUST.shadowStops);
+    expect(correction.shadows).toBeGreaterThan(0.3);
+    expect(shadowDepth(input.map((item) => apply(item, correction)))).toBeLessThan(depth - 0.3);
+  });
+
+  it('does not open shadow areas that are already open', () => {
+    // The same scene with no area darker than 0.25 encoded, and black speckles keeping its black point.
+    const floor = decode709(0.25);
+    const input = frames(6, (seed) => (x, y) => {
+      if (hash(x, y, seed + 11) < 0.01) return [0.006, 0.006, 0.006];
+      const pixel = scene(seed)(x, y);
+      const level = 0.2126 * pixel[0] + 0.7152 * pixel[1] + 0.0722 * pixel[2];
+      return pixel.map((value) => (value * Math.max(level, floor)) / level) as unknown as Linear;
+    });
+    expect(shadowDepth(input)).toBeLessThan(AUTO_ADJUST.shadowStops);
+    expect(analyse(input).shadows).toBe(0);
   });
 
   it('restores the black and white points, midtone contrast and saturation of flat footage', () => {
@@ -227,11 +252,14 @@ describe('Auto adjust estimator', () => {
     const input = frames(6, (seed) => flat(scene(seed)));
     const first = analyse(input);
     const second = analyse(input.map((item) => apply(item, first)));
-    const size = (correction: AutoCorrection): number =>
-      Math.hypot(...TONE.map((setting) => correction[setting]), Math.log2(correction.contrast));
-    expect(size(second)).toBeLessThan(0.2 * size(first));
-    // Saturation stops at its cap on flat footage, so a second pass would still add some.
+    // Saturation and Shadows stop at their bounds on flat footage, so a second pass would still add some of
+    // both, and lower Blacks to keep the black point that Shadows lifts in its band.
     expect(first.saturation).toBe(AUTO_ADJUST.maximumSaturation);
+    expect(first.shadows).toBe(0.5);
+    const settled = ['exposure', 'brightness', 'highlights', 'whites'] as const;
+    const size = (correction: AutoCorrection): number =>
+      Math.hypot(...settled.map((setting) => correction[setting]), Math.log2(correction.contrast));
+    expect(size(second)).toBeLessThan(0.2 * size(first));
   });
 
   it('is deterministic', () => {
