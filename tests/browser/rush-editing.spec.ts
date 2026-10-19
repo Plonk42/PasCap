@@ -1932,7 +1932,7 @@ test('the motion timeline shows jolts, allowed movement and the steadiest range;
   const requests: string[] = [];
   await page.route(`**/api/media/${asset.id}/motion`, async (route) => {
     requests.push(route.request().method());
-    await route.fulfill({ json: { analysis } });
+    await route.fulfill({ json: { analysis, job: null } });
   });
   const before = await current(page);
   await page.getByRole('button', { name: 'Review pattern-a.mp4', exact: true }).click();
@@ -2069,7 +2069,7 @@ test('Add all adds one clip per steady range to the target track in one Undo ste
   const fps = 30000 / 1001;
   const analysis = jerkyThenSteady(asset);
   const steady = smoothRanges(motionProfile(analysis, fps), SMOOTH_TOLERANCE.initial, fps);
-  await page.route(`**/api/media/${asset.id}/motion`, (route) => route.fulfill({ json: { analysis } }));
+  await page.route(`**/api/media/${asset.id}/motion`, (route) => route.fulfill({ json: { analysis, job: null } }));
   const before = await current(page);
   await page.getByRole('button', { name: 'Review pattern-a.mp4', exact: true }).click();
   const addAll = page.getByRole('button', { name: /^Add all \d+ steady ranges to / });
@@ -2115,7 +2115,7 @@ test('a proxy prepared before the analysis offers Analyse camera motion, which r
       await route.fulfill({ status: 202, json: { job } });
       return;
     }
-    await route.fulfill({ json: { analysis: polls >= 2 ? analysis : null } });
+    await route.fulfill({ json: { analysis: polls >= 2 ? analysis : null, job: null } });
   });
   await page.route('**/api/jobs', async (route) => {
     if (!posts.length) {
@@ -2135,6 +2135,45 @@ test('a proxy prepared before the analysis offers Analyse camera motion, which r
   await expect(page.locator('.smooth-panel')).toHaveAttribute('data-smooth-in', /^\d+$/);
   await expect(page.locator('.source-motion')).toHaveCount(1);
   expect(posts).toEqual(['{}']);
+  await flush(page);
+  expect(memory.saves).toBe(0);
+});
+
+test('a ready recording follows the camera motion analysis queued after preparation, without a button', async ({
+  page,
+}) => {
+  const asset = assets[0]!;
+  const analysis = jerkyThenSteady(asset);
+  const job = {
+    id: 'queued-motion-job',
+    kind: 'motion',
+    label: asset.name,
+    state: 'queued',
+    progress: 0,
+    message: 'Waiting for the media worker',
+    createdAt: new Date().toISOString(),
+    finishedAt: null,
+    outputUrl: null,
+    receiptUrl: null,
+  };
+  const methods: string[] = [];
+  let state: Record<string, unknown> = {};
+  await page.route(`**/api/media/${asset.id}/motion`, async (route) => {
+    methods.push(route.request().method());
+    const done = state.state === 'completed';
+    await route.fulfill({ json: done ? { analysis, job: null } : { analysis: null, job: { ...job, ...state } } });
+  });
+  await page.route('**/api/jobs', (route) => route.fulfill({ json: { jobs: [{ ...job, ...state }] } }));
+  await page.getByRole('button', { name: 'Review pattern-a.mp4', exact: true }).click();
+  const panel = page.locator('.smooth-panel');
+  await expect(panel).toContainText('Camera motion queued after the other jobs');
+  await expect(page.getByRole('button', { name: 'Analyse camera motion', exact: true })).toHaveCount(0);
+  state = { state: 'running', progress: 0.25 };
+  await expect(panel).toContainText('Measuring camera motion… 25 %');
+  state = { state: 'completed', progress: 1, finishedAt: job.createdAt };
+  await expect(panel).toHaveAttribute('data-smooth-in', /^\d+$/);
+  await expect(page.locator('.source-motion')).toHaveCount(1);
+  expect(methods.every((method) => method === 'GET')).toBe(true);
   await flush(page);
   expect(memory.saves).toBe(0);
 });

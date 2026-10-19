@@ -108,3 +108,8 @@ export const jobSchema = z
   })
   .strict();
 export type MediaJob = z.infer<typeof jobSchema>;
+
+/** Camera motion analysis waits for every other queued job, so a batch's proxies all come first. */
+export function runsInBackground(job: Pick<MediaJob, 'kind'>): boolean {
+  return job.kind === 'motion';
+}

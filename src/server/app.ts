@@ -248,7 +248,7 @@ export async function createApp(config = createConfig()) {
   app.get('/api/media/:id/motion', async (request) => {
     const asset = library.get(idParams.parse(request.params).id);
     await assertSourceIdentity(asset.sourcePath, asset.fingerprint);
-    return { analysis: await library.motion(asset.id) };
+    return { analysis: await library.motion(asset.id), job: library.motionJob(asset.id) };
   });
   app.post('/api/media/:id/motion', async (request, reply) => {
     z.object({}).strict().parse(request.body);

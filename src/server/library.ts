@@ -103,9 +103,8 @@ function undamagedFrame(frame: number, damage: readonly DamagedRange[], frameCou
 function repairedFrameLimit(repair: readonly DamagedRange[], frameCount: number): string[] {
   return repair.length ? ['-frames:v', String(frameCount)] : [];
 }
-function preparedNote(repair: readonly DamagedRange[], note: string | undefined): string | undefined {
-  if (!repair.length) return note;
-  return [`Damaged frames ${damageLabel(repair)} are shown black.`, note].filter(Boolean).join(' ');
+function preparedNote(repair: readonly DamagedRange[]): string | undefined {
+  return repair.length ? `Damaged frames ${damageLabel(repair)} are shown black.` : undefined;
 }
 
 export class MediaLibrary {
@@ -115,7 +114,8 @@ export class MediaLibrary {
   readonly #prepareRequests = new Map<string, Promise<MediaJob>>();
   readonly #preparing = new Map<string, string>();
   readonly #relinking = new Map<string, string>();
-  readonly #analysing = new Map<string, string>();
+  readonly #analysing = new Map<string, { job: string; verifiedAt: string }>();
+  #nvdec: Promise<boolean> | null = null;
   constructor(
     readonly config: ServiceConfig,
     readonly jobs: JobQueue,
@@ -189,16 +189,29 @@ export class MediaLibrary {
       ? analysis
       : null;
   }
+  /** The queued or running camera motion analysis of this recording, if any. */
+  motionJob(id: string): MediaJob | null {
+    const active = this.#analysing.get(id);
+    return active === undefined ? null : this.jobs.get(active.job);
+  }
   /** Measures camera motion in the verified proxy for smooth-range suggestions. */
   analyseMotion(id: string): MediaJob {
     const active = this.#analysing.get(id);
-    if (active !== undefined) return this.jobs.get(active);
+    if (active !== undefined) return this.jobs.get(active.job);
     const asset = this.get(id);
     if (asset.status !== 'ready' || !asset.prepared)
       throw new ServiceError('Prepare the recording before analysing its camera motion.', 409);
     if (this.#preparing.has(id) || this.#prepareRequests.has(id) || this.#relinking.has(id))
       throw new ServiceError(`${asset.name} is busy. Try again once its current job finishes.`, 409);
-    const { verifiedAt } = asset.prepared.verification;
+    return this.#submitMotion(asset);
+  }
+  #submitMotion(asset: MediaAsset): MediaJob {
+    const { id } = asset;
+    const { verifiedAt } = asset.prepared!.verification;
+    const active = this.#analysing.get(id);
+    if (active?.verifiedAt === verifiedAt) return this.jobs.get(active.job);
+    // An analysis still queued for an earlier proxy would only fail.
+    if (active) this.jobs.cancel(active.job);
     const job = this.jobs.submit(
       'motion',
       asset.name,
@@ -211,11 +224,11 @@ export class MediaLibrary {
         return 'Camera motion measured';
       },
       () => {
-        this.#analysing.delete(id);
+        if (this.#analysing.get(id)?.job === job.id) this.#analysing.delete(id);
         return Promise.resolve();
       },
     );
-    this.#analysing.set(id, job.id);
+    this.#analysing.set(id, { job: job.id, verifiedAt });
     return job;
   }
   async #save(): Promise<void> {
@@ -422,6 +435,8 @@ export class MediaLibrary {
           return note;
         },
         async (finished) => {
+          // Queued before the recording shows as ready, so Source preview finds the job.
+          const motion = finished.state === 'completed' ? await this.#queueMotion(current) : null;
           current.status = finished.state === 'completed' ? 'ready' : 'error';
           current.error = finished.state === 'completed' ? null : finished.message;
           if (finished.state !== 'completed') current.prepared = null;
@@ -431,6 +446,7 @@ export class MediaLibrary {
             current.status = 'error';
             current.error = `Cannot persist proxy preparation: ${errorMessage(error)}`;
             current.prepared = null;
+            if (motion) this.jobs.cancel(motion.id);
             throw error;
           } finally {
             this.#preparing.delete(id);
@@ -545,107 +561,32 @@ export class MediaLibrary {
       }
       if (cached) {
         await assertSourceIdentity(asset.sourcePath, asset.fingerprint, true);
-        // Proxies prepared before camera motion analysis existed gain it here.
-        if (!(await this.#hasMotion(asset))) return this.#measureAfterPreparation(asset, context);
         context.update(0.99, 'Verified cached proxy');
         return;
       }
     }
     const temporary = path.join(directory, `proxy-${context.id}.partial.mp4`);
     await this.#assertRepairable(asset, repair, context);
+    const { frameCount } = asset.metadata;
+    const frames = [0, Math.floor((frameCount - 1) / 2), frameCount - 1].map((frame) =>
+      undamagedFrame(frame, repair, frameCount),
+    );
+    const stop = new AbortController();
+    // Separate seeked decodes of the original, run while the encode leaves cores idle.
+    const originals = this.#originalFrames(asset, frames, AbortSignal.any([context.signal, stop.signal]));
+    // Its failure is reported at the comparison, after the proxy's own checks.
+    originals.catch(() => {});
     try {
       context.update(0.01, 'Encoding a read-only 720p proxy');
-      const inputRange = asset.metadata.colourRange === 'tv' ? 'tv' : 'pc';
-      await runProcess(
-        this.config.ffmpeg,
-        [
-          '-hide_banner',
-          '-loglevel',
-          'error',
-          '-nostdin',
-          '-n',
-          '-threads',
-          NATIVE_THREADS,
-          ...repairInputArgs(repair),
-          '-i',
-          asset.sourcePath,
-          '-map',
-          '0:v:0',
-          '-an',
-          '-sn',
-          '-dn',
-          '-vf',
-          `${repairFilter(repair, 0)}scale=w='min(1280,iw)':h='min(720,ih)':force_original_aspect_ratio=decrease:force_divisible_by=2:flags=bicubic:in_color_matrix=bt709:out_color_matrix=bt709:in_range=${inputRange}:out_range=tv,setsar=1`,
-          ...repairedFrameLimit(repair, asset.metadata.frameCount),
-          '-fps_mode',
-          'passthrough',
-          '-c:v',
-          'libx264',
-          '-preset',
-          'veryfast',
-          '-crf',
-          '20',
-          '-pix_fmt',
-          'yuv420p',
-          '-g',
-          String(PROXY_GOP_FRAMES),
-          '-keyint_min',
-          String(PROXY_GOP_FRAMES),
-          '-sc_threshold',
-          '0',
-          '-bf',
-          '0',
-          '-flags',
-          '+cgop',
-          '-threads',
-          NATIVE_THREADS,
-          '-filter_threads',
-          NATIVE_THREADS,
-          '-color_primaries',
-          'bt709',
-          '-color_trc',
-          'bt709',
-          '-colorspace',
-          'bt709',
-          '-color_range',
-          'tv',
-          '-movflags',
-          '+faststart',
-          '-video_track_timescale',
-          '30000',
-          '-progress',
-          'pipe:1',
-          temporary,
-        ],
-        {
-          signal: context.signal,
-          onProgress: (fields) => {
-            const microseconds = Number(fields['out_time_us']);
-            if (Number.isFinite(microseconds))
-              context.update(
-                0.05 + Math.min(0.7, (microseconds / 1e6 / asset.metadata.durationSeconds) * 0.7),
-                'Encoding proxy',
-              );
-          },
-        },
-      );
-      context.update(0.77, 'Checking beginning, middle and end frame correspondence');
+      const fallback = await this.#encodeWithFallback(asset, repair, temporary, context);
+      context.update(0.87, 'Checking beginning, middle and end frame correspondence');
       const metadata = await this.#verifyProxyTiming(asset, repair, temporary, context);
       await this.#verifyRepairBoundaries(asset, repair, temporary, context);
-      const frames = [0, Math.floor((metadata.frameCount - 1) / 2), metadata.frameCount - 1].map((frame) =>
-        undamagedFrame(frame, repair, metadata.frameCount),
-      );
+      const sources = await originals;
       const samples: { frame: number; meanAbsoluteError8Bit: number }[] = [];
-      await forEachSerial(frames, async (frame) => {
-        const original = await extractComparisonFrame(
-          this.config,
-          asset.sourcePath,
-          frame,
-          asset.metadata.colourRange,
-          context.signal,
-        );
+      await forEachSerial(frames.entries(), async ([index, frame]) => {
         const proxy = await extractComparisonFrame(this.config, temporary, frame, 'tv', context.signal);
-        const mae = meanAbsoluteError(original, proxy);
+        const mae = meanAbsoluteError(sources[index]!, proxy);
         if (mae > FRAME_SAMPLE_MAE_LIMIT)
           throw new ServiceError(
             `Proxy/source frame ${frame} differs by ${mae.toFixed(2)} / 255. Correspondence unverified.`,
@@ -693,10 +634,150 @@ export class MediaLibrary {
         thumbnailFrames,
         verification: { frameCount: metadata.frameCount, samples, verifiedAt: new Date().toISOString() },
       };
-      return preparedNote(repair, await this.#measureAfterPreparation(asset, context));
+      return [preparedNote(repair), fallback].filter(Boolean).join(' ') || undefined;
     } finally {
+      stop.abort();
+      await originals.catch(() => {});
       await rm(temporary, { force: true });
     }
+  }
+  /** Whether NVDEC can decode originals: probed once, and off after a failed encode. */
+  #hardwareDecode(): Promise<boolean> {
+    if (!this.config.hardwareDecode) return Promise.resolve(false);
+    this.#nvdec ??= runProcess(this.config.ffmpeg, [
+      '-hide_banner',
+      '-loglevel',
+      'error',
+      '-nostdin',
+      '-init_hw_device',
+      'cuda',
+      '-f',
+      'lavfi',
+      '-i',
+      'nullsrc=s=64x64:d=0.04',
+      '-frames:v',
+      '1',
+      '-f',
+      'null',
+      '-',
+    ]).then(
+      () => true,
+      () => false,
+    );
+    return this.#nvdec;
+  }
+  /** NVDEC decodes like the CPU decoder; damaged originals keep the CPU decoder their repair was verified with. */
+  async #encodeWithFallback(
+    asset: MediaAsset,
+    repair: readonly DamagedRange[],
+    temporary: string,
+    context: JobContext,
+  ): Promise<string | undefined> {
+    const gpu = !repair.length && (await this.#hardwareDecode());
+    try {
+      await this.#encodeProxy(asset, repair, temporary, context, gpu);
+      return undefined;
+    } catch (error) {
+      if (!gpu || context.signal.aborted) throw error;
+      await rm(temporary, { force: true });
+      await this.#encodeProxy(asset, repair, temporary, context, false);
+      this.#nvdec = Promise.resolve(false);
+      const reason = errorMessage(error).split('\n')[0]!.slice(0, 300);
+      return `GPU decoding failed (${reason}), so this proxy was decoded on the CPU, like the next ones until PasCap restarts.`;
+    }
+  }
+  /** The original's comparison frames, each from its own seeked decode, independent of the encode. */
+  async #originalFrames(asset: MediaAsset, frames: readonly number[], signal: AbortSignal): Promise<Buffer[]> {
+    const decoded: Buffer[] = [];
+    await forEachSerial(frames, async (frame) => {
+      decoded.push(
+        await extractComparisonFrame(this.config, asset.sourcePath, frame, asset.metadata.colourRange, signal),
+      );
+    });
+    return decoded;
+  }
+  async #encodeProxy(
+    asset: MediaAsset,
+    repair: readonly DamagedRange[],
+    temporary: string,
+    context: JobContext,
+    gpu: boolean,
+  ): Promise<void> {
+    const inputRange = asset.metadata.colourRange === 'tv' ? 'tv' : 'pc';
+    await runProcess(
+      this.config.ffmpeg,
+      [
+        '-hide_banner',
+        '-loglevel',
+        'error',
+        '-nostdin',
+        '-n',
+        '-threads',
+        NATIVE_THREADS,
+        ...repairInputArgs(repair),
+        ...(gpu ? ['-hwaccel', 'cuda'] : []),
+        '-i',
+        asset.sourcePath,
+        '-map',
+        '0:v:0',
+        '-an',
+        '-sn',
+        '-dn',
+        '-vf',
+        `${repairFilter(repair, 0)}scale=w='min(1280,iw)':h='min(720,ih)':force_original_aspect_ratio=decrease:force_divisible_by=2:flags=bicubic:in_color_matrix=bt709:out_color_matrix=bt709:in_range=${inputRange}:out_range=tv,setsar=1`,
+        ...repairedFrameLimit(repair, asset.metadata.frameCount),
+        '-fps_mode',
+        'passthrough',
+        '-c:v',
+        'libx264',
+        '-preset',
+        'veryfast',
+        '-crf',
+        '20',
+        '-pix_fmt',
+        'yuv420p',
+        '-g',
+        String(PROXY_GOP_FRAMES),
+        '-keyint_min',
+        String(PROXY_GOP_FRAMES),
+        '-sc_threshold',
+        '0',
+        '-bf',
+        '0',
+        '-flags',
+        '+cgop',
+        '-threads',
+        NATIVE_THREADS,
+        '-filter_threads',
+        NATIVE_THREADS,
+        '-color_primaries',
+        'bt709',
+        '-color_trc',
+        'bt709',
+        '-colorspace',
+        'bt709',
+        '-color_range',
+        'tv',
+        '-movflags',
+        '+faststart',
+        '-video_track_timescale',
+        '30000',
+        '-progress',
+        'pipe:1',
+        temporary,
+      ],
+      {
+        signal: context.signal,
+        onProgress: (fields) => {
+          const microseconds = Number(fields['out_time_us']);
+          if (Number.isFinite(microseconds))
+            context.update(
+              0.05 + Math.min(0.8, (microseconds / 1e6 / asset.metadata.durationSeconds) * 0.8),
+              gpu ? 'Encoding proxy · GPU decoding' : 'Encoding proxy',
+            );
+        },
+      },
+    );
   }
   async #verifyProxyTiming(
     asset: MediaAsset,
@@ -786,14 +867,13 @@ export class MediaLibrary {
     const telemetry = await readTelemetry(this.config, asset.sourcePath, context.signal);
     await atomicWrite(this.motionPath(asset), JSON.stringify({ ...motion, telemetry }));
   }
-  /** Camera motion analysis is a convenience: its failure leaves a usable, verified proxy. */
-  async #measureAfterPreparation(asset: MediaAsset, context: JobContext): Promise<string | undefined> {
+  /** Proxies come first: their camera motion is measured afterwards, by a background job. */
+  async #queueMotion(asset: MediaAsset): Promise<MediaJob | null> {
     try {
-      await this.#measureMotion(asset, context, 0.84, 0.99);
-      return undefined;
-    } catch (error) {
-      if (context.signal.aborted) throw error;
-      return `Proxy ready; camera motion analysis failed: ${errorMessage(error)} Use Analyse camera motion to retry.`;
+      return (await this.#hasMotion(asset)) ? null : this.#submitMotion(asset);
+    } catch {
+      // The proxy is ready either way; Source preview then offers Analyse camera motion.
+      return null;
     }
   }
   async #hasMotion(asset: MediaAsset): Promise<boolean> {

@@ -7,5 +7,7 @@ export default defineConfig({
     hookTimeout: 60_000,
     maxWorkers: 2,
     reporters: ['default', './tests/timing/vitest-reporter.ts'],
+    // Tests choose NVDEC explicitly; the CPU decoder is the reference everywhere else.
+    env: { PASCAP_HW_DECODE: 'off' },
   },
 });

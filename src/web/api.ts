@@ -248,11 +248,11 @@ export const api = {
       'POST',
       blackOutDamage ? { blackOutDamage: true } : {},
     ),
-  /** The cached camera-motion analysis of the current proxy, or null. */
+  /** The cached camera-motion analysis of the current proxy, or null, and its queued or running job. */
   motion: (id: string, options?: RequestOptions) =>
     request(
       `/api/media/${id}/motion`,
-      z.object({ analysis: motionAnalysisSchema.nullable() }),
+      z.object({ analysis: motionAnalysisSchema.nullable(), job: jobSchema.nullable() }),
       'GET',
       undefined,
       options,
