@@ -734,13 +734,16 @@ Choices persist per project in that browser and affect future insertions only.
 ### Camera motion and the steadiest range
 
 Source preview suggests the steadiest stretch of a drone recording, where the camera
-moves without brutal changes of angle or speed. Proxy preparation measures it as its
-last step: it decodes the verified editing proxy at 320 × 180 grey and measures, for
+moves without brutal changes of angle or speed. Once a proxy is verified the recording
+is ready, and a **Camera motion analysis** job measures it in the background: that job
+runs after every other queued job, so a batch import makes all its proxies first. It
+decodes the verified editing proxy at 320 × 180 grey and measures, for
 every frame, the camera's global motion since the previous one (translation, zoom and
 rotation from block phase correlation, with a robust fit that ignores moving water,
-trees or other subjects). Featureless frames stay unmeasured. This adds roughly a
-quarter of the recording's duration to preparation (about 120 frames/s for a 720p
-proxy on the development machine). It also reads the original's first subtitle track,
+trees or other subjects). Featureless frames stay unmeasured. Chunks of 30 frames are
+measured on up to eight worker threads (host cores − 1, in process below three cores),
+with results identical to one pass: about 350 frames/s for a 720p proxy on the
+16-thread development machine, roughly a tenth of the recording's duration. It also reads the original's first subtitle track,
 where DJI Mini drones record telemetry once per second, and keeps horizontal and
 vertical speed (`H.S`, `V.S`, m/s), height (`H`) and distance from home (`D`, m), ISO,
 shutter speed (`SS`), exposure bias (`EV`) and digital zoom (`DZOOM`); GPS position and
@@ -748,8 +751,9 @@ aperture are not kept. This demuxes only that track (about 0.2 s for a 600 MB ru
 recordings without it simply have no telemetry. The result is cached as
 `motion-v3.json` beside the proxy and its thumbnails, tied to the proxy's verification
 time; re-preparing the proxy replaces it, and older `motion-v1.json`/`motion-v2.json`
-caches are ignored (use **Analyse camera motion** to measure again). A failed measurement
-never fails preparation: the job reports it and the proxy stays usable. The original
+caches are ignored (use **Analyse camera motion** to measure again). A failed or
+cancelled measurement leaves the proxy usable; Source preview then offers **Analyse
+camera motion**. The original
 is identity-checked and only its subtitle track is read.
 
 Opening a recording reads its analysis, once per session. Directly under the range strip,
@@ -786,7 +790,8 @@ use** once applied. **Add all N** (**Add all N steady ranges to** the target tra
 inserts one independent clip per steady range at the current allowed movement, in
 recording order, exactly like **Add clip** with that range: Ripple-on tracks append,
 positioned tracks start at the playhead, and the whole batch is one Undo step. It leaves
-the applied source range unchanged. Recordings prepared before this analysis existed show **Analyse
+the applied source range unchanged. While its analysis waits or runs, the header shows
+**Camera motion queued after the other jobs…** or its progress. Recordings prepared before this analysis existed show **Analyse
 camera motion** in the header instead, which queues one **Camera motion analysis** job
 (shown in Activity). Forward
 acceleration seen straight ahead barely changes the picture, so speed changes without

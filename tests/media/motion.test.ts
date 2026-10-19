@@ -115,8 +115,20 @@ describe.skipIf(!enabled)('smooth-part motion analysis · disposable native fixt
     expect(prepared.state).toBe('completed');
     expect(prepared.message).toBe('Complete');
 
+    // The recording is ready first; its analysis follows as a background job.
+    const pending = (await app.inject({ method: 'GET', url: `/api/media/${id}/motion`, headers })).json<{
+      analysis: MotionAnalysis | null;
+      job: MediaJob;
+    }>();
+    expect(pending.analysis).toBeNull();
+    expect(pending.job.kind).toBe('motion');
+    expect(library.get(id).status).toBe('ready');
+    const measured = await jobs.wait(pending.job.id);
+    expect(measured.state, measured.message).toBe('completed');
+
     const response = await app.inject({ method: 'GET', url: `/api/media/${id}/motion`, headers });
-    const { analysis } = response.json<{ analysis: MotionAnalysis }>();
+    const { analysis, job: settled } = response.json<{ analysis: MotionAnalysis; job: MediaJob | null }>();
+    expect(settled).toBeNull();
     expect(analysis.frameCount).toBe(210);
     expect(analysis.verifiedAt).toBe(library.get(id).prepared!.verification.verifiedAt);
     expect(analysis.tx[0]).toBeNull();
@@ -139,6 +151,7 @@ describe.skipIf(!enabled)('smooth-part motion analysis · disposable native fixt
     await rm(cache);
     expect((await app.inject({ method: 'GET', url: `/api/media/${id}/motion`, headers })).json()).toEqual({
       analysis: null,
+      job: null,
     });
     const started = await app.inject({ method: 'POST', url: `/api/media/${id}/motion`, headers, payload: {} });
     expect(started.statusCode).toBe(202);

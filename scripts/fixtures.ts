@@ -176,6 +176,8 @@ if (process.argv.includes('--browser')) {
   };
   const store = new ProjectStore(config.dataDir);
   fixture.document = await store.save(fixture.document, fixture.document.revision);
+  // Closing the queue would cancel the camera motion analyses that follow preparation.
+  await fixture.jobs.idle();
   await fixture.jobs.close();
   console.log(
     'Disposable browser fixture prepared (preview-lab): 12 project recordings, registered music, no placed music tracks, three verified video proxies.',

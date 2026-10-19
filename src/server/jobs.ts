@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { jobSchema, type MediaJob } from '../shared/media.js';
+import { jobSchema, runsInBackground, type MediaJob } from '../shared/media.js';
 import { whileSerial } from '../shared/serial.js';
 import { errorMessage, ServiceError } from './errors.js';
 
@@ -17,7 +17,10 @@ interface Entry {
   finish: () => void;
 }
 
-/** One heavy media task at a time. Jobs themselves never own mutable editor documents. */
+/**
+ * One heavy media task at a time, FIFO except background jobs, which wait for the others.
+ * Jobs themselves never own mutable editor documents.
+ */
 export class JobQueue {
   readonly #entries = new Map<string, Entry>();
   readonly #pending: Entry[] = [];
@@ -90,6 +93,17 @@ export class JobQueue {
       if (['queued', 'running'].includes(entry.job.state)) entry.controller.abort();
     await Promise.all([...this.#entries.values()].map((entry) => entry.done));
   }
+  /** Resolves once no job is queued or running, including jobs submitted meanwhile. */
+  async idle(): Promise<void> {
+    await whileSerial(
+      () => [...this.#entries.values()].some((entry) => ['queued', 'running'].includes(entry.job.state)),
+      () => Promise.all([...this.#entries.values()].map((entry) => entry.done)),
+    );
+  }
+  #next(): Entry {
+    const index = this.#pending.findIndex((entry) => !runsInBackground(entry.job));
+    return this.#pending.splice(Math.max(0, index), 1)[0]!;
+  }
   async #drain(): Promise<void> {
     if (this.#running) return;
     this.#running = true;
@@ -101,7 +115,7 @@ export class JobQueue {
         this.#running = false;
         return false;
       },
-      () => this.#runEntry(this.#pending.shift()!),
+      () => this.#runEntry(this.#next()),
     );
   }
   async #runEntry(current: Entry): Promise<void> {

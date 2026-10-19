@@ -12,6 +12,8 @@ export interface ServiceConfig {
   chrome: string | null;
   /** Composite detail/HDR export groups on the GPU when a hardware renderer starts. */
   gpuCompositing: boolean;
+  /** Decode undamaged originals for proxy encodes with NVDEC when a CUDA device starts. */
+  hardwareDecode: boolean;
   allowedOrigins: Set<string>;
   allowedHosts: Set<string>;
 }
@@ -58,6 +60,8 @@ export function createConfig(overrides: Partial<ServiceConfig> = {}): ServiceCon
     overrides.mediaRoots === undefined ? configuredMediaRoots() : validateMediaRoots(overrides.mediaRoots);
   const gpu = process.env['PASCAP_GPU_COMPOSITING'] ?? 'auto';
   if (gpu !== 'auto' && gpu !== 'off') throw new Error('PASCAP_GPU_COMPOSITING must be auto or off.');
+  const decode = process.env['PASCAP_HW_DECODE'] ?? 'auto';
+  if (decode !== 'auto' && decode !== 'off') throw new Error('PASCAP_HW_DECODE must be auto or off.');
   return {
     dataDir: path.resolve(process.env['PASCAP_DATA_DIR'] ?? '.pascap'),
     webDir: path.resolve('dist/web'),
@@ -66,6 +70,7 @@ export function createConfig(overrides: Partial<ServiceConfig> = {}): ServiceCon
     ffprobe: process.env['PASCAP_FFPROBE'] ?? 'ffprobe',
     chrome: process.env['PASCAP_CHROME'] || null,
     gpuCompositing: gpu === 'auto',
+    hardwareDecode: decode === 'auto',
     allowedOrigins: new Set(origins),
     allowedHosts: new Set(origins.map((origin) => new URL(origin).host)),
     ...overrides,

@@ -169,7 +169,8 @@ clips. Plus/double-click target the selected video track; a drop targets the tra
 
 ### Find the steadiest range
 
-Preparing a drone recording also measures its camera motion. Lanes directly under the
+After a drone recording is prepared, a background job measures its camera motion
+(Activity shows it after the other jobs, so every proxy of an import comes first). Lanes directly under the
 source range strip share its playhead and hatching: the first shows jolts (amber area:
 sudden angle or speed changes), camera movement (white line) and the dashed allowed
 movement (drag it); the green bands mark steady ranges, the suggested one strongest.

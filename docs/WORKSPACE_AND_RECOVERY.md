@@ -858,7 +858,8 @@ draft database or interrupted-render resume is claimed.
 
 ## Activity and exports
 
-Activity is a nonmodal drawer, with running first, FIFO queued jobs, then history by
+Activity is a nonmodal drawer, with running first, then queued jobs in the order they
+will run (FIFO, with camera motion analyses after the others), then history by
 completion date. It includes video/audio preparation, reference renders, exports,
 failures and cancellations. Progress is numeric/bar-based; settled outcomes are
 announced without reading every progress poll aloud. A **running export** also shows
