@@ -249,13 +249,13 @@ export function SourceReview({
   const observedFrame = currentObservation?.frame ?? null;
   const shownFrame = observedFrame ?? currentObservation?.requestedFrame ?? requestedFrame;
   const error = decoderError || currentObservation?.error || '';
-  const buffering = observedFrame === null && !error;
-  // A fast seek keeps the previous image instead of blinking; a slow one hides it and says so.
-  const seekingShown = useDelayedFlag(buffering);
+  const buffering = !error && (observedFrame === null || currentObservation?.status === 'buffering');
+  // A seek keeps the previous image instead of blinking; 250 ms without a new image hides it and says so.
+  const seekingShown = useDelayedFlag(buffering, undefined, observedFrame);
   const playing = currentObservation?.status === 'playing' || currentObservation?.status === 'starting';
   const steadyTransportLabel = playing ? 'Playing' : 'Paused';
   const transportLabel = currentObservation?.status === 'starting' ? 'Starting' : steadyTransportLabel;
-  const playDisabled = rangeDraft || !visible || disabled || (!playing && (observedFrame === null || !!error));
+  const playDisabled = rangeDraft || !visible || disabled || (!playing && (buffering || !!error));
   const togglePlayback = (): void => {
     if (playing) pause();
     else if (!playDisabled) transport.current?.play();
