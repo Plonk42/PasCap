@@ -84,8 +84,8 @@ not the SDR RGB grade, with no additional track multiplier or sidebar duplicate.
 **Temperature / Tint** use normalized **−2…2** and **−1…1** values, neutral **0**: positive
 Temperature warms, positive Tint adds magenta. They are track-owned, independently
 keyable and editable on empty tracks. Nonzero settings intentionally colour greys;
-the shared linear-gain formula runs before Exposure, not as Kelvin/HDR output/automatic
-white balance. Static HSL/curves add no animation channels. See
+the shared linear-gain formula runs before Exposure, not as Kelvin/HDR output. **Auto white
+balance**, under Tint, keyframes both from the light around the playhead. Static HSL/curves add no animation channels. See
 [Temperature and Tint](docs/design/TEMPERATURE_AND_TINT.md).
 **HDR** (0–1, neutral 0) is a keyable SDR local tone-mapping look applied with the
 clip detail filters before grading; see [detail filters](docs/design/DETAIL_FILTERS.md#hdr-look).

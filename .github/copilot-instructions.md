@@ -151,7 +151,10 @@ edits real projects with it, so saved data must keep working. Details are in
   curves → fades/coverage. CPU/reference/native/GPU use the same math and order.
   Nonzero settings intentionally colour greys; normalization preserves neutral-white
   linear luminance before clipping only, not arbitrary pixels or final output.
-  No Kelvin/HDR output/AWB. Main/stored slider/exact-field/reset/diamond/navigation retain
+  No Kelvin/HDR output. #218 **Auto white balance** (under Tint) estimates Temperature/Tint
+  from 7 proxy frames within ±15 of the playhead (its clip, mapped through retiming) on its
+  own temporary reader, and keyframes both at the playhead like their diamonds, one Undo
+  step; no schema/render/export change. Main/stored slider/exact-field/reset/diamond/navigation retain
   explicit capture, row ownership, empty-row editing and one-step gestures.
   Compare bypasses all Colour, including Temperature/Tint, and clip Detail, never coverage or geometry.
   See [Temperature and Tint](../docs/design/TEMPERATURE_AND_TINT.md).

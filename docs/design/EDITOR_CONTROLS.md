@@ -77,7 +77,12 @@ and technical paths stay unchanged; this glossary does not change the project sc
   Exposure, are independently animatable and work on empty tracks, with the standard
   slider/exact-field/reset pattern, capture diamonds,
   adjacent per-setting Previous/Next buttons, section navigation and stored-setting
-  chip arrows. No Kelvin or AWB label.
+  chip arrows. No Kelvin label.
+- **Auto white balance** is the secondary button under Tint: it keyframes Temperature and Tint at the
+  playhead from the light of a few frames around it, like their diamonds, in one Undo step. Unavailable
+  with its reason (`aria-disabled` and tooltip) without a prepared clip of the track at the playhead;
+  **Analysing n/7…** with a **Cancel** icon (or Escape) appears only after 250 ms; failures stay inline.
+  See [automatic white balance](TEMPERATURE_AND_TINT.md#automatic-white-balance).
 - **Vibrance** is a track-owned −1…2 scalar Colour control, neutral 0, last in the **Colour**
   group after Saturation: it scales saturation more for muted colours than strong ones
   (greys and fully saturated colours stay unchanged); a plain slider track, no gradient.
