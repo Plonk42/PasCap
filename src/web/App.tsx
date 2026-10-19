@@ -75,6 +75,7 @@ import type { SourcePlayback } from './SourceReview.js';
 import { planTimelineDrop } from './timeline-placement.js';
 import { adjacentBookmark, rangeBookmarkCommands } from './timeline-bookmarks.js';
 import { Timeline, type DraftPreview } from './Timeline.js';
+import { useReviewTarget } from './use-review-target.js';
 import {
   DEFAULT_LAYOUT,
   defaultTimelineHeight,
@@ -252,7 +253,7 @@ export function App() {
   const viewer = useRef(viewerMode);
   viewer.current = viewerMode;
   const sourcePlayback = useRef<SourcePlayback | null>(null);
-  const [review, setReview] = useState<ReviewTarget | null>(null);
+  const [review, reviews] = useReviewTarget(sourcePlayback);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectedMusicId, setSelectedMusicId] = useState<string | null>(null);
   const [selectedLayerId, setSelectedLayerId] = useState(EMPTY_PROJECT.layers[0]!.id);
@@ -296,9 +297,6 @@ export function App() {
   const actionPending = useRef(false);
   const refreshSequence = useRef(0);
   const jobGeneration = useRef(0);
-  // The last clicked/focused recording; hovering another one only previews it temporarily.
-  const chosenReview = useRef<ReviewTarget | null>(null);
-  const hoveringReview = useRef(false);
   const exportAccepted = useRef(false);
   const timelineTab = useRef<HTMLButtonElement>(null);
   const projectsTrigger = useRef<HTMLButtonElement>(null);
@@ -828,9 +826,7 @@ export function App() {
       }
       sourceRanges.current = choices;
       setRanges(choices);
-      chosenReview.current = null;
-      hoveringReview.current = false;
-      setReview(null);
+      reviews.close();
       setViewerMode('timeline');
       const first = calculateLayout(loaded).clips[0];
       if (first) select(first.clip.id);
@@ -872,9 +868,7 @@ export function App() {
     sourceRanges.current = {};
     setRanges({});
     setDraggedMediaIds(null);
-    chosenReview.current = null;
-    hoveringReview.current = false;
-    setReview(null);
+    reviews.close();
     setViewerMode('timeline');
     setSaveState({ state: 'saved', message: 'Local workspace', revision: 0, recovery: null });
     const url = new URL(location.href);
@@ -1579,24 +1573,11 @@ export function App() {
       .catch((cause: unknown) => setError(message(cause, 'Preview could not be retried.')));
   };
   const reviewSource = (next: ReviewTarget, choose: boolean): void => {
-    if (choose) chosenReview.current = next;
-    hoveringReview.current = !choose;
-    setReview(next);
-    setViewerMode('source');
-  };
-  const endReviewHover = (): void => {
-    if (!hoveringReview.current) return;
-    hoveringReview.current = false;
-    if (chosenReview.current) setReview(chosenReview.current);
-  };
-  const reviewFrame = (next: ReviewTarget): void => {
-    setReview(next);
-    if (!hoveringReview.current && chosenReview.current?.mediaId === next.mediaId) chosenReview.current = next;
+    reviews.source(next, choose);
+    if (viewer.current !== 'source') setViewerMode('source');
   };
   const closeReview = (): void => {
-    chosenReview.current = null;
-    hoveringReview.current = false;
-    setReview(null);
+    reviews.close();
     setViewerMode('timeline');
     timelineTab.current?.focus({ preventScroll: true });
   };
@@ -1610,13 +1591,8 @@ export function App() {
     }
     setError('');
     setTimeRange(null);
-    if (chosenReview.current && removal.videoIds.includes(chosenReview.current.mediaId)) chosenReview.current = null;
-    if (review && removal.videoIds.includes(review.mediaId)) {
-      // Release the removed recording's review decoder without moving keyboard focus.
-      hoveringReview.current = false;
-      setReview(null);
-      setViewerMode('timeline');
-    }
+    // Release the removed recording's review decoder without moving keyboard focus.
+    if (reviews.remove(removal.videoIds)) setViewerMode('timeline');
     return true;
   };
   const refreshActivity = async (): Promise<boolean> => (await act(() => refresh(), 'activity')).ok;
@@ -1920,8 +1896,9 @@ export function App() {
               onImport={() => requestImport()}
               importRevision={importRevision}
               review={review}
+              currentReview={reviews.current}
               onReview={reviewSource}
-              onReviewHoverEnd={endReviewHover}
+              onReviewHoverEnd={reviews.endHover}
               targetLayer={targetLayer}
               onCollapse={togglePanel}
               collapseDisabled={draft !== null}
@@ -2025,12 +2002,11 @@ export function App() {
                     range={resolveMediaSelection(reviewAsset.id, reviewAsset.metadata.frameCount, ranges)}
                     excerpts={reviewExcerpts}
                     disabled={!project || busy || draft !== null}
-                    onFrame={(frame) => reviewFrame({ mediaId: reviewAsset.id, frame })}
+                    onFrame={(frame) => reviews.displayed({ mediaId: reviewAsset.id, frame })}
                     onRange={setSourceRange}
                     onClose={closeReview}
                     onInsert={(steady) => {
-                      chosenReview.current = review;
-                      hoveringReview.current = false;
+                      reviews.chooseShown();
                       return insert(steady ?? [reviewAsset.id], undefined, undefined, undefined, true);
                     }}
                     onRevealClip={revealClip}

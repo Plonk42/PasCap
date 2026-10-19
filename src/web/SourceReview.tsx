@@ -64,6 +64,8 @@ interface Props {
 /** Lets the editor's Space shortcut play or pause the source preview while it is displayed. */
 export interface SourcePlayback {
   toggle: () => void;
+  /** Seek the open recording without a render of the editor; false when another one is shown. */
+  show: (mediaId: string, frame: number) => boolean;
 }
 
 interface Observation {
@@ -140,8 +142,10 @@ export function SourceReview({
   const requestedFrame = Math.max(0, Math.min(asset.metadata.frameCount - 1, Math.round(frame)));
   const rate = asset.metadata.frameRate;
   const resourceKey = `${asset.id}/${asset.prepared?.verification.verifiedAt}/${asset.metadata.frameCount}/${rate.numerator}/${rate.denominator}/${retry}`;
-  const latest = useRef({ frame: requestedFrame, range, onFrame });
-  latest.current = { frame: requestedFrame, range, onFrame };
+  const latest = useRef({ range, onFrame });
+  latest.current = { range, onFrame };
+  // The latest requested frame: `frame` only changes when the editor opens or returns to a frame.
+  const position = useRef({ mediaId: asset.id, frame: requestedFrame });
 
   useEffect(() => {
     setLastAdded(null);
@@ -200,14 +204,16 @@ export function SourceReview({
       }
       context.drawImage(frame, 0, 0, canvas.width, canvas.height);
     };
+    const mediaId = asset.id;
     const owner = new SourceTransport(
       new VideoStreams(1),
       draw,
       rate,
       asset.metadata.frameCount,
       latest.current.range,
-      latest.current.frame,
+      position.current.mediaId === mediaId ? position.current.frame : requestedFrame,
       (state) => {
+        position.current = { mediaId, frame: state.requestedFrame };
         setObservation({ key: resourceKey, state });
         if (state.frame !== null) latest.current.onFrame(state.frame);
       },
@@ -224,8 +230,9 @@ export function SourceReview({
   }, [resourceKey, visible]);
 
   useLayoutEffect(() => {
+    position.current = { mediaId: asset.id, frame: requestedFrame };
     transport.current?.follow(requestedFrame);
-  }, [requestedFrame, resourceKey, visible]);
+  }, [requestedFrame, asset.id]);
   useLayoutEffect(() => {
     transport.current?.setRange(range);
     if (disabled) transport.current?.pause();
@@ -240,6 +247,7 @@ export function SourceReview({
 
   const currentObservation = visible && observation?.key === resourceKey ? observation.state : null;
   const observedFrame = currentObservation?.frame ?? null;
+  const shownFrame = observedFrame ?? currentObservation?.requestedFrame ?? requestedFrame;
   const error = decoderError || currentObservation?.error || '';
   const buffering = observedFrame === null && !error;
   // A fast seek keeps the previous image instead of blinking; a slow one hides it and says so.
@@ -252,7 +260,16 @@ export function SourceReview({
     if (playing) pause();
     else if (!playDisabled) transport.current?.play();
   };
-  useImperativeHandle(ref, () => ({ toggle: togglePlayback }));
+  useImperativeHandle(ref, () => ({
+    toggle: togglePlayback,
+    show(mediaId, frame) {
+      if (mediaId !== asset.id) return false;
+      const next = Math.max(0, Math.min(asset.metadata.frameCount - 1, Math.round(frame)));
+      position.current = { mediaId, frame: next };
+      transport.current?.follow(next);
+      return true;
+    },
+  }));
   const keyboard = (event: KeyboardEvent<HTMLElement>): void => {
     // Space reaches the editor shortcut, which plays this preview while it is displayed.
     if (event.code === 'Space') return;
@@ -382,7 +399,7 @@ export function SourceReview({
         ref={commands}
         asset={asset}
         range={range}
-        frame={observedFrame ?? requestedFrame}
+        frame={shownFrame}
         observedFrame={observedFrame}
         disabled={disabled}
         onFrame={scrub}
@@ -404,8 +421,8 @@ export function SourceReview({
         }
         readout={
           <div className="source-review-readout">
-            <span title={`Frame ${observedFrame ?? requestedFrame} of ${asset.metadata.frameCount - 1}`}>
-              {formatTimecode(observedFrame ?? requestedFrame, rate)}
+            <span title={`Frame ${shownFrame} of ${asset.metadata.frameCount - 1}`}>
+              {formatTimecode(shownFrame, rate)}
             </span>
             <small>{transportLabel}</small>
           </div>
