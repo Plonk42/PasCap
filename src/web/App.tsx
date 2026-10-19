@@ -43,7 +43,9 @@ import { removeSelectedRange, splitSourceFrame, trimAtPlayhead, type TimelineRan
 import { forEachSerial } from '../shared/serial.js';
 import { validateSourceRanges } from '../shared/source-range.js';
 import { calculateLayout, layerClips } from '../shared/timeline.js';
+import type { AnalysisFrame } from '../shared/white-balance.js';
 import { api, type RequestOptions } from './api.js';
+import { proxyUrl } from './auto-white-balance.js';
 import { Autosave, type SaveState } from './autosave.js';
 import { waitForService } from './connection.js';
 import { DeferredPanel } from './DeferredPanel.js';
@@ -89,6 +91,8 @@ interface EditorDebug {
   project: () => ProjectDocument | null;
   verifyColour: (settings: ColourSettings) => GpuComparison;
   verifyComposition: () => GpuCompositionComparison;
+  /** The pixels automatic analyses read from a recording's proxy, keyed by source frame. */
+  sampleFrames: (mediaId: string, frames: readonly number[]) => Promise<Map<number, AnalysisFrame>>;
   setDocument: (document: ProjectDocument) => void;
   flush: () => Promise<void>;
 }
@@ -910,6 +914,8 @@ export function App() {
           project: () => current.current,
           verifyColour: module.verifyGpuColour,
           verifyComposition: module.verifyLayerComposition,
+          sampleFrames: (mediaId, frames) =>
+            module.sampleProxyFrames(proxyUrl(mediaId), frames, new AbortController().signal),
           setDocument: commit,
           flush: async () => {
             await autosave.current?.flush();

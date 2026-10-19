@@ -1,0 +1,44 @@
+/* Track → Colour: Auto white balance sits under Temperature and Tint, the two settings it keyframes. */
+.auto-white-balance {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  min-width: 0;
+}
+
+.auto-white-balance-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.auto-white-balance-button[aria-disabled='true'] {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.auto-white-balance-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  white-space: nowrap;
+}
+
+.auto-white-balance-progress {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.auto-white-balance .icon-button {
+  width: 22px;
+  height: 22px;
+}
+
+.auto-white-balance-error {
+  flex-basis: 100%;
+  margin: 0;
+  color: var(--error);
+  font-size: 10px;
+  line-height: 1.35;
+}

@@ -1,9 +1,10 @@
 # Video track Temperature and Tint
 
-Approved contract for [#68](https://github.com/Plonk42/PasCap/issues/68).
-These are normalized **SDR colour controls**, not Kelvin, HDR output, illuminant
-estimation, automatic white balance or highlight recovery. This guide specifies
-behaviour and required validation, not completed tests or hardware qualification.
+Approved contract for [#68](https://github.com/Plonk42/PasCap/issues/68), with
+[automatic white balance](#automatic-white-balance) from [#218](https://github.com/Plonk42/PasCap/issues/218).
+These are normalized **SDR colour controls**, not Kelvin, HDR output or highlight
+recovery. This guide specifies behaviour and required validation, not completed
+tests or hardware qualification.
 
 ## Ownership, data and controls
 
@@ -81,6 +82,61 @@ Temperature/Tint and every other colour stage, never Opacity, geometry or fades.
 These appearance-only controls add no decoder, full-frame buffer, LUT array or
 native process; existing frame/pixel/resource and A/V gates remain unchanged.
 
+## Automatic white balance
+
+**Auto white balance**, a button under Tint in **Track → Colour**, estimates the light at
+the playhead and keyframes Temperature and Tint there. It only chooses values: no
+schema, grade stage, render, export or decoder changes. Its constants live in one
+module, [white-balance.ts](../../src/shared/white-balance.ts), as starting values to tune on real flights.
+
+**Frames.** The clip of the selected track shown at the real playhead (in a dissolve,
+the selected clip when it is one of the two, else the one past its midpoint) supplies
+**7 project frames**: the playhead and up to **15 frames (0.5 s) on each side**, never
+across that clip's ends, the other six shared between the two sides in proportion to
+their room and evenly spaced. Each maps to the source frame the clip shows there
+through `PlacedClip.retiming` (speed and Reverse). A temporary one-decoder reader
+decodes them from the verified proxy, never an original, separate from the timeline and
+source review lanes; each frame is drawn into a canvas of at most 320 × 180 pixels
+(the decoded frame as the compositor uploads it), read back and closed at once. The
+reader is released when done, failed or cancelled.
+
+**Per frame.** Letterbox rows/columns (no code above 16) are dropped. Pixels with a
+channel at 250 or more, and their 3 × 3 neighbours, are clipped; linear luma below
+0.002 is noise; both are ignored. Two estimates of the light $e$ in linear BT.709:
+
+- Shades of Grey: $e_c=\big(\tfrac1n\sum c^6\big)^{1/6}$;
+- 1st-order Grey-Edge: a 3 × 3 binomial blur, central-difference gradient magnitudes
+  per channel, $e_c=\big(\tfrac1n\sum|\nabla c|^6\big)^{1/6}$, away from ignored pixels.
+  Large uniform sky, sea or grass have almost no gradient, so they barely count.
+
+The frame's light is their per-channel geometric mean, with confidence
+$k=1-\min(1,\angle(e_{SoG},e_{GE})/8°)$. Fewer than 256 usable pixels or edge samples,
+as on black, clipped or uniform frames, give no estimate. Gains proportional to $1/e$
+are exactly Temperature/Tint gains (up to the luminance normalization):
+
+$$T=\log_2(e_B/e_R),\qquad I=\log_2\!\big(e_G^2/(e_Re_B)\big).$$
+
+**Pooling and damping.** The median of each frame's $T$, $I$ and $k$, so one frame facing
+the sun or a passing subject does not decide; confidence halves when the robust spread
+($1.4826\times$ median absolute deviation) of $T$ exceeds 0.25, a light change within
+the window. With $\mathrm{soft}(x,m)=m\tanh(x/m)$, the captured values are
+$T'=\mathrm{soft}(k\beta T,0.5)$, with $\beta=0.85$ for a cool cast ($T>0$) and $0.6$ for a
+warm one, which viewers accept more readily (a sunset stays warm), and
+$I'=\mathrm{soft}(0.8kI,0.3)$, rounded to thousandths. No frame with an estimate is an
+explicit error.
+
+**Capture.** The result is captured at the real playhead exactly like the two capture
+diamonds: it creates the track keyframe there or joins the existing one, adopting the
+Easing that keyframe's settings agree on (else Linear), and overwrites only these two
+values when they are already enabled. Both are one transaction, one Undo step. Running
+it at two frames makes Temperature and Tint follow the light between them by ordinary
+keyframe interpolation; there is no automatic per-frame adaptation. It is unavailable,
+with the reason, when no clip of the track is at the playhead, its recording has no
+verified proxy, or the track holds 256 keyframes and none is at the playhead. Moving
+the playhead, changing track, clip or project, Escape or **Cancel** stop it without an
+edit. Analysis of the ungraded proxy makes the result absolute, not a change to the
+current grade.
+
 ## Strict preservation and validation
 
 Projects are upgraded to the **current schema** on load from the oldest supported schema
@@ -99,4 +155,7 @@ identity, both axis signs and combined gains, pre-clipping neutral-white
 luminance, intentionally coloured greys, stage order and unchanged CPU/reference/
 native/GPU error gates. Editing checks cover empty tracks, independent capture,
 read-only gaps, final-keyframe removal, resets, invalid/cancelled drafts, Undo/Redo and
-live desktop/compact screenshots. No real-media jobs or new performance claims.
+live desktop/compact screenshots. Automatic white balance checks cover the estimator on
+synthetic images (neutral, casts, outlier frame, sky, sunset, letterbox and clipping), the
+window, capture, Undo, cancellation and failure, and that the analysed pixels equal the
+compositor input. No real-media jobs or new performance claims.

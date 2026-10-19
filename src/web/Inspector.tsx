@@ -1,4 +1,4 @@
-import { memo, useEffect, useId, type KeyboardEvent, type ReactNode } from 'react';
+import { Fragment, memo, useEffect, useId, type KeyboardEvent, type ReactNode } from 'react';
 import { COLOUR_CONTROLS, NEUTRAL_COLOUR } from '../shared/colour.js';
 import { applyCommand, type EditCommand } from '../shared/commands.js';
 import { colourAt } from '../shared/composition.js';
@@ -8,6 +8,7 @@ import type { ProjectDocument, Transition, VideoClip, VideoLayer } from '../shar
 import { calculateLayout, transitionOffset, type TimelineLayout } from '../shared/timeline.js';
 import { ColourCurvesSection, HslRangesSection } from './AdvancedColour.js';
 import { TrackAnimationControls } from './AnimationControls.js';
+import { AutoWhiteBalance } from './AutoWhiteBalance.js';
 import { ClipSourceRange } from './ClipSourceRange.js';
 import { COLOUR_GROUPS, colourGroupResetCommands, colourResetCommands } from './colour-reset.js';
 import { DetailSection } from './DetailControls.js';
@@ -312,11 +313,23 @@ function ColourSection({
   layer,
   frame,
   duration,
+  layout,
+  assets,
+  selectedClipId,
   resetKey,
   disabled,
   onEdit,
   id,
-}: Readonly<LayerControlProps & { project: ProjectDocument; duration: number; id: string }>) {
+}: Readonly<
+  LayerControlProps & {
+    project: ProjectDocument;
+    duration: number;
+    layout: TimelineLayout;
+    assets: readonly MediaAsset[];
+    selectedClipId: string | null;
+    id: string;
+  }
+>) {
   const colour = colourAt(layer, frame);
   const opacity = evaluateLayerSetting(layer, 'opacity', frame, layer.opacity);
   const animated =
@@ -398,6 +411,18 @@ function ColourSection({
             disabled={disabled}
             onEdit={onEdit}
             id={id}
+            afterTint={
+              <AutoWhiteBalance
+                projectId={project.id}
+                layer={layer}
+                layout={layout}
+                assets={assets}
+                frame={frame}
+                selectedClipId={selectedClipId}
+                disabled={disabled}
+                onEdit={onEdit}
+              />
+            }
           />
         ))}
       </div>
@@ -421,7 +446,8 @@ function ColourGroup({
   disabled,
   onEdit,
   id,
-}: Readonly<LayerControlProps & { group: (typeof COLOUR_GROUPS)[number]; id: string }>) {
+  afterTint,
+}: Readonly<LayerControlProps & { group: (typeof COLOUR_GROUPS)[number]; id: string; afterTint: ReactNode }>) {
   const colour = colourAt(layer, frame);
   const headingId = `${id}-group-${group.name.toLowerCase()}`;
   const neutral = group.settings.every((setting) =>
@@ -440,31 +466,32 @@ function ColourGroup({
         <span id={headingId}>{group.name}</span>
         <ResetButton name={`the ${group.name} group`} blocked={blocked} onReset={() => onEdit(commands)} />
       </legend>
-      {group.settings.map((setting) =>
-        setting === 'opacity' ? (
-          <OpacityControl
-            key={setting}
-            layer={layer}
-            frame={frame}
-            resetKey={resetKey}
-            disabled={disabled}
-            onEdit={onEdit}
-            id={`${id}-opacity`}
-          />
-        ) : (
-          <ColourControl
-            key={setting}
-            layer={layer}
-            frame={frame}
-            resetKey={resetKey}
-            disabled={disabled}
-            onEdit={onEdit}
-            control={COLOUR_CONTROLS.find((item) => item.key === setting)!}
-            value={colour[setting]}
-            id={`${id}-${setting}`}
-          />
-        ),
-      )}
+      {group.settings.map((setting) => (
+        <Fragment key={setting}>
+          {setting === 'opacity' ? (
+            <OpacityControl
+              layer={layer}
+              frame={frame}
+              resetKey={resetKey}
+              disabled={disabled}
+              onEdit={onEdit}
+              id={`${id}-opacity`}
+            />
+          ) : (
+            <ColourControl
+              layer={layer}
+              frame={frame}
+              resetKey={resetKey}
+              disabled={disabled}
+              onEdit={onEdit}
+              control={COLOUR_CONTROLS.find((item) => item.key === setting)!}
+              value={colour[setting]}
+              id={`${id}-${setting}`}
+            />
+          )}
+          {setting === 'tint' && afterTint}
+        </Fragment>
+      ))}
     </fieldset>
   );
 }
@@ -977,6 +1004,9 @@ function InspectorPanel({
                 layer={layer}
                 frame={frame}
                 duration={layout.duration}
+                layout={layout}
+                assets={assets}
+                selectedClipId={selectedClipId}
                 resetKey={`${inputContext}:${frame}`}
                 disabled={drafting}
                 onEdit={onEdit}
