@@ -437,7 +437,7 @@ intermediates use 16 slices above two threads so every encoder thread has work.
 Audio and thumbnail work keep two. With `PASCAP_HW_DECODE=auto` and a CUDA device (probed once
 per service), the proxy encode decodes undamaged originals with NVDEC (`-hwaccel cuda`): its frames,
 and so the proxy, are identical to the CPU decoder's, and it frees about half the encode's CPU
-(a 30 s UHD proxy took 6.4 s instead of 10.2 s on the development machine). Damaged originals keep
+(a 30 s UHD proxy encode took about 7.4 s instead of 10.6 s on the development machine). Damaged originals keep
 the CPU decoder their repair was verified with. A failed NVDEC encode is retried once on the CPU,
 which the service then keeps using, and the job says so. While the proxy encodes, one more two-thread decoder
 seeks the original's three comparison frames (beginning, middle and end), one at a time,
