@@ -46,7 +46,7 @@ import {
 } from './keyframe-slide.js';
 import { ClipContextMenu, type ClipMenuAnchor } from './ClipContextMenu.js';
 import { nextLayerName } from './move-to-track.js';
-import './declutter.css';
+import './editor-panels.css';
 import './layers.css';
 import { Layers } from './Layers.js';
 import { createMusicInstance, videoTimelineDuration } from './music-ui.js';

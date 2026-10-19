@@ -2,7 +2,7 @@ import { useId, useState, type ReactNode } from 'react';
 import type { Interpolation } from '../shared/keyframes.js';
 import { formatTimecode } from '../shared/timing.js';
 import { ChannelSteps } from './AnimationControls.js';
-import './declutter.css';
+import './editor-panels.css';
 import { Icon } from './icons.js';
 import { KeyframeEasing } from './KeyframeEasing.js';
 import { keySeekHint } from './keyframe-navigation.js';

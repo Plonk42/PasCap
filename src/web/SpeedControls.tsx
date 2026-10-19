@@ -6,7 +6,7 @@ import { MAX_CLIP_SPEED_KEYS, sourceRateAt, type SpeedSettings } from '../shared
 import { KeyframeLine } from './AnimationControls.js';
 import { previewClipSource } from './clip-speed-geometry.js';
 import { ClipSpeedCurve } from './ClipSpeedCurve.js';
-import './declutter.css';
+import './editor-panels.css';
 import { sourceSeconds } from './display.js';
 import { HelpPopover } from './HelpPopover.js';
 import { Icon } from './icons.js';

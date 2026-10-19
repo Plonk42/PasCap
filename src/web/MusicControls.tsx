@@ -2,7 +2,7 @@ import { useId, useState, type ReactNode } from 'react';
 import type { AudioAsset } from '../shared/audio.js';
 import { applyCommand, type EditCommand } from '../shared/commands.js';
 import { MAX_MUSIC_TRACKS, type MusicTrack, type ProjectDocument } from '../shared/model.js';
-import './declutter.css';
+import './editor-panels.css';
 import { Disclosure } from './Disclosure.js';
 import { durationLabel, sourceSeconds } from './display.js';
 import { HelpPopover } from './HelpPopover.js';
