@@ -600,9 +600,21 @@ describe('one worker, cancellation and explicit retry', () => {
     await entered.promise;
     expect(imported.jobs).toHaveLength(2);
     expect(starts).toBe(1);
-    expect(runProcess).toHaveBeenCalledTimes(1);
     const first = imported.jobs.find((job) => job.label === 'a.mp4')!;
     const second = imported.jobs.find((job) => job.label === 'b.mp4')!;
+    // While the proxy encodes, its original's three comparison frames are decoded separately.
+    const original = imported.assets.find((asset) => asset.name === 'a.mp4')!.sourcePath;
+    await vi.waitFor(() => {
+      const calls = vi.mocked(runProcess).mock.calls.map(([, args]) => args);
+      expect(calls.filter((args) => args.includes('-progress'))).toHaveLength(1);
+      expect(
+        calls.filter((args) => !args.includes('-progress')).map((args) => [args[args.indexOf('-i') + 1], args.at(-1)]),
+      ).toEqual([
+        [original, 'pipe:1'],
+        [original, 'pipe:1'],
+        [original, 'pipe:1'],
+      ]);
+    });
     expect(jobs.get(first.id).state).toBe('running');
     expect(jobs.get(second.id).state).toBe('queued');
     jobs.cancel(first.id);
@@ -633,7 +645,14 @@ describe('one worker, cancellation and explicit retry', () => {
 
   it('skips a failed encode until an explicit prepare request retries it', async () => {
     const { sources, library, jobs } = await fixture();
-    vi.mocked(runProcess).mockRejectedValueOnce(new ServiceError('Encoder rejected the source.', 422));
+    let rejected = false;
+    vi.mocked(runProcess).mockImplementation(async (binary, args, options) => {
+      if (!rejected && args.includes('-progress')) {
+        rejected = true;
+        throw new ServiceError('Encoder rejected the source.', 422);
+      }
+      return fakeProcess(binary, args, options);
+    });
     const accepted = await library.addForEditing(await source(sources));
     expect((await jobs.wait(accepted.job!.id)).state).toBe('failed');
     const repeated = await library.importForEditing(sources);
@@ -642,6 +661,46 @@ describe('one worker, cancellation and explicit retry', () => {
     expect(jobs.list()).toHaveLength(1);
     const retry = await library.prepare(accepted.asset.id);
     expect((await jobs.wait(retry.id)).state).toBe('completed');
+  });
+
+  it("stops the original's comparison decodes when the encode fails, before the job settles", async () => {
+    const { sources, library, jobs } = await fixture();
+    const decoding = deferred();
+    let stopped = false;
+    vi.mocked(runProcess).mockImplementation(async (binary, args, options = {}) => {
+      if (args.includes('-progress')) {
+        await decoding.promise;
+        throw new ServiceError('Encoder rejected the source.', 422);
+      }
+      try {
+        decoding.resolve();
+        await untilReleased(new Promise(() => {}), options.signal!);
+      } finally {
+        stopped = true;
+      }
+      return fakeProcess(binary, args, options);
+    });
+    const accepted = await library.addForEditing(await source(sources));
+    const failed = await jobs.wait(accepted.job!.id);
+    expect(failed).toMatchObject({ state: 'failed', message: 'Encoder rejected the source.' });
+    expect(stopped).toBe(true);
+    expect(await readdir(library.assetDir(accepted.asset))).toEqual([]);
+  });
+
+  it("reports a failed comparison decode of the original after the proxy's own checks", async () => {
+    const { sources, library, jobs } = await fixture();
+    let encoded = false;
+    vi.mocked(runProcess).mockImplementation(async (binary, args, options) => {
+      if (args.includes('-progress')) encoded = true;
+      else if (args.at(-1) === 'pipe:1' && !args.some((arg) => arg.endsWith('.partial.mp4')))
+        throw new ServiceError('Cannot decode the original frame.', 422);
+      return fakeProcess(binary, args, options);
+    });
+    const accepted = await library.addForEditing(await source(sources));
+    const failed = await jobs.wait(accepted.job!.id);
+    expect(failed).toMatchObject({ state: 'failed', message: 'Cannot decode the original frame.' });
+    expect(encoded).toBe(true);
+    expect(vi.mocked(probeVideo).mock.calls.some(([, filename]) => filename.endsWith('.partial.mp4'))).toBe(true);
   });
 });
 

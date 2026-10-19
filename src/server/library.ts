@@ -566,99 +566,26 @@ export class MediaLibrary {
     }
     const temporary = path.join(directory, `proxy-${context.id}.partial.mp4`);
     await this.#assertRepairable(asset, repair, context);
+    const { frameCount } = asset.metadata;
+    const frames = [0, Math.floor((frameCount - 1) / 2), frameCount - 1].map((frame) =>
+      undamagedFrame(frame, repair, frameCount),
+    );
+    const stop = new AbortController();
+    // Separate seeked decodes of the original, run while the encode leaves cores idle.
+    const originals = this.#originalFrames(asset, frames, AbortSignal.any([context.signal, stop.signal]));
+    // Its failure is reported at the comparison, after the proxy's own checks.
+    originals.catch(() => {});
     try {
       context.update(0.01, 'Encoding a read-only 720p proxy');
-      const inputRange = asset.metadata.colourRange === 'tv' ? 'tv' : 'pc';
-      await runProcess(
-        this.config.ffmpeg,
-        [
-          '-hide_banner',
-          '-loglevel',
-          'error',
-          '-nostdin',
-          '-n',
-          '-threads',
-          NATIVE_THREADS,
-          ...repairInputArgs(repair),
-          '-i',
-          asset.sourcePath,
-          '-map',
-          '0:v:0',
-          '-an',
-          '-sn',
-          '-dn',
-          '-vf',
-          `${repairFilter(repair, 0)}scale=w='min(1280,iw)':h='min(720,ih)':force_original_aspect_ratio=decrease:force_divisible_by=2:flags=bicubic:in_color_matrix=bt709:out_color_matrix=bt709:in_range=${inputRange}:out_range=tv,setsar=1`,
-          ...repairedFrameLimit(repair, asset.metadata.frameCount),
-          '-fps_mode',
-          'passthrough',
-          '-c:v',
-          'libx264',
-          '-preset',
-          'veryfast',
-          '-crf',
-          '20',
-          '-pix_fmt',
-          'yuv420p',
-          '-g',
-          String(PROXY_GOP_FRAMES),
-          '-keyint_min',
-          String(PROXY_GOP_FRAMES),
-          '-sc_threshold',
-          '0',
-          '-bf',
-          '0',
-          '-flags',
-          '+cgop',
-          '-threads',
-          NATIVE_THREADS,
-          '-filter_threads',
-          NATIVE_THREADS,
-          '-color_primaries',
-          'bt709',
-          '-color_trc',
-          'bt709',
-          '-colorspace',
-          'bt709',
-          '-color_range',
-          'tv',
-          '-movflags',
-          '+faststart',
-          '-video_track_timescale',
-          '30000',
-          '-progress',
-          'pipe:1',
-          temporary,
-        ],
-        {
-          signal: context.signal,
-          onProgress: (fields) => {
-            const microseconds = Number(fields['out_time_us']);
-            if (Number.isFinite(microseconds))
-              context.update(
-                0.05 + Math.min(0.8, (microseconds / 1e6 / asset.metadata.durationSeconds) * 0.8),
-                'Encoding proxy',
-              );
-          },
-        },
-      );
+      await this.#encodeProxy(asset, repair, temporary, context);
       context.update(0.87, 'Checking beginning, middle and end frame correspondence');
       const metadata = await this.#verifyProxyTiming(asset, repair, temporary, context);
       await this.#verifyRepairBoundaries(asset, repair, temporary, context);
-      const frames = [0, Math.floor((metadata.frameCount - 1) / 2), metadata.frameCount - 1].map((frame) =>
-        undamagedFrame(frame, repair, metadata.frameCount),
-      );
+      const sources = await originals;
       const samples: { frame: number; meanAbsoluteError8Bit: number }[] = [];
-      await forEachSerial(frames, async (frame) => {
-        const original = await extractComparisonFrame(
-          this.config,
-          asset.sourcePath,
-          frame,
-          asset.metadata.colourRange,
-          context.signal,
-        );
+      await forEachSerial(frames.entries(), async ([index, frame]) => {
         const proxy = await extractComparisonFrame(this.config, temporary, frame, 'tv', context.signal);
-        const mae = meanAbsoluteError(original, proxy);
+        const mae = meanAbsoluteError(sources[index]!, proxy);
         if (mae > FRAME_SAMPLE_MAE_LIMIT)
           throw new ServiceError(
             `Proxy/source frame ${frame} differs by ${mae.toFixed(2)} / 255. Correspondence unverified.`,
@@ -708,8 +635,101 @@ export class MediaLibrary {
       };
       return preparedNote(repair);
     } finally {
+      stop.abort();
+      await originals.catch(() => {});
       await rm(temporary, { force: true });
     }
+  }
+  /** The original's comparison frames, each from its own seeked decode, independent of the encode. */
+  async #originalFrames(asset: MediaAsset, frames: readonly number[], signal: AbortSignal): Promise<Buffer[]> {
+    const decoded: Buffer[] = [];
+    await forEachSerial(frames, async (frame) => {
+      decoded.push(
+        await extractComparisonFrame(this.config, asset.sourcePath, frame, asset.metadata.colourRange, signal),
+      );
+    });
+    return decoded;
+  }
+  async #encodeProxy(
+    asset: MediaAsset,
+    repair: readonly DamagedRange[],
+    temporary: string,
+    context: JobContext,
+  ): Promise<void> {
+    const inputRange = asset.metadata.colourRange === 'tv' ? 'tv' : 'pc';
+    await runProcess(
+      this.config.ffmpeg,
+      [
+        '-hide_banner',
+        '-loglevel',
+        'error',
+        '-nostdin',
+        '-n',
+        '-threads',
+        NATIVE_THREADS,
+        ...repairInputArgs(repair),
+        '-i',
+        asset.sourcePath,
+        '-map',
+        '0:v:0',
+        '-an',
+        '-sn',
+        '-dn',
+        '-vf',
+        `${repairFilter(repair, 0)}scale=w='min(1280,iw)':h='min(720,ih)':force_original_aspect_ratio=decrease:force_divisible_by=2:flags=bicubic:in_color_matrix=bt709:out_color_matrix=bt709:in_range=${inputRange}:out_range=tv,setsar=1`,
+        ...repairedFrameLimit(repair, asset.metadata.frameCount),
+        '-fps_mode',
+        'passthrough',
+        '-c:v',
+        'libx264',
+        '-preset',
+        'veryfast',
+        '-crf',
+        '20',
+        '-pix_fmt',
+        'yuv420p',
+        '-g',
+        String(PROXY_GOP_FRAMES),
+        '-keyint_min',
+        String(PROXY_GOP_FRAMES),
+        '-sc_threshold',
+        '0',
+        '-bf',
+        '0',
+        '-flags',
+        '+cgop',
+        '-threads',
+        NATIVE_THREADS,
+        '-filter_threads',
+        NATIVE_THREADS,
+        '-color_primaries',
+        'bt709',
+        '-color_trc',
+        'bt709',
+        '-colorspace',
+        'bt709',
+        '-color_range',
+        'tv',
+        '-movflags',
+        '+faststart',
+        '-video_track_timescale',
+        '30000',
+        '-progress',
+        'pipe:1',
+        temporary,
+      ],
+      {
+        signal: context.signal,
+        onProgress: (fields) => {
+          const microseconds = Number(fields['out_time_us']);
+          if (Number.isFinite(microseconds))
+            context.update(
+              0.05 + Math.min(0.8, (microseconds / 1e6 / asset.metadata.durationSeconds) * 0.8),
+              'Encoding proxy',
+            );
+        },
+      },
+    );
   }
   async #verifyProxyTiming(
     asset: MediaAsset,
