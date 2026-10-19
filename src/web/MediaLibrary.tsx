@@ -41,6 +41,8 @@ interface Props {
   /** Changes after a successful import, so new media is not hidden by a search or filter. */
   importRevision: number;
   review: ReviewTarget | null;
+  /** The reviewed recording's latest frame, which `review` does not follow. */
+  currentReview: () => ReviewTarget | null;
   /** `choose` remembers the recording to return to once hovering ends. */
   onReview: (review: ReviewTarget, choose: boolean) => void;
   onReviewHoverEnd: () => void;
@@ -262,6 +264,7 @@ export function MediaLibrary({
   onImport,
   importRevision,
   review,
+  currentReview,
   onReview,
   onReviewHoverEnd,
   targetLayer,
@@ -364,7 +367,8 @@ export function MediaLibrary({
       if (applyHover(pending, true)) return;
     }
     const range = resolveMediaSelection(asset.id, asset.metadata.frameCount, ranges);
-    onReview(review?.mediaId === asset.id ? review : { mediaId: asset.id, frame: range.sourceIn }, true);
+    const shown = currentReview();
+    onReview(shown?.mediaId === asset.id ? shown : { mediaId: asset.id, frame: range.sourceIn }, true);
   };
   const reviewedAsset = assets.find((asset) => asset.id === review?.mediaId && mediaReady(asset));
 
