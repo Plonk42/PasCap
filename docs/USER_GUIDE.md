@@ -357,12 +357,21 @@ and interpolation remain unchanged.
 
 ### Temperature and Tint
 
-In **Track → Colour**, **Temperature** and **Tint** open the Colour group. Both use
-normalized **−1…1**, neutral **0**, not Kelvin or automatic white balance.
+In **Track → Colour**, **Temperature** and **Tint** open the Colour group. They use
+normalized **−2…2** and **−1…1**, neutral **0**, not Kelvin.
 Positive Temperature warms, negative cools; positive Tint adds magenta, negative
 adds green. Nonzero settings intentionally colour greys. The common gain formula
 runs in linear RGB before Exposure; it preserves neutral-white linear luminance
 before clipping only, not final brightness or arbitrary coloured pixels.
+
+**Auto white balance**, under Tint, removes a colour cast at the playhead: it measures
+the light in seven frames around it (up to half a second each side, within the clip
+there) and keyframes Temperature and Tint at the playhead, exactly as their diamonds
+would, in one Undo step. Where the light changes during a flight, run it again further
+on: Temperature and Tint then ease from one keyframe to the next. It removes cool casts
+more than warm ones, so a sunset stays warm, and large uniform areas such as sky or sea
+barely count. Rerun at a keyframe, it replaces only these two values. It needs a
+prepared clip of the track at the playhead; Escape cancels it.
 
 Sliders, exact fields and the **Reset** icon beside each setting's name (or double-click the name) reset it to 0 and use the same main/stored
 control rules as other scalar Colour settings. Main diamonds come with adjacent per-setting Previous/Next buttons; its header visits the

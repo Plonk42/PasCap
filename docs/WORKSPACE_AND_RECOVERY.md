@@ -25,7 +25,9 @@ diamonds and adjacent per-setting Previous/Next buttons are always visible, alon
 Positive Temperature warms; positive Tint adds magenta.
 Nonzero settings intentionally colour greys; shared normalized linear gains run
 before Exposure, preserving neutral-white linear luminance before clipping only.
-They are not Kelvin/HDR output/automatic white balance. HSL/curves remain static. See
+They are not Kelvin or HDR output. **Auto white balance**, under Tint, keyframes both at the playhead from
+the light of a few frames around it ([details](design/TEMPERATURE_AND_TINT.md#automatic-white-balance)).
+HSL/curves remain static. See
 [Temperature and Tint](design/TEMPERATURE_AND_TINT.md).
 **HDR** (0–1, neutral 0) is a keyable SDR local tone-mapping look applied with the
 clip detail filters before grading; see [detail filters](design/DETAIL_FILTERS.md#hdr-look).

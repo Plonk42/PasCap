@@ -12,6 +12,7 @@ export const BASE_LAYER_ID = 'video-1';
 export const MAX_VIDEO_LAYERS = 8;
 export const MAX_MUSIC_TRACKS = 8;
 export const MAX_BOOKMARKS = 1_000;
+export const MAX_TRACK_KEYFRAMES = 256;
 
 export const idSchema = z.string().regex(/^[a-zA-Z0-9_-]{1,100}$/);
 export const frameSchema = z.number().int().nonnegative().max(2_147_483_647);
@@ -70,7 +71,7 @@ export const layerSchema = z
     colour: colourSchema,
     keyframes: z
       .array(layerKeyframeSchema)
-      .max(256)
+      .max(MAX_TRACK_KEYFRAMES)
       .refine(orderedKeys, { message: 'Track keyframes must have unique ascending project frames.' }),
     transform: spatialSettingsSchema,
     ripple: z.boolean(),
