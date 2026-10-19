@@ -154,7 +154,12 @@ edits real projects with it, so saved data must keep working. Details are in
   No Kelvin/HDR output. #218 **Auto white balance** (under Tint) estimates Temperature/Tint
   from 7 proxy frames within ±15 of the playhead (its clip, mapped through retiming) on its
   own temporary reader, and keyframes both at the playhead like their diamonds, one Undo
-  step; no schema/render/export change. Main/stored slider/exact-field/reset/diamond/navigation retain
+  step; no schema/render/export change. #167 Phase 1 **Auto** (Colour keyframe line)
+  fits ten scalar bases from 16 proxy frames of the clip at the playhead through the real
+  grade, previews them in a popover with Intensity and applies one Colour edit, leaving
+  animated settings and keyframes unchanged; constants in `src/shared/auto-adjust.ts`,
+  no schema/render change ([Auto adjust](../docs/design/AUTO_ADJUST.md)).
+  Main/stored slider/exact-field/reset/diamond/navigation retain
   explicit capture, row ownership, empty-row editing and one-step gestures.
   Compare bypasses all Colour, including Temperature/Tint, and clip Detail, never coverage or geometry.
   See [Temperature and Tint](../docs/design/TEMPERATURE_AND_TINT.md).

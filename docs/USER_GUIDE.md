@@ -403,6 +403,20 @@ all these Colour stages, retaining Opacity and geometry. Exact processing:
 [Temperature/Tint](design/TEMPERATURE_AND_TINT.md) and
 [HSL/curves](design/HSL_AND_CURVES.md).
 
+### Auto adjust
+
+**Auto**, at the end of the Colour keyframe line, suggests a balanced correction for the
+clip at the playhead: it analyses 16 frames spread over the clip and balances white,
+exposure, contrast, black and white points and saturation, restoring footage shot flat.
+The popover previews the result in the image; lower **Intensity** for a lighter touch,
+then **Apply** sets Temperature, Tint, Saturation, Exposure, Brightness, Contrast,
+Highlights, Shadows, Whites and Blacks for the whole track in one Undo step. Settings the
+track animates are left unchanged, and the popover lists them. **Cancel**, Escape or a
+click elsewhere leaves the track as it was. Reopening Auto on the same clip skips the
+analysis and starts at the intensity you last applied, so you can lower it later. The
+correction comes from one clip: put shots that need different corrections on different
+tracks. See [Auto adjust](design/AUTO_ADJUST.md).
+
 ### HDR
 
 **HDR**, in the Effects group of **Track → Colour**, opens shadows and recovers highlights

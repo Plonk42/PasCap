@@ -36,6 +36,24 @@ export interface WhiteBalanceTarget {
 
 export type WhiteBalanceAvailability = { target: WhiteBalanceTarget; reason: null } | { target: null; reason: string };
 
+/** The track's clip at the playhead with its prepared recording, or why an analysis cannot read it. */
+export function readyClipAtPlayhead(
+  layer: VideoLayer,
+  layout: TimelineLayout,
+  assets: readonly MediaAsset[],
+  frame: number,
+  preferredClipId: string | null,
+  purpose: string,
+): { clip: PlacedClip; asset: MediaAsset; reason: null } | { clip: null; asset: null; reason: string } {
+  const clip = clipAtPlayhead(layout, layer.id, frame, preferredClipId);
+  if (!clip)
+    return { clip: null, asset: null, reason: `Move the playhead over a clip on ${layer.name} to ${purpose}.` };
+  const asset = assets.find((item) => item.id === clip.clip.mediaId);
+  if (!asset || !mediaReady(asset) || asset.prepared?.verification.frameCount !== asset.metadata.frameCount)
+    return { clip: null, asset: null, reason: 'Prepare the recording of the clip at the playhead first.' };
+  return { clip, asset, reason: null };
+}
+
 /** What Auto white balance would analyse at the playhead, or why it cannot run there. */
 export function whiteBalanceTarget(
   layer: VideoLayer,
@@ -44,11 +62,15 @@ export function whiteBalanceTarget(
   frame: number,
   preferredClipId: string | null,
 ): WhiteBalanceAvailability {
-  const clip = clipAtPlayhead(layout, layer.id, frame, preferredClipId);
-  if (!clip) return { target: null, reason: `Move the playhead over a clip on ${layer.name} to balance its light.` };
-  const asset = assets.find((item) => item.id === clip.clip.mediaId);
-  if (!asset || !mediaReady(asset) || asset.prepared?.verification.frameCount !== asset.metadata.frameCount)
-    return { target: null, reason: 'Prepare the recording of the clip at the playhead first.' };
+  const { clip, asset, reason } = readyClipAtPlayhead(
+    layer,
+    layout,
+    assets,
+    frame,
+    preferredClipId,
+    'balance its light',
+  );
+  if (reason !== null) return { target: null, reason };
   if (layer.keyframes.length >= MAX_TRACK_KEYFRAMES && !layer.keyframes.some((key) => key.frame === frame))
     return {
       target: null,

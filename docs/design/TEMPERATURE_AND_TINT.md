@@ -3,8 +3,9 @@
 Approved contract for [#68](https://github.com/Plonk42/PasCap/issues/68), with
 [automatic white balance](#automatic-white-balance) from [#218](https://github.com/Plonk42/PasCap/issues/218).
 These are normalized **SDR colour controls**, not Kelvin, HDR output or highlight
-recovery. This guide specifies behaviour and required validation, not completed
-tests or hardware qualification.
+recovery. [Auto adjust](AUTO_ADJUST.md) sets their bases with the same estimate. This
+guide specifies behaviour and required validation, not completed tests or hardware
+qualification.
 
 ## Ownership, data and controls
 
@@ -135,7 +136,8 @@ with the reason, when no clip of the track is at the playhead, its recording has
 verified proxy, or the track holds 256 keyframes and none is at the playhead. Moving
 the playhead, changing track, clip or project, Escape or **Cancel** stop it without an
 edit. Analysis of the ungraded proxy makes the result absolute, not a change to the
-current grade.
+current grade. [Auto adjust](AUTO_ADJUST.md) reuses this estimate over a whole clip and
+writes it into the track's Temperature and Tint bases instead of keyframes.
 
 ## Strict preservation and validation
 
