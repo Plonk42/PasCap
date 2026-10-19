@@ -791,7 +791,7 @@ inserts one independent clip per steady range at the current allowed movement, i
 recording order, exactly like **Add clip** with that range: Ripple-on tracks append,
 positioned tracks start at the playhead, and the whole batch is one Undo step. It leaves
 the applied source range unchanged. While its analysis waits or runs, the header shows
-**Camera motion queued after the other jobs…** or its progress. Recordings prepared before this analysis existed show **Analyse
+**Camera motion queued…** or its progress. Recordings prepared before this analysis existed show **Analyse
 camera motion** in the header instead, which queues one **Camera motion analysis** job
 (shown in Activity). Forward
 acceleration seen straight ahead barely changes the picture, so speed changes without
