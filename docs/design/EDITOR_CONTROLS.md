@@ -81,7 +81,7 @@ and technical paths stay unchanged; this glossary does not change the project sc
 - **Auto white balance** is the secondary button under Tint: it keyframes Temperature and Tint at the
   playhead from the light of a few frames around it, like their diamonds, in one Undo step. Unavailable
   with its reason (`aria-disabled` and tooltip) without a prepared clip of the track at the playhead;
-  **Analysing n/7…** with a **Cancel** icon (or Escape) appears only after 250 ms; failures stay inline.
+  **Analysing n/16…** with a **Cancel** icon (or Escape) appears only after 250 ms; failures stay inline.
   See [automatic white balance](TEMPERATURE_AND_TINT.md#automatic-white-balance).
 - **Auto adjust** is the **Auto** text button (wand icon) ending the Colour keyframe line; on its own
   row at the right when the line is narrower than 280 px. It opens a popover with a **Source** choice,

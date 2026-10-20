@@ -10,7 +10,12 @@ import {
   type AutoCorrection,
 } from '../../src/shared/auto-adjust.js';
 import { decode709, encode709, temperatureTintGains } from '../../src/shared/colour.js';
-import { WHITE_BALANCE, type AnalysisFrame } from '../../src/shared/white-balance.js';
+import {
+  frameIlluminant,
+  poolWhiteBalance,
+  WHITE_BALANCE,
+  type AnalysisFrame,
+} from '../../src/shared/white-balance.js';
 
 type Linear = readonly [number, number, number];
 type Pixel = (x: number, y: number) => Linear;
@@ -396,6 +401,20 @@ describe('Auto adjust estimator', () => {
   it('gives no correction without usable pixels', () => {
     expect(analyseAutoAdjust([frame(() => [0, 0, 0])])).toBeNull();
     expect(analyseAutoAdjust([])).toBeNull();
+  });
+
+  it('takes the same Temperature and Tint as Auto white balance from the same frames', () => {
+    for (const light of [
+      [1.25, 1, 0.8],
+      [0.85, 1, 1.2],
+      [1, 1.15, 1],
+      [1, 1, 1],
+    ] as const) {
+      const input = frames(16, (seed) => scene(seed, { light }));
+      const balance = poolWhiteBalance(input.map(frameIlluminant))!;
+      const correction = analyse(input);
+      expect({ temperature: correction.temperature, tint: correction.tint }, String(light)).toEqual(balance);
+    }
   });
 
   it('raises the colour of muted footage with both Saturation and Vibrance', () => {

@@ -244,20 +244,28 @@ describe('automatic white balance estimator', () => {
 });
 
 describe('white balance analysis window', () => {
-  it('spreads seven frames over half a second each side, including the playhead', () => {
-    expect(whiteBalanceWindow({ start: 0, end: 300 }, 100)).toEqual([85, 90, 95, 100, 105, 110, 115]);
+  it('spreads sixteen frames over one second each side, including the playhead', () => {
+    expect(whiteBalanceWindow({ start: 0, end: 300 }, 100)).toEqual([
+      70, 74, 77, 81, 85, 89, 92, 96, 100, 104, 109, 113, 117, 121, 126, 130,
+    ]);
   });
 
-  it('stays within the clip at the playhead and keeps seven frames when there is room', () => {
-    expect(whiteBalanceWindow({ start: 100, end: 300 }, 100)).toEqual([100, 103, 105, 108, 110, 113, 115]);
-    expect(whiteBalanceWindow({ start: 0, end: 300 }, 299)).toEqual([284, 286, 289, 291, 294, 296, 299]);
-    expect(whiteBalanceWindow({ start: 98, end: 300 }, 100)).toEqual([98, 100, 103, 106, 109, 112, 115]);
+  it('stays within the clip at the playhead and keeps sixteen frames when there is room', () => {
+    expect(whiteBalanceWindow({ start: 100, end: 300 }, 100)).toEqual([
+      100, 102, 104, 106, 108, 110, 112, 114, 116, 118, 120, 122, 124, 126, 128, 130,
+    ]);
+    expect(whiteBalanceWindow({ start: 0, end: 300 }, 299)).toEqual([
+      269, 271, 273, 275, 277, 279, 281, 283, 285, 287, 289, 291, 293, 295, 297, 299,
+    ]);
+    expect(whiteBalanceWindow({ start: 98, end: 300 }, 100)).toEqual([
+      98, 100, 102, 104, 106, 109, 111, 113, 115, 117, 119, 121, 124, 126, 128, 130,
+    ]);
     for (let playhead = 40; playhead < 80; playhead++) {
       const window = whiteBalanceWindow({ start: 40, end: 80 }, playhead);
       expect(window).toContain(playhead);
-      expect(window).toHaveLength(7);
-      expect(new Set(window).size).toBe(7);
-      expect(window.every((frame) => frame >= 40 && frame < 80 && Math.abs(frame - playhead) <= 15)).toBe(true);
+      expect(window).toHaveLength(16);
+      expect(new Set(window).size).toBe(16);
+      expect(window.every((frame) => frame >= 40 && frame < 80 && Math.abs(frame - playhead) <= 30)).toBe(true);
     }
   });
 

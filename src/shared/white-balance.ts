@@ -27,8 +27,8 @@ export const WHITE_BALANCE = Object.freeze({
   tintLimit: 0.3,
 });
 
-/** Frames analysed: the playhead and up to `radius` project frames (0.5 s) on each side, within its clip. */
-export const WHITE_BALANCE_WINDOW = Object.freeze({ frames: 7, radius: 15 });
+/** Frames analysed: the playhead and up to `radius` project frames (1 s) on each side, within its clip; shared with Auto adjust. */
+export const WHITE_BALANCE_WINDOW = Object.freeze({ frames: 16, radius: 30 });
 
 /** Encoded BT.709 RGBA bytes, rows top to bottom, as read back from a canvas. */
 export interface AnalysisFrame {

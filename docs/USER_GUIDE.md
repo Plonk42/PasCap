@@ -375,7 +375,7 @@ runs in linear RGB before Exposure; it preserves neutral-white linear luminance
 before clipping only, not final brightness or arbitrary coloured pixels.
 
 **Auto white balance**, under Tint, removes a colour cast at the playhead: it measures
-the light in seven frames around it (up to half a second each side, within the clip
+the light in sixteen frames around it (up to a second each side, within the clip
 there) and keyframes Temperature and Tint at the playhead, exactly as their diamonds
 would, in one Undo step. Where the light changes during a flight, run it again further
 on: Temperature and Tint then ease from one keyframe to the next. It removes cool casts
