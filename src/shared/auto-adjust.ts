@@ -79,19 +79,20 @@ export const AUTO_ADJUST = Object.freeze({
   /** Below this colourfulness footage is monochrome and keeps Saturation 1 and Vibrance 0. */
   monochrome: 5,
   /**
-   * A gain above 1 is given by Vibrance, so that this quantile of the pixel saturations, the scene's muted
-   * colours, gains it, up to maximumVibrance. Saturation only lowers colour.
+   * A gain above 1 is shared: Saturation takes this share of it (in log terms), Vibrance the rest, so that
+   * this quantile of the pixel saturations, the scene's muted colours, gains it all, up to maximumVibrance.
    */
+  saturationShare: 0.5,
   mutedQuantile: 0.25,
   maximumVibrance: 1,
   /**
    * The strong colours, this quantile of the pixel saturations (linear (max − min) / max, as Vibrance
    * measures them), may rise to strongCeiling, or by strongMargin once at or above it: a saturated sky
-   * filling a tenth of the frame or more is barely pushed further.
+   * filling a tenth of the frame or more is barely pushed further. Saturation's share gives way first.
    */
   strongQuantile: 0.9,
-  strongCeiling: 0.6,
-  strongMargin: 0.03,
+  strongCeiling: 0.7,
+  strongMargin: 0.05,
   /** Pixels whose colourfulness is measured, shared among the frames. */
   saturationSamples: 20_000,
   /** Intensity that applies the correction as fitted; above it, up to 100%, the correction is exaggerated. */
@@ -583,9 +584,10 @@ const quantileIndex = (length: number, q: number): number => Math.min(length - 1
 
 /**
  * Colour towards a fairly colourful result, from the median frame colourfulness after tone. A gain below 1
- * lowers Saturation. A gain above 1 raises Vibrance instead, which spares colours that are already strong,
- * and no more than the scene's strong colours allow: a global gain would push a saturated sky, whose
- * uniformity alone makes the scene measure dull, as far as its muted colours.
+ * lowers Saturation. A gain above 1 is shared between Saturation, which raises every colour alike, and
+ * Vibrance, which spares colours that are already strong, and no more than the scene's strong colours
+ * allow: Saturation alone would push a saturated sky, whose uniformity alone makes the scene measure dull,
+ * as far as its muted colours.
  */
 function fitChroma(statistics: ToneStatistics, balance: WhiteBalance, tone: Readonly<Tone>): Chroma {
   const render = renderFlat(balance, tone);
@@ -601,26 +603,37 @@ function fitChroma(statistics: ToneStatistics, balance: WhiteBalance, tone: Read
   const sorted = frames.map((samples) => bySaturation(samples, render));
   const at = (q: number): number =>
     median(sorted.map(({ saturations }) => saturations[quantileIndex(saturations.length, q)]!));
-  const wanted = Math.min(AUTO_ADJUST.maximumVibrance, (gain - 1) / Math.max(1e-6, 1 - at(AUTO_ADJUST.mutedQuantile)));
+  const muted = Math.max(1e-6, 1 - at(AUTO_ADJUST.mutedQuantile));
+  /** Saturation gain^share, and the Vibrance that brings the muted colours to the whole gain. */
+  const mixed = (share: number): Chroma => {
+    const saturation = gain ** share;
+    return { saturation, vibrance: Math.min(AUTO_ADJUST.maximumVibrance, (gain / saturation - 1) / muted) };
+  };
   const limit = Math.max(AUTO_ADJUST.strongCeiling, at(AUTO_ADJUST.strongQuantile) + AUTO_ADJUST.strongMargin);
-  // Vibrance keeps the saturation order of the pixels, so each frame's strong quantile stays the same pixel.
+  // Saturation and Vibrance keep the saturation order of the pixels, so each frame's strong quantile stays the same pixel.
   const strong = sorted.map(({ offsets }, index) => {
     const offset = offsets[quantileIndex(offsets.length, AUTO_ADJUST.strongQuantile)]!;
     return frames[index]!.subarray(offset, offset + 3);
   });
-  const allowed = (vibrance: number): boolean => {
-    const graded = renderFlat(balance, tone, { saturation: 1, vibrance });
+  const allowed = (colour: Chroma): boolean => {
+    const graded = renderFlat(balance, tone, colour);
     return median(strong.map((pixel) => pixelSaturation(graded(pixel)))) <= limit;
   };
-  if (allowed(wanted)) return { saturation: 1, vibrance: wanted };
-  let low = 0;
-  let high = wanted;
-  for (let step = 0; step < AUTO_ADJUST.lineSearchSteps; step++) {
-    const middle = (low + high) / 2;
-    if (allowed(middle)) low = middle;
-    else high = middle;
-  }
-  return { saturation: 1, vibrance: low };
+  /** The largest value in [0, high] that `fits`, by bisection, given that 0 fits. */
+  const largest = (high: number, fits: (value: number) => boolean): number => {
+    if (fits(high)) return high;
+    let low = 0;
+    for (let step = 0; step < AUTO_ADJUST.lineSearchSteps; step++) {
+      const middle = (low + high) / 2;
+      if (fits(middle)) low = middle;
+      else high = middle;
+    }
+    return low;
+  };
+  // Lowering Saturation's share moves the gain to Vibrance, which raises the strong colours less.
+  if (allowed(mixed(0))) return mixed(largest(AUTO_ADJUST.saturationShare, (share) => allowed(mixed(share))));
+  const vibrance = largest(mixed(0).vibrance, (value) => allowed({ saturation: 1, vibrance: value }));
+  return { saturation: 1, vibrance };
 }
 
 /**

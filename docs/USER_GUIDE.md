@@ -408,8 +408,9 @@ all these Colour stages, retaining Opacity and geometry. Exact processing:
 **Auto**, at the end of the Colour keyframe line, suggests a balanced correction for the
 clip at the playhead: it balances white, exposure, contrast, black and white points and
 colour, restoring footage shot flat, and opens dark shadow areas with Shadows. It raises
-colour with Vibrance, which lifts muted colours more than strong ones, so an already blue sky
-stays about as it was; it lowers only very colourful footage, with Saturation.
+colour with Saturation and Vibrance, which lifts muted colours more than strong ones; where
+strong colours such as a blue sky fill much of the frame, it relies on Vibrance so they stay
+close to how they were. It lowers only very colourful footage, with Saturation.
 First choose what it applies to:
 
 - **Track values** analyses 16 frames spread over the whole clip and sets Temperature, Tint,

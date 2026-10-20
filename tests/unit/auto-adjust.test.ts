@@ -198,8 +198,8 @@ describe('Auto adjust estimator', () => {
     const correction = analyse(input);
     expect(correction.blacks).toBeLessThan(0);
     expect(correction.contrast).toBeGreaterThan(1.1);
-    expect(correction.saturation).toBe(1);
-    expect(correction.vibrance).toBeGreaterThan(0.4);
+    expect(correction.saturation).toBeGreaterThan(1.1);
+    expect(correction.vibrance).toBeGreaterThan(0.1);
     const corrected = input.map((item) => apply(item, correction));
     expect(meanSaturation(saturations(corrected))).toBeGreaterThan(1.2 * meanSaturation(saturations(input)));
     const before = measured(input);
@@ -398,11 +398,12 @@ describe('Auto adjust estimator', () => {
     expect(analyseAutoAdjust([])).toBeNull();
   });
 
-  it('raises the colour of muted footage with Vibrance, not Saturation', () => {
+  it('raises the colour of muted footage with both Saturation and Vibrance', () => {
     const input = frames(6, (seed) => scene(seed, { chroma: 0.15 }));
     const correction = analyse(input);
-    expect(correction.saturation).toBe(1);
-    expect(correction.vibrance).toBeGreaterThan(0.3);
+    // Saturation takes its whole share of the 1.5 gain, Vibrance brings the muted colours to the rest.
+    expect(correction.saturation).toBeCloseTo(1.5 ** AUTO_ADJUST.saturationShare, 2);
+    expect(correction.vibrance).toBeGreaterThan(0.1);
     const corrected = input.map((item) => apply(item, correction));
     expect(meanSaturation(saturations(corrected))).toBeGreaterThan(1.25 * meanSaturation(saturations(input)));
   });
@@ -427,6 +428,7 @@ describe('Auto adjust estimator', () => {
       return [(0.15 + 0.2 * haze) * grain, (0.3 + 0.2 * haze) * grain, (0.7 + 0.05 * haze) * grain];
     });
     const correction = analyse(sky);
+    // Saturation gives way entirely, and Vibrance as far as the strong colours require.
     expect(correction.saturation).toBe(1);
     const before = saturations(sky);
     const after = saturations(sky.map((item) => apply(item, correction)));
@@ -436,7 +438,7 @@ describe('Auto adjust estimator', () => {
     expect(saturationQuantile(after, AUTO_ADJUST.strongQuantile)).toBeLessThanOrEqual(
       saturationQuantile(before, AUTO_ADJUST.strongQuantile) + AUTO_ADJUST.strongMargin + 0.01,
     );
-    expect(meanSaturation(after) - meanSaturation(before)).toBeLessThan(0.05);
+    expect(meanSaturation(after) - meanSaturation(before)).toBeLessThan(0.1);
   });
 
   it('keeps the sky above snow at its saturation while the snow gains colour', () => {
@@ -454,7 +456,9 @@ describe('Auto adjust estimator', () => {
       return [level * 0.97, level, level * 1.04];
     });
     const correction = analyse(view);
-    expect(correction.saturation).toBe(1);
+    // Saturation's share of the 1.39 gain mostly gives way to Vibrance.
+    expect(correction.saturation).toBeGreaterThan(1);
+    expect(correction.saturation).toBeLessThan(1.1);
     expect(correction.vibrance).toBeGreaterThan(0.1);
     const corrected = view.map((item) => apply(item, correction));
     // A Saturation of 1.39 took this sky from 0.71 to 0.80.
