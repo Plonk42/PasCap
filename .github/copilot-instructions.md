@@ -155,11 +155,12 @@ edits real projects with it, so saved data must keep working. Details are in
   from 7 proxy frames within ±15 of the playhead (its clip, mapped through retiming) on its
   own temporary reader, and keyframes both at the playhead like their diamonds, one Undo
   step; no schema/render/export change. #167 Phase 1 **Auto** (Colour keyframe line)
-  fits ten scalar settings from 16 proxy frames through the real grade, previews them in a
+  fits eleven scalar settings from 16 proxy frames through the real grade (#225: colour is raised with
+  Vibrance, limited on strong colours such as skies; Saturation only lowers it), previews them in a
   popover with Intensity (initially 80%, the fitted correction; 100% exaggerates it by a
   quarter) and applies one Undo step: **Track values** analyses the whole clip at the playhead
   and edits the bases, leaving animated settings and keyframes unchanged; **Keyframe at
-  playhead** analyses ±30 frames and captures all ten like their diamonds (initial once any is
+  playhead** analyses ±30 frames and captures all eleven like their diamonds (initial once any is
   animated). Constants in `src/shared/auto-adjust.ts`, no schema/render change
   ([Auto adjust](../docs/design/AUTO_ADJUST.md)).
   Main/stored slider/exact-field/reset/diamond/navigation retain

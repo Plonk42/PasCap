@@ -231,7 +231,7 @@ function applied(document: ProjectDocument, correction: AutoCorrection, intensit
   return applyCommand(document, autoAdjustCommand(document.layers[0]!, correction, intensity)!);
 }
 
-test('previews the analysed correction, and Apply sets the ten settings in one Undo step', async ({ page }) => {
+test('previews the analysed correction, and Apply sets the eleven settings in one Undo step', async ({ page }) => {
   const before = await current(page);
   const correction = await expectedCorrection(page);
   // Flat footage under a blue cast: warmed, black point lowered and contrast restored.
@@ -323,7 +323,7 @@ test('Intensity scales the correction, exaggerates it above 80%, and a later App
 
 test('leaves animated settings and keyframes unchanged and says so', async ({ page }) => {
   const seeded = await current(page);
-  seeded.layers[0]!.colour = { ...seeded.layers[0]!.colour, exposure: 0.25, hue: 15, hdr: 0.3 };
+  seeded.layers[0]!.colour = { ...seeded.layers[0]!.colour, exposure: 0.25, hue: 15, hdr: 0.3, vibrance: 0.4 };
   seeded.layers[0]!.keyframes = [
     sharedPoint(20, { exposure: 0.5, opacity: 0.8 }),
     sharedPoint(80, { saturation: 1.3 }, 'smooth'),
@@ -346,11 +346,14 @@ test('leaves animated settings and keyframes unchanged and says so', async ({ pa
   const colour = expected.layers[0]!.colour;
   expect([colour.exposure, colour.saturation, colour.hue, colour.hdr]).toEqual([0.25, 1, 15, 0.3]);
   expect(colour.blacks).toBe(correction.blacks);
+  expect(colour.vibrance).toBe(correction.vibrance);
   expect(expected.layers[0]!.keyframes).toEqual(seeded.layers[0]!.keyframes);
   expect(expected.layers[0]!.opacity).toBe(seeded.layers[0]!.opacity);
 });
 
-test('Keyframe at playhead keys the ten settings from the frames around it, one keyframe per run', async ({ page }) => {
+test('Keyframe at playhead keys the eleven settings from the frames around it, one keyframe per run', async ({
+  page,
+}) => {
   const before = await current(page);
   const first = await expectedCorrection(page, keyframeFrames(before, 45));
   const graded = await checksum(page);

@@ -407,15 +407,17 @@ all these Colour stages, retaining Opacity and geometry. Exact processing:
 
 **Auto**, at the end of the Colour keyframe line, suggests a balanced correction for the
 clip at the playhead: it balances white, exposure, contrast, black and white points and
-saturation, restoring footage shot flat, and opens dark shadow areas with Shadows.
+colour, restoring footage shot flat, and opens dark shadow areas with Shadows. It raises
+colour with Vibrance, which lifts muted colours more than strong ones, so an already blue sky
+stays about as it was; it lowers only very colourful footage, with Saturation.
 First choose what it applies to:
 
 - **Track values** analyses 16 frames spread over the whole clip and sets Temperature, Tint,
-  Saturation, Exposure, Brightness, Contrast, Highlights, Shadows, Whites and Blacks for the
-  whole track. Settings the track animates are left unchanged, and the popover lists them.
-- **Keyframe at playhead** analyses the second around the playhead and keys those ten
+  Saturation, Vibrance, Exposure, Brightness, Contrast, Highlights, Shadows, Whites and Blacks
+  for the whole track. Settings the track animates are left unchanged, and the popover lists them.
+- **Keyframe at playhead** analyses the second around the playhead and keys those eleven
   settings there. Run it again at other moments of a clip whose light changes: the
-  keyframes follow the light between them. Once the track animates any of the ten, Auto
+  keyframes follow the light between them. Once the track animates any of the eleven, Auto
   starts with this choice.
 
 The popover previews the result in the image. **Intensity** starts at 80%, the suggested

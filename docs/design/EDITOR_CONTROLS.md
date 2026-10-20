@@ -89,7 +89,7 @@ and technical paths stay unchanged; this glossary does not change the project sc
   setting Auto sets), that analyses the clip at the playhead (**Analysing n/16 frames…**, **Cancel**), then
   offers **Intensity** (0–100%, initially 80%, the correction as suggested; above it exaggerates), lists
   each animated setting Track values leaves unchanged and commits with **Apply**, one Undo step: a Colour
-  edit, or the ten settings keyed at the playhead like their diamonds.
+  edit, or the eleven settings keyed at the playhead like their diamonds.
   The preview shows the result while the popover is open; Cancel, Escape or a click outside restore it.
   Unavailable with its reason like Auto white balance. See [Auto adjust](AUTO_ADJUST.md).
 - **Vibrance** is a track-owned −1…2 scalar Colour control, neutral 0, last in the **Colour**

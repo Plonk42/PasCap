@@ -74,7 +74,7 @@ export function settingLabel(setting: AutoAdjustSetting): string {
 }
 
 /**
- * The one Colour edit Auto applies: the correction at `intensity` (0–1) replaces the track's values of the ten
+ * The one Colour edit Auto applies: the correction at `intensity` (0–1) replaces the track's values of the eleven
  * settings, except animated ones. Null when every one of them is animated.
  */
 export function autoAdjustCommand(
@@ -91,7 +91,7 @@ export function autoAdjustCommand(
   return { type: 'colour', layerId: layer.id, colour };
 }
 
-/** The edit Auto applies in `target`'s mode: the track's values, or a keyframe of all ten at the playhead. */
+/** The edit Auto applies in `target`'s mode: the track's values, or a keyframe of all eleven at the playhead. */
 export function autoAdjustCommands(
   layer: VideoLayer,
   target: Pick<AutoAdjustTarget, 'mode' | 'frame'>,

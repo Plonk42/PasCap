@@ -137,7 +137,7 @@ verified proxy, or the track holds 256 keyframes and none is at the playhead. Mo
 the playhead, changing track, clip or project, Escape or **Cancel** stop it without an
 edit. Analysis of the ungraded proxy makes the result absolute, not a change to the
 current grade. [Auto adjust](AUTO_ADJUST.md) reuses this estimate over a whole clip for the
-track's Temperature and Tint bases, or over 1 s around the playhead for a keyframe of ten settings.
+track's Temperature and Tint bases, or over 1 s around the playhead for a keyframe of eleven settings.
 
 ## Strict preservation and validation
 
