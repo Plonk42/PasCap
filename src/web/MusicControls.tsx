@@ -8,6 +8,7 @@ import { durationLabel, sourceSeconds } from './display.js';
 import { HelpPopover } from './HelpPopover.js';
 import { Icon } from './icons.js';
 import { createMusicInstance, musicInstanceEdit, videoTimelineDuration } from './music-ui.js';
+import { MusicAnalysisStatus } from './MusicAnalysis.js';
 import { NumberField } from './NumberField.js';
 import { Popover } from './Popover.js';
 import { ResetButton, resetBlocked } from './SettingValueControl.js';
@@ -135,6 +136,7 @@ export function MusicControls({
           </select>
         </label>
       )}
+      {music && <MusicAnalysisStatus asset={assets.find((asset) => asset.id === music.mediaId)} />}
       <div className="music-add-row">
         {addReason || blocked ? (
           <button

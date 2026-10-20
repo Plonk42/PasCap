@@ -96,7 +96,7 @@ export type ProxyVerification = z.infer<typeof proxyVerificationSchema>;
 export const jobSchema = z
   .object({
     id: idSchema,
-    kind: z.enum(['prepare', 'reference', 'audio', 'export', 'relink', 'motion']),
+    kind: z.enum(['prepare', 'reference', 'audio', 'export', 'relink', 'motion', 'music-analysis']),
     label: z.string(),
     state: z.enum(['queued', 'running', 'completed', 'failed', 'cancelled']),
     progress: z.number().min(0).max(1),
@@ -109,7 +109,7 @@ export const jobSchema = z
   .strict();
 export type MediaJob = z.infer<typeof jobSchema>;
 
-/** Camera motion analysis waits for every other queued job, so a batch's proxies all come first. */
+/** Camera motion and music analyses wait for every other queued job, so a batch's proxies all come first. */
 export function runsInBackground(job: Pick<MediaJob, 'kind'>): boolean {
-  return job.kind === 'motion';
+  return job.kind === 'motion' || job.kind === 'music-analysis';
 }

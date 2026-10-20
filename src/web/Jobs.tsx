@@ -22,6 +22,7 @@ const KIND_LABELS: Readonly<Record<MediaJob['kind'], string>> = {
   export: 'Export',
   relink: 'Recording relink',
   motion: 'Camera motion analysis',
+  'music-analysis': 'Music analysis',
 };
 const STATE_LABELS: Readonly<Record<MediaJob['state'], string>> = {
   queued: 'Queued',
