@@ -108,8 +108,8 @@ read-only until explicitly captured. Capture never uses
 an inspected stored time. Sliders never create keyframes. Track-keyframe selectors
 visibly read **Easing**, retaining contextual accessible names; each enabled setting has its own Easing.
 **Auto** in the Colour keyframe line ([Auto adjust](AUTO_ADJUST.md)) analyses the clip at the
-playhead and, on **Apply**, either replaces ten of the track's scalar bases in one Colour edit, leaving
-animated settings and every keyframe unchanged, or keys those ten settings at the playhead from the
+playhead and, on **Apply**, either replaces eleven of the track's scalar bases in one Colour edit, leaving
+animated settings and every keyframe unchanged, or keys those eleven settings at the playhead from the
 frames around it: the correction stays track-owned like any grade.
 The static **HSL ranges** and **Colour curves** Track sections share video track ownership, with no new diamonds.
 **Track → Transform** shares the same ownership, with its own project-frame keyframes;

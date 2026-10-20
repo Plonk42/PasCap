@@ -47,6 +47,7 @@ const CORRECTION: AutoCorrection = {
   temperature: 0.3,
   tint: -0.1,
   saturation: 1.44,
+  vibrance: 0.25,
   exposure: 0.6,
   brightness: 0.04,
   contrast: 1.21,
@@ -85,7 +86,7 @@ describe('Auto adjust target', () => {
 });
 
 describe('Auto adjust edit', () => {
-  it('replaces the ten settings with the scaled correction in one Colour edit and one Undo step', () => {
+  it('replaces the eleven settings with the scaled correction in one Colour edit and one Undo step', () => {
     const document = project();
     const layer = document.layers[0]!;
     layer.colour = { ...layer.colour, hue: 12, vibrance: 0.4, hdr: 0.3, localContrast: 0.2, exposure: -1 };
@@ -96,7 +97,7 @@ describe('Auto adjust edit', () => {
     const next = applyCommand(document, command);
     const scaled = scaleCorrection(CORRECTION, 0.5);
     expect(next.layers[0]!.colour).toEqual({ ...layer.colour, ...scaled });
-    // Hue, Vibrance, HDR, Local contrast, HSL, curves, Opacity, Transform and keyframes are untouched.
+    // Hue, HDR, Local contrast, HSL, curves, Opacity, Transform and keyframes are untouched.
     expect({ ...next.layers[0]!, colour: before.layers[0]!.colour }).toEqual(before.layers[0]);
     expect(next.layers[0]!.colour.hsl).toEqual(before.layers[0]!.colour.hsl);
     expect(next.layers[1]).toEqual(before.layers[1]);
@@ -125,7 +126,7 @@ describe('Auto adjust edit', () => {
     expect(next.layers[0]!.keyframes).toEqual(layer.keyframes);
   });
 
-  it('has nothing to apply when all ten settings are animated', () => {
+  it('has nothing to apply when all eleven settings are animated', () => {
     const layer = project().layers[0]!;
     layer.keyframes = [
       layerKeyframe(
@@ -135,6 +136,7 @@ describe('Auto adjust edit', () => {
           temperature: 0,
           tint: 0,
           saturation: 1,
+          vibrance: 0,
           exposure: 0,
           brightness: 0,
           contrast: 1,
@@ -227,7 +229,7 @@ describe('Auto adjust keyframe', () => {
     expect(autoAdjustTarget(layer, layout, ASSETS, 11, null).target).not.toBeNull();
   });
 
-  it('keys the ten settings at the playhead in one Undo step, joining or overwriting a keyframe there', () => {
+  it('keys the eleven settings at the playhead in one Undo step, joining or overwriting a keyframe there', () => {
     const document = project();
     const layer = document.layers[0]!;
     layer.colour.exposure = -0.4;

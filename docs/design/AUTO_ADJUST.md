@@ -2,7 +2,7 @@
 
 Current contract for Phase 1 of [#167](https://github.com/Plonk42/PasCap/issues/167):
 an **Auto** action that analyses the clip at the playhead and writes a balanced
-correction into ten of the track's existing scalar Colour settings, either as the track's
+correction into eleven of the track's existing scalar Colour settings, either as the track's
 values or as a keyframe at the playhead. It only chooses values: no schema, grade stage,
 render, export or decoder changes, and it makes no CapCut parity claim. A clip-owned
 correction (Phase 2) is not implemented; the issue holds its plan. This
@@ -31,10 +31,10 @@ choice:
 
 - **Track values** (whole clip) analyses 16 frames spread over the clip's **whole source
   range**, and replaces the track's values. It is the initial choice while the track
-  animates none of the ten settings.
+  animates none of the eleven settings.
 - **Keyframe at playhead** (1 s around it) analyses 16 frames within 30 project frames of
   the playhead, never across the clip's ends, mapped to source frames through
-  `PlacedClip.retiming`, and keys the ten settings at the playhead. It is the initial choice
+  `PlacedClip.retiming`, and keys the eleven settings at the playhead. It is the initial choice
   once the track animates any of them. It is unavailable, with the reason, when the track
   holds 256 keyframes and none is at the playhead.
 
@@ -48,16 +48,16 @@ n/16 frames…** and **Cancel**. Then:
   no document, history or save change.
 - For Track values, a line per setting the track animates, such as **Exposure is animated:
   not changed**.
-- **Apply** commits one Undo step and closes the popover. Hue, Vibrance, HDR, Local
-  contrast, HSL, curves, Opacity, Transform and clips are untouched.
+- **Apply** commits one Undo step and closes the popover. Hue, HDR, Local contrast, HSL,
+  curves, Opacity, Transform and clips are untouched.
   - Track values: one `colour` edit, the scaled correction replacing the track's
-    Temperature, Tint, Saturation, Exposure, Brightness, Contrast, Highlights, Shadows,
-    Whites and Blacks, except animated ones; no keyframe changes. Apply is unavailable
-    when all ten settings are animated.
-  - Keyframe at playhead: the ten settings are captured at the playhead exactly like their
+    Temperature, Tint, Saturation, Vibrance, Exposure, Brightness, Contrast, Highlights,
+    Shadows, Whites and Blacks, except animated ones; no keyframe changes. Apply is
+    unavailable when all eleven settings are animated.
+  - Keyframe at playhead: the eleven settings are captured at the playhead exactly like their
     diamonds, in one transaction: a new keyframe gets Linear Easing; an existing one is
     joined (each joining setting adopts the Easing the keyframe's settings agree on, else
-    Linear) and its values of the ten are overwritten. Track values and other keyframes
+    Linear) and its values of the eleven are overwritten. Track values and other keyframes
     are untouched.
 - **Cancel**, Escape anywhere in the popover (a slider drag first cancels itself) or a
   click outside closes it and restores the preview, without an edit.
@@ -77,13 +77,13 @@ frame, to keep shots apart.
 The editor keeps each analysis in session memory, never saved or in history: one per
 clip for Track values and one per clip and playhead for a keyframe. Reopening Auto on the
 same frames skips decoding and starts at the intensity last applied, so the user can
-lower it later; **Apply** then replaces the ten settings again, including manual edits to
+lower it later; **Apply** then replaces the eleven settings again, including manual edits to
 them. The memory is dropped when the clip's source range or its proxy changes, on another
 project and on reload. Track values serve the whole track, taken from one clip: tracks
 holding shots that need different corrections need one track each, or keyframes.
 
 Intensity $p$ scales the fitted correction from neutral by $a=p/80\%$ (`balancedIntensity`):
-Temperature, Tint, Exposure, Brightness, Highlights, Shadows, Whites and Blacks by $a$,
+Temperature, Tint, Vibrance, Exposure, Brightness, Highlights, Shadows, Whites and Blacks by $a$,
 Contrast and Saturation as $A^a$, each kept within its setting's range and rounded to
 thousandths. So 40% is half the correction and 100% is 1.25 times it. Temperature, Tint and
 Exposure are log-gains, so half the correction is the geometric midpoint of the light change.
@@ -109,7 +109,7 @@ whose linear luma is below 0.002 are left out as noise.
 [Auto white balance](TEMPERATURE_AND_TINT.md#automatic-white-balance) estimates from these
 frames: Shades of Grey and Grey-Edge per frame, median pooling, confidence and damping
 (cool casts more than warm ones, soft limits 0.5 and 0.3). They are applied to every
-analysed pixel before the tone and Saturation fits.
+analysed pixel before the tone and colour fits.
 
 **Statistics, per frame, then the median over frames.** Linear luma percentiles 0.5 and
 99.5 (the black and white points) and 1 and 99; the log-average
@@ -168,12 +168,28 @@ deterministic: identical frames give bit-identical results.
 Exposure, Whites, Brightness, Shadows and Contrast − 1 are halved: lifting would mostly
 amplify noise. Blacks is kept, since crushing the black point hides noise.
 
-**Saturation.** The Hasler–Süsstrunk colourfulness
+**Saturation and Vibrance.** The Hasler–Süsstrunk colourfulness
 $M=\sqrt{\sigma_{rg}^2+\sigma_{yb}^2}+0.3\sqrt{\mu_{rg}^2+\mu_{yb}^2}$ of about 20,000
 pixels shared among the frames, after white balance and tone, on encoded 0–255 values,
-median over frames. Saturation is $(65/M)^{0.75}$ within 0.9–1.5, or 1 when $M<5$
-(monochrome). 65 is the paper's fairly colourful range; the exponent and cap keep
-colourful footage nearly untouched and stop well short of a saturation pump.
+median over frames, sets the chroma gain the scene asks for: $g=(65/M)^{0.75}$ within
+0.9–1.5, or none when $M<5$ (monochrome). 65 is the paper's fairly colourful range; the
+exponent and cap keep colourful footage nearly untouched and stop well short of a
+saturation pump.
+
+- A gain below 1, on very colourful footage, is Saturation $g$, lowering every colour alike.
+- A gain above 1 is Vibrance, with Saturation 1. Vibrance scales a pixel's chroma by
+  $1+v(1-c)$, $c$ its linear $(\max-\min)/\max$ saturation, so strong colours gain little.
+  With $c_{25}$ the 25th percentile of the pixels' saturation (median over frames),
+  $v=(g-1)/(1-c_{25})$ up to 1: the scene's muted colours gain $g$.
+- The strong colours, the 90th percentile $c_{90}$, may then rise to 0.6, or by 0.03 when
+  already at or above it. When $v$ pushes them further, it is lowered by bisection until
+  they stay within that limit. Vibrance keeps the pixels' order of saturation, so each
+  frame's 90th-percentile pixel stays the same one and only those pixels are graded again.
+
+$M$ rewards variety of colour, so a uniform saturated sky measures dull; a single global
+gain then pushed it as far as the scene's muted colours (#225). The 90th percentile makes
+the limit apply where strong colours fill a tenth of the frame or more, such as a sky,
+not to a small red jacket, which Vibrance barely raises anyway.
 
 ### Differences from the issue's proposal
 
@@ -207,6 +223,23 @@ differs by 0.011 encoded on average, at most 0.03.
 The issue also had Intensity start at 100%, the correction as fitted. Intensity now starts at
 80% for that correction, so the range above it can exaggerate the look.
 
+Auto first raised colour with Saturation alone, which over-saturated skies in owner testing
+([#225](https://github.com/Plonk42/PasCap/issues/225)). On synthetic fixtures, the mean
+linear saturation of the region named, before and after Auto at 80%:
+
+| Fixture                    | Before | Saturation alone       | Vibrance and its limit |
+| -------------------------- | ------ | ---------------------- | ---------------------- |
+| Sky filling the frame      | 0.66   | 0.80 (Saturation 1.5)  | 0.70 (Vibrance 0.39)   |
+| Snow under a sky, the sky  | 0.71   | 0.80 (Saturation 1.39) | 0.72 (Vibrance 0.29)   |
+| Flat footage, whole frame  | 0.30   | 0.41 (Saturation 1.5)  | 0.38 (Vibrance 0.56)   |
+| Hazy footage, whole frame  | 0.45   | 0.51 (Saturation 1.18) | 0.49 (Vibrance 0.23)   |
+| Muted colours, whole frame | 0.15   | 0.22 (Saturation 1.5)  | 0.21 (Vibrance 0.53)   |
+
+The sky filling the frame rises by 0.04 on average: its strongest tenth rises by at most
+0.03, its paler lower part up to 0.6. Muted footage gains slightly less colour than with
+Saturation, because its stronger colours gain less. No owner recording was analysed for
+this change.
+
 ## Limits
 
 - Track values are one correction per track, from one clip. Keyframes adapt to light that
@@ -222,14 +255,18 @@ The issue also had Intensity start at 100%, the correction as fitted. Intensity 
   log-average, and analysing the corrected picture again opens them further.
 - Bright snow close-ups whose log-average sits above even the highest key are still
   slightly darkened, with Contrast down to about 0.75.
-- White balance damping and the Saturation cap and exponent are partial on purpose:
-  analysing a corrected image again can still suggest some warming or saturation, for
-  example on very flat footage whose Saturation reached its 1.5 cap. Footage with little
-  colour, such as snow, also reaches that cap, which can strengthen a faint tint.
+- White balance damping and the colour gain's cap and exponent are partial on purpose:
+  analysing a corrected image again can still suggest some warming or colour, for example
+  on very flat footage whose gain reached its 1.5 cap. Footage with little colour, such as
+  snow, gets that whole gain on its muted colours, which can strengthen a faint tint.
+- The strong-colour limit does not know what a sky is: any strong colours filling a tenth
+  of the frame keep the muted ones from gaining their whole Vibrance, and a sky paler than
+  0.6 saturation may rise to it.
 - The scalar tone settings approximate, not reproduce, a camera's flat-to-Rec.709
   conversion; Auto never sets colour curves.
 - The unit tests use synthetic fixtures only: neutral, flat, under- and overexposed, casts,
-  hazy, snow, night, sunset, sky and sea, and an outlier frame. The constants were then set
+  hazy, snow, night, sunset, sky and sea, skies over snow or filling the frame, muted and
+  monochrome colour, and an outlier frame. The constants were then set
   on the real flights above; neither qualifies other cameras, colour profiles or scenes.
 
 ## Validation
@@ -237,12 +274,15 @@ The issue also had Intensity start at 100%, the correction as fitted. Intensity 
 Unit tests cover the estimator's properties on synthetic images: neutral footage almost
 unchanged except its darkest areas, which Shadows opens, and shadow areas already open left
 alone; flat footage gets negative Blacks, output black and white points in their
-bands, a midtone slope at least 1.3× the input's and Saturation above 1.2; exposure errors
+bands, a midtone slope at least 1.3× the input's and more than 1.2× its saturation from
+Vibrance; exposure errors
 beyond the dead zone corrected stop for stop; cast signs and damping; near idempotence
 (analysing the output changes the image under 20% as much, and flat footage's global tone
-settles in one pass while Saturation and Shadows stop at their bounds); determinism; one
+settles in one pass while Shadows stops at its bound); determinism; one
 outlier frame among 16; hazy, snow, night, sunset,
-sky and sea; intensity scaling, exaggeration within bounds and frame selection. Editor
+sky and sea; a sky filling the frame whose strongest tenth rises by at most 0.03 and a sky
+over snow kept within 0.03 of its saturation; muted colours raised by Vibrance, very
+colourful ones lowered by Saturation, monochrome ones untouched; intensity scaling, exaggeration within bounds and frame selection. Editor
 tests cover the target and the keyframe window (reversed and retimed), the single Colour
 edit, the keyframe capture (new, joined, 256-keyframe limit), the initial choice, animated
 settings and session memory. A

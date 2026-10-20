@@ -91,9 +91,9 @@ function analyse(input: readonly AnalysisFrame[]): AutoCorrection {
 
 /** The frame as PasCap renders it with the correction, for flat areas: Shadows/Highlights on itself. */
 function apply(input: AnalysisFrame, correction: AutoCorrection): AnalysisFrame {
-  const { temperature, tint, saturation, ...tone } = correction;
+  const { temperature, tint, saturation, vibrance, ...tone } = correction;
   const gains = temperatureTintGains({ temperature, tint });
-  const render = renderFlat({ temperature, tint }, tone, saturation);
+  const render = renderFlat({ temperature, tint }, tone, { saturation, vibrance });
   const data = new Uint8ClampedArray(input.data.length);
   for (let index = 0; index < data.length; index += 4) {
     const balanced = [0, 1, 2].map((channel) => decode709(input.data[index + channel]! / 255) * gains[channel]!);
@@ -131,6 +131,31 @@ function measured(input: readonly AnalysisFrame[]): { black: number; white: numb
 
 const TONE = ['exposure', 'brightness', 'highlights', 'shadows', 'whites', 'blacks'] as const;
 const logged = (value: number): number => Math.abs(Math.log2(value));
+
+/** Each frame's pixel saturations in `region`, linear (max − min) / max as Vibrance measures them. */
+function saturations(input: readonly AnalysisFrame[], region: (x: number, y: number) => boolean = () => true) {
+  return input.map((item) => {
+    const values: number[] = [];
+    for (let y = 0; y < item.height; y++)
+      for (let x = 0; x < item.width; x++) {
+        if (!region(x, y)) continue;
+        const offset = (y * item.width + x) * 4;
+        const linear = [0, 1, 2].map((channel) => decode709(item.data[offset + channel]! / 255));
+        const maximum = Math.max(...linear);
+        values.push(maximum > 0 ? (maximum - Math.min(...linear)) / maximum : 0);
+      }
+    return values.sort((a, b) => a - b);
+  });
+}
+const meanSaturation = (values: number[][]): number => {
+  const all = values.flat();
+  return all.reduce((sum, value) => sum + value, 0) / all.length;
+};
+/** The median over frames of each frame's `q` quantile of saturation. */
+const saturationQuantile = (values: number[][], q: number): number => {
+  const quantiles = values.map((frame) => frame[Math.min(frame.length - 1, Math.floor(q * frame.length))]!);
+  return quantiles.sort((a, b) => a - b)[Math.floor(quantiles.length / 2)]!;
+};
 /** Stops between the log-average and the darkest tenth of the areas, as the estimator measures them. */
 const shadowDepth = (input: readonly AnalysisFrame[]): number => {
   const statistics = toneStatistics(input, { temperature: 0, tint: 0 })!;
@@ -147,6 +172,7 @@ describe('Auto adjust estimator', () => {
       if (setting !== 'shadows') expect(Math.abs(correction[setting]), setting).toBeLessThan(0.03);
     expect(logged(correction.contrast)).toBeLessThan(0.03);
     expect(logged(correction.saturation)).toBeLessThan(0.05);
+    expect(correction.vibrance).toBeLessThan(0.05);
     // Its darkest tenth of the areas sits more than shadowStops below the log-average: Shadows lifts it.
     const depth = shadowDepth(input);
     expect(depth).toBeGreaterThan(AUTO_ADJUST.shadowStops);
@@ -172,9 +198,12 @@ describe('Auto adjust estimator', () => {
     const correction = analyse(input);
     expect(correction.blacks).toBeLessThan(0);
     expect(correction.contrast).toBeGreaterThan(1.1);
-    expect(correction.saturation).toBeGreaterThan(1.2);
+    expect(correction.saturation).toBe(1);
+    expect(correction.vibrance).toBeGreaterThan(0.4);
+    const corrected = input.map((item) => apply(item, correction));
+    expect(meanSaturation(saturations(corrected))).toBeGreaterThan(1.2 * meanSaturation(saturations(input)));
     const before = measured(input);
-    const after = measured(input.map((item) => apply(item, correction)));
+    const after = measured(corrected);
     // One 8-bit step of tolerance for the corrected frames' quantisation.
     expect(after.black).toBeGreaterThanOrEqual(AUTO_ADJUST.black[0] - 0.004);
     expect(after.black).toBeLessThanOrEqual(AUTO_ADJUST.black[1] + 0.004);
@@ -183,8 +212,8 @@ describe('Auto adjust estimator', () => {
     expect(before.black).toBeGreaterThan(0.1);
     expect(before.white).toBeLessThan(0.82);
     // The output's midtone slope, measured on grey around the log-average, at least 1.3× the input's.
-    const { temperature, tint, saturation, ...tone } = correction;
-    const render = renderFlat({ temperature, tint }, tone, saturation);
+    const { temperature, tint, saturation, vibrance, ...tone } = correction;
+    const render = renderFlat({ temperature, tint }, tone, { saturation, vibrance });
     const middle = toneStatistics(input, { temperature, tint })!.logAverage;
     const output = (value: number): number => {
       const [red, green, blue] = render([value, value, value]);
@@ -252,9 +281,8 @@ describe('Auto adjust estimator', () => {
     const input = frames(6, (seed) => flat(scene(seed)));
     const first = analyse(input);
     const second = analyse(input.map((item) => apply(item, first)));
-    // Saturation and Shadows stop at their bounds on flat footage, so a second pass would still add some of
-    // both, and lower Blacks to keep the black point that Shadows lifts in its band.
-    expect(first.saturation).toBe(AUTO_ADJUST.maximumSaturation);
+    // Shadows stops at its bound on flat footage and Vibrance spares its stronger colours, so a second pass
+    // would still add some of both, and lower Blacks to keep the black point that Shadows lifts in its band.
     expect(first.shadows).toBe(0.5);
     const settled = ['exposure', 'brightness', 'highlights', 'whites'] as const;
     const size = (correction: AutoCorrection): number =>
@@ -369,6 +397,71 @@ describe('Auto adjust estimator', () => {
     expect(analyseAutoAdjust([frame(() => [0, 0, 0])])).toBeNull();
     expect(analyseAutoAdjust([])).toBeNull();
   });
+
+  it('raises the colour of muted footage with Vibrance, not Saturation', () => {
+    const input = frames(6, (seed) => scene(seed, { chroma: 0.15 }));
+    const correction = analyse(input);
+    expect(correction.saturation).toBe(1);
+    expect(correction.vibrance).toBeGreaterThan(0.3);
+    const corrected = input.map((item) => apply(item, correction));
+    expect(meanSaturation(saturations(corrected))).toBeGreaterThan(1.25 * meanSaturation(saturations(input)));
+  });
+
+  it('keeps the colour of monochrome footage', () => {
+    const correction = analyse(frames(6, (seed) => scene(seed, { chroma: 0 })));
+    expect(correction.saturation).toBe(1);
+    expect(correction.vibrance).toBe(0);
+  });
+
+  it('lowers the Saturation of very colourful footage, without Vibrance', () => {
+    const correction = analyse(frames(6, (seed) => scene(seed, { chroma: 1.6 })));
+    expect(correction.saturation).toBeLessThan(1);
+    expect(correction.saturation).toBeGreaterThanOrEqual(AUTO_ADJUST.minimumSaturation);
+    expect(correction.vibrance).toBe(0);
+  });
+
+  it('barely pushes a saturated sky that fills the frame, which measures dull for its uniformity', () => {
+    const sky = frames(6, (seed) => (x, y) => {
+      const haze = y / 90;
+      const grain = 0.98 + 0.04 * hash(x, y, seed);
+      return [(0.15 + 0.2 * haze) * grain, (0.3 + 0.2 * haze) * grain, (0.7 + 0.05 * haze) * grain];
+    });
+    const correction = analyse(sky);
+    expect(correction.saturation).toBe(1);
+    const before = saturations(sky);
+    const after = saturations(sky.map((item) => apply(item, correction)));
+    expect(saturationQuantile(before, AUTO_ADJUST.strongQuantile)).toBeGreaterThan(AUTO_ADJUST.strongCeiling);
+    // Its strongest tenth rises by at most strongMargin (with 8-bit quantisation); its paler, lower part
+    // may rise to strongCeiling. A Saturation of 1.5 took the sky from 0.66 to 0.80 on average.
+    expect(saturationQuantile(after, AUTO_ADJUST.strongQuantile)).toBeLessThanOrEqual(
+      saturationQuantile(before, AUTO_ADJUST.strongQuantile) + AUTO_ADJUST.strongMargin + 0.01,
+    );
+    expect(meanSaturation(after) - meanSaturation(before)).toBeLessThan(0.05);
+  });
+
+  it('keeps the sky above snow at its saturation while the snow gains colour', () => {
+    const isSky = (_x: number, y: number): boolean => y < 18;
+    const view = frames(6, (seed) => (x, y) => {
+      if (isSky(x, y)) {
+        const haze = y / 18;
+        const grain = 0.98 + 0.04 * hash(x, y, seed);
+        return [(0.12 + 0.2 * haze) * grain, (0.28 + 0.18 * haze) * grain, (0.72 + 0.03 * haze) * grain];
+      }
+      const rock = hash(Math.floor(x / 6), Math.floor(y / 6), seed + 3) < 0.2;
+      const level = rock
+        ? 0.03 + 0.05 * hash(x, y, seed)
+        : 0.45 + 0.3 * hash(Math.floor(x / 3), Math.floor(y / 3), seed);
+      return [level * 0.97, level, level * 1.04];
+    });
+    const correction = analyse(view);
+    expect(correction.saturation).toBe(1);
+    expect(correction.vibrance).toBeGreaterThan(0.1);
+    const corrected = view.map((item) => apply(item, correction));
+    // A Saturation of 1.39 took this sky from 0.71 to 0.80.
+    expect(meanSaturation(saturations(corrected, isSky))).toBeLessThanOrEqual(
+      meanSaturation(saturations(view, isSky)) + AUTO_ADJUST.strongMargin,
+    );
+  });
 });
 
 describe('Auto adjust intensity and frames', () => {
@@ -376,6 +469,7 @@ describe('Auto adjust intensity and frames', () => {
     temperature: 0.4,
     tint: -0.2,
     saturation: 1.44,
+    vibrance: 0.4,
     exposure: 1,
     brightness: 0.1,
     contrast: 1.21,
@@ -393,6 +487,7 @@ describe('Auto adjust intensity and frames', () => {
       temperature: 0.2,
       tint: -0.1,
       saturation: 1.2,
+      vibrance: 0.2,
       exposure: 0.5,
       brightness: 0.05,
       contrast: 1.1,
@@ -413,6 +508,7 @@ describe('Auto adjust intensity and frames', () => {
       temperature: 0.5,
       tint: -0.25,
       saturation: 1.577,
+      vibrance: 0.5,
       exposure: 1.25,
       brightness: 0.125,
       contrast: 1.269,
