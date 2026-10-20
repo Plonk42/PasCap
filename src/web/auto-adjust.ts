@@ -2,6 +2,7 @@ import {
   analyseAutoAdjust,
   AUTO_ADJUST_SETTINGS,
   autoAdjustFrames,
+  autoAdjustWindow,
   scaleCorrection,
   type AutoAdjustSetting,
   type AutoCorrection,
@@ -14,13 +15,19 @@ import type { VideoLayer } from '../shared/model.js';
 import { forEachSerial } from '../shared/serial.js';
 import type { PlacedClip, TimelineLayout } from '../shared/timeline.js';
 import { frameIlluminant, type AnalysisFrame, type IlluminantEstimate } from '../shared/white-balance.js';
-import { proxyUrl, readyClipAtPlayhead } from './auto-white-balance.js';
+import { captureCommands, keyframeLimitReason, proxyUrl, readyClipAtPlayhead } from './auto-white-balance.js';
+
+/** Track values from the whole clip, or a keyframe at the playhead from the frames around it. */
+export type AutoAdjustMode = 'track' | 'keyframe';
 
 export interface AutoAdjustTarget {
+  mode: AutoAdjustMode;
   clip: PlacedClip;
   asset: MediaAsset;
-  /** One analysis: the clip, its recording as prepared and its source range. */
+  /** One analysis: the clip, its recording as prepared and the source frames it reads. */
   key: string;
+  /** The playhead, where a keyframe goes. */
+  frame: number;
   sourceFrames: number[];
 }
 
@@ -33,12 +40,28 @@ export function autoAdjustTarget(
   assets: readonly MediaAsset[],
   frame: number,
   preferredClipId: string | null,
+  mode: AutoAdjustMode = 'track',
 ): AutoAdjustAvailability {
   const { clip, asset, reason } = readyClipAtPlayhead(layer, layout, assets, frame, preferredClipId, 'analyse it');
   if (reason !== null) return { target: null, reason };
   const { sourceIn, sourceOut } = clip.clip;
-  const key = [clip.clip.id, asset.id, asset.prepared?.verification.verifiedAt, sourceIn, sourceOut].join(':');
-  return { target: { clip, asset, key, sourceFrames: autoAdjustFrames(sourceIn, sourceOut) }, reason: null };
+  const prefix = [mode, clip.clip.id, asset.id, asset.prepared?.verification.verifiedAt, sourceIn, sourceOut];
+  if (mode === 'track') {
+    const sourceFrames = autoAdjustFrames(sourceIn, sourceOut);
+    return { target: { mode, clip, asset, key: prefix.join(':'), frame, sourceFrames }, reason: null };
+  }
+  const full = keyframeLimitReason(layer, frame);
+  if (full !== null) return { target: null, reason: full };
+  const sourceFrames = [
+    ...new Set(autoAdjustWindow(clip, frame).map((projectFrame) => clip.retiming.sourceAt(projectFrame - clip.start))),
+  ];
+  const key = [...prefix, frame, sourceFrames.join(',')].join(':');
+  return { target: { mode, clip, asset, key, frame, sourceFrames }, reason: null };
+}
+
+/** Once the track animates any setting Auto sets, a keyframe is the edit that can change them all. */
+export function initialMode(layer: VideoLayer): AutoAdjustMode {
+  return animatedSettings(layer).length ? 'keyframe' : 'track';
 }
 
 /** The settings Auto sets that this track animates: Auto leaves them unchanged. */
@@ -68,22 +91,31 @@ export function autoAdjustCommand(
   return { type: 'colour', layerId: layer.id, colour };
 }
 
+/** The edit Auto applies in `target`'s mode: the track's values, or a keyframe of all ten at the playhead. */
+export function autoAdjustCommands(
+  layer: VideoLayer,
+  target: Pick<AutoAdjustTarget, 'mode' | 'frame'>,
+  correction: Readonly<AutoCorrection>,
+  intensity: number,
+): EditCommand[] {
+  if (target.mode === 'keyframe') return captureCommands(layer, target.frame, scaleCorrection(correction, intensity));
+  const edit = autoAdjustCommand(layer, correction, intensity);
+  return edit ? [edit] : [];
+}
+
 export interface AutoAdjustAnalysis {
-  key: string;
   correction: AutoCorrection;
   /** The intensity last applied, 0–100%. */
   percent: number;
 }
 
-// Session memory only: the last analysis of each clip of the open project, never saved or in history.
+// Session memory only: the last analyses of the open project, never saved or in history.
 let analysesProject: string | null = null;
 const analyses = new Map<string, AutoAdjustAnalysis>();
 
-/** The clip's last analysis, unless it was trimmed or its recording prepared again since. */
+/** The last analysis of the same frames, unless the clip was trimmed or its recording prepared again since. */
 export function cachedAnalysis(projectId: string, target: AutoAdjustTarget): AutoAdjustAnalysis | null {
-  if (analysesProject !== projectId) return null;
-  const analysis = analyses.get(target.clip.clip.id);
-  return analysis?.key === target.key ? analysis : null;
+  return analysesProject === projectId ? (analyses.get(target.key) ?? null) : null;
 }
 
 export function rememberAnalysis(projectId: string, target: AutoAdjustTarget, analysis: AutoAdjustAnalysis): void {
@@ -91,7 +123,7 @@ export function rememberAnalysis(projectId: string, target: AutoAdjustTarget, an
     analyses.clear();
     analysesProject = projectId;
   }
-  analyses.set(target.clip.clip.id, analysis);
+  analyses.set(target.key, analysis);
 }
 
 /** Lets input events through between frames, so Cancel stays responsive during the analysis. */

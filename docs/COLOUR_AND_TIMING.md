@@ -33,7 +33,7 @@ See [track appearance](design/ROW_APPEARANCE.md) for ownership, UI and strict st
   arbitrary coloured pixels or final output. CPU/reference/native/GPU use this
   same math, not Kelvin or HDR. **Auto white balance** only chooses Temperature/Tint
   keyframe values, and **Auto** ([Auto adjust](design/AUTO_ADJUST.md)) only chooses ten
-  scalar bases by evaluating this grade; neither adds a stage. See
+  scalar bases or keyframe values by evaluating this grade; neither adds a stage. See
   [Temperature and Tint](design/TEMPERATURE_AND_TINT.md).
 - Exposure: multiply linear RGB by `2^exposure`.
 - Tone curves: compute `Y = clamp(dot(RGB, [0.2126, 0.7152, 0.0722]), 0, 1)` and

@@ -1,7 +1,7 @@
 import type { EditCommand } from '../shared/commands.js';
 
-/** Transient, never committed: show `command` applied to the current project until it is replaced or null. */
-export type LivePreview = (command: EditCommand | null) => void;
+/** Transient, never committed: show `commands` applied to the current project until replaced or null. */
+export type LivePreview = (commands: EditCommand | readonly EditCommand[] | null) => void;
 
 let sink: LivePreview | null = null;
 
@@ -13,6 +13,11 @@ export function registerLivePreview(next: LivePreview): () => void {
   };
 }
 
-export function livePreview(command: EditCommand | null): void {
-  sink?.(command);
+export function livePreview(commands: EditCommand | readonly EditCommand[] | null): void {
+  sink?.(commands);
+}
+
+export function previewCommands(commands: EditCommand | readonly EditCommand[] | null): readonly EditCommand[] {
+  if (commands === null) return [];
+  return 'type' in commands ? [commands] : commands;
 }

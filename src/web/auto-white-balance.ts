@@ -1,5 +1,5 @@
 import type { EditCommand } from '../shared/commands.js';
-import { activeLayerSetting } from '../shared/keyframes.js';
+import { activeLayerSetting, type KeyframeSetting } from '../shared/keyframes.js';
 import type { MediaAsset } from '../shared/media.js';
 import { MAX_TRACK_KEYFRAMES, type VideoLayer } from '../shared/model.js';
 import type { PlacedClip, TimelineLayout } from '../shared/timeline.js';
@@ -71,25 +71,37 @@ export function whiteBalanceTarget(
     'balance its light',
   );
   if (reason !== null) return { target: null, reason };
-  if (layer.keyframes.length >= MAX_TRACK_KEYFRAMES && !layer.keyframes.some((key) => key.frame === frame))
-    return {
-      target: null,
-      reason: `This track already has ${MAX_TRACK_KEYFRAMES} keyframes. Move the playhead to one of them, or remove one.`,
-    };
+  const full = keyframeLimitReason(layer, frame);
+  if (full !== null) return { target: null, reason: full };
   const projectFrames = whiteBalanceWindow(clip, frame);
   const sourceFrames = projectFrames.map((projectFrame) => clip.retiming.sourceAt(projectFrame - clip.start));
   return { target: { clip, asset, projectFrames, sourceFrames }, reason: null };
 }
 
+/** Why no keyframe can be captured at `frame`: the track is full and none is there to join. */
+export function keyframeLimitReason(layer: VideoLayer, frame: number): string | null {
+  return layer.keyframes.length >= MAX_TRACK_KEYFRAMES && !layer.keyframes.some((key) => key.frame === frame)
+    ? `This track already has ${MAX_TRACK_KEYFRAMES} keyframes. Move the playhead to one of them, or remove one.`
+    : null;
+}
+
+/** Captures each value at `frame` exactly like its diamond (joining or overwriting), in one transaction. */
+export function captureCommands(
+  layer: VideoLayer,
+  frame: number,
+  values: Readonly<Partial<Record<KeyframeSetting, number>>>,
+): EditCommand[] {
+  return (Object.entries(values) as [KeyframeSetting, number][]).map(([setting, value]): EditCommand => {
+    const capture = { layerId: layer.id, frame, setting, value };
+    return activeLayerSetting(layer, setting, frame)
+      ? { type: 'layer-key-value', ...capture }
+      : { type: 'layer-key-toggle', ...capture };
+  });
+}
+
 /** Captures both settings at the playhead exactly like their diamonds, in one transaction. */
 export function whiteBalanceCommands(layer: VideoLayer, frame: number, balance: WhiteBalance): EditCommand[] {
-  return (['temperature', 'tint'] as const).map((setting) => ({
-    type: activeLayerSetting(layer, setting, frame) ? 'layer-key-value' : 'layer-key-toggle',
-    layerId: layer.id,
-    frame,
-    setting,
-    value: balance[setting],
-  }));
+  return captureCommands(layer, frame, { temperature: balance.temperature, tint: balance.tint });
 }
 
 export function proxyUrl(mediaId: string): string {

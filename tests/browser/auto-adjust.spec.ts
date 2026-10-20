@@ -8,14 +8,16 @@ import {
   analyseAutoAdjust,
   AUTO_ADJUST_SETTINGS,
   autoAdjustFrames,
+  autoAdjustWindow,
   scaleCorrection,
   type AutoCorrection,
 } from '../../src/shared/auto-adjust.js';
 import { applyCommand } from '../../src/shared/commands.js';
 import type { MediaAsset } from '../../src/shared/media.js';
 import { createClip, createLayer, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
+import { calculateLayout } from '../../src/shared/timeline.js';
 import type { AnalysisFrame } from '../../src/shared/white-balance.js';
-import { autoAdjustCommand } from '../../src/web/auto-adjust.js';
+import { autoAdjustCommand, autoAdjustCommands } from '../../src/web/auto-adjust.js';
 import { expandedInspectorPreferences, inspectorTab, sharedPoint } from './editor-helpers.js';
 import { memoryProjects, type MemoryProjects } from './memory-projects.js';
 
@@ -182,8 +184,7 @@ async function checksum(page: Page): Promise<number> {
 }
 
 /** The pixels the analysis reads, decoded in the page, and the correction the shared estimator fits to them. */
-async function expectedCorrection(page: Page): Promise<AutoCorrection> {
-  const frames = autoAdjustFrames(30, 120);
+async function expectedCorrection(page: Page, frames = autoAdjustFrames(30, 120)): Promise<AutoCorrection> {
   const encoded = await page.evaluate(
     async ({ mediaId, sources }) => {
       const sampled = await window.pascapLab!.sampleFrames(mediaId, sources);
@@ -207,9 +208,24 @@ async function expectedCorrection(page: Page): Promise<AutoCorrection> {
   return correction;
 }
 
+/** Source frames a keyframe at `frame` analyses: within 1 s of it, in the flat clip (source 30 at frame 0). */
+function keyframeFrames(document: ProjectDocument, frame: number): number[] {
+  const clip = calculateLayout(document).clips.find((item) => item.clip.id === 'flat')!;
+  return autoAdjustWindow(clip, frame).map((projectFrame) => clip.retiming.sourceAt(projectFrame - clip.start));
+}
+
+function keyframed(document: ProjectDocument, frame: number, correction: AutoCorrection): ProjectDocument {
+  let next = document;
+  for (const command of autoAdjustCommands(next.layers[0]!, { mode: 'keyframe', frame }, correction, 0.8))
+    next = applyCommand(next, command);
+  return next;
+}
+
 const auto = (page: Page) => page.locator('summary[aria-label="Auto adjust"]');
 const apply = (page: Page) => page.getByRole('button', { name: 'Apply', exact: true });
 const intensity = (page: Page) => page.getByRole('spinbutton', { name: 'Auto adjust intensity', exact: true });
+const mode = (page: Page, name: 'Track values' | 'Keyframe at playhead') =>
+  page.getByRole('radio', { name, exact: true });
 
 function applied(document: ProjectDocument, correction: AutoCorrection, intensity: number): ProjectDocument {
   return applyCommand(document, autoAdjustCommand(document.layers[0]!, correction, intensity)!);
@@ -319,6 +335,9 @@ test('leaves animated settings and keyframes unchanged and says so', async ({ pa
   await seek(page, 45);
   const correction = await expectedCorrection(page);
   await auto(page).click();
+  // The track animates Exposure and Saturation: Auto starts on a keyframe, the track values remain a choice.
+  await expect(mode(page, 'Keyframe at playhead')).toBeChecked();
+  await mode(page, 'Track values').check();
   await expect(page.getByText('Saturation is animated: not changed', { exact: true })).toBeVisible();
   await expect(page.getByText('Exposure is animated: not changed', { exact: true })).toBeVisible();
   await apply(page).click();
@@ -329,6 +348,46 @@ test('leaves animated settings and keyframes unchanged and says so', async ({ pa
   expect(colour.blacks).toBe(correction.blacks);
   expect(expected.layers[0]!.keyframes).toEqual(seeded.layers[0]!.keyframes);
   expect(expected.layers[0]!.opacity).toBe(seeded.layers[0]!.opacity);
+});
+
+test('Keyframe at playhead keys the ten settings from the frames around it, one keyframe per run', async ({ page }) => {
+  const before = await current(page);
+  const first = await expectedCorrection(page, keyframeFrames(before, 45));
+  const graded = await checksum(page);
+  await auto(page).click();
+  await expect(mode(page, 'Track values')).toBeChecked();
+  await expect(apply(page)).toBeVisible();
+  const reads = proxyReads;
+  await mode(page, 'Keyframe at playhead').check();
+  await expect(apply(page)).toBeVisible();
+  await expect(intensity(page)).toHaveValue('80');
+  expect(proxyReads).toBeGreaterThan(reads);
+  await expect.poll(() => checksum(page)).not.toBe(graded);
+  expect(await current(page)).toEqual(before);
+  await apply(page).click();
+  await expect(apply(page)).toHaveCount(0);
+  const once = keyframed(before, 45, first);
+  await expect.poll(() => current(page)).toEqual(once);
+  const key = once.layers[0]!.keyframes[0]!;
+  expect(key.frame).toBe(45);
+  for (const setting of AUTO_ADJUST_SETTINGS) expect(key.values[setting]).toBe(first[setting]);
+  expect(once.layers[0]!.colour).toEqual(before.layers[0]!.colour);
+
+  // Now animated, Auto starts on a keyframe; another frame is another analysis and another keyframe.
+  await seek(page, 80);
+  const second = await expectedCorrection(page, keyframeFrames(before, 80));
+  await auto(page).click();
+  await expect(mode(page, 'Keyframe at playhead')).toBeChecked();
+  await expect(apply(page)).toBeVisible();
+  await apply(page).click();
+  const twice = keyframed(once, 80, second);
+  await expect.poll(() => current(page)).toEqual(twice);
+  expect(twice.layers[0]!.keyframes.map((point) => point.frame)).toEqual([45, 80]);
+
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  expect(await current(page)).toEqual(once);
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  expect(await current(page)).toEqual(before);
 });
 
 test('explains when it cannot run, and a cancelled or failed analysis leaves no edit', async ({ page }) => {

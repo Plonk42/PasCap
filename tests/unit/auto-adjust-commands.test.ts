@@ -1,14 +1,29 @@
 import { describe, expect, it } from 'vitest';
-import { AUTO_ADJUST, autoAdjustFrames, scaleCorrection, type AutoCorrection } from '../../src/shared/auto-adjust.js';
+import {
+  AUTO_ADJUST,
+  AUTO_ADJUST_SETTINGS,
+  autoAdjustFrames,
+  autoAdjustWindow,
+  scaleCorrection,
+  type AutoCorrection,
+} from '../../src/shared/auto-adjust.js';
 import { applyCommand, EditHistory } from '../../src/shared/commands.js';
 import { EMPTY_KEY_VALUES, layerKeyframe } from '../../src/shared/keyframes.js';
-import { createClip, createLayer, createProject, type ProjectDocument } from '../../src/shared/model.js';
+import {
+  createClip,
+  createLayer,
+  createProject,
+  MAX_TRACK_KEYFRAMES,
+  type ProjectDocument,
+} from '../../src/shared/model.js';
 import { calculateLayout } from '../../src/shared/timeline.js';
 import {
   animatedSettings,
   autoAdjustCommand,
+  autoAdjustCommands,
   autoAdjustTarget,
   cachedAnalysis,
+  initialMode,
   rememberAnalysis,
   settingLabel,
 } from '../../src/web/auto-adjust.js';
@@ -142,8 +157,8 @@ describe('Auto adjust session memory', () => {
     const layer = document.layers[0]!;
     const target = autoAdjustTarget(layer, layout, ASSETS, 10, null).target!;
     expect(cachedAnalysis('auto', target)).toBeNull();
-    rememberAnalysis('auto', target, { key: target.key, correction: CORRECTION, percent: 60 });
-    expect(cachedAnalysis('auto', target)).toEqual({ key: target.key, correction: CORRECTION, percent: 60 });
+    rememberAnalysis('auto', target, { correction: CORRECTION, percent: 60 });
+    expect(cachedAnalysis('auto', target)).toEqual({ correction: CORRECTION, percent: 60 });
 
     const trimmed = applyCommand(document, { type: 'trim', clipId: 'a', sourceIn: 120, sourceOut: 400 });
     const trimmedTarget = autoAdjustTarget(trimmed.layers[0]!, calculateLayout(trimmed), ASSETS, 10, null).target!;
@@ -154,8 +169,104 @@ describe('Auto adjust session memory', () => {
     const reprepared = autoAdjustTarget(layer, layout, [prepared, ASSETS[1]!], 10, null).target!;
     expect(cachedAnalysis('auto', reprepared)).toBeNull();
 
-    rememberAnalysis('other', target, { key: target.key, correction: CORRECTION, percent: 100 });
+    rememberAnalysis('other', target, { correction: CORRECTION, percent: 100 });
     expect(cachedAnalysis('auto', target)).toBeNull();
     expect(cachedAnalysis('other', target)?.percent).toBe(100);
+  });
+
+  it('keeps the analyses of a clip and of each keyframe frame apart', () => {
+    const document = project();
+    const layout = calculateLayout(document);
+    const layer = document.layers[0]!;
+    const whole = autoAdjustTarget(layer, layout, ASSETS, 50, null).target!;
+    const at50 = autoAdjustTarget(layer, layout, ASSETS, 50, null, 'keyframe').target!;
+    const at80 = autoAdjustTarget(layer, layout, ASSETS, 80, null, 'keyframe').target!;
+    rememberAnalysis('auto', at50, { correction: CORRECTION, percent: 70 });
+    expect(cachedAnalysis('auto', whole)).toBeNull();
+    expect(cachedAnalysis('auto', at80)).toBeNull();
+    expect(cachedAnalysis('auto', autoAdjustTarget(layer, layout, ASSETS, 50, null, 'keyframe').target!)?.percent).toBe(
+      70,
+    );
+  });
+});
+
+function keyedValues(document: ProjectDocument, frame: number): Partial<Record<string, number | null>> {
+  const key = document.layers[0]!.keyframes.find((point) => point.frame === frame)!;
+  return Object.fromEntries(AUTO_ADJUST_SETTINGS.map((setting) => [setting, key.values[setting]]));
+}
+
+describe('Auto adjust keyframe', () => {
+  it('analyses the frames within 1 s of the playhead, through the clip retiming', () => {
+    const document = project();
+    const layout = calculateLayout(document);
+    const layer = document.layers[0]!;
+    const a = autoAdjustTarget(layer, layout, ASSETS, 100, null, 'keyframe').target!;
+    expect(a.frame).toBe(100);
+    expect(a.sourceFrames).toEqual(autoAdjustWindow(layout.clips[0]!, 100).map((frame) => frame + 100));
+    expect(a.sourceFrames).toHaveLength(AUTO_ADJUST.frames);
+    expect(Math.min(...a.sourceFrames)).toBe(170);
+    expect(Math.max(...a.sourceFrames)).toBe(230);
+    // Reversed at 2×: each project frame shows a source frame counted down from the end, two apart.
+    const b = layout.clips[1]!;
+    const reversed = autoAdjustTarget(layer, layout, ASSETS, b.start + 40, null, 'keyframe').target!;
+    expect(reversed.sourceFrames).toEqual(
+      autoAdjustWindow(b, b.start + 40).map((frame) => b.retiming.sourceAt(frame - b.start)),
+    );
+    expect(reversed.sourceFrames[0]).toBeGreaterThan(reversed.sourceFrames.at(-1)!);
+  });
+
+  it('needs room for a keyframe at the playhead', () => {
+    const document = project();
+    const layout = calculateLayout(document);
+    const layer = document.layers[0]!;
+    layer.keyframes = Array.from({ length: MAX_TRACK_KEYFRAMES }, (_, index) =>
+      layerKeyframe(index * 2, { ...EMPTY_KEY_VALUES, hue: 0 }, 'linear'),
+    );
+    expect(autoAdjustTarget(layer, layout, ASSETS, 11, null, 'keyframe').reason).toMatch(/already has 256 keyframes/);
+    expect(autoAdjustTarget(layer, layout, ASSETS, 10, null, 'keyframe').target).not.toBeNull();
+    expect(autoAdjustTarget(layer, layout, ASSETS, 11, null).target).not.toBeNull();
+  });
+
+  it('keys the ten settings at the playhead in one Undo step, joining or overwriting a keyframe there', () => {
+    const document = project();
+    const layer = document.layers[0]!;
+    layer.colour.exposure = -0.4;
+    layer.keyframes = [layerKeyframe(60, { ...EMPTY_KEY_VALUES, hue: 20, exposure: 0.2 }, 'smooth')];
+    const before = structuredClone(document);
+    const scaled = scaleCorrection(CORRECTION, 0.6);
+    let next = document;
+    for (const command of autoAdjustCommands(layer, { mode: 'keyframe', frame: 60 }, CORRECTION, 0.6))
+      next = applyCommand(next, command);
+    expect(keyedValues(next, 60)).toEqual(scaled);
+    const key = next.layers[0]!.keyframes[0]!;
+    expect(next.layers[0]!.keyframes).toHaveLength(1);
+    expect(key.values.hue).toBe(20);
+    // Joining settings adopt the Easing the keyframe's settings agree on.
+    expect(AUTO_ADJUST_SETTINGS.every((setting) => key.easing[setting] === 'smooth')).toBe(true);
+    expect(next.layers[0]!.colour).toEqual(before.layers[0]!.colour);
+    const history = new EditHistory(document);
+    history.replace(next);
+    expect(history.undo()).toEqual(before);
+
+    // A second keyframe elsewhere is new, with Linear easing; the first is unchanged.
+    let later = next;
+    for (const command of autoAdjustCommands(next.layers[0]!, { mode: 'keyframe', frame: 90 }, CORRECTION, 0.8))
+      later = applyCommand(later, command);
+    expect(later.layers[0]!.keyframes.map((point) => point.frame)).toEqual([60, 90]);
+    expect(keyedValues(later, 90)).toEqual(CORRECTION);
+    expect(later.layers[0]!.keyframes[1]!.easing.exposure).toBe('linear');
+    expect(later.layers[0]!.keyframes[0]).toEqual(key);
+  });
+
+  it('starts in keyframe mode once the track animates a setting Auto sets', () => {
+    const layer = project().layers[0]!;
+    expect(initialMode(layer)).toBe('track');
+    layer.keyframes = [layerKeyframe(20, { ...EMPTY_KEY_VALUES, hue: 10 }, 'linear')];
+    expect(initialMode(layer)).toBe('track');
+    layer.keyframes = [layerKeyframe(20, { ...EMPTY_KEY_VALUES, temperature: 0.2 }, 'linear')];
+    expect(initialMode(layer)).toBe('keyframe');
+    expect(autoAdjustCommands(layer, { mode: 'track', frame: 20 }, CORRECTION, 0.8)).toEqual([
+      autoAdjustCommand(layer, CORRECTION, 0.8),
+    ]);
   });
 });

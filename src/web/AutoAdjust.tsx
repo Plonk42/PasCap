@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
+import { useEffect, useId, useState, type KeyboardEvent } from 'react';
 import { AUTO_ADJUST, type AutoCorrection } from '../shared/auto-adjust.js';
 import type { EditCommand } from '../shared/commands.js';
 import type { MediaAsset } from '../shared/media.js';
@@ -7,11 +7,14 @@ import type { TimelineLayout } from '../shared/timeline.js';
 import {
   analyseClip,
   animatedSettings,
-  autoAdjustCommand,
+  autoAdjustCommands,
   autoAdjustTarget,
   cachedAnalysis,
+  initialMode,
   rememberAnalysis,
   settingLabel,
+  type AutoAdjustAvailability,
+  type AutoAdjustMode,
   type AutoAdjustTarget,
 } from './auto-adjust.js';
 import { shortName } from './display.js';
@@ -36,6 +39,10 @@ interface Props {
 const TITLE = 'Analyse the clip at the playhead and suggest a balanced Colour correction for this track';
 /** The initial Intensity, in percent: the correction as suggested. */
 const BALANCED = Math.round(AUTO_ADJUST.balancedIntensity * 100);
+const MODES: readonly { mode: AutoAdjustMode; label: string; hint: string }[] = [
+  { mode: 'track', label: 'Track values', hint: 'whole clip' },
+  { mode: 'keyframe', label: 'Keyframe at playhead', hint: '1 s around it' },
+];
 
 /** Track → Colour → Auto: analyses the clip at the playhead and applies its correction to the track. */
 export function AutoAdjust({
@@ -76,7 +83,8 @@ export function AutoAdjust({
       key={`${projectId}:${layer.id}:${availability.target.key}`}
       projectId={projectId}
       layer={layer}
-      target={availability.target}
+      trackTarget={availability.target}
+      keyframeAvailability={autoAdjustTarget(layer, layout, assets, frame, selectedClipId, 'keyframe')}
       onEdit={onEdit}
     />
   );
@@ -84,95 +92,101 @@ export function AutoAdjust({
 
 type Phase =
   | { kind: 'idle' }
-  | { kind: 'analysing'; done: number; total: number }
-  | { kind: 'failed'; message: string }
-  | { kind: 'ready'; correction: AutoCorrection };
+  | { kind: 'analysing'; key: string; done: number; total: number }
+  | { kind: 'failed'; key: string; message: string }
+  | { kind: 'ready'; key: string; correction: AutoCorrection };
 
 function AutoAdjustPopover({
   projectId,
   layer,
-  target,
+  trackTarget,
+  keyframeAvailability,
   onEdit,
 }: Readonly<{
   projectId: string;
   layer: VideoLayer;
-  target: AutoAdjustTarget;
+  trackTarget: AutoAdjustTarget;
+  keyframeAvailability: AutoAdjustAvailability;
   onEdit: (commands: readonly EditCommand[]) => void;
 }>) {
   const id = useId();
   const [open, setOpen] = useState(false);
+  const [mode, setMode] = useState<AutoAdjustMode>('track');
   const [phase, setPhase] = useState<Phase>({ kind: 'idle' });
   // Intensity in percent; `draft` is the value being dragged, previewed but not chosen yet.
   const [percent, setPercent] = useState(BALANCED);
   const [draft, setDraft] = useState<number | null>(null);
   const [announcement, setAnnouncement] = useState('');
-  const controller = useRef<AbortController | null>(null);
-  const stop = (): void => {
-    controller.current?.abort();
-    controller.current = null;
-  };
-  useEffect(() => () => controller.current?.abort(), []);
 
-  const ready = phase.kind === 'ready' ? phase : null;
-  const previewing = open && ready !== null;
-  const shown = ready && autoAdjustCommand(layer, ready.correction, (draft ?? percent) / 100);
-  // Re-issued when the committed track changes too, since that replaces the preview.
+  const { target, reason } = mode === 'track' ? { target: trackTarget, reason: null } : keyframeAvailability;
+  const targetKey = target?.key ?? null;
+  // A new mode or, for a keyframe, a new playhead is a new analysis; leaving it cancels the old one.
   useEffect(() => {
-    if (previewing && ready) livePreview(autoAdjustCommand(layer, ready.correction, (draft ?? percent) / 100));
-  }, [previewing, ready, layer, draft, percent]);
-  useEffect(() => (previewing ? () => livePreview(null) : undefined), [previewing]);
-
-  const analyse = async (): Promise<void> => {
+    if (!open || !target) return;
+    const { key } = target;
     const cached = cachedAnalysis(projectId, target);
     if (cached) {
       setPercent(cached.percent);
-      setPhase({ kind: 'ready', correction: cached.correction });
+      setPhase({ kind: 'ready', key, correction: cached.correction });
       return;
     }
     const abort = new AbortController();
-    stop();
-    controller.current = abort;
-    setPhase({ kind: 'analysing', done: 0, total: target.sourceFrames.length });
-    try {
-      const correction = await analyseClip(target, abort.signal, (done, total) => {
-        if (!abort.signal.aborted) setPhase({ kind: 'analysing', done, total });
-      });
-      abort.signal.throwIfAborted();
-      rememberAnalysis(projectId, target, { key: target.key, correction, percent: BALANCED });
-      setPercent(BALANCED);
-      setPhase({ kind: 'ready', correction });
-      setAnnouncement('Auto adjust is ready: its correction is previewed. Choose an Intensity, then Apply.');
-    } catch (cause) {
-      if (!abort.signal.aborted)
-        setPhase({ kind: 'failed', message: cause instanceof Error ? cause.message : 'Auto adjust failed.' });
-    } finally {
-      if (controller.current === abort) controller.current = null;
-    }
-  };
+    setPercent(BALANCED);
+    setPhase({ kind: 'analysing', key, done: 0, total: target.sourceFrames.length });
+    analyseClip(target, abort.signal, (done, total) => {
+      if (!abort.signal.aborted) setPhase({ kind: 'analysing', key, done, total });
+    }).then(
+      (correction) => {
+        if (abort.signal.aborted) return;
+        rememberAnalysis(projectId, target, { correction, percent: BALANCED });
+        setPhase({ kind: 'ready', key, correction });
+        setAnnouncement('Auto adjust is ready: its correction is previewed. Choose an Intensity, then Apply.');
+      },
+      (cause: unknown) => {
+        if (!abort.signal.aborted)
+          setPhase({ kind: 'failed', key, message: cause instanceof Error ? cause.message : 'Auto adjust failed.' });
+      },
+    );
+    return () => abort.abort();
+    // The key identifies the target: a new object for the same frames is the same analysis.
+  }, [open, projectId, targetKey]);
+
+  const current = phase.kind !== 'idle' && phase.key === targetKey ? phase : null;
+  const ready = current?.kind === 'ready' && target ? { correction: current.correction, target } : null;
+  const correction = current?.kind === 'ready' ? current.correction : null;
+  const commandsAt = (value: number): EditCommand[] =>
+    ready ? autoAdjustCommands(layer, ready.target, ready.correction, value / 100) : [];
+  const previewing = open && ready !== null;
+  // Re-issued when the committed track changes too, since that replaces the preview.
+  useEffect(() => {
+    if (previewing && target && correction)
+      livePreview(autoAdjustCommands(layer, target, correction, (draft ?? percent) / 100));
+  }, [previewing, targetKey, correction, layer, draft, percent]);
+  useEffect(() => (previewing ? () => livePreview(null) : undefined), [previewing]);
 
   const openChange = (next: boolean): void => {
     setOpen(next);
     setDraft(null);
     if (next) {
       setAnnouncement('');
-      void analyse();
-    } else {
-      stop();
-      setPhase({ kind: 'idle' });
-    }
+      setMode(initialMode(layer));
+    } else setPhase({ kind: 'idle' });
   };
 
   const apply = (close: () => void): void => {
     if (!ready) return;
-    const edit = autoAdjustCommand(layer, ready.correction, percent / 100);
-    if (!edit) return;
-    rememberAnalysis(projectId, target, { key: target.key, correction: ready.correction, percent });
-    onEdit([edit]);
+    const commands = commandsAt(percent);
+    if (!commands.length) return;
+    rememberAnalysis(projectId, ready.target, { correction: ready.correction, percent });
+    onEdit(commands);
     close();
-    setAnnouncement(`Auto adjust applied at ${percent}%.`);
+    setAnnouncement(
+      mode === 'keyframe' ? `Auto adjust keyframed at ${percent}%.` : `Auto adjust applied at ${percent}%.`,
+    );
   };
 
-  const animated = animatedSettings(layer);
+  const animated = mode === 'track' ? animatedSettings(layer) : [];
+  const nothing = ready !== null && commandsAt(percent).length === 0;
   return (
     <span className="auto-adjust">
       <Popover
@@ -197,17 +211,37 @@ function AutoAdjustPopover({
           };
           return (
             <div className="auto-adjust-panel" onKeyDownCapture={escape}>
-              <p className="auto-adjust-source" title={target.asset.name}>
-                From {shortName(target.asset.name)}
+              <p className="auto-adjust-source" title={trackTarget.asset.name}>
+                From {shortName(trackTarget.asset.name)}
               </p>
-              {phase.kind === 'analysing' && (
+              <fieldset className="auto-adjust-mode">
+                <legend>Apply to</legend>
+                {MODES.map((option) => (
+                  <label key={option.mode}>
+                    <input
+                      type="radio"
+                      name={`${id}-mode`}
+                      aria-label={option.label}
+                      checked={mode === option.mode}
+                      onChange={() => {
+                        setDraft(null);
+                        setMode(option.mode);
+                      }}
+                    />
+                    {option.label}
+                    <small>{option.hint}</small>
+                  </label>
+                ))}
+              </fieldset>
+              {reason !== null && <p className="auto-adjust-error">{reason}</p>}
+              {current?.kind === 'analysing' && (
                 <output className="auto-adjust-progress">
-                  Analysing {phase.done}/{phase.total} frames…
+                  Analysing {current.done}/{current.total} frames…
                 </output>
               )}
-              {phase.kind === 'failed' && (
+              {current?.kind === 'failed' && (
                 <p className="auto-adjust-error" role="alert">
-                  {phase.message}
+                  {current.message}
                 </p>
               )}
               {ready && (
@@ -254,15 +288,17 @@ function AutoAdjustPopover({
                   <button
                     type="button"
                     className="primary-button small"
-                    aria-disabled={shown === null || undefined}
-                    title={shown === null ? 'Every setting Auto sets is animated on this track.' : undefined}
+                    aria-disabled={nothing || undefined}
+                    title={
+                      nothing ? 'Every setting Auto sets is animated on this track: add a keyframe instead.' : undefined
+                    }
                     onClick={() => apply(close)}
                   >
                     Apply
                   </button>
                 )}
                 <button type="button" className="secondary-button small" onClick={close}>
-                  {phase.kind === 'failed' ? 'Close' : 'Cancel'}
+                  {current?.kind === 'failed' ? 'Close' : 'Cancel'}
                 </button>
               </div>
             </div>
