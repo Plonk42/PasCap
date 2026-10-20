@@ -477,6 +477,10 @@ placement, source range and loops (`musicBeatFrames`). Validation uses synthetic
 tracks, modulated noise, swing, a tempo change and loudness steps only; real songs are
 evaluated by the owner.
 
+Each analysed music clip shows its beats as ticks, and **Beats → bookmarks** under the
+analysis line adds a music track's beats or downbeats as project bookmarks in one Undo step
+([bookmarks](TIMELINE_EDITING.md#bookmarks)).
+
 ## Versioning
 
 The current project schema requires explicit `media.videoIds` and `media.audioIds` arrays,

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { MusicTrack } from './model.js';
+import { MAX_BOOKMARKS, type MusicTrack } from './model.js';
 import { MUSIC_SAMPLE_RATE, MUSIC_SAMPLES_PER_FRAME } from './music-format.js';
 
 export const MUSIC_ANALYSIS_VERSION = 1;
@@ -80,4 +80,30 @@ export function musicBeatFrames(music: MusicTrack, beats: MusicAnalysis['beats']
     }
   }
   return placed;
+}
+
+export type BeatChoice = 'beats' | 'downbeats';
+
+/**
+ * The bookmarks Beats → bookmarks would add for a music track: its beats (or downbeats) at
+ * project frames that are not bookmarks yet, or why none can be added. Never a partial add.
+ */
+export function beatBookmarks(
+  bookmarks: readonly number[],
+  music: MusicTrack,
+  beats: MusicAnalysis['beats'],
+  choice: BeatChoice,
+): { frames: number[]; reason: string } {
+  const existing = new Set(bookmarks);
+  const placed = musicBeatFrames(music, beats).filter((beat) => choice === 'beats' || beat.downbeat);
+  const frames = placed.map((beat) => beat.frame).filter((frame) => !existing.has(frame));
+  const noun = choice === 'beats' ? 'beat' : 'downbeat';
+  if (!placed.length) return { frames, reason: `No ${noun}s fall within this music track's placement.` };
+  if (!frames.length) return { frames, reason: `Every ${noun} of this music track is already a bookmark.` };
+  if (bookmarks.length + frames.length > MAX_BOOKMARKS)
+    return {
+      frames,
+      reason: `${frames.length.toLocaleString('en')} ${noun}s would exceed ${MAX_BOOKMARKS.toLocaleString('en')} bookmarks (${bookmarks.length.toLocaleString('en')} already set).${choice === 'beats' ? ' Add downbeats only instead.' : ''}`,
+    };
+  return { frames, reason: '' };
 }

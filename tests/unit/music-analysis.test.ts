@@ -1,8 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { analyseFeatures, MusicFeatureExtractor } from '../../src/server/music-analysis.js';
-import { musicBeatFrames, type MusicAnalysis, type MusicMeasurement } from '../../src/shared/music-analysis.js';
+import {
+  beatBookmarks,
+  musicBeatFrames,
+  type MusicAnalysis,
+  type MusicMeasurement,
+} from '../../src/shared/music-analysis.js';
 import { MUSIC_SAMPLES_PER_FRAME } from '../../src/shared/music-format.js';
-import type { MusicTrack } from '../../src/shared/model.js';
+import { MAX_BOOKMARKS, type MusicTrack } from '../../src/shared/model.js';
 
 const RATE = 48_000;
 const TOLERANCE = 0.035 * RATE;
@@ -265,5 +270,29 @@ describe('music beats at project frames', () => {
     expect(musicBeatFrames(track({}), [{ sample, strength: 0.5, downbeat: false }])).toEqual([
       { frame: 113, downbeat: false, strength: 0.5 },
     ]);
+  });
+
+  it('turns beats or downbeats into new bookmarks only, never a partial add past the limit', () => {
+    const music = track({ sourceIn: 5, sourceOut: 30, duration: 70, loop: true });
+    expect(beatBookmarks([], music, beats, 'beats')).toEqual({
+      frames: [105, 115, 130, 140, 155, 165],
+      reason: '',
+    });
+    expect(beatBookmarks([0, 115, 140], music, beats, 'downbeats')).toEqual({ frames: [165], reason: '' });
+    expect(beatBookmarks([115, 140, 165], music, beats, 'downbeats')).toEqual({
+      frames: [],
+      reason: 'Every downbeat of this music track is already a bookmark.',
+    });
+    const full = Array.from({ length: MAX_BOOKMARKS - 4 }, (_, index) => 1_000 + index);
+    expect(beatBookmarks(full, music, beats, 'beats')).toEqual({
+      frames: [105, 115, 130, 140, 155, 165],
+      reason: '6 beats would exceed 1,000 bookmarks (996 already set). Add downbeats only instead.',
+    });
+    expect(beatBookmarks(full, music, beats, 'downbeats').reason).toBe('');
+    const unaccented = beats.map((beat) => ({ ...beat, downbeat: false }));
+    expect(beatBookmarks([], music, unaccented, 'downbeats')).toEqual({
+      frames: [],
+      reason: "No downbeats fall within this music track's placement.",
+    });
   });
 });

@@ -22,7 +22,7 @@ interface Props {
   selectedMusicId: string | null;
   onSelectMusic: (id: string) => void;
   onImport: () => void;
-  onEdit: (command: EditCommand) => void;
+  onEdit: (command: EditCommand | readonly EditCommand[]) => void;
 }
 
 function MusicTiming({ helpId, children }: Readonly<{ helpId: string; children: ReactNode }>) {
@@ -136,7 +136,15 @@ export function MusicControls({
           </select>
         </label>
       )}
-      {music && <MusicAnalysisStatus asset={assets.find((asset) => asset.id === music.mediaId)} />}
+      {music && (
+        <MusicAnalysisStatus
+          asset={assets.find((asset) => asset.id === music.mediaId)}
+          music={music}
+          bookmarks={project.bookmarks}
+          disabled={blocked}
+          onEdit={onEdit}
+        />
+      )}
       <div className="music-add-row">
         {addReason || blocked ? (
           <button
