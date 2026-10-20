@@ -254,7 +254,7 @@ export function MusicTimeline(props: Readonly<Props>) {
       event.preventDefault();
       props.onEdit({ type: 'music', music: project.music.filter((track) => track.id !== music.id) });
       requestAnimationFrame(() => {
-        latest.current.viewport.current?.querySelector<HTMLButtonElement>('.music-lane-select:not(:disabled)')?.focus();
+        latest.current.viewport.current?.querySelector<HTMLButtonElement>('.music-body:not(:disabled)')?.focus();
       });
       return;
     }
@@ -268,81 +268,67 @@ export function MusicTimeline(props: Readonly<Props>) {
   };
   const handlers = { onPointerMove: move, onPointerUp: finish, onPointerCancel: cancel, onLostPointerCapture: cancel };
   return (
-    <>
+    <div
+      className={`music-timeline-clip ${selected ? 'selected' : ''} ${candidate?.error ? 'invalid' : ''}`}
+      data-music-id={music.id}
+      data-music-start={music.start}
+      data-music-duration={music.duration}
+      data-music-valid={!candidate?.error}
+      title={candidate?.error || `${name} · ${formatTimecode(music.start)} · ${music.duration} frames`}
+      style={{
+        left: (drag.current?.leading ?? leading) + music.start * (drag.current?.scale ?? scale),
+        width: music.duration * (drag.current?.scale ?? scale),
+      }}
+    >
       <button
-        type="button"
-        className="music-lane-select"
-        aria-label={`Select ${name}`}
+        className="music-body"
+        aria-label={`Move ${name}`}
         aria-pressed={selected}
-        disabled={disabled}
-        title={`${name} · select to edit in Audio`}
+        disabled={disabled && !drag.current}
+        onPointerDown={(event) => start(event, 'move')}
         onClick={() => props.onSelect(music.id)}
-        onKeyDown={(event) => event.stopPropagation()}
+        onKeyDown={(event) => keyboard(event, 'move')}
+        {...handlers}
       >
-        Music track {index + 1} · {asset?.name ?? 'Unavailable recording'}
+        <svg viewBox="0 0 512 45" preserveAspectRatio="none" aria-label={`Waveform for ${name}`} role="img">
+          {peaks.map(({ x, peak }) => (
+            <path
+              key={x}
+              d={`M${x} ${22 - Math.max(1, peak * 20)}v${Math.max(2, peak * 40)}`}
+              stroke="#acb8ee"
+              strokeWidth="2"
+            />
+          ))}
+        </svg>
+        <span>
+          {asset?.name ?? 'Unavailable recording'}
+          {music.loop ? ' · loop' : ''}
+        </span>
       </button>
-      <div
-        className={`music-timeline-clip ${selected ? 'selected' : ''} ${candidate?.error ? 'invalid' : ''}`}
-        data-music-id={music.id}
-        data-music-start={music.start}
-        data-music-duration={music.duration}
-        data-music-valid={!candidate?.error}
-        title={candidate?.error || `${name} · ${formatTimecode(music.start)} · ${music.duration} frames`}
-        style={{
-          left: (drag.current?.leading ?? leading) + music.start * (drag.current?.scale ?? scale),
-          width: music.duration * (drag.current?.scale ?? scale),
-        }}
+      <button
+        className="trim-handle in"
+        aria-label={`Trim music start, track ${index + 1}: ${asset?.name ?? 'Unavailable recording'}`}
+        title="Trim source IN and timeline start; Arrow keys: one frame, Shift: ten"
+        disabled={disabled && !drag.current}
+        onPointerDown={(event) => start(event, 'in')}
+        onClick={() => props.onSelect(music.id)}
+        onKeyDown={(event) => keyboard(event, 'in')}
+        {...handlers}
       >
-        <button
-          className="music-body"
-          aria-label={`Move ${name}`}
-          aria-pressed={selected}
-          disabled={disabled && !drag.current}
-          onPointerDown={(event) => start(event, 'move')}
-          onClick={() => props.onSelect(music.id)}
-          onKeyDown={(event) => keyboard(event, 'move')}
-          {...handlers}
-        >
-          <svg viewBox="0 0 512 45" preserveAspectRatio="none" aria-label={`Waveform for ${name}`} role="img">
-            {peaks.map(({ x, peak }) => (
-              <path
-                key={x}
-                d={`M${x} ${22 - Math.max(1, peak * 20)}v${Math.max(2, peak * 40)}`}
-                stroke="#acb8ee"
-                strokeWidth="2"
-              />
-            ))}
-          </svg>
-          <span>
-            {asset?.name ?? 'Unavailable recording'}
-            {music.loop ? ' · loop' : ''}
-          </span>
-        </button>
-        <button
-          className="trim-handle in"
-          aria-label={`Trim music start, track ${index + 1}: ${asset?.name ?? 'Unavailable recording'}`}
-          title="Trim source IN and timeline start; Arrow keys: one frame, Shift: ten"
-          disabled={disabled && !drag.current}
-          onPointerDown={(event) => start(event, 'in')}
-          onClick={() => props.onSelect(music.id)}
-          onKeyDown={(event) => keyboard(event, 'in')}
-          {...handlers}
-        >
-          <span />
-        </button>
-        <button
-          className="trim-handle out"
-          aria-label={`Trim music duration, track ${index + 1}: ${asset?.name ?? 'Unavailable recording'}`}
-          title="Trim timeline duration; Arrow keys: one frame, Shift: ten"
-          disabled={disabled && !drag.current}
-          onPointerDown={(event) => start(event, 'out')}
-          onClick={() => props.onSelect(music.id)}
-          onKeyDown={(event) => keyboard(event, 'out')}
-          {...handlers}
-        >
-          <span />
-        </button>
-      </div>
-    </>
+        <span />
+      </button>
+      <button
+        className="trim-handle out"
+        aria-label={`Trim music duration, track ${index + 1}: ${asset?.name ?? 'Unavailable recording'}`}
+        title="Trim timeline duration; Arrow keys: one frame, Shift: ten"
+        disabled={disabled && !drag.current}
+        onPointerDown={(event) => start(event, 'out')}
+        onClick={() => props.onSelect(music.id)}
+        onKeyDown={(event) => keyboard(event, 'out')}
+        {...handlers}
+      >
+        <span />
+      </button>
+    </div>
   );
 }

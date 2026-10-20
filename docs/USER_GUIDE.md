@@ -732,7 +732,8 @@ separate entry that prepares its own cache and leaves the old entry and projects
 untouched. Reimporting the same unchanged path reuses its entry.
 
 Use up to **eight independent music tracks**, including several from the same
-recording. **Music track** selects the track to edit; **Add music track** adds
+recording. Click a music clip on the timeline, or choose it in **Music track**, to
+select the track to edit; **Add music track** adds
 another from a ready music file, and **Recording** changes the selected music track's
 file. Its trash action **Delete selected
 music track** removes only that placement; Undo restores it. Selection creates no
