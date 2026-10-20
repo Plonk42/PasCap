@@ -83,6 +83,10 @@
   line-height: 1.35;
 }
 
+.editor-popover-content .auto-adjust-mode label:has(> input:disabled) {
+  color: var(--muted);
+}
+
 .editor-popover-content .auto-adjust-panel .auto-adjust-mode input[type='radio'] {
   width: auto;
   margin: 2px 0 0;

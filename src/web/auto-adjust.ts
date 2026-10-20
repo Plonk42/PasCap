@@ -1,5 +1,6 @@
 import {
   analyseAutoAdjust,
+  AUTO_ADJUST,
   AUTO_ADJUST_SETTINGS,
   autoAdjustFrames,
   autoAdjustWindow,
@@ -15,57 +16,124 @@ import type { VideoLayer } from '../shared/model.js';
 import { forEachSerial } from '../shared/serial.js';
 import type { PlacedClip, TimelineLayout } from '../shared/timeline.js';
 import { frameIlluminant, type AnalysisFrame, type IlluminantEstimate } from '../shared/white-balance.js';
-import { captureCommands, keyframeLimitReason, proxyUrl, readyClipAtPlayhead } from './auto-white-balance.js';
+import {
+  captureCommands,
+  keyframeLimitReason,
+  proxyUrl,
+  readyAsset,
+  readyClipAtPlayhead,
+} from './auto-white-balance.js';
 
-/**
- * Track values from the whole clip or from the frames around the playhead, or a keyframe at the playhead
- * from those frames.
- */
-export type AutoAdjustMode = 'track' | 'playhead' | 'keyframe';
+/** What Auto analyses: 1 s around the playhead, the whole clip at the playhead, or every clip of the track. */
+export type AutoAdjustSource = 'playhead' | 'clip' | 'track';
+/** How Auto applies its correction: the track's values, or a keyframe at the playhead. */
+export type AutoAdjustApply = 'values' | 'keyframe';
+
+/** Source frames read from one recording's proxy. */
+export interface AutoAdjustRead {
+  asset: MediaAsset;
+  sourceFrames: number[];
+}
 
 export interface AutoAdjustTarget {
-  mode: AutoAdjustMode;
-  clip: PlacedClip;
-  asset: MediaAsset;
-  /** One analysis: the clip, its recording as prepared and the source frames it reads. */
+  source: AutoAdjustSource;
+  /** What the popover names as analysed: a recording, or the track's clips. */
+  label: string;
+  /** One analysis: the recordings as prepared and the source frames it reads. */
   key: string;
   /** The playhead, where a keyframe goes. */
   frame: number;
-  sourceFrames: number[];
+  reads: AutoAdjustRead[];
 }
 
 export type AutoAdjustAvailability = { target: AutoAdjustTarget; reason: null } | { target: null; reason: string };
 
-/** The clip Auto would analyse, the one of this track at the playhead, or why it cannot. */
+const preparedAt = (asset: MediaAsset): string => asset.prepared?.verification.verifiedAt ?? '';
+
+/** What Auto would analyse from `source`, around the clip of this track at the playhead, or why it cannot. */
 export function autoAdjustTarget(
   layer: VideoLayer,
   layout: TimelineLayout,
   assets: readonly MediaAsset[],
   frame: number,
   preferredClipId: string | null,
-  mode: AutoAdjustMode = 'track',
+  source: AutoAdjustSource = 'clip',
 ): AutoAdjustAvailability {
   const { clip, asset, reason } = readyClipAtPlayhead(layer, layout, assets, frame, preferredClipId, 'analyse it');
   if (reason !== null) return { target: null, reason };
+  if (source === 'track') return trackTarget(layer, layout, assets, frame);
   const { sourceIn, sourceOut } = clip.clip;
-  const prefix = [clip.clip.id, asset.id, asset.prepared?.verification.verifiedAt, sourceIn, sourceOut];
-  if (mode === 'track') {
-    const sourceFrames = autoAdjustFrames(sourceIn, sourceOut);
-    return { target: { mode, clip, asset, key: ['clip', ...prefix].join(':'), frame, sourceFrames }, reason: null };
-  }
-  const full = mode === 'keyframe' ? keyframeLimitReason(layer, frame) : null;
-  if (full !== null) return { target: null, reason: full };
+  const prefix = [clip.clip.id, asset.id, preparedAt(asset), sourceIn, sourceOut];
+  const target = (key: unknown[], sourceFrames: number[]): AutoAdjustAvailability => ({
+    target: { source, label: asset.name, key: key.join(':'), frame, reads: [{ asset, sourceFrames }] },
+    reason: null,
+  });
+  if (source === 'clip') return target(['clip', ...prefix], autoAdjustFrames(sourceIn, sourceOut));
   const sourceFrames = [
     ...new Set(autoAdjustWindow(clip, frame).map((projectFrame) => clip.retiming.sourceAt(projectFrame - clip.start))),
   ];
-  // Both playhead modes analyse the same frames: one analysis serves either.
-  const key = ['playhead', ...prefix, frame, sourceFrames.join(',')].join(':');
-  return { target: { mode, clip, asset, key, frame, sourceFrames }, reason: null };
+  return target(['playhead', ...prefix, frame, sourceFrames.join(',')], sourceFrames);
+}
+
+/**
+ * Every clip of the track laid end to end in timeline order, with up to AUTO_ADJUST.frames output frames at the
+ * centres of equal slices: each clip is analysed in proportion to its duration on screen.
+ */
+export function trackSamples(clips: readonly PlacedClip[]): { clip: PlacedClip; sourceFrame: number }[] {
+  const ordered = [...clips].sort((left, right) => left.start - right.start);
+  const total = ordered.reduce((sum, clip) => sum + clip.end - clip.start, 0);
+  const count = Math.min(AUTO_ADJUST.frames, total);
+  const samples: { clip: PlacedClip; sourceFrame: number }[] = [];
+  let index = 0;
+  let before = 0;
+  for (let sample = 0; sample < count; sample++) {
+    const position = Math.floor(((sample + 0.5) * total) / count);
+    while (position >= before + ordered[index]!.end - ordered[index]!.start) {
+      before += ordered[index]!.end - ordered[index]!.start;
+      index++;
+    }
+    const clip = ordered[index]!;
+    samples.push({ clip, sourceFrame: clip.retiming.sourceAt(position - before) });
+  }
+  return samples;
+}
+
+function trackTarget(
+  layer: VideoLayer,
+  layout: TimelineLayout,
+  assets: readonly MediaAsset[],
+  frame: number,
+): AutoAdjustAvailability {
+  const clips = layout.clips.filter((item) => item.clip.layerId === layer.id);
+  const reads = new Map<string, AutoAdjustRead>();
+  for (const { clip, sourceFrame } of trackSamples(clips)) {
+    const asset = readyAsset(assets, clip.clip.mediaId);
+    if (!asset) return { target: null, reason: `Prepare the recordings of every clip on ${layer.name} first.` };
+    const read = reads.get(asset.id) ?? { asset, sourceFrames: [] };
+    if (!read.sourceFrames.includes(sourceFrame)) read.sourceFrames.push(sourceFrame);
+    reads.set(asset.id, read);
+  }
+  const list = [...reads.values()];
+  const key = [
+    'track',
+    layer.id,
+    ...list.map(({ asset, sourceFrames }) => `${asset.id}/${preparedAt(asset)}/${sourceFrames.join(',')}`),
+  ].join(':');
+  const label = `${clips.length} ${clips.length === 1 ? 'clip' : 'clips'} on ${layer.name}`;
+  return { target: { source: 'track', label, key, frame, reads: list }, reason: null };
+}
+
+/** Why a keyframe cannot take the correction from `source` at the playhead, or null. */
+export function keyframeReason(layer: VideoLayer, source: AutoAdjustSource, frame: number): string | null {
+  if (source !== 'playhead') return 'A keyframe takes the light at the playhead: analyse the playhead.';
+  return keyframeLimitReason(layer, frame);
 }
 
 /** Once the track animates any setting Auto sets, a keyframe is the edit that can change them all. */
-export function initialMode(layer: VideoLayer): AutoAdjustMode {
-  return animatedSettings(layer).length ? 'keyframe' : 'track';
+export function initialChoice(layer: VideoLayer): { source: AutoAdjustSource; apply: AutoAdjustApply } {
+  return animatedSettings(layer).length
+    ? { source: 'playhead', apply: 'keyframe' }
+    : { source: 'clip', apply: 'values' };
 }
 
 /** The settings Auto sets that this track animates: Auto leaves them unchanged. */
@@ -95,14 +163,15 @@ export function autoAdjustCommand(
   return { type: 'colour', layerId: layer.id, colour };
 }
 
-/** The edit Auto applies in `target`'s mode: the track's values, or a keyframe of all eleven at the playhead. */
+/** The edit Auto applies: the track's values, or a keyframe of all eleven at the playhead `frame`. */
 export function autoAdjustCommands(
   layer: VideoLayer,
-  target: Pick<AutoAdjustTarget, 'mode' | 'frame'>,
+  apply: AutoAdjustApply,
+  frame: number,
   correction: Readonly<AutoCorrection>,
   intensity: number,
 ): EditCommand[] {
-  if (target.mode === 'keyframe') return captureCommands(layer, target.frame, scaleCorrection(correction, intensity));
+  if (apply === 'keyframe') return captureCommands(layer, frame, scaleCorrection(correction, intensity));
   const edit = autoAdjustCommand(layer, correction, intensity);
   return edit ? [edit] : [];
 }
@@ -135,22 +204,28 @@ function nextTask(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 0));
 }
 
-/** Decodes the clip's analysed frames from its proxy on a temporary reader, then fits the correction. */
-export async function analyseClip(
+/** Decodes the analysed frames from each recording's proxy, one temporary reader at a time, then fits the correction. */
+export async function analyseTarget(
   target: AutoAdjustTarget,
   signal: AbortSignal,
   onProgress: (done: number, total: number) => void,
 ): Promise<AutoCorrection> {
   const { sampleProxyFrames } = await import('../preview/frame-sampler.js');
-  const sampled = await sampleProxyFrames(proxyUrl(target.asset.id), target.sourceFrames, signal, onProgress).catch(
-    (cause: unknown) => {
+  const total = target.reads.reduce((sum, read) => sum + read.sourceFrames.length, 0);
+  const frames: AnalysisFrame[] = [];
+  await forEachSerial(target.reads, async ({ asset, sourceFrames }) => {
+    const before = frames.length;
+    const sampled = await sampleProxyFrames(proxyUrl(asset.id), sourceFrames, signal, (done) =>
+      onProgress(before + done, total),
+    ).catch((cause: unknown) => {
       if (signal.aborted || !(cause instanceof Error)) throw cause;
-      throw new Error(`Could not read the clip’s frames: ${cause.message}`);
-    },
-  );
-  const frames = target.sourceFrames
-    .map((source) => sampled.get(source))
-    .filter((frame): frame is AnalysisFrame => frame !== undefined);
+      throw new Error(`Could not read the frames of ${asset.name}: ${cause.message}`);
+    });
+    for (const source of sourceFrames) {
+      const frame = sampled.get(source);
+      if (frame) frames.push(frame);
+    }
+  });
   const illuminants: (IlluminantEstimate | null)[] = [];
   await forEachSerial(frames, async (frame) => {
     illuminants.push(frameIlluminant(frame));
