@@ -46,52 +46,49 @@ The plan builds on current code; these are the pieces it reuses or must change.
 | Detail                       | Static clip `detail` with no estimator ([detail filters](DETAIL_FILTERS.md))                                                                                                                                                                                                     | A noise/sharpness measurement helper is new                                                                                                                                          |
 | First-pass selection         | Whole recordings leave the project with **Remove from project**; the Source preview's applied IN/OUT is **browser-local** (`pascap-media-ranges-<project>` in `localStorage`), one range per recording, copied into new clips                                                    | The user's kept ranges are invisible to the service: they must move into the project document                                                                                        |
 | Jobs                         | `JobQueue` runs one heavy task at a time, `motion` in the background after other jobs ([jobs](../../src/server/jobs.ts), [media](../../src/shared/media.ts))                                                                                                                     | Music analysis is another background kind; stills are not jobs                                                                                                                       |
-| Service guards               | Loopback Fastify; every request needs an allowed Host/Origin and non-GET requests the `x-pascap-client` header ([app](../../src/server/app.ts)); 1 MiB body limit                                                                                                                | An MCP process is a trusted local client of this API, not a hole in it                                                                                                               |
+| Service guards               | Loopback Fastify; every request needs an allowed Host/Origin and non-GET requests the `x-pascap-client` header ([app](../../src/server/app.ts)); 1 MiB body limit                                                                                                                | An MCP endpoint joins this API behind the same loopback checks, with its own token                                                                                                   |
 | Request and response schemas | Every request body/params is a Zod schema in [app.ts](../../src/server/app.ts); the web client validates every response with Zod ([api.ts](../../src/web/api.ts)); but `EditCommand` is a plain TypeScript union, not a schema, and each route/client wrapper is written by hand | A single operation registry can generate the HTTP route, the MCP tool and the typed client from one definition; the edit vocabulary must become a schema to be exposed automatically |
 | Dependencies                 | `fastify`, `@fastify/static`, `react`, `react-dom`, `zod` 4.6 ([package.json](../../package.json)), which has `.meta()` and `z.toJSONSchema()`; locked production-license inventory                                                                                              | Adding `@modelcontextprotocol/sdk` is a dependency change: risky route, licence inventory update, zod 4 compatibility check                                                          |
 
 ## Decisions to confirm
 
-| Question                           | Proposal                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | Why                                                                                                                                                                                                                                                                                                                          |
-| ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| How service features reach the MCP | One **operation registry** in the service: each capability is defined once (name, LLM-facing description, Zod input/output with `.meta()`, access, audience, `run`). Three surfaces are generated from it in a loop each: the HTTP route `POST /api/ops/<name>`, the MCP tool and the typed web client. Adding a feature is adding one operation file; nothing is written twice.                                                                                             | The MCP must not be a second API to maintain. Zod schemas are the TypeScript equivalent of annotations: they already validate every request, and zod 4 converts them to the JSON Schema an MCP tool needs. TypeScript has no classpath scanning, so a registry array (tested for completeness) replaces decorator discovery. |
-| How the edit vocabulary is exposed | `EditCommand` becomes `editCommandSchema`, a Zod discriminated union with a description per variant and field; the type is `z.infer` of it (a type-equality test guards the migration). One `edit` operation takes a batch of commands.                                                                                                                                                                                                                                      | Every command added for the editor is then available to the assistant automatically, with its description, validation and error messages, and no wrapper tools are needed.                                                                                                                                                   |
-| Where the MCP server runs          | The tools are transport-agnostic: the registry is driven through an `AssistantBackend` interface with two implementations, **HTTP** (a separate stdio process, `npm run mcp`, talking to the running service with `PASCAP_URL`, default `http://127.0.0.1:4318`) and **direct** (in-process, over the service objects). The stdio process ships first; an opt-in Streamable HTTP mount at `/mcp` with a startup token uses the direct backend later.                         | Every LLM client (Claude Desktop/Code, VS Code, Codex CLI) launches stdio servers, and the service keeps its one-writer, loopback and header guards unchanged. The in-process mount is what a container deployment and push notifications will want; with the registry it is a second loop, not a rewrite.                   |
-| Where the user's kept ranges live  | New required project field **`selects`**: per recording in the bin, an ordered list of kept source ranges. No entry = the whole recording is available; `[]` is not allowed (remove the recording instead). Schema bump with migration (`selects: {}`) and frozen fixture per [data compatibility](../GITHUB_WORKFLOW.md#data-compatibility).                                                                                                                                | The assistant cannot read `localStorage`, and the rule "never add back" needs a server-checkable source of truth. The Source preview's applied range becomes a view of the first select, so the UI change is small.                                                                                                          |
-| How the assistant edits            | The `edit` operation `{ commands, expectedRevision }`: the service applies the batch atomically with `applyCommand`, validates like a save and writes one revision. Candidates (`preview_edits`, `still` of a draft) are also `commands` relative to a saved revision, never whole documents. The editor keeps its document saves.                                                                                                                                           | One validation path and one revision per logical step (the assistant's "one Undo step"); rich command errors come back verbatim; commands stay small under the 1 MiB body limit where a large project document would not; the editor can adopt it later for bulk actions.                                                    |
-| Concurrency with the open editor   | A server-side **assistant session** (lease) per project: started from the editor's **Hand off** dialog after flushing autosave, with a **checkpoint** copy of the document. While it holds the lease, editor saves get 423 and the editor follows the document read-only (polling revision); `edit` requires the lease. The user can **Take over** at any time; the LLM can end the session with notes (`session_end`). The lease expires after 10 min without MCP activity. | Same project, no silent divergence, nothing destructive: the checkpoint restores the pre-hand-off cut through **Open project file…** (new project) or a **Restore checkpoint** action. A `copy: true` option builds the cut in a new project instead, using the existing import path.                                        |
-| How the LLM sees pictures          | **Native stills** from the proxies through `composeLayerFrame`, encoded to JPEG by FFmpeg, served by new routes; contact sheets tile several stills with a JSON legend. No browser screenshots.                                                                                                                                                                                                                                                                              | The composed picture is what matters, it matches export, and it needs no GPU or Chrome. The editor UI is for the user.                                                                                                                                                                                                       |
-| Music analysis                     | A new background job kind (`music-analysis`) on the existing PCM cache: onset envelope, tempo, beats, downbeats, loudness, sections and accents, cached as `music-v1.json`; pure TypeScript in a worker thread, no new dependency or decoder.                                                                                                                                                                                                                                | The PCM is already exact 48 kHz stereo; a bounded single-thread analysis takes about a second per song. It also gives the editor beat ticks and **Beats → bookmarks** without the assistant.                                                                                                                                 |
-| Export                             | Not exposed.                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | The user reviews first; export remains a deliberate action with its own storage checks.                                                                                                                                                                                                                                      |
+| Question                           | Proposal                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | Why                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| How service features reach the MCP | One **operation registry** in the service: each capability is defined once (name, LLM-facing description, Zod input/output with `.meta()`, access, audience, `run`). Three surfaces are generated from it in a loop each: the HTTP route `POST /api/ops/<name>`, the MCP tool and the typed web client. Adding a feature is adding one operation file; nothing is written twice.                                                                                             | The MCP must not be a second API to maintain. Zod schemas are the TypeScript equivalent of annotations: they already validate every request, and zod 4 converts them to the JSON Schema an MCP tool needs. TypeScript has no classpath scanning, so a registry array (tested for completeness) replaces decorator discovery.                                                                                                                                           |
+| How the edit vocabulary is exposed | `EditCommand` becomes `editCommandSchema`, a Zod discriminated union with a description per variant and field; the type is `z.infer` of it (a type-equality test guards the migration). One `edit` operation takes a batch of commands.                                                                                                                                                                                                                                      | Every command added for the editor is then available to the assistant automatically, with its description, validation and error messages, and no wrapper tools are needed.                                                                                                                                                                                                                                                                                             |
+| Where the MCP server runs          | **In the service**: a Streamable HTTP endpoint at `/mcp` on the existing loopback port, registered from the same registry, calling `op.run` directly. Access needs a token the service generates at startup (`<dataDir>/mcp-token`, shown in the Hand off dialog's configuration snippet) in place of the `x-pascap-client` header; Host/loopback checks stay. No separate process, no second backend.                                                                       | The service already owns the lease, the compositor pool, the job queue and the data directory, so in-process tools need no HTTP hop, token hand-over, body limit or request timeout, and can push progress later. Nothing new is published: the endpoint lives on the loopback port the editor already uses. VS Code, Claude Code and Codex connect to HTTP servers with a header; a stdio-only client uses the generic `mcp-remote` bridge, which is not PasCap code. |
+| Where the user's kept ranges live  | New required project field **`selects`**: per recording in the bin, an ordered list of kept source ranges. No entry = the whole recording is available; `[]` is not allowed (remove the recording instead). Schema bump with migration (`selects: {}`) and frozen fixture per [data compatibility](../GITHUB_WORKFLOW.md#data-compatibility).                                                                                                                                | The assistant cannot read `localStorage`, and the rule "never add back" needs a server-checkable source of truth. The Source preview's applied range becomes a view of the first select, so the UI change is small.                                                                                                                                                                                                                                                    |
+| How the assistant edits            | The `edit` operation `{ commands, expectedRevision }`: the service applies the batch atomically with `applyCommand`, validates like a save and writes one revision. Candidates (`preview_edits`, `still` of a draft) are also `commands` relative to a saved revision, never whole documents. The editor keeps its document saves.                                                                                                                                           | One validation path and one revision per logical step (the assistant's "one Undo step"); rich command errors come back verbatim; commands stay small under the 1 MiB body limit where a large project document would not; the editor can adopt it later for bulk actions.                                                                                                                                                                                              |
+| Concurrency with the open editor   | A server-side **assistant session** (lease) per project: started from the editor's **Hand off** dialog after flushing autosave, with a **checkpoint** copy of the document. While it holds the lease, editor saves get 423 and the editor follows the document read-only (polling revision); `edit` requires the lease. The user can **Take over** at any time; the LLM can end the session with notes (`session_end`). The lease expires after 10 min without MCP activity. | Same project, no silent divergence, nothing destructive: the checkpoint restores the pre-hand-off cut through **Open project file…** (new project) or a **Restore checkpoint** action. A `copy: true` option builds the cut in a new project instead, using the existing import path.                                                                                                                                                                                  |
+| How the LLM sees pictures          | **Native stills** from the proxies through `composeLayerFrame`, encoded to JPEG by FFmpeg, served by new routes; contact sheets tile several stills with a JSON legend. No browser screenshots.                                                                                                                                                                                                                                                                              | The composed picture is what matters, it matches export, and it needs no GPU or Chrome. The editor UI is for the user.                                                                                                                                                                                                                                                                                                                                                 |
+| Music analysis                     | A new background job kind (`music-analysis`) on the existing PCM cache: onset envelope, tempo, beats, downbeats, loudness, sections and accents, cached as `music-v1.json`; pure TypeScript in a worker thread, no new dependency or decoder.                                                                                                                                                                                                                                | The PCM is already exact 48 kHz stereo; a bounded single-thread analysis takes about a second per song. It also gives the editor beat ticks and **Beats → bookmarks** without the assistant.                                                                                                                                                                                                                                                                           |
+| Export                             | Not exposed.                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | The user reviews first; export remains a deliberate action with its own storage checks.                                                                                                                                                                                                                                                                                                                                                                                |
 
 ## Architecture
 
 ```mermaid
 flowchart LR
-  subgraph LLM client
-    L[LLM] -- MCP stdio --> M[pascap-mcp process\nregistry → tools\nHTTP backend]
-  end
-  M -- POST /api/ops/name\nx-pascap-client --> S[PasCap service :4318]
-  subgraph Service
+  L[LLM client] -- MCP Streamable HTTP\n/mcp + token --> X
+  subgraph Service :4318
     O[Operation registry\nsrc/server/operations/*]
     O -- loop --> H[Fastify routes\n/api/ops/:name]
-    O -. optional .-> X[Streamable HTTP /mcp\ndirect backend]
+    O -- loop --> X[MCP tools and resources\n/mcp]
     O -- types --> W[Web client ops.name]
-    S --> H
-    H --> P[(projects/*.json\nrevision, checkpoints, session)]
-    H --> R[(registries, proxies,\nmotion-v3.json, PCM, music-v1.json)]
-    H --> C[Native compositor\ncomposeLayerFrame]
-    H --> J[JobQueue\nmusic-analysis, motion]
-    H --> F[FFmpeg\nproxy frame decode, JPEG]
+    H --> K
+    X --> K[op.run]
+    K --> P[(projects/*.json\nrevision, checkpoints, session)]
+    K --> R[(registries, proxies,\nmotion-v3.json, PCM, music-v1.json)]
+    K --> C[Native compositor\ncomposeLayerFrame]
+    K --> J[JobQueue\nmusic-analysis, motion]
+    K --> F[FFmpeg\nproxy frame decode, JPEG]
   end
-  E[Editor tab] -- Hand off / Take over\nfollow revision --> S
+  E[Editor tab] -- Hand off / Take over\nfollow revision --> H
 ```
 
-The registry is the only place a capability is described. The stdio process holds no state
-besides the session token and last known revision: it registers one tool per operation,
-forwards calls to `POST /api/ops/<name>`, maps HTTP errors into tool errors and converts
-frames to timecode for the model. All analysis, validation and writing happen in the
-service, whichever backend is used.
+The registry is the only place a capability is described; the HTTP routes serve the
+editor, the MCP endpoint serves the LLM, and both call the same `run`. The MCP layer adds
+only what the protocol needs: JSON Schema from the Zod input, image content for stills,
+timecode beside frames, and the service's validation messages as tool errors.
 
 ## Data model changes
 
@@ -186,7 +183,7 @@ Drift gates, as unit tests over the array: unique names; non-empty descriptions;
 input and output converts to JSON Schema without unrepresentable types; every field of a
 write operation is described; `audience` set explicitly. One table-driven contract test
 runs each operation with the same fixture through the HTTP route and through an in-memory
-MCP client over the HTTP backend, and compares the results.
+MCP client against the in-process endpoint, and compares the results.
 
 What stays manual: the playbook (when to use what), noted descriptions where a
 `.refine()` rule cannot appear in JSON Schema (clip `sourceOut > sourceIn`, the layout
@@ -347,20 +344,26 @@ beats; the action reports when it would exceed the limit and offers downbeats on
 
 ## MCP server
 
-`src/mcp/` is built by `tsconfig.server.json` into `dist/server/mcp` and contains three
-small parts: `tools.ts` (the loop from the registry to MCP tools and resources, over an
-`AssistantBackend` interface), `http-backend.ts` (calls `POST /api/ops/<name>` with
-`x-pascap-client: assistant`, added to the accepted values, and holds the session token)
-and `main.ts` (stdio entry point, `npm run mcp`). Configuration: `PASCAP_URL` (default
-`http://127.0.0.1:4318`), `PASCAP_PROJECT` (optional default project). A later
-`direct-backend.ts` over the service objects lets the service mount the same tools at
-`/mcp` (Streamable HTTP, startup token, same Host/Origin guards) for containers and push
-notifications; it is not part of the first delivery. The LLM client configuration is one
-line, for example in VS Code:
+`src/server/mcp.ts` registers the endpoint on the Fastify app: one `McpServer` from
+`@modelcontextprotocol/sdk` whose tools and resources are built from the registry in a
+loop, and a Streamable HTTP transport served at `/mcp`. The SDK's transport works on raw
+Node request/response objects, so the route hijacks the reply and hands `request.raw`/
+`reply.raw` to it; sessions follow the SDK's `Mcp-Session-Id` header. Authentication is a
+bearer token generated at startup and written to `<dataDir>/mcp-token` (owner-only
+permissions, like the rest of the data directory); `/mcp` is exempt from the
+`x-pascap-client` rule and keeps the Host/loopback and Origin checks. The Hand off dialog
+shows the client configuration, for example in VS Code:
 
 ```json
-{ "servers": { "pascap": { "type": "stdio", "command": "node", "args": ["dist/server/mcp/main.js"] } } }
+{
+  "servers": {
+    "pascap": { "type": "http", "url": "http://127.0.0.1:4318/mcp", "headers": { "Authorization": "Bearer …" } }
+  }
+}
 ```
+
+Clients that only launch stdio servers use `npx mcp-remote http://127.0.0.1:4318/mcp
+--header "Authorization: Bearer …"`; PasCap ships no process of its own.
 
 Conventions enforced by the loop, not per tool: frames are authoritative and every output
 also carries `MM:SS:FF` timecode (30 fps NDF, as the editor shows), inputs accept either
@@ -395,11 +398,11 @@ which command (for example static grades unless the brief wants animation).
 - No assistant operation takes a filesystem path, imports, prepares, relinks, exports,
   deletes a project or removes a recording from the project; `audience` is a required
   field, so an operation cannot reach the assistant by omission.
-- Session required for every write; the lease token never reaches the LLM (the backend
-  holds it). A take-over or expiry ends the session: later writes fail with "The user took
-  the project back."
+- Session required for every write; the lease belongs to the MCP session inside the
+  service, so no token ever reaches the LLM. A take-over or expiry ends the session: later
+  writes fail with "The user took the project back."
 - Selects, bin membership and brief permissions are enforced in the service's `edit`, not
-  in the MCP process.
+  in the MCP layer.
 - Image responses are at most 1 MB each; stills and estimates are serialised and refused
   during exports; the service applies the same 120 s request timeout as today.
 - Every batch is validated like a save (`projectSchema`, layout, `assertProjectSources`).
@@ -421,7 +424,7 @@ which command (for example static grades unless the brief wants animation).
    checkpoint** (replaces the document in one revision; the current state is checkpointed
    first) beside **Open checkpoint as new project**.
 4. The MCP client is started by the user outside PasCap (its own window); the dialog shows
-   the one-line client configuration and whether an MCP process has connected.
+   the client configuration with the token and whether an MCP session has connected.
 
 Keyboard, focus and Undo contracts of the editor are unchanged outside follow mode; follow
 mode is a new read-only state tested like a disabled preview.
@@ -469,8 +472,8 @@ auto-merge); editor UI and docs are routine.
 | 2     | Music analysis job, cache, `music_analyse`/`music_analysis`/`beats_to_bookmarks`, beat ticks on music lanes, **Beats → bookmarks**                                                                                             | Risky (format)     | Unit: synthetic beat/tempo/section gates, worker bounds, cancellation; browser: ticks and bookmarks action; `test:media` for the PCM reader                                                             |
 | 3     | Session operations (lease, checkpoint, brief, 423/409 paths, selects and permission enforcement in `edit`), editor **Hand off**/follow mode/**Take over**/**Restore checkpoint**                                               | Risky (routes)     | Unit: lease, atomic batch, enforcement; browser: hand-off dialog, follow mode, take-over, restore                                                                                                       |
 | 4     | `still`, `timeline_sheet`, `source_frame`, `describe_recording`, `estimate` (Auto adjust/AWB/detail), `check_alignment`, `snap_cuts_to_beats`                                                                                  | Risky (native)     | Unit: still equals the layered-export frame for the same project (same compositor), sheet legend, estimator tolerance against the browser path, snap-cuts arithmetic                                    |
-| 5     | MCP process: SDK dependency and licence inventory, `tools.ts` loop, resources and guide, HTTP backend, `npm run mcp`, docs (USER_GUIDE, DEVELOPMENT, this guide becomes the contract)                                          | Risky (deps)       | Unit: in-memory MCP client runs a scripted session end to end against a memory service through the registry; the contract test covers every assistant operation over both surfaces; no real model in CI |
-| 6     | Owner evaluation on real flights (consent): playbook and heuristic tuning, image budgets, timings; decide the in-process `/mcp` mount and Phase 2 of Auto adjust                                                               | —                  | Evidence in the issue, not CI                                                                                                                                                                           |
+| 5     | MCP endpoint: SDK dependency and licence inventory, registry-to-tools loop, resources and guide, `/mcp` transport and token, docs (USER_GUIDE, DEVELOPMENT, DEPLOYMENT, this guide becomes the contract)                       | Risky (deps)       | Unit: in-memory MCP client runs a scripted session end to end against a memory service through the registry; the contract test covers every assistant operation over both surfaces; no real model in CI |
+| 6     | Owner evaluation on real flights (consent): playbook and heuristic tuning, image budgets, timings; decide progress notifications and Phase 2 of Auto adjust                                                                    | —                  | Evidence in the issue, not CI                                                                                                                                                                           |
 
 Phase 0 is a refactor that pays for itself in the editor (typed operations, bulk actions)
 and removes the MCP's maintenance cost before it exists. Phases 2 and 4 are useful without
@@ -480,9 +483,9 @@ and is small once the registry exists.
 Docs to update when each phase lands: [TIMELINE_EDITING](../TIMELINE_EDITING.md)
 (selects, beats as bookmarks), [SPEED_AND_AUDIO](../SPEED_AND_AUDIO.md) (music analysis
 and cache), [WORKSPACE_AND_RECOVERY](../WORKSPACE_AND_RECOVERY.md) (hand-off, follow
-mode, checkpoints), [DEVELOPMENT](../DEVELOPMENT.md) (routes, `npm run mcp`, resource
-bounds), [USER_GUIDE](../USER_GUIDE.md), [DEPLOYMENT](../DEPLOYMENT.md) (the MCP process
-and loopback), [EDITOR_CONTROLS](EDITOR_CONTROLS.md) (new controls) and the
+mode, checkpoints), [DEVELOPMENT](../DEVELOPMENT.md) (operations, `/mcp`, resource
+bounds), [USER_GUIDE](../USER_GUIDE.md), [DEPLOYMENT](../DEPLOYMENT.md) (the `/mcp`
+endpoint, token and loopback), [EDITOR_CONTROLS](EDITOR_CONTROLS.md) (new controls) and the
 [README index](../README.md).
 
 ## Open questions for the owner
@@ -491,8 +494,8 @@ and loopback), [EDITOR_CONTROLS](EDITOR_CONTROLS.md) (new controls) and the
 2. Should the assistant be allowed to create tracks, use Transform overlays and speed
    changes by default, or only when the brief allows (proposed: brief flags, all off
    except several tracks)?
-3. Which LLM client first (VS Code, Claude Desktop/Code, Codex CLI)? All use stdio; the
-   dialog's configuration snippet targets the first one.
+3. Which LLM client first (VS Code, Claude Code, Codex, Claude Desktop through
+   `mcp-remote`)? The dialog's configuration snippet targets the first one.
 4. Do the user's first-pass ranges also need **exclusions** (ranges to avoid inside a
    kept range), or are several kept ranges enough (proposed)?
 5. Should `Beats → bookmarks` and beat ticks ship before anything assistant-related
@@ -511,9 +514,10 @@ and loopback), [EDITOR_CONTROLS](EDITOR_CONTROLS.md) (new controls) and the
   the browser and FFmpeg scale differently.
 - Stills are proxy-resolution compositions; fine detail at 4K is judged at export, as in
   the preview today.
-- The MCP SDK is a new production dependency: its zod 4 compatibility, licence and size
-  must be checked before Phase 5; it loads into the service only if the opt-in `/mcp`
-  mount is adopted later.
+- The MCP SDK is a new production dependency of the service: its zod 4 compatibility,
+  licence, size and Fastify integration (raw request hijack) must be checked before
+  Phase 5. A `tsx watch` restart during development ends an MCP session, as it ends an
+  export.
 - Automatic exposure is not automatic guidance: a new command appears in `edit` by itself,
   but the playbook may need a sentence, and `.refine()` rules are invisible in JSON Schema
   until the model reads the error message.
