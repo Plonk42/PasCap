@@ -120,8 +120,6 @@ const ImportDialog = lazy(() => import('./ImportDialog.js').then((module) => ({ 
 const loadInspector = () => import('./Inspector.js').then((module) => ({ default: module.Inspector }));
 const loadDiagnostics = () => import('./Diagnostics.js').then((module) => ({ default: module.Diagnostics }));
 const EMPTY_PROJECT = createProject('preview-lab', 'Untitled');
-/** A seek still undecoded after this long is superseded, so a stuck decode cannot freeze scrubbing. */
-const SEEK_SUPERSEDE_MS = 500;
 const SAVE_LABEL: Record<SaveState['state'], string> = {
   saved: 'Saved locally',
   saving: 'Saving…',
@@ -273,6 +271,9 @@ export function App() {
   const [selectedLayerId, setSelectedLayerId] = useState(EMPTY_PROJECT.layers[0]!.id);
   const [keyframeInspection, setKeyframeInspection] = useState<KeyframeInspection | null>(null);
   const [sourceInspectionEpoch, setSourceInspectionEpoch] = useState(0);
+  /** A source navigation set a stored cursor since the last epoch: only then does a seek need a new one. */
+  const sourceInspected = useRef(false);
+  const seekLayout = useRef<{ document: ProjectDocument; duration: number } | null>(null);
   const [scrubbing, setScrubbing] = useState(false);
   const [ranges, setRanges] = useState<MediaSelections>({});
   const [boundaryId, setBoundaryId] = useState<string | null>(null);
@@ -293,7 +294,6 @@ export function App() {
   const [historyState, setHistoryState] = useState({ canUndo: false, canRedo: false });
   const canvas = useRef<HTMLCanvasElement>(null);
   const engine = useRef<PreviewEngine | null>(null);
-  const seeking = useRef<{ since: number | null; pending: number | null }>({ since: null, pending: null });
   const autosave = useRef<Autosave | null>(null);
   const history = useRef<EditHistory | null>(null);
   const current = useRef<ProjectDocument | null>(null);
@@ -583,38 +583,23 @@ export function App() {
     },
     [insert],
   );
-  /** Latest-wins: a newer seek would abort an undecoded one, so fast scrubbing showed nothing. */
-  const seekEngine = useCallback((frame: number): void => {
-    const state = seeking.current;
-    if (state.since !== null && performance.now() - state.since < SEEK_SUPERSEDE_MS) {
-      state.pending = frame;
-      return;
-    }
-    const preview = engine.current;
-    state.pending = null;
-    if (!preview) return;
-    const since = performance.now();
-    state.since = since;
-    void preview.seek(frame).finally(() => {
-      if (state.since !== since) return;
-      state.since = null;
-      const next = state.pending;
-      state.pending = null;
-      // Another operation (play, load, draft preview) took over: its frame wins.
-      const { playing, requestedFrame } = preview.diagnostics();
-      if (next !== null && engine.current === preview && !playing && requestedFrame === frame) seekEngine(next);
-    });
-  }, []);
   const seek = useCallback((frame: number, preserveSourceInspection = false): void => {
     const document = current.current;
     if (!document || drafting.current) return;
     playAfterSeek.current = false;
     setKeyframeInspection(null);
-    if (!preserveSourceInspection) setSourceInspectionEpoch((epoch) => epoch + 1);
-    const duration = calculateLayout(document).duration;
+    if (preserveSourceInspection) sourceInspected.current = true;
+    else if (sourceInspected.current) {
+      sourceInspected.current = false;
+      setSourceInspectionEpoch((epoch) => epoch + 1);
+    }
+    // Scrubbing seeks on every pointer move: committed documents are immutable, so reuse their duration.
+    if (seekLayout.current?.document !== document)
+      seekLayout.current = { document, duration: calculateLayout(document).duration };
+    const { duration } = seekLayout.current;
     if (duration) {
       setViewerMode('timeline');
-      seekEngine(Math.max(0, Math.min(duration - 1, frame)));
+      engine.current?.scrub(Math.max(0, Math.min(duration - 1, frame)));
     }
   }, []);
   const seekBoundary = useCallback(
@@ -628,8 +613,8 @@ export function App() {
   );
   const togglePlayback = useCallback(() => {
     if (drafting.current) return;
-    seeking.current.pending = null;
     setKeyframeInspection(null);
+    sourceInspected.current = false;
     setSourceInspectionEpoch((epoch) => epoch + 1);
     setViewerMode('timeline');
     const preview = engine.current;
@@ -1228,7 +1213,7 @@ export function App() {
     });
   };
   const visible = draft?.document ?? project ?? EMPTY_PROJECT;
-  const layout = calculateLayout(visible);
+  const layout = useMemo(() => calculateLayout(visible), [visible]);
   const inspection = draft
     ? null
     : reconcileKeyframeInspection(

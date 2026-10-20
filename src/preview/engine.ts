@@ -1,6 +1,7 @@
 import { colourSchema, NEUTRAL_COLOUR, type ColourSettings } from '../shared/colour.js';
 import { isNeutralDetail, NEUTRAL_DETAIL } from '../shared/detail.js';
 import { usesLocalTone } from '../shared/keyframes.js';
+import { PROXY_GOP_FRAMES } from '../shared/media.js';
 import { projectSchema, type ProjectDocument, type VideoClip } from '../shared/model.js';
 import {
   calculateLayout,
@@ -62,6 +63,10 @@ const STREAM_WINDOW = 60;
 const PREFILL_FRAMES = 3;
 /** A decoder that delivers nothing for this long has failed, not merely fallen behind. */
 const STALL_DEADLINE_MS = 5_000;
+/** Scrub requests closer than this are one moving gesture; after it, the pointer has settled. */
+const SCRUB_MOVING_MS = 100;
+/** Presenting a frame slower than this blocks input: the next scrub frame waits for newer requests. */
+const SLOW_PRESENT_MS = 100;
 
 /** One timeline video decoder and its compositor texture. */
 interface Lane {
@@ -140,6 +145,16 @@ export class PreviewEngine {
   #layout: TimelineLayout = { clips: [], transitions: [], duration: 0 };
   #controller = new AbortController();
   #operationFrame = 0;
+  /** The scrub operation drawing frames towards `#scrubTarget`, while it is current. */
+  #scrubSignal: AbortSignal | null = null;
+  #scrubTarget: number | null = null;
+  /** A scrub request arrived while a frame was decoding: requests outpace the decoders. */
+  #chasing = false;
+  /** The frame being decoded is an intermediate one, not the latest request. */
+  #approximating = false;
+  #scrubRequestedAt = 0;
+  #settleTimer: ReturnType<typeof setTimeout> | undefined;
+  #presentMs = 0;
   readonly #listeners = new Set<(diagnostics: PreviewDiagnostics) => void>();
   #raf = 0;
   #disposed = false;
@@ -522,6 +537,117 @@ export class PreviewEngine {
       if (this.#isCurrent(signal)) this.#handleError(error);
     }
   }
+  /**
+   * Interactive seek. While requests keep arriving, the frame being decoded is never cancelled: the
+   * latest request waits for it, and the next image may be a cheaper exact frame on the way to it.
+   * Once requests stop, such an intermediate frame gives way, so the latest request is drawn exactly
+   * as soon as possible.
+   */
+  scrub(frame: number): void {
+    if (this.#disposed || !this.#document || !this.#layout.duration) return;
+    if (!Number.isInteger(frame) || frame < 0 || frame >= this.#layout.duration)
+      throw new Error('Requested project frame is outside the timeline.');
+    this.#scrubTarget = frame;
+    this.#operationFrame = frame;
+    this.#scrubRequestedAt = performance.now();
+    clearTimeout(this.#settleTimer);
+    if (this.#scrubSignal && this.#isCurrent(this.#scrubSignal)) {
+      this.#chasing = true;
+      this.#settleTimer = setTimeout(this.#settle, SCRUB_MOVING_MS);
+      return;
+    }
+    this.pause();
+    this.#startScrub();
+  }
+  #startScrub(): void {
+    const signal = this.#beginOperation();
+    this.#scrubSignal = signal;
+    this.#chasing = false;
+    this.#setStatus('seeking', `Seeking frame ${this.#scrubTarget}`);
+    void this.#runScrub(signal);
+  }
+  readonly #settle = (): void => {
+    if (this.#scrubSignal && this.#isCurrent(this.#scrubSignal) && this.#approximating) this.#startScrub();
+  };
+  /** The frame to decode next: the latest request, or while it outpaces decoding a cheaper one on the way. */
+  #nextScrubFrame(goal: number): number {
+    // Once requests stop, an intermediate frame would only delay the exact one.
+    const moving = performance.now() - this.#scrubRequestedAt < SCRUB_MOVING_MS;
+    const frame = this.#chasing && moving ? this.#cheapestFrame(goal) : goal;
+    this.#chasing = false;
+    this.#approximating = frame !== goal;
+    if (frame === goal) this.#scrubTarget = null;
+    return frame;
+  }
+  /**
+   * A presentation slower than SLOW_PRESENT_MS blocks input, so the latest request may not have
+   * arrived yet: wait for it before choosing the next frame. Faster ones are only measured.
+   */
+  async #presented(): Promise<void> {
+    const drawn = performance.now();
+    const presented = new Promise<void>((resolve) =>
+      requestAnimationFrame(() =>
+        requestAnimationFrame(() => {
+          this.#presentMs = performance.now() - drawn;
+          resolve();
+        }),
+      ),
+    );
+    if (this.#scrubTarget !== null && this.#presentMs > SLOW_PRESENT_MS) await presented;
+  }
+  async #runScrub(signal: AbortSignal): Promise<void> {
+    const started = performance.now();
+    try {
+      let goal = this.#scrubTarget;
+      while (goal !== null) {
+        await this.#showFrame(this.#nextScrubFrame(goal), signal);
+        if (!this.#isCurrent(signal)) return;
+        this.#approximating = false;
+        await this.#presented();
+        if (!this.#isCurrent(signal)) return;
+        goal = this.#scrubTarget;
+        if (goal !== null) {
+          this.#message = `Seeking frame ${goal}`;
+          this.#emit(true);
+        }
+      }
+      this.#scrubSignal = null;
+      this.#busy = false;
+      this.#seekTimes.push(performance.now() - started);
+      if (this.#seekTimes.length > 200) this.#seekTimes.shift();
+      this.#setStatus('paused', 'Paused');
+    } catch (error) {
+      if (this.#isCurrent(signal)) this.#handleError(error);
+    }
+  }
+  /** Decodes from each source's keyframe in the proxy's closed GOPs; shown sources cost none. */
+  #decodeCost(frame: number): number {
+    let decodes = 0;
+    for (const layer of sampleTimeline(this.#document!, frame, this.#layout))
+      if (!this.#shows(this.#laneOf(layer.clipId), layer)) decodes += (layer.sourceFrame % PROXY_GOP_FRAMES) + 1;
+    return decodes;
+  }
+  /**
+   * The cheapest exact frame in the half of the way to `goal` nearest it, at most one GOP before it,
+   * when it needs at most half the goal's decodes: an intermediate frame costs a draw of its own.
+   */
+  #cheapestFrame(goal: number): number {
+    const shown = this.#frame;
+    const step = goal > shown ? -1 : 1;
+    const reach = Math.min(PROXY_GOP_FRAMES - 1, Math.floor(Math.abs(goal - shown) / 2));
+    const goalCost = this.#decodeCost(goal);
+    let best = goal;
+    let lowest = goalCost;
+    for (let frame = goal + step, count = 1; count <= reach; frame += step, count++) {
+      const decodes = this.#decodeCost(frame);
+      // Walking from the goal, ties keep the frame closest to it.
+      if (decodes < lowest) {
+        best = frame;
+        lowest = decodes;
+      }
+    }
+    return lowest * 2 <= goalCost ? best : goal;
+  }
   /** Paused redraws reuse the exact textures, decoding only when a source is not shown yet. */
   #redrawPaused(): void {
     if (!this.#playing && !this.#busy && this.#status === 'paused' && !this.#drawFrame(this.#frame))
@@ -832,6 +958,7 @@ export class PreviewEngine {
     if (this.#disposed) return;
     this.pause();
     this.#disposed = true;
+    clearTimeout(this.#settleTimer);
     this.#ungraded = false;
     cancelAnimationFrame(this.#raf);
     this.canvas.removeEventListener('webglcontextlost', this.#onContextLost);

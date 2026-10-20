@@ -115,7 +115,12 @@ export function PreviewPanel({
 }: Readonly<Props>) {
   const frame = diagnostics?.frame ?? 0;
   const status = diagnostics?.status ?? 'empty';
-  const waiting = useDelayedFlag(['loading', 'seeking', 'buffering'].includes(status));
+  // A scrub drawing frames on its way keeps the image: wait 250 ms without a new one.
+  const waiting = useDelayedFlag(
+    ['loading', 'seeking', 'buffering'].includes(status),
+    undefined,
+    status === 'seeking' ? frame : undefined,
+  );
   const failed = !!startupError || status === 'error';
   const controlsUnavailable = !duration || drafting || loading || !!startupError;
   const label = { playing: 'Playing', paused: 'Paused' }[status as 'playing' | 'paused'] ?? status;

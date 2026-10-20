@@ -2,6 +2,7 @@ import {
   useCallback,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   type CSSProperties,
@@ -603,7 +604,8 @@ export function Timeline(props: Readonly<Props>) {
   const revealTarget = useRef<'video' | 'music'>('video');
   const keyframeNavigation = useKeyframeNavigation();
   const scale = framesToSeconds(1, project.frameRate) * pixelsPerSecond;
-  const baselineWidth = Math.max(viewportWidth, 32 + calculateLayout(project).duration * scale + 96);
+  const baseLayout = useMemo(() => calculateLayout(project), [project]);
+  const baselineWidth = Math.max(viewportWidth, 32 + baseLayout.duration * scale + 96);
   const keyframes = useKeyframeSlide({
     kind: trackKeyframeKind({
       onSelectLayer,
@@ -734,8 +736,10 @@ export function Timeline(props: Readonly<Props>) {
     draft ??
     musicGesture?.document ??
     project;
-  const layout = calculateLayout(visible);
-  const baseLayout = calculateLayout(project);
+  const layout = useMemo(
+    () => (visible === project ? baseLayout : calculateLayout(visible)),
+    [visible, project, baseLayout],
+  );
   const selected = layout.clips.find((placed) => placed.clip.id === selectedClipId);
   const source = assets.find((asset) => asset.id === selected?.clip.mediaId);
   // Reserve access to omitted head/tail footage, including the first/last clip.
