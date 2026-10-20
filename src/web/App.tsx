@@ -584,12 +584,12 @@ export function App() {
     [insert],
   );
   const seek = useCallback((frame: number, preserveSourceInspection = false): void => {
+    if (preserveSourceInspection) sourceInspected.current = true;
     const document = current.current;
     if (!document || drafting.current) return;
     playAfterSeek.current = false;
     setKeyframeInspection(null);
-    if (preserveSourceInspection) sourceInspected.current = true;
-    else if (sourceInspected.current) {
+    if (!preserveSourceInspection && sourceInspected.current) {
       sourceInspected.current = false;
       setSourceInspectionEpoch((epoch) => epoch + 1);
     }
