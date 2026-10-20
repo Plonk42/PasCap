@@ -33,56 +33,65 @@ jobs stay with the user.
 
 The plan builds on current code; these are the pieces it reuses or must change.
 
-| Area                 | Today                                                                                                                                                                                                                                                           | Consequence for the plan                                                                                                    |
-| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| Project document     | Strict Zod schema ([model](../../src/shared/model.ts)); one JSON per project; `PUT /api/projects/:id` with `expectedRevision`, 409 on a stale revision ([storage](../../src/server/storage.ts)); `assertProjectSources` checks registered recordings and ranges | The assistant writes through the same validated save; a concurrent editor tab must stop saving while it works               |
-| Edits                | One pure reducer, `applyCommand(document, command)` over the `EditCommand` union ([commands](../../src/shared/commands.ts)): insert/delete/trim/split/place/transition/fades/colour/speed/reverse/transform/detail/music/opacity/keyframes/tracks/bookmarks     | Every assistant edit is an existing command; no second edit vocabulary                                                      |
-| Layout               | `calculateLayout()` and `sampleTimeline(project, frame)` ([timeline](../../src/shared/timeline.ts)) give placed clips, transitions and the per-frame `PreviewLayer` list                                                                                        | Text summaries and stills come from the authoritative layout                                                                |
-| Native compositor    | `composeLayerFrame()` ([layered-frame](../../src/server/layered-frame.ts)) composes one project frame from per-source RGB8 content into premultiplied RGBA16, CPU pool of ≤ 8 workers; it is the export parity reference                                        | Stills reuse it unchanged                                                                                                   |
-| Recordings           | Registry v2 ([media](../../src/shared/media.ts)): metadata, verified 720p proxy (`h264-720p-bt709-gop15-v1`, closed GOP 15), five thumbnails, `damage` ranges; project bin `media.videoIds`/`audioIds`                                                          | The assistant works only on prepared recordings in the bin                                                                  |
-| Camera motion        | Background job `motion` writes `motion-v3.json` (per-frame `tx/ty/zoom/rotation`, DJI telemetry); `motionProfile()` and `smoothRanges()` ([motion-analysis](../../src/shared/motion-analysis.ts)); `GET /api/media/:id/motion`                                  | Shot descriptors and steady ranges derive from it, no new decode                                                            |
-| Music                | `AudioLibrary` ([audio](../../src/server/audio.ts)) prepares a PCM16 48 kHz stereo cache (`pcm16-48k-stereo-mono-unity-v3`) and a ≤ 2,048-peak waveform; no tempo, beat or structure analysis                                                                   | **New music analysis job** reading that cache                                                                               |
-| Auto adjust / AWB    | Pure estimators on RGBA bytes: `analyseAutoAdjust(frames)` ([auto-adjust](../../src/shared/auto-adjust.ts)), `frameIlluminant`/`poolWhiteBalance` ([white-balance](../../src/shared/white-balance.ts)); the editor samples frames with WebCodecs in the browser | The service can run the same estimators on FFmpeg-decoded proxy frames                                                      |
-| Detail               | Static clip `detail` with no estimator ([detail filters](DETAIL_FILTERS.md))                                                                                                                                                                                    | A noise/sharpness measurement helper is new                                                                                 |
-| First-pass selection | Whole recordings leave the project with **Remove from project**; the Source preview's applied IN/OUT is **browser-local** (`pascap-media-ranges-<project>` in `localStorage`), one range per recording, copied into new clips                                   | The user's kept ranges are invisible to the service: they must move into the project document                               |
-| Jobs                 | `JobQueue` runs one heavy task at a time, `motion` in the background after other jobs ([jobs](../../src/server/jobs.ts), [media](../../src/shared/media.ts))                                                                                                    | Music analysis is another background kind; stills are not jobs                                                              |
-| Service guards       | Loopback Fastify; every request needs an allowed Host/Origin and non-GET requests the `x-pascap-client` header ([app](../../src/server/app.ts)); 1 MiB body limit                                                                                               | An MCP process is a trusted local client of this API, not a hole in it                                                      |
-| Dependencies         | `fastify`, `@fastify/static`, `react`, `react-dom`, `zod` 4 ([package.json](../../package.json)); locked production-license inventory                                                                                                                           | Adding `@modelcontextprotocol/sdk` is a dependency change: risky route, licence inventory update, zod 4 compatibility check |
+| Area                         | Today                                                                                                                                                                                                                                                                            | Consequence for the plan                                                                                                                                                             |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Project document             | Strict Zod schema ([model](../../src/shared/model.ts)); one JSON per project; `PUT /api/projects/:id` with `expectedRevision`, 409 on a stale revision ([storage](../../src/server/storage.ts)); `assertProjectSources` checks registered recordings and ranges                  | The assistant writes through the same validated save; a concurrent editor tab must stop saving while it works                                                                        |
+| Edits                        | One pure reducer, `applyCommand(document, command)` over the `EditCommand` union ([commands](../../src/shared/commands.ts)): insert/delete/trim/split/place/transition/fades/colour/speed/reverse/transform/detail/music/opacity/keyframes/tracks/bookmarks                      | Every assistant edit is an existing command; no second edit vocabulary                                                                                                               |
+| Layout                       | `calculateLayout()` and `sampleTimeline(project, frame)` ([timeline](../../src/shared/timeline.ts)) give placed clips, transitions and the per-frame `PreviewLayer` list                                                                                                         | Text summaries and stills come from the authoritative layout                                                                                                                         |
+| Native compositor            | `composeLayerFrame()` ([layered-frame](../../src/server/layered-frame.ts)) composes one project frame from per-source RGB8 content into premultiplied RGBA16, CPU pool of ≤ 8 workers; it is the export parity reference                                                         | Stills reuse it unchanged                                                                                                                                                            |
+| Recordings                   | Registry v2 ([media](../../src/shared/media.ts)): metadata, verified 720p proxy (`h264-720p-bt709-gop15-v1`, closed GOP 15), five thumbnails, `damage` ranges; project bin `media.videoIds`/`audioIds`                                                                           | The assistant works only on prepared recordings in the bin                                                                                                                           |
+| Camera motion                | Background job `motion` writes `motion-v3.json` (per-frame `tx/ty/zoom/rotation`, DJI telemetry); `motionProfile()` and `smoothRanges()` ([motion-analysis](../../src/shared/motion-analysis.ts)); `GET /api/media/:id/motion`                                                   | Shot descriptors and steady ranges derive from it, no new decode                                                                                                                     |
+| Music                        | `AudioLibrary` ([audio](../../src/server/audio.ts)) prepares a PCM16 48 kHz stereo cache (`pcm16-48k-stereo-mono-unity-v3`) and a ≤ 2,048-peak waveform; no tempo, beat or structure analysis                                                                                    | **New music analysis job** reading that cache                                                                                                                                        |
+| Auto adjust / AWB            | Pure estimators on RGBA bytes: `analyseAutoAdjust(frames)` ([auto-adjust](../../src/shared/auto-adjust.ts)), `frameIlluminant`/`poolWhiteBalance` ([white-balance](../../src/shared/white-balance.ts)); the editor samples frames with WebCodecs in the browser                  | The service can run the same estimators on FFmpeg-decoded proxy frames                                                                                                               |
+| Detail                       | Static clip `detail` with no estimator ([detail filters](DETAIL_FILTERS.md))                                                                                                                                                                                                     | A noise/sharpness measurement helper is new                                                                                                                                          |
+| First-pass selection         | Whole recordings leave the project with **Remove from project**; the Source preview's applied IN/OUT is **browser-local** (`pascap-media-ranges-<project>` in `localStorage`), one range per recording, copied into new clips                                                    | The user's kept ranges are invisible to the service: they must move into the project document                                                                                        |
+| Jobs                         | `JobQueue` runs one heavy task at a time, `motion` in the background after other jobs ([jobs](../../src/server/jobs.ts), [media](../../src/shared/media.ts))                                                                                                                     | Music analysis is another background kind; stills are not jobs                                                                                                                       |
+| Service guards               | Loopback Fastify; every request needs an allowed Host/Origin and non-GET requests the `x-pascap-client` header ([app](../../src/server/app.ts)); 1 MiB body limit                                                                                                                | An MCP process is a trusted local client of this API, not a hole in it                                                                                                               |
+| Request and response schemas | Every request body/params is a Zod schema in [app.ts](../../src/server/app.ts); the web client validates every response with Zod ([api.ts](../../src/web/api.ts)); but `EditCommand` is a plain TypeScript union, not a schema, and each route/client wrapper is written by hand | A single operation registry can generate the HTTP route, the MCP tool and the typed client from one definition; the edit vocabulary must become a schema to be exposed automatically |
+| Dependencies                 | `fastify`, `@fastify/static`, `react`, `react-dom`, `zod` 4.6 ([package.json](../../package.json)), which has `.meta()` and `z.toJSONSchema()`; locked production-license inventory                                                                                              | Adding `@modelcontextprotocol/sdk` is a dependency change: risky route, licence inventory update, zod 4 compatibility check                                                          |
 
 ## Decisions to confirm
 
-| Question                          | Proposal                                                                                                                                                                                                                                                                                                                                                                                                                                           | Why                                                                                                                                                                                                                                                                                       |
-| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Where the MCP server runs         | A **separate stdio process** (`node dist/mcp/main.js`, `npm run mcp`) that talks to the running service's HTTP API as a client, with `PASCAP_URL` (default `http://127.0.0.1:4318`). Not mounted inside Fastify at first.                                                                                                                                                                                                                          | Every LLM client (Claude Desktop/Code, VS Code, Codex CLI) launches stdio servers; the service keeps its one-writer, loopback and header guards unchanged; the SDK never loads into the service process. A Streamable HTTP mount at `/mcp` with a startup token can come later if needed. |
-| Where the user's kept ranges live | New required project field **`selects`**: per recording in the bin, an ordered list of kept source ranges. No entry = the whole recording is available; `[]` is not allowed (remove the recording instead). Schema bump with migration (`selects: {}`) and frozen fixture per [data compatibility](../GITHUB_WORKFLOW.md#data-compatibility).                                                                                                      | The assistant cannot read `localStorage`, and the rule "never add back" needs a server-checkable source of truth. The Source preview's applied range becomes a view of the first select, so the UI change is small.                                                                       |
-| How the assistant edits           | New **`POST /api/projects/:id/edits`** `{ commands: EditCommand[], expectedRevision, session }`: the service applies the batch atomically with `applyCommand`, validates like a save and writes one revision. The editor keeps its document saves.                                                                                                                                                                                                 | One validation path and one revision per logical step (the assistant's "one Undo step"); rich command errors come back verbatim; the editor can adopt it later for bulk actions.                                                                                                          |
-| Concurrency with the open editor  | A server-side **assistant session** (lease) per project: started from the editor's **Hand off** dialog after flushing autosave, with a **checkpoint** copy of the document. While it holds the lease, editor saves get 423 and the editor follows the document read-only (polling revision); `edits` require the lease. The user can **Take over** at any time; the LLM can `finish_session`. The lease expires after 10 min without MCP activity. | Same project, no silent divergence, nothing destructive: the checkpoint restores the pre-hand-off cut through **Open project file…** (new project) or a **Restore checkpoint** action. A `copy: true` option builds the cut in a new project instead, using the existing import path.     |
-| How the LLM sees pictures         | **Native stills** from the proxies through `composeLayerFrame`, encoded to JPEG by FFmpeg, served by new routes; contact sheets tile several stills with a JSON legend. No browser screenshots.                                                                                                                                                                                                                                                    | The composed picture is what matters, it matches export, and it needs no GPU or Chrome. The editor UI is for the user.                                                                                                                                                                    |
-| Music analysis                    | A new background job kind (`music-analysis`) on the existing PCM cache: onset envelope, tempo, beats, downbeats, loudness, sections and accents, cached as `music-v1.json`; pure TypeScript in a worker thread, no new dependency or decoder.                                                                                                                                                                                                      | The PCM is already exact 48 kHz stereo; a bounded single-thread analysis takes about a second per song. It also gives the editor beat ticks and **Beats → bookmarks** without the assistant.                                                                                              |
-| Export                            | Not exposed.                                                                                                                                                                                                                                                                                                                                                                                                                                       | The user reviews first; export remains a deliberate action with its own storage checks.                                                                                                                                                                                                   |
+| Question                           | Proposal                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | Why                                                                                                                                                                                                                                                                                                                          |
+| ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| How service features reach the MCP | One **operation registry** in the service: each capability is defined once (name, LLM-facing description, Zod input/output with `.meta()`, access, audience, `run`). Three surfaces are generated from it in a loop each: the HTTP route `POST /api/ops/<name>`, the MCP tool and the typed web client. Adding a feature is adding one operation file; nothing is written twice.                                                                                             | The MCP must not be a second API to maintain. Zod schemas are the TypeScript equivalent of annotations: they already validate every request, and zod 4 converts them to the JSON Schema an MCP tool needs. TypeScript has no classpath scanning, so a registry array (tested for completeness) replaces decorator discovery. |
+| How the edit vocabulary is exposed | `EditCommand` becomes `editCommandSchema`, a Zod discriminated union with a description per variant and field; the type is `z.infer` of it (a type-equality test guards the migration). One `edit` operation takes a batch of commands.                                                                                                                                                                                                                                      | Every command added for the editor is then available to the assistant automatically, with its description, validation and error messages, and no wrapper tools are needed.                                                                                                                                                   |
+| Where the MCP server runs          | The tools are transport-agnostic: the registry is driven through an `AssistantBackend` interface with two implementations, **HTTP** (a separate stdio process, `npm run mcp`, talking to the running service with `PASCAP_URL`, default `http://127.0.0.1:4318`) and **direct** (in-process, over the service objects). The stdio process ships first; an opt-in Streamable HTTP mount at `/mcp` with a startup token uses the direct backend later.                         | Every LLM client (Claude Desktop/Code, VS Code, Codex CLI) launches stdio servers, and the service keeps its one-writer, loopback and header guards unchanged. The in-process mount is what a container deployment and push notifications will want; with the registry it is a second loop, not a rewrite.                   |
+| Where the user's kept ranges live  | New required project field **`selects`**: per recording in the bin, an ordered list of kept source ranges. No entry = the whole recording is available; `[]` is not allowed (remove the recording instead). Schema bump with migration (`selects: {}`) and frozen fixture per [data compatibility](../GITHUB_WORKFLOW.md#data-compatibility).                                                                                                                                | The assistant cannot read `localStorage`, and the rule "never add back" needs a server-checkable source of truth. The Source preview's applied range becomes a view of the first select, so the UI change is small.                                                                                                          |
+| How the assistant edits            | The `edit` operation `{ commands, expectedRevision }`: the service applies the batch atomically with `applyCommand`, validates like a save and writes one revision. Candidates (`preview_edits`, `still` of a draft) are also `commands` relative to a saved revision, never whole documents. The editor keeps its document saves.                                                                                                                                           | One validation path and one revision per logical step (the assistant's "one Undo step"); rich command errors come back verbatim; commands stay small under the 1 MiB body limit where a large project document would not; the editor can adopt it later for bulk actions.                                                    |
+| Concurrency with the open editor   | A server-side **assistant session** (lease) per project: started from the editor's **Hand off** dialog after flushing autosave, with a **checkpoint** copy of the document. While it holds the lease, editor saves get 423 and the editor follows the document read-only (polling revision); `edit` requires the lease. The user can **Take over** at any time; the LLM can end the session with notes (`session_end`). The lease expires after 10 min without MCP activity. | Same project, no silent divergence, nothing destructive: the checkpoint restores the pre-hand-off cut through **Open project file…** (new project) or a **Restore checkpoint** action. A `copy: true` option builds the cut in a new project instead, using the existing import path.                                        |
+| How the LLM sees pictures          | **Native stills** from the proxies through `composeLayerFrame`, encoded to JPEG by FFmpeg, served by new routes; contact sheets tile several stills with a JSON legend. No browser screenshots.                                                                                                                                                                                                                                                                              | The composed picture is what matters, it matches export, and it needs no GPU or Chrome. The editor UI is for the user.                                                                                                                                                                                                       |
+| Music analysis                     | A new background job kind (`music-analysis`) on the existing PCM cache: onset envelope, tempo, beats, downbeats, loudness, sections and accents, cached as `music-v1.json`; pure TypeScript in a worker thread, no new dependency or decoder.                                                                                                                                                                                                                                | The PCM is already exact 48 kHz stereo; a bounded single-thread analysis takes about a second per song. It also gives the editor beat ticks and **Beats → bookmarks** without the assistant.                                                                                                                                 |
+| Export                             | Not exposed.                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | The user reviews first; export remains a deliberate action with its own storage checks.                                                                                                                                                                                                                                      |
 
 ## Architecture
 
 ```mermaid
 flowchart LR
   subgraph LLM client
-    L[LLM] -- MCP stdio --> M[pascap-mcp\nnode dist/mcp/main.js]
+    L[LLM] -- MCP stdio --> M[pascap-mcp process\nregistry → tools\nHTTP backend]
   end
-  M -- HTTP loopback\nx-pascap-client --> S[PasCap service :4318]
+  M -- POST /api/ops/name\nx-pascap-client --> S[PasCap service :4318]
   subgraph Service
-    S --> P[(projects/*.json\nrevision, checkpoints, session)]
-    S --> R[(registries, proxies,\nmotion-v3.json, PCM, music-v1.json)]
-    S --> C[Native compositor\ncomposeLayerFrame]
-    S --> J[JobQueue\nmusic-analysis, motion]
-    S --> F[FFmpeg\nproxy frame decode, JPEG]
+    O[Operation registry\nsrc/server/operations/*]
+    O -- loop --> H[Fastify routes\n/api/ops/:name]
+    O -. optional .-> X[Streamable HTTP /mcp\ndirect backend]
+    O -- types --> W[Web client ops.name]
+    S --> H
+    H --> P[(projects/*.json\nrevision, checkpoints, session)]
+    H --> R[(registries, proxies,\nmotion-v3.json, PCM, music-v1.json)]
+    H --> C[Native compositor\ncomposeLayerFrame]
+    H --> J[JobQueue\nmusic-analysis, motion]
+    H --> F[FFmpeg\nproxy frame decode, JPEG]
   end
   E[Editor tab] -- Hand off / Take over\nfollow revision --> S
 ```
 
-The MCP process holds no state besides the session token and last known revision. It
-converts tool calls into HTTP requests, maps HTTP errors into tool errors and converts
+The registry is the only place a capability is described. The stdio process holds no state
+besides the session token and last known revision: it registers one tool per operation,
+forwards calls to `POST /api/ops/<name>`, maps HTTP errors into tool errors and converts
 frames to timecode for the model. All analysis, validation and writing happen in the
-service.
+service, whichever backend is used.
 
 ## Data model changes
 
@@ -98,7 +107,7 @@ selects: Record<mediaId, SelectRange[]>; // SelectRange = { sourceIn, sourceOut 
   the selects (the user can always do what they want in the editor). Only **assistant
   sessions** are bound: every clip they insert, trim or place must lie inside one select
   of its recording, and a `selects` change they make must be a subset of the previous one
-  (`narrow` only). The service enforces this on `edits` with a session.
+  (`narrow` only). The service enforces this in `edit` during a session.
 - Migration: add `selects: {}`. The Source preview keeps its applied IN/OUT; applying a
   range writes it as the recording's single select (one Undo step through a new
   `select-set` command); a later **Keep this range too** adds a second one. Clips still copy
@@ -141,21 +150,89 @@ when asked (project frame = `start + (sourceFrame − sourceIn)`, through loops;
 `musicSourceFrame` in [audio](../../src/shared/audio.ts)). Arrays are bounded by song
 length: a 10-minute song has about 1,500 beats and 6,000 loudness values.
 
-## Service additions
+## The operation registry
 
-| Route                                 | Purpose                                                                                                                                                                         | Bounds                                                                                               |
-| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| `POST /api/projects/:id/assistant`    | Start a session: checkpoint, brief, lease token; refuses when a session is active, recordings in the bin are not ready, or autosave is dirty (the editor flushes first)         | One session per project                                                                              |
-| `GET /api/projects/:id/assistant`     | Session status, brief, edit log, notes (editor banner and LLM resource)                                                                                                         |                                                                                                      |
-| `DELETE /api/projects/:id/assistant`  | End or take over; keeps notes                                                                                                                                                   |                                                                                                      |
-| `POST /api/projects/:id/edits`        | Apply a batch of `EditCommand`s atomically; with a session token it also enforces selects and bin membership; returns the saved document or the first failing command's message | ≤ 64 commands per batch, 1 MiB body as today                                                         |
-| `POST /api/projects/:id/still`        | One composed project frame from the proxies (`{ document?, frame, width ≤ 1280, crop? }`), JPEG                                                                                 | Serial, one FFmpeg child at a time, two waiting; refused (409) while an export or reference job runs |
-| `POST /api/projects/:id/sheet`        | Contact sheet of ≤ 12 project frames (explicit list, or `from/to/count`), JPEG plus legend                                                                                      | Same as still                                                                                        |
-| `GET /api/media/:id/frame/:frame`     | One proxy source frame as JPEG (`width ≤ 1280`), for looking at footage before placing it; `sheet` variant for a source range                                                   | Same as still                                                                                        |
-| `GET /api/media/:id/shots?tolerance=` | Shot descriptors from `motion-v3.json` (below); 409 with the job when analysis is missing or running                                                                            | Computed on request, no cache                                                                        |
-| `POST /api/media/:id/estimate`        | `{ sourceIn, sourceOut, kind: 'auto-adjust' \| 'white-balance' \| 'detail' }`: decodes ≤ 16 proxy frames at ≤ 320 × 180 and runs the shared estimators or the detail heuristics | Serial with stills                                                                                   |
-| `POST /api/audio/:id/analyse`         | Queue the music analysis job; `GET /api/audio/:id/analysis` returns `{ analysis, job }`                                                                                         | Background job kind                                                                                  |
-| `POST /api/projects/:id/beats`        | Helpers over the saved document: `alignment` report, `snap-cuts` proposal/apply, `beats-to-bookmarks`                                                                           | Pure, bounded by clip/beat counts                                                                    |
+Every new capability is one file in `src/server/operations/`, exporting one definition:
+
+```ts
+export interface Operation<I, O> {
+  name: string; // unique snake_case; the tool name and the route segment
+  description: string; // written for the LLM: when to use it, what it returns
+  input: z.ZodType<I>; // fields carry .meta({ description }) and examples
+  output: z.ZodType<O> | { image: 'image/jpeg' }; // JSON, or bytes plus a JSON legend
+  access: 'read' | 'write'; // write needs the session lease and bumps the revision
+  audience: readonly ('editor' | 'assistant')[]; // required, no default
+  run(context: ServiceContext, input: I): Promise<O>;
+}
+```
+
+`operations.ts` exports the array; a definition that is not in the array does not exist.
+From that array:
+
+- **HTTP**: one loop registers `POST /api/ops/:name` per operation (parse `input`, call
+  `run`, send `output`); the existing REST routes stay as they are and migrate one at a
+  time when touched.
+- **MCP**: one loop registers one tool per operation whose `audience` includes
+  `assistant`, with `z.toJSONSchema(op.input)` and `op.description`; image outputs
+  become MCP image content plus the legend as text.
+- **Web client**: `ops.<name>(input)` typed from `typeof operations`, one generic
+  function, so the editor can use new operations (bulk actions, beats to bookmarks)
+  without a wrapper in `api.ts`.
+- **Docs**: a script writes the operation catalogue (name, audience, description, input
+  fields) into this guide's catalogue section; `npm run check` fails when it drifts, as
+  `licenses:check` does for notices.
+
+Drift gates, as unit tests over the array: unique names; non-empty descriptions; every
+input and output converts to JSON Schema without unrepresentable types; every field of a
+write operation is described; `audience` set explicitly. One table-driven contract test
+runs each operation with the same fixture through the HTTP route and through an in-memory
+MCP client over the HTTP backend, and compares the results.
+
+What stays manual: the playbook (when to use what), noted descriptions where a
+`.refine()` rule cannot appear in JSON Schema (clip `sourceOut > sourceIn`, the layout
+refinement), and the `audience` decision for each operation. Decorators would add nothing:
+they still need the module imported to register, and the schema would be harder to read
+and test.
+
+### `editCommandSchema`
+
+`EditCommand` ([commands](../../src/shared/commands.ts)) becomes a Zod discriminated union
+on `type`, each variant and field with a `.meta({ description })` written for the LLM
+(for example `trim`: "Change a clip's source range; placement stays, Ripple re-sequences
+the suffix; frames outside the recording or the selects are rejected"). `EditCommand` is
+then `z.infer<typeof editCommandSchema>`; a compile-time equality test keeps the union
+identical during the migration and `applyCommand` is unchanged. The `edit` operation's
+input is `{ commands: editCommandSchema.array().max(64), expectedRevision }`. Any command
+added later for the editor is exposed to the assistant the moment it is in the union.
+
+## Operations
+
+The first operations. Session and editor-only ones are listed because they share the
+registry; the assistant never sees them.
+
+| Operation            | Audience  | Purpose                                                                                                                                                                                   | Bounds                                                                                               |
+| -------------------- | --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `session_start`      | editor    | Start an assistant session: checkpoint, brief, lease token; refuses when a session is active, recordings in the bin are not ready, or autosave is dirty (the editor flushes first)        | One session per project                                                                              |
+| `session_status`     | both      | State, brief, edit log, notes (editor banner and LLM resource)                                                                                                                            |                                                                                                      |
+| `session_end`        | both      | Take over (editor) or finish with notes (assistant); the notes appear in the editor's hand-off dialog                                                                                     |                                                                                                      |
+| `checkpoint`         | both      | Named checkpoint of the current document; `checkpoint_restore` (editor only) replaces the document in one revision after checkpointing the current state                                  | Last 5 per project                                                                                   |
+| `edit`               | both      | Apply a batch of commands atomically; with a session it also enforces selects and bin membership; returns the new revision and a one-line summary, or the first failing command's message | ≤ 64 commands                                                                                        |
+| `preview_edits`      | assistant | Dry run of a batch against the saved revision: resulting timeline summary and errors, no save                                                                                             |                                                                                                      |
+| `describe_project`   | both      | Compact timeline: tracks, clips with timecodes, transitions, music, bookmarks, selects, alignment summary; `detail: summary \| full`                                                      |                                                                                                      |
+| `describe_recording` | both      | Shot descriptors (below) inside the selects, telemetry, damage; `tolerance`                                                                                                               | Computed on request, no cache                                                                        |
+| `still`              | both      | One composed project frame from the proxies (`frame`, `width ≤ 1280`, `crop?`, `commands?` for a candidate), JPEG                                                                         | Serial, one FFmpeg child at a time, two waiting; refused (409) while an export or reference job runs |
+| `timeline_sheet`     | both      | Contact sheet of ≤ 12 project frames (`frames[]` or `from/to/count`), JPEG plus legend                                                                                                    | Same as still                                                                                        |
+| `source_frame`       | both      | One proxy source frame (`mediaId`, `frame`, `width`, `crop?`), JPEG; `recording_sheet` for a source range                                                                                 | Same as still                                                                                        |
+| `estimate`           | both      | `{ clipId or mediaId + range, kind: auto-adjust \| white-balance \| detail }`: decodes ≤ 16 proxy frames at ≤ 320 × 180 and runs the shared estimators or the detail heuristics           | Serial with stills                                                                                   |
+| `music_analyse`      | editor    | Queue the music analysis job; `music_analysis` (both) returns `{ analysis, job }`, with beats/accents in a window as samples, source frames and project frames                            | Background job kind                                                                                  |
+| `check_alignment`    | both      | Boundary-to-beat report (below)                                                                                                                                                           | Pure, bounded by clip/beat counts                                                                    |
+| `snap_cuts_to_beats` | both      | `layerId`, `prefer: beat \| downbeat`, `minimumSeconds`, `apply`: the alignment helper, a proposal or one `edit` batch                                                                    |                                                                                                      |
+| `beats_to_bookmarks` | both      | Add a music track's beats or downbeats as bookmarks in one revision; the editor's **Beats → bookmarks** uses it too                                                                       | ≤ 1,000 bookmarks                                                                                    |
+
+There are deliberately no `add_clip`/`set_transition`-style wrappers: those are `edit`
+commands, already described in `editCommandSchema`, and a wrapper would be a second place
+to maintain. Brief permissions (speed, several tracks, picture-in-picture) are enforced in
+`edit` by command type during a session.
 
 ### Stills and contact sheets
 
@@ -175,8 +252,9 @@ Pipeline for project frame $f$:
    legend `{ cell, frame, timecode, clipIds }` instead of burnt-in text (no libfreetype
    dependency).
 
-An optional `document` in the body previews a candidate before saving it, so the LLM can
-compare a grade or a transition without a revision; it is validated exactly like a save.
+Optional `commands` apply to the saved revision in memory before composing, so the LLM can
+compare a grade or a transition without a revision; the draft is validated exactly like a
+save and never written.
 Default size 640 × 360 (about 50 KB); a `crop` at 1:1 proxy pixels serves judging Sharpen
 and Denoise. Stills show the 720p proxy composition: the export at 4K differs in
 resolution only, as the preview does today ([detail filters](DETAIL_FILTERS.md#kernel)).
@@ -200,7 +278,7 @@ ranges.
 
 ### Server-side Auto adjust, white balance and detail measurement
 
-`POST /api/media/:id/estimate` decodes the frames `autoAdjustFrames(sourceIn, sourceOut)`
+The `estimate` operation decodes the frames `autoAdjustFrames(sourceIn, sourceOut)`
 (or the white-balance window) from the proxy, scaled to at most 320 × 180 with a bilinear
 scaler, to RGBA and runs the unchanged estimators. The browser samples through a canvas, so pixels differ
 slightly from FFmpeg's scaler: the results agree within tolerance but are not bit-identical
@@ -255,37 +333,41 @@ beats; the action reports when it would exceed the limit and offers downbeats on
 
 ### Alignment helpers
 
-`POST /api/projects/:id/beats`:
-
-- `alignment`: for every boundary of every video track, the moment the viewer perceives
+- `check_alignment`: for every boundary of every video track, the moment the viewer perceives
   (cut frame; middle of a dissolve; middle of a black pause), the nearest beat and
   downbeat with signed offsets in frames, and a summary (share of boundaries within one
   frame of a beat). Also the first and last video frame against the music's first/last
   beat and sections.
-- `snap-cuts`: on one Ripple track, shorten clips' OUT (or IN) inside their selects so each
-  boundary lands on the nearest beat or downbeat at or before its current position,
-  keeping each clip at least `minimumFrames` long and honouring existing dissolve
-  overlaps; returns the resulting `trim` commands as a proposal (`dryRun: true`) or applies
-  them as one batch. Deterministic arithmetic the LLM should not do by hand.
-- `beats-to-bookmarks`: the editor action above, for the LLM.
+- `snap_cuts_to_beats`: on one Ripple track, shorten clips' OUT (or IN) inside their
+  selects so each boundary lands on the nearest beat or downbeat at or before its current
+  position, keeping each clip at least `minimumSeconds` long and honouring existing
+  dissolve overlaps; returns the resulting `trim` commands as a proposal (`apply: false`)
+  or applies them as one batch. Deterministic arithmetic the LLM should not do by hand.
+- `beats_to_bookmarks`: the editor action above, for the LLM.
 
 ## MCP server
 
-Package: `src/mcp/` built by `tsconfig.server.json` into `dist/server/mcp`, started with
-`npm run mcp` (`node dist/server/mcp/main.js`). Configuration: `PASCAP_URL`
-(default `http://127.0.0.1:4318`), `PASCAP_PROJECT` (optional default project). It sends
-`x-pascap-client: assistant` (added to the accepted values) on every request. The LLM
-client configuration is one line, for example in VS Code:
+`src/mcp/` is built by `tsconfig.server.json` into `dist/server/mcp` and contains three
+small parts: `tools.ts` (the loop from the registry to MCP tools and resources, over an
+`AssistantBackend` interface), `http-backend.ts` (calls `POST /api/ops/<name>` with
+`x-pascap-client: assistant`, added to the accepted values, and holds the session token)
+and `main.ts` (stdio entry point, `npm run mcp`). Configuration: `PASCAP_URL` (default
+`http://127.0.0.1:4318`), `PASCAP_PROJECT` (optional default project). A later
+`direct-backend.ts` over the service objects lets the service mount the same tools at
+`/mcp` (Streamable HTTP, startup token, same Host/Origin guards) for containers and push
+notifications; it is not part of the first delivery. The LLM client configuration is one
+line, for example in VS Code:
 
 ```json
 { "servers": { "pascap": { "type": "stdio", "command": "node", "args": ["dist/server/mcp/main.js"] } } }
 ```
 
-Conventions: frames are authoritative and every output also carries `MM:SS:FF` timecode
-(30 fps NDF, as the editor shows); inputs accept either. Every write returns the new
-revision and a one-line summary. Validation failures are tool errors with the service's
-message (for example an overlap or an invalid fade), never exceptions. Large outputs are
-paged (`offset`/`limit`) and summarised by default; the LLM asks for detail.
+Conventions enforced by the loop, not per tool: frames are authoritative and every output
+also carries `MM:SS:FF` timecode (30 fps NDF, as the editor shows), inputs accept either
+(a shared `frameOrTimecode` schema); every write returns the new revision and a one-line
+summary; validation failures are tool errors with the service's message (for example an
+overlap or an invalid fade), never exceptions; large outputs are paged (`offset`/`limit`)
+and summarised by default.
 
 ### Resources
 
@@ -300,54 +382,24 @@ paged (`offset`/`limit`) and summarised by default; the LLM asks for detail.
 
 ### Tools
 
-Read and analysis (no revision change):
-
-| Tool                 | Input                                                    | Output                                                                                 |
-| -------------------- | -------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| `describe_project`   | `detail: 'summary' \| 'full'`                            | Text table of the timeline, duration, music, alignment summary                         |
-| `describe_recording` | `mediaId`, `tolerance?`                                  | Shots, steady ranges inside selects, telemetry, damage                                 |
-| `recording_sheet`    | `mediaId`, `sourceIn`, `sourceOut`, `count ≤ 12`         | Contact sheet image + legend                                                           |
-| `source_frame`       | `mediaId`, `frame`, `width?`, `crop?`                    | One proxy frame image                                                                  |
-| `still`              | `frame`, `width?`, `crop?`, `document?`                  | Composed project frame image (optionally of a candidate document)                      |
-| `timeline_sheet`     | `from`, `to`, `count ≤ 12` or `frames[]`                 | Contact sheet of the timeline + legend                                                 |
-| `music_analysis`     | `mediaId`, `window?`                                     | Tempo, sections, beats/accents in the window as samples, source frames, project frames |
-| `check_alignment`    | —                                                        | Boundary-to-beat report                                                                |
-| `estimate`           | `clipId`, `kind: auto-adjust \| white-balance \| detail` | Suggested values with confidence and the frames used                                   |
-| `preview_edits`      | `commands[]`                                             | Dry run: the resulting timeline summary and errors, no save                            |
-
-Write (each call is one revision, one Undo step for the user):
-
-| Tool                 | Input                                                                     | Notes                                                                                 |
-| -------------------- | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| `edit`               | `commands: EditCommand[]`                                                 | The generic path; the same union as the editor, validated server-side                 |
-| `add_clip`           | `mediaId`, `sourceIn`, `sourceOut`, `layerId?`, `start?`, `after?`        | Builds `insert`/`place`; refuses frames outside selects or recordings outside the bin |
-| `trim_clip`          | `clipId`, `sourceIn?`, `sourceOut?`                                       | `trim`; selects enforced                                                              |
-| `remove_clip`        | `clipId`                                                                  | `delete`                                                                              |
-| `set_transition`     | `leftId`, `rightId`, `type`, `duration?` / `fade?`, `pause?`              | `transition`; same-track adjacency rules apply                                        |
-| `set_fades`          | `layerId`, `opening`, `closing`                                           | `fades`                                                                               |
-| `set_music`          | `music: MusicTrack[]`                                                     | `music`; only recordings in `audioIds`                                                |
-| `set_colour`         | `layerId`, partial Colour settings or `autoAdjust: { clipId, intensity }` | `colour`; animated settings skipped and reported                                      |
-| `set_detail`         | `clipId`, `sharpen?`, `clarity?`, `denoise?`                              | `detail`                                                                              |
-| `set_speed`          | `clipId`, `rate` or keyframes, `reverse?`                                 | `speed`/`reverse`; refused when the brief forbids speed changes                       |
-| `set_transform`      | `layerId`, base pose fields                                               | `transform`; refused when the brief forbids picture-in-picture                        |
-| `add_track`          | `name`, `ripple?`                                                         | `layer-add`; refused when the brief forbids several tracks                            |
-| `snap_cuts_to_beats` | `layerId`, `prefer: beat \| downbeat`, `minimumSeconds`, `apply`          | The alignment helper                                                                  |
-| `add_bookmarks`      | `frames[]` or `fromBeats: { musicId, downbeatsOnly }`                     | `bookmark-add` batch                                                                  |
-| `narrow_selects`     | `mediaId`, `ranges[]`                                                     | Subset only                                                                           |
-| `checkpoint`         | `label`                                                                   | A named checkpoint the user can restore                                               |
-| `finish_session`     | `notes`                                                                   | Ends the lease; the notes appear in the editor's hand-off dialog                      |
-
-Keyframes are reachable only through `edit` (`layer-key-*`), deliberately without
-wrappers: the playbook asks for static grades unless the brief wants animation.
+The tools are exactly the operations with `assistant` in their audience; the generated
+catalogue in this guide is their reference. Everything that changes the project goes
+through `edit`, whose command vocabulary is `editCommandSchema`: inserting, trimming,
+placing and removing clips, transitions, fades, music, Colour (including an Auto adjust
+result applied through `colour`), Detail, speed, Reverse, Transform, tracks, bookmarks,
+keyframes and the new `select-narrow`. The playbook, not the tool list, says when to use
+which command (for example static grades unless the brief wants animation).
 
 ### Guards
 
-- No tool takes a filesystem path, imports, prepares, relinks, exports, deletes a project
-  or removes a recording from the project.
-- Session required for every write; the lease token never reaches the LLM (the MCP
-  process holds it). A take-over or expiry ends the session: later writes fail with
-  "The user took the project back."
-- Selects and bin membership are enforced in the service, not only in the MCP process.
+- No assistant operation takes a filesystem path, imports, prepares, relinks, exports,
+  deletes a project or removes a recording from the project; `audience` is a required
+  field, so an operation cannot reach the assistant by omission.
+- Session required for every write; the lease token never reaches the LLM (the backend
+  holds it). A take-over or expiry ends the session: later writes fail with "The user took
+  the project back."
+- Selects, bin membership and brief permissions are enforced in the service's `edit`, not
+  in the MCP process.
 - Image responses are at most 1 MB each; stills and estimates are serialised and refused
   during exports; the service applies the same 120 s request timeout as today.
 - Every batch is validated like a save (`projectSchema`, layout, `assertProjectSources`).
@@ -364,7 +416,7 @@ wrappers: the playbook asks for static grades unless the brief wants animation.
    **Take over**; controls are read-only; the document reloads on each new revision
    (polling `GET /api/projects/:id` about once per second, with the preview following the
    last edited frame); history is cleared on take-over like a project switch.
-3. **Take over**, `finish_session` or expiry returns to normal editing on the latest
+3. **Take over**, the assistant's `session_end` or expiry returns to normal editing on the latest
    revision. The dialog then shows the assistant's notes, the edit log and **Restore
    checkpoint** (replaces the document in one revision; the current state is checkpointed
    first) beside **Open checkpoint as new project**.
@@ -390,7 +442,8 @@ The LLM is told what good looks like and what PasCap can do; the tools do the ar
    calm shots in quiet sections); plan clip lengths from the sections and the beat grid
    (longer clips on slow music, cuts on downbeats at peaks). Use a second track only for
    deliberate overlays the brief allows.
-4. **Build** on one Ripple track with `add_clip` in order, then `snap_cuts_to_beats`;
+4. **Build** on one Ripple track with `edit` (`insert` commands) in order, then
+   `snap_cuts_to_beats`;
    check `check_alignment` and a `timeline_sheet` around each boundary. Set transitions:
    cuts on beats, short dissolves (8–15 frames) between related shots, fade through black
    between sections, opening and closing fades matching the music's fade.
@@ -400,7 +453,7 @@ The LLM is told what good looks like and what PasCap can do; the tools do the ar
    track if it needs its own grade. Set Detail per clip from `estimate detail`, verified
    on a 1:1 crop (no halos, no waxy denoise).
 6. **Verify**: a full `timeline_sheet`, the alignment report, the duration against the
-   target, every clip inside its selects, music fades; then `finish_session` with notes
+   target, every clip inside its selects, music fades; then `session_end` with notes
    naming the structure, the choices and anything the user should look at.
 
 ## Delivery plan
@@ -409,17 +462,20 @@ Each phase is one or more issues; routes follow [the workflow](../GITHUB_WORKFLO
 Persisted formats, service routes and the new dependency are risky (PR with
 auto-merge); editor UI and docs are routine.
 
-| Phase | Work                                                                                                                                                                    | Route          | Validation                                                                                                                                                           |
-| ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 0     | Project `selects` (schema bump, migration, fixture, `select-set`/`select-narrow` commands), Source preview applies to selects, **Keep this range too**                  | Risky (schema) | Unit: schema/migration/commands; browser: source range round trip; fixture compatibility                                                                             |
-| 1     | Music analysis job, cache, routes, beat ticks on music lanes, **Beats → bookmarks**                                                                                     | Risky (format) | Unit: synthetic beat/tempo/section gates, worker bounds, cancellation; browser: ticks and bookmarks action; `test:media` for the PCM reader                          |
-| 2     | `edits` batch route, assistant session/lease/checkpoint, editor **Hand off**/follow mode/**Take over**/**Restore checkpoint**                                           | Risky (routes) | Unit: lease, 423/409 paths, atomic batch, selects enforcement; browser: hand-off dialog, follow mode, take-over, restore                                             |
-| 3     | Stills, sheets, source frames, shot descriptors, `estimate` (Auto adjust/AWB/detail), alignment helpers                                                                 | Risky (native) | Unit: still equals the layered-export frame for the same project (same compositor), sheet legend, estimator tolerance against the browser path, snap-cuts arithmetic |
-| 4     | MCP process: SDK dependency and licence inventory, tools/resources/guide, error mapping, `npm run mcp`, docs (USER_GUIDE, DEVELOPMENT, this guide becomes the contract) | Risky (deps)   | Unit: in-memory MCP client runs a scripted session end to end against a memory service; a deterministic "fake LLM" script exercises every tool; no real model in CI  |
-| 5     | Owner evaluation on real flights (consent): playbook and heuristic tuning, image budgets, timings; decide Phase 2 of Auto adjust interplay                              | —              | Evidence in the issue, not CI                                                                                                                                        |
+| Phase | Work                                                                                                                                                                                                                           | Route              | Validation                                                                                                                                                                                              |
+| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0     | Foundations, no behaviour change: `editCommandSchema` with descriptions (type-equality test), the operation registry with its HTTP loop, typed web client and catalogue script, first operations `describe_project` and `edit` | Routine (refactor) | Unit: registry drift gates, HTTP contract test, `applyCommand` suite unchanged; `npm run check` catalogue check                                                                                         |
+| 1     | Project `selects` (schema bump, migration, fixture, `select-set`/`select-narrow` commands), Source preview applies to selects, **Keep this range too**                                                                         | Risky (schema)     | Unit: schema/migration/commands; browser: source range round trip; fixture compatibility                                                                                                                |
+| 2     | Music analysis job, cache, `music_analyse`/`music_analysis`/`beats_to_bookmarks`, beat ticks on music lanes, **Beats → bookmarks**                                                                                             | Risky (format)     | Unit: synthetic beat/tempo/section gates, worker bounds, cancellation; browser: ticks and bookmarks action; `test:media` for the PCM reader                                                             |
+| 3     | Session operations (lease, checkpoint, brief, 423/409 paths, selects and permission enforcement in `edit`), editor **Hand off**/follow mode/**Take over**/**Restore checkpoint**                                               | Risky (routes)     | Unit: lease, atomic batch, enforcement; browser: hand-off dialog, follow mode, take-over, restore                                                                                                       |
+| 4     | `still`, `timeline_sheet`, `source_frame`, `describe_recording`, `estimate` (Auto adjust/AWB/detail), `check_alignment`, `snap_cuts_to_beats`                                                                                  | Risky (native)     | Unit: still equals the layered-export frame for the same project (same compositor), sheet legend, estimator tolerance against the browser path, snap-cuts arithmetic                                    |
+| 5     | MCP process: SDK dependency and licence inventory, `tools.ts` loop, resources and guide, HTTP backend, `npm run mcp`, docs (USER_GUIDE, DEVELOPMENT, this guide becomes the contract)                                          | Risky (deps)       | Unit: in-memory MCP client runs a scripted session end to end against a memory service through the registry; the contract test covers every assistant operation over both surfaces; no real model in CI |
+| 6     | Owner evaluation on real flights (consent): playbook and heuristic tuning, image budgets, timings; decide the in-process `/mcp` mount and Phase 2 of Auto adjust                                                               | —                  | Evidence in the issue, not CI                                                                                                                                                                           |
 
-Phases 1 and 3 are independent of the MCP and useful on their own; Phase 0 unblocks the
-"never add back" rule and should land first. Phase 4 cannot start before 2 and 3.
+Phase 0 is a refactor that pays for itself in the editor (typed operations, bulk actions)
+and removes the MCP's maintenance cost before it exists. Phases 2 and 4 are useful without
+the MCP; Phase 1 unblocks the "never add back" rule. Phase 5 cannot start before 3 and 4,
+and is small once the registry exists.
 
 Docs to update when each phase lands: [TIMELINE_EDITING](../TIMELINE_EDITING.md)
 (selects, beats as bookmarks), [SPEED_AND_AUDIO](../SPEED_AND_AUDIO.md) (music analysis
@@ -442,6 +498,8 @@ and loopback), [EDITOR_CONTROLS](EDITOR_CONTROLS.md) (new controls) and the
 5. Should `Beats → bookmarks` and beat ticks ship before anything assistant-related
    (proposed: yes, Phase 1 is user-facing on its own)?
 6. Image budget: default 640 × 360 and 12-cell sheets, or smaller to save tokens?
+7. Should the editor's existing REST routes migrate to operations when touched (proposed),
+   or stay as they are indefinitely?
 
 ## Risks and limits
 
@@ -454,7 +512,13 @@ and loopback), [EDITOR_CONTROLS](EDITOR_CONTROLS.md) (new controls) and the
 - Stills are proxy-resolution compositions; fine detail at 4K is judged at export, as in
   the preview today.
 - The MCP SDK is a new production dependency: its zod 4 compatibility, licence and size
-  must be checked before Phase 4; the MCP process never runs inside the service.
+  must be checked before Phase 5; it loads into the service only if the opt-in `/mcp`
+  mount is adopted later.
+- Automatic exposure is not automatic guidance: a new command appears in `edit` by itself,
+  but the playbook may need a sentence, and `.refine()` rules are invisible in JSON Schema
+  until the model reads the error message.
+- The registry covers new work; the editor's existing routes migrate only when touched,
+  so two route styles coexist for a while.
 - Follow mode polls; a long assistant session keeps the tab's preview decoding on each
   revision. The interval and the "jump to last edit" behaviour need live checks.
 - Nothing here changes rendering, export routing, resource budgets or the proxy/PCM
