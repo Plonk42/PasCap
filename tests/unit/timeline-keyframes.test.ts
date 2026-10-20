@@ -3,9 +3,15 @@ import { NEUTRAL_COLOUR, scalarColourValues } from '../../src/shared/colour.js';
 import { EditHistory } from '../../src/shared/commands.js';
 import { EMPTY_KEY_VALUES, type LayerKeyframe, layerKeyframe } from '../../src/shared/keyframes.js';
 import { createClip, createProject } from '../../src/shared/model.js';
+import { defaultSpatialKeyframe } from '../../src/shared/spatial.js';
 import { calculateLayout } from '../../src/shared/timeline.js';
 import { slideTravel } from '../../src/web/keyframe-slide.js';
-import { planKeyframeDrag, trackKeyframeFrame } from '../../src/web/timeline-keyframes.js';
+import {
+  planKeyframeDrag,
+  trackKeyframeFrame,
+  trackKeyframeKind,
+  transformKeyframeKind,
+} from '../../src/web/timeline-keyframes.js';
 
 const keyframeFrameAtPointer = (
   frame: number,
@@ -109,5 +115,23 @@ describe('shared-point drag planning', () => {
     const { project } = fixture();
     expect(planKeyframeDrag(project, 'missing-row', 20, 30, [], 0).error).toContain('Track no longer exists');
     expect(planKeyframeDrag(project, 'video-1', 21, 30, [], 0).error).toContain('Track keyframe no longer exists');
+  });
+  it('removes a focused Colour or Transform marker’s keyframe on a track without clips, in one Undo step each', () => {
+    const { project } = fixture();
+    project.clips = [];
+    project.layers[0]!.transform.keyframes = [defaultSpatialKeyframe(40)];
+    const target = (origin: number) => ({ scope: 'video-1', origin });
+    const options = { onSelectLayer: () => {}, onOpenSection: () => {} };
+    const colour = trackKeyframeKind({ ...options, onSeekKeyframe: () => {} });
+    const transform = transformKeyframeKind({ ...options, onSeek: () => {} });
+    const history = new EditHistory(project);
+    history.commit(colour.remove!(history.current, target(80)));
+    history.commit(transform.remove!(history.current, target(40)));
+    expect(history.current.layers[0]!.keyframes.map((point) => point.frame)).toEqual([20]);
+    expect(history.current.layers[0]!.transform.keyframes).toEqual([]);
+    history.undo();
+    expect(history.current.layers[0]!.transform).toEqual(project.layers[0]!.transform);
+    history.undo();
+    expect(history.current).toEqual(project);
   });
 });

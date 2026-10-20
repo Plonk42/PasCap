@@ -202,7 +202,7 @@ button (hollow ▽ / filled ▼, **Keyframe Scale**, etc.) and per-setting **Pre
   it is cleared by a manual seek, playback, track inspection or **Follow playhead**. The row of
   the inspected key, or of the key at the playhead, is marked current. An inspected key the
   preview cannot show (after the duration) gets a dashed **Stored keyframe · timeline frame N**
-  panel; capture always uses the playhead.
+  panel with **Follow playhead** and **Delete**; capture always uses the playhead.
 - Each row's **Edit** disclosure (closed initially) edits that key:
   **Timeline frame** (**Transform keyframe frame N**), **Easing** (**Transform keyframe
   easing N**; sets every enabled setting, reads **Mixed** when they differ; **Per setting**
@@ -223,7 +223,8 @@ seeks the key (or the last frame for a key after the duration) and opens Track �
 Transform. Markers slide through the shared `useKeyframeSlide`: drag (snapping to
 boundaries, bookmarks and the playhead; Alt bypasses) or ←/→ (one frame, Shift ten);
 drafts preview without history/save, a valid release is one Undo step, and Escape,
-cancellation, blur or an occupied frame restores. Clips have no Transform lane; their
+cancellation, blur or an occupied frame restores. Delete/Backspace on a focused marker
+removes its keyframe in one Undo step. Clips have no Transform lane; their
 salmon **●** custom-speed lane is unchanged.
 
 ## Preservation

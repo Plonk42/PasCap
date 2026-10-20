@@ -833,7 +833,7 @@ storage/render breakdowns remain their existing expandable controls, not help bu
 | Session history                             | Ctrl+Z; Ctrl+Shift+Z or Ctrl+Y redo                                                   |
 | Positioned clip / first Ripple anchor nudge | Alt+←/→ one frame; Alt+Shift+←/→ ten; later Ripple starts require Ripple off          |
 | Focused trim handle                         | Arrows one source frame; Shift ten; left Home/right End restore                       |
-| Focused track keyframe marker               | Arrows one project frame; Shift ten; Enter selects/seeks                              |
+| Focused track keyframe marker               | Arrows one project frame; Shift ten; Enter selects/seeks; Delete removes              |
 | Focused source review                       | I/O marks the source range, not the timeline range                                    |
 | Shortcut guide                              | ? outside form/modal/source controls                                                  |
 

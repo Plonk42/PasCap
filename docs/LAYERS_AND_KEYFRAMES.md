@@ -313,7 +313,9 @@ count or navigation of its own; the keyframe line above counts and visits its ke
 Colour's and Transform's lists are one shared component, so they look and behave alike.
 The entry of the keyframe at the playhead, or of the inspected one, is marked current; an inspected
 stored keyframe the preview cannot show (after the duration, or on an empty timeline) shows
-a dashed **Stored keyframe · timeline frame N** panel with **Follow playhead**. Each shared
+a dashed **Stored keyframe · timeline frame N** panel with **Follow playhead** and **Delete**
+(**Delete stored track keyframe N**), so a keyframe left outside the timeline, for example
+after every clip of its track was removed, stays removable. Each shared
 keyframe entry has a timecode button (**Go to track keyframe N**) stretched over the whole
 entry, so a click anywhere outside its controls selects it, **Default** and **Outside
 duration** badges where they apply, a trash (**Delete track keyframe N**), its enabled-setting
@@ -420,6 +422,8 @@ On a focused marker, **Left/Right** moves one project frame and **Shift+Left/Rig
 moves ten, with the same atomic validation and no snapping. Focus and the inspected
 keyframe cursor follow the move. Movement navigates to the keyframe without also firing
 ordinary playhead-step or clip-nudge shortcuts, or leaking other editor shortcuts.
+**Delete** or **Backspace** on a focused marker removes that whole keyframe in one Undo step,
+whether or not the track still has clips, even outside the duration.
 Dragging can reach beyond duration, but retaining that keyframe never extends the
 sequence merely for its marker. No other track's keyframes/values, clip settings/source ranges or
 music are copied or shifted, and no clip is retimed. There is no cross-track keyframe move.
