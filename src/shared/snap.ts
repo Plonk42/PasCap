@@ -1,10 +1,11 @@
 import type { ProjectDocument } from './model.js';
+import { musicClips } from './music-lanes.js';
 import { calculateLayout } from './timeline.js';
 
 export function snapPoints(project: ProjectDocument): number[] {
   const layout = calculateLayout(project);
   const points = layout.clips.flatMap((clip) => [clip.start, clip.end]);
-  for (const track of project.music) points.push(track.start, track.start + track.duration);
+  for (const clip of musicClips(project.music)) points.push(clip.start, clip.start + clip.duration);
   return [
     ...new Set([
       0,

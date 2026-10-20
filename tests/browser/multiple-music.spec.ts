@@ -6,10 +6,14 @@ import {
   createClip,
   createProject,
   projectSchema,
+  type MusicClip,
+  type MusicLane,
   type MusicTrack,
   type ProjectDocument,
 } from '../../src/shared/model.js';
+import { musicTracks } from '../../src/shared/music-lanes.js';
 import { calculateLayout } from '../../src/shared/timeline.js';
+import { singleClipLane, singleClipLanes } from '../music-lanes.js';
 import { addMusicTrack, expectDecoders, inspectorTab } from './editor-helpers.js';
 import { memoryProjects, type MemoryProjects } from './memory-projects.js';
 import { installMusicEvidence, observeMusicPlayback, observeRealtimeHeadroom } from './music-evidence.js';
@@ -113,12 +117,20 @@ function track(id: string, settings: Partial<Omit<MusicTrack, 'id'>> = {}): Musi
 async function seed(page: Page, tracks: MusicTrack[]): Promise<ProjectDocument> {
   const document = await current(page);
   document.media.audioIds = [song.id];
-  document.music = tracks;
+  document.music = singleClipLanes(tracks);
   memory.seed(document);
   await page.reload();
   await ready(page, document);
   await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
   return document;
+}
+
+/** The music track the seeded placement `id` became: its only clip keeps the ID. */
+const laneOf = (id: string): string => singleClipLane(track(id)).id;
+
+/** A one-clip music track with changes to its clip. */
+function withClip(lane: MusicLane, changes: Partial<MusicClip>): MusicLane {
+  return { ...lane, clips: [{ ...lane.clips[0]!, ...changes }] };
 }
 
 async function flush(page: Page): Promise<void> {
@@ -190,7 +202,9 @@ test('import is bin-only; add, duplicate recording, select, edit and trash retai
   await flush(page);
   const first = (await current(page)).music[0]!;
   expect(first.id).toBeTruthy();
-  expect(first).toMatchObject({ mediaId: song.id, duration: 120, start: 0, gainDb: 0 });
+  expect(first).toMatchObject({ gainDb: 0, ripple: false, transitions: [] });
+  expect(first.clips).toHaveLength(1);
+  expect(first.clips[0]).toMatchObject({ mediaId: song.id, duration: 120, start: 0 });
   expect(memory.saves).toBe(2);
   await expect(page.getByRole('combobox', { name: 'Music recording', exact: true })).toHaveValue(song.id);
   await addMusicTrack(page, song.name);
@@ -200,7 +214,8 @@ test('import is bin-only; add, duplicate recording, select, edit and trash retai
   expect(duplicated.music).toHaveLength(2);
   expect(new Set(duplicated.music.map((item) => item.id)).size).toBe(2);
   expect(duplicated.music[0]).toEqual(first);
-  expect({ ...second, id: first.id }).toEqual(first);
+  expect(second.clips[0]!.id).not.toBe(first.clips[0]!.id);
+  expect(withClip({ ...second, id: first.id }, { id: first.clips[0]!.id })).toEqual(first);
   expect(memory.saves).toBe(3);
   await expect(page.getByRole('combobox', { name: 'Music track', exact: true })).toHaveValue(second.id);
 
@@ -256,9 +271,9 @@ test('eight independent instances are the hard limit; removing one re-enables Ad
   await expect(add).toBeDisabled();
   await expect(add).toHaveAccessibleDescription(/at most 8 music tracks/);
   expect(memory.saves).toBe(1);
-  await select(page, 'limit-3');
+  await select(page, laneOf('limit-3'));
   await page.getByRole('button', { name: 'Delete selected music track', exact: true }).click();
-  expect((await current(page)).music).toEqual(eight.music.filter((item) => item.id !== 'limit-3'));
+  expect((await current(page)).music).toEqual(eight.music.filter((item) => item.id !== laneOf('limit-3')));
   await expect(add).toBeEnabled();
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   expect((await current(page)).music).toEqual(eight.music);
@@ -283,18 +298,97 @@ test('dragging a ready music file from Media onto the music lane adds one track 
   await row.dragTo(lane, { targetPosition: { x: leading + 30 * scale, y: 20 } });
   const added = (await current(page)).music;
   expect(added).toHaveLength(1);
-  expect(added[0]).toMatchObject({ mediaId: song.id, sourceIn: 0, gainDb: 0 });
-  expect(Math.abs(added[0]!.start - 30)).toBeLessThanOrEqual(1);
+  expect(added[0]).toMatchObject({ gainDb: 0 });
+  expect(added[0]!.clips[0]).toMatchObject({ mediaId: song.id, sourceIn: 0 });
+  expect(Math.abs(added[0]!.clips[0]!.start - 30)).toBeLessThanOrEqual(1);
   await expect(page.locator('[data-music-lane]')).toHaveCount(1);
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   expect((await current(page)).music).toEqual([]);
+});
+
+test('a music track holds clips joined by Cut, Crossfade or Fade through silence, with Ripple and one Undo per edit', async ({
+  page,
+}) => {
+  const document = await seed(page, [track('mix-a', { sourceOut: 60, duration: 60 })]);
+  const lane = laneOf('mix-a');
+  const controls = await select(page, lane);
+  const clipSelect = page.getByRole('combobox', { name: 'Music clip', exact: true });
+  const starts = async (): Promise<number[]> => (await current(page)).music[0]!.clips.map((clip) => clip.start);
+  await controls.locator('summary[aria-label="Add music clip"]').click();
+  await page.getByRole('button', { name: `Add ${song.name} as a clip of music track 1`, exact: true }).click();
+  const added = (await current(page)).music[0]!;
+  const [first, second] = added.clips as [MusicClip, MusicClip];
+  expect(added.clips).toHaveLength(2);
+  expect(first).toEqual(document.music[0]!.clips[0]);
+  expect(second).toMatchObject({ mediaId: song.id, sourceIn: 0, start: 60, loop: false });
+  expect(added.transitions).toEqual([{ leftId: first.id, rightId: second.id, type: 'cut', duration: 0 }]);
+  await expect(clipSelect).toHaveValue(second.id);
+  const timeline = page.locator(`[data-music-lane="${lane}"]`);
+  await expect(timeline.locator('[data-music-id]')).toHaveCount(2);
+  await expect(
+    timeline.getByRole('button', { name: `Move music track 1 clip 2: ${song.name}`, exact: true }),
+  ).toBeVisible();
+  const boundary = timeline.getByRole('button', { name: 'Transition after clip 1 on music track 1', exact: true });
+  await expect(boundary).toHaveText('Cut');
+
+  // The timeline boundary opens its transition in Audio, selecting the clip before it.
+  await boundary.click();
+  const type = controls.getByRole('combobox', { name: 'Music transition after clip 1', exact: true });
+  await expect(type).toBeFocused();
+  await expect(clipSelect).toHaveValue(first.id);
+  await type.selectOption('crossfade');
+  const crossfaded = (await current(page)).music;
+  expect(crossfaded[0]!.transitions[0]).toEqual({
+    leftId: first.id,
+    rightId: second.id,
+    type: 'crossfade',
+    duration: 30,
+  });
+  expect(await starts()).toEqual([0, 30]);
+  await expect(boundary).toHaveText('Crossfade');
+  const length = controls.getByRole('spinbutton', { name: 'Music transition duration after clip 1', exact: true });
+  await length.fill('61');
+  await length.press('Enter');
+  await expect(length).toHaveAttribute('aria-invalid', 'true');
+  await expect(length.locator('..').getByRole('alert')).toContainText('cannot be longer than either clip');
+  expect((await current(page)).music).toEqual(crossfaded);
+  await length.press('Escape');
+  await number(controls, 'Music transition duration after clip 1', '20');
+  expect(await starts()).toEqual([0, 40]);
+  await type.selectOption('fade-through-silence');
+  expect((await current(page)).music[0]!.transitions[0]).toMatchObject({ type: 'fade-through-silence', duration: 20 });
+  expect(await starts()).toEqual([0, 60]);
+  await type.selectOption('cut');
+  expect(await starts()).toEqual([0, 60]);
+
+  // Without Ripple a clip keeps its own start; Ripple plays the clips one after another.
+  await clipSelect.selectOption(second.id);
+  await controls.getByRole('button', { name: 'Placement & fades', exact: true }).click();
+  await number(controls, 'Music timeline start', '100');
+  expect(await starts()).toEqual([0, 100]);
+  await controls.getByRole('checkbox', { name: 'Ripple on music track 1', exact: true }).check();
+  expect((await current(page)).music[0]!.ripple).toBe(true);
+  expect(await starts()).toEqual([0, 60]);
+  await expect(controls.getByRole('spinbutton', { name: 'Music timeline start', exact: true })).toBeDisabled();
+
+  const remove = controls.getByRole('button', { name: 'Delete selected music clip', exact: true });
+  await remove.click();
+  expect((await current(page)).music[0]!.clips).toEqual([first]);
+  expect((await current(page)).music[0]!.transitions).toEqual([]);
+  await expect(clipSelect).toHaveValue(first.id);
+  await expect(remove).toBeDisabled();
+  await expect(remove).toHaveAccessibleDescription(/delete the music track instead/);
+  await flush(page);
+  for (let step = 0; step < 8; step++) await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  expect((await current(page)).music).toEqual(document.music);
+  await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
 });
 
 test('invalid per-instance numeric drafts survive selection without save, clamping or cross-instance edits; music OUT extends duration', async ({
   page,
 }) => {
   const document = await seed(page, [track('draft-a'), track('draft-b', { gainDb: -12 })]);
-  const controls = await select(page, 'draft-a');
+  const controls = await select(page, laneOf('draft-a'));
   const gain = controls.getByRole('spinbutton', { name: 'Music gain', exact: true });
   for (const value of ['', '-61', '13']) {
     await gain.fill(value);
@@ -309,10 +403,10 @@ test('invalid per-instance numeric drafts survive selection without save, clampi
   }
   await gain.fill('13');
   await gain.press('Enter');
-  const other = await select(page, 'draft-b');
+  const other = await select(page, laneOf('draft-b'));
   await expect(other.getByRole('spinbutton', { name: 'Music gain', exact: true })).toHaveValue('-12');
   await expect(controls).toBeHidden();
-  await select(page, 'draft-a');
+  await select(page, laneOf('draft-a'));
   await expect(gain).toHaveValue('13');
   await expect(gain).toHaveAttribute('aria-invalid', 'true');
   await gain.press('Escape');
@@ -327,7 +421,7 @@ test('invalid per-instance numeric drafts survive selection without save, clampi
   await start.press('Escape');
   await number(controls, 'Music timeline start', '150');
   const extended = await current(page);
-  expect(extended.music).toEqual([{ ...document.music[0]!, start: 150 }, document.music[1]]);
+  expect(extended.music).toEqual([withClip(document.music[0]!, { start: 150 }), document.music[1]]);
   expect(calculateLayout(extended).duration).toBe(270);
   await ready(page, extended);
   await flush(page);
@@ -387,7 +481,7 @@ for (const cancellation of ['Escape', 'pointercancel', 'lostcapture', 'windowblu
     await beginMove(page, body, 20);
     await page.mouse.up();
     await page.keyboard.up('Alt');
-    expect((await current(page)).music).toEqual([document.music[0], { ...document.music[1]!, start: 30 }]);
+    expect((await current(page)).music).toEqual([document.music[0], withClip(document.music[1]!, { start: 30 })]);
     await flush(page);
     expect(memory.saves).toBe(1);
     await page.getByRole('button', { name: 'Undo', exact: true }).click();
@@ -397,7 +491,7 @@ for (const cancellation of ['Escape', 'pointercancel', 'lostcapture', 'windowblu
     const out = clip.getByRole('button', { name: `Trim music duration, track 2: ${song.name}`, exact: true });
     await out.focus();
     await out.press('ArrowLeft');
-    expect((await current(page)).music).toEqual([document.music[0], { ...document.music[1]!, duration: 119 }]);
+    expect((await current(page)).music).toEqual([document.music[0], withClip(document.music[1]!, { duration: 119 })]);
     expect((await current(page)).clips).toEqual(document.clips);
     await page.getByRole('button', { name: 'Undo', exact: true }).click();
     expect((await current(page)).music).toEqual(document.music);
@@ -431,7 +525,7 @@ for (const { width, height } of [
     for (let travelled = 0; travelled < extent; travelled += box.height / 2) {
       await page.mouse.wheel(0, box.height / 2);
     }
-    const last = page.locator('[data-music-lane="lane-7"]');
+    const last = page.locator(`[data-music-lane="${laneOf('lane-7')}"]`);
     const button = last.getByRole('button', { name: `Move music track 8: ${song.name}`, exact: true });
     await expect(button).toBeInViewport();
     await expect.poll(() => viewport.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
@@ -463,7 +557,7 @@ for (const { width, height } of [
     await expect(button).toBeInViewport();
     // Focus the preceding native control without revealing it; Tab must reveal the next lane itself.
     await page
-      .locator('[data-music-lane="lane-6"] .trim-handle.out')
+      .locator(`[data-music-lane="${laneOf('lane-6')}"] .trim-handle.out`)
       .evaluate((element) => (element as HTMLButtonElement).focus({ preventScroll: true }));
     await viewport.evaluate((element) => {
       element.scrollTop = 0;
@@ -474,9 +568,9 @@ for (const { width, height } of [
     const frame = await page.evaluate(() => window.pascapLab!.engine.diagnostics().frame);
     await button.press('Enter');
     await expect(button).toHaveAttribute('aria-pressed', 'true');
-    await expect(page.getByRole('combobox', { name: 'Music track', exact: true })).toHaveValue('lane-7');
+    await expect(page.getByRole('combobox', { name: 'Music track', exact: true })).toHaveValue(laneOf('lane-7'));
     await expect(page.getByRole('spinbutton', { name: 'Music gain', exact: true })).toHaveValue('-7');
-    await expect(page.locator('[data-music-controls-id="lane-0"]')).toBeHidden();
+    await expect(page.locator(`[data-music-controls-id="${laneOf('lane-0')}"]`)).toBeHidden();
     await expect(page.locator('.timeline-ruler')).toBeInViewport();
     expect(await page.evaluate(() => globalThis.document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     const target = (await button.boundingBox())!;
@@ -495,7 +589,7 @@ for (const { width, height } of [
     await expect(page.locator('[data-music-lane]')).toHaveCount(7);
     await expect(
       page
-        .locator('[data-music-lane="lane-0"]')
+        .locator(`[data-music-lane="${laneOf('lane-0')}"]`)
         .getByRole('button', { name: `Move music track 1: ${song.name}`, exact: true }),
     ).toBeFocused();
     expect((await current(page)).music).toEqual(document.music.slice(0, 7));
@@ -524,7 +618,7 @@ test('actual mixed PCM gain/fades/placement continues over the last clip fade in
   document.clips = [createClip('tail-video', video.id, 0, 30)];
   document.layers[0]!.closingFade = 6;
   document.media.audioIds = [song.id];
-  document.music = [
+  document.music = singleClipLanes([
     track('tail-a', { sourceOut: 15, start: 10, duration: 40, gainDb: -12, fadeIn: 5, fadeOut: 10, loop: true }),
     track('tail-b', {
       sourceIn: 5,
@@ -536,7 +630,7 @@ test('actual mixed PCM gain/fades/placement continues over the last clip fade in
       fadeOut: 10,
       loop: true,
     }),
-  ];
+  ]);
   expect(calculateLayout(document).duration).toBe(90);
   expect(calculateLayout(document).clips[0]!.end).toBe(30);
   // Read only the necessary first 30 source frames from the already prepared synthetic PCM.
@@ -553,7 +647,7 @@ test('actual mixed PCM gain/fades/placement continues over the last clip fade in
     expect(bytes).toHaveLength(end - begin + 1);
     for (let offset = 0; offset < bytes.length; offset += 2) pcm.push(bytes.readInt16LE(offset));
   }
-  await installMusicEvidence(page, true, { pcm, tracks: document.music });
+  await installMusicEvidence(page, true, { pcm, tracks: musicTracks(document.music) });
   await observeRealtimeHeadroom(page, test.info());
   memory.seed(document);
   await page.reload();

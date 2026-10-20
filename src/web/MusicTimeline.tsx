@@ -13,6 +13,7 @@ import { musicSourceFrame } from '../shared/audio.js';
 import type { EditCommand } from '../shared/commands.js';
 import type { MusicTrack, ProjectDocument } from '../shared/model.js';
 import { musicBeatFrames, type MusicAnalysis } from '../shared/music-analysis.js';
+import { removeMusicClips } from '../shared/music-lanes.js';
 import { snapFrame } from '../shared/snap.js';
 import { formatTimecode } from '../shared/timing.js';
 import './music-ui.css';
@@ -72,8 +73,12 @@ export interface MusicTimelineGesture {
 }
 interface Props {
   project: ProjectDocument;
+  /** The clip as it plays: its source range, placement and the fades its track gives it. */
   music: MusicTrack;
+  /** Music track index, then the clip's index on it. */
   index: number;
+  clipIndex: number;
+  clipCount: number;
   selected: boolean;
   asset: AudioAsset | undefined;
   leading: number;
@@ -110,7 +115,7 @@ interface MusicDrag {
 }
 
 export function MusicTimeline(props: Readonly<Props>) {
-  const { project, asset, leading, scale, disabled, selected, index } = props;
+  const { project, asset, leading, scale, disabled, selected, index, clipIndex, clipCount } = props;
   const latest = useRef(props);
   latest.current = props;
   const [candidate, setCandidate] = useState<ReturnType<typeof planMusicGesture> | null>(null);
@@ -152,7 +157,9 @@ export function MusicTimeline(props: Readonly<Props>) {
     if (drag.current && drag.current.base !== project) cancel();
   }, [project, cancel]);
   const music = candidate?.track ?? props.music;
-  const name = `music track ${index + 1}: ${asset?.name ?? 'Unavailable recording'}`;
+  const clipLabel = clipCount > 1 ? ` clip ${clipIndex + 1}` : '';
+  const recording = asset?.name ?? 'Unavailable recording';
+  const name = `music track ${index + 1}${clipLabel}: ${recording}`;
   const { phase } = useMusicAnalysis(asset);
   const clipScale = drag.current?.scale ?? scale;
   const analysed = phase.kind === 'ready' ? phase.analysis.beats : null;
@@ -255,11 +262,7 @@ export function MusicTimeline(props: Readonly<Props>) {
       frame: props.frame,
       alt: event.altKey,
       moved: false,
-      targets: placementSnapPoints(
-        { ...project, music: project.music.filter((track) => track.id !== props.music.id) },
-        null,
-        props.frame,
-      ),
+      targets: placementSnapPoints(project, props.music.id, props.frame),
       plan,
     };
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -306,7 +309,9 @@ export function MusicTimeline(props: Readonly<Props>) {
     if (disabled || drag.current || event.nativeEvent.isComposing) return;
     if (event.key === 'Delete' || event.key === 'Backspace') {
       event.preventDefault();
-      props.onEdit({ type: 'music', music: project.music.filter((track) => track.id !== music.id) });
+      // Deleting a music track's last clip deletes the track.
+      const removed = new Set([music.id]);
+      props.onEdit({ type: 'music', music: project.music.flatMap((lane) => removeMusicClips(lane, removed) ?? []) });
       requestAnimationFrame(() => {
         latest.current.viewport.current?.querySelector<HTMLButtonElement>('.music-body:not(:disabled)')?.focus();
       });
@@ -372,7 +377,7 @@ export function MusicTimeline(props: Readonly<Props>) {
       </button>
       <button
         className="trim-handle in"
-        aria-label={`Trim music start, track ${index + 1}: ${asset?.name ?? 'Unavailable recording'}`}
+        aria-label={`Trim music start, track ${index + 1}${clipLabel}: ${recording}`}
         title="Trim source IN and timeline start; Arrow keys: one frame, Shift: ten"
         disabled={disabled && !drag.current}
         onPointerDown={(event) => start(event, 'in')}
@@ -384,7 +389,7 @@ export function MusicTimeline(props: Readonly<Props>) {
       </button>
       <button
         className="trim-handle out"
-        aria-label={`Trim music duration, track ${index + 1}: ${asset?.name ?? 'Unavailable recording'}`}
+        aria-label={`Trim music duration, track ${index + 1}${clipLabel}: ${recording}`}
         title="Trim timeline duration; Arrow keys: one frame, Shift: ten"
         disabled={disabled && !drag.current}
         onPointerDown={(event) => start(event, 'out')}

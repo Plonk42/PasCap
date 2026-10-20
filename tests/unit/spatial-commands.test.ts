@@ -11,6 +11,7 @@ import {
   type ProjectDocument,
 } from '../../src/shared/model.js';
 import { trimOnTimeline } from '../../src/shared/source-range.js';
+import { singleClipLane } from '../music-lanes.js';
 import {
   createSpatialSettings,
   evaluateSpatial,
@@ -53,7 +54,7 @@ function fixture(): ProjectDocument {
     ],
   };
   document.music = [
-    {
+    singleClipLane({
       id: 'song',
       mediaId: 'audio',
       sourceIn: 0,
@@ -64,7 +65,7 @@ function fixture(): ProjectDocument {
       fadeIn: 3,
       fadeOut: 4,
       loop: false,
-    },
+    }),
   ];
   document.media = { videoIds: ['original'], audioIds: ['audio'] };
   return projectSchema.parse(document);

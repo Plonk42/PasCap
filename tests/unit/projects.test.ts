@@ -28,13 +28,16 @@ import {
   idSchema,
   PROJECT_SCHEMA_VERSION,
   projectSchema,
+  type MusicClip,
   type ProjectDocument,
 } from '../../src/shared/model.js';
 import { projectSummarySchema } from '../../src/shared/projects.js';
 import { createSpatialSettings, NEUTRAL_SPATIAL_POSE } from '../../src/shared/spatial.js';
 import { calculateLayout } from '../../src/shared/timeline.js';
 import { framesToSeconds, PROJECT_FPS } from '../../src/shared/timing.js';
-import { EARLIER_SCHEMA_VERSIONS, unsupportedProject } from './project-fixtures.js';
+import { musicTracks } from '../../src/shared/music-lanes.js';
+import { singleClipLane } from '../music-lanes.js';
+import { EARLIER_SCHEMA_VERSIONS, SUPPORTED_VERSIONS, unsupportedProject } from './project-fixtures.js';
 
 const temporary: string[] = [];
 const services: Awaited<ReturnType<typeof createApp>>[] = [];
@@ -92,13 +95,13 @@ describe('multiple-project store', () => {
       const filename = path.join(directory, 'projects', `${id}.json`);
       await atomicWrite(filename, bytes);
       await expect(store.load(id)).rejects.toThrow(`Unsupported project schema version ${schemaVersion}`);
-      await expect(store.rename(id, 'No migration', 0)).rejects.toThrow(`requires version ${PROJECT_SCHEMA_VERSION}`);
+      await expect(store.rename(id, 'No migration', 0)).rejects.toThrow(`requires ${SUPPORTED_VERSIONS}`);
       await expect(store.save(createProject(id, 'No overwrite'), 0)).rejects.toThrow('existing file was not changed');
       expect(await store.list()).toEqual([
         expect.objectContaining({
           id,
           compatible: false,
-          error: expect.stringContaining(`requires version ${PROJECT_SCHEMA_VERSION}`),
+          error: expect.stringContaining(`requires ${SUPPORTED_VERSIONS}`),
         }),
       ]);
       expect(await readFile(filename, 'utf8')).toBe(bytes);
@@ -171,41 +174,45 @@ describe('multiple-project store', () => {
     const oldBytes = JSON.stringify(old);
     const oldPath = path.join(directory, 'projects', `${oldId}.json`);
     await writeFile(oldPath, oldBytes);
-    await expect(store.load(oldId)).rejects.toThrow(`requires version ${PROJECT_SCHEMA_VERSION}`);
+    await expect(store.load(oldId)).rejects.toThrow(`requires ${SUPPORTED_VERSIONS}`);
     await expect(store.rename(oldId, 'No overwrite', 0)).rejects.toThrow('existing file was not changed');
     await expect(store.save(createProject(oldId, 'No overwrite'), 0)).rejects.toThrow('existing file was not changed');
     expect((await store.list()).find((summary) => summary.id === oldId)!.compatible).toBe(false);
     expect(await readFile(oldPath, 'utf8')).toBe(oldBytes);
     expect(await store.load(saved.id)).toEqual(saved);
   });
-  it('round-trips eight identified music instances and never rewrites invalid or obsolete music data', async () => {
+  it('round-trips eight identified music tracks and never rewrites invalid or obsolete music data', async () => {
     const directory = await temp();
     const store = new ProjectStore(directory);
     const document = createProject('eight-music', 'Independent music');
-    document.music = Array.from({ length: 8 }, (_, index) => ({
-      id: `instance-${index}`,
-      mediaId: index % 2 ? 'second-source' : 'repeated-source',
-      sourceIn: index,
-      sourceOut: 100 + index,
-      start: index * 25,
-      duration: 100,
-      gainDb: index === 0 ? 0 : -index,
-      fadeIn: index,
-      fadeOut: index * 2,
-      loop: index % 2 === 0,
-    }));
+    document.music = Array.from({ length: 8 }, (_, index) =>
+      singleClipLane({
+        id: `instance-${index}`,
+        mediaId: index % 2 ? 'second-source' : 'repeated-source',
+        sourceIn: index,
+        sourceOut: 100 + index,
+        start: index * 25,
+        duration: 100,
+        gainDb: index === 0 ? 0 : -index,
+        fadeIn: index,
+        fadeOut: index * 2,
+        loop: index % 2 === 0,
+      }),
+    );
     const saved = await store.save(document, 0);
     expect(saved.music).toEqual(document.music);
     expect(await store.load(document.id)).toEqual(saved);
     expect((await store.list())[0]!.duration).toBe(275);
     const filename = path.join(directory, 'projects', `${document.id}.json`);
     const bytes = await readFile(filename);
+    const first = document.music[0]!;
     for (const music of [
       null,
-      document.music[0],
-      [document.music[0], document.music[0]],
-      [...document.music, { ...document.music[0], id: 'ninth' }],
-      [{ ...document.music[0], start: 2_147_483_647 }],
+      first,
+      [first, first],
+      [...document.music, { ...first, id: 'ninth', clips: [{ ...first.clips[0]!, id: 'ninth-clip' }] }],
+      [{ ...first, clips: [{ ...first.clips[0]!, start: 2_147_483_647 }] }],
+      musicTracks(document.music),
     ]) {
       await expect(store.save({ ...saved, music } as ProjectDocument, 1)).rejects.toThrow();
       expect(await readFile(filename)).toEqual(bytes);
@@ -213,7 +220,7 @@ describe('multiple-project store', () => {
     const obsolete = JSON.stringify({ ...document, id: 'preserved-v7', schemaVersion: 7, music: null });
     const obsoletePath = path.join(directory, 'projects', 'preserved-v7.json');
     await writeFile(obsoletePath, obsolete);
-    await expect(store.load('preserved-v7')).rejects.toThrow(`version ${PROJECT_SCHEMA_VERSION}`);
+    await expect(store.load('preserved-v7')).rejects.toThrow(SUPPORTED_VERSIONS);
     expect((await store.list()).find((item) => item.id === 'preserved-v7')!.compatible).toBe(false);
     expect(await readFile(obsoletePath, 'utf8')).toBe(obsolete);
     expect(await store.load(document.id)).toEqual(saved);
@@ -761,7 +768,7 @@ describe('multiple-project HTTP API', () => {
     expect((await service.app.inject({ url: '/api/projects', headers })).json().projects[0].compatible).toBe(false);
     const load = await service.app.inject({ url: '/api/projects/old', headers });
     expect(load.statusCode).toBe(422);
-    expect(load.json().error).toContain(`version ${PROJECT_SCHEMA_VERSION}`);
+    expect(load.json().error).toContain(`requires ${SUPPORTED_VERSIONS}`);
     expect(
       (
         await service.app.inject({
@@ -809,7 +816,7 @@ describe('multiple-project HTTP API', () => {
     const loaded = await service.app.inject({ url: '/api/projects/legacy-v3', headers });
     expect(loaded.statusCode).toBe(422);
     expect(loaded.json().error).toContain('schema version 3');
-    expect(loaded.json().error).toContain(`requires version ${PROJECT_SCHEMA_VERSION}`);
+    expect(loaded.json().error).toContain(`requires ${SUPPORTED_VERSIONS}`);
     expect(
       (
         await service.app.inject({
@@ -891,7 +898,7 @@ describe('multiple-project HTTP API', () => {
       ...createProject('preview-lab', 'Video and music'),
       clips: [createClip('clip-a', video.id, 0, 120)],
       music: [
-        {
+        singleClipLane({
           id: 'music-instance',
           mediaId: music.id,
           sourceIn: 0,
@@ -902,8 +909,8 @@ describe('multiple-project HTTP API', () => {
           fadeIn: 5,
           fadeOut: 5,
           loop: false,
-        },
-        {
+        }),
+        singleClipLane({
           id: 'second-music-instance',
           mediaId: secondMusic.id,
           sourceIn: 2,
@@ -914,7 +921,7 @@ describe('multiple-project HTTP API', () => {
           fadeIn: 8,
           fadeOut: 10,
           loop: true,
-        },
+        }),
       ],
     });
     const saved = await service.app.inject({
@@ -977,7 +984,9 @@ describe('multiple-project HTTP API', () => {
     expect(await service.projects.load('spatial-bounds')).toEqual(projectSchema.parse(acceptedSpatial.json().document));
     expect(await readFile(confirmedPath)).toEqual(confirmedBytes);
     const videoTooLong = { ...current, clips: [createClip('clip-a', video.id, 0, 121)] };
-    const musicTooLong = { ...current, music: [current.music[0]!, { ...current.music[1]!, sourceOut: 60 }] };
+    const second = current.music[1]!;
+    const secondClip = (changes: Partial<MusicClip>) => ({ ...second, clips: [{ ...second.clips[0]!, ...changes }] });
+    const musicTooLong = { ...current, music: [current.music[0]!, secondClip({ sourceOut: 60 })] };
     expect(
       (
         await service.app.inject({
@@ -1005,7 +1014,7 @@ describe('multiple-project HTTP API', () => {
           url: '/api/projects/preview-lab',
           headers,
           payload: {
-            document: { ...current, music: [current.music[0]!, { ...current.music[1]!, mediaId: 'missing-audio' }] },
+            document: { ...current, music: [current.music[0]!, secondClip({ mediaId: 'missing-audio' })] },
             expectedRevision: 1,
           },
         })

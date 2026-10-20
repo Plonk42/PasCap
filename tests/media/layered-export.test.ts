@@ -61,6 +61,7 @@ import {
   type TimelineLayout,
 } from '../../src/shared/timeline.js';
 import { framesToSeconds } from '../../src/shared/timing.js';
+import { singleClipLane } from '../music-lanes.js';
 import { observedJobBytes } from './scratch-observation.js';
 
 // Observe actual native children; do not stub decoding, pipe backpressure or exits.
@@ -1468,7 +1469,7 @@ describe.skipIf(!enabled)('current-schema layered native export · disposable sy
     const project = simple(4);
     project.clips[1]!.start = 5;
     project.music = [
-      {
+      singleClipLane({
         id: 'layered-music-instance',
         mediaId: music.id,
         sourceIn: 2,
@@ -1479,7 +1480,7 @@ describe.skipIf(!enabled)('current-schema layered native export · disposable sy
         fadeIn: 1,
         fadeOut: 3,
         loop: true,
-      },
+      }),
     ];
     const result = await complete(project);
     bounds(result.receipt);

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { AudioAsset } from '../shared/audio.js';
 import type { ProjectDocument } from '../shared/model.js';
+import { musicClips } from '../shared/music-lanes.js';
 import { mediaRemovalUsage } from '../shared/projects.js';
 import { durationLabel, MUSIC_DRAG_TYPE } from './display.js';
 import { Icon } from './icons.js';
@@ -25,7 +26,7 @@ export function musicMatchesFilter(
   if (!asset.name.toLocaleLowerCase().includes(search.toLocaleLowerCase())) return false;
   if (filter === 'ready') return asset.status === 'ready';
   if (filter === 'unprepared') return asset.status !== 'ready';
-  const used = project?.music.some((track) => track.mediaId === asset.id) ?? false;
+  const used = musicClips(project?.music ?? []).some((clip) => clip.mediaId === asset.id);
   if (filter === 'used') return used;
   if (filter === 'unused') return !used;
   return true;
@@ -51,7 +52,7 @@ export function MediaMusicList({
 }>) {
   const [removing, setRemoving] = useState<string | null>(null);
   if (!music.length) return null;
-  const tracks = (id: string): number => project?.music.filter((track) => track.mediaId === id).length ?? 0;
+  const clips = (id: string): number => musicClips(project?.music ?? []).filter((clip) => clip.mediaId === id).length;
   const remove = (id: string): void => {
     const index = music.findIndex((asset) => asset.id === id);
     const neighbour = music[index + 1] ?? music[index - 1];
@@ -75,7 +76,7 @@ export function MediaMusicList({
         Music <span className="count">{music.length}</span>
       </h3>
       {music.map((asset) => {
-        const used = tracks(asset.id);
+        const used = clips(asset.id);
         const lost = missing.has(asset.id);
         const status = lost ? 'Original missing' : STATUS[asset.status];
         return (
@@ -85,7 +86,9 @@ export function MediaMusicList({
             data-music-media-id={asset.id}
             data-status={asset.status}
             draggable={asset.status === 'ready' && project !== null && !busy}
-            title={asset.status === 'ready' ? 'Drag onto the music lane to add a music track' : undefined}
+            title={
+              asset.status === 'ready' ? 'Drag onto the timeline’s music to place it at the drop frame' : undefined
+            }
             onDragStart={(event) => {
               event.dataTransfer.setData(MUSIC_DRAG_TYPE, asset.id);
               event.dataTransfer.effectAllowed = 'copy';
@@ -100,7 +103,7 @@ export function MediaMusicList({
                 <span className="media-recording-duration">{durationLabel(asset.metadata.durationSeconds)}</span>
                 {used > 0 && (
                   <span className="media-usage-badge">
-                    {used} {used === 1 ? 'music track' : 'music tracks'}
+                    {used} {used === 1 ? 'music clip' : 'music clips'}
                   </span>
                 )}
                 {(asset.status !== 'ready' || lost) && <span className="media-status-text">{status}</span>}

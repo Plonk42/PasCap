@@ -3,6 +3,7 @@ import { isNeutralDetail, NEUTRAL_DETAIL } from '../shared/detail.js';
 import { usesLocalTone } from '../shared/keyframes.js';
 import { PROXY_GOP_FRAMES } from '../shared/media.js';
 import { projectSchema, type ProjectDocument, type VideoClip } from '../shared/model.js';
+import { musicTracks } from '../shared/music-lanes.js';
 import {
   calculateLayout,
   layerClips,
@@ -500,7 +501,7 @@ export class PreviewEngine {
     this.#setStatus('loading', 'Loading preview');
     try {
       this.#resizeLanes();
-      await this.#music.configure(snapshot.music, signal);
+      await this.#music.configure(musicTracks(snapshot.music), signal);
       if (!this.#isCurrent(signal)) return;
       if (!this.#compositor.available) throw new Error('WebGL context is unavailable.');
       if (!this.#layout.duration) {

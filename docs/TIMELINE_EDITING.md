@@ -20,9 +20,9 @@ membership even without timeline placement; clip/music references also remain
 visible. New projects start with both arrays empty. **Remove from project** (the
 trash on a Media card or music file, or on the selection header for a selection)
 removes only that bin membership in one Undo step.
-A recording still used by clips or music tracks first asks for confirmation
+A recording still used by clips or music clips first asks for confirmation
 with their counts, then removes those placements in the same step; Ripple tracks
-close the gaps as ordinary deletions do. Originals, registry entries, proxies,
+close the gaps as ordinary deletions do, and a music track left without clips goes too. Originals, registry entries, proxies,
 thumbnails, PCM caches, other projects and exports are untouched; a deliberate
 re-import makes it available again. Importing an existing source
 deliberately reuses the global content-deduplicated registry/proxy cache; switching
@@ -59,7 +59,7 @@ Transform edits do not change placement or duration. See
 [spatial transforms](design/SPATIAL_TRANSFORMS.md).
 
 Project duration is the maximum of all retimed clip ends (including hidden
-tracks) and every independent music track's start + duration. Music can extend
+tracks) and every music clip's start + duration. Music can extend
 the project. After the last active video clip OUT, preview/export is opaque black,
 not a frozen last image, while music continues/fades to its own OUT. Each video
 closing fade remains inside its last clip and ends at that clip's OUT. Music-only
@@ -149,7 +149,7 @@ into Timeline remains unchanged. Uncertain registration results are not retried
 automatically; check Media/Activity before resubmitting.
 
 The strict current schema requires complete video track colour with Temperature/Tint/Vibrance/Whites/Blacks/HDR/Local contrast and static HSL/curves, track Transform, a boolean clip `reverse`, per-track Ripple, transitions and fades, and a required
-0–8 identified music track `music` array (`[]` without music); proxy/PCM formats are
+0–8 music track `music` array of clips joined by transitions (`[]` without music); proxy/PCM formats are
 unchanged and the registries are version 2 (full-content checksums). Only generated
 proxies/thumbnails, metadata,
 exports/receipts and scratch are created, not duplicate originals. Keep originals
@@ -657,10 +657,10 @@ music or keyframes and are never rendered or exported.
   same eight pixels: trims, clip moves and drops, music placement/trim, track and
   clip speed-keyframe drags, ruler clicks/ranges and playhead scrubbing. Snapping
   to existing boundaries is unchanged.
-- **Beats → bookmarks** in **Audio → Music** turns the selected music track's beats
+- **Beats → bookmarks** in **Audio → Music** turns the selected music clip's beats
   ([music analysis](SPEED_AND_AUDIO.md#music-analysis)) into bookmarks, so cuts snap to
   the beat. Its popover offers **All beats** or **Downbeats only**, each with the number
-  it would add: the beats at project frames within the track's placement, repeated
+  it would add: the beats at project frames within the clip's placement, repeated
   across loops, skipping existing bookmarks. One choice is one Undo step. A choice that
   would exceed 1,000 bookmarks, or would add nothing, is unavailable with its reason
   (**All beats** then suggests downbeats only); nothing is ever added partially. The
@@ -693,27 +693,39 @@ receipts. Removing a clip is not removing that recording from the import bin;
 use **Remove from project** for that. Proxy formats are
 unchanged; the registries are version 2 (full-content checksums).
 
-The required `music` array holds **0–8 independent music tracks**, each with a unique
-required `id`, registered `mediaId`, source IN/OUT, start/duration, gain, fades and
-loop flag. No null/singular fallback, omitted-field default or old-format reader
-is accepted. Version-1 export receipts require a strict current-schema snapshot and captured
-audio-source/instance-plan arrays; older snapshots/invalid arrays are rejected
-while the receipt and finished output remain preserved. Current PCM format is unchanged.
+The required `music` array holds **0–8 independent music tracks**. Like a video track,
+each has a unique `id`, gain, Ripple, opening/closing fades, **1–8 clips** (each with a
+unique `id`, registered `mediaId`, source IN/OUT, start/duration and loop flag) and one
+transition per adjacent pair of clips. No null/singular fallback or omitted-field default
+is accepted; projects saved before music tracks held clips open with one clip per track.
+Version-1 export receipts require a strict current-schema snapshot and captured
+audio-source/plan arrays (one plan per music clip); older snapshots/invalid arrays are
+rejected while the receipt and finished output remain preserved. Current PCM format is unchanged.
 
-Each music track has its own backend-prepared waveform and timeline lane, holding only
-its clip: the clip shows the recording name (and **loop**), kept at the left edge while the
-clip starts off-screen. Clicking the clip, or Enter on it, selects the track, as does
-**Audio → Music → Music track**; **Add music track** lists
-ready music files and creates a track (dragging one from Media → Music onto
-the music lane does the same), and the selected-track trash action removes only that
-placement. Import never implicitly places music. Selection creates no save/history
-entry, and editing/removing one music track leaves all others and imported media intact.
-Independent drafts cannot apply to another music track. Placement/trim gestures are
-transient and commit once; each accepted edit/add/remove is one Undo step.
+Each music track has its own timeline lane holding its clips, each with its
+backend-prepared waveform: a clip shows the recording name (and **loop**), kept at the
+left edge while the clip starts off-screen, and a boundary button (**Cut**, **Crossfade**
+or **Fade**) sits between adjacent clips. Clicking a clip, or Enter on it, selects it and
+its track, as does **Audio → Music → Music track** (then **Clip**); a boundary button
+selects the clip before it and focuses that transition in Audio. **Add music track**
+lists ready music files and creates a track with one clip; **+ Clip** adds a clip after
+the selected track's last one. Dragging a ready file from Media → Music onto a music
+track adds a clip there at the drop frame (a Ripple track takes it at the nearest place in
+its sequence), or starts a track when dropped on the empty music area. The trash actions
+remove the selected clip or the whole track. Import never implicitly places music.
+Selection creates no save/history entry, and editing/removing one clip or track leaves
+all others and imported media intact.
+Independent drafts cannot apply to another music track or clip. Placement/trim gestures
+are transient and commit once; each accepted edit/add/remove is one Undo step.
 Invalid release/cancellation is atomic with no committed draft/history/save.
-Numeric controls provide source IN/OUT, placement/duration and fades; gain uses a
-native slider with an exact `NumberField`, and looping is explicit per music track.
-Music is not retimed or rippled with video tracks. All music tracks sum linearly after their
+Numeric controls provide source IN/OUT, placement/duration, track fades and transition
+durations; gain uses a native slider with an exact `NumberField`, and looping is explicit
+per clip. A music track's **Ripple** plays its clips one after another from the first
+one's start, re-sequencing later clips after a move, trim, removal or transition change;
+without it each clip keeps its start. Music is never retimed or rippled with video tracks.
+A Crossfade overlaps two clips by its duration with two linear fades; a Fade through
+silence fades the first clip out, then the second in. Transitions or fades that do not
+fit are refused, never shortened. All music clips sum linearly after their
 gain/fades and clamp once after the complete mix; one AudioContext/worklet/output
 clock drives synchronisation, never per-track clocks or queues.
 See [the multiple-music contract](design/MULTIPLE_MUSIC.md).

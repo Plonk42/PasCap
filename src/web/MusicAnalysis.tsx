@@ -194,7 +194,7 @@ export function MusicAnalysisStatus({ asset, music, bookmarks, disabled, onEdit 
         <Popover label="Beats → bookmarks" className="music-beat-bookmarks" trigger={trigger}>
           {(close) => (
             <div className="music-beat-choices">
-              <p>Bookmark this music track&apos;s beats, so every snapping gesture lands on the beat.</p>
+              <p>Bookmark this music clip&apos;s beats, so every snapping gesture lands on the beat.</p>
               {(['beats', 'downbeats'] as const satisfies readonly BeatChoice[]).map((choice) => {
                 const plan = beatBookmarks(bookmarks, music, phase.analysis.beats, choice);
                 const label = choice === 'beats' ? 'All beats' : 'Downbeats only';

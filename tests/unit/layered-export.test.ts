@@ -51,7 +51,7 @@ import { NEUTRAL_SPATIAL_POSE } from '../../src/shared/spatial.js';
 import { compileRetiming, type Retiming } from '../../src/shared/speed.js';
 import { calculateLayout, type PreviewLayer } from '../../src/shared/timeline.js';
 import { framesToSeconds, PROJECT_FPS } from '../../src/shared/timing.js';
-import { EARLIER_SCHEMA_VERSIONS, unsupportedProject } from './project-fixtures.js';
+import { EARLIER_SCHEMA_VERSIONS, SUPPORTED_VERSIONS, unsupportedProject } from './project-fixtures.js';
 
 const temporary: string[] = [];
 const queues: JobQueue[] = [];
@@ -315,7 +315,7 @@ describe('current-schema production dispatch and read-only validation', () => {
         title,
         error: expect.stringContaining(`schema version ${version}`),
       });
-      await expect(store.load(id)).rejects.toThrow(`requires version ${PROJECT_SCHEMA_VERSION}`);
+      await expect(store.load(id)).rejects.toThrow(`requires ${SUPPORTED_VERSIONS}`);
       await expect(store.rename(id, 'No migration', 0)).rejects.toThrow('existing file was not changed');
       await expect(store.save(createProject(id, 'No migration'), 0)).rejects.toThrow('existing file was not changed');
       expect(await readFile(filename, 'utf8')).toBe(bytes);

@@ -281,7 +281,7 @@ describe('music beats at project frames', () => {
     expect(beatBookmarks([0, 115, 140], music, beats, 'downbeats')).toEqual({ frames: [165], reason: '' });
     expect(beatBookmarks([115, 140, 165], music, beats, 'downbeats')).toEqual({
       frames: [],
-      reason: 'Every downbeat of this music track is already a bookmark.',
+      reason: 'Every downbeat of this music clip is already a bookmark.',
     });
     const full = Array.from({ length: MAX_BOOKMARKS - 4 }, (_, index) => 1_000 + index);
     expect(beatBookmarks(full, music, beats, 'beats')).toEqual({
@@ -292,7 +292,7 @@ describe('music beats at project frames', () => {
     const unaccented = beats.map((beat) => ({ ...beat, downbeat: false }));
     expect(beatBookmarks([], music, unaccented, 'downbeats')).toEqual({
       frames: [],
-      reason: "No downbeats fall within this music track's placement.",
+      reason: "No downbeats fall within this music clip's placement.",
     });
   });
 });

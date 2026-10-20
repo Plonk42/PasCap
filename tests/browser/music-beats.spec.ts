@@ -12,6 +12,7 @@ import {
 import { musicBeatFrames, type MusicAnalysis } from '../../src/shared/music-analysis.js';
 import { MUSIC_SAMPLES_PER_FRAME } from '../../src/shared/music-format.js';
 import { calculateLayout } from '../../src/shared/timeline.js';
+import { singleClipLane } from '../music-lanes.js';
 import { inspectorTab } from './editor-helpers.js';
 import { memoryProjects, type MemoryProjects } from './memory-projects.js';
 
@@ -116,7 +117,7 @@ async function current(page: Page): Promise<ProjectDocument> {
 }
 
 async function open(page: Page, bookmarks: number[] = []): Promise<ProjectDocument> {
-  const document = projectSchema.parse({ ...base, music: [{ ...TRACK, mediaId: song.id }], bookmarks });
+  const document = projectSchema.parse({ ...base, music: [singleClipLane({ ...TRACK, mediaId: song.id })], bookmarks });
   memory.seed(document);
   await page.goto(`/?project=${document.id}`);
   await expect
@@ -172,7 +173,7 @@ test('beat ticks follow the music track placement and loops, and Beats → bookm
   await openBeats(page);
   const downbeats = page.getByRole('button', { name: 'Downbeats only · 0', exact: true });
   await expect(downbeats).toHaveAttribute('aria-disabled', 'true');
-  await expect(downbeats).toHaveAccessibleDescription('Every downbeat of this music track is already a bookmark.');
+  await expect(downbeats).toHaveAccessibleDescription('Every downbeat of this music clip is already a bookmark.');
   const beats = expected(false).length - expected(true).length;
   await page.getByRole('button', { name: `All beats · ${beats}`, exact: true }).click();
   expect((await current(page)).bookmarks).toEqual(expected(false));

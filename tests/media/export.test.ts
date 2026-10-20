@@ -37,6 +37,8 @@ import { forEachSerial } from '../../src/shared/serial.js';
 import { compileRetiming, type SpeedSettings } from '../../src/shared/speed.js';
 import { calculateLayout, sampleTimeline } from '../../src/shared/timeline.js';
 import { framesToSeconds } from '../../src/shared/timing.js';
+import { arrangeMusicLane, musicTracks, setMusicTransition } from '../../src/shared/music-lanes.js';
+import { singleClipLane } from '../music-lanes.js';
 import { observedJobBytes } from './scratch-observation.js';
 
 const enabled = process.env['PASCAP_MEDIA_TESTS'] === '1';
@@ -698,7 +700,7 @@ describe.skipIf(!enabled)('production native export · opt-in disposable media o
   it('places, loops ONLY the selected music range, applies linear fades/gain and pads AAC to the complete video', async () => {
     const project = document(36);
     project.music = [
-      {
+      singleClipLane({
         id: 'music-instance',
         mediaId: audio.id,
         sourceIn: 6,
@@ -709,13 +711,13 @@ describe.skipIf(!enabled)('production native export · opt-in disposable media o
         fadeIn: 6,
         fadeOut: 6,
         loop: true,
-      },
+      }),
     ];
     const result = await completed(project);
     const samples = await rawAudio(config, result.filename);
     expect(result.receipt.verification.audio).toMatchObject({ codec: 'aac', sampleRate: 48000, channels: 2 });
     expect(result.receipt.verification.audio!.durationErrorSeconds).toBeLessThanOrEqual(framesToSeconds(1));
-    const track = project.music[0]!;
+    const track = musicTracks(project.music)[0]!;
     const start = exportAudioSample(track.start);
     const sourceIn = exportAudioSample(track.sourceIn);
     const selected = exportAudioSample(track.sourceOut) - sourceIn;
@@ -756,7 +758,7 @@ describe.skipIf(!enabled)('production native export · opt-in disposable media o
     for (const start of [2, 20]) {
       const project = document(12);
       project.music = [
-        {
+        singleClipLane({
           id: 'music-instance',
           mediaId: audio.id,
           sourceIn: 6,
@@ -767,7 +769,7 @@ describe.skipIf(!enabled)('production native export · opt-in disposable media o
           fadeIn: 0,
           fadeOut: 0,
           loop: false,
-        },
+        }),
       ];
       const result = await completed(project);
       const samples = await rawAudio(config, result.filename);
@@ -814,12 +816,12 @@ describe.skipIf(!enabled)('production native export · opt-in disposable media o
         loop: true,
       };
       project.music = [
-        long,
-        { ...long, id: 'shorter-last', start: 1, duration: 1, fadeOut: 1, gainDb: -12, loop: false },
+        singleClipLane(long),
+        singleClipLane({ ...long, id: 'shorter-last', start: 1, duration: 1, fadeOut: 1, gainDb: -12, loop: false }),
       ];
       const captured = structuredClone(project);
-      const capturedLong = captured.music[0]!;
-      const plans = captured.music.map((track) => planExportMusic(track, projectFrames));
+      const capturedLong = musicTracks(captured.music)[0]!;
+      const plans = musicTracks(captured.music).map((track) => planExportMusic(track, projectFrames));
       const originalRun = nativeProcesses.runProcess;
       const accumulators: number[] = [];
       const processSpy = vi
@@ -850,7 +852,7 @@ describe.skipIf(!enabled)('production native export · opt-in disposable media o
         jobId = job.id;
         expect(job.state).toBe('queued');
         project.title = 'Later editor changes';
-        project.music[0]!.duration += 5;
+        project.music[0]!.clips[0]!.duration += 5;
         project.music[1]!.gainDb = -30;
         project.clips[0]!.sourceOut++;
         release();
@@ -954,12 +956,14 @@ describe.skipIf(!enabled)('production native export · opt-in disposable media o
       loop: true,
     };
     project.music = [
-      ...Array.from({ length: 6 }, (_, index) => ({
-        ...base,
-        id: `opposing-${index}`,
-        mediaId: index < 3 ? positive.id : negative.id,
-      })),
-      {
+      ...Array.from({ length: 6 }, (_, index) =>
+        singleClipLane({
+          ...base,
+          id: `opposing-${index}`,
+          mediaId: index < 3 ? positive.id : negative.id,
+        }),
+      ),
+      singleClipLane({
         ...base,
         id: 'retained-tone',
         mediaId: audio.id,
@@ -970,8 +974,8 @@ describe.skipIf(!enabled)('production native export · opt-in disposable media o
         gainDb: -6,
         fadeIn: 6,
         fadeOut: 6,
-      },
-      {
+      }),
+      singleClipLane({
         ...base,
         id: 'late-conclusion',
         mediaId: audio.id,
@@ -982,9 +986,10 @@ describe.skipIf(!enabled)('production native export · opt-in disposable media o
         gainDb: -6,
         fadeOut: 2,
         loop: false,
-      },
+      }),
     ];
     const captured = structuredClone(project.music);
+    const capturedTracks = musicTracks(captured);
     const updates: number[] = [];
     const submit = fixture.jobs.submit.bind(fixture.jobs);
     const progressSpy = vi.spyOn(fixture.jobs, 'submit').mockImplementation((kind, label, task, settled = null) =>
@@ -1056,7 +1061,7 @@ describe.skipIf(!enabled)('production native export · opt-in disposable media o
               assertPCM(
                 await stereoPCM(config, path.join(options.cwd!, output)),
                 expectedMusicPCM(
-                  captured.slice(0, index + 1).map((track) => planExportMusic(track, 46)),
+                  capturedTracks.slice(0, index + 1).map((track) => planExportMusic(track, 46)),
                   sourcePCM,
                 ),
                 `eight-instance accumulator ${index}`,
@@ -1094,7 +1099,7 @@ describe.skipIf(!enabled)('production native export · opt-in disposable media o
     expect(project.music).toEqual(captured);
     expect(result.receipt.snapshot.music).toEqual(captured);
     expect(result.receipt.musicSources.map((source) => source.id)).toEqual([positive.id, negative.id, audio.id]);
-    expect(result.receipt.settings.audio.map((plan) => plan.id)).toEqual(captured.map((track) => track.id));
+    expect(result.receipt.settings.audio.map((plan) => plan.id)).toEqual(capturedTracks.map((track) => track.id));
     expect(result.receipt.settings.resources).toMatchObject({
       maxMusicTracks: 8,
       maxOriginalAudioDecoders: 1,
@@ -1118,7 +1123,7 @@ describe.skipIf(!enabled)('production native export · opt-in disposable media o
     expect(accumulated[73673], 'non-looping source OUT pads the final unmatched sample').toBe(0);
     for (let sample = 0; sample < accumulated.length; sample++) {
       const frame = sample / ((48000 * 1001) / 30000);
-      const expected = captured.slice(6).reduce((sum, track) => {
+      const expected = capturedTracks.slice(6).reduce((sum, track) => {
         const selectedStart = exportAudioSample(track.sourceIn);
         const selectedLength = exportAudioSample(track.sourceOut) - selectedStart;
         const offset = sample - exportAudioSample(track.start);
@@ -1145,23 +1150,25 @@ describe.skipIf(!enabled)('production native export · opt-in disposable media o
 
   it('clamps only the completed native sum before AAC, including positive and negative stereo overflow', async () => {
     const project = document(12);
-    project.music = Array.from({ length: 2 }, (_, index) => ({
-      id: `overflow-${index}`,
-      mediaId: mixSources[1]!.id,
-      sourceIn: 0,
-      sourceOut: 12,
-      start: 0,
-      duration: 12,
-      gainDb: 12,
-      fadeIn: 0,
-      fadeOut: 0,
-      loop: false,
-    }));
+    project.music = Array.from({ length: 2 }, (_, index) =>
+      singleClipLane({
+        id: `overflow-${index}`,
+        mediaId: mixSources[1]!.id,
+        sourceIn: 0,
+        sourceOut: 12,
+        start: 0,
+        duration: 12,
+        gainDb: 12,
+        fadeIn: 0,
+        fadeOut: 0,
+        loop: false,
+      }),
+    );
     const originalRun = nativeProcesses.runProcess;
     let peak = 0;
     let clamped: Float32Array | null = null;
     const expectedPCM = expectedMusicPCM(
-      project.music.map((track) => planExportMusic(track, 12)),
+      musicTracks(project.music).map((track) => planExportMusic(track, 12)),
       sourcePCM,
     );
     const intermediateIndices: number[] = [];
@@ -1208,7 +1215,9 @@ describe.skipIf(!enabled)('production native export · opt-in disposable media o
           assertPCM(
             await stereoPCM(config, path.join(options.cwd!, args.at(-1)!)),
             expectedMusicPCM(
-              project.music.slice(0, index + 1).map((track) => planExportMusic(track, 12)),
+              musicTracks(project.music)
+                .slice(0, index + 1)
+                .map((track) => planExportMusic(track, 12)),
               sourcePCM,
             ),
             `overflow accumulator ${index}`,
@@ -1244,22 +1253,88 @@ describe.skipIf(!enabled)('production native export · opt-in disposable media o
       ).toBeLessThan(0.004);
   }, 120_000);
 
+  it('mixes the clips of one music track and their crossfade as overlapping linear fades with the track gain', async () => {
+    const project = document(24);
+    const tone = mixSources[1]!;
+    const empty = {
+      id: 'crossfaded',
+      gainDb: -6,
+      ripple: true,
+      openingFade: 2,
+      closingFade: 3,
+      clips: [],
+      transitions: [],
+    };
+    const lane = setMusicTransition(
+      arrangeMusicLane(empty, [
+        { id: 'first', mediaId: tone.id, sourceIn: 0, sourceOut: 12, start: 0, duration: 12, loop: false },
+        { id: 'second', mediaId: audio.id, sourceIn: 6, sourceOut: 18, start: 12, duration: 12, loop: false },
+      ]),
+      0,
+      'crossfade',
+      4,
+    );
+    project.music = [lane];
+    const plans = musicTracks(project.music).map((track) => planExportMusic(track, 24));
+    const originalRun = nativeProcesses.runProcess;
+    const accumulators: number[] = [];
+    const processSpy = vi
+      .spyOn(nativeProcesses, 'runProcess')
+      .mockImplementation(async (binary, args, options = {}) => {
+        const result = await originalRun(binary, args, options);
+        const match = /^music-accumulator-(\d+)\.wav$/.exec(args.at(-1)!);
+        if (binary === config.ffmpeg && match) {
+          const index = Number(match[1]);
+          assertPCM(
+            await stereoPCM(config, path.join(options.cwd!, args.at(-1)!)),
+            expectedMusicPCM(plans.slice(0, index + 1), sourcePCM),
+            `crossfade accumulator ${index}`,
+          );
+          accumulators.push(index);
+        }
+        return result;
+      });
+    let result: Awaited<ReturnType<typeof completed>>;
+    try {
+      result = await completed(project);
+    } finally {
+      processSpy.mockRestore();
+    }
+    expect(accumulators).toEqual([0, 1]);
+    expect(lane.clips.map((clip) => clip.start)).toEqual([0, 8]);
+    expect(
+      result.receipt.settings.audio.map((plan) => [
+        plan.id,
+        plan.startSamples,
+        plan.fadeInSamples,
+        plan.fadeOutSamples,
+      ]),
+    ).toEqual([
+      ['first', 0, exportAudioSample(2), exportAudioSample(4)],
+      ['second', exportAudioSample(8), exportAudioSample(4), exportAudioSample(3)],
+    ]);
+    expect(result.receipt.settings.audio.every((plan) => plan.gain === 10 ** (-6 / 20))).toBe(true);
+    expect(result.receipt.snapshot.music).toEqual([lane]);
+  }, 120_000);
+
   it('fails a missing second original and cancels its active decode without changing originals, saved edits or successful outputs', async () => {
     const positive = mixSources[1]!;
     const negative = mixSources[2]!;
     const project = document(12);
-    project.music = [positive, negative].map((source, index) => ({
-      id: `cancel-${index}`,
-      mediaId: source.id,
-      sourceIn: 0,
-      sourceOut: 12,
-      start: 0,
-      duration: 12,
-      gainDb: 0,
-      fadeIn: 0,
-      fadeOut: 0,
-      loop: false,
-    }));
+    project.music = [positive, negative].map((source, index) =>
+      singleClipLane({
+        id: `cancel-${index}`,
+        mediaId: source.id,
+        sourceIn: 0,
+        sourceOut: 12,
+        start: 0,
+        duration: 12,
+        gainDb: 0,
+        fadeIn: 0,
+        fadeOut: 0,
+        loop: false,
+      }),
+    );
     const successful = await readFile(path.join(successfulDirectory, 'export.mp4'));
     const failed = startExport(project, 'draft720', fixture.library, (id) =>
       id === positive.id ? positive : { ...negative, sourcePath: path.join(directory, 'missing-second.wav') },
@@ -1364,7 +1439,7 @@ describe.skipIf(!enabled)('production native export · opt-in disposable media o
       {
         ...document(3),
         music: [
-          {
+          singleClipLane({
             id: 'invalid-music-instance',
             mediaId: audio.id,
             sourceIn: 0,
@@ -1375,7 +1450,7 @@ describe.skipIf(!enabled)('production native export · opt-in disposable media o
             fadeIn: 0,
             fadeOut: 0,
             loop: false,
-          },
+          }),
         ],
       },
       'draft720',

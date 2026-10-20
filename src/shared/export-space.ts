@@ -9,6 +9,7 @@ import {
   type ExportProfile,
 } from './export.js';
 import type { ProjectDocument } from './model.js';
+import { musicTracks } from './music-lanes.js';
 import { calculateLayout } from './timeline.js';
 
 /** Minimum headroom to START a job, not a bound on its duration-dependent disk use. */
@@ -61,7 +62,7 @@ export function estimateExportSpace(document: ProjectDocument, profile: ExportPr
     : 0;
   const losslessBytes = pixels * (clipFrames * 4 + timelineFrames * 8);
   const encodedBytes = pixels * layout.duration * 2;
-  const music = document.music.map((track) => planExportMusic(track, layout.duration));
+  const music = musicTracks(document.music).map((track) => planExportMusic(track, layout.duration));
   const selectedPcmBytes = Math.max(
     0,
     ...music.map((track) => (track.activeSamples > 0 ? (track.sourceOutSamples - track.sourceInSamples) * 4 : 0)),

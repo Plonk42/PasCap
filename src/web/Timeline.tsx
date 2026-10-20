@@ -15,7 +15,14 @@ import { applyCommand, type EditCommand } from '../shared/commands.js';
 import { KEYFRAME_SETTINGS, keySettings } from '../shared/keyframes.js';
 import { resolveMediaSelection, type MediaSelections } from '../shared/media-selection.js';
 import type { MediaAsset } from '../shared/media.js';
-import { createClip, createLayer, type ProjectDocument, type VideoClip } from '../shared/model.js';
+import {
+  createClip,
+  createLayer,
+  type MusicTransition,
+  type ProjectDocument,
+  type VideoClip,
+} from '../shared/model.js';
+import { insertMusicClip, musicClips, musicTracks } from '../shared/music-lanes.js';
 import type { TimelineRange } from '../shared/rush-editing.js';
 import { snapFrame, snapPoints } from '../shared/snap.js';
 import { trimOnTimeline, type TrimEdge } from '../shared/source-range.js';
@@ -50,7 +57,7 @@ import { nextLayerName } from './move-to-track.js';
 import './editor-panels.css';
 import './layers.css';
 import { Layers } from './Layers.js';
-import { createMusicInstance, videoTimelineDuration } from './music-ui.js';
+import { createMusicClip, createMusicLane, musicEditError, musicLaneEdit, videoTimelineDuration } from './music-ui.js';
 import { MusicTimeline, type MusicTimelineGesture } from './MusicTimeline.js';
 import { RulerRange, RushEditBar, TimelineCutOverlay } from './RushEditBar.js';
 import { useRulerRange } from './ruler-range.js';
@@ -88,6 +95,8 @@ interface Props {
   onSelectLayer: (id: string) => void;
   selectedMusicId: string | null;
   onSelectMusic: (id: string) => void;
+  /** Opens the transition after this music clip in Audio. */
+  onMusicBoundary: (leftClipId: string) => void;
   selectedBoundaryId: string | null;
   frame: number;
   onSelect: (id: string) => void;
@@ -318,7 +327,7 @@ function timelineSurfaceClassName(error: string, draft: ProjectDocument | null, 
 function timelineMusicExtent(project: ProjectDocument, gesture: MusicTimelineGesture | null): number {
   return Math.max(
     0,
-    ...project.music.map((track) => track.start + track.duration),
+    ...musicClips((gesture?.document ?? project).music).map((clip) => clip.start + clip.duration),
     gesture ? gesture.start + gesture.duration : 0,
   );
 }
@@ -327,10 +336,18 @@ function timelineMusicHeight(project: ProjectDocument): number {
   return project.music.length ? project.music.length * MUSIC_LANE_HEIGHT : 55;
 }
 
-/** A ready music file dropped from Media becomes a new music track starting at the drop frame. */
+/**
+ * A ready music file dropped on a music track becomes a clip of that track at the drop frame (a Ripple
+ * track takes it at the nearest place in its sequence); dropped on the empty music area it starts a track.
+ */
 function musicDrop(
   props: Readonly<
-    Pick<Props, 'project' | 'audioAssets' | 'onEdit'> & { leading: number; scale: number; disabled: boolean }
+    Pick<Props, 'project' | 'audioAssets' | 'onEdit' | 'onError'> & {
+      leading: number;
+      scale: number;
+      disabled: boolean;
+      laneId: string | null;
+    }
   >,
 ) {
   const accepts = (event: DragEvent<HTMLDivElement>): boolean =>
@@ -348,11 +365,32 @@ function musicDrop(
       if (asset?.status !== 'ready') return;
       const bounds = event.currentTarget.getBoundingClientRect();
       const start = Math.max(0, Math.round((event.clientX - bounds.left - props.leading) / props.scale));
-      const music = { ...createMusicInstance(crypto.randomUUID(), asset, videoTimelineDuration(props.project)), start };
-      props.onEdit({ type: 'music', music: [...props.project.music, music] });
+      try {
+        if (props.laneId === null) {
+          const lane = createMusicLane(
+            crypto.randomUUID(),
+            crypto.randomUUID(),
+            asset,
+            videoTimelineDuration(props.project),
+          );
+          const clip = { ...lane.clips[0]!, start };
+          props.onEdit({ type: 'music', music: [...props.project.music, { ...lane, clips: [clip] }] });
+          return;
+        }
+        const clip = createMusicClip(crypto.randomUUID(), asset, start);
+        props.onEdit(musicLaneEdit(props.project, props.laneId, (lane) => insertMusicClip(lane, clip)));
+      } catch (cause) {
+        props.onError(musicEditError(cause, 'This music cannot be added here.'));
+      }
     },
   };
 }
+
+const MUSIC_TRANSITION_LABELS: Record<MusicTransition['type'], string> = {
+  cut: 'Cut',
+  crossfade: 'Crossfade',
+  'fade-through-silence': 'Fade',
+};
 
 function TimelineMusicLanes(
   props: Readonly<
@@ -362,12 +400,15 @@ function TimelineMusicLanes(
       | 'audioAssets'
       | 'selectedMusicId'
       | 'onSelectMusic'
+      | 'onMusicBoundary'
       | 'frame'
       | 'onPause'
       | 'onEdit'
       | 'onPreview'
       | 'onError'
     > & {
+      /** The document drawn: a music gesture's draft, else the project. */
+      display: ProjectDocument;
       top: number;
       leading: number;
       scale: number;
@@ -379,42 +420,72 @@ function TimelineMusicLanes(
     }
   >,
 ) {
-  if (!props.project.music.length)
+  if (!props.display.music.length)
     return (
-      <div className="music-lane-wrapper" style={{ top: props.top }} {...musicDrop(props)}>
+      <div className="music-lane-wrapper" style={{ top: props.top }} {...musicDrop({ ...props, laneId: null })}>
         <div className="music-track-empty">Drop music here or use Audio → Add music track</div>
       </div>
     );
-  return props.project.music.map((music, index) => (
-    <div
-      key={music.id}
-      className={`music-lane-wrapper music-instance-lane ${music.id === props.selectedMusicId ? 'selected' : ''}`}
-      data-music-lane={music.id}
-      style={{ top: props.top + index * MUSIC_LANE_HEIGHT }}
-      {...musicDrop(props)}
-    >
-      <MusicTimeline
-        project={props.project}
-        music={music}
-        index={index}
-        selected={music.id === props.selectedMusicId}
-        asset={props.audioAssets.find((asset) => asset.id === music.mediaId)}
-        leading={props.leading}
-        scale={props.scale}
-        width={props.width}
-        viewport={props.viewport}
-        frame={props.frame}
-        snapping={props.snapping}
-        disabled={props.disabled}
-        onSelect={props.onSelectMusic}
-        onPause={props.onPause}
-        onEdit={props.onEdit}
-        onPreview={props.onPreview}
-        onGesture={props.onGesture}
-        onError={props.onError}
-      />
-    </div>
-  ));
+  return props.display.music.map((lane, index) => {
+    const sources = musicTracks([lane]);
+    return (
+      <div
+        key={lane.id}
+        className={`music-lane-wrapper music-instance-lane ${lane.clips.some((clip) => clip.id === props.selectedMusicId) ? 'selected' : ''}`}
+        data-music-lane={lane.id}
+        style={{ top: props.top + index * MUSIC_LANE_HEIGHT }}
+        {...musicDrop({ ...props, laneId: lane.id })}
+      >
+        {sources.map((music, clipIndex) => (
+          <MusicTimeline
+            key={music.id}
+            project={props.project}
+            music={music}
+            index={index}
+            clipIndex={clipIndex}
+            clipCount={lane.clips.length}
+            selected={music.id === props.selectedMusicId}
+            asset={props.audioAssets.find((asset) => asset.id === music.mediaId)}
+            leading={props.leading}
+            scale={props.scale}
+            width={props.width}
+            viewport={props.viewport}
+            frame={props.frame}
+            snapping={props.snapping}
+            disabled={props.disabled}
+            onSelect={props.onSelectMusic}
+            onPause={props.onPause}
+            onEdit={props.onEdit}
+            onPreview={props.onPreview}
+            onGesture={props.onGesture}
+            onError={props.onError}
+          />
+        ))}
+        {lane.transitions.map((transition, position) => {
+          const left = lane.clips[position]!;
+          const end = left.start + left.duration;
+          // A crossfade's button sits in the middle of its overlap, the others on the boundary.
+          const at = transition.type === 'crossfade' ? end - transition.duration / 2 : end;
+          const label = MUSIC_TRANSITION_LABELS[transition.type];
+          return (
+            <button
+              key={`${transition.leftId}-${transition.rightId}`}
+              type="button"
+              className="boundary-button music-boundary"
+              data-music-transition={transition.leftId}
+              disabled={props.disabled}
+              style={{ left: props.leading + at * props.scale }}
+              aria-label={`Transition after clip ${position + 1} on music track ${index + 1}`}
+              title={`${label} on music track ${index + 1} · edit this boundary in Audio`}
+              onClick={() => props.onMusicBoundary(transition.leftId)}
+            >
+              {label}
+            </button>
+          );
+        })}
+      </div>
+    );
+  });
 }
 
 /** What the Bookmark button does: bookmark the selected range's ends, else toggle one at the playhead. */
@@ -555,6 +626,7 @@ export function Timeline(props: Readonly<Props>) {
     onSelectLayer,
     selectedMusicId,
     onSelectMusic,
+    onMusicBoundary,
     selectedBoundaryId,
     frame,
     onSelect,
@@ -855,7 +927,7 @@ export function Timeline(props: Readonly<Props>) {
   }, [selectedClipId, props.revealRequest, project.id]);
   useLayoutEffect(() => {
     const element = scroll.current;
-    const index = project.music.findIndex((track) => track.id === selectedMusicId);
+    const index = project.music.findIndex((lane) => lane.clips.some((clip) => clip.id === selectedMusicId));
     if (
       !element ||
       revealTarget.current !== 'music' ||
@@ -870,7 +942,7 @@ export function Timeline(props: Readonly<Props>) {
     if (top < element.scrollTop + TIMELINE_RULER_HEIGHT) element.scrollTop = Math.max(0, top - TIMELINE_RULER_HEIGHT);
     else if (top + MUSIC_LANE_HEIGHT > element.scrollTop + element.clientHeight)
       element.scrollTop = Math.max(0, top + MUSIC_LANE_HEIGHT - element.clientHeight);
-    const music = project.music[index]!;
+    const music = project.music[index]!.clips.find((clip) => clip.id === selectedMusicId)!;
     const left = leading + music.start * scale;
     if (left < element.scrollLeft + 20) element.scrollLeft = Math.max(0, left - 32);
     else if (left > element.scrollLeft + element.clientWidth - 60)
@@ -1789,9 +1861,11 @@ export function Timeline(props: Readonly<Props>) {
             )}
             <TimelineMusicLanes
               project={project}
+              display={musicGesture?.document ?? project}
               audioAssets={audioAssets}
               selectedMusicId={selectedMusicId}
               onSelectMusic={onSelectMusic}
+              onMusicBoundary={onMusicBoundary}
               top={musicTop}
               leading={leading}
               scale={scale}

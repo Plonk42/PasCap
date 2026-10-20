@@ -6,6 +6,7 @@ import { createClip, createProject, type ProjectDocument } from '../../src/share
 import { memoryProjects, type MemoryProjects } from './memory-projects.js';
 import { installMusicEvidence, observeRealtimeHeadroom } from './music-evidence.js';
 import { installVideoFrameGate } from './video-frame-gate.js';
+import { singleClipLane } from '../music-lanes.js';
 
 interface RecoveryFixture {
   memory: MemoryProjects;
@@ -67,7 +68,7 @@ async function openRecoveryProject(
     project.media.audioIds = [audio!.id];
     // Music covers the entire playback, without a source wrap or placement boundary.
     project.music = [
-      {
+      singleClipLane({
         id: 'recovery-music',
         mediaId: audio!.id,
         sourceIn: 0,
@@ -78,7 +79,7 @@ async function openRecoveryProject(
         fadeIn: 0,
         fadeOut: 0,
         loop: false,
-      },
+      }),
     ];
   }
   const memory = await memoryProjects(page, project);

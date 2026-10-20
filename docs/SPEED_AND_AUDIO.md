@@ -214,7 +214,7 @@ conflicts remain inline errors.
 
 Shared video track keyframes contain only Opacity and Colour settings, and track
 Transform keyframes only pose settings; neither affects speed or duration. Storing/moving one beyond duration does not extend the
-sequence; actual clip retiming or a music track's OUT can change project duration.
+sequence; actual clip retiming or a music clip's OUT can change project duration.
 Details: [LAYERS_AND_KEYFRAMES.md](LAYERS_AND_KEYFRAMES.md).
 
 ### Precise clip-curve editor
@@ -297,12 +297,14 @@ frame for main capture.
 
 ## Music
 
-Projects require `music: MusicTrack[]`, with **0–8 independent music tracks**
-and unique required track `id` values; `[]` means no music. Each music track
-requires `mediaId`, `sourceIn`, `sourceOut`, `start`, `duration`, `gainDb`, `fadeIn`,
-`fadeOut` and `loop`. Several music tracks can use the same registered recording
-without sharing edits. A missing array/ID, null/singular music, unknown fields or
-duplicate IDs are errors, never defaulted or migrated. Detailed bounds and pending
+Projects require `music`, an array of **0–8 independent music tracks**; `[]` means no
+music. Like a video track, a music track owns its gain, Ripple, opening/closing fades and
+**1–8 clips** joined by transitions (Cut, Crossfade or Fade through silence). Each clip
+requires `mediaId`, `sourceIn`, `sourceOut`, `start`, `duration` and `loop`; track and clip
+IDs are unique together. Several clips can use the same registered recording without
+sharing edits. A missing array/ID, null/singular music, unknown fields or duplicate IDs
+are errors, never defaulted. Projects saved before music tracks held clips open with each
+music track as a track of one clip that plays the same. Detailed bounds and pending
 acceptance are in [MULTIPLE_MUSIC.md](design/MULTIPLE_MUSIC.md).
 
 Music is imported like video, through the shared **Import media** dialog: **Import** in
@@ -336,28 +338,41 @@ Embedded cover artwork explicitly marked as an attached picture is accepted and
 ignored during audio-only playback preparation; video soundtracks remain rejected.
 Original files are referenced in place and are never stripped or rewritten.
 
-**Music track** selects a track. **Add music track** is the single creation
-path: it lists this project's ready music files and creates an independent
-music track using the chosen one, up to eight. Dragging a ready file from Media's
-**Music** list onto the music lane does the same at the drop frame. **Recording**
-only changes the selected music track's source. The trash beside **Music track**
-(**Delete selected music track**) removes only that music track. Import never implicitly
-places music. Selection is editor-only; edits, recording changes and removal leave
-other music tracks, video tracks, track keyframes and bin membership untouched. Each music track
-retains independent drafts; selection never applies one music track's text to another.
-Each accepted add/edit/remove or completed gesture is one Undo step; invalid or
-cancelled gestures restore atomically without a committed edit/history/save.
+**Music track** selects a track. **Add music track** lists this project's ready music
+files and creates an independent music track holding one clip of the chosen one, up to
+eight. **+ Clip** (**Add music clip**) appends a clip of a ready file after the selected
+track's last clip, up to eight; **Clip** selects one, and **Delete selected music clip**
+removes it (a track keeps at least one clip). Dragging a ready file from Media's
+**Music** list onto a music track adds a clip there at the drop frame, or starts a track
+when dropped on the empty music area. **Recording** only changes the selected clip's
+source. The trash beside **Music track** (**Delete selected music track**) removes that
+track and its clips. Import never implicitly places music. Selection is editor-only;
+edits, recording changes and removal leave other music tracks, video tracks, track
+keyframes and bin membership untouched. Each music track and clip retains independent
+drafts; selection never applies one's text to another. Each accepted add/edit/remove or
+completed gesture is one Undo step; invalid or cancelled gestures restore atomically
+without a committed edit/history/save.
 
-Every music track has explicit source IN/OUT, timeline start/duration, gain dB,
-fade durations and loop flag. A non-looping duration cannot exceed its selected
+Every clip has explicit source IN/OUT, timeline start/duration and loop flag; its track
+has gain dB, Ripple and fade in/out. A non-looping duration cannot exceed its selected
 source range; looping repeats **only that range**. Source OUT must fit the registered
-original and exceed IN; fade IN + OUT must fit duration. Timeline OUT must fit
-0–2,147,483,647; overflow rejects the edit rather than shortening it.
+original and exceed IN; the fades a clip receives must fit its duration. Timeline OUT
+must fit 0–2,147,483,647; overflow rejects the edit rather than shortening it.
 
-Project duration is **max(all retimed video clip OUTs, every music start + duration)**,
+A track's **Transitions** list one boundary per pair of adjacent clips, also reached
+from the boundary button on the timeline: **Cut** (the next clip starts at or after the
+previous OUT; a gap is allowed without Ripple), **Crossfade** (the clips overlap by its
+duration, one fading out while the other fades in, both linearly) or **Fade through
+silence** (the clips touch; the first fades out, then the second fades in). With
+**Ripple** on, clips play one after another from the first clip's start and later clips'
+starts are not editable; with it off each clip keeps its start, and choosing or
+lengthening a crossfade or fade through silence moves only the clip after it. A
+transition that does not fit is refused, never shortened.
+
+Project duration is **max(all retimed video clip OUTs, every music clip start + duration)**,
 including hidden video placements. Music can extend it. Each video closing fade
 ends inside its last clip at that clip's OUT, then no active video means **opaque
-black**, never a held last image. Music continues and fades at each music track's
+black**, never a held last image. Music continues and fades at each music clip's
 own OUT. Music-only preview is naturally black; export requires at least one video
 clip. A music tail uses composited export through full project duration.
 
@@ -367,10 +382,11 @@ Source IN/OUT, timeline start, duration and fades retain exact native numeric fi
 with their existing units and timecode feedback, not arbitrary timing sliders.
 Loop stays a checkbox.
 
-Each music track's linear amplitude envelope is `10^(gainDb/20)` multiplied by
-`offset/fadeIn` within its opening fade and `(duration-offset)/fadeOut` within its
-closing fade. A zero fade is absent. Outside its placement the music track contributes
-silence. Sum all active sources linearly **after per-track gain/fades**, then
+Each music clip's linear amplitude envelope is its track's `10^(gainDb/20)` multiplied by
+`offset/fadeIn` within its fade in and `(duration-offset)/fadeOut` within its fade out:
+the track's fades on its first and last clips, a transition's fades between clips. A
+zero fade is absent. Outside its placement the clip contributes
+silence. Sum all active sources linearly **after per-clip gain/fades**, then
 hard-clamp to **[−1, 1] once after the complete sum**, separately for each channel.
 Never clamp a source or intermediate sum: opposite-polarity contributions must
 remain able to cancel. No normalisation, ducking, effects or hidden gain compensation.
@@ -409,8 +425,8 @@ range/short-selection scratch, one **128 KiB conversion workspace** and one
 **128 KiB mixed-output workspace**. Receipts have one unacknowledged message and
 reads are serial/credit-controlled. There are no duration-sized silence buffers
 or per-track queues. Audio-buffer bounds do not scale with song/project duration
-or track count; music track metadata is bounded by eight entries.
-Missing active-source data is an explicit failure, never an omitted track or
+or track count; music metadata is bounded by eight tracks of eight clips.
+Missing active-source data is an explicit failure, never an omitted clip or
 successful silence. Pause/seek/edit/cancellation invalidate the whole mix epoch.
 Target-browser long-run A/V/audio behaviour still needs
 qualification; synthetic music regressions are not full Firefox qualification.
@@ -436,7 +452,7 @@ s16 PCM**, then serially places/loops/envelopes it and pairwise-sums with the pr
 outside −1–1: no intermediate clipping/normalisation. At most **two intermediate
 audio inputs**, **one native audio child per pass** and **three audio scratch files**
 (selected PCM + old/new accumulators) coexist; consumed inputs are deleted before
-the next music track. One final mixed input is hard-clamped once before **48 kHz AAC**.
+the next music clip. One final mixed input is hard-clamped once before **48 kHz AAC**.
 Audio silence/padding/sample count follows **full project duration**, including
 black music tails, not the last video OUT. Existing video buffer/child/LUT bounds
 remain unchanged.
@@ -472,13 +488,13 @@ before this job existed, or whose analysis is stale, failed or was cancelled, sh
 **Audio → Music**; otherwise that line shows the tempo, meter and beat count, or the job's
 progress. `GET /api/audio/<id>/analysis` returns `{ analysis, job }`;
 `POST /api/audio/<id>/analysis` queues the job. A cancelled or failed analysis leaves the
-PCM cache and playback untouched. Beats map to project frames through each music track's
+PCM cache and playback untouched. Beats map to project frames through each music clip's
 placement, source range and loops (`musicBeatFrames`). Validation uses synthetic click
 tracks, modulated noise, swing, a tempo change and loudness steps only; real songs are
 evaluated by the owner.
 
 Each analysed music clip shows its beats as ticks, and **Beats → bookmarks** under the
-analysis line adds a music track's beats or downbeats as project bookmarks in one Undo step
+analysis line adds the selected music clip's beats or downbeats as project bookmarks in one Undo step
 ([bookmarks](TIMELINE_EDITING.md#bookmarks)).
 
 ## Versioning
@@ -489,8 +505,9 @@ and static HSL/curves, clip constant or 1–256-keyframe custom-curve
 speed and a boolean `reverse`, required video track `transform: { base, keyframes }` with eight-value base and
 0–256 project-frame keyframes with required per-setting easing and `reset`, track
 keyframe arrays with all fifteen nullable value fields, placement and music
-source OUT. `music` is a required 0–8 array with unique required music track IDs and
-all per-track fields above; `[]` is the sole no-music representation, not null
+source OUT. `music` is a required 0–8 array of music tracks with unique required track
+and clip IDs, each with gain, Ripple, opening/closing fades, 1–8 clips and one transition
+per adjacent pair; `[]` is the sole no-music representation, not null
 or a compatibility default. Every video track also requires `ripple`, `transitions`, `openingFade` and
 `closingFade`, plus numeric `opacity` in 0–1; 1 is the new-track initial value,
 not a default for missing saved fields. Transitions/fades are track-local, with
@@ -517,8 +534,9 @@ Preview uses the current explicitly prepared PCM cache described above.
 
 Export receipts remain **version 1** with a strict current-schema snapshot, required
 `musicSources` captured unique-original array and `settings.audio` identified
-instance-plan array (`[]` for each without music). Plans preserve independent
-timing/gain/fades/loop; several may refer to the same captured original. The plan
+instance-plan array (`[]` for each without music), one plan per music clip. Plans preserve
+independent timing, the track's gain and the clip's effective fades (track fades at the
+ends, transition fades between clips) and loop; several may refer to the same captured original. The plan
 field `videoSamples` represents **full project duration**, including music tails.
 Invalid arrays/older snapshots are rejected and their receipt/finished MP4 remains
 untouched; no singular/null reader or automatic conversion is permitted.

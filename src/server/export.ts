@@ -23,6 +23,7 @@ import {
 } from '../shared/export.js';
 import { mediaAssetSchema, type MediaAsset, type MediaJob, type VideoMetadata } from '../shared/media.js';
 import type { MusicTrack, ProjectDocument } from '../shared/model.js';
+import { musicTracks } from '../shared/music-lanes.js';
 import { forEachSerial } from '../shared/serial.js';
 import { validateSourceRanges } from '../shared/source-range.js';
 import { framesToSeconds, PROJECT_FPS, sameRate } from '../shared/timing.js';
@@ -179,7 +180,7 @@ export async function preflightExport(
   resolveAudio?: AudioResolver,
 ): Promise<ExportPreflight> {
   const inputs = captureInputs(document, profile, library);
-  await forEachSerial(inputs.snapshot.music, async (music) => {
+  await forEachSerial(musicTracks(inputs.snapshot.music), async (music) => {
     validateExportAudio(music, await resolveRequiredAudio(music.mediaId, resolveAudio));
   });
   return readExportSpace(library.config.dataDir, inputs.snapshot, inputs.profile);
@@ -1003,14 +1004,15 @@ async function renderCapturedExport(
     const uniqueAssets = [...new Map(inputs.assets.map((asset) => [asset.id, asset])).values()];
     await checkSources(uniqueAssets, []);
     const audioById = new Map<string, AudioAsset>();
-    await forEachSerial(inputs.snapshot.music, async (track) => {
+    const tracks = musicTracks(inputs.snapshot.music);
+    await forEachSerial(tracks, async (track) => {
       checkCancelled(context);
       const asset = audioById.get(track.mediaId) ?? (await resolveRequiredAudio(track.mediaId, resolveAudio));
       audioById.set(track.mediaId, validateExportAudio(track, asset));
     });
     const musicSources = [...audioById.values()];
     await checkSources([], musicSources);
-    const music = inputs.snapshot.music.map((track) => planExportMusic(track, inputs.plan.duration));
+    const music = tracks.map((track) => planExportMusic(track, inputs.plan.duration));
     checkCancelled(context);
     const target = EXPORT_PROFILES[inputs.profile];
     const { chunks, retiming, layered } = await renderVideo(inputs, { library, directory: work, context, target });

@@ -22,6 +22,7 @@ import {
   submitExport,
 } from './editor-helpers.js';
 import { memoryProjects } from './memory-projects.js';
+import { singleClipLane } from '../music-lanes.js';
 
 test.beforeEach(async ({ page, request }) => {
   await expandedInspectorPreferences(page);
@@ -537,7 +538,7 @@ test('plays three simultaneous sources through row-wide rate/grade curves, a tra
   project = applyCommand(project, {
     type: 'music',
     music: [
-      {
+      singleClipLane({
         id: 'layers-music',
         mediaId: music.assets[0]!.id,
         sourceIn: 0,
@@ -548,7 +549,7 @@ test('plays three simultaneous sources through row-wide rate/grade curves, a tra
         fadeIn: 5,
         fadeOut: 5,
         loop: true,
-      },
+      }),
     ],
   });
   await page.evaluate((document) => window.pascapLab!.setDocument(document), project);

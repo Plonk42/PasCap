@@ -15,7 +15,7 @@ Removing a clip or music track does not remove the imported recording.
 
 Projects use **a strict current format**, with complete required video track colour and track
 Transform (base plus per-setting project-frame keyframes), a required `bookmarks` array of project frames (`[]` on new projects), a required `music` array of 0–8 independent
-music tracks and unique required IDs (`[]` without music), every video track's Ripple, transitions and
+music tracks of clips joined by transitions, with unique required IDs (`[]` without music), every video track's Ripple, transitions and
 opening/closing fades and required numeric `opacity` in 0–1 (1 on new tracks),
 with fifteen nullable animation channels, in control order: `opacity`,
 `temperature`, `tint`, `exposure`, `brightness`, `contrast`, `hue`, `saturation`,
@@ -721,31 +721,36 @@ Source-video audio is not used. Import music like video: **Import** in the Media
 panel, or **Import music** in **Audio → Music**, which opens the same dialog showing
 only music. Wait for preparation,
 then choose **Add music track** and pick the file, or drag it from **Media → Music**
-onto the music lane. Importing alone never places music. The trash on the file in
+onto the music lanes. Importing alone never places music. The trash on the file in
 **Media → Music** removes that recording (and, after confirmation, its music
-tracks) from this project. No soundtrack is
+clips) from this project. No soundtrack is
 supplied; use music you own or have permission to use and keep private paths private.
 
 If music was moved, **Relink** its **Original missing** file in Media → Music to keep
-its music tracks and cache (see above). Importing the new location instead creates a
+its music clips and cache (see above). Importing the new location instead creates a
 separate entry that prepares its own cache and leaves the old entry and projects
 untouched. Reimporting the same unchanged path reuses its entry.
 
-Use up to **eight independent music tracks**, including several from the same
-recording. Click a music clip on the timeline, or choose it in **Music track**, to
-select the track to edit; **Add music track** adds
-another from a ready music file, and **Recording** changes the selected music track's
-file. Its trash action **Delete selected
-music track** removes only that placement; Undo restores it. Selection creates no
-save/history entry, and editing/removing one music track leaves all others unchanged.
-Each music track has its own waveform placement/edge trims, source IN/OUT,
-start/duration, native **gain dB** slider with an exact numeric field, linear fades
-and **Loop selected source range**. Without looping, duration must fit its source
-range; looping repeats only it. Independent drafts never apply to another music track.
+Use up to **eight independent music tracks**, each holding up to **eight clips**, including
+several from the same recording. Click a music clip on the timeline, or choose its track in
+**Music track** and the clip in **Clip**, to edit it; **Add music track** adds a track
+from a ready music file, **+ Clip** adds a clip after the track's last one, and
+**Recording** changes the selected clip's file. Dragging a ready file onto a music track
+adds a clip there. The trash actions **Delete selected music clip** and **Delete selected
+music track** remove only that clip or track; Undo restores it. Selection creates no
+save/history entry, and editing/removing one clip or track leaves all others unchanged.
+A music track has its own native **gain dB** slider with an exact numeric field, fade in
+and out at its start and end, and **Ripple**, which plays its clips one after another
+like a video track. Each clip has its own waveform placement/edge trims, source IN/OUT,
+start/duration and **Loop selected source range**. Without looping, duration must fit its
+source range; looping repeats only it. Between clips, **Transitions** choose a **Cut**, a
+**Crossfade** (the clips overlap, one fading out while the other fades in) or a **Fade
+through silence**, with its length; the boundary button on the timeline opens it.
+Independent drafts never apply to another clip or track.
 Each accepted edit or completed gesture is one Undo step; invalid/cancelled edits
 are atomic and never silently clamp timing, save a draft or change other tracks.
 
-Overlapping music sums linearly after each music track's gain/fades, with **one hard
+Overlapping music sums linearly after each clip's gain/fades, with **one hard
 clamp to −1–1 after the complete sum**, not per track. There is no loudness
 normalisation, ducking, effect or video-speed retiming of music. Preview uses one
 AudioContext/worklet/output clock and one bounded mixed PCM queue, not full-file
@@ -757,9 +762,9 @@ job, and older caches/originals remain untouched. This cache needs about 11.52 M
 per minute; video-proxy/PCM cache formats are unchanged.
 
 **Music can extend the project.** Duration is the maximum of every retimed video
-clip OUT and every music start + duration. Video closing fades remain at their
+clip OUT and every music clip start + duration. Video closing fades remain at their
 clip OUTs, then the picture is black while music continues and fades at each
-music track's own end. Native export uses the composited path for this black tail and
+music clip's own end. Native export uses the composited path for this black tail and
 pads/trims mixed AAC to full project duration, never freezing the last image.
 Music-only preview is black; export requires at least one retained video clip.
 

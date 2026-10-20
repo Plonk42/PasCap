@@ -9,7 +9,7 @@ import { JobQueue } from '../../src/server/jobs.js';
 import { ProjectStore } from '../../src/server/storage.js';
 import { EMPTY_KEY_VALUES, layerKeyframe, uniformKeyframe } from '../../src/shared/keyframes.js';
 import { createClip, createLayer, createProject, PROJECT_SCHEMA_VERSION } from '../../src/shared/model.js';
-import { EARLIER_SCHEMA_VERSIONS, unsupportedProject } from '../unit/project-fixtures.js';
+import { EARLIER_SCHEMA_VERSIONS, SUPPORTED_VERSIONS, unsupportedProject } from '../unit/project-fixtures.js';
 
 const enabled = process.env['PASCAP_MEDIA_TESTS'] === '1';
 const roots: string[] = [];
@@ -62,7 +62,7 @@ describe.skipIf(!enabled)('current-schema storage/archive integration · generat
       await writeFile(filename, bytes);
       old.push({ id, title, version, filename, bytes });
       await expect(store.load(id)).rejects.toThrow(
-        `schema version ${version}; this build requires version ${PROJECT_SCHEMA_VERSION}`,
+        `schema version ${version}; this build requires ${SUPPORTED_VERSIONS}`,
       );
       await expect(store.rename(id, 'Must not rewrite an older file', 0)).rejects.toThrow(
         'existing file was not changed',
@@ -85,7 +85,7 @@ describe.skipIf(!enabled)('current-schema storage/archive integration · generat
         revision: 0,
         clipCount: 0,
         duration: 0,
-        error: expect.stringContaining(`requires version ${PROJECT_SCHEMA_VERSION}`),
+        error: expect.stringContaining(`requires ${SUPPORTED_VERSIONS}`),
       });
       expect(await readFile(entry.filename)).toEqual(entry.bytes);
     }
@@ -395,7 +395,7 @@ describe.skipIf(!enabled)('current-schema storage/archive integration · generat
       });
       for (const entry of older) {
         expect(warnings.find((warning) => warning.startsWith(`${entry.id}:`))).toContain(
-          `Unsupported export snapshot schema version ${entry.version}; this build requires version ${PROJECT_SCHEMA_VERSION}`,
+          `Unsupported export snapshot schema version ${entry.version}; this build requires ${SUPPORTED_VERSIONS}`,
         );
         expect(warnings.find((warning) => warning.startsWith(`${entry.id}:`))).toContain(
           'successful output were not changed',

@@ -59,7 +59,7 @@ export interface PlacedBeat {
 }
 
 /**
- * Beats of a music track at project frames, repeated across loops. A beat at a fractional
+ * Beats of a music clip at project frames, repeated across loops. A beat at a fractional
  * source frame lands on the nearest project frame of the placement.
  */
 export function musicBeatFrames(music: MusicTrack, beats: MusicAnalysis['beats']): PlacedBeat[] {
@@ -85,7 +85,7 @@ export function musicBeatFrames(music: MusicTrack, beats: MusicAnalysis['beats']
 export type BeatChoice = 'beats' | 'downbeats';
 
 /**
- * The bookmarks Beats → bookmarks would add for a music track: its beats (or downbeats) at
+ * The bookmarks Beats → bookmarks would add for a music clip: its beats (or downbeats) at
  * project frames that are not bookmarks yet, or why none can be added. Never a partial add.
  */
 export function beatBookmarks(
@@ -98,8 +98,8 @@ export function beatBookmarks(
   const placed = musicBeatFrames(music, beats).filter((beat) => choice === 'beats' || beat.downbeat);
   const frames = placed.map((beat) => beat.frame).filter((frame) => !existing.has(frame));
   const noun = choice === 'beats' ? 'beat' : 'downbeat';
-  if (!placed.length) return { frames, reason: `No ${noun}s fall within this music track's placement.` };
-  if (!frames.length) return { frames, reason: `Every ${noun} of this music track is already a bookmark.` };
+  if (!placed.length) return { frames, reason: `No ${noun}s fall within this music clip's placement.` };
+  if (!frames.length) return { frames, reason: `Every ${noun} of this music clip is already a bookmark.` };
   if (bookmarks.length + frames.length > MAX_BOOKMARKS)
     return {
       frames,
