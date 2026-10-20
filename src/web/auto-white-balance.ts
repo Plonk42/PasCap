@@ -48,10 +48,17 @@ export function readyClipAtPlayhead(
   const clip = clipAtPlayhead(layout, layer.id, frame, preferredClipId);
   if (!clip)
     return { clip: null, asset: null, reason: `Move the playhead over a clip on ${layer.name} to ${purpose}.` };
-  const asset = assets.find((item) => item.id === clip.clip.mediaId);
-  if (!asset || !mediaReady(asset) || asset.prepared?.verification.frameCount !== asset.metadata.frameCount)
-    return { clip: null, asset: null, reason: 'Prepare the recording of the clip at the playhead first.' };
+  const asset = readyAsset(assets, clip.clip.mediaId);
+  if (!asset) return { clip: null, asset: null, reason: 'Prepare the recording of the clip at the playhead first.' };
   return { clip, asset, reason: null };
+}
+
+/** The recording with a verified proxy an analysis can read, or null. */
+export function readyAsset(assets: readonly MediaAsset[], mediaId: string): MediaAsset | null {
+  const asset = assets.find((item) => item.id === mediaId);
+  return asset && mediaReady(asset) && asset.prepared?.verification.frameCount === asset.metadata.frameCount
+    ? asset
+    : null;
 }
 
 /** What Auto white balance would analyse at the playhead, or why it cannot run there. */

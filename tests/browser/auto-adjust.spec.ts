@@ -17,7 +17,7 @@ import type { MediaAsset } from '../../src/shared/media.js';
 import { createClip, createLayer, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
 import { calculateLayout } from '../../src/shared/timeline.js';
 import type { AnalysisFrame } from '../../src/shared/white-balance.js';
-import { autoAdjustCommand, autoAdjustCommands } from '../../src/web/auto-adjust.js';
+import { autoAdjustCommand, autoAdjustCommands, autoAdjustTarget } from '../../src/web/auto-adjust.js';
 import { expandedInspectorPreferences, inspectorTab, sharedPoint } from './editor-helpers.js';
 import { memoryProjects, type MemoryProjects } from './memory-projects.js';
 
@@ -216,7 +216,7 @@ function keyframeFrames(document: ProjectDocument, frame: number): number[] {
 
 function keyframed(document: ProjectDocument, frame: number, correction: AutoCorrection): ProjectDocument {
   let next = document;
-  for (const command of autoAdjustCommands(next.layers[0]!, { mode: 'keyframe', frame }, correction, 0.8))
+  for (const command of autoAdjustCommands(next.layers[0]!, 'keyframe', frame, correction, 0.8))
     next = applyCommand(next, command);
   return next;
 }
@@ -224,7 +224,8 @@ function keyframed(document: ProjectDocument, frame: number, correction: AutoCor
 const auto = (page: Page) => page.locator('summary[aria-label="Auto adjust"]');
 const apply = (page: Page) => page.getByRole('button', { name: 'Apply', exact: true });
 const intensity = (page: Page) => page.getByRole('spinbutton', { name: 'Auto adjust intensity', exact: true });
-const mode = (page: Page, name: 'Track values' | 'Track values from playhead' | 'Keyframe at playhead') =>
+/** A Source (Playhead, Clip, Track) or Apply as (Track values, Keyframe at playhead) choice. */
+const choice = (page: Page, name: 'Playhead' | 'Clip' | 'Track' | 'Track values' | 'Keyframe at playhead') =>
   page.getByRole('radio', { name, exact: true });
 
 function applied(document: ProjectDocument, correction: AutoCorrection, intensity: number): ProjectDocument {
@@ -336,8 +337,10 @@ test('leaves animated settings and keyframes unchanged and says so', async ({ pa
   const correction = await expectedCorrection(page);
   await auto(page).click();
   // The track animates Exposure and Saturation: Auto starts on a keyframe, the track values remain a choice.
-  await expect(mode(page, 'Keyframe at playhead')).toBeChecked();
-  await mode(page, 'Track values').check();
+  await expect(choice(page, 'Playhead')).toBeChecked();
+  await expect(choice(page, 'Keyframe at playhead')).toBeChecked();
+  await choice(page, 'Clip').check();
+  await expect(choice(page, 'Track values')).toBeChecked();
   await expect(page.getByText('Saturation is animated: not changed', { exact: true })).toBeVisible();
   await expect(page.getByText('Exposure is animated: not changed', { exact: true })).toBeVisible();
   await apply(page).click();
@@ -358,10 +361,14 @@ test('Keyframe at playhead keys the eleven settings from the frames around it, o
   const first = await expectedCorrection(page, keyframeFrames(before, 45));
   const graded = await checksum(page);
   await auto(page).click();
-  await expect(mode(page, 'Track values')).toBeChecked();
+  await expect(choice(page, 'Clip')).toBeChecked();
+  await expect(choice(page, 'Track values')).toBeChecked();
+  // A keyframe takes the light at the playhead: it needs the Playhead source.
+  await expect(choice(page, 'Keyframe at playhead')).toBeDisabled();
   await expect(apply(page)).toBeVisible();
   const reads = proxyReads;
-  await mode(page, 'Keyframe at playhead').check();
+  await choice(page, 'Playhead').check();
+  await choice(page, 'Keyframe at playhead').check();
   await expect(apply(page)).toBeVisible();
   await expect(intensity(page)).toHaveValue('80');
   expect(proxyReads).toBeGreaterThan(reads);
@@ -380,7 +387,7 @@ test('Keyframe at playhead keys the eleven settings from the frames around it, o
   await seek(page, 80);
   const second = await expectedCorrection(page, keyframeFrames(before, 80));
   await auto(page).click();
-  await expect(mode(page, 'Keyframe at playhead')).toBeChecked();
+  await expect(choice(page, 'Keyframe at playhead')).toBeChecked();
   await expect(apply(page)).toBeVisible();
   await apply(page).click();
   const twice = keyframed(once, 80, second);
@@ -393,21 +400,21 @@ test('Keyframe at playhead keys the eleven settings from the frames around it, o
   expect(await current(page)).toEqual(before);
 });
 
-test('Track values from playhead sets the whole track from the second around it, sharing the keyframe analysis', async ({
+test('Track values from the playhead set the whole track from the second around it, sharing the keyframe analysis', async ({
   page,
 }) => {
   const before = await current(page);
   const correction = await expectedCorrection(page, keyframeFrames(before, 45));
   await auto(page).click();
-  await expect(mode(page, 'Track values')).toBeChecked();
   await expect(apply(page)).toBeVisible();
-  await mode(page, 'Track values from playhead').check();
+  await choice(page, 'Playhead').check();
+  await expect(choice(page, 'Track values')).toBeChecked();
   await expect(apply(page)).toBeVisible();
-  // A keyframe at the playhead analyses the same frames: switching to it decodes nothing more.
+  // A keyframe analyses the same frames: switching to it decodes nothing more.
   const reads = proxyReads;
-  await mode(page, 'Keyframe at playhead').check();
+  await choice(page, 'Keyframe at playhead').check();
   await expect(apply(page)).toBeVisible();
-  await mode(page, 'Track values from playhead').check();
+  await choice(page, 'Track values').check();
   await expect(apply(page)).toBeVisible();
   expect(proxyReads).toBe(reads);
   await apply(page).click();
@@ -418,6 +425,28 @@ test('Track values from playhead sets the whole track from the second around it,
   expect(expected.layers[0]!.keyframes).toEqual(before.layers[0]!.keyframes);
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   expect(await current(page)).toEqual(before);
+});
+
+test('the Track source analyses every clip of the track for its values, never a keyframe', async ({ page }) => {
+  const before = await current(page);
+  const layout = calculateLayout(before);
+  const target = autoAdjustTarget(before.layers[0]!, layout, assets, 45, null, 'track').target!;
+  // Both clips use the flat recording: the black clip's frames count too, in proportion to its duration.
+  expect(target.reads.map(({ asset }) => asset.id)).toEqual([assets[0]!.id]);
+  const correction = await expectedCorrection(page, target.reads[0]!.sourceFrames);
+  await auto(page).click();
+  await expect(apply(page)).toBeVisible();
+  await choice(page, 'Playhead').check();
+  await choice(page, 'Keyframe at playhead').check();
+  await choice(page, 'Track').check();
+  await expect(choice(page, 'Track values')).toBeChecked();
+  await expect(choice(page, 'Keyframe at playhead')).toBeDisabled();
+  await expect(page.locator('.auto-adjust-source')).toHaveText('From 2 clips on Track 1');
+  await expect(apply(page)).toBeVisible();
+  await apply(page).click();
+  const expected = applied(before, correction, 0.8);
+  await expect.poll(() => current(page)).toEqual(expected);
+  expect(expected.layers[0]!.keyframes).toEqual(before.layers[0]!.keyframes);
 });
 
 test('explains when it cannot run, and a cancelled or failed analysis leaves no edit', async ({ page }) => {

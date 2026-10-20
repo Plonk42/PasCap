@@ -411,24 +411,24 @@ colour, restoring footage shot flat, and opens dark shadow areas with Shadows. I
 colour with Saturation and Vibrance, which lifts muted colours more than strong ones; where
 strong colours such as a blue sky fill much of the frame, it relies on Vibrance so they stay
 close to how they were. It lowers only very colourful footage, with Saturation.
-First choose what it applies to:
+First choose its **Source**, what it analyses: **Playhead** (the second around it), **Clip**
+(16 frames spread over the clip at the playhead) or **Track** (16 frames spread over all the
+track's clips, each in proportion to its duration). Then choose how to **Apply as**:
 
-- **Track values** analyses 16 frames spread over the whole clip and sets Temperature, Tint,
-  Saturation, Vibrance, Exposure, Brightness, Contrast, Highlights, Shadows, Whites and Blacks
-  for the whole track. Settings the track animates are left unchanged, and the popover lists them.
-- **Track values from playhead** sets the same values for the whole track, but from the second
-  around the playhead: choose the moment whose look the whole track should take.
-- **Keyframe at playhead** analyses the second around the playhead and keys those eleven
-  settings there. Run it again at other moments of a clip whose light changes: the
-  keyframes follow the light between them. Once the track animates any of the eleven, Auto
-  starts with this choice.
+- **Track values** sets Temperature, Tint, Saturation, Vibrance, Exposure, Brightness,
+  Contrast, Highlights, Shadows, Whites and Blacks for the whole track. Settings the track
+  animates are left unchanged, and the popover lists them.
+- **Keyframe** keys those eleven settings at the playhead, from the Playhead source only. Run
+  it again at other moments of a clip whose light changes: the keyframes follow the light
+  between them. Once the track animates any of the eleven, Auto starts with Playhead and
+  Keyframe.
 
 The popover previews the result in the image. **Intensity** starts at 80%, the suggested
 correction: lower it for a lighter touch, or raise it towards 100% for a stronger,
 exaggerated look. Then **Apply** makes the change in one Undo step. **Cancel**, Escape or a
 click elsewhere leaves the track as it was. Reopening Auto on the same frames skips the
 analysis and starts at the intensity you last applied, so you can change it later. Track
-values come from one clip: put shots that need different corrections on different tracks,
+values are one look for the whole track: put shots that need different corrections on different tracks,
 or key them. Keyframes stay at their timeline frames when you trim or move clips, and with
 Linear Easing a correction eases across a cut into the next shot: set **Hold** on a shot's
 last keyframe to keep shots apart. See [Auto adjust](design/AUTO_ADJUST.md).

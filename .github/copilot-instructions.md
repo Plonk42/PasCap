@@ -158,10 +158,10 @@ edits real projects with it, so saved data must keep working. Details are in
   fits eleven scalar settings from 16 proxy frames through the real grade (#225: colour is raised with
   Saturation and Vibrance, Saturation giving way first on strong colours such as skies), previews them in a
   popover with Intensity (initially 80%, the fitted correction; 100% exaggerates it by a
-  quarter) and applies one Undo step: **Track values** analyses the whole clip at the playhead
-  and edits the bases, leaving animated settings and keyframes unchanged; **Track values from playhead**
-  does the same from ±30 frames; **Keyframe at
-  playhead** analyses ±30 frames (one shared analysis) and captures all eleven like their diamonds (initial once any is
+  quarter) and applies one Undo step. **Source**: Playhead (±30 frames), Clip (whole clip at the playhead)
+  or Track (all its clips by duration). **Apply as**: Track values edits the bases, leaving animated
+  settings and keyframes unchanged; Keyframe (Playhead source only) captures all eleven like their
+  diamonds (initial, with Playhead, once any is
   animated). Constants in `src/shared/auto-adjust.ts`, no schema/render change
   ([Auto adjust](../docs/design/AUTO_ADJUST.md)).
   Main/stored slider/exact-field/reset/diamond/navigation retain

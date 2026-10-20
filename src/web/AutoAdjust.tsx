@@ -5,16 +5,18 @@ import type { MediaAsset } from '../shared/media.js';
 import type { VideoLayer } from '../shared/model.js';
 import type { TimelineLayout } from '../shared/timeline.js';
 import {
-  analyseClip,
+  analyseTarget,
   animatedSettings,
   autoAdjustCommands,
   autoAdjustTarget,
   cachedAnalysis,
-  initialMode,
+  initialChoice,
+  keyframeReason,
   rememberAnalysis,
   settingLabel,
+  type AutoAdjustApply,
   type AutoAdjustAvailability,
-  type AutoAdjustMode,
+  type AutoAdjustSource,
   type AutoAdjustTarget,
 } from './auto-adjust.js';
 import { shortName } from './display.js';
@@ -39,10 +41,14 @@ interface Props {
 const TITLE = 'Analyse the clip at the playhead and suggest a balanced Colour correction for this track';
 /** The initial Intensity, in percent: the correction as suggested. */
 const BALANCED = Math.round(AUTO_ADJUST.balancedIntensity * 100);
-const MODES: readonly { mode: AutoAdjustMode; label: string; hint: string }[] = [
-  { mode: 'track', label: 'Track values', hint: 'whole clip' },
-  { mode: 'playhead', label: 'Track values from playhead', hint: '1 s around it' },
-  { mode: 'keyframe', label: 'Keyframe at playhead', hint: '1 s around it' },
+const SOURCES: readonly { source: AutoAdjustSource; label: string; hint: string }[] = [
+  { source: 'playhead', label: 'Playhead', hint: '1 s around it' },
+  { source: 'clip', label: 'Clip', hint: 'all of it' },
+  { source: 'track', label: 'Track', hint: 'all its clips' },
+];
+const APPLIES: readonly { apply: AutoAdjustApply; label: string; name: string; hint: string }[] = [
+  { apply: 'values', label: 'Track values', name: 'Track values', hint: 'whole track' },
+  { apply: 'keyframe', label: 'Keyframe', name: 'Keyframe at playhead', hint: 'at playhead' },
 ];
 
 /** Track → Colour → Auto: analyses the clip at the playhead and applies its correction to the track. */
@@ -84,9 +90,12 @@ export function AutoAdjust({
       key={`${projectId}:${layer.id}:${availability.target.key}`}
       projectId={projectId}
       layer={layer}
-      trackTarget={availability.target}
-      playheadAvailability={autoAdjustTarget(layer, layout, assets, frame, selectedClipId, 'playhead')}
-      keyframeAvailability={autoAdjustTarget(layer, layout, assets, frame, selectedClipId, 'keyframe')}
+      availabilities={{
+        playhead: autoAdjustTarget(layer, layout, assets, frame, selectedClipId, 'playhead'),
+        clip: availability,
+        track: autoAdjustTarget(layer, layout, assets, frame, selectedClipId, 'track'),
+      }}
+      frame={frame}
       onEdit={onEdit}
     />
   );
@@ -101,35 +110,31 @@ type Phase =
 function AutoAdjustPopover({
   projectId,
   layer,
-  trackTarget,
-  playheadAvailability,
-  keyframeAvailability,
+  availabilities,
+  frame,
   onEdit,
 }: Readonly<{
   projectId: string;
   layer: VideoLayer;
-  trackTarget: AutoAdjustTarget;
-  playheadAvailability: AutoAdjustAvailability;
-  keyframeAvailability: AutoAdjustAvailability;
+  availabilities: Readonly<Record<AutoAdjustSource, AutoAdjustAvailability>>;
+  frame: number;
   onEdit: (commands: readonly EditCommand[]) => void;
 }>) {
   const id = useId();
   const [open, setOpen] = useState(false);
-  const [mode, setMode] = useState<AutoAdjustMode>('track');
+  const [source, setSource] = useState<AutoAdjustSource>('clip');
+  const [applyAs, setApplyAs] = useState<AutoAdjustApply>('values');
   const [phase, setPhase] = useState<Phase>({ kind: 'idle' });
   // Intensity in percent; `draft` is the value being dragged, previewed but not chosen yet.
   const [percent, setPercent] = useState(BALANCED);
   const [draft, setDraft] = useState<number | null>(null);
   const [announcement, setAnnouncement] = useState('');
 
-  const availabilities: Record<AutoAdjustMode, AutoAdjustAvailability> = {
-    track: { target: trackTarget, reason: null },
-    playhead: playheadAvailability,
-    keyframe: keyframeAvailability,
-  };
-  const { target, reason } = availabilities[mode];
+  const available = availabilities[source];
+  const reason = available.reason ?? (applyAs === 'keyframe' ? keyframeReason(layer, source, frame) : null);
+  const target: AutoAdjustTarget | null = reason === null ? available.target : null;
   const targetKey = target?.key ?? null;
-  // A new mode or, for a keyframe, a new playhead is a new analysis; leaving it cancels the old one.
+  // A new source or, from the playhead, a new playhead is a new analysis; leaving it cancels the old one.
   useEffect(() => {
     if (!open || !target) return;
     const { key } = target;
@@ -141,8 +146,9 @@ function AutoAdjustPopover({
     }
     const abort = new AbortController();
     setPercent(BALANCED);
-    setPhase({ kind: 'analysing', key, done: 0, total: target.sourceFrames.length });
-    analyseClip(target, abort.signal, (done, total) => {
+    const total = target.reads.reduce((sum, read) => sum + read.sourceFrames.length, 0);
+    setPhase({ kind: 'analysing', key, done: 0, total });
+    analyseTarget(target, abort.signal, (done) => {
       if (!abort.signal.aborted) setPhase({ kind: 'analysing', key, done, total });
     }).then(
       (correction) => {
@@ -164,14 +170,14 @@ function AutoAdjustPopover({
   const ready = current?.kind === 'ready' && target ? { correction: current.correction, target } : null;
   const correction = current?.kind === 'ready' ? current.correction : null;
   const commandsAt = (value: number): EditCommand[] =>
-    ready ? autoAdjustCommands(layer, ready.target, ready.correction, value / 100) : [];
+    ready ? autoAdjustCommands(layer, applyAs, frame, ready.correction, value / 100) : [];
   const previewing = open && ready !== null;
-  // Re-issued when the committed track changes too, since that replaces the preview, and on a new mode for
+  // Re-issued when the committed track changes too, since that replaces the preview, and on a new way to apply
   // the same analysis.
   useEffect(() => {
-    if (previewing && target && correction)
-      livePreview(autoAdjustCommands(layer, target, correction, (draft ?? percent) / 100));
-  }, [previewing, targetKey, mode, correction, layer, draft, percent]);
+    if (previewing && correction)
+      livePreview(autoAdjustCommands(layer, applyAs, frame, correction, (draft ?? percent) / 100));
+  }, [previewing, targetKey, applyAs, frame, correction, layer, draft, percent]);
   useEffect(() => (previewing ? () => livePreview(null) : undefined), [previewing]);
 
   const openChange = (next: boolean): void => {
@@ -179,7 +185,9 @@ function AutoAdjustPopover({
     setDraft(null);
     if (next) {
       setAnnouncement('');
-      setMode(initialMode(layer));
+      const initial = initialChoice(layer);
+      setSource(initial.source);
+      setApplyAs(initial.apply);
     } else setPhase({ kind: 'idle' });
   };
 
@@ -191,12 +199,13 @@ function AutoAdjustPopover({
     onEdit(commands);
     close();
     setAnnouncement(
-      mode === 'keyframe' ? `Auto adjust keyframed at ${percent}%.` : `Auto adjust applied at ${percent}%.`,
+      applyAs === 'keyframe' ? `Auto adjust keyframed at ${percent}%.` : `Auto adjust applied at ${percent}%.`,
     );
   };
 
-  const animated = mode === 'keyframe' ? [] : animatedSettings(layer);
+  const animated = applyAs === 'keyframe' ? [] : animatedSettings(layer);
   const nothing = ready !== null && commandsAt(percent).length === 0;
+  const analysed = available.target?.label ?? availabilities.clip.target?.label ?? '';
   return (
     <span className="auto-adjust">
       <Popover
@@ -221,21 +230,23 @@ function AutoAdjustPopover({
           };
           return (
             <div className="auto-adjust-panel" onKeyDownCapture={escape}>
-              <p className="auto-adjust-source" title={trackTarget.asset.name}>
-                From {shortName(trackTarget.asset.name)}
+              <p className="auto-adjust-source" title={analysed}>
+                From {shortName(analysed)}
               </p>
               <fieldset className="auto-adjust-mode">
-                <legend>Apply to</legend>
-                {MODES.map((option) => (
-                  <label key={option.mode}>
+                <legend>Source</legend>
+                {SOURCES.map((option) => (
+                  <label key={option.source}>
                     <input
                       type="radio"
-                      name={`${id}-mode`}
+                      name={`${id}-source`}
                       aria-label={option.label}
-                      checked={mode === option.mode}
+                      checked={source === option.source}
                       onChange={() => {
                         setDraft(null);
-                        setMode(option.mode);
+                        setSource(option.source);
+                        // A keyframe takes the light at the playhead only.
+                        if (option.source !== 'playhead') setApplyAs('values');
                       }}
                     />
                     <span>
@@ -244,6 +255,31 @@ function AutoAdjustPopover({
                     </span>
                   </label>
                 ))}
+              </fieldset>
+              <fieldset className="auto-adjust-mode">
+                <legend>Apply as</legend>
+                {APPLIES.map((option) => {
+                  const unavailable = option.apply === 'keyframe' && source !== 'playhead';
+                  return (
+                    <label key={option.apply} title={unavailable ? 'Analyse the playhead to key it.' : undefined}>
+                      <input
+                        type="radio"
+                        name={`${id}-apply`}
+                        aria-label={option.name}
+                        checked={applyAs === option.apply}
+                        disabled={unavailable}
+                        onChange={() => {
+                          setDraft(null);
+                          setApplyAs(option.apply);
+                        }}
+                      />
+                      <span>
+                        {option.label}
+                        <small>{unavailable ? 'needs Playhead' : option.hint}</small>
+                      </span>
+                    </label>
+                  );
+                })}
               </fieldset>
               {reason !== null && <p className="auto-adjust-error">{reason}</p>}
               {current?.kind === 'analysing' && (
