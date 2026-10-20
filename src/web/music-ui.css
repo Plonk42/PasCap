@@ -19,12 +19,19 @@
   margin-bottom: 6px;
 }
 
+.music-controls .music-analysis {
+  display: grid;
+  justify-items: start;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
 .music-controls .music-analysis-status {
   display: flex;
   align-items: center;
   gap: 6px;
+  width: 100%;
   min-height: 24px;
-  margin-bottom: 10px;
   color: var(--muted);
   font-size: 12px;
 }
@@ -39,6 +46,78 @@
 
 .music-analysis-status.error > span {
   color: #f2a7a7;
+}
+
+button.music-beat-bookmarks,
+.music-controls .music-beat-bookmarks > summary.editor-popover-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.music-controls .music-beat-bookmarks > summary.editor-popover-trigger {
+  width: auto;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+button.music-beat-bookmarks[aria-disabled='true'] {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.music-beat-choices {
+  display: grid;
+  gap: 6px;
+  max-width: 260px;
+}
+
+.music-beat-choices > p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.music-beat-choice {
+  display: grid;
+  justify-items: start;
+  gap: 2px;
+}
+
+.music-beat-choice > button[aria-disabled='true'] {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.music-beat-choice > small {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+/* Beat ticks along the bottom of a music clip; downbeats are taller and brighter. */
+.music-body .music-beats {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 1;
+  pointer-events: none;
+}
+
+.music-beats path {
+  stroke-width: 1;
+  shape-rendering: crispEdges;
+}
+
+.music-beats .beat {
+  stroke: rgb(243 217 164 / 45%);
+}
+
+.music-beats .downbeat {
+  stroke: rgb(243 217 164 / 95%);
 }
 
 .music-controls .music-add-row {
