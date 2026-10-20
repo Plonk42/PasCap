@@ -177,19 +177,22 @@ exponent and cap keep colourful footage nearly untouched and stop well short of 
 saturation pump.
 
 - A gain below 1, on very colourful footage, is Saturation $g$, lowering every colour alike.
-- A gain above 1 is Vibrance, with Saturation 1. Vibrance scales a pixel's chroma by
-  $1+v(1-c)$, $c$ its linear $(\max-\min)/\max$ saturation, so strong colours gain little.
-  With $c_{25}$ the 25th percentile of the pixels' saturation (median over frames),
-  $v=(g-1)/(1-c_{25})$ up to 1: the scene's muted colours gain $g$.
-- The strong colours, the 90th percentile $c_{90}$, may then rise to 0.6, or by 0.03 when
-  already at or above it. When $v$ pushes them further, it is lowered by bisection until
-  they stay within that limit. Vibrance keeps the pixels' order of saturation, so each
-  frame's 90th-percentile pixel stays the same one and only those pixels are graded again.
+- A gain above 1 is shared. Saturation takes half of it in log terms, $s=g^{0.5}$, raising
+  every colour alike, as many like a slightly saturated look. Vibrance scales a pixel's chroma
+  by $1+v(1-c)$, $c$ its linear $(\max-\min)/\max$ saturation, so strong colours gain little;
+  with $c_{25}$ the 25th percentile of the pixels' saturation (median over frames),
+  $v=(g/s-1)/(1-c_{25})$ up to 1 brings the scene's muted colours to the whole gain $g$.
+- The strong colours, the 90th percentile $c_{90}$, may then rise to 0.7, or by 0.05 when
+  already at or above it. When they would rise further, Saturation's share gives way first,
+  found by bisection, each lower share leaving more of the gain to Vibrance; if Vibrance
+  alone still pushes them too far, it is lowered too. Saturation and Vibrance keep the
+  pixels' order of saturation, so each frame's 90th-percentile pixel stays the same one and
+  only those pixels are graded again.
 
-$M$ rewards variety of colour, so a uniform saturated sky measures dull; a single global
-gain then pushed it as far as the scene's muted colours (#225). The 90th percentile makes
+$M$ rewards variety of colour, so a uniform saturated sky measures dull; Saturation alone
+then pushed it as far as the scene's muted colours (#225). The 90th percentile makes
 the limit apply where strong colours fill a tenth of the frame or more, such as a sky,
-not to a small red jacket, which Vibrance barely raises anyway.
+not to a small red jacket. Intensity above 80% raises both settings for a bolder look.
 
 ### Differences from the issue's proposal
 
@@ -227,18 +230,17 @@ Auto first raised colour with Saturation alone, which over-saturated skies in ow
 ([#225](https://github.com/Plonk42/PasCap/issues/225)). On synthetic fixtures, the mean
 linear saturation of the region named, before and after Auto at 80%:
 
-| Fixture                    | Before | Saturation alone       | Vibrance and its limit |
-| -------------------------- | ------ | ---------------------- | ---------------------- |
-| Sky filling the frame      | 0.66   | 0.80 (Saturation 1.5)  | 0.70 (Vibrance 0.39)   |
-| Snow under a sky, the sky  | 0.71   | 0.80 (Saturation 1.39) | 0.72 (Vibrance 0.29)   |
-| Flat footage, whole frame  | 0.30   | 0.41 (Saturation 1.5)  | 0.38 (Vibrance 0.56)   |
-| Hazy footage, whole frame  | 0.45   | 0.51 (Saturation 1.18) | 0.49 (Vibrance 0.23)   |
-| Muted colours, whole frame | 0.15   | 0.22 (Saturation 1.5)  | 0.21 (Vibrance 0.53)   |
+| Fixture                    | Before | Saturation alone       | Saturation and Vibrance, limited |
+| -------------------------- | ------ | ---------------------- | -------------------------------- |
+| Sky filling the frame      | 0.66   | 0.80 (Saturation 1.5)  | 0.73 (1 and 0.67)                |
+| Snow under a sky, the sky  | 0.71   | 0.80 (Saturation 1.39) | 0.74 (1.05 and 0.33)             |
+| Flat footage, whole frame  | 0.30   | 0.41 (Saturation 1.5)  | 0.39 (1.22 and 0.26)             |
+| Hazy footage, whole frame  | 0.45   | 0.51 (Saturation 1.18) | 0.50 (1.09 and 0.11)             |
+| Muted colours, whole frame | 0.15   | 0.22 (Saturation 1.5)  | 0.22 (1.22 and 0.24)             |
 
-The sky filling the frame rises by 0.04 on average: its strongest tenth rises by at most
-0.03, its paler lower part up to 0.6. Muted footage gains slightly less colour than with
-Saturation, because its stronger colours gain less. No owner recording was analysed for
-this change.
+The sky filling the frame rises by 0.07 on average: its strongest tenth rises by at most
+0.05, its paler lower part up to 0.7. Footage without strong colours gains about as much
+colour as with Saturation alone. No owner recording was analysed for this change.
 
 ## Limits
 
@@ -260,8 +262,8 @@ this change.
   on very flat footage whose gain reached its 1.5 cap. Footage with little colour, such as
   snow, gets that whole gain on its muted colours, which can strengthen a faint tint.
 - The strong-colour limit does not know what a sky is: any strong colours filling a tenth
-  of the frame keep the muted ones from gaining their whole Vibrance, and a sky paler than
-  0.6 saturation may rise to it.
+  of the frame take Saturation's share away from the whole picture, and a sky paler than
+  0.7 saturation may rise to it.
 - The scalar tone settings approximate, not reproduce, a camera's flat-to-Rec.709
   conversion; Auto never sets colour curves.
 - The unit tests use synthetic fixtures only: neutral, flat, under- and overexposed, casts,
@@ -275,13 +277,14 @@ Unit tests cover the estimator's properties on synthetic images: neutral footage
 unchanged except its darkest areas, which Shadows opens, and shadow areas already open left
 alone; flat footage gets negative Blacks, output black and white points in their
 bands, a midtone slope at least 1.3× the input's and more than 1.2× its saturation from
-Vibrance; exposure errors
+Saturation and Vibrance; exposure errors
 beyond the dead zone corrected stop for stop; cast signs and damping; near idempotence
 (analysing the output changes the image under 20% as much, and flat footage's global tone
 settles in one pass while Shadows stops at its bound); determinism; one
 outlier frame among 16; hazy, snow, night, sunset,
-sky and sea; a sky filling the frame whose strongest tenth rises by at most 0.03 and a sky
-over snow kept within 0.03 of its saturation; muted colours raised by Vibrance, very
+sky and sea; a sky filling the frame whose strongest tenth rises by at most 0.05 and a sky
+over snow kept within 0.05 of its saturation, Saturation giving way first; muted colours
+raised by both settings, very
 colourful ones lowered by Saturation, monochrome ones untouched; intensity scaling, exaggeration within bounds and frame selection. Editor
 tests cover the target and the keyframe window (reversed and retimed), the single Colour
 edit, the keyframe capture (new, joined, 256-keyframe limit), the initial choice, animated

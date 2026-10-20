@@ -156,7 +156,7 @@ edits real projects with it, so saved data must keep working. Details are in
   own temporary reader, and keyframes both at the playhead like their diamonds, one Undo
   step; no schema/render/export change. #167 Phase 1 **Auto** (Colour keyframe line)
   fits eleven scalar settings from 16 proxy frames through the real grade (#225: colour is raised with
-  Vibrance, limited on strong colours such as skies; Saturation only lowers it), previews them in a
+  Saturation and Vibrance, Saturation giving way first on strong colours such as skies), previews them in a
   popover with Intensity (initially 80%, the fitted correction; 100% exaggerates it by a
   quarter) and applies one Undo step: **Track values** analyses the whole clip at the playhead
   and edits the bases, leaving animated settings and keyframes unchanged; **Keyframe at
