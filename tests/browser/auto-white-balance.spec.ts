@@ -21,7 +21,7 @@ import { expandedInspectorPreferences, inspectorTab } from './editor-helpers.js'
 import { memoryProjects, type MemoryProjects } from './memory-projects.js';
 
 /**
- * A disposable proxy in the editing-proxy format: 30 black frames, then 90 frames of grey patches
+ * A disposable proxy in the editing-proxy format: 60 black frames, then 60 frames of grey patches
  * (40 × 36, aligned with the 4:2:0 chroma) under a blue cast. It replaces pattern-a's proxy in this spec.
  */
 async function castProxy(directory: string): Promise<Buffer> {
@@ -35,7 +35,7 @@ async function castProxy(directory: string): Promise<Buffer> {
       "geq=lum='48+18*mod(floor(X/40)*5+floor(Y/36)*3\\,8)':cb=128:cr=128",
       'format=rgb24',
       'colorchannelmixer=rr=0.82:bb=1.18',
-      "drawbox=c=black:t=fill:enable='lt(n\\,30)'",
+      "drawbox=c=black:t=fill:enable='lt(n\\,60)'",
       'scale=out_color_matrix=bt709:out_range=tv',
       'format=yuv420p',
       'setparams=range=limited:color_primaries=bt709:color_trc=bt709:colorspace=bt709',
@@ -298,7 +298,7 @@ test('explains when it cannot run, and a cancelled or failed analysis leaves no 
   expect(await current(page)).toEqual(before);
   await page.getByRole('button', { name: 'Select track Track 1', exact: true }).click();
 
-  // The first second of the cast clip is black: nothing to measure.
+  // The first two seconds of the cast clip are black: nothing to measure within a second of frame 10.
   await seek(page, 10);
   await autoButton(page).click();
   await expect(page.locator('.auto-white-balance').getByRole('alert')).toContainText('too dark');

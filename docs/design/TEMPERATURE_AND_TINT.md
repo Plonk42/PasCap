@@ -92,9 +92,10 @@ module, [white-balance.ts](../../src/shared/white-balance.ts), as starting value
 
 **Frames.** The clip of the selected track shown at the real playhead (in a dissolve,
 the selected clip when it is one of the two, else the one past its midpoint) supplies
-**7 project frames**: the playhead and up to **15 frames (0.5 s) on each side**, never
-across that clip's ends, the other six shared between the two sides in proportion to
-their room and evenly spaced. Each maps to the source frame the clip shows there
+**16 project frames**: the playhead and up to **30 frames (1 s) on each side**, never
+across that clip's ends, the other fifteen shared between the two sides in proportion to
+their room and evenly spaced (the same window as [Auto adjust](AUTO_ADJUST.md)'s Playhead source, so both estimate
+the same Temperature and Tint there). Each maps to the source frame the clip shows there
 through `PlacedClip.retiming` (speed and Reverse). A temporary one-decoder reader
 decodes them from the verified proxy, never an original, separate from the timeline and
 source review lanes; each frame is drawn into a canvas of at most 320 × 180 pixels

@@ -28,8 +28,6 @@ import {
 export const AUTO_ADJUST = Object.freeze({
   /** Source frames analysed, at the centres of equal slices of the clip's range. */
   frames: 16,
-  /** A keyframe analyses the same number of frames within this many project frames (1 s) of the playhead. */
-  keyframeRadius: 30,
   /** Centre weight 0.5 + 0.5·exp(−r² / (2σ²)), r the distance from the centre (1 at the corners). */
   centreSigma: 0.35,
   /** Reinhard's automatic key: mid-grey, adapted to high- and low-key scenes within these bounds. */
@@ -173,7 +171,7 @@ export function autoAdjustFrames(sourceIn: number, sourceOut: number): number[] 
 
 /** Project frames a keyframe analyses: the playhead and up to 1 s on each side, within its clip [start, end). */
 export function autoAdjustWindow(clip: { start: number; end: number }, playhead: number): number[] {
-  return whiteBalanceWindow(clip, playhead, AUTO_ADJUST.frames, AUTO_ADJUST.keyframeRadius);
+  return whiteBalanceWindow(clip, playhead);
 }
 
 function rounded(value: number): number {

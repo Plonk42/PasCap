@@ -104,7 +104,7 @@ Exposure are log-gains, so half the correction is the geometric midpoint of the 
 `[sourceIn, sourceOut)`; for the Track source, of the track's clips laid end to end in output
 frames, each mapped to its source frame. For the Playhead, the playhead and up to 15 more project frames within
 **30** (1 s) of it inside its clip, shared between the two sides in proportion to their room
-and evenly spaced, as in white balance's window, each mapped to the source frame shown there
+and evenly spaced, exactly as Auto white balance's window (one shared constant), each mapped to the source frame shown there
 (repeated source frames of slow motion are read once). They are
 decoded from the verified proxy (never an original) on a temporary one-decoder reader, one
 recording at a time for the Track source,
@@ -121,7 +121,13 @@ whose linear luma is below 0.002 are left out as noise.
 [Auto white balance](TEMPERATURE_AND_TINT.md#automatic-white-balance) estimates from these
 frames: Shades of Grey and Grey-Edge per frame, median pooling, confidence and damping
 (cool casts more than warm ones, soft limits 0.5 and 0.3). They are applied to every
-analysed pixel before the tone and colour fits.
+analysed pixel before the tone and colour fits. With the Playhead source and Intensity 80%
+they equal what Auto white balance captures at the same playhead (a unit test compares them);
+the Clip and Track sources deliberately analyse more of the footage, so they can differ from it.
+When no frame has a usable illuminant (black, clipped or uniform frames), white balance is
+neutral (0 and 0) and the tone fit continues, where Auto white balance reports an error.
+Intensity scales Temperature and Tint like the other settings, within their Colour bounds, not
+within the soft limits: 100% exaggerates them to 1.25 times the fit.
 
 **Statistics, per frame, then the median over frames.** Linear luma percentiles 0.5 and
 99.5 (the black and white points) and 1 and 99; the log-average

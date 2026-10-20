@@ -35,8 +35,10 @@ describe('Auto white balance target', () => {
     const a = whiteBalanceTarget(layer, layout, ASSETS, 100, null);
     expect(a.reason).toBeNull();
     expect(a.target!.clip.clip.id).toBe('a');
-    expect(a.target!.projectFrames).toEqual([85, 90, 95, 100, 105, 110, 115]);
-    expect(a.target!.sourceFrames).toEqual([185, 190, 195, 200, 205, 210, 215]);
+    expect(a.target!.projectFrames).toEqual([70, 74, 77, 81, 85, 89, 92, 96, 100, 104, 109, 113, 117, 121, 126, 130]);
+    expect(a.target!.sourceFrames).toEqual([
+      170, 174, 177, 181, 185, 189, 192, 196, 200, 204, 209, 213, 217, 221, 226, 230,
+    ]);
     const b = whiteBalanceTarget(layer, layout, ASSETS, 400, null).target!;
     expect(b.clip.clip.id).toBe('b');
     const placed = layout.clips[1]!;
