@@ -1698,6 +1698,46 @@ test('a one-frame source range remains exact; an Escape-cancelled numeric draft 
   expect((await current(page)).clips.find((clip) => clip.id === id)).toMatchObject({ sourceIn: 50, sourceOut: 51 });
 });
 
+test('Reset source range restores the whole recording, clears drafts and keeps the frame without project edits', async ({
+  page,
+}) => {
+  const before = await current(page);
+  await page.getByRole('button', { name: 'Review pattern-a.mp4', exact: true }).click();
+  const reset = page.getByRole('button', { name: 'Reset source range', exact: true });
+  const count = String(assets[0]!.metadata.frameCount);
+  await expect(reset).toHaveAttribute('aria-disabled', 'true');
+  await expect(reset).toHaveAttribute('title', 'The range already covers the whole recording.');
+  await sourceRange(page, 20, 60);
+  await sourceFrame(page, 30);
+  await expect(reset).toHaveAttribute('aria-disabled', 'false');
+  // An invalid unapplied draft is replaced, with no stale error.
+  await page.getByRole('spinbutton', { name: 'Source OUT', exact: true }).fill('10');
+  await page.getByRole('spinbutton', { name: 'Source OUT', exact: true }).press('Enter');
+  await expect(page.locator('.source-range-error')).toBeVisible();
+  await reset.click();
+  await expect(page.locator('.source-range-strip')).toHaveAttribute('data-source-in', '0');
+  await expect(page.locator('.source-range-strip')).toHaveAttribute('data-source-out', count);
+  await expect(page.getByRole('spinbutton', { name: 'Source IN', exact: true })).toHaveValue('0');
+  await expect(page.getByRole('spinbutton', { name: 'Source OUT', exact: true })).toHaveValue(count);
+  await expect(page.locator('.source-range-error')).toHaveCount(0);
+  await expect(page.locator('.source-preview')).toHaveAttribute('data-source-frame', '30');
+  await expect(reset).toHaveAttribute('aria-disabled', 'true');
+  // At the whole recording, a pending draft still makes Reset useful.
+  await page.getByRole('spinbutton', { name: 'Source IN', exact: true }).fill('5');
+  await expect(reset).toHaveAttribute('aria-disabled', 'false');
+  await reset.click();
+  await expect(page.getByRole('spinbutton', { name: 'Source IN', exact: true })).toHaveValue('0');
+  await page.getByRole('button', { name: 'Play source preview', exact: true }).click();
+  await page.getByRole('button', { name: 'Pause source preview', exact: true }).click();
+  const id = await addExcerpt(page);
+  expect((await current(page)).clips.find((clip) => clip.id === id)).toMatchObject({
+    sourceIn: 0,
+    sourceOut: Number(count),
+  });
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  expect(await current(page)).toEqual(before);
+});
+
 for (const action of ['pause', 'scrub', 'tab', 'asset', 'project', 'close'] as const) {
   test(`a source playback withheld before its first frame across ${action} never restarts an obsolete viewer`, async ({
     page,

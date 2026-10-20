@@ -709,8 +709,11 @@ a mouse-following marker. The source viewer is separate from the project playhea
 and stays out of list flow so recording cards never move under an active hover/drag. Review
 IN/OUT handles, numeric fields and I/O marks are non-destructive. OUT is
 exclusive; handle drafts cancel/release independently of timeline history/autosave.
-There are no separate Mark IN/OUT or Reset buttons: Home/End on a handle restores
-that edge. The numeric pair applies on Enter or when focus leaves both fields, validating IN and OUT
+There are no separate Mark IN/OUT buttons: Home/End on a handle restores
+that edge, and the reset icon after OUT (**Reset source range**) restores the whole recording
+(IN = 0, OUT = frame count) in one action, replacing any unapplied numeric draft and keeping the
+displayed frame; it is dimmed with its reason when the range already covers the whole recording.
+The numeric pair applies on Enter or when focus leaves both fields, validating IN and OUT
 together; invalid drafts keep an inline error until corrected or restored with Escape.
 The source range strip below the image spans the whole original with its five prepared
 snapshots; hatching identifies omitted footage and timeline-style **IN / OUT**
