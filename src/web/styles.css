@@ -1139,6 +1139,14 @@ svg {
   z-index: 2;
 }
 
+/* Other clips of a multi-selection: dashed, so the solid primary clip stays the one Clip properties edit. */
+.timeline-clip.grouped {
+  outline: 1px dashed var(--accent);
+  outline-offset: 1px;
+  border-color: var(--accent);
+  z-index: 2;
+}
+
 .timeline-clip-body {
   position: absolute;
   inset: 0;

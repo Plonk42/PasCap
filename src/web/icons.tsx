@@ -51,6 +51,7 @@ export type IconName =
   | 'bookmark'
   | 'clock'
   | 'link'
+  | 'select-all'
   | 'panel-left-close'
   | 'panel-left-open'
   | 'panel-right-close'
@@ -113,6 +114,7 @@ const paths: Record<IconName, string> = {
   'panel-right-close': 'M3 4h18v16H3V4Zm12 0v16M8 9l3 3-3 3',
   'panel-right-open': 'M3 4h18v16H3V4Zm12 0v16m-4-11-3 3 3 3',
   link: 'M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7',
+  'select-all': 'M3 8V4h4m10 0h4v4m0 8v4h-4M7 20H3v-4M7 9h4v6H7V9Zm6 0h4v6h-4V9Z',
 };
 export function Icon({ name, size = 18 }: Readonly<{ name: IconName; size?: number }>) {
   return (

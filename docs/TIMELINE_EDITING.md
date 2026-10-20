@@ -352,6 +352,21 @@ and undoable, and never move music, other tracks or absolute track keyframes.
   Invalid overlap/fade placements have a red ghost/reason and never enter history.
   Edge scrolling updates the same plan; cancellation leaves placement unchanged.
   Unchanged adjacent pairs retain their transition; new pairs become cuts.
+- **Several clips** can be selected: **Ctrl-click** (Cmd-click) adds a clip, which becomes the
+  primary clip that Clip properties edit (solid outline; the others are dashed), or removes a
+  selected one; the **Select all clips** icon in a track header adds that track's clips. A plain
+  click, or selecting a track, returns to one selected clip. The selection is editor-only, never
+  saved. Dragging any selected clip moves them all by the same number of frames: clips from one
+  track follow the pointer to its track, clips from several tracks stay on their own tracks. On
+  a Ripple-off destination each keeps its offset from the others and any moved edge snaps; on a
+  Ripple-on destination they follow its sequence: clips arriving from another track join it as
+  one block at the slot nearest their new start, and on their own track each run of consecutive
+  selected clips moves to the slot nearest its shifted start, so a small drag changes nothing.
+  Every moved clip shows a ghost. The whole move is validated at once: a start before frame 0,
+  an overlap or a fade/transition conflict turns the ghosts red and commits nothing, never
+  clamping or moving part of the selection. A valid drop is one Undo step. **Delete** removes
+  every selected clip and **Alt+Left/Right** nudges them all (Ripple tracks keep their order),
+  each in one Undo step; track keyframes, Colour and Transform never move with clips.
 - Ripple-on deletion closes the gap; Ripple-off deletion leaves other placements intact.
   Split finds the original source boundary through the placed map and preserves
   independent clip speed, including source-frame speed keyframes. Track Colour and Opacity are
