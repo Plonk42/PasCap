@@ -14,3 +14,22 @@ export function useDelayedFlag(active: boolean, delayMs = WAITING_INDICATOR_DELA
   }, [active, delayMs, progress]);
   return active && elapsed;
 }
+
+/**
+ * While `moving`, the value last held unchanged for `restMs` (initially the value when moving began);
+ * otherwise the current value. Consumers then render once per pause rather than on every change.
+ */
+export function useRestingValue<T>(value: T, moving: boolean, restMs: number): T {
+  const [rested, setRested] = useState(value);
+  const [wasMoving, setWasMoving] = useState(moving);
+  if (moving !== wasMoving) {
+    setWasMoving(moving);
+    if (moving) setRested(() => value);
+  }
+  useEffect(() => {
+    if (!moving) return;
+    const timer = window.setTimeout(() => setRested(() => value), restMs);
+    return () => window.clearTimeout(timer);
+  }, [value, moving, restMs]);
+  return moving ? rested : value;
+}
