@@ -90,8 +90,9 @@ or dissolve can start from prefilled frames.
 - Paused seeks start a one-frame stream per active clip, wait for that exact
   frame, upload it and stop. A lane already showing the exact recording and
   source frame keeps its texture without decoding again. The previous image stays
-  meanwhile; the seeking or buffering overlay appears only after 250 ms of
-  continuous waiting, so ruler scrubbing does not blink.
+  meanwhile; the seeking overlay appears only after 250 ms without a new image,
+  and the buffering overlay after 250 ms of continuous waiting, so scrubbing does
+  not blink.
 - Play prefills up to three frames per active clip, starts music when present
   and anchors the clock at the requested frame.
 - Every animation frame, the clock frame is sampled. Frames the clock has passed
@@ -119,6 +120,31 @@ or dissolve can start from prefilled frames.
 Diagnostics report decoded, queued and dropped frames, stalls (mid-clip and at clip
 boundaries) and total stall time. WebGL context loss stops playback and releases
 every lane.
+
+### Timeline scrubbing
+
+Editor seeks (the playhead handle, ruler clicks and range drags, keyboard steps and
+navigation) are paused seeks with a latest-wins rule ([#224](https://github.com/Plonk42/PasCap/issues/224)).
+Every drawn image is the exact composed frame of some project frame, drawn in request
+order:
+
+- While the frames of one seek decode, a newer request waits instead of cancelling
+  them: they are drawn, then the latest request. Requests in between are skipped.
+- While requests keep arriving (one within the last 100 ms), the next image may be
+  an intermediate frame: in the half of the way to the latest request nearest to it,
+  at most one GOP before it, the frame whose sources need the fewest decodes from
+  their keyframes (the proxy's closed 15-frame GOPs), when it needs at most half the
+  request's decodes. One track then shows a keyframe; several tracks a frame where
+  their sources are close to keyframes.
+- Once no request has arrived for 100 ms, an intermediate frame still decoding gives
+  way and the latest request is decoded exactly; the image then settles on it.
+- When presenting a frame blocks the editor for more than 100 ms (software
+  rendering), the next frame is chosen after that presentation, from the requests
+  that arrived meanwhile.
+- The seeking overlay appears only after 250 ms without a new image.
+
+Playback, exact programmatic seeks, timing edits and project changes take over a
+scrub as they do a seek. Decoder lanes, credits and the reader worker are unchanged.
 
 ## Source review
 

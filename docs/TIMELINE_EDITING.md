@@ -594,7 +594,10 @@ audio clock continues and late frames are skipped. Source review uses its own
 one-decoder worker. See [WebCodecs preview decoding](design/WEBCODECS_PREVIEW.md).
 
 Seeks and timing changes discard obsolete decoded frames by stream generation;
-no stale frame is uploaded while the target recording decodes.
+no stale frame is uploaded while the target recording decodes. Scrubbing the playhead or
+ruler never cancels the frame being decoded while the pointer moves: it is drawn, then the
+newest position, possibly through a cheaper exact frame on the way, and the image settles on
+the exact frame once the pointer rests ([scrubbing](design/WEBCODECS_PREVIEW.md#timeline-scrubbing)).
 All track opacity/colour channels use project time, so coverage and grading can change
 even on held source frames. Appearance-only edits update rendering without reloading
 unchanged timing/music. Source/speed/placement edits pause and reload
