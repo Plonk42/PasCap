@@ -137,7 +137,9 @@ and technical paths stay unchanged; this glossary does not change the project sc
   Handle arrows move one original frame (Shift ten); Home restores IN=0 and End
   restores OUT=original frame count. Source review's numeric IN/OUT apply as one
   validated pair on Enter or when focus leaves both fields (not between them), except that a
-  native stepper/↑↓ step applies at once and shows that edge; Escape restores. See [TIMELINE_EDITING.md](../TIMELINE_EDITING.md).
+  native stepper/↑↓ step applies at once and shows that edge; Escape restores. A reset icon after OUT,
+  **Reset source range**, restores IN = 0 and OUT = frame count (dimmed with its reason at the whole
+  recording). See [TIMELINE_EDITING.md](../TIMELINE_EDITING.md).
 - Other frames/durations/fades: native numeric stepper, explicit frame units and existing
   timecode feedback. No clamping, rounding or hidden timing repair.
 - Easing/modes/recordings: native select; selected easing has its existing graph.

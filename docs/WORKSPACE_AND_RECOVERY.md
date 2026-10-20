@@ -587,7 +587,8 @@ original access or implicit preparation.
 Click/focus chooses a prepared source. Hovering another recording card previews it;
 leaving that card returns to the chosen source at its last frame (without a chosen
 source, the last hovered frame stays). IN/OUT handles/numeric fields/I/O marks stay recoverable; Home/End
-on a handle restores that edge. There are no Mark IN/OUT or Reset buttons and no
+on a handle restores that edge, and **Reset source range** (the reset icon after OUT) restores the
+whole recording. There are no Mark IN/OUT buttons and no
 static selected/omitted-frame summary: the strip and exact fields show the range,
 while inline text appears only for drag hints and invalid numeric drafts; Escape
 restores unapplied numeric drafts.

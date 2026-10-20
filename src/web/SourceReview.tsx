@@ -661,6 +661,13 @@ function SourceRangeEditor({
     }
     commit({ mediaId: asset.id, sourceIn: Number(numbers.sourceIn), sourceOut: Number(numbers.sourceOut) });
   };
+  let resetBlocked: string | null = null;
+  if (disabled) resetBlocked = 'Finish the current edit before resetting the range.';
+  else if (range.sourceIn === 0 && range.sourceOut === count && !numbersDirty && !error)
+    resetBlocked = 'The range already covers the whole recording.';
+  const resetRange = (): void => {
+    if (resetBlocked === null && !drag.current) commit({ mediaId: asset.id, sourceIn: 0, sourceOut: count });
+  };
 
   const changeNumber = (event: ChangeEvent<HTMLInputElement>, edge: MediaSelectionEdge): void => {
     const text = event.currentTarget.value;
@@ -905,6 +912,18 @@ function SourceRangeEditor({
               onChange={(event) => changeNumber(event, 'out')}
             />
           </label>
+          <button
+            type="button"
+            className="icon-button source-range-reset"
+            aria-label="Reset source range"
+            aria-disabled={resetBlocked !== null}
+            tabIndex={resetBlocked === null ? 0 : -1}
+            title={resetBlocked ?? 'Reset IN and OUT to the whole recording'}
+            onKeyDown={onKeyDown}
+            onClick={resetRange}
+          >
+            <Icon name="reset" size={13} />
+          </button>
         </form>
       </div>
       {error && (

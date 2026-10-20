@@ -139,7 +139,8 @@ Set source **IN/OUT** by dragging the handles, with focused source **I/O**, or w
 the paired numeric fields, which apply together on Enter or when you leave both;
 Escape restores an unapplied draft. OUT is exclusive; **O** includes
 the displayed frame. Drag a handle back to an edge (or press **Home**/**End** on it)
-to restore the full recording. These choices are per-project, browser-local state,
+to restore that edge, or use the reset icon after **OUT** to restore the full recording.
+These choices are per-project, browser-local state,
 not portable project-document fields.
 
 The source range strip under the image shows snapshots across the whole recording, like

@@ -508,8 +508,9 @@ review controls are focused. OUT is exclusive: **O** selects through the visible
 frame (`OUT = frame + 1`). The numeric pair applies on Enter or when focus leaves
 both fields; Escape restores an unapplied draft.
 At least one original frame is retained. Home/End on
-a handle restores 0 or the full frame count; there are no separate Mark or Reset
-buttons. Handle drafts commit only on release; Escape,
+a handle restores 0 or the full frame count; the reset icon after OUT (**Reset source range**)
+restores both, replacing any unapplied numeric draft. It is dimmed with its reason when the range
+already covers the whole recording. There are no separate Mark buttons. Handle drafts commit only on release; Escape,
 pointer cancellation, lost capture or window blur discards them and restores the
 prior source frame. Below the image, a timeline-like **source range strip** maps the whole
 original from frame 0 (left) to the exclusive OUT (right). It shows the five
