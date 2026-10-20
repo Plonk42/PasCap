@@ -446,7 +446,8 @@ and seeks, opening Track → Colour, without editing. **Drag horizontally** to m
 On a focused marker, **Left/Right** moves the keyframe one project frame;
 **Shift+Left/Right** moves ten, without snapping. The cursor/focus follows the
 keyframe; ordinary playhead stepping, clip nudging and other editor shortcuts do not
-also run.
+also run. **Delete** or **Backspace** removes the focused keyframe in one Undo step, also
+on a track without clips or outside the duration.
 Shared time-field editing remains available. A dragged keyframe can be stored beyond
 duration and stays list-editable, but does not extend the sequence merely for the
 keyframe. Moving it copies/shifts no other keyframes, track values, clip settings/source ranges or music,

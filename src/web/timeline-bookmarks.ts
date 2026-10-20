@@ -67,6 +67,6 @@ export function bookmarkKind(onSeek: (frame: number) => void): KeyframeSlideKind
     // A dragged bookmark never snaps back to its own origin.
     snapTargets: (project, { origin }) =>
       snapPoints({ ...project, bookmarks: project.bookmarks.filter((frame) => frame !== origin) }),
-    remove: ({ origin }) => ({ type: 'bookmark-remove', frame: origin }),
+    remove: (_project, { origin }) => ({ type: 'bookmark-remove', frame: origin }),
   };
 }

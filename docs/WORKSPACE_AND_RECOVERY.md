@@ -185,7 +185,7 @@ otherwise. Editing
 shortcuts cannot mutate clips while using a modal, source control, input, options
 popover, activity drawer or pane divider. Skip links expose the major editor regions.
 On a focused track keyframe marker, Left/Right moves that keyframe one project frame and Shift
-moves ten. Marker keyboard events remain in that context, retaining keyframe/Timeline
+moves ten; Delete/Backspace removes it (one Undo step). Marker keyboard events remain in that context, retaining keyframe/Timeline
 focus while navigating to the moved keyframe, without also firing ordinary playhead-step,
 clip-nudge or other editor shortcuts.
 Click or Enter on a marker selects its track, seeks and opens Track → Colour, without editing; whole-track keyframe navigation preserves the chosen Properties tab.

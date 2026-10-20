@@ -688,7 +688,7 @@ for (const viewport of [
       for (const frame of TRANSFORM_FRAMES)
         await expect(marker(page, 'transform', frame)).toHaveAttribute(
           'title',
-          /Drag to move; Arrow keys: 1 frame, Shift: 10\. Alt bypasses snapping\.$/,
+          /Drag to move; Arrow keys: 1 frame, Shift: 10; Delete removes\. Alt bypasses snapping\.$/,
         );
       for (const source of [30, 80]) {
         const key = marker(page, 'speed', source);
@@ -760,8 +760,8 @@ for (const viewport of [
       await key.focus();
       await key.press('Enter');
       await previewAt(page, document, 50);
-      // Arrow keys move a Transform key (spatial-editor spec); every other shortcut must stay isolated.
-      for (const shortcut of ['s', 'q', 'w', 'i', 'o', 'Control+d', 'Delete']) await key.press(shortcut);
+      // Arrow keys move and Delete removes a Transform key (other specs); every other shortcut must stay isolated.
+      for (const shortcut of ['s', 'q', 'w', 'i', 'o', 'Control+d']) await key.press(shortcut);
       await previewAt(page, document, 50);
       await expect(key).toBeFocused();
       await key.press('Space');

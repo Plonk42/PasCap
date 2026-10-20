@@ -87,7 +87,7 @@ describe('bookmark snapping', () => {
     const blocked = planBookmarkMove(document, 37, 200);
     expect(blocked.error).toContain('already exists');
     expect(blocked.document).toBe(document);
-    expect(kind.remove!(first!)).toEqual({ type: 'bookmark-remove', frame: 37 });
+    expect(kind.remove!(document, first!)).toEqual({ type: 'bookmark-remove', frame: 37 });
     expect(kind.seekFrame(document, first!, 500)).toBe(89);
   });
 

@@ -1545,7 +1545,7 @@ export function Timeline(props: Readonly<Props>) {
                     'data-keyframe-layer': layer.id,
                     'aria-label': `Track keyframe ${state.frame} on ${layer.name}${point.reset ? ' (default)' : ''}`,
                     'aria-pressed': current,
-                    title: `${layer.name} · ${formatTimecode(state.frame)} · ${point.reset ? 'Default keyframe: settings return to their defaults here' : settings} · Drag to move all animated settings; Arrow keys: 1 frame, Shift: 10. Alt bypasses snapping.`,
+                    title: `${layer.name} · ${formatTimecode(state.frame)} · ${point.reset ? 'Default keyframe: settings return to their defaults here' : settings} · Drag to move all animated settings; Arrow keys: 1 frame, Shift: 10; Delete removes. Alt bypasses snapping.`,
                     style: { top: rowTop(layer.id) + 48, left: leading + (state.at ?? origin) * scale },
                     children: (
                       <>
@@ -1584,7 +1584,7 @@ export function Timeline(props: Readonly<Props>) {
                     'data-transform-keyframe': state.frame,
                     'data-transform-layer': layer.id,
                     'aria-label': `Transform keyframe ${state.frame} on ${layer.name} (${described})`,
-                    title: `${layer.name} · Transform · ${formatTimecode(state.frame)} · ${point.reset ? 'Default keyframe: Transform returns to its defaults here' : settings} · Drag to move; Arrow keys: 1 frame, Shift: 10. Alt bypasses snapping.`,
+                    title: `${layer.name} · Transform · ${formatTimecode(state.frame)} · ${point.reset ? 'Default keyframe: Transform returns to its defaults here' : settings} · Drag to move; Arrow keys: 1 frame, Shift: 10; Delete removes. Alt bypasses snapping.`,
                     style: { top: rowTop(layer.id) - 3, left: leading + (state.at ?? origin) * scale },
                     children: (
                       <>

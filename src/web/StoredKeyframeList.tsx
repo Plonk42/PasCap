@@ -301,11 +301,24 @@ export function StoredKeyframeList<S extends string, K extends StoredKeyframe<S>
               ? 'No preview frame is available. This keyframe remains editable below.'
               : `Preview is at frame ${frame}, not at this stored keyframe.`}
           </span>
-          {onFollowPlayhead && (
-            <button type="button" className="text-button" onClick={onFollowPlayhead}>
-              Follow playhead
+          <div className="layer-keyframe-inspected-actions">
+            {onFollowPlayhead && (
+              <button type="button" className="text-button" onClick={onFollowPlayhead}>
+                Follow playhead
+              </button>
+            )}
+            <button
+              type="button"
+              className="text-button"
+              aria-label={`Delete stored ${kind.noun} keyframe ${unshown.frame}`}
+              title={kind.removeTitle}
+              disabled={disabled}
+              onClick={() => kind.remove(unshown)}
+            >
+              <Icon name="trash" size={13} />
+              Delete
             </button>
-          )}
+          </div>
         </div>
       )}
       {keys.length > 0 && (

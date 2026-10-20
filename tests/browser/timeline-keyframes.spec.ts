@@ -3,6 +3,7 @@ import { NEUTRAL_COLOUR, scalarColourValues } from '../../src/shared/colour.js';
 import { applyCommand } from '../../src/shared/commands.js';
 import type { MediaAsset } from '../../src/shared/media.js';
 import { createClip, createLayer, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
+import { defaultSpatialKeyframe } from '../../src/shared/spatial.js';
 import { calculateLayout } from '../../src/shared/timeline.js';
 import {
   editLayerPoint,
@@ -488,4 +489,42 @@ test('stored points after the last clip keep their own markers without extending
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   expect(await current(page)).toEqual(project);
   await expect(marker(page, 160)).toBeVisible();
+});
+
+test('after every clip is removed, Delete on Colour and Transform markers and the stored keyframe panel remove keyframes, one Undo each', async ({
+  page,
+}) => {
+  const project = sequence();
+  project.layers[0]!.transform.keyframes = [defaultSpatialKeyframe(40)];
+  await fixture(page, project);
+  for (const id of ['first', 'second']) {
+    await page.locator(`[data-clip-id="${id}"]`).click();
+    await page.getByRole('button', { name: 'Delete selected clip', exact: true }).click();
+  }
+  await expect(page.locator('[data-clip-id]')).toHaveCount(0);
+  const emptied = await current(page);
+  expect(emptied.clips).toEqual([]);
+  expect(emptied.layers[0]!.keyframes.map((point) => point.frame)).toEqual([20, 80]);
+  const transformMarker = page.locator('[data-transform-layer="video-1"][data-transform-keyframe="40"]');
+  await expect(transformMarker).toHaveAttribute('title', /Delete removes/);
+  await marker(page, 20).focus();
+  await marker(page, 20).press('Delete');
+  await expect(marker(page, 20)).toHaveCount(0);
+  expect((await current(page)).layers[0]!.keyframes.map((point) => point.frame)).toEqual([80]);
+  await transformMarker.focus();
+  await transformMarker.press('Backspace');
+  await expect(transformMarker).toHaveCount(0);
+  expect((await current(page)).layers[0]!.transform.keyframes).toEqual([]);
+  expect((await current(page)).clips).toEqual([]);
+  await marker(page, 80).click();
+  const keys = layerKeyframes(page, 'Track 1');
+  await expect(keys.locator('.layer-keyframe-inspected')).toContainText('Stored keyframe · timeline frame 80');
+  await keys.getByRole('button', { name: 'Delete stored track keyframe 80', exact: true }).click();
+  await expect(marker(page, 80)).toHaveCount(0);
+  await expect(keys.locator('.layer-keyframe-inspected')).toHaveCount(0);
+  expect((await current(page)).layers[0]!.keyframes).toEqual([]);
+  for (let undo = 0; undo < 3; undo++) await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  expect(await current(page)).toEqual(emptied);
+  await expect(marker(page, 20)).toBeVisible();
+  await expect(transformMarker).toBeVisible();
 });

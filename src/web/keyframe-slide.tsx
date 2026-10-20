@@ -55,7 +55,7 @@ export interface KeyframeSlideKind<T extends KeyframeSlideTarget> {
   /** Snap targets other than the playhead; defaults to `snapPoints(project)`. */
   snapTargets?(project: ProjectDocument, target: T): number[];
   /** Delete/Backspace on a focused marker, when the type supports it. */
-  remove?(target: T): EditCommand;
+  remove?(project: ProjectDocument, target: T): EditCommand;
 }
 
 interface Options<T extends KeyframeSlideTarget> {
@@ -286,7 +286,7 @@ export function useKeyframeSlide<T extends KeyframeSlideTarget>(options: Options
     if (disabled || session.current) return;
     if (kind.remove && ['Delete', 'Backspace'].includes(event.key)) {
       event.preventDefault();
-      onEdit(kind.remove(target));
+      onEdit(kind.remove(project, target));
       focusMarker(target, null);
       return;
     }
