@@ -53,7 +53,7 @@ test.beforeEach(async ({ page, request }) => {
       return;
     }
     const video = /^\/api\/media\/([^/]+)\/(?:proxy|thumbnail\/\d+)$/.exec(pathname);
-    const music = /^\/api\/audio\/([^/]+)\/(?:playback|waveform)$/.exec(pathname);
+    const music = /^\/api\/audio\/([^/]+)\/(?:playback|waveform|analysis)$/.exec(pathname);
     if (
       method === 'GET' &&
       ((video && assets.some((asset) => asset.id === video[1])) ||

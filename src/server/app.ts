@@ -322,6 +322,15 @@ export async function createApp(config = createConfig()) {
   app.get('/api/audio/:id/waveform', async (request) => ({
     waveform: (await audio.assertReady(idParams.parse(request.params).id)).waveform,
   }));
+  app.get('/api/audio/:id/analysis', async (request) => {
+    const asset = audio.get(idParams.parse(request.params).id);
+    await assertSourceIdentity(asset.sourcePath, asset.fingerprint);
+    return { analysis: await audio.analysis(asset.id), job: audio.analysisJob(asset.id) };
+  });
+  app.post('/api/audio/:id/analysis', async (request, reply) => {
+    z.object({}).strict().parse(request.body);
+    return reply.code(202).send({ job: audio.analyse(idParams.parse(request.params).id) });
+  });
   app.get('/api/projects', async () => ({ projects: await projects.list() }));
   app.post('/api/projects', async (request, reply) =>
     reply.code(201).send({ document: await projects.create(createProjectSchema.parse(request.body).title) }),

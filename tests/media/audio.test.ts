@@ -10,6 +10,7 @@ import {
   rename,
   rm,
   symlink,
+  utimes,
   writeFile,
 } from 'node:fs/promises';
 import os from 'node:os';
@@ -23,6 +24,7 @@ import { JobQueue } from '../../src/server/jobs.js';
 import * as processes from '../../src/server/process.js';
 import { audioAssetSchema, type AudioAsset } from '../../src/shared/audio.js';
 import { jobSchema } from '../../src/shared/media.js';
+import { musicAnalysisSchema, type MusicAnalysis } from '../../src/shared/music-analysis.js';
 
 const enabled = process.env['PASCAP_MEDIA_TESTS'] === '1';
 const headers = { host: '127.0.0.1:4318', 'x-pascap-client': 'preview-lab' };
@@ -110,6 +112,8 @@ describe.skipIf(!enabled)('registered music · disposable lavfi audio only', () 
     expect(job.kind).toBe('audio');
     const finished = await service.jobs.wait(job.id);
     expect(finished.state, finished.message).toBe('completed');
+    // Preparation queues a background music analysis; let it settle so tests see a quiet queue.
+    await service.jobs.idle();
     return service.audio.get(registered.id);
   }
   async function readyTone(): Promise<AudioAsset> {
@@ -522,6 +526,8 @@ describe.skipIf(!enabled)('registered music · disposable lavfi audio only', () 
 
   it('exposes a missing current cache without rewriting the registry, deleting older files or starting work', async () => {
     const asset = await readyTone();
+    // The previous test's preparations queued background analyses.
+    await service.jobs.idle();
     const playback = service.audio.playbackPath(asset);
     const previous = path.join(path.dirname(service.audio.assetDir(asset)), 'aac-48k-stereo-mono-unity-v2');
     await mkdir(previous, { recursive: true });
@@ -675,5 +681,76 @@ describe.skipIf(!enabled)('registered music · disposable lavfi audio only', () 
     ).toBe(409);
     expect(service.audio.get(asset.id)).toEqual(asset);
     expect(service.jobs.list()).toEqual(before);
+  });
+
+  it('analyses prepared music in the background, ignores a stale analysis and survives a cancelled one', async () => {
+    // 12 s of 120 BPM clicks at 44.1 kHz mono, written directly as a WAV file.
+    const rate = 44_100;
+    const samples = new Int16Array(12 * rate);
+    for (let beat = 0.25; beat < 12; beat += 0.5)
+      for (let offset = 0; offset < 0.05 * rate; offset++)
+        samples[Math.round(beat * rate) + offset] = Math.round(
+          20_000 * Math.exp(-offset / (0.008 * rate)) * Math.sin((2 * Math.PI * 900 * offset) / rate),
+        );
+    const header = Buffer.alloc(44);
+    header.write('RIFF', 0);
+    header.writeUInt32LE(36 + samples.byteLength, 4);
+    header.write('WAVEfmt ', 8);
+    header.writeUInt32LE(16, 16);
+    header.writeUInt16LE(1, 20);
+    header.writeUInt16LE(1, 22);
+    header.writeUInt32LE(rate, 24);
+    header.writeUInt32LE(rate * 2, 28);
+    header.writeUInt16LE(2, 32);
+    header.writeUInt16LE(16, 34);
+    header.write('data', 36);
+    header.writeUInt32LE(samples.byteLength, 40);
+    const clicksPath = path.join(sources, 'clicks.wav');
+    await writeFile(clicksPath, Buffer.concat([header, Buffer.from(samples.buffer)]));
+    const asset = await registerReady(clicksPath);
+    const queued = service.jobs.list().filter((job) => job.kind === 'music-analysis' && job.label === 'clicks.wav');
+    expect(queued.map((job) => job.state)).toEqual(['completed']);
+    const url = `/api/audio/${asset.id}/analysis`;
+    const read = async (): Promise<{ analysis: MusicAnalysis | null; job: unknown }> => {
+      const response = await service.app.inject({ url, headers });
+      expect(response.statusCode, response.body).toBe(200);
+      return response.json();
+    };
+    const { analysis, job } = await read();
+    expect(job).toBeNull();
+    expect(musicAnalysisSchema.parse(analysis)).toEqual(analysis);
+    expect(Math.abs(analysis!.tempo!.bpm / 120 - 1)).toBeLessThanOrEqual(0.02);
+    expect(analysis!.beats.length).toBeGreaterThanOrEqual(22);
+    for (const beat of analysis!.beats) {
+      const seconds = beat.sample / 48_000;
+      expect(Math.abs(seconds - 0.25 - Math.round((seconds - 0.25) * 2) / 2)).toBeLessThanOrEqual(0.035);
+    }
+    expect(analysis!.loudness).toHaveLength(120);
+    expect(path.basename(service.audio.analysisPath(asset))).toBe('music-v1.json');
+    expect(path.dirname(service.audio.analysisPath(asset))).toBe(path.dirname(service.audio.playbackPath(asset)));
+
+    // A re-written PCM cache makes the analysis stale rather than wrong.
+    const later = new Date(Date.now() + 5_000);
+    await utimes(service.audio.playbackPath(asset), later, later);
+    expect((await read()).analysis).toBeNull();
+
+    const started = await service.app.inject({ method: 'POST', url, headers, payload: {} });
+    expect(started.statusCode, started.body).toBe(202);
+    const running = jobSchema.parse(started.json().job);
+    await vi.waitUntil(() => service.jobs.get(running.id).state !== 'queued', { timeout: 5_000, interval: 5 });
+    service.jobs.cancel(running.id);
+    expect((await service.jobs.wait(running.id)).state).toBe('cancelled');
+    expect((await read()).analysis).toBeNull();
+    await expect(service.audio.assertReady(asset.id)).resolves.toMatchObject({ status: 'ready' });
+    expect((await service.app.inject({ url: `/api/audio/${asset.id}/playback`, headers })).statusCode).toBe(200);
+
+    const again = await service.app.inject({ method: 'POST', url, headers, payload: {} });
+    const finished = await service.jobs.wait(jobSchema.parse(again.json().job).id);
+    expect(finished.state, finished.message).toBe('completed');
+    expect((await read()).analysis?.beats).toEqual(analysis!.beats);
+    expect(
+      (await service.app.inject({ method: 'POST', url: '/api/audio/unregistered/analysis', headers, payload: {} }))
+        .statusCode,
+    ).toBe(404);
   });
 });

@@ -87,7 +87,7 @@ test.beforeEach(async ({ page, request }) => {
       await route.continue();
       return;
     }
-    const audio = /^\/api\/audio\/([^/]+)\/playback$/.exec(pathname);
+    const audio = /^\/api\/audio\/([^/]+)\/(?:playback|analysis)$/.exec(pathname);
     if ((method === 'GET' || method === 'HEAD') && audio && audioAssets.some((asset) => asset.id === audio[1])) {
       await route.continue();
       return;
