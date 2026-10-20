@@ -27,6 +27,9 @@ Nonzero settings intentionally colour greys; shared normalized linear gains run
 before Exposure, preserving neutral-white linear luminance before clipping only.
 They are not Kelvin or HDR output. **Auto white balance**, under Tint, keyframes both at the playhead from
 the light of a few frames around it ([details](design/TEMPERATURE_AND_TINT.md#automatic-white-balance)).
+**Auto**, in the Colour keyframe line, analyses the whole clip at the playhead for the track's values, or
+the second around the playhead for a keyframe there, and, from its popover's **Apply**, sets ten Colour
+settings in one Undo step, previewing first ([Auto adjust](design/AUTO_ADJUST.md)).
 HSL/curves remain static. See
 [Temperature and Tint](design/TEMPERATURE_AND_TINT.md).
 **HDR** (0–1, neutral 0) is a keyable SDR local tone-mapping look applied with the

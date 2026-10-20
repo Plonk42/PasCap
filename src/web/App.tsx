@@ -72,7 +72,7 @@ import {
   toggleClip,
   useClipGroup,
 } from './clip-selection.js';
-import { registerLivePreview } from './live-preview.js';
+import { previewCommands, registerLivePreview } from './live-preview.js';
 import { MediaLibrary, type ReviewTarget } from './MediaLibrary.js';
 import { nextLayerName } from './move-to-track.js';
 import type { ImportActions, ImportKind, ImportResult, RelinkTarget } from './ImportDialog.js';
@@ -784,10 +784,10 @@ export function App() {
     [edit, clipGroup.latest],
   );
   // Slider drags show their value in the preview only: no document, history, autosave or Inspector change.
-  const livePending = useRef<{ command: EditCommand | null } | null>(null);
+  const livePending = useRef<{ commands: EditCommand | readonly EditCommand[] | null } | null>(null);
   const liveFrame = useRef<number | null>(null);
-  const previewLive = useCallback((command: EditCommand | null): void => {
-    livePending.current = { command };
+  const previewLive = useCallback((commands: EditCommand | readonly EditCommand[] | null): void => {
+    livePending.current = { commands };
     if (liveFrame.current !== null) return;
     liveFrame.current = requestAnimationFrame(() => {
       liveFrame.current = null;
@@ -797,7 +797,9 @@ export function App() {
       const preview = engine.current;
       if (!request || !document || !preview || drafting.current) return;
       try {
-        preview.updateProjectAppearance(request.command ? applyCommand(document, request.command) : document);
+        let next = document;
+        for (const command of previewCommands(request.commands)) next = applyCommand(next, command);
+        preview.updateProjectAppearance(next);
       } catch {
         // An invalid or timing-changing value is not previewed; the committed project stays shown.
         preview.updateProjectAppearance(document);

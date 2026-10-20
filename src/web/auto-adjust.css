@@ -1,0 +1,120 @@
+/* Track → Colour: Auto ends the Colour keyframe line, styled like its Reset text button. */
+.auto-adjust {
+  display: inline-flex;
+}
+
+.auto-adjust-trigger,
+.editor-popover.auto-adjust-popover > summary.editor-popover-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  width: auto;
+  height: 24px;
+  padding: 0 2px;
+  border: 0;
+  border-radius: 4px;
+  font-size: 10px;
+  color: #b1d8bc;
+}
+
+.auto-adjust-trigger[aria-disabled='true'] {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* The line measures itself: too narrow for Auto beside a two-digit count, Auto takes its own row. */
+.section-keyframe-line:has(> .auto-adjust) {
+  container: colour-keyframe-line / inline-size;
+}
+
+@container colour-keyframe-line (width < 280px) {
+  .section-keyframe-line > .auto-adjust {
+    flex-basis: 100%;
+    justify-content: flex-end;
+  }
+}
+
+.auto-adjust-panel {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.auto-adjust-panel p {
+  margin: 0;
+}
+
+.auto-adjust-source {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.auto-adjust-progress {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.auto-adjust-mode {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.auto-adjust-mode legend {
+  margin-bottom: 2px;
+  padding: 0;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+/* Above the popover's stacked label and full-width input defaults. */
+.editor-popover-content .auto-adjust-mode label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: inherit;
+  font-size: 12px;
+}
+
+.editor-popover-content .auto-adjust-panel .auto-adjust-mode input[type='radio'] {
+  width: auto;
+  margin: 0;
+}
+
+.auto-adjust-mode small {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.auto-adjust-error {
+  color: var(--error);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.auto-adjust-animated {
+  display: grid;
+  gap: 3px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.auto-adjust-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.auto-adjust-actions .primary-button[aria-disabled='true'] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}

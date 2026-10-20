@@ -5,19 +5,38 @@ import { popoverPosition, type PopoverPosition } from './popover-position.js';
 
 interface Props {
   label: string;
+  /** The trigger's tooltip; defaults to the label. */
+  title?: string;
   className?: string;
   trigger?: ReactNode;
+  /** Called after the popover opens or closes, however it does. */
+  onOpenChange?: (open: boolean) => void;
   children: ReactNode | ((close: () => void) => ReactNode);
 }
 
 /** A nonmodal disclosure: normal Tab order, not an incomplete ARIA menu. */
-export function Popover({ label, className = '', trigger: triggerContent, children }: Readonly<Props>) {
+export function Popover({
+  label,
+  title = label,
+  className = '',
+  trigger: triggerContent,
+  onOpenChange,
+  children,
+}: Readonly<Props>) {
   const contentId = useId();
   const root = useRef<HTMLDetailsElement>(null);
   const trigger = useRef<HTMLElement>(null);
   const content = useRef<HTMLFieldSetElement>(null);
   const [open, setOpen] = useState(false);
   const [position, setPosition] = useState<PopoverPosition | null>(null);
+  const openChange = useRef(onOpenChange);
+  openChange.current = onOpenChange;
+  const reported = useRef(false);
+  useEffect(() => {
+    if (reported.current === open) return;
+    reported.current = open;
+    openChange.current?.(open);
+  }, [open]);
   const close = useCallback((restoreFocus = true): void => {
     if (content.current?.matches(':popover-open')) content.current.hidePopover();
     setOpen(false);
@@ -95,7 +114,7 @@ export function Popover({ label, className = '', trigger: triggerContent, childr
         ref={trigger}
         className="editor-popover-trigger icon-button"
         aria-label={label}
-        title={label}
+        title={title}
         aria-expanded={open}
         aria-controls={contentId}
         onClick={(event) => {
