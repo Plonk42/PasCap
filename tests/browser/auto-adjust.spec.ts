@@ -224,7 +224,7 @@ function keyframed(document: ProjectDocument, frame: number, correction: AutoCor
 const auto = (page: Page) => page.locator('summary[aria-label="Auto adjust"]');
 const apply = (page: Page) => page.getByRole('button', { name: 'Apply', exact: true });
 const intensity = (page: Page) => page.getByRole('spinbutton', { name: 'Auto adjust intensity', exact: true });
-const mode = (page: Page, name: 'Track values' | 'Keyframe at playhead') =>
+const mode = (page: Page, name: 'Track values' | 'Track values from playhead' | 'Keyframe at playhead') =>
   page.getByRole('radio', { name, exact: true });
 
 function applied(document: ProjectDocument, correction: AutoCorrection, intensity: number): ProjectDocument {
@@ -389,6 +389,33 @@ test('Keyframe at playhead keys the eleven settings from the frames around it, o
 
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   expect(await current(page)).toEqual(once);
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  expect(await current(page)).toEqual(before);
+});
+
+test('Track values from playhead sets the whole track from the second around it, sharing the keyframe analysis', async ({
+  page,
+}) => {
+  const before = await current(page);
+  const correction = await expectedCorrection(page, keyframeFrames(before, 45));
+  await auto(page).click();
+  await expect(mode(page, 'Track values')).toBeChecked();
+  await expect(apply(page)).toBeVisible();
+  await mode(page, 'Track values from playhead').check();
+  await expect(apply(page)).toBeVisible();
+  // A keyframe at the playhead analyses the same frames: switching to it decodes nothing more.
+  const reads = proxyReads;
+  await mode(page, 'Keyframe at playhead').check();
+  await expect(apply(page)).toBeVisible();
+  await mode(page, 'Track values from playhead').check();
+  await expect(apply(page)).toBeVisible();
+  expect(proxyReads).toBe(reads);
+  await apply(page).click();
+  await expect(apply(page)).toHaveCount(0);
+  const expected = applied(before, correction, 0.8);
+  await expect.poll(() => current(page)).toEqual(expected);
+  for (const setting of AUTO_ADJUST_SETTINGS) expect(expected.layers[0]!.colour[setting]).toBe(correction[setting]);
+  expect(expected.layers[0]!.keyframes).toEqual(before.layers[0]!.keyframes);
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   expect(await current(page)).toEqual(before);
 });

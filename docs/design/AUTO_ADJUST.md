@@ -32,13 +32,17 @@ choice:
 - **Track values** (whole clip) analyses 16 frames spread over the clip's **whole source
   range**, and replaces the track's values. It is the initial choice while the track
   animates none of the eleven settings.
+- **Track values from playhead** (1 s around it) analyses the same frames as a keyframe
+  below, and replaces the track's values like Track values: for a clip whose light changes,
+  the moment that matters sets the look of the whole track.
 - **Keyframe at playhead** (1 s around it) analyses 16 frames within 30 project frames of
   the playhead, never across the clip's ends, mapped to source frames through
   `PlacedClip.retiming`, and keys the eleven settings at the playhead. It is the initial choice
   once the track animates any of them. It is unavailable, with the reason, when the track
   holds 256 keyframes and none is at the playhead.
 
-Changing the choice starts its own analysis. While it runs the popover shows **Analysing
+Changing the choice starts its own analysis, except between the two playhead choices, which
+share one. While it runs the popover shows **Analysing
 n/16 frames…** and **Cancel**. Then:
 
 - **Intensity**, a slider with an exact field (0–100%, initially 80%, Reset restores
@@ -46,11 +50,11 @@ n/16 frames…** and **Cancel**. Then:
   more at 100%. The correction at the chosen intensity is previewed in the image while the
   popover is open, the dragged value while dragging, through the live preview path:
   no document, history or save change.
-- For Track values, a line per setting the track animates, such as **Exposure is animated:
+- For both Track values choices, a line per setting the track animates, such as **Exposure is animated:
   not changed**.
 - **Apply** commits one Undo step and closes the popover. Hue, HDR, Local contrast, HSL,
   curves, Opacity, Transform and clips are untouched.
-  - Track values: one `colour` edit, the scaled correction replacing the track's
+  - Track values, from the whole clip or the playhead: one `colour` edit, the scaled correction replacing the track's
     Temperature, Tint, Saturation, Vibrance, Exposure, Brightness, Contrast, Highlights,
     Shadows, Whites and Blacks, except animated ones; no keyframe changes. Apply is
     unavailable when all eleven settings are animated.
@@ -65,7 +69,7 @@ n/16 frames…** and **Cancel**. Then:
 Errors (an unreadable proxy, frames too dark or too uniform) stay in the popover with
 **Close**. Changing track, project or the clip at the playhead, or trimming that clip,
 closes the popover and cancels a running analysis. Moving the playhead within the clip
-does not; for a keyframe it starts the analysis around the new playhead.
+does not; for the playhead choices it starts the analysis around the new playhead.
 
 Running Auto at several frames of a clip whose light changes keys a correction at each,
 and ordinary keyframe interpolation follows the light between them. The keyframes stay at
@@ -75,7 +79,7 @@ clip on the track; set **Hold** on the last keyframe of a shot, or key the next 
 frame, to keep shots apart.
 
 The editor keeps each analysis in session memory, never saved or in history: one per
-clip for Track values and one per clip and playhead for a keyframe. Reopening Auto on the
+clip for Track values and one per clip and playhead for the playhead choices. Reopening Auto on the
 same frames skips decoding and starts at the intensity last applied, so the user can
 lower it later; **Apply** then replaces the eleven settings again, including manual edits to
 them. The memory is dropped when the clip's source range or its proxy changes, on another
@@ -91,7 +95,7 @@ Exposure are log-gains, so half the correction is the geometric midpoint of the 
 ## Analysis
 
 **Frames.** For Track values, the centres of up to **16** equal slices of the clip's
-`[sourceIn, sourceOut)`. For a keyframe, the playhead and up to 15 more project frames within
+`[sourceIn, sourceOut)`. For the playhead choices, the playhead and up to 15 more project frames within
 **30** (1 s) of it inside its clip, shared between the two sides in proportion to their room
 and evenly spaced, as in white balance's window, each mapped to the source frame shown there
 (repeated source frames of slow motion are read once). They are

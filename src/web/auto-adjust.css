@@ -76,18 +76,21 @@
 /* Above the popover's stacked label and full-width input defaults. */
 .editor-popover-content .auto-adjust-mode label {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 6px;
   color: inherit;
   font-size: 12px;
+  line-height: 1.35;
 }
 
 .editor-popover-content .auto-adjust-panel .auto-adjust-mode input[type='radio'] {
   width: auto;
-  margin: 0;
+  margin: 2px 0 0;
 }
 
 .auto-adjust-mode small {
+  margin-left: 4px;
+  white-space: nowrap;
   color: var(--muted);
   font-size: 11px;
 }

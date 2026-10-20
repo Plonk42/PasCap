@@ -41,6 +41,7 @@ const TITLE = 'Analyse the clip at the playhead and suggest a balanced Colour co
 const BALANCED = Math.round(AUTO_ADJUST.balancedIntensity * 100);
 const MODES: readonly { mode: AutoAdjustMode; label: string; hint: string }[] = [
   { mode: 'track', label: 'Track values', hint: 'whole clip' },
+  { mode: 'playhead', label: 'Track values from playhead', hint: '1 s around it' },
   { mode: 'keyframe', label: 'Keyframe at playhead', hint: '1 s around it' },
 ];
 
@@ -84,6 +85,7 @@ export function AutoAdjust({
       projectId={projectId}
       layer={layer}
       trackTarget={availability.target}
+      playheadAvailability={autoAdjustTarget(layer, layout, assets, frame, selectedClipId, 'playhead')}
       keyframeAvailability={autoAdjustTarget(layer, layout, assets, frame, selectedClipId, 'keyframe')}
       onEdit={onEdit}
     />
@@ -100,12 +102,14 @@ function AutoAdjustPopover({
   projectId,
   layer,
   trackTarget,
+  playheadAvailability,
   keyframeAvailability,
   onEdit,
 }: Readonly<{
   projectId: string;
   layer: VideoLayer;
   trackTarget: AutoAdjustTarget;
+  playheadAvailability: AutoAdjustAvailability;
   keyframeAvailability: AutoAdjustAvailability;
   onEdit: (commands: readonly EditCommand[]) => void;
 }>) {
@@ -118,7 +122,12 @@ function AutoAdjustPopover({
   const [draft, setDraft] = useState<number | null>(null);
   const [announcement, setAnnouncement] = useState('');
 
-  const { target, reason } = mode === 'track' ? { target: trackTarget, reason: null } : keyframeAvailability;
+  const availabilities: Record<AutoAdjustMode, AutoAdjustAvailability> = {
+    track: { target: trackTarget, reason: null },
+    playhead: playheadAvailability,
+    keyframe: keyframeAvailability,
+  };
+  const { target, reason } = availabilities[mode];
   const targetKey = target?.key ?? null;
   // A new mode or, for a keyframe, a new playhead is a new analysis; leaving it cancels the old one.
   useEffect(() => {
@@ -157,11 +166,12 @@ function AutoAdjustPopover({
   const commandsAt = (value: number): EditCommand[] =>
     ready ? autoAdjustCommands(layer, ready.target, ready.correction, value / 100) : [];
   const previewing = open && ready !== null;
-  // Re-issued when the committed track changes too, since that replaces the preview.
+  // Re-issued when the committed track changes too, since that replaces the preview, and on a new mode for
+  // the same analysis.
   useEffect(() => {
     if (previewing && target && correction)
       livePreview(autoAdjustCommands(layer, target, correction, (draft ?? percent) / 100));
-  }, [previewing, targetKey, correction, layer, draft, percent]);
+  }, [previewing, targetKey, mode, correction, layer, draft, percent]);
   useEffect(() => (previewing ? () => livePreview(null) : undefined), [previewing]);
 
   const openChange = (next: boolean): void => {
@@ -185,7 +195,7 @@ function AutoAdjustPopover({
     );
   };
 
-  const animated = mode === 'track' ? animatedSettings(layer) : [];
+  const animated = mode === 'keyframe' ? [] : animatedSettings(layer);
   const nothing = ready !== null && commandsAt(percent).length === 0;
   return (
     <span className="auto-adjust">
@@ -228,8 +238,10 @@ function AutoAdjustPopover({
                         setMode(option.mode);
                       }}
                     />
-                    {option.label}
-                    <small>{option.hint}</small>
+                    <span>
+                      {option.label}
+                      <small>{option.hint}</small>
+                    </span>
                   </label>
                 ))}
               </fieldset>

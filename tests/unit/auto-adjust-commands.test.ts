@@ -189,6 +189,10 @@ describe('Auto adjust session memory', () => {
     expect(cachedAnalysis('auto', autoAdjustTarget(layer, layout, ASSETS, 50, null, 'keyframe').target!)?.percent).toBe(
       70,
     );
+    // Track values from the playhead analyse the same frames as a keyframe there: one analysis serves both.
+    const values50 = autoAdjustTarget(layer, layout, ASSETS, 50, null, 'playhead').target!;
+    expect(values50.sourceFrames).toEqual(at50.sourceFrames);
+    expect(cachedAnalysis('auto', values50)?.percent).toBe(70);
   });
 });
 
@@ -227,6 +231,7 @@ describe('Auto adjust keyframe', () => {
     expect(autoAdjustTarget(layer, layout, ASSETS, 11, null, 'keyframe').reason).toMatch(/already has 256 keyframes/);
     expect(autoAdjustTarget(layer, layout, ASSETS, 10, null, 'keyframe').target).not.toBeNull();
     expect(autoAdjustTarget(layer, layout, ASSETS, 11, null).target).not.toBeNull();
+    expect(autoAdjustTarget(layer, layout, ASSETS, 11, null, 'playhead').target).not.toBeNull();
   });
 
   it('keys the eleven settings at the playhead in one Undo step, joining or overwriting a keyframe there', () => {
@@ -268,6 +273,9 @@ describe('Auto adjust keyframe', () => {
     layer.keyframes = [layerKeyframe(20, { ...EMPTY_KEY_VALUES, temperature: 0.2 }, 'linear')];
     expect(initialMode(layer)).toBe('keyframe');
     expect(autoAdjustCommands(layer, { mode: 'track', frame: 20 }, CORRECTION, 0.8)).toEqual([
+      autoAdjustCommand(layer, CORRECTION, 0.8),
+    ]);
+    expect(autoAdjustCommands(layer, { mode: 'playhead', frame: 20 }, CORRECTION, 0.8)).toEqual([
       autoAdjustCommand(layer, CORRECTION, 0.8),
     ]);
   });

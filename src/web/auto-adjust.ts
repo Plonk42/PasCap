@@ -17,8 +17,11 @@ import type { PlacedClip, TimelineLayout } from '../shared/timeline.js';
 import { frameIlluminant, type AnalysisFrame, type IlluminantEstimate } from '../shared/white-balance.js';
 import { captureCommands, keyframeLimitReason, proxyUrl, readyClipAtPlayhead } from './auto-white-balance.js';
 
-/** Track values from the whole clip, or a keyframe at the playhead from the frames around it. */
-export type AutoAdjustMode = 'track' | 'keyframe';
+/**
+ * Track values from the whole clip or from the frames around the playhead, or a keyframe at the playhead
+ * from those frames.
+ */
+export type AutoAdjustMode = 'track' | 'playhead' | 'keyframe';
 
 export interface AutoAdjustTarget {
   mode: AutoAdjustMode;
@@ -45,17 +48,18 @@ export function autoAdjustTarget(
   const { clip, asset, reason } = readyClipAtPlayhead(layer, layout, assets, frame, preferredClipId, 'analyse it');
   if (reason !== null) return { target: null, reason };
   const { sourceIn, sourceOut } = clip.clip;
-  const prefix = [mode, clip.clip.id, asset.id, asset.prepared?.verification.verifiedAt, sourceIn, sourceOut];
+  const prefix = [clip.clip.id, asset.id, asset.prepared?.verification.verifiedAt, sourceIn, sourceOut];
   if (mode === 'track') {
     const sourceFrames = autoAdjustFrames(sourceIn, sourceOut);
-    return { target: { mode, clip, asset, key: prefix.join(':'), frame, sourceFrames }, reason: null };
+    return { target: { mode, clip, asset, key: ['clip', ...prefix].join(':'), frame, sourceFrames }, reason: null };
   }
-  const full = keyframeLimitReason(layer, frame);
+  const full = mode === 'keyframe' ? keyframeLimitReason(layer, frame) : null;
   if (full !== null) return { target: null, reason: full };
   const sourceFrames = [
     ...new Set(autoAdjustWindow(clip, frame).map((projectFrame) => clip.retiming.sourceAt(projectFrame - clip.start))),
   ];
-  const key = [...prefix, frame, sourceFrames.join(',')].join(':');
+  // Both playhead modes analyse the same frames: one analysis serves either.
+  const key = ['playhead', ...prefix, frame, sourceFrames.join(',')].join(':');
   return { target: { mode, clip, asset, key, frame, sourceFrames }, reason: null };
 }
 

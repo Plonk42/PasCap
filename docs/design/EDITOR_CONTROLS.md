@@ -85,10 +85,11 @@ and technical paths stay unchanged; this glossary does not change the project sc
   See [automatic white balance](TEMPERATURE_AND_TINT.md#automatic-white-balance).
 - **Auto adjust** is the **Auto** text button (wand icon) ending the Colour keyframe line; on its own
   row at the right when the line is narrower than 280 px. It opens a popover with an **Apply to** choice,
-  **Track values** (whole clip) or **Keyframe at playhead** (1 s around it; initial once the track animates a
+  **Track values** (whole clip), **Track values from playhead** (1 s around it) or **Keyframe at playhead**
+  (1 s around it; initial once the track animates a
   setting Auto sets), that analyses the clip at the playhead (**Analysing n/16 frames…**, **Cancel**), then
   offers **Intensity** (0–100%, initially 80%, the correction as suggested; above it exaggerates), lists
-  each animated setting Track values leaves unchanged and commits with **Apply**, one Undo step: a Colour
+  each animated setting the track values leave unchanged and commits with **Apply**, one Undo step: a Colour
   edit, or the eleven settings keyed at the playhead like their diamonds.
   The preview shows the result while the popover is open; Cancel, Escape or a click outside restore it.
   Unavailable with its reason like Auto white balance. See [Auto adjust](AUTO_ADJUST.md).
