@@ -82,7 +82,9 @@ same kernel; see [local contrast](design/DETAIL_FILTERS.md#local-contrast).
   a click seeks, a drag selects a range to cut and the handle scrubs;
   distinct Cut/Fade/Dissolve buttons open boundary transitions, not keyframes.
   While dragging a ruler range or the playhead, the preview shows each decoded frame as soon as it is
-  ready (the newest pointer position wins, never aborting an undecoded seek); the Properties panel's
+  ready, then the newest pointer position, never cancelling the frame being decoded while the pointer
+  moves; it settles on the exact frame under the pointer once it rests
+  ([scrubbing](design/WEBCODECS_PREVIEW.md#timeline-scrubbing)). The Properties panel's
   playhead values catch up whenever the pointer rests, even before release, and exactly on release.
 
 Viewer and Properties tabs use native buttons with consistent padding, borders and

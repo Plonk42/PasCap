@@ -625,6 +625,128 @@ describe('exact paused frames', () => {
   });
 });
 
+describe('scrubbing', () => {
+  /** Run the pending display callbacks once, at the current time. */
+  function displayFrame(): void {
+    const pending = [...state.raf.values()];
+    state.raf.clear();
+    pending.forEach((callback) => callback(state.now));
+  }
+  const uploads = (): number[] => compositor().uploadFrame.mock.calls.map(([, frame]) => frame.sourceFrame);
+
+  it('never cancels the frame being decoded, then draws the latest request exactly', async () => {
+    const project = singleProject();
+    const engine = await paused(project, 8);
+    state.autoDecode = false;
+    engine.scrub(20);
+    const lane = laneOf(engine, 'clip');
+    engine.scrub(26);
+    engine.scrub(27);
+    expect(engine.diagnostics()).toMatchObject({ status: 'seeking', requestedFrame: 27, frame: 8 });
+    expect(streams().starts.at(-1)).toMatchObject({ frames: [20] });
+    streams().decode(lane);
+    await settle();
+    expect(engine.diagnostics()).toMatchObject({ status: 'seeking', requestedFrame: 27, frame: 20 });
+    expectSurface(engine, project, 20);
+    // No frame on the way to 27 needs half its 13 decodes: decode it exactly.
+    expect(streams().starts.at(-1)).toMatchObject({ frames: [27] });
+    streams().decode(lane);
+    await settle();
+    expect(engine.diagnostics()).toMatchObject({ status: 'paused', requestedFrame: 27, frame: 27 });
+    expectSurface(engine, project, 27);
+    expect(uploads()).toEqual([8, 20, 27]);
+  });
+
+  it('shows a cheaper exact frame on the way while requests outpace decoding', async () => {
+    const project = singleProject();
+    const engine = await paused(project, 8);
+    state.autoDecode = false;
+    engine.scrub(20);
+    const lane = laneOf(engine, 'clip');
+    engine.scrub(52);
+    streams().decode(lane);
+    await settle();
+    // Keyframe 45 needs one decode, 52 needs eight from the same keyframe.
+    expect(streams().starts.at(-1)).toMatchObject({ frames: [45] });
+    streams().decode(lane);
+    await settle();
+    expect(engine.diagnostics()).toMatchObject({ status: 'seeking', requestedFrame: 52, frame: 45 });
+    expectSurface(engine, project, 45);
+    expect(streams().starts.at(-1)).toMatchObject({ frames: [52] });
+    streams().decode(lane);
+    await settle();
+    expect(engine.diagnostics()).toMatchObject({ status: 'paused', frame: 52 });
+    expect(uploads()).toEqual([8, 20, 45, 52]);
+  });
+
+  it('replaces an intermediate frame by the latest request once requests stop', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const project = singleProject();
+      const engine = await paused(project, 8);
+      state.autoDecode = false;
+      engine.scrub(20);
+      const lane = laneOf(engine, 'clip');
+      engine.scrub(52);
+      streams().decode(lane);
+      await settle();
+      expect(streams().starts.at(-1)).toMatchObject({ frames: [45] });
+      vi.advanceTimersByTime(100);
+      expect(streams().starts.at(-1)).toMatchObject({ frames: [52] });
+      streams().decode(lane);
+      await settle();
+      expect(engine.diagnostics()).toMatchObject({ status: 'paused', frame: 52 });
+      expect(uploads()).toEqual([8, 20, 52]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('waits for a slow presentation before choosing the next frame, then follows the latest request', async () => {
+    const project = singleProject();
+    const engine = await paused(project, 8);
+    engine.scrub(20);
+    await settle();
+    // Presenting frame 20 took 200 ms.
+    displayFrame();
+    state.now += 200;
+    displayFrame();
+    state.autoDecode = false;
+    engine.scrub(30);
+    const lane = laneOf(engine, 'clip');
+    engine.scrub(40);
+    streams().decode(lane);
+    await settle();
+    expect(engine.diagnostics()).toMatchObject({ status: 'seeking', frame: 30 });
+    expect(streams().starts.at(-1)).toMatchObject({ frames: [30] });
+    engine.scrub(44);
+    displayFrame();
+    displayFrame();
+    await settle();
+    expect(streams().starts.at(-1)).toMatchObject({ frames: [44] });
+    streams().decode(lane);
+    await settle();
+    expect(engine.diagnostics()).toMatchObject({ status: 'paused', frame: 44 });
+    expect(uploads()).toEqual([8, 20, 30, 44]);
+  });
+
+  it('gives way to an exact seek or playback', async () => {
+    const project = singleProject();
+    const engine = await paused(project, 8);
+    state.autoDecode = false;
+    engine.scrub(20);
+    const lane = laneOf(engine, 'clip');
+    engine.scrub(40);
+    const seek = engine.seek(30);
+    streams().decode(lane);
+    await seek;
+    await settle();
+    expect(engine.diagnostics()).toMatchObject({ status: 'paused', frame: 30, requestedFrame: 30 });
+    expect(uploads()).toEqual([8, 30]);
+    expect(() => engine.scrub(60)).toThrow(/outside the timeline/);
+  });
+});
+
 describe('playback on one clock', () => {
   it('prefills every active source before starting the clock, then presents each exact frame', async () => {
     const project = singleProject();
