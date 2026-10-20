@@ -39,6 +39,7 @@ fields, filenames and URLs retain their technical spelling.
 | [design/DETAIL_FILTERS.md](design/DETAIL_FILTERS.md)             | Required static clip Sharpen/Clarity/Denoise and keyable track HDR/Local contrast, shared source-tap kernel before grading, preview/native parity gates and Detail controls |
 | [design/WEBCODECS_PREVIEW.md](design/WEBCODECS_PREVIEW.md)       | WebCodecs proxy decoding in workers: proxy index contract, credit-bounded exact frames, decoder lanes, buffering and source review                                          |
 | [design/SOURCE_RELINK.md](design/SOURCE_RELINK.md)               | Verified relinking of moved video/music originals: full-content checksums, version-2 registries, ID-keyed caches and the Relink flow                                        |
+| [design/ASSISTANT_MCP.md](design/ASSISTANT_MCP.md)               | **Plan, not implemented**: hand-off of a first-pass project to an LLM through an MCP process, project selects, music analysis, native stills and the phased delivery        |
 
 Use the final approved [#67](https://github.com/Plonk42/PasCap/issues/67) contract:
 one required numeric video track `opacity`, initially 1 (100%) on new tracks, with the sole
