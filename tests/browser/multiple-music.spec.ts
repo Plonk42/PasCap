@@ -431,7 +431,7 @@ for (const { width, height } of [
       await page.mouse.wheel(0, box.height / 2);
     }
     const last = page.locator('[data-music-lane="lane-7"]');
-    const button = last.getByRole('button', { name: `Select music track 8: ${song.name}`, exact: true });
+    const button = last.getByRole('button', { name: `Move music track 8: ${song.name}`, exact: true });
     await expect(button).toBeInViewport();
     await expect.poll(() => viewport.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
     const size = await viewport.evaluate((element) => ({
@@ -490,6 +490,14 @@ for (const { width, height } of [
     await test
       .info()
       .attach(`music-lanes-${width}-selected`, { body: await page.screenshot(), contentType: 'image/png' });
+    await button.press('Delete');
+    await expect(page.locator('[data-music-lane]')).toHaveCount(7);
+    await expect(
+      page
+        .locator('[data-music-lane="lane-0"]')
+        .getByRole('button', { name: `Move music track 1: ${song.name}`, exact: true }),
+    ).toBeFocused();
+    expect((await current(page)).music).toEqual(document.music.slice(0, 7));
   });
 
 interface TailEvidence {

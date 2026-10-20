@@ -688,8 +688,10 @@ is accepted. Version-1 export receipts require a strict current-schema snapshot 
 audio-source/instance-plan arrays; older snapshots/invalid arrays are rejected
 while the receipt and finished output remain preserved. Current PCM format is unchanged.
 
-Each music track has its own backend-prepared waveform and timeline lane.
-**Audio → Music → Music track** selects the track; **Add music track** lists
+Each music track has its own backend-prepared waveform and timeline lane, holding only
+its clip: the clip shows the recording name (and **loop**), kept at the left edge while the
+clip starts off-screen. Clicking the clip, or Enter on it, selects the track, as does
+**Audio → Music → Music track**; **Add music track** lists
 ready music files and creates a track (dragging one from Media → Music onto
 the music lane does the same), and the selected-track trash action removes only that
 placement. Import never implicitly places music. Selection creates no save/history

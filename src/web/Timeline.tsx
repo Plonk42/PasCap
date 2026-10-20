@@ -61,6 +61,7 @@ import { planTimelineDrop, type DropPlan, type TimelinePayload } from './timelin
 import {
   LANE_HEIGHT,
   LANE_OFFSET,
+  MUSIC_LANE_HEIGHT,
   musicLanesTop,
   TIMELINE_RULER_HEIGHT,
   timelineLayerAt,
@@ -323,7 +324,7 @@ function timelineMusicExtent(project: ProjectDocument, gesture: MusicTimelineGes
 }
 
 function timelineMusicHeight(project: ProjectDocument): number {
-  return project.music.length ? project.music.length * 70 : 55;
+  return project.music.length ? project.music.length * MUSIC_LANE_HEIGHT : 55;
 }
 
 /** A ready music file dropped from Media becomes a new music track starting at the drop frame. */
@@ -389,7 +390,7 @@ function TimelineMusicLanes(
       key={music.id}
       className={`music-lane-wrapper music-instance-lane ${music.id === props.selectedMusicId ? 'selected' : ''}`}
       data-music-lane={music.id}
-      style={{ top: props.top + index * 70 }}
+      style={{ top: props.top + index * MUSIC_LANE_HEIGHT }}
       {...musicDrop(props)}
     >
       <MusicTimeline
@@ -865,10 +866,10 @@ export function Timeline(props: Readonly<Props>) {
       slideActive
     )
       return;
-    const top = musicTop + index * 70;
+    const top = musicTop + index * MUSIC_LANE_HEIGHT;
     if (top < element.scrollTop + TIMELINE_RULER_HEIGHT) element.scrollTop = Math.max(0, top - TIMELINE_RULER_HEIGHT);
-    else if (top + 64 > element.scrollTop + element.clientHeight)
-      element.scrollTop = Math.max(0, top + 70 - element.clientHeight);
+    else if (top + MUSIC_LANE_HEIGHT > element.scrollTop + element.clientHeight)
+      element.scrollTop = Math.max(0, top + MUSIC_LANE_HEIGHT - element.clientHeight);
     const music = project.music[index]!;
     const left = leading + music.start * scale;
     if (left < element.scrollLeft + 20) element.scrollLeft = Math.max(0, left - 32);
